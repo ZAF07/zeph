@@ -1,0 +1,31 @@
+# 08 — Knowledge
+
+Status: ready-for-agent
+
+## Parent
+
+`.scratch/mvp/PRD.md`
+
+## What to build
+
+The Companion draws on a curated Knowledge library, starting with mindfulness. Introduces the embedder port (fastembed, small local BGE model) and vector store port (pgvector).
+
+Admins upload documents (text, Markdown, PDF) with title, source/author and tradition. Each document is split into chunks, embedded and stored; its status moves pending → ready / failed. When composing a reply, the top few matching chunks are added to the prompt, and the prompt tells the Companion to use them only when they genuinely fit, without lecturing. A starter mindfulness set (public-domain texts plus the owner's summaries) is seeded from data files.
+
+## Acceptance criteria
+
+- [ ] Admins can upload text, Markdown and PDF Knowledge documents with title, source/author and tradition
+- [ ] Uploaded documents are chunked, embedded and stored; status shows pending, ready or failed
+- [ ] Admins can list and delete documents; deleting removes their chunks
+- [ ] Relevant chunks are included when composing a reply
+- [ ] A starter mindfulness Knowledge set is seeded from data files
+- [ ] The embedder and vector store are behind ports and chosen via `.env`
+- [ ] Seam 1 tests with a fake embedder cover upload → ready, failed extraction → failed, and matching chunks reaching the prompt
+- [ ] A separate contract test checks the fastembed adapter returns embeddings of the expected size
+- [ ] Seam 3 tests cover the admin Knowledge page
+- [ ] `make check` passes
+- [ ] Verified in the running app via `/run`
+
+## Blocked by
+
+- `.scratch/mvp/issues/04-admin-area-foundation.md`
