@@ -5,6 +5,7 @@ from typing import Any
 
 from companion.core.models import StoredSetting, User
 from companion.core.ports import Clock, PlatformSettingsRepository
+from companion.core.safeguard import HELPLINES_PLACEHOLDER
 
 MODEL_CHOICES_KEY = "available_models"
 
@@ -28,6 +29,10 @@ class EditableSetting:
         minimum: The smallest allowed whole number.
         maximum: The largest allowed whole number.
         max_length: The longest allowed text.
+        required_placeholder: A placeholder the text must keep, e.g.
+            "{helplines}"; None if there is none.
+        placeholder_meaning: What the placeholder stands for, as Admins are
+            told when it is missing.
     """
 
     key: str
@@ -36,6 +41,8 @@ class EditableSetting:
     minimum: int = 0
     maximum: int = 0
     max_length: int = 20_000
+    required_placeholder: str | None = None
+    placeholder_meaning: str = ""
 
 
 @dataclass(frozen=True)
@@ -59,6 +66,16 @@ class CoreService:
 
 EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     EditableSetting("persona", "Persona", SettingKind.TEXT),
+    EditableSetting("safeguard_prompt", "Safeguard prompt", SettingKind.TEXT),
+    EditableSetting("safeguard_model", "Safeguard model", SettingKind.MODEL),
+    EditableSetting(
+        "crisis_reply",
+        "Crisis Reply",
+        SettingKind.TEXT,
+        max_length=4_000,
+        required_placeholder=HELPLINES_PLACEHOLDER,
+        placeholder_meaning="where the Helplines go",
+    ),
     EditableSetting("response_prompt", "Response composition prompt", SettingKind.TEXT),
     EditableSetting("response_model", "Response composition model", SettingKind.MODEL),
     EditableSetting(
@@ -81,6 +98,16 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
 )
 
 CORE_SERVICES: tuple[CoreService, ...] = (
+    CoreService(
+        name="Safeguard",
+        runs_when="Every incoming message, first",
+        description=(
+            "Checks each message for crisis. On a crisis Zeph sends the Crisis "
+            "Reply with Helplines instead of a normal reply."
+        ),
+        prompt_key="safeguard_prompt",
+        model_key="safeguard_model",
+    ),
     CoreService(
         name="Response composition",
         runs_when="Every reply",
@@ -177,6 +204,12 @@ class PlatformSettingsService:
                 raise InvalidSettingError(
                     f"The {setting.label} must be at most "
                     f"{setting.max_length} characters."
+                )
+            placeholder = setting.required_placeholder
+            if placeholder is not None and placeholder not in value:
+                raise InvalidSettingError(
+                    f"The {setting.label} must include {placeholder}, "
+                    f"{setting.placeholder_meaning}."
                 )
             return value.strip()
         if setting.kind == SettingKind.WHOLE_NUMBER:

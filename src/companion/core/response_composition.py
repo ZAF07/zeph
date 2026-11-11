@@ -1,7 +1,12 @@
 import re
 from uuid import UUID
 
-from companion.core.models import ChatLine, ChatRole, MessageDirection
+from companion.core.models import (
+    ChatLine,
+    ChatRole,
+    ConversationMessage,
+    MessageDirection,
+)
 from companion.core.ports import ChatModel, Repositories
 
 BLANK_LINE = re.compile(r"\n\s*\n")
@@ -22,6 +27,26 @@ def split_into_messages(reply: str) -> list[str]:
     """
     parts = (part.strip() for part in BLANK_LINE.split(reply))
     return [part for part in parts if part]
+
+
+def to_chat_history(messages: list[ConversationMessage]) -> list[ChatLine]:
+    """Turn a Conversation's saved messages into history for the chat model.
+
+    Args:
+        messages: The messages, oldest first.
+
+    Returns:
+        One line per message, saying who said it.
+    """
+    return [
+        ChatLine(
+            role=ChatRole.USER
+            if message.direction == MessageDirection.INCOMING
+            else ChatRole.COMPANION,
+            text=message.content,
+        )
+        for message in messages
+    ]
 
 
 class ResponseComposer:
@@ -54,16 +79,9 @@ class ResponseComposer:
         """
         settings = self._repositories.platform_settings
         instructions = f"{settings.get('persona')}\n\n{settings.get('response_prompt')}"
-        messages = self._repositories.conversations.list_messages(conversation_id)
-        history = [
-            ChatLine(
-                role=ChatRole.USER
-                if message.direction == MessageDirection.INCOMING
-                else ChatRole.COMPANION,
-                text=message.content,
-            )
-            for message in messages
-        ]
+        history = to_chat_history(
+            self._repositories.conversations.list_messages(conversation_id)
+        )
         reply = self._chat_model.generate(
             model=settings.get("response_model"),
             instructions=instructions,

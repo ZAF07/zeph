@@ -11,6 +11,11 @@ from companion.core.models import (
     Conversation,
     ConversationMessage,
     ConversationTurn,
+    Helpline,
+    HelplineDetails,
+    RiskType,
+    SafeguardEvent,
+    SafeguardEventOverview,
     StoredSetting,
     TelegramConnection,
     User,
@@ -80,7 +85,9 @@ class ConversationEngine(Protocol):
     """Runs the steps of answering a connected User's message."""
 
     def handle(self, turn: ConversationTurn) -> None:
-        """Answer one message: save it, compose a reply and send it.
+        """Answer one message: save it, check it with the Safeguard, then reply.
+
+        On a crisis the Crisis Reply is sent and no reply is composed.
 
         Args:
             turn: The message to answer.
@@ -365,6 +372,117 @@ class PlatformSettingsRepository(Protocol):
         ...
 
 
+class HelplineRepository(Protocol):
+    """Stores Helplines per country and the one international fallback."""
+
+    def list_countries(self) -> list[Helpline]:
+        """List every country's Helplines, by country and then sort order.
+
+        Returns:
+            The Helplines, without the international fallback.
+        """
+        ...
+
+    def list_for_country(self, country: str) -> list[Helpline]:
+        """List one country's Helplines in sort order.
+
+        Args:
+            country: Two-letter country code.
+
+        Returns:
+            The Helplines; empty if the country has none.
+        """
+        ...
+
+    def get(self, helpline_id: UUID) -> Helpline | None:
+        """Find a Helpline, the international fallback included.
+
+        Args:
+            helpline_id: The Helpline's ID.
+
+        Returns:
+            The Helpline, or None if there is none.
+        """
+        ...
+
+    def get_international_fallback(self) -> Helpline:
+        """Read the international fallback.
+
+        Returns:
+            The international fallback.
+        """
+        ...
+
+    def add(self, country: str, details: HelplineDetails) -> Helpline:
+        """Save a new Helpline last in its country's list.
+
+        Args:
+            country: Two-letter country code.
+            details: Its name, number and hours.
+
+        Returns:
+            The saved Helpline.
+        """
+        ...
+
+    def update(
+        self, helpline_id: UUID, country: str | None, details: HelplineDetails
+    ) -> Helpline:
+        """Change a Helpline; one moved to another country goes last there.
+
+        Args:
+            helpline_id: The Helpline's ID.
+            country: Its country; None only for the international fallback.
+            details: Its new name, number and hours.
+
+        Returns:
+            The saved Helpline.
+        """
+        ...
+
+    def delete(self, helpline_id: UUID) -> None:
+        """Remove a Helpline.
+
+        Args:
+            helpline_id: The Helpline's ID.
+        """
+        ...
+
+    def set_sort_orders(self, sort_orders: Mapping[UUID, int]) -> None:
+        """Save new sort orders for several Helplines in one step.
+
+        Args:
+            sort_orders: The new sort order for each Helpline ID.
+        """
+        ...
+
+
+class SafeguardEventRepository(Protocol):
+    """Stores Safeguard Events."""
+
+    def add(self, event: SafeguardEvent) -> None:
+        """Save a Safeguard Event.
+
+        Args:
+            event: The event to save.
+        """
+        ...
+
+    def list_overviews(
+        self, since: datetime | None, risk_type: RiskType | None
+    ) -> list[SafeguardEventOverview]:
+        """List Safeguard Events with who the User is, newest first.
+
+        Args:
+            since: Only events at or after this time; None for all time.
+            risk_type: Only events of this risk type; None for every type.
+
+        Returns:
+            The events.
+        """
+        ...
+
+
 @dataclass(frozen=True)
 class Repositories:
     """Every repository the core needs, so adapters can be swapped as one."""
@@ -374,3 +492,5 @@ class Repositories:
     connection_tokens: ConnectionTokenRepository
     conversations: ConversationRepository
     platform_settings: PlatformSettingsRepository
+    helplines: HelplineRepository
+    safeguard_events: SafeguardEventRepository

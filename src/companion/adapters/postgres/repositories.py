@@ -1,16 +1,18 @@
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from sqlalchemy import Engine, Row, func, select, update
+from sqlalchemy import Connection, Engine, Row, delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from companion.adapters.postgres.tables import (
     connection_tokens,
     conversation_messages,
     conversations,
+    helplines,
     platform_settings,
+    safeguard_events,
     telegram_connections,
     users,
 )
@@ -18,8 +20,13 @@ from companion.core.models import (
     ConnectionToken,
     Conversation,
     ConversationMessage,
+    Helpline,
+    HelplineDetails,
     MessageDirection,
     MessageKind,
+    RiskType,
+    SafeguardEvent,
+    SafeguardEventOverview,
     StoredSetting,
     TelegramConnection,
     User,
@@ -125,6 +132,23 @@ def _to_message(row: Row[Any]) -> ConversationMessage:
         kind=MessageKind(row.kind),
         content=row.content,
         sent_at=row.sent_at,
+    )
+
+
+def _to_helpline(row: Row[Any]) -> Helpline:
+    """Turn a `helplines` row into a Helpline.
+
+    Args:
+        row: The database row.
+
+    Returns:
+        The Helpline.
+    """
+    return Helpline(
+        id=row.id,
+        country=row.country,
+        details=HelplineDetails(name=row.name, number=row.number, hours=row.hours),
+        sort_order=row.sort_order,
     )
 
 
@@ -671,6 +695,246 @@ class PostgresPlatformSettingsRepository:
                 )
 
 
+class PostgresHelplineRepository:
+    """Stores Helplines in Postgres; the international fallback has no country."""
+
+    def __init__(self, engine: Engine) -> None:
+        """Set up the repository.
+
+        Args:
+            engine: The database engine.
+        """
+        self._engine = engine
+
+    def list_countries(self) -> list[Helpline]:
+        """List every country's Helplines, by country and then sort order.
+
+        Returns:
+            The Helplines, without the international fallback.
+        """
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                select(helplines)
+                .where(helplines.c.country.is_not(None))
+                .order_by(helplines.c.country, helplines.c.sort_order)
+            ).all()
+        return [_to_helpline(row) for row in rows]
+
+    def list_for_country(self, country: str) -> list[Helpline]:
+        """List one country's Helplines in sort order.
+
+        Args:
+            country: Two-letter country code.
+
+        Returns:
+            The Helplines; empty if the country has none.
+        """
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                select(helplines)
+                .where(helplines.c.country == country)
+                .order_by(helplines.c.sort_order)
+            ).all()
+        return [_to_helpline(row) for row in rows]
+
+    def get(self, helpline_id: UUID) -> Helpline | None:
+        """Find a Helpline, the international fallback included.
+
+        Args:
+            helpline_id: The Helpline's ID.
+
+        Returns:
+            The Helpline, or None if there is none.
+        """
+        with self._engine.connect() as connection:
+            row = connection.execute(
+                select(helplines).where(helplines.c.id == helpline_id)
+            ).first()
+        return _to_helpline(row) if row else None
+
+    def get_international_fallback(self) -> Helpline:
+        """Read the international fallback.
+
+        Returns:
+            The international fallback.
+        """
+        with self._engine.connect() as connection:
+            row = connection.execute(
+                select(helplines).where(helplines.c.country.is_(None))
+            ).one()
+        return _to_helpline(row)
+
+    def add(self, country: str, details: HelplineDetails) -> Helpline:
+        """Save a new Helpline last in its country's list.
+
+        Args:
+            country: Two-letter country code.
+            details: Its name, number and hours.
+
+        Returns:
+            The saved Helpline.
+        """
+        with self._engine.begin() as connection:
+            row = connection.execute(
+                insert(helplines)
+                .values(
+                    id=uuid4(),
+                    country=country,
+                    name=details.name,
+                    number=details.number,
+                    hours=details.hours,
+                    sort_order=self._next_sort_order(connection, country),
+                )
+                .returning(helplines)
+            ).one()
+        return _to_helpline(row)
+
+    def update(
+        self, helpline_id: UUID, country: str | None, details: HelplineDetails
+    ) -> Helpline:
+        """Change a Helpline; one moved to another country goes last there.
+
+        Args:
+            helpline_id: The Helpline's ID.
+            country: Its country; None only for the international fallback.
+            details: Its new name, number and hours.
+
+        Returns:
+            The saved Helpline.
+        """
+        with self._engine.begin() as connection:
+            current_country = connection.execute(
+                select(helplines.c.country).where(helplines.c.id == helpline_id)
+            ).scalar_one()
+            values: dict[str, Any] = {
+                "country": country,
+                "name": details.name,
+                "number": details.number,
+                "hours": details.hours,
+            }
+            if country is not None and country != current_country:
+                values["sort_order"] = self._next_sort_order(connection, country)
+            row = connection.execute(
+                update(helplines)
+                .where(helplines.c.id == helpline_id)
+                .values(**values)
+                .returning(helplines)
+            ).one()
+        return _to_helpline(row)
+
+    def delete(self, helpline_id: UUID) -> None:
+        """Remove a Helpline.
+
+        Args:
+            helpline_id: The Helpline's ID.
+        """
+        with self._engine.begin() as connection:
+            connection.execute(delete(helplines).where(helplines.c.id == helpline_id))
+
+    def set_sort_orders(self, sort_orders: Mapping[UUID, int]) -> None:
+        """Save new sort orders for several Helplines in one step.
+
+        Args:
+            sort_orders: The new sort order for each Helpline ID.
+        """
+        with self._engine.begin() as connection:
+            for helpline_id, sort_order in sort_orders.items():
+                connection.execute(
+                    update(helplines)
+                    .where(helplines.c.id == helpline_id)
+                    .values(sort_order=sort_order)
+                )
+
+    @staticmethod
+    def _next_sort_order(connection: Connection, country: str) -> int:
+        """Work out the sort order that puts a Helpline last in its country.
+
+        Args:
+            connection: The open database connection.
+            country: Two-letter country code.
+
+        Returns:
+            One more than the country's highest sort order, or 0.
+        """
+        highest = connection.execute(
+            select(func.max(helplines.c.sort_order)).where(
+                helplines.c.country == country
+            )
+        ).scalar()
+        return 0 if highest is None else int(highest) + 1
+
+
+class PostgresSafeguardEventRepository:
+    """Stores Safeguard Events in Postgres. There is no column for message text."""
+
+    def __init__(self, engine: Engine) -> None:
+        """Set up the repository.
+
+        Args:
+            engine: The database engine.
+        """
+        self._engine = engine
+
+    def add(self, event: SafeguardEvent) -> None:
+        """Save a Safeguard Event.
+
+        Args:
+            event: The event to save.
+        """
+        with self._engine.begin() as connection:
+            connection.execute(
+                insert(safeguard_events).values(
+                    id=event.id,
+                    user_id=event.user_id,
+                    risk_type=event.risk_type.value,
+                    created_at=event.created_at,
+                    helplines_country=event.helplines_country,
+                )
+            )
+
+    def list_overviews(
+        self, since: datetime | None, risk_type: RiskType | None
+    ) -> list[SafeguardEventOverview]:
+        """List Safeguard Events with who the User is, newest first.
+
+        Args:
+            since: Only events at or after this time; None for all time.
+            risk_type: Only events of this risk type; None for every type.
+
+        Returns:
+            The events.
+        """
+        statement = (
+            select(
+                safeguard_events,
+                users.c.name.label("user_name"),
+                users.c.email.label("user_email"),
+            )
+            .select_from(safeguard_events.join(users))
+            .order_by(safeguard_events.c.created_at.desc())
+        )
+        if since is not None:
+            statement = statement.where(safeguard_events.c.created_at >= since)
+        if risk_type is not None:
+            statement = statement.where(safeguard_events.c.risk_type == risk_type.value)
+        with self._engine.connect() as connection:
+            rows = connection.execute(statement).all()
+        return [
+            SafeguardEventOverview(
+                event=SafeguardEvent(
+                    id=row.id,
+                    user_id=row.user_id,
+                    risk_type=RiskType(row.risk_type),
+                    created_at=row.created_at,
+                    helplines_country=row.helplines_country,
+                ),
+                user_name=row.user_name,
+                user_email=row.user_email,
+            )
+            for row in rows
+        ]
+
+
 def build_postgres_repositories(engine: Engine) -> Repositories:
     """Build every repository on one Postgres engine.
 
@@ -686,4 +950,6 @@ def build_postgres_repositories(engine: Engine) -> Repositories:
         connection_tokens=PostgresConnectionTokenRepository(engine),
         conversations=PostgresConversationRepository(engine),
         platform_settings=PostgresPlatformSettingsRepository(engine),
+        helplines=PostgresHelplineRepository(engine),
+        safeguard_events=PostgresSafeguardEventRepository(engine),
     )

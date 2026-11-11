@@ -271,6 +271,16 @@ export function countryOptions(): CountryOption[] {
 }
 
 /**
+ * Gives a country's English name.
+ *
+ * @param code - The two-letter country code, e.g. "SG".
+ * @returns The name, e.g. "Singapore", or the code if it has no name.
+ */
+export function countryName(code: string): string {
+  return new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code;
+}
+
+/**
  * Guesses the User's country from the browser's language setting.
  *
  * @param languages - The browser's preferred languages, e.g. ["en-SG"].

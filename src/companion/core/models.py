@@ -306,3 +306,80 @@ class StoredSetting:
     value: Any
     updated_at: datetime
     updated_by_name: str | None
+
+
+class RiskType(StrEnum):
+    """What kind of crisis the Safeguard sees in a message, if any."""
+
+    NONE = "none"
+    SUICIDE_OR_SELF_HARM = "suicide_or_self_harm"
+    DANGER_TO_OTHERS = "danger_to_others"
+    ABUSE = "abuse"
+    MEDICAL_EMERGENCY = "medical_emergency"
+
+
+@dataclass(frozen=True)
+class HelplineDetails:
+    """What an Admin enters for a Helpline.
+
+    Attributes:
+        name: The Helpline's name, e.g. "Samaritans of Singapore (SOS)".
+        number: The phone number, or a web address for a directory.
+        hours: When it is open, e.g. "24 hours", if known.
+    """
+
+    name: str
+    number: str
+    hours: str | None
+
+
+@dataclass(frozen=True)
+class Helpline:
+    """A crisis support contact shared in the Crisis Reply.
+
+    Attributes:
+        id: Our ID for the Helpline.
+        country: Two-letter country code; None for the international fallback.
+        details: Its name, number and hours.
+        sort_order: Where it comes in its country's list, lowest first.
+    """
+
+    id: UUID
+    country: str | None
+    details: HelplineDetails
+    sort_order: int
+
+
+@dataclass(frozen=True)
+class SafeguardEvent:
+    """A record that the Safeguard detected a crisis. Never holds message text.
+
+    Attributes:
+        id: Our ID for the event.
+        user_id: The User it happened for.
+        risk_type: What kind of crisis it was.
+        created_at: When it happened.
+        helplines_country: The country whose Helplines were shared; None if
+            the international fallback was shared instead.
+    """
+
+    id: UUID
+    user_id: UUID
+    risk_type: RiskType
+    created_at: datetime
+    helplines_country: str | None
+
+
+@dataclass(frozen=True)
+class SafeguardEventOverview:
+    """A Safeguard Event as Admins see it, with who the User is.
+
+    Attributes:
+        event: The event.
+        user_name: The User's name, if they have given one.
+        user_email: The User's email, if known.
+    """
+
+    event: SafeguardEvent
+    user_name: str | None
+    user_email: str | None

@@ -15,7 +15,11 @@ from companion.adapters.langgraph.conversation_engine import (
     LangGraphConversationEngine,
     build_postgres_checkpointer,
 )
-from companion.adapters.postgres.database import migrate, seed_platform_settings
+from companion.adapters.postgres.database import (
+    migrate,
+    seed_helplines,
+    seed_platform_settings,
+)
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.app import AppDependencies, create_app
 from companion.core.conversations import ConversationServices
@@ -32,7 +36,9 @@ DASHBOARD_URL = "http://dashboard.test"
 INITIAL_ADMIN_EMAIL = "owner@example.com"
 os.environ.setdefault("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/var/run/docker.sock")
 
-SEED_FILE = Path(__file__).parent.parent / "src/companion/seed/platform_settings.yaml"
+SEED_DIR = Path(__file__).parent.parent / "src/companion/seed"
+SEED_FILE = SEED_DIR / "platform_settings.yaml"
+HELPLINES_SEED_FILE = SEED_DIR / "helplines.yaml"
 
 
 @pytest.fixture(scope="session")
@@ -58,10 +64,12 @@ def engine(database_url: str) -> Iterator[Engine]:
         connection.execute(
             text(
                 "TRUNCATE users, telegram_connections, connection_tokens, "
-                "conversations, conversation_messages, platform_settings CASCADE"
+                "conversations, conversation_messages, platform_settings, "
+                "helplines, safeguard_events CASCADE"
             )
         )
     seed_platform_settings(engine, SEED_FILE)
+    seed_helplines(engine, HELPLINES_SEED_FILE)
     yield engine
     engine.dispose()
 
@@ -85,9 +93,9 @@ def auth_verifier() -> FakeAuthVerifier:
 
 
 @pytest.fixture
-def chat_model() -> ScriptedChatModel:
-    """A chat model that returns scripted replies."""
-    return ScriptedChatModel()
+def chat_model(seeded_settings: dict[str, Any]) -> ScriptedChatModel:
+    """A chat model that returns scripted replies and Safeguard answers."""
+    return ScriptedChatModel(safeguard_prompt=seeded_settings["safeguard_prompt"])
 
 
 @pytest.fixture

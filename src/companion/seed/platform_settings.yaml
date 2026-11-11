@@ -124,3 +124,48 @@ response_prompt: |-
     never more than four.
   - Write only the texts themselves: no names, labels, quotes or notes around
     them.
+
+# The model the Safeguard uses to check each incoming message for crisis.
+safeguard_model: deepseek-chat
+
+# How the Safeguard classifies each incoming message. The answer must be
+# exactly one of the labels below.
+safeguard_prompt: |-
+  You are the Safeguard for Zeph, an AI companion people talk to on Telegram.
+  You are given a transcript of a conversation between a person and the
+  Companion. Decide whether the person's latest message shows signs of a
+  crisis. Use the earlier messages as context: a short message can be a crisis
+  because of what came before it.
+
+  You only classify. Never reply to the person, give advice or list helplines,
+  even if the transcript is upsetting.
+
+  Answer with exactly one label and nothing else:
+  - suicide_or_self_harm: they talk about wanting to die, ending their life,
+    killing themselves or hurting themselves, now or as a plan, even if said
+    quietly, indirectly or as a "joke" that doesn't read like one.
+  - danger_to_others: they talk about seriously hurting or killing someone
+    else, or someone else being in immediate danger.
+  - abuse: they are being hurt, threatened, controlled or exploited by someone
+    (physical, sexual or emotional abuse, domestic violence), or a child is.
+  - medical_emergency: signs of a medical emergency happening now, such as
+    chest pain, trouble breathing, an overdose, poisoning, a stroke or heavy
+    bleeding.
+  - none: anything else.
+
+  Everyday stress or sadness is not a crisis. A bad day, feeling low, tired,
+  lonely, anxious, angry, heartbroken, grieving or overwhelmed is "none" unless
+  there is also a sign of one of the crises above. Figures of speech like "this
+  deadline is killing me" or "I could murder a pizza" are "none". Talking about
+  a crisis in a book, film, the news or the past, with no risk now, is "none".
+
+  When a message could be a real crisis and you are unsure, choose the crisis
+  label: missing a crisis is worse than a false alarm.
+
+# Sent instead of a normal reply when the Safeguard detects a crisis.
+# `{helplines}` is replaced with the User's country Helplines, one per line,
+# or with the international fallback when their country has none.
+crisis_reply: |-
+  I’m really glad you told me. I’m an AI, so I can’t keep you safe the way a person can — but people are ready to help right now:
+  {helplines}
+  If you’re in immediate danger, please call your local emergency number. I’m still here to keep talking while you reach out.

@@ -114,6 +114,56 @@ export type CoreServices = {
   model_choices: string[];
 };
 
+/** A crisis support contact; the international fallback has no country. */
+export type Helpline = {
+  id: string;
+  country: string | null;
+  name: string;
+  number: string;
+  hours: string | null;
+  sort_order: number;
+};
+
+/** A Helpline's name, number and hours, as an Admin enters them. */
+export type HelplineDetails = {
+  name: string;
+  number: string;
+  hours: string | null;
+};
+
+/** A country Helpline as an Admin enters it. */
+export type HelplineInput = HelplineDetails & { country: string };
+
+/** Every country's Helplines, by country and order, and the fallback. */
+export type Helplines = {
+  helplines: Helpline[];
+  international_fallback: Helpline;
+};
+
+/** Which way to move a Helpline in its country's list. */
+export type MoveDirection = "up" | "down";
+
+/** The kinds of crisis the Safeguard detects. */
+export type RiskType =
+  "suicide_or_self_harm" | "danger_to_others" | "abuse" | "medical_emergency";
+
+/** A Safeguard Event: who, when and what kind of risk. Never message text. */
+export type SafeguardEvent = {
+  id: string;
+  user_id: string;
+  user_name: string | null;
+  user_email: string | null;
+  risk_type: RiskType;
+  created_at: string;
+  helplines_country: string | null;
+};
+
+/** Which Safeguard Events to list; a field left out means no limit. */
+export type SafeguardEventFilter = {
+  riskType?: RiskType;
+  days?: number;
+};
+
 /** Every call the Dashboard makes to the backend. */
 export type ApiClient = {
   getMe: () => Promise<Me>;
@@ -129,6 +179,15 @@ export type ApiClient = {
     values: Record<string, SettingValue>,
   ) => Promise<AdminSettings>;
   getCoreServices: () => Promise<CoreServices>;
+  listHelplines: () => Promise<Helplines>;
+  addHelpline: (helpline: HelplineInput) => Promise<Helpline>;
+  updateHelpline: (id: string, helpline: HelplineInput) => Promise<Helpline>;
+  deleteHelpline: (id: string) => Promise<void>;
+  moveHelpline: (id: string, direction: MoveDirection) => Promise<Helpline[]>;
+  updateInternationalFallback: (details: HelplineDetails) => Promise<Helpline>;
+  listSafeguardEvents: (
+    filter: SafeguardEventFilter,
+  ) => Promise<SafeguardEvent[]>;
 };
 
 /** Raised when the backend answers with an error status. */
@@ -202,6 +261,9 @@ export function createApiClient(
     if (!response.ok) {
       throw new ApiError(response.status, path, await errorDetail(response));
     }
+    if (response.status === 204) {
+      return undefined as T;
+    }
     return (await response.json()) as T;
   }
 
@@ -231,5 +293,41 @@ export function createApiClient(
         )
       ).settings,
     getCoreServices: () => request<CoreServices>("/api/admin/core-services"),
+    listHelplines: () => request<Helplines>("/api/admin/helplines"),
+    addHelpline: (helpline) =>
+      request<Helpline>("/api/admin/helplines", "POST", helpline),
+    updateHelpline: (id, helpline) =>
+      request<Helpline>(`/api/admin/helplines/${id}`, "PUT", helpline),
+    deleteHelpline: (id) =>
+      request<void>(`/api/admin/helplines/${id}`, "DELETE"),
+    moveHelpline: async (id, direction) =>
+      (
+        await request<{ helplines: Helpline[] }>(
+          `/api/admin/helplines/${id}/move`,
+          "POST",
+          { direction },
+        )
+      ).helplines,
+    updateInternationalFallback: (details) =>
+      request<Helpline>(
+        "/api/admin/helplines/international-fallback",
+        "PUT",
+        details,
+      ),
+    listSafeguardEvents: async (filter) => {
+      const query = new URLSearchParams();
+      if (filter.riskType) {
+        query.set("risk_type", filter.riskType);
+      }
+      if (filter.days) {
+        query.set("days", String(filter.days));
+      }
+      const search = query.size > 0 ? `?${query.toString()}` : "";
+      return (
+        await request<{ events: SafeguardEvent[] }>(
+          `/api/admin/safeguard-events${search}`,
+        )
+      ).events;
+    },
   };
 }

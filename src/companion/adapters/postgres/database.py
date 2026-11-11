@@ -1,13 +1,14 @@
 from datetime import UTC, datetime
 from pathlib import Path
+from uuid import uuid4
 
 import yaml
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import Engine
+from sqlalchemy import Engine, exists, select
 from sqlalchemy.dialects.postgresql import insert
 
-from companion.adapters.postgres.tables import platform_settings
+from companion.adapters.postgres.tables import helplines, platform_settings
 
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
@@ -44,3 +45,44 @@ def seed_platform_settings(engine: Engine, seed_file: Path) -> None:
         connection.execute(
             insert(platform_settings).values(rows).on_conflict_do_nothing()
         )
+
+
+def seed_helplines(engine: Engine, seed_file: Path) -> None:
+    """Load the seed Helplines and international fallback on first run.
+
+    Nothing is loaded once any Helpline exists, so a Helpline an Admin removed
+    never comes back.
+
+    Args:
+        engine: The database engine.
+        seed_file: YAML file with `countries` (country code to a list of
+            Helplines) and one `international_fallback`.
+    """
+    seed = yaml.safe_load(seed_file.read_text())
+    fallback = seed["international_fallback"]
+    rows = [
+        {
+            "id": uuid4(),
+            "country": None,
+            "name": fallback["name"],
+            "number": str(fallback["number"]),
+            "hours": fallback.get("hours"),
+            "sort_order": 0,
+        }
+    ]
+    for country, country_helplines in seed["countries"].items():
+        rows.extend(
+            {
+                "id": uuid4(),
+                "country": country,
+                "name": helpline["name"],
+                "number": str(helpline["number"]),
+                "hours": helpline.get("hours"),
+                "sort_order": sort_order,
+            }
+            for sort_order, helpline in enumerate(country_helplines)
+        )
+    with engine.begin() as connection:
+        if connection.execute(select(exists().select_from(helplines))).scalar():
+            return
+        connection.execute(insert(helplines).values(rows))

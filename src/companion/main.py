@@ -25,7 +25,9 @@ from companion.core.ports import (
     Repositories,
 )
 
-SEED_FILE = Path(__file__).parent / "seed" / "platform_settings.yaml"
+SEED_DIR = Path(__file__).parent / "seed"
+SEED_FILE = SEED_DIR / "platform_settings.yaml"
+HELPLINES_SEED_FILE = SEED_DIR / "helplines.yaml"
 
 
 class UnknownAdapterError(Exception):

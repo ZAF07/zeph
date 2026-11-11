@@ -1,3 +1,4 @@
+import re
 from datetime import timedelta
 from typing import Any
 
@@ -176,9 +177,10 @@ def test_core_services_list_their_prompt_and_model_settings(
     response = client.get("/api/admin/core-services", headers=headers).json()
 
     assert [service["name"] for service in response["services"]] == [
-        "Response composition"
+        "Safeguard",
+        "Response composition",
     ]
-    [service] = response["services"]
+    service = response["services"][1]
     assert service["prompt_key"] == "response_prompt"
     assert service["model_key"] == "response_model"
     assert response["model_choices"] == ["deepseek-chat", "deepseek-reasoner"]
@@ -198,8 +200,8 @@ def test_every_admin_endpoint_refuses_users_who_are_not_admins(
 
     assert len(admin_routes) >= 5
     for method, path in admin_routes:
-        concrete_path = path.replace(
-            "{user_id}", "00000000-0000-0000-0000-000000000000"
+        concrete_path = re.sub(
+            r"\{[^}]+\}", "00000000-0000-0000-0000-000000000000", path
         )
         response = client.request(method, concrete_path, headers=maya, json={})
         assert response.status_code == 403, (method, path)
