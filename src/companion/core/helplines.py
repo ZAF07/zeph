@@ -1,7 +1,7 @@
 from enum import StrEnum
 from uuid import UUID
 
-from companion.core.models import Helpline, HelplineDetails
+from companion.core.models import Helpline, HelplineDetails, HelplinesToShare
 from companion.core.ports import HelplineRepository
 from companion.core.users import InvalidProfileError, check_country
 
@@ -87,6 +87,23 @@ class HelplineService:
             The Helplines, without the international fallback.
         """
         return self._helplines.list_countries()
+
+    def to_share_with(self, country: str | None) -> HelplinesToShare:
+        """Pick the Helplines to share with a User in crisis.
+
+        Args:
+            country: The User's two-letter country code, if they have set one.
+
+        Returns:
+            Their country's Helplines, or the international fallback when
+            their country has none.
+        """
+        country_helplines = self._helplines.list_for_country(country) if country else []
+        if country_helplines:
+            return HelplinesToShare(helplines=country_helplines, country=country)
+        return HelplinesToShare(
+            helplines=[self._helplines.get_international_fallback()], country=None
+        )
 
     def international_fallback(self) -> Helpline:
         """Read the international fallback.

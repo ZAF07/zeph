@@ -1,7 +1,9 @@
+import logging
 import re
 from datetime import timedelta
 from uuid import UUID, uuid4
 
+from companion.core.helplines import HelplineService
 from companion.core.models import (
     ChatLine,
     ChatRole,
@@ -13,31 +15,43 @@ from companion.core.models import (
 from companion.core.ports import ChatModel, Clock, Repositories
 from companion.core.response_composition import to_chat_history
 
+logger = logging.getLogger(__name__)
+
 HELPLINES_PLACEHOLDER = "{helplines}"
 WORD = re.compile(r"[a-z_]+")
-CRISIS_RISK_TYPES = frozenset(RiskType) - {RiskType.NONE}
+CRISIS_LABELS = frozenset(
+    {
+        RiskType.SUICIDE_OR_SELF_HARM,
+        RiskType.DANGER_TO_OTHERS,
+        RiskType.ABUSE,
+        RiskType.MEDICAL_EMERGENCY,
+    }
+)
 
 
 class InvalidEventFilterError(ValueError):
     """Raised when Safeguard Events are filtered by something that isn't a crisis."""
 
 
-def read_risk_type(answer: str) -> RiskType:
+def read_risk_type(answer: str) -> RiskType | None:
     """Read the risk type from the Safeguard model's answer.
 
     The first crisis label in the answer wins, whatever its case or the words
-    around it. An answer with no crisis label counts as no crisis.
+    around it. Otherwise "none" means no crisis.
 
     Args:
         answer: The model's answer, ideally just one label.
 
     Returns:
-        The risk type.
+        The risk type, or None if the answer has no label at all.
     """
-    for word in WORD.findall(answer.lower()):
-        if word in CRISIS_RISK_TYPES:
+    words = WORD.findall(answer.lower())
+    for word in words:
+        if word in CRISIS_LABELS:
             return RiskType(word)
-    return RiskType.NONE
+    if RiskType.NONE.value in words:
+        return RiskType.NONE
+    return None
 
 
 def speaker_name(line: ChatLine) -> str:
@@ -97,17 +111,23 @@ class Safeguard:
     """Checks every incoming message for crisis and answers a crisis safely."""
 
     def __init__(
-        self, repositories: Repositories, chat_model: ChatModel, clock: Clock
+        self,
+        repositories: Repositories,
+        helplines: HelplineService,
+        chat_model: ChatModel,
+        clock: Clock,
     ) -> None:
         """Set up the Safeguard.
 
         Args:
-            repositories: Where Conversations, Users, Helplines, Safeguard
-                Events and settings are stored.
+            repositories: Where Conversations, Users, Safeguard Events and
+                settings are stored.
+            helplines: Picks the Helplines to share in the Crisis Reply.
             chat_model: Classifies messages.
             clock: Tells the current time.
         """
         self._repositories = repositories
+        self._helplines = helplines
         self._chat_model = chat_model
         self._clock = clock
 
@@ -116,7 +136,8 @@ class Safeguard:
 
         The model sees the whole Conversation as one transcript, so a message
         that is only worrying in context is still caught. Uses the Safeguard
-        prompt and model from platform settings.
+        prompt and model from platform settings. An answer with no label is
+        asked again once; if it still has none, it counts as a crisis.
 
         Args:
             conversation_id: The Conversation the message was added to.
@@ -128,12 +149,18 @@ class Safeguard:
         history = to_chat_history(
             self._repositories.conversations.list_messages(conversation_id)
         )
-        answer = self._chat_model.generate(
-            model=settings.get("safeguard_model"),
-            instructions=settings.get("safeguard_prompt"),
-            history=[ChatLine(role=ChatRole.USER, text=to_transcript(history))],
-        )
-        return read_risk_type(answer)
+        transcript = [ChatLine(role=ChatRole.USER, text=to_transcript(history))]
+        for _ in range(2):
+            answer = self._chat_model.generate(
+                model=settings.get("safeguard_model"),
+                instructions=settings.get("safeguard_prompt"),
+                history=transcript,
+            )
+            risk_type = read_risk_type(answer)
+            if risk_type is not None:
+                return risk_type
+        logger.warning("The Safeguard model gave no label twice; treating as crisis")
+        return RiskType.UNCLEAR
 
     def respond_to_crisis(self, user_id: UUID, risk_type: RiskType) -> str:
         """Write the Crisis Reply and record a Safeguard Event.
@@ -151,24 +178,20 @@ class Safeguard:
             The Crisis Reply.
         """
         user = self._repositories.users.get(user_id)
-        country = user.country if user is not None else None
-        helplines = (
-            self._repositories.helplines.list_for_country(country) if country else []
-        )
-        helplines_country = country if helplines else None
-        if not helplines:
-            helplines = [self._repositories.helplines.get_international_fallback()]
+        to_share = self._helplines.to_share_with(user.country if user else None)
         self._repositories.safeguard_events.add(
             SafeguardEvent(
                 id=uuid4(),
                 user_id=user_id,
                 risk_type=risk_type,
                 created_at=self._clock.now(),
-                helplines_country=helplines_country,
+                helplines_country=to_share.country,
             )
         )
         wording: str = self._repositories.platform_settings.get("crisis_reply")
-        return wording.replace(HELPLINES_PLACEHOLDER, format_helplines(helplines))
+        return wording.replace(
+            HELPLINES_PLACEHOLDER, format_helplines(to_share.helplines)
+        )
 
     def list_events(
         self, days: int | None, risk_type: RiskType | None

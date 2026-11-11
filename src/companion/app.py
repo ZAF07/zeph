@@ -83,8 +83,10 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         clock=dependencies.clock,
         dashboard_url=dependencies.dashboard_url,
     )
+    helpline_service = HelplineService(dependencies.repositories.helplines)
     safeguard = Safeguard(
         repositories=dependencies.repositories,
+        helplines=helpline_service,
         chat_model=dependencies.chat_model,
         clock=dependencies.clock,
     )
@@ -136,7 +138,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             platform_settings_service=PlatformSettingsService(
                 dependencies.repositories.platform_settings, dependencies.clock
             ),
-            helpline_service=HelplineService(dependencies.repositories.helplines),
+            helpline_service=helpline_service,
             safeguard=safeguard,
         )
     )

@@ -234,19 +234,41 @@ def test_the_safeguard_answer_is_read_loosely(
     assert event["risk_type"] == risk_type
 
 
-def test_an_unclear_safeguard_answer_is_treated_as_no_crisis(
+def test_an_answer_without_a_label_is_asked_again(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
     chat_model: ScriptedChatModel,
 ) -> None:
     connect_user_in(client, auth_verifier, chat_channel, "SG")
-    chat_model.script_safeguard("I'm not sure")
+    chat_model.script_safeguard("I'm so sorry you're going through this.", "none")
     chat_model.script("hey")
 
     send_to_webhook(client, telegram_text_update("hi"))
 
+    assert len(chat_model.safeguard_calls) == 2
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["hey"]
+
+
+def test_two_answers_without_a_label_are_treated_as_a_crisis(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    use_simple_crisis_reply(client, admin)
+    connect_user_in(client, auth_verifier, chat_channel, "SG")
+    chat_model.script_safeguard("Please reach out to someone.", "I'm not sure")
+
+    send_to_webhook(client, telegram_text_update("i can't do this anymore"))
+
+    assert chat_model.calls == []
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
+        f"I'm an AI. Please reach out:\n{SINGAPORE_HELPLINES}"
+    ]
+    [event] = client.get("/api/admin/safeguard-events", headers=admin).json()["events"]
+    assert event["risk_type"] == "unclear"
 
 
 def test_the_crisis_reply_is_part_of_the_conversation_that_follows(

@@ -309,13 +309,18 @@ class StoredSetting:
 
 
 class RiskType(StrEnum):
-    """What kind of crisis the Safeguard sees in a message, if any."""
+    """What kind of crisis the Safeguard sees in a message, if any.
+
+    `UNCLEAR` means the model twice gave no label; it is treated as a crisis,
+    because missing a real one is worse than a false alarm.
+    """
 
     NONE = "none"
     SUICIDE_OR_SELF_HARM = "suicide_or_self_harm"
     DANGER_TO_OTHERS = "danger_to_others"
     ABUSE = "abuse"
     MEDICAL_EMERGENCY = "medical_emergency"
+    UNCLEAR = "unclear"
 
 
 @dataclass(frozen=True)
@@ -348,6 +353,20 @@ class Helpline:
     country: str | None
     details: HelplineDetails
     sort_order: int
+
+
+@dataclass(frozen=True)
+class HelplinesToShare:
+    """The Helplines a Crisis Reply shares with one User.
+
+    Attributes:
+        helplines: The Helplines, in order.
+        country: The country they are for; None when they are the
+            international fallback.
+    """
+
+    helplines: list[Helpline]
+    country: str | None
 
 
 @dataclass(frozen=True)

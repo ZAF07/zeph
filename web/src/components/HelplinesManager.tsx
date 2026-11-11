@@ -7,6 +7,7 @@ import { inputField } from "@/components/form-styles";
 import { HelplineForm } from "@/components/HelplineForm";
 import { LoadFailed } from "@/components/LoadFailed";
 import type {
+  ApiClient,
   Helpline,
   HelplineInput,
   Helplines,
@@ -24,6 +25,16 @@ type Editing =
   { kind: "add" } | { kind: "edit"; helpline: Helpline } | { kind: "fallback" };
 
 type Flash = { text: string; isError: boolean };
+
+/** What the Helpline form shows and does for one kind of edit. */
+type FormSetup = {
+  key: string;
+  title: string;
+  initial: HelplineInput;
+  withCountry: boolean;
+  submitLabel: string;
+  save: (input: HelplineInput) => Promise<string>;
+};
 
 const headings = ["Country", "Name", "Number", "Hours", "Order"];
 
@@ -56,6 +67,82 @@ function placeInCountry(
 }
 
 /**
+ * Describes the Helpline form for adding a Helpline, editing one, or editing
+ * the international fallback.
+ *
+ * @param editing - What is being edited.
+ * @param countryFilter - The chosen country filter; a new Helpline starts in
+ *   that country.
+ * @param fallback - The international fallback.
+ * @param apiClient - Saves the form.
+ * @returns The form's title, starting values and labels, and `save`, which
+ *   saves and returns the message to show.
+ */
+function formSetup(
+  editing: Editing,
+  countryFilter: string,
+  fallback: Helpline,
+  apiClient: Pick<
+    ApiClient,
+    "addHelpline" | "updateHelpline" | "updateInternationalFallback"
+  >,
+): FormSetup {
+  if (editing.kind === "add") {
+    return {
+      key: "add",
+      title: "Add Helpline",
+      initial: {
+        country: countryFilter === "all" ? "" : countryFilter,
+        name: "",
+        number: "",
+        hours: null,
+      },
+      withCountry: true,
+      submitLabel: "Add Helpline",
+      save: async (input) => {
+        await apiClient.addHelpline(input);
+        return `Added ${input.name}.`;
+      },
+    };
+  }
+  if (editing.kind === "edit") {
+    const { helpline } = editing;
+    return {
+      key: helpline.id,
+      title: `Edit ${helpline.name}`,
+      initial: {
+        country: helpline.country ?? "",
+        name: helpline.name,
+        number: helpline.number,
+        hours: helpline.hours,
+      },
+      withCountry: true,
+      submitLabel: "Save",
+      save: async (input) => {
+        await apiClient.updateHelpline(helpline.id, input);
+        return `Saved ${input.name}.`;
+      },
+    };
+  }
+  return {
+    key: "fallback",
+    title: "Edit international fallback",
+    initial: {
+      country: "",
+      name: fallback.name,
+      number: fallback.number,
+      hours: fallback.hours,
+    },
+    withCountry: false,
+    submitLabel: "Save",
+    save: async ({ name, number, hours }) => {
+      await apiClient.updateInternationalFallback({ name, number, hours });
+      return "Saved the international fallback.";
+    },
+  };
+}
+
+/**
  * The Safety page's Helplines section: every country's Helplines, with the
  * international fallback always last. Admins add, edit, reorder and remove
  * Helplines, and edit (but never remove) the fallback.
@@ -81,25 +168,6 @@ export function HelplinesManager() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  async function saveForm(input: HelplineInput) {
-    if (editing?.kind === "add") {
-      await apiClient.addHelpline(input);
-      setFlash({ text: `Added ${input.name}.`, isError: false });
-    } else if (editing?.kind === "edit") {
-      await apiClient.updateHelpline(editing.helpline.id, input);
-      setFlash({ text: `Saved ${input.name}.`, isError: false });
-    } else {
-      await apiClient.updateInternationalFallback({
-        name: input.name,
-        number: input.number,
-        hours: input.hours,
-      });
-      setFlash({ text: "Saved the international fallback.", isError: false });
-    }
-    setEditing(null);
-    await load();
-  }
 
   async function runRowAction(
     helpline: Helpline,
@@ -167,6 +235,9 @@ export function HelplinesManager() {
   const countriesWithHelplines = [
     ...new Set(helplines.map((helpline) => helpline.country ?? "")),
   ];
+  const form = editing
+    ? formSetup(editing, countryFilter, fallback, apiClient)
+    : null;
   const shownHelplines = helplines.filter(
     (helpline) => countryFilter === "all" || helpline.country === countryFilter,
   );
@@ -223,41 +294,19 @@ export function HelplinesManager() {
         </p>
       ) : null}
 
-      {editing ? (
+      {form ? (
         <HelplineForm
-          key={editing.kind === "edit" ? editing.helpline.id : editing.kind}
-          title={
-            editing.kind === "add"
-              ? "Add Helpline"
-              : editing.kind === "edit"
-                ? `Edit ${editing.helpline.name}`
-                : "Edit international fallback"
-          }
-          initial={
-            editing.kind === "add"
-              ? {
-                  country: countryFilter === "all" ? "" : countryFilter,
-                  name: "",
-                  number: "",
-                  hours: null,
-                }
-              : editing.kind === "edit"
-                ? {
-                    country: editing.helpline.country ?? "",
-                    name: editing.helpline.name,
-                    number: editing.helpline.number,
-                    hours: editing.helpline.hours,
-                  }
-                : {
-                    country: "",
-                    name: fallback.name,
-                    number: fallback.number,
-                    hours: fallback.hours,
-                  }
-          }
-          withCountry={editing.kind !== "fallback"}
-          submitLabel={editing.kind === "add" ? "Add Helpline" : "Save"}
-          onSubmit={saveForm}
+          key={form.key}
+          title={form.title}
+          initial={form.initial}
+          withCountry={form.withCountry}
+          submitLabel={form.submitLabel}
+          onSubmit={async (input) => {
+            const message = await form.save(input);
+            setFlash({ text: message, isError: false });
+            setEditing(null);
+            await load();
+          }}
           onCancel={() => setEditing(null)}
         />
       ) : null}

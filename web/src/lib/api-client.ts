@@ -143,9 +143,16 @@ export type Helplines = {
 /** Which way to move a Helpline in its country's list. */
 export type MoveDirection = "up" | "down";
 
-/** The kinds of crisis the Safeguard detects. */
+/**
+ * The kinds of crisis the Safeguard detects. "unclear" means the model twice
+ * gave no answer, so it was treated as a crisis to be safe.
+ */
 export type RiskType =
-  "suicide_or_self_harm" | "danger_to_others" | "abuse" | "medical_emergency";
+  | "suicide_or_self_harm"
+  | "danger_to_others"
+  | "abuse"
+  | "medical_emergency"
+  | "unclear";
 
 /** A Safeguard Event: who, when and what kind of risk. Never message text. */
 export type SafeguardEvent = {
