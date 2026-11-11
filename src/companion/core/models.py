@@ -226,12 +226,15 @@ class Conversation:
         user_id: The User taking part.
         started_at: When the first message was sent.
         last_message_at: When the newest message was sent.
+        ended_at: When the scheduler saw the quiet gap pass and ended it; a
+            later message starts a new Conversation.
     """
 
     id: UUID
     user_id: UUID
     started_at: datetime
     last_message_at: datetime
+    ended_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -402,3 +405,92 @@ class SafeguardEventOverview:
     event: SafeguardEvent
     user_name: str | None
     user_email: str | None
+
+
+@dataclass(frozen=True)
+class MemoryCategory:
+    """The kind of fact a Memory Item records. Managed by Admins.
+
+    Attributes:
+        id: Our ID for the category.
+        name: Its name, e.g. "Goals".
+        description: What belongs in it, as the chat model is told.
+        always_include: Whether its Memory Items go into every reply.
+        archived: Whether it is archived: it keeps its Memory Items but gets
+            no new ones.
+        sort_order: Where it comes in the list, lowest first.
+    """
+
+    id: UUID
+    name: str
+    description: str
+    always_include: bool
+    archived: bool
+    sort_order: int
+
+
+class MemorySource(StrEnum):
+    """Where a Memory Item came from."""
+
+    CONVERSATION = "conversation"
+    ONBOARDING = "onboarding"
+
+
+@dataclass(frozen=True)
+class MemoryItem:
+    """A single fact about a User, in one Memory Category.
+
+    Attributes:
+        id: Our ID for the item.
+        user_id: The User it is about.
+        category_id: The Memory Category it belongs to.
+        content: The fact, e.g. "Started a new role in September".
+        source: Where it came from.
+        source_conversation_id: The Conversation it was last learned in, if
+            it came from one.
+        created_at: When it was first saved.
+        updated_at: When it was last changed.
+    """
+
+    id: UUID
+    user_id: UUID
+    category_id: UUID
+    content: str
+    source: MemorySource
+    source_conversation_id: UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
+class MemoryGroup:
+    """A User's Memory Items in one Memory Category.
+
+    Attributes:
+        category: The Memory Category.
+        items: Its Memory Items, oldest first.
+    """
+
+    category: MemoryCategory
+    items: list[MemoryItem]
+
+
+@dataclass(frozen=True)
+class ConversationSummary:
+    """A short account of what one Conversation covered and how the User seemed.
+
+    Attributes:
+        id: Our ID for the summary.
+        conversation_id: The Conversation it sums up.
+        user_id: The User who took part.
+        summary: What was talked about.
+        mood: How the User seemed, e.g. "unsettled at first, then calmer".
+        created_at: When it was written.
+    """
+
+    id: UUID
+    conversation_id: UUID
+    user_id: UUID
+    summary: str
+    mood: str
+    created_at: datetime

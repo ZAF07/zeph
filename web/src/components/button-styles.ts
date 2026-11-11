@@ -14,3 +14,13 @@ export const quietButton = `${base} border border-transparent bg-transparent px-
 /** A small secondary action inside a table row. */
 export const compactSecondaryButton =
   "inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full border border-line-strong bg-transparent px-3.5 py-2 text-sm font-medium leading-tight text-ink cursor-pointer disabled:cursor-not-allowed disabled:opacity-60";
+
+/** A destructive action, before it is confirmed. */
+export const dangerButton = `${base} border border-danger-line bg-danger-tint text-danger hover:text-danger`;
+
+/** The button that confirms a destructive action. */
+export const confirmDangerButton = `${base} border border-danger bg-danger text-white hover:text-white`;
+
+/** A round icon-only delete button inside a list row. */
+export const deleteIconButton =
+  "inline-flex size-11 flex-none cursor-pointer items-center justify-center rounded-full border border-transparent bg-transparent text-danger disabled:cursor-not-allowed disabled:opacity-60";

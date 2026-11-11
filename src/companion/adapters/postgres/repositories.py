@@ -9,8 +9,11 @@ from sqlalchemy.dialects.postgresql import insert
 from companion.adapters.postgres.tables import (
     connection_tokens,
     conversation_messages,
+    conversation_summaries,
     conversations,
     helplines,
+    memory_categories,
+    memory_items,
     platform_settings,
     safeguard_events,
     telegram_connections,
@@ -20,8 +23,12 @@ from companion.core.models import (
     ConnectionToken,
     Conversation,
     ConversationMessage,
+    ConversationSummary,
     Helpline,
     HelplineDetails,
+    MemoryCategory,
+    MemoryItem,
+    MemorySource,
     MessageDirection,
     MessageKind,
     RiskType,
@@ -33,7 +40,7 @@ from companion.core.models import (
     UserOverview,
     UserRole,
 )
-from companion.core.ports import Repositories
+from companion.core.ports import MemoryChanges, Repositories
 
 
 def _to_user(row: Row[Any]) -> User:
@@ -113,6 +120,7 @@ def _to_conversation(row: Row[Any]) -> Conversation:
         user_id=row.user_id,
         started_at=row.started_at,
         last_message_at=row.last_message_at,
+        ended_at=row.ended_at,
     )
 
 
@@ -132,6 +140,86 @@ def _to_message(row: Row[Any]) -> ConversationMessage:
         kind=MessageKind(row.kind),
         content=row.content,
         sent_at=row.sent_at,
+    )
+
+
+def _to_memory_category(row: Row[Any]) -> MemoryCategory:
+    """Turn a `memory_categories` row into a MemoryCategory.
+
+    Args:
+        row: The database row.
+
+    Returns:
+        The Memory Category.
+    """
+    return MemoryCategory(
+        id=row.id,
+        name=row.name,
+        description=row.description,
+        always_include=row.always_include,
+        archived=row.archived,
+        sort_order=row.sort_order,
+    )
+
+
+def _to_memory_item(row: Row[Any]) -> MemoryItem:
+    """Turn a `memory_items` row into a MemoryItem.
+
+    Args:
+        row: The database row.
+
+    Returns:
+        The Memory Item.
+    """
+    return MemoryItem(
+        id=row.id,
+        user_id=row.user_id,
+        category_id=row.category_id,
+        content=row.content,
+        source=MemorySource(row.source),
+        source_conversation_id=row.source_conversation_id,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+def _memory_item_values(item: MemoryItem) -> dict[str, Any]:
+    """Turn a MemoryItem into the values of a `memory_items` row.
+
+    Args:
+        item: The Memory Item.
+
+    Returns:
+        The column values.
+    """
+    return {
+        "id": item.id,
+        "user_id": item.user_id,
+        "category_id": item.category_id,
+        "content": item.content,
+        "source": item.source.value,
+        "source_conversation_id": item.source_conversation_id,
+        "created_at": item.created_at,
+        "updated_at": item.updated_at,
+    }
+
+
+def _to_summary(row: Row[Any]) -> ConversationSummary:
+    """Turn a `conversation_summaries` row into a ConversationSummary.
+
+    Args:
+        row: The database row.
+
+    Returns:
+        The Conversation Summary.
+    """
+    return ConversationSummary(
+        id=row.id,
+        conversation_id=row.conversation_id,
+        user_id=row.user_id,
+        summary=row.summary,
+        mood=row.mood,
+        created_at=row.created_at,
     )
 
 
@@ -612,6 +700,41 @@ class PostgresConversationRepository:
             ).all()
         return [_to_message(row) for row in rows]
 
+    def end_quiet(self, quiet_since: datetime, ended_at: datetime) -> None:
+        """End every open Conversation with no message since a given time.
+
+        Args:
+            quiet_since: Conversations whose newest message is at or before
+                this time are ended.
+            ended_at: When they are being ended.
+        """
+        with self._engine.begin() as connection:
+            connection.execute(
+                update(conversations)
+                .where(
+                    conversations.c.ended_at.is_(None),
+                    conversations.c.last_message_at <= quiet_since,
+                )
+                .values(ended_at=ended_at)
+            )
+
+    def list_ended_unprocessed(self) -> list[Conversation]:
+        """List ended Conversations not yet processed, oldest first.
+
+        Returns:
+            The Conversations.
+        """
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                select(conversations)
+                .where(
+                    conversations.c.ended_at.is_not(None),
+                    conversations.c.processed_at.is_(None),
+                )
+                .order_by(conversations.c.ended_at)
+            ).all()
+        return [_to_conversation(row) for row in rows]
+
 
 class PostgresPlatformSettingsRepository:
     """Reads platform settings from Postgres."""
@@ -935,6 +1058,211 @@ class PostgresSafeguardEventRepository:
         ]
 
 
+class PostgresMemoryCategoryRepository:
+    """Stores Memory Categories in Postgres."""
+
+    def __init__(self, engine: Engine) -> None:
+        """Set up the repository.
+
+        Args:
+            engine: The database engine.
+        """
+        self._engine = engine
+
+    def list_all(self) -> list[MemoryCategory]:
+        """List every Memory Category, archived ones included, in sort order.
+
+        Returns:
+            The categories.
+        """
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                select(memory_categories).order_by(memory_categories.c.sort_order)
+            ).all()
+        return [_to_memory_category(row) for row in rows]
+
+
+class PostgresUserMemoryRepository:
+    """Stores Memory Items and Conversation Summaries in Postgres."""
+
+    def __init__(self, engine: Engine) -> None:
+        """Set up the repository.
+
+        Args:
+            engine: The database engine.
+        """
+        self._engine = engine
+
+    def list_items(self, user_id: UUID) -> list[MemoryItem]:
+        """List a User's Memory Items in the order they were saved.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Memory Items.
+        """
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                select(memory_items)
+                .where(memory_items.c.user_id == user_id)
+                .order_by(memory_items.c.position)
+            ).all()
+        return [_to_memory_item(row) for row in rows]
+
+    def delete_item(self, user_id: UUID, item_id: UUID) -> bool:
+        """Delete one of a User's Memory Items.
+
+        Args:
+            user_id: The User's ID.
+            item_id: The Memory Item's ID.
+
+        Returns:
+            True if it was deleted; False if the User has no such item.
+        """
+        with self._engine.begin() as connection:
+            deleted = connection.execute(
+                delete(memory_items)
+                .where(memory_items.c.user_id == user_id, memory_items.c.id == item_id)
+                .returning(memory_items.c.id)
+            ).first()
+        return deleted is not None
+
+    def delete_all_items(self, user_id: UUID) -> None:
+        """Delete every one of a User's Memory Items.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._engine.begin() as connection:
+            connection.execute(
+                delete(memory_items).where(memory_items.c.user_id == user_id)
+            )
+
+    def replace_onboarding_items(self, user_id: UUID, items: list[MemoryItem]) -> None:
+        """Swap the User's Memory Items from onboarding for new ones, in one step.
+
+        Args:
+            user_id: The User's ID.
+            items: The new Memory Items from onboarding.
+        """
+        with self._engine.begin() as connection:
+            connection.execute(
+                delete(memory_items).where(
+                    memory_items.c.user_id == user_id,
+                    memory_items.c.source == MemorySource.ONBOARDING.value,
+                )
+            )
+            if items:
+                connection.execute(
+                    insert(memory_items).values(
+                        [_memory_item_values(item) for item in items]
+                    )
+                )
+
+    def list_summaries(
+        self, user_id: UUID, limit: int | None = None
+    ) -> list[ConversationSummary]:
+        """List a User's Conversation Summaries, newest first.
+
+        Args:
+            user_id: The User's ID.
+            limit: The most to return; None for all of them.
+
+        Returns:
+            The Conversation Summaries.
+        """
+        statement = (
+            select(conversation_summaries)
+            .where(conversation_summaries.c.user_id == user_id)
+            .order_by(conversation_summaries.c.created_at.desc())
+            .limit(limit)
+        )
+        with self._engine.connect() as connection:
+            rows = connection.execute(statement).all()
+        return [_to_summary(row) for row in rows]
+
+    def delete_summary(self, user_id: UUID, summary_id: UUID) -> bool:
+        """Delete one of a User's Conversation Summaries.
+
+        Args:
+            user_id: The User's ID.
+            summary_id: The Conversation Summary's ID.
+
+        Returns:
+            True if it was deleted; False if the User has no such summary.
+        """
+        with self._engine.begin() as connection:
+            deleted = connection.execute(
+                delete(conversation_summaries)
+                .where(
+                    conversation_summaries.c.user_id == user_id,
+                    conversation_summaries.c.id == summary_id,
+                )
+                .returning(conversation_summaries.c.id)
+            ).first()
+        return deleted is not None
+
+    def save_processed_conversation(
+        self,
+        conversation_id: UUID,
+        processed_at: datetime,
+        summary: ConversationSummary | None,
+        changes: MemoryChanges,
+    ) -> None:
+        """Save what processing an ended Conversation produced, in one step.
+
+        The Conversation is marked processed at the same time, so it is
+        never processed twice.
+
+        Args:
+            conversation_id: The Conversation that was processed.
+            processed_at: When processing finished.
+            summary: Its Conversation Summary; None when nothing is saved.
+            changes: The changes to the User's Memory Items.
+        """
+        with self._engine.begin() as connection:
+            if summary is not None:
+                connection.execute(
+                    insert(conversation_summaries).values(
+                        id=summary.id,
+                        conversation_id=summary.conversation_id,
+                        user_id=summary.user_id,
+                        summary=summary.summary,
+                        mood=summary.mood,
+                        created_at=summary.created_at,
+                    )
+                )
+            if changes.added:
+                connection.execute(
+                    insert(memory_items).values(
+                        [_memory_item_values(item) for item in changes.added]
+                    )
+                )
+            for item in changes.updated:
+                connection.execute(
+                    update(memory_items)
+                    .where(memory_items.c.id == item.id)
+                    .values(
+                        category_id=item.category_id,
+                        content=item.content,
+                        source_conversation_id=item.source_conversation_id,
+                        updated_at=item.updated_at,
+                    )
+                )
+            if changes.removed_ids:
+                connection.execute(
+                    delete(memory_items).where(
+                        memory_items.c.id.in_(changes.removed_ids)
+                    )
+                )
+            connection.execute(
+                update(conversations)
+                .where(conversations.c.id == conversation_id)
+                .values(processed_at=processed_at)
+            )
+
+
 def build_postgres_repositories(engine: Engine) -> Repositories:
     """Build every repository on one Postgres engine.
 
@@ -952,4 +1280,6 @@ def build_postgres_repositories(engine: Engine) -> Repositories:
         platform_settings=PostgresPlatformSettingsRepository(engine),
         helplines=PostgresHelplineRepository(engine),
         safeguard_events=PostgresSafeguardEventRepository(engine),
+        memory_categories=PostgresMemoryCategoryRepository(engine),
+        user_memory=PostgresUserMemoryRepository(engine),
     )

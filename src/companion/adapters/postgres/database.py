@@ -8,7 +8,11 @@ from alembic.config import Config
 from sqlalchemy import Engine, exists, select
 from sqlalchemy.dialects.postgresql import insert
 
-from companion.adapters.postgres.tables import helplines, platform_settings
+from companion.adapters.postgres.tables import (
+    helplines,
+    memory_categories,
+    platform_settings,
+)
 
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
@@ -86,3 +90,32 @@ def seed_helplines(engine: Engine, seed_file: Path) -> None:
         if connection.execute(select(exists().select_from(helplines))).scalar():
             return
         connection.execute(insert(helplines).values(rows))
+
+
+def seed_memory_categories(engine: Engine, seed_file: Path) -> None:
+    """Load the starting Memory Categories on first run.
+
+    Nothing is loaded once any Memory Category exists, so Admin changes are
+    never overwritten.
+
+    Args:
+        engine: The database engine.
+        seed_file: YAML file listing categories with `name`, `description`
+            and `always_include`, in the order to show them.
+    """
+    seed = yaml.safe_load(seed_file.read_text())
+    rows = [
+        {
+            "id": uuid4(),
+            "name": category["name"],
+            "description": category["description"],
+            "always_include": category["always_include"],
+            "archived": False,
+            "sort_order": sort_order,
+        }
+        for sort_order, category in enumerate(seed)
+    ]
+    with engine.begin() as connection:
+        if connection.execute(select(exists().select_from(memory_categories))).scalar():
+            return
+        connection.execute(insert(memory_categories).values(rows))

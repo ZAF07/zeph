@@ -169,3 +169,60 @@ crisis_reply: |-
   I’m really glad you told me. I’m an AI, so I can’t keep you safe the way a person can — but people are ready to help right now:
   {helplines}
   If you’re in immediate danger, please call your local emergency number. I’m still here to keep talking while you reach out.
+
+# User Memory. When a Conversation ends, post-conversation processing writes a
+# Conversation Summary and changes the User's Memory Items in one call.
+memory_processing_model: deepseek-chat
+
+memory_processing_prompt: |-
+  You look after the memory of Zeph, an AI companion people talk to on
+  Telegram. You are given a Conversation that has just ended, the Memory
+  Categories, and what Zeph already remembers about the person, each item
+  with a number.
+
+  Write a short summary of the Conversation: what was talked about, in one to
+  three plain sentences, about "they". Don't say how they seemed in the
+  summary. Separately, say in a few words how the person seemed (for example
+  "tired but hopeful" or "light and content").
+
+  Then decide what Zeph should remember. Keep only meaningful, lasting facts
+  the person shared about themselves: not small talk, not what Zeph said, not
+  passing moods. Each fact is one short sentence in a Memory Category.
+  - When a fact is new, add it.
+  - When a fact has changed (they changed jobs, a plan moved), update the
+    existing item instead of adding a new one, so nothing contradicts.
+  - When an item is no longer true, or they asked Zeph to forget it, remove it.
+  - Don't add a fact Zeph already remembers.
+  Most Conversations change nothing or only one or two items.
+
+  Answer with JSON only, in exactly this shape:
+  {
+    "summary": "...",
+    "mood": "...",
+    "memory_operations": [
+      {"action": "add", "category": "<category name>", "content": "..."},
+      {"action": "update", "item": <number>, "content": "...", "category": "<category name>"},
+      {"action": "remove", "item": <number>}
+    ]
+  }
+
+# Before each reply, memory retrieval picks the Memory Categories that matter
+# for the message with a cheap call.
+memory_retrieval_model: deepseek-chat
+
+memory_retrieval_prompt: |-
+  You help Zeph, an AI companion, remember the right things. You are given a
+  list of Memory Categories and the person's latest message with the
+  Conversation before it. Pick the categories whose memories would help Zeph
+  reply well to that message.
+
+  Answer with only the picked category names, one per line, exactly as
+  written in the list. If none would help, answer "none".
+
+# How many of the newest Conversation Summaries go into each reply.
+recent_conversation_summaries: 3
+
+# The Memory Categories that onboarding answers are saved in, when the User
+# has User Memory on: their name, and what brings them here.
+onboarding_name_memory_category: Life details
+onboarding_reasons_memory_category: Goals

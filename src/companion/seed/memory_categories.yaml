@@ -1,0 +1,42 @@
+# Starting Memory Categories (ADR-0004). Loaded on first run only, when there
+# are no Memory Categories at all; after that Admins manage them.
+# Memory Items in an "always include" category go into every reply; the rest
+# are picked per message.
+
+- name: Life details
+  description: >-
+    Facts about the person's life: what they're called, where they live, work
+    or study, their routines and big life events.
+  always_include: false
+
+- name: Relationships
+  description: >-
+    The people in their life — partner, family, friends, colleagues — and how
+    things are between them.
+  always_include: false
+
+- name: Goals
+  description: >-
+    What they want to do, change or work towards, and why they came to Zeph.
+  always_include: false
+
+- name: Values & beliefs
+  description: What matters to them and how they see the world.
+  always_include: true
+
+- name: Challenges
+  description: >-
+    What they find hard or keep running into: worries, patterns, struggles.
+  always_include: true
+
+- name: Preferences
+  description: >-
+    How they like to talk and be supported, and their tastes: ideas,
+    traditions, books, things they like or dislike.
+  always_include: true
+
+- name: What helps
+  description: >-
+    Things that help them feel better or more like themselves: practices,
+    places, people, habits.
+  always_include: false

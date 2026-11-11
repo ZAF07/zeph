@@ -12,6 +12,7 @@ from companion.adapters.langgraph.conversation_engine import (
     build_postgres_checkpointer,
 )
 from companion.adapters.postgres.repositories import build_postgres_repositories
+from companion.adapters.scheduler import InProcessScheduler
 from companion.adapters.telegram.chat_channel import TelegramChatChannel
 from companion.app import AppDependencies, create_app
 from companion.config import Settings, load_settings
@@ -23,11 +24,14 @@ from companion.core.ports import (
     Clock,
     ConversationEngine,
     Repositories,
+    Scheduler,
 )
 
 SEED_DIR = Path(__file__).parent / "seed"
 SEED_FILE = SEED_DIR / "platform_settings.yaml"
 HELPLINES_SEED_FILE = SEED_DIR / "helplines.yaml"
+MEMORY_CATEGORIES_SEED_FILE = SEED_DIR / "memory_categories.yaml"
+SCHEDULER_INTERVAL_SECONDS = 60
 
 
 class UnknownAdapterError(Exception):
@@ -114,6 +118,23 @@ def build_clock(settings: Settings) -> Clock:
     raise UnknownAdapterError("CLOCK_ADAPTER", settings.clock_adapter)
 
 
+def build_scheduler(settings: Settings) -> Scheduler:
+    """Build the scheduler chosen in `.env`.
+
+    Args:
+        settings: The loaded settings.
+
+    Returns:
+        The scheduler.
+
+    Raises:
+        UnknownAdapterError: If the chosen adapter does not exist.
+    """
+    if settings.scheduler_adapter == "in_process":
+        return InProcessScheduler(SCHEDULER_INTERVAL_SECONDS)
+    raise UnknownAdapterError("SCHEDULER_ADAPTER", settings.scheduler_adapter)
+
+
 def build_chat_model(settings: Settings) -> ChatModel:
     """Build the chat model chosen in `.env`.
 
@@ -183,6 +204,7 @@ def build_production_app() -> FastAPI:
         build_conversation_engine=build_conversation_engine_factory(settings),
         auth_verifier=build_auth_verifier(settings),
         clock=build_clock(settings),
+        scheduler=build_scheduler(settings),
         telegram_webhook_secret=settings.telegram_webhook_secret,
         telegram_bot_username=settings.telegram_bot_username,
         dashboard_url=settings.dashboard_url,

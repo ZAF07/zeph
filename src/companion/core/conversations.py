@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from uuid import UUID, uuid4
 
+from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.models import (
     Conversation,
     ConversationMessage,
@@ -108,6 +109,8 @@ class ConversationService:
     def _open_conversation_id(self, user_id: UUID) -> UUID:
         """Find the User's open Conversation, or start a new one.
 
+        A Conversation is open until it is ended or the quiet gap passes.
+
         Args:
             user_id: The User.
 
@@ -118,7 +121,12 @@ class ConversationService:
         quiet_gap = timedelta(minutes=settings.get("conversation_quiet_gap_minutes"))
         now = self._clock.now()
         latest = self._repositories.conversations.get_latest_for_user(user_id)
-        if latest is not None and now - latest.last_message_at < quiet_gap:
+        is_open = (
+            latest is not None
+            and latest.ended_at is None
+            and now - latest.last_message_at < quiet_gap
+        )
+        if latest is not None and is_open:
             return latest.id
         conversation = Conversation(
             id=uuid4(), user_id=user_id, started_at=now, last_message_at=now
@@ -155,9 +163,11 @@ class ConversationServices:
     Attributes:
         conversations: Saves messages and sends replies.
         safeguard: Checks each message for crisis and writes the Crisis Reply.
+        memory_retrieval: Finds the User Memory that matters for a message.
         response_composer: Writes the Companion's reply.
     """
 
     conversations: ConversationService
     safeguard: Safeguard
+    memory_retrieval: MemoryRetrieval
     response_composer: ResponseComposer

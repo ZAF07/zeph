@@ -1,4 +1,4 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Protocol
@@ -10,9 +10,12 @@ from companion.core.models import (
     ConnectionToken,
     Conversation,
     ConversationMessage,
+    ConversationSummary,
     ConversationTurn,
     Helpline,
     HelplineDetails,
+    MemoryCategory,
+    MemoryItem,
     RiskType,
     SafeguardEvent,
     SafeguardEventOverview,
@@ -40,6 +43,22 @@ class Clock(Protocol):
         Args:
             seconds: How long to wait.
         """
+        ...
+
+
+class Scheduler(Protocol):
+    """Runs due work over and over, a tick at a time, while the backend is up."""
+
+    def start(self, tick: Callable[[], None]) -> None:
+        """Start running the tick every so often.
+
+        Args:
+            tick: The work to run on each tick.
+        """
+        ...
+
+    def stop(self) -> None:
+        """Stop running ticks."""
         ...
 
 
@@ -87,7 +106,8 @@ class ConversationEngine(Protocol):
     def handle(self, turn: ConversationTurn) -> None:
         """Answer one message: save it, check it with the Safeguard, then reply.
 
-        On a crisis the Crisis Reply is sent and no reply is composed.
+        On a crisis the Crisis Reply is sent and no reply is composed;
+        otherwise the reply is given the User Memory that matters.
 
         Args:
             turn: The message to answer.
@@ -330,6 +350,141 @@ class ConversationRepository(Protocol):
         """
         ...
 
+    def end_quiet(self, quiet_since: datetime, ended_at: datetime) -> None:
+        """End every open Conversation with no message since a given time.
+
+        Args:
+            quiet_since: Conversations whose newest message is at or before
+                this time are ended.
+            ended_at: When they are being ended.
+        """
+        ...
+
+    def list_ended_unprocessed(self) -> list[Conversation]:
+        """List ended Conversations not yet processed, oldest first.
+
+        Returns:
+            The Conversations.
+        """
+        ...
+
+
+@dataclass(frozen=True)
+class MemoryChanges:
+    """What post-conversation processing changes in a User's Memory Items.
+
+    Attributes:
+        added: New Memory Items to save.
+        updated: Existing Memory Items with their new content and category.
+        removed_ids: IDs of Memory Items to delete.
+    """
+
+    added: list[MemoryItem]
+    updated: list[MemoryItem]
+    removed_ids: list[UUID]
+
+
+class MemoryCategoryRepository(Protocol):
+    """Stores Memory Categories."""
+
+    def list_all(self) -> list[MemoryCategory]:
+        """List every Memory Category, archived ones included, in sort order.
+
+        Returns:
+            The categories.
+        """
+        ...
+
+
+class UserMemoryRepository(Protocol):
+    """Stores each User's Memory Items and Conversation Summaries."""
+
+    def list_items(self, user_id: UUID) -> list[MemoryItem]:
+        """List a User's Memory Items in the order they were saved.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Memory Items.
+        """
+        ...
+
+    def delete_item(self, user_id: UUID, item_id: UUID) -> bool:
+        """Delete one of a User's Memory Items.
+
+        Args:
+            user_id: The User's ID.
+            item_id: The Memory Item's ID.
+
+        Returns:
+            True if it was deleted; False if the User has no such item.
+        """
+        ...
+
+    def delete_all_items(self, user_id: UUID) -> None:
+        """Delete every one of a User's Memory Items.
+
+        Args:
+            user_id: The User's ID.
+        """
+        ...
+
+    def replace_onboarding_items(self, user_id: UUID, items: list[MemoryItem]) -> None:
+        """Swap the User's Memory Items from onboarding for new ones, in one step.
+
+        Args:
+            user_id: The User's ID.
+            items: The new Memory Items from onboarding.
+        """
+        ...
+
+    def list_summaries(
+        self, user_id: UUID, limit: int | None = None
+    ) -> list[ConversationSummary]:
+        """List a User's Conversation Summaries, newest first.
+
+        Args:
+            user_id: The User's ID.
+            limit: The most to return; None for all of them.
+
+        Returns:
+            The Conversation Summaries.
+        """
+        ...
+
+    def delete_summary(self, user_id: UUID, summary_id: UUID) -> bool:
+        """Delete one of a User's Conversation Summaries.
+
+        Args:
+            user_id: The User's ID.
+            summary_id: The Conversation Summary's ID.
+
+        Returns:
+            True if it was deleted; False if the User has no such summary.
+        """
+        ...
+
+    def save_processed_conversation(
+        self,
+        conversation_id: UUID,
+        processed_at: datetime,
+        summary: ConversationSummary | None,
+        changes: MemoryChanges,
+    ) -> None:
+        """Save what processing an ended Conversation produced, in one step.
+
+        The Conversation is marked processed at the same time, so it is
+        never processed twice.
+
+        Args:
+            conversation_id: The Conversation that was processed.
+            processed_at: When processing finished.
+            summary: Its Conversation Summary; None when nothing is saved.
+            changes: The changes to the User's Memory Items.
+        """
+        ...
+
 
 class PlatformSettingsRepository(Protocol):
     """Stores admin-managed platform settings and content."""
@@ -494,3 +649,5 @@ class Repositories:
     platform_settings: PlatformSettingsRepository
     helplines: HelplineRepository
     safeguard_events: SafeguardEventRepository
+    memory_categories: MemoryCategoryRepository
+    user_memory: UserMemoryRepository

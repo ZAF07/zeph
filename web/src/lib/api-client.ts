@@ -171,6 +171,32 @@ export type SafeguardEventFilter = {
   days?: number;
 };
 
+/** Where a Memory Item came from. */
+export type MemorySource = "conversation" | "onboarding";
+
+/** A single fact the Companion remembers about the User. */
+export type MemoryItem = {
+  id: string;
+  content: string;
+  source: MemorySource;
+  created_at: string;
+  updated_at: string;
+};
+
+/** The User's Memory Items in one Memory Category. */
+export type MemoryGroup = {
+  category: string;
+  items: MemoryItem[];
+};
+
+/** A short account of one Conversation and how the User seemed. */
+export type ConversationSummary = {
+  id: string;
+  summary: string;
+  mood: string;
+  created_at: string;
+};
+
 /** Every call the Dashboard makes to the backend. */
 export type ApiClient = {
   getMe: () => Promise<Me>;
@@ -179,6 +205,11 @@ export type ApiClient = {
   getPlatformContent: () => Promise<PlatformContent>;
   getTelegramConnection: () => Promise<TelegramConnectionStatus>;
   createConnectionToken: () => Promise<ConnectionToken>;
+  listMemoryGroups: () => Promise<MemoryGroup[]>;
+  deleteMemoryItem: (id: string) => Promise<void>;
+  deleteAllMemoryItems: () => Promise<void>;
+  listConversationSummaries: () => Promise<ConversationSummary[]>;
+  deleteConversationSummary: (id: string) => Promise<void>;
   listAdminUsers: () => Promise<AdminUser[]>;
   changeUserRole: (userId: string, role: UserRole) => Promise<RoleChange>;
   getAdminSettings: () => Promise<AdminSettings>;
@@ -284,6 +315,19 @@ export function createApiClient(
       request<TelegramConnectionStatus>("/api/telegram-connection"),
     createConnectionToken: () =>
       request<ConnectionToken>("/api/telegram-connection/tokens", "POST"),
+    listMemoryGroups: async () =>
+      (await request<{ groups: MemoryGroup[] }>("/api/memory-items")).groups,
+    deleteMemoryItem: (id) =>
+      request<void>(`/api/memory-items/${id}`, "DELETE"),
+    deleteAllMemoryItems: () => request<void>("/api/memory-items", "DELETE"),
+    listConversationSummaries: async () =>
+      (
+        await request<{ summaries: ConversationSummary[] }>(
+          "/api/conversation-summaries",
+        )
+      ).summaries,
+    deleteConversationSummary: (id) =>
+      request<void>(`/api/conversation-summaries/${id}`, "DELETE"),
     listAdminUsers: async () =>
       (await request<{ users: AdminUser[] }>("/api/admin/users")).users,
     changeUserRole: (userId, role) =>

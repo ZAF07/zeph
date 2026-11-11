@@ -21,6 +21,7 @@ class TurnState(TypedDict, total=False):
     text: str
     conversation_id: str
     risk_type: str
+    memory: str
     reply_parts: list[str]
 
 
@@ -99,7 +100,7 @@ class LangGraphConversationEngine:
                 The name of the next step.
             """
             if state["risk_type"] == RiskType.NONE.value:
-                return "compose_reply"
+                return "recall_memory"
             return "send_crisis_reply"
 
         def send_crisis_reply(state: TurnState) -> TurnState:
@@ -121,6 +122,20 @@ class LangGraphConversationEngine:
             )
             return {}
 
+        def recall_memory(state: TurnState) -> TurnState:
+            """Find the User Memory that matters for the message.
+
+            Args:
+                state: The graph's state so far.
+
+            Returns:
+                The memory to give the reply.
+            """
+            memory = services.memory_retrieval.recall(
+                UUID(state["user_id"]), UUID(state["conversation_id"])
+            )
+            return {"memory": memory}
+
         def compose_reply(state: TurnState) -> TurnState:
             """Write the Companion's reply.
 
@@ -131,7 +146,7 @@ class LangGraphConversationEngine:
                 The reply as short messages.
             """
             reply_parts = services.response_composer.compose(
-                UUID(state["conversation_id"])
+                UUID(state["conversation_id"]), state["memory"]
             )
             return {"reply_parts": reply_parts}
 
@@ -153,6 +168,7 @@ class LangGraphConversationEngine:
         graph.add_node("record_incoming", record_incoming)
         graph.add_node("check_safeguard", check_safeguard)
         graph.add_node("send_crisis_reply", send_crisis_reply)
+        graph.add_node("recall_memory", recall_memory)
         graph.add_node("compose_reply", compose_reply)
         graph.add_node("deliver_reply", deliver_reply)
         graph.add_edge(START, "record_incoming")
@@ -160,9 +176,10 @@ class LangGraphConversationEngine:
         graph.add_conditional_edges(
             "check_safeguard",
             after_safeguard,
-            ["send_crisis_reply", "compose_reply"],
+            ["send_crisis_reply", "recall_memory"],
         )
         graph.add_edge("send_crisis_reply", END)
+        graph.add_edge("recall_memory", "compose_reply")
         graph.add_edge("compose_reply", "deliver_reply")
         graph.add_edge("deliver_reply", END)
         self._graph = graph.compile(checkpointer=checkpointer)
@@ -171,6 +188,7 @@ class LangGraphConversationEngine:
         """Answer one message: save it, run the Safeguard, then reply.
 
         On a crisis the Crisis Reply is sent instead of a composed reply.
+        Otherwise the User Memory that matters is recalled for the reply.
 
         Args:
             turn: The message to answer.

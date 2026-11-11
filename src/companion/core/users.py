@@ -11,6 +11,7 @@ from companion.core.models import (
     UserRole,
 )
 from companion.core.ports import Clock, UserRepository
+from companion.core.user_memory import UserMemoryService
 
 COUNTRY_CODE_PATTERN = re.compile(r"[A-Z]{2}")
 MAX_NAME_LENGTH = 100
@@ -82,6 +83,7 @@ class UserService:
     def __init__(
         self,
         users: UserRepository,
+        user_memory: UserMemoryService,
         clock: Clock,
         initial_admin_emails: frozenset[str] = frozenset(),
     ) -> None:
@@ -89,11 +91,13 @@ class UserService:
 
         Args:
             users: Where Users are stored.
+            user_memory: Saves onboarding answers as Memory Items.
             clock: Tells the current time.
             initial_admin_emails: Emails, in lower case, whose accounts become
                 Admins on first sign-in.
         """
         self._users = users
+        self._user_memory = user_memory
         self._clock = clock
         self._initial_admin_emails = initial_admin_emails
 
@@ -146,6 +150,8 @@ class UserService:
         """Save a User's onboarding answers and mark onboarding done.
 
         Answering again updates the answers but keeps the first completion time.
+        With User Memory on, the name and "What brings you here?" answers are
+        also saved as Memory Items.
 
         Args:
             user: The User onboarding.
@@ -173,7 +179,9 @@ class UserService:
             ai_notice_acknowledged_at=user.ai_notice_acknowledged_at or now,
             onboarding_completed_at=user.onboarding_completed_at or now,
         )
-        return self._users.update(onboarded)
+        saved = self._users.update(onboarded)
+        self._user_memory.remember_onboarding(saved)
+        return saved
 
     def update_preferences(self, user: User, changes: PreferenceChanges) -> User:
         """Change a User's name, User Memory setting, country or time zone.

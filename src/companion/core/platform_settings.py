@@ -79,6 +79,22 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     EditableSetting("response_prompt", "Response composition prompt", SettingKind.TEXT),
     EditableSetting("response_model", "Response composition model", SettingKind.MODEL),
     EditableSetting(
+        "memory_processing_prompt",
+        "Post-conversation processing prompt",
+        SettingKind.TEXT,
+    ),
+    EditableSetting(
+        "memory_processing_model",
+        "Post-conversation processing model",
+        SettingKind.MODEL,
+    ),
+    EditableSetting(
+        "memory_retrieval_prompt", "Memory retrieval prompt", SettingKind.TEXT
+    ),
+    EditableSetting(
+        "memory_retrieval_model", "Memory retrieval model", SettingKind.MODEL
+    ),
+    EditableSetting(
         "conversation_quiet_gap_minutes",
         "Conversation quiet gap",
         SettingKind.WHOLE_NUMBER,
@@ -112,10 +128,31 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         name="Response composition",
         runs_when="Every reply",
         description=(
-            "Writes Zeph’s reply from the Persona and the Conversation so far."
+            "Writes Zeph’s reply from the Persona, the relevant memories, recent "
+            "Conversation Summaries and the Conversation so far."
         ),
         prompt_key="response_prompt",
         model_key="response_model",
+    ),
+    CoreService(
+        name="Post-conversation processing",
+        runs_when="After quiet gap",
+        description=(
+            "After a Conversation goes quiet, writes the Conversation Summary "
+            "and mood, and adds, updates or removes Memory Items by category."
+        ),
+        prompt_key="memory_processing_prompt",
+        model_key="memory_processing_model",
+    ),
+    CoreService(
+        name="Memory retrieval",
+        runs_when="Every reply",
+        description=(
+            "Picks the Memory Categories that matter for the message, so the "
+            "reply gets only relevant memories plus the always-included ones."
+        ),
+        prompt_key="memory_retrieval_prompt",
+        model_key="memory_retrieval_model",
     ),
 )
 

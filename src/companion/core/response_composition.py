@@ -49,6 +49,22 @@ def to_chat_history(messages: list[ConversationMessage]) -> list[ChatLine]:
     ]
 
 
+def to_transcript_lines(messages: list[ConversationMessage]) -> str:
+    """Write messages as transcript lines for a model to read, not answer.
+
+    Args:
+        messages: The messages, oldest first.
+
+    Returns:
+        One "Person: ..." or "Zeph: ..." line per message.
+    """
+    return "\n".join(
+        f"{'Person' if message.direction == MessageDirection.INCOMING else 'Zeph'}: "
+        f"{message.content}"
+        for message in messages
+    )
+
+
 class ResponseComposer:
     """Writes the Companion's reply to the current Conversation."""
 
@@ -62,14 +78,16 @@ class ResponseComposer:
         self._repositories = repositories
         self._chat_model = chat_model
 
-    def compose(self, conversation_id: UUID) -> list[str]:
+    def compose(self, conversation_id: UUID, memory: str = "") -> list[str]:
         """Compose a reply to the Conversation's newest message.
 
         Uses the Persona, response prompt and model from platform settings,
-        and gives the model every earlier message in the Conversation.
+        then what the Companion remembers, and gives the model every earlier
+        message in the Conversation.
 
         Args:
             conversation_id: The Conversation to reply in.
+            memory: The User Memory that matters for this message; "" if none.
 
         Returns:
             The reply as one or more short messages.
@@ -79,6 +97,8 @@ class ResponseComposer:
         """
         settings = self._repositories.platform_settings
         instructions = f"{settings.get('persona')}\n\n{settings.get('response_prompt')}"
+        if memory:
+            instructions += f"\n\n{memory}"
         history = to_chat_history(
             self._repositories.conversations.list_messages(conversation_id)
         )
