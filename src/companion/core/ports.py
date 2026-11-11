@@ -1,3 +1,4 @@
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Protocol
@@ -10,8 +11,10 @@ from companion.core.models import (
     Conversation,
     ConversationMessage,
     ConversationTurn,
+    StoredSetting,
     TelegramConnection,
     User,
+    UserOverview,
 )
 
 
@@ -103,6 +106,17 @@ class AuthVerifier(Protocol):
 class UserRepository(Protocol):
     """Stores Users."""
 
+    def get(self, user_id: UUID) -> User | None:
+        """Find a User by our ID.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The User, or None if there is none.
+        """
+        ...
+
     def get_by_auth_id(self, auth_id: str) -> User | None:
         """Find a User by the auth provider's account ID.
 
@@ -133,6 +147,47 @@ class UserRepository(Protocol):
 
         Returns:
             The saved User.
+        """
+        ...
+
+    def list_overviews(self) -> list[UserOverview]:
+        """List every User with their activity counts, newest sign-up first.
+
+        Returns:
+            One overview per User.
+        """
+        ...
+
+    def count_admins(self) -> int:
+        """Count the Users who are Admins.
+
+        Returns:
+            How many Admins there are.
+        """
+        ...
+
+    def promote_to_admin(self, user_id: UUID) -> User:
+        """Make a User an Admin.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The saved User.
+        """
+        ...
+
+    def demote_unless_last_admin(self, user_id: UUID) -> User | None:
+        """Make an Admin a plain User, in one step, unless they are the only one.
+
+        Two Admins demoting each other at the same time can never leave the
+        platform without an Admin.
+
+        Args:
+            user_id: The Admin's ID.
+
+        Returns:
+            The saved User, or None if they are the last Admin.
         """
         ...
 
@@ -270,7 +325,7 @@ class ConversationRepository(Protocol):
 
 
 class PlatformSettingsRepository(Protocol):
-    """Reads admin-managed platform settings and content."""
+    """Stores admin-managed platform settings and content."""
 
     def get(self, key: str) -> Any:
         """Read one setting.
@@ -283,6 +338,29 @@ class PlatformSettingsRepository(Protocol):
 
         Raises:
             KeyError: If the setting does not exist.
+        """
+        ...
+
+    def get_many(self, keys: Sequence[str]) -> list[StoredSetting]:
+        """Read several settings with when and by whom they were last saved.
+
+        Args:
+            keys: The settings' keys.
+
+        Returns:
+            The settings that exist, in the order of `keys`.
+        """
+        ...
+
+    def save_many(
+        self, values: Mapping[str, Any], updated_at: datetime, updated_by: UUID
+    ) -> None:
+        """Save new values for several settings in one step.
+
+        Args:
+            values: The new value for each setting key.
+            updated_at: When they are being saved.
+            updated_by: The Admin saving them.
         """
         ...
 

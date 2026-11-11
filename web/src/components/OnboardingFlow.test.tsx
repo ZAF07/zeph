@@ -41,6 +41,7 @@ function newUser(overrides: Partial<Me> = {}): Me {
     ai_notice_acknowledged_at: null,
     user_memory_enabled: true,
     onboarding_completed_at: null,
+    role: "user",
     ...overrides,
   };
 }

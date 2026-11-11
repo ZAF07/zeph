@@ -11,7 +11,7 @@ A person with an account who converses with the Companion.
 _Avoid_: Customer, member, client
 
 **Admin**:
-A User who also has access to the admin area of the Dashboard to configure the platform.
+A User who also has access to the admin area of the Dashboard to configure the platform. The first Admins are the Users whose emails are listed as initial Admin emails; after that, Admins make or remove other Admins. There is always at least one Admin: the last one can't be removed.
 _Avoid_: Operator, superuser, staff
 
 ### Product

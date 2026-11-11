@@ -8,6 +8,7 @@ from companion.core.models import (
     OnboardingAnswers,
     PreferenceChanges,
     User,
+    UserRole,
 )
 from companion.core.ports import Clock, UserRepository
 
@@ -78,18 +79,30 @@ def check_time_zone(time_zone: str) -> str:
 class UserService:
     """Finds the User behind a Dashboard account and keeps their profile."""
 
-    def __init__(self, users: UserRepository, clock: Clock) -> None:
+    def __init__(
+        self,
+        users: UserRepository,
+        clock: Clock,
+        initial_admin_emails: frozenset[str] = frozenset(),
+    ) -> None:
         """Set up the service.
 
         Args:
             users: Where Users are stored.
             clock: Tells the current time.
+            initial_admin_emails: Emails, in lower case, whose accounts become
+                Admins on first sign-in.
         """
         self._users = users
         self._clock = clock
+        self._initial_admin_emails = initial_admin_emails
 
     def get_or_create(self, identity: AccountIdentity) -> User:
         """Return the User for an account, creating them if they are new.
+
+        A new User whose email is an initial Admin email becomes an Admin. So
+        an account made before its email was listed still gets in, a listed
+        existing User also becomes an Admin while the platform has none.
 
         Args:
             identity: The verified account identity.
@@ -99,14 +112,35 @@ class UserService:
         """
         existing = self._users.get_by_auth_id(identity.auth_id)
         if existing is not None:
+            should_bootstrap = (
+                existing.role == UserRole.USER
+                and self._is_initial_admin_email(identity.email)
+                and self._users.count_admins() == 0
+            )
+            if should_bootstrap:
+                return self._users.promote_to_admin(existing.id)
             return existing
         new_user = User(
             id=uuid4(),
             auth_id=identity.auth_id,
             email=identity.email,
             created_at=self._clock.now(),
+            role=UserRole.ADMIN
+            if self._is_initial_admin_email(identity.email)
+            else UserRole.USER,
         )
         return self._users.add(new_user)
+
+    def _is_initial_admin_email(self, email: str | None) -> bool:
+        """Tell whether an email is one of the initial Admin emails.
+
+        Args:
+            email: The account's email, if known.
+
+        Returns:
+            True if it is listed, ignoring case.
+        """
+        return email is not None and email.lower() in self._initial_admin_emails
 
     def complete_onboarding(self, user: User, answers: OnboardingAnswers) -> User:
         """Save a User's onboarding answers and mark onboarding done.

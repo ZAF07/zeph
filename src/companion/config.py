@@ -56,6 +56,18 @@ class Settings(BaseSettings):
     conversation_engine_adapter: str = "langgraph"
 
     @property
+    def initial_admin_email_set(self) -> frozenset[str]:
+        """Split the comma-separated initial Admin emails.
+
+        Returns:
+            The emails in lower case, without blanks.
+        """
+        emails = (
+            email.strip().lower() for email in self.initial_admin_emails.split(",")
+        )
+        return frozenset(email for email in emails if email)
+
+    @property
     def database_url(self) -> str:
         """Build the SQLAlchemy URL for Postgres.
 

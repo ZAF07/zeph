@@ -185,5 +185,6 @@ def build_production_app() -> FastAPI:
         telegram_bot_username=settings.telegram_bot_username,
         dashboard_url=settings.dashboard_url,
         cors_origins=[settings.dashboard_url],
+        initial_admin_emails=settings.initial_admin_email_set,
     )
     return create_app(dependencies)

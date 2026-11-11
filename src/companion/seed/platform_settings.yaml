@@ -65,6 +65,11 @@ typing_seconds_per_character: 0.05
 min_typing_seconds: 1.5
 max_typing_seconds: 5
 
+# The models Admins can pick for each core service.
+available_models:
+  - deepseek-chat
+  - deepseek-reasoner
+
 # The DeepSeek model that writes the Companion's replies.
 response_model: deepseek-chat
 

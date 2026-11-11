@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { SidebarAdminBadge } from "@/components/SidebarAdminBadge";
 import { SidebarAiNotice } from "@/components/SidebarAiNotice";
 import { SidebarNav } from "@/components/SidebarNav";
 import { ZephLogo } from "@/components/ZephLogo";
@@ -56,7 +57,10 @@ export function Sidebar({ account }: { account: CurrentAccount }) {
             {account.name.charAt(0).toUpperCase()}
           </span>
           <span className="flex min-w-0 flex-col text-caption leading-[1.3]">
-            <span className="font-semibold">{account.name}</span>
+            <span className="flex items-center gap-1.5 font-semibold">
+              {account.name}
+              <SidebarAdminBadge />
+            </span>
             <span className="overflow-hidden text-ellipsis text-ink-muted">
               {account.email}
             </span>

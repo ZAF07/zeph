@@ -40,3 +40,16 @@ def test_deepseek_key_is_required() -> None:
         load_settings(environment)
 
     assert "DEEPSEEK_API_KEY" in str(error.value)
+
+
+def test_initial_admin_emails_are_split_and_lower_cased() -> None:
+    environment = {
+        **COMPLETE_ENVIRONMENT,
+        "INITIAL_ADMIN_EMAILS": " Owner@Example.com, ,ren@example.com ",
+    }
+
+    settings = load_settings(environment)
+
+    assert settings.initial_admin_email_set == frozenset(
+        {"owner@example.com", "ren@example.com"}
+    )

@@ -4,10 +4,17 @@ from dataclasses import dataclass, field
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from companion.adapters.http.admin_api import build_admin_api_router
+from companion.adapters.http.auth import (
+    build_current_admin_dependency,
+    build_current_user_dependency,
+)
 from companion.adapters.http.dashboard_api import build_dashboard_api_router
 from companion.adapters.telegram.webhook import build_telegram_webhook_router
+from companion.core.admin_users import AdminUserService
 from companion.core.conversations import ConversationService, ConversationServices
 from companion.core.incoming_messages import IncomingMessageHandler
+from companion.core.platform_settings import PlatformSettingsService
 from companion.core.ports import (
     AuthVerifier,
     ChatChannel,
@@ -37,6 +44,8 @@ class AppDependencies:
         telegram_bot_username: The Companion's Telegram @username.
         dashboard_url: The Dashboard's public address.
         cors_origins: Browser origins allowed to call the Dashboard API.
+        initial_admin_emails: Emails, in lower case, whose accounts become
+            Admins on first sign-in.
     """
 
     repositories: Repositories
@@ -49,6 +58,7 @@ class AppDependencies:
     telegram_bot_username: str
     dashboard_url: str
     cors_origins: list[str] = field(default_factory=list)
+    initial_admin_emails: frozenset[str] = frozenset()
 
 
 def create_app(dependencies: AppDependencies) -> FastAPI:
@@ -60,7 +70,11 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     Returns:
         The FastAPI app.
     """
-    user_service = UserService(dependencies.repositories.users, dependencies.clock)
+    user_service = UserService(
+        dependencies.repositories.users,
+        dependencies.clock,
+        dependencies.initial_admin_emails,
+    )
     telegram_connection_service = TelegramConnectionService(
         repositories=dependencies.repositories,
         chat_channel=dependencies.chat_channel,
@@ -95,13 +109,25 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    current_user = build_current_user_dependency(
+        dependencies.auth_verifier, user_service
+    )
     app.include_router(
         build_dashboard_api_router(
-            auth_verifier=dependencies.auth_verifier,
+            current_user=current_user,
             user_service=user_service,
             telegram_connection_service=telegram_connection_service,
             platform_settings=dependencies.repositories.platform_settings,
             telegram_bot_username=dependencies.telegram_bot_username,
+        )
+    )
+    app.include_router(
+        build_admin_api_router(
+            current_admin=build_current_admin_dependency(current_user),
+            admin_user_service=AdminUserService(dependencies.repositories.users),
+            platform_settings_service=PlatformSettingsService(
+                dependencies.repositories.platform_settings, dependencies.clock
+            ),
         )
     )
     app.include_router(

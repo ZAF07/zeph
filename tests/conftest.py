@@ -29,6 +29,7 @@ from tests.fakes import (
 WEBHOOK_SECRET = "test-webhook-secret"
 BOT_USERNAME = "zeph_test_bot"
 DASHBOARD_URL = "http://dashboard.test"
+INITIAL_ADMIN_EMAIL = "owner@example.com"
 os.environ.setdefault("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/var/run/docker.sock")
 
 SEED_FILE = Path(__file__).parent.parent / "src/companion/seed/platform_settings.yaml"
@@ -119,6 +120,7 @@ def client(
         telegram_webhook_secret=WEBHOOK_SECRET,
         telegram_bot_username=BOT_USERNAME,
         dashboard_url=DASHBOARD_URL,
+        initial_admin_emails=frozenset({INITIAL_ADMIN_EMAIL}),
     )
     return TestClient(create_app(dependencies))
 
