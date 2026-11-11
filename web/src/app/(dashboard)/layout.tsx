@@ -6,8 +6,8 @@ import { Sidebar } from "@/components/Sidebar";
 import { getCurrentAccount } from "@/lib/auth/server";
 
 /**
- * The Dashboard shell: sidebar beside the page. Users who have not finished
- * onboarding are sent there first.
+ * The Dashboard shell: sidebar beside the page, for User and admin pages
+ * alike. Users who have not finished onboarding are sent there first.
  *
  * @param props - `children` is the page.
  * @returns The shell.
@@ -27,9 +27,7 @@ export default async function DashboardLayout({
         <Sidebar account={account} />
       </div>
       <main className="min-w-0 flex-1 px-4 py-12 md:px-12">
-        <div className="mx-auto flex max-w-[880px] flex-col gap-8">
-          <OnboardingGate>{children}</OnboardingGate>
-        </div>
+        <OnboardingGate>{children}</OnboardingGate>
       </main>
     </div>
   );

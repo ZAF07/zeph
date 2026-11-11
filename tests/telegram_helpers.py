@@ -2,11 +2,12 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from tests.conftest import WEBHOOK_SECRET
-from tests.fakes import FakeAuthVerifier
+from tests.conftest import INITIAL_ADMIN_EMAIL, WEBHOOK_SECRET
+from tests.fakes import FakeAuthVerifier, FakeChatChannel
 
 TELEGRAM_USER_ID = 5551001
 TELEGRAM_CHAT_ID = 5551001
+OWNER_AUTH_ID = INITIAL_ADMIN_EMAIL.split("@")[0]
 
 
 def telegram_text_update(
@@ -49,3 +50,25 @@ def create_connection_token(client: TestClient, headers: dict[str, str]) -> str:
     assert response.status_code == 201
     token: str = response.json()["token"]
     return token
+
+
+def connect_telegram(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+) -> None:
+    """Sign up a User, make their Telegram Connection and forget the welcome."""
+    headers = auth_headers(auth_verifier, "user_maya")
+    token = create_connection_token(client, headers)
+    assert send_to_webhook(client, telegram_text_update(f"/start {token}")) == 200
+    chat_channel.sent.clear()
+    chat_channel.events.clear()
+
+
+def owner_headers(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> dict[str, str]:
+    """Sign in as the initial Admin and return their Dashboard API headers."""
+    headers = auth_headers(auth_verifier, OWNER_AUTH_ID)
+    assert client.get("/api/me", headers=headers).json()["role"] == "admin"
+    return headers

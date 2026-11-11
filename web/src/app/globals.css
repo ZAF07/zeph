@@ -60,25 +60,28 @@
   --spacing: 4px;
 }
 
-body {
-  margin: 0;
-  background: var(--color-white);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
-  line-height: 1.5;
-}
+/* In the base layer, so Tailwind utility classes can override these. */
+@layer base {
+  body {
+    margin: 0;
+    background: var(--color-white);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+  }
 
-a {
-  color: var(--color-blue);
-}
+  a {
+    color: var(--color-blue);
+  }
 
-a:hover {
-  color: var(--color-ink);
-}
+  a:hover {
+    color: var(--color-ink);
+  }
 
-:focus-visible {
-  outline: 2px solid var(--color-blue);
-  outline-offset: 2px;
+  :focus-visible {
+    outline: 2px solid var(--color-blue);
+    outline-offset: 2px;
+  }
 }
 
 .brand-stripe {

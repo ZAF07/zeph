@@ -1,7 +1,8 @@
+from collections.abc import Callable
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from companion.core.models import (
@@ -10,8 +11,9 @@ from companion.core.models import (
     OnboardingAnswers,
     PreferenceChanges,
     User,
+    UserRole,
 )
-from companion.core.ports import AuthVerifier, PlatformSettingsRepository
+from companion.core.ports import PlatformSettingsRepository
 from companion.core.telegram_connection import TelegramConnectionService
 from companion.core.users import InvalidProfileError, UserService
 
@@ -29,6 +31,7 @@ class MeResponse(BaseModel):
     ai_notice_acknowledged_at: datetime | None
     user_memory_enabled: bool
     onboarding_completed_at: datetime | None
+    role: UserRole
 
 
 class OnboardingRequest(BaseModel):
@@ -107,11 +110,12 @@ def to_me_response(user: User) -> MeResponse:
         ai_notice_acknowledged_at=user.ai_notice_acknowledged_at,
         user_memory_enabled=user.user_memory_enabled,
         onboarding_completed_at=user.onboarding_completed_at,
+        role=user.role,
     )
 
 
 def build_dashboard_api_router(
-    auth_verifier: AuthVerifier,
+    current_user: Callable[..., User],
     user_service: UserService,
     telegram_connection_service: TelegramConnectionService,
     platform_settings: PlatformSettingsRepository,
@@ -123,9 +127,8 @@ def build_dashboard_api_router(
     first request.
 
     Args:
-        auth_verifier: Checks bearer tokens.
-        user_service: Finds or creates the User behind a token, and keeps their
-            profile.
+        current_user: The dependency that finds the User making a request.
+        user_service: Keeps the User's profile.
         telegram_connection_service: Issues tokens and reports connection status.
         platform_settings: Admin-managed wording shown on the Dashboard.
         telegram_bot_username: The Companion's Telegram @username, for deep links.
@@ -134,24 +137,6 @@ def build_dashboard_api_router(
         The router.
     """
     router = APIRouter(prefix="/api")
-
-    def current_user(authorization: Annotated[str | None, Header()] = None) -> User:
-        """Find the User making the request.
-
-        Args:
-            authorization: The `Authorization: Bearer <token>` header.
-
-        Returns:
-            The User.
-
-        Raises:
-            HTTPException: 401 if the token is missing or not valid.
-        """
-        scheme, _, token = (authorization or "").partition(" ")
-        identity = auth_verifier.verify(token) if scheme == "Bearer" else None
-        if identity is None:
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not signed in")
-        return user_service.get_or_create(identity)
 
     def to_token_response(
         token: ConnectionToken, token_status: ConnectionTokenStatus

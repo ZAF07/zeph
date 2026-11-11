@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
+from typing import Any
 from uuid import UUID
 
 
@@ -15,6 +16,13 @@ class AccountIdentity:
 
     auth_id: str
     email: str | None
+
+
+class UserRole(StrEnum):
+    """What a User may do on the platform."""
+
+    USER = "user"
+    ADMIN = "admin"
 
 
 @dataclass(frozen=True)
@@ -35,6 +43,7 @@ class User:
             AI notice, if they have.
         user_memory_enabled: Whether the Companion may keep User Memory.
         onboarding_completed_at: When they finished onboarding, if they have.
+        role: Whether they are a plain User or an Admin.
     """
 
     id: UUID
@@ -49,6 +58,24 @@ class User:
     ai_notice_acknowledged_at: datetime | None = None
     user_memory_enabled: bool = True
     onboarding_completed_at: datetime | None = None
+    role: UserRole = UserRole.USER
+
+
+@dataclass(frozen=True)
+class UserOverview:
+    """What Admins see about a User: activity counts, never message text.
+
+    Attributes:
+        user: The User.
+        telegram_connected: Whether they have a Telegram Connection.
+        conversation_count: How many Conversations they have had.
+        messages_sent: How many messages they have sent the Companion.
+    """
+
+    user: User
+    telegram_connected: bool
+    conversation_count: int
+    messages_sent: int
 
 
 @dataclass(frozen=True)
@@ -261,3 +288,21 @@ class ChatLine:
 
     role: ChatRole
     text: str
+
+
+@dataclass(frozen=True)
+class StoredSetting:
+    """A platform setting's value and when it was last saved.
+
+    Attributes:
+        key: The setting's key.
+        value: Its value.
+        updated_at: When it was last saved.
+        updated_by_name: The name, or else email, of the Admin who last saved
+            it; None if it still has its seeded value.
+    """
+
+    key: str
+    value: Any
+    updated_at: datetime
+    updated_by_name: str | None

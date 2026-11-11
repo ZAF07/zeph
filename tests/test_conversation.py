@@ -11,26 +11,12 @@ from tests.conftest import DASHBOARD_URL
 from tests.fakes import FakeAuthVerifier, FakeChatChannel, FakeClock, ScriptedChatModel
 from tests.telegram_helpers import (
     TELEGRAM_CHAT_ID,
-    auth_headers,
-    create_connection_token,
+    connect_telegram,
     send_to_webhook,
     telegram_text_update,
 )
 
 STRANGER_TELEGRAM_ID = 7770001
-
-
-def connect_telegram(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-) -> None:
-    """Sign up a User, make their Telegram Connection and forget the welcome."""
-    headers = auth_headers(auth_verifier, "user_maya")
-    token = create_connection_token(client, headers)
-    assert send_to_webhook(client, telegram_text_update(f"/start {token}")) == 200
-    chat_channel.sent.clear()
-    chat_channel.events.clear()
 
 
 def set_platform_setting(engine: Engine, key: str, value: Any) -> None:

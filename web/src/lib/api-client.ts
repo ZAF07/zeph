@@ -23,6 +23,9 @@ export type TelegramConnectionStatus = {
   latest_token: ConnectionToken | null;
 };
 
+/** Whether a User is a plain User or an Admin. */
+export type UserRole = "user" | "admin";
+
 /** The signed-in User, with their profile and preferences. */
 export type Me = {
   id: string;
@@ -35,6 +38,7 @@ export type Me = {
   ai_notice_acknowledged_at: string | null;
   user_memory_enabled: boolean;
   onboarding_completed_at: string | null;
+  role: UserRole;
 };
 
 /** Everything a new User answers during onboarding. */
@@ -64,6 +68,52 @@ export type PlatformContent = {
   onboarding_reason_choices: string[];
 };
 
+/** A User as Admins see them: activity counts, never message text. */
+export type AdminUser = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  role: UserRole;
+  signed_up_at: string;
+  telegram_connected: boolean;
+  conversation_count: number;
+  messages_sent: number;
+};
+
+/** A User's role after a change. */
+export type RoleChange = {
+  id: string;
+  role: UserRole;
+};
+
+/** The value of a platform setting Admins can edit. */
+export type SettingValue = string | number;
+
+/** A platform setting's value and when, and by whom, it was last saved. */
+export type AdminSetting = {
+  value: SettingValue;
+  updated_at: string;
+  updated_by: string | null;
+};
+
+/** Every platform setting Admins can edit, by key. */
+export type AdminSettings = Record<string, AdminSetting>;
+
+/** A core service whose prompt and model Admins can change. */
+export type CoreService = {
+  name: string;
+  runs_when: string;
+  description: string;
+  prompt_key: string;
+  model_key: string;
+};
+
+/** The core services and the models Admins can pick for them. */
+export type CoreServices = {
+  services: CoreService[];
+  model_choices: string[];
+};
+
 /** Every call the Dashboard makes to the backend. */
 export type ApiClient = {
   getMe: () => Promise<Me>;
@@ -72,6 +122,13 @@ export type ApiClient = {
   getPlatformContent: () => Promise<PlatformContent>;
   getTelegramConnection: () => Promise<TelegramConnectionStatus>;
   createConnectionToken: () => Promise<ConnectionToken>;
+  listAdminUsers: () => Promise<AdminUser[]>;
+  changeUserRole: (userId: string, role: UserRole) => Promise<RoleChange>;
+  getAdminSettings: () => Promise<AdminSettings>;
+  updateAdminSettings: (
+    values: Record<string, SettingValue>,
+  ) => Promise<AdminSettings>;
+  getCoreServices: () => Promise<CoreServices>;
 };
 
 /** Raised when the backend answers with an error status. */
@@ -79,13 +136,38 @@ export class ApiError extends Error {
   /**
    * @param status - The HTTP status code.
    * @param path - The API path that failed.
+   * @param detail - The backend's explanation, when it gave one.
    */
   constructor(
     readonly status: number,
     path: string,
+    readonly detail: string | null = null,
   ) {
     super(`API request to ${path} failed with status ${status}`);
   }
+}
+
+/**
+ * Reads the backend's explanation from an error response, if it has one.
+ *
+ * @param response - The error response.
+ * @returns The `detail` text, or null.
+ */
+async function errorDetail(response: Response): Promise<string | null> {
+  try {
+    const body: unknown = await response.json();
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      "detail" in body &&
+      typeof body.detail === "string"
+    ) {
+      return body.detail;
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 /**
@@ -118,7 +200,7 @@ export function createApiClient(
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     if (!response.ok) {
-      throw new ApiError(response.status, path);
+      throw new ApiError(response.status, path, await errorDetail(response));
     }
     return (await response.json()) as T;
   }
@@ -133,5 +215,21 @@ export function createApiClient(
       request<TelegramConnectionStatus>("/api/telegram-connection"),
     createConnectionToken: () =>
       request<ConnectionToken>("/api/telegram-connection/tokens", "POST"),
+    listAdminUsers: async () =>
+      (await request<{ users: AdminUser[] }>("/api/admin/users")).users,
+    changeUserRole: (userId, role) =>
+      request<RoleChange>(`/api/admin/users/${userId}/role`, "PUT", { role }),
+    getAdminSettings: async () =>
+      (await request<{ settings: AdminSettings }>("/api/admin/settings"))
+        .settings,
+    updateAdminSettings: async (values) =>
+      (
+        await request<{ settings: AdminSettings }>(
+          "/api/admin/settings",
+          "PATCH",
+          { values },
+        )
+      ).settings,
+    getCoreServices: () => request<CoreServices>("/api/admin/core-services"),
   };
 }

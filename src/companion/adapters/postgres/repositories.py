@@ -1,8 +1,9 @@
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Engine, Row, select, update
+from sqlalchemy import Engine, Row, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from companion.adapters.postgres.tables import (
@@ -19,8 +20,11 @@ from companion.core.models import (
     ConversationMessage,
     MessageDirection,
     MessageKind,
+    StoredSetting,
     TelegramConnection,
     User,
+    UserOverview,
+    UserRole,
 )
 from companion.core.ports import Repositories
 
@@ -47,6 +51,7 @@ def _to_user(row: Row[Any]) -> User:
         ai_notice_acknowledged_at=row.ai_notice_acknowledged_at,
         user_memory_enabled=row.user_memory_enabled,
         onboarding_completed_at=row.onboarding_completed_at,
+        role=UserRole(row.role),
     )
 
 
@@ -134,6 +139,19 @@ class PostgresUserRepository:
         """
         self._engine = engine
 
+    def get(self, user_id: UUID) -> User | None:
+        """Find a User by our ID.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The User, or None if there is none.
+        """
+        with self._engine.connect() as connection:
+            row = connection.execute(select(users).where(users.c.id == user_id)).first()
+        return _to_user(row) if row else None
+
     def get_by_auth_id(self, auth_id: str) -> User | None:
         """Find a User by the auth provider's account ID.
 
@@ -165,6 +183,7 @@ class PostgresUserRepository:
                 auth_id=user.auth_id,
                 email=user.email,
                 created_at=user.created_at,
+                role=user.role.value,
             )
             .on_conflict_do_nothing(index_elements=[users.c.auth_id])
         )
@@ -201,6 +220,115 @@ class PostgresUserRepository:
         )
         with self._engine.begin() as connection:
             row = connection.execute(statement).one()
+        return _to_user(row)
+
+    def list_overviews(self) -> list[UserOverview]:
+        """List every User with their activity counts, newest sign-up first.
+
+        Returns:
+            One overview per User.
+        """
+        conversation_count = (
+            select(func.count())
+            .select_from(conversations)
+            .where(conversations.c.user_id == users.c.id)
+            .scalar_subquery()
+        )
+        messages_sent = (
+            select(func.count())
+            .select_from(conversation_messages.join(conversations))
+            .where(
+                conversations.c.user_id == users.c.id,
+                conversation_messages.c.direction == MessageDirection.INCOMING.value,
+            )
+            .scalar_subquery()
+        )
+        telegram_connected = (
+            select(telegram_connections.c.user_id)
+            .where(telegram_connections.c.user_id == users.c.id)
+            .exists()
+        )
+        statement = select(
+            users,
+            telegram_connected.label("telegram_connected"),
+            conversation_count.label("conversation_count"),
+            messages_sent.label("messages_sent"),
+        ).order_by(users.c.created_at.desc())
+        with self._engine.connect() as connection:
+            rows = connection.execute(statement).all()
+        return [
+            UserOverview(
+                user=_to_user(row),
+                telegram_connected=row.telegram_connected,
+                conversation_count=row.conversation_count,
+                messages_sent=row.messages_sent,
+            )
+            for row in rows
+        ]
+
+    def count_admins(self) -> int:
+        """Count the Users who are Admins.
+
+        Returns:
+            How many Admins there are.
+        """
+        with self._engine.connect() as connection:
+            admin_count = connection.execute(
+                select(func.count())
+                .select_from(users)
+                .where(users.c.role == UserRole.ADMIN.value)
+            ).scalar_one()
+        return int(admin_count)
+
+    def promote_to_admin(self, user_id: UUID) -> User:
+        """Make a User an Admin.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The saved User.
+        """
+        with self._engine.begin() as connection:
+            row = connection.execute(
+                update(users)
+                .where(users.c.id == user_id)
+                .values(role=UserRole.ADMIN.value)
+                .returning(users)
+            ).one()
+        return _to_user(row)
+
+    def demote_unless_last_admin(self, user_id: UUID) -> User | None:
+        """Make an Admin a plain User, in one step, unless they are the only one.
+
+        The Admin rows are locked first, so a second demotion running at the
+        same time waits and then sees this one.
+
+        Args:
+            user_id: The Admin's ID.
+
+        Returns:
+            The saved User, or None if they are the last Admin.
+        """
+        with self._engine.begin() as connection:
+            admin_ids = (
+                connection.execute(
+                    select(users.c.id)
+                    .where(users.c.role == UserRole.ADMIN.value)
+                    .with_for_update()
+                )
+                .scalars()
+                .all()
+            )
+            other_admins = [admin_id for admin_id in admin_ids if admin_id != user_id]
+            if not other_admins:
+                return None
+            row = connection.execute(
+                update(users)
+                .where(users.c.id == user_id)
+                .values(role=UserRole.USER.value)
+                .returning(users)
+            ).one()
         return _to_user(row)
 
 
@@ -491,6 +619,56 @@ class PostgresPlatformSettingsRepository:
         if row is None:
             raise KeyError(key)
         return row.value
+
+    def get_many(self, keys: Sequence[str]) -> list[StoredSetting]:
+        """Read several settings with when and by whom they were last saved.
+
+        Args:
+            keys: The settings' keys.
+
+        Returns:
+            The settings that exist, in the order of `keys`.
+        """
+        statement = (
+            select(
+                platform_settings.c.key,
+                platform_settings.c.value,
+                platform_settings.c.updated_at,
+                func.coalesce(users.c.name, users.c.email).label("updated_by_name"),
+            )
+            .select_from(platform_settings.outerjoin(users))
+            .where(platform_settings.c.key.in_(keys))
+        )
+        with self._engine.connect() as connection:
+            rows = {row.key: row for row in connection.execute(statement).all()}
+        return [
+            StoredSetting(
+                key=key,
+                value=rows[key].value,
+                updated_at=rows[key].updated_at,
+                updated_by_name=rows[key].updated_by_name,
+            )
+            for key in keys
+            if key in rows
+        ]
+
+    def save_many(
+        self, values: Mapping[str, Any], updated_at: datetime, updated_by: UUID
+    ) -> None:
+        """Save new values for several settings in one step.
+
+        Args:
+            values: The new value for each setting key.
+            updated_at: When they are being saved.
+            updated_by: The Admin saving them.
+        """
+        with self._engine.begin() as connection:
+            for key, value in values.items():
+                connection.execute(
+                    update(platform_settings)
+                    .where(platform_settings.c.key == key)
+                    .values(value=value, updated_at=updated_at, updated_by=updated_by)
+                )
 
 
 def build_postgres_repositories(engine: Engine) -> Repositories:
