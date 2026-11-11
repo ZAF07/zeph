@@ -1,4 +1,4 @@
-.PHONY: check check-python check-web contract eval up
+.PHONY: check check-python check-web contract eval up restart
 
 ## Run every check from CLAUDE.md (Python and TypeScript).
 check: check-python check-web
@@ -26,3 +26,7 @@ eval:
 ## Start everything.
 up:
 	docker compose up --build
+
+## Rebuild and restart everything in the background, picking up code and .env changes.
+restart:
+	docker compose up --build --force-recreate --detach
