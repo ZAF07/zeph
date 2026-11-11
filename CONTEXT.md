@@ -37,7 +37,7 @@ A one-time, short-lived code from the Dashboard that a User sends to the Compani
 _Avoid_: Link code, invite, pairing code
 
 **Conversation**:
-A run of messages between a User and the Companion that ends after a quiet gap (set by an Admin) with no message from either side. A Check-in the User replies to also starts one.
+A run of messages between a User and the Companion that ends after a quiet gap (set by an Admin) with no message from either side. Once ended it never reopens: the next message starts a new Conversation. A Check-in the User replies to also starts one.
 _Avoid_: Session, thread, chat
 
 **Knowledge**:
@@ -89,17 +89,17 @@ _Avoid_: Alert, incident, flag
 ### User Memory
 
 **User Memory**:
-Everything the Companion has retained about a specific User, made up of Memory Items and Conversation Summaries.
+Everything the Companion has retained about a specific User, made up of Memory Items and Conversation Summaries. The User can turn it off: then nothing new is kept and the Companion doesn't use what it has, but nothing is deleted until the User deletes it.
 _Avoid_: Memory, profile, history, context
 
 **Memory Item**:
-A single fact about a User (e.g. a goal, value or preference), belonging to one Memory Category. Added, updated or removed when a Conversation ends; the User can delete it.
+A single fact about a User (e.g. a goal, value or preference), belonging to one Memory Category. Comes from a Conversation, or from the User's Onboarding answers (their name and what brings them here). Added, updated or removed when a Conversation ends — a changed fact replaces the old one rather than sitting beside it; the User can delete it.
 _Avoid_: Memory, fact, note
 
 **Memory Category**:
-The kind of fact a Memory Item records, used to fetch only relevant items. Managed by Admins; can be archived but never deleted.
+The kind of fact a Memory Item records, used to fetch only relevant items for each reply. An "always include" category's items go into every reply. Managed by Admins; can be archived but never deleted.
 _Avoid_: Type, tag, label
 
 **Conversation Summary**:
-A short account of what one Conversation covered and how the User seemed, written when the Conversation ends.
+A short account of what one Conversation covered and how the User seemed (its mood), written once, when the Conversation ends. The newest few go into every reply.
 _Avoid_: Recap, transcript, log
