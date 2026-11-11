@@ -77,4 +77,4 @@ Caveats / follow-ups:
 ## Completion
 
 - Completed: 2026-11-11
-- Commit: <to be filled in manually>
+- Commit: cf5f408
