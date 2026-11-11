@@ -70,4 +70,4 @@ Evidence:
 ## Completion
 
 - Completed: 2026-11-11
-- Commit: <to be filled in manually>
+- Commit: 917ee4c (merged from `feat/03-onboarding`)
