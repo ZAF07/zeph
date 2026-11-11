@@ -1,0 +1,20 @@
+# Starting values for admin-managed platform settings (ADR-0004).
+# Loaded on start; a key already in the database is never overwritten.
+# `{dashboard_url}` in a reply is replaced with the Dashboard's address.
+
+connection_token_ttl_minutes: 15
+
+welcome_message: >-
+  Hi, I'm Zeph 👋 Good to meet you here. I'm an AI companion — someone to think
+  things through with, not a therapist or a crisis service. Tell me what's on
+  your mind whenever you like, there's no rush.
+
+connection_token_invalid_reply: >-
+  That link has expired or was already used. For your security each link works
+  once and only for a short while. You can get a fresh one from your Dashboard:
+  {dashboard_url}
+
+telegram_connected_elsewhere_reply: >-
+  This Telegram account is already connected to another Zeph account. Sign in to
+  that account and disconnect Telegram there first, or use a different Telegram
+  account: {dashboard_url}

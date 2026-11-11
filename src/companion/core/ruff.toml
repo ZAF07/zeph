@@ -1,0 +1,15 @@
+# The core owns the ports; it must never import an adapter's library (ADR-0003).
+extend = "../../../pyproject.toml"
+
+[lint.flake8-tidy-imports.banned-api]
+"companion.adapters".msg = "Core must not import adapters."
+"sqlalchemy".msg = "Core must not import database libraries; use a repository port."
+"psycopg".msg = "Core must not import database libraries; use a repository port."
+"alembic".msg = "Core must not import database libraries."
+"jwt".msg = "Core must not import auth libraries; use the AuthVerifier port."
+"httpx".msg = "Core must not make HTTP calls; use a port."
+"fastapi".msg = "Core must not import the web framework."
+"telegram".msg = "Core must not import Telegram libraries; use the ChatChannel port."
+"clerk_backend_api".msg = "Core must not import Clerk; use the AuthVerifier port."
+"langchain".msg = "Core must not import LangChain; use a port."
+"langgraph".msg = "Core must not import LangGraph; use the conversation engine port."

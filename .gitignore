@@ -1,0 +1,21 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Dashboard
+web/node_modules/
+web/.next/
+web/next-env.d.ts
+web/*.tsbuildinfo
+
+# OS
+.DS_Store

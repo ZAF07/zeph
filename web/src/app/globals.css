@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens from the Foundations screen of docs/design/zeph-product.html.
+ * Tailwind's default colours are cleared so pages can only use these.
+ */
+@theme {
+  --color-*: initial;
+  --color-white: #ffffff;
+  --color-subtle: #fafafa;
+  --color-hover: #efefef;
+  --color-line: #ebebeb;
+  --color-line-strong: #d4d4d4;
+  --color-code: #f4f4f5;
+  --color-ink: #0a0a0a;
+  --color-ink-body: #262626;
+  --color-ink-soft: #525252;
+  --color-ink-muted: #6b6b6b;
+  --color-black: #0a0a0a;
+  --color-on-black-soft: #bdbdbd;
+  --color-on-black-muted: #a3a3a3;
+  --color-blue: #1f4fff;
+  --color-blue-tint: #edf1ff;
+  --color-blue-deep: #1533b3;
+  --color-orange: #ff5a1f;
+  --color-orange-text: #c2410c;
+  --color-yellow: #ffc633;
+  --color-yellow-tint: #fff6cc;
+  --color-yellow-deep: #6b4f00;
+  --color-danger: #c81e1e;
+  --color-danger-tint: #fef3f2;
+  --color-danger-line: #fecdca;
+  --color-danger-deep: #912018;
+
+  --font-sans: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --text-display: clamp(44px, 6vw, 76px);
+  --text-display--line-height: 1.02;
+  --text-display--letter-spacing: -0.025em;
+  --text-h1: 48px;
+  --text-h1--line-height: 1.1;
+  --text-h1--letter-spacing: -0.015em;
+  --text-h2: 28px;
+  --text-h2--line-height: 1.2;
+  --text-h3: 18px;
+  --text-h3--line-height: 1.4;
+  --text-body: 16px;
+  --text-body--line-height: 1.55;
+  --text-lead: 18px;
+  --text-lead--line-height: 1.55;
+  --text-eyebrow: 13px;
+  --text-eyebrow--letter-spacing: 0.06em;
+  --text-caption: 13px;
+
+  --radius-input: 10px;
+  --radius-card: 14px;
+  --radius-panel: 16px;
+
+  --spacing: 4px;
+}
+
+body {
+  margin: 0;
+  background: var(--color-white);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
+
+a {
+  color: var(--color-blue);
+}
+
+a:hover {
+  color: var(--color-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-blue);
+  outline-offset: 2px;
+}
+
+.brand-stripe {
+  background: linear-gradient(
+    90deg,
+    var(--color-orange) 0 33.3%,
+    var(--color-yellow) 33.3% 66.6%,
+    var(--color-blue) 66.6% 100%
+  );
+}

@@ -1,0 +1,118 @@
+from dataclasses import dataclass
+from datetime import datetime
+from enum import StrEnum
+from uuid import UUID
+
+
+@dataclass(frozen=True)
+class AccountIdentity:
+    """Who a Dashboard request is from, as told by the auth provider.
+
+    Attributes:
+        auth_id: The auth provider's ID for the account (the Clerk user ID).
+        email: The account's email address, if known.
+    """
+
+    auth_id: str
+    email: str | None
+
+
+@dataclass(frozen=True)
+class User:
+    """A person with an account who converses with the Companion.
+
+    Attributes:
+        id: Our ID for the User.
+        auth_id: The auth provider's ID for the account; unique per User.
+        email: The User's email address, if known.
+        created_at: When the User signed up.
+    """
+
+    id: UUID
+    auth_id: str
+    email: str | None
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class TelegramConnection:
+    """The link between a User and their Telegram account.
+
+    Attributes:
+        user_id: The User this connection belongs to.
+        telegram_user_id: The Telegram account's ID; linked to one User only.
+        telegram_chat_id: The chat the Companion sends messages to.
+        telegram_username: The Telegram @username, if the account has one.
+        connected_at: When the connection was made.
+    """
+
+    user_id: UUID
+    telegram_user_id: int
+    telegram_chat_id: int
+    telegram_username: str | None
+    connected_at: datetime
+
+
+class ConnectionTokenStatus(StrEnum):
+    """Where a connection token stands."""
+
+    ACTIVE = "active"
+    USED = "used"
+    EXPIRED = "expired"
+    CONNECTED_ELSEWHERE = "connected_elsewhere"
+
+
+@dataclass(frozen=True)
+class ConnectionToken:
+    """A one-time, expiring code a User sends to the Companion to connect Telegram.
+
+    Attributes:
+        user_id: The User who asked for the token.
+        token: The code itself, e.g. "7Q2K-ZEPH".
+        created_at: When the token was made.
+        expires_at: When the token stops working.
+        used_at: When the token made a Telegram Connection, if it has.
+        rejected_at: When the token was refused because the Telegram account
+            already belongs to another User, if it was.
+    """
+
+    user_id: UUID
+    token: str
+    created_at: datetime
+    expires_at: datetime
+    used_at: datetime | None
+    rejected_at: datetime | None
+
+    def status_at(self, now: datetime) -> ConnectionTokenStatus:
+        """Work out the token's status at a given time.
+
+        Args:
+            now: The time to check at.
+
+        Returns:
+            The token's status.
+        """
+        if self.used_at is not None:
+            return ConnectionTokenStatus.USED
+        if self.rejected_at is not None:
+            return ConnectionTokenStatus.CONNECTED_ELSEWHERE
+        if now >= self.expires_at:
+            return ConnectionTokenStatus.EXPIRED
+        return ConnectionTokenStatus.ACTIVE
+
+
+@dataclass(frozen=True)
+class IncomingMessage:
+    """A message a person sent to the Companion, independent of chat channel.
+
+    Attributes:
+        sender_id: The sender's account ID on the chat channel.
+        chat_id: The chat to reply in.
+        sender_username: The sender's username on the chat channel, if any.
+        text: The message text.
+    """
+
+    sender_id: int
+    chat_id: int
+    sender_username: str | None
+    text: str

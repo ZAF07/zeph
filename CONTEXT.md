@@ -32,6 +32,10 @@ _Avoid_: Sticker pack, emoji set
 The link between a User's account and their Telegram account, made once from the Dashboard. A User must have one to talk to the Companion.
 _Avoid_: Telegram link, binding, pairing
 
+**Connection Token**:
+A one-time, short-lived code from the Dashboard that a User sends to the Companion in Telegram to make their Telegram Connection. It works once, and only for the User who asked for it.
+_Avoid_: Link code, invite, pairing code
+
 **Conversation**:
 A run of messages between a User and the Companion that ends after a quiet gap (set by an Admin). A Check-in the User replies to also starts one.
 _Avoid_: Session, thread, chat

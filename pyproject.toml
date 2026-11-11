@@ -1,0 +1,61 @@
+[project]
+name = "companion"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "ZAF07", email = "zaffere07@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.20.1",
+    "fastapi>=0.162.4",
+    "httpx>=0.28.1",
+    "psycopg[binary]>=3.3.8",
+    "pydantic-settings>=2.16.2",
+    "pyjwt[crypto]>=2.15.1",
+    "pyyaml>=6.0.3",
+    "sqlalchemy>=2",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.24,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.4.1",
+    "pytest>=9.2.0",
+    "ruff>=0.17.4",
+    "testcontainers[postgres]>=4.15.0",
+    "types-pyyaml>=6.0.12.20261103",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-m 'not contract'"
+markers = ["contract: needs a real external service and keys; run with `make contract`"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "D", "TID"]
+ignore = ["D100", "D104", "D105", "D107"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]
+"src/companion/adapters/postgres/migrations/**" = ["D400", "D415"]
+
+[tool.mypy]
+strict = true
+files = ["src"]
+plugins = ["pydantic.mypy"]
