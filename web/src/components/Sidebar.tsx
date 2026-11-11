@@ -1,17 +1,24 @@
 import Link from "next/link";
 
+import { SidebarAiNotice } from "@/components/SidebarAiNotice";
 import { SidebarNav } from "@/components/SidebarNav";
 import { ZephLogo } from "@/components/ZephLogo";
 import type { SidebarItem } from "@/components/SidebarNav";
 import type { CurrentAccount } from "@/lib/auth/server";
 
-/** The User pages built so far; later issues add Memories, Check-ins and more. */
+/** The User pages built so far; later issues add Memories and Check-ins. */
 const userSidebarItems: SidebarItem[] = [
   {
     id: "home",
     label: "Home",
     href: "/",
     iconPath: "M4 10.5L12 4l8 6.5V20H4zM10 20v-5h4v5",
+  },
+  {
+    id: "account",
+    label: "Account & privacy",
+    href: "/account",
+    iconPath: "M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z",
   },
 ];
 
@@ -40,23 +47,7 @@ export function Sidebar({ account }: { account: CurrentAccount }) {
       <SidebarNav items={userSidebarItems} />
 
       <div className="mt-auto flex flex-col gap-2.5 px-1">
-        <p className="m-0 flex items-start gap-1.5 px-2 text-xs text-ink-muted">
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            aria-hidden="true"
-            className="mt-px flex-none"
-          >
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 8v4M12 16h.01" />
-          </svg>
-          <span>Zeph is an AI, not a therapist or crisis service.</span>
-        </p>
+        <SidebarAiNotice />
         <div className="flex items-center gap-2.5 p-2">
           <span
             aria-hidden="true"

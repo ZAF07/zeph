@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { OnboardingGate } from "@/components/OnboardingGate";
 import { Sidebar } from "@/components/Sidebar";
 import { getCurrentAccount } from "@/lib/auth/server";
 
 /**
- * The Dashboard shell: sidebar beside the page.
+ * The Dashboard shell: sidebar beside the page. Users who have not finished
+ * onboarding are sent there first.
  *
  * @param props - `children` is the page.
  * @returns The shell.
@@ -26,7 +28,7 @@ export default async function DashboardLayout({
       </div>
       <main className="min-w-0 flex-1 px-4 py-12 md:px-12">
         <div className="mx-auto flex max-w-[880px] flex-col gap-8">
-          {children}
+          <OnboardingGate>{children}</OnboardingGate>
         </div>
       </main>
     </div>

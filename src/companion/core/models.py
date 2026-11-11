@@ -26,12 +26,69 @@ class User:
         auth_id: The auth provider's ID for the account; unique per User.
         email: The User's email address, if known.
         created_at: When the User signed up.
+        name: What the Companion calls the User, once they have said.
+        onboarding_reasons: The "What brings you here?" choices they picked.
+        onboarding_note: What brings them here, in their own words, if given.
+        country: Two-letter country code, used to pick Helplines.
+        time_zone: IANA time zone name, e.g. "Asia/Singapore".
+        ai_notice_acknowledged_at: When they ticked "I understand" on the
+            AI notice, if they have.
+        user_memory_enabled: Whether the Companion may keep User Memory.
+        onboarding_completed_at: When they finished onboarding, if they have.
     """
 
     id: UUID
     auth_id: str
     email: str | None
     created_at: datetime
+    name: str | None = None
+    onboarding_reasons: tuple[str, ...] = ()
+    onboarding_note: str | None = None
+    country: str | None = None
+    time_zone: str | None = None
+    ai_notice_acknowledged_at: datetime | None = None
+    user_memory_enabled: bool = True
+    onboarding_completed_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class OnboardingAnswers:
+    """What a new User told the Dashboard during onboarding.
+
+    Attributes:
+        name: What the Companion should call them.
+        ai_notice_acknowledged: Whether they ticked "I understand".
+        onboarding_reasons: The "What brings you here?" choices they picked.
+        onboarding_note: What brings them here, in their own words.
+        user_memory_enabled: Whether the Companion may keep User Memory.
+        country: Two-letter country code.
+        time_zone: IANA time zone name.
+    """
+
+    name: str
+    ai_notice_acknowledged: bool
+    onboarding_reasons: tuple[str, ...]
+    onboarding_note: str | None
+    user_memory_enabled: bool
+    country: str
+    time_zone: str
+
+
+@dataclass(frozen=True)
+class PreferenceChanges:
+    """Preferences a User wants to change; None means leave it as it is.
+
+    Attributes:
+        name: What the Companion should call them.
+        user_memory_enabled: Whether the Companion may keep User Memory.
+        country: Two-letter country code.
+        time_zone: IANA time zone name.
+    """
+
+    name: str | None = None
+    user_memory_enabled: bool | None = None
+    country: str | None = None
+    time_zone: str | None = None
 
 
 @dataclass(frozen=True)
