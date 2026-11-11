@@ -70,4 +70,4 @@ Evidence:
 ## Completion
 
 - Completed: 2026-11-11
-- Commit: <to be filled in manually>
+- Commit: 20bcb0d (merged from `feat/05-safeguard` in 28e37c4)
