@@ -56,6 +56,14 @@ _Avoid_: Template, check-in type
 The web app where Users manage their account, preferences and privacy, and where Admins configure the platform.
 _Avoid_: Portal, web app, console
 
+**Onboarding**:
+The steps a new User completes on the Dashboard before making their Telegram Connection: what the Companion should call them, acknowledging the AI Notice, what brings them here, country and time zone, and User Memory consent. A User who has not finished it cannot use the rest of the Dashboard.
+_Avoid_: Setup, registration, sign-up (sign-up is the account creation before it)
+
+**AI Notice**:
+The Admin-worded statement that the Companion is an AI, not a therapist, doctor or crisis service, and that Helplines are for emergencies. A User must acknowledge it during Onboarding; a short form stays visible on the Dashboard afterwards.
+_Avoid_: Disclaimer, warning, terms
+
 ### Safety
 
 **Safeguard**:
