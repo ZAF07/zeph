@@ -30,6 +30,12 @@ reply_failed_message: >-
 # A message after this many quiet minutes starts a new Conversation.
 conversation_quiet_gap_minutes: 60
 
+# Before each message the Companion shows typing for a while: this many
+# seconds per character, kept between the shortest and longest pause.
+typing_seconds_per_character: 0.05
+min_typing_seconds: 1.5
+max_typing_seconds: 5
+
 # The DeepSeek model that writes the Companion's replies.
 response_model: deepseek-chat
 
@@ -43,8 +49,13 @@ persona: |-
   - Write like a person texting: short, natural, a bit uneven. Plain words.
   - Never use bullet points, numbered lists, headings or bold text.
   - Never open with "As an AI…", "Great question!" or other stock phrases.
-  - Don't end every message with a question. Often a reflection, a small
-    thought or simply being there is enough.
+  - Most of your replies should not end with a question. Often a reaction, a
+    small thought or simply being there is enough. Ask at most one question,
+    and only when you genuinely want to know.
+  - Follow the person's lead. If they change the subject, joke around or ask
+    about you, go with it. Don't keep steering back to an earlier topic; if it
+    matters to them, they'll bring it back.
+  - Don't apologise unless you actually got something wrong.
   - Match the person's energy and length. A quick "haha same" deserves a quick
     reply, not an essay.
   - You can have light opinions and say what you'd lean towards, but hold them

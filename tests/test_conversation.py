@@ -1,3 +1,4 @@
+import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from typing import Any
@@ -29,17 +30,18 @@ def connect_telegram(
     token = create_connection_token(client, headers)
     assert send_to_webhook(client, telegram_text_update(f"/start {token}")) == 200
     chat_channel.sent.clear()
+    chat_channel.events.clear()
 
 
-def set_platform_setting(engine: Engine, key: str, value: str) -> None:
+def set_platform_setting(engine: Engine, key: str, value: Any) -> None:
     """Change a platform setting the way an Admin would."""
     with engine.begin() as connection:
         connection.execute(
             text(
-                "UPDATE platform_settings SET value = to_jsonb(CAST(:value AS text)) "
+                "UPDATE platform_settings SET value = CAST(:value AS jsonb) "
                 "WHERE key = :key"
             ),
-            {"key": key, "value": value},
+            {"key": key, "value": json.dumps(value)},
         )
 
 
@@ -96,9 +98,34 @@ def test_reply_with_blank_lines_is_sent_as_several_short_messages(
 
     send_to_webhook(client, telegram_text_update("ugh today was rough"))
 
-    assert chat_channel.batches == [
-        ["oh no", "that sounds like a long day", "what happened?"]
+    assert chat_channel.events == [
+        "typing",
+        "typing",
+        "text: oh no",
+        "typing",
+        "text: that sounds like a long day",
+        "typing",
+        "text: what happened?",
     ]
+
+
+def test_typing_pause_before_each_message_follows_platform_settings(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    set_platform_setting(engine, "typing_seconds_per_character", 0.1)
+    set_platform_setting(engine, "min_typing_seconds", 2)
+    set_platform_setting(engine, "max_typing_seconds", 5)
+    chat_model.script("ok\n\n" + "x" * 30 + "\n\n" + "y" * 200)
+
+    send_to_webhook(client, telegram_text_update("hi"))
+
+    assert clock.slept == [2, 3, 5]
 
 
 def test_earlier_messages_in_the_conversation_are_given_to_the_model(

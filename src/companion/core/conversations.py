@@ -8,8 +8,31 @@ from companion.core.models import (
     MessageDirection,
     MessageKind,
 )
-from companion.core.ports import ChatChannel, Clock, Repositories
+from companion.core.ports import (
+    ChatChannel,
+    Clock,
+    PlatformSettingsRepository,
+    Repositories,
+)
 from companion.core.response_composition import ResponseComposer
+
+
+def typing_pause_seconds(text: str, settings: PlatformSettingsRepository) -> float:
+    """Work out how long to show typing before sending a message.
+
+    Longer messages take longer to "type", within the range set by Admins.
+
+    Args:
+        text: The message about to be sent.
+        settings: Holds the typing pace and its lower and upper limits.
+
+    Returns:
+        The pause in seconds.
+    """
+    pause = len(text) * settings.get("typing_seconds_per_character")
+    shortest = settings.get("min_typing_seconds")
+    longest = settings.get("max_typing_seconds")
+    return float(min(max(pause, shortest), longest))
 
 
 class ConversationService:
@@ -51,15 +74,21 @@ class ConversationService:
     def deliver_reply(
         self, conversation_id: UUID, chat_id: int, reply_parts: list[str]
     ) -> None:
-        """Send the Companion's reply and save each part to the Conversation.
+        """Send the Companion's reply, one short message at a time.
+
+        Before each message the Companion shows typing for a while, as a
+        person would. Each message is saved as soon as it is sent.
 
         Args:
             conversation_id: The Conversation being answered.
             chat_id: The chat to send to.
             reply_parts: The short messages that make up the reply, in order.
         """
-        self._chat_channel.send_texts(chat_id, reply_parts)
+        settings = self._repositories.platform_settings
         for part in reply_parts:
+            self._chat_channel.show_typing(chat_id)
+            self._clock.sleep(typing_pause_seconds(part, settings))
+            self._chat_channel.send_text(chat_id, part)
             self._save(conversation_id, MessageDirection.OUTGOING, part)
 
     def _open_conversation_id(self, user_id: UUID) -> UUID:

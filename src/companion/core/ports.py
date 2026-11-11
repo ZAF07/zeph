@@ -26,6 +26,14 @@ class Clock(Protocol):
         """
         ...
 
+    def sleep(self, seconds: float) -> None:
+        """Wait before carrying on.
+
+        Args:
+            seconds: How long to wait.
+        """
+        ...
+
 
 class ChatChannel(Protocol):
     """Sends messages to people on the chat channel (Telegram for the MVP)."""
@@ -36,15 +44,6 @@ class ChatChannel(Protocol):
         Args:
             chat_id: The chat to send to.
             text: The message text.
-        """
-        ...
-
-    def send_texts(self, chat_id: int, texts: list[str]) -> None:
-        """Send several short messages in a row, showing typing between them.
-
-        Args:
-            chat_id: The chat to send to.
-            texts: The message texts, in the order to send them.
         """
         ...
 

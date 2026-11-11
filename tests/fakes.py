@@ -14,13 +14,16 @@ class SentText:
 
 
 class FakeChatChannel:
-    """Chat channel that records sent messages instead of sending them."""
+    """Chat channel that records sent messages instead of sending them.
+
+    `events` lists texts and typing in the order they happened.
+    """
 
     def __init__(self) -> None:
-        """Start with no sent messages."""
+        """Start with nothing sent."""
         self.sent: list[SentText] = []
-        self.batches: list[list[str]] = []
         self.typing_shown_in: list[int] = []
+        self.events: list[str] = []
 
     def send_text(self, chat_id: int, text: str) -> None:
         """Record a text message.
@@ -30,17 +33,7 @@ class FakeChatChannel:
             text: The message text.
         """
         self.sent.append(SentText(chat_id=chat_id, text=text))
-
-    def send_texts(self, chat_id: int, texts: list[str]) -> None:
-        """Record several messages sent in a row as one batch.
-
-        Args:
-            chat_id: The chat the messages are for.
-            texts: The message texts.
-        """
-        self.batches.append(list(texts))
-        for text in texts:
-            self.sent.append(SentText(chat_id=chat_id, text=text))
+        self.events.append(f"text: {text}")
 
     def show_typing(self, chat_id: int) -> None:
         """Record that typing was shown.
@@ -49,6 +42,7 @@ class FakeChatChannel:
             chat_id: The chat it was shown in.
         """
         self.typing_shown_in.append(chat_id)
+        self.events.append("typing")
 
     def texts_sent_to(self, chat_id: int) -> list[str]:
         """List the texts sent to one chat, oldest first.
@@ -96,7 +90,7 @@ class FakeAuthVerifier:
 
 
 class FakeClock:
-    """Clock that only moves when told to."""
+    """Clock that only moves when told to, or when something sleeps on it."""
 
     def __init__(self, start: datetime) -> None:
         """Set the starting time.
@@ -105,6 +99,7 @@ class FakeClock:
             start: The time the clock starts at.
         """
         self._now = start
+        self.slept: list[float] = []
 
     def now(self) -> datetime:
         """Return the current fake time.
@@ -121,6 +116,15 @@ class FakeClock:
             duration: How far to move.
         """
         self._now += duration
+
+    def sleep(self, seconds: float) -> None:
+        """Record a pause and move the clock forward by it, without waiting.
+
+        Args:
+            seconds: How long the pause is.
+        """
+        self.slept.append(seconds)
+        self._now += timedelta(seconds=seconds)
 
 
 @dataclass(frozen=True)

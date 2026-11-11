@@ -1,3 +1,4 @@
+import time
 from datetime import UTC, datetime
 
 
@@ -11,3 +12,11 @@ class SystemClock:
             The current time in UTC.
         """
         return datetime.now(UTC)
+
+    def sleep(self, seconds: float) -> None:
+        """Wait before carrying on.
+
+        Args:
+            seconds: How long to wait.
+        """
+        time.sleep(seconds)
