@@ -40,10 +40,6 @@ _Avoid_: Link code, invite, pairing code
 A run of messages between a User and the Companion that ends after a quiet gap (set by an Admin) with no message from either side. Once ended it never reopens: the next message starts a new Conversation. A Check-in the User replies to also starts one.
 _Avoid_: Session, thread, chat
 
-**Knowledge**:
-The curated library of philosophy, psychology and mindfulness material the Companion draws on. Shared by all Users; never about any one User.
-_Avoid_: Wisdom base, corpus, content
-
 **Check-in**:
 A message the Companion sends first, unprompted, to a User who has opted in — meant to feel like a friend reaching out, not a task reminder.
 _Avoid_: Notification, nudge, reminder, push
@@ -103,3 +99,17 @@ _Avoid_: Type, tag, label
 **Conversation Summary**:
 A short account of what one Conversation covered and how the User seemed (its mood), written once, when the Conversation ends. The newest few go into every reply.
 _Avoid_: Recap, transcript, log
+
+### Knowledge
+
+**Knowledge**:
+The curated library of philosophy, psychology and mindfulness material the Companion draws on, made of Knowledge Documents. Shared by all Users; never about any one User. The Companion brings it in only when it genuinely fits the message, lightly and in its own words, never as a lecture.
+_Avoid_: Wisdom base, corpus, content
+
+**Knowledge Document**:
+One text in the Knowledge library (text, Markdown or PDF), with a title, a source or author, and a tradition. It is Pending until it is made ready, then Ready (used in replies) or Failed (with a reason; an Admin can retry it). Only Ready documents are ever used. Deleting one removes it from replies at once.
+_Avoid_: File, article, resource
+
+**Starter Knowledge**:
+The Knowledge Documents loaded on first run, when the library is empty: public-domain texts and the owner's own summaries, mindfulness first. After that the library is Admin-managed, so a deleted starter document never comes back.
+_Avoid_: Default knowledge, seed content
