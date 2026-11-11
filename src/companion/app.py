@@ -16,6 +16,7 @@ from companion.core.admin_users import AdminUserService
 from companion.core.conversations import ConversationService, ConversationServices
 from companion.core.helplines import HelplineService
 from companion.core.incoming_messages import IncomingMessageHandler
+from companion.core.memory_categories import MemoryCategoryService
 from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.platform_settings import PlatformSettingsService
 from companion.core.ports import (
@@ -181,6 +182,9 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             ),
             helpline_service=helpline_service,
             safeguard=safeguard,
+            memory_category_service=MemoryCategoryService(
+                dependencies.repositories, dependencies.clock
+            ),
         )
     )
     app.include_router(

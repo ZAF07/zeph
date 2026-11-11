@@ -27,6 +27,8 @@ from companion.core.models import (
     Helpline,
     HelplineDetails,
     MemoryCategory,
+    MemoryCategoryDetails,
+    MemoryCategoryOverview,
     MemoryChanges,
     MemoryItem,
     MemorySource,
@@ -1081,6 +1083,94 @@ class PostgresMemoryCategoryRepository:
                 select(memory_categories).order_by(memory_categories.c.sort_order)
             ).all()
         return [_to_memory_category(row) for row in rows]
+
+    def list_overviews(self) -> list[MemoryCategoryOverview]:
+        """List every Memory Category with its Memory Item count, in sort order.
+
+        Returns:
+            The categories, archived ones included.
+        """
+        item_count = func.count(memory_items.c.id).label("item_count")
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                select(memory_categories, item_count)
+                .outerjoin(
+                    memory_items, memory_items.c.category_id == memory_categories.c.id
+                )
+                .group_by(memory_categories.c.id)
+                .order_by(memory_categories.c.sort_order)
+            ).all()
+        return [
+            MemoryCategoryOverview(
+                category=_to_memory_category(row), item_count=row.item_count
+            )
+            for row in rows
+        ]
+
+    def get(self, category_id: UUID) -> MemoryCategory | None:
+        """Find a Memory Category.
+
+        Args:
+            category_id: The category's ID.
+
+        Returns:
+            The category, or None if there is none.
+        """
+        with self._engine.connect() as connection:
+            row = connection.execute(
+                select(memory_categories).where(memory_categories.c.id == category_id)
+            ).first()
+        return _to_memory_category(row) if row else None
+
+    def add(self, details: MemoryCategoryDetails) -> MemoryCategory:
+        """Save a new, active Memory Category last in the list.
+
+        Args:
+            details: Its name, description and "always include".
+
+        Returns:
+            The saved category.
+        """
+        with self._engine.begin() as connection:
+            highest = connection.execute(
+                select(func.max(memory_categories.c.sort_order))
+            ).scalar()
+            row = connection.execute(
+                insert(memory_categories)
+                .values(
+                    id=uuid4(),
+                    name=details.name,
+                    description=details.description,
+                    always_include=details.always_include,
+                    archived=False,
+                    sort_order=0 if highest is None else int(highest) + 1,
+                )
+                .returning(memory_categories)
+            ).one()
+        return _to_memory_category(row)
+
+    def update(self, category: MemoryCategory) -> MemoryCategory:
+        """Save a Memory Category's name, description and flags.
+
+        Args:
+            category: The category with its new values.
+
+        Returns:
+            The saved category.
+        """
+        with self._engine.begin() as connection:
+            row = connection.execute(
+                update(memory_categories)
+                .where(memory_categories.c.id == category.id)
+                .values(
+                    name=category.name,
+                    description=category.description,
+                    always_include=category.always_include,
+                    archived=category.archived,
+                )
+                .returning(memory_categories)
+            ).one()
+        return _to_memory_category(row)
 
 
 class PostgresUserMemoryRepository:
