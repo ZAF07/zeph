@@ -59,4 +59,4 @@ Evidence: seam 1 `tests/test_knowledge.py` (13), `tests/test_knowledge_seed.py` 
 ## Completion
 
 - Completed: 2026-11-12
-- Commit: <to be filled in manually>
+- Commit: c736b35, review fixes f0f9546 (merged from `feat/08-knowledge` in dd52c10)
