@@ -237,6 +237,96 @@ def test_an_archived_category_keeps_its_items_but_gets_no_new_ones(
     assert "Swimming" not in chat_model.calls[-1].instructions
 
 
+def test_an_archived_always_include_category_leaves_every_reply(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    connect_telegram(client, auth_verifier, chat_channel)
+    headers = auth_headers(auth_verifier, "user_maya")
+    have_conversation(
+        client,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        "I hate mornings",
+        processing_answer(
+            operations=[
+                {
+                    "action": "add",
+                    "category": "Preferences",
+                    "content": "Not a morning person",
+                }
+            ]
+        ),
+    )
+
+    archive(client, admin, category_named(client, admin, "Preferences")["id"])
+
+    chat_model.calls.clear()
+    chat_model.script("mm")
+    send_to_webhook(client, telegram_text_update("long day"))
+    assert "Not a morning person" not in chat_model.calls[-1].instructions
+    assert memory_contents(client, headers) == {"Preferences": ["Not a morning person"]}
+
+
+def test_an_item_is_never_moved_into_an_archived_category(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    connect_telegram(client, auth_verifier, chat_channel)
+    headers = auth_headers(auth_verifier, "user_maya")
+    have_conversation(
+        client,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        "I swim most mornings",
+        processing_answer(
+            operations=[
+                {"action": "add", "category": "Life details", "content": "Swims"}
+            ]
+        ),
+    )
+    archive(client, admin, category_named(client, admin, "What helps")["id"])
+
+    have_conversation(
+        client,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        "swimming is what keeps me sane",
+        processing_answer(
+            operations=[
+                {
+                    "action": "update",
+                    "item": 1,
+                    "category": "What helps",
+                    "content": "Swimming keeps them sane",
+                }
+            ]
+        ),
+    )
+
+    assert memory_contents(client, headers) == {
+        "Life details": ["Swimming keeps them sane"]
+    }
+
+
 def test_a_restored_category_gets_new_items_again(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,

@@ -1,6 +1,10 @@
 import logging
 from uuid import UUID, uuid4
 
+from companion.core.memory_categories import (
+    ONBOARDING_NAME_CATEGORY_SETTING,
+    ONBOARDING_REASONS_CATEGORY_SETTING,
+)
 from companion.core.models import (
     ConversationSummary,
     MemoryCategory,
@@ -119,10 +123,10 @@ class UserMemoryService:
             if not category.archived
         }
         name_category = active_categories.get(
-            settings.get("onboarding_name_memory_category")
+            settings.get(ONBOARDING_NAME_CATEGORY_SETTING)
         )
         reasons_category = active_categories.get(
-            settings.get("onboarding_reasons_memory_category")
+            settings.get(ONBOARDING_REASONS_CATEGORY_SETTING)
         )
         facts: list[tuple[MemoryCategory | None, str]] = []
         if user.name:

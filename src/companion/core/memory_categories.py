@@ -9,9 +9,11 @@ from companion.core.models import (
 )
 from companion.core.ports import Clock, Repositories
 
+ONBOARDING_NAME_CATEGORY_SETTING = "onboarding_name_memory_category"
+ONBOARDING_REASONS_CATEGORY_SETTING = "onboarding_reasons_memory_category"
 ONBOARDING_CATEGORY_SETTINGS = (
-    "onboarding_name_memory_category",
-    "onboarding_reasons_memory_category",
+    ONBOARDING_NAME_CATEGORY_SETTING,
+    ONBOARDING_REASONS_CATEGORY_SETTING,
 )
 
 

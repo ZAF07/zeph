@@ -37,7 +37,7 @@ const emptyCategory: MemoryCategoryInput = {
  * @param count - How many Memory Items there are.
  * @returns The count with the right word.
  */
-function itemCount(count: number): string {
+function itemCountLabel(count: number): string {
   return `· ${count} ${count === 1 ? "item" : "items"}`;
 }
 
@@ -233,7 +233,7 @@ export function MemoryCategoriesManager() {
                   <span>
                     <span className="font-semibold">{category.name}</span>{" "}
                     <span className="text-caption text-ink-muted">
-                      {itemCount(category.item_count)}
+                      {itemCountLabel(category.item_count)}
                     </span>
                   </span>
                   <span className="text-caption text-ink-soft">
@@ -324,7 +324,7 @@ export function MemoryCategoriesManager() {
                       {category.name}
                     </span>{" "}
                     <span className="text-caption text-ink-muted">
-                      {itemCount(category.item_count)} kept
+                      {itemCountLabel(category.item_count)} kept
                     </span>
                   </span>
                   <span className="text-caption text-ink-muted">
