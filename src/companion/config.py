@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     webhook_base_url: str
     dashboard_url: str
 
-    deepseek_api_key: str | None = None
+    deepseek_api_key: str
     tavily_api_key: str | None = None
     initial_admin_emails: str = ""
 
@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     auth_verifier_adapter: str = "clerk"
     repositories_adapter: str = "postgres"
     clock_adapter: str = "system"
+    chat_model_adapter: str = "deepseek"
+    conversation_engine_adapter: str = "langgraph"
 
     @property
     def database_url(self) -> str:

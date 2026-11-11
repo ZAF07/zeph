@@ -7,13 +7,24 @@ from typing import Any
 import pytest
 import yaml
 from fastapi.testclient import TestClient
+from langgraph.checkpoint.postgres import PostgresSaver
 from sqlalchemy import Engine, create_engine, text
 from testcontainers.community.postgres import PostgresContainer
 
+from companion.adapters.langgraph.conversation_engine import (
+    LangGraphConversationEngine,
+    build_postgres_checkpointer,
+)
 from companion.adapters.postgres.database import migrate, seed_platform_settings
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.app import AppDependencies, create_app
-from tests.fakes import FakeAuthVerifier, FakeChatChannel, FakeClock
+from companion.core.conversations import ConversationServices
+from tests.fakes import (
+    FakeAuthVerifier,
+    FakeChatChannel,
+    FakeClock,
+    ScriptedChatModel,
+)
 
 WEBHOOK_SECRET = "test-webhook-secret"
 BOT_USERNAME = "zeph_test_bot"
@@ -32,6 +43,12 @@ def database_url() -> Iterator[str]:
         yield url
 
 
+@pytest.fixture(scope="session")
+def checkpointer(database_url: str) -> PostgresSaver:
+    """The LangGraph Postgres checkpointer, set up once on the test database."""
+    return build_postgres_checkpointer(database_url)
+
+
 @pytest.fixture
 def engine(database_url: str) -> Iterator[Engine]:
     """Give each test an empty, freshly seeded database."""
@@ -40,7 +57,7 @@ def engine(database_url: str) -> Iterator[Engine]:
         connection.execute(
             text(
                 "TRUNCATE users, telegram_connections, connection_tokens, "
-                "platform_settings CASCADE"
+                "conversations, conversation_messages, platform_settings CASCADE"
             )
         )
     seed_platform_settings(engine, SEED_FILE)
@@ -67,16 +84,36 @@ def auth_verifier() -> FakeAuthVerifier:
 
 
 @pytest.fixture
+def chat_model() -> ScriptedChatModel:
+    """A chat model that returns scripted replies."""
+    return ScriptedChatModel()
+
+
+@pytest.fixture
 def client(
     engine: Engine,
+    checkpointer: PostgresSaver,
     clock: FakeClock,
     chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
     auth_verifier: FakeAuthVerifier,
 ) -> TestClient:
-    """A test client for the backend wired with fakes and the real database."""
+    """A test client for the backend wired with fakes and the real database.
+
+    The conversation engine is the real LangGraph one, so tests run the same
+    graph as production.
+    """
+
+    def build_conversation_engine(
+        services: ConversationServices,
+    ) -> LangGraphConversationEngine:
+        return LangGraphConversationEngine(services, checkpointer)
+
     dependencies = AppDependencies(
         repositories=build_postgres_repositories(engine),
         chat_channel=chat_channel,
+        chat_model=chat_model,
+        build_conversation_engine=build_conversation_engine,
         auth_verifier=auth_verifier,
         clock=clock,
         telegram_webhook_secret=WEBHOOK_SECRET,

@@ -3,6 +3,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Identity,
     MetaData,
     Table,
     Text,
@@ -51,6 +52,39 @@ connection_tokens = Table(
     Column("expires_at", DateTime(timezone=True), nullable=False),
     Column("used_at", DateTime(timezone=True)),
     Column("rejected_at", DateTime(timezone=True)),
+)
+
+conversations = Table(
+    "conversations",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("started_at", DateTime(timezone=True), nullable=False),
+    Column("last_message_at", DateTime(timezone=True), nullable=False),
+)
+
+conversation_messages = Table(
+    "conversation_messages",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column(
+        "conversation_id",
+        Uuid,
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("position", BigInteger, Identity(), nullable=False, unique=True),
+    Column("direction", Text, nullable=False),
+    Column("kind", Text, nullable=False),
+    Column("content", Text, nullable=False),
+    Column("sent_at", DateTime(timezone=True), nullable=False),
 )
 
 platform_settings = Table(

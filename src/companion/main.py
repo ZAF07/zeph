@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -5,11 +6,24 @@ from sqlalchemy import create_engine
 
 from companion.adapters.clerk.auth_verifier import ClerkAuthVerifier
 from companion.adapters.clock import SystemClock
+from companion.adapters.deepseek.chat_model import DeepSeekChatModel
+from companion.adapters.langgraph.conversation_engine import (
+    LangGraphConversationEngine,
+    build_postgres_checkpointer,
+)
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.adapters.telegram.chat_channel import TelegramChatChannel
 from companion.app import AppDependencies, create_app
 from companion.config import Settings, load_settings
-from companion.core.ports import AuthVerifier, ChatChannel, Clock, Repositories
+from companion.core.conversations import ConversationServices
+from companion.core.ports import (
+    AuthVerifier,
+    ChatChannel,
+    ChatModel,
+    Clock,
+    ConversationEngine,
+    Repositories,
+)
 
 SEED_FILE = Path(__file__).parent / "seed" / "platform_settings.yaml"
 
@@ -98,6 +112,59 @@ def build_clock(settings: Settings) -> Clock:
     raise UnknownAdapterError("CLOCK_ADAPTER", settings.clock_adapter)
 
 
+def build_chat_model(settings: Settings) -> ChatModel:
+    """Build the chat model chosen in `.env`.
+
+    Args:
+        settings: The loaded settings.
+
+    Returns:
+        The chat model.
+
+    Raises:
+        UnknownAdapterError: If the chosen adapter does not exist.
+    """
+    if settings.chat_model_adapter == "deepseek":
+        return DeepSeekChatModel(settings.deepseek_api_key)
+    raise UnknownAdapterError("CHAT_MODEL_ADAPTER", settings.chat_model_adapter)
+
+
+def build_conversation_engine_factory(
+    settings: Settings,
+) -> Callable[[ConversationServices], ConversationEngine]:
+    """Pick how to build the conversation engine chosen in `.env`.
+
+    Args:
+        settings: The loaded settings.
+
+    Returns:
+        A function that builds the engine around the core services.
+
+    Raises:
+        UnknownAdapterError: If the chosen adapter does not exist.
+    """
+    if settings.conversation_engine_adapter == "langgraph":
+        checkpointer = build_postgres_checkpointer(settings.database_url)
+
+        def build_langgraph_engine(
+            services: ConversationServices,
+        ) -> ConversationEngine:
+            """Build the LangGraph engine with the Postgres checkpointer.
+
+            Args:
+                services: The core services the engine runs.
+
+            Returns:
+                The engine.
+            """
+            return LangGraphConversationEngine(services, checkpointer)
+
+        return build_langgraph_engine
+    raise UnknownAdapterError(
+        "CONVERSATION_ENGINE_ADAPTER", settings.conversation_engine_adapter
+    )
+
+
 def build_production_app() -> FastAPI:
     """Build the backend app with the adapters chosen in `.env`.
 
@@ -110,6 +177,8 @@ def build_production_app() -> FastAPI:
     dependencies = AppDependencies(
         repositories=build_repositories(settings),
         chat_channel=build_chat_channel(settings),
+        chat_model=build_chat_model(settings),
+        build_conversation_engine=build_conversation_engine_factory(settings),
         auth_verifier=build_auth_verifier(settings),
         clock=build_clock(settings),
         telegram_webhook_secret=settings.telegram_webhook_secret,

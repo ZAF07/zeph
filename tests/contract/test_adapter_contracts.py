@@ -5,7 +5,9 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from companion.adapters.clerk.auth_verifier import ClerkAuthVerifier
+from companion.adapters.deepseek.chat_model import DeepSeekChatModel
 from companion.adapters.telegram.chat_channel import TelegramChatChannel
+from companion.core.models import ChatLine, ChatRole
 
 pytestmark = pytest.mark.contract
 
@@ -36,3 +38,15 @@ def test_clerk_refuses_a_token_it_did_not_sign() -> None:
     )
 
     assert verifier.verify(forged_token) is None
+
+
+def test_deepseek_generates_a_reply() -> None:
+    chat_model = DeepSeekChatModel(required_env("DEEPSEEK_API_KEY"))
+
+    reply = chat_model.generate(
+        model="deepseek-chat",
+        instructions="Reply with one short friendly sentence.",
+        history=[ChatLine(role=ChatRole.USER, text="hi there")],
+    )
+
+    assert reply.strip()

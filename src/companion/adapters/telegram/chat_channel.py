@@ -25,6 +25,14 @@ class TelegramChatChannel:
         """
         self._call("sendMessage", {"chat_id": chat_id, "text": text})
 
+    def show_typing(self, chat_id: int) -> None:
+        """Show that the Companion is typing.
+
+        Args:
+            chat_id: The chat to show it in.
+        """
+        self._call("sendChatAction", {"chat_id": chat_id, "action": "typing"})
+
     def register_webhook(self, url: str, secret_token: str) -> None:
         """Tell Telegram where to post updates.
 
