@@ -1,8 +1,12 @@
+import hashlib
+import math
+import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from companion.adapters.postgres.tables import EMBEDDING_SIZE
 from companion.core.models import AccountIdentity, ChatLine
 
 
@@ -285,3 +289,62 @@ class ScriptedChatModel:
         if isinstance(answer, Exception):
             raise answer
         return answer
+
+
+class FakeEmbedder:
+    """Embedder that turns the words in a text into a fixed-size vector.
+
+    Each word longer than three letters adds to one slot, so texts sharing
+    words are close and texts with none in common are far apart. Set
+    `failure` to make every call raise it, like a broken model.
+    """
+
+    def __init__(self) -> None:
+        """Start working, with no calls."""
+        self.failure: Exception | None = None
+        self.queries: list[str] = []
+
+    def embed_passages(self, texts: list[str]) -> list[list[float]]:
+        """Embed each text.
+
+        Args:
+            texts: The texts.
+
+        Returns:
+            One vector per text.
+        """
+        return [self._embed(text) for text in texts]
+
+    def embed_query(self, text: str) -> list[float]:
+        """Record and embed a search message.
+
+        Args:
+            text: The message.
+
+        Returns:
+            Its vector.
+        """
+        self.queries.append(text)
+        return self._embed(text)
+
+    def _embed(self, text: str) -> list[float]:
+        """Count the text's longer words into slots and scale to length one.
+
+        Args:
+            text: The text.
+
+        Returns:
+            Its vector; never all zeros.
+
+        Raises:
+            Exception: The `failure` set on the fake, if any.
+        """
+        if self.failure is not None:
+            raise self.failure
+        vector = [0.0] * EMBEDDING_SIZE
+        vector[0] = 0.01
+        for word in re.findall(r"[a-z]{4,}", text.lower()):
+            slot = int(hashlib.sha256(word.encode()).hexdigest(), 16) % EMBEDDING_SIZE
+            vector[slot] += 1.0
+        length = math.sqrt(sum(value * value for value in vector))
+        return [value / length for value in vector]

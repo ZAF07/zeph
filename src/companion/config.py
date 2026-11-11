@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     clock_adapter: str = "system"
     chat_model_adapter: str = "deepseek"
     conversation_engine_adapter: str = "langgraph"
+    embedder_adapter: str = "fastembed"
+    vector_store_adapter: str = "pgvector"
     scheduler_adapter: str = "in_process"
 
     @property

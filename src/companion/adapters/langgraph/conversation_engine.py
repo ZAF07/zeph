@@ -22,6 +22,7 @@ class TurnState(TypedDict, total=False):
     conversation_id: str
     risk_type: str
     memory: str
+    knowledge: str
     reply_parts: list[str]
 
 
@@ -136,6 +137,20 @@ class LangGraphConversationEngine:
             )
             return {"memory": memory}
 
+        def recall_knowledge(state: TurnState) -> TurnState:
+            """Find the Knowledge that may fit the message.
+
+            Args:
+                state: The graph's state so far.
+
+            Returns:
+                The Knowledge to give the reply.
+            """
+            knowledge = services.knowledge_retrieval.recall(
+                UUID(state["conversation_id"])
+            )
+            return {"knowledge": knowledge}
+
         def compose_reply(state: TurnState) -> TurnState:
             """Write the Companion's reply.
 
@@ -146,7 +161,7 @@ class LangGraphConversationEngine:
                 The reply as short messages.
             """
             reply_parts = services.response_composer.compose(
-                UUID(state["conversation_id"]), state["memory"]
+                UUID(state["conversation_id"]), state["memory"], state["knowledge"]
             )
             return {"reply_parts": reply_parts}
 
@@ -169,6 +184,7 @@ class LangGraphConversationEngine:
         graph.add_node("check_safeguard", check_safeguard)
         graph.add_node("send_crisis_reply", send_crisis_reply)
         graph.add_node("recall_memory", recall_memory)
+        graph.add_node("recall_knowledge", recall_knowledge)
         graph.add_node("compose_reply", compose_reply)
         graph.add_node("deliver_reply", deliver_reply)
         graph.add_edge(START, "record_incoming")
@@ -179,7 +195,8 @@ class LangGraphConversationEngine:
             ["send_crisis_reply", "recall_memory"],
         )
         graph.add_edge("send_crisis_reply", END)
-        graph.add_edge("recall_memory", "compose_reply")
+        graph.add_edge("recall_memory", "recall_knowledge")
+        graph.add_edge("recall_knowledge", "compose_reply")
         graph.add_edge("compose_reply", "deliver_reply")
         graph.add_edge("deliver_reply", END)
         self._graph = graph.compile(checkpointer=checkpointer)
@@ -188,7 +205,8 @@ class LangGraphConversationEngine:
         """Answer one message: save it, run the Safeguard, then reply.
 
         On a crisis the Crisis Reply is sent instead of a composed reply.
-        Otherwise the User Memory that matters is recalled for the reply.
+        Otherwise the User Memory that matters and the Knowledge that may fit
+        are recalled for the reply.
 
         Args:
             turn: The message to answer.

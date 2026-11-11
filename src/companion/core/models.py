@@ -537,3 +537,93 @@ class ConversationSummary:
     summary: str
     mood: str
     created_at: datetime
+
+
+class KnowledgeFileType(StrEnum):
+    """The kinds of file a Knowledge document can be uploaded as."""
+
+    TEXT = "text"
+    MARKDOWN = "markdown"
+    PDF = "pdf"
+
+
+class KnowledgeStatus(StrEnum):
+    """Where a Knowledge document is in being made ready for replies."""
+
+    PENDING = "pending"
+    READY = "ready"
+    FAILED = "failed"
+
+
+@dataclass(frozen=True)
+class KnowledgeUpload:
+    """A Knowledge document as an Admin uploads it.
+
+    Attributes:
+        title: Its title, e.g. "Dhammapada".
+        source: Who wrote or translated it, e.g. "Seneca, trans. Gummere".
+        tradition: The tradition it belongs to, e.g. "Buddhism".
+        file_name: The uploaded file's name.
+        file_type: What kind of file it is.
+        content: The file's bytes.
+    """
+
+    title: str
+    source: str
+    tradition: str
+    file_name: str
+    file_type: KnowledgeFileType
+    content: bytes
+
+
+@dataclass(frozen=True)
+class KnowledgeDocument:
+    """A document in the Knowledge library, without its file.
+
+    Attributes:
+        id: Our ID for the document.
+        title: Its title.
+        source: Who wrote or translated it.
+        tradition: The tradition it belongs to.
+        file_name: The uploaded file's name.
+        file_type: What kind of file it was.
+        status: Whether it is pending, ready for replies, or failed.
+        failure_reason: Why it failed, as Admins are told; None unless failed.
+        created_at: When it was uploaded.
+    """
+
+    id: UUID
+    title: str
+    source: str
+    tradition: str
+    file_name: str
+    file_type: KnowledgeFileType
+    status: KnowledgeStatus
+    failure_reason: str | None
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class EmbeddedChunk:
+    """One piece of a Knowledge document, with its embedding.
+
+    Attributes:
+        text: The piece's text.
+        embedding: Its embedding, from the embedder.
+    """
+
+    text: str
+    embedding: list[float]
+
+
+@dataclass(frozen=True)
+class KnowledgeChunkMatch:
+    """A Knowledge chunk found by a search, best match first.
+
+    Attributes:
+        document_id: The document the chunk is from.
+        text: The chunk's text.
+    """
+
+    document_id: UUID
+    text: str

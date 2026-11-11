@@ -6,6 +6,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 
 from companion.adapters.clerk.auth_verifier import ClerkAuthVerifier
 from companion.adapters.deepseek.chat_model import DeepSeekChatModel
+from companion.adapters.fastembed.embedder import FastEmbedEmbedder
+from companion.adapters.postgres.tables import EMBEDDING_SIZE
 from companion.adapters.telegram.chat_channel import TelegramChatChannel
 from companion.core.models import ChatLine, ChatRole
 
@@ -50,3 +52,13 @@ def test_deepseek_generates_a_reply() -> None:
     )
 
     assert reply.strip()
+
+
+def test_fastembed_embeddings_have_the_size_the_vector_store_keeps() -> None:
+    embedder = FastEmbedEmbedder()
+
+    passages = embedder.embed_passages(["Notice the breath.", "Return gently."])
+    query = embedder.embed_query("how do I calm down?")
+
+    assert [len(vector) for vector in passages] == [EMBEDDING_SIZE, EMBEDDING_SIZE]
+    assert len(query) == EMBEDDING_SIZE

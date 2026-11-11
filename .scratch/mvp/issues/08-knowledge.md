@@ -35,3 +35,7 @@ Build order inside this issue: (1) backend API and seam 1 tests — this fixes t
 ## Blocked by
 
 - `.scratch/mvp/issues/04-admin-area-foundation.md`
+
+## Comments
+
+**2026-11-11 — started on branch `feat/08-knowledge`.** Plan: ports for embedder (fastembed BGE small, 384 dims), vector store (pgvector) and document text extraction (pypdf); `KnowledgeService` (upload → pending → background ingestion → ready/failed, retry, delete, starter seed); `KnowledgeRetrieval` step before response composition; admin API under `/api/admin/knowledge-documents`; `/admin/knowledge` page.

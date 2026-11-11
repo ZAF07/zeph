@@ -36,6 +36,7 @@ describe("SidebarNav", () => {
       "Prompts & models",
       "Safety",
       "Safeguard Events",
+      "Knowledge",
       "Memory Categories",
       "Platform settings",
     ]);

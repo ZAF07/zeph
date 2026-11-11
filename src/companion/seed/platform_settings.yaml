@@ -228,6 +228,18 @@ reply_memory_intro: >-
 # How many of the newest Conversation Summaries go into each reply.
 recent_conversation_summaries: 3
 
+# Knowledge. Before each reply the message is matched against the Knowledge
+# library, and this many of the closest passages go into the reply.
+knowledge_chunks_per_reply: 3
+
+# Put before the Knowledge passages given to each reply.
+reply_knowledge_intro: >-
+  Passages from your Knowledge library that may relate to this message. Most
+  of the time, use none of them. Draw on one only if it genuinely fits what
+  the person is going through, briefly and in your own words, the way a
+  friend might mention something they once read. Never lecture, quote at
+  length or force it in:
+
 # The Memory Categories that onboarding answers are saved in, when the User
 # has User Memory on: their name, and what brings them here.
 onboarding_name_memory_category: Life details

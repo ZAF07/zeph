@@ -20,6 +20,7 @@ const adminItems = [
   { label: "Prompts & models", href: "/admin/prompts" },
   { label: "Safety", href: "/admin/safety" },
   { label: "Safeguard Events", href: "/admin/safeguard-events" },
+  { label: "Knowledge", href: "/admin/knowledge" },
   { label: "Memory Categories", href: "/admin/memory-categories" },
   { label: "Platform settings", href: "/admin/settings" },
 ];

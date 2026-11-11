@@ -16,6 +16,8 @@ from companion.core.admin_users import AdminUserService
 from companion.core.conversations import ConversationService, ConversationServices
 from companion.core.helplines import HelplineService
 from companion.core.incoming_messages import IncomingMessageHandler
+from companion.core.knowledge import KnowledgeService
+from companion.core.knowledge_retrieval import KnowledgeRetrieval
 from companion.core.memory_categories import MemoryCategoryService
 from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.platform_settings import PlatformSettingsService
@@ -25,6 +27,9 @@ from companion.core.ports import (
     ChatModel,
     Clock,
     ConversationEngine,
+    DocumentTextExtractor,
+    Embedder,
+    KnowledgeVectorStore,
     Repositories,
     Scheduler,
 )
@@ -48,6 +53,9 @@ class AppDependencies:
         build_conversation_engine: Builds the conversation engine around the
             core services it runs.
         auth_verifier: Checks Dashboard bearer tokens.
+        text_extractor: Reads the text out of uploaded Knowledge files.
+        embedder: Turns text into embeddings.
+        knowledge_vector_store: Stores and searches Knowledge embeddings.
         clock: Tells the current time.
         scheduler: Runs the scheduled work while the app is up.
         telegram_webhook_secret: The secret Telegram sends with each update.
@@ -63,6 +71,9 @@ class AppDependencies:
     chat_model: ChatModel
     build_conversation_engine: Callable[[ConversationServices], ConversationEngine]
     auth_verifier: AuthVerifier
+    text_extractor: DocumentTextExtractor
+    embedder: Embedder
+    knowledge_vector_store: KnowledgeVectorStore
     clock: Clock
     scheduler: Scheduler
     telegram_webhook_secret: str
@@ -114,6 +125,11 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             memory_retrieval=MemoryRetrieval(
                 repositories=dependencies.repositories,
                 chat_model=dependencies.chat_model,
+            ),
+            knowledge_retrieval=KnowledgeRetrieval(
+                repositories=dependencies.repositories,
+                embedder=dependencies.embedder,
+                vector_store=dependencies.knowledge_vector_store,
             ),
             response_composer=ResponseComposer(
                 repositories=dependencies.repositories,
@@ -184,6 +200,13 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             safeguard=safeguard,
             memory_category_service=MemoryCategoryService(
                 dependencies.repositories, dependencies.clock
+            ),
+            knowledge_service=KnowledgeService(
+                repositories=dependencies.repositories,
+                text_extractor=dependencies.text_extractor,
+                embedder=dependencies.embedder,
+                vector_store=dependencies.knowledge_vector_store,
+                clock=dependencies.clock,
             ),
         )
     )

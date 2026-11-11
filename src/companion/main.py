@@ -2,16 +2,19 @@ from collections.abc import Callable
 from pathlib import Path
 
 from fastapi import FastAPI
-from sqlalchemy import create_engine
+from sqlalchemy import Engine, create_engine
 
 from companion.adapters.clerk.auth_verifier import ClerkAuthVerifier
 from companion.adapters.clock import SystemClock
 from companion.adapters.deepseek.chat_model import DeepSeekChatModel
+from companion.adapters.fastembed.embedder import FastEmbedEmbedder
 from companion.adapters.langgraph.conversation_engine import (
     LangGraphConversationEngine,
     build_postgres_checkpointer,
 )
+from companion.adapters.pgvector.vector_store import PgvectorKnowledgeVectorStore
 from companion.adapters.postgres.repositories import build_postgres_repositories
+from companion.adapters.pypdf.text_extractor import PypdfTextExtractor
 from companion.adapters.scheduler import InProcessScheduler
 from companion.adapters.telegram.chat_channel import TelegramChatChannel
 from companion.app import AppDependencies, create_app
@@ -23,6 +26,8 @@ from companion.core.ports import (
     ChatModel,
     Clock,
     ConversationEngine,
+    Embedder,
+    KnowledgeVectorStore,
     Repositories,
     Scheduler,
 )
@@ -31,6 +36,7 @@ SEED_DIR = Path(__file__).parent / "seed"
 SEED_FILE = SEED_DIR / "platform_settings.yaml"
 HELPLINES_SEED_FILE = SEED_DIR / "helplines.yaml"
 MEMORY_CATEGORIES_SEED_FILE = SEED_DIR / "memory_categories.yaml"
+KNOWLEDGE_SEED_FILE = SEED_DIR / "knowledge" / "knowledge.yaml"
 SCHEDULER_INTERVAL_SECONDS = 60
 
 
@@ -47,11 +53,24 @@ class UnknownAdapterError(Exception):
         super().__init__(f"Unknown adapter '{adapter_name}' for {setting_key}")
 
 
-def build_repositories(settings: Settings) -> Repositories:
+def build_database_engine(settings: Settings) -> Engine:
+    """Connect to the Postgres database the Postgres and pgvector adapters share.
+
+    Args:
+        settings: The loaded settings.
+
+    Returns:
+        The database engine.
+    """
+    return create_engine(settings.database_url, pool_pre_ping=True)
+
+
+def build_repositories(settings: Settings, engine: Engine) -> Repositories:
     """Build the repositories chosen in `.env`.
 
     Args:
         settings: The loaded settings.
+        engine: The database engine.
 
     Returns:
         The repositories.
@@ -60,9 +79,43 @@ def build_repositories(settings: Settings) -> Repositories:
         UnknownAdapterError: If the chosen adapter does not exist.
     """
     if settings.repositories_adapter == "postgres":
-        engine = create_engine(settings.database_url, pool_pre_ping=True)
         return build_postgres_repositories(engine)
     raise UnknownAdapterError("REPOSITORIES_ADAPTER", settings.repositories_adapter)
+
+
+def build_embedder(settings: Settings) -> Embedder:
+    """Build the embedder chosen in `.env`.
+
+    Args:
+        settings: The loaded settings.
+
+    Returns:
+        The embedder.
+
+    Raises:
+        UnknownAdapterError: If the chosen adapter does not exist.
+    """
+    if settings.embedder_adapter == "fastembed":
+        return FastEmbedEmbedder()
+    raise UnknownAdapterError("EMBEDDER_ADAPTER", settings.embedder_adapter)
+
+
+def build_vector_store(settings: Settings, engine: Engine) -> KnowledgeVectorStore:
+    """Build the Knowledge vector store chosen in `.env`.
+
+    Args:
+        settings: The loaded settings.
+        engine: The database engine.
+
+    Returns:
+        The vector store.
+
+    Raises:
+        UnknownAdapterError: If the chosen adapter does not exist.
+    """
+    if settings.vector_store_adapter == "pgvector":
+        return PgvectorKnowledgeVectorStore(engine)
+    raise UnknownAdapterError("VECTOR_STORE_ADAPTER", settings.vector_store_adapter)
 
 
 def build_chat_channel(settings: Settings) -> ChatChannel:
@@ -197,12 +250,16 @@ def build_production_app() -> FastAPI:
         The FastAPI app.
     """
     settings = load_settings()
+    engine = build_database_engine(settings)
     dependencies = AppDependencies(
-        repositories=build_repositories(settings),
+        repositories=build_repositories(settings, engine),
         chat_channel=build_chat_channel(settings),
         chat_model=build_chat_model(settings),
         build_conversation_engine=build_conversation_engine_factory(settings),
         auth_verifier=build_auth_verifier(settings),
+        text_extractor=PypdfTextExtractor(),
+        embedder=build_embedder(settings),
+        knowledge_vector_store=build_vector_store(settings, engine),
         clock=build_clock(settings),
         scheduler=build_scheduler(settings),
         telegram_webhook_secret=settings.telegram_webhook_secret,

@@ -15,6 +15,7 @@ from companion.adapters.langgraph.conversation_engine import (
     LangGraphConversationEngine,
     build_postgres_checkpointer,
 )
+from companion.adapters.pgvector.vector_store import PgvectorKnowledgeVectorStore
 from companion.adapters.postgres.database import (
     migrate,
     seed_helplines,
@@ -22,12 +23,14 @@ from companion.adapters.postgres.database import (
     seed_platform_settings,
 )
 from companion.adapters.postgres.repositories import build_postgres_repositories
+from companion.adapters.pypdf.text_extractor import PypdfTextExtractor
 from companion.app import AppDependencies, create_app
 from companion.core.conversations import ConversationServices
 from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
     FakeClock,
+    FakeEmbedder,
     FakeScheduler,
     ScriptedChatModel,
 )
@@ -42,6 +45,7 @@ SEED_DIR = Path(__file__).parent.parent / "src/companion/seed"
 SEED_FILE = SEED_DIR / "platform_settings.yaml"
 HELPLINES_SEED_FILE = SEED_DIR / "helplines.yaml"
 MEMORY_CATEGORIES_SEED_FILE = SEED_DIR / "memory_categories.yaml"
+KNOWLEDGE_SEED_FILE = SEED_DIR / "knowledge" / "knowledge.yaml"
 
 
 @pytest.fixture(scope="session")
@@ -69,7 +73,8 @@ def engine(database_url: str) -> Iterator[Engine]:
                 "TRUNCATE users, telegram_connections, connection_tokens, "
                 "conversations, conversation_messages, platform_settings, "
                 "helplines, safeguard_events, memory_categories, memory_items, "
-                "conversation_summaries CASCADE"
+                "conversation_summaries, knowledge_documents, knowledge_chunks "
+                "CASCADE"
             )
         )
     seed_platform_settings(engine, SEED_FILE)
@@ -98,6 +103,12 @@ def auth_verifier() -> FakeAuthVerifier:
 
 
 @pytest.fixture
+def embedder() -> FakeEmbedder:
+    """An embedder that turns words into vectors, with no model."""
+    return FakeEmbedder()
+
+
+@pytest.fixture
 def scheduler() -> FakeScheduler:
     """A scheduler whose ticks tests run by hand."""
     return FakeScheduler()
@@ -121,12 +132,15 @@ def client(
     chat_channel: FakeChatChannel,
     chat_model: ScriptedChatModel,
     auth_verifier: FakeAuthVerifier,
+    embedder: FakeEmbedder,
     scheduler: FakeScheduler,
 ) -> Iterator[TestClient]:
     """A test client for the backend wired with fakes and the real database.
 
     The conversation engine is the real LangGraph one, so tests run the same
-    graph as production. The app is started, so its scheduler has the tick.
+    graph as production. Knowledge uses the real pgvector store and text
+    extractor with a fake embedder. The app is started, so its scheduler has
+    the tick.
     """
 
     def build_conversation_engine(
@@ -140,6 +154,9 @@ def client(
         chat_model=chat_model,
         build_conversation_engine=build_conversation_engine,
         auth_verifier=auth_verifier,
+        text_extractor=PypdfTextExtractor(),
+        embedder=embedder,
+        knowledge_vector_store=PgvectorKnowledgeVectorStore(engine),
         clock=clock,
         scheduler=scheduler,
         telegram_webhook_secret=WEBHOOK_SECRET,

@@ -12,6 +12,7 @@ from companion.adapters.postgres.tables import (
     conversation_summaries,
     conversations,
     helplines,
+    knowledge_documents,
     memory_categories,
     memory_items,
     platform_settings,
@@ -26,6 +27,10 @@ from companion.core.models import (
     ConversationSummary,
     Helpline,
     HelplineDetails,
+    KnowledgeDocument,
+    KnowledgeFileType,
+    KnowledgeStatus,
+    KnowledgeUpload,
     MemoryCategory,
     MemoryCategoryDetails,
     MemoryCategoryOverview,
@@ -222,6 +227,28 @@ def _to_summary(row: Row[Any]) -> ConversationSummary:
         user_id=row.user_id,
         summary=row.summary,
         mood=row.mood,
+        created_at=row.created_at,
+    )
+
+
+def _to_knowledge_document(row: Row[Any]) -> KnowledgeDocument:
+    """Turn a `knowledge_documents` row into a Knowledge document.
+
+    Args:
+        row: The database row.
+
+    Returns:
+        The document, without its file.
+    """
+    return KnowledgeDocument(
+        id=row.id,
+        title=row.title,
+        source=row.source,
+        tradition=row.tradition,
+        file_name=row.file_name,
+        file_type=KnowledgeFileType(row.file_type),
+        status=KnowledgeStatus(row.status),
+        failure_reason=row.failure_reason,
         created_at=row.created_at,
     )
 
@@ -1355,6 +1382,135 @@ class PostgresUserMemoryRepository:
             )
 
 
+KNOWLEDGE_DOCUMENT_COLUMNS = [
+    column for column in knowledge_documents.c if column.name != "content"
+]
+
+
+class PostgresKnowledgeDocumentRepository:
+    """Stores Knowledge documents and their uploaded files in Postgres."""
+
+    def __init__(self, engine: Engine) -> None:
+        """Set up the repository.
+
+        Args:
+            engine: The database engine.
+        """
+        self._engine = engine
+
+    def list_all(self) -> list[KnowledgeDocument]:
+        """List every Knowledge document, newest upload first.
+
+        Returns:
+            The documents.
+        """
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                select(*KNOWLEDGE_DOCUMENT_COLUMNS).order_by(
+                    knowledge_documents.c.created_at.desc(),
+                    knowledge_documents.c.title,
+                )
+            ).all()
+        return [_to_knowledge_document(row) for row in rows]
+
+    def get(self, document_id: UUID) -> KnowledgeDocument | None:
+        """Find a Knowledge document.
+
+        Args:
+            document_id: The document's ID.
+
+        Returns:
+            The document, or None if there is none.
+        """
+        with self._engine.connect() as connection:
+            row = connection.execute(
+                select(*KNOWLEDGE_DOCUMENT_COLUMNS).where(
+                    knowledge_documents.c.id == document_id
+                )
+            ).first()
+        return _to_knowledge_document(row) if row else None
+
+    def get_content(self, document_id: UUID) -> bytes:
+        """Read a Knowledge document's uploaded file.
+
+        Args:
+            document_id: The document's ID.
+
+        Returns:
+            The file's bytes.
+        """
+        with self._engine.connect() as connection:
+            content: bytes = connection.execute(
+                select(knowledge_documents.c.content).where(
+                    knowledge_documents.c.id == document_id
+                )
+            ).scalar_one()
+        return content
+
+    def add(self, upload: KnowledgeUpload, created_at: datetime) -> KnowledgeDocument:
+        """Save a new, pending Knowledge document with its file.
+
+        Args:
+            upload: The document and its file.
+            created_at: When it was uploaded.
+
+        Returns:
+            The saved document.
+        """
+        with self._engine.begin() as connection:
+            row = connection.execute(
+                insert(knowledge_documents)
+                .values(
+                    id=uuid4(),
+                    title=upload.title,
+                    source=upload.source,
+                    tradition=upload.tradition,
+                    file_name=upload.file_name,
+                    file_type=upload.file_type.value,
+                    content=upload.content,
+                    status=KnowledgeStatus.PENDING.value,
+                    created_at=created_at,
+                )
+                .returning(*KNOWLEDGE_DOCUMENT_COLUMNS)
+            ).one()
+        return _to_knowledge_document(row)
+
+    def set_status(
+        self, document_id: UUID, status: KnowledgeStatus, failure_reason: str | None
+    ) -> KnowledgeDocument | None:
+        """Save where a Knowledge document is in being made ready.
+
+        Args:
+            document_id: The document's ID.
+            status: Its new status.
+            failure_reason: Why it failed; None unless it failed.
+
+        Returns:
+            The saved document, or None if it has been deleted.
+        """
+        with self._engine.begin() as connection:
+            row = connection.execute(
+                update(knowledge_documents)
+                .where(knowledge_documents.c.id == document_id)
+                .values(status=status.value, failure_reason=failure_reason)
+                .returning(*KNOWLEDGE_DOCUMENT_COLUMNS)
+            ).first()
+        return _to_knowledge_document(row) if row else None
+
+    def delete(self, document_id: UUID) -> None:
+        """Remove a Knowledge document and its file.
+
+        Args:
+            document_id: The document's ID.
+        """
+        with self._engine.begin() as connection:
+            connection.execute(
+                delete(knowledge_documents).where(
+                    knowledge_documents.c.id == document_id
+                )
+            )
+
+
 def build_postgres_repositories(engine: Engine) -> Repositories:
     """Build every repository on one Postgres engine.
 
@@ -1374,4 +1530,5 @@ def build_postgres_repositories(engine: Engine) -> Repositories:
         safeguard_events=PostgresSafeguardEventRepository(engine),
         memory_categories=PostgresMemoryCategoryRepository(engine),
         user_memory=PostgresUserMemoryRepository(engine),
+        knowledge_documents=PostgresKnowledgeDocumentRepository(engine),
     )
