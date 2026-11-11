@@ -232,7 +232,7 @@ See `CONTEXT.md` for terms and ADR-0001 to ADR-0005 for the architectural decisi
 ### API contracts (Dashboard API, all JSON, all authenticated via the auth verifier)
 
 - **User:** get/update own profile and onboarding fields; acknowledge AI notice; set User Memory on/off; get/update Check-in settings; create a Telegram connection link; get Telegram Connection status; list own Memory Items by Memory Category; delete a Memory Item; delete all own data.
-- **Admin (role checked on every call):** list Users with counts; change a User's role; CRUD for Helplines, Check-in Kinds, Sticker Library; create, edit, archive and restore Memory Categories; upload, list and delete Knowledge documents; get/update platform settings (Persona, prompts, models, Crisis Reply, limits, toggles); list Safeguard Events; list Check-in sends/skips; view usage per User per day.
+- **Admin (role checked on every call):** list Users with counts; change a User's role; CRUD for Helplines, Check-in Kinds, Sticker Library; create, edit, archive and restore Memory Categories; upload, list, retry (failed only) and delete Knowledge documents; get/update platform settings (Persona, prompts, models, Crisis Reply, limits, toggles); list Safeguard Events; list Check-in sends/skips; view usage per User per day.
 - **Telegram webhook:** receives updates; verified with Telegram's secret token header.
 
 ## Testing Decisions

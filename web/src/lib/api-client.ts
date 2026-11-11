@@ -216,6 +216,33 @@ export type MemoryCategoryInput = {
   always_include: boolean;
 };
 
+/** The kinds of file a Knowledge document can be. */
+export type KnowledgeFileType = "text" | "markdown" | "pdf";
+
+/** Where a Knowledge document is in being made ready for replies. */
+export type KnowledgeStatus = "pending" | "ready" | "failed";
+
+/** A document in the Knowledge library, without its file. */
+export type KnowledgeDocument = {
+  id: string;
+  title: string;
+  source: string;
+  tradition: string;
+  file_name: string;
+  file_type: KnowledgeFileType;
+  status: KnowledgeStatus;
+  failure_reason: string | null;
+  created_at: string;
+};
+
+/** A Knowledge document as an Admin uploads it. */
+export type KnowledgeUpload = {
+  file: File;
+  title: string;
+  source: string;
+  tradition: string;
+};
+
 /** Every call the Dashboard makes to the backend. */
 export type ApiClient = {
   getMe: () => Promise<Me>;
@@ -253,6 +280,12 @@ export type ApiClient = {
   ) => Promise<MemoryCategory>;
   archiveMemoryCategory: (id: string) => Promise<MemoryCategory>;
   restoreMemoryCategory: (id: string) => Promise<MemoryCategory>;
+  listKnowledgeDocuments: () => Promise<KnowledgeDocument[]>;
+  uploadKnowledgeDocument: (
+    upload: KnowledgeUpload,
+  ) => Promise<KnowledgeDocument>;
+  retryKnowledgeDocument: (id: string) => Promise<KnowledgeDocument>;
+  deleteKnowledgeDocument: (id: string) => Promise<void>;
 };
 
 /** Raised when the backend answers with an error status. */
@@ -315,13 +348,17 @@ export function createApiClient(
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
-    if (body !== undefined) {
+    let requestBody: BodyInit | undefined;
+    if (body instanceof FormData) {
+      requestBody = body;
+    } else if (body !== undefined) {
       headers["Content-Type"] = "application/json";
+      requestBody = JSON.stringify(body);
     }
     const response = await fetch(`${baseUrl}${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: requestBody,
     });
     if (!response.ok) {
       throw new ApiError(response.status, path, await errorDetail(response));
@@ -431,5 +468,30 @@ export function createApiClient(
         `/api/admin/memory-categories/${id}/restore`,
         "POST",
       ),
+    listKnowledgeDocuments: async () =>
+      (
+        await request<{ documents: KnowledgeDocument[] }>(
+          "/api/admin/knowledge-documents",
+        )
+      ).documents,
+    uploadKnowledgeDocument: (upload) => {
+      const form = new FormData();
+      form.append("file", upload.file);
+      form.append("title", upload.title);
+      form.append("source", upload.source);
+      form.append("tradition", upload.tradition);
+      return request<KnowledgeDocument>(
+        "/api/admin/knowledge-documents",
+        "POST",
+        form,
+      );
+    },
+    retryKnowledgeDocument: (id) =>
+      request<KnowledgeDocument>(
+        `/api/admin/knowledge-documents/${id}/retry`,
+        "POST",
+      ),
+    deleteKnowledgeDocument: (id) =>
+      request<void>(`/api/admin/knowledge-documents/${id}`, "DELETE"),
   };
 }

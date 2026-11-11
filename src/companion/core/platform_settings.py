@@ -129,7 +129,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         runs_when="Every reply",
         description=(
             "Writes Zeph’s reply from the Persona, the relevant memories, recent "
-            "Conversation Summaries and the Conversation so far."
+            "Conversation Summaries, Knowledge and the Conversation so far."
         ),
         prompt_key="response_prompt",
         model_key="response_model",

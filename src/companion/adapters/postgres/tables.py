@@ -1,3 +1,4 @@
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -7,6 +8,7 @@ from sqlalchemy import (
     Identity,
     Index,
     Integer,
+    LargeBinary,
     MetaData,
     Table,
     Text,
@@ -14,6 +16,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import text
+
+EMBEDDING_SIZE = 384
 
 metadata = MetaData()
 
@@ -204,4 +208,35 @@ conversation_summaries = Table(
     Column("summary", Text, nullable=False),
     Column("mood", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
+)
+
+knowledge_documents = Table(
+    "knowledge_documents",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("title", Text, nullable=False),
+    Column("source", Text, nullable=False),
+    Column("tradition", Text, nullable=False),
+    Column("file_name", Text, nullable=False),
+    Column("file_type", Text, nullable=False),
+    Column("content", LargeBinary, nullable=False),
+    Column("status", Text, nullable=False),
+    Column("failure_reason", Text),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
+
+knowledge_chunks = Table(
+    "knowledge_chunks",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column(
+        "document_id",
+        Uuid,
+        ForeignKey("knowledge_documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("position", Integer, nullable=False),
+    Column("text", Text, nullable=False),
+    Column("embedding", Vector(EMBEDDING_SIZE), nullable=False),
 )

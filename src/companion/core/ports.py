@@ -12,8 +12,14 @@ from companion.core.models import (
     ConversationMessage,
     ConversationSummary,
     ConversationTurn,
+    EmbeddedChunk,
     Helpline,
     HelplineDetails,
+    KnowledgeChunkMatch,
+    KnowledgeDocument,
+    KnowledgeFileType,
+    KnowledgeStatus,
+    KnowledgeUpload,
     MemoryCategory,
     MemoryCategoryDetails,
     MemoryCategoryOverview,
@@ -103,6 +109,91 @@ class ChatModel(Protocol):
         ...
 
 
+class TextExtractionError(Exception):
+    """Raised when no text can be read from a Knowledge document's file.
+
+    The message says why, in words fit to show Admins.
+    """
+
+
+class DocumentTextExtractor(Protocol):
+    """Reads the text out of an uploaded Knowledge document's file."""
+
+    def extract(self, file_type: KnowledgeFileType, content: bytes) -> str:
+        """Read a file's text.
+
+        Args:
+            file_type: What kind of file it is.
+            content: The file's bytes.
+
+        Returns:
+            The text, which may be blank if the file has none.
+
+        Raises:
+            TextExtractionError: If the file can't be read.
+        """
+        ...
+
+
+class Embedder(Protocol):
+    """Turns text into embeddings, so similar texts can be found."""
+
+    def embed_passages(self, texts: list[str]) -> list[list[float]]:
+        """Embed pieces of Knowledge to be searched later.
+
+        Args:
+            texts: The pieces' texts.
+
+        Returns:
+            One embedding per text, in the same order.
+        """
+        ...
+
+    def embed_query(self, text: str) -> list[float]:
+        """Embed a message to search Knowledge with.
+
+        Args:
+            text: The message.
+
+        Returns:
+            Its embedding.
+        """
+        ...
+
+
+class KnowledgeVectorStore(Protocol):
+    """Stores Knowledge chunk embeddings and finds the closest ones."""
+
+    def replace_chunks(self, document_id: UUID, chunks: list[EmbeddedChunk]) -> None:
+        """Save a document's chunks in place of any it had, in one step.
+
+        Args:
+            document_id: The document the chunks are from.
+            chunks: The chunks, in reading order.
+        """
+        ...
+
+    def delete_chunks(self, document_id: UUID) -> None:
+        """Remove every chunk of a document.
+
+        Args:
+            document_id: The document.
+        """
+        ...
+
+    def search(self, embedding: list[float], limit: int) -> list[KnowledgeChunkMatch]:
+        """Find the chunks closest to an embedding.
+
+        Args:
+            embedding: What to search with.
+            limit: The most chunks to return.
+
+        Returns:
+            The closest chunks, best match first.
+        """
+        ...
+
+
 class ConversationEngine(Protocol):
     """Runs the steps of answering a connected User's message."""
 
@@ -110,7 +201,8 @@ class ConversationEngine(Protocol):
         """Answer one message: save it, check it with the Safeguard, then reply.
 
         On a crisis the Crisis Reply is sent and no reply is composed;
-        otherwise the reply is given the User Memory that matters.
+        otherwise the reply is given the User Memory that matters and the
+        Knowledge that may fit.
 
         Args:
             turn: The message to answer.
@@ -667,6 +759,75 @@ class SafeguardEventRepository(Protocol):
         ...
 
 
+class KnowledgeDocumentRepository(Protocol):
+    """Stores Knowledge documents and their uploaded files."""
+
+    def list_all(self) -> list[KnowledgeDocument]:
+        """List every Knowledge document, newest upload first.
+
+        Returns:
+            The documents.
+        """
+        ...
+
+    def get(self, document_id: UUID) -> KnowledgeDocument | None:
+        """Find a Knowledge document.
+
+        Args:
+            document_id: The document's ID.
+
+        Returns:
+            The document, or None if there is none.
+        """
+        ...
+
+    def get_content(self, document_id: UUID) -> bytes:
+        """Read a Knowledge document's uploaded file.
+
+        Args:
+            document_id: The document's ID.
+
+        Returns:
+            The file's bytes.
+        """
+        ...
+
+    def add(self, upload: KnowledgeUpload, created_at: datetime) -> KnowledgeDocument:
+        """Save a new, pending Knowledge document with its file.
+
+        Args:
+            upload: The document and its file.
+            created_at: When it was uploaded.
+
+        Returns:
+            The saved document.
+        """
+        ...
+
+    def set_status(
+        self, document_id: UUID, status: KnowledgeStatus, failure_reason: str | None
+    ) -> KnowledgeDocument | None:
+        """Save where a Knowledge document is in being made ready.
+
+        Args:
+            document_id: The document's ID.
+            status: Its new status.
+            failure_reason: Why it failed; None unless it failed.
+
+        Returns:
+            The saved document, or None if it has been deleted.
+        """
+        ...
+
+    def delete(self, document_id: UUID) -> None:
+        """Remove a Knowledge document and its file.
+
+        Args:
+            document_id: The document's ID.
+        """
+        ...
+
+
 @dataclass(frozen=True)
 class Repositories:
     """Every repository the core needs, so adapters can be swapped as one."""
@@ -680,3 +841,4 @@ class Repositories:
     safeguard_events: SafeguardEventRepository
     memory_categories: MemoryCategoryRepository
     user_memory: UserMemoryRepository
+    knowledge_documents: KnowledgeDocumentRepository

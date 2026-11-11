@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from uuid import UUID, uuid4
 
+from companion.core.knowledge_retrieval import KnowledgeRetrieval
 from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.models import (
     Conversation,
@@ -163,10 +164,12 @@ class ConversationServices:
         conversations: Saves messages and sends replies.
         safeguard: Checks each message for crisis and writes the Crisis Reply.
         memory_retrieval: Finds the User Memory that matters for a message.
+        knowledge_retrieval: Finds the Knowledge that may fit a message.
         response_composer: Writes the Companion's reply.
     """
 
     conversations: ConversationService
     safeguard: Safeguard
     memory_retrieval: MemoryRetrieval
+    knowledge_retrieval: KnowledgeRetrieval
     response_composer: ResponseComposer

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  formatAddedDay,
   formatDay,
   formatSavedAt,
   formatShortDay,
@@ -39,6 +40,27 @@ describe("formatWeekdayDay", () => {
   it("uses the given time zone", () => {
     expect(formatWeekdayDay("2026-11-11T20:00:00Z", "Asia/Singapore")).toBe(
       "Thu 12 Nov",
+    );
+  });
+});
+
+describe("formatAddedDay", () => {
+  const now = new Date("2026-11-12T10:00:00Z");
+
+  it("says Today and Yesterday for the last two days", () => {
+    expect(formatAddedDay("2026-11-12T01:00:00Z", now, "UTC")).toBe("Today");
+    expect(formatAddedDay("2026-11-11T23:59:00Z", now, "UTC")).toBe(
+      "Yesterday",
+    );
+  });
+
+  it("writes the day and month for anything older", () => {
+    expect(formatAddedDay("2026-10-02T09:00:00Z", now, "UTC")).toBe("2 Oct");
+  });
+
+  it("counts days in the given time zone", () => {
+    expect(formatAddedDay("2026-11-11T17:00:00Z", now, "Asia/Singapore")).toBe(
+      "Today",
     );
   });
 });

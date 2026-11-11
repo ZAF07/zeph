@@ -1,0 +1,27 @@
+# Starter Knowledge, loaded on first run (before any document exists) and then
+# managed by Admins. Public-domain texts plus the owner's own summaries only;
+# modern teachers' works appear only as the owner's summaries.
+- file: dhammapada-selections.md
+  title: Dhammapada (selections)
+  source: trans. F. Max Müller
+  tradition: Buddhism
+- file: meditations-books-2-and-4.md
+  title: Meditations, Books II and IV
+  source: Marcus Aurelius, trans. Meric Casaubon
+  tradition: Stoicism
+- file: tao-te-ching-selections.md
+  title: Tao Te Ching (selections)
+  source: Laozi, trans. James Legge
+  tradition: Taoism
+- file: mindful-breathing.md
+  title: Mindful breathing
+  source: Owner’s summary
+  tradition: Mindfulness
+- file: noticing-thoughts.md
+  title: Noticing thoughts without following them
+  source: Owner’s summary
+  tradition: Mindfulness
+- file: self-compassion.md
+  title: Self-compassion
+  source: Owner’s summary, after Kristin Neff
+  tradition: Psychology

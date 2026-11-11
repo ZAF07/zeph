@@ -3,7 +3,17 @@ from datetime import datetime
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    Form,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from pydantic import BaseModel
 
 from companion.core.admin_users import (
@@ -18,6 +28,14 @@ from companion.core.helplines import (
     InvalidHelplineError,
     MoveDirection,
 )
+from companion.core.knowledge import (
+    MAX_UPLOAD_BYTES,
+    InvalidKnowledgeDocumentError,
+    KnowledgeDocumentNotFoundError,
+    KnowledgeNotRetryableError,
+    KnowledgeService,
+    knowledge_file_type,
+)
 from companion.core.memory_categories import (
     InvalidMemoryCategoryError,
     MemoryCategoryNotFoundError,
@@ -26,6 +44,10 @@ from companion.core.memory_categories import (
 from companion.core.models import (
     Helpline,
     HelplineDetails,
+    KnowledgeDocument,
+    KnowledgeFileType,
+    KnowledgeStatus,
+    KnowledgeUpload,
     MemoryCategory,
     MemoryCategoryDetails,
     RiskType,
@@ -224,6 +246,50 @@ class MemoryCategoryRequest(BaseModel):
         )
 
 
+class KnowledgeDocumentResponse(BaseModel):
+    """A Knowledge document as Admins see it, without its file."""
+
+    id: str
+    title: str
+    source: str
+    tradition: str
+    file_name: str
+    file_type: KnowledgeFileType
+    status: KnowledgeStatus
+    failure_reason: str | None
+    created_at: datetime
+
+
+class KnowledgeDocumentsResponse(BaseModel):
+    """Every Knowledge document, newest upload first."""
+
+    documents: list[KnowledgeDocumentResponse]
+
+
+def to_knowledge_document_response(
+    document: KnowledgeDocument,
+) -> KnowledgeDocumentResponse:
+    """Describe a Knowledge document for the admin area.
+
+    Args:
+        document: The document.
+
+    Returns:
+        The response body.
+    """
+    return KnowledgeDocumentResponse(
+        id=str(document.id),
+        title=document.title,
+        source=document.source,
+        tradition=document.tradition,
+        file_name=document.file_name,
+        file_type=document.file_type,
+        status=document.status,
+        failure_reason=document.failure_reason,
+        created_at=document.created_at,
+    )
+
+
 def to_memory_category_response(category: MemoryCategory) -> MemoryCategoryResponse:
     """Describe a Memory Category for the admin area.
 
@@ -332,6 +398,7 @@ def build_admin_api_router(
     helpline_service: HelplineService,
     safeguard: Safeguard,
     memory_category_service: MemoryCategoryService,
+    knowledge_service: KnowledgeService,
 ) -> APIRouter:
     """Build the admin API routes.
 
@@ -345,6 +412,7 @@ def build_admin_api_router(
         helpline_service: Manages Helplines and the international fallback.
         safeguard: Lists Safeguard Events.
         memory_category_service: Manages Memory Categories.
+        knowledge_service: Manages the Knowledge library.
 
     Returns:
         The router.
@@ -745,5 +813,118 @@ def build_admin_api_router(
                 status.HTTP_404_NOT_FOUND, "No such Memory Category"
             ) from error
         return to_memory_category_response(category)
+
+    @router.get("/knowledge-documents")
+    def list_knowledge_documents() -> KnowledgeDocumentsResponse:
+        """List every Knowledge document with its status.
+
+        Returns:
+            The documents, newest upload first.
+        """
+        return KnowledgeDocumentsResponse(
+            documents=[
+                to_knowledge_document_response(document)
+                for document in knowledge_service.list_documents()
+            ]
+        )
+
+    @router.post("/knowledge-documents", status_code=status.HTTP_201_CREATED)
+    def upload_knowledge_document(
+        background_tasks: BackgroundTasks,
+        file: UploadFile,
+        title: Annotated[str, Form()],
+        source: Annotated[str, Form()],
+        tradition: Annotated[str, Form()],
+    ) -> KnowledgeDocumentResponse:
+        """Upload a text, Markdown or PDF Knowledge document.
+
+        The document is saved as pending and ingested after the response is
+        sent; listing documents shows when it is ready or has failed.
+
+        Args:
+            background_tasks: Runs the ingestion after the response.
+            file: The uploaded file.
+            title: The document's title.
+            source: Who wrote or translated it.
+            tradition: The tradition it belongs to.
+
+        Returns:
+            The pending document.
+
+        Raises:
+            HTTPException: 422 if the file type, file or details are not
+                valid.
+        """
+        file_name = file.filename or ""
+        try:
+            document = knowledge_service.upload(
+                KnowledgeUpload(
+                    title=title,
+                    source=source,
+                    tradition=tradition,
+                    file_name=file_name,
+                    file_type=knowledge_file_type(file_name),
+                    content=file.file.read(MAX_UPLOAD_BYTES + 1),
+                )
+            )
+        except InvalidKnowledgeDocumentError as error:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
+            ) from error
+        background_tasks.add_task(knowledge_service.ingest, document.id)
+        return to_knowledge_document_response(document)
+
+    @router.post("/knowledge-documents/{document_id}/retry")
+    def retry_knowledge_document(
+        background_tasks: BackgroundTasks, document_id: UUID
+    ) -> KnowledgeDocumentResponse:
+        """Ingest a failed Knowledge document again.
+
+        Args:
+            background_tasks: Runs the ingestion after the response.
+            document_id: The document to retry.
+
+        Returns:
+            The pending document.
+
+        Raises:
+            HTTPException: 404 if there is no such document; 409 if it has
+                not failed.
+        """
+        try:
+            document = knowledge_service.retry(document_id)
+        except KnowledgeDocumentNotFoundError as error:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "No such Knowledge document"
+            ) from error
+        except KnowledgeNotRetryableError as error:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, "Only a failed document can be retried."
+            ) from error
+        background_tasks.add_task(knowledge_service.ingest, document.id)
+        return to_knowledge_document_response(document)
+
+    @router.delete(
+        "/knowledge-documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT
+    )
+    def delete_knowledge_document(document_id: UUID) -> Response:
+        """Remove a Knowledge document and its chunks.
+
+        Args:
+            document_id: The document to remove.
+
+        Returns:
+            An empty response.
+
+        Raises:
+            HTTPException: 404 if there is no such document.
+        """
+        try:
+            knowledge_service.delete(document_id)
+        except KnowledgeDocumentNotFoundError as error:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "No such Knowledge document"
+            ) from error
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     return router

@@ -80,16 +80,19 @@ class ResponseComposer:
         self._repositories = repositories
         self._chat_model = chat_model
 
-    def compose(self, conversation_id: UUID, memory: str = "") -> list[str]:
+    def compose(
+        self, conversation_id: UUID, memory: str = "", knowledge: str = ""
+    ) -> list[str]:
         """Compose a reply to the Conversation's newest message.
 
         Uses the Persona, response prompt and model from platform settings,
-        then what the Companion remembers, and gives the model every earlier
-        message in the Conversation.
+        then what the Companion remembers and the Knowledge that may fit, and
+        gives the model every earlier message in the Conversation.
 
         Args:
             conversation_id: The Conversation to reply in.
             memory: The User Memory that matters for this message; "" if none.
+            knowledge: The Knowledge passages that may fit; "" if none.
 
         Returns:
             The reply as one or more short messages.
@@ -99,8 +102,9 @@ class ResponseComposer:
         """
         settings = self._repositories.platform_settings
         instructions = f"{settings.get('persona')}\n\n{settings.get('response_prompt')}"
-        if memory:
-            instructions += f"\n\n{memory}"
+        for section in (memory, knowledge):
+            if section:
+                instructions += f"\n\n{section}"
         history = to_chat_history(
             self._repositories.conversations.list_messages(conversation_id)
         )

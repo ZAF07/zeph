@@ -77,3 +77,28 @@ export function formatWeekdayDay(
     parts.find((entry) => entry.type === type)?.value ?? "";
   return `${part("weekday")} ${part("day")} ${part("month")}`;
 }
+
+/**
+ * Writes the day something was added: "Today", "Yesterday" or like "2 Oct".
+ *
+ * @param isoTimestamp - The moment, as the backend sends it.
+ * @param now - The current moment.
+ * @param timeZone - The time zone to count days in; the browser's by default.
+ * @returns The day.
+ */
+export function formatAddedDay(
+  isoTimestamp: string,
+  now: Date,
+  timeZone?: string,
+): string {
+  const calendarDay = new Intl.DateTimeFormat("en-CA", { timeZone });
+  const added = calendarDay.format(new Date(isoTimestamp));
+  if (added === calendarDay.format(now)) {
+    return "Today";
+  }
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  if (added === calendarDay.format(yesterday)) {
+    return "Yesterday";
+  }
+  return formatShortDay(isoTimestamp, timeZone);
+}
