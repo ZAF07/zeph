@@ -1,6 +1,6 @@
 # 02 — Chat with the Companion
 
-Status: ready-for-agent
+Status: in-progress
 
 ## Parent
 

@@ -1,7 +1,7 @@
 import hmac
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Body, Header, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Body, Header, HTTPException, status
 
 from companion.core.incoming_messages import IncomingMessageHandler
 from companion.core.models import IncomingMessage
@@ -42,6 +42,8 @@ def build_telegram_webhook_router(
     """Build the route Telegram posts updates to.
 
     Requests without the right secret token header are refused with 401.
+    Each message is handled after the response is sent, so Telegram is not
+    kept waiting while the Companion composes a reply.
 
     Args:
         handler: Handles each incoming message.
@@ -55,12 +57,14 @@ def build_telegram_webhook_router(
     @router.post("/telegram/webhook")
     def receive_update(
         update: Annotated[dict[str, Any], Body()],
+        background_tasks: BackgroundTasks,
         secret_token: Annotated[str | None, Header(alias=SECRET_HEADER)] = None,
     ) -> dict[str, bool]:
         """Receive one Telegram update.
 
         Args:
             update: The JSON body Telegram posted.
+            background_tasks: Runs the handler after the response is sent.
             secret_token: The secret token header Telegram sends.
 
         Returns:
@@ -72,7 +76,7 @@ def build_telegram_webhook_router(
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Bad secret token")
         message = parse_update(update)
         if message is not None:
-            handler.handle(message)
+            background_tasks.add_task(handler.handle, message)
         return {"ok": True}
 
     return router

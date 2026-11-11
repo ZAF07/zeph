@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from companion.core.models import AccountIdentity
+from companion.core.models import AccountIdentity, ChatLine
 
 
 @dataclass(frozen=True)
@@ -18,6 +18,8 @@ class FakeChatChannel:
     def __init__(self) -> None:
         """Start with no sent messages."""
         self.sent: list[SentText] = []
+        self.batches: list[list[str]] = []
+        self.typing_shown_in: list[int] = []
 
     def send_text(self, chat_id: int, text: str) -> None:
         """Record a text message.
@@ -27,6 +29,25 @@ class FakeChatChannel:
             text: The message text.
         """
         self.sent.append(SentText(chat_id=chat_id, text=text))
+
+    def send_texts(self, chat_id: int, texts: list[str]) -> None:
+        """Record several messages sent in a row as one batch.
+
+        Args:
+            chat_id: The chat the messages are for.
+            texts: The message texts.
+        """
+        self.batches.append(list(texts))
+        for text in texts:
+            self.sent.append(SentText(chat_id=chat_id, text=text))
+
+    def show_typing(self, chat_id: int) -> None:
+        """Record that typing was shown.
+
+        Args:
+            chat_id: The chat it was shown in.
+        """
+        self.typing_shown_in.append(chat_id)
 
     def texts_sent_to(self, chat_id: int) -> list[str]:
         """List the texts sent to one chat, oldest first.
@@ -99,3 +120,45 @@ class FakeClock:
             duration: How far to move.
         """
         self._now += duration
+
+
+@dataclass(frozen=True)
+class ChatModelCall:
+    """One call the scripted chat model received."""
+
+    model: str
+    instructions: str
+    history: list[ChatLine]
+
+
+class ScriptedChatModel:
+    """Chat model that returns pre-written replies and records each call."""
+
+    def __init__(self) -> None:
+        """Start with no replies scripted and no calls."""
+        self._replies: list[str] = []
+        self.calls: list[ChatModelCall] = []
+
+    def script(self, *replies: str) -> None:
+        """Queue replies to return, one per call, in order.
+
+        Args:
+            replies: The reply texts.
+        """
+        self._replies.extend(replies)
+
+    def generate(self, model: str, instructions: str, history: list[ChatLine]) -> str:
+        """Record the call and return the next scripted reply.
+
+        Args:
+            model: The model name asked for.
+            instructions: The instructions given.
+            history: The Conversation so far.
+
+        Returns:
+            The next scripted reply.
+        """
+        self.calls.append(
+            ChatModelCall(model=model, instructions=instructions, history=history)
+        )
+        return self._replies.pop(0)

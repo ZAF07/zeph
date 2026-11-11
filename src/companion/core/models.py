@@ -116,3 +116,91 @@ class IncomingMessage:
     chat_id: int
     sender_username: str | None
     text: str
+
+
+class MessageDirection(StrEnum):
+    """Who a message in a Conversation came from."""
+
+    INCOMING = "incoming"
+    OUTGOING = "outgoing"
+
+
+class MessageKind(StrEnum):
+    """What kind of message it is."""
+
+    TEXT = "text"
+
+
+@dataclass(frozen=True)
+class Conversation:
+    """A run of messages between a User and the Companion.
+
+    A Conversation ends once the quiet gap passes with no new message.
+
+    Attributes:
+        id: Our ID for the Conversation.
+        user_id: The User taking part.
+        started_at: When the first message was sent.
+        last_message_at: When the newest message was sent.
+    """
+
+    id: UUID
+    user_id: UUID
+    started_at: datetime
+    last_message_at: datetime
+
+
+@dataclass(frozen=True)
+class ConversationMessage:
+    """One saved message in a Conversation.
+
+    Attributes:
+        id: Our ID for the message.
+        conversation_id: The Conversation it belongs to.
+        direction: Whether the User sent it or the Companion did.
+        kind: What kind of message it is.
+        content: The message text.
+        sent_at: When it was sent.
+    """
+
+    id: UUID
+    conversation_id: UUID
+    direction: MessageDirection
+    kind: MessageKind
+    content: str
+    sent_at: datetime
+
+
+@dataclass(frozen=True)
+class ConversationTurn:
+    """A connected User's message that the Companion should answer.
+
+    Attributes:
+        user_id: The User who sent it.
+        chat_id: The chat to reply in.
+        text: The message text.
+    """
+
+    user_id: UUID
+    chat_id: int
+    text: str
+
+
+class ChatRole(StrEnum):
+    """Who said a line in the history given to the chat model."""
+
+    USER = "user"
+    COMPANION = "companion"
+
+
+@dataclass(frozen=True)
+class ChatLine:
+    """One line of history given to the chat model.
+
+    Attributes:
+        role: Who said it.
+        text: What was said.
+    """
+
+    role: ChatRole
+    text: str

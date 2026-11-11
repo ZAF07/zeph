@@ -7,11 +7,21 @@ from sqlalchemy.dialects.postgresql import insert
 
 from companion.adapters.postgres.tables import (
     connection_tokens,
+    conversation_messages,
+    conversations,
     platform_settings,
     telegram_connections,
     users,
 )
-from companion.core.models import ConnectionToken, TelegramConnection, User
+from companion.core.models import (
+    ConnectionToken,
+    Conversation,
+    ConversationMessage,
+    MessageDirection,
+    MessageKind,
+    TelegramConnection,
+    User,
+)
 from companion.core.ports import Repositories
 
 
@@ -63,6 +73,42 @@ def _to_token(row: Row[Any]) -> ConnectionToken:
         expires_at=row.expires_at,
         used_at=row.used_at,
         rejected_at=row.rejected_at,
+    )
+
+
+def _to_conversation(row: Row[Any]) -> Conversation:
+    """Turn a `conversations` row into a Conversation.
+
+    Args:
+        row: The database row.
+
+    Returns:
+        The Conversation.
+    """
+    return Conversation(
+        id=row.id,
+        user_id=row.user_id,
+        started_at=row.started_at,
+        last_message_at=row.last_message_at,
+    )
+
+
+def _to_message(row: Row[Any]) -> ConversationMessage:
+    """Turn a `conversation_messages` row into a ConversationMessage.
+
+    Args:
+        row: The database row.
+
+    Returns:
+        The message.
+    """
+    return ConversationMessage(
+        id=row.id,
+        conversation_id=row.conversation_id,
+        direction=MessageDirection(row.direction),
+        kind=MessageKind(row.kind),
+        content=row.content,
+        sent_at=row.sent_at,
     )
 
 
@@ -290,6 +336,92 @@ class PostgresConnectionTokenRepository:
             )
 
 
+class PostgresConversationRepository:
+    """Stores Conversations and their messages in Postgres."""
+
+    def __init__(self, engine: Engine) -> None:
+        """Set up the repository.
+
+        Args:
+            engine: The database engine.
+        """
+        self._engine = engine
+
+    def get_latest_for_user(self, user_id: UUID) -> Conversation | None:
+        """Find a User's newest Conversation.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The newest Conversation, or None if the User has never had one.
+        """
+        with self._engine.connect() as connection:
+            row = connection.execute(
+                select(conversations)
+                .where(conversations.c.user_id == user_id)
+                .order_by(conversations.c.last_message_at.desc())
+                .limit(1)
+            ).first()
+        return _to_conversation(row) if row else None
+
+    def add(self, conversation: Conversation) -> None:
+        """Save a new Conversation.
+
+        Args:
+            conversation: The Conversation to save.
+        """
+        with self._engine.begin() as connection:
+            connection.execute(
+                insert(conversations).values(
+                    id=conversation.id,
+                    user_id=conversation.user_id,
+                    started_at=conversation.started_at,
+                    last_message_at=conversation.last_message_at,
+                )
+            )
+
+    def add_message(self, message: ConversationMessage) -> None:
+        """Save a message and make it the Conversation's newest message.
+
+        Args:
+            message: The message to save.
+        """
+        with self._engine.begin() as connection:
+            connection.execute(
+                insert(conversation_messages).values(
+                    id=message.id,
+                    conversation_id=message.conversation_id,
+                    direction=message.direction.value,
+                    kind=message.kind.value,
+                    content=message.content,
+                    sent_at=message.sent_at,
+                )
+            )
+            connection.execute(
+                update(conversations)
+                .where(conversations.c.id == message.conversation_id)
+                .values(last_message_at=message.sent_at)
+            )
+
+    def list_messages(self, conversation_id: UUID) -> list[ConversationMessage]:
+        """List a Conversation's messages in the order they were saved.
+
+        Args:
+            conversation_id: The Conversation's ID.
+
+        Returns:
+            The messages.
+        """
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                select(conversation_messages)
+                .where(conversation_messages.c.conversation_id == conversation_id)
+                .order_by(conversation_messages.c.position)
+            ).all()
+        return [_to_message(row) for row in rows]
+
+
 class PostgresPlatformSettingsRepository:
     """Reads platform settings from Postgres."""
 
@@ -335,5 +467,6 @@ def build_postgres_repositories(engine: Engine) -> Repositories:
         users=PostgresUserRepository(engine),
         telegram_connections=PostgresTelegramConnectionRepository(engine),
         connection_tokens=PostgresConnectionTokenRepository(engine),
+        conversations=PostgresConversationRepository(engine),
         platform_settings=PostgresPlatformSettingsRepository(engine),
     )

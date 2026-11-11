@@ -5,7 +5,11 @@ from uuid import UUID
 
 from companion.core.models import (
     AccountIdentity,
+    ChatLine,
     ConnectionToken,
+    Conversation,
+    ConversationMessage,
+    ConversationTurn,
     TelegramConnection,
     User,
 )
@@ -32,6 +36,52 @@ class ChatChannel(Protocol):
         Args:
             chat_id: The chat to send to.
             text: The message text.
+        """
+        ...
+
+    def send_texts(self, chat_id: int, texts: list[str]) -> None:
+        """Send several short messages in a row, typing before each one.
+
+        Args:
+            chat_id: The chat to send to.
+            texts: The message texts, in the order to send them.
+        """
+        ...
+
+    def show_typing(self, chat_id: int) -> None:
+        """Show that the Companion is typing.
+
+        Args:
+            chat_id: The chat to show it in.
+        """
+        ...
+
+
+class ChatModel(Protocol):
+    """Generates the Companion's words with a large language model."""
+
+    def generate(self, model: str, instructions: str, history: list[ChatLine]) -> str:
+        """Generate the next reply.
+
+        Args:
+            model: The model to use, e.g. "deepseek-chat".
+            instructions: What the model should be and do (Persona and prompt).
+            history: The Conversation so far, oldest first.
+
+        Returns:
+            The reply text.
+        """
+        ...
+
+
+class ConversationEngine(Protocol):
+    """Runs the steps of answering a connected User's message."""
+
+    def handle(self, turn: ConversationTurn) -> None:
+        """Answer one message: save it, compose a reply and send it.
+
+        Args:
+            turn: The message to answer.
         """
         ...
 
@@ -167,6 +217,48 @@ class ConnectionTokenRepository(Protocol):
         ...
 
 
+class ConversationRepository(Protocol):
+    """Stores Conversations and their messages."""
+
+    def get_latest_for_user(self, user_id: UUID) -> Conversation | None:
+        """Find a User's newest Conversation.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The newest Conversation, or None if the User has never had one.
+        """
+        ...
+
+    def add(self, conversation: Conversation) -> None:
+        """Save a new Conversation.
+
+        Args:
+            conversation: The Conversation to save.
+        """
+        ...
+
+    def add_message(self, message: ConversationMessage) -> None:
+        """Save a message and make it the Conversation's newest message.
+
+        Args:
+            message: The message to save.
+        """
+        ...
+
+    def list_messages(self, conversation_id: UUID) -> list[ConversationMessage]:
+        """List a Conversation's messages, oldest first.
+
+        Args:
+            conversation_id: The Conversation's ID.
+
+        Returns:
+            The messages.
+        """
+        ...
+
+
 class PlatformSettingsRepository(Protocol):
     """Reads admin-managed platform settings and content."""
 
@@ -192,4 +284,5 @@ class Repositories:
     users: UserRepository
     telegram_connections: TelegramConnectionRepository
     connection_tokens: ConnectionTokenRepository
+    conversations: ConversationRepository
     platform_settings: PlatformSettingsRepository
