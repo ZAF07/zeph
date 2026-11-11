@@ -27,6 +27,7 @@ from companion.core.models import (
     Helpline,
     HelplineDetails,
     MemoryCategory,
+    MemoryChanges,
     MemoryItem,
     MemorySource,
     MessageDirection,
@@ -40,7 +41,7 @@ from companion.core.models import (
     UserOverview,
     UserRole,
 )
-from companion.core.ports import MemoryChanges, Repositories
+from companion.core.ports import Repositories
 
 
 def _to_user(row: Row[Any]) -> User:
@@ -1246,6 +1247,7 @@ class PostgresUserMemoryRepository:
                     .values(
                         category_id=item.category_id,
                         content=item.content,
+                        source=item.source.value,
                         source_conversation_id=item.source_conversation_id,
                         updated_at=item.updated_at,
                     )

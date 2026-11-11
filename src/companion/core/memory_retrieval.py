@@ -16,11 +16,6 @@ from companion.core.response_composition import to_transcript_lines
 
 logger = logging.getLogger(__name__)
 
-MEMORY_INTRO = (
-    "What you remember about this person from earlier Conversations. Bring it "
-    "up only when it fits, casually, the way a friend would:"
-)
-
 
 def describe_message_for_picking(
     categories: list[MemoryCategory], messages: list[ConversationMessage]
@@ -87,10 +82,12 @@ def format_memory(
     items: list[MemoryItem],
     summaries: list[ConversationSummary],
     time_zone: str | None,
+    intro: str,
 ) -> str:
     """Write the User Memory part of the reply instructions.
 
     Args:
+        intro: The Admin-set line that tells the model how to use memories.
         categories: The Memory Categories whose items go in, in order.
         items: The User's Memory Items.
         summaries: The newest Conversation Summaries, newest first.
@@ -117,7 +114,7 @@ def format_memory(
         )
     if not sections:
         return ""
-    return MEMORY_INTRO + "\n\n" + "\n\n".join(sections)
+    return intro + "\n\n" + "\n\n".join(sections)
 
 
 class MemoryRetrieval:
@@ -173,13 +170,17 @@ class MemoryRetrieval:
             for category in active_categories
             if category.always_include or category.id in picked_ids
         ]
+        settings = self._repositories.platform_settings
         summaries = user_memory.list_summaries(
-            user_id,
-            limit=self._repositories.platform_settings.get(
-                "recent_conversation_summaries"
-            ),
+            user_id, limit=settings.get("recent_conversation_summaries")
         )
-        return format_memory(chosen, items, summaries, user.time_zone)
+        return format_memory(
+            chosen,
+            items,
+            summaries,
+            user.time_zone,
+            settings.get("reply_memory_intro"),
+        )
 
     def _pick(
         self, categories: list[MemoryCategory], conversation_id: UUID

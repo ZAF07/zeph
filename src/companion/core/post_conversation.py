@@ -12,10 +12,11 @@ from companion.core.models import (
     ConversationMessage,
     ConversationSummary,
     MemoryCategory,
+    MemoryChanges,
     MemoryItem,
     MemorySource,
 )
-from companion.core.ports import ChatModel, Clock, MemoryChanges, Repositories
+from companion.core.ports import ChatModel, Clock, Repositories
 from companion.core.response_composition import to_transcript_lines
 
 logger = logging.getLogger(__name__)
@@ -93,7 +94,7 @@ def read_processing_answer(answer: str) -> ProcessingAnswer | None:
     )
 
 
-def text_field(operation: dict[str, Any], key: str) -> str | None:
+def read_text_field(operation: dict[str, Any], key: str) -> str | None:
     """Read a non-empty text field from an operation.
 
     Args:
@@ -134,8 +135,8 @@ def plan_memory_changes(
         if not isinstance(operation, dict):
             continue
         action = operation.get("action")
-        content = text_field(operation, "content")
-        category_name = (text_field(operation, "category") or "").lower()
+        content = read_text_field(operation, "content")
+        category_name = (read_text_field(operation, "category") or "").lower()
         category = context.active_categories.get(category_name)
         if action == "add":
             if content is None or category is None:
@@ -170,7 +171,7 @@ def plan_memory_changes(
                     user_id=existing.user_id,
                     category_id=category.id if category else existing.category_id,
                     content=content,
-                    source=existing.source,
+                    source=MemorySource.CONVERSATION,
                     source_conversation_id=context.conversation_id,
                     created_at=existing.created_at,
                     updated_at=context.now,
@@ -210,7 +211,7 @@ def describe_conversation(
     )
     return (
         f"Memory Categories:\n{category_lines}\n\n"
-        f"What Zeph remembers now:\n{item_lines or 'Nothing yet.'}\n\n"
+        f"What is remembered now:\n{item_lines or 'Nothing yet.'}\n\n"
         f"The Conversation:\n{to_transcript_lines(messages)}"
     )
 

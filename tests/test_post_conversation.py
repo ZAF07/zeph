@@ -17,6 +17,7 @@ from tests.telegram_helpers import (
     send_to_webhook,
     telegram_text_update,
 )
+from tests.test_onboarding import onboarding_answers
 
 
 def processing_answer(
@@ -339,3 +340,35 @@ def test_operations_that_cannot_be_applied_are_skipped(
     )
 
     assert memory_contents(client, headers) == {"Preferences": ["Not a morning person"]}
+
+
+def test_an_updated_onboarding_memory_survives_answering_onboarding_again(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    headers = auth_headers(auth_verifier, "user_maya")
+    client.put("/api/onboarding", json=onboarding_answers(), headers=headers)
+    connect_telegram(client, auth_verifier, chat_channel)
+    have_conversation(
+        client,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        "call me May, actually",
+        processing_answer(
+            operations=[{"action": "update", "item": 1, "content": "Goes by May"}]
+        ),
+    )
+
+    client.put("/api/onboarding", json=onboarding_answers(), headers=headers)
+
+    assert memory_contents(client, headers)["Life details"] == [
+        "Goes by May",
+        "Goes by Maya",
+    ]

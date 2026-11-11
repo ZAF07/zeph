@@ -121,12 +121,11 @@ class ConversationService:
         quiet_gap = timedelta(minutes=settings.get("conversation_quiet_gap_minutes"))
         now = self._clock.now()
         latest = self._repositories.conversations.get_latest_for_user(user_id)
-        is_open = (
+        if (
             latest is not None
             and latest.ended_at is None
             and now - latest.last_message_at < quiet_gap
-        )
-        if latest is not None and is_open:
+        ):
             return latest.id
         conversation = Conversation(
             id=uuid4(), user_id=user_id, started_at=now, last_message_at=now

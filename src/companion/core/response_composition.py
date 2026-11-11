@@ -56,12 +56,14 @@ def to_transcript_lines(messages: list[ConversationMessage]) -> str:
         messages: The messages, oldest first.
 
     Returns:
-        One "Person: ..." or "Zeph: ..." line per message.
+        One "Person: ..." or "Companion: ..." line per message.
     """
+    speakers = {
+        MessageDirection.INCOMING: "Person",
+        MessageDirection.OUTGOING: "Companion",
+    }
     return "\n".join(
-        f"{'Person' if message.direction == MessageDirection.INCOMING else 'Zeph'}: "
-        f"{message.content}"
-        for message in messages
+        f"{speakers[message.direction]}: {message.content}" for message in messages
     )
 
 

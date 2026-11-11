@@ -463,6 +463,21 @@ class MemoryItem:
 
 
 @dataclass(frozen=True)
+class MemoryChanges:
+    """What post-conversation processing changes in a User's Memory Items.
+
+    Attributes:
+        added: New Memory Items to save.
+        updated: Existing Memory Items with their new content and category.
+        removed_ids: IDs of Memory Items to delete.
+    """
+
+    added: list[MemoryItem]
+    updated: list[MemoryItem]
+    removed_ids: list[UUID]
+
+
+@dataclass(frozen=True)
 class MemoryGroup:
     """A User's Memory Items in one Memory Category.
 

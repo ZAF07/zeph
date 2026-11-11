@@ -186,8 +186,9 @@ memory_processing_prompt: |-
   "tired but hopeful" or "light and content").
 
   Then decide what Zeph should remember. Keep only meaningful, lasting facts
-  the person shared about themselves: not small talk, not what Zeph said, not
-  passing moods. Each fact is one short sentence in a Memory Category.
+  the person shared about themselves: not small talk, not what the Companion
+  (Zeph) said, not passing moods. Each fact is one short sentence in a Memory
+  Category.
   - When a fact is new, add it.
   - When a fact has changed (they changed jobs, a plan moved), update the
     existing item instead of adding a new one, so nothing contradicts.
@@ -218,6 +219,11 @@ memory_retrieval_prompt: |-
 
   Answer with only the picked category names, one per line, exactly as
   written in the list. If none would help, answer "none".
+
+# Put before the User Memory given to each reply.
+reply_memory_intro: >-
+  What you remember about this person from earlier Conversations. Bring it up
+  only when it fits, casually, the way a friend would:
 
 # How many of the newest Conversation Summaries go into each reply.
 recent_conversation_summaries: 3
