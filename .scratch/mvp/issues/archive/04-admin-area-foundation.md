@@ -71,4 +71,4 @@ Evidence:
 ## Completion
 
 - Completed: 2026-11-11
-- Commit: <to be filled in manually>
+- Commit: 6831da5 (merged from `feat/04-admin-area-foundation`)
