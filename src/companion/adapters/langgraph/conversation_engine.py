@@ -7,7 +7,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
 from companion.core.conversations import ConversationServices
-from companion.core.models import ConversationTurn
+from companion.core.models import ConversationTurn, RiskType
 
 
 class TurnState(TypedDict, total=False):
@@ -20,6 +20,7 @@ class TurnState(TypedDict, total=False):
     chat_id: int
     text: str
     conversation_id: str
+    risk_type: str
     reply_parts: list[str]
 
 
@@ -76,6 +77,50 @@ class LangGraphConversationEngine:
             )
             return {"conversation_id": str(conversation_id)}
 
+        def check_safeguard(state: TurnState) -> TurnState:
+            """Check the User's message for crisis.
+
+            Args:
+                state: The graph's state so far.
+
+            Returns:
+                The risk type the Safeguard saw.
+            """
+            risk_type = services.safeguard.assess(UUID(state["conversation_id"]))
+            return {"risk_type": risk_type.value}
+
+        def after_safeguard(state: TurnState) -> str:
+            """Pick the next step: the Crisis Reply, or a normal reply.
+
+            Args:
+                state: The graph's state so far.
+
+            Returns:
+                The name of the next step.
+            """
+            if state["risk_type"] == RiskType.NONE.value:
+                return "compose_reply"
+            return "send_crisis_reply"
+
+        def send_crisis_reply(state: TurnState) -> TurnState:
+            """Send the Crisis Reply and record the Safeguard Event.
+
+            Normal response composition is skipped.
+
+            Args:
+                state: The graph's state so far.
+
+            Returns:
+                Nothing new to add to the state.
+            """
+            crisis_reply = services.safeguard.respond_to_crisis(
+                UUID(state["user_id"]), RiskType(state["risk_type"])
+            )
+            services.conversations.deliver_at_once(
+                UUID(state["conversation_id"]), state["chat_id"], crisis_reply
+            )
+            return {}
+
         def compose_reply(state: TurnState) -> TurnState:
             """Write the Companion's reply.
 
@@ -106,16 +151,26 @@ class LangGraphConversationEngine:
 
         graph = StateGraph(TurnState)
         graph.add_node("record_incoming", record_incoming)
+        graph.add_node("check_safeguard", check_safeguard)
+        graph.add_node("send_crisis_reply", send_crisis_reply)
         graph.add_node("compose_reply", compose_reply)
         graph.add_node("deliver_reply", deliver_reply)
         graph.add_edge(START, "record_incoming")
-        graph.add_edge("record_incoming", "compose_reply")
+        graph.add_edge("record_incoming", "check_safeguard")
+        graph.add_conditional_edges(
+            "check_safeguard",
+            after_safeguard,
+            ["send_crisis_reply", "compose_reply"],
+        )
+        graph.add_edge("send_crisis_reply", END)
         graph.add_edge("compose_reply", "deliver_reply")
         graph.add_edge("deliver_reply", END)
         self._graph = graph.compile(checkpointer=checkpointer)
 
     def handle(self, turn: ConversationTurn) -> None:
-        """Answer one message: save it, compose a reply and send it.
+        """Answer one message: save it, run the Safeguard, then reply.
+
+        On a crisis the Crisis Reply is sent instead of a composed reply.
 
         Args:
             turn: The message to answer.

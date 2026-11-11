@@ -143,12 +143,25 @@ class ChatModelCall:
 
 
 class ScriptedChatModel:
-    """Chat model that returns pre-written replies and records each call."""
+    """Chat model that returns pre-written replies and records each call.
 
-    def __init__(self) -> None:
-        """Start with no replies scripted, no calls and no delay."""
+    Calls whose instructions are the Safeguard prompt are kept apart from
+    reply calls: they answer from their own script and default to "none",
+    so tests about replies don't have to script the Safeguard too.
+    """
+
+    def __init__(self, safeguard_prompt: str = "") -> None:
+        """Start with no replies scripted, no calls and no delay.
+
+        Args:
+            safeguard_prompt: The instructions that mark a Safeguard call.
+        """
         self._replies: list[str | Exception] = []
+        self._safeguard_answers: list[str | Exception] = []
+        self.safeguard_prompt = safeguard_prompt
         self.calls: list[ChatModelCall] = []
+        self.safeguard_calls: list[ChatModelCall] = []
+        self.call_order: list[str] = []
         self.delay_seconds = 0.0
 
     def script(self, *replies: str | Exception) -> None:
@@ -160,8 +173,17 @@ class ScriptedChatModel:
         """
         self._replies.extend(replies)
 
+    def script_safeguard(self, *answers: str | Exception) -> None:
+        """Queue Safeguard answers to return, one per Safeguard call.
+
+        Args:
+            answers: The risk labels; an exception is raised instead of
+                returned, to act like a failing model.
+        """
+        self._safeguard_answers.extend(answers)
+
     def generate(self, model: str, instructions: str, history: list[ChatLine]) -> str:
-        """Record the call and return the next scripted reply.
+        """Record the call and return the next scripted reply or answer.
 
         Args:
             model: The model name asked for.
@@ -169,13 +191,20 @@ class ScriptedChatModel:
             history: The Conversation so far.
 
         Returns:
-            The next scripted reply.
+            The next scripted reply, or Safeguard answer for a Safeguard call.
         """
-        self.calls.append(
-            ChatModelCall(model=model, instructions=instructions, history=history)
-        )
-        time.sleep(self.delay_seconds)
-        reply = self._replies.pop(0)
-        if isinstance(reply, Exception):
-            raise reply
-        return reply
+        call = ChatModelCall(model=model, instructions=instructions, history=history)
+        if self.safeguard_prompt and instructions == self.safeguard_prompt:
+            self.safeguard_calls.append(call)
+            self.call_order.append("safeguard")
+            answer = (
+                self._safeguard_answers.pop(0) if self._safeguard_answers else "none"
+            )
+        else:
+            self.calls.append(call)
+            self.call_order.append("reply")
+            time.sleep(self.delay_seconds)
+            answer = self._replies.pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer

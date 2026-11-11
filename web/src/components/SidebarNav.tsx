@@ -18,6 +18,8 @@ const adminItems = [
   { label: "Users", href: "/admin/users" },
   { label: "Persona", href: "/admin/persona" },
   { label: "Prompts & models", href: "/admin/prompts" },
+  { label: "Safety", href: "/admin/safety" },
+  { label: "Safeguard Events", href: "/admin/safeguard-events" },
   { label: "Platform settings", href: "/admin/settings" },
 ];
 

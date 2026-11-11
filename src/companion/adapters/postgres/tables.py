@@ -5,12 +5,15 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Identity,
+    Index,
+    Integer,
     MetaData,
     Table,
     Text,
     Uuid,
 )
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.sql import text
 
 metadata = MetaData()
 
@@ -104,4 +107,37 @@ platform_settings = Table(
     Column("value", JSONB, nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
     Column("updated_by", Uuid, ForeignKey("users.id", ondelete="SET NULL")),
+)
+
+helplines = Table(
+    "helplines",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("country", Text),
+    Column("name", Text, nullable=False),
+    Column("number", Text, nullable=False),
+    Column("hours", Text),
+    Column("sort_order", Integer, nullable=False),
+    Index(
+        "helplines_one_international_fallback",
+        text("(country IS NULL)"),
+        unique=True,
+        postgresql_where=text("country IS NULL"),
+    ),
+)
+
+safeguard_events = Table(
+    "safeguard_events",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("risk_type", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False, index=True),
+    Column("helplines_country", Text),
 )

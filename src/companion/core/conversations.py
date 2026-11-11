@@ -15,6 +15,7 @@ from companion.core.ports import (
     Repositories,
 )
 from companion.core.response_composition import ResponseComposer
+from companion.core.safeguard import Safeguard
 
 
 def typing_pause_seconds(text: str, settings: PlatformSettingsRepository) -> float:
@@ -91,6 +92,19 @@ class ConversationService:
             self._chat_channel.send_text(chat_id, part)
             self._save(conversation_id, MessageDirection.OUTGOING, part)
 
+    def deliver_at_once(self, conversation_id: UUID, chat_id: int, text: str) -> None:
+        """Send one message straight away, without a typing pause, and save it.
+
+        Used for the Crisis Reply, which must never wait.
+
+        Args:
+            conversation_id: The Conversation being answered.
+            chat_id: The chat to send to.
+            text: The message, sent whole even if it has blank lines.
+        """
+        self._chat_channel.send_text(chat_id, text)
+        self._save(conversation_id, MessageDirection.OUTGOING, text)
+
     def _open_conversation_id(self, user_id: UUID) -> UUID:
         """Find the User's open Conversation, or start a new one.
 
@@ -140,8 +154,10 @@ class ConversationServices:
 
     Attributes:
         conversations: Saves messages and sends replies.
+        safeguard: Checks each message for crisis and writes the Crisis Reply.
         response_composer: Writes the Companion's reply.
     """
 
     conversations: ConversationService
+    safeguard: Safeguard
     response_composer: ResponseComposer

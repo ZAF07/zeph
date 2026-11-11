@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { countryFromBrowser, countryOptions } from "@/lib/countries";
+import {
+  countryFromBrowser,
+  countryName,
+  countryOptions,
+} from "@/lib/countries";
 
 describe("countryFromBrowser", () => {
   it("reads the country from the first language that names one", () => {
@@ -23,5 +27,12 @@ describe("countryOptions", () => {
 
     expect(options).toContainEqual({ code: "SG", name: "Singapore" });
     expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+  });
+});
+
+describe("countryName", () => {
+  it("names a country in English", () => {
+    expect(countryName("SG")).toBe("Singapore");
+    expect(countryName("GB")).toBe("United Kingdom");
   });
 });

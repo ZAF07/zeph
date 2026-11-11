@@ -13,6 +13,7 @@ from companion.adapters.http.dashboard_api import build_dashboard_api_router
 from companion.adapters.telegram.webhook import build_telegram_webhook_router
 from companion.core.admin_users import AdminUserService
 from companion.core.conversations import ConversationService, ConversationServices
+from companion.core.helplines import HelplineService
 from companion.core.incoming_messages import IncomingMessageHandler
 from companion.core.platform_settings import PlatformSettingsService
 from companion.core.ports import (
@@ -24,6 +25,7 @@ from companion.core.ports import (
     Repositories,
 )
 from companion.core.response_composition import ResponseComposer
+from companion.core.safeguard import Safeguard
 from companion.core.telegram_connection import TelegramConnectionService
 from companion.core.users import UserService
 
@@ -81,6 +83,13 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         clock=dependencies.clock,
         dashboard_url=dependencies.dashboard_url,
     )
+    helpline_service = HelplineService(dependencies.repositories.helplines)
+    safeguard = Safeguard(
+        repositories=dependencies.repositories,
+        helplines=helpline_service,
+        chat_model=dependencies.chat_model,
+        clock=dependencies.clock,
+    )
     conversation_engine = dependencies.build_conversation_engine(
         ConversationServices(
             conversations=ConversationService(
@@ -88,6 +97,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 chat_channel=dependencies.chat_channel,
                 clock=dependencies.clock,
             ),
+            safeguard=safeguard,
             response_composer=ResponseComposer(
                 repositories=dependencies.repositories,
                 chat_model=dependencies.chat_model,
@@ -128,6 +138,8 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             platform_settings_service=PlatformSettingsService(
                 dependencies.repositories.platform_settings, dependencies.clock
             ),
+            helpline_service=helpline_service,
+            safeguard=safeguard,
         )
     )
     app.include_router(

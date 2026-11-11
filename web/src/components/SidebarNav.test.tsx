@@ -34,6 +34,8 @@ describe("SidebarNav", () => {
       "Users",
       "Persona",
       "Prompts & models",
+      "Safety",
+      "Safeguard Events",
       "Platform settings",
     ]);
     expect(

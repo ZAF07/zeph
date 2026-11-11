@@ -1,0 +1,21 @@
+# Starting Helplines (ADR-0004). Loaded on first run only, when there are no
+# Helplines at all; after that Admins manage them from the Dashboard.
+# The owner must check these numbers before testers start.
+
+countries:
+  SG:
+    - name: Samaritans of Singapore (SOS)
+      number: "1767"
+      hours: 24 hours
+    - name: IMH Mental Health Helpline
+      number: 6389 2222
+      hours: 24 hours
+    - name: Emergency ambulance (SCDF)
+      number: "995"
+      hours: 24 hours
+
+# Shared with Users whose country has no Helplines.
+international_fallback:
+  name: Find A Helpline
+  number: findahelpline.com
+  hours: null

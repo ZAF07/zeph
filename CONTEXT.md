@@ -67,19 +67,23 @@ _Avoid_: Disclaimer, warning, terms
 ### Safety
 
 **Safeguard**:
-The check on every incoming message for signs of crisis (suicide or self-harm, danger to others, abuse, medical emergency). Everyday stress or sadness is not a crisis.
+The check on every incoming message, read in the light of the Conversation so far, for signs of crisis (suicide or self-harm, danger to others, abuse, medical emergency). Everyday stress or sadness is not a crisis. When the Safeguard can't tell, it treats the message as a crisis: a false alarm is better than a missed crisis.
 _Avoid_: Filter, moderation, guardrail
 
 **Crisis Reply**:
-The short, warm reply sent instead of a normal one when the Safeguard detects a crisis. It states that the Companion is an AI and points to Helplines for the User's country.
+The short, warm reply sent instead of a normal one when the Safeguard detects a crisis. It states that the Companion is an AI and points to Helplines for the User's country, or to the International fallback when that country has none. Its wording is set by Admins.
 _Avoid_: Emergency message, SOS reply
 
 **Helpline**:
-A crisis support contact (name, number, hours) for a given country, managed by Admins.
+A crisis support contact (name, number, hours) for a given country, managed by Admins. Each country's Helplines are shared in a set order.
 _Avoid_: Hotline, resource
 
+**International fallback**:
+The one Helpline with no country (e.g. a worldwide helpline directory), shared only with Users whose country has no Helplines. Admins can edit it but never remove it, so every User always has somewhere to turn.
+_Avoid_: Default helpline, global helpline
+
 **Safeguard Event**:
-A record that the Safeguard detected a crisis for a User: who, when and what kind of risk. Never includes the message text.
+A record that the Safeguard detected a crisis for a User: who, when, what kind of risk, and whose Helplines were shared (their country's, or the International fallback). Never includes the message text.
 _Avoid_: Alert, incident, flag
 
 ### User Memory
