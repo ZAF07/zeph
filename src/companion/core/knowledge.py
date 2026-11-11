@@ -309,6 +309,17 @@ class KnowledgeService:
         for upload in read_starter_set():
             self.ingest(self.upload(upload).id)
 
+    def ingest_pending(self) -> None:
+        """Ingest every document still pending, e.g. after a restart.
+
+        Ingestion runs after an upload's response, so a restart part-way
+        leaves a document pending. Run this before the backend takes
+        requests, when nothing else is ingesting.
+        """
+        for document in self._repositories.knowledge_documents.list_all():
+            if document.status == KnowledgeStatus.PENDING:
+                self.ingest(document.id)
+
     def _get(self, document_id: UUID) -> KnowledgeDocument:
         """Find a Knowledge document.
 

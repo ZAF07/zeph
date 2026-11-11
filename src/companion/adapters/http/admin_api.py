@@ -855,14 +855,15 @@ def build_admin_api_router(
             HTTPException: 422 if the file type, file or details are not
                 valid.
         """
+        file_name = file.filename or ""
         try:
             document = knowledge_service.upload(
                 KnowledgeUpload(
                     title=title,
                     source=source,
                     tradition=tradition,
-                    file_name=file.filename or "",
-                    file_type=knowledge_file_type(file.filename or ""),
+                    file_name=file_name,
+                    file_type=knowledge_file_type(file_name),
                     content=file.file.read(MAX_UPLOAD_BYTES + 1),
                 )
             )

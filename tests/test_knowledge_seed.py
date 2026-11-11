@@ -54,3 +54,17 @@ def test_the_starter_set_is_seeded_only_on_first_run(engine: Engine) -> None:
     assert [document.id for document in service.list_documents()] == [
         document.id for document in kept
     ]
+
+
+def test_documents_left_pending_by_a_restart_are_ingested_on_the_next_start(
+    engine: Engine,
+) -> None:
+    service = knowledge_service(engine)
+    [upload, *_] = read_knowledge_seed(KNOWLEDGE_SEED_FILE)
+    interrupted = service.upload(upload)
+
+    service.ingest_pending()
+
+    [document] = service.list_documents()
+    assert document.id == interrupted.id
+    assert document.status == KnowledgeStatus.READY

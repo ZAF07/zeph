@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     conversation_engine_adapter: str = "langgraph"
     embedder_adapter: str = "fastembed"
     vector_store_adapter: str = "pgvector"
+    text_extractor_adapter: str = "pypdf"
     scheduler_adapter: str = "in_process"
 
     @property

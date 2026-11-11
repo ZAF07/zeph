@@ -36,6 +36,9 @@ const headings = [
   "Added",
 ];
 
+const headingCell =
+  "whitespace-nowrap border-b border-line bg-subtle px-[18px] py-3.5 font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted";
+
 const fileTypeLabels: Record<KnowledgeFileType, string> = {
   text: "Text",
   markdown: "Markdown",
@@ -228,15 +231,12 @@ export function KnowledgeLibrary() {
                   <th
                     key={heading}
                     scope="col"
-                    className="whitespace-nowrap border-b border-line bg-subtle px-[18px] py-3.5 text-left font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted"
+                    className={`${headingCell} text-left`}
                   >
                     {heading}
                   </th>
                 ))}
-                <th
-                  scope="col"
-                  className="whitespace-nowrap border-b border-line bg-subtle px-[18px] py-3.5 text-right font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted"
-                >
+                <th scope="col" className={`${headingCell} text-right`}>
                   Actions
                 </th>
               </tr>

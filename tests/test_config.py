@@ -2,7 +2,12 @@ import pytest
 from sqlalchemy import create_engine
 
 from companion.config import MissingSettingsError, load_settings
-from companion.main import UnknownAdapterError, build_embedder, build_vector_store
+from companion.main import (
+    UnknownAdapterError,
+    build_embedder,
+    build_text_extractor,
+    build_vector_store,
+)
 
 COMPLETE_ENVIRONMENT = {
     "POSTGRES_USER": "companion",
@@ -57,19 +62,21 @@ def test_initial_admin_emails_are_split_and_lower_cased() -> None:
     )
 
 
-def test_knowledge_adapters_default_to_fastembed_and_pgvector() -> None:
+def test_knowledge_adapters_default_to_fastembed_pgvector_and_pypdf() -> None:
     settings = load_settings(COMPLETE_ENVIRONMENT)
 
     assert settings.embedder_adapter == "fastembed"
     assert settings.vector_store_adapter == "pgvector"
+    assert settings.text_extractor_adapter == "pypdf"
 
 
-def test_an_unknown_embedder_or_vector_store_is_named_in_the_error() -> None:
+def test_an_unknown_knowledge_adapter_is_named_in_the_error() -> None:
     settings = load_settings(
         {
             **COMPLETE_ENVIRONMENT,
             "EMBEDDER_ADAPTER": "nope",
             "VECTOR_STORE_ADAPTER": "nada",
+            "TEXT_EXTRACTOR_ADAPTER": "zilch",
         }
     )
 
@@ -77,3 +84,5 @@ def test_an_unknown_embedder_or_vector_store_is_named_in_the_error() -> None:
         build_embedder(settings)
     with pytest.raises(UnknownAdapterError, match="VECTOR_STORE_ADAPTER"):
         build_vector_store(settings, create_engine(settings.database_url))
+    with pytest.raises(UnknownAdapterError, match="TEXT_EXTRACTOR_ADAPTER"):
+        build_text_extractor(settings)

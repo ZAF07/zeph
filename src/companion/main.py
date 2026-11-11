@@ -26,6 +26,7 @@ from companion.core.ports import (
     ChatModel,
     Clock,
     ConversationEngine,
+    DocumentTextExtractor,
     Embedder,
     KnowledgeVectorStore,
     Repositories,
@@ -98,6 +99,23 @@ def build_embedder(settings: Settings) -> Embedder:
     if settings.embedder_adapter == "fastembed":
         return FastEmbedEmbedder()
     raise UnknownAdapterError("EMBEDDER_ADAPTER", settings.embedder_adapter)
+
+
+def build_text_extractor(settings: Settings) -> DocumentTextExtractor:
+    """Build the Knowledge text extractor chosen in `.env`.
+
+    Args:
+        settings: The loaded settings.
+
+    Returns:
+        The text extractor.
+
+    Raises:
+        UnknownAdapterError: If the chosen adapter does not exist.
+    """
+    if settings.text_extractor_adapter == "pypdf":
+        return PypdfTextExtractor()
+    raise UnknownAdapterError("TEXT_EXTRACTOR_ADAPTER", settings.text_extractor_adapter)
 
 
 def build_vector_store(settings: Settings, engine: Engine) -> KnowledgeVectorStore:
@@ -257,7 +275,7 @@ def build_production_app() -> FastAPI:
         chat_model=build_chat_model(settings),
         build_conversation_engine=build_conversation_engine_factory(settings),
         auth_verifier=build_auth_verifier(settings),
-        text_extractor=PypdfTextExtractor(),
+        text_extractor=build_text_extractor(settings),
         embedder=build_embedder(settings),
         knowledge_vector_store=build_vector_store(settings, engine),
         clock=build_clock(settings),
