@@ -78,4 +78,4 @@ Evidence:
 ## Completion
 
 - Completed: 2026-11-11
-- Commit: <to be filled in manually>
+- Commit: 7369f7b, review fixes 069b225 (merged from `feat/06-user-memory` in d7b4e45)
