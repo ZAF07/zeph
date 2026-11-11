@@ -15,6 +15,8 @@ from companion.core.models import (
     Helpline,
     HelplineDetails,
     MemoryCategory,
+    MemoryCategoryDetails,
+    MemoryCategoryOverview,
     MemoryChanges,
     MemoryItem,
     RiskType,
@@ -378,6 +380,47 @@ class MemoryCategoryRepository(Protocol):
 
         Returns:
             The categories.
+        """
+        ...
+
+    def list_overviews(self) -> list[MemoryCategoryOverview]:
+        """List every Memory Category with its Memory Item count, in sort order.
+
+        Returns:
+            The categories, archived ones included.
+        """
+        ...
+
+    def get(self, category_id: UUID) -> MemoryCategory | None:
+        """Find a Memory Category.
+
+        Args:
+            category_id: The category's ID.
+
+        Returns:
+            The category, or None if there is none.
+        """
+        ...
+
+    def add(self, details: MemoryCategoryDetails) -> MemoryCategory:
+        """Save a new, active Memory Category last in the list.
+
+        Args:
+            details: Its name, description and "always include".
+
+        Returns:
+            The saved category.
+        """
+        ...
+
+    def update(self, category: MemoryCategory) -> MemoryCategory:
+        """Save a Memory Category's name, description and flags.
+
+        Args:
+            category: The category with its new values.
+
+        Returns:
+            The saved category.
         """
         ...
 

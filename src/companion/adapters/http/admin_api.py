@@ -18,9 +18,16 @@ from companion.core.helplines import (
     InvalidHelplineError,
     MoveDirection,
 )
+from companion.core.memory_categories import (
+    InvalidMemoryCategoryError,
+    MemoryCategoryNotFoundError,
+    MemoryCategoryService,
+)
 from companion.core.models import (
     Helpline,
     HelplineDetails,
+    MemoryCategory,
+    MemoryCategoryDetails,
     RiskType,
     SafeguardEventOverview,
     StoredSetting,
@@ -175,6 +182,66 @@ class SafeguardEventsResponse(BaseModel):
     events: list[SafeguardEventResponse]
 
 
+class MemoryCategoryResponse(BaseModel):
+    """A Memory Category as Admins see it."""
+
+    id: str
+    name: str
+    description: str
+    always_include: bool
+    archived: bool
+
+
+class MemoryCategoryOverviewResponse(MemoryCategoryResponse):
+    """A Memory Category and how many Memory Items, across all Users, are in it."""
+
+    item_count: int
+
+
+class MemoryCategoriesResponse(BaseModel):
+    """Every Memory Category in order, archived ones included."""
+
+    categories: list[MemoryCategoryOverviewResponse]
+
+
+class MemoryCategoryRequest(BaseModel):
+    """A Memory Category's name, description and "always include"."""
+
+    name: str
+    description: str
+    always_include: bool = False
+
+    def to_details(self) -> MemoryCategoryDetails:
+        """Turn the request into Memory Category details.
+
+        Returns:
+            The details.
+        """
+        return MemoryCategoryDetails(
+            name=self.name,
+            description=self.description,
+            always_include=self.always_include,
+        )
+
+
+def to_memory_category_response(category: MemoryCategory) -> MemoryCategoryResponse:
+    """Describe a Memory Category for the admin area.
+
+    Args:
+        category: The category.
+
+    Returns:
+        The response body.
+    """
+    return MemoryCategoryResponse(
+        id=str(category.id),
+        name=category.name,
+        description=category.description,
+        always_include=category.always_include,
+        archived=category.archived,
+    )
+
+
 def to_helpline_response(helpline: Helpline) -> HelplineResponse:
     """Describe a Helpline for the admin area.
 
@@ -264,6 +331,7 @@ def build_admin_api_router(
     platform_settings_service: PlatformSettingsService,
     helpline_service: HelplineService,
     safeguard: Safeguard,
+    memory_category_service: MemoryCategoryService,
 ) -> APIRouter:
     """Build the admin API routes.
 
@@ -276,6 +344,7 @@ def build_admin_api_router(
         platform_settings_service: Reads and changes platform settings.
         helpline_service: Manages Helplines and the international fallback.
         safeguard: Lists Safeguard Events.
+        memory_category_service: Manages Memory Categories.
 
     Returns:
         The router.
@@ -552,5 +621,129 @@ def build_admin_api_router(
         return SafeguardEventsResponse(
             events=[to_safeguard_event_response(overview) for overview in overviews]
         )
+
+    @router.get("/memory-categories")
+    def list_memory_categories() -> MemoryCategoriesResponse:
+        """List every Memory Category with its Memory Item count.
+
+        Returns:
+            The categories in order, archived ones included.
+        """
+        return MemoryCategoriesResponse(
+            categories=[
+                MemoryCategoryOverviewResponse(
+                    **to_memory_category_response(overview.category).model_dump(),
+                    item_count=overview.item_count,
+                )
+                for overview in memory_category_service.list_overviews()
+            ]
+        )
+
+    @router.post("/memory-categories", status_code=status.HTTP_201_CREATED)
+    def add_memory_category(request: MemoryCategoryRequest) -> MemoryCategoryResponse:
+        """Add an active Memory Category last in the list.
+
+        Args:
+            request: The category.
+
+        Returns:
+            The saved category.
+
+        Raises:
+            HTTPException: 422 if the name or description is blank or the
+                name is taken.
+        """
+        try:
+            category = memory_category_service.add(request.to_details())
+        except InvalidMemoryCategoryError as error:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
+            ) from error
+        return to_memory_category_response(category)
+
+    @router.put("/memory-categories/{category_id}")
+    def update_memory_category(
+        admin: Annotated[User, Depends(current_admin)],
+        category_id: UUID,
+        request: MemoryCategoryRequest,
+    ) -> MemoryCategoryResponse:
+        """Change a Memory Category's name, description and "always include".
+
+        Args:
+            admin: The Admin making the change.
+            category_id: The category to change.
+            request: Its new name, description and "always include".
+
+        Returns:
+            The saved category.
+
+        Raises:
+            HTTPException: 404 if there is no such category; 422 if the name
+                or description is blank or the name is taken.
+        """
+        try:
+            category = memory_category_service.update(
+                admin, category_id, request.to_details()
+            )
+        except MemoryCategoryNotFoundError as error:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "No such Memory Category"
+            ) from error
+        except InvalidMemoryCategoryError as error:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
+            ) from error
+        return to_memory_category_response(category)
+
+    @router.post("/memory-categories/{category_id}/archive")
+    def archive_memory_category(category_id: UUID) -> MemoryCategoryResponse:
+        """Archive a Memory Category: it keeps its items but gets no new ones.
+
+        Args:
+            category_id: The category to archive.
+
+        Returns:
+            The saved category.
+
+        Raises:
+            HTTPException: 404 if there is no such category.
+        """
+        return set_archived(category_id, archived=True)
+
+    @router.post("/memory-categories/{category_id}/restore")
+    def restore_memory_category(category_id: UUID) -> MemoryCategoryResponse:
+        """Restore an archived Memory Category so it gets new items again.
+
+        Args:
+            category_id: The category to restore.
+
+        Returns:
+            The saved category.
+
+        Raises:
+            HTTPException: 404 if there is no such category.
+        """
+        return set_archived(category_id, archived=False)
+
+    def set_archived(category_id: UUID, archived: bool) -> MemoryCategoryResponse:
+        """Archive or restore a Memory Category.
+
+        Args:
+            category_id: The category.
+            archived: True to archive it, False to restore it.
+
+        Returns:
+            The saved category.
+
+        Raises:
+            HTTPException: 404 if there is no such category.
+        """
+        try:
+            category = memory_category_service.set_archived(category_id, archived)
+        except MemoryCategoryNotFoundError as error:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "No such Memory Category"
+            ) from error
+        return to_memory_category_response(category)
 
     return router

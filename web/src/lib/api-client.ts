@@ -197,6 +197,25 @@ export type ConversationSummary = {
   created_at: string;
 };
 
+/** The kind of fact a Memory Item records, as Admins manage it. */
+export type MemoryCategory = {
+  id: string;
+  name: string;
+  description: string;
+  always_include: boolean;
+  archived: boolean;
+};
+
+/** A Memory Category and how many Memory Items, across all Users, it has. */
+export type MemoryCategoryOverview = MemoryCategory & { item_count: number };
+
+/** A Memory Category's name, description and "always include". */
+export type MemoryCategoryInput = {
+  name: string;
+  description: string;
+  always_include: boolean;
+};
+
 /** Every call the Dashboard makes to the backend. */
 export type ApiClient = {
   getMe: () => Promise<Me>;
@@ -226,6 +245,14 @@ export type ApiClient = {
   listSafeguardEvents: (
     filter: SafeguardEventFilter,
   ) => Promise<SafeguardEvent[]>;
+  listMemoryCategories: () => Promise<MemoryCategoryOverview[]>;
+  addMemoryCategory: (category: MemoryCategoryInput) => Promise<MemoryCategory>;
+  updateMemoryCategory: (
+    id: string,
+    category: MemoryCategoryInput,
+  ) => Promise<MemoryCategory>;
+  archiveMemoryCategory: (id: string) => Promise<MemoryCategory>;
+  restoreMemoryCategory: (id: string) => Promise<MemoryCategory>;
 };
 
 /** Raised when the backend answers with an error status. */
@@ -380,5 +407,29 @@ export function createApiClient(
         )
       ).events;
     },
+    listMemoryCategories: async () =>
+      (
+        await request<{ categories: MemoryCategoryOverview[] }>(
+          "/api/admin/memory-categories",
+        )
+      ).categories,
+    addMemoryCategory: (category) =>
+      request<MemoryCategory>("/api/admin/memory-categories", "POST", category),
+    updateMemoryCategory: (id, category) =>
+      request<MemoryCategory>(
+        `/api/admin/memory-categories/${id}`,
+        "PUT",
+        category,
+      ),
+    archiveMemoryCategory: (id) =>
+      request<MemoryCategory>(
+        `/api/admin/memory-categories/${id}/archive`,
+        "POST",
+      ),
+    restoreMemoryCategory: (id) =>
+      request<MemoryCategory>(
+        `/api/admin/memory-categories/${id}/restore`,
+        "POST",
+      ),
   };
 }

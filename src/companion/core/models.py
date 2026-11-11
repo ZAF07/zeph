@@ -429,6 +429,34 @@ class MemoryCategory:
     sort_order: int
 
 
+@dataclass(frozen=True)
+class MemoryCategoryDetails:
+    """A Memory Category's details, as an Admin enters them.
+
+    Attributes:
+        name: Its name, e.g. "Work".
+        description: What belongs in it, as the chat model is told.
+        always_include: Whether its Memory Items go into every reply.
+    """
+
+    name: str
+    description: str
+    always_include: bool
+
+
+@dataclass(frozen=True)
+class MemoryCategoryOverview:
+    """A Memory Category and how many Memory Items, across all Users, it has.
+
+    Attributes:
+        category: The Memory Category.
+        item_count: How many Memory Items are in it.
+    """
+
+    category: MemoryCategory
+    item_count: int
+
+
 class MemorySource(StrEnum):
     """Where a Memory Item came from."""
 
