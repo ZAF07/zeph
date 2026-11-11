@@ -5,11 +5,16 @@ from sqlalchemy import create_engine
 from companion.adapters.postgres.database import (
     migrate,
     seed_helplines,
+    seed_memory_categories,
     seed_platform_settings,
 )
 from companion.adapters.telegram.chat_channel import TelegramChatChannel
 from companion.config import MissingSettingsError, load_settings
-from companion.main import HELPLINES_SEED_FILE, SEED_FILE
+from companion.main import (
+    HELPLINES_SEED_FILE,
+    MEMORY_CATEGORIES_SEED_FILE,
+    SEED_FILE,
+)
 
 
 def prepare() -> None:
@@ -23,6 +28,7 @@ def prepare() -> None:
     engine = create_engine(settings.database_url)
     seed_platform_settings(engine, SEED_FILE)
     seed_helplines(engine, HELPLINES_SEED_FILE)
+    seed_memory_categories(engine, MEMORY_CATEGORIES_SEED_FILE)
     engine.dispose()
     webhook_url = f"{settings.webhook_base_url.rstrip('/')}/telegram/webhook"
     TelegramChatChannel(settings.telegram_bot_token).register_webhook(

@@ -1,13 +1,17 @@
 from collections.abc import Callable
 from datetime import datetime
 from typing import Annotated
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
 from companion.core.models import (
     ConnectionToken,
     ConnectionTokenStatus,
+    ConversationSummary,
+    MemoryGroup,
+    MemorySource,
     OnboardingAnswers,
     PreferenceChanges,
     User,
@@ -15,6 +19,7 @@ from companion.core.models import (
 )
 from companion.core.ports import PlatformSettingsRepository
 from companion.core.telegram_connection import TelegramConnectionService
+from companion.core.user_memory import MemoryNotFoundError, UserMemoryService
 from companion.core.users import InvalidProfileError, UserService
 
 
@@ -90,6 +95,90 @@ class TelegramConnectionStatusResponse(BaseModel):
     latest_token: ConnectionTokenResponse | None
 
 
+class MemoryItemResponse(BaseModel):
+    """A Memory Item and where it came from."""
+
+    id: str
+    content: str
+    source: MemorySource
+    created_at: datetime
+    updated_at: datetime
+
+
+class MemoryGroupResponse(BaseModel):
+    """A User's Memory Items in one Memory Category."""
+
+    category: str
+    items: list[MemoryItemResponse]
+
+
+class MemoryItemsResponse(BaseModel):
+    """A User's Memory Items by Memory Category, in category order."""
+
+    groups: list[MemoryGroupResponse]
+
+
+class ConversationSummaryResponse(BaseModel):
+    """A Conversation Summary and how the User seemed."""
+
+    id: str
+    summary: str
+    mood: str
+    created_at: datetime
+
+
+class ConversationSummariesResponse(BaseModel):
+    """A User's Conversation Summaries, newest first."""
+
+    summaries: list[ConversationSummaryResponse]
+
+
+def to_memory_items_response(groups: list[MemoryGroup]) -> MemoryItemsResponse:
+    """Describe a User's Memory Items for the Dashboard.
+
+    Args:
+        groups: The Memory Items by Memory Category.
+
+    Returns:
+        The response body.
+    """
+    return MemoryItemsResponse(
+        groups=[
+            MemoryGroupResponse(
+                category=group.category.name,
+                items=[
+                    MemoryItemResponse(
+                        id=str(item.id),
+                        content=item.content,
+                        source=item.source,
+                        created_at=item.created_at,
+                        updated_at=item.updated_at,
+                    )
+                    for item in group.items
+                ],
+            )
+            for group in groups
+        ]
+    )
+
+
+def to_summary_response(summary: ConversationSummary) -> ConversationSummaryResponse:
+    """Describe a Conversation Summary for the Dashboard.
+
+    Args:
+        summary: The Conversation Summary.
+
+    Returns:
+        The response body.
+    """
+    return ConversationSummaryResponse(
+        id=str(summary.id),
+        summary=summary.summary,
+        mood=summary.mood,
+        created_at=summary.created_at,
+    )
+
+
 def to_me_response(user: User) -> MeResponse:
     """Describe a User for the Dashboard.
 
@@ -117,6 +206,7 @@ def to_me_response(user: User) -> MeResponse:
 def build_dashboard_api_router(
     current_user: Callable[..., User],
     user_service: UserService,
+    user_memory_service: UserMemoryService,
     telegram_connection_service: TelegramConnectionService,
     platform_settings: PlatformSettingsRepository,
     telegram_bot_username: str,
@@ -129,6 +219,7 @@ def build_dashboard_api_router(
     Args:
         current_user: The dependency that finds the User making a request.
         user_service: Keeps the User's profile.
+        user_memory_service: Shows and deletes the User's User Memory.
         telegram_connection_service: Issues tokens and reports connection status.
         platform_settings: Admin-managed wording shown on the Dashboard.
         telegram_bot_username: The Companion's Telegram @username, for deep links.
@@ -299,5 +390,104 @@ def build_dashboard_api_router(
         """
         token = telegram_connection_service.create_token(user.id)
         return to_token_response(token, ConnectionTokenStatus.ACTIVE)
+
+    @router.get("/memory-items")
+    def list_memory_items(
+        user: Annotated[User, Depends(current_user)],
+    ) -> MemoryItemsResponse:
+        """Return the User's Memory Items by Memory Category.
+
+        Args:
+            user: The signed-in User.
+
+        Returns:
+            The Memory Items.
+        """
+        return to_memory_items_response(user_memory_service.list_groups(user.id))
+
+    @router.delete("/memory-items", status_code=status.HTTP_204_NO_CONTENT)
+    def delete_all_memory_items(
+        user: Annotated[User, Depends(current_user)],
+    ) -> Response:
+        """Delete every one of the User's Memory Items; Summaries stay.
+
+        Args:
+            user: The signed-in User.
+
+        Returns:
+            An empty response.
+        """
+        user_memory_service.delete_all_items(user.id)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @router.delete("/memory-items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+    def delete_memory_item(
+        user: Annotated[User, Depends(current_user)], item_id: UUID
+    ) -> Response:
+        """Delete one of the User's Memory Items.
+
+        Args:
+            user: The signed-in User.
+            item_id: The Memory Item's ID.
+
+        Returns:
+            An empty response.
+
+        Raises:
+            HTTPException: 404 if the User has no such Memory Item.
+        """
+        try:
+            user_memory_service.delete_item(user.id, item_id)
+        except MemoryNotFoundError as error:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "Memory not found"
+            ) from error
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @router.get("/conversation-summaries")
+    def list_conversation_summaries(
+        user: Annotated[User, Depends(current_user)],
+    ) -> ConversationSummariesResponse:
+        """Return the User's Conversation Summaries, newest first.
+
+        Args:
+            user: The signed-in User.
+
+        Returns:
+            The Conversation Summaries.
+        """
+        return ConversationSummariesResponse(
+            summaries=[
+                to_summary_response(summary)
+                for summary in user_memory_service.list_summaries(user.id)
+            ]
+        )
+
+    @router.delete(
+        "/conversation-summaries/{summary_id}",
+        status_code=status.HTTP_204_NO_CONTENT,
+    )
+    def delete_conversation_summary(
+        user: Annotated[User, Depends(current_user)], summary_id: UUID
+    ) -> Response:
+        """Delete one of the User's Conversation Summaries.
+
+        Args:
+            user: The signed-in User.
+            summary_id: The Conversation Summary's ID.
+
+        Returns:
+            An empty response.
+
+        Raises:
+            HTTPException: 404 if the User has no such Conversation Summary.
+        """
+        try:
+            user_memory_service.delete_summary(user.id, summary_id)
+        except MemoryNotFoundError as error:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "Conversation Summary not found"
+            ) from error
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     return router

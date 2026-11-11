@@ -80,6 +80,8 @@ conversations = Table(
     ),
     Column("started_at", DateTime(timezone=True), nullable=False),
     Column("last_message_at", DateTime(timezone=True), nullable=False),
+    Column("ended_at", DateTime(timezone=True)),
+    Column("processed_at", DateTime(timezone=True)),
 )
 
 conversation_messages = Table(
@@ -140,4 +142,66 @@ safeguard_events = Table(
     Column("risk_type", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False, index=True),
     Column("helplines_country", Text),
+)
+
+memory_categories = Table(
+    "memory_categories",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("name", Text, nullable=False, unique=True),
+    Column("description", Text, nullable=False),
+    Column("always_include", Boolean, nullable=False),
+    Column("archived", Boolean, nullable=False, server_default="false"),
+    Column("sort_order", Integer, nullable=False),
+)
+
+memory_items = Table(
+    "memory_items",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column(
+        "category_id",
+        Uuid,
+        ForeignKey("memory_categories.id"),
+        nullable=False,
+    ),
+    Column("position", BigInteger, Identity(), nullable=False, unique=True),
+    Column("content", Text, nullable=False),
+    Column("source", Text, nullable=False),
+    Column(
+        "source_conversation_id",
+        Uuid,
+        ForeignKey("conversations.id", ondelete="SET NULL"),
+    ),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+)
+
+conversation_summaries = Table(
+    "conversation_summaries",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column(
+        "conversation_id",
+        Uuid,
+        ForeignKey("conversations.id", ondelete="SET NULL"),
+        unique=True,
+    ),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("summary", Text, nullable=False),
+    Column("mood", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
 )

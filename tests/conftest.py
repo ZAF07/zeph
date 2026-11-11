@@ -18,6 +18,7 @@ from companion.adapters.langgraph.conversation_engine import (
 from companion.adapters.postgres.database import (
     migrate,
     seed_helplines,
+    seed_memory_categories,
     seed_platform_settings,
 )
 from companion.adapters.postgres.repositories import build_postgres_repositories
@@ -27,6 +28,7 @@ from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
     FakeClock,
+    FakeScheduler,
     ScriptedChatModel,
 )
 
@@ -39,6 +41,7 @@ os.environ.setdefault("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/var/run/docker.
 SEED_DIR = Path(__file__).parent.parent / "src/companion/seed"
 SEED_FILE = SEED_DIR / "platform_settings.yaml"
 HELPLINES_SEED_FILE = SEED_DIR / "helplines.yaml"
+MEMORY_CATEGORIES_SEED_FILE = SEED_DIR / "memory_categories.yaml"
 
 
 @pytest.fixture(scope="session")
@@ -65,11 +68,13 @@ def engine(database_url: str) -> Iterator[Engine]:
             text(
                 "TRUNCATE users, telegram_connections, connection_tokens, "
                 "conversations, conversation_messages, platform_settings, "
-                "helplines, safeguard_events CASCADE"
+                "helplines, safeguard_events, memory_categories, memory_items, "
+                "conversation_summaries CASCADE"
             )
         )
     seed_platform_settings(engine, SEED_FILE)
     seed_helplines(engine, HELPLINES_SEED_FILE)
+    seed_memory_categories(engine, MEMORY_CATEGORIES_SEED_FILE)
     yield engine
     engine.dispose()
 
@@ -93,9 +98,19 @@ def auth_verifier() -> FakeAuthVerifier:
 
 
 @pytest.fixture
+def scheduler() -> FakeScheduler:
+    """A scheduler whose ticks tests run by hand."""
+    return FakeScheduler()
+
+
+@pytest.fixture
 def chat_model(seeded_settings: dict[str, Any]) -> ScriptedChatModel:
-    """A chat model that returns scripted replies and Safeguard answers."""
-    return ScriptedChatModel(safeguard_prompt=seeded_settings["safeguard_prompt"])
+    """A chat model that returns scripted replies and answers for each service."""
+    return ScriptedChatModel(
+        safeguard_prompt=seeded_settings["safeguard_prompt"],
+        memory_processing_prompt=seeded_settings["memory_processing_prompt"],
+        memory_retrieval_prompt=seeded_settings["memory_retrieval_prompt"],
+    )
 
 
 @pytest.fixture
@@ -106,11 +121,12 @@ def client(
     chat_channel: FakeChatChannel,
     chat_model: ScriptedChatModel,
     auth_verifier: FakeAuthVerifier,
-) -> TestClient:
+    scheduler: FakeScheduler,
+) -> Iterator[TestClient]:
     """A test client for the backend wired with fakes and the real database.
 
     The conversation engine is the real LangGraph one, so tests run the same
-    graph as production.
+    graph as production. The app is started, so its scheduler has the tick.
     """
 
     def build_conversation_engine(
@@ -125,12 +141,14 @@ def client(
         build_conversation_engine=build_conversation_engine,
         auth_verifier=auth_verifier,
         clock=clock,
+        scheduler=scheduler,
         telegram_webhook_secret=WEBHOOK_SECRET,
         telegram_bot_username=BOT_USERNAME,
         dashboard_url=DASHBOARD_URL,
         initial_admin_emails=frozenset({INITIAL_ADMIN_EMAIL}),
     )
-    return TestClient(create_app(dependencies))
+    with TestClient(create_app(dependencies)) as test_client:
+        yield test_client
 
 
 @pytest.fixture

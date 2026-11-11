@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     clock_adapter: str = "system"
     chat_model_adapter: str = "deepseek"
     conversation_engine_adapter: str = "langgraph"
+    scheduler_adapter: str = "in_process"
 
     @property
     def initial_admin_email_set(self) -> frozenset[str]:

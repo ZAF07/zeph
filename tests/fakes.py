@@ -1,4 +1,5 @@
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -142,25 +143,67 @@ class ChatModelCall:
     history: list[ChatLine]
 
 
+class FakeScheduler:
+    """Scheduler that never runs on its own; tests run each tick by hand."""
+
+    def __init__(self) -> None:
+        """Start with no tick to run."""
+        self._tick: Callable[[], None] | None = None
+        self.stopped = False
+
+    def start(self, tick: Callable[[], None]) -> None:
+        """Keep the tick so a test can run it.
+
+        Args:
+            tick: The work to run on each tick.
+        """
+        self._tick = tick
+
+    def stop(self) -> None:
+        """Record that the scheduler was stopped."""
+        self.stopped = True
+
+    def tick(self) -> None:
+        """Run one tick now, as the real scheduler would every so often."""
+        assert self._tick is not None, "The app has not started the scheduler"
+        self._tick()
+
+
 class ScriptedChatModel:
     """Chat model that returns pre-written replies and records each call.
 
-    Calls whose instructions are the Safeguard prompt are kept apart from
-    reply calls: they answer from their own script and default to "none",
-    so tests about replies don't have to script the Safeguard too.
+    Safeguard, memory processing and memory retrieval calls are told apart
+    by their instructions and kept apart from reply calls, each with its own
+    script. The Safeguard defaults to "none" and retrieval to "none", so
+    tests about replies don't have to script them too.
     """
 
-    def __init__(self, safeguard_prompt: str = "") -> None:
+    def __init__(
+        self,
+        safeguard_prompt: str = "",
+        memory_processing_prompt: str = "",
+        memory_retrieval_prompt: str = "",
+    ) -> None:
         """Start with no replies scripted, no calls and no delay.
 
         Args:
             safeguard_prompt: The instructions that mark a Safeguard call.
+            memory_processing_prompt: The instructions that mark a
+                post-conversation processing call.
+            memory_retrieval_prompt: The instructions that mark a memory
+                retrieval call.
         """
         self._replies: list[str | Exception] = []
         self._safeguard_answers: list[str | Exception] = []
+        self._processing_answers: list[str | Exception] = []
+        self._retrieval_answers: list[str | Exception] = []
         self.safeguard_prompt = safeguard_prompt
+        self.memory_processing_prompt = memory_processing_prompt
+        self.memory_retrieval_prompt = memory_retrieval_prompt
         self.calls: list[ChatModelCall] = []
         self.safeguard_calls: list[ChatModelCall] = []
+        self.processing_calls: list[ChatModelCall] = []
+        self.retrieval_calls: list[ChatModelCall] = []
         self.call_order: list[str] = []
         self.delay_seconds = 0.0
 
@@ -182,6 +225,24 @@ class ScriptedChatModel:
         """
         self._safeguard_answers.extend(answers)
 
+    def script_processing(self, *answers: str | Exception) -> None:
+        """Queue post-conversation processing answers, one per call.
+
+        Args:
+            answers: The JSON answers; an exception is raised instead of
+                returned, to act like a failing model.
+        """
+        self._processing_answers.extend(answers)
+
+    def script_retrieval(self, *answers: str | Exception) -> None:
+        """Queue memory retrieval answers, one per call.
+
+        Args:
+            answers: The picked category names; an exception is raised
+                instead of returned, to act like a failing model.
+        """
+        self._retrieval_answers.extend(answers)
+
     def generate(self, model: str, instructions: str, history: list[ChatLine]) -> str:
         """Record the call and return the next scripted reply or answer.
 
@@ -199,6 +260,22 @@ class ScriptedChatModel:
             self.call_order.append("safeguard")
             answer = (
                 self._safeguard_answers.pop(0) if self._safeguard_answers else "none"
+            )
+        elif (
+            self.memory_processing_prompt
+            and instructions == self.memory_processing_prompt
+        ):
+            self.processing_calls.append(call)
+            self.call_order.append("processing")
+            answer = self._processing_answers.pop(0)
+        elif (
+            self.memory_retrieval_prompt
+            and instructions == self.memory_retrieval_prompt
+        ):
+            self.retrieval_calls.append(call)
+            self.call_order.append("retrieval")
+            answer = (
+                self._retrieval_answers.pop(0) if self._retrieval_answers else "none"
             )
         else:
             self.calls.append(call)

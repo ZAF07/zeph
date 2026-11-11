@@ -1,4 +1,5 @@
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 
 from fastapi import FastAPI
@@ -15,6 +16,7 @@ from companion.core.admin_users import AdminUserService
 from companion.core.conversations import ConversationService, ConversationServices
 from companion.core.helplines import HelplineService
 from companion.core.incoming_messages import IncomingMessageHandler
+from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.platform_settings import PlatformSettingsService
 from companion.core.ports import (
     AuthVerifier,
@@ -23,10 +25,14 @@ from companion.core.ports import (
     Clock,
     ConversationEngine,
     Repositories,
+    Scheduler,
 )
+from companion.core.post_conversation import PostConversationProcessor
 from companion.core.response_composition import ResponseComposer
 from companion.core.safeguard import Safeguard
+from companion.core.scheduled_work import ScheduledWork
 from companion.core.telegram_connection import TelegramConnectionService
+from companion.core.user_memory import UserMemoryService
 from companion.core.users import UserService
 
 
@@ -42,6 +48,7 @@ class AppDependencies:
             core services it runs.
         auth_verifier: Checks Dashboard bearer tokens.
         clock: Tells the current time.
+        scheduler: Runs the scheduled work while the app is up.
         telegram_webhook_secret: The secret Telegram sends with each update.
         telegram_bot_username: The Companion's Telegram @username.
         dashboard_url: The Dashboard's public address.
@@ -56,6 +63,7 @@ class AppDependencies:
     build_conversation_engine: Callable[[ConversationServices], ConversationEngine]
     auth_verifier: AuthVerifier
     clock: Clock
+    scheduler: Scheduler
     telegram_webhook_secret: str
     telegram_bot_username: str
     dashboard_url: str
@@ -72,8 +80,12 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     Returns:
         The FastAPI app.
     """
+    user_memory_service = UserMemoryService(
+        dependencies.repositories, dependencies.clock
+    )
     user_service = UserService(
         dependencies.repositories.users,
+        user_memory_service,
         dependencies.clock,
         dependencies.initial_admin_emails,
     )
@@ -98,6 +110,10 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 clock=dependencies.clock,
             ),
             safeguard=safeguard,
+            memory_retrieval=MemoryRetrieval(
+                repositories=dependencies.repositories,
+                chat_model=dependencies.chat_model,
+            ),
             response_composer=ResponseComposer(
                 repositories=dependencies.repositories,
                 chat_model=dependencies.chat_model,
@@ -112,7 +128,31 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         dashboard_url=dependencies.dashboard_url,
     )
 
-    app = FastAPI(title="Companion backend")
+    scheduled_work = ScheduledWork(
+        repositories=dependencies.repositories,
+        post_conversation=PostConversationProcessor(
+            repositories=dependencies.repositories,
+            chat_model=dependencies.chat_model,
+            clock=dependencies.clock,
+        ),
+        clock=dependencies.clock,
+    )
+
+    @asynccontextmanager
+    async def run_scheduler(app: FastAPI) -> AsyncIterator[None]:
+        """Run the scheduled work for as long as the app is up.
+
+        Args:
+            app: The app starting up.
+
+        Yields:
+            Control back to the app until it shuts down.
+        """
+        dependencies.scheduler.start(scheduled_work.tick)
+        yield
+        dependencies.scheduler.stop()
+
+    app = FastAPI(title="Companion backend", lifespan=run_scheduler)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=dependencies.cors_origins,
@@ -126,6 +166,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         build_dashboard_api_router(
             current_user=current_user,
             user_service=user_service,
+            user_memory_service=user_memory_service,
             telegram_connection_service=telegram_connection_service,
             platform_settings=dependencies.repositories.platform_settings,
             telegram_bot_username=dependencies.telegram_bot_username,

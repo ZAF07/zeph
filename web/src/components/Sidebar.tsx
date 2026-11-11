@@ -7,13 +7,19 @@ import { ZephLogo } from "@/components/ZephLogo";
 import type { SidebarItem } from "@/components/SidebarNav";
 import type { CurrentAccount } from "@/lib/auth/server";
 
-/** The User pages built so far; later issues add Memories and Check-ins. */
+/** The User pages built so far; a later issue adds Check-ins. */
 const userSidebarItems: SidebarItem[] = [
   {
     id: "home",
     label: "Home",
     href: "/",
     iconPath: "M4 10.5L12 4l8 6.5V20H4zM10 20v-5h4v5",
+  },
+  {
+    id: "memories",
+    label: "Memories",
+    href: "/memories",
+    iconPath: "M12 3v4M12 17v4M3 12h4M17 12h4M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8",
   },
   {
     id: "account",
