@@ -10,6 +10,12 @@ Status: ready-for-agent
 
 The Companion can send and understand stickers. Admins build the Sticker Library by sending stickers to the Companion from their own connected Telegram account, or by entering a sticker set name, and add a "when to use" note to each; they can remove stickers. Response composition may add one optional sticker, picked from the Sticker Library; the Persona says to use them occasionally. Incoming stickers reach the Companion as their emoji (e.g. "[sticker: 😂]"). Voice notes, photos and other unsupported types get an in-character "can't do that yet, can you type it?" reply.
 
+## Design
+
+- `docs/design/zeph-admin.html`: Sticker Library
+
+Build order inside this issue: (1) backend API and seam 1 tests — this fixes the API contract; (2) Dashboard pages from the screens above, seam 3 tests with a mocked API client; (3) `/run` end to end. Ignore anything tagged "Later" in the design.
+
 ## Acceptance criteria
 
 - [ ] An Admin sending a sticker to the Companion from their connected Telegram account adds it to the Sticker Library; a non-Admin doing the same does not

@@ -12,6 +12,12 @@ Every incoming message passes through the Safeguard before anything else. It cla
 
 Admins manage Helplines per country and the international fallback, edit the Crisis Reply wording, and view Safeguard Events. Singapore Helplines and the international fallback are seeded from data files.
 
+## Design
+
+- `docs/design/zeph-admin.html`: Safety, Safeguard Events
+
+Build order inside this issue: (1) backend API and seam 1 tests — this fixes the API contract; (2) Dashboard pages from the screens above, seam 3 tests with a mocked API client; (3) `/run` end to end. Ignore anything tagged "Later" in the design.
+
 ## Acceptance criteria
 
 - [ ] The Safeguard runs on every incoming message, before the rest of the graph

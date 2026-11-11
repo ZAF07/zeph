@@ -49,6 +49,23 @@ Every external dependency sits behind a port so it can be swapped by config: Dee
 24. As a User, I want a Conversation to continue naturally while I keep replying, and to be treated as finished after a quiet gap, so that the Companion processes it at a sensible moment.
 25. As a User, when I reply to a Check-in, I want that to start a normal Conversation, so that a Check-in can lead to a real chat.
 
+### Settings via chat
+
+86. As a User, I want to change my settings by telling the Companion in plain words (pause or resume Check-ins, change frequency or quiet hours, turn User Memory on or off, forget a specific memory, change time zone), so that I don't have to leave the chat (ADR-0006).
+87. As a User, I want the Companion to tell me plainly what it changed, and the Dashboard to show the same thing, so that I always know my real settings.
+88. As a User, I want to ask for "Delete my data" in chat, but only have it happen after I reply with an exact confirmation word, so that a misunderstanding never wipes my data.
+89. As a User, I want Delete account, country and disconnecting Telegram to stay on the Dashboard only, so that permanent or safety-related changes are never made by mistake.
+
+### Dashboard (from the web UI design review)
+
+90. As a new User, I want to tell the Companion what to call me and what brings me here during onboarding, so that our first Conversation starts in the right place.
+91. As a User, I want to see my Conversation Summaries (what we talked about and how I seemed) and delete any of them, so that every part of User Memory is visible and in my control.
+92. As a User, I want to delete all my Memory Items at once, so that I can start fresh without deleting everything else.
+93. As a User, I want to pause Check-ins for a day, a week or until I resume, without losing my settings, so that I can have quiet when I need it.
+94. As a User, I want to see my recent Check-ins (sent, replied, skipped to give me space), but never a promised next time, so that I know what's happening without feeling scheduled.
+95. As a User, I want a "Delete account" option that removes all my data and my account, so that I can leave completely.
+96. As a User, I want a home page showing my Telegram Connection, Check-in status, my goals and what was recently remembered, so that I can see where things stand at a glance.
+
 ### Stickers and message types
 
 26. As a User, I want the Companion to occasionally send a fitting sticker, so that our chat feels like texting a friend.
@@ -182,7 +199,7 @@ See `CONTEXT.md` for terms and ADR-0001 to ADR-0005 for the architectural decisi
 - **Retention cleanup** — on scheduler tick, deletes raw messages older than the retention setting.
 - **Data deletion** — "Delete my data" removes the User's messages, User Memory, Check-in history and Telegram Connection (and LangGraph checkpoints for that User).
 - **Knowledge ingestion** — on upload, extract text (text, Markdown, PDF), split into chunks, embed, store; document status moves through pending → ready / failed.
-- **Seeding** — on first run, loads seed data files: Singapore Helplines and international fallback, starter Memory Categories (Life details, Relationships, Goals, Values & beliefs, Challenges, Preferences — the last three "always include"), starter Check-in Kinds (casual hello, follow-up, present-moment prompt, thought to reflect on), starter Persona, prompts and settings defaults. Starter Knowledge is mindfulness-focused, public-domain texts plus the owner's own summaries.
+- **Seeding** — on first run, loads seed data files: Singapore Helplines and international fallback, starter Memory Categories (Life details, Relationships, Goals, Values & beliefs, Challenges, Preferences, What helps — Values & beliefs, Challenges and Preferences are "always include"), starter Check-in Kinds (casual hello, follow-up, present-moment prompt, thought to reflect on), starter Persona, prompts and settings defaults. Starter Knowledge is mindfulness-focused, public-domain texts plus the owner's own summaries.
 
 ### Message handling flow (the graph)
 
@@ -196,7 +213,7 @@ See `CONTEXT.md` for terms and ADR-0001 to ADR-0005 for the architectural decisi
 
 ### Schema (main tables, described not prescribed)
 
-- Users: Clerk ID, email, role, country, time zone, AI-notice acknowledged at, User Memory enabled, Check-in settings (enabled, frequency, quiet hours, paused, consecutive ignored count, next due at), onboarding completed at.
+- Users: Clerk ID, email, name, onboarding reasons ("What brings you here?"), role, country, time zone, AI-notice acknowledged at, User Memory enabled, Check-in settings (enabled, frequency, quiet hours, paused until, consecutive ignored count, next due at), onboarding completed at.
 - Telegram Connections: User, Telegram user ID (unique), Telegram chat ID, connected at. Connection tokens: User, token, expires at, used at.
 - Conversations: User, started at, last message at, ended at, processed at.
 - Messages: Conversation, direction, kind (text, sticker, unsupported), content, sent at.

@@ -10,6 +10,12 @@ Status: ready-for-agent
 
 Admins manage Memory Categories in the admin area: add, rename, edit description, toggle "always include", archive and restore. Categories can never be deleted. Archived categories keep their existing Memory Items but are not offered for new items or category picking. Post-conversation processing and memory retrieval always read the current list.
 
+## Design
+
+- `docs/design/zeph-admin.html`: Memory Categories
+
+Build order inside this issue: (1) backend API and seam 1 tests — this fixes the API contract; (2) Dashboard pages from the screens above, seam 3 tests with a mocked API client; (3) `/run` end to end. Ignore anything tagged "Later" in the design.
+
 ## Acceptance criteria
 
 - [ ] Admins can add, rename, edit description, toggle "always include", archive and restore Memory Categories; there is no delete

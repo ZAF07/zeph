@@ -16,6 +16,10 @@ Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-
 
 Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+### UI design
+
+The Dashboard UI design lives in `docs/design/`: `zeph-product.html` (User pages) and `zeph-admin.html` (admin area). Build pages from these; ignore anything tagged "Later".
+
 ## How I want you to work (process)
 
 - **Plan before large changes.** For anything non-trivial, outline the approach first.

@@ -12,6 +12,12 @@ The Companion draws on a curated Knowledge library, starting with mindfulness. I
 
 Admins upload documents (text, Markdown, PDF) with title, source/author and tradition. Each document is split into chunks, embedded and stored; its status moves pending → ready / failed. When composing a reply, the top few matching chunks are added to the prompt, and the prompt tells the Companion to use them only when they genuinely fit, without lecturing. A starter mindfulness set (public-domain texts plus the owner's summaries) is seeded from data files.
 
+## Design
+
+- `docs/design/zeph-admin.html`: Knowledge
+
+Build order inside this issue: (1) backend API and seam 1 tests — this fixes the API contract; (2) Dashboard pages from the screens above, seam 3 tests with a mocked API client; (3) `/run` end to end. Ignore anything tagged "Later" in the design.
+
 ## Acceptance criteria
 
 - [ ] Admins can upload text, Markdown and PDF Knowledge documents with title, source/author and tradition

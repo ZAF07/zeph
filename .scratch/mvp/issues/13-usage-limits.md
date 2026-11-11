@@ -10,6 +10,12 @@ Status: ready-for-agent
 
 Keep costs in check. Each User has an Admin-set daily message limit (default generous, e.g. 200). Over the limit, the Companion replies in character ("I'm wiped for today, talk tomorrow?") instead of composing a reply. The Safeguard still runs first, so a crisis always gets the Crisis Reply. Token usage, message count and web search count are recorded per User per day and shown in the admin area.
 
+## Design
+
+- `docs/design/zeph-admin.html`: Usage, Platform settings (daily message limit)
+
+Build order inside this issue: (1) backend API and seam 1 tests — this fixes the API contract; (2) Dashboard pages from the screens above, seam 3 tests with a mocked API client; (3) `/run` end to end. Ignore anything tagged "Later" in the design.
+
 ## Acceptance criteria
 
 - [ ] Over the daily message limit, the User gets the in-character limit reply (wording from settings) and no reply is composed

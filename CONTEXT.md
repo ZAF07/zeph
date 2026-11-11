@@ -21,7 +21,7 @@ The AI conversational partner a User talks to.
 _Avoid_: Bot, assistant, agent
 
 **Persona**:
-The Companion's voice and character — human in style, honest that it is an AI. Managed by Admins.
+The Companion's voice and character — human in style, honest that it is an AI. Managed by Admins. Users never pick a style: the Companion adapts to how each User messages.
 _Avoid_: System prompt, personality, character
 
 **Sticker Library**:
