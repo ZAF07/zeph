@@ -3,7 +3,7 @@ const base =
   "inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-[22px] py-3 text-[15px] font-medium leading-tight whitespace-nowrap no-underline cursor-pointer";
 
 /** The one main action on a view. */
-export const primaryButton = `${base} border border-ink bg-ink text-white hover:text-white`;
+export const primaryButton = `${base} border border-ink bg-ink text-white hover:text-white disabled:cursor-not-allowed disabled:border-line-strong disabled:bg-line-strong disabled:text-ink-muted`;
 
 /** A secondary action. */
 export const secondaryButton = `${base} border border-line-strong bg-transparent text-ink`;

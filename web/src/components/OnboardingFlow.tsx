@@ -27,6 +27,9 @@ const LOCATION_STEP = 2;
 const MEMORY_STEP = 3;
 const TELEGRAM_STEP = 4;
 
+const stepHeading =
+  "m-0 text-[clamp(34px,5vw,44px)] font-normal leading-[1.08] tracking-[-0.035em]";
+
 /** The answers being filled in, before they are saved. */
 type Answers = {
   name: string;
@@ -201,9 +204,7 @@ export function OnboardingFlow() {
       {step === HELLO_STEP ? (
         <section className="flex flex-col gap-7">
           <div className="flex flex-col gap-3">
-            <h1 className="m-0 text-[clamp(34px,5vw,44px)] font-normal leading-[1.08] tracking-[-0.035em]">
-              Hello. I’m Zeph.
-            </h1>
+            <h1 className={stepHeading}>Hello. I’m Zeph.</h1>
             <p className="m-0 text-[17px] text-ink-soft">
               I’m an AI companion for reflection — a place to think out loud,
               notice what matters, and practise living by it.
@@ -254,9 +255,7 @@ export function OnboardingFlow() {
       {step === INTENTIONS_STEP ? (
         <section className="flex flex-col gap-7">
           <div className="flex flex-col gap-3">
-            <h1 className="m-0 text-[clamp(34px,5vw,44px)] font-normal leading-[1.08] tracking-[-0.035em]">
-              What brings you here?
-            </h1>
+            <h1 className={stepHeading}>What brings you here?</h1>
             <p className="m-0 text-[17px] text-ink-soft">
               Choose any that feel true right now. This shapes where we start,
               not where we end up.
@@ -305,9 +304,7 @@ export function OnboardingFlow() {
 
       {step === LOCATION_STEP ? (
         <section className="flex flex-col gap-7">
-          <h1 className="m-0 text-[clamp(34px,5vw,44px)] font-normal leading-[1.08] tracking-[-0.035em]">
-            Where are you?
-          </h1>
+          <h1 className={stepHeading}>Where are you?</h1>
           <LocationFields
             country={answers.country}
             timeZone={answers.timeZone}
@@ -326,9 +323,7 @@ export function OnboardingFlow() {
       {step === MEMORY_STEP ? (
         <section className="flex flex-col gap-7">
           <div className="flex flex-col gap-3">
-            <h1 className="m-0 text-[clamp(34px,5vw,44px)] font-normal leading-[1.08] tracking-[-0.035em]">
-              Can I remember things?
-            </h1>
+            <h1 className={stepHeading}>Can I remember things?</h1>
             {paragraphs(content.user_memory_explanation).map((paragraph) => (
               <p key={paragraph} className="m-0 text-[17px] text-ink-soft">
                 {paragraph}
@@ -357,9 +352,7 @@ export function OnboardingFlow() {
       {step === TELEGRAM_STEP ? (
         <section className="flex flex-col gap-6">
           <div className="flex flex-col gap-3">
-            <h1 className="m-0 text-[clamp(34px,5vw,44px)] font-normal leading-[1.08] tracking-[-0.035em]">
-              Let’s meet on Telegram.
-            </h1>
+            <h1 className={stepHeading}>Let’s meet on Telegram.</h1>
             <p className="m-0 text-[17px] text-ink-soft">
               That’s where we’ll talk. Linking takes one tap.
             </p>
@@ -383,7 +376,7 @@ export function OnboardingFlow() {
         {step < TELEGRAM_STEP ? (
           <button
             type="button"
-            className={`${primaryButton} disabled:cursor-not-allowed disabled:border-line-strong disabled:bg-line-strong disabled:text-ink-muted`}
+            className={primaryButton}
             disabled={!canContinue}
             onClick={next}
           >

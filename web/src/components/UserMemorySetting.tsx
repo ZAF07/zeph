@@ -26,7 +26,7 @@ export function UserMemorySetting({
   const [isSaving, setIsSaving] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
 
-  async function change(next: boolean) {
+  async function saveUserMemorySetting(next: boolean) {
     setIsSaving(true);
     setSaveFailed(false);
     try {
@@ -54,7 +54,7 @@ export function UserMemorySetting({
           label="Remember meaningful details"
           checked={isEnabled}
           disabled={isSaving}
-          onChange={(next) => void change(next)}
+          onChange={(next) => void saveUserMemorySetting(next)}
         />
       </div>
       {paragraphs(explanation).map((paragraph) => (

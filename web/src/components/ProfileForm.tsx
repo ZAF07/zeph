@@ -48,7 +48,7 @@ export function ProfileForm({ me }: { me: Me }) {
     }
   }
 
-  function edited<T>(setter: (value: T) => void) {
+  function clearSavedOnEdit<T>(setter: (value: T) => void) {
     return (value: T) => {
       setter(value);
       setSaveState("idle");
@@ -72,7 +72,7 @@ export function ProfileForm({ me }: { me: Me }) {
             type="text"
             maxLength={100}
             value={name}
-            onChange={(event) => edited(setName)(event.target.value)}
+            onChange={(event) => clearSavedOnEdit(setName)(event.target.value)}
           />
         </label>
         <div className={fieldLabel}>
@@ -86,15 +86,11 @@ export function ProfileForm({ me }: { me: Me }) {
       <LocationFields
         country={country}
         timeZone={timeZone}
-        onCountryChange={edited(setCountry)}
-        onTimeZoneChange={edited(setTimeZone)}
+        onCountryChange={clearSavedOnEdit(setCountry)}
+        onTimeZoneChange={clearSavedOnEdit(setTimeZone)}
       />
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="submit"
-          className={`${primaryButton} disabled:cursor-not-allowed disabled:border-line-strong disabled:bg-line-strong disabled:text-ink-muted`}
-          disabled={!canSave}
-        >
+        <button type="submit" className={primaryButton} disabled={!canSave}>
           {saveState === "saving" ? "Saving…" : "Save changes"}
         </button>
         {saveState === "saved" ? (
