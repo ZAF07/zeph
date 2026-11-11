@@ -1,11 +1,82 @@
+import re
+from dataclasses import replace
 from uuid import uuid4
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from companion.core.models import AccountIdentity, User
+from companion.core.models import (
+    AccountIdentity,
+    OnboardingAnswers,
+    PreferenceChanges,
+    User,
+)
 from companion.core.ports import Clock, UserRepository
+
+COUNTRY_CODE_PATTERN = re.compile(r"[A-Z]{2}")
+MAX_NAME_LENGTH = 100
+
+
+class InvalidProfileError(ValueError):
+    """Raised when onboarding answers or preferences are not acceptable."""
+
+
+def clean_name(name: str) -> str:
+    """Check and tidy the name the Companion should use.
+
+    Args:
+        name: The name as typed.
+
+    Returns:
+        The name without surrounding spaces.
+
+    Raises:
+        InvalidProfileError: If the name is empty or too long.
+    """
+    cleaned = name.strip()
+    if not cleaned:
+        raise InvalidProfileError("Name is required.")
+    if len(cleaned) > MAX_NAME_LENGTH:
+        raise InvalidProfileError(f"Name must be at most {MAX_NAME_LENGTH} characters.")
+    return cleaned
+
+
+def check_country(country: str) -> str:
+    """Check that a country is a two-letter code like "SG".
+
+    Args:
+        country: The country code.
+
+    Returns:
+        The country code.
+
+    Raises:
+        InvalidProfileError: If it is not two capital letters.
+    """
+    if not COUNTRY_CODE_PATTERN.fullmatch(country):
+        raise InvalidProfileError("Country must be a two-letter code.")
+    return country
+
+
+def check_time_zone(time_zone: str) -> str:
+    """Check that a time zone is a known IANA name like "Asia/Singapore".
+
+    Args:
+        time_zone: The time zone name.
+
+    Returns:
+        The time zone name.
+
+    Raises:
+        InvalidProfileError: If the time zone is not known.
+    """
+    try:
+        ZoneInfo(time_zone)
+    except (ZoneInfoNotFoundError, ValueError) as error:
+        raise InvalidProfileError("Time zone is not recognised.") from error
+    return time_zone
 
 
 class UserService:
-    """Finds the User behind a Dashboard account, creating them on first visit."""
+    """Finds the User behind a Dashboard account and keeps their profile."""
 
     def __init__(self, users: UserRepository, clock: Clock) -> None:
         """Set up the service.
@@ -36,3 +107,70 @@ class UserService:
             created_at=self._clock.now(),
         )
         return self._users.add(new_user)
+
+    def complete_onboarding(self, user: User, answers: OnboardingAnswers) -> User:
+        """Save a User's onboarding answers and mark onboarding done.
+
+        Answering again updates the answers but keeps the first completion time.
+
+        Args:
+            user: The User onboarding.
+            answers: What they told the Dashboard.
+
+        Returns:
+            The saved User.
+
+        Raises:
+            InvalidProfileError: If the AI notice was not acknowledged or an
+                answer is not acceptable.
+        """
+        if not answers.ai_notice_acknowledged:
+            raise InvalidProfileError("The AI notice must be acknowledged.")
+        now = self._clock.now()
+        note = (answers.onboarding_note or "").strip() or None
+        onboarded = replace(
+            user,
+            name=clean_name(answers.name),
+            onboarding_reasons=answers.onboarding_reasons,
+            onboarding_note=note,
+            user_memory_enabled=answers.user_memory_enabled,
+            country=check_country(answers.country),
+            time_zone=check_time_zone(answers.time_zone),
+            ai_notice_acknowledged_at=user.ai_notice_acknowledged_at or now,
+            onboarding_completed_at=user.onboarding_completed_at or now,
+        )
+        return self._users.update(onboarded)
+
+    def update_preferences(self, user: User, changes: PreferenceChanges) -> User:
+        """Change a User's name, User Memory setting, country or time zone.
+
+        Args:
+            user: The User making the change.
+            changes: The preferences to change; None leaves one as it is.
+
+        Returns:
+            The saved User.
+
+        Raises:
+            InvalidProfileError: If a new value is not acceptable.
+        """
+        updated = replace(
+            user,
+            name=clean_name(changes.name) if changes.name is not None else user.name,
+            user_memory_enabled=(
+                changes.user_memory_enabled
+                if changes.user_memory_enabled is not None
+                else user.user_memory_enabled
+            ),
+            country=(
+                check_country(changes.country)
+                if changes.country is not None
+                else user.country
+            ),
+            time_zone=(
+                check_time_zone(changes.time_zone)
+                if changes.time_zone is not None
+                else user.time_zone
+            ),
+        )
+        return self._users.update(updated)

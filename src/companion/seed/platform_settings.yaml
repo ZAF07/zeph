@@ -27,6 +27,35 @@ unknown_telegram_user_reply: >-
 reply_failed_message: >-
   Sorry, my thoughts got tangled for a second there. Could you send that again?
 
+# Onboarding. The AI notice is shown on the first step with an "I understand"
+# tick; the short version stays on the Dashboard afterwards.
+ai_notice: >-
+  I'm an AI, not a person. I can be good company for thinking, but I'm not a
+  therapist, doctor or crisis service. If you're ever in danger, please contact
+  local emergency services or a Helpline.
+
+ai_notice_short: Zeph is an AI, not a therapist or crisis service.
+
+# Shown when asking for User Memory consent. A blank line starts a new
+# paragraph.
+user_memory_explanation: |-
+  So you don't have to repeat yourself, I can keep meaningful details — your
+  goals, what helps you, the people you mention.
+
+  Everything I remember is listed on your Dashboard, where you can see it and
+  delete any of it. You can also tell me "forget that" in chat.
+
+# The choice chips for "What brings you here?".
+onboarding_reason_choices:
+  - Being more present
+  - Making sense of a decision
+  - Understanding myself
+  - Calmer under pressure
+  - Relationships
+  - Finding direction and values
+  - Exploring philosophy
+  - Living more deliberately
+
 # A message after this many quiet minutes starts a new Conversation.
 conversation_quiet_gap_minutes: 60
 

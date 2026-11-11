@@ -1,5 +1,6 @@
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     Column,
     DateTime,
     ForeignKey,
@@ -20,6 +21,14 @@ users = Table(
     Column("auth_id", Text, nullable=False, unique=True),
     Column("email", Text),
     Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("name", Text),
+    Column("onboarding_reasons", JSONB, nullable=False, server_default="[]"),
+    Column("onboarding_note", Text),
+    Column("country", Text),
+    Column("time_zone", Text),
+    Column("ai_notice_acknowledged_at", DateTime(timezone=True)),
+    Column("user_memory_enabled", Boolean, nullable=False, server_default="true"),
+    Column("onboarding_completed_at", DateTime(timezone=True)),
 )
 
 telegram_connections = Table(

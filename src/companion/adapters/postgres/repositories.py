@@ -35,7 +35,18 @@ def _to_user(row: Row[Any]) -> User:
         The User.
     """
     return User(
-        id=row.id, auth_id=row.auth_id, email=row.email, created_at=row.created_at
+        id=row.id,
+        auth_id=row.auth_id,
+        email=row.email,
+        created_at=row.created_at,
+        name=row.name,
+        onboarding_reasons=tuple(row.onboarding_reasons),
+        onboarding_note=row.onboarding_note,
+        country=row.country,
+        time_zone=row.time_zone,
+        ai_notice_acknowledged_at=row.ai_notice_acknowledged_at,
+        user_memory_enabled=row.user_memory_enabled,
+        onboarding_completed_at=row.onboarding_completed_at,
     )
 
 
@@ -162,6 +173,34 @@ class PostgresUserRepository:
             row = connection.execute(
                 select(users).where(users.c.auth_id == user.auth_id)
             ).one()
+        return _to_user(row)
+
+    def update(self, user: User) -> User:
+        """Save changes to an existing User's profile and preferences.
+
+        Args:
+            user: The User with their new values.
+
+        Returns:
+            The saved User.
+        """
+        statement = (
+            update(users)
+            .where(users.c.id == user.id)
+            .values(
+                name=user.name,
+                onboarding_reasons=list(user.onboarding_reasons),
+                onboarding_note=user.onboarding_note,
+                country=user.country,
+                time_zone=user.time_zone,
+                ai_notice_acknowledged_at=user.ai_notice_acknowledged_at,
+                user_memory_enabled=user.user_memory_enabled,
+                onboarding_completed_at=user.onboarding_completed_at,
+            )
+            .returning(users)
+        )
+        with self._engine.begin() as connection:
+            row = connection.execute(statement).one()
         return _to_user(row)
 
 

@@ -125,6 +125,17 @@ class UserRepository(Protocol):
         """
         ...
 
+    def update(self, user: User) -> User:
+        """Save changes to an existing User's profile and preferences.
+
+        Args:
+            user: The User with their new values.
+
+        Returns:
+            The saved User.
+        """
+        ...
+
 
 class TelegramConnectionRepository(Protocol):
     """Stores Telegram Connections."""

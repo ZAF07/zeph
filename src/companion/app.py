@@ -100,6 +100,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             auth_verifier=dependencies.auth_verifier,
             user_service=user_service,
             telegram_connection_service=telegram_connection_service,
+            platform_settings=dependencies.repositories.platform_settings,
             telegram_bot_username=dependencies.telegram_bot_username,
         )
     )
