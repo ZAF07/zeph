@@ -39,3 +39,11 @@ Build order inside this issue: (1) backend API and seam 1 tests — this fixes t
 ## Comments
 
 **2026-11-11 — started on branch `feat/08-knowledge`.** Plan: ports for embedder (fastembed BGE small, 384 dims), vector store (pgvector) and document text extraction (pypdf); `KnowledgeService` (upload → pending → background ingestion → ready/failed, retry, delete, starter seed); `KnowledgeRetrieval` step before response composition; admin API under `/api/admin/knowledge-documents`; `/admin/knowledge` page.
+
+**2026-11-12 — implemented and reviewed; one check left.** Commits `c736b35`, `f0f9546` on `feat/08-knowledge`.
+
+Done and verified: every acceptance criterion except the signed-in browser check of `/admin/knowledge`. `make check` green (Python 162, web 134). Docker run with real fastembed, pgvector and DeepSeek: prestart seeded the 6 starter documents (84 chunks); txt/md/pdf uploads became ready; scanned and broken PDFs failed with their reasons; a simulated indexing failure was retried to ready; `.docx` refused (422); non-Admin 403; delete removed the chunks; a racing-thoughts message got the mindful-breathing and noticing-thoughts passages and DeepSeek used them lightly. A document left pending by a restart is finished on the next start.
+
+Decisions: ingestion runs after the upload response (FastAPI background task); prestart finishes any document still pending. The uploaded file is stored so Retry works (failed documents only). Text extractor is a port too (`TEXT_EXTRACTOR_ADAPTER=pypdf`). New seeded settings `knowledge_chunks_per_reply` (3) and `reply_knowledge_intro`. Chunks ≤1,000 characters by paragraph. Starter set: Dhammapada (Müller), Meditations II & IV (Casaubon), Tao Te Ching selections (Legge), all public domain from Project Gutenberg, plus three summaries drafted for the owner to review (`mindful-breathing.md`, `noticing-thoughts.md`, `self-compassion.md`).
+
+Open: browser check of the page while signed in as an Admin. Creating a temporary Clerk test user from the session was blocked.
