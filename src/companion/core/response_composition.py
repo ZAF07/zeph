@@ -7,6 +7,10 @@ from companion.core.ports import ChatModel, Repositories
 BLANK_LINE = re.compile(r"\n\s*\n")
 
 
+class EmptyReplyError(Exception):
+    """Raised when the chat model's reply has no text to send."""
+
+
 def split_into_messages(reply: str) -> list[str]:
     """Split a reply into short messages wherever there is a blank line.
 
@@ -44,6 +48,9 @@ class ResponseComposer:
 
         Returns:
             The reply as one or more short messages.
+
+        Raises:
+            EmptyReplyError: If the model's reply has no text.
         """
         settings = self._repositories.platform_settings
         instructions = f"{settings.get('persona')}\n\n{settings.get('response_prompt')}"
@@ -62,4 +69,7 @@ class ResponseComposer:
             instructions=instructions,
             history=history,
         )
-        return split_into_messages(reply)
+        reply_parts = split_into_messages(reply)
+        if not reply_parts:
+            raise EmptyReplyError
+        return reply_parts

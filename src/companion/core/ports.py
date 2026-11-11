@@ -40,7 +40,7 @@ class ChatChannel(Protocol):
         ...
 
     def send_texts(self, chat_id: int, texts: list[str]) -> None:
-        """Send several short messages in a row, typing before each one.
+        """Send several short messages in a row, showing typing between them.
 
         Args:
             chat_id: The chat to send to.

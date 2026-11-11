@@ -63,21 +63,42 @@ class LangGraphConversationEngine:
         """
 
         def record_incoming(state: TurnState) -> TurnState:
-            """Save the User's message into their open Conversation."""
+            """Save the User's message into their open Conversation.
+
+            Args:
+                state: The graph's state so far.
+
+            Returns:
+                The ID of that Conversation.
+            """
             conversation_id = services.conversations.record_incoming(
                 UUID(state["user_id"]), state["chat_id"], state["text"]
             )
             return {"conversation_id": str(conversation_id)}
 
         def compose_reply(state: TurnState) -> TurnState:
-            """Write the Companion's reply."""
+            """Write the Companion's reply.
+
+            Args:
+                state: The graph's state so far.
+
+            Returns:
+                The reply as short messages.
+            """
             reply_parts = services.response_composer.compose(
                 UUID(state["conversation_id"])
             )
             return {"reply_parts": reply_parts}
 
         def deliver_reply(state: TurnState) -> TurnState:
-            """Send the reply and save it to the Conversation."""
+            """Send the reply and save it to the Conversation.
+
+            Args:
+                state: The graph's state so far.
+
+            Returns:
+                Nothing new to add to the state.
+            """
             services.conversations.deliver_reply(
                 UUID(state["conversation_id"]), state["chat_id"], state["reply_parts"]
             )

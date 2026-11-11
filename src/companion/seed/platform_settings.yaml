@@ -24,6 +24,9 @@ unknown_telegram_user_reply: >-
   connect your Telegram account there first — it only takes a minute:
   {dashboard_url}
 
+reply_failed_message: >-
+  Sorry, my thoughts got tangled for a second there. Could you send that again?
+
 # A message after this many quiet minutes starts a new Conversation.
 conversation_quiet_gap_minutes: 60
 

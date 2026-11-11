@@ -1,3 +1,4 @@
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -124,7 +125,13 @@ class FakeClock:
 
 @dataclass(frozen=True)
 class ChatModelCall:
-    """One call the scripted chat model received."""
+    """One call the scripted chat model received.
+
+    Attributes:
+        model: The model name asked for.
+        instructions: The instructions given.
+        history: The Conversation so far.
+    """
 
     model: str
     instructions: str
@@ -135,15 +142,17 @@ class ScriptedChatModel:
     """Chat model that returns pre-written replies and records each call."""
 
     def __init__(self) -> None:
-        """Start with no replies scripted and no calls."""
-        self._replies: list[str] = []
+        """Start with no replies scripted, no calls and no delay."""
+        self._replies: list[str | Exception] = []
         self.calls: list[ChatModelCall] = []
+        self.delay_seconds = 0.0
 
-    def script(self, *replies: str) -> None:
+    def script(self, *replies: str | Exception) -> None:
         """Queue replies to return, one per call, in order.
 
         Args:
-            replies: The reply texts.
+            replies: The reply texts; an exception is raised instead of
+                returned, to act like a failing model.
         """
         self._replies.extend(replies)
 
@@ -161,4 +170,8 @@ class ScriptedChatModel:
         self.calls.append(
             ChatModelCall(model=model, instructions=instructions, history=history)
         )
-        return self._replies.pop(0)
+        time.sleep(self.delay_seconds)
+        reply = self._replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply

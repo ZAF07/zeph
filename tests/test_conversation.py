@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from typing import Any
 
@@ -187,3 +188,59 @@ def test_telegram_user_without_a_connection_is_pointed_to_sign_up(
     assert chat_channel.texts_sent_to(STRANGER_TELEGRAM_ID) == [expected_reply]
     assert DASHBOARD_URL in expected_reply
     assert chat_model.calls == []
+
+
+def test_user_gets_a_fallback_reply_when_the_model_fails(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script(TimeoutError("DeepSeek timed out"))
+
+    assert send_to_webhook(client, telegram_text_update("hi")) == 200
+
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
+        seeded_settings["reply_failed_message"]
+    ]
+
+
+def test_user_gets_a_fallback_reply_when_the_model_returns_nothing(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script("  \n\n ")
+
+    send_to_webhook(client, telegram_text_update("hi"))
+
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
+        seeded_settings["reply_failed_message"]
+    ]
+
+
+def test_messages_sent_at_once_are_answered_one_after_another(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script("first reply", "second reply")
+    chat_model.delay_seconds = 0.3
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        statuses = list(
+            pool.map(
+                lambda text: send_to_webhook(client, telegram_text_update(text)),
+                ["one", "two"],
+            )
+        )
+
+    assert statuses == [200, 200]
+    assert len(chat_model.calls[1].history) == 3

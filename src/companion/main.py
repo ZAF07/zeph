@@ -149,7 +149,14 @@ def build_conversation_engine_factory(
         def build_langgraph_engine(
             services: ConversationServices,
         ) -> ConversationEngine:
-            """Build the LangGraph engine with the Postgres checkpointer."""
+            """Build the LangGraph engine with the Postgres checkpointer.
+
+            Args:
+                services: The core services the engine runs.
+
+            Returns:
+                The engine.
+            """
             return LangGraphConversationEngine(services, checkpointer)
 
         return build_langgraph_engine
