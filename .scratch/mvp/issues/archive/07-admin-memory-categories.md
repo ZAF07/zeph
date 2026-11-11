@@ -62,4 +62,4 @@ Evidence:
 ## Completion
 
 - Completed: 2026-11-11
-- Commit: <to be filled in manually>
+- Commit: 3934b7e, review fixes 14f9d85 (merged from `feat/07-admin-memory-categories` in 4841ee3)
