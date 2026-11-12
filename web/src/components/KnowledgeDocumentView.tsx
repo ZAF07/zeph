@@ -104,6 +104,7 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
       change,
     );
     setState({ kind: "loaded", document: saved });
+    return saved;
   }
 
   async function retry(knowledgeDocument: KnowledgeDocumentWithText) {

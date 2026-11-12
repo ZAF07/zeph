@@ -15,7 +15,7 @@ import {
   knowledgeTraditions,
 } from "@/lib/knowledge-labels";
 
-type Message = { text: string; isError: boolean };
+type Flash = { text: string; isError: boolean };
 
 /**
  * A Knowledge document's Details card: its title, source / author and
@@ -32,7 +32,9 @@ export function KnowledgeDetailsForm({
   onSave,
 }: {
   knowledgeDocument: KnowledgeDocumentWithText;
-  onSave: (change: KnowledgeDetailsChange) => Promise<unknown>;
+  onSave: (
+    change: KnowledgeDetailsChange,
+  ) => Promise<KnowledgeDocumentWithText>;
 }) {
   const [title, setTitle] = useState(knowledgeDocument.title);
   const [source, setSource] = useState(knowledgeDocument.source);
@@ -42,7 +44,7 @@ export function KnowledgeDetailsForm({
     source: knowledgeDocument.source,
     tradition: knowledgeDocument.tradition,
   });
-  const [message, setMessage] = useState<Message | null>(null);
+  const [flash, setFlash] = useState<Flash | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const traditionChoices = knowledgeTraditions.includes(saved.tradition)
@@ -52,6 +54,13 @@ export function KnowledgeDetailsForm({
     title !== saved.title ||
     source !== saved.source ||
     tradition !== saved.tradition;
+  const fixedDetails = [
+    {
+      term: "Type",
+      value: `${knowledgeFileTypeLabels[knowledgeDocument.file_type]} · ${knowledgeDocument.file_name}`,
+    },
+    { term: "Added", value: formatDay(knowledgeDocument.created_at) },
+  ];
   const canSave = hasChanges && title.trim() !== "" && source.trim() !== "";
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -60,23 +69,23 @@ export function KnowledgeDetailsForm({
       return;
     }
     setIsSaving(true);
-    setMessage(null);
+    setFlash(null);
     try {
-      await onSave({ title, source, tradition });
-      const trimmed = {
-        title: title.trim(),
-        source: source.trim(),
-        tradition,
-      };
-      setTitle(trimmed.title);
-      setSource(trimmed.source);
-      setSaved(trimmed);
-      setMessage({
+      const savedDocument = await onSave({ title, source, tradition });
+      setTitle(savedDocument.title);
+      setSource(savedDocument.source);
+      setTradition(savedDocument.tradition);
+      setSaved({
+        title: savedDocument.title,
+        source: savedDocument.source,
+        tradition: savedDocument.tradition,
+      });
+      setFlash({
         text: "Details saved. Replies use them straight away.",
         isError: false,
       });
     } catch (saveError) {
-      setMessage({
+      setFlash({
         text:
           saveError instanceof ApiError && saveError.detail
             ? saveError.detail
@@ -133,34 +142,25 @@ export function KnowledgeDetailsForm({
         </label>
       </div>
       <dl className="m-0 grid grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))] gap-x-3 gap-y-4">
-        <div className="flex min-w-0 flex-col gap-1">
-          <dt className="font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted">
-            Type
-          </dt>
-          <dd className="m-0 break-words text-[15px]">
-            {knowledgeFileTypeLabels[knowledgeDocument.file_type]} ·{" "}
-            {knowledgeDocument.file_name}
-          </dd>
-        </div>
-        <div className="flex min-w-0 flex-col gap-1">
-          <dt className="font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted">
-            Added
-          </dt>
-          <dd className="m-0 text-[15px]">
-            {formatDay(knowledgeDocument.created_at)}
-          </dd>
-        </div>
+        {fixedDetails.map((detail) => (
+          <div key={detail.term} className="flex min-w-0 flex-col gap-1">
+            <dt className="font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted">
+              {detail.term}
+            </dt>
+            <dd className="m-0 break-words text-[15px]">{detail.value}</dd>
+          </div>
+        ))}
       </dl>
-      {message ? (
+      {flash ? (
         <p
-          role={message.isError ? "alert" : "status"}
+          role={flash.isError ? "alert" : "status"}
           className={`m-0 rounded-xl px-4 py-3.5 text-sm ${
-            message.isError
+            flash.isError
               ? "border border-danger-line bg-danger-tint text-danger-deep"
               : "bg-blue-tint text-blue-deep"
           }`}
         >
-          {message.text}
+          {flash.text}
         </p>
       ) : null}
       <button

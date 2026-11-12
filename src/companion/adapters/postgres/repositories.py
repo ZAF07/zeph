@@ -1,4 +1,5 @@
 from collections.abc import Mapping, Sequence
+from dataclasses import asdict
 from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -1502,13 +1503,7 @@ class PostgresKnowledgeDocumentRepository:
             The saved document, or None if there is none.
         """
         values = {
-            name: value
-            for name, value in {
-                "title": change.title,
-                "source": change.source,
-                "tradition": change.tradition,
-            }.items()
-            if value is not None
+            name: value for name, value in asdict(change).items() if value is not None
         }
         if not values:
             return self.get(document_id)

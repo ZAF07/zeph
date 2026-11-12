@@ -295,10 +295,8 @@ class KnowledgeService:
             source=optional_detail(change.source, BLANK_SOURCE),
             tradition=optional_detail(change.tradition, BLANK_TRADITION),
         )
-        if (
-            self._repositories.knowledge_documents.update_details(document_id, cleaned)
-            is None
-        ):
+        documents = self._repositories.knowledge_documents
+        if documents.update_details(document_id, cleaned) is None:
             raise KnowledgeDocumentNotFoundError(document_id)
         return self.get_document(document_id)
 
