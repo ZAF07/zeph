@@ -532,11 +532,12 @@ def send_check_ins(
     clock: FakeClock,
     scheduler: FakeScheduler,
     count: int,
+    gap: timedelta = ONE_DAY,
 ) -> None:
-    """Let a day pass and send a casual-hello Check-in, `count` times."""
+    """Let a gap pass and send a casual-hello Check-in, `count` times."""
     for number in range(count):
         chat_model.script(send_answer(f"hey, just saying hi #{number}"))
-        clock.advance(ONE_DAY)
+        clock.advance(gap)
         scheduler.tick()
 
 
@@ -661,4 +662,64 @@ def test_an_answer_that_is_not_a_decision_sends_nothing_and_is_tried_again(
     scheduler.tick()
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
         "hey, how are you doing today?"
+    ]
+
+
+def test_settings_changed_while_the_model_decides_are_kept(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+) -> None:
+    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    chat_model.before_next_reply = lambda: client.patch(
+        "/api/check-ins",
+        json={"frequency": "weekly", "quiet_hours_end": "09:00"},
+        headers=headers,
+    )
+    chat_model.script(skip_answer("They seem busy this week."))
+
+    clock.advance(ONE_DAY)
+    scheduler.tick()
+
+    check_ins = client.get("/api/check-ins", headers=headers).json()
+    assert check_ins["frequency"] == "weekly"
+    assert check_ins["quiet_hours_end"] == "09:00:00"
+
+
+def test_a_message_long_after_a_check_in_still_resets_the_ignored_count(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    set_up_user_with_check_ins(
+        client, auth_verifier, chat_channel, check_in_frequency="weekly"
+    )
+    threshold = seeded_settings["check_in_ignore_threshold"]
+    one_week = timedelta(weeks=1)
+    send_check_ins(chat_model, clock, scheduler, threshold, gap=one_week)
+    clock.advance(timedelta(days=3))
+    have_conversation(
+        client,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        "hey, sorry I went quiet",
+        processing_answer(),
+    )
+    chat_channel.sent.clear()
+
+    chat_model.script(send_answer("hey, how's the week going?"))
+    clock.advance(timedelta(days=4))
+    scheduler.tick()
+
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
+        "hey, how's the week going?"
     ]

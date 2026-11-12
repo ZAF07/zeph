@@ -35,8 +35,13 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Drop skipped Check-ins and go back to sent Check-ins only."""
-    op.execute("DELETE FROM check_ins WHERE outcome = 'skipped'")
+    """Go back to sent Check-ins only and the plain-message Check-in prompt.
+
+    Skips and "would you like fewer?" messages are dropped, and the stored
+    Check-in prompt is removed so the old seed value loads again.
+    """
+    op.execute("DELETE FROM check_ins WHERE outcome <> 'sent'")
+    op.execute("DELETE FROM platform_settings WHERE key = 'check_in_prompt'")
     op.alter_column("check_ins", "decided_at", new_column_name="sent_at")
     op.alter_column("check_ins", "message", nullable=False)
     op.drop_column("check_ins", "skip_reason")

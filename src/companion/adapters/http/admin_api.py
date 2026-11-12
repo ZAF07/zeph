@@ -1067,7 +1067,7 @@ def build_admin_api_router(
             kinds=[
                 CheckInKindOverviewResponse(
                     **to_check_in_kind_response(overview.kind).model_dump(),
-                    sent_last_30_days=overview.sent_last_30_days,
+                    sent_last_30_days=overview.sent_count,
                 )
                 for overview in check_in_kind_service.list_overviews()
             ]

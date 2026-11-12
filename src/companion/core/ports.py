@@ -13,7 +13,6 @@ from companion.core.models import (
     CheckInKindDetails,
     CheckInKindOverview,
     CheckInLogEntry,
-    CheckInSettings,
     ConnectionToken,
     Conversation,
     ConversationMessage,
@@ -1147,13 +1146,19 @@ class CheckInRepository(Protocol):
         """
         ...
 
-    def add(self, check_in: CheckIn, settings: CheckInSettings) -> None:
-        """Save a Check-in decision and the User's new Check-in settings, together.
+    def add(
+        self, check_in: CheckIn, next_due_at: datetime, pause_until_resumed: bool
+    ) -> None:
+        """Save a Check-in decision and the User's next due time, together.
+
+        Only the next due time and, when asked, the pause are changed, so
+        settings the User changed meanwhile are kept.
 
         Args:
             check_in: The Check-in decision.
-            settings: The User's Check-in settings after it, such as their
-                next due time.
+            next_due_at: When the User's next Check-in may be sent.
+            pause_until_resumed: Whether to also pause the User's Check-ins
+                until they resume.
         """
         ...
 

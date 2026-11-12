@@ -882,12 +882,12 @@ class CheckInKindOverview:
 
     Attributes:
         kind: The Check-in Kind.
-        sent_last_30_days: How many Check-ins of this Kind were sent in the
-            last 30 days.
+        sent_count: How many Check-ins of this Kind were sent in the period
+            asked for.
     """
 
     kind: CheckInKind
-    sent_last_30_days: int
+    sent_count: int
 
 
 class CheckInOutcome(StrEnum):

@@ -73,13 +73,13 @@ class CheckInDecision:
 
     Attributes:
         kind: The Check-in Kind to send; None to skip.
-        message: The message to send; None to skip.
-        skip_reason: Why it skipped; None when sending.
+        message: The message to send; "" when skipping.
+        skip_reason: Why it skipped; "" when sending.
     """
 
     kind: CheckInKind | None
-    message: str | None
-    skip_reason: str | None
+    message: str = ""
+    skip_reason: str = ""
 
 
 def is_in_quiet_hours(settings: CheckInSettings, local_time: time) -> bool:
@@ -218,14 +218,17 @@ def describe_recent_check_ins(
     lines = []
     for item in recent:
         check_in = item.check_in
-        what = (
-            "skipped"
-            if not check_in.was_sent
-            else f"{check_in.kind_name or 'a check-in'}, {item.status.value}"
-        )
-        lines.append(
-            f"- {format_day(check_in.decided_at, time_zone)}: {what.replace('_', ' ')}"
-        )
+        if check_in.outcome == CheckInOutcome.SKIPPED:
+            happened = "skipped"
+        else:
+            sent_what = (
+                "asked if they'd like fewer check-ins"
+                if check_in.outcome == CheckInOutcome.ASKED_ABOUT_FEWER
+                else check_in.kind_name or "a check-in"
+            )
+            reply = "no reply" if item.status == CheckInStatus.NO_REPLY else item.status
+            happened = f"{sent_what}, {reply}"
+        lines.append(f"- {format_day(check_in.decided_at, time_zone)}: {happened}")
     return "\n".join(lines)
 
 
@@ -288,26 +291,24 @@ def read_check_in_decision(answer: str, kinds: list[CheckInKind]) -> CheckInDeci
         parsed = None
     if not isinstance(parsed, dict):
         raise InvalidCheckInAnswerError("No JSON decision")
-    if parsed.get("decision") == "skip":
+    decision = parsed.get("decision")
+    if decision == "skip":
         reason = parsed.get("reason")
         if not isinstance(reason, str) or not reason.strip():
             raise InvalidCheckInAnswerError("A skip with no reason")
-        return CheckInDecision(kind=None, message=None, skip_reason=reason.strip())
+        return CheckInDecision(kind=None, skip_reason=reason.strip())
+    if decision != "send":
+        raise InvalidCheckInAnswerError(f"Not send or skip: {decision!r}")
     kind_name, message = parsed.get("kind"), parsed.get("message")
-    kind = next(
-        (
-            kind
-            for kind in kinds
-            if isinstance(kind_name, str)
-            and kind.name.lower() == kind_name.strip().lower()
-        ),
-        None,
-    )
-    if parsed.get("decision") != "send" or kind is None:
+    if not isinstance(kind_name, str):
+        raise InvalidCheckInAnswerError("A send with no Kind")
+    kinds_by_name = {kind.name.lower(): kind for kind in kinds}
+    kind = kinds_by_name.get(kind_name.strip().lower())
+    if kind is None:
         raise InvalidCheckInAnswerError(f"Not a Kind it was offered: {kind_name!r}")
     if not isinstance(message, str) or not message.strip():
         raise InvalidCheckInAnswerError("A send with no message")
-    return CheckInDecision(kind=kind, message=message.strip(), skip_reason=None)
+    return CheckInDecision(kind=kind, message=message.strip())
 
 
 class CheckInService:
@@ -512,45 +513,60 @@ class CheckInService:
         connection = self._repositories.telegram_connections.get_by_user(user.id)
         if connection is None or self._has_open_conversation(user, now):
             return
-        next_settings = replace(
-            settings, next_due_at=now + self._gap(settings.frequency)
-        )
+        next_due_at = now + self._gap(settings.frequency)
         if self._has_ignored_too_many(user):
-            message = self._repositories.platform_settings.get("check_in_fewer_message")
-            self._chat_channel.send_text(connection.telegram_chat_id, message)
-            self._repositories.check_ins.add(
-                CheckIn(
-                    id=uuid4(),
-                    user_id=user.id,
-                    outcome=CheckInOutcome.ASKED_ABOUT_FEWER,
-                    decided_at=now,
-                    message=message,
-                ),
-                replace(next_settings, paused=True, paused_until=None),
-            )
+            self._ask_about_fewer(user, connection.telegram_chat_id, now, next_due_at)
             return
         kinds = self.kinds_for(user)
         if not kinds:
             logger.warning("No Check-in Kind may be sent to this User")
             return
         decision = self._decide(user, kinds, local_time)
-        if decision.kind is not None and decision.message is not None:
+        if decision.kind is None:
+            check_in = CheckIn(
+                id=uuid4(),
+                user_id=user.id,
+                outcome=CheckInOutcome.SKIPPED,
+                decided_at=now,
+                skip_reason=decision.skip_reason,
+            )
+        else:
             self._chat_channel.send_text(connection.telegram_chat_id, decision.message)
+            check_in = CheckIn(
+                id=uuid4(),
+                user_id=user.id,
+                outcome=CheckInOutcome.SENT,
+                decided_at=now,
+                kind_id=decision.kind.id,
+                message=decision.message,
+            )
+        self._repositories.check_ins.add(
+            check_in, next_due_at, pause_until_resumed=False
+        )
+
+    def _ask_about_fewer(
+        self, user: User, chat_id: int, now: datetime, next_due_at: datetime
+    ) -> None:
+        """Send the "would you like fewer?" message and pause the User's Check-ins.
+
+        Args:
+            user: The User who ignored too many Check-ins in a row.
+            chat_id: Their Telegram chat.
+            now: The current time.
+            next_due_at: When their next Check-in may be sent once resumed.
+        """
+        message = self._repositories.platform_settings.get("check_in_fewer_message")
+        self._chat_channel.send_text(chat_id, message)
         self._repositories.check_ins.add(
             CheckIn(
                 id=uuid4(),
                 user_id=user.id,
-                outcome=(
-                    CheckInOutcome.SKIPPED
-                    if decision.kind is None
-                    else CheckInOutcome.SENT
-                ),
+                outcome=CheckInOutcome.ASKED_ABOUT_FEWER,
                 decided_at=now,
-                kind_id=decision.kind.id if decision.kind else None,
-                message=decision.message,
-                skip_reason=decision.skip_reason,
+                message=message,
             ),
-            next_settings,
+            next_due_at,
+            pause_until_resumed=True,
         )
 
     def _recent(self, user: User, limit: int) -> list[RecentCheckIn]:

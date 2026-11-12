@@ -131,26 +131,6 @@ def _to_check_in_kind(row: Row[Any]) -> CheckInKind:
     )
 
 
-def _check_in_settings_columns(settings: CheckInSettings) -> dict[str, Any]:
-    """Turn a User's Check-in settings into `users` column values.
-
-    Args:
-        settings: The Check-in settings.
-
-    Returns:
-        The values, by column name.
-    """
-    return {
-        "check_ins_enabled": settings.enabled,
-        "check_in_frequency": settings.frequency.value,
-        "quiet_hours_start": settings.quiet_hours_start,
-        "quiet_hours_end": settings.quiet_hours_end,
-        "check_ins_paused": settings.paused,
-        "check_ins_paused_until": settings.paused_until,
-        "check_in_next_due_at": settings.next_due_at,
-    }
-
-
 def _to_connection(row: Row[Any]) -> TelegramConnection:
     """Turn a `telegram_connections` row into a TelegramConnection.
 
@@ -453,7 +433,13 @@ class PostgresUserRepository:
                 ai_notice_acknowledged_at=user.ai_notice_acknowledged_at,
                 user_memory_enabled=user.user_memory_enabled,
                 onboarding_completed_at=user.onboarding_completed_at,
-                **_check_in_settings_columns(user.check_ins),
+                check_ins_enabled=user.check_ins.enabled,
+                check_in_frequency=user.check_ins.frequency.value,
+                quiet_hours_start=user.check_ins.quiet_hours_start,
+                quiet_hours_end=user.check_ins.quiet_hours_end,
+                check_ins_paused=user.check_ins.paused,
+                check_ins_paused_until=user.check_ins.paused_until,
+                check_in_next_due_at=user.check_ins.next_due_at,
             )
             .returning(users)
         )
@@ -1916,9 +1902,7 @@ class PostgresCheckInRepository:
                 .order_by(check_in_kinds.c.sort_order)
             ).all()
         return [
-            CheckInKindOverview(
-                kind=_to_check_in_kind(row), sent_last_30_days=row.sent_count
-            )
+            CheckInKindOverview(kind=_to_check_in_kind(row), sent_count=row.sent_count)
             for row in rows
         ]
 
@@ -2025,14 +2009,20 @@ class PostgresCheckInRepository:
             ).all()
         return [_to_user(row) for row in rows]
 
-    def add(self, check_in: CheckIn, settings: CheckInSettings) -> None:
-        """Save a Check-in decision and the User's new Check-in settings, together.
+    def add(
+        self, check_in: CheckIn, next_due_at: datetime, pause_until_resumed: bool
+    ) -> None:
+        """Save a Check-in decision and the User's next due time, together.
 
         Args:
             check_in: The Check-in decision.
-            settings: The User's Check-in settings after it, such as their
-                next due time.
+            next_due_at: When the User's next Check-in may be sent.
+            pause_until_resumed: Whether to also pause the User's Check-ins
+                until they resume.
         """
+        user_changes: dict[str, Any] = {"check_in_next_due_at": next_due_at}
+        if pause_until_resumed:
+            user_changes |= {"check_ins_paused": True, "check_ins_paused_until": None}
         with self._engine.begin() as connection:
             connection.execute(
                 insert(check_ins).values(
@@ -2049,7 +2039,7 @@ class PostgresCheckInRepository:
             connection.execute(
                 update(users)
                 .where(users.c.id == check_in.user_id)
-                .values(**_check_in_settings_columns(settings))
+                .values(**user_changes)
             )
 
     def list_recent(self, user_id: UUID, limit: int) -> list[CheckIn]:

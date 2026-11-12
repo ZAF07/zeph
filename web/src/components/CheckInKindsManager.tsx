@@ -125,8 +125,9 @@ export function CheckInKindsManager() {
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(420px,100%),1fr))] gap-4">
           {state.kinds.map((kind) => (
             <CheckInKindCard
-              key={`${kind.id}-${kind.name}-${kind.description}-${kind.allowed_without_user_memory}`}
+              key={kind.id}
               initial={kind}
+              isNew={false}
               sentLast30Days={kind.sent_last_30_days}
               onSave={(input) => save(kind, input)}
               onRemove={() => remove(kind)}
@@ -135,7 +136,8 @@ export function CheckInKindsManager() {
           {isAdding ? (
             <CheckInKindCard
               initial={emptyKind}
-              sentLast30Days={null}
+              isNew
+              sentLast30Days={0}
               onSave={add}
               onCancel={() => setIsAdding(false)}
             />

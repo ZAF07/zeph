@@ -16,20 +16,23 @@ import { ApiError, type CheckInKindInput } from "@/lib/api-client";
  * allowed when User Memory is off, how often it was sent, Save and Remove.
  * A new Kind's card has Add and Cancel instead.
  *
- * @param props - `initial` fills the card; `sentLast30Days` is the send
- *   count, or null for a new Kind; `onSave` saves and rejects if the backend
- *   refuses; `onRemove` removes the Kind, or `onCancel` drops a new one.
+ * @param props - `initial` fills the card; `isNew` marks a Kind not saved
+ *   yet; `sentLast30Days` is the send count; `onSave` saves and rejects if
+ *   the backend refuses; `onRemove` removes the Kind, or `onCancel` drops a
+ *   new one.
  * @returns The card.
  */
 export function CheckInKindCard({
   initial,
+  isNew,
   sentLast30Days,
   onSave,
   onRemove,
   onCancel,
 }: {
   initial: CheckInKindInput;
-  sentLast30Days: number | null;
+  isNew: boolean;
+  sentLast30Days: number;
   onSave: (kind: CheckInKindInput) => Promise<void>;
   onRemove?: () => Promise<void>;
   onCancel?: () => void;
@@ -44,7 +47,6 @@ export function CheckInKindCard({
   const [isConfirmingRemove, setIsConfirmingRemove] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isNew = sentLast30Days === null;
   const title = isNew ? "New Check-in Kind" : initial.name;
   const isComplete = name.trim() !== "" && description.trim() !== "";
   const isChanged =
