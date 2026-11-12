@@ -303,6 +303,10 @@ export type ApiClient = {
     id: string,
     text: string,
   ) => Promise<KnowledgeDocumentWithText>;
+  replaceKnowledgeDocumentFile: (
+    id: string,
+    file: File,
+  ) => Promise<KnowledgeDocumentWithText>;
   uploadKnowledgeDocument: (
     upload: KnowledgeUpload,
   ) => Promise<KnowledgeDocument>;
@@ -512,6 +516,15 @@ export function createApiClient(
         "PUT",
         { text },
       ),
+    replaceKnowledgeDocumentFile: (id, file) => {
+      const form = new FormData();
+      form.append("file", file);
+      return request<KnowledgeDocumentWithText>(
+        `/api/admin/knowledge-documents/${id}/file`,
+        "PUT",
+        form,
+      );
+    },
     uploadKnowledgeDocument: (upload) => {
       const form = new FormData();
       form.append("file", upload.file);

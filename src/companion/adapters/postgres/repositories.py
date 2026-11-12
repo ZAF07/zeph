@@ -30,6 +30,7 @@ from companion.core.models import (
     HelplineDetails,
     KnowledgeDetailsChange,
     KnowledgeDocument,
+    KnowledgeFile,
     KnowledgeFileType,
     KnowledgeStatus,
     KnowledgeUpload,
@@ -1512,6 +1513,37 @@ class PostgresKnowledgeDocumentRepository:
                 update(knowledge_documents)
                 .where(knowledge_documents.c.id == document_id)
                 .values(**values)
+                .returning(*KNOWLEDGE_DOCUMENT_COLUMNS)
+            ).first()
+        return _to_knowledge_document(row) if row else None
+
+    def replace_file(
+        self, document_id: UUID, file: KnowledgeFile
+    ) -> KnowledgeDocument | None:
+        """Give a Knowledge document a new file and make it pending.
+
+        Its saved text and edited flag are cleared, so the new file is read.
+
+        Args:
+            document_id: The document's ID.
+            file: The new file.
+
+        Returns:
+            The saved document, or None if there is none.
+        """
+        with self._engine.begin() as connection:
+            row = connection.execute(
+                update(knowledge_documents)
+                .where(knowledge_documents.c.id == document_id)
+                .values(
+                    file_name=file.file_name,
+                    file_type=file.file_type.value,
+                    content=file.content,
+                    text=None,
+                    text_edited=False,
+                    status=KnowledgeStatus.PENDING.value,
+                    failure_reason=None,
+                )
                 .returning(*KNOWLEDGE_DOCUMENT_COLUMNS)
             ).first()
         return _to_knowledge_document(row) if row else None

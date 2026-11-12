@@ -24,3 +24,7 @@ On a document's page, an Admin replaces the document's file with a new text, Mar
 ## Blocked by
 
 - `.scratch/knowledge-editing/issues/03-edit-knowledge-text.md`
+
+## Comments
+
+**2026-11-12 — started on branch `feat/ke-04-replace-file`.** Plan: `PUT /api/admin/knowledge-documents/{id}/file` (multipart) checks the file like upload, stores the new file and type, clears the saved text and the Edited flag, makes the document Pending and runs Read then Index in the background (clearing the text is what makes `ingest` read the new file). Dashboard: a Replace file card on the document page sharing the upload form's drop area.

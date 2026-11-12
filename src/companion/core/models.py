@@ -577,6 +577,21 @@ class KnowledgeUpload:
 
 
 @dataclass(frozen=True)
+class KnowledgeFile:
+    """A file an Admin gives a Knowledge document in place of its old one.
+
+    Attributes:
+        file_name: The file's name.
+        file_type: What kind of file it is.
+        content: The file's bytes.
+    """
+
+    file_name: str
+    file_type: KnowledgeFileType
+    content: bytes
+
+
+@dataclass(frozen=True)
 class KnowledgeDetailsChange:
     """Details an Admin changes on a Knowledge document; None keeps one.
 

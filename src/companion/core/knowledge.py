@@ -10,6 +10,7 @@ from companion.core.models import (
     KnowledgeDetailsChange,
     KnowledgeDocument,
     KnowledgeDocumentWithText,
+    KnowledgeFile,
     KnowledgeFileType,
     KnowledgeStatus,
     KnowledgeUpload,
@@ -193,6 +194,21 @@ def optional_detail(value: str | None, blank_message: str) -> str | None:
     return None if value is None else required_detail(value, blank_message)
 
 
+def check_file_content(content: bytes) -> None:
+    """Check an uploaded file is neither empty nor too big.
+
+    Args:
+        content: The file's bytes.
+
+    Raises:
+        InvalidKnowledgeDocumentError: If it is empty or over 20 MB.
+    """
+    if not content:
+        raise InvalidKnowledgeDocumentError("The file is empty.")
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise InvalidKnowledgeDocumentError("The file is bigger than 20 MB.")
+
+
 class KnowledgeService:
     """Lets Admins build the Knowledge library the Companion draws on.
 
@@ -249,10 +265,7 @@ class KnowledgeService:
         title = required_detail(upload.title, BLANK_TITLE)
         source = required_detail(upload.source, BLANK_SOURCE)
         tradition = required_detail(upload.tradition, BLANK_TRADITION)
-        if not upload.content:
-            raise InvalidKnowledgeDocumentError("The file is empty.")
-        if len(upload.content) > MAX_UPLOAD_BYTES:
-            raise InvalidKnowledgeDocumentError("The file is bigger than 20 MB.")
+        check_file_content(upload.content)
         return self._repositories.knowledge_documents.add(
             replace(upload, title=title, source=source, tradition=tradition),
             self._clock.now(),
@@ -337,6 +350,32 @@ class KnowledgeService:
         if documents.save_text(document_id, trimmed, edited=True) is None:
             raise KnowledgeDocumentNotFoundError(document_id)
         documents.set_status(document_id, KnowledgeStatus.PENDING, failure_reason=None)
+        return self.get_document(document_id)
+
+    def replace_file(
+        self, document_id: UUID, file: KnowledgeFile
+    ) -> KnowledgeDocumentWithText:
+        """Give a document a new file to be read and indexed again.
+
+        Its ID, details and added date stay; its saved text and Edited flag
+        are cleared, and it is pending until `ingest` has read and indexed
+        the new file. Until then, replies don't use it.
+
+        Args:
+            document_id: The document's ID.
+            file: The new file.
+
+        Returns:
+            The pending document, with no text yet.
+
+        Raises:
+            InvalidKnowledgeDocumentError: If the file is empty or too big.
+            KnowledgeDocumentNotFoundError: If there is no such document.
+        """
+        check_file_content(file.content)
+        documents = self._repositories.knowledge_documents
+        if documents.replace_file(document_id, file) is None:
+            raise KnowledgeDocumentNotFoundError(document_id)
         return self.get_document(document_id)
 
     def ingest(self, document_id: UUID) -> None:

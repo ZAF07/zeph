@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, type DragEvent, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 
 import { primaryButton } from "@/components/button-styles";
 import { fieldLabel, inputField } from "@/components/form-styles";
+import { KnowledgeFileDrop } from "@/components/KnowledgeFileDrop";
 import { ApiError, type KnowledgeUpload } from "@/lib/api-client";
 import { knowledgeTraditions } from "@/lib/knowledge-labels";
 
@@ -53,11 +54,6 @@ export function KnowledgeUploadForm({
     }
   }
 
-  function dropFile(event: DragEvent<HTMLLabelElement>) {
-    event.preventDefault();
-    chooseFile(event.dataTransfer.files[0] ?? null);
-  }
-
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!file || !canUpload) {
@@ -92,37 +88,11 @@ export function KnowledgeUploadForm({
       <h2 id="add-document-heading" className="m-0 text-[17px] font-semibold">
         Add a document
       </h2>
-      <label
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={dropFile}
-        className="flex cursor-pointer flex-col items-center gap-1.5 rounded-[14px] border-[1.5px] border-dashed border-line-strong bg-white px-4 py-7 text-center"
-      >
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-          className="text-blue"
-        >
-          <path d="M12 16V4M7 9l5-5 5 5M4 16v4h16v-4" />
-        </svg>
-        <span className="font-medium">Drop a file or choose one</span>
-        <span className="text-caption text-ink-muted">
-          {file ? file.name : "Text, Markdown or PDF · up to 20 MB"}
-        </span>
-        <input
-          key={fileInputKey}
-          type="file"
-          accept=".txt,.md,.markdown,.pdf"
-          className="sr-only"
-          onChange={(event) => chooseFile(event.target.files?.[0] ?? null)}
-        />
-      </label>
+      <KnowledgeFileDrop
+        file={file}
+        inputKey={fileInputKey}
+        onChoose={chooseFile}
+      />
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))] gap-3">
         <label className={fieldLabel}>
           Title

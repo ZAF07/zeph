@@ -48,6 +48,7 @@ from companion.core.models import (
     KnowledgeDetailsChange,
     KnowledgeDocument,
     KnowledgeDocumentWithText,
+    KnowledgeFile,
     KnowledgeFileType,
     KnowledgeStatus,
     KnowledgeUpload,
@@ -1007,6 +1008,48 @@ def build_admin_api_router(
             raise HTTPException(
                 status.HTTP_409_CONFLICT,
                 "The file is still being read. Try again when it’s done.",
+            ) from error
+        except InvalidKnowledgeDocumentError as error:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
+            ) from error
+        background_tasks.add_task(knowledge_service.ingest, document_id)
+        return to_knowledge_document_with_text_response(document_with_text)
+
+    @router.put("/knowledge-documents/{document_id}/file")
+    def replace_knowledge_document_file(
+        background_tasks: BackgroundTasks, document_id: UUID, file: UploadFile
+    ) -> KnowledgeDocumentWithTextResponse:
+        """Replace a Knowledge document's file with a text, Markdown or PDF file.
+
+        The document keeps its ID, details and added date, and is pending
+        until the new file is read and indexed after the response.
+
+        Args:
+            background_tasks: Runs the reading and indexing after the response.
+            document_id: The document to change.
+            file: The new file.
+
+        Returns:
+            The pending document, with no text yet.
+
+        Raises:
+            HTTPException: 404 if there is no such document; 422 if the file
+                type or file is not valid.
+        """
+        file_name = file.filename or ""
+        try:
+            document_with_text = knowledge_service.replace_file(
+                document_id,
+                KnowledgeFile(
+                    file_name=file_name,
+                    file_type=knowledge_file_type(file_name),
+                    content=file.file.read(MAX_UPLOAD_BYTES + 1),
+                ),
+            )
+        except KnowledgeDocumentNotFoundError as error:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "No such Knowledge document"
             ) from error
         except InvalidKnowledgeDocumentError as error:
             raise HTTPException(

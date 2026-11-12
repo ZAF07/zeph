@@ -10,6 +10,7 @@ import {
   dangerButton,
 } from "@/components/button-styles";
 import { KnowledgeDetailsForm } from "@/components/KnowledgeDetailsForm";
+import { KnowledgeReplaceFileForm } from "@/components/KnowledgeReplaceFileForm";
 import { KnowledgeStatusPill } from "@/components/KnowledgeStatusPill";
 import { KnowledgeTextSection } from "@/components/KnowledgeTextSection";
 import { LoadFailed } from "@/components/LoadFailed";
@@ -34,9 +35,9 @@ const libraryPath = "/admin/knowledge";
 
 /**
  * One Knowledge document's page: its details (editable), status and why it
- * failed, the text Zeph draws on in the Knowledge text editor (editable),
- * Retry when it failed and Delete. Checks again every few seconds while the
- * document is pending.
+ * failed, Replace file, the text Zeph draws on in the Knowledge text editor
+ * (editable), Retry when it failed and Delete. Checks again every few
+ * seconds while the document is pending.
  *
  * @param props - `documentId` is the document to show.
  * @returns The page body, or a loading, not-found or error state.
@@ -95,6 +96,15 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
     const saved = await apiClient.saveKnowledgeDocumentText(documentId, text);
     setState({ kind: "loaded", document: saved });
     return saved;
+  }
+
+  async function replaceFile(file: File) {
+    const replaced = await apiClient.replaceKnowledgeDocumentFile(
+      documentId,
+      file,
+    );
+    setState({ kind: "loaded", document: replaced });
+    return replaced;
   }
 
   async function retry(knowledgeDocument: KnowledgeDocumentWithText) {
@@ -239,6 +249,11 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
       <KnowledgeDetailsForm
         knowledgeDocument={knowledgeDocument}
         onSave={(change) => saveDetails(knowledgeDocument, change)}
+      />
+
+      <KnowledgeReplaceFileForm
+        knowledgeDocument={knowledgeDocument}
+        onReplace={replaceFile}
       />
 
       <KnowledgeTextSection
