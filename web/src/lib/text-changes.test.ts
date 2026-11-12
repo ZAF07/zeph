@@ -23,7 +23,7 @@ describe("compareTexts", () => {
   it("counts the words added and removed", () => {
     expect(
       compareTexts("Notice the breath.", "Notice the slow, warm breath."),
-    ).toMatchObject({ addedWords: 2, removedWords: 0, hasChanges: true });
+    ).toMatchObject({ addedWords: 2, removedWords: 0 });
     expect(
       compareTexts("Notice the slow breath.", "Notice the breath."),
     ).toMatchObject({ addedWords: 0, removedWords: 1 });
@@ -41,7 +41,11 @@ describe("compareTexts", () => {
     });
   });
 
-  it("says when nothing changed", () => {
-    expect(compareTexts("Same text.", "Same text.").hasChanges).toBe(false);
+  it("counts nothing when nothing changed", () => {
+    expect(compareTexts("Same text.", "Same text.")).toEqual({
+      parts: [{ kind: "same", text: "Same text." }],
+      addedWords: 0,
+      removedWords: 0,
+    });
   });
 });

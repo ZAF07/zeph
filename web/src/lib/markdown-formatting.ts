@@ -11,18 +11,25 @@ export type TextEdit = {
   selectionTo: number;
 };
 
-type FormatRule =
-  { kind: "inline"; mark: string } | { kind: "line"; pattern: RegExp };
+type LineRule = {
+  kind: "line";
+  pattern: RegExp;
+  prefix: (lineNumber: number) => string;
+};
 
-const headingPattern = /^#{1,6} /;
+type FormatRule = { kind: "inline"; mark: string } | LineRule;
 
 const formatRules: Record<MarkdownFormat, FormatRule> = {
-  heading: { kind: "line", pattern: headingPattern },
+  heading: { kind: "line", pattern: /^#{1,6} /, prefix: () => "## " },
   bold: { kind: "inline", mark: "**" },
   italic: { kind: "inline", mark: "_" },
-  quote: { kind: "line", pattern: /^> / },
-  bulletList: { kind: "line", pattern: /^[-*] / },
-  numberedList: { kind: "line", pattern: /^\d+\. / },
+  quote: { kind: "line", pattern: /^> /, prefix: () => "> " },
+  bulletList: { kind: "line", pattern: /^[-*] /, prefix: () => "- " },
+  numberedList: {
+    kind: "line",
+    pattern: /^\d+\. /,
+    prefix: (lineNumber) => `${lineNumber}. `,
+  },
 };
 
 /**
@@ -63,42 +70,21 @@ function toggleInlineMark(
 }
 
 /**
- * Writes the prefix a line gets for a line format.
- *
- * @param format - The line format.
- * @param number - The line's place in a numbered list, from 1.
- * @returns The prefix, like "## " or "2. ".
- */
-function prefixFor(format: MarkdownFormat, number: number): string {
-  switch (format) {
-    case "heading":
-      return "## ";
-    case "quote":
-      return "> ";
-    case "bulletList":
-      return "- ";
-    default:
-      return `${number}. `;
-  }
-}
-
-/**
  * Adds a line format to every selected line, or removes it if they all
- * have it. Blank lines are skipped unless every line is blank.
+ * have it. Blank lines are skipped unless every line is blank; a line that
+ * already has the format gets it afresh, so numbers run in order.
  *
  * @param text - The whole text.
  * @param from - Where the selection starts.
  * @param to - Where the selection ends.
- * @param format - The line format.
- * @param pattern - Matches the format's prefix at a line's start.
+ * @param rule - The line format's prefix and how to spot it.
  * @returns The edit.
  */
 function toggleLinePrefix(
   text: string,
   from: number,
   to: number,
-  format: MarkdownFormat,
-  pattern: RegExp,
+  { pattern, prefix }: LineRule,
 ): TextEdit {
   const lineStart = text.lastIndexOf("\n", from - 1) + 1;
   const nextBreak = text.indexOf("\n", to);
@@ -110,7 +96,7 @@ function toggleLinePrefix(
     lines
       .filter((line) => line.trim() !== "")
       .every((line) => pattern.test(line));
-  let number = 0;
+  let lineNumber = 0;
   const newLines = lines.map((line) => {
     if (shouldRemove) {
       return line.replace(pattern, "");
@@ -118,10 +104,8 @@ function toggleLinePrefix(
     if (!allBlank && line.trim() === "") {
       return line;
     }
-    number += 1;
-    const unformatted =
-      format === "heading" ? line.replace(headingPattern, "") : line;
-    return prefixFor(format, number) + unformatted;
+    lineNumber += 1;
+    return prefix(lineNumber) + line.replace(pattern, "");
   });
   const insert = newLines.join("\n");
   if (lines.length === 1 && from === to) {
@@ -166,5 +150,5 @@ export function formatMarkdown(
   if (rule.kind === "inline") {
     return toggleInlineMark(text, from, to, rule.mark);
   }
-  return toggleLinePrefix(text, from, to, format, rule.pattern);
+  return toggleLinePrefix(text, from, to, rule);
 }

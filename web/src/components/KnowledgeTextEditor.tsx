@@ -9,7 +9,7 @@ import {
 import { EditorToolbarButton } from "@/components/EditorToolbarButton";
 import { MarkdownPreview } from "@/components/MarkdownPreview";
 import { editorIcons, formatIcons } from "@/lib/editor-icons";
-import { formatShortcuts } from "@/lib/editor-shortcuts";
+import { formatShortcuts, historyShortcuts } from "@/lib/editor-shortcuts";
 import type { MarkdownFormat } from "@/lib/markdown-formatting";
 import { describeLength } from "@/lib/text-stats";
 
@@ -98,16 +98,16 @@ export function KnowledgeTextEditor({
               {toolbarDivider}
               <EditorToolbarButton
                 label="Undo"
-                shortcut="Ctrl/⌘ Z"
-                keyShortcuts="Control+Z Meta+Z"
+                shortcut={historyShortcuts.undo.label}
+                keyShortcuts={historyShortcuts.undo.ariaKeyShortcuts}
                 iconPath={editorIcons.undo}
                 disabled={view === "preview"}
                 onClick={() => editorRef.current?.undo()}
               />
               <EditorToolbarButton
                 label="Redo"
-                shortcut="Ctrl/⌘ Shift Z"
-                keyShortcuts="Control+Shift+Z Meta+Shift+Z"
+                shortcut={historyShortcuts.redo.label}
+                keyShortcuts={historyShortcuts.redo.ariaKeyShortcuts}
                 iconPath={editorIcons.redo}
                 disabled={view === "preview"}
                 onClick={() => editorRef.current?.redo()}

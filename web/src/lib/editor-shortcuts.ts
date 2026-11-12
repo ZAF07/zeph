@@ -7,6 +7,20 @@ export type EditorShortcut = {
   ariaKeyShortcuts: string;
 };
 
+/** The text editor's undo and redo shortcuts, as CodeMirror's history binds them. */
+export const historyShortcuts: Record<"undo" | "redo", EditorShortcut> = {
+  undo: {
+    key: "Mod-z",
+    label: "Ctrl/⌘ Z",
+    ariaKeyShortcuts: "Control+Z Meta+Z",
+  },
+  redo: {
+    key: "Mod-Shift-z",
+    label: "Ctrl/⌘ Shift Z",
+    ariaKeyShortcuts: "Control+Shift+Z Meta+Shift+Z",
+  },
+};
+
 /** The shortcut for each Markdown format in the text editor. */
 export const formatShortcuts: Record<MarkdownFormat, EditorShortcut> = {
   heading: {

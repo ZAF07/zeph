@@ -91,8 +91,8 @@ const formatKeymap = (
 /**
  * A CodeMirror 6 Markdown editor: line numbers, soft wrap, Markdown
  * highlighting, active line, find (and replace when editable), undo / redo,
- * Markdown formatting shortcuts and Ctrl/⌘+S. When read-only it can still be focused, moved through and
- * searched.
+ * Markdown formatting shortcuts and Ctrl/⌘+S. When read-only it can still be
+ * focused, moved through and searched.
  *
  * @param props - `value` is the text; `onChange` gets each edit; `readOnly`
  *   stops editing; `label` names the editor for screen readers; `onSave`
@@ -208,6 +208,13 @@ export function CodeMirrorEditor({
     });
   }, [readOnly]);
 
+  function runAndFocus(command: (view: EditorView) => boolean) {
+    if (viewRef.current) {
+      command(viewRef.current);
+      viewRef.current.focus();
+    }
+  }
+
   useImperativeHandle(
     ref,
     () => ({
@@ -217,24 +224,9 @@ export function CodeMirrorEditor({
           openSearchPanel(viewRef.current);
         }
       },
-      undo: () => {
-        if (viewRef.current) {
-          undo(viewRef.current);
-          viewRef.current.focus();
-        }
-      },
-      redo: () => {
-        if (viewRef.current) {
-          redo(viewRef.current);
-          viewRef.current.focus();
-        }
-      },
-      format: (format) => {
-        if (viewRef.current) {
-          applyFormat(viewRef.current, format);
-          viewRef.current.focus();
-        }
-      },
+      undo: () => runAndFocus(undo),
+      redo: () => runAndFocus(redo),
+      format: (format) => runAndFocus((view) => applyFormat(view, format)),
     }),
     [],
   );

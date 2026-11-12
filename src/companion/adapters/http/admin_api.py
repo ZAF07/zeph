@@ -32,6 +32,7 @@ from companion.core.knowledge import (
     MAX_UPLOAD_BYTES,
     InvalidKnowledgeDocumentError,
     KnowledgeDocumentNotFoundError,
+    KnowledgeFileStillBeingReadError,
     KnowledgeNotRetryableError,
     KnowledgeService,
     knowledge_file_type,
@@ -993,14 +994,19 @@ def build_admin_api_router(
             The pending document and its text.
 
         Raises:
-            HTTPException: 404 if there is no such document; 422 if the text
-                is blank.
+            HTTPException: 404 if there is no such document; 409 if its file
+                is still being read; 422 if the text is blank.
         """
         try:
             document_with_text = knowledge_service.save_text(document_id, request.text)
         except KnowledgeDocumentNotFoundError as error:
             raise HTTPException(
                 status.HTTP_404_NOT_FOUND, "No such Knowledge document"
+            ) from error
+        except KnowledgeFileStillBeingReadError as error:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "The file is still being read. Try again when it’s done.",
             ) from error
         except InvalidKnowledgeDocumentError as error:
             raise HTTPException(

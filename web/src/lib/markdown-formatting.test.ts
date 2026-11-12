@@ -71,6 +71,11 @@ describe("formatMarkdown, lines", () => {
     expect(apply("[1. one\n2. two]", "numberedList")).toBe("[one\ntwo]");
   });
 
+  it("numbers a part-numbered selection afresh, without doubling marks", () => {
+    expect(apply("[3. one\ntwo]", "numberedList")).toBe("[1. one\n2. two]");
+    expect(apply("[### one\ntwo]", "heading")).toBe("[## one\n## two]");
+  });
+
   it("starts a list on an empty line", () => {
     expect(apply("Intro\n[]", "bulletList")).toBe("Intro\n- []");
   });

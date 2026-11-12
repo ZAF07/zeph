@@ -55,6 +55,10 @@ class InvalidKnowledgeDocumentError(ValueError):
     """Raised when an uploaded Knowledge document is not valid."""
 
 
+class KnowledgeFileStillBeingReadError(ValueError):
+    """Raised when text is saved for a document whose file is still being read."""
+
+
 class KnowledgeNotRetryableError(ValueError):
     """Raised when asked to retry a Knowledge document that has not failed."""
 
@@ -318,9 +322,18 @@ class KnowledgeService:
         Raises:
             InvalidKnowledgeDocumentError: If the text is blank.
             KnowledgeDocumentNotFoundError: If there is no such document.
+            KnowledgeFileStillBeingReadError: If the document is pending and
+                its file has not been read yet, so reading it could replace
+                the Admin's text.
         """
         trimmed = required_detail(text, BLANK_TEXT)
         documents = self._repositories.knowledge_documents
+        document = self._get(document_id)
+        if (
+            document.status == KnowledgeStatus.PENDING
+            and documents.get_text(document_id) is None
+        ):
+            raise KnowledgeFileStillBeingReadError(document_id)
         if documents.save_text(document_id, trimmed, edited=True) is None:
             raise KnowledgeDocumentNotFoundError(document_id)
         documents.set_status(document_id, KnowledgeStatus.PENDING, failure_reason=None)
@@ -475,15 +488,20 @@ class KnowledgeService:
         """Chunk, embed and store a document's text, then mark it ready.
 
         Its old chunks are swapped for the new ones in one step, only when
-        indexing succeeds; otherwise it is marked failed.
+        indexing succeeds; otherwise it is marked failed. If an Admin saved
+        newer text meanwhile, this older run stops and leaves the document to
+        the run that indexes the newer text.
 
         Args:
             document_id: The document's ID.
             text: The text to index.
         """
         chunks = split_into_chunks(text)
+        documents = self._repositories.knowledge_documents
         try:
             embeddings = self._embedder.embed_passages(chunks)
+            if documents.get_text(document_id) != text:
+                return
             self._vector_store.replace_chunks(
                 document_id,
                 [
@@ -495,9 +513,7 @@ class KnowledgeService:
             logger.exception("Could not index Knowledge document %s", document_id)
             self._fail(document_id, INDEXING_FAILED_REASON)
             return
-        self._repositories.knowledge_documents.set_status(
-            document_id, KnowledgeStatus.READY, failure_reason=None
-        )
+        documents.set_status(document_id, KnowledgeStatus.READY, failure_reason=None)
 
     def _fail(self, document_id: UUID, reason: str) -> None:
         """Mark a document failed with the reason Admins are shown.

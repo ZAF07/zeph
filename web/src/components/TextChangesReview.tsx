@@ -8,7 +8,7 @@ import { compareTexts } from "@/lib/text-changes";
 /**
  * The "Review changes" dialog: the saved and edited text compared word by
  * word, with additions and removals highlighted, then "Save and re-index"
- * or "Keep editing". Escape keeps editing.
+ * or "Keep editing". Escape keeps editing, unless a save is under way.
  *
  * @param props - `saved` and `edited` are the texts to compare; `isSaving`
  *   shows the save is under way; `error` is why the last save failed;
@@ -38,14 +38,17 @@ export function TextChangesReview({
 
   useEffect(() => {
     confirmRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !isSaving) {
         onCancel();
       }
     }
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [onCancel]);
+  }, [isSaving, onCancel]);
 
   return (
     <div className="fixed inset-0 z-[400] flex items-center justify-center bg-ink/40 p-4">

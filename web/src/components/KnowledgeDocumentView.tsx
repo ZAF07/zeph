@@ -35,8 +35,8 @@ const libraryPath = "/admin/knowledge";
 /**
  * One Knowledge document's page: its details (editable), status and why it
  * failed, the text Zeph draws on in the Knowledge text editor (editable),
- * Retry when it failed and Delete. Checks again every few seconds while the document is
- * pending.
+ * Retry when it failed and Delete. Checks again every few seconds while the
+ * document is pending.
  *
  * @param props - `documentId` is the document to show.
  * @returns The page body, or a loading, not-found or error state.

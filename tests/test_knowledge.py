@@ -3,9 +3,9 @@ from typing import Any
 from uuid import UUID
 
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, func, select
+from sqlalchemy import Engine, func, select, update
 
-from companion.adapters.postgres.tables import knowledge_chunks
+from companion.adapters.postgres.tables import knowledge_chunks, knowledge_documents
 from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
@@ -444,6 +444,24 @@ def test_blank_text_is_refused_and_a_missing_document_is_not_found(
     assert blank.json()["detail"] == "The text can’t be blank."
     assert missing.status_code == 404
     assert document_text(client, admin, uploaded.json()["id"]) == BREATH_PASSAGES[0]
+
+
+def test_text_cant_be_saved_while_the_file_is_still_being_read(
+    client: TestClient, auth_verifier: FakeAuthVerifier, engine: Engine
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    uploaded = upload_document(client, admin, "breath.txt", BREATH_PASSAGES[0].encode())
+    with engine.begin() as connection:
+        connection.execute(
+            update(knowledge_documents).values(text=None, status="pending")
+        )
+
+    response = save_text(client, admin, uploaded.json()["id"], RIVER_PASSAGE)
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "The file is still being read. Try again when it’s done."
+    )
 
 
 def test_typing_the_text_of_a_scanned_pdf_makes_it_ready(

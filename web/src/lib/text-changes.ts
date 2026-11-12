@@ -12,7 +12,6 @@ export type TextComparison = {
   parts: TextChangePart[];
   addedWords: number;
   removedWords: number;
-  hasChanges: boolean;
 };
 
 const longestUnchanged = 240;
@@ -78,10 +77,5 @@ export function compareTexts(saved: string, edited: string): TextComparison {
       index === changes.length - 1,
     );
   });
-  return {
-    parts,
-    addedWords,
-    removedWords,
-    hasChanges: changes.some((change) => change.added || change.removed),
-  };
+  return { parts, addedWords, removedWords };
 }
