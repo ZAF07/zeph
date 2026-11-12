@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, field
+from datetime import datetime, time
 from enum import StrEnum
 from typing import Any
 from uuid import UUID
@@ -25,6 +25,78 @@ class UserRole(StrEnum):
     ADMIN = "admin"
 
 
+class CheckInFrequency(StrEnum):
+    """How often, at most, the Companion may send a User a Check-in."""
+
+    WEEKLY = "weekly"
+    FEW_TIMES_A_WEEK = "few_times_a_week"
+    MOST_DAYS = "most_days"
+
+
+class PauseLength(StrEnum):
+    """How long a User pauses their Check-ins for."""
+
+    DAY = "day"
+    WEEK = "week"
+    UNTIL_RESUMED = "until_resumed"
+
+
+@dataclass(frozen=True)
+class CheckInSettings:
+    """A User's Check-in settings.
+
+    Attributes:
+        enabled: Whether the User opted in to Check-ins.
+        frequency: How often, at most, a Check-in may be sent.
+        quiet_hours_start: Local time when quiet hours begin.
+        quiet_hours_end: Local time when quiet hours end; earlier than the
+            start when quiet hours run past midnight.
+        paused: Whether the User paused their Check-ins.
+        paused_until: When a timed pause ends; None while paused means until
+            the User resumes.
+        next_due_at: When the next Check-in may be sent; never shown to the
+            User.
+    """
+
+    enabled: bool = False
+    frequency: CheckInFrequency = CheckInFrequency.FEW_TIMES_A_WEEK
+    quiet_hours_start: time = time(22, 0)
+    quiet_hours_end: time = time(7, 30)
+    paused: bool = False
+    paused_until: datetime | None = None
+    next_due_at: datetime | None = None
+
+    def is_paused_at(self, now: datetime) -> bool:
+        """Tell whether Check-ins are paused at a given time.
+
+        Args:
+            now: The time to check at.
+
+        Returns:
+            True while paused; a timed pause ends by itself.
+        """
+        if not self.paused:
+            return False
+        return self.paused_until is None or now < self.paused_until
+
+
+@dataclass(frozen=True)
+class CheckInChanges:
+    """Check-in settings a User wants to change; None leaves one as it is.
+
+    Attributes:
+        enabled: Whether Check-ins are on.
+        frequency: How often, at most, a Check-in may be sent.
+        quiet_hours_start: Local time when quiet hours begin.
+        quiet_hours_end: Local time when quiet hours end.
+    """
+
+    enabled: bool | None = None
+    frequency: CheckInFrequency | None = None
+    quiet_hours_start: time | None = None
+    quiet_hours_end: time | None = None
+
+
 @dataclass(frozen=True)
 class User:
     """A person with an account who converses with the Companion.
@@ -44,6 +116,7 @@ class User:
         user_memory_enabled: Whether the Companion may keep User Memory.
         onboarding_completed_at: When they finished onboarding, if they have.
         role: Whether they are a plain User or an Admin.
+        check_ins: Their Check-in settings.
     """
 
     id: UUID
@@ -59,6 +132,7 @@ class User:
     user_memory_enabled: bool = True
     onboarding_completed_at: datetime | None = None
     role: UserRole = UserRole.USER
+    check_ins: CheckInSettings = field(default_factory=CheckInSettings)
 
 
 @dataclass(frozen=True)
@@ -762,3 +836,54 @@ class StickerImage:
 
     content: bytes
     media_type: str
+
+
+@dataclass(frozen=True)
+class CheckInKind:
+    """A style of Check-in the Companion can send, managed by Admins.
+
+    Attributes:
+        id: Our ID for the Check-in Kind.
+        name: Its name, e.g. "A casual hello".
+        description: What it is, as the Check-in model and Users are told.
+        allowed_without_user_memory: Whether it may be sent to a User with
+            User Memory off.
+        sort_order: Where it comes in the list.
+    """
+
+    id: UUID
+    name: str
+    description: str
+    allowed_without_user_memory: bool
+    sort_order: int
+
+
+class CheckInStatus(StrEnum):
+    """What happened after a Check-in was sent."""
+
+    SENT = "sent"
+    REPLIED = "replied"
+    NO_REPLY = "no_reply"
+
+
+@dataclass(frozen=True)
+class CheckIn:
+    """A Check-in the Companion sent to a User.
+
+    Attributes:
+        id: Our ID for the Check-in.
+        user_id: The User it was sent to.
+        kind_id: Its Check-in Kind; None if the Kind was removed since.
+        kind_name: The Check-in Kind's name; None if it was removed since.
+        message: The text that was sent.
+        sent_at: When it was sent.
+        replied_at: When the User replied, if they have.
+    """
+
+    id: UUID
+    user_id: UUID
+    kind_id: UUID | None
+    kind_name: str | None
+    message: str
+    sent_at: datetime
+    replied_at: datetime | None = None

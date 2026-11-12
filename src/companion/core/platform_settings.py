@@ -95,6 +95,8 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     EditableSetting(
         "memory_retrieval_model", "Memory retrieval model", SettingKind.MODEL
     ),
+    EditableSetting("check_in_prompt", "Check-in prompt", SettingKind.TEXT),
+    EditableSetting("check_in_model", "Check-in model", SettingKind.MODEL),
     EditableSetting(
         "conversation_quiet_gap_minutes",
         "Conversation quiet gap",
@@ -162,6 +164,16 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         ),
         prompt_key="memory_retrieval_prompt",
         model_key="memory_retrieval_model",
+    ),
+    CoreService(
+        name="Check-ins",
+        runs_when="Scheduler tick, for Users who are due",
+        description=(
+            "Writes the Check-in Zeph sends first to a User who opted in, "
+            "from the Persona, the Check-in Kind and their local time."
+        ),
+        prompt_key="check_in_prompt",
+        model_key="check_in_model",
     ),
 )
 

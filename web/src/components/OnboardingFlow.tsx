@@ -9,23 +9,33 @@ import {
   quietButton,
   secondaryButton,
 } from "@/components/button-styles";
+import { CheckInFrequencyPicker } from "@/components/CheckInFrequencyPicker";
 import { fieldLabel, inputField } from "@/components/form-styles";
 import { LocationFields } from "@/components/LocationFields";
 import { OnboardingProgress } from "@/components/OnboardingProgress";
+import { QuietHoursFields } from "@/components/QuietHoursFields";
 import { Switch } from "@/components/Switch";
 import { TelegramConnectionCard } from "@/components/TelegramConnectionCard";
-import type { Me, PlatformContent } from "@/lib/api-client";
+import type { CheckInFrequency, Me, PlatformContent } from "@/lib/api-client";
 import { countryFromBrowser } from "@/lib/countries";
 import { paragraphs } from "@/lib/paragraphs";
-import { timeZoneFromBrowser } from "@/lib/time-zones";
+import { timeZoneFromBrowser, timeZoneLabel } from "@/lib/time-zones";
 import { useApiClient } from "@/lib/use-api-client";
 
-const STEP_LABELS = ["Hello", "Intentions", "Location", "Memory", "Telegram"];
+const STEP_LABELS = [
+  "Hello",
+  "Intentions",
+  "Location",
+  "Check-ins",
+  "Memory",
+  "Telegram",
+];
 const HELLO_STEP = 0;
 const INTENTIONS_STEP = 1;
 const LOCATION_STEP = 2;
-const MEMORY_STEP = 3;
-const TELEGRAM_STEP = 4;
+const CHECK_INS_STEP = 3;
+const MEMORY_STEP = 4;
+const TELEGRAM_STEP = 5;
 
 const stepHeading =
   "m-0 text-[clamp(34px,5vw,44px)] font-normal leading-[1.08] tracking-[-0.035em]";
@@ -39,6 +49,10 @@ type Answers = {
   userMemoryEnabled: boolean;
   country: string;
   timeZone: string;
+  checkInsEnabled: boolean;
+  checkInFrequency: CheckInFrequency;
+  quietHoursStart: string;
+  quietHoursEnd: string;
 };
 
 type LoadState =
@@ -61,13 +75,17 @@ function startingAnswers(me: Me): Answers {
     userMemoryEnabled: me.user_memory_enabled,
     country: me.country ?? countryFromBrowser(navigator.languages) ?? "",
     timeZone: me.time_zone ?? timeZoneFromBrowser(),
+    checkInsEnabled: false,
+    checkInFrequency: "few_times_a_week",
+    quietHoursStart: "22:00",
+    quietHoursEnd: "07:30",
   };
 }
 
 /**
  * The onboarding steps a new User goes through before Connect Telegram:
- * name and AI notice, what brings them here, country and time zone, User
- * Memory consent, then Telegram. Answers are saved when they leave the
+ * name and AI notice, what brings them here, country and time zone,
+ * Check-ins (off by default), User Memory consent, then Telegram. Answers are saved when they leave the
  * Memory step. A User who already finished onboarding goes to the Dashboard.
  *
  * @returns The onboarding flow.
@@ -169,6 +187,10 @@ export function OnboardingFlow() {
         user_memory_enabled: answers.userMemoryEnabled,
         country: answers.country,
         time_zone: answers.timeZone,
+        check_ins_enabled: answers.checkInsEnabled,
+        check_in_frequency: answers.checkInFrequency,
+        quiet_hours_start: answers.quietHoursStart,
+        quiet_hours_end: answers.quietHoursEnd,
       });
       setStep(TELEGRAM_STEP);
     } catch {
@@ -317,6 +339,63 @@ export function OnboardingFlow() {
               countryFromBrowserUsed ? "Filled in from your browser" : undefined
             }
           />
+        </section>
+      ) : null}
+
+      {step === CHECK_INS_STEP ? (
+        <section className="flex flex-col gap-7">
+          <div className="flex flex-col gap-3">
+            <h1 className={stepHeading}>Should I check in?</h1>
+            <p className="m-0 text-[17px] text-ink-soft">
+              Now and then I can message you first on Telegram — a hello to see
+              how you are. I choose the moment, and sometimes I’ll stay quiet to
+              give you space.
+            </p>
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-panel border border-line bg-white p-5">
+            <span className="flex flex-col">
+              <span className="font-semibold">Check-ins</span>
+              <span className="text-caption text-ink-muted">
+                Off unless you turn them on
+              </span>
+            </span>
+            <Switch
+              label="Check-ins"
+              checked={answers.checkInsEnabled}
+              onChange={(checkInsEnabled) => change({ checkInsEnabled })}
+            />
+          </div>
+          {answers.checkInsEnabled ? (
+            <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-2.5">
+                <span className="text-sm font-semibold">
+                  How often, at most
+                </span>
+                <CheckInFrequencyPicker
+                  value={answers.checkInFrequency}
+                  onChange={(checkInFrequency) => change({ checkInFrequency })}
+                />
+              </div>
+              <div className="flex flex-col gap-2.5">
+                <span className="text-sm font-semibold">Quiet hours</span>
+                <QuietHoursFields
+                  start={answers.quietHoursStart}
+                  end={answers.quietHoursEnd}
+                  onStartChange={(quietHoursStart) =>
+                    change({ quietHoursStart })
+                  }
+                  onEndChange={(quietHoursEnd) => change({ quietHoursEnd })}
+                />
+                <p className="m-0 text-caption text-ink-muted">
+                  Never in your quiet hours, in your time zone:{" "}
+                  {timeZoneLabel(answers.timeZone)}.
+                </p>
+              </div>
+            </div>
+          ) : null}
+          <p className="m-0 text-caption text-ink-muted">
+            You can change this any time on your Check-ins page.
+          </p>
         </section>
       ) : null}
 

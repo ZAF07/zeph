@@ -18,6 +18,7 @@ from companion.adapters.langgraph.conversation_engine import (
 from companion.adapters.pgvector.vector_store import PgvectorKnowledgeVectorStore
 from companion.adapters.postgres.database import (
     migrate,
+    seed_check_in_kinds,
     seed_helplines,
     seed_memory_categories,
     seed_platform_settings,
@@ -46,6 +47,7 @@ SEED_DIR = Path(__file__).parent.parent / "src/companion/seed"
 SEED_FILE = SEED_DIR / "platform_settings.yaml"
 HELPLINES_SEED_FILE = SEED_DIR / "helplines.yaml"
 MEMORY_CATEGORIES_SEED_FILE = SEED_DIR / "memory_categories.yaml"
+CHECK_IN_KINDS_SEED_FILE = SEED_DIR / "check_in_kinds.yaml"
 KNOWLEDGE_SEED_FILE = SEED_DIR / "knowledge" / "knowledge.yaml"
 
 
@@ -75,12 +77,13 @@ def engine(database_url: str) -> Iterator[Engine]:
                 "conversations, conversation_messages, platform_settings, "
                 "helplines, safeguard_events, memory_categories, memory_items, "
                 "conversation_summaries, knowledge_documents, knowledge_chunks, "
-                "daily_usage, stickers CASCADE"
+                "daily_usage, stickers, check_in_kinds, check_ins CASCADE"
             )
         )
     seed_platform_settings(engine, SEED_FILE)
     seed_helplines(engine, HELPLINES_SEED_FILE)
     seed_memory_categories(engine, MEMORY_CATEGORIES_SEED_FILE)
+    seed_check_in_kinds(engine, CHECK_IN_KINDS_SEED_FILE)
     yield engine
     engine.dispose()
 

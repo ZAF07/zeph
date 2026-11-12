@@ -4,10 +4,22 @@ from datetime import date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import Connection, Engine, Row, delete, func, select, update
+from sqlalchemy import (
+    Connection,
+    Engine,
+    Row,
+    Select,
+    delete,
+    func,
+    or_,
+    select,
+    update,
+)
 from sqlalchemy.dialects.postgresql import insert
 
 from companion.adapters.postgres.tables import (
+    check_in_kinds,
+    check_ins,
     connection_tokens,
     conversation_messages,
     conversation_summaries,
@@ -25,6 +37,10 @@ from companion.adapters.postgres.tables import (
 )
 from companion.core.models import (
     ChannelSticker,
+    CheckIn,
+    CheckInFrequency,
+    CheckInKind,
+    CheckInSettings,
     ConnectionToken,
     Conversation,
     ConversationMessage,
@@ -81,6 +97,33 @@ def _to_user(row: Row[Any]) -> User:
         user_memory_enabled=row.user_memory_enabled,
         onboarding_completed_at=row.onboarding_completed_at,
         role=UserRole(row.role),
+        check_ins=CheckInSettings(
+            enabled=row.check_ins_enabled,
+            frequency=CheckInFrequency(row.check_in_frequency),
+            quiet_hours_start=row.quiet_hours_start,
+            quiet_hours_end=row.quiet_hours_end,
+            paused=row.check_ins_paused,
+            paused_until=row.check_ins_paused_until,
+            next_due_at=row.check_in_next_due_at,
+        ),
+    )
+
+
+def _to_check_in_kind(row: Row[Any]) -> CheckInKind:
+    """Turn a `check_in_kinds` row into a CheckInKind.
+
+    Args:
+        row: The database row.
+
+    Returns:
+        The Check-in Kind.
+    """
+    return CheckInKind(
+        id=row.id,
+        name=row.name,
+        description=row.description,
+        allowed_without_user_memory=row.allowed_without_user_memory,
+        sort_order=row.sort_order,
     )
 
 
@@ -386,6 +429,13 @@ class PostgresUserRepository:
                 ai_notice_acknowledged_at=user.ai_notice_acknowledged_at,
                 user_memory_enabled=user.user_memory_enabled,
                 onboarding_completed_at=user.onboarding_completed_at,
+                check_ins_enabled=user.check_ins.enabled,
+                check_in_frequency=user.check_ins.frequency.value,
+                quiet_hours_start=user.check_ins.quiet_hours_start,
+                quiet_hours_end=user.check_ins.quiet_hours_end,
+                check_ins_paused=user.check_ins.paused,
+                check_ins_paused_until=user.check_ins.paused_until,
+                check_in_next_due_at=user.check_ins.next_due_at,
             )
             .returning(users)
         )
@@ -1803,6 +1853,158 @@ class PostgresStickerRepository:
         return removed is not None
 
 
+class PostgresCheckInRepository:
+    """Stores Check-in Kinds and sent Check-ins in Postgres."""
+
+    def __init__(self, engine: Engine) -> None:
+        """Set up the repository.
+
+        Args:
+            engine: The database engine.
+        """
+        self._engine = engine
+
+    def list_kinds(self) -> list[CheckInKind]:
+        """List every Check-in Kind in order.
+
+        Returns:
+            The Check-in Kinds.
+        """
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                select(check_in_kinds).order_by(check_in_kinds.c.sort_order)
+            ).all()
+        return [_to_check_in_kind(row) for row in rows]
+
+    def list_due_users(self, now: datetime) -> list[User]:
+        """List onboarded Users with Check-ins on whose next one is due.
+
+        Args:
+            now: The time to check at.
+
+        Returns:
+            The Users whose next due time is at or before now, or not set.
+        """
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                select(users).where(
+                    users.c.check_ins_enabled.is_(True),
+                    users.c.onboarding_completed_at.is_not(None),
+                    or_(
+                        users.c.check_in_next_due_at.is_(None),
+                        users.c.check_in_next_due_at <= now,
+                    ),
+                )
+            ).all()
+        return [_to_user(row) for row in rows]
+
+    def add(self, check_in: CheckIn, next_due_at: datetime) -> None:
+        """Save a sent Check-in and the User's next due time, together.
+
+        Args:
+            check_in: The Check-in that was sent.
+            next_due_at: When the User's next Check-in may be sent.
+        """
+        with self._engine.begin() as connection:
+            connection.execute(
+                insert(check_ins).values(
+                    id=check_in.id,
+                    user_id=check_in.user_id,
+                    kind_id=check_in.kind_id,
+                    message=check_in.message,
+                    sent_at=check_in.sent_at,
+                    replied_at=check_in.replied_at,
+                )
+            )
+            connection.execute(
+                update(users)
+                .where(users.c.id == check_in.user_id)
+                .values(check_in_next_due_at=next_due_at)
+            )
+
+    def list_recent(self, user_id: UUID, limit: int) -> list[CheckIn]:
+        """List a User's newest Check-ins, newest first.
+
+        Args:
+            user_id: The User's ID.
+            limit: The most to list.
+
+        Returns:
+            The Check-ins.
+        """
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                self._select_check_ins()
+                .where(check_ins.c.user_id == user_id)
+                .order_by(check_ins.c.sent_at.desc())
+                .limit(limit)
+            ).all()
+        return [self._to_check_in(row) for row in rows]
+
+    def claim_reply(self, user_id: UUID, replied_at: datetime) -> CheckIn | None:
+        """Mark the User's newest Check-in replied, if it is not yet.
+
+        Args:
+            user_id: The User's ID.
+            replied_at: When they replied.
+
+        Returns:
+            The Check-in they replied to, or None if their newest Check-in
+            was already replied to or they have none.
+        """
+        newest_id = (
+            select(check_ins.c.id)
+            .where(check_ins.c.user_id == user_id)
+            .order_by(check_ins.c.sent_at.desc())
+            .limit(1)
+            .scalar_subquery()
+        )
+        with self._engine.begin() as connection:
+            claimed_id = connection.execute(
+                update(check_ins)
+                .where(check_ins.c.id == newest_id, check_ins.c.replied_at.is_(None))
+                .values(replied_at=replied_at)
+                .returning(check_ins.c.id)
+            ).scalar()
+            if claimed_id is None:
+                return None
+            row = connection.execute(
+                self._select_check_ins().where(check_ins.c.id == claimed_id)
+            ).one()
+        return self._to_check_in(row)
+
+    @staticmethod
+    def _select_check_ins() -> Select[Any]:
+        """Select Check-ins with their Check-in Kind's name.
+
+        Returns:
+            The select statement.
+        """
+        return select(check_ins, check_in_kinds.c.name.label("kind_name")).join(
+            check_in_kinds, check_ins.c.kind_id == check_in_kinds.c.id, isouter=True
+        )
+
+    @staticmethod
+    def _to_check_in(row: Row[Any]) -> CheckIn:
+        """Turn a Check-in row with its Kind's name into a CheckIn.
+
+        Args:
+            row: The database row.
+
+        Returns:
+            The Check-in.
+        """
+        return CheckIn(
+            id=row.id,
+            user_id=row.user_id,
+            kind_id=row.kind_id,
+            kind_name=row.kind_name,
+            message=row.message,
+            sent_at=row.sent_at,
+            replied_at=row.replied_at,
+        )
+
+
 def build_postgres_repositories(engine: Engine) -> Repositories:
     """Build every repository on one Postgres engine.
 
@@ -1825,4 +2027,5 @@ def build_postgres_repositories(engine: Engine) -> Repositories:
         knowledge_documents=PostgresKnowledgeDocumentRepository(engine),
         usage=PostgresUsageRepository(engine),
         stickers=PostgresStickerRepository(engine),
+        check_ins=PostgresCheckInRepository(engine),
     )

@@ -4,6 +4,7 @@ from functools import partial
 from companion.adapters.knowledge_seed import read_knowledge_seed
 from companion.adapters.postgres.database import (
     migrate,
+    seed_check_in_kinds,
     seed_helplines,
     seed_memory_categories,
     seed_platform_settings,
@@ -12,6 +13,7 @@ from companion.adapters.telegram.chat_channel import TelegramChatChannel
 from companion.config import MissingSettingsError, load_settings
 from companion.core.knowledge import KnowledgeService
 from companion.main import (
+    CHECK_IN_KINDS_SEED_FILE,
     HELPLINES_SEED_FILE,
     KNOWLEDGE_SEED_FILE,
     MEMORY_CATEGORIES_SEED_FILE,
@@ -39,6 +41,7 @@ def prepare() -> None:
     seed_platform_settings(engine, SEED_FILE)
     seed_helplines(engine, HELPLINES_SEED_FILE)
     seed_memory_categories(engine, MEMORY_CATEGORIES_SEED_FILE)
+    seed_check_in_kinds(engine, CHECK_IN_KINDS_SEED_FILE)
     knowledge_service = KnowledgeService(
         repositories=build_repositories(settings, engine),
         text_extractor=build_text_extractor(settings),

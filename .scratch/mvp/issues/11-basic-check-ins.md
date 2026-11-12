@@ -35,3 +35,13 @@ Build order inside this issue: (1) backend API and seam 1 tests — this fixes t
 
 - `.scratch/mvp/issues/03-onboarding.md`
 - `.scratch/mvp/issues/06-user-memory.md`
+
+## Comments
+
+**2026-11-12 — started on branch `feat/11-basic-check-ins`.** Plan:
+- User gets Check-in settings: on/off (off by default), frequency (once a week / a few times a week / most days), quiet hours (from, until; local time), paused (for a day, a week, or until resumed; a timed pause ends by itself) and next due time. Turning Check-ins on or changing the frequency sets the next due time to one frequency gap from now. Hours per frequency are a seeded setting.
+- Onboarding takes the Check-in answers; `GET/PUT /api/check-ins` reads and changes settings (plus pause/resume) and lists recent Check-ins. The response never has a next due time.
+- New `check_in_kinds` table seeded from `seed/check_in_kinds.yaml` (only when empty), and a `check_ins` table (User, Kind, message, sent at, replied at).
+- Check-in service on each tick: Users with Check-ins on, a Telegram Connection, due, not paused, outside quiet hours in their time zone and with no open Conversation get a casual hello written by the LLM (Persona + Check-in prompt and model from settings). It is sent, recorded, and the next due time is set.
+- A reply: the User's first message after a Check-in starts a new Conversation that begins with the Check-in text, so the reply has context; the Check-in is marked replied.
+- Dashboard: Check-ins step in onboarding, a Check-ins page (switch, frequency, quiet hours, time zone, pause, Recent check-ins) and a sidebar link. Issue 12 parts (skips, Kinds list, ignore rule) and issue 17 parts ("changed in chat", "just tell Zeph") are left out.

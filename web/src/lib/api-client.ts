@@ -41,6 +41,15 @@ export type Me = {
   role: UserRole;
 };
 
+/** How often, at most, Zeph may send a Check-in. */
+export type CheckInFrequency = "weekly" | "few_times_a_week" | "most_days";
+
+/** How long to pause Check-ins for. */
+export type PauseLength = "day" | "week" | "until_resumed";
+
+/** What happened after a Check-in was sent. */
+export type CheckInStatus = "sent" | "replied" | "no_reply";
+
 /** Everything a new User answers during onboarding. */
 export type OnboardingAnswers = {
   name: string;
@@ -50,6 +59,41 @@ export type OnboardingAnswers = {
   user_memory_enabled: boolean;
   country: string;
   time_zone: string;
+  check_ins_enabled: boolean;
+  check_in_frequency: CheckInFrequency;
+  quiet_hours_start: string;
+  quiet_hours_end: string;
+};
+
+/** A Check-in Zeph sent, and whether the User replied. Never its text. */
+export type RecentCheckIn = {
+  id: string;
+  kind: string | null;
+  sent_at: string;
+  status: CheckInStatus;
+};
+
+/**
+ * A User's Check-in settings and recent Check-ins. Quiet hours are local
+ * times like "22:00:00"; `paused_until` is null while paused until resumed.
+ * There is never a next Check-in time.
+ */
+export type CheckIns = {
+  enabled: boolean;
+  frequency: CheckInFrequency;
+  quiet_hours_start: string;
+  quiet_hours_end: string;
+  paused: boolean;
+  paused_until: string | null;
+  recent: RecentCheckIn[];
+};
+
+/** Check-in settings to change; a field left out stays as it is. */
+export type CheckInChanges = {
+  enabled?: boolean;
+  frequency?: CheckInFrequency;
+  quiet_hours_start?: string;
+  quiet_hours_end?: string;
 };
 
 /** Preferences to change; a field left out stays as it is. */
@@ -274,6 +318,10 @@ export type ApiClient = {
   getPlatformContent: () => Promise<PlatformContent>;
   getTelegramConnection: () => Promise<TelegramConnectionStatus>;
   createConnectionToken: () => Promise<ConnectionToken>;
+  getCheckIns: () => Promise<CheckIns>;
+  updateCheckIns: (changes: CheckInChanges) => Promise<CheckIns>;
+  pauseCheckIns: (length: PauseLength) => Promise<CheckIns>;
+  resumeCheckIns: () => Promise<CheckIns>;
   listMemoryGroups: () => Promise<MemoryGroup[]>;
   deleteMemoryItem: (id: string) => Promise<void>;
   deleteAllMemoryItems: () => Promise<void>;
@@ -431,6 +479,12 @@ export function createApiClient(
       request<TelegramConnectionStatus>("/api/telegram-connection"),
     createConnectionToken: () =>
       request<ConnectionToken>("/api/telegram-connection/tokens", "POST"),
+    getCheckIns: () => request<CheckIns>("/api/check-ins"),
+    updateCheckIns: (changes) =>
+      request<CheckIns>("/api/check-ins", "PATCH", changes),
+    pauseCheckIns: (length) =>
+      request<CheckIns>("/api/check-ins/pause", "PUT", { length }),
+    resumeCheckIns: () => request<CheckIns>("/api/check-ins/pause", "DELETE"),
     listMemoryGroups: async () =>
       (await request<{ groups: MemoryGroup[] }>("/api/memory-items")).groups,
     deleteMemoryItem: (id) =>

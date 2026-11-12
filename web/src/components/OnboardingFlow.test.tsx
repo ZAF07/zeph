@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -136,6 +136,11 @@ describe("OnboardingFlow", () => {
     await user.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(
+      screen.getByRole("heading", { name: "Should I check in?" }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(
       screen.getByRole("heading", { name: "Can I remember things?" }),
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Continue" }));
@@ -151,6 +156,10 @@ describe("OnboardingFlow", () => {
       user_memory_enabled: true,
       country: "SG",
       time_zone: "Asia/Singapore",
+      check_ins_enabled: false,
+      check_in_frequency: "few_times_a_week",
+      quiet_hours_start: "22:00",
+      quiet_hours_end: "07:30",
     });
     expect(
       await screen.findByRole("link", { name: "Open in Telegram" }),
@@ -191,7 +200,7 @@ describe("OnboardingFlow", () => {
     await renderAtHelloStep();
     await user.type(screen.getByLabelText("What should I call you?"), "Maya");
     await user.click(screen.getByRole("checkbox"));
-    for (let step = 0; step < 3; step++) {
+    for (let step = 0; step < 4; step++) {
       await user.click(screen.getByRole("button", { name: "Continue" }));
     }
 
@@ -221,7 +230,7 @@ describe("OnboardingFlow", () => {
     await renderAtHelloStep();
     await user.type(screen.getByLabelText("What should I call you?"), "Maya");
     await user.click(screen.getByRole("checkbox"));
-    for (let step = 0; step < 4; step++) {
+    for (let step = 0; step < 5; step++) {
       await user.click(screen.getByRole("button", { name: "Continue" }));
     }
 
@@ -242,13 +251,58 @@ describe("OnboardingFlow", () => {
     await user.click(screen.getByRole("checkbox"));
 
     const seenText: string[] = [document.body.textContent ?? ""];
-    for (let step = 0; step < 4; step++) {
+    for (let step = 0; step < 5; step++) {
       await user.click(screen.getByRole("button", { name: "Continue" }));
       seenText.push(document.body.textContent ?? "");
     }
 
     expect(seenText.join(" ")).not.toMatch(
       /style|tradition|how much philosophy/i,
+    );
+  });
+
+  it("has Check-ins off by default, with frequency and quiet hours once turned on", async () => {
+    const user = userEvent.setup();
+    await renderAtHelloStep();
+    await user.type(screen.getByLabelText("What should I call you?"), "Maya");
+    await user.click(screen.getByRole("checkbox"));
+    for (let step = 0; step < 3; step++) {
+      await user.click(screen.getByRole("button", { name: "Continue" }));
+    }
+
+    const checkInsSwitch = screen.getByRole("switch", { name: "Check-ins" });
+    expect(checkInsSwitch).toHaveAttribute("aria-checked", "false");
+    expect(
+      screen.queryByRole("group", { name: "How often" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("group", { name: "Quiet hours" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(checkInsSwitch);
+    await user.click(screen.getByRole("button", { name: "Most days" }));
+    expect(screen.getByRole("button", { name: "Most days" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    const from = screen.getByLabelText("From");
+    expect(from).toHaveValue("22:00");
+    expect(screen.getByLabelText("Until")).toHaveValue("07:30");
+    fireEvent.change(from, { target: { value: "21:00" } });
+    expect(
+      screen.getByText(/Never in your quiet hours, in your time zone/),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+
+    await screen.findByRole("heading", { name: "Let’s meet on Telegram." });
+    expect(apiClient.completeOnboarding).toHaveBeenCalledWith(
+      expect.objectContaining({
+        check_ins_enabled: true,
+        check_in_frequency: "most_days",
+        quiet_hours_start: "21:00",
+        quiet_hours_end: "07:30",
+      }),
     );
   });
 

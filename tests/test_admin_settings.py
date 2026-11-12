@@ -209,6 +209,7 @@ def test_core_services_list_their_prompt_and_model_settings(
         "Response composition",
         "Post-conversation processing",
         "Memory retrieval",
+        "Check-ins",
     ]
     service = response["services"][1]
     assert service["prompt_key"] == "response_prompt"
