@@ -88,4 +88,4 @@ Evidence: seam 1 `tests/test_admin_check_ins.py` (6), `tests/test_check_ins.py`;
 ## Completion
 
 - Completed: 2026-11-12
-- Commit: 6452635, review fixes 0b444b1, run fix ba394e6, archive <archive>, merged from `feat/12-smart-check-ins` in <merge>
+- Commit: 6452635, review fixes 0b444b1, run fix ba394e6, archive 21c0474 (merged from `feat/12-smart-check-ins` in 2edb860)
