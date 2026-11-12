@@ -1,6 +1,6 @@
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -34,6 +34,7 @@ from companion.core.models import (
     TelegramConnection,
     User,
     UserOverview,
+    WebSearchResult,
 )
 
 
@@ -94,19 +95,70 @@ class ChatChannel(Protocol):
         ...
 
 
+@dataclass(frozen=True)
+class ChatTool:
+    """A tool the chat model may call while writing a reply.
+
+    Attributes:
+        name: The tool's name, e.g. "web_search".
+        description: When and how to use it, as the model is told.
+        parameters: JSON Schema of the arguments it takes.
+        run: Runs the tool with the model's arguments and returns what the
+            model is told back; it never raises.
+    """
+
+    name: str
+    description: str
+    parameters: dict[str, Any]
+    run: Callable[[dict[str, Any]], str]
+
+
 class ChatModel(Protocol):
     """Generates the Companion's words with a large language model."""
 
-    def generate(self, model: str, instructions: str, history: list[ChatLine]) -> str:
-        """Generate the next reply.
+    def generate(
+        self,
+        model: str,
+        instructions: str,
+        history: list[ChatLine],
+        tools: Sequence[ChatTool] = (),
+    ) -> str:
+        """Generate the next reply, calling tools first if the model wants to.
 
         Args:
             model: The model to use, e.g. "deepseek-chat".
             instructions: What the model should be and do (Persona and prompt).
             history: The Conversation so far, oldest first.
+            tools: The tools the model may call; none by default.
 
         Returns:
             The reply text.
+        """
+        ...
+
+
+class WebSearch(Protocol):
+    """Searches the web and reads web pages."""
+
+    def search(self, query: str) -> list[WebSearchResult]:
+        """Search the web.
+
+        Args:
+            query: What to search for.
+
+        Returns:
+            The best results, best first.
+        """
+        ...
+
+    def fetch_page(self, url: str) -> str:
+        """Read the text of a web page.
+
+        Args:
+            url: The page's address.
+
+        Returns:
+            The page's text, or "" if it could not be read.
         """
         ...
 
@@ -887,6 +939,36 @@ class KnowledgeDocumentRepository(Protocol):
         ...
 
 
+class UsageRepository(Protocol):
+    """Stores what each User used on each day."""
+
+    def claim_web_search(self, user_id: UUID, day: date, daily_limit: int) -> bool:
+        """Count one web search for a User's day, in one step, if under the limit.
+
+        Args:
+            user_id: The User's ID.
+            day: The User's day.
+            daily_limit: The most web searches allowed in a day.
+
+        Returns:
+            True if the search was counted; False if the limit was reached,
+            so two searches at once can never go over it.
+        """
+        ...
+
+    def count_web_searches(self, user_id: UUID, day: date) -> int:
+        """Count a User's web searches on a day.
+
+        Args:
+            user_id: The User's ID.
+            day: The User's day.
+
+        Returns:
+            How many web searches they made.
+        """
+        ...
+
+
 @dataclass(frozen=True)
 class Repositories:
     """Every repository the core needs, so adapters can be swapped as one."""
@@ -901,3 +983,4 @@ class Repositories:
     memory_categories: MemoryCategoryRepository
     user_memory: UserMemoryRepository
     knowledge_documents: KnowledgeDocumentRepository
+    usage: UsageRepository

@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     dashboard_url: str
 
     deepseek_api_key: str
-    tavily_api_key: str | None = None
+    tavily_api_key: str
     initial_admin_emails: str = ""
 
     chat_channel_adapter: str = "telegram"
@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     embedder_adapter: str = "fastembed"
     vector_store_adapter: str = "pgvector"
     text_extractor_adapter: str = "pypdf"
+    web_search_adapter: str = "tavily"
     scheduler_adapter: str = "in_process"
 
     @property

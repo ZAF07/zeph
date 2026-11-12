@@ -32,6 +32,7 @@ from tests.fakes import (
     FakeClock,
     FakeEmbedder,
     FakeScheduler,
+    FakeWebSearch,
     ScriptedChatModel,
 )
 
@@ -73,8 +74,8 @@ def engine(database_url: str) -> Iterator[Engine]:
                 "TRUNCATE users, telegram_connections, connection_tokens, "
                 "conversations, conversation_messages, platform_settings, "
                 "helplines, safeguard_events, memory_categories, memory_items, "
-                "conversation_summaries, knowledge_documents, knowledge_chunks "
-                "CASCADE"
+                "conversation_summaries, knowledge_documents, knowledge_chunks, "
+                "daily_usage CASCADE"
             )
         )
     seed_platform_settings(engine, SEED_FILE)
@@ -109,6 +110,12 @@ def embedder() -> FakeEmbedder:
 
 
 @pytest.fixture
+def web_search() -> FakeWebSearch:
+    """A web search that returns set results, with no service behind it."""
+    return FakeWebSearch()
+
+
+@pytest.fixture
 def scheduler() -> FakeScheduler:
     """A scheduler whose ticks tests run by hand."""
     return FakeScheduler()
@@ -133,6 +140,7 @@ def client(
     chat_model: ScriptedChatModel,
     auth_verifier: FakeAuthVerifier,
     embedder: FakeEmbedder,
+    web_search: FakeWebSearch,
     scheduler: FakeScheduler,
 ) -> Iterator[TestClient]:
     """A test client for the backend wired with fakes and the real database.
@@ -157,6 +165,7 @@ def client(
         text_extractor=PypdfTextExtractor(),
         embedder=embedder,
         knowledge_vector_store=PgvectorKnowledgeVectorStore(engine),
+        web_search=web_search,
         clock=clock,
         scheduler=scheduler,
         telegram_webhook_secret=WEBHOOK_SECRET,

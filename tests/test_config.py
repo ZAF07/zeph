@@ -1,12 +1,14 @@
 import pytest
 from sqlalchemy import create_engine
 
+from companion.adapters.tavily.web_search import TavilyWebSearch
 from companion.config import MissingSettingsError, load_settings
 from companion.main import (
     UnknownAdapterError,
     build_embedder,
     build_text_extractor,
     build_vector_store,
+    build_web_search,
 )
 
 COMPLETE_ENVIRONMENT = {
@@ -20,6 +22,7 @@ COMPLETE_ENVIRONMENT = {
     "WEBHOOK_BASE_URL": "https://zeph.ngrok.app",
     "DASHBOARD_URL": "http://localhost:3000",
     "DEEPSEEK_API_KEY": "sk-deepseek-x",
+    "TAVILY_API_KEY": "tvly-x",
 }
 
 
@@ -33,10 +36,28 @@ def test_missing_required_key_is_named_in_the_error() -> None:
     assert "TELEGRAM_BOT_TOKEN" in str(error.value)
 
 
-def test_keys_for_later_issues_are_optional() -> None:
+def test_tavily_key_is_required() -> None:
+    environment = dict(COMPLETE_ENVIRONMENT)
+    del environment["TAVILY_API_KEY"]
+
+    with pytest.raises(MissingSettingsError) as error:
+        load_settings(environment)
+
+    assert "TAVILY_API_KEY" in str(error.value)
+
+
+def test_web_search_adapter_defaults_to_tavily() -> None:
     settings = load_settings(COMPLETE_ENVIRONMENT)
 
-    assert settings.tavily_api_key is None
+    assert settings.web_search_adapter == "tavily"
+    assert isinstance(build_web_search(settings), TavilyWebSearch)
+
+
+def test_unknown_web_search_adapter_is_refused() -> None:
+    settings = load_settings({**COMPLETE_ENVIRONMENT, "WEB_SEARCH_ADAPTER": "bing"})
+
+    with pytest.raises(UnknownAdapterError):
+        build_web_search(settings)
 
 
 def test_deepseek_key_is_required() -> None:

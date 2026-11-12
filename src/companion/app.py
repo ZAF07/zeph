@@ -32,6 +32,7 @@ from companion.core.ports import (
     KnowledgeVectorStore,
     Repositories,
     Scheduler,
+    WebSearch,
 )
 from companion.core.post_conversation import PostConversationProcessor
 from companion.core.response_composition import ResponseComposer
@@ -40,6 +41,7 @@ from companion.core.scheduled_work import ScheduledWork
 from companion.core.telegram_connection import TelegramConnectionService
 from companion.core.user_memory import UserMemoryService
 from companion.core.users import UserService
+from companion.core.web_search import WebSearchTools
 
 
 @dataclass(frozen=True)
@@ -56,6 +58,7 @@ class AppDependencies:
         text_extractor: Reads the text out of uploaded Knowledge files.
         embedder: Turns text into embeddings.
         knowledge_vector_store: Stores and searches Knowledge embeddings.
+        web_search: Searches the web and reads pages for replies.
         clock: Tells the current time.
         scheduler: Runs the scheduled work while the app is up.
         telegram_webhook_secret: The secret Telegram sends with each update.
@@ -74,6 +77,7 @@ class AppDependencies:
     text_extractor: DocumentTextExtractor
     embedder: Embedder
     knowledge_vector_store: KnowledgeVectorStore
+    web_search: WebSearch
     clock: Clock
     scheduler: Scheduler
     telegram_webhook_secret: str
@@ -134,6 +138,11 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             response_composer=ResponseComposer(
                 repositories=dependencies.repositories,
                 chat_model=dependencies.chat_model,
+                web_search_tools=WebSearchTools(
+                    repositories=dependencies.repositories,
+                    web_search=dependencies.web_search,
+                    clock=dependencies.clock,
+                ),
             ),
         )
     )

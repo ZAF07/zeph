@@ -674,3 +674,18 @@ class KnowledgeChunkMatch:
 
     document_id: UUID
     text: str
+
+
+@dataclass(frozen=True)
+class WebSearchResult:
+    """One result from a web search.
+
+    Attributes:
+        title: The page's title.
+        url: The page's address.
+        content: A short piece of the page that matches the search.
+    """
+
+    title: str
+    url: str
+    content: str

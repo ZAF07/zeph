@@ -2,12 +2,14 @@ import hashlib
 import math
 import re
 import time
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from typing import Any
 
 from companion.adapters.postgres.tables import EMBEDDING_SIZE
-from companion.core.models import AccountIdentity, ChatLine
+from companion.core.models import AccountIdentity, ChatLine, WebSearchResult
+from companion.core.ports import ChatTool
 
 
 @dataclass(frozen=True)
@@ -140,11 +142,28 @@ class ChatModelCall:
         model: The model name asked for.
         instructions: The instructions given.
         history: The Conversation so far.
+        tools: The tools the model was offered.
+        tool_results: What each scripted tool call returned, in order.
     """
 
     model: str
     instructions: str
     history: list[ChatLine]
+    tools: list[ChatTool] = field(default_factory=list)
+    tool_results: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class ToolCall:
+    """A tool call to script before a reply, as a real model might make.
+
+    Attributes:
+        name: The tool's name.
+        arguments: The arguments to call it with.
+    """
+
+    name: str
+    arguments: dict[str, Any]
 
 
 class FakeScheduler:
@@ -197,7 +216,7 @@ class ScriptedChatModel:
             memory_retrieval_prompt: The instructions that mark a memory
                 retrieval call.
         """
-        self._replies: list[str | Exception] = []
+        self._replies: list[str | Exception | ToolCall] = []
         self._safeguard_answers: list[str | Exception] = []
         self._processing_answers: list[str | Exception] = []
         self._retrieval_answers: list[str | Exception] = []
@@ -211,12 +230,13 @@ class ScriptedChatModel:
         self.call_order: list[str] = []
         self.delay_seconds = 0.0
 
-    def script(self, *replies: str | Exception) -> None:
+    def script(self, *replies: str | Exception | ToolCall) -> None:
         """Queue replies to return, one per call, in order.
 
         Args:
             replies: The reply texts; an exception is raised instead of
-                returned, to act like a failing model.
+                returned, to act like a failing model. A tool call is run
+                with the offered tool before the next reply is returned.
         """
         self._replies.extend(replies)
 
@@ -247,18 +267,27 @@ class ScriptedChatModel:
         """
         self._retrieval_answers.extend(answers)
 
-    def generate(self, model: str, instructions: str, history: list[ChatLine]) -> str:
+    def generate(
+        self,
+        model: str,
+        instructions: str,
+        history: list[ChatLine],
+        tools: Sequence[ChatTool] = (),
+    ) -> str:
         """Record the call and return the next scripted reply or answer.
 
         Args:
             model: The model name asked for.
             instructions: The instructions given.
             history: The Conversation so far.
+            tools: The tools the model may call.
 
         Returns:
             The next scripted reply, or Safeguard answer for a Safeguard call.
         """
-        call = ChatModelCall(model=model, instructions=instructions, history=history)
+        call = ChatModelCall(
+            model=model, instructions=instructions, history=history, tools=list(tools)
+        )
         if self.safeguard_prompt and instructions == self.safeguard_prompt:
             self.safeguard_calls.append(call)
             self.call_order.append("safeguard")
@@ -286,6 +315,10 @@ class ScriptedChatModel:
             self.call_order.append("reply")
             time.sleep(self.delay_seconds)
             answer = self._replies.pop(0)
+            while isinstance(answer, ToolCall):
+                [tool] = [tool for tool in tools if tool.name == answer.name]
+                call.tool_results.append(tool.run(answer.arguments))
+                answer = self._replies.pop(0)
         if isinstance(answer, Exception):
             raise answer
         return answer
@@ -348,3 +381,52 @@ class FakeEmbedder:
             vector[slot] += 1.0
         length = math.sqrt(sum(value * value for value in vector))
         return [value / length for value in vector]
+
+
+class FakeWebSearch:
+    """Web search that returns set results and pages, recording each request.
+
+    Set `failure` to make every call raise it, like a broken service.
+    """
+
+    def __init__(self) -> None:
+        """Start with no results, no pages and no requests."""
+        self.results: list[WebSearchResult] = []
+        self.pages: dict[str, str] = {}
+        self.failure: Exception | None = None
+        self.queries: list[str] = []
+        self.fetched_urls: list[str] = []
+
+    def search(self, query: str) -> list[WebSearchResult]:
+        """Record the query and return the set results.
+
+        Args:
+            query: What to search for.
+
+        Returns:
+            The set results.
+
+        Raises:
+            Exception: The `failure` set on the fake, if any.
+        """
+        self.queries.append(query)
+        if self.failure is not None:
+            raise self.failure
+        return self.results
+
+    def fetch_page(self, url: str) -> str:
+        """Record the address and return the set page text.
+
+        Args:
+            url: The page's address.
+
+        Returns:
+            The page's text, or "" if none was set.
+
+        Raises:
+            Exception: The `failure` set on the fake, if any.
+        """
+        self.fetched_urls.append(url)
+        if self.failure is not None:
+            raise self.failure
+        return self.pages.get(url, "")
