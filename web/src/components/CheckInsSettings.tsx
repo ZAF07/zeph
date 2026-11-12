@@ -8,6 +8,7 @@ import { fieldLabel, inputField } from "@/components/form-styles";
 import { LoadFailed } from "@/components/LoadFailed";
 import { QuietHoursFields } from "@/components/QuietHoursFields";
 import { RecentCheckInsList } from "@/components/RecentCheckInsList";
+import { SettingLabel } from "@/components/SettingLabel";
 import { Switch } from "@/components/Switch";
 import type {
   CheckInChanges,
@@ -63,11 +64,8 @@ export function CheckInsSettings() {
     void load();
   }, [load]);
 
-  const savedTimeZone = state.kind === "loaded" ? state.me.time_zone : null;
-  const timeZones = useMemo(
-    () => timeZoneOptions(savedTimeZone),
-    [savedTimeZone],
-  );
+  const timeZone = state.kind === "loaded" ? state.me.time_zone : null;
+  const timeZones = useMemo(() => timeZoneOptions(timeZone), [timeZone]);
 
   async function save(
     change: () => Promise<{ me: Me } | { checkIns: CheckIns }>,
@@ -109,7 +107,6 @@ export function CheckInsSettings() {
   }
 
   const checkIns = state.kind === "loaded" ? state.checkIns : null;
-  const timeZone = state.kind === "loaded" ? state.me.time_zone : null;
   let switchLabel = "Check-ins on";
   if (checkIns && !checkIns.enabled) {
     switchLabel = "Check-ins off";
@@ -209,12 +206,10 @@ export function CheckInsSettings() {
               Settings
             </h2>
             <div className={`${settingsRow} items-start`}>
-              <span className="flex min-w-0 flex-[1_1_260px] flex-col gap-0.5">
-                <span className="font-semibold">How often, at most</span>
-                <span className="text-caption text-ink-muted">
-                  Zeph will often check in less than this.
-                </span>
-              </span>
+              <SettingLabel
+                title="How often, at most"
+                caption="Zeph will often check in less than this."
+              />
               <CheckInFrequencyPicker
                 value={checkIns.frequency}
                 disabled={isSaving}
@@ -222,12 +217,10 @@ export function CheckInsSettings() {
               />
             </div>
             <div className={`${settingsRow} items-end`}>
-              <span className="flex min-w-0 flex-[1_1_260px] flex-col gap-0.5">
-                <span className="font-semibold">Quiet hours</span>
-                <span className="text-caption text-ink-muted">
-                  Zeph never checks in during these hours.
-                </span>
-              </span>
+              <SettingLabel
+                title="Quiet hours"
+                caption="Zeph never checks in during these hours."
+              />
               <div className="flex flex-[1_1_360px] flex-wrap gap-3">
                 <QuietHoursFields
                   start={toTimeFieldValue(checkIns.quiet_hours_start)}
@@ -258,12 +251,10 @@ export function CheckInsSettings() {
               </div>
             </div>
             <div className={settingsRow}>
-              <span className="flex min-w-0 flex-[1_1_260px] flex-col gap-0.5">
-                <span className="font-semibold">Need some quiet?</span>
-                <span className="text-caption text-ink-muted">
-                  Pause without changing anything else.
-                </span>
-              </span>
+              <SettingLabel
+                title="Need some quiet?"
+                caption="Pause without changing anything else."
+              />
               <div className="flex flex-wrap gap-2">
                 {pauseChoices.map((choice) => (
                   <button

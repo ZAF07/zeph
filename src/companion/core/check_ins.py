@@ -1,10 +1,9 @@
 import logging
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import datetime, time, timedelta
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from companion.core.conversations import is_open
 from companion.core.models import (
     ChatLine,
     ChatRole,
@@ -18,6 +17,7 @@ from companion.core.models import (
     User,
 )
 from companion.core.ports import ChatChannel, ChatModel, Clock, Repositories
+from companion.core.timing import check_in_reply_window, is_open, quiet_gap
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,19 @@ PAUSE_LENGTHS = {
 
 class EmptyCheckInError(Exception):
     """Raised when the Check-in model writes no message."""
+
+
+@dataclass(frozen=True)
+class RecentCheckIn:
+    """A sent Check-in and what happened after it.
+
+    Attributes:
+        check_in: The Check-in.
+        status: Whether it was replied to, had no reply, or can still be.
+    """
+
+    check_in: CheckIn
+    status: CheckInStatus
 
 
 def is_in_quiet_hours(settings: CheckInSettings, local_time: time) -> bool:
@@ -66,20 +79,28 @@ def local_now(now: datetime, time_zone: str | None) -> datetime:
     return now.astimezone(ZoneInfo(time_zone or "UTC"))
 
 
-def check_in_status(check_in: CheckIn, is_newest: bool) -> CheckInStatus:
+def check_in_status(
+    check_in: CheckIn, is_newest: bool, now: datetime, reply_window: timedelta
+) -> CheckInStatus:
     """Work out what happened after a Check-in was sent.
+
+    Only the User's newest Check-in can get a reply, and only within the
+    reply window.
 
     Args:
         check_in: The Check-in.
-        is_newest: Whether it is the User's newest Check-in, which can still
-            be replied to.
+        is_newest: Whether it is the User's newest Check-in.
+        now: The current time.
+        reply_window: How long after a Check-in a reply still counts.
 
     Returns:
-        Replied, no reply, or just sent for the newest one with no reply yet.
+        Replied; sent, while a reply can still come; or no reply.
     """
     if check_in.replied_at is not None:
         return CheckInStatus.REPLIED
-    return CheckInStatus.SENT if is_newest else CheckInStatus.NO_REPLY
+    if is_newest and now - check_in.sent_at < reply_window:
+        return CheckInStatus.SENT
+    return CheckInStatus.NO_REPLY
 
 
 def describe_check_in(user: User, kind: CheckInKind, local_time: datetime) -> str:
@@ -125,11 +146,7 @@ class CheckInService:
         self._clock = clock
 
     def change_settings(self, user: User, changes: CheckInChanges) -> User:
-        """Change a User's Check-in settings.
-
-        Turning Check-ins on, or changing the frequency, sets the next due
-        time one frequency gap from now. Turning them off also ends any
-        pause.
+        """Change and save a User's Check-in settings.
 
         Args:
             user: The User making the change.
@@ -138,11 +155,30 @@ class CheckInService:
         Returns:
             The saved User.
         """
-        current = user.check_ins
+        return self._save(user, self.settings_after(user.check_ins, changes))
+
+    def settings_after(
+        self, current: CheckInSettings, changes: CheckInChanges
+    ) -> CheckInSettings:
+        """Work out a User's Check-in settings after a change, without saving.
+
+        Turning Check-ins on, or changing the frequency, sets the next due
+        time one frequency gap from now. Turning them off also ends any
+        pause.
+
+        Args:
+            current: The settings now.
+            changes: The settings to change; None leaves one as it is.
+
+        Returns:
+            The changed settings.
+        """
         updated = replace(
             current,
             enabled=current.enabled if changes.enabled is None else changes.enabled,
-            frequency=changes.frequency or current.frequency,
+            frequency=(
+                current.frequency if changes.frequency is None else changes.frequency
+            ),
             quiet_hours_start=(
                 current.quiet_hours_start
                 if changes.quiet_hours_start is None
@@ -154,7 +190,7 @@ class CheckInService:
                 else changes.quiet_hours_end
             ),
         )
-        return self._save(user, self._with_next_due_time(current, updated))
+        return self._with_next_due_time(current, updated)
 
     def pause(self, user: User, length: PauseLength) -> User:
         """Pause a User's Check-ins, keeping their other settings.
@@ -169,13 +205,12 @@ class CheckInService:
             The saved User.
         """
         current = user.check_ins
-        pause_length = PAUSE_LENGTHS.get(length)
-        paused = replace(
-            current,
-            enabled=True,
-            paused=True,
-            paused_until=self._clock.now() + pause_length if pause_length else None,
+        paused_until = (
+            None
+            if length == PauseLength.UNTIL_RESUMED
+            else self._clock.now() + PAUSE_LENGTHS[length]
         )
+        paused = replace(current, enabled=True, paused=True, paused_until=paused_until)
         return self._save(user, self._with_next_due_time(current, paused))
 
     def resume(self, user: User) -> User:
@@ -202,7 +237,7 @@ class CheckInService:
         """
         return user.check_ins.is_paused_at(self._clock.now())
 
-    def list_recent(self, user: User) -> list[tuple[CheckIn, CheckInStatus]]:
+    def list_recent(self, user: User) -> list[RecentCheckIn]:
         """List a User's newest Check-ins with what happened after each.
 
         Args:
@@ -214,8 +249,13 @@ class CheckInService:
         recent = self._repositories.check_ins.list_recent(
             user.id, RECENT_CHECK_INS_LIMIT
         )
+        now = self._clock.now()
+        reply_window = check_in_reply_window(self._repositories.platform_settings)
         return [
-            (check_in, check_in_status(check_in, is_newest=index == 0))
+            RecentCheckIn(
+                check_in=check_in,
+                status=check_in_status(check_in, index == 0, now, reply_window),
+            )
             for index, check_in in enumerate(recent)
         ]
 
@@ -290,12 +330,8 @@ class CheckInService:
             True if their newest Conversation is still open.
         """
         latest = self._repositories.conversations.get_latest_for_user(user.id)
-        quiet_gap = timedelta(
-            minutes=self._repositories.platform_settings.get(
-                "conversation_quiet_gap_minutes"
-            )
-        )
-        return latest is not None and is_open(latest, now, quiet_gap)
+        gap = quiet_gap(self._repositories.platform_settings)
+        return latest is not None and is_open(latest, now, gap)
 
     def _write(self, description: str) -> str:
         """Ask the Check-in model to write the message.

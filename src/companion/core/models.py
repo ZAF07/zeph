@@ -164,6 +164,7 @@ class OnboardingAnswers:
         user_memory_enabled: Whether the Companion may keep User Memory.
         country: Two-letter country code.
         time_zone: IANA time zone name.
+        check_ins: Their Check-in choices; left as they are by default.
     """
 
     name: str
@@ -173,6 +174,7 @@ class OnboardingAnswers:
     user_memory_enabled: bool
     country: str
     time_zone: str
+    check_ins: CheckInChanges = field(default_factory=CheckInChanges)
 
 
 @dataclass(frozen=True)

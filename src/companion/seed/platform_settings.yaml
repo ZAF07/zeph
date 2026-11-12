@@ -329,3 +329,7 @@ check_in_hours_between:
   weekly: 168
   few_times_a_week: 56
   most_days: 24
+
+# A User's first message within this many hours of a Check-in is its reply:
+# that Conversation starts with the Check-in. Later, the Check-in had no reply.
+check_in_reply_window_hours: 24

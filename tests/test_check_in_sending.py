@@ -36,7 +36,7 @@ def set_up_user_with_check_ins(
     connect_telegram(client, auth_verifier, chat_channel)
     headers = auth_headers(auth_verifier, "user_maya")
     answers = onboarding_answers(
-        check_ins_enabled=True, check_in_frequency="most_days", **overrides
+        **{"check_ins_enabled": True, "check_in_frequency": "most_days", **overrides}
     )
     assert (
         client.put("/api/onboarding", json=answers, headers=headers).status_code == 200
@@ -394,3 +394,32 @@ def test_only_the_first_message_after_a_check_in_counts_as_its_reply(
     send_to_webhook(client, telegram_text_update("random thought"))
 
     assert [line.text for line in chat_model.calls[-1].history] == ["random thought"]
+
+
+def test_a_message_long_after_an_ignored_check_in_is_not_its_reply(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    headers = set_up_user_with_check_ins(
+        client, auth_verifier, chat_channel, check_in_frequency="weekly"
+    )
+    clock.advance(timedelta(weeks=1))
+    chat_model.script("hey, how's your week been?")
+    scheduler.tick()
+    assert recent_check_ins(client, headers)[0]["status"] == "sent"
+
+    window = timedelta(hours=seeded_settings["check_in_reply_window_hours"])
+    clock.advance(window)
+    assert recent_check_ins(client, headers)[0]["status"] == "no_reply"
+    chat_model.script("oh hey, what's up?")
+    send_to_webhook(client, telegram_text_update("random question for you"))
+
+    assert [line.text for line in chat_model.calls[-1].history] == [
+        "random question for you"
+    ]
+    assert recent_check_ins(client, headers)[0]["status"] == "no_reply"

@@ -101,9 +101,16 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     user_memory_service = UserMemoryService(
         dependencies.repositories, dependencies.clock
     )
+    check_in_service = CheckInService(
+        repositories=dependencies.repositories,
+        chat_model=dependencies.chat_model,
+        chat_channel=dependencies.chat_channel,
+        clock=dependencies.clock,
+    )
     user_service = UserService(
         dependencies.repositories.users,
         user_memory_service,
+        check_in_service,
         dependencies.clock,
         dependencies.initial_admin_emails,
     )
@@ -161,12 +168,6 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         dashboard_url=dependencies.dashboard_url,
     )
 
-    check_in_service = CheckInService(
-        repositories=dependencies.repositories,
-        chat_model=dependencies.chat_model,
-        chat_channel=dependencies.chat_channel,
-        clock=dependencies.clock,
-    )
     scheduled_work = ScheduledWork(
         repositories=dependencies.repositories,
         post_conversation=PostConversationProcessor(

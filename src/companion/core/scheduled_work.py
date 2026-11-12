@@ -1,9 +1,9 @@
 import logging
-from datetime import timedelta
 
 from companion.core.check_ins import CheckInService
 from companion.core.ports import Clock, Repositories
 from companion.core.post_conversation import PostConversationProcessor
+from companion.core.timing import quiet_gap
 
 logger = logging.getLogger(__name__)
 
@@ -38,13 +38,11 @@ class ScheduledWork:
         again on the next tick; the others still go ahead.
         """
         conversations = self._repositories.conversations
-        quiet_gap = timedelta(
-            minutes=self._repositories.platform_settings.get(
-                "conversation_quiet_gap_minutes"
-            )
-        )
         now = self._clock.now()
-        conversations.end_quiet(quiet_since=now - quiet_gap, ended_at=now)
+        conversations.end_quiet(
+            quiet_since=now - quiet_gap(self._repositories.platform_settings),
+            ended_at=now,
+        )
         for conversation in conversations.list_ended_unprocessed():
             try:
                 self._post_conversation.process(conversation)

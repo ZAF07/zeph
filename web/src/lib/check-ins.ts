@@ -31,6 +31,21 @@ export function toTimeFieldValue(timeOfDay: string): string {
 }
 
 /**
+ * Splits a moment into named date parts, like its weekday and month.
+ *
+ * @param moment - The moment.
+ * @param options - Which parts to write and how.
+ * @returns A function that gives one part's text, or "" if it has none.
+ */
+function dateParts(
+  moment: Date,
+  options: Intl.DateTimeFormatOptions,
+): (type: Intl.DateTimeFormatPartTypes) => string {
+  const parts = new Intl.DateTimeFormat("en-GB", options).formatToParts(moment);
+  return (type) => parts.find((entry) => entry.type === type)?.value ?? "";
+}
+
+/**
  * Says how long Check-ins are paused for, like "Paused until Thursday,
  * 12 November."
  *
@@ -45,19 +60,17 @@ export function pausedText(
   if (pausedUntil === null) {
     return "Paused until you resume.";
   }
-  const day = new Intl.DateTimeFormat("en-GB", {
+  const part = dateParts(new Date(pausedUntil), {
     weekday: "long",
     day: "numeric",
     month: "long",
     timeZone,
-  }).formatToParts(new Date(pausedUntil));
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    day.find((entry) => entry.type === type)?.value ?? "";
+  });
   return `Paused until ${part("weekday")}, ${part("day")} ${part("month")}.`;
 }
 
 /**
- * Writes when a Check-in was sent, like "Sun 9 Nov · 6:42 pm".
+ * Writes when a Check-in was sent, like "Mon 9 Nov · 6:42 pm".
  *
  * @param isoTimestamp - When it was sent, as the backend sends it.
  * @param timeZone - The time zone to show it in.
@@ -68,14 +81,12 @@ export function formatCheckInSentAt(
   timeZone?: string,
 ): string {
   const moment = new Date(isoTimestamp);
-  const parts = new Intl.DateTimeFormat("en-GB", {
+  const part = dateParts(moment, {
     weekday: "short",
     day: "numeric",
     month: "short",
     timeZone,
-  }).formatToParts(moment);
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((entry) => entry.type === type)?.value ?? "";
+  });
   const time = new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",

@@ -9,6 +9,7 @@ const apiClient = {
   getMe: vi.fn<ApiClient["getMe"]>(),
   getPlatformContent: vi.fn<ApiClient["getPlatformContent"]>(),
   completeOnboarding: vi.fn<ApiClient["completeOnboarding"]>(),
+  getCheckIns: vi.fn<ApiClient["getCheckIns"]>(),
   getTelegramConnection: vi.fn<ApiClient["getTelegramConnection"]>(),
   createConnectionToken: vi.fn<ApiClient["createConnectionToken"]>(),
 };
@@ -63,6 +64,15 @@ describe("OnboardingFlow", () => {
     vi.resetAllMocks();
     apiClient.getMe.mockResolvedValue(newUser());
     apiClient.getPlatformContent.mockResolvedValue(content);
+    apiClient.getCheckIns.mockResolvedValue({
+      enabled: false,
+      frequency: "few_times_a_week",
+      quiet_hours_start: "22:00:00",
+      quiet_hours_end: "07:30:00",
+      paused: false,
+      paused_until: null,
+      recent: [],
+    });
     apiClient.completeOnboarding.mockImplementation(async () =>
       newUser({ onboarding_completed_at: "2026-11-11T09:00:00Z" }),
     );

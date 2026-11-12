@@ -6,11 +6,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
-from companion.core.check_ins import CheckInService
+from companion.core.check_ins import CheckInService, RecentCheckIn
 from companion.core.models import (
-    CheckIn,
     CheckInChanges,
     CheckInFrequency,
+    CheckInSettings,
     CheckInStatus,
     ConnectionToken,
     ConnectionTokenStatus,
@@ -45,6 +45,9 @@ class MeResponse(BaseModel):
     role: UserRole
 
 
+DEFAULT_CHECK_INS = CheckInSettings()
+
+
 class OnboardingRequest(BaseModel):
     """Everything a new User answers during onboarding."""
 
@@ -57,10 +60,10 @@ class OnboardingRequest(BaseModel):
     user_memory_enabled: bool
     country: str
     time_zone: str
-    check_ins_enabled: bool = False
-    check_in_frequency: CheckInFrequency = CheckInFrequency.FEW_TIMES_A_WEEK
-    quiet_hours_start: time = time(22, 0)
-    quiet_hours_end: time = time(7, 30)
+    check_ins_enabled: bool = DEFAULT_CHECK_INS.enabled
+    check_in_frequency: CheckInFrequency = DEFAULT_CHECK_INS.frequency
+    quiet_hours_start: time = DEFAULT_CHECK_INS.quiet_hours_start
+    quiet_hours_end: time = DEFAULT_CHECK_INS.quiet_hours_end
 
 
 class PreferencesRequest(BaseModel):
@@ -225,23 +228,20 @@ def to_summary_response(summary: ConversationSummary) -> ConversationSummaryResp
     )
 
 
-def to_recent_check_in_response(
-    check_in: CheckIn, check_in_status: CheckInStatus
-) -> RecentCheckInResponse:
+def to_recent_check_in_response(recent: RecentCheckIn) -> RecentCheckInResponse:
     """Describe a sent Check-in for the Dashboard; never its message.
 
     Args:
-        check_in: The Check-in.
-        check_in_status: Whether the User replied.
+        recent: The Check-in and whether the User replied.
 
     Returns:
         The response body.
     """
     return RecentCheckInResponse(
-        id=str(check_in.id),
-        kind=check_in.kind_name,
-        sent_at=check_in.sent_at,
-        status=check_in_status,
+        id=str(recent.check_in.id),
+        kind=recent.check_in.kind_name,
+        sent_at=recent.check_in.sent_at,
+        status=recent.status,
     )
 
 
@@ -316,8 +316,8 @@ def build_dashboard_api_router(
             paused=is_paused,
             paused_until=settings.paused_until if is_paused else None,
             recent=[
-                to_recent_check_in_response(check_in, check_in_status)
-                for check_in, check_in_status in check_in_service.list_recent(user)
+                to_recent_check_in_response(recent)
+                for recent in check_in_service.list_recent(user)
             ],
         )
 
@@ -407,23 +407,19 @@ def build_dashboard_api_router(
             user_memory_enabled=request.user_memory_enabled,
             country=request.country,
             time_zone=request.time_zone,
-        )
-        check_in_changes = CheckInChanges(
-            enabled=request.check_ins_enabled,
-            frequency=request.check_in_frequency,
-            quiet_hours_start=request.quiet_hours_start,
-            quiet_hours_end=request.quiet_hours_end,
+            check_ins=CheckInChanges(
+                enabled=request.check_ins_enabled,
+                frequency=request.check_in_frequency,
+                quiet_hours_start=request.quiet_hours_start,
+                quiet_hours_end=request.quiet_hours_end,
+            ),
         )
         try:
-            onboarded = user_service.complete_onboarding(user, answers)
+            return to_me_response(user_service.complete_onboarding(user, answers))
         except InvalidProfileError as error:
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
             ) from error
-
-        return to_me_response(
-            check_in_service.change_settings(onboarded, check_in_changes)
-        )
 
     @router.get("/check-ins")
     def get_check_ins(user: Annotated[User, Depends(current_user)]) -> CheckInsResponse:

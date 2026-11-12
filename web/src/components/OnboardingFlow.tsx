@@ -16,7 +16,13 @@ import { OnboardingProgress } from "@/components/OnboardingProgress";
 import { QuietHoursFields } from "@/components/QuietHoursFields";
 import { Switch } from "@/components/Switch";
 import { TelegramConnectionCard } from "@/components/TelegramConnectionCard";
-import type { CheckInFrequency, Me, PlatformContent } from "@/lib/api-client";
+import type {
+  CheckInFrequency,
+  CheckIns,
+  Me,
+  PlatformContent,
+} from "@/lib/api-client";
+import { toTimeFieldValue } from "@/lib/check-ins";
 import { countryFromBrowser } from "@/lib/countries";
 import { paragraphs } from "@/lib/paragraphs";
 import { timeZoneFromBrowser, timeZoneLabel } from "@/lib/time-zones";
@@ -64,9 +70,11 @@ type LoadState =
  * Starts the answers from what the User saved before, or from the browser.
  *
  * @param me - The signed-in User.
+ * @param checkIns - Their Check-in settings, which start as the backend's
+ *   defaults.
  * @returns The starting answers.
  */
-function startingAnswers(me: Me): Answers {
+function startingAnswers(me: Me, checkIns: CheckIns): Answers {
   return {
     name: me.name ?? "",
     aiNoticeAcknowledged: me.ai_notice_acknowledged_at !== null,
@@ -75,18 +83,18 @@ function startingAnswers(me: Me): Answers {
     userMemoryEnabled: me.user_memory_enabled,
     country: me.country ?? countryFromBrowser(navigator.languages) ?? "",
     timeZone: me.time_zone ?? timeZoneFromBrowser(),
-    checkInsEnabled: false,
-    checkInFrequency: "few_times_a_week",
-    quietHoursStart: "22:00",
-    quietHoursEnd: "07:30",
+    checkInsEnabled: checkIns.enabled,
+    checkInFrequency: checkIns.frequency,
+    quietHoursStart: toTimeFieldValue(checkIns.quiet_hours_start),
+    quietHoursEnd: toTimeFieldValue(checkIns.quiet_hours_end),
   };
 }
 
 /**
  * The onboarding steps a new User goes through before Connect Telegram:
  * name and AI notice, what brings them here, country and time zone,
- * Check-ins (off by default), User Memory consent, then Telegram. Answers are saved when they leave the
- * Memory step. A User who already finished onboarding goes to the Dashboard.
+ * Check-ins (off by default), User Memory consent, then Telegram. Answers
+ * are saved when they leave the Memory step. A User who already finished onboarding goes to the Dashboard.
  *
  * @returns The onboarding flow.
  */
@@ -103,15 +111,16 @@ export function OnboardingFlow() {
   const load = useCallback(async () => {
     setLoadState({ kind: "loading" });
     try {
-      const [me, content] = await Promise.all([
+      const [me, content, checkIns] = await Promise.all([
         apiClient.getMe(),
         apiClient.getPlatformContent(),
+        apiClient.getCheckIns(),
       ]);
       if (me.onboarding_completed_at) {
         router.replace("/");
         return;
       }
-      const starting = startingAnswers(me);
+      const starting = startingAnswers(me, checkIns);
       setAnswers(starting);
       setCountryFromBrowserUsed(!me.country && starting.country !== "");
       setLoadState({ kind: "loaded", content });

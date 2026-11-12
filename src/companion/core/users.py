@@ -3,6 +3,7 @@ from dataclasses import replace
 from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from companion.core.check_ins import CheckInService
 from companion.core.models import (
     AccountIdentity,
     OnboardingAnswers,
@@ -84,6 +85,7 @@ class UserService:
         self,
         users: UserRepository,
         user_memory: UserMemoryService,
+        check_ins: CheckInService,
         clock: Clock,
         initial_admin_emails: frozenset[str] = frozenset(),
     ) -> None:
@@ -92,12 +94,14 @@ class UserService:
         Args:
             users: Where Users are stored.
             user_memory: Saves onboarding answers as Memory Items.
+            check_ins: Works out the Check-in settings onboarding chooses.
             clock: Tells the current time.
             initial_admin_emails: Emails, in lower case, whose accounts become
                 Admins on first sign-in.
         """
         self._users = users
         self._user_memory = user_memory
+        self._check_ins = check_ins
         self._clock = clock
         self._initial_admin_emails = initial_admin_emails
 
@@ -150,8 +154,9 @@ class UserService:
         """Save a User's onboarding answers and mark onboarding done.
 
         Answering again updates the answers but keeps the first completion time.
-        With User Memory on, the name and "What brings you here?" answers are
-        also saved as Memory Items.
+        The Check-in choices are saved with the rest. With User Memory on, the
+        name and "What brings you here?" answers are also saved as Memory
+        Items.
 
         Args:
             user: The User onboarding.
@@ -178,6 +183,7 @@ class UserService:
             time_zone=check_time_zone(answers.time_zone),
             ai_notice_acknowledged_at=user.ai_notice_acknowledged_at or now,
             onboarding_completed_at=user.onboarding_completed_at or now,
+            check_ins=self._check_ins.settings_after(user.check_ins, answers.check_ins),
         )
         saved = self._users.update(onboarded)
         self._user_memory.remember_onboarding(saved)

@@ -1941,16 +1941,20 @@ class PostgresCheckInRepository:
             ).all()
         return [self._to_check_in(row) for row in rows]
 
-    def claim_reply(self, user_id: UUID, replied_at: datetime) -> CheckIn | None:
-        """Mark the User's newest Check-in replied, if it is not yet.
+    def claim_reply(
+        self, user_id: UUID, replied_at: datetime, sent_since: datetime
+    ) -> CheckIn | None:
+        """Mark the User's newest Check-in replied, if it can still be.
 
         Args:
             user_id: The User's ID.
             replied_at: When they replied.
+            sent_since: A Check-in sent at or before this can't get a reply.
 
         Returns:
             The Check-in they replied to, or None if their newest Check-in
-            was already replied to or they have none.
+            was already replied to, was sent before `sent_since`, or they
+            have none.
         """
         newest_id = (
             select(check_ins.c.id)
@@ -1962,7 +1966,11 @@ class PostgresCheckInRepository:
         with self._engine.begin() as connection:
             claimed_id = connection.execute(
                 update(check_ins)
-                .where(check_ins.c.id == newest_id, check_ins.c.replied_at.is_(None))
+                .where(
+                    check_ins.c.id == newest_id,
+                    check_ins.c.replied_at.is_(None),
+                    check_ins.c.sent_at > sent_since,
+                )
                 .values(replied_at=replied_at)
                 .returning(check_ins.c.id)
             ).scalar()
