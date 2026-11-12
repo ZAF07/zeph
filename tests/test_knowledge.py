@@ -507,6 +507,152 @@ def test_retrying_a_failed_reindex_keeps_the_edited_text(
     assert BREATH_PASSAGES[0] not in instructions
 
 
+def replace_file(
+    client: TestClient,
+    admin: dict[str, str],
+    document_id: str,
+    file_name: str,
+    content: bytes,
+) -> Any:
+    """Replace a Knowledge document's file through the admin API."""
+    return client.put(
+        f"/api/admin/knowledge-documents/{document_id}/file",
+        files={"file": (file_name, content)},
+        headers=admin,
+    )
+
+
+def test_replacing_a_file_keeps_the_document_and_uses_the_new_text(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    uploaded = upload_document(client, admin, "breath.txt", BREATH_PASSAGES[0].encode())
+    document_id = uploaded.json()["id"]
+    save_text(client, admin, document_id, BREATH_PASSAGES[1])
+    connect_telegram(client, auth_verifier, chat_channel)
+    clock.advance(timedelta(days=3))
+
+    response = replace_file(
+        client, admin, document_id, "river.pdf", pdf_with_text(RIVER_PASSAGE)
+    )
+
+    assert response.status_code == 200, response.text
+    replaced = response.json()
+    assert replaced["status"] == "pending"
+    assert replaced["text_edited"] is False
+    [listed] = list_documents(client, admin)
+    assert listed["id"] == document_id
+    assert (listed["title"], listed["source"], listed["tradition"]) == (
+        "Dhammapada",
+        "trans. Max Müller",
+        "Buddhism",
+    )
+    assert listed["created_at"] == uploaded.json()["created_at"]
+    assert (listed["file_name"], listed["file_type"], listed["status"]) == (
+        "river.pdf",
+        "pdf",
+        "ready",
+    )
+    assert listed["text_edited"] is False
+    assert RIVER_PASSAGE in (document_text(client, admin, document_id) or "")
+    instructions = reply_instructions(
+        client, chat_model, "watching the river and the breath"
+    )
+    assert "Watching the river flowing past" in instructions
+    assert BREATH_PASSAGES[0] not in instructions
+    assert BREATH_PASSAGES[1] not in instructions
+
+
+def test_an_unreadable_replacement_fails_with_the_usual_reason(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    scan = upload_document(client, admin, "a.txt", b"Words", title="Scan")
+    broken = upload_document(client, admin, "b.txt", b"Words", title="Broken")
+    odd = upload_document(client, admin, "c.txt", b"Words", title="Odd")
+
+    replace_file(client, admin, scan.json()["id"], "scan.pdf", blank_pdf())
+    replace_file(client, admin, broken.json()["id"], "broken.pdf", b"not a pdf")
+    replace_file(client, admin, odd.json()["id"], "odd.md", "café".encode("latin-1"))
+
+    reasons = {
+        d["title"]: (d["status"], d["failure_reason"])
+        for d in list_documents(client, admin)
+    }
+    assert reasons == {
+        "Scan": ("failed", "Scanned PDF — no text found"),
+        "Broken": ("failed", "Couldn’t read this PDF."),
+        "Odd": (
+            "failed",
+            "Couldn’t read the text. Save the file as UTF-8 and try again.",
+        ),
+    }
+    assert document_text(client, admin, scan.json()["id"]) is None
+
+
+def test_a_file_cant_be_replaced_while_the_last_one_is_still_being_read(
+    client: TestClient, auth_verifier: FakeAuthVerifier, engine: Engine
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    uploaded = upload_document(client, admin, "breath.txt", BREATH_PASSAGES[0].encode())
+    with engine.begin() as connection:
+        connection.execute(
+            update(knowledge_documents).values(text=None, status="pending")
+        )
+
+    response = replace_file(
+        client, admin, uploaded.json()["id"], "river.txt", RIVER_PASSAGE.encode()
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "The file is still being read. Try again when it’s done."
+    )
+    [listed] = list_documents(client, admin)
+    assert listed["file_name"] == "breath.txt"
+
+
+def test_a_failed_replacement_leaves_none_of_the_old_text_behind(
+    client: TestClient, auth_verifier: FakeAuthVerifier, engine: Engine
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    uploaded = upload_document(client, admin, "breath.txt", BREATH_PASSAGES[0].encode())
+
+    replace_file(client, admin, uploaded.json()["id"], "scan.pdf", blank_pdf())
+
+    assert chunk_count(engine) == 0
+
+
+def test_replacement_files_follow_the_upload_rules(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    uploaded = upload_document(client, admin, "breath.txt", BREATH_PASSAGES[0].encode())
+    document_id = uploaded.json()["id"]
+
+    wrong_type = replace_file(client, admin, document_id, "essay.docx", b"words")
+    empty = replace_file(client, admin, document_id, "a.txt", b"")
+    too_big = replace_file(
+        client, admin, document_id, "big.txt", b"a" * (20 * 1024 * 1024 + 1)
+    )
+    missing = replace_file(client, admin, MISSING_ID, "a.txt", b"words")
+
+    assert wrong_type.status_code == 422
+    assert wrong_type.json()["detail"] == (
+        "Upload a text (.txt), Markdown (.md) or PDF (.pdf) file."
+    )
+    assert empty.json()["detail"] == "The file is empty."
+    assert too_big.json()["detail"] == "The file is bigger than 20 MB."
+    assert missing.status_code == 404
+    [listed] = list_documents(client, admin)
+    assert listed["file_name"] == "breath.txt"
+    assert document_text(client, admin, document_id) == BREATH_PASSAGES[0]
+
+
 def test_matching_knowledge_reaches_the_reply_with_where_it_is_from(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
@@ -626,6 +772,7 @@ def test_only_admins_can_manage_knowledge(
         headers=user,
     )
     text_saved = save_text(client, user, MISSING_ID, "Words")
+    file_replaced = replace_file(client, user, MISSING_ID, "a.txt", b"words")
     uploaded = upload_document(client, user, "a.txt", b"words")
     deleted = client.delete(
         f"/api/admin/knowledge-documents/{MISSING_ID}", headers=user
@@ -636,6 +783,7 @@ def test_only_admins_can_manage_knowledge(
         viewed.status_code,
         edited.status_code,
         text_saved.status_code,
+        file_replaced.status_code,
         uploaded.status_code,
         deleted.status_code,
-    ] == [403, 403, 403, 403, 403, 403]
+    ] == [403, 403, 403, 403, 403, 403, 403]

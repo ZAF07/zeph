@@ -18,6 +18,7 @@ from companion.core.models import (
     KnowledgeChunkMatch,
     KnowledgeDetailsChange,
     KnowledgeDocument,
+    KnowledgeFile,
     KnowledgeFileType,
     KnowledgeStatus,
     KnowledgeUpload,
@@ -828,6 +829,22 @@ class KnowledgeDocumentRepository(Protocol):
         Args:
             document_id: The document's ID.
             change: The details to change; a None field is kept.
+
+        Returns:
+            The saved document, or None if there is none.
+        """
+        ...
+
+    def replace_file(
+        self, document_id: UUID, file: KnowledgeFile
+    ) -> KnowledgeDocument | None:
+        """Give a Knowledge document a new file and make it pending.
+
+        Its saved text and edited flag are cleared, so the new file is read.
+
+        Args:
+            document_id: The document's ID.
+            file: The new file.
 
         Returns:
             The saved document, or None if there is none.

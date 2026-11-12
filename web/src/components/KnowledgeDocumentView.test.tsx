@@ -14,6 +14,8 @@ const apiClient = {
   updateKnowledgeDocumentDetails:
     vi.fn<ApiClient["updateKnowledgeDocumentDetails"]>(),
   saveKnowledgeDocumentText: vi.fn<ApiClient["saveKnowledgeDocumentText"]>(),
+  replaceKnowledgeDocumentFile:
+    vi.fn<ApiClient["replaceKnowledgeDocumentFile"]>(),
   retryKnowledgeDocument: vi.fn<ApiClient["retryKnowledgeDocument"]>(),
   deleteKnowledgeDocument: vi.fn<ApiClient["deleteKnowledgeDocument"]>(),
 };
@@ -332,6 +334,84 @@ describe("KnowledgeDocumentView", () => {
       "You have unsaved text changes. Leave and lose them?",
     );
     expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+  });
+
+  it("replaces an edited document's file after confirming", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    apiClient.getKnowledgeDocument.mockResolvedValue({
+      ...breathing,
+      text_edited: true,
+    });
+    apiClient.replaceKnowledgeDocumentFile.mockResolvedValue({
+      ...breathing,
+      file_name: "breathing-v2.pdf",
+      file_type: "pdf",
+      status: "pending",
+      text_edited: false,
+      text: null,
+    });
+    render(<KnowledgeDocumentView documentId="breathing" />);
+    const replace = within(
+      await screen.findByRole("form", { name: "Replace file" }),
+    );
+    expect(screen.getByText("Edited")).toBeInTheDocument();
+    expect(
+      replace.getByRole("button", { name: "Replace file" }),
+    ).toBeDisabled();
+    const file = new File(["%PDF"], "breathing-v2.pdf", {
+      type: "application/pdf",
+    });
+
+    await userEvent.upload(replace.getByLabelText(/choose one/), file);
+    expect(replace.getByText("breathing-v2.pdf")).toBeInTheDocument();
+    await userEvent.click(
+      replace.getByRole("button", { name: "Replace file" }),
+    );
+
+    expect(confirm).toHaveBeenCalledWith(
+      expect.stringContaining("Replacing the file replaces those edits"),
+    );
+    expect(apiClient.replaceKnowledgeDocumentFile).toHaveBeenCalledWith(
+      "breathing",
+      file,
+    );
+    expect(
+      await replace.findByText(
+        "Replaced with breathing-v2.pdf. It’s being read and indexed now.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Edited")).toBeNull();
+    expect(screen.getByText("PDF · breathing-v2.pdf")).toBeInTheDocument();
+    expect(screen.getByText("No text yet")).toBeInTheDocument();
+  });
+
+  it("shows the backend's reason when it refuses a replacement file", async () => {
+    apiClient.replaceKnowledgeDocumentFile.mockRejectedValue(
+      new ApiError(
+        422,
+        "/api/admin/knowledge-documents/breathing/file",
+        "The file is empty.",
+      ),
+    );
+    render(<KnowledgeDocumentView documentId="breathing" />);
+    const replace = within(
+      await screen.findByRole("form", { name: "Replace file" }),
+    );
+
+    await userEvent.upload(
+      replace.getByLabelText(/choose one/),
+      new File([""], "empty.txt", { type: "text/plain" }),
+    );
+    await userEvent.click(
+      replace.getByRole("button", { name: "Replace file" }),
+    );
+
+    expect(await replace.findByRole("alert")).toHaveTextContent(
+      "The file is empty.",
+    );
+    expect(
+      screen.getByText("Markdown · mindful-breathing.md"),
+    ).toBeInTheDocument();
   });
 
   it("previews the text as formatted Markdown", async () => {
