@@ -577,6 +577,21 @@ class KnowledgeUpload:
 
 
 @dataclass(frozen=True)
+class KnowledgeDetailsChange:
+    """Details an Admin changes on a Knowledge document; None keeps one.
+
+    Attributes:
+        title: Its new title.
+        source: Who wrote or translated it.
+        tradition: The tradition it belongs to.
+    """
+
+    title: str | None = None
+    source: str | None = None
+    tradition: str | None = None
+
+
+@dataclass(frozen=True)
 class KnowledgeDocument:
     """A document in the Knowledge library, without its file.
 

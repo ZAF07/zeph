@@ -16,6 +16,7 @@ from companion.core.models import (
     Helpline,
     HelplineDetails,
     KnowledgeChunkMatch,
+    KnowledgeDetailsChange,
     KnowledgeDocument,
     KnowledgeFileType,
     KnowledgeStatus,
@@ -816,6 +817,20 @@ class KnowledgeDocumentRepository(Protocol):
 
         Returns:
             The saved document, or None if it has been deleted.
+        """
+        ...
+
+    def update_details(
+        self, document_id: UUID, change: KnowledgeDetailsChange
+    ) -> KnowledgeDocument | None:
+        """Save new details on a Knowledge document.
+
+        Args:
+            document_id: The document's ID.
+            change: The details to change; a None field is kept.
+
+        Returns:
+            The saved document, or None if there is none.
         """
         ...
 

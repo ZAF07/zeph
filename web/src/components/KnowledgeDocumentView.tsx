@@ -9,15 +9,16 @@ import {
   compactSecondaryButton,
   dangerButton,
 } from "@/components/button-styles";
+import { KnowledgeDetailsForm } from "@/components/KnowledgeDetailsForm";
 import { KnowledgeStatusPill } from "@/components/KnowledgeStatusPill";
 import { KnowledgeTextEditor } from "@/components/KnowledgeTextEditor";
 import { LoadFailed } from "@/components/LoadFailed";
-import { ApiError, type KnowledgeDocumentWithText } from "@/lib/api-client";
-import { formatDay } from "@/lib/dates";
 import {
-  knowledgeFileTypeLabels,
-  knowledgeStatusLabels,
-} from "@/lib/knowledge-labels";
+  ApiError,
+  type KnowledgeDetailsChange,
+  type KnowledgeDocumentWithText,
+} from "@/lib/api-client";
+import { knowledgeStatusLabels } from "@/lib/knowledge-labels";
 import { useApiClient } from "@/lib/use-api-client";
 
 type LoadState =
@@ -48,9 +49,10 @@ function noTextExplanation(
 }
 
 /**
- * One Knowledge document's page: its details, status and why it failed, the
- * text Zeph draws on in the read-only text editor, Retry when it failed and
- * Delete. Checks again every few seconds while the document is pending.
+ * One Knowledge document's page: its details (editable), status and why it
+ * failed, the text Zeph draws on in the read-only text editor, Retry when it
+ * failed and Delete. Checks again every few seconds while the document is
+ * pending.
  *
  * @param props - `documentId` is the document to show.
  * @returns The page body, or a loading, not-found or error state.
@@ -92,6 +94,17 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
     const timer = setTimeout(() => void load(), pendingCheckMilliseconds);
     return () => clearTimeout(timer);
   }, [isPending, load, state]);
+
+  async function saveDetails(
+    knowledgeDocument: KnowledgeDocumentWithText,
+    change: KnowledgeDetailsChange,
+  ) {
+    const saved = await apiClient.updateKnowledgeDocumentDetails(
+      knowledgeDocument.id,
+      change,
+    );
+    setState({ kind: "loaded", document: saved });
+  }
 
   async function retry(knowledgeDocument: KnowledgeDocumentWithText) {
     setIsBusy(true);
@@ -184,15 +197,6 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
 
   const knowledgeDocument = state.document;
   const statusLabel = knowledgeStatusLabels[knowledgeDocument.status].label;
-  const details = [
-    { term: "Source / author", value: knowledgeDocument.source },
-    { term: "Tradition", value: knowledgeDocument.tradition },
-    {
-      term: "Type",
-      value: `${knowledgeFileTypeLabels[knowledgeDocument.file_type]} · ${knowledgeDocument.file_name}`,
-    },
-    { term: "Added", value: formatDay(knowledgeDocument.created_at) },
-  ];
 
   return (
     <div className="flex flex-col gap-9">
@@ -242,27 +246,11 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
         </div>
       ) : null}
 
-      <section
-        aria-labelledby="document-details-heading"
-        className="flex flex-col gap-4 rounded-card border border-line bg-white p-6"
-      >
-        <h2
-          id="document-details-heading"
-          className="m-0 text-[17px] font-semibold"
-        >
-          Details
-        </h2>
-        <dl className="m-0 grid grid-cols-[repeat(auto-fit,minmax(min(200px,100%),1fr))] gap-x-6 gap-y-4">
-          {details.map((detail) => (
-            <div key={detail.term} className="flex min-w-0 flex-col gap-1">
-              <dt className="font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted">
-                {detail.term}
-              </dt>
-              <dd className="m-0 break-words text-[15px]">{detail.value}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
+      <KnowledgeDetailsForm
+        key={knowledgeDocument.id}
+        knowledgeDocument={knowledgeDocument}
+        onSave={(change) => saveDetails(knowledgeDocument, change)}
+      />
 
       <section
         aria-labelledby="document-text-heading"

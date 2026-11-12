@@ -24,3 +24,7 @@ On a document's page, an Admin edits its title, source / author and tradition an
 ## Blocked by
 
 - `.scratch/knowledge-editing/issues/01-view-knowledge-document.md`
+
+## Comments
+
+**2026-11-12 — started on branch `feat/ke-02-edit-details`.** Plan: `PATCH /api/admin/knowledge-documents/{id}` with optional title / source / tradition, trimmed and checked like upload, no status or chunk change; returns the document with its text so the page can show it as is. Repository gains `update_details`. Document page's Details card becomes a form with Save.

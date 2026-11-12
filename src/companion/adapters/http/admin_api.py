@@ -44,6 +44,7 @@ from companion.core.memory_categories import (
 from companion.core.models import (
     Helpline,
     HelplineDetails,
+    KnowledgeDetailsChange,
     KnowledgeDocument,
     KnowledgeDocumentWithText,
     KnowledgeFileType,
@@ -266,6 +267,14 @@ class KnowledgeDocumentWithTextResponse(KnowledgeDocumentResponse):
     """A Knowledge document with the text replies draw on; null until read."""
 
     text: str | None
+
+
+class KnowledgeDetailsRequest(BaseModel):
+    """Details to change on a Knowledge document; a field left out is kept."""
+
+    title: str | None = None
+    source: str | None = None
+    tradition: str | None = None
 
 
 class KnowledgeDocumentsResponse(BaseModel):
@@ -918,6 +927,44 @@ def build_admin_api_router(
         except KnowledgeDocumentNotFoundError as error:
             raise HTTPException(
                 status.HTTP_404_NOT_FOUND, "No such Knowledge document"
+            ) from error
+        return to_knowledge_document_with_text_response(document_with_text)
+
+    @router.patch("/knowledge-documents/{document_id}")
+    def update_knowledge_document_details(
+        document_id: UUID, request: KnowledgeDetailsRequest
+    ) -> KnowledgeDocumentWithTextResponse:
+        """Change a Knowledge document's title, source or tradition.
+
+        Takes effect straight away, with no re-indexing.
+
+        Args:
+            document_id: The document to change.
+            request: The details to change.
+
+        Returns:
+            The saved document and its text.
+
+        Raises:
+            HTTPException: 404 if there is no such document; 422 if a given
+                detail is blank.
+        """
+        try:
+            document_with_text = knowledge_service.update_details(
+                document_id,
+                KnowledgeDetailsChange(
+                    title=request.title,
+                    source=request.source,
+                    tradition=request.tradition,
+                ),
+            )
+        except KnowledgeDocumentNotFoundError as error:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "No such Knowledge document"
+            ) from error
+        except InvalidKnowledgeDocumentError as error:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
             ) from error
         return to_knowledge_document_with_text_response(document_with_text)
 

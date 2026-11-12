@@ -5,16 +5,7 @@ import { useState, type DragEvent, type FormEvent } from "react";
 import { primaryButton } from "@/components/button-styles";
 import { fieldLabel, inputField } from "@/components/form-styles";
 import { ApiError, type KnowledgeUpload } from "@/lib/api-client";
-
-const traditions = [
-  "Stoicism",
-  "Buddhism",
-  "Taoism",
-  "Existentialism",
-  "Psychology",
-  "Mindfulness",
-  "Other",
-];
+import { knowledgeTraditions } from "@/lib/knowledge-labels";
 
 /**
  * Turns a file name like "tao-te-ching.txt" into a starting title.
@@ -47,7 +38,7 @@ export function KnowledgeUploadForm({
   const [fileInputKey, setFileInputKey] = useState(0);
   const [title, setTitle] = useState("");
   const [source, setSource] = useState("");
-  const [tradition, setTradition] = useState(traditions[0]);
+  const [tradition, setTradition] = useState(knowledgeTraditions[0]);
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -80,7 +71,7 @@ export function KnowledgeUploadForm({
       setFileInputKey((key) => key + 1);
       setTitle("");
       setSource("");
-      setTradition(traditions[0]);
+      setTradition(knowledgeTraditions[0]);
     } catch (uploadError) {
       setError(
         uploadError instanceof ApiError && uploadError.detail
@@ -160,7 +151,7 @@ export function KnowledgeUploadForm({
             value={tradition}
             onChange={(event) => setTradition(event.target.value)}
           >
-            {traditions.map((option) => (
+            {knowledgeTraditions.map((option) => (
               <option key={option}>{option}</option>
             ))}
           </select>
