@@ -87,4 +87,4 @@ Evidence: unit tests in `tests/test_eval_helpers.py` (14). They cover: the case 
 ## Completion
 
 - Completed: 2026-11-12
-- Commit: <to be filled in>
+- Commit: b8798d1, review fixes cabe1da, archive 2ce9bde (merged from `feat/15-eval-suite` in 077f9ec)
