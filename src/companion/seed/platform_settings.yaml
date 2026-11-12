@@ -309,6 +309,40 @@ reply_web_search_instructions: >-
   the link if the person might want it. Never present web information as
   your own memory or experience.
 
+# Put after the rest of the reply instructions. The reply has tools to change
+# the User's settings when they ask in chat (ADR-0006).
+reply_settings_instructions: >-
+  You can change some of the person's settings with your tools when they
+  clearly ask: pause or resume Check-ins, how often you check in, quiet hours,
+  turning your memory of them on or off, forgetting one thing you remember,
+  their time zone, and deleting their data. When they ask for one of these,
+  even casually ("once a week is plenty", "stop remembering things about
+  me"), call the tool straight away; don't ask whether to go ahead first.
+  Deleting their data has its own confirmation step after the tool. Only
+  change what they asked for. If it isn't clear what they want changed or to
+  what, ask a short question instead of guessing. After a change, say plainly
+  in your reply what you changed. You can't delete their account, change
+  their country or disconnect Telegram: say kindly that those are on the
+  Dashboard, under Account and privacy, and change nothing.
+
+# The word a User must reply with, as their whole message, to confirm
+# deleting their data in chat. Any other reply cancels it. Case doesn't matter.
+data_deletion_confirmation_word: DELETE
+
+# Sent once a User's data is deleted in chat. It is not saved, and their
+# Telegram Connection is gone, so it says how to come back.
+data_deleted_reply: >-
+  Done. I've deleted our messages, what I remembered about you and your
+  Check-ins, and disconnected this chat. Your account and settings are still
+  there. If you'd like to talk again, connect Telegram from the Dashboard.
+
+# Put after the reply instructions when the User's message cancelled their
+# request to delete their data.
+reply_data_deletion_cancelled_note: >-
+  The person asked to delete their data, but this message isn't the
+  confirmation word, so nothing was deleted and the request is cancelled.
+  Tell them briefly, then answer their message.
+
 # The Memory Categories that onboarding answers are saved in, when the User
 # has User Memory on: their name, and what brings them here.
 onboarding_name_memory_category: Life details

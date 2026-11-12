@@ -69,6 +69,50 @@ describe("CheckInsSettings", () => {
     expect(screen.getByLabelText("Time zone")).toHaveValue("Asia/Singapore");
   });
 
+  it("says Check-ins can be changed by telling Zeph", async () => {
+    await renderLoaded();
+
+    expect(
+      screen.getByText(/You can also just tell Zeph “take a week off/),
+    ).toBeInTheDocument();
+  });
+
+  it("marks settings last changed in chat with the day", async () => {
+    apiClient.getMe.mockResolvedValue({
+      ...maya,
+      changed_in_chat: {
+        quiet_hours: "2026-11-03T02:00:00Z",
+        check_in_pause: "2026-11-11T09:00:00Z",
+      },
+    });
+    await renderLoaded();
+
+    expect(screen.getByText("Changed in chat · 3 Nov")).toBeInTheDocument();
+    expect(screen.getByText("Changed in chat · 11 Nov")).toBeInTheDocument();
+    expect(screen.getAllByText(/Changed in chat/)).toHaveLength(2);
+  });
+
+  it("drops the caption once the setting is changed on the Dashboard", async () => {
+    apiClient.getMe.mockResolvedValueOnce({
+      ...maya,
+      changed_in_chat: { check_in_frequency: "2026-11-03T02:00:00Z" },
+    });
+    apiClient.getMe.mockResolvedValue(maya);
+    apiClient.updateCheckIns.mockResolvedValue(
+      checkInsWith({ frequency: "weekly" }),
+    );
+    const user = userEvent.setup();
+    await renderLoaded();
+    expect(screen.getByText("Changed in chat · 3 Nov")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Once a week" }));
+
+    expect(
+      await screen.findByRole("button", { name: "Once a week" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText(/Changed in chat/)).not.toBeInTheDocument();
+  });
+
   it("saves a new frequency", async () => {
     apiClient.updateCheckIns.mockResolvedValue(
       checkInsWith({ frequency: "weekly" }),

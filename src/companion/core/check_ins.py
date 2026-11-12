@@ -9,6 +9,7 @@ from companion.core.memory_retrieval import format_day, format_memory
 from companion.core.models import (
     ChatLine,
     ChatRole,
+    ChatSetting,
     CheckIn,
     CheckInChanges,
     CheckInFrequency,
@@ -21,6 +22,7 @@ from companion.core.models import (
     User,
 )
 from companion.core.ports import ChatChannel, Clock, Repositories
+from companion.core.settings_changes import record_where_changed
 from companion.core.timing import check_in_reply_window, is_open, quiet_gap
 from companion.core.usage import UsageRecordingChatModel
 
@@ -336,17 +338,38 @@ class CheckInService:
         self._chat_channel = chat_channel
         self._clock = clock
 
-    def change_settings(self, user: User, changes: CheckInChanges) -> User:
+    def change_settings(
+        self, user: User, changes: CheckInChanges, in_chat: bool = False
+    ) -> User:
         """Change and save a User's Check-in settings.
+
+        Only settings whose value really changes are marked as changed in
+        chat or on the Dashboard. Turning Check-ins on or off counts as a
+        change to the pause, since turning them off ends it.
 
         Args:
             user: The User making the change.
             changes: The settings to change; None leaves one as it is.
+            in_chat: True if the User asked for it in chat, not on the
+                Dashboard.
 
         Returns:
             The saved User.
         """
-        return self._save(user, self.settings_after(user.check_ins, changes))
+        current = user.check_ins
+        updated = self.settings_after(current, changes)
+        changed = []
+        if updated.frequency != current.frequency:
+            changed.append(ChatSetting.CHECK_IN_FREQUENCY)
+        if (updated.quiet_hours_start, updated.quiet_hours_end) != (
+            current.quiet_hours_start,
+            current.quiet_hours_end,
+        ):
+            changed.append(ChatSetting.QUIET_HOURS)
+        if updated.enabled != current.enabled:
+            changed.append(ChatSetting.CHECK_IN_PAUSE)
+        recorded = record_where_changed(user, changed, in_chat, self._clock.now())
+        return self._save(recorded, updated)
 
     def settings_after(
         self, current: CheckInSettings, changes: CheckInChanges
@@ -383,7 +406,7 @@ class CheckInService:
         )
         return self._with_next_due_time(current, updated)
 
-    def pause(self, user: User, length: PauseLength) -> User:
+    def pause(self, user: User, length: PauseLength, in_chat: bool = False) -> User:
         """Pause a User's Check-ins, keeping their other settings.
 
         Pausing turns Check-ins on if they were off.
@@ -391,30 +414,39 @@ class CheckInService:
         Args:
             user: The User pausing.
             length: For a day, a week or until they resume.
+            in_chat: True if the User asked for it in chat, not on the
+                Dashboard.
 
         Returns:
             The saved User.
         """
+        now = self._clock.now()
         current = user.check_ins
         paused_until = (
-            None
-            if length == PauseLength.UNTIL_RESUMED
-            else self._clock.now() + PAUSE_LENGTHS[length]
+            None if length == PauseLength.UNTIL_RESUMED else now + PAUSE_LENGTHS[length]
         )
         paused = replace(current, enabled=True, paused=True, paused_until=paused_until)
-        return self._save(user, self._with_next_due_time(current, paused))
+        recorded = record_where_changed(
+            user, [ChatSetting.CHECK_IN_PAUSE], in_chat, now
+        )
+        return self._save(recorded, self._with_next_due_time(current, paused))
 
-    def resume(self, user: User) -> User:
+    def resume(self, user: User, in_chat: bool = False) -> User:
         """End a pause on a User's Check-ins.
 
         Args:
             user: The User resuming.
+            in_chat: True if the User asked for it in chat, not on the
+                Dashboard.
 
         Returns:
             The saved User.
         """
+        recorded = record_where_changed(
+            user, [ChatSetting.CHECK_IN_PAUSE], in_chat, self._clock.now()
+        )
         return self._save(
-            user, replace(user.check_ins, paused=False, paused_until=None)
+            recorded, replace(user.check_ins, paused=False, paused_until=None)
         )
 
     def is_paused(self, user: User) -> bool:

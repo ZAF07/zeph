@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 
 import { primaryButton } from "@/components/button-styles";
+import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
 import { fieldCaption, fieldLabel, inputField } from "@/components/form-styles";
 import { LocationFields } from "@/components/LocationFields";
 import type { Me } from "@/lib/api-client";
@@ -23,6 +24,9 @@ export function ProfileForm({ me }: { me: Me }) {
   const [country, setCountry] = useState(me.country ?? "");
   const [timeZone, setTimeZone] = useState(me.time_zone ?? "");
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [timeZoneChangedInChatAt, setTimeZoneChangedInChatAt] = useState(
+    me.changed_in_chat.time_zone,
+  );
 
   const canSave =
     name.trim() !== "" &&
@@ -37,11 +41,12 @@ export function ProfileForm({ me }: { me: Me }) {
     }
     setSaveState("saving");
     try {
-      await apiClient.updatePreferences({
+      const saved = await apiClient.updatePreferences({
         name: name.trim(),
         country,
         time_zone: timeZone,
       });
+      setTimeZoneChangedInChatAt(saved.changed_in_chat.time_zone);
       setSaveState("saved");
     } catch {
       setSaveState("failed");
@@ -88,6 +93,12 @@ export function ProfileForm({ me }: { me: Me }) {
         timeZone={timeZone}
         onCountryChange={clearSavedOnEdit(setCountry)}
         onTimeZoneChange={clearSavedOnEdit(setTimeZone)}
+        timeZoneNote={
+          <ChangedInChatCaption
+            changedAt={timeZoneChangedInChatAt}
+            timeZone={me.time_zone ?? undefined}
+          />
+        }
       />
       <div className="flex flex-wrap items-center gap-3">
         <button type="submit" className={primaryButton} disabled={!canSave}>

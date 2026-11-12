@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from companion.core.check_ins import CheckInService, RecentCheckIn
 from companion.core.message_retention import RETENTION_DAYS_SETTING
 from companion.core.models import (
+    ChatSetting,
     CheckInChanges,
     CheckInFrequency,
     CheckInOutcome,
@@ -46,6 +47,7 @@ class MeResponse(BaseModel):
     user_memory_enabled: bool
     onboarding_completed_at: datetime | None
     role: UserRole
+    changed_in_chat: dict[ChatSetting, datetime]
 
 
 DEFAULT_CHECK_INS = CheckInSettings()
@@ -280,6 +282,7 @@ def to_me_response(user: User) -> MeResponse:
         user_memory_enabled=user.user_memory_enabled,
         onboarding_completed_at=user.onboarding_completed_at,
         role=user.role,
+        changed_in_chat=user.settings_changed_in_chat,
     )
 
 

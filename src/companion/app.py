@@ -13,6 +13,7 @@ from companion.adapters.http.auth import (
 from companion.adapters.http.dashboard_api import build_dashboard_api_router
 from companion.adapters.telegram.webhook import build_telegram_webhook_router
 from companion.core.admin_users import AdminUserService
+from companion.core.chat_settings import SettingsTools
 from companion.core.check_in_kinds import CheckInKindService
 from companion.core.check_ins import CheckInService
 from companion.core.conversations import ConversationService, ConversationServices
@@ -45,7 +46,7 @@ from companion.core.scheduled_work import ScheduledWork
 from companion.core.stickers import StickerLibraryService, StickerTools
 from companion.core.telegram_connection import TelegramConnectionService
 from companion.core.usage import UsageLimiter, UsageRecordingChatModel
-from companion.core.user_data import UserDataService
+from companion.core.user_data import ChatDataDeletion, UserDataService
 from companion.core.user_memory import UserMemoryService
 from companion.core.users import UserService
 from companion.core.web_search import WebSearchTools
@@ -133,6 +134,9 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     sticker_library = StickerLibraryService(
         dependencies.repositories, dependencies.chat_channel, dependencies.clock
     )
+    chat_data_deletion = ChatDataDeletion(
+        dependencies.repositories, dependencies.chat_channel, dependencies.clock
+    )
     safeguard = Safeguard(
         repositories=dependencies.repositories,
         helplines=helpline_service,
@@ -165,8 +169,16 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                     web_search=dependencies.web_search,
                     clock=dependencies.clock,
                 ),
+                settings_tools=SettingsTools(
+                    repositories=dependencies.repositories,
+                    users=user_service,
+                    check_ins=check_in_service,
+                    user_memory=user_memory_service,
+                    data_deletion=chat_data_deletion,
+                ),
                 sticker_tools=StickerTools(dependencies.repositories),
             ),
+            data_deletion=chat_data_deletion,
         )
     )
     incoming_message_handler = IncomingMessageHandler(

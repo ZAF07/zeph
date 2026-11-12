@@ -97,6 +97,16 @@ class CheckInChanges:
     quiet_hours_end: time | None = None
 
 
+class ChatSetting(StrEnum):
+    """A setting a User can change by telling the Companion in chat."""
+
+    CHECK_IN_PAUSE = "check_in_pause"
+    CHECK_IN_FREQUENCY = "check_in_frequency"
+    QUIET_HOURS = "quiet_hours"
+    USER_MEMORY = "user_memory"
+    TIME_ZONE = "time_zone"
+
+
 @dataclass(frozen=True)
 class User:
     """A person with an account who converses with the Companion.
@@ -117,6 +127,10 @@ class User:
         onboarding_completed_at: When they finished onboarding, if they have.
         role: Whether they are a plain User or an Admin.
         check_ins: Their Check-in settings.
+        settings_changed_in_chat: When each setting was last changed in chat;
+            a setting is left out once it is changed on the Dashboard.
+        data_deletion_requested_at: When they asked in chat to delete their
+            data and are yet to reply with the confirmation word; None if not.
     """
 
     id: UUID
@@ -133,6 +147,8 @@ class User:
     onboarding_completed_at: datetime | None = None
     role: UserRole = UserRole.USER
     check_ins: CheckInSettings = field(default_factory=CheckInSettings)
+    settings_changed_in_chat: dict[ChatSetting, datetime] = field(default_factory=dict)
+    data_deletion_requested_at: datetime | None = None
 
 
 @dataclass(frozen=True)

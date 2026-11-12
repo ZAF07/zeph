@@ -1,5 +1,18 @@
+from dataclasses import replace
+from enum import StrEnum
+from uuid import UUID
+
 from companion.core.models import User
-from companion.core.ports import AuthAccounts, ConversationEngine, Repositories
+from companion.core.ports import (
+    AuthAccounts,
+    ChatChannel,
+    Clock,
+    ConversationEngine,
+    Repositories,
+)
+
+CONFIRMATION_WORD_SETTING = "data_deletion_confirmation_word"
+DELETED_REPLY_SETTING = "data_deleted_reply"
 
 
 class LastAdminError(Exception):
@@ -54,3 +67,107 @@ class UserDataService:
         if not self._repositories.users.delete_unless_last_admin(user.id):
             raise LastAdminError
         self._auth_accounts.delete_account(user.auth_id)
+
+
+class DataDeletionAnswer(StrEnum):
+    """What a User's message did to a Delete My Data they asked for in chat."""
+
+    NOTHING_ASKED = "nothing_asked"
+    CONFIRMED = "confirmed"
+    CANCELLED = "cancelled"
+
+
+class ChatDataDeletion:
+    """Runs Delete My Data when a User asks in chat and then confirms.
+
+    The User's next message settles the request: only the confirmation word
+    deletes their data; anything else cancels it. It deletes the same data as
+    `UserDataService.delete_data`, but leaves forgetting the conversation
+    engine's saved state to the engine itself, which is running the turn.
+    """
+
+    def __init__(
+        self, repositories: Repositories, chat_channel: ChatChannel, clock: Clock
+    ) -> None:
+        """Set up the service.
+
+        Args:
+            repositories: Where the User's data and settings are stored.
+            chat_channel: Sends the reply once the data is gone.
+            clock: Tells the current time.
+        """
+        self._repositories = repositories
+        self._chat_channel = chat_channel
+        self._clock = clock
+
+    def confirmation_word(self) -> str:
+        """Read the word a User must reply with to confirm.
+
+        Returns:
+            The confirmation word Admins set, e.g. "DELETE".
+        """
+        word: str = self._repositories.platform_settings.get(CONFIRMATION_WORD_SETTING)
+        return word
+
+    def ask(self, user: User) -> None:
+        """Note that the User asked to delete their data, pending confirmation.
+
+        Args:
+            user: The User asking.
+        """
+        self._repositories.users.update(
+            replace(user, data_deletion_requested_at=self._clock.now())
+        )
+
+    def settle(self, user_id: UUID, chat_id: int, text: str) -> DataDeletionAnswer:
+        """Delete the User's data if they confirmed, or else cancel the request.
+
+        The confirmation must be the whole message; case and the spaces
+        around it don't matter. Once the data is gone a fixed reply is sent,
+        and not saved, so nothing of theirs is left behind.
+
+        Args:
+            user_id: The User who sent the message.
+            chat_id: The chat to reply in.
+            text: Their message.
+
+        Returns:
+            Whether there was a request, and if so whether it was confirmed.
+        """
+        if not self._clear_request(user_id):
+            return DataDeletionAnswer.NOTHING_ASKED
+        if text.strip().casefold() != self.confirmation_word().casefold():
+            return DataDeletionAnswer.CANCELLED
+        self._repositories.users.delete_data(user_id)
+        self._chat_channel.send_text(
+            chat_id, self._repositories.platform_settings.get(DELETED_REPLY_SETTING)
+        )
+        return DataDeletionAnswer.CONFIRMED
+
+    def cancel(self, user_id: UUID) -> DataDeletionAnswer:
+        """Cancel the User's pending request, if they have one.
+
+        Args:
+            user_id: The User.
+
+        Returns:
+            Whether there was a request to cancel.
+        """
+        if not self._clear_request(user_id):
+            return DataDeletionAnswer.NOTHING_ASKED
+        return DataDeletionAnswer.CANCELLED
+
+    def _clear_request(self, user_id: UUID) -> bool:
+        """Clear the User's pending request to delete their data.
+
+        Args:
+            user_id: The User.
+
+        Returns:
+            True if they had a pending request.
+        """
+        user = self._repositories.users.get(user_id)
+        if user is None or user.data_deletion_requested_at is None:
+            return False
+        self._repositories.users.update(replace(user, data_deletion_requested_at=None))
+        return True

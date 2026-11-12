@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import { fieldCaption, fieldLabel, inputField } from "@/components/form-styles";
 import { countryOptions } from "@/lib/countries";
@@ -11,7 +11,8 @@ import { timeZoneOptions } from "@/lib/time-zones";
  * page. No reason is given for asking the country.
  *
  * @param props - `country` and `timeZone` are the chosen values, with their
- *   change handlers; `countryCaption` is an optional line under the country.
+ *   change handlers; `countryCaption` is an optional line under the country and
+ *   `timeZoneNote` an optional line under the time zone.
  * @returns The two fields side by side.
  */
 export function LocationFields({
@@ -20,12 +21,14 @@ export function LocationFields({
   onCountryChange,
   onTimeZoneChange,
   countryCaption,
+  timeZoneNote,
 }: {
   country: string;
   timeZone: string;
   onCountryChange: (country: string) => void;
   onTimeZoneChange: (timeZone: string) => void;
   countryCaption?: string;
+  timeZoneNote?: ReactNode;
 }) {
   const countries = useMemo(() => countryOptions(), []);
   const timeZones = useMemo(() => timeZoneOptions(timeZone), [timeZone]);
@@ -70,6 +73,7 @@ export function LocationFields({
             </option>
           ))}
         </select>
+        {timeZoneNote}
       </label>
     </div>
   );

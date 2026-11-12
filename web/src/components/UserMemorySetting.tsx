@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
 import { Switch } from "@/components/Switch";
 import { paragraphs } from "@/lib/paragraphs";
 import { useApiClient } from "@/lib/use-api-client";
@@ -11,20 +12,26 @@ import { useApiClient } from "@/lib/use-api-client";
  * Admin-worded explanation of what is remembered.
  *
  * @param props - `enabled` is the saved setting; `explanation` is the
- *   User Memory explanation from platform settings.
+ *   User Memory explanation from platform settings; `changedInChatAt` is
+ *   when it was last changed in chat, if it was; `timeZone` is the User's.
  * @returns The section.
  */
 export function UserMemorySetting({
   enabled,
   explanation,
+  changedInChatAt,
+  timeZone,
 }: {
   enabled: boolean;
   explanation: string;
+  changedInChatAt: string | undefined;
+  timeZone?: string;
 }) {
   const apiClient = useApiClient();
   const [isEnabled, setIsEnabled] = useState(enabled);
   const [isSaving, setIsSaving] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
+  const [changedAt, setChangedAt] = useState(changedInChatAt);
 
   async function saveUserMemorySetting(next: boolean) {
     setIsSaving(true);
@@ -34,6 +41,7 @@ export function UserMemorySetting({
         user_memory_enabled: next,
       });
       setIsEnabled(me.user_memory_enabled);
+      setChangedAt(me.changed_in_chat.user_memory);
     } catch {
       setSaveFailed(true);
     } finally {
@@ -57,6 +65,7 @@ export function UserMemorySetting({
           onChange={(next) => void saveUserMemorySetting(next)}
         />
       </div>
+      <ChangedInChatCaption changedAt={changedAt} timeZone={timeZone} />
       {paragraphs(explanation).map((paragraph) => (
         <p key={paragraph} className="m-0 text-[15px] text-ink-soft">
           {paragraph}

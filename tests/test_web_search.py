@@ -4,6 +4,7 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from companion.core.models import WebSearchResult
+from companion.core.ports import ChatTool
 from tests.fakes import (
     ChatModelCall,
     FakeAuthVerifier,
@@ -44,9 +45,17 @@ def reply_call(
     return call
 
 
+WEB_TOOLS = ("web_search", "fetch_page")
+
+
+def web_tools(call: ChatModelCall) -> list[ChatTool]:
+    """List the web tools a reply call was offered, leaving out the others."""
+    return [tool for tool in call.tools if tool.name in WEB_TOOLS]
+
+
 def tool_names(call: ChatModelCall) -> list[str]:
-    """List the names of the tools a reply call was offered."""
-    return [tool.name for tool in call.tools]
+    """List the names of the web tools a reply call was offered."""
+    return [tool.name for tool in web_tools(call)]
 
 
 def search(query: str) -> ToolCall:
@@ -113,7 +122,7 @@ def test_tool_instructions_forbid_personal_details_and_ask_for_sources(
 
     call = reply_call(client, chat_model, "hi", "hey")
 
-    search_tool, fetch_tool = call.tools
+    search_tool, fetch_tool = web_tools(call)
     assert search_tool.description == seeded_settings["web_search_tool_description"]
     assert "Never put the person's personal details" in search_tool.description
     assert fetch_tool.description == seeded_settings["page_fetch_tool_description"]
@@ -137,7 +146,7 @@ def test_with_web_search_off_the_tools_are_not_offered(
 
     call = reply_call(client, chat_model, "who won the match last night?", "no idea")
 
-    assert call.tools == []
+    assert web_tools(call) == []
     assert seeded_settings["reply_web_search_instructions"] not in call.instructions
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["no idea"]
 
@@ -170,8 +179,8 @@ def test_at_the_daily_limit_the_tools_are_gone_until_the_users_next_day(
 
     assert tool_names(first) == ["web_search", "fetch_page"]
     assert web_search.queries == ["stoicism", "seneca"]
-    assert at_limit.tools == []
-    assert same_local_day.tools == []
+    assert web_tools(at_limit) == []
+    assert web_tools(same_local_day) == []
     assert tool_names(next_local_day) == ["web_search", "fetch_page"]
 
 
@@ -213,7 +222,7 @@ def test_a_limit_of_zero_offers_no_tools(
 
     call = reply_call(client, chat_model, "hi", "hey")
 
-    assert call.tools == []
+    assert web_tools(call) == []
 
 
 def test_the_reply_still_goes_when_the_web_search_fails(

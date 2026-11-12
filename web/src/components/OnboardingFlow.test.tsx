@@ -44,6 +44,7 @@ function newUser(overrides: Partial<Me> = {}): Me {
     user_memory_enabled: true,
     onboarding_completed_at: null,
     role: "user",
+    changed_in_chat: {},
     ...overrides,
   };
 }

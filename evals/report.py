@@ -1,7 +1,9 @@
 from dataclasses import dataclass, field
 
-from evals.cases import SafeguardCase
+from evals.cases import SafeguardCase, SettingsCase
 from evals.judge import NO_VERSION, RuleVerdict, VersionVerdict
+
+READ_ONLY_SETTINGS_TOOLS = frozenset({"list_memories"})
 
 
 @dataclass(frozen=True)
@@ -99,6 +101,45 @@ class KnowledgeStepResult:
         return f"{outcome} {self.verdict.reason}"
 
 
+@dataclass(frozen=True)
+class SettingsResult:
+    """The settings tools a reply called for one settings request.
+
+    Attributes:
+        case: The settings request.
+        called: The settings tools the reply called, in order.
+    """
+
+    case: SettingsCase
+    called: list[str]
+
+    @property
+    def passed(self) -> bool:
+        """Whether the reply changed exactly the settings it should have.
+
+        Returns:
+            True if it called every expected tool and no other tool that
+            changes a setting.
+        """
+        changing = set(self.called) - READ_ONLY_SETTINGS_TOOLS
+        return changing == set(self.case.tools)
+
+    def describe(self) -> str:
+        """Write the case as one line of the report.
+
+        Returns:
+            E.g. "FAIL delete-account: delete my account please → expected
+            no tool, called start_deleting_my_data".
+        """
+        mark = "PASS" if self.passed else "FAIL"
+        expected = ", ".join(self.case.tools) or "no tool"
+        called = ", ".join(self.called) or "no tool"
+        return (
+            f"{mark} {self.case.id}: {self.case.message} → expected {expected}, "
+            f"called {called}"
+        )
+
+
 def verdict_line(verdict: RuleVerdict) -> str:
     """Write a rule verdict as one line of the report.
 
@@ -121,6 +162,7 @@ class EvalReport:
         safeguard: Each Safeguard case's result.
         persona: Each scripted conversation's verdicts.
         knowledge: Each Knowledge step's result.
+        settings: Each settings request's result.
         tokens_in: Tokens sent to the LLM, by the app and the judge.
         tokens_out: Tokens the LLM wrote, for the app and the judge.
     """
@@ -129,6 +171,7 @@ class EvalReport:
     safeguard: list[SafeguardResult] = field(default_factory=list)
     persona: list[PersonaResult] = field(default_factory=list)
     knowledge: list[KnowledgeStepResult] = field(default_factory=list)
+    settings: list[SettingsResult] = field(default_factory=list)
     tokens_in: int = 0
     tokens_out: int = 0
 
@@ -179,6 +222,17 @@ class EvalReport:
             lines.append(f"    {step.describe()}")
         return lines
 
+    def settings_lines(self) -> list[str]:
+        """Write the Settings part of the report.
+
+        Returns:
+            The lines: the score, then each case.
+        """
+        passed = sum(result.passed for result in self.settings)
+        lines = [f"Settings: {passed} of {len(self.settings)} right"]
+        lines += [f"  {result.describe()}" for result in self.settings]
+        return lines
+
     def lines(self) -> list[str]:
         """Write the whole report.
 
@@ -195,4 +249,6 @@ class EvalReport:
             lines += ["", *self.persona_lines()]
         if self.knowledge:
             lines += ["", *self.knowledge_lines()]
+        if self.settings:
+            lines += ["", *self.settings_lines()]
         return lines

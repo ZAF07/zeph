@@ -21,6 +21,7 @@ from companion.core.safeguard import Safeguard
 from companion.core.stickers import sticker_message_text
 from companion.core.timing import check_in_reply_window, is_open, quiet_gap
 from companion.core.usage import UsageLimiter
+from companion.core.user_data import ChatDataDeletion
 
 
 def typing_pause_seconds(text: str, settings: PlatformSettingsRepository) -> float:
@@ -209,6 +210,7 @@ class ConversationServices:
         memory_retrieval: Finds the User Memory that matters for a message.
         knowledge_retrieval: Finds the Knowledge that may fit a message.
         response_composer: Writes the Companion's reply.
+        data_deletion: Settles a Delete My Data the User asked for in chat.
     """
 
     conversations: ConversationService
@@ -217,3 +219,4 @@ class ConversationServices:
     memory_retrieval: MemoryRetrieval
     knowledge_retrieval: KnowledgeRetrieval
     response_composer: ResponseComposer
+    data_deletion: ChatDataDeletion
