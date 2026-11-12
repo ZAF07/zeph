@@ -113,3 +113,13 @@ _Avoid_: File, article, resource
 **Starter Knowledge**:
 The Knowledge Documents loaded on first run, when the library is empty: public-domain texts and the owner's own summaries, mindfulness first. After that the library is Admin-managed, so a deleted starter document never comes back.
 _Avoid_: Default knowledge, seed content
+
+### Web
+
+**Web Search**:
+The Companion looking something up on the web while it replies — searching, or reading a page — when the Conversation needs a fact it doesn't know well. Queries carry only the general topic, never the User's personal details, and a reply that uses web information says where it came from. Admins can turn it off for everyone.
+_Avoid_: Browsing, internet lookup, googling
+
+**Web Search Limit**:
+The most Web Searches the Companion makes for one User in a day, set by Admins; each search and each page read counts as one. The day is the User's own, so it resets at midnight in their time zone. Once it is reached the Companion replies without the web until the next day.
+_Avoid_: Search quota, web budget
