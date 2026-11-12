@@ -67,8 +67,9 @@ def answer_with_tools(
 ) -> str:
     """Let the model call tools, sending back each result, until it replies.
 
-    After `MAX_TOOL_ROUNDS` rounds of tool calls the model must reply
-    without calling any more.
+    A call whose arguments are not valid JSON is sent back as an error so
+    the model can try again. After `MAX_TOOL_ROUNDS` rounds of tool calls
+    the model must reply without calling any more.
 
     Args:
         ask: Asks the model, with the tools bound, for its next message.
@@ -82,9 +83,17 @@ def answer_with_tools(
     tools_by_name = {tool.name: tool for tool in tools}
     for _ in range(MAX_TOOL_ROUNDS):
         response = ask(messages)
-        if not response.tool_calls:
+        if not response.tool_calls and not response.invalid_tool_calls:
             return response.text
         messages.append(response)
+        for broken_call in response.invalid_tool_calls:
+            messages.append(
+                ToolMessage(
+                    f"The arguments for {broken_call['name']} were not valid "
+                    "JSON. Try again.",
+                    tool_call_id=broken_call["id"] or "",
+                )
+            )
         for tool_call in response.tool_calls:
             tool = tools_by_name.get(tool_call["name"])
             result = (

@@ -43,12 +43,16 @@ class WebSearchOffer:
     instructions: str
 
 
-def format_search_results(query: str, results: list[WebSearchResult]) -> str:
+def format_search_results(
+    query: str, results: list[WebSearchResult], source_reminder: str
+) -> str:
     """Write web search results for the model, each with where it is from.
 
     Args:
         query: What was searched for.
         results: The results, best first.
+        source_reminder: The Admin-set reminder to say where web information
+            came from, put last.
 
     Returns:
         The results as text.
@@ -59,7 +63,11 @@ def format_search_results(query: str, results: list[WebSearchResult]) -> str:
         f"{number}. {result.title}\n{result.url}\n{result.content}"
         for number, result in enumerate(results, start=1)
     ]
-    return f'Web results for "{query}":\n\n' + "\n\n".join(listed)
+    return (
+        f'Web results for "{query}":\n\n'
+        + "\n\n".join(listed)
+        + f"\n\n{source_reminder}"
+    )
 
 
 class WebSearchTools:
@@ -93,10 +101,11 @@ class WebSearchTools:
             The tools and their reply instructions.
         """
         settings = self._repositories.platform_settings
+        usage = self._repositories.usage
         daily_limit = settings.get("web_search_daily_limit")
-        used_today = self._repositories.usage.count_web_searches(
-            user_id, self._users_day(user_id)
-        )
+        today = self._users_day(user_id)
+        source_reminder = settings.get("web_result_source_reminder")
+        used_today = usage.count_web_searches(user_id, today)
         if not settings.get("web_search_enabled") or used_today >= daily_limit:
             return WebSearchOffer(tools=[], instructions="")
 
@@ -112,10 +121,12 @@ class WebSearchTools:
             query = str(arguments.get("query", "")).strip()
             if not query:
                 return MISSING_QUERY
-            if not self._claim_web_search(user_id):
+            if not usage.claim_web_search(user_id, today, daily_limit):
                 return LIMIT_REACHED
             try:
-                return format_search_results(query, self._web_search.search(query))
+                return format_search_results(
+                    query, self._web_search.search(query), source_reminder
+                )
             except Exception:
                 logger.exception("Web search failed")
                 return SEARCH_FAILED
@@ -132,7 +143,7 @@ class WebSearchTools:
             url = str(arguments.get("url", "")).strip()
             if not url.startswith(("http://", "https://")):
                 return MISSING_URL
-            if not self._claim_web_search(user_id):
+            if not usage.claim_web_search(user_id, today, daily_limit):
                 return LIMIT_REACHED
             try:
                 text = self._web_search.fetch_page(url)
@@ -141,7 +152,7 @@ class WebSearchTools:
                 return PAGE_FAILED
             if not text.strip():
                 return PAGE_FAILED
-            return f"Page {url}:\n\n{text[:MAX_PAGE_CHARACTERS]}"
+            return f"Page {url}:\n\n{text[:MAX_PAGE_CHARACTERS]}\n\n{source_reminder}"
 
         return WebSearchOffer(
             tools=[
@@ -159,20 +170,6 @@ class WebSearchTools:
                 ),
             ],
             instructions=settings.get("reply_web_search_instructions"),
-        )
-
-    def _claim_web_search(self, user_id: UUID) -> bool:
-        """Count one web search for the User today, unless the limit is reached.
-
-        Args:
-            user_id: The User.
-
-        Returns:
-            True if the search may go ahead.
-        """
-        daily_limit = self._repositories.platform_settings.get("web_search_daily_limit")
-        return self._repositories.usage.claim_web_search(
-            user_id, self._users_day(user_id), daily_limit
         )
 
     def _users_day(self, user_id: UUID) -> date:

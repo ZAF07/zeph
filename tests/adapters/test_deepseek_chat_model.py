@@ -103,3 +103,29 @@ def test_after_too_many_tool_rounds_the_model_must_answer_without_tools() -> Non
     assert reply == "Here's what I found."
     assert len(chat.received) == MAX_TOOL_ROUNDS
     assert len(final.received[0]) == 2 * MAX_TOOL_ROUNDS
+
+
+def test_a_tool_call_with_broken_arguments_is_sent_back_so_the_model_retries() -> None:
+    broken_call = AIMessage(
+        "",
+        invalid_tool_calls=[
+            {
+                "name": "web_search",
+                "args": '{"query": ',
+                "id": "c1",
+                "error": "bad JSON",
+                "type": "invalid_tool_call",
+            }
+        ],
+    )
+    chat = ScriptedLangChainModel(broken_call, AIMessage("ok"))
+
+    reply = answer_with_tools(
+        chat.invoke, ScriptedLangChainModel().invoke, [], [search_tool()]
+    )
+
+    assert reply == "ok"
+    assert chat.received[1][-1] == ToolMessage(
+        "The arguments for web_search were not valid JSON. Try again.",
+        tool_call_id="c1",
+    )

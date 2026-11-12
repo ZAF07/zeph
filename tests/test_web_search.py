@@ -94,6 +94,9 @@ def test_the_companion_searches_the_web_and_the_results_reach_the_reply(
     assert BOOK_RESULT.content in search_result
     assert BOOK_RESULT.url in page
     assert BOOK_PAGE in page
+    reminder = seeded_settings["web_result_source_reminder"]
+    assert search_result.endswith(reminder)
+    assert page.endswith(reminder)
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
         "The Miracle of Mindfulness, going by Wikipedia"
     ]

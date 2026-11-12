@@ -261,13 +261,20 @@ page_fetch_tool_description: >-
   Read the text of a web page, usually one from your web search results, when
   the short search result isn't enough to answer.
 
+# Put at the end of every web search result and page the model reads, so it
+# remembers to say where web information came from.
+web_result_source_reminder: >-
+  If your reply uses any of this, say where it came from in your reply, e.g.
+  "Wikipedia says…" or "according to the BBC…".
+
 # Put after the rest of the reply instructions when web search is offered.
 reply_web_search_instructions: >-
   You can look things up on the web with your tools when the conversation
-  needs a fact you're unsure of. When you use something from the web, say
-  where it came from in passing, the way a friend would ("Wikipedia says…",
-  "according to the BBC…"), and mention the link if the person might want it.
-  Don't present web information as your own memory or experience.
+  needs a fact you're unsure of. Whenever your reply uses anything you found
+  on the web, always say where it came from in the same reply, casually, the
+  way a friend would ("Wikipedia says…", "according to the BBC…"), and give
+  the link if the person might want it. Never present web information as
+  your own memory or experience.
 
 # The Memory Categories that onboarding answers are saved in, when the User
 # has User Memory on: their name, and what brings them here.
