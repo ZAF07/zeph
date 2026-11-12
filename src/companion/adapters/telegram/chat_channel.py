@@ -1,6 +1,49 @@
+from pathlib import PurePosixPath
+from typing import Any
+
 import httpx
 
+from companion.core.models import ChannelSticker, StickerImage
+
 TELEGRAM_API_URL = "https://api.telegram.org"
+IMAGE_MEDIA_TYPES = {
+    ".webp": "image/webp",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+}
+
+
+def parse_sticker(sticker: dict[str, Any]) -> ChannelSticker:
+    """Turn a Telegram sticker object into a channel-neutral sticker.
+
+    A still sticker is its own image; an animated or video sticker is shown
+    by its thumbnail, if it has one.
+
+    Args:
+        sticker: The sticker object from the Bot API.
+
+    Returns:
+        The sticker.
+    """
+    file_id = str(sticker["file_id"])
+    thumbnail = sticker.get("thumbnail")
+    is_still = not sticker.get("is_animated") and not sticker.get("is_video")
+    if is_still:
+        preview_file_id: str | None = file_id
+    elif isinstance(thumbnail, dict):
+        preview_file_id = str(thumbnail["file_id"])
+    else:
+        preview_file_id = None
+    emoji = sticker.get("emoji")
+    set_name = sticker.get("set_name")
+    return ChannelSticker(
+        file_id=file_id,
+        file_unique_id=str(sticker["file_unique_id"]),
+        emoji=emoji if isinstance(emoji, str) else None,
+        set_name=set_name if isinstance(set_name, str) else None,
+        preview_file_id=preview_file_id,
+    )
 
 
 class TelegramChatChannel:
@@ -14,6 +57,7 @@ class TelegramChatChannel:
             http_client: The HTTP client to use; a new one is made if not given.
         """
         self._bot_url = f"{TELEGRAM_API_URL}/bot{bot_token}"
+        self._file_url = f"{TELEGRAM_API_URL}/file/bot{bot_token}"
         self._http = http_client or httpx.Client(timeout=10)
 
     def send_text(self, chat_id: int, text: str) -> None:
@@ -32,6 +76,60 @@ class TelegramChatChannel:
             chat_id: The chat to show it in.
         """
         self._call("sendChatAction", {"chat_id": chat_id, "action": "typing"})
+
+    def send_sticker(self, chat_id: int, file_id: str) -> None:
+        """Send one sticker.
+
+        Args:
+            chat_id: The chat to send to.
+            file_id: The sticker's file ID.
+        """
+        self._call("sendSticker", {"chat_id": chat_id, "sticker": file_id})
+
+    def get_sticker_set(self, name: str) -> list[ChannelSticker] | None:
+        """Look up every sticker in a sticker set.
+
+        Args:
+            name: The set's name.
+
+        Returns:
+            Its stickers in order, or None if Telegram has no such set.
+
+        Raises:
+            httpx.HTTPError: If Telegram can't be reached or fails.
+        """
+        try:
+            result = self._call("getStickerSet", {"name": name})
+        except httpx.HTTPStatusError as error:
+            if error.response.status_code == httpx.codes.BAD_REQUEST:
+                return None
+            raise
+        stickers = result.get("stickers")
+        if not isinstance(stickers, list):
+            return None
+        return [parse_sticker(sticker) for sticker in stickers]
+
+    def get_sticker_image(self, file_id: str) -> StickerImage | None:
+        """Download an image of a sticker.
+
+        Args:
+            file_id: The image's file ID.
+
+        Returns:
+            The image, or None if it isn't a WebP, JPEG or PNG image.
+
+        Raises:
+            httpx.HTTPError: If Telegram can't be reached or fails.
+        """
+        file_path = self._call("getFile", {"file_id": file_id}).get("file_path")
+        if not isinstance(file_path, str):
+            return None
+        media_type = IMAGE_MEDIA_TYPES.get(PurePosixPath(file_path).suffix.lower())
+        if media_type is None:
+            return None
+        response = self._http.get(f"{self._file_url}/{file_path}")
+        response.raise_for_status()
+        return StickerImage(content=response.content, media_type=media_type)
 
     def register_webhook(self, url: str, secret_token: str) -> None:
         """Tell Telegram where to post updates.

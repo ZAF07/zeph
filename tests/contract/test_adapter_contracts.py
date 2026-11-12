@@ -30,6 +30,12 @@ def test_telegram_bot_token_reaches_the_configured_bot() -> None:
     assert channel.get_bot_username() == required_env("TELEGRAM_BOT_USERNAME")
 
 
+def test_telegram_says_an_unknown_sticker_set_does_not_exist() -> None:
+    channel = TelegramChatChannel(required_env("TELEGRAM_BOT_TOKEN"))
+
+    assert channel.get_sticker_set("zeph_no_such_set_8f3k2q") is None
+
+
 def test_clerk_refuses_a_token_it_did_not_sign() -> None:
     verifier = ClerkAuthVerifier(
         required_env("CLERK_SECRET_KEY"), authorized_parties=["http://localhost:3000"]

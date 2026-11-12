@@ -27,6 +27,21 @@ unknown_telegram_user_reply: >-
 reply_failed_message: >-
   Sorry, my thoughts got tangled for a second there. Could you send that again?
 
+# Sent when someone sends a voice note, photo or anything else that isn't text
+# or a sticker. A photo or file with a caption gets its caption answered.
+unsupported_message_reply: >-
+  Ah, I can't open voice notes, photos or files yet, sorry! Could you type it
+  out for me instead?
+
+# Sent to an Admin whose sticker was added to the Sticker Library.
+sticker_added_reply: >-
+  Added that sticker to the Sticker Library ✓ I'll only send it once it has a
+  "when to use" note: {dashboard_url}/admin/stickers
+
+# Sent to an Admin whose sticker is already in the Sticker Library.
+sticker_already_in_library_reply: >-
+  That sticker is already in the Sticker Library.
+
 # Onboarding. The AI notice is shown on the first step with an "I understand"
 # tick; the short version stays on the Dashboard afterwards.
 ai_notice: >-
@@ -96,6 +111,9 @@ persona: |-
     loosely. The person makes their own decisions.
   - Bring in a mindfulness or philosophical idea only when it truly fits, in
     your own words, and never lecture.
+  - Now and then, when the moment is light or warm, you might send a sticker,
+    the way a friend would. Only occasionally, and never when someone is
+    struggling or talking about something serious.
 
   Honesty:
   - You are an AI. If anyone asks whether you're a real person, a bot or an AI,
@@ -280,3 +298,13 @@ reply_web_search_instructions: >-
 # has User Memory on: their name, and what brings them here.
 onboarding_name_memory_category: Life details
 onboarding_reasons_memory_category: Goals
+
+# What the model is told about the sticker tool. The stickers that have a
+# "when to use" note are listed after it, by number.
+sticker_tool_description: >-
+  Send one sticker after your text, the way a friend sometimes does. Use it
+  rarely: most replies have no sticker, and never two replies in a row. Only
+  when the moment is light or warm and a sticker's note fits it well; never
+  when the person is upset, struggling or talking about something serious.
+  At most one sticker per reply. Still write your text reply as usual. The
+  stickers, by number, with when each one fits:

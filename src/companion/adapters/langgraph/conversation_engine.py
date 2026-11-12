@@ -7,23 +7,27 @@ from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
 from companion.core.conversations import ConversationServices
-from companion.core.models import ConversationTurn, RiskType
+from companion.core.models import ConversationTurn, MessageKind, RiskType
 
 
 class TurnState(TypedDict, total=False):
     """What the graph knows while answering one message.
 
     IDs are stored as strings so checkpoints stay plain JSON-like data.
+    Every turn sets `sticker_id`, "" for none, so a sticker from an earlier
+    turn on the same thread is never sent again.
     """
 
     user_id: str
     chat_id: int
     text: str
+    kind: str
     conversation_id: str
     risk_type: str
     memory: str
     knowledge: str
     reply_parts: list[str]
+    sticker_id: str
 
 
 def build_postgres_checkpointer(database_url: str) -> PostgresSaver:
@@ -75,7 +79,10 @@ class LangGraphConversationEngine:
                 The ID of that Conversation.
             """
             conversation_id = services.conversations.record_incoming(
-                UUID(state["user_id"]), state["chat_id"], state["text"]
+                UUID(state["user_id"]),
+                state["chat_id"],
+                state["text"],
+                MessageKind(state["kind"]),
             )
             return {"conversation_id": str(conversation_id)}
 
@@ -158,15 +165,16 @@ class LangGraphConversationEngine:
                 state: The graph's state so far.
 
             Returns:
-                The reply as short messages.
+                The reply as short messages, and its sticker's ID or "".
             """
-            reply_parts = services.response_composer.compose(
+            reply = services.response_composer.compose(
                 UUID(state["conversation_id"]),
                 UUID(state["user_id"]),
                 state["memory"],
                 state["knowledge"],
             )
-            return {"reply_parts": reply_parts}
+            sticker_id = str(reply.sticker.id) if reply.sticker else ""
+            return {"reply_parts": reply.parts, "sticker_id": sticker_id}
 
         def deliver_reply(state: TurnState) -> TurnState:
             """Send the reply and save it to the Conversation.
@@ -177,8 +185,12 @@ class LangGraphConversationEngine:
             Returns:
                 Nothing new to add to the state.
             """
+            sticker_id = state["sticker_id"]
             services.conversations.deliver_reply(
-                UUID(state["conversation_id"]), state["chat_id"], state["reply_parts"]
+                UUID(state["conversation_id"]),
+                state["chat_id"],
+                state["reply_parts"],
+                UUID(sticker_id) if sticker_id else None,
             )
             return {}
 
@@ -219,6 +231,7 @@ class LangGraphConversationEngine:
                 "user_id": str(turn.user_id),
                 "chat_id": turn.chat_id,
                 "text": turn.text,
+                "kind": turn.kind.value,
             },
             config={"configurable": {"thread_id": str(turn.user_id)}},
         )

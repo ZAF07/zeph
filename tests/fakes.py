@@ -8,7 +8,13 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from companion.adapters.postgres.tables import EMBEDDING_SIZE
-from companion.core.models import AccountIdentity, ChatLine, WebSearchResult
+from companion.core.models import (
+    AccountIdentity,
+    ChannelSticker,
+    ChatLine,
+    StickerImage,
+    WebSearchResult,
+)
 from companion.core.ports import ChatTool
 
 
@@ -20,17 +26,31 @@ class SentText:
     text: str
 
 
+@dataclass(frozen=True)
+class SentSticker:
+    """A sticker the fake chat channel was asked to send."""
+
+    chat_id: int
+    file_id: str
+
+
 class FakeChatChannel:
     """Chat channel that records sent messages instead of sending them.
 
-    `events` lists texts and typing in the order they happened.
+    `events` lists texts, stickers and typing in the order they happened.
+    Sticker sets and sticker images it knows are set by tests; set
+    `sticker_lookup_failure` to make looking them up raise it.
     """
 
     def __init__(self) -> None:
-        """Start with nothing sent."""
+        """Start with nothing sent and no sticker sets or images."""
         self.sent: list[SentText] = []
+        self.sent_stickers: list[SentSticker] = []
         self.typing_shown_in: list[int] = []
         self.events: list[str] = []
+        self.sticker_sets: dict[str, list[ChannelSticker]] = {}
+        self.sticker_images: dict[str, StickerImage] = {}
+        self.sticker_lookup_failure: Exception | None = None
 
     def send_text(self, chat_id: int, text: str) -> None:
         """Record a text message.
@@ -41,6 +61,48 @@ class FakeChatChannel:
         """
         self.sent.append(SentText(chat_id=chat_id, text=text))
         self.events.append(f"text: {text}")
+
+    def send_sticker(self, chat_id: int, file_id: str) -> None:
+        """Record a sticker.
+
+        Args:
+            chat_id: The chat the sticker is for.
+            file_id: The sticker's file ID.
+        """
+        self.sent_stickers.append(SentSticker(chat_id=chat_id, file_id=file_id))
+        self.events.append(f"sticker: {file_id}")
+
+    def get_sticker_set(self, name: str) -> list[ChannelSticker] | None:
+        """Return a sticker set the test set up.
+
+        Args:
+            name: The set's name.
+
+        Returns:
+            Its stickers, or None if the test set up no such set.
+
+        Raises:
+            Exception: The `sticker_lookup_failure` set on the fake, if any.
+        """
+        if self.sticker_lookup_failure is not None:
+            raise self.sticker_lookup_failure
+        return self.sticker_sets.get(name)
+
+    def get_sticker_image(self, file_id: str) -> StickerImage | None:
+        """Return a sticker image the test set up.
+
+        Args:
+            file_id: The image's file ID.
+
+        Returns:
+            The image, or None if the test set up none.
+
+        Raises:
+            Exception: The `sticker_lookup_failure` set on the fake, if any.
+        """
+        if self.sticker_lookup_failure is not None:
+            raise self.sticker_lookup_failure
+        return self.sticker_images.get(file_id)
 
     def show_typing(self, chat_id: int) -> None:
         """Record that typing was shown.

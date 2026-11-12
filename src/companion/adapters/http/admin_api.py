@@ -52,6 +52,7 @@ from companion.core.models import (
     KnowledgeFileType,
     KnowledgeStatus,
     KnowledgeUpload,
+    LibrarySticker,
     MemoryCategory,
     MemoryCategoryDetails,
     RiskType,
@@ -67,6 +68,13 @@ from companion.core.platform_settings import (
     PlatformSettingsService,
 )
 from companion.core.safeguard import InvalidEventFilterError, Safeguard
+from companion.core.stickers import (
+    InvalidStickerError,
+    StickerLibraryService,
+    StickerNotFoundError,
+    StickerSetNotFoundError,
+    StickerSetUnavailableError,
+)
 
 
 class AdminUserResponse(BaseModel):
@@ -291,6 +299,60 @@ class KnowledgeDocumentsResponse(BaseModel):
     documents: list[KnowledgeDocumentResponse]
 
 
+class StickerResponse(BaseModel):
+    """A sticker in the Sticker Library as Admins see it."""
+
+    id: str
+    emoji: str | None
+    set_name: str | None
+    note: str
+    has_image: bool
+    added_at: datetime
+
+
+class StickersResponse(BaseModel):
+    """Every sticker in the Sticker Library, in the order they were added."""
+
+    stickers: list[StickerResponse]
+
+
+class StickerImportRequest(BaseModel):
+    """The name of a sticker set to add."""
+
+    set_name: str
+
+
+class StickerImportResponse(BaseModel):
+    """How many stickers a sticker set added."""
+
+    added_count: int
+
+
+class StickerNoteRequest(BaseModel):
+    """When a sticker should be used; "" means the Companion won't send it."""
+
+    note: str
+
+
+def to_sticker_response(sticker: LibrarySticker) -> StickerResponse:
+    """Describe a sticker for the admin area.
+
+    Args:
+        sticker: The sticker.
+
+    Returns:
+        The response body.
+    """
+    return StickerResponse(
+        id=str(sticker.id),
+        emoji=sticker.emoji,
+        set_name=sticker.set_name,
+        note=sticker.note,
+        has_image=sticker.preview_file_id is not None,
+        added_at=sticker.added_at,
+    )
+
+
 def to_knowledge_document_response(
     document: KnowledgeDocument,
 ) -> KnowledgeDocumentResponse:
@@ -462,6 +524,7 @@ def build_admin_api_router(
     safeguard: Safeguard,
     memory_category_service: MemoryCategoryService,
     knowledge_service: KnowledgeService,
+    sticker_library: StickerLibraryService,
 ) -> APIRouter:
     """Build the admin API routes.
 
@@ -476,6 +539,7 @@ def build_admin_api_router(
         safeguard: Lists Safeguard Events.
         memory_category_service: Manages Memory Categories.
         knowledge_service: Manages the Knowledge library.
+        sticker_library: Manages the Sticker Library.
 
     Returns:
         The router.
@@ -876,6 +940,123 @@ def build_admin_api_router(
                 status.HTTP_404_NOT_FOUND, "No such Memory Category"
             ) from error
         return to_memory_category_response(category)
+
+    @router.get("/stickers")
+    def list_stickers() -> StickersResponse:
+        """List the Sticker Library.
+
+        Returns:
+            Every sticker, in the order they were added.
+        """
+        return StickersResponse(
+            stickers=[
+                to_sticker_response(sticker) for sticker in sticker_library.list_all()
+            ]
+        )
+
+    @router.post("/stickers/import", status_code=status.HTTP_201_CREATED)
+    def import_sticker_set(request: StickerImportRequest) -> StickerImportResponse:
+        """Add every sticker in a sticker set, without notes.
+
+        Args:
+            request: The set's name.
+
+        Returns:
+            How many stickers were added; ones already there are skipped.
+
+        Raises:
+            HTTPException: 404 if there is no such set; 422 if the name is
+                blank; 502 if Telegram didn't answer.
+        """
+        try:
+            added_count = sticker_library.import_set(request.set_name)
+        except InvalidStickerError as error:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
+            ) from error
+        except StickerSetNotFoundError as error:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                f"There is no sticker set called “{request.set_name.strip()}”.",
+            ) from error
+        except StickerSetUnavailableError as error:
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                "Telegram didn’t respond. Please try again.",
+            ) from error
+        return StickerImportResponse(added_count=added_count)
+
+    @router.put("/stickers/{sticker_id}")
+    def save_sticker_note(
+        sticker_id: UUID, request: StickerNoteRequest
+    ) -> StickerResponse:
+        """Save when a sticker should be used.
+
+        Args:
+            sticker_id: The sticker.
+            request: Its "when to use" note.
+
+        Returns:
+            The saved sticker.
+
+        Raises:
+            HTTPException: 404 if there is no such sticker; 422 if the note
+                is too long.
+        """
+        try:
+            sticker = sticker_library.save_note(sticker_id, request.note)
+        except StickerNotFoundError as error:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "No such sticker") from error
+        except InvalidStickerError as error:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
+            ) from error
+        return to_sticker_response(sticker)
+
+    @router.delete("/stickers/{sticker_id}", status_code=status.HTTP_204_NO_CONTENT)
+    def remove_sticker(sticker_id: UUID) -> Response:
+        """Remove a sticker so the Companion no longer sends it.
+
+        Args:
+            sticker_id: The sticker.
+
+        Returns:
+            An empty response.
+
+        Raises:
+            HTTPException: 404 if there is no such sticker.
+        """
+        try:
+            sticker_library.remove(sticker_id)
+        except StickerNotFoundError as error:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "No such sticker") from error
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @router.get("/stickers/{sticker_id}/image")
+    def get_sticker_image(sticker_id: UUID) -> Response:
+        """Return an image of a sticker.
+
+        Args:
+            sticker_id: The sticker.
+
+        Returns:
+            The image.
+
+        Raises:
+            HTTPException: 404 if there is no such sticker or it has no
+                image a browser can show.
+        """
+        try:
+            image = sticker_library.get_image(sticker_id)
+        except StickerNotFoundError as error:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "No such sticker") from error
+        if image is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "This sticker has no image")
+        return Response(
+            content=image.content,
+            media_type=image.media_type,
+            headers={"Cache-Control": "private, max-age=86400"},
+        )
 
     @router.get("/knowledge-documents")
     def list_knowledge_documents() -> KnowledgeDocumentsResponse:
