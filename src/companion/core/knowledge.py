@@ -378,7 +378,7 @@ class KnowledgeService:
             document.file_type,
             self._repositories.knowledge_documents.get_content(document.id),
         ).strip()
-        if not split_into_chunks(text):
+        if not text:
             raise TextExtractionError(NO_TEXT_REASONS[document.file_type])
         return text
 

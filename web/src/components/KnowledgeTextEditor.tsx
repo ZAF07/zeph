@@ -53,7 +53,7 @@ export function KnowledgeTextEditor({
   }
 
   return (
-    <div className="flex flex-col rounded-card border border-line bg-white focus-within:border-blue">
+    <div className="flex flex-col rounded-card border border-line bg-white focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue">
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-t-card border-b border-line bg-subtle px-2.5 py-2">
         <div
           role="toolbar"

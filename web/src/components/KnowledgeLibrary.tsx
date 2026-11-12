@@ -15,7 +15,7 @@ import type { KnowledgeDocument, KnowledgeUpload } from "@/lib/api-client";
 import { formatAddedDay } from "@/lib/dates";
 import {
   knowledgeFileTypeLabels,
-  knowledgeStatuses,
+  knowledgeStatusOrder,
 } from "@/lib/knowledge-labels";
 import { useApiClient } from "@/lib/use-api-client";
 
@@ -50,8 +50,8 @@ function countsCaption(documents: KnowledgeDocument[]): string {
   const total = `${documents.length} ${
     documents.length === 1 ? "document" : "documents"
   }`;
-  const perStatus = knowledgeStatuses
-    .map(({ status }) => ({
+  const perStatus = knowledgeStatusOrder
+    .map((status) => ({
       status,
       count: documents.filter(
         (knowledgeDocument) => knowledgeDocument.status === status,
@@ -65,8 +65,8 @@ function countsCaption(documents: KnowledgeDocument[]): string {
 /**
  * The admin Knowledge library: upload a document, then see each one's
  * status while it is indexed, open its page from its title, retry one that
- * failed, or delete one. Checks
- * again every few seconds while any document is pending.
+ * failed, or delete one. Checks again every few seconds while any document
+ * is pending.
  *
  * @returns The upload form and document table, or a loading, empty or error
  *   state.

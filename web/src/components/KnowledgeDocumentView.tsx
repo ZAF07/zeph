@@ -16,7 +16,7 @@ import { ApiError, type KnowledgeDocumentWithText } from "@/lib/api-client";
 import { formatDay } from "@/lib/dates";
 import {
   knowledgeFileTypeLabels,
-  knowledgeStatuses,
+  knowledgeStatusLabels,
 } from "@/lib/knowledge-labels";
 import { useApiClient } from "@/lib/use-api-client";
 
@@ -183,10 +183,7 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
   }
 
   const knowledgeDocument = state.document;
-  const statusLabel =
-    knowledgeStatuses.find(
-      (option) => option.status === knowledgeDocument.status,
-    )?.label ?? knowledgeDocument.status;
+  const statusLabel = knowledgeStatusLabels[knowledgeDocument.status].label;
   const details = [
     { term: "Source / author", value: knowledgeDocument.source },
     { term: "Tradition", value: knowledgeDocument.tradition },

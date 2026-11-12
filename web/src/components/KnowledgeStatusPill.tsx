@@ -1,5 +1,5 @@
 import type { KnowledgeStatus } from "@/lib/api-client";
-import { knowledgeStatuses } from "@/lib/knowledge-labels";
+import { knowledgeStatusLabels } from "@/lib/knowledge-labels";
 
 /**
  * The coloured pill showing whether a Knowledge document is Ready, Pending
@@ -9,14 +9,12 @@ import { knowledgeStatuses } from "@/lib/knowledge-labels";
  * @returns The pill.
  */
 export function KnowledgeStatusPill({ status }: { status: KnowledgeStatus }) {
-  const option = knowledgeStatuses.find(
-    (knowledgeStatus) => knowledgeStatus.status === status,
-  );
+  const { label, pill } = knowledgeStatusLabels[status];
   return (
     <span
-      className={`inline-flex w-fit items-center whitespace-nowrap rounded-full px-2.5 py-[3px] text-xs font-medium ${option?.pill ?? ""}`}
+      className={`inline-flex w-fit items-center whitespace-nowrap rounded-full px-2.5 py-[3px] text-xs font-medium ${pill}`}
     >
-      {option?.label ?? status}
+      {label}
     </span>
   );
 }

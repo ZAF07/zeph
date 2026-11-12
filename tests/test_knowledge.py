@@ -132,7 +132,7 @@ def test_markdown_and_pdf_documents_show_their_text(
     assert document_text(client, admin, markdown["id"]) == (
         "# Breath\n\nNotice the breath."
     )
-    assert "Mind is the forerunner" in str(document_text(client, admin, pdf["id"]))
+    assert "Mind is the forerunner" in (document_text(client, admin, pdf["id"]) or "")
 
 
 def test_a_document_whose_file_had_no_text_shows_no_text(

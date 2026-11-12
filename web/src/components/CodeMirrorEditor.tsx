@@ -31,7 +31,7 @@ export type CodeMirrorEditorHandle = {
   openFind: () => void;
 };
 
-const fromValueProp = Annotation.define<boolean>();
+const syncedFromValueProp = Annotation.define<boolean>();
 
 /**
  * The editing extensions that change with `readOnly`.
@@ -126,7 +126,7 @@ export function CodeMirrorEditor({
           ),
           EditorView.updateListener.of((update) => {
             const fromProp = update.transactions.some((transaction) =>
-              transaction.annotation(fromValueProp),
+              transaction.annotation(syncedFromValueProp),
             );
             if (update.docChanged && !fromProp) {
               onChangeRef.current?.(update.state.doc.toString());
@@ -152,7 +152,7 @@ export function CodeMirrorEditor({
     if (current !== value) {
       view.dispatch({
         changes: { from: 0, to: current.length, insert: value },
-        annotations: fromValueProp.of(true),
+        annotations: syncedFromValueProp.of(true),
       });
     }
   }, [value]);

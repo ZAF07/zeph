@@ -19,7 +19,7 @@ const previewStyles = [
 
 /**
  * Shows Markdown as formatted text in Zeph's type styles. Raw HTML in the
- * text is shown as text, never run.
+ * text is left out, never run.
  *
  * @param props - `text` is the Markdown.
  * @returns The formatted text.
