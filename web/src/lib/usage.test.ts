@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { DailyUsage } from "@/lib/api-client";
 import {
+  formatFullCount,
   formatUsageCount,
   limitsReached,
   summarizeUsage,
@@ -18,11 +19,11 @@ function row(overrides: Partial<DailyUsage>): DailyUsage {
     tokens_in: 31240,
     tokens_out: 3880,
     web_search_count: 1,
+    message_limit_reached: false,
+    web_search_limit_reached: false,
     ...overrides,
   };
 }
-
-const limits = { daily_message_limit: 60, web_search_daily_limit: 10 };
 
 describe("Usage", () => {
   it("adds up tokens, messages and web searches", () => {
@@ -49,22 +50,19 @@ describe("Usage", () => {
     expect(formatUsageCount(212_000)).toBe("212K");
     expect(formatUsageCount(1406)).toBe("1,406");
     expect(formatUsageCount(88)).toBe("88");
+    expect(formatFullCount(31240)).toBe("31,240");
   });
 
-  it("says which daily limits a row reached", () => {
-    expect(limitsReached(row({}), limits)).toEqual([]);
-    expect(limitsReached(row({ message_count: 60 }), limits)).toEqual([
+  it("says which daily limits turned something away that day", () => {
+    expect(limitsReached(row({}))).toEqual([]);
+    expect(limitsReached(row({ message_limit_reached: true }))).toEqual([
       "Message limit reached",
     ]);
     expect(
-      limitsReached(row({ message_count: 60, web_search_count: 10 }), limits),
+      limitsReached(
+        row({ message_limit_reached: true, web_search_limit_reached: true }),
+      ),
     ).toEqual(["Message limit reached", "Search limit reached"]);
-    expect(
-      limitsReached(row({ web_search_count: 0 }), {
-        ...limits,
-        web_search_daily_limit: 0,
-      }),
-    ).toEqual([]);
   });
 
   it("writes the rows as CSV, quoting text that needs it", () => {

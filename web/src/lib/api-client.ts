@@ -291,6 +291,8 @@ export type DailyUsage = {
   tokens_in: number;
   tokens_out: number;
   web_search_count: number;
+  message_limit_reached: boolean;
+  web_search_limit_reached: boolean;
 };
 
 /** Usage per User per day, newest day first, with the limits in force now. */

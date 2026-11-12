@@ -9,6 +9,7 @@ import { LockIcon } from "@/components/LockIcon";
 import type { DailyUsage, UsageReport } from "@/lib/api-client";
 import { formatShortDay } from "@/lib/dates";
 import {
+  formatFullCount,
   formatUsageCount,
   limitsReached,
   summarizeUsage,
@@ -36,8 +37,6 @@ const headings = [
   "Web searches",
   "Limits",
 ];
-
-const fullNumber = new Intl.NumberFormat("en");
 
 const cell = "px-[18px] py-3.5";
 const numberCell = `${cell} text-right tabular-nums`;
@@ -198,7 +197,7 @@ export function AdminUsage() {
             </thead>
             <tbody>
               {rows.map((row) => {
-                const reached = limitsReached(row, state.report);
+                const reached = limitsReached(row);
                 return (
                   <tr
                     key={`${row.day}-${row.user_id}`}
@@ -211,16 +210,16 @@ export function AdminUsage() {
                       {row.user_name ?? row.user_email ?? "Unknown User"}
                     </td>
                     <td className={numberCell}>
-                      {fullNumber.format(row.message_count)}
+                      {formatFullCount(row.message_count)}
                     </td>
                     <td className={numberCell}>
-                      {fullNumber.format(row.tokens_in)}
+                      {formatFullCount(row.tokens_in)}
                     </td>
                     <td className={numberCell}>
-                      {fullNumber.format(row.tokens_out)}
+                      {formatFullCount(row.tokens_out)}
                     </td>
                     <td className={numberCell}>
-                      {fullNumber.format(row.web_search_count)}
+                      {formatFullCount(row.web_search_count)}
                     </td>
                     <td className={cell}>
                       {reached.length === 0 ? (

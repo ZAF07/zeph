@@ -279,3 +279,56 @@ def test_admins_can_set_the_daily_message_limit_within_its_range(
     settings = client.get("/api/admin/settings", headers=admin).json()["settings"]
     assert settings["daily_message_limit"]["value"] == 60
     assert settings["daily_limit_reply"]["value"] == LIMIT_REPLY
+
+
+def test_today_is_each_users_own_day(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    connect_telegram(client, auth_verifier, chat_channel)
+    client.patch(
+        "/api/me",
+        json={"time_zone": "America/Los_Angeles"},
+        headers=auth_headers(auth_verifier, "user_maya"),
+    )
+    chat_model.script("hey", "evening!")
+    send_text(client, "hi")
+    clock.advance(timedelta(hours=18))
+    send_text(client, "still the 11th here")
+
+    [row] = usage_rows(client, admin, days=1)
+
+    assert row["day"] == "2026-11-11"
+    assert row["message_count"] == 2
+
+
+def test_a_limit_shows_as_reached_only_once_something_was_turned_away(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    web_search: FakeWebSearch,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    connect_telegram(client, auth_verifier, chat_channel)
+    set_message_limit(client, admin, 1)
+    change_settings(client, admin, {"web_search_daily_limit": 1})
+    chat_model.script(
+        ToolCall("web_search", {"query": "stoicism"}),
+        ToolCall("web_search", {"query": "seneca"}),
+        "found a bit",
+    )
+    send_text(client, "tell me about stoicism")
+    [at_limits] = usage_rows(client, admin)
+
+    send_text(client, "and more?")
+    set_message_limit(client, admin, 50)
+    [turned_away] = usage_rows(client, admin)
+
+    assert at_limits["message_limit_reached"] is False
+    assert at_limits["web_search_limit_reached"] is True
+    assert turned_away["message_limit_reached"] is True

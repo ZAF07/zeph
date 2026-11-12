@@ -24,6 +24,8 @@ const report: UsageReport = {
       tokens_in: 31240,
       tokens_out: 3880,
       web_search_count: 1,
+      message_limit_reached: false,
+      web_search_limit_reached: false,
     },
     {
       day: "2026-11-11",
@@ -34,6 +36,8 @@ const report: UsageReport = {
       tokens_in: 88910,
       tokens_out: 9402,
       web_search_count: 10,
+      message_limit_reached: true,
+      web_search_limit_reached: true,
     },
   ],
   daily_message_limit: 60,

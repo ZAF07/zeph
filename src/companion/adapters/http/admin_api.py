@@ -299,6 +299,8 @@ class DailyUsageResponse(BaseModel):
     tokens_in: int
     tokens_out: int
     web_search_count: int
+    message_limit_reached: bool
+    web_search_limit_reached: bool
 
 
 class UsageResponse(BaseModel):
@@ -1210,6 +1212,8 @@ def build_admin_api_router(
                     tokens_in=row.tokens_in,
                     tokens_out=row.tokens_out,
                     web_search_count=row.web_search_count,
+                    message_limit_reached=row.message_limit_reached,
+                    web_search_limit_reached=row.web_search_limit_reached,
                 )
                 for row in report.rows
             ],

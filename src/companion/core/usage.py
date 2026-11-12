@@ -1,11 +1,11 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import timedelta
 from uuid import UUID
 
 from companion.core.models import ChatLine, DailyUsage
 from companion.core.ports import ChatModel, ChatTool, Clock, Repositories
-from companion.core.timing import users_today
+from companion.core.timing import user_today, users_today
 
 
 @dataclass(frozen=True)
@@ -52,7 +52,9 @@ class UsageLimiter:
         """
         daily_limit = self._repositories.platform_settings.get("daily_message_limit")
         return self._repositories.usage.claim_message(
-            user_id, self._users_day(user_id), daily_limit
+            user_id,
+            user_today(self._repositories.users, user_id, self._clock.now()),
+            daily_limit,
         )
 
     def limit_reply(self) -> str:
@@ -73,37 +75,36 @@ class UsageLimiter:
             tokens_out: Tokens the model wrote.
         """
         self._repositories.usage.add_tokens(
-            user_id, self._users_day(user_id), tokens_in, tokens_out
+            user_id,
+            user_today(self._repositories.users, user_id, self._clock.now()),
+            tokens_in,
+            tokens_out,
         )
 
     def report(self, days: int) -> UsageReport:
         """List every User's usage over the last few days.
 
+        Each User's days are their own, so "today" is today where they live.
+
         Args:
-            days: How many days to list, today included (in UTC).
+            days: How many days to list, today included.
 
         Returns:
             The usage and the limits in force now.
         """
         settings = self._repositories.platform_settings
-        first_day = self._clock.now().date() - timedelta(days=days - 1)
+        now = self._clock.now()
+        earliest_possible_day = now.date() - timedelta(days=days)
+        rows = [
+            row
+            for row in self._repositories.usage.list_since(earliest_possible_day)
+            if row.day > users_today(row.user_time_zone, now) - timedelta(days=days)
+        ]
         return UsageReport(
-            rows=self._repositories.usage.list_since(first_day),
+            rows=rows,
             daily_message_limit=settings.get("daily_message_limit"),
             web_search_daily_limit=settings.get("web_search_daily_limit"),
         )
-
-    def _users_day(self, user_id: UUID) -> date:
-        """Work out today's date where the User lives.
-
-        Args:
-            user_id: The User.
-
-        Returns:
-            Today's date in their time zone, or in UTC if they have none.
-        """
-        user = self._repositories.users.get(user_id)
-        return users_today(user.time_zone if user else None, self._clock.now())
 
 
 class UsageRecordingChatModel:

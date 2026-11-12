@@ -1,12 +1,11 @@
 import logging
 from dataclasses import dataclass
-from datetime import date
 from typing import Any
 from uuid import UUID
 
 from companion.core.models import WebSearchResult
 from companion.core.ports import ChatTool, Clock, Repositories, WebSearch
-from companion.core.timing import users_today
+from companion.core.timing import user_today
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +102,7 @@ class WebSearchTools:
         settings = self._repositories.platform_settings
         usage = self._repositories.usage
         daily_limit = settings.get("web_search_daily_limit")
-        today = self._users_day(user_id)
+        today = user_today(self._repositories.users, user_id, self._clock.now())
         source_reminder = settings.get("web_result_source_reminder")
         used_today = usage.count_web_searches(user_id, today)
         if not settings.get("web_search_enabled") or used_today >= daily_limit:
@@ -171,15 +170,3 @@ class WebSearchTools:
             ],
             instructions=settings.get("reply_web_search_instructions"),
         )
-
-    def _users_day(self, user_id: UUID) -> date:
-        """Work out today's date where the User lives.
-
-        Args:
-            user_id: The User.
-
-        Returns:
-            Today's date in their time zone, or in UTC if they have none.
-        """
-        user = self._repositories.users.get(user_id)
-        return users_today(user.time_zone if user else None, self._clock.now())

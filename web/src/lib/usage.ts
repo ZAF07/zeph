@@ -1,4 +1,4 @@
-import type { DailyUsage, UsageReport } from "@/lib/api-client";
+import type { DailyUsage } from "@/lib/api-client";
 
 /** The totals shown above the usage table. */
 export type UsageSummary = {
@@ -7,12 +7,6 @@ export type UsageSummary = {
   messages: number;
   webSearches: number;
 };
-
-/** The daily limits a usage row is checked against. */
-export type UsageLimits = Pick<
-  UsageReport,
-  "daily_message_limit" | "web_search_daily_limit"
->;
 
 const csvHeadings = [
   "Date",
@@ -62,22 +56,28 @@ export function formatUsageCount(count: number): string {
 }
 
 /**
- * Says which daily limits a User reached on a day, judged by today's limits.
+ * Writes a count in full, like "31,240".
+ *
+ * @param count - The count.
+ * @returns The count with thousands separators.
+ */
+export function formatFullCount(count: number): string {
+  return fullNumber.format(count);
+}
+
+/**
+ * Says which daily limits turned something away for a User on a day.
  *
  * @param row - The User's usage on that day.
- * @param limits - The daily message and web search limits.
  * @returns "Message limit reached" and/or "Search limit reached"; none if
- *   neither was reached.
+ *   neither limit was hit.
  */
-export function limitsReached(row: DailyUsage, limits: UsageLimits): string[] {
+export function limitsReached(row: DailyUsage): string[] {
   const reached: string[] = [];
-  if (row.message_count >= limits.daily_message_limit) {
+  if (row.message_limit_reached) {
     reached.push("Message limit reached");
   }
-  if (
-    limits.web_search_daily_limit > 0 &&
-    row.web_search_count >= limits.web_search_daily_limit
-  ) {
+  if (row.web_search_limit_reached) {
     reached.push("Search limit reached");
   }
   return reached;
