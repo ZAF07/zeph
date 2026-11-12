@@ -29,8 +29,9 @@ def prepare() -> None:
     """Get everything ready before the backend starts serving.
 
     Checks settings, migrates the database, loads seed data (embedding the
-    starter Knowledge on first run and finishing any upload a restart
-    interrupted) and registers the Telegram webhook.
+    starter Knowledge on first run, finishing any upload a restart
+    interrupted and saving the text of documents uploaded before text was
+    saved) and registers the Telegram webhook.
     """
     settings = load_settings()
     migrate(settings.database_url)
@@ -46,6 +47,7 @@ def prepare() -> None:
         clock=build_clock(settings),
     )
     knowledge_service.ingest_pending()
+    knowledge_service.read_missing_texts()
     knowledge_service.seed_starter_set(
         partial(read_knowledge_seed, KNOWLEDGE_SEED_FILE)
     )

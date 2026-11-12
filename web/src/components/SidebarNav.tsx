@@ -27,7 +27,8 @@ const adminItems = [
 
 /**
  * The sidebar's page links, highlighting the page being viewed. Admins also
- * see an Admin group of links.
+ * see an Admin group of links; an admin link stays highlighted on the pages
+ * under it, like a Knowledge document's page.
  *
  * @param props - `items` are the User page links to show.
  * @returns The navigation.
@@ -86,7 +87,8 @@ export function SidebarNav({ items }: { items: SidebarItem[] }) {
           </span>
           <ul className="m-0 flex list-none flex-wrap gap-px p-0">
             {adminItems.map((item) => {
-              const isActive = item.href === pathname;
+              const isActive =
+                item.href === pathname || pathname.startsWith(`${item.href}/`);
               return (
                 <li key={item.href} className="flex-[1_1_150px]">
                   <Link

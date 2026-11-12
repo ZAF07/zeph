@@ -8,6 +8,7 @@ from uuid import UUID
 from companion.core.models import (
     EmbeddedChunk,
     KnowledgeDocument,
+    KnowledgeDocumentWithText,
     KnowledgeFileType,
     KnowledgeStatus,
     KnowledgeUpload,
@@ -151,9 +152,10 @@ def split_into_chunks(
 class KnowledgeService:
     """Lets Admins build the Knowledge library the Companion draws on.
 
-    An uploaded document starts pending. Ingestion reads its text, splits it
-    into chunks, embeds them and stores them; then the document is ready for
-    replies, or failed with a reason Admins can read.
+    An uploaded document starts pending. Ingestion reads its file's text and
+    saves it on the document, then splits that text into chunks, embeds them
+    and stores them; then the document is ready for replies, or failed with a
+    reason Admins can read.
     """
 
     def __init__(
@@ -218,11 +220,32 @@ class KnowledgeService:
             self._clock.now(),
         )
 
-    def ingest(self, document_id: UUID) -> None:
-        """Read, chunk, embed and store a pending document's text.
+    def get_document(self, document_id: UUID) -> KnowledgeDocumentWithText:
+        """Find a Knowledge document with the text replies draw on.
 
-        The document ends up ready, or failed with the reason. A document
-        deleted meanwhile is left alone.
+        Args:
+            document_id: The document's ID.
+
+        Returns:
+            The document and its text.
+
+        Raises:
+            KnowledgeDocumentNotFoundError: If there is no such document.
+        """
+        document = self._get(document_id)
+        return KnowledgeDocumentWithText(
+            document=document,
+            text=self._repositories.knowledge_documents.get_text(document_id),
+        )
+
+    def ingest(self, document_id: UUID) -> None:
+        """Make a pending document ready for replies.
+
+        Two steps: Read gets the text out of the file and saves it, and Index
+        chunks, embeds and stores the saved text. Read is skipped when the
+        document already has saved text, so text an Admin edited is never
+        replaced by the file's. The document ends up ready, or failed with the
+        reason. A document deleted meanwhile is left alone.
 
         Args:
             document_id: The document's ID.
@@ -231,31 +254,32 @@ class KnowledgeService:
         document = documents.get(document_id)
         if document is None:
             return
-        try:
-            text = self._text_extractor.extract(
-                document.file_type, documents.get_content(document_id)
-            )
-        except TextExtractionError as error:
-            self._fail(document_id, str(error))
-            return
-        chunks = split_into_chunks(text)
-        if not chunks:
-            self._fail(document_id, NO_TEXT_REASONS[document.file_type])
-            return
-        try:
-            embeddings = self._embedder.embed_passages(chunks)
-            self._vector_store.replace_chunks(
-                document_id,
-                [
-                    EmbeddedChunk(text=chunk, embedding=embedding)
-                    for chunk, embedding in zip(chunks, embeddings, strict=True)
-                ],
-            )
-        except Exception:
-            logger.exception("Could not index Knowledge document %s", document_id)
-            self._fail(document_id, INDEXING_FAILED_REASON)
-            return
-        documents.set_status(document_id, KnowledgeStatus.READY, failure_reason=None)
+        text = documents.get_text(document_id)
+        if text is None:
+            try:
+                text = self._read_file(document)
+            except TextExtractionError as error:
+                self._fail(document_id, str(error))
+                return
+            documents.save_text(document_id, text, edited=False)
+        self._index(document_id, text)
+
+    def read_missing_texts(self) -> None:
+        """Save the text of documents uploaded before text was saved.
+
+        Each such document's file is read and its text saved, without
+        re-indexing. A document whose file can't be read is left as it is;
+        Retry reads it again.
+        """
+        documents = self._repositories.knowledge_documents
+        for document in documents.list_all():
+            if documents.get_text(document.id) is not None:
+                continue
+            try:
+                text = self._read_file(document)
+            except TextExtractionError:
+                continue
+            documents.save_text(document.id, text, edited=False)
 
     def retry(self, document_id: UUID) -> KnowledgeDocument:
         """Make a failed document pending again, ready to be ingested again.
@@ -336,6 +360,55 @@ class KnowledgeService:
         if document is None:
             raise KnowledgeDocumentNotFoundError(document_id)
         return document
+
+    def _read_file(self, document: KnowledgeDocument) -> str:
+        """Read the text out of a document's file.
+
+        Args:
+            document: The document.
+
+        Returns:
+            The text, trimmed.
+
+        Raises:
+            TextExtractionError: If the file can't be read or has no text,
+                with the reason Admins are shown.
+        """
+        text = self._text_extractor.extract(
+            document.file_type,
+            self._repositories.knowledge_documents.get_content(document.id),
+        ).strip()
+        if not split_into_chunks(text):
+            raise TextExtractionError(NO_TEXT_REASONS[document.file_type])
+        return text
+
+    def _index(self, document_id: UUID, text: str) -> None:
+        """Chunk, embed and store a document's text, then mark it ready.
+
+        Its old chunks are swapped for the new ones in one step, only when
+        indexing succeeds; otherwise it is marked failed.
+
+        Args:
+            document_id: The document's ID.
+            text: The text to index.
+        """
+        chunks = split_into_chunks(text)
+        try:
+            embeddings = self._embedder.embed_passages(chunks)
+            self._vector_store.replace_chunks(
+                document_id,
+                [
+                    EmbeddedChunk(text=chunk, embedding=embedding)
+                    for chunk, embedding in zip(chunks, embeddings, strict=True)
+                ],
+            )
+        except Exception:
+            logger.exception("Could not index Knowledge document %s", document_id)
+            self._fail(document_id, INDEXING_FAILED_REASON)
+            return
+        self._repositories.knowledge_documents.set_status(
+            document_id, KnowledgeStatus.READY, failure_reason=None
+        )
 
     def _fail(self, document_id: UUID, reason: str) -> None:
         """Mark a document failed with the reason Admins are shown.

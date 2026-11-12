@@ -36,3 +36,7 @@ Build order: (1) backend and seam 1 tests, which fix the API contract; (2) the D
 ## Blocked by
 
 None - can start immediately
+
+## Comments
+
+**2026-11-12 — started on branch `feat/ke-01-view-document`.** Plan: migration 0008 adds `text` and `text_edited`; ingestion splits into Read (extract, save text) and Index (chunk the saved text); `ingest` skips Read when text is saved; prestart fills text for older documents; `GET /api/admin/knowledge-documents/{id}`; `/admin/knowledge/[id]` page with a CodeMirror 6 `KnowledgeTextEditor` (read-only here) and `react-markdown` Preview.
