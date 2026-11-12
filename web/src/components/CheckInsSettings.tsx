@@ -216,12 +216,12 @@ export function CheckInsSettings() {
                 onChange={(frequency) => changeSettings({ frequency })}
               />
             </div>
-            <div className={`${settingsRow} items-end`}>
+            <div className={`${settingsRow} items-start`}>
               <SettingLabel
                 title="Quiet hours"
                 caption="Zeph never checks in during these hours."
               />
-              <div className="flex flex-[1_1_360px] flex-wrap gap-3">
+              <div className="flex flex-[2_1_480px] flex-col gap-3">
                 <QuietHoursFields
                   start={toTimeFieldValue(checkIns.quiet_hours_start)}
                   end={toTimeFieldValue(checkIns.quiet_hours_end)}
@@ -233,7 +233,7 @@ export function CheckInsSettings() {
                     changeSettings({ quiet_hours_end: end })
                   }
                 />
-                <label className={`${fieldLabel} flex-[2_1_180px]`}>
+                <label className={fieldLabel}>
                   Time zone
                   <select
                     className={inputField}

@@ -22,7 +22,7 @@ export function CheckInFrequencyPicker({
     <div
       role="group"
       aria-label="How often"
-      className="inline-flex flex-wrap gap-1 self-start rounded-full bg-code p-1"
+      className="inline-flex flex-wrap gap-1 self-start rounded-3xl bg-code p-1"
     >
       {checkInFrequencyOptions.map((option) => {
         const isPicked = option.value === value;

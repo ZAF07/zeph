@@ -21,11 +21,7 @@ export function QuietHoursFields({
   onEndChange: (end: string) => void;
 }) {
   return (
-    <div
-      role="group"
-      aria-label="Quiet hours"
-      className="flex flex-[1_1_260px] flex-wrap gap-3"
-    >
+    <div role="group" aria-label="Quiet hours" className="flex flex-wrap gap-3">
       <label className={`${fieldLabel} flex-[1_1_120px]`}>
         From
         <input
