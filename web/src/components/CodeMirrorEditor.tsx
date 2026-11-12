@@ -24,7 +24,13 @@ import {
   keymap,
   lineNumbers,
 } from "@codemirror/view";
-import { useEffect, useImperativeHandle, useRef, type Ref } from "react";
+import {
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  type Ref,
+} from "react";
 
 import {
   zephEditorTheme,
@@ -92,7 +98,8 @@ const formatKeymap = (
  * A CodeMirror 6 Markdown editor: line numbers, soft wrap, Markdown
  * highlighting, active line, find (and replace when editable), undo / redo,
  * Markdown formatting shortcuts and Ctrl/⌘+S. When read-only it can still be
- * focused, moved through and searched.
+ * focused, moved through and searched. It is built in a layout effect, so
+ * it is in the page the moment the component is, never a moment later.
  *
  * @param props - `value` is the text; `onChange` gets each edit; `readOnly`
  *   stops editing; `label` names the editor for screen readers; `onSave`
@@ -128,7 +135,7 @@ export function CodeMirrorEditor({
     onSaveRef.current = onSave;
   }, [onChange, onSave]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!containerRef.current) {
       return;
     }
