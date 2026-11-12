@@ -19,9 +19,9 @@ check-web:
 contract:
 	set -a && . ./.env && set +a && uv run pytest -m contract
 
-## Real-LLM evals (issue 15).
+## Real-LLM evals: Safeguard, Persona and Knowledge; needs keys in .env. See evals/README.md.
 eval:
-	@echo "No evals yet; they arrive in issue 15." && exit 1
+	set -a && . ./.env && set +a && uv run pytest evals -m eval
 
 ## Start everything.
 up:

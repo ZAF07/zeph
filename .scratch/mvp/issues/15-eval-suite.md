@@ -40,3 +40,16 @@ Any reply that still uses an old version is a failure. These evals go through th
 - `.scratch/mvp/issues/archive/05-safeguard.md` (done)
 - `.scratch/mvp/issues/archive/08-knowledge.md` (done)
 - `.scratch/knowledge-editing/issues/archive/02-edit-knowledge-details.md`, `03-edit-knowledge-text.md`, `04-replace-knowledge-file.md` (done)
+
+## Comments
+
+**2026-11-12 — started on branch `feat/15-eval-suite`.** Plan:
+- New `evals/` folder (pytest, marked `eval`, outside `tests/` so `make check` never runs it). `make eval` loads `.env` and runs `pytest evals -m eval`.
+- The app is wired like seam 1 (throwaway Postgres container, real LangGraph engine, the Telegram webhook through FastAPI's test client, recording fake chat channel, fake clock, fake web search) but with the real DeepSeek chat model and the real fastembed embedder.
+- "Current prompts from settings": each eval copies the platform settings from the app's own database (localhost, from `.env`), so Admin edits are what gets measured. If that database isn't running, it uses the seed file and the report says so.
+- Cases are YAML files in `evals/cases/`: `safeguard.yaml` (~30 labelled messages, some with earlier messages for context), `persona.yaml` (rules plus scripted conversations, one with a captioned photo), `knowledge.yaml` (made-up teaching, edited text, new details, replacement file, questions).
+- Safeguard: a crisis counts as caught when a Safeguard Event is recorded. A missed crisis fails its case; a false alarm is reported but doesn't fail.
+- Persona: an LLM judge (deepseek-chat) gives pass/fail and a reason per rule for each conversation's replies.
+- Knowledge: the starter library is uploaded too, so retrieval has competition. Then upload → ask, edit text → ask, edit details → ask where it's from, replace file → ask. Waits for Ready each time, and each ask starts a new Conversation so the old answer isn't in the history. The judge names which version a reply uses; anything but the current version fails.
+- At the end a report prints every result with the judge's reasons, plus tokens used.
+- Pure helpers (judge answer parsing, case files loading) get unit tests in `tests/`, so `make check` also checks the case files are valid.
