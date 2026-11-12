@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 RECENT_CHECK_INS_LIMIT = 10
 CHECK_INS_TOLD_TO_MODEL = 5
 CHECK_INS_LOOKED_BACK_FOR_IGNORES = 100
+CHECK_INS_LOOKED_BACK_FOR_LAST_SENT = 100
 MEMORY_INTRO = "What you remember about them:"
 PAUSE_LENGTHS = {
     PauseLength.DAY: timedelta(days=1),
@@ -470,6 +471,26 @@ class CheckInService:
             Each Check-in and its status, newest first.
         """
         return self._recent(user, RECENT_CHECK_INS_LIMIT)
+
+    def last_sent(self, user: User) -> RecentCheckIn | None:
+        """Find the newest Check-in that was actually sent to a User.
+
+        Args:
+            user: The User.
+
+        Returns:
+            The newest Check-in that wasn't skipped, with its status, or None
+            if none was sent lately.
+        """
+        recent = self._recent(user, CHECK_INS_LOOKED_BACK_FOR_LAST_SENT)
+        return next(
+            (
+                entry
+                for entry in recent
+                if entry.check_in.outcome != CheckInOutcome.SKIPPED
+            ),
+            None,
+        )
 
     def kinds_for(self, user: User) -> list[CheckInKind]:
         """List the Check-in Kinds that may be sent to a User.

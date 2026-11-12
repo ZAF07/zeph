@@ -11,9 +11,11 @@ from companion.core.ports import Clock, Repositories
 
 ONBOARDING_NAME_CATEGORY_SETTING = "onboarding_name_memory_category"
 ONBOARDING_REASONS_CATEGORY_SETTING = "onboarding_reasons_memory_category"
-ONBOARDING_CATEGORY_SETTINGS = (
+HOME_GOALS_CATEGORY_SETTING = "home_goals_memory_category"
+CATEGORY_NAME_SETTINGS = (
     ONBOARDING_NAME_CATEGORY_SETTING,
     ONBOARDING_REASONS_CATEGORY_SETTING,
+    HOME_GOALS_CATEGORY_SETTING,
 )
 
 
@@ -100,7 +102,7 @@ class MemoryCategoryService:
             )
         )
         if saved.name != category.name:
-            self._rename_in_onboarding_settings(admin, category.name, saved.name)
+            self._rename_in_settings(admin, category.name, saved.name)
         return saved
 
     def set_archived(self, category_id: UUID, archived: bool) -> MemoryCategory:
@@ -173,10 +175,8 @@ class MemoryCategoryService:
             name=name, description=description, always_include=details.always_include
         )
 
-    def _rename_in_onboarding_settings(
-        self, admin: User, old_name: str, new_name: str
-    ) -> None:
-        """Point the onboarding settings that named a category at its new name.
+    def _rename_in_settings(self, admin: User, old_name: str, new_name: str) -> None:
+        """Point the settings that named a category at its new name.
 
         Args:
             admin: The Admin who renamed it.
@@ -186,7 +186,7 @@ class MemoryCategoryService:
         settings = self._repositories.platform_settings
         renamed = {
             key: new_name
-            for key in ONBOARDING_CATEGORY_SETTINGS
+            for key in CATEGORY_NAME_SETTINGS
             if settings.get(key) == old_name
         }
         if renamed:

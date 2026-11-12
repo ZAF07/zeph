@@ -18,6 +18,7 @@ from companion.core.check_in_kinds import CheckInKindService
 from companion.core.check_ins import CheckInService
 from companion.core.conversations import ConversationService, ConversationServices
 from companion.core.helplines import HelplineService
+from companion.core.home import HomeService
 from companion.core.incoming_messages import IncomingMessageHandler
 from companion.core.knowledge import KnowledgeService
 from companion.core.knowledge_retrieval import KnowledgeRetrieval
@@ -241,6 +242,10 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 repositories=dependencies.repositories,
                 conversation_engine=conversation_engine,
                 auth_accounts=dependencies.auth_accounts,
+            ),
+            home_service=HomeService(
+                repositories=dependencies.repositories,
+                check_in_service=check_in_service,
             ),
             platform_settings=dependencies.repositories.platform_settings,
             telegram_bot_username=dependencies.telegram_bot_username,

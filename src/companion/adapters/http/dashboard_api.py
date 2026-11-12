@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
 from companion.core.check_ins import CheckInService, RecentCheckIn
+from companion.core.home import Home, HomeService
 from companion.core.message_retention import RETENTION_DAYS_SETTING
 from companion.core.models import (
     ChatSetting,
@@ -19,6 +20,7 @@ from companion.core.models import (
     ConnectionTokenStatus,
     ConversationSummary,
     MemoryGroup,
+    MemoryItem,
     MemorySource,
     OnboardingAnswers,
     PauseLength,
@@ -176,6 +178,40 @@ class MemoryGroupResponse(BaseModel):
     items: list[MemoryItemResponse]
 
 
+class RememberedItemResponse(MemoryItemResponse):
+    """A Memory Item with the name of its Memory Category."""
+
+    category: str
+
+
+class HomeCheckInsResponse(BaseModel):
+    """A User's Check-in status and the last Check-in sent; never a next time."""
+
+    enabled: bool
+    frequency: CheckInFrequency
+    quiet_hours_start: time
+    quiet_hours_end: time
+    paused: bool
+    paused_until: datetime | None
+    pause_changed_in_chat_at: datetime | None
+    last_sent: RecentCheckInResponse | None
+
+
+class HomeResponse(BaseModel):
+    """What the Dashboard home shows a User."""
+
+    name: str | None
+    time_zone: str | None
+    telegram_connection: TelegramConnectionResponse | None
+    telegram_chat_url: str
+    last_conversation_at: datetime | None
+    check_ins: HomeCheckInsResponse
+    user_memory_enabled: bool
+    goals: list[MemoryItemResponse]
+    recently_remembered: list[RememberedItemResponse]
+    ai_notice: str
+
+
 class MemoryItemsResponse(BaseModel):
     """A User's Memory Items by Memory Category, in category order."""
 
@@ -197,6 +233,24 @@ class ConversationSummariesResponse(BaseModel):
     summaries: list[ConversationSummaryResponse]
 
 
+def to_memory_item_response(item: MemoryItem) -> MemoryItemResponse:
+    """Describe a Memory Item for the Dashboard.
+
+    Args:
+        item: The Memory Item.
+
+    Returns:
+        The response body.
+    """
+    return MemoryItemResponse(
+        id=str(item.id),
+        content=item.content,
+        source=item.source,
+        created_at=item.created_at,
+        updated_at=item.updated_at,
+    )
+
+
 def to_memory_items_response(groups: list[MemoryGroup]) -> MemoryItemsResponse:
     """Describe a User's Memory Items for the Dashboard.
 
@@ -210,16 +264,7 @@ def to_memory_items_response(groups: list[MemoryGroup]) -> MemoryItemsResponse:
         groups=[
             MemoryGroupResponse(
                 category=group.category.name,
-                items=[
-                    MemoryItemResponse(
-                        id=str(item.id),
-                        content=item.content,
-                        source=item.source,
-                        created_at=item.created_at,
-                        updated_at=item.updated_at,
-                    )
-                    for item in group.items
-                ],
+                items=[to_memory_item_response(item) for item in group.items],
             )
             for group in groups
         ]
@@ -293,6 +338,7 @@ def build_dashboard_api_router(
     check_in_service: CheckInService,
     telegram_connection_service: TelegramConnectionService,
     user_data_service: UserDataService,
+    home_service: HomeService,
     platform_settings: PlatformSettingsRepository,
     telegram_bot_username: str,
 ) -> APIRouter:
@@ -308,6 +354,7 @@ def build_dashboard_api_router(
         check_in_service: Keeps the User's Check-in settings.
         telegram_connection_service: Issues tokens and reports connection status.
         user_data_service: Deletes the User's data or account.
+        home_service: Gathers what the Dashboard home shows.
         platform_settings: Admin-managed wording shown on the Dashboard.
         telegram_bot_username: The Companion's Telegram @username, for deep links.
 
@@ -315,6 +362,7 @@ def build_dashboard_api_router(
         The router.
     """
     router = APIRouter(prefix="/api")
+    telegram_chat_url = f"https://t.me/{telegram_bot_username}"
 
     def to_check_ins_response(user: User) -> CheckInsResponse:
         """Describe a User's Check-in settings and recent Check-ins.
@@ -359,10 +407,63 @@ def build_dashboard_api_router(
         """
         return ConnectionTokenResponse(
             token=token.token,
-            deep_link_url=f"https://t.me/{telegram_bot_username}?start={token.token}",
+            deep_link_url=f"{telegram_chat_url}?start={token.token}",
             bot_username=telegram_bot_username,
             expires_at=token.expires_at,
             status=token_status,
+        )
+
+    def to_home_response(user: User, home: Home) -> HomeResponse:
+        """Describe a User's Dashboard home.
+
+        Args:
+            user: The User.
+            home: What their home shows.
+
+        Returns:
+            The response body, with the pause as it stands right now.
+        """
+        settings = user.check_ins
+        connection = home.telegram_connection
+        return HomeResponse(
+            name=user.name,
+            time_zone=user.time_zone,
+            telegram_connection=(
+                TelegramConnectionResponse(
+                    telegram_username=connection.telegram_username,
+                    connected_at=connection.connected_at,
+                )
+                if connection
+                else None
+            ),
+            telegram_chat_url=telegram_chat_url,
+            last_conversation_at=home.last_conversation_at,
+            check_ins=HomeCheckInsResponse(
+                enabled=settings.enabled,
+                frequency=settings.frequency,
+                quiet_hours_start=settings.quiet_hours_start,
+                quiet_hours_end=settings.quiet_hours_end,
+                paused=home.check_ins_paused,
+                paused_until=settings.paused_until if home.check_ins_paused else None,
+                pause_changed_in_chat_at=user.settings_changed_in_chat.get(
+                    ChatSetting.CHECK_IN_PAUSE
+                ),
+                last_sent=(
+                    to_recent_check_in_response(home.last_check_in)
+                    if home.last_check_in
+                    else None
+                ),
+            ),
+            user_memory_enabled=user.user_memory_enabled,
+            goals=[to_memory_item_response(item) for item in home.goals],
+            recently_remembered=[
+                RememberedItemResponse(
+                    **to_memory_item_response(remembered.item).model_dump(),
+                    category=remembered.category,
+                )
+                for remembered in home.recently_remembered
+            ],
+            ai_notice=platform_settings.get("ai_notice_short"),
         )
 
     @router.get("/me")
@@ -480,6 +581,19 @@ def build_dashboard_api_router(
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
             ) from error
+
+    @router.get("/home")
+    def get_home(user: Annotated[User, Depends(current_user)]) -> HomeResponse:
+        """Return what the Dashboard home shows the User.
+
+        Args:
+            user: The signed-in User.
+
+        Returns:
+            Their Telegram Connection, Check-in status, Goals, newest Memory
+            Items and the AI notice.
+        """
+        return to_home_response(user, home_service.get(user))
 
     @router.get("/check-ins")
     def get_check_ins(user: Annotated[User, Depends(current_user)]) -> CheckInsResponse:

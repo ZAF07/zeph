@@ -348,6 +348,10 @@ reply_data_deletion_cancelled_note: >-
 onboarding_name_memory_category: Life details
 onboarding_reasons_memory_category: Goals
 
+# The Memory Category shown as "What you're working toward" on the Dashboard
+# home.
+home_goals_memory_category: Goals
+
 # What the model is told about the sticker tool. The stickers that have a
 # "when to use" note are listed after it, by number.
 sticker_tool_description: >-

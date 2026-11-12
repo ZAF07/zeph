@@ -3,6 +3,7 @@ import type {
   CheckInStatus,
   RecentCheckIn,
 } from "@/lib/api-client";
+import { dateParts } from "@/lib/dates";
 
 /** The frequencies a User can pick, in the order they are shown. */
 export const checkInFrequencyOptions: {
@@ -53,21 +54,6 @@ export function toTimeFieldValue(timeOfDay: string): string {
 }
 
 /**
- * Splits a moment into named date parts, like its weekday and month.
- *
- * @param moment - The moment.
- * @param options - Which parts to write and how.
- * @returns A function that gives one part's text, or "" if it has none.
- */
-function dateParts(
-  moment: Date,
-  options: Intl.DateTimeFormatOptions,
-): (type: Intl.DateTimeFormatPartTypes) => string {
-  const parts = new Intl.DateTimeFormat("en-GB", options).formatToParts(moment);
-  return (type) => parts.find((entry) => entry.type === type)?.value ?? "";
-}
-
-/**
  * Says how long Check-ins are paused for, like "Paused until Thursday,
  * 12 November."
  *
@@ -79,8 +65,22 @@ export function pausedText(
   pausedUntil: string | null,
   timeZone?: string,
 ): string {
+  return `Paused ${pauseEndText(pausedUntil, timeZone)}.`;
+}
+
+/**
+ * Says when a pause on Check-ins ends, like "until Thursday, 12 November".
+ *
+ * @param pausedUntil - When the pause ends; null until the User resumes.
+ * @param timeZone - The time zone to show the day in.
+ * @returns The words after "Paused".
+ */
+export function pauseEndText(
+  pausedUntil: string | null,
+  timeZone?: string,
+): string {
   if (pausedUntil === null) {
-    return "Paused until you resume.";
+    return "until you resume";
   }
   const part = dateParts(new Date(pausedUntil), {
     weekday: "long",
@@ -88,7 +88,7 @@ export function pausedText(
     month: "long",
     timeZone,
   });
-  return `Paused until ${part("weekday")}, ${part("day")} ${part("month")}.`;
+  return `until ${part("weekday")}, ${part("day")} ${part("month")}`;
 }
 
 /**
@@ -102,16 +102,28 @@ export function formatCheckInSentAt(
   isoTimestamp: string,
   timeZone?: string,
 ): string {
-  const moment = new Date(isoTimestamp);
-  const time = new Intl.DateTimeFormat("en-US", {
+  return `${formatCheckInDay(isoTimestamp, timeZone)} · ${formatTimeOfDay(isoTimestamp, timeZone)}`;
+}
+
+/**
+ * Writes the time of day of a moment, like "6:42 pm".
+ *
+ * @param isoTimestamp - The moment, as the backend sends it.
+ * @param timeZone - The time zone to show it in.
+ * @returns The time.
+ */
+export function formatTimeOfDay(
+  isoTimestamp: string,
+  timeZone?: string,
+): string {
+  return new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
     timeZone,
   })
-    .format(moment)
+    .format(new Date(isoTimestamp))
     .replace(/\s/g, " ")
     .toLowerCase();
-  return `${formatCheckInDay(isoTimestamp, timeZone)} · ${time}`;
 }
 
 /**

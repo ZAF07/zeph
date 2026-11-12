@@ -9,23 +9,9 @@ import {
   secondaryButton,
 } from "@/components/button-styles";
 import { DeleteIcon } from "@/components/DeleteIcon";
-import type { MemoryGroup, MemoryItem } from "@/lib/api-client";
-import { formatShortDay } from "@/lib/dates";
+import type { MemoryGroup } from "@/lib/api-client";
+import { memorySourceLabel } from "@/lib/memories";
 import { useApiClient } from "@/lib/use-api-client";
-
-/**
- * Says where a Memory Item came from and when, like "From a conversation ·
- * 2 Oct".
- *
- * @param item - The Memory Item.
- * @param timeZone - The User's time zone.
- * @returns The source line.
- */
-function sourceLabel(item: MemoryItem, timeZone?: string): string {
-  const origin =
-    item.source === "onboarding" ? "From onboarding" : "From a conversation";
-  return `${origin} · ${formatShortDay(item.updated_at, timeZone)}`;
-}
 
 /**
  * The Memories tab: Memory Items grouped by Memory Category, each deletable,
@@ -133,7 +119,7 @@ export function MemoryItemsList({
                       {group.category}
                     </span>
                     <span className="text-caption text-ink-muted">
-                      {sourceLabel(item, timeZone)}
+                      {memorySourceLabel(item, timeZone)}
                     </span>
                   </span>
                 </span>
