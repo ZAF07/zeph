@@ -121,7 +121,7 @@ A single fact about a User (e.g. a goal, value or preference), belonging to one 
 _Avoid_: Memory, fact, note
 
 **Memory Category**:
-The kind of fact a Memory Item records, used to fetch only relevant items for each reply. An "always include" category's items go into every reply. Managed by Admins; each has a unique name (ignoring case). Can be archived but never deleted: an archived category keeps its Memory Items, which the User still sees and can delete, but gets no new ones and its items no longer go into replies, even if it is "always include". Restoring it undoes all that.
+The kind of fact a Memory Item records, used to fetch only relevant items for each reply. An "always include" category's items go into every reply. Managed by Admins; each has a unique name (ignoring case). Can be archived but never deleted: an archived category keeps its Memory Items, which the User still sees and can delete, but gets no new ones and its items no longer go into replies, even if it is "always include". Restoring it undoes all that. One category (Goals, to start) holds a User's goals; the Dashboard shows its items as what the User is working toward, and renaming it keeps that link.
 _Avoid_: Type, tag, label
 
 **Conversation Summary**:
