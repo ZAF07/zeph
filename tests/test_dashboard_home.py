@@ -10,6 +10,7 @@ from tests.fakes import (
     FakeClock,
     FakeScheduler,
     ScriptedChatModel,
+    ToolCall,
 )
 from tests.telegram_helpers import (
     auth_headers,
@@ -27,6 +28,7 @@ from tests.test_check_in_sending import (
 )
 from tests.test_onboarding import onboarding_answers
 from tests.test_post_conversation import have_conversation, processing_answer
+from tests.test_settings_via_chat import reply_call
 
 
 def get_home(client: TestClient, headers: dict[str, str]) -> dict[str, Any]:
@@ -202,6 +204,30 @@ def test_home_shows_when_check_ins_are_paused_until(
     assert check_ins["paused_until"] == (clock.now() + timedelta(weeks=1)).isoformat(
         timespec="seconds"
     ).replace("+00:00", "Z")
+    assert check_ins["pause_changed_in_chat_at"] is None
+
+
+def test_home_says_when_check_ins_were_paused_in_chat(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+) -> None:
+    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    paused_at = iso(clock)
+    reply_call(
+        client,
+        chat_model,
+        "give me a week off from check-ins",
+        ToolCall("pause_check_ins", {"length": "week"}),
+        "Done.",
+    )
+
+    check_ins = get_home(client, headers)["check_ins"]
+
+    assert check_ins["paused"] is True
+    assert check_ins["pause_changed_in_chat_at"] == paused_at
 
 
 def test_home_needs_a_signed_in_user(client: TestClient) -> None:

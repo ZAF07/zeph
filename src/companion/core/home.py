@@ -77,7 +77,9 @@ class HomeService:
             user.id
         )
         goals, recently_remembered = (
-            self._memory(user) if user.user_memory_enabled else ([], [])
+            self._goals_and_recently_remembered(user)
+            if user.user_memory_enabled
+            else ([], [])
         )
         return Home(
             telegram_connection=self._repositories.telegram_connections.get_by_user(
@@ -92,7 +94,9 @@ class HomeService:
             recently_remembered=recently_remembered,
         )
 
-    def _memory(self, user: User) -> tuple[list[MemoryItem], list[RememberedItem]]:
+    def _goals_and_recently_remembered(
+        self, user: User
+    ) -> tuple[list[MemoryItem], list[RememberedItem]]:
         """Pick a User's Goals and newest Memory Items.
 
         Args:

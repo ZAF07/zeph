@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   formatCheckInDay,
   formatCheckInSentAt,
+  formatTimeOfDay,
+  pauseEndText,
   pausedText,
   toTimeFieldValue,
 } from "@/lib/check-ins";
@@ -31,6 +33,19 @@ describe("check-in wording", () => {
   it("writes the day of a skipped Check-in, without a time", () => {
     expect(formatCheckInDay("2026-11-06T17:00:00Z", "Asia/Singapore")).toBe(
       "Sat 7 Nov",
+    );
+  });
+
+  it("says when a pause ends without the word Paused", () => {
+    expect(pauseEndText("2026-11-11T17:00:00Z", "Asia/Singapore")).toBe(
+      "until Thursday, 12 November",
+    );
+    expect(pauseEndText(null)).toBe("until you resume");
+  });
+
+  it("writes a time of day in the User's time zone", () => {
+    expect(formatTimeOfDay("2026-11-11T11:48:00Z", "Asia/Singapore")).toBe(
+      "7:48 pm",
     );
   });
 });

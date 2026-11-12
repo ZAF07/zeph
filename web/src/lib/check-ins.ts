@@ -3,6 +3,7 @@ import type {
   CheckInStatus,
   RecentCheckIn,
 } from "@/lib/api-client";
+import { dateParts } from "@/lib/dates";
 
 /** The frequencies a User can pick, in the order they are shown. */
 export const checkInFrequencyOptions: {
@@ -50,21 +51,6 @@ export function recentCheckInTitle(checkIn: RecentCheckIn): string {
  */
 export function toTimeFieldValue(timeOfDay: string): string {
   return timeOfDay.slice(0, 5);
-}
-
-/**
- * Splits a moment into named date parts, like its weekday and month.
- *
- * @param moment - The moment.
- * @param options - Which parts to write and how.
- * @returns A function that gives one part's text, or "" if it has none.
- */
-function dateParts(
-  moment: Date,
-  options: Intl.DateTimeFormatOptions,
-): (type: Intl.DateTimeFormatPartTypes) => string {
-  const parts = new Intl.DateTimeFormat("en-GB", options).formatToParts(moment);
-  return (type) => parts.find((entry) => entry.type === type)?.value ?? "";
 }
 
 /**

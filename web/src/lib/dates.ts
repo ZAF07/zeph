@@ -1,4 +1,19 @@
 /**
+ * Splits a moment into named date parts, like its weekday and month.
+ *
+ * @param moment - The moment.
+ * @param options - Which parts to write and how.
+ * @returns A function that gives one part's text, or "" if it has none.
+ */
+export function dateParts(
+  moment: Date,
+  options: Intl.DateTimeFormatOptions,
+): (type: Intl.DateTimeFormatPartTypes) => string {
+  const parts = new Intl.DateTimeFormat("en-GB", options).formatToParts(moment);
+  return (type) => parts.find((entry) => entry.type === type)?.value ?? "";
+}
+
+/**
  * Writes a day like "2 Oct 2026".
  *
  * @param isoTimestamp - The moment, as the backend sends it.

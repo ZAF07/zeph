@@ -266,7 +266,8 @@ export type RememberedItem = MemoryItem & { category: string };
 
 /**
  * A User's Check-in status for the Dashboard home, and the last Check-in
- * sent. There is never a next Check-in time.
+ * sent. `pause_changed_in_chat_at` says when the pause was last changed in
+ * chat, if it was. There is never a next Check-in time.
  */
 export type HomeCheckIns = {
   enabled: boolean;
@@ -275,6 +276,7 @@ export type HomeCheckIns = {
   quiet_hours_end: string;
   paused: boolean;
   paused_until: string | null;
+  pause_changed_in_chat_at: string | null;
   last_sent: RecentCheckIn | null;
 };
 

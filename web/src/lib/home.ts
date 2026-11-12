@@ -9,7 +9,7 @@ import {
   formatTimeOfDay,
   recentCheckInTitle,
 } from "@/lib/check-ins";
-import { formatAddedDay } from "@/lib/dates";
+import { dateParts, formatAddedDay } from "@/lib/dates";
 
 const replyLabels: Record<CheckInStatus, string | null> = {
   replied: "you replied",
@@ -51,14 +51,12 @@ export function greeting(
  * @returns The date.
  */
 export function todayHeading(now: Date, timeZone?: string): string {
-  const parts = new Intl.DateTimeFormat("en-GB", {
+  const part = dateParts(now, {
     weekday: "long",
     day: "numeric",
     month: "long",
     timeZone,
-  }).formatToParts(now);
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((entry) => entry.type === type)?.value ?? "";
+  });
   return `${part("weekday")}, ${part("day")} ${part("month")}`;
 }
 

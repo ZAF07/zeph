@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 RECENT_CHECK_INS_LIMIT = 10
 CHECK_INS_TOLD_TO_MODEL = 5
 CHECK_INS_LOOKED_BACK_FOR_IGNORES = 100
+CHECK_INS_LOOKED_BACK_FOR_LAST_SENT = 100
 MEMORY_INTRO = "What you remember about them:"
 PAUSE_LENGTHS = {
     PauseLength.DAY: timedelta(days=1),
@@ -481,7 +482,7 @@ class CheckInService:
             The newest Check-in that wasn't skipped, with its status, or None
             if none was sent lately.
         """
-        recent = self._recent(user, CHECK_INS_LOOKED_BACK_FOR_IGNORES)
+        recent = self._recent(user, CHECK_INS_LOOKED_BACK_FOR_LAST_SENT)
         return next(
             (
                 entry

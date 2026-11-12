@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
 import type { HomeCheckIns } from "@/lib/api-client";
 import { pauseEndText } from "@/lib/check-ins";
 import {
@@ -44,12 +45,18 @@ export function HomeCheckInsCard({
           Zeph only replies when you message
         </p>
       ) : checkIns.paused ? (
-        <p className={statusLine}>
-          <span className={`${pill} bg-yellow-tint text-yellow-deep`}>
-            Paused
-          </span>
-          {pauseEndText(checkIns.paused_until, timeZone)}
-        </p>
+        <div className="flex flex-col gap-1.5">
+          <p className={statusLine}>
+            <span className={`${pill} bg-yellow-tint text-yellow-deep`}>
+              Paused
+            </span>
+            {pauseEndText(checkIns.paused_until, timeZone)}
+          </p>
+          <ChangedInChatCaption
+            changedAt={checkIns.pause_changed_in_chat_at ?? undefined}
+            timeZone={timeZone}
+          />
+        </div>
       ) : (
         <div className="flex flex-col gap-1.5">
           <p className={statusLine}>

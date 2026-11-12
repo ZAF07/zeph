@@ -21,6 +21,7 @@ function checkInsWith(overrides: Partial<HomeCheckIns> = {}): HomeCheckIns {
     quiet_hours_end: "07:30:00",
     paused: false,
     paused_until: null,
+    pause_changed_in_chat_at: null,
     last_sent: {
       id: "c1",
       outcome: "sent",
@@ -156,6 +157,7 @@ describe("DashboardHome", () => {
         check_ins: checkInsWith({
           paused: true,
           paused_until: "2026-11-18T03:00:00Z",
+          pause_changed_in_chat_at: "2026-11-11T03:00:00Z",
         }),
       }),
     );
@@ -167,6 +169,9 @@ describe("DashboardHome", () => {
     expect(within(checkIns).getByText("Paused")).toBeInTheDocument();
     expect(
       within(checkIns).getByText("until Wednesday, 18 November"),
+    ).toBeInTheDocument();
+    expect(
+      within(checkIns).getByText("Changed in chat · 11 Nov"),
     ).toBeInTheDocument();
     expect(
       within(checkIns).getByText(/^Last Check-in: a casual hello/),

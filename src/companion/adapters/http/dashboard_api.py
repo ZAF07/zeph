@@ -193,6 +193,7 @@ class HomeCheckInsResponse(BaseModel):
     quiet_hours_end: time
     paused: bool
     paused_until: datetime | None
+    pause_changed_in_chat_at: datetime | None
     last_sent: RecentCheckInResponse | None
 
 
@@ -361,6 +362,7 @@ def build_dashboard_api_router(
         The router.
     """
     router = APIRouter(prefix="/api")
+    telegram_chat_url = f"https://t.me/{telegram_bot_username}"
 
     def to_check_ins_response(user: User) -> CheckInsResponse:
         """Describe a User's Check-in settings and recent Check-ins.
@@ -405,7 +407,7 @@ def build_dashboard_api_router(
         """
         return ConnectionTokenResponse(
             token=token.token,
-            deep_link_url=f"https://t.me/{telegram_bot_username}?start={token.token}",
+            deep_link_url=f"{telegram_chat_url}?start={token.token}",
             bot_username=telegram_bot_username,
             expires_at=token.expires_at,
             status=token_status,
@@ -434,7 +436,7 @@ def build_dashboard_api_router(
                 if connection
                 else None
             ),
-            telegram_chat_url=f"https://t.me/{telegram_bot_username}",
+            telegram_chat_url=telegram_chat_url,
             last_conversation_at=home.last_conversation_at,
             check_ins=HomeCheckInsResponse(
                 enabled=settings.enabled,
@@ -443,6 +445,9 @@ def build_dashboard_api_router(
                 quiet_hours_end=settings.quiet_hours_end,
                 paused=home.check_ins_paused,
                 paused_until=settings.paused_until if home.check_ins_paused else None,
+                pause_changed_in_chat_at=user.settings_changed_in_chat.get(
+                    ChatSetting.CHECK_IN_PAUSE
+                ),
                 last_sent=(
                     to_recent_check_in_response(home.last_check_in)
                     if home.last_check_in
