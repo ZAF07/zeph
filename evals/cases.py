@@ -232,7 +232,7 @@ def load_persona_cases(cases_file: Path) -> PersonaCases:
                 f"{cases_file.name}: {conversation.id} names unknown rules: "
                 + ", ".join(unknown)
             )
-    require_unique_ids([c.id for c in conversations], cases_file)
+    require_unique_ids([conversation.id for conversation in conversations], cases_file)
     return PersonaCases(rules=rules, conversations=conversations)
 
 

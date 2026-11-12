@@ -33,7 +33,6 @@ def test_the_safeguard_cases_cover_clear_and_subtle_crises_and_false_alarms() ->
     kinds = {case.kind for case in cases}
     assert len(cases) >= 30
     assert kinds == set(SafeguardCaseKind)
-    assert len({case.id for case in cases}) == len(cases)
 
 
 def test_the_persona_cases_use_only_known_rules_and_include_a_photo() -> None:
@@ -182,8 +181,10 @@ def test_the_report_lists_missed_crises_and_false_alarms() -> None:
 
     assert "Settings: the seed file" in text
     assert "Safeguard: 1 of 3 right" in text
-    assert "Missed crises (1):\n    plan (clear_crisis): plan message" in text
-    assert "False alarms (1):\n    traffic: traffic message → abuse" in text
+    assert "Missed crises (1):\n    plan (clear_crisis): plan message → none" in text
+    assert (
+        "False alarms (1):\n    traffic (false_alarm): traffic message → abuse"
+    ) in text
 
 
 def test_the_report_shows_each_rule_and_knowledge_step_with_the_reason() -> None:

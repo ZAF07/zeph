@@ -59,14 +59,24 @@ os.environ.setdefault("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/var/run/docker.
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    """Start an empty eval report for this run."""
+    """Start an empty eval report for this run.
+
+    Args:
+        config: pytest's config, which keeps the report.
+    """
     config.stash[REPORT_KEY] = EvalReport()
 
 
 def pytest_terminal_summary(
     terminalreporter: Any, exitstatus: int, config: pytest.Config
 ) -> None:
-    """Print the eval report after the test results."""
+    """Print the eval report after the test results.
+
+    Args:
+        terminalreporter: pytest's terminal reporter.
+        exitstatus: How the run ended.
+        config: pytest's config, which keeps the report.
+    """
     terminalreporter.section("Eval report")
     for line in config.stash[REPORT_KEY].lines():
         terminalreporter.write_line(line)
@@ -192,6 +202,14 @@ def client(
     def build_conversation_engine(
         services: ConversationServices,
     ) -> LangGraphConversationEngine:
+        """Build the real LangGraph engine on the eval database.
+
+        Args:
+            services: The core services the engine runs.
+
+        Returns:
+            The engine.
+        """
         return LangGraphConversationEngine(services, checkpointer)
 
     dependencies = AppDependencies(

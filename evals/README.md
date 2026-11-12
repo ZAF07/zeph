@@ -27,6 +27,8 @@ There are three:
    platform settings (prompts, models, Knowledge intro, chunks per reply...)
    from the app's database, so they measure what Admins have set. If it isn't
    running, they use the seed file. The report's first line says which.
+   The settings are only read, never changed; the database is the one `.env`
+   points at (host `postgres` is read as `localhost`).
 
 The first run downloads the fastembed model (about 70 MB), like the app does.
 

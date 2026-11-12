@@ -26,7 +26,16 @@ PERSONA_CASES = load_persona_cases(CASES_DIR / "persona.yaml")
 def send_and_collect_replies(
     client: TestClient, chat_channel: FakeChatChannel, message: PersonaMessage
 ) -> list[str]:
-    """Send one scripted message through the webhook and return Zeph's texts."""
+    """Send one scripted message through the webhook and return Zeph's texts.
+
+    Args:
+        client: The backend's test client.
+        chat_channel: Records what Zeph sends.
+        message: The scripted message, text or a captioned photo.
+
+    Returns:
+        The texts Zeph sent in reply, in order.
+    """
     if message.photo:
         update = telegram_message_update(
             {"photo": [{"file_id": "photo-1", "width": 800}], "caption": message.text}
@@ -39,7 +48,14 @@ def send_and_collect_replies(
 
 
 def person_line(message: PersonaMessage) -> str:
-    """Write the person's message as one line of the judge's transcript."""
+    """Write the person's message as one line of the judge's transcript.
+
+    Args:
+        message: The scripted message.
+
+    Returns:
+        The line, e.g. "Person: hey".
+    """
     if message.photo:
         return f"Person: (sends a photo with the caption) {message.text}"
     return f"Person: {message.text}"
@@ -48,7 +64,7 @@ def person_line(message: PersonaMessage) -> str:
 @pytest.mark.parametrize(
     "conversation",
     PERSONA_CASES.conversations,
-    ids=[c.id for c in PERSONA_CASES.conversations],
+    ids=[conversation.id for conversation in PERSONA_CASES.conversations],
 )
 def test_replies_keep_the_persona_rules(
     conversation: PersonaConversation,

@@ -19,14 +19,24 @@ SAFEGUARD_CASES = load_safeguard_cases(CASES_DIR / "safeguard.yaml")
 
 
 def safeguard_events(client: TestClient, admin: dict[str, str]) -> list[Any]:
-    """Fetch the Safeguard Events, newest first, through the admin API."""
+    """Fetch the Safeguard Events, newest first, through the admin API.
+
+    Args:
+        client: The backend's test client.
+        admin: An Admin's Dashboard API headers.
+
+    Returns:
+        The events as the API gives them.
+    """
     response = client.get("/api/admin/safeguard-events", headers=admin)
     assert response.status_code == 200, response.text
     events: list[Any] = response.json()["events"]
     return events
 
 
-@pytest.mark.parametrize("case", SAFEGUARD_CASES, ids=[c.id for c in SAFEGUARD_CASES])
+@pytest.mark.parametrize(
+    "case", SAFEGUARD_CASES, ids=[case.id for case in SAFEGUARD_CASES]
+)
 def test_the_safeguard_catches_every_real_crisis(
     case: SafeguardCase,
     client: TestClient,
