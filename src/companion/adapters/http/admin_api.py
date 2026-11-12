@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -85,6 +85,7 @@ from companion.core.stickers import (
     StickerSetNotFoundError,
     StickerSetUnavailableError,
 )
+from companion.core.usage import UsageLimiter
 
 
 class AdminUserResponse(BaseModel):
@@ -285,6 +286,29 @@ class CheckInLogResponse(BaseModel):
     """Check-in decisions, newest first."""
 
     entries: list[CheckInLogEntryResponse]
+
+
+class DailyUsageResponse(BaseModel):
+    """What one User used on one of their days. Counts only."""
+
+    day: date
+    user_id: str
+    user_name: str | None
+    user_email: str | None
+    message_count: int
+    tokens_in: int
+    tokens_out: int
+    web_search_count: int
+    message_limit_reached: bool
+    web_search_limit_reached: bool
+
+
+class UsageResponse(BaseModel):
+    """Usage per User per day, newest day first, with the limits in force."""
+
+    rows: list[DailyUsageResponse]
+    daily_message_limit: int
+    web_search_daily_limit: int
 
 
 class MemoryCategoryResponse(BaseModel):
@@ -638,6 +662,7 @@ def build_admin_api_router(
     sticker_library: StickerLibraryService,
     check_in_kind_service: CheckInKindService,
     check_in_service: CheckInService,
+    usage_limiter: UsageLimiter,
 ) -> APIRouter:
     """Build the admin API routes.
 
@@ -655,6 +680,7 @@ def build_admin_api_router(
         sticker_library: Manages the Sticker Library.
         check_in_kind_service: Manages Check-in Kinds.
         check_in_service: Lists Check-in decisions.
+        usage_limiter: Reports usage per User per day.
 
     Returns:
         The router.
@@ -1162,6 +1188,37 @@ def build_admin_api_router(
                 to_check_in_log_entry_response(logged)
                 for logged in check_in_service.list_log(days)
             ]
+        )
+
+    @router.get("/usage")
+    def list_usage(days: Annotated[int, Query(ge=1, le=365)] = 7) -> UsageResponse:
+        """List tokens, messages and web searches per User per day.
+
+        Args:
+            days: How many days to list, today included.
+
+        Returns:
+            The usage, newest day first, and the current limits.
+        """
+        report = usage_limiter.report(days)
+        return UsageResponse(
+            rows=[
+                DailyUsageResponse(
+                    day=row.day,
+                    user_id=str(row.user_id),
+                    user_name=row.user_name,
+                    user_email=row.user_email,
+                    message_count=row.message_count,
+                    tokens_in=row.tokens_in,
+                    tokens_out=row.tokens_out,
+                    web_search_count=row.web_search_count,
+                    message_limit_reached=row.message_limit_reached,
+                    web_search_limit_reached=row.web_search_limit_reached,
+                )
+                for row in report.rows
+            ],
+            daily_message_limit=report.daily_message_limit,
+            web_search_daily_limit=report.web_search_daily_limit,
         )
 
     @router.get("/stickers")

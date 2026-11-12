@@ -59,7 +59,9 @@ def test_deepseek_generates_a_reply() -> None:
         history=[ChatLine(role=ChatRole.USER, text="hi there")],
     )
 
-    assert reply.strip()
+    assert reply.text.strip()
+    assert reply.tokens_in > 0
+    assert reply.tokens_out > 0
 
 
 def test_deepseek_calls_an_offered_tool_and_uses_its_result() -> None:
@@ -92,7 +94,7 @@ def test_deepseek_calls_an_offered_tool_and_uses_its_result() -> None:
     )
 
     assert queries
-    assert "lantern" in reply.lower()
+    assert "lantern" in reply.text.lower()
 
 
 def test_tavily_searches_the_web_and_reads_a_page() -> None:

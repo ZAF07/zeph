@@ -12,10 +12,14 @@ from companion.core.models import (
     AccountIdentity,
     ChannelSticker,
     ChatLine,
+    ModelAnswer,
     StickerImage,
     WebSearchResult,
 )
 from companion.core.ports import ChatTool
+
+TOKENS_IN_PER_CALL = 120
+TOKENS_OUT_PER_CALL = 30
 
 
 @dataclass(frozen=True)
@@ -338,7 +342,7 @@ class ScriptedChatModel:
         instructions: str,
         history: list[ChatLine],
         tools: Sequence[ChatTool] = (),
-    ) -> str:
+    ) -> ModelAnswer:
         """Record the call and return the next scripted reply or answer.
 
         Args:
@@ -348,7 +352,8 @@ class ScriptedChatModel:
             tools: The tools the model may call.
 
         Returns:
-            The next scripted reply, or Safeguard answer for a Safeguard call.
+            The next scripted reply, or Safeguard answer for a Safeguard call,
+            with the same token counts for every call.
         """
         call = ChatModelCall(
             model=model, instructions=instructions, history=history, tools=list(tools)
@@ -389,7 +394,9 @@ class ScriptedChatModel:
                 answer = self._replies.pop(0)
         if isinstance(answer, Exception):
             raise answer
-        return answer
+        return ModelAnswer(
+            text=answer, tokens_in=TOKENS_IN_PER_CALL, tokens_out=TOKENS_OUT_PER_CALL
+        )
 
 
 class FakeEmbedder:

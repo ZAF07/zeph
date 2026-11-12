@@ -11,8 +11,9 @@ from companion.core.models import (
     MemoryCategory,
     MemoryItem,
 )
-from companion.core.ports import ChatModel, Repositories
+from companion.core.ports import Repositories
 from companion.core.response_composition import to_transcript_lines
+from companion.core.usage import UsageRecordingChatModel
 
 logger = logging.getLogger(__name__)
 
@@ -120,13 +121,16 @@ def format_memory(
 class MemoryRetrieval:
     """Finds the User Memory that matters for the message being answered."""
 
-    def __init__(self, repositories: Repositories, chat_model: ChatModel) -> None:
+    def __init__(
+        self, repositories: Repositories, chat_model: UsageRecordingChatModel
+    ) -> None:
         """Set up memory retrieval.
 
         Args:
             repositories: Where Users, Conversations, User Memory and
                 settings are stored.
-            chat_model: Picks the Memory Categories that matter.
+            chat_model: Picks the Memory Categories that matter and records
+                the tokens used.
         """
         self._repositories = repositories
         self._chat_model = chat_model
@@ -164,7 +168,9 @@ class MemoryRetrieval:
             for category in active_categories
             if not category.always_include and category.id in filled_category_ids
         ]
-        picked_ids = {category.id for category in self._pick(pickable, conversation_id)}
+        picked_ids = {
+            category.id for category in self._pick(pickable, user_id, conversation_id)
+        }
         chosen = [
             category
             for category in active_categories
@@ -183,12 +189,16 @@ class MemoryRetrieval:
         )
 
     def _pick(
-        self, categories: list[MemoryCategory], conversation_id: UUID
+        self,
+        categories: list[MemoryCategory],
+        user_id: UUID,
+        conversation_id: UUID,
     ) -> list[MemoryCategory]:
         """Ask the model which categories matter for the newest message.
 
         Args:
             categories: The categories it may pick from.
+            user_id: The User being answered.
             conversation_id: The Conversation the message is in.
 
         Returns:
@@ -201,6 +211,7 @@ class MemoryRetrieval:
         messages = self._repositories.conversations.list_messages(conversation_id)
         try:
             answer = self._chat_model.generate(
+                user_id=user_id,
                 model=settings.get("memory_retrieval_model"),
                 instructions=settings.get("memory_retrieval_prompt"),
                 history=[

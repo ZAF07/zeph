@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime, time
+from datetime import date, datetime, time
 from enum import StrEnum
 from typing import Any
 from uuid import UUID
@@ -401,6 +401,52 @@ class ChatLine:
 
     role: ChatRole
     text: str
+
+
+@dataclass(frozen=True)
+class ModelAnswer:
+    """What the chat model answered, and how many tokens it took.
+
+    Attributes:
+        text: The answer text.
+        tokens_in: Tokens the model read, across every round of tool calls.
+        tokens_out: Tokens the model wrote, across every round of tool calls.
+    """
+
+    text: str
+    tokens_in: int = 0
+    tokens_out: int = 0
+
+
+@dataclass(frozen=True)
+class DailyUsage:
+    """What one User used on one of their days. Counts only, never content.
+
+    Attributes:
+        day: The User's day.
+        user_id: The User's ID.
+        user_name: What the Companion calls them, if set.
+        user_email: Their account email, if known.
+        user_time_zone: Their time zone, which decides their day; None for UTC.
+        message_count: Messages that counted toward the daily message limit.
+        tokens_in: Tokens the chat model read for them.
+        tokens_out: Tokens the chat model wrote for them.
+        web_search_count: Web searches and page reads made for them.
+        message_limit_reached: True once a message was over the daily limit.
+        web_search_limit_reached: True once a web search was over its limit.
+    """
+
+    day: date
+    user_id: UUID
+    user_name: str | None
+    user_email: str | None
+    user_time_zone: str | None
+    message_count: int
+    tokens_in: int
+    tokens_out: int
+    web_search_count: int
+    message_limit_reached: bool
+    web_search_limit_reached: bool
 
 
 @dataclass(frozen=True)

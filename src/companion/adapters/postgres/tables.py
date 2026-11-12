@@ -268,6 +268,18 @@ daily_usage = Table(
     ),
     Column("day", Date, primary_key=True),
     Column("web_search_count", Integer, nullable=False, server_default=text("0")),
+    Column("message_count", Integer, nullable=False, server_default=text("0")),
+    Column("tokens_in", BigInteger, nullable=False, server_default=text("0")),
+    Column("tokens_out", BigInteger, nullable=False, server_default=text("0")),
+    Column(
+        "message_limit_reached", Boolean, nullable=False, server_default=text("false")
+    ),
+    Column(
+        "web_search_limit_reached",
+        Boolean,
+        nullable=False,
+        server_default=text("false"),
+    ),
 )
 
 stickers = Table(

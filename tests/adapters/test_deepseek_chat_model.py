@@ -71,7 +71,7 @@ def test_tool_calls_are_run_and_their_results_sent_back_until_a_reply() -> None:
         [search_tool()],
     )
 
-    assert reply == "Seneca was a Stoic."
+    assert reply.text == "Seneca was a Stoic."
     second_request = chat.received[1]
     assert second_request[1] == asks_for_search("seneca", "call_1")
     assert second_request[2] == ToolMessage("results for seneca", tool_call_id="call_1")
@@ -100,7 +100,7 @@ def test_after_too_many_tool_rounds_the_model_must_answer_without_tools() -> Non
 
     reply = answer_with_tools(chat.invoke, final.invoke, [], [search_tool()])
 
-    assert reply == "Here's what I found."
+    assert reply.text == "Here's what I found."
     assert len(chat.received) == MAX_TOOL_ROUNDS
     assert len(final.received[0]) == 2 * MAX_TOOL_ROUNDS
 
@@ -124,8 +124,40 @@ def test_a_tool_call_with_broken_arguments_is_sent_back_so_the_model_retries() -
         chat.invoke, ScriptedLangChainModel().invoke, [], [search_tool()]
     )
 
-    assert reply == "ok"
+    assert reply.text == "ok"
     assert chat.received[1][-1] == ToolMessage(
         "The arguments for web_search were not valid JSON. Try again.",
         tool_call_id="c1",
     )
+
+
+def with_usage(message: AIMessage, tokens_in: int, tokens_out: int) -> AIMessage:
+    message.usage_metadata = {
+        "input_tokens": tokens_in,
+        "output_tokens": tokens_out,
+        "total_tokens": tokens_in + tokens_out,
+    }
+    return message
+
+
+def test_tokens_are_added_up_across_every_tool_round() -> None:
+    chat = ScriptedLangChainModel(
+        with_usage(asks_for_search("seneca", "c1"), 100, 10),
+        with_usage(AIMessage("Seneca was a Stoic."), 250, 20),
+    )
+
+    reply = answer_with_tools(
+        chat.invoke, ScriptedLangChainModel().invoke, [], [search_tool()]
+    )
+
+    assert (reply.tokens_in, reply.tokens_out) == (350, 30)
+
+
+def test_a_response_without_usage_counts_as_no_tokens() -> None:
+    chat = ScriptedLangChainModel(AIMessage("hi"))
+
+    reply = answer_with_tools(
+        chat.invoke, ScriptedLangChainModel().invoke, [], [search_tool()]
+    )
+
+    assert (reply.tokens_in, reply.tokens_out) == (0, 0)

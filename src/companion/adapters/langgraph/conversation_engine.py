@@ -24,6 +24,7 @@ class TurnState(TypedDict, total=False):
     kind: str
     conversation_id: str
     risk_type: str
+    within_message_limit: bool
     memory: str
     knowledge: str
     reply_parts: list[str]
@@ -95,11 +96,13 @@ class LangGraphConversationEngine:
             Returns:
                 The risk type the Safeguard saw.
             """
-            risk_type = services.safeguard.assess(UUID(state["conversation_id"]))
+            risk_type = services.safeguard.assess(
+                UUID(state["conversation_id"]), UUID(state["user_id"])
+            )
             return {"risk_type": risk_type.value}
 
         def after_safeguard(state: TurnState) -> str:
-            """Pick the next step: the Crisis Reply, or a normal reply.
+            """Pick the next step: the Crisis Reply, or the daily limit check.
 
             Args:
                 state: The graph's state so far.
@@ -108,8 +111,49 @@ class LangGraphConversationEngine:
                 The name of the next step.
             """
             if state["risk_type"] == RiskType.NONE.value:
-                return "recall_memory"
+                return "check_message_limit"
             return "send_crisis_reply"
+
+        def check_message_limit(state: TurnState) -> TurnState:
+            """Count the message toward the User's daily message limit.
+
+            Args:
+                state: The graph's state so far.
+
+            Returns:
+                Whether the message is within the limit.
+            """
+            within_limit = services.usage_limiter.claim_message(UUID(state["user_id"]))
+            return {"within_message_limit": within_limit}
+
+        def after_message_limit(state: TurnState) -> str:
+            """Pick the next step: a normal reply, or the limit reply.
+
+            Args:
+                state: The graph's state so far.
+
+            Returns:
+                The name of the next step.
+            """
+            if state["within_message_limit"]:
+                return "recall_memory"
+            return "send_limit_reply"
+
+        def send_limit_reply(state: TurnState) -> TurnState:
+            """Send the in-character limit reply instead of composing one.
+
+            Args:
+                state: The graph's state so far.
+
+            Returns:
+                Nothing new to add to the state.
+            """
+            services.conversations.deliver_at_once(
+                UUID(state["conversation_id"]),
+                state["chat_id"],
+                services.usage_limiter.limit_reply(),
+            )
+            return {}
 
         def send_crisis_reply(state: TurnState) -> TurnState:
             """Send the Crisis Reply and record the Safeguard Event.
@@ -198,6 +242,8 @@ class LangGraphConversationEngine:
         graph.add_node("record_incoming", record_incoming)
         graph.add_node("check_safeguard", check_safeguard)
         graph.add_node("send_crisis_reply", send_crisis_reply)
+        graph.add_node("check_message_limit", check_message_limit)
+        graph.add_node("send_limit_reply", send_limit_reply)
         graph.add_node("recall_memory", recall_memory)
         graph.add_node("recall_knowledge", recall_knowledge)
         graph.add_node("compose_reply", compose_reply)
@@ -207,9 +253,15 @@ class LangGraphConversationEngine:
         graph.add_conditional_edges(
             "check_safeguard",
             after_safeguard,
-            ["send_crisis_reply", "recall_memory"],
+            ["send_crisis_reply", "check_message_limit"],
         )
         graph.add_edge("send_crisis_reply", END)
+        graph.add_conditional_edges(
+            "check_message_limit",
+            after_message_limit,
+            ["recall_memory", "send_limit_reply"],
+        )
+        graph.add_edge("send_limit_reply", END)
         graph.add_edge("recall_memory", "recall_knowledge")
         graph.add_edge("recall_knowledge", "compose_reply")
         graph.add_edge("compose_reply", "deliver_reply")
@@ -219,7 +271,9 @@ class LangGraphConversationEngine:
     def handle(self, turn: ConversationTurn) -> None:
         """Answer one message: save it, run the Safeguard, then reply.
 
-        On a crisis the Crisis Reply is sent instead of a composed reply.
+        On a crisis the Crisis Reply is sent instead of a composed reply, and
+        the message doesn't count toward the daily message limit. Over the
+        limit, the in-character limit reply is sent and nothing is composed.
         Otherwise the User Memory that matters and the Knowledge that may fit
         are recalled for the reply.
 

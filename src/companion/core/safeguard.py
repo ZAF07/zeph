@@ -12,8 +12,9 @@ from companion.core.models import (
     SafeguardEvent,
     SafeguardEventOverview,
 )
-from companion.core.ports import ChatModel, Clock, Repositories
+from companion.core.ports import Clock, Repositories
 from companion.core.response_composition import to_chat_history
+from companion.core.usage import UsageRecordingChatModel
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +115,7 @@ class Safeguard:
         self,
         repositories: Repositories,
         helplines: HelplineService,
-        chat_model: ChatModel,
+        chat_model: UsageRecordingChatModel,
         clock: Clock,
     ) -> None:
         """Set up the Safeguard.
@@ -123,7 +124,7 @@ class Safeguard:
             repositories: Where Conversations, Users, Safeguard Events and
                 settings are stored.
             helplines: Picks the Helplines to share in the Crisis Reply.
-            chat_model: Classifies messages.
+            chat_model: Classifies messages and records the tokens used.
             clock: Tells the current time.
         """
         self._repositories = repositories
@@ -131,7 +132,7 @@ class Safeguard:
         self._chat_model = chat_model
         self._clock = clock
 
-    def assess(self, conversation_id: UUID) -> RiskType:
+    def assess(self, conversation_id: UUID, user_id: UUID) -> RiskType:
         """Classify the risk in the Conversation's newest message.
 
         The model sees the whole Conversation as one transcript, so a message
@@ -141,6 +142,7 @@ class Safeguard:
 
         Args:
             conversation_id: The Conversation the message was added to.
+            user_id: The User who sent it.
 
         Returns:
             The risk type, or `RiskType.NONE` if it is not a crisis.
@@ -152,6 +154,7 @@ class Safeguard:
         transcript = [ChatLine(role=ChatRole.USER, text=to_transcript(history))]
         for _ in range(2):
             answer = self._chat_model.generate(
+                user_id=user_id,
                 model=settings.get("safeguard_model"),
                 instructions=settings.get("safeguard_prompt"),
                 history=transcript,
