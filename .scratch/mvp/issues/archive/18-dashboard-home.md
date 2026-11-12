@@ -74,4 +74,4 @@ Evidence: seam 1 `tests/test_dashboard_home.py` (9: new User not connected and n
 ## Completion
 
 - Completed: 2026-11-12
-- Commit: 0f6b371, review fixes 2fcb896
+- Commit: 0f6b371, review fixes 2fcb896, archive c9f231e (merged from `dashboard-home` in 5aad78b)
