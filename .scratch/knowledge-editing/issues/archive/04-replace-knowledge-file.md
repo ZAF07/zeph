@@ -45,3 +45,5 @@ Evidence: seam 1 `tests/test_knowledge.py` (`test_replacing_a_file_keeps_the_doc
 
 - Completed: 2026-11-12
 - Commit: 00a1e6a "Replace a Knowledge document's file: PUT file route, Replace file card sharing the upload drop area (knowledge-editing issue 04)"; review fixes 1a1adb9 "Replace file review fixes: no replacing while the last file is being read, old chunks removed at once, shared upload file helper" (merged from `feat/ke-04-replace-file`)
+- Archive commit: 23bb53a "Knowledge editing issue 04 done: archive issue, replacing a file in glossary"
+- Merge commit: ab2f560 "Merge knowledge-editing issue 04: replace a Knowledge Document's file"

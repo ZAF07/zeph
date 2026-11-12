@@ -59,3 +59,5 @@ Evidence: seam 1 `tests/test_knowledge.py` (`test_editing_a_documents_text_reind
 
 - Completed: 2026-11-12
 - Commit: 25b5bf8 "Edit a Knowledge document's text: PUT text route, editable text editor with formatting toolbar, review changes, discard and leave warning (knowledge-editing issue 03)"; review fixes a8e76ff "Knowledge text review fixes: an older re-index never overwrites a newer edit, no text saves while the file is being read, rule-held formatting prefixes" (merged from `feat/ke-03-edit-text`)
+- Archive commit: 90cdc88 "Knowledge editing issue 03 done: archive issue, editable text in glossary"
+- Merge commit: ce0b7c5 "Merge knowledge-editing issue 03: edit a Knowledge Document's text"

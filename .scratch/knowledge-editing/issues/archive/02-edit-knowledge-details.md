@@ -45,3 +45,5 @@ Evidence: seam 1 `tests/test_knowledge.py` (`test_an_admin_edits_a_documents_det
 
 - Completed: 2026-11-12
 - Commit: 39a9c27 "Edit a Knowledge document's details: PATCH route, details form on the document page (knowledge-editing issue 02)"; review fixes a670bcb "Knowledge details review fixes: form shows the saved document, fixed details as a list, simpler update" (merged from `feat/ke-02-edit-details`)
+- Archive commit: 2415fc2 "Knowledge editing issue 02 done: archive issue, editable details in glossary"
+- Merge commit: 5a2c468 "Merge knowledge-editing issue 02: edit a Knowledge Document's details"

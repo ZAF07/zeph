@@ -57,3 +57,5 @@ Evidence: seam 1 `tests/test_knowledge.py` (`test_a_document_shows_the_text_read
 
 - Completed: 2026-11-12
 - Commit: 2f399ab "Knowledge document page: saved text, Read then Index, start-up text fill, read-only text editor (knowledge-editing issue 01)"; review fixes 93f5122 "Knowledge document page review fixes: status labels as a record, visible editor focus ring, simpler empty-text check" (merged from `feat/ke-01-view-document`)
+- Archive commit: a26e040 "Knowledge editing issue 01 done: archive issue, Knowledge Document text in glossary"
+- Merge commit: 21f1351 "Merge knowledge-editing issue 01: view a Knowledge Document"
