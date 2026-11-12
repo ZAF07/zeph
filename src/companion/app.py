@@ -13,6 +13,7 @@ from companion.adapters.http.auth import (
 from companion.adapters.http.dashboard_api import build_dashboard_api_router
 from companion.adapters.telegram.webhook import build_telegram_webhook_router
 from companion.core.admin_users import AdminUserService
+from companion.core.check_in_kinds import CheckInKindService
 from companion.core.check_ins import CheckInService
 from companion.core.conversations import ConversationService, ConversationServices
 from companion.core.helplines import HelplineService
@@ -234,6 +235,10 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 clock=dependencies.clock,
             ),
             sticker_library=sticker_library,
+            check_in_kind_service=CheckInKindService(
+                dependencies.repositories, dependencies.clock
+            ),
+            check_in_service=check_in_service,
         )
     )
     app.include_router(

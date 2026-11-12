@@ -158,12 +158,12 @@ class ConversationService:
         check_in = self._repositories.check_ins.claim_reply(
             user_id, replied_at=now, sent_since=now - check_in_reply_window(settings)
         )
-        if check_in is not None:
+        if check_in is not None and check_in.message is not None:
             self._save(
                 conversation.id,
                 MessageDirection.OUTGOING,
                 check_in.message,
-                sent_at=check_in.sent_at,
+                sent_at=check_in.decided_at,
             )
         return conversation.id
 

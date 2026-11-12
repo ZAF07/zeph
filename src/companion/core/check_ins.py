@@ -1,9 +1,11 @@
+import json
 import logging
 from dataclasses import dataclass, replace
 from datetime import datetime, time, timedelta
-from uuid import uuid4
+from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
+from companion.core.memory_retrieval import format_day, format_memory
 from companion.core.models import (
     ChatLine,
     ChatRole,
@@ -11,6 +13,8 @@ from companion.core.models import (
     CheckInChanges,
     CheckInFrequency,
     CheckInKind,
+    CheckInLogEntry,
+    CheckInOutcome,
     CheckInSettings,
     CheckInStatus,
     PauseLength,
@@ -22,27 +26,60 @@ from companion.core.timing import check_in_reply_window, is_open, quiet_gap
 logger = logging.getLogger(__name__)
 
 RECENT_CHECK_INS_LIMIT = 10
+CHECK_INS_TOLD_TO_MODEL = 5
+CHECK_INS_LOOKED_BACK_FOR_IGNORES = 100
+MEMORY_INTRO = "What you remember about them:"
 PAUSE_LENGTHS = {
     PauseLength.DAY: timedelta(days=1),
     PauseLength.WEEK: timedelta(weeks=1),
 }
 
 
-class EmptyCheckInError(Exception):
-    """Raised when the Check-in model writes no message."""
+class InvalidCheckInAnswerError(Exception):
+    """Raised when the Check-in model's answer is not a decision we can use."""
 
 
 @dataclass(frozen=True)
 class RecentCheckIn:
-    """A sent Check-in and what happened after it.
+    """A Check-in decision and what happened after it.
 
     Attributes:
         check_in: The Check-in.
-        status: Whether it was replied to, had no reply, or can still be.
+        status: Skipped, replied, no reply, or sent while a reply can still
+            come.
     """
 
     check_in: CheckIn
     status: CheckInStatus
+
+
+@dataclass(frozen=True)
+class LoggedCheckIn:
+    """A Check-in decision for the Admins' Check-in log. Never the message.
+
+    Attributes:
+        entry: The decision and who it was for.
+        status: Skipped, replied, no reply, or sent while a reply can still
+            come.
+    """
+
+    entry: CheckInLogEntry
+    status: CheckInStatus
+
+
+@dataclass(frozen=True)
+class CheckInDecision:
+    """What the Check-in model decided: send a Kind and message, or skip.
+
+    Attributes:
+        kind: The Check-in Kind to send; None to skip.
+        message: The message to send; None to skip.
+        skip_reason: Why it skipped; None when sending.
+    """
+
+    kind: CheckInKind | None
+    message: str | None
+    skip_reason: str | None
 
 
 def is_in_quiet_hours(settings: CheckInSettings, local_time: time) -> bool:
@@ -94,31 +131,183 @@ def check_in_status(
         reply_window: How long after a Check-in a reply still counts.
 
     Returns:
-        Replied; sent, while a reply can still come; or no reply.
+        Skipped; replied; sent, while a reply can still come; or no reply.
     """
+    if not check_in.was_sent:
+        return CheckInStatus.SKIPPED
     if check_in.replied_at is not None:
         return CheckInStatus.REPLIED
-    if is_newest and now - check_in.sent_at < reply_window:
+    if is_newest and now - check_in.decided_at < reply_window:
         return CheckInStatus.SENT
     return CheckInStatus.NO_REPLY
 
 
-def describe_check_in(user: User, kind: CheckInKind, local_time: datetime) -> str:
-    """Write what the Check-in model is told about the Check-in to write.
+def check_in_statuses(
+    check_ins: list[CheckIn], now: datetime, reply_window: timedelta
+) -> list[CheckInStatus]:
+    """Work out what happened after each Check-in in a newest-first list.
+
+    Only each User's newest sent Check-in can still get a reply.
+
+    Args:
+        check_ins: Check-ins of one or more Users, newest first.
+        now: The current time.
+        reply_window: How long after a Check-in a reply still counts.
+
+    Returns:
+        Each Check-in's status, in the same order.
+    """
+    users_with_a_newer_send: set[UUID] = set()
+    statuses = []
+    for check_in in check_ins:
+        is_newest = check_in.user_id not in users_with_a_newer_send
+        statuses.append(check_in_status(check_in, is_newest, now, reply_window))
+        if check_in.was_sent:
+            users_with_a_newer_send.add(check_in.user_id)
+    return statuses
+
+
+def ignored_in_a_row(
+    recent: list[CheckIn], last_conversation_started_at: datetime | None
+) -> int:
+    """Count the sent Check-ins the User ignored, newest first, in a row.
+
+    The count stops at a Check-in they replied to, at the last "would you
+    like fewer?" message, and at Check-ins sent before they last started a
+    Conversation. Skipped Check-ins are passed over.
+
+    Args:
+        recent: The User's newest Check-ins, newest first.
+        last_conversation_started_at: When the User last started a
+            Conversation, if ever.
+
+    Returns:
+        How many Check-ins in a row went unanswered.
+    """
+    count = 0
+    for check_in in recent:
+        if not check_in.was_sent:
+            continue
+        if check_in.outcome == CheckInOutcome.ASKED_ABOUT_FEWER:
+            break
+        if check_in.replied_at is not None:
+            break
+        if (
+            last_conversation_started_at is not None
+            and check_in.decided_at < last_conversation_started_at
+        ):
+            break
+        count += 1
+    return count
+
+
+def describe_recent_check_ins(
+    recent: list[RecentCheckIn], time_zone: str | None
+) -> str:
+    """Write the User's recent Check-ins for the Check-in model.
+
+    Args:
+        recent: The newest Check-ins and their statuses, newest first.
+        time_zone: The User's IANA time zone, for the days.
+
+    Returns:
+        One line per Check-in, or a note that there are none.
+    """
+    if not recent:
+        return "None yet."
+    lines = []
+    for item in recent:
+        check_in = item.check_in
+        what = (
+            "skipped"
+            if not check_in.was_sent
+            else f"{check_in.kind_name or 'a check-in'}, {item.status.value}"
+        )
+        lines.append(
+            f"- {format_day(check_in.decided_at, time_zone)}: {what.replace('_', ' ')}"
+        )
+    return "\n".join(lines)
+
+
+def describe_check_in(
+    user: User,
+    kinds: list[CheckInKind],
+    local_time: datetime,
+    recent: str,
+    memory: str,
+) -> str:
+    """Write what the Check-in model is told to decide on a Check-in.
 
     Args:
         user: The User it is for.
-        kind: The Check-in Kind to write.
+        kinds: The Check-in Kinds it may choose from.
         local_time: The User's local time now.
+        recent: The User's recent Check-ins, as lines.
+        memory: What is remembered about the User; "" if nothing.
 
     Returns:
-        The Kind, what to call the User and their local time.
+        The Kinds, what to call the User, their local time, recent
+        Check-ins and what is remembered about them.
     """
-    return (
-        f"Kind of Check-in: {kind.name} — {kind.description}\n"
-        f"What to call them: {user.name or 'unknown'}\n"
-        f"Their local time: {local_time.strftime('%A, %H:%M')}"
+    kind_lines = "\n".join(f"- {kind.name}: {kind.description}" for kind in kinds)
+    remembered = memory or (
+        "Nothing remembered about them."
+        if user.user_memory_enabled
+        else "User Memory is off, so you know nothing else about them."
     )
+    return (
+        f"Check-in Kinds you may choose from:\n{kind_lines}\n\n"
+        f"What to call them: {user.name or 'unknown'}\n"
+        f"Their local time: {local_time.strftime('%A, %H:%M')}\n\n"
+        f"Recent Check-ins, newest first:\n{recent}\n\n"
+        f"{remembered}"
+    )
+
+
+def read_check_in_decision(answer: str, kinds: list[CheckInKind]) -> CheckInDecision:
+    """Read the Check-in model's JSON decision.
+
+    Text around the JSON object, such as a code fence, is ignored. The Kind
+    is matched by name, in any case, and must be one it was offered.
+
+    Args:
+        answer: The model's answer.
+        kinds: The Check-in Kinds it could choose from.
+
+    Returns:
+        The decision.
+
+    Raises:
+        InvalidCheckInAnswerError: If there is no JSON decision, the Kind is
+            not one it was offered, or the message or reason is empty.
+    """
+    start, end = answer.find("{"), answer.rfind("}")
+    try:
+        parsed = json.loads(answer[start : end + 1]) if 0 <= start < end else None
+    except json.JSONDecodeError:
+        parsed = None
+    if not isinstance(parsed, dict):
+        raise InvalidCheckInAnswerError("No JSON decision")
+    if parsed.get("decision") == "skip":
+        reason = parsed.get("reason")
+        if not isinstance(reason, str) or not reason.strip():
+            raise InvalidCheckInAnswerError("A skip with no reason")
+        return CheckInDecision(kind=None, message=None, skip_reason=reason.strip())
+    kind_name, message = parsed.get("kind"), parsed.get("message")
+    kind = next(
+        (
+            kind
+            for kind in kinds
+            if isinstance(kind_name, str)
+            and kind.name.lower() == kind_name.strip().lower()
+        ),
+        None,
+    )
+    if parsed.get("decision") != "send" or kind is None:
+        raise InvalidCheckInAnswerError(f"Not a Kind it was offered: {kind_name!r}")
+    if not isinstance(message, str) or not message.strip():
+        raise InvalidCheckInAnswerError("A send with no message")
+    return CheckInDecision(kind=kind, message=message.strip(), skip_reason=None)
 
 
 class CheckInService:
@@ -238,7 +427,7 @@ class CheckInService:
         return user.check_ins.is_paused_at(self._clock.now())
 
     def list_recent(self, user: User) -> list[RecentCheckIn]:
-        """List a User's newest Check-ins with what happened after each.
+        """List a User's newest Check-in decisions with what happened after each.
 
         Args:
             user: The User.
@@ -246,44 +435,75 @@ class CheckInService:
         Returns:
             Each Check-in and its status, newest first.
         """
-        recent = self._repositories.check_ins.list_recent(
-            user.id, RECENT_CHECK_INS_LIMIT
-        )
+        return self._recent(user, RECENT_CHECK_INS_LIMIT)
+
+    def kinds_for(self, user: User) -> list[CheckInKind]:
+        """List the Check-in Kinds that may be sent to a User.
+
+        Args:
+            user: The User.
+
+        Returns:
+            Every Check-in Kind in order; only those allowed without User
+            Memory when the User has it off.
+        """
+        kinds = self._repositories.check_ins.list_kinds()
+        if user.user_memory_enabled:
+            return kinds
+        return [kind for kind in kinds if kind.allowed_without_user_memory]
+
+    def list_log(self, days: int) -> list[LoggedCheckIn]:
+        """List every User's Check-in decisions from the last few days.
+
+        Args:
+            days: How many days back to list.
+
+        Returns:
+            The decisions with who each was for and what happened after,
+            newest first.
+        """
         now = self._clock.now()
-        reply_window = check_in_reply_window(self._repositories.platform_settings)
+        entries = self._repositories.check_ins.list_log(now - timedelta(days=days))
+        statuses = check_in_statuses(
+            [entry.check_in for entry in entries],
+            now,
+            check_in_reply_window(self._repositories.platform_settings),
+        )
         return [
-            RecentCheckIn(
-                check_in=check_in,
-                status=check_in_status(check_in, index == 0, now, reply_window),
-            )
-            for index, check_in in enumerate(recent)
+            LoggedCheckIn(entry=entry, status=status)
+            for entry, status in zip(entries, statuses, strict=True)
         ]
 
     def send_due(self) -> None:
-        """Send a Check-in to every User who is due one right now.
+        """Decide on a Check-in for every User who is due one right now.
 
         A User is due when Check-ins are on, the frequency gap has passed,
         they are not paused, it is outside their quiet hours, they have a
-        Telegram Connection and no open Conversation. A Check-in that fails
-        to send is logged and tried again on the next tick; the others still
-        go ahead.
+        Telegram Connection and no open Conversation. A decision that fails
+        is logged and tried again on the next tick; the others still go
+        ahead.
         """
         now = self._clock.now()
         for user in self._repositories.check_ins.list_due_users(now):
             try:
-                self._send_if_due(user, now)
+                self._check_in_if_due(user, now)
             except Exception:
-                logger.exception("Could not send a Check-in")
+                logger.exception("Could not decide on a Check-in")
 
-    def _send_if_due(self, user: User, now: datetime) -> None:
-        """Send one User a casual-hello Check-in if nothing holds it back.
+    def _check_in_if_due(self, user: User, now: datetime) -> None:
+        """Send, skip, or ask about fewer Check-ins, if nothing holds it back.
+
+        After the Admin-set number of ignored Check-ins in a row, the User
+        gets the "would you like fewer?" message and their Check-ins pause.
+        Otherwise the Check-in model decides on a Kind and message, or to
+        skip. Either way the next attempt is one frequency gap later.
 
         Args:
             user: A User whose next Check-in is due.
             now: The current time.
 
         Raises:
-            EmptyCheckInError: If the model writes no message.
+            InvalidCheckInAnswerError: If the model's answer can't be used.
         """
         settings = user.check_ins
         local_time = local_now(now, user.time_zone)
@@ -292,32 +512,148 @@ class CheckInService:
         connection = self._repositories.telegram_connections.get_by_user(user.id)
         if connection is None or self._has_open_conversation(user, now):
             return
-        kind = self._casual_hello()
-        if kind is None:
-            logger.warning("No Check-in Kind is allowed without User Memory")
+        next_settings = replace(
+            settings, next_due_at=now + self._gap(settings.frequency)
+        )
+        if self._has_ignored_too_many(user):
+            message = self._repositories.platform_settings.get("check_in_fewer_message")
+            self._chat_channel.send_text(connection.telegram_chat_id, message)
+            self._repositories.check_ins.add(
+                CheckIn(
+                    id=uuid4(),
+                    user_id=user.id,
+                    outcome=CheckInOutcome.ASKED_ABOUT_FEWER,
+                    decided_at=now,
+                    message=message,
+                ),
+                replace(next_settings, paused=True, paused_until=None),
+            )
             return
-        message = self._write(describe_check_in(user, kind, local_time))
-        self._chat_channel.send_text(connection.telegram_chat_id, message)
+        kinds = self.kinds_for(user)
+        if not kinds:
+            logger.warning("No Check-in Kind may be sent to this User")
+            return
+        decision = self._decide(user, kinds, local_time)
+        if decision.kind is not None and decision.message is not None:
+            self._chat_channel.send_text(connection.telegram_chat_id, decision.message)
         self._repositories.check_ins.add(
             CheckIn(
                 id=uuid4(),
                 user_id=user.id,
-                kind_id=kind.id,
-                kind_name=kind.name,
-                message=message,
-                sent_at=now,
+                outcome=(
+                    CheckInOutcome.SKIPPED
+                    if decision.kind is None
+                    else CheckInOutcome.SENT
+                ),
+                decided_at=now,
+                kind_id=decision.kind.id if decision.kind else None,
+                message=decision.message,
+                skip_reason=decision.skip_reason,
             ),
-            next_due_at=now + self._gap(settings.frequency),
+            next_settings,
         )
 
-    def _casual_hello(self) -> CheckInKind | None:
-        """Pick the Check-in Kind for a casual hello.
+    def _recent(self, user: User, limit: int) -> list[RecentCheckIn]:
+        """List a User's newest Check-in decisions with their statuses.
+
+        Args:
+            user: The User.
+            limit: The most to list.
 
         Returns:
-            The first Check-in Kind allowed without User Memory, or None.
+            Each Check-in and its status, newest first.
         """
-        kinds = self._repositories.check_ins.list_kinds()
-        return next((kind for kind in kinds if kind.allowed_without_user_memory), None)
+        recent = self._repositories.check_ins.list_recent(user.id, limit)
+        statuses = check_in_statuses(
+            recent,
+            self._clock.now(),
+            check_in_reply_window(self._repositories.platform_settings),
+        )
+        return [
+            RecentCheckIn(check_in=check_in, status=status)
+            for check_in, status in zip(recent, statuses, strict=True)
+        ]
+
+    def _has_ignored_too_many(self, user: User) -> bool:
+        """Tell whether the User ignored the Admin-set number of Check-ins in a row.
+
+        Args:
+            user: The User.
+
+        Returns:
+            True if it is time to ask whether they'd like fewer.
+        """
+        threshold: int = self._repositories.platform_settings.get(
+            "check_in_ignore_threshold"
+        )
+        recent = self._repositories.check_ins.list_recent(
+            user.id, CHECK_INS_LOOKED_BACK_FOR_IGNORES
+        )
+        latest = self._repositories.conversations.get_latest_for_user(user.id)
+        started_at = latest.started_at if latest is not None else None
+        return ignored_in_a_row(recent, started_at) >= threshold
+
+    def _memory(self, user: User) -> str:
+        """Write what is remembered about the User, for the Check-in model.
+
+        Args:
+            user: The User.
+
+        Returns:
+            Their Memory Items by active Memory Category and their newest
+            Conversation Summaries; "" if User Memory is off or empty.
+        """
+        if not user.user_memory_enabled:
+            return ""
+        user_memory = self._repositories.user_memory
+        settings = self._repositories.platform_settings
+        categories = [
+            category
+            for category in self._repositories.memory_categories.list_all()
+            if not category.archived
+        ]
+        return format_memory(
+            categories,
+            user_memory.list_items(user.id),
+            user_memory.list_summaries(
+                user.id, limit=settings.get("recent_conversation_summaries")
+            ),
+            user.time_zone,
+            MEMORY_INTRO,
+        )
+
+    def _decide(
+        self, user: User, kinds: list[CheckInKind], local_time: datetime
+    ) -> CheckInDecision:
+        """Ask the Check-in model to choose a Kind and write the message, or skip.
+
+        Args:
+            user: The User it is for.
+            kinds: The Check-in Kinds it may choose from.
+            local_time: The User's local time now.
+
+        Returns:
+            The decision.
+
+        Raises:
+            InvalidCheckInAnswerError: If the answer can't be used.
+        """
+        settings = self._repositories.platform_settings
+        description = describe_check_in(
+            user,
+            kinds,
+            local_time,
+            describe_recent_check_ins(
+                self._recent(user, CHECK_INS_TOLD_TO_MODEL), user.time_zone
+            ),
+            self._memory(user),
+        )
+        answer = self._chat_model.generate(
+            model=settings.get("check_in_model"),
+            instructions=f"{settings.get('persona')}\n\n{settings.get('check_in_prompt')}",
+            history=[ChatLine(role=ChatRole.USER, text=description)],
+        )
+        return read_check_in_decision(answer, kinds)
 
     def _has_open_conversation(self, user: User, now: datetime) -> bool:
         """Tell whether the User is in the middle of a Conversation.
@@ -332,28 +668,6 @@ class CheckInService:
         latest = self._repositories.conversations.get_latest_for_user(user.id)
         gap = quiet_gap(self._repositories.platform_settings)
         return latest is not None and is_open(latest, now, gap)
-
-    def _write(self, description: str) -> str:
-        """Ask the Check-in model to write the message.
-
-        Args:
-            description: The Kind, what to call the User and their local time.
-
-        Returns:
-            The message.
-
-        Raises:
-            EmptyCheckInError: If the model writes no message.
-        """
-        settings = self._repositories.platform_settings
-        message = self._chat_model.generate(
-            model=settings.get("check_in_model"),
-            instructions=f"{settings.get('persona')}\n\n{settings.get('check_in_prompt')}",
-            history=[ChatLine(role=ChatRole.USER, text=description)],
-        ).strip()
-        if not message:
-            raise EmptyCheckInError
-        return message
 
     def _gap(self, frequency: CheckInFrequency) -> timedelta:
         """Look up the fewest hours between two Check-ins for a frequency.

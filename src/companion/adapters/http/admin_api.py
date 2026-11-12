@@ -21,6 +21,12 @@ from companion.core.admin_users import (
     LastAdminError,
     UserNotFoundError,
 )
+from companion.core.check_in_kinds import (
+    CheckInKindNotFoundError,
+    CheckInKindService,
+    InvalidCheckInKindError,
+)
+from companion.core.check_ins import CheckInService, LoggedCheckIn
 from companion.core.helplines import (
     FallbackHelplineError,
     HelplineNotFoundError,
@@ -43,6 +49,10 @@ from companion.core.memory_categories import (
     MemoryCategoryService,
 )
 from companion.core.models import (
+    CheckInKind,
+    CheckInKindDetails,
+    CheckInOutcome,
+    CheckInStatus,
     Helpline,
     HelplineDetails,
     KnowledgeDetailsChange,
@@ -214,6 +224,67 @@ class SafeguardEventsResponse(BaseModel):
     """Safeguard Events, newest first."""
 
     events: list[SafeguardEventResponse]
+
+
+class CheckInKindResponse(BaseModel):
+    """A Check-in Kind as Admins see it."""
+
+    id: str
+    name: str
+    description: str
+    allowed_without_user_memory: bool
+
+
+class CheckInKindOverviewResponse(CheckInKindResponse):
+    """A Check-in Kind and how many Check-ins of it were sent in 30 days."""
+
+    sent_last_30_days: int
+
+
+class CheckInKindsResponse(BaseModel):
+    """Every Check-in Kind in order."""
+
+    kinds: list[CheckInKindOverviewResponse]
+
+
+class CheckInKindRequest(BaseModel):
+    """A Check-in Kind's name, description and User Memory flag."""
+
+    name: str
+    description: str
+    allowed_without_user_memory: bool = False
+
+    def to_details(self) -> CheckInKindDetails:
+        """Turn the request into Check-in Kind details.
+
+        Returns:
+            The details.
+        """
+        return CheckInKindDetails(
+            name=self.name,
+            description=self.description,
+            allowed_without_user_memory=self.allowed_without_user_memory,
+        )
+
+
+class CheckInLogEntryResponse(BaseModel):
+    """A Check-in decision: who, when, sent or skipped and why. Never the message."""
+
+    id: str
+    user_id: str
+    user_name: str | None
+    user_email: str | None
+    decided_at: datetime
+    outcome: CheckInOutcome
+    kind: str | None
+    skip_reason: str | None
+    status: CheckInStatus
+
+
+class CheckInLogResponse(BaseModel):
+    """Check-in decisions, newest first."""
+
+    entries: list[CheckInLogEntryResponse]
 
 
 class MemoryCategoryResponse(BaseModel):
@@ -415,6 +486,46 @@ def to_knowledge_file(file: UploadFile) -> KnowledgeFile:
     )
 
 
+def to_check_in_kind_response(kind: CheckInKind) -> CheckInKindResponse:
+    """Describe a Check-in Kind for the admin area.
+
+    Args:
+        kind: The Check-in Kind.
+
+    Returns:
+        The response body.
+    """
+    return CheckInKindResponse(
+        id=str(kind.id),
+        name=kind.name,
+        description=kind.description,
+        allowed_without_user_memory=kind.allowed_without_user_memory,
+    )
+
+
+def to_check_in_log_entry_response(logged: LoggedCheckIn) -> CheckInLogEntryResponse:
+    """Describe a Check-in decision for the admin area; never its message.
+
+    Args:
+        logged: The decision, who it was for and what happened after.
+
+    Returns:
+        The response body.
+    """
+    check_in = logged.entry.check_in
+    return CheckInLogEntryResponse(
+        id=str(check_in.id),
+        user_id=str(check_in.user_id),
+        user_name=logged.entry.user_name,
+        user_email=logged.entry.user_email,
+        decided_at=check_in.decided_at,
+        outcome=check_in.outcome,
+        kind=check_in.kind_name,
+        skip_reason=check_in.skip_reason,
+        status=logged.status,
+    )
+
+
 def to_memory_category_response(category: MemoryCategory) -> MemoryCategoryResponse:
     """Describe a Memory Category for the admin area.
 
@@ -525,6 +636,8 @@ def build_admin_api_router(
     memory_category_service: MemoryCategoryService,
     knowledge_service: KnowledgeService,
     sticker_library: StickerLibraryService,
+    check_in_kind_service: CheckInKindService,
+    check_in_service: CheckInService,
 ) -> APIRouter:
     """Build the admin API routes.
 
@@ -540,6 +653,8 @@ def build_admin_api_router(
         memory_category_service: Manages Memory Categories.
         knowledge_service: Manages the Knowledge library.
         sticker_library: Manages the Sticker Library.
+        check_in_kind_service: Manages Check-in Kinds.
+        check_in_service: Lists Check-in decisions.
 
     Returns:
         The router.
@@ -940,6 +1055,114 @@ def build_admin_api_router(
                 status.HTTP_404_NOT_FOUND, "No such Memory Category"
             ) from error
         return to_memory_category_response(category)
+
+    @router.get("/check-in-kinds")
+    def list_check_in_kinds() -> CheckInKindsResponse:
+        """List every Check-in Kind with its sends in the last 30 days.
+
+        Returns:
+            The Check-in Kinds in order.
+        """
+        return CheckInKindsResponse(
+            kinds=[
+                CheckInKindOverviewResponse(
+                    **to_check_in_kind_response(overview.kind).model_dump(),
+                    sent_last_30_days=overview.sent_last_30_days,
+                )
+                for overview in check_in_kind_service.list_overviews()
+            ]
+        )
+
+    @router.post("/check-in-kinds", status_code=status.HTTP_201_CREATED)
+    def add_check_in_kind(request: CheckInKindRequest) -> CheckInKindResponse:
+        """Add a Check-in Kind last in the list.
+
+        Args:
+            request: The Check-in Kind.
+
+        Returns:
+            The saved Check-in Kind.
+
+        Raises:
+            HTTPException: 422 if the name or description is blank or too
+                long, or the name is taken.
+        """
+        try:
+            kind = check_in_kind_service.add(request.to_details())
+        except InvalidCheckInKindError as error:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
+            ) from error
+        return to_check_in_kind_response(kind)
+
+    @router.put("/check-in-kinds/{kind_id}")
+    def update_check_in_kind(
+        kind_id: UUID, request: CheckInKindRequest
+    ) -> CheckInKindResponse:
+        """Change a Check-in Kind's name, description and User Memory flag.
+
+        Args:
+            kind_id: The Check-in Kind to change.
+            request: Its new name, description and User Memory flag.
+
+        Returns:
+            The saved Check-in Kind.
+
+        Raises:
+            HTTPException: 404 if there is no such Kind; 422 if the name or
+                description is blank or too long, or the name is taken.
+        """
+        try:
+            kind = check_in_kind_service.update(kind_id, request.to_details())
+        except CheckInKindNotFoundError as error:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "No such Check-in Kind"
+            ) from error
+        except InvalidCheckInKindError as error:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
+            ) from error
+        return to_check_in_kind_response(kind)
+
+    @router.delete("/check-in-kinds/{kind_id}", status_code=status.HTTP_204_NO_CONTENT)
+    def remove_check_in_kind(kind_id: UUID) -> Response:
+        """Remove a Check-in Kind; past Check-ins of it keep no Kind.
+
+        Args:
+            kind_id: The Check-in Kind to remove.
+
+        Returns:
+            An empty response.
+
+        Raises:
+            HTTPException: 404 if there is no such Kind.
+        """
+        try:
+            check_in_kind_service.remove(kind_id)
+        except CheckInKindNotFoundError as error:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "No such Check-in Kind"
+            ) from error
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @router.get("/check-ins")
+    def list_check_in_log(
+        days: Annotated[int, Query(ge=1, le=365)] = 7,
+    ) -> CheckInLogResponse:
+        """List Check-in sends and skips with skip reasons. Never message text.
+
+        Args:
+            days: Only decisions from the last this many days.
+
+        Returns:
+            The decisions with who each User is, newest first.
+        """
+        return CheckInLogResponse(
+            entries=[
+                to_check_in_log_entry_response(logged)
+                for logged in check_in_service.list_log(days)
+            ]
+        )
 
     @router.get("/stickers")
     def list_stickers() -> StickersResponse:

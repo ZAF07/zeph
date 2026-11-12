@@ -24,6 +24,7 @@ def test_check_ins_are_off_by_default_after_onboarding(
         "paused": False,
         "paused_until": None,
         "recent": [],
+        "kinds": check_ins["kinds"],
     }
 
 

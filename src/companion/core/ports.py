@@ -10,6 +10,10 @@ from companion.core.models import (
     ChatLine,
     CheckIn,
     CheckInKind,
+    CheckInKindDetails,
+    CheckInKindOverview,
+    CheckInLogEntry,
+    CheckInSettings,
     ConnectionToken,
     Conversation,
     ConversationMessage,
@@ -1064,13 +1068,69 @@ class StickerRepository(Protocol):
 
 
 class CheckInRepository(Protocol):
-    """Stores Check-in Kinds and the Check-ins sent to Users."""
+    """Stores Check-in Kinds and the Check-in decisions made for Users."""
 
     def list_kinds(self) -> list[CheckInKind]:
         """List every Check-in Kind in order.
 
         Returns:
             The Check-in Kinds.
+        """
+        ...
+
+    def list_kind_overviews(self, sent_since: datetime) -> list[CheckInKindOverview]:
+        """List every Check-in Kind in order with how often it was sent lately.
+
+        Args:
+            sent_since: Only Check-ins sent after this are counted.
+
+        Returns:
+            The Check-in Kinds with their send counts.
+        """
+        ...
+
+    def get_kind(self, kind_id: UUID) -> CheckInKind | None:
+        """Find one Check-in Kind.
+
+        Args:
+            kind_id: The Check-in Kind's ID.
+
+        Returns:
+            The Check-in Kind, or None if there is no such Kind.
+        """
+        ...
+
+    def add_kind(self, details: CheckInKindDetails) -> CheckInKind:
+        """Add a Check-in Kind last in the list.
+
+        Args:
+            details: Its name, description and whether it is allowed without
+                User Memory.
+
+        Returns:
+            The saved Check-in Kind.
+        """
+        ...
+
+    def update_kind(self, kind: CheckInKind) -> CheckInKind:
+        """Save a Check-in Kind's name, description and User Memory flag.
+
+        Args:
+            kind: The Check-in Kind with its new values.
+
+        Returns:
+            The saved Check-in Kind.
+        """
+        ...
+
+    def delete_kind(self, kind_id: UUID) -> bool:
+        """Remove a Check-in Kind; past Check-ins of it keep no Kind.
+
+        Args:
+            kind_id: The Check-in Kind's ID.
+
+        Returns:
+            True if it was removed; False if there was no such Kind.
         """
         ...
 
@@ -1087,17 +1147,18 @@ class CheckInRepository(Protocol):
         """
         ...
 
-    def add(self, check_in: CheckIn, next_due_at: datetime) -> None:
-        """Save a sent Check-in and the User's next due time, together.
+    def add(self, check_in: CheckIn, settings: CheckInSettings) -> None:
+        """Save a Check-in decision and the User's new Check-in settings, together.
 
         Args:
-            check_in: The Check-in that was sent.
-            next_due_at: When the User's next Check-in may be sent.
+            check_in: The Check-in decision.
+            settings: The User's Check-in settings after it, such as their
+                next due time.
         """
         ...
 
     def list_recent(self, user_id: UUID, limit: int) -> list[CheckIn]:
-        """List a User's newest Check-ins, newest first.
+        """List a User's newest Check-in decisions, newest first.
 
         Args:
             user_id: The User's ID.
@@ -1108,10 +1169,23 @@ class CheckInRepository(Protocol):
         """
         ...
 
+    def list_log(self, since: datetime) -> list[CheckInLogEntry]:
+        """List every User's Check-in decisions since a time, newest first.
+
+        Args:
+            since: Only decisions after this are listed.
+
+        Returns:
+            The decisions with who each User is.
+        """
+        ...
+
     def claim_reply(
         self, user_id: UUID, replied_at: datetime, sent_since: datetime
     ) -> CheckIn | None:
-        """Mark the User's newest Check-in replied, if it can still be.
+        """Mark the User's newest sent Check-in replied, if it can still be.
+
+        Skipped Check-ins are passed over, since nothing was sent.
 
         Args:
             user_id: The User's ID.
@@ -1119,9 +1193,9 @@ class CheckInRepository(Protocol):
             sent_since: A Check-in sent at or before this can't get a reply.
 
         Returns:
-            The Check-in they replied to, or None if their newest Check-in
-            was already replied to, was sent before `sent_since`, or they
-            have none.
+            The Check-in they replied to, or None if their newest sent
+            Check-in was already replied to, was sent before `sent_since`, or
+            they have none.
         """
         ...
 

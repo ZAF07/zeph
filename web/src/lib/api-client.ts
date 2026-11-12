@@ -47,8 +47,11 @@ export type CheckInFrequency = "weekly" | "few_times_a_week" | "most_days";
 /** How long to pause Check-ins for. */
 export type PauseLength = "day" | "week" | "until_resumed";
 
-/** What happened after a Check-in was sent. */
-export type CheckInStatus = "sent" | "replied" | "no_reply";
+/** What happened after a Check-in decision. */
+export type CheckInStatus = "sent" | "replied" | "no_reply" | "skipped";
+
+/** What Zeph decided for a Check-in: sent, skipped, or asked about fewer. */
+export type CheckInOutcome = "sent" | "skipped" | "asked_about_fewer";
 
 /** Everything a new User answers during onboarding. */
 export type OnboardingAnswers = {
@@ -65,12 +68,22 @@ export type OnboardingAnswers = {
   quiet_hours_end: string;
 };
 
-/** A Check-in Zeph sent, and whether the User replied. Never its text. */
+/**
+ * A Check-in Zeph sent or skipped, and whether the User replied. Never its
+ * text or why it was skipped.
+ */
 export type RecentCheckIn = {
   id: string;
+  outcome: CheckInOutcome;
   kind: string | null;
-  sent_at: string;
+  decided_at: string;
   status: CheckInStatus;
+};
+
+/** A Check-in Kind as Users see it, read-only. */
+export type CheckInKindSummary = {
+  name: string;
+  description: string;
 };
 
 /**
@@ -86,6 +99,7 @@ export type CheckIns = {
   paused: boolean;
   paused_until: string | null;
   recent: RecentCheckIn[];
+  kinds: CheckInKindSummary[];
 };
 
 /** Check-in settings to change; a field left out stays as it is. */
@@ -241,6 +255,32 @@ export type ConversationSummary = {
   created_at: string;
 };
 
+/** A Check-in Kind's name, description and "allowed when memory is off". */
+export type CheckInKindInput = {
+  name: string;
+  description: string;
+  allowed_without_user_memory: boolean;
+};
+
+/** A Check-in Kind as Admins manage it. */
+export type CheckInKind = CheckInKindInput & { id: string };
+
+/** A Check-in Kind and how many Check-ins of it were sent in 30 days. */
+export type CheckInKindOverview = CheckInKind & { sent_last_30_days: number };
+
+/** One Check-in decision in the admin log. Never the message text. */
+export type CheckInLogEntry = {
+  id: string;
+  user_id: string;
+  user_name: string | null;
+  user_email: string | null;
+  decided_at: string;
+  outcome: CheckInOutcome;
+  kind: string | null;
+  skip_reason: string | null;
+  status: CheckInStatus;
+};
+
 /** The kind of fact a Memory Item records, as Admins manage it. */
 export type MemoryCategory = {
   id: string;
@@ -343,6 +383,14 @@ export type ApiClient = {
   listSafeguardEvents: (
     filter: SafeguardEventFilter,
   ) => Promise<SafeguardEvent[]>;
+  listCheckInKinds: () => Promise<CheckInKindOverview[]>;
+  addCheckInKind: (kind: CheckInKindInput) => Promise<CheckInKind>;
+  updateCheckInKind: (
+    id: string,
+    kind: CheckInKindInput,
+  ) => Promise<CheckInKind>;
+  removeCheckInKind: (id: string) => Promise<void>;
+  listCheckInLog: (days: number) => Promise<CheckInLogEntry[]>;
   listMemoryCategories: () => Promise<MemoryCategoryOverview[]>;
   addMemoryCategory: (category: MemoryCategoryInput) => Promise<MemoryCategory>;
   updateMemoryCategory: (
@@ -550,6 +598,24 @@ export function createApiClient(
         )
       ).events;
     },
+    listCheckInKinds: async () =>
+      (
+        await request<{ kinds: CheckInKindOverview[] }>(
+          "/api/admin/check-in-kinds",
+        )
+      ).kinds,
+    addCheckInKind: (kind) =>
+      request<CheckInKind>("/api/admin/check-in-kinds", "POST", kind),
+    updateCheckInKind: (id, kind) =>
+      request<CheckInKind>(`/api/admin/check-in-kinds/${id}`, "PUT", kind),
+    removeCheckInKind: (id) =>
+      request<void>(`/api/admin/check-in-kinds/${id}`, "DELETE"),
+    listCheckInLog: async (days) =>
+      (
+        await request<{ entries: CheckInLogEntry[] }>(
+          `/api/admin/check-ins?days=${days}`,
+        )
+      ).entries,
     listMemoryCategories: async () =>
       (
         await request<{ categories: MemoryCategoryOverview[] }>(

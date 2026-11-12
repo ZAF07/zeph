@@ -305,8 +305,10 @@ check_ins = Table(
         nullable=False,
         index=True,
     ),
+    Column("outcome", Text, nullable=False),
     Column("kind_id", Uuid, ForeignKey("check_in_kinds.id", ondelete="SET NULL")),
-    Column("message", Text, nullable=False),
-    Column("sent_at", DateTime(timezone=True), nullable=False),
+    Column("message", Text),
+    Column("skip_reason", Text),
+    Column("decided_at", DateTime(timezone=True), nullable=False),
     Column("replied_at", DateTime(timezone=True)),
 )

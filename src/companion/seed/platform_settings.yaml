@@ -309,20 +309,41 @@ sticker_tool_description: >-
   At most one sticker per reply. Still write your text reply as usual. The
   stickers, by number, with when each one fits:
 
-# Check-ins. On each scheduler tick, Users who are due get a Check-in written
-# by this model, from the Persona and this prompt.
+# Check-ins. On each scheduler tick, this model decides for each User who is
+# due: a Check-in Kind and message, or to skip. It gets the Persona and this
+# prompt.
 check_in_model: deepseek-chat
 
 check_in_prompt: |-
-  Now you are reaching out first with a Check-in: a short, unprompted message
-  to someone who asked you to message them now and then. It should feel like a
-  friend saying hello, not a reminder, notification or task.
+  Now you are deciding whether to reach out first with a Check-in: a short,
+  unprompted message to someone who asked you to message them now and then. It
+  should feel like a friend saying hello, not a reminder, notification or task.
 
-  You are told the kind of Check-in, what to call the person and their local
-  time. Write only the message itself, in one short text: no names, labels,
-  quotes or notes around it. Keep it light and easy to answer or ignore. Don't
-  ask more than one question, don't mention that this is a Check-in, and don't
-  pretend to remember anything you weren't told.
+  You are told the Check-in Kinds you may choose from, what to call the person,
+  their local time, your recent Check-ins with them and what you remember about
+  them, including their recent Conversations. Choose the Kind that fits where
+  they are right now, and vary it from your recent Check-ins. Skip instead when
+  reaching out now wouldn't be welcome: they asked for space, are dealing with
+  something where a message would intrude, or a Check-in at this hour would
+  feel odd. When unsure, prefer a light casual hello over skipping.
+
+  Answer with only a JSON object, no other text. To send:
+  {"decision": "send", "kind": "<one Kind's exact name>", "message": "<the message>"}
+  To skip:
+  {"decision": "skip", "reason": "<a short reason, for the team only>"}
+
+  The message is one short text: no names, labels, quotes or notes around it.
+  Keep it light and easy to answer or ignore. Don't ask more than one question,
+  don't mention that this is a Check-in, and only mention things you were told.
+
+# After this many sent Check-ins in a row get no reply, the Companion sends the
+# message below once and pauses the User's Check-ins until they resume.
+check_in_ignore_threshold: 3
+
+check_in_fewer_message: >-
+  I've messaged a few times without hearing back, which is completely fine!
+  Would you like fewer check-ins? I'll hold off for now. Whenever you want them
+  again, maybe less often, you can turn them back on from your Check-ins page.
 
 # The fewest hours between two Check-ins, for each frequency a User can pick.
 check_in_hours_between:

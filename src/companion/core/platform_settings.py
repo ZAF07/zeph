@@ -98,6 +98,19 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     EditableSetting("check_in_prompt", "Check-in prompt", SettingKind.TEXT),
     EditableSetting("check_in_model", "Check-in model", SettingKind.MODEL),
     EditableSetting(
+        "check_in_ignore_threshold",
+        "Ignore threshold",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=10,
+    ),
+    EditableSetting(
+        "check_in_fewer_message",
+        "“Would you like fewer?” message",
+        SettingKind.TEXT,
+        max_length=1_000,
+    ),
+    EditableSetting(
         "conversation_quiet_gap_minutes",
         "Conversation quiet gap",
         SettingKind.WHOLE_NUMBER,
@@ -169,8 +182,9 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         name="Check-ins",
         runs_when="Scheduler tick, for Users who are due",
         description=(
-            "Writes the Check-in Zeph sends first to a User who opted in, "
-            "from the Persona, the Check-in Kind and their local time."
+            "Decides whether to reach out to a User who opted in, which "
+            "Check-in Kind to use and what to say, or to skip and give space, "
+            "from their recent Conversation Summaries and Memory Items."
         ),
         prompt_key="check_in_prompt",
         model_key="check_in_model",

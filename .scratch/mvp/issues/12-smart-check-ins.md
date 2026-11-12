@@ -39,3 +39,15 @@ Build order inside this issue: (1) backend API and seam 1 tests — this fixes t
 
 - `.scratch/mvp/issues/04-admin-area-foundation.md`
 - `.scratch/mvp/issues/11-basic-check-ins.md`
+
+## Comments
+
+**2026-11-12 — started on branch `feat/12-smart-check-ins`.** Plan:
+- One Check-in model call per due User decides: it gets the Persona + Check-in prompt, the Check-in Kinds it may pick (only those allowed without User Memory when memory is off), the User's name and local time, their recent Check-in decisions and, with User Memory on, their Memory Items and recent Conversation Summaries. It answers JSON: send with a Kind and message, or skip with a reason. A bad answer (unknown or not-allowed Kind, no message, no JSON) sends nothing and is tried again next tick, like a model error today.
+- `check_ins` rows become decisions: `outcome` (sent / skipped / asked_about_fewer), `skip_reason`, nullable `message`, and `sent_at` renamed `decided_at`. Skips and sends both set the next due time one frequency gap on.
+- Ignored streak is worked out, not stored: the User's newest sent Check-ins with no reply, counting back until one was replied, the last "would you like fewer?" message, or the User's last Conversation started. At the Admin-set `check_in_ignore_threshold` (default 3) the Companion sends the Admin-set `check_in_fewer_message` (no model call), records it and pauses Check-ins until the User resumes. A reply to any Check-in breaks the streak.
+- Old `check_in_prompt` (plain text answer) is replaced by a JSON one; migration 0012 removes the stored row so the new seed value loads.
+- Admin API: CRUD `/api/admin/check-in-kinds` (with sends in the last 30 days), `GET /api/admin/check-ins?days=` (time, User, outcome, Kind, skip reason, reply; never the message). Threshold and message on Platform settings.
+- User API: `GET /api/check-ins` adds the Kinds that may be sent to this User; recent entries carry an `outcome` and the new `skipped` status, never the reason.
+- Dashboard: Check-in Kinds and Check-in log admin pages, Check-ins section on Platform settings, and on the Check-ins page skipped entries ("Skipped — gave you some space", date only), "What Zeph might reach out about" and the ignore rule line.
+- Quiet hours, pause, no Telegram and mid-Conversation still hold a Check-in back each tick without a log entry; the log only shows the service's decisions.

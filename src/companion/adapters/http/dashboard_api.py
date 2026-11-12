@@ -10,6 +10,7 @@ from companion.core.check_ins import CheckInService, RecentCheckIn
 from companion.core.models import (
     CheckInChanges,
     CheckInFrequency,
+    CheckInOutcome,
     CheckInSettings,
     CheckInStatus,
     ConnectionToken,
@@ -91,12 +92,20 @@ class PauseRequest(BaseModel):
 
 
 class RecentCheckInResponse(BaseModel):
-    """A sent Check-in and whether the User replied."""
+    """A Check-in sent or skipped and whether the User replied; never a reason."""
 
     id: str
+    outcome: CheckInOutcome
     kind: str | None
-    sent_at: datetime
+    decided_at: datetime
     status: CheckInStatus
+
+
+class CheckInKindSummaryResponse(BaseModel):
+    """A Check-in Kind as Users see it, read-only."""
+
+    name: str
+    description: str
 
 
 class CheckInsResponse(BaseModel):
@@ -109,6 +118,7 @@ class CheckInsResponse(BaseModel):
     paused: bool
     paused_until: datetime | None
     recent: list[RecentCheckInResponse]
+    kinds: list[CheckInKindSummaryResponse]
 
 
 class PlatformContentResponse(BaseModel):
@@ -229,18 +239,19 @@ def to_summary_response(summary: ConversationSummary) -> ConversationSummaryResp
 
 
 def to_recent_check_in_response(recent: RecentCheckIn) -> RecentCheckInResponse:
-    """Describe a sent Check-in for the Dashboard; never its message.
+    """Describe a Check-in for the Dashboard; never its message or skip reason.
 
     Args:
-        recent: The Check-in and whether the User replied.
+        recent: The Check-in and what happened after it.
 
     Returns:
         The response body.
     """
     return RecentCheckInResponse(
         id=str(recent.check_in.id),
+        outcome=recent.check_in.outcome,
         kind=recent.check_in.kind_name,
-        sent_at=recent.check_in.sent_at,
+        decided_at=recent.check_in.decided_at,
         status=recent.status,
     )
 
@@ -304,7 +315,8 @@ def build_dashboard_api_router(
             user: The User.
 
         Returns:
-            The response body, with the pause as it stands right now.
+            The response body, with the pause as it stands right now and the
+            Check-in Kinds that may be sent to them.
         """
         settings = user.check_ins
         is_paused = check_in_service.is_paused(user)
@@ -318,6 +330,10 @@ def build_dashboard_api_router(
             recent=[
                 to_recent_check_in_response(recent)
                 for recent in check_in_service.list_recent(user)
+            ],
+            kinds=[
+                CheckInKindSummaryResponse(name=kind.name, description=kind.description)
+                for kind in check_in_service.kinds_for(user)
             ],
         )
 

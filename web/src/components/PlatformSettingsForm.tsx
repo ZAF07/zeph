@@ -46,6 +46,18 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
       },
     ],
   },
+  {
+    heading: "Check-ins",
+    fields: [
+      {
+        key: "check_in_ignore_threshold",
+        label: "Ignore threshold",
+        caption:
+          "Unanswered Check-ins in a row before Zeph pauses and asks once about fewer.",
+        unit: "in a row",
+      },
+    ],
+  },
 ];
 
 const webSearchKey = "web_search_enabled";
@@ -74,6 +86,11 @@ const textFields: TextField[] = [
     key: "user_memory_explanation",
     label: "Memory explanation",
     caption: "— shown when asking for User Memory consent",
+  },
+  {
+    key: "check_in_fewer_message",
+    label: "“Would you like fewer?” message",
+    caption: "— sent once when a User reaches the ignore threshold",
   },
 ];
 
