@@ -107,7 +107,7 @@ The curated library of philosophy, psychology and mindfulness material the Compa
 _Avoid_: Wisdom base, corpus, content
 
 **Knowledge Document**:
-One text in the Knowledge library (text, Markdown or PDF), with a title, a source or author, and a tradition; Admins can change those details at any time and replies use them straight away. It is Pending until it is made ready, then Ready (used in replies) or Failed (with a reason; an Admin can retry it). Only Ready documents are ever used. Its text, read from its file, is what replies draw on, and Admins can view it on the document's page. Deleting one removes it from replies at once.
+One text in the Knowledge library (text, Markdown or PDF), with a title, a source or author, and a tradition; Admins can change those details at any time and replies use them straight away. It is Pending until it is made ready, then Ready (used in replies) or Failed (with a reason; an Admin can retry it). Only Ready documents are ever used. Its text, read from its file, is what replies draw on; Admins can view and edit it on the document's page, and an edit makes the document Pending until it is re-indexed (it is then marked Edited, as it no longer matches its file word for word). Deleting one removes it from replies at once.
 _Avoid_: File, article, resource
 
 **Starter Knowledge**:

@@ -32,6 +32,7 @@ from companion.core.knowledge import (
     MAX_UPLOAD_BYTES,
     InvalidKnowledgeDocumentError,
     KnowledgeDocumentNotFoundError,
+    KnowledgeFileStillBeingReadError,
     KnowledgeNotRetryableError,
     KnowledgeService,
     knowledge_file_type,
@@ -275,6 +276,12 @@ class KnowledgeDetailsRequest(BaseModel):
     title: str | None = None
     source: str | None = None
     tradition: str | None = None
+
+
+class KnowledgeTextRequest(BaseModel):
+    """The text an Admin wrote for a Knowledge document."""
+
+    text: str
 
 
 class KnowledgeDocumentsResponse(BaseModel):
@@ -966,6 +973,46 @@ def build_admin_api_router(
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
             ) from error
+        return to_knowledge_document_with_text_response(document_with_text)
+
+    @router.put("/knowledge-documents/{document_id}/text")
+    def save_knowledge_document_text(
+        background_tasks: BackgroundTasks,
+        document_id: UUID,
+        request: KnowledgeTextRequest,
+    ) -> KnowledgeDocumentWithTextResponse:
+        """Save a Knowledge document's edited text and index it again.
+
+        The document is pending until it is indexed after the response.
+
+        Args:
+            background_tasks: Runs the indexing after the response.
+            document_id: The document to change.
+            request: Its new text.
+
+        Returns:
+            The pending document and its text.
+
+        Raises:
+            HTTPException: 404 if there is no such document; 409 if its file
+                is still being read; 422 if the text is blank.
+        """
+        try:
+            document_with_text = knowledge_service.save_text(document_id, request.text)
+        except KnowledgeDocumentNotFoundError as error:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "No such Knowledge document"
+            ) from error
+        except KnowledgeFileStillBeingReadError as error:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "The file is still being read. Try again when it’s done.",
+            ) from error
+        except InvalidKnowledgeDocumentError as error:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
+            ) from error
+        background_tasks.add_task(knowledge_service.ingest, document_id)
         return to_knowledge_document_with_text_response(document_with_text)
 
     @router.post("/knowledge-documents/{document_id}/retry")

@@ -11,14 +11,13 @@ import {
 } from "@/components/button-styles";
 import { KnowledgeDetailsForm } from "@/components/KnowledgeDetailsForm";
 import { KnowledgeStatusPill } from "@/components/KnowledgeStatusPill";
-import { KnowledgeTextEditor } from "@/components/KnowledgeTextEditor";
+import { KnowledgeTextSection } from "@/components/KnowledgeTextSection";
 import { LoadFailed } from "@/components/LoadFailed";
 import {
   ApiError,
   type KnowledgeDetailsChange,
   type KnowledgeDocumentWithText,
 } from "@/lib/api-client";
-import { knowledgeStatusLabels } from "@/lib/knowledge-labels";
 import { useApiClient } from "@/lib/use-api-client";
 
 type LoadState =
@@ -34,25 +33,10 @@ const pendingCheckMilliseconds = 3000;
 const libraryPath = "/admin/knowledge";
 
 /**
- * Says what an Admin sees in place of a document's text before it has any.
- *
- * @param knowledgeDocument - The document, which has no text yet.
- * @returns A short explanation.
- */
-function noTextExplanation(
-  knowledgeDocument: KnowledgeDocumentWithText,
-): string {
-  if (knowledgeDocument.status === "pending") {
-    return "The file is being read. Its text will show here when it’s ready.";
-  }
-  return "No text could be read from this file, so Zeph doesn’t draw on it.";
-}
-
-/**
  * One Knowledge document's page: its details (editable), status and why it
- * failed, the text Zeph draws on in the read-only text editor, Retry when it
- * failed and Delete. Checks again every few seconds while the document is
- * pending.
+ * failed, the text Zeph draws on in the Knowledge text editor (editable),
+ * Retry when it failed and Delete. Checks again every few seconds while the
+ * document is pending.
  *
  * @param props - `documentId` is the document to show.
  * @returns The page body, or a loading, not-found or error state.
@@ -103,6 +87,12 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
       knowledgeDocument.id,
       change,
     );
+    setState({ kind: "loaded", document: saved });
+    return saved;
+  }
+
+  async function saveText(text: string) {
+    const saved = await apiClient.saveKnowledgeDocumentText(documentId, text);
     setState({ kind: "loaded", document: saved });
     return saved;
   }
@@ -197,7 +187,6 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
   }
 
   const knowledgeDocument = state.document;
-  const statusLabel = knowledgeStatusLabels[knowledgeDocument.status].label;
 
   return (
     <div className="flex flex-col gap-9">
@@ -248,39 +237,14 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
       ) : null}
 
       <KnowledgeDetailsForm
-        key={knowledgeDocument.id}
         knowledgeDocument={knowledgeDocument}
         onSave={(change) => saveDetails(knowledgeDocument, change)}
       />
 
-      <section
-        aria-labelledby="document-text-heading"
-        className="flex flex-col gap-3"
-      >
-        <div className="flex flex-col gap-1">
-          <h2 id="document-text-heading" className="m-0 text-h3 font-semibold">
-            Text
-          </h2>
-          <p className="m-0 text-caption text-ink-muted">
-            What Zeph draws on, as read from the file.
-          </p>
-        </div>
-        {knowledgeDocument.text === null ? (
-          <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-12 text-center">
-            <span className="text-[17px] font-medium">No text yet</span>
-            <p className="m-0 max-w-[34em] text-caption text-ink-muted">
-              {noTextExplanation(knowledgeDocument)}
-            </p>
-          </div>
-        ) : (
-          <KnowledgeTextEditor
-            value={knowledgeDocument.text}
-            readOnly
-            label={`Text of ${knowledgeDocument.title}`}
-            statusNote={statusLabel}
-          />
-        )}
-      </section>
+      <KnowledgeTextSection
+        knowledgeDocument={knowledgeDocument}
+        onSave={saveText}
+      />
 
       <div className="flex flex-col items-start gap-2 border-t border-line pt-6">
         <button
