@@ -494,3 +494,56 @@ def test_a_crisis_message_cancels_a_pending_delete_my_data(
     reply_call(client, chat_model, word, "Hm?")
 
     assert rows_per_table(engine, user_id) == before
+
+
+def test_saving_the_profile_without_changing_the_time_zone_keeps_its_mark(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    reply_call(
+        client,
+        chat_model,
+        "I'm in London now, and stop remembering things",
+        ToolCall("change_time_zone", {"time_zone": "Europe/London"}),
+        ToolCall("turn_user_memory_on_or_off", {"on": False}),
+        "Done.",
+    )
+
+    client.patch(
+        "/api/me",
+        json={
+            "name": "Maya L",
+            "country": "SG",
+            "time_zone": "Europe/London",
+            "user_memory_enabled": False,
+        },
+        headers=headers,
+    )
+
+    assert me(client, headers)["changed_in_chat"].keys() == {
+        "time_zone",
+        "user_memory",
+    }
+
+
+def test_turning_check_ins_off_on_the_dashboard_clears_the_pause_mark(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    reply_call(
+        client,
+        chat_model,
+        "week off please",
+        ToolCall("pause_check_ins", {"length": "week"}),
+        "Done.",
+    )
+
+    client.patch("/api/check-ins", json={"enabled": False}, headers=headers)
+
+    assert me(client, headers)["changed_in_chat"] == {}

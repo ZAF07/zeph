@@ -134,10 +134,8 @@ class ChatDataDeletion:
         Returns:
             Whether there was a request, and if so whether it was confirmed.
         """
-        user = self._repositories.users.get(user_id)
-        if user is None or user.data_deletion_requested_at is None:
+        if not self._clear_request(user_id):
             return DataDeletionAnswer.NOTHING_ASKED
-        self._repositories.users.update(replace(user, data_deletion_requested_at=None))
         if text.strip().casefold() != self.confirmation_word().casefold():
             return DataDeletionAnswer.CANCELLED
         self._repositories.users.delete_data(user_id)
@@ -155,8 +153,21 @@ class ChatDataDeletion:
         Returns:
             Whether there was a request to cancel.
         """
+        if not self._clear_request(user_id):
+            return DataDeletionAnswer.NOTHING_ASKED
+        return DataDeletionAnswer.CANCELLED
+
+    def _clear_request(self, user_id: UUID) -> bool:
+        """Clear the User's pending request to delete their data.
+
+        Args:
+            user_id: The User.
+
+        Returns:
+            True if they had a pending request.
+        """
         user = self._repositories.users.get(user_id)
         if user is None or user.data_deletion_requested_at is None:
-            return DataDeletionAnswer.NOTHING_ASKED
+            return False
         self._repositories.users.update(replace(user, data_deletion_requested_at=None))
-        return DataDeletionAnswer.CANCELLED
+        return True

@@ -343,6 +343,10 @@ class CheckInService:
     ) -> User:
         """Change and save a User's Check-in settings.
 
+        Only settings whose value really changes are marked as changed in
+        chat or on the Dashboard. Turning Check-ins on or off counts as a
+        change to the pause, since turning them off ends it.
+
         Args:
             user: The User making the change.
             changes: The settings to change; None leaves one as it is.
@@ -352,13 +356,20 @@ class CheckInService:
         Returns:
             The saved User.
         """
+        current = user.check_ins
+        updated = self.settings_after(current, changes)
         changed = []
-        if changes.frequency is not None:
+        if updated.frequency != current.frequency:
             changed.append(ChatSetting.CHECK_IN_FREQUENCY)
-        if changes.quiet_hours_start is not None or changes.quiet_hours_end is not None:
+        if (updated.quiet_hours_start, updated.quiet_hours_end) != (
+            current.quiet_hours_start,
+            current.quiet_hours_end,
+        ):
             changed.append(ChatSetting.QUIET_HOURS)
+        if updated.enabled != current.enabled:
+            changed.append(ChatSetting.CHECK_IN_PAUSE)
         recorded = record_where_changed(user, changed, in_chat, self._clock.now())
-        return self._save(recorded, self.settings_after(user.check_ins, changes))
+        return self._save(recorded, updated)
 
     def settings_after(
         self, current: CheckInSettings, changes: CheckInChanges

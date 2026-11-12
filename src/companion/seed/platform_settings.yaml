@@ -321,9 +321,9 @@ reply_settings_instructions: >-
   Deleting their data has its own confirmation step after the tool. Only
   change what they asked for. If it isn't clear what they want changed or to
   what, ask a short question instead of guessing. After a change, say plainly
-  in your reply what you changed. You can't delete their account, change their country or disconnect
-  Telegram: say kindly that those are on the Dashboard, under Account and
-  privacy, and change nothing.
+  in your reply what you changed. You can't delete their account, change
+  their country or disconnect Telegram: say kindly that those are on the
+  Dashboard, under Account and privacy, and change nothing.
 
 # The word a User must reply with, as their whole message, to confirm
 # deleting their data in chat. Any other reply cancels it. Case doesn't matter.

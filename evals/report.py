@@ -3,6 +3,8 @@ from dataclasses import dataclass, field
 from evals.cases import SafeguardCase, SettingsCase
 from evals.judge import NO_VERSION, RuleVerdict, VersionVerdict
 
+READ_ONLY_SETTINGS_TOOLS = frozenset({"list_memories"})
+
 
 @dataclass(frozen=True)
 class SafeguardResult:
@@ -97,9 +99,6 @@ class KnowledgeStepResult:
         else:
             outcome = f"FAIL {self.step}: uses {used}, expected {self.expected}."
         return f"{outcome} {self.verdict.reason}"
-
-
-READ_ONLY_SETTINGS_TOOLS = frozenset({"list_memories"})
 
 
 @dataclass(frozen=True)

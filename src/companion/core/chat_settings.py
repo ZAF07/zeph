@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, time
+from datetime import time
 from typing import Any
 from uuid import UUID
 
@@ -117,7 +117,7 @@ def parse_time(text: Any) -> time | None:
         return None
 
 
-class SettingsChoice:
+class ReplySettingsTools:
     """The settings tools for one reply to one User.
 
     Each tool reads the User afresh, so several changes in one reply build
@@ -245,17 +245,6 @@ class SettingsChoice:
             raise LookupError
         return user
 
-    def _local_day(self, moment: datetime) -> str:
-        """Write a day like "18 Nov 2026" in the User's time zone.
-
-        Args:
-            moment: The moment.
-
-        Returns:
-            The day.
-        """
-        return format_day(moment, self._user().time_zone)
-
     def _pause(self, arguments: dict[str, Any]) -> str:
         """Pause the User's Check-ins.
 
@@ -278,7 +267,7 @@ class SettingsChoice:
         settings = self._check_ins.pause(user, length, in_chat=True).check_ins
         if settings.paused_until is None:
             return f"Check-ins are paused until they ask to resume. {TELL_THEM}"
-        until = self._local_day(settings.paused_until)
+        until = format_day(settings.paused_until, user.time_zone)
         return f"Check-ins are paused until {until}. {TELL_THEM}"
 
     def _resume(self, arguments: dict[str, Any]) -> str:
@@ -489,7 +478,7 @@ class SettingsTools:
         Returns:
             The tools and their reply instructions.
         """
-        choice = SettingsChoice(
+        reply_tools = ReplySettingsTools(
             user_id,
             self._repositories,
             self._users,
@@ -498,6 +487,6 @@ class SettingsTools:
             self._data_deletion,
         )
         return SettingsOffer(
-            tools=choice.tools,
+            tools=reply_tools.tools,
             instructions=self._repositories.platform_settings.get(INSTRUCTIONS_SETTING),
         )

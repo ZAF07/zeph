@@ -196,6 +196,9 @@ class UserService:
     ) -> User:
         """Change a User's name, User Memory setting, country or time zone.
 
+        Only the User Memory setting and time zone are marked as changed in
+        chat or on the Dashboard, and only when their value really changes.
+
         Args:
             user: The User making the change.
             changes: The preferences to change; None leaves one as it is.
@@ -209,9 +212,9 @@ class UserService:
             InvalidProfileError: If a new value is not acceptable.
         """
         changed = []
-        if changes.user_memory_enabled is not None:
+        if changes.user_memory_enabled not in (None, user.user_memory_enabled):
             changed.append(ChatSetting.USER_MEMORY)
-        if changes.time_zone is not None:
+        if changes.time_zone not in (None, user.time_zone):
             changed.append(ChatSetting.TIME_ZONE)
         updated = replace(
             record_where_changed(user, changed, in_chat, self._clock.now()),
