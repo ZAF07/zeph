@@ -84,4 +84,4 @@ Evidence: seam 1 `tests/test_usage_limits.py` (13: under limit → reply; over l
 ## Completion
 
 - Completed: 2026-11-12
-- Commit: <to be filled in manually>
+- Commit: 407d410, review fixes f01c727, archive be43fec (merged from `feat/13-usage-limits` in 3c8efd7)
