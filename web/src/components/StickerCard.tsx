@@ -64,7 +64,7 @@ export function StickerCard({
       <div className="flex items-center justify-between gap-2">
         <span
           aria-label={`Emoji: ${sticker.emoji ?? "none"}`}
-          className="inline-flex items-center rounded-full bg-[#F4F4F5] px-2.5 py-0.5 text-base"
+          className="inline-flex items-center rounded-full bg-code px-2.5 py-0.5 text-base"
         >
           {sticker.emoji}
         </span>

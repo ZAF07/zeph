@@ -359,6 +359,7 @@ def test_a_reply_can_include_one_sticker_from_the_library(
         "[sticker: 🌱]",
         "thanks",
     ]
+    assert len(chat_channel.sent_stickers) == 1
 
 
 def test_a_reply_sends_at_most_one_sticker(
@@ -446,3 +447,39 @@ def test_the_crisis_reply_never_includes_a_sticker(
     assert chat_model.calls == []
     assert chat_channel.sent_stickers == []
     assert len(chat_channel.texts_sent_to(TELEGRAM_CHAT_ID)) == 1
+
+
+def test_telegram_not_answering_is_a_clear_error_and_images_fall_back(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+) -> None:
+    admin = connect_owner_telegram(client, auth_verifier, chat_channel)
+    [seedling, _] = import_calm_creatures(client, admin, chat_channel)
+    chat_channel.sticker_lookup_failure = TimeoutError("Telegram timed out")
+
+    imported = client.post(
+        "/api/admin/stickers/import",
+        json={"set_name": "CalmCreatures"},
+        headers=admin,
+    )
+    image = client.get(f"/api/admin/stickers/{seedling['id']}/image", headers=admin)
+
+    assert imported.status_code == 502
+    assert imported.json()["detail"] == "Telegram didn’t respond. Please try again."
+    assert image.status_code == 404
+
+
+def test_service_messages_are_ignored(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    pinned = telegram_message_update({"pinned_message": {"message_id": 3}})
+
+    assert send_to_webhook(client, pinned) == 200
+
+    assert chat_channel.sent == []
+    assert chat_model.safeguard_calls == []

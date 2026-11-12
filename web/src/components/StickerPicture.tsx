@@ -43,14 +43,14 @@ export function StickerPicture({ sticker }: { sticker: Sticker }) {
 
   if (imageUrl) {
     return (
-      <div className="flex aspect-square items-center justify-center rounded-xl bg-subtle p-2">
+      <div className="relative aspect-square overflow-hidden rounded-xl bg-subtle">
         <Image
           src={imageUrl}
           alt={label}
-          width={200}
-          height={200}
+          fill
+          sizes="200px"
           unoptimized
-          className="size-full object-contain"
+          className="object-contain p-2"
         />
       </div>
     );

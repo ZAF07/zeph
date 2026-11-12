@@ -38,7 +38,8 @@ class FakeChatChannel:
     """Chat channel that records sent messages instead of sending them.
 
     `events` lists texts, stickers and typing in the order they happened.
-    Sticker sets and sticker images it knows are set by tests.
+    Sticker sets and sticker images it knows are set by tests; set
+    `sticker_lookup_failure` to make looking them up raise it.
     """
 
     def __init__(self) -> None:
@@ -49,6 +50,7 @@ class FakeChatChannel:
         self.events: list[str] = []
         self.sticker_sets: dict[str, list[ChannelSticker]] = {}
         self.sticker_images: dict[str, StickerImage] = {}
+        self.sticker_lookup_failure: Exception | None = None
 
     def send_text(self, chat_id: int, text: str) -> None:
         """Record a text message.
@@ -78,7 +80,12 @@ class FakeChatChannel:
 
         Returns:
             Its stickers, or None if the test set up no such set.
+
+        Raises:
+            Exception: The `sticker_lookup_failure` set on the fake, if any.
         """
+        if self.sticker_lookup_failure is not None:
+            raise self.sticker_lookup_failure
         return self.sticker_sets.get(name)
 
     def get_sticker_image(self, file_id: str) -> StickerImage | None:
@@ -89,7 +96,12 @@ class FakeChatChannel:
 
         Returns:
             The image, or None if the test set up none.
+
+        Raises:
+            Exception: The `sticker_lookup_failure` set on the fake, if any.
         """
+        if self.sticker_lookup_failure is not None:
+            raise self.sticker_lookup_failure
         return self.sticker_images.get(file_id)
 
     def show_typing(self, chat_id: int) -> None:

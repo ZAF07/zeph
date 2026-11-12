@@ -73,6 +73,7 @@ from companion.core.stickers import (
     StickerLibraryService,
     StickerNotFoundError,
     StickerSetNotFoundError,
+    StickerSetUnavailableError,
 )
 
 
@@ -965,7 +966,7 @@ def build_admin_api_router(
 
         Raises:
             HTTPException: 404 if there is no such set; 422 if the name is
-                blank.
+                blank; 502 if Telegram didn't answer.
         """
         try:
             added_count = sticker_library.import_set(request.set_name)
@@ -977,6 +978,11 @@ def build_admin_api_router(
             raise HTTPException(
                 status.HTTP_404_NOT_FOUND,
                 f"There is no sticker set called “{request.set_name.strip()}”.",
+            ) from error
+        except StickerSetUnavailableError as error:
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                "Telegram didn’t respond. Please try again.",
             ) from error
         return StickerImportResponse(added_count=added_count)
 

@@ -379,10 +379,14 @@ export function createApiClient(
   baseUrl: string,
   getToken: () => Promise<string | null>,
 ): ApiClient {
-  async function requestBlob(path: string): Promise<Blob> {
+  async function authHeaders(): Promise<Record<string, string>> {
     const token = await getToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  async function requestBlob(path: string): Promise<Blob> {
     const response = await fetch(`${baseUrl}${path}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers: await authHeaders(),
     });
     if (!response.ok) {
       throw new ApiError(response.status, path, await errorDetail(response));
@@ -395,11 +399,7 @@ export function createApiClient(
     method = "GET",
     body?: unknown,
   ): Promise<T> {
-    const token = await getToken();
-    const headers: Record<string, string> = {};
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
+    const headers = await authHeaders();
     let requestBody: BodyInit | undefined;
     if (body instanceof FormData) {
       requestBody = body;

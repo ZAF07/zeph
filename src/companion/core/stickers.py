@@ -1,8 +1,11 @@
+import logging
 from typing import Any
 from uuid import UUID
 
 from companion.core.models import ChannelSticker, LibrarySticker, StickerImage
 from companion.core.ports import ChatChannel, ChatTool, Clock, Repositories
+
+logger = logging.getLogger(__name__)
 
 MAX_NOTE_LENGTH = 500
 ALREADY_PICKED = "You already picked a sticker for this reply; only one is sent."
@@ -23,6 +26,10 @@ class StickerNotFoundError(LookupError):
 
 class StickerSetNotFoundError(LookupError):
     """Raised when the chat channel has no sticker set with the given name."""
+
+
+class StickerSetUnavailableError(Exception):
+    """Raised when the chat channel can't be asked about a sticker set."""
 
 
 class InvalidStickerError(ValueError):
@@ -105,11 +112,16 @@ class StickerLibraryService:
         Raises:
             InvalidStickerError: If the name is blank.
             StickerSetNotFoundError: If there is no such set.
+            StickerSetUnavailableError: If the chat channel didn't answer.
         """
         name = set_name.strip()
         if not name:
             raise InvalidStickerError("Enter a sticker set name.")
-        stickers = self._chat_channel.get_sticker_set(name)
+        try:
+            stickers = self._chat_channel.get_sticker_set(name)
+        except Exception as error:
+            logger.exception("Could not look up a sticker set")
+            raise StickerSetUnavailableError(name) from error
         if stickers is None:
             raise StickerSetNotFoundError(name)
         return self._repositories.stickers.add_new(stickers, self._clock.now())
@@ -157,7 +169,8 @@ class StickerLibraryService:
             sticker_id: The sticker's ID.
 
         Returns:
-            The image, or None if the sticker has none a browser can show.
+            The image, or None if the sticker has none a browser can show or
+            it couldn't be downloaded.
 
         Raises:
             StickerNotFoundError: If there is no such sticker.
@@ -167,7 +180,11 @@ class StickerLibraryService:
             raise StickerNotFoundError(sticker_id)
         if sticker.preview_file_id is None:
             return None
-        return self._chat_channel.get_sticker_image(sticker.preview_file_id)
+        try:
+            return self._chat_channel.get_sticker_image(sticker.preview_file_id)
+        except Exception:
+            logger.exception("Could not download a sticker image")
+            return None
 
 
 class StickerChoice:

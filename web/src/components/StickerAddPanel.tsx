@@ -180,7 +180,7 @@ export function StickerAddPanel({ onAdded }: { onAdded: () => void }) {
             >
               <span
                 aria-hidden="true"
-                className="size-2 rounded-full bg-[#C2410C]"
+                className="size-2 rounded-full bg-orange-text"
               />
               Listening for stickers from @{telegramUsername}…
             </p>

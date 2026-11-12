@@ -102,8 +102,9 @@ class IncomingMessageHandler:
             return
 
         settings = self._repositories.platform_settings
-        if message.sticker is not None and self._is_admin(connection.user_id):
-            if self._sticker_library.add_sent_sticker(message.sticker):
+        sticker = message.sticker if message.kind == MessageKind.STICKER else None
+        if sticker is not None and self._is_admin(connection.user_id):
+            if self._sticker_library.add_sent_sticker(sticker):
                 reply = settings.get("sticker_added_reply")
             else:
                 reply = settings.get("sticker_already_in_library_reply")
