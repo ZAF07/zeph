@@ -9,8 +9,9 @@ from companion.core.models import (
     LibrarySticker,
     MessageDirection,
 )
-from companion.core.ports import ChatModel, Repositories
+from companion.core.ports import Repositories
 from companion.core.stickers import StickerTools
+from companion.core.usage import UsageRecordingChatModel
 from companion.core.web_search import WebSearchTools
 
 BLANK_LINE = re.compile(r"\n\s*\n")
@@ -91,7 +92,7 @@ class ResponseComposer:
     def __init__(
         self,
         repositories: Repositories,
-        chat_model: ChatModel,
+        chat_model: UsageRecordingChatModel,
         web_search_tools: WebSearchTools,
         sticker_tools: StickerTools,
     ) -> None:
@@ -99,7 +100,7 @@ class ResponseComposer:
 
         Args:
             repositories: Where Conversations and settings are stored.
-            chat_model: Generates the reply.
+            chat_model: Generates the reply and records the tokens used.
             web_search_tools: Offers the web tools the reply may call.
             sticker_tools: Offers the Sticker Library to the reply.
         """
@@ -146,6 +147,7 @@ class ResponseComposer:
             self._repositories.conversations.list_messages(conversation_id)
         )
         reply = self._chat_model.generate(
+            user_id=user_id,
             model=settings.get("response_model"),
             instructions=instructions,
             history=history,

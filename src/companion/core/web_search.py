@@ -3,10 +3,10 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 from uuid import UUID
-from zoneinfo import ZoneInfo
 
 from companion.core.models import WebSearchResult
 from companion.core.ports import ChatTool, Clock, Repositories, WebSearch
+from companion.core.timing import users_today
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +182,4 @@ class WebSearchTools:
             Today's date in their time zone, or in UTC if they have none.
         """
         user = self._repositories.users.get(user_id)
-        time_zone = ZoneInfo(user.time_zone) if user and user.time_zone else None
-        now = self._clock.now()
-        return (now.astimezone(time_zone) if time_zone else now).date()
+        return users_today(user.time_zone if user else None, self._clock.now())

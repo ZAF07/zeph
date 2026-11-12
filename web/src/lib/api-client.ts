@@ -281,6 +281,25 @@ export type CheckInLogEntry = {
   status: CheckInStatus;
 };
 
+/** What one User used on one of their days. Counts only, never content. */
+export type DailyUsage = {
+  day: string;
+  user_id: string;
+  user_name: string | null;
+  user_email: string | null;
+  message_count: number;
+  tokens_in: number;
+  tokens_out: number;
+  web_search_count: number;
+};
+
+/** Usage per User per day, newest day first, with the limits in force now. */
+export type UsageReport = {
+  rows: DailyUsage[];
+  daily_message_limit: number;
+  web_search_daily_limit: number;
+};
+
 /** The kind of fact a Memory Item records, as Admins manage it. */
 export type MemoryCategory = {
   id: string;
@@ -391,6 +410,7 @@ export type ApiClient = {
   ) => Promise<CheckInKind>;
   removeCheckInKind: (id: string) => Promise<void>;
   listCheckInLog: (days: number) => Promise<CheckInLogEntry[]>;
+  getUsage: (days: number) => Promise<UsageReport>;
   listMemoryCategories: () => Promise<MemoryCategoryOverview[]>;
   addMemoryCategory: (category: MemoryCategoryInput) => Promise<MemoryCategory>;
   updateMemoryCategory: (
@@ -616,6 +636,7 @@ export function createApiClient(
           `/api/admin/check-ins?days=${days}`,
         )
       ).entries,
+    getUsage: (days) => request<UsageReport>(`/api/admin/usage?days=${days}`),
     listMemoryCategories: async () =>
       (
         await request<{ categories: MemoryCategoryOverview[] }>(

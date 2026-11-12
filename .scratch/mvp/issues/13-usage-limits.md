@@ -1,6 +1,6 @@
 # 13 — Usage limits
 
-Status: ready-for-agent
+Status: in-progress
 
 ## Parent
 
@@ -30,3 +30,13 @@ Build order inside this issue: (1) backend API and seam 1 tests — this fixes t
 ## Blocked by
 
 - `.scratch/mvp/issues/04-admin-area-foundation.md`
+
+## Comments
+
+**2026-11-12 — started on branch `feat/13-usage-limits`.** Plan:
+- `daily_usage` (today: web searches only) gains `message_count`, `tokens_in`, `tokens_out` (migration 0013). The day is the User's own day, as for the Web Search Limit.
+- New settings `daily_message_limit` (default 200, 0–10000) and `daily_limit_reply` (in-character wording), both on Platform settings.
+- Reply flow: record message → Safeguard → crisis gets the Crisis Reply (not counted, as the design says "Safety replies never count") → otherwise count the message in one step only if under the limit (like web searches) → over the limit: the limit reply is sent and saved, nothing is composed.
+- Tokens: the chat model port returns the text with tokens in/out. A core `UsageRecordingChatModel` wraps it, takes the User and adds their tokens to today's row, so every model call for a User counts (Safeguard, memory retrieval, reply, post-conversation, Check-ins), as the design's footnote says.
+- Admin API: `GET /api/admin/usage?days=1|7|30` → rows (day, User, messages, tokens in/out, web searches), totals for the period, and the current limits.
+- Dashboard: Admin Usage page (period select, 4 totals, table with "Message limit reached" / "Search limit reached", Download CSV made in the browser), Usage in the admin sidebar, daily message limit and limit-reached reply on Platform settings.

@@ -49,6 +49,7 @@ from companion.core.models import (
     Conversation,
     ConversationMessage,
     ConversationSummary,
+    DailyUsage,
     Helpline,
     HelplineDetails,
     KnowledgeDetailsChange,
@@ -1746,6 +1747,95 @@ class PostgresUsageRepository:
                 )
             ).scalar()
         return count or 0
+
+    def claim_message(self, user_id: UUID, day: date, daily_limit: int) -> bool:
+        """Count one message for a User's day, in one step, if under the limit.
+
+        Args:
+            user_id: The User's ID.
+            day: The User's day.
+            daily_limit: The most messages allowed in a day.
+
+        Returns:
+            True if the message was counted; False if the limit was reached.
+        """
+        if daily_limit < 1:
+            return False
+        statement = insert(daily_usage).values(
+            user_id=user_id, day=day, message_count=1
+        )
+        with self._engine.begin() as connection:
+            claimed = connection.execute(
+                statement.on_conflict_do_update(
+                    index_elements=[daily_usage.c.user_id, daily_usage.c.day],
+                    set_={"message_count": daily_usage.c.message_count + 1},
+                    where=daily_usage.c.message_count < daily_limit,
+                ).returning(daily_usage.c.message_count)
+            ).first()
+        return claimed is not None
+
+    def add_tokens(
+        self, user_id: UUID, day: date, tokens_in: int, tokens_out: int
+    ) -> None:
+        """Add chat model tokens to a User's day.
+
+        Args:
+            user_id: The User's ID.
+            day: The User's day.
+            tokens_in: Tokens the model read.
+            tokens_out: Tokens the model wrote.
+        """
+        statement = insert(daily_usage).values(
+            user_id=user_id, day=day, tokens_in=tokens_in, tokens_out=tokens_out
+        )
+        with self._engine.begin() as connection:
+            connection.execute(
+                statement.on_conflict_do_update(
+                    index_elements=[daily_usage.c.user_id, daily_usage.c.day],
+                    set_={
+                        "tokens_in": daily_usage.c.tokens_in + tokens_in,
+                        "tokens_out": daily_usage.c.tokens_out + tokens_out,
+                    },
+                )
+            )
+
+    def list_since(self, first_day: date) -> list[DailyUsage]:
+        """List every User's usage from a day on.
+
+        Args:
+            first_day: The earliest day to list.
+
+        Returns:
+            One entry per User per day, newest day first, then by User.
+        """
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                select(
+                    daily_usage,
+                    users.c.name.label("user_name"),
+                    users.c.email.label("user_email"),
+                )
+                .join(users, users.c.id == daily_usage.c.user_id)
+                .where(daily_usage.c.day >= first_day)
+                .order_by(
+                    daily_usage.c.day.desc(),
+                    func.lower(func.coalesce(users.c.name, users.c.email)),
+                    users.c.id,
+                )
+            ).all()
+        return [
+            DailyUsage(
+                day=row.day,
+                user_id=row.user_id,
+                user_name=row.user_name,
+                user_email=row.user_email,
+                message_count=row.message_count,
+                tokens_in=row.tokens_in,
+                tokens_out=row.tokens_out,
+                web_search_count=row.web_search_count,
+            )
+            for row in rows
+        ]
 
 
 class PostgresStickerRepository:

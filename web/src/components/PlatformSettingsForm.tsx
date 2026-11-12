@@ -44,6 +44,12 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
         caption: "Minutes of silence before a Conversation ends.",
         unit: "min",
       },
+      {
+        key: "daily_message_limit",
+        label: "Daily message limit",
+        caption: "Per User. Safety replies never count toward it.",
+        unit: "msgs",
+      },
     ],
   },
   {
@@ -91,6 +97,11 @@ const textFields: TextField[] = [
     key: "check_in_fewer_message",
     label: "“Would you like fewer?” message",
     caption: "— sent once when a User reaches the ignore threshold",
+  },
+  {
+    key: "daily_limit_reply",
+    label: "Limit-reached reply",
+    caption: "— sent in Telegram when a User hits the daily limit",
   },
 ];
 

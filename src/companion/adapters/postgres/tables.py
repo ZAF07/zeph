@@ -268,6 +268,9 @@ daily_usage = Table(
     ),
     Column("day", Date, primary_key=True),
     Column("web_search_count", Integer, nullable=False, server_default=text("0")),
+    Column("message_count", Integer, nullable=False, server_default=text("0")),
+    Column("tokens_in", BigInteger, nullable=False, server_default=text("0")),
+    Column("tokens_out", BigInteger, nullable=False, server_default=text("0")),
 )
 
 stickers = Table(

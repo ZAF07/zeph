@@ -20,8 +20,9 @@ from companion.core.models import (
     PauseLength,
     User,
 )
-from companion.core.ports import ChatChannel, ChatModel, Clock, Repositories
+from companion.core.ports import ChatChannel, Clock, Repositories
 from companion.core.timing import check_in_reply_window, is_open, quiet_gap
+from companion.core.usage import UsageRecordingChatModel
 
 logger = logging.getLogger(__name__)
 
@@ -317,7 +318,7 @@ class CheckInService:
     def __init__(
         self,
         repositories: Repositories,
-        chat_model: ChatModel,
+        chat_model: UsageRecordingChatModel,
         chat_channel: ChatChannel,
         clock: Clock,
     ) -> None:
@@ -326,7 +327,7 @@ class CheckInService:
         Args:
             repositories: Where Users, Check-ins, Conversations and settings
                 are stored.
-            chat_model: Writes each Check-in.
+            chat_model: Writes each Check-in and records the tokens used.
             chat_channel: Sends Check-ins to Users.
             clock: Tells the current time.
         """
@@ -665,6 +666,7 @@ class CheckInService:
             self._memory(user),
         )
         answer = self._chat_model.generate(
+            user_id=user.id,
             model=settings.get("check_in_model"),
             instructions=f"{settings.get('persona')}\n\n{settings.get('check_in_prompt')}",
             history=[ChatLine(role=ChatRole.USER, text=description)],

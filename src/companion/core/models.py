@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime, time
+from datetime import date, datetime, time
 from enum import StrEnum
 from typing import Any
 from uuid import UUID
@@ -401,6 +401,46 @@ class ChatLine:
 
     role: ChatRole
     text: str
+
+
+@dataclass(frozen=True)
+class ModelAnswer:
+    """What the chat model answered, and how many tokens it took.
+
+    Attributes:
+        text: The answer text.
+        tokens_in: Tokens the model read, across every round of tool calls.
+        tokens_out: Tokens the model wrote, across every round of tool calls.
+    """
+
+    text: str
+    tokens_in: int = 0
+    tokens_out: int = 0
+
+
+@dataclass(frozen=True)
+class DailyUsage:
+    """What one User used on one of their days. Counts only, never content.
+
+    Attributes:
+        day: The User's day.
+        user_id: The User's ID.
+        user_name: What the Companion calls them, if set.
+        user_email: Their account email, if known.
+        message_count: Messages that counted toward the daily message limit.
+        tokens_in: Tokens the chat model read for them.
+        tokens_out: Tokens the chat model wrote for them.
+        web_search_count: Web searches and page reads made for them.
+    """
+
+    day: date
+    user_id: UUID
+    user_name: str | None
+    user_email: str | None
+    message_count: int
+    tokens_in: int
+    tokens_out: int
+    web_search_count: int
 
 
 @dataclass(frozen=True)

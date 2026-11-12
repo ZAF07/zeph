@@ -16,8 +16,9 @@ from companion.core.models import (
     MemoryItem,
     MemorySource,
 )
-from companion.core.ports import ChatModel, Clock, Repositories
+from companion.core.ports import Clock, Repositories
 from companion.core.response_composition import to_transcript_lines
+from companion.core.usage import UsageRecordingChatModel
 
 logger = logging.getLogger(__name__)
 
@@ -220,14 +221,18 @@ class PostConversationProcessor:
     """Sums up each ended Conversation and updates the User's Memory Items."""
 
     def __init__(
-        self, repositories: Repositories, chat_model: ChatModel, clock: Clock
+        self,
+        repositories: Repositories,
+        chat_model: UsageRecordingChatModel,
+        clock: Clock,
     ) -> None:
         """Set up the processor.
 
         Args:
             repositories: Where Users, Conversations, User Memory and
                 settings are stored.
-            chat_model: Writes the summary and the Memory Item operations.
+            chat_model: Writes the summary and the Memory Item operations,
+                and records the tokens used.
             clock: Tells the current time.
         """
         self._repositories = repositories
@@ -259,7 +264,9 @@ class PostConversationProcessor:
             return
         categories = self._repositories.memory_categories.list_all()
         items_by_number = dict(enumerate(user_memory.list_items(user.id), start=1))
-        answer = self._ask(describe_conversation(messages, categories, items_by_number))
+        answer = self._ask(
+            user.id, describe_conversation(messages, categories, items_by_number)
+        )
         if answer is None:
             logger.warning("Post-conversation processing gave no readable answer")
             user_memory.save_processed_conversation(
@@ -291,10 +298,11 @@ class PostConversationProcessor:
         )
         user_memory.save_processed_conversation(conversation.id, now, summary, changes)
 
-    def _ask(self, description: str) -> ProcessingAnswer | None:
+    def _ask(self, user_id: UUID, description: str) -> ProcessingAnswer | None:
         """Ask the model about the Conversation, once more if it can't be read.
 
         Args:
+            user_id: The User whose Conversation it was.
             description: The categories, current memory and Conversation.
 
         Returns:
@@ -303,6 +311,7 @@ class PostConversationProcessor:
         settings = self._repositories.platform_settings
         for _ in range(2):
             answer = self._chat_model.generate(
+                user_id=user_id,
                 model=settings.get("memory_processing_model"),
                 instructions=settings.get("memory_processing_prompt"),
                 history=[ChatLine(role=ChatRole.USER, text=description)],

@@ -18,6 +18,7 @@ from companion.core.models import (
     ConversationMessage,
     ConversationSummary,
     ConversationTurn,
+    DailyUsage,
     EmbeddedChunk,
     Helpline,
     HelplineDetails,
@@ -34,6 +35,7 @@ from companion.core.models import (
     MemoryCategoryOverview,
     MemoryChanges,
     MemoryItem,
+    ModelAnswer,
     RiskType,
     SafeguardEvent,
     SafeguardEventOverview,
@@ -161,7 +163,7 @@ class ChatModel(Protocol):
         instructions: str,
         history: list[ChatLine],
         tools: Sequence[ChatTool] = (),
-    ) -> str:
+    ) -> ModelAnswer:
         """Generate the next reply, calling tools first if the model wants to.
 
         Args:
@@ -171,7 +173,7 @@ class ChatModel(Protocol):
             tools: The tools the model may call; none by default.
 
         Returns:
-            The reply text.
+            The reply text and the tokens it took.
         """
         ...
 
@@ -1004,6 +1006,43 @@ class UsageRepository(Protocol):
 
         Returns:
             How many web searches they made.
+        """
+        ...
+
+    def claim_message(self, user_id: UUID, day: date, daily_limit: int) -> bool:
+        """Count one message for a User's day, in one step, if under the limit.
+
+        Args:
+            user_id: The User's ID.
+            day: The User's day.
+            daily_limit: The most messages allowed in a day.
+
+        Returns:
+            True if the message was counted; False if the limit was reached.
+        """
+        ...
+
+    def add_tokens(
+        self, user_id: UUID, day: date, tokens_in: int, tokens_out: int
+    ) -> None:
+        """Add chat model tokens to a User's day.
+
+        Args:
+            user_id: The User's ID.
+            day: The User's day.
+            tokens_in: Tokens the model read.
+            tokens_out: Tokens the model wrote.
+        """
+        ...
+
+    def list_since(self, first_day: date) -> list[DailyUsage]:
+        """List every User's usage from a day on.
+
+        Args:
+            first_day: The earliest day to list.
+
+        Returns:
+            One entry per User per day, newest day first, then by User.
         """
         ...
 

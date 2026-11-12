@@ -117,6 +117,19 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         minimum=5,
         maximum=1440,
     ),
+    EditableSetting(
+        "daily_message_limit",
+        "Daily message limit",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=10_000,
+    ),
+    EditableSetting(
+        "daily_limit_reply",
+        "Limit-reached reply",
+        SettingKind.TEXT,
+        max_length=1_000,
+    ),
     EditableSetting("web_search_enabled", "Web search", SettingKind.ON_OFF),
     EditableSetting(
         "web_search_daily_limit",

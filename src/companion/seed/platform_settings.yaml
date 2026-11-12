@@ -258,6 +258,16 @@ reply_knowledge_intro: >-
   friend might mention something they once read. Never lecture, quote at
   length or force it in:
 
+# The most messages a User can send the Companion in a day; it resets at
+# midnight in the User's time zone. Over the limit the Companion sends the
+# reply below instead of writing one. The Safeguard still checks every message
+# first, and a crisis never counts toward the limit.
+daily_message_limit: 200
+
+daily_limit_reply: >-
+  I'm honestly wiped for today, my brain needs a rest. Talk tomorrow? If
+  something urgent comes up, please reach out to someone you trust.
+
 # Web search. When it is on, each reply may search the web and read pages.
 # Every search and every page read counts toward the per-User daily limit,
 # which resets at midnight in the User's time zone.

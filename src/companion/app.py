@@ -42,6 +42,7 @@ from companion.core.safeguard import Safeguard
 from companion.core.scheduled_work import ScheduledWork
 from companion.core.stickers import StickerLibraryService, StickerTools
 from companion.core.telegram_connection import TelegramConnectionService
+from companion.core.usage import UsageLimiter, UsageRecordingChatModel
 from companion.core.user_memory import UserMemoryService
 from companion.core.users import UserService
 from companion.core.web_search import WebSearchTools
@@ -102,9 +103,11 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     user_memory_service = UserMemoryService(
         dependencies.repositories, dependencies.clock
     )
+    usage_limiter = UsageLimiter(dependencies.repositories, dependencies.clock)
+    chat_model = UsageRecordingChatModel(dependencies.chat_model, usage_limiter)
     check_in_service = CheckInService(
         repositories=dependencies.repositories,
-        chat_model=dependencies.chat_model,
+        chat_model=chat_model,
         chat_channel=dependencies.chat_channel,
         clock=dependencies.clock,
     )
@@ -128,7 +131,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     safeguard = Safeguard(
         repositories=dependencies.repositories,
         helplines=helpline_service,
-        chat_model=dependencies.chat_model,
+        chat_model=chat_model,
         clock=dependencies.clock,
     )
     conversation_engine = dependencies.build_conversation_engine(
@@ -139,9 +142,10 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 clock=dependencies.clock,
             ),
             safeguard=safeguard,
+            usage_limiter=usage_limiter,
             memory_retrieval=MemoryRetrieval(
                 repositories=dependencies.repositories,
-                chat_model=dependencies.chat_model,
+                chat_model=chat_model,
             ),
             knowledge_retrieval=KnowledgeRetrieval(
                 repositories=dependencies.repositories,
@@ -150,7 +154,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             ),
             response_composer=ResponseComposer(
                 repositories=dependencies.repositories,
-                chat_model=dependencies.chat_model,
+                chat_model=chat_model,
                 web_search_tools=WebSearchTools(
                     repositories=dependencies.repositories,
                     web_search=dependencies.web_search,
@@ -173,7 +177,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         repositories=dependencies.repositories,
         post_conversation=PostConversationProcessor(
             repositories=dependencies.repositories,
-            chat_model=dependencies.chat_model,
+            chat_model=chat_model,
             clock=dependencies.clock,
         ),
         check_ins=check_in_service,
@@ -239,6 +243,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 dependencies.repositories, dependencies.clock
             ),
             check_in_service=check_in_service,
+            usage_limiter=usage_limiter,
         )
     )
     app.include_router(

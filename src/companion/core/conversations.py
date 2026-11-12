@@ -20,6 +20,7 @@ from companion.core.response_composition import ResponseComposer
 from companion.core.safeguard import Safeguard
 from companion.core.stickers import sticker_message_text
 from companion.core.timing import check_in_reply_window, is_open, quiet_gap
+from companion.core.usage import UsageLimiter
 
 
 def typing_pause_seconds(text: str, settings: PlatformSettingsRepository) -> float:
@@ -122,7 +123,8 @@ class ConversationService:
     def deliver_at_once(self, conversation_id: UUID, chat_id: int, text: str) -> None:
         """Send one message straight away, without a typing pause, and save it.
 
-        Used for the Crisis Reply, which must never wait.
+        Used for the Crisis Reply, which must never wait, and the daily
+        limit reply.
 
         Args:
             conversation_id: The Conversation being answered.
@@ -203,6 +205,7 @@ class ConversationServices:
     Attributes:
         conversations: Saves messages and sends replies.
         safeguard: Checks each message for crisis and writes the Crisis Reply.
+        usage_limiter: Keeps each User within the daily message limit.
         memory_retrieval: Finds the User Memory that matters for a message.
         knowledge_retrieval: Finds the Knowledge that may fit a message.
         response_composer: Writes the Companion's reply.
@@ -210,6 +213,7 @@ class ConversationServices:
 
     conversations: ConversationService
     safeguard: Safeguard
+    usage_limiter: UsageLimiter
     memory_retrieval: MemoryRetrieval
     knowledge_retrieval: KnowledgeRetrieval
     response_composer: ResponseComposer

@@ -27,6 +27,8 @@ const settings: AdminSettings = {
   user_memory_explanation: seeded("I can keep details."),
   check_in_ignore_threshold: seeded(3),
   check_in_fewer_message: seeded("Would you like fewer check-ins?"),
+  daily_message_limit: seeded(200),
+  daily_limit_reply: seeded("I'm wiped for today, talk tomorrow?"),
 };
 
 describe("PlatformSettingsForm", () => {
@@ -92,6 +94,29 @@ describe("PlatformSettingsForm", () => {
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       check_in_ignore_threshold: 5,
       check_in_fewer_message: "Fewer of these?",
+    });
+  });
+
+  it("shows and saves the daily message limit and limit-reached reply", async () => {
+    const user = userEvent.setup();
+    render(<PlatformSettingsForm />);
+    const limit = await screen.findByLabelText("Daily message limit");
+    expect(limit).toHaveValue(200);
+    expect(
+      screen.getByText("Per User. Safety replies never count toward it."),
+    ).toBeVisible();
+    const reply = screen.getByLabelText(/Limit-reached reply/);
+    expect(reply).toHaveValue("I'm wiped for today, talk tomorrow?");
+
+    await user.clear(limit);
+    await user.type(limit, "60");
+    await user.clear(reply);
+    await user.type(reply, "Out of steam, talk tomorrow?");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      daily_message_limit: 60,
+      daily_limit_reply: "Out of steam, talk tomorrow?",
     });
   });
 
