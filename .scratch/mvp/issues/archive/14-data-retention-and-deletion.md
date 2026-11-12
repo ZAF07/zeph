@@ -75,4 +75,4 @@ Evidence: seam 2 `tests/test_message_retention.py` (5: tick deletes old messages
 ## Completion
 
 - Completed: 2026-11-12
-- Commit: <to be filled in after merge>
+- Commit: 987e611, review fixes 1645764, archive 2fd8de1 (merged from `feat/14-data-retention-and-deletion` in 955f4bf)
