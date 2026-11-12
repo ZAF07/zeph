@@ -41,12 +41,20 @@ A one-time, short-lived code from the Dashboard that a User sends to the Compani
 _Avoid_: Link code, invite, pairing code
 
 **Conversation**:
-A run of messages between a User and the Companion that ends after a quiet gap (set by an Admin) with no message from either side. Once ended it never reopens: the next message starts a new Conversation. A Check-in the User replies to also starts one.
+A run of messages between a User and the Companion that ends after a quiet gap (set by an Admin) with no message from either side. Once ended it never reopens: the next message starts a new Conversation. A reply to a Check-in also starts one, beginning with that Check-in.
 _Avoid_: Session, thread, chat
 
 **Check-in**:
-A message the Companion sends first, unprompted, to a User who has opted in — meant to feel like a friend reaching out, not a task reminder.
+A message the Companion sends first, unprompted, to a User who has opted in — meant to feel like a friend reaching out, not a task reminder. Sent only when the User is due (their frequency gap has passed), not paused, outside their Quiet Hours and not mid-Conversation. The User's first message within the reply window (set by an Admin) is its reply; after that it had no reply. Users never see when the next one will come.
 _Avoid_: Notification, nudge, reminder, push
+
+**Quiet Hours**:
+The local times, in the User's time zone, when the Companion never sends a Check-in. They may run past midnight (e.g. 22:00 until 07:30).
+_Avoid_: Do not disturb, sleep hours
+
+**Check-in Pause**:
+A break from Check-ins for a day, a week or until the User resumes, which keeps every other Check-in setting. A timed pause ends by itself.
+_Avoid_: Snooze, mute
 
 **Check-in Kind**:
 The style of a Check-in (e.g. casual hello, follow-up on something shared, present-moment prompt), chosen from the User's recent Conversation Summaries and Memory Items. Managed by Admins.
