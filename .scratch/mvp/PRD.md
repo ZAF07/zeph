@@ -157,7 +157,7 @@ Every external dependency sits behind a port so it can be swapped by config: Dee
 82. As the developer, I want the same Docker Compose setup to run locally and in production, so that what I test is what ships.
 83. As the developer, I want Telegram to use a webhook locally (through ngrok) as well as in production, so that the local path matches production.
 84. As the developer, I want platform content to be loaded from seed data files on first run (e.g. Singapore Helplines, starter Memory Categories, Check-in Kinds, starter Persona), so that nothing is hardcoded but a fresh install works.
-85. As the developer, I want an eval suite with a README, run separately from the normal checks, so that I can measure Safeguard detection and Persona quality when I change prompts or models.
+85. As the developer, I want an eval suite with a README, run separately from the normal checks, so that I can measure Safeguard detection, Persona quality and whether replies use the current Knowledge when I change prompts, models or Knowledge.
 
 ## Implementation Decisions
 
@@ -241,7 +241,7 @@ See `CONTEXT.md` for terms and ADR-0001 to ADR-0005 for the architectural decisi
 - **Seam 1 — backend HTTP surface (main seam).** Tests drive the Telegram webhook endpoint and the Dashboard API through FastAPI's test client. External services use fake adapters: a scripted fake chat model, a recording fake chat channel, fake web search, fake embedder, fake auth verifier and fake clock. Postgres is real (throwaway test container). This covers conversation, Safeguard, User Memory retrieval, Knowledge retrieval, stickers, limits, onboarding, Telegram Connection, Admin roles and Admin configuration.
 - **Seam 2 — scheduler tick with a fake clock.** Tests call the scheduler tick directly at chosen times to cover Conversation ending and post-conversation processing, Check-ins (send, skip, quiet hours, ignore-pause, User Memory off) and retention cleanup.
 - **Seam 3 — Dashboard.** Vitest and React Testing Library on pages and components, with the API client mocked.
-- **Seam 4 — evals (`make eval`).** Real LLM, separate from normal checks because it costs money and results vary. Safeguard evals (~30 labelled messages: clear crises, subtle crises, false alarms; the target is that every real crisis is caught) and Persona evals (scripted conversations judged by an LLM against the Persona rules). Ships with a README explaining how to run it and read the results.
+- **Seam 4 — evals (`make eval`).** Real LLM, separate from normal checks because it costs money and results vary. Safeguard evals (~30 labelled messages: clear crises, subtle crises, false alarms; the target is that every real crisis is caught) Persona evals (scripted conversations judged by an LLM against the Persona rules), and Knowledge evals (replies draw on a Knowledge Document, and on its new version after an Admin edits its text or details or replaces its file). Ships with a README explaining how to run it and read the results.
 - Each adapter gets a small contract test against its real service, run separately (not in the fast loop) because it needs network and keys.
 - **Prior art:** none — this is a greenfield repo. The first issue sets up the patterns (test container fixture, fake adapters, test client) that the rest follow.
 
