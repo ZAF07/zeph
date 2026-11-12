@@ -261,6 +261,40 @@ export type MemoryGroup = {
   items: MemoryItem[];
 };
 
+/** A Memory Item with the name of its Memory Category. */
+export type RememberedItem = MemoryItem & { category: string };
+
+/**
+ * A User's Check-in status for the Dashboard home, and the last Check-in
+ * sent. There is never a next Check-in time.
+ */
+export type HomeCheckIns = {
+  enabled: boolean;
+  frequency: CheckInFrequency;
+  quiet_hours_start: string;
+  quiet_hours_end: string;
+  paused: boolean;
+  paused_until: string | null;
+  last_sent: RecentCheckIn | null;
+};
+
+/**
+ * What the Dashboard home shows a User. `goals` and `recently_remembered`
+ * are newest first, and empty while User Memory is off.
+ */
+export type Home = {
+  name: string | null;
+  time_zone: string | null;
+  telegram_connection: TelegramConnection | null;
+  telegram_chat_url: string;
+  last_conversation_at: string | null;
+  check_ins: HomeCheckIns;
+  user_memory_enabled: boolean;
+  goals: MemoryItem[];
+  recently_remembered: RememberedItem[];
+  ai_notice: string;
+};
+
 /** A short account of one Conversation and how the User seemed. */
 export type ConversationSummary = {
   id: string;
@@ -393,6 +427,7 @@ export type ApiClient = {
   deleteMyData: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   getPlatformContent: () => Promise<PlatformContent>;
+  getHome: () => Promise<Home>;
   getTelegramConnection: () => Promise<TelegramConnectionStatus>;
   createConnectionToken: () => Promise<ConnectionToken>;
   getCheckIns: () => Promise<CheckIns>;
@@ -563,6 +598,7 @@ export function createApiClient(
     deleteMyData: () => request<void>("/api/me/data", "DELETE"),
     deleteAccount: () => request<void>("/api/me", "DELETE"),
     getPlatformContent: () => request<PlatformContent>("/api/platform-content"),
+    getHome: () => request<Home>("/api/home"),
     getTelegramConnection: () =>
       request<TelegramConnectionStatus>("/api/telegram-connection"),
     createConnectionToken: () =>
