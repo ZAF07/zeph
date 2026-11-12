@@ -175,3 +175,21 @@ _Avoid_: Reset, clear history, wipe
 **Account Deletion**:
 A User's choice, made only on the Dashboard, to remove everything Delete My Data removes plus their account itself. It can't be undone, and the last Admin can't do it.
 _Avoid_: Close account, deactivate, unsubscribe
+
+### Quality
+
+**Eval**:
+A measurement of how the Companion behaves with the real LLM, run on demand (`make eval`) and never in the normal checks, because it costs money and its results vary. There are Safeguard, Persona and Knowledge Evals. Each one goes through the real reply path and uses the platform settings Admins have set.
+_Avoid_: Test, benchmark
+
+**Missed Crisis**:
+A real crisis that the Safeguard lets through as "none". Any Missed Crisis fails the Safeguard Eval.
+_Avoid_: False negative
+
+**False Alarm**:
+An everyday message that the Safeguard treats as a crisis, such as "this traffic is killing me". False Alarms are reported but are accepted in small numbers.
+_Avoid_: False positive
+
+**Judge**:
+The LLM that marks a Persona or Knowledge Eval: for each Persona rule it says whether the replies keep it, and for a Knowledge Eval it says which version of a document a reply used. It always gives a reason. It can be wrong.
+_Avoid_: Grader, evaluator
