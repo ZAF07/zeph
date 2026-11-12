@@ -32,14 +32,15 @@ class MessageRetention:
     def delete_expired(self) -> None:
         """Delete messages older than the retention period.
 
-        What the conversation engine saved for each User who lost messages is
-        deleted too, as it holds copies of their messages.
+        What the conversation engine saved for each User with old messages is
+        deleted first, as it holds copies of their messages. If that fails,
+        the messages stay too, so the next tick tries again.
         """
         retention = timedelta(
             days=self._repositories.platform_settings.get(RETENTION_DAYS_SETTING)
         )
-        user_ids = self._repositories.conversations.delete_messages_sent_before(
-            self._clock.now() - retention
-        )
-        for user_id in user_ids:
+        cutoff = self._clock.now() - retention
+        conversations = self._repositories.conversations
+        for user_id in conversations.list_users_with_messages_sent_before(cutoff):
             self._conversation_engine.forget_user(user_id)
+        conversations.delete_messages_sent_before(cutoff)

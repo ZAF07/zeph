@@ -1,6 +1,7 @@
 from datetime import timedelta
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 from langgraph.checkpoint.postgres import PostgresSaver
 from sqlalchemy import Engine, text
@@ -175,3 +176,38 @@ def test_an_admin_can_shorten_the_retention_period(
     assert response.status_code == 200
     assert response.json()["settings"]["message_retention_days"]["value"] == 7
     assert message_contents(engine) == []
+
+
+def test_old_messages_stay_until_the_saved_state_can_be_deleted_too(
+    client: TestClient,
+    engine: Engine,
+    checkpointer: PostgresSaver,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    headers = auth_headers(auth_verifier, "user_maya")
+    user_id = client.get("/api/me", headers=headers).json()["id"]
+    chat_model.script("hey!")
+    send_to_webhook(client, telegram_text_update("an old message"))
+    clock.advance(retention(seeded_settings) + ONE_DAY)
+    chat_model.script_processing(processing_answer())
+
+    def failing_delete_thread(thread_id: str) -> None:
+        raise ConnectionError("checkpoint store is down")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(checkpointer, "delete_thread", failing_delete_thread)
+        with pytest.raises(ConnectionError):
+            scheduler.tick()
+    assert message_contents(engine) == ["an old message", "hey!"]
+
+    scheduler.tick()
+
+    assert message_contents(engine) == []
+    assert not has_checkpoints(checkpointer, user_id)

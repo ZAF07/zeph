@@ -604,14 +604,22 @@ class ConversationRepository(Protocol):
         """
         ...
 
-    def delete_messages_sent_before(self, cutoff: datetime) -> list[UUID]:
+    def list_users_with_messages_sent_before(self, cutoff: datetime) -> list[UUID]:
+        """List the Users who have any message sent before a time.
+
+        Args:
+            cutoff: The time to look before.
+
+        Returns:
+            The Users' IDs.
+        """
+        ...
+
+    def delete_messages_sent_before(self, cutoff: datetime) -> None:
         """Delete every message sent before a time; Conversations stay.
 
         Args:
             cutoff: Messages sent before this are deleted.
-
-        Returns:
-            The IDs of the Users who had messages deleted.
         """
         ...
 

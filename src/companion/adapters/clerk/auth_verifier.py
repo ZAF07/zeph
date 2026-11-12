@@ -7,6 +7,20 @@ CLERK_API_URL = "https://api.clerk.com/v1"
 USER_AGENT = "companion-backend"
 
 
+def clerk_api_headers(secret_key: str) -> dict[str, str]:
+    """Build the headers every Clerk Backend API request carries.
+
+    Requests carry a User-Agent because Clerk refuses Python's default one.
+
+    Args:
+        secret_key: The Clerk secret key.
+
+    Returns:
+        The Authorization and User-Agent headers.
+    """
+    return {"Authorization": f"Bearer {secret_key}", "User-Agent": USER_AGENT}
+
+
 class ClerkAuthVerifier:
     """Verifies Clerk session tokens sent by the Dashboard."""
 
@@ -25,10 +39,7 @@ class ClerkAuthVerifier:
             authorized_parties: Origins allowed in the token's `azp` claim.
             http_client: The HTTP client to use; a new one is made if not given.
         """
-        self._auth_header = {
-            "Authorization": f"Bearer {secret_key}",
-            "User-Agent": USER_AGENT,
-        }
+        self._auth_header = clerk_api_headers(secret_key)
         self._authorized_parties = authorized_parties
         self._http = http_client or httpx.Client(timeout=10)
         self._signing_keys = jwt.PyJWKClient(

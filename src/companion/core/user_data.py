@@ -40,16 +40,17 @@ class UserDataService:
     def delete_account(self, user: User) -> None:
         """Delete everything of the User's, then their account at the auth provider.
 
-        Our data goes first, so if the auth provider fails the User can try
-        again and nothing of theirs is left behind.
+        Our data goes first, so if anything fails the User can try again
+        and nothing of theirs is left behind.
 
         Args:
             user: The User.
 
         Raises:
-            LastAdminError: If they are the only Admin; nothing is deleted.
+            LastAdminError: If they are the only Admin; their account and data
+                stay.
         """
+        self._conversation_engine.forget_user(user.id)
         if not self._repositories.users.delete_unless_last_admin(user.id):
             raise LastAdminError
-        self._conversation_engine.forget_user(user.id)
         self._auth_accounts.delete_account(user.auth_id)

@@ -1,6 +1,6 @@
 import httpx
 
-from companion.adapters.clerk.auth_verifier import CLERK_API_URL, USER_AGENT
+from companion.adapters.clerk.auth_verifier import CLERK_API_URL, clerk_api_headers
 
 
 class ClerkAccounts:
@@ -12,14 +12,10 @@ class ClerkAccounts:
         """Set up the client.
 
         Args:
-            secret_key: The Clerk secret key. Requests carry a User-Agent
-                because Clerk refuses Python's default one.
+            secret_key: The Clerk secret key.
             http_client: The HTTP client to use; a new one is made if not given.
         """
-        self._auth_header = {
-            "Authorization": f"Bearer {secret_key}",
-            "User-Agent": USER_AGENT,
-        }
+        self._auth_header = clerk_api_headers(secret_key)
         self._http = http_client or httpx.Client(timeout=10)
 
     def delete_account(self, auth_id: str) -> None:

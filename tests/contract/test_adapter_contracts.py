@@ -4,6 +4,7 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
+from companion.adapters.clerk.accounts import ClerkAccounts
 from companion.adapters.clerk.auth_verifier import ClerkAuthVerifier
 from companion.adapters.deepseek.chat_model import DeepSeekChatModel
 from companion.adapters.fastembed.embedder import FastEmbedEmbedder
@@ -48,6 +49,12 @@ def test_clerk_refuses_a_token_it_did_not_sign() -> None:
     )
 
     assert verifier.verify(forged_token) is None
+
+
+def test_clerk_treats_deleting_an_account_it_does_not_have_as_done() -> None:
+    accounts = ClerkAccounts(required_env("CLERK_SECRET_KEY"))
+
+    accounts.delete_account("user_zeph_no_such_account_8f3k2q")
 
 
 def test_deepseek_generates_a_reply() -> None:
