@@ -241,6 +241,13 @@ export type KnowledgeDocumentWithText = KnowledgeDocument & {
   text: string | null;
 };
 
+/** Details to change on a Knowledge document; a field left out is kept. */
+export type KnowledgeDetailsChange = {
+  title?: string;
+  source?: string;
+  tradition?: string;
+};
+
 /** A Knowledge document as an Admin uploads it. */
 export type KnowledgeUpload = {
   file: File;
@@ -288,6 +295,10 @@ export type ApiClient = {
   restoreMemoryCategory: (id: string) => Promise<MemoryCategory>;
   listKnowledgeDocuments: () => Promise<KnowledgeDocument[]>;
   getKnowledgeDocument: (id: string) => Promise<KnowledgeDocumentWithText>;
+  updateKnowledgeDocumentDetails: (
+    id: string,
+    change: KnowledgeDetailsChange,
+  ) => Promise<KnowledgeDocumentWithText>;
   uploadKnowledgeDocument: (
     upload: KnowledgeUpload,
   ) => Promise<KnowledgeDocument>;
@@ -484,6 +495,12 @@ export function createApiClient(
     getKnowledgeDocument: (id) =>
       request<KnowledgeDocumentWithText>(
         `/api/admin/knowledge-documents/${id}`,
+      ),
+    updateKnowledgeDocumentDetails: (id, change) =>
+      request<KnowledgeDocumentWithText>(
+        `/api/admin/knowledge-documents/${id}`,
+        "PATCH",
+        change,
       ),
     uploadKnowledgeDocument: (upload) => {
       const form = new FormData();

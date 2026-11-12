@@ -1,5 +1,6 @@
 from datetime import timedelta
 from typing import Any
+from uuid import UUID
 
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, func, select
@@ -281,6 +282,111 @@ def test_documents_are_listed_newest_first(
     assert titles == ["Newer", "Older"]
 
 
+def chunk_ids(engine: Engine) -> set[UUID]:
+    with engine.connect() as connection:
+        return set(connection.execute(select(knowledge_chunks.c.id)).scalars())
+
+
+def test_an_admin_edits_a_documents_details_without_reindexing(
+    client: TestClient, auth_verifier: FakeAuthVerifier, engine: Engine
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    uploaded = upload_document(client, admin, "breath.txt", BREATH_PASSAGES[0].encode())
+    chunks_before = chunk_ids(engine)
+
+    response = client.patch(
+        f"/api/admin/knowledge-documents/{uploaded.json()['id']}",
+        json={
+            "title": "  On the breath ",
+            "source": " Owner’s summary",
+            "tradition": "Mindfulness ",
+        },
+        headers=admin,
+    )
+
+    assert response.status_code == 200, response.text
+    edited = response.json()
+    assert (edited["title"], edited["source"], edited["tradition"]) == (
+        "On the breath",
+        "Owner’s summary",
+        "Mindfulness",
+    )
+    assert edited["status"] == "ready"
+    assert edited["text"] == BREATH_PASSAGES[0]
+    [listed] = list_documents(client, admin)
+    assert listed["title"] == "On the breath"
+    assert chunk_ids(engine) == chunks_before
+
+
+def test_editing_only_some_details_keeps_the_others(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    uploaded = upload_document(client, admin, "breath.txt", BREATH_PASSAGES[0].encode())
+
+    response = client.patch(
+        f"/api/admin/knowledge-documents/{uploaded.json()['id']}",
+        json={"tradition": "Mindfulness"},
+        headers=admin,
+    )
+
+    assert response.status_code == 200, response.text
+    [listed] = list_documents(client, admin)
+    assert (listed["title"], listed["source"], listed["tradition"]) == (
+        "Dhammapada",
+        "trans. Max Müller",
+        "Mindfulness",
+    )
+
+
+def test_blank_details_are_refused_and_a_missing_document_is_not_found(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    uploaded = upload_document(client, admin, "breath.txt", BREATH_PASSAGES[0].encode())
+    path = f"/api/admin/knowledge-documents/{uploaded.json()['id']}"
+
+    blank_title = client.patch(path, json={"title": "  "}, headers=admin)
+    blank_source = client.patch(path, json={"source": ""}, headers=admin)
+    blank_tradition = client.patch(path, json={"tradition": " "}, headers=admin)
+    missing = client.patch(
+        f"/api/admin/knowledge-documents/{MISSING_ID}",
+        json={"title": "Anything"},
+        headers=admin,
+    )
+
+    assert blank_title.status_code == 422
+    assert blank_title.json()["detail"] == "A document needs a title."
+    assert blank_source.json()["detail"] == "A document needs a source or author."
+    assert blank_tradition.json()["detail"] == "A document needs a tradition."
+    assert missing.status_code == 404
+    [listed] = list_documents(client, admin)
+    assert listed["title"] == "Dhammapada"
+
+
+def test_the_next_reply_cites_a_documents_new_details(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    uploaded = upload_document(client, admin, "breath.txt", BREATH_PASSAGES[0].encode())
+    connect_telegram(client, auth_verifier, chat_channel)
+
+    client.patch(
+        f"/api/admin/knowledge-documents/{uploaded.json()['id']}",
+        json={"title": "On the breath", "source": "Owner’s summary"},
+        headers=admin,
+    )
+    instructions = reply_instructions(client, chat_model, "notice the breath")
+
+    assert (
+        f"From “On the breath” (Owner’s summary, Buddhism):\n{BREATH_PASSAGES[0]}"
+    ) in instructions
+    assert "Dhammapada" not in instructions
+
+
 def test_matching_knowledge_reaches_the_reply_with_where_it_is_from(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
@@ -394,6 +500,11 @@ def test_only_admins_can_manage_knowledge(
 
     listed = client.get("/api/admin/knowledge-documents", headers=user)
     viewed = client.get(f"/api/admin/knowledge-documents/{MISSING_ID}", headers=user)
+    edited = client.patch(
+        f"/api/admin/knowledge-documents/{MISSING_ID}",
+        json={"title": "Anything"},
+        headers=user,
+    )
     uploaded = upload_document(client, user, "a.txt", b"words")
     deleted = client.delete(
         f"/api/admin/knowledge-documents/{MISSING_ID}", headers=user
@@ -402,6 +513,7 @@ def test_only_admins_can_manage_knowledge(
     assert [
         listed.status_code,
         viewed.status_code,
+        edited.status_code,
         uploaded.status_code,
         deleted.status_code,
-    ] == [403, 403, 403, 403]
+    ] == [403, 403, 403, 403, 403]

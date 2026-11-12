@@ -7,6 +7,7 @@ from uuid import UUID
 
 from companion.core.models import (
     EmbeddedChunk,
+    KnowledgeDetailsChange,
     KnowledgeDocument,
     KnowledgeDocumentWithText,
     KnowledgeFileType,
@@ -37,6 +38,9 @@ NO_TEXT_REASONS = {
     KnowledgeFileType.MARKDOWN: "The file has no text.",
     KnowledgeFileType.PDF: "Scanned PDF — no text found",
 }
+BLANK_TITLE = "A document needs a title."
+BLANK_SOURCE = "A document needs a source or author."
+BLANK_TRADITION = "A document needs a tradition."
 INDEXING_FAILED_REASON = "Couldn’t index the document. Try again."
 BLANK_LINE = re.compile(r"\n\s*\n")
 SENTENCE_END = re.compile(r"(?<=[.!?…])\s+")
@@ -149,6 +153,41 @@ def split_into_chunks(
     return pack(pieces, "\n\n", max_characters)
 
 
+def required_detail(value: str, blank_message: str) -> str:
+    """Trim a document detail an Admin must fill in.
+
+    Args:
+        value: What the Admin typed.
+        blank_message: What to tell them if it is blank.
+
+    Returns:
+        The trimmed value.
+
+    Raises:
+        InvalidKnowledgeDocumentError: If it is blank.
+    """
+    trimmed = value.strip()
+    if not trimmed:
+        raise InvalidKnowledgeDocumentError(blank_message)
+    return trimmed
+
+
+def optional_detail(value: str | None, blank_message: str) -> str | None:
+    """Trim a document detail an Admin may leave out, but not blank.
+
+    Args:
+        value: What the Admin typed, or None if they left it out.
+        blank_message: What to tell them if it is blank.
+
+    Returns:
+        The trimmed value, or None if left out.
+
+    Raises:
+        InvalidKnowledgeDocumentError: If it is given but blank.
+    """
+    return None if value is None else required_detail(value, blank_message)
+
+
 class KnowledgeService:
     """Lets Admins build the Knowledge library the Companion draws on.
 
@@ -202,15 +241,9 @@ class KnowledgeService:
             InvalidKnowledgeDocumentError: If the title, source or tradition
                 is blank, or the file is empty or too big.
         """
-        title = upload.title.strip()
-        source = upload.source.strip()
-        tradition = upload.tradition.strip()
-        if not title:
-            raise InvalidKnowledgeDocumentError("A document needs a title.")
-        if not source:
-            raise InvalidKnowledgeDocumentError("A document needs a source or author.")
-        if not tradition:
-            raise InvalidKnowledgeDocumentError("A document needs a tradition.")
+        title = required_detail(upload.title, BLANK_TITLE)
+        source = required_detail(upload.source, BLANK_SOURCE)
+        tradition = required_detail(upload.tradition, BLANK_TRADITION)
         if not upload.content:
             raise InvalidKnowledgeDocumentError("The file is empty.")
         if len(upload.content) > MAX_UPLOAD_BYTES:
@@ -237,6 +270,35 @@ class KnowledgeService:
             document=document,
             text=self._repositories.knowledge_documents.get_text(document_id),
         )
+
+    def update_details(
+        self, document_id: UUID, change: KnowledgeDetailsChange
+    ) -> KnowledgeDocumentWithText:
+        """Change a document's title, source or tradition.
+
+        Takes effect straight away with no re-indexing: replies read a
+        document's details when they are composed.
+
+        Args:
+            document_id: The document's ID.
+            change: The details to change; a None field is kept.
+
+        Returns:
+            The saved document and its text.
+
+        Raises:
+            InvalidKnowledgeDocumentError: If a given detail is blank.
+            KnowledgeDocumentNotFoundError: If there is no such document.
+        """
+        cleaned = KnowledgeDetailsChange(
+            title=optional_detail(change.title, BLANK_TITLE),
+            source=optional_detail(change.source, BLANK_SOURCE),
+            tradition=optional_detail(change.tradition, BLANK_TRADITION),
+        )
+        documents = self._repositories.knowledge_documents
+        if documents.update_details(document_id, cleaned) is None:
+            raise KnowledgeDocumentNotFoundError(document_id)
+        return self.get_document(document_id)
 
     def ingest(self, document_id: UUID) -> None:
         """Make a pending document ready for replies.

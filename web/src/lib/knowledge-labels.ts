@@ -1,5 +1,16 @@
 import type { KnowledgeFileType, KnowledgeStatus } from "@/lib/api-client";
 
+/** The traditions an Admin can file a Knowledge document under. */
+export const knowledgeTraditions = [
+  "Stoicism",
+  "Buddhism",
+  "Taoism",
+  "Existentialism",
+  "Psychology",
+  "Mindfulness",
+  "Other",
+];
+
 /** How each kind of Knowledge file is named on screen. */
 export const knowledgeFileTypeLabels: Record<KnowledgeFileType, string> = {
   text: "Text",

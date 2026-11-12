@@ -1,4 +1,5 @@
 from collections.abc import Mapping, Sequence
+from dataclasses import asdict
 from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -27,6 +28,7 @@ from companion.core.models import (
     ConversationSummary,
     Helpline,
     HelplineDetails,
+    KnowledgeDetailsChange,
     KnowledgeDocument,
     KnowledgeFileType,
     KnowledgeStatus,
@@ -1484,6 +1486,32 @@ class PostgresKnowledgeDocumentRepository:
                 update(knowledge_documents)
                 .where(knowledge_documents.c.id == document_id)
                 .values(text=text, text_edited=edited)
+                .returning(*KNOWLEDGE_DOCUMENT_COLUMNS)
+            ).first()
+        return _to_knowledge_document(row) if row else None
+
+    def update_details(
+        self, document_id: UUID, change: KnowledgeDetailsChange
+    ) -> KnowledgeDocument | None:
+        """Save new details on a Knowledge document.
+
+        Args:
+            document_id: The document's ID.
+            change: The details to change; a None field is kept.
+
+        Returns:
+            The saved document, or None if there is none.
+        """
+        values = {
+            name: value for name, value in asdict(change).items() if value is not None
+        }
+        if not values:
+            return self.get(document_id)
+        with self._engine.begin() as connection:
+            row = connection.execute(
+                update(knowledge_documents)
+                .where(knowledge_documents.c.id == document_id)
+                .values(**values)
                 .returning(*KNOWLEDGE_DOCUMENT_COLUMNS)
             ).first()
         return _to_knowledge_document(row) if row else None
