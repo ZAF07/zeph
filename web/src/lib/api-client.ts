@@ -256,6 +256,16 @@ export type KnowledgeUpload = {
   tradition: string;
 };
 
+/** A sticker in the Sticker Library; Zeph only sends it once it has a note. */
+export type Sticker = {
+  id: string;
+  emoji: string | null;
+  set_name: string | null;
+  note: string;
+  has_image: boolean;
+  added_at: string;
+};
+
 /** Every call the Dashboard makes to the backend. */
 export type ApiClient = {
   getMe: () => Promise<Me>;
@@ -312,6 +322,11 @@ export type ApiClient = {
   ) => Promise<KnowledgeDocument>;
   retryKnowledgeDocument: (id: string) => Promise<KnowledgeDocument>;
   deleteKnowledgeDocument: (id: string) => Promise<void>;
+  listStickers: () => Promise<Sticker[]>;
+  importStickerSet: (setName: string) => Promise<number>;
+  saveStickerNote: (id: string, note: string) => Promise<Sticker>;
+  removeSticker: (id: string) => Promise<void>;
+  getStickerImage: (id: string) => Promise<Blob>;
 };
 
 /** Raised when the backend answers with an error status. */
@@ -364,6 +379,17 @@ export function createApiClient(
   baseUrl: string,
   getToken: () => Promise<string | null>,
 ): ApiClient {
+  async function requestBlob(path: string): Promise<Blob> {
+    const token = await getToken();
+    const response = await fetch(`${baseUrl}${path}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) {
+      throw new ApiError(response.status, path, await errorDetail(response));
+    }
+    return response.blob();
+  }
+
   async function request<T>(
     path: string,
     method = "GET",
@@ -544,5 +570,19 @@ export function createApiClient(
       ),
     deleteKnowledgeDocument: (id) =>
       request<void>(`/api/admin/knowledge-documents/${id}`, "DELETE"),
+    listStickers: async () =>
+      (await request<{ stickers: Sticker[] }>("/api/admin/stickers")).stickers,
+    importStickerSet: async (setName) =>
+      (
+        await request<{ added_count: number }>(
+          "/api/admin/stickers/import",
+          "POST",
+          { set_name: setName },
+        )
+      ).added_count,
+    saveStickerNote: (id, note) =>
+      request<Sticker>(`/api/admin/stickers/${id}`, "PUT", { note }),
+    removeSticker: (id) => request<void>(`/api/admin/stickers/${id}`, "DELETE"),
+    getStickerImage: (id) => requestBlob(`/api/admin/stickers/${id}/image`),
   };
 }

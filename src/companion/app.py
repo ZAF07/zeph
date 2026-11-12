@@ -38,6 +38,7 @@ from companion.core.post_conversation import PostConversationProcessor
 from companion.core.response_composition import ResponseComposer
 from companion.core.safeguard import Safeguard
 from companion.core.scheduled_work import ScheduledWork
+from companion.core.stickers import StickerLibraryService, StickerTools
 from companion.core.telegram_connection import TelegramConnectionService
 from companion.core.user_memory import UserMemoryService
 from companion.core.users import UserService
@@ -112,6 +113,9 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         dashboard_url=dependencies.dashboard_url,
     )
     helpline_service = HelplineService(dependencies.repositories.helplines)
+    sticker_library = StickerLibraryService(
+        dependencies.repositories, dependencies.chat_channel, dependencies.clock
+    )
     safeguard = Safeguard(
         repositories=dependencies.repositories,
         helplines=helpline_service,
@@ -143,6 +147,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                     web_search=dependencies.web_search,
                     clock=dependencies.clock,
                 ),
+                sticker_tools=StickerTools(dependencies.repositories),
             ),
         )
     )
@@ -151,6 +156,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         repositories=dependencies.repositories,
         conversation_engine=conversation_engine,
         chat_channel=dependencies.chat_channel,
+        sticker_library=sticker_library,
         dashboard_url=dependencies.dashboard_url,
     )
 
@@ -217,6 +223,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 vector_store=dependencies.knowledge_vector_store,
                 clock=dependencies.clock,
             ),
+            sticker_library=sticker_library,
         )
     )
     app.include_router(

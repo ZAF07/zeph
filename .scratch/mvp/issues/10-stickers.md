@@ -31,3 +31,13 @@ Build order inside this issue: (1) backend API and seam 1 tests — this fixes t
 ## Blocked by
 
 - `.scratch/mvp/issues/04-admin-area-foundation.md`
+
+## Comments
+
+**2026-11-12 — started on branch `feat/10-stickers`.** Plan:
+- `IncomingMessage` gets a kind (text, sticker, unsupported). The Telegram webhook reads stickers (emoji, file IDs, set name); photos, voice notes and other types are unsupported, with any caption kept.
+- A sticker from an Admin's connected Telegram account goes into the Sticker Library (once per sticker) and the Admin gets a short confirmation; it is not answered as a chat message. A User's sticker reaches the Companion as "[sticker: 😂]". An unsupported message gets `unsupported_message_reply`; if it has a caption, the caption is answered as "[photo] caption" so the Safeguard still checks it.
+- New `stickers` table; admin API to list, import a set by name, edit the "when to use" note, remove, and show a sticker's image.
+- Response composition offers a `send_sticker` tool listing only stickers that have a note; at most one per reply, sent after the text and saved as "[sticker: 🌱]". The Crisis Reply path never composes, so it never has a sticker.
+- Chat channel port: `send_sticker`, `get_sticker_set`, `get_sticker_image` (Telegram adapter).
+- Dashboard: Sticker Library page from the design and a sidebar link.

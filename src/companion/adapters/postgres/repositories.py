@@ -19,10 +19,12 @@ from companion.adapters.postgres.tables import (
     memory_items,
     platform_settings,
     safeguard_events,
+    stickers,
     telegram_connections,
     users,
 )
 from companion.core.models import (
+    ChannelSticker,
     ConnectionToken,
     Conversation,
     ConversationMessage,
@@ -35,6 +37,7 @@ from companion.core.models import (
     KnowledgeFileType,
     KnowledgeStatus,
     KnowledgeUpload,
+    LibrarySticker,
     MemoryCategory,
     MemoryCategoryDetails,
     MemoryCategoryOverview,
@@ -171,6 +174,27 @@ def _to_memory_category(row: Row[Any]) -> MemoryCategory:
         always_include=row.always_include,
         archived=row.archived,
         sort_order=row.sort_order,
+    )
+
+
+def _to_library_sticker(row: Row[Any]) -> LibrarySticker:
+    """Turn a `stickers` row into a LibrarySticker.
+
+    Args:
+        row: The database row.
+
+    Returns:
+        The sticker.
+    """
+    return LibrarySticker(
+        id=row.id,
+        file_id=row.file_id,
+        file_unique_id=row.file_unique_id,
+        emoji=row.emoji,
+        set_name=row.set_name,
+        preview_file_id=row.preview_file_id,
+        note=row.note,
+        added_at=row.added_at,
     )
 
 
@@ -1670,6 +1694,115 @@ class PostgresUsageRepository:
         return count or 0
 
 
+class PostgresStickerRepository:
+    """Stores the Sticker Library in Postgres."""
+
+    def __init__(self, engine: Engine) -> None:
+        """Set up the repository.
+
+        Args:
+            engine: The database engine.
+        """
+        self._engine = engine
+
+    def list_all(self) -> list[LibrarySticker]:
+        """List every sticker in the order they were added.
+
+        Returns:
+            The stickers.
+        """
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                select(stickers).order_by(stickers.c.position)
+            ).all()
+        return [_to_library_sticker(row) for row in rows]
+
+    def get(self, sticker_id: UUID) -> LibrarySticker | None:
+        """Find a sticker.
+
+        Args:
+            sticker_id: The sticker's ID.
+
+        Returns:
+            The sticker, or None if there is none.
+        """
+        with self._engine.connect() as connection:
+            row = connection.execute(
+                select(stickers).where(stickers.c.id == sticker_id)
+            ).first()
+        return _to_library_sticker(row) if row else None
+
+    def add_new(self, new_stickers: list[ChannelSticker], added_at: datetime) -> int:
+        """Add stickers without a note, skipping any already in the library.
+
+        Args:
+            new_stickers: The stickers, in order.
+            added_at: When they are being added.
+
+        Returns:
+            How many were added.
+        """
+        if not new_stickers:
+            return 0
+        rows = [
+            {
+                "id": uuid4(),
+                "file_id": sticker.file_id,
+                "file_unique_id": sticker.file_unique_id,
+                "emoji": sticker.emoji,
+                "set_name": sticker.set_name,
+                "preview_file_id": sticker.preview_file_id,
+                "note": "",
+                "added_at": added_at,
+            }
+            for sticker in new_stickers
+        ]
+        with self._engine.begin() as connection:
+            added = connection.execute(
+                insert(stickers)
+                .values(rows)
+                .on_conflict_do_nothing(index_elements=[stickers.c.file_unique_id])
+                .returning(stickers.c.id)
+            ).all()
+        return len(added)
+
+    def save_note(self, sticker_id: UUID, note: str) -> LibrarySticker | None:
+        """Save a sticker's "when to use" note.
+
+        Args:
+            sticker_id: The sticker's ID.
+            note: The note.
+
+        Returns:
+            The saved sticker, or None if there is none.
+        """
+        with self._engine.begin() as connection:
+            row = connection.execute(
+                update(stickers)
+                .where(stickers.c.id == sticker_id)
+                .values(note=note)
+                .returning(stickers)
+            ).first()
+        return _to_library_sticker(row) if row else None
+
+    def delete(self, sticker_id: UUID) -> bool:
+        """Remove a sticker.
+
+        Args:
+            sticker_id: The sticker's ID.
+
+        Returns:
+            True if it was removed; False if there was none.
+        """
+        with self._engine.begin() as connection:
+            removed = connection.execute(
+                delete(stickers)
+                .where(stickers.c.id == sticker_id)
+                .returning(stickers.c.id)
+            ).first()
+        return removed is not None
+
+
 def build_postgres_repositories(engine: Engine) -> Repositories:
     """Build every repository on one Postgres engine.
 
@@ -1691,4 +1824,5 @@ def build_postgres_repositories(engine: Engine) -> Repositories:
         user_memory=PostgresUserMemoryRepository(engine),
         knowledge_documents=PostgresKnowledgeDocumentRepository(engine),
         usage=PostgresUsageRepository(engine),
+        stickers=PostgresStickerRepository(engine),
     )

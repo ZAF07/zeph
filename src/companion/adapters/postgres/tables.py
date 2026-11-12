@@ -256,3 +256,17 @@ daily_usage = Table(
     Column("day", Date, primary_key=True),
     Column("web_search_count", Integer, nullable=False, server_default=text("0")),
 )
+
+stickers = Table(
+    "stickers",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("position", BigInteger, Identity(), nullable=False, unique=True),
+    Column("file_id", Text, nullable=False),
+    Column("file_unique_id", Text, nullable=False, unique=True),
+    Column("emoji", Text),
+    Column("set_name", Text),
+    Column("preview_file_id", Text),
+    Column("note", Text, nullable=False, server_default=""),
+    Column("added_at", DateTime(timezone=True), nullable=False),
+)

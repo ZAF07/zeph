@@ -18,6 +18,7 @@ from companion.core.ports import (
 )
 from companion.core.response_composition import ResponseComposer
 from companion.core.safeguard import Safeguard
+from companion.core.stickers import sticker_message_text
 
 
 def typing_pause_seconds(text: str, settings: PlatformSettingsRepository) -> float:
@@ -55,7 +56,13 @@ class ConversationService:
         self._chat_channel = chat_channel
         self._clock = clock
 
-    def record_incoming(self, user_id: UUID, chat_id: int, text: str) -> UUID:
+    def record_incoming(
+        self,
+        user_id: UUID,
+        chat_id: int,
+        text: str,
+        kind: MessageKind = MessageKind.TEXT,
+    ) -> UUID:
         """Save a User's message and show that the Companion is typing.
 
         The message joins the User's open Conversation, or starts a new one if
@@ -64,28 +71,36 @@ class ConversationService:
         Args:
             user_id: The User who sent it.
             chat_id: The chat it came from.
-            text: The message text.
+            text: The message as the Companion reads it.
+            kind: What kind of message it is.
 
         Returns:
             The ID of the Conversation the message was added to.
         """
         conversation_id = self._open_conversation_id(user_id)
-        self._save(conversation_id, MessageDirection.INCOMING, text)
+        self._save(conversation_id, MessageDirection.INCOMING, text, kind)
         self._chat_channel.show_typing(chat_id)
         return conversation_id
 
     def deliver_reply(
-        self, conversation_id: UUID, chat_id: int, reply_parts: list[str]
+        self,
+        conversation_id: UUID,
+        chat_id: int,
+        reply_parts: list[str],
+        sticker_id: UUID | None = None,
     ) -> None:
         """Send the Companion's reply, one short message at a time.
 
         Before each message the Companion shows typing for a while, as a
-        person would. Each message is saved as soon as it is sent.
+        person would. Each message is saved as soon as it is sent. The
+        sticker, if any, goes last; it is skipped if it was removed from the
+        Sticker Library meanwhile.
 
         Args:
             conversation_id: The Conversation being answered.
             chat_id: The chat to send to.
             reply_parts: The short messages that make up the reply, in order.
+            sticker_id: The Sticker Library sticker to send after them.
         """
         settings = self._repositories.platform_settings
         for part in reply_parts:
@@ -93,6 +108,15 @@ class ConversationService:
             self._clock.sleep(typing_pause_seconds(part, settings))
             self._chat_channel.send_text(chat_id, part)
             self._save(conversation_id, MessageDirection.OUTGOING, part)
+        sticker = self._repositories.stickers.get(sticker_id) if sticker_id else None
+        if sticker is not None:
+            self._chat_channel.send_sticker(chat_id, sticker.file_id)
+            self._save(
+                conversation_id,
+                MessageDirection.OUTGOING,
+                sticker_message_text(sticker.emoji),
+                MessageKind.STICKER,
+            )
 
     def deliver_at_once(self, conversation_id: UUID, chat_id: int, text: str) -> None:
         """Send one message straight away, without a typing pause, and save it.
@@ -135,21 +159,26 @@ class ConversationService:
         return conversation.id
 
     def _save(
-        self, conversation_id: UUID, direction: MessageDirection, text: str
+        self,
+        conversation_id: UUID,
+        direction: MessageDirection,
+        text: str,
+        kind: MessageKind = MessageKind.TEXT,
     ) -> None:
-        """Save one text message to a Conversation.
+        """Save one message to a Conversation.
 
         Args:
             conversation_id: The Conversation.
             direction: Who sent it.
-            text: The message text.
+            text: The message as the Companion reads it.
+            kind: What kind of message it is.
         """
         self._repositories.conversations.add_message(
             ConversationMessage(
                 id=uuid4(),
                 conversation_id=conversation_id,
                 direction=direction,
-                kind=MessageKind.TEXT,
+                kind=kind,
                 content=text,
                 sent_at=self._clock.now(),
             )

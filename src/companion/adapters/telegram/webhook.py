@@ -3,36 +3,83 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, BackgroundTasks, Body, Header, HTTPException, status
 
+from companion.adapters.telegram.chat_channel import parse_sticker
 from companion.core.incoming_messages import IncomingMessageHandler
-from companion.core.models import IncomingMessage
+from companion.core.models import IncomingMessage, MessageKind
 
 SECRET_HEADER = "X-Telegram-Bot-Api-Secret-Token"
+ATTACHMENT_NAMES = (
+    ("photo", "photo"),
+    ("voice", "voice note"),
+    ("video_note", "video message"),
+    ("video", "video"),
+    ("animation", "GIF"),
+    ("audio", "audio"),
+    ("document", "file"),
+    ("location", "location"),
+    ("contact", "contact"),
+    ("poll", "poll"),
+)
+
+
+def attachment_name(message: dict[str, Any]) -> str:
+    """Name what a Telegram message holds instead of text.
+
+    Args:
+        message: The Telegram message.
+
+    Returns:
+        E.g. "photo" or "voice note"; "attachment" for anything else.
+    """
+    for field, name in ATTACHMENT_NAMES:
+        if field in message:
+            return name
+    return "attachment"
 
 
 def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
     """Turn a Telegram update into a channel-neutral incoming message.
 
+    Text and stickers are read; anything else, like a voice note or photo,
+    is an unsupported message that keeps its caption.
+
     Args:
         update: The JSON body Telegram posted to the webhook.
 
     Returns:
-        The incoming message, or None for updates that are not text messages.
+        The incoming message, or None for updates that are not messages.
     """
     message = update.get("message")
     if not isinstance(message, dict):
         return None
-    text = message.get("text")
     sender = message.get("from")
     chat = message.get("chat")
-    if not isinstance(text, str) or not isinstance(sender, dict):
+    if not isinstance(sender, dict) or not isinstance(chat, dict):
         return None
-    if not isinstance(chat, dict):
-        return None
+    sender_id = int(sender["id"])
+    chat_id = int(chat["id"])
+    username = sender.get("username")
+    text = message.get("text")
+    if isinstance(text, str):
+        return IncomingMessage(sender_id, chat_id, username, text)
+    sticker = message.get("sticker")
+    if isinstance(sticker, dict):
+        return IncomingMessage(
+            sender_id,
+            chat_id,
+            username,
+            text="",
+            kind=MessageKind.STICKER,
+            sticker=parse_sticker(sticker),
+        )
+    caption = message.get("caption")
     return IncomingMessage(
-        sender_id=int(sender["id"]),
-        chat_id=int(chat["id"]),
-        sender_username=sender.get("username"),
-        text=text,
+        sender_id,
+        chat_id,
+        username,
+        text=caption if isinstance(caption, str) else "",
+        kind=MessageKind.UNSUPPORTED,
+        attachment=attachment_name(message),
     )
 
 

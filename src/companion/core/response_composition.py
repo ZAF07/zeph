@@ -1,20 +1,37 @@
 import re
+from dataclasses import dataclass
 from uuid import UUID
 
 from companion.core.models import (
     ChatLine,
     ChatRole,
     ConversationMessage,
+    LibrarySticker,
     MessageDirection,
 )
 from companion.core.ports import ChatModel, Repositories
+from companion.core.stickers import StickerTools
 from companion.core.web_search import WebSearchTools
 
 BLANK_LINE = re.compile(r"\n\s*\n")
 
 
 class EmptyReplyError(Exception):
-    """Raised when the chat model's reply has no text to send."""
+    """Raised when the chat model's reply has neither text nor a sticker."""
+
+
+@dataclass(frozen=True)
+class ComposedReply:
+    """The Companion's reply, ready to send.
+
+    Attributes:
+        parts: The short text messages, in order; may be empty when the
+            reply is just a sticker.
+        sticker: The one sticker to send after the text, if any.
+    """
+
+    parts: list[str]
+    sticker: LibrarySticker | None
 
 
 def split_into_messages(reply: str) -> list[str]:
@@ -76,6 +93,7 @@ class ResponseComposer:
         repositories: Repositories,
         chat_model: ChatModel,
         web_search_tools: WebSearchTools,
+        sticker_tools: StickerTools,
     ) -> None:
         """Set up the composer.
 
@@ -83,10 +101,12 @@ class ResponseComposer:
             repositories: Where Conversations and settings are stored.
             chat_model: Generates the reply.
             web_search_tools: Offers the web tools the reply may call.
+            sticker_tools: Offers the Sticker Library to the reply.
         """
         self._repositories = repositories
         self._chat_model = chat_model
         self._web_search_tools = web_search_tools
+        self._sticker_tools = sticker_tools
 
     def compose(
         self,
@@ -94,13 +114,14 @@ class ResponseComposer:
         user_id: UUID,
         memory: str = "",
         knowledge: str = "",
-    ) -> list[str]:
+    ) -> ComposedReply:
         """Compose a reply to the Conversation's newest message.
 
         Uses the Persona, response prompt and model from platform settings,
         then what the Companion remembers and the Knowledge that may fit, and
         gives the model every earlier message in the Conversation. The model
-        may search the web and read pages when web search is offered.
+        may search the web and read pages when web search is offered, and may
+        pick one sticker from the Sticker Library.
 
         Args:
             conversation_id: The Conversation to reply in.
@@ -109,14 +130,15 @@ class ResponseComposer:
             knowledge: The Knowledge passages that may fit; "" if none.
 
         Returns:
-            The reply as one or more short messages.
+            The reply as short messages and an optional sticker.
 
         Raises:
-            EmptyReplyError: If the model's reply has no text.
+            EmptyReplyError: If the reply has neither text nor a sticker.
         """
         settings = self._repositories.platform_settings
         instructions = f"{settings.get('persona')}\n\n{settings.get('response_prompt')}"
         web_search = self._web_search_tools.offer(user_id)
+        sticker_choice = self._sticker_tools.offer()
         for section in (memory, knowledge, web_search.instructions):
             if section:
                 instructions += f"\n\n{section}"
@@ -127,9 +149,9 @@ class ResponseComposer:
             model=settings.get("response_model"),
             instructions=instructions,
             history=history,
-            tools=web_search.tools,
+            tools=[*web_search.tools, *sticker_choice.tools],
         )
         reply_parts = split_into_messages(reply)
-        if not reply_parts:
+        if not reply_parts and sticker_choice.picked is None:
             raise EmptyReplyError
-        return reply_parts
+        return ComposedReply(parts=reply_parts, sticker=sticker_choice.picked)

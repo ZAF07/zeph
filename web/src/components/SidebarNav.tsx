@@ -22,6 +22,7 @@ const adminItems = [
   { label: "Safeguard Events", href: "/admin/safeguard-events" },
   { label: "Knowledge", href: "/admin/knowledge" },
   { label: "Memory Categories", href: "/admin/memory-categories" },
+  { label: "Sticker Library", href: "/admin/stickers" },
   { label: "Platform settings", href: "/admin/settings" },
 ];
 

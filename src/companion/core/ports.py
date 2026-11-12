@@ -6,6 +6,7 @@ from uuid import UUID
 
 from companion.core.models import (
     AccountIdentity,
+    ChannelSticker,
     ChatLine,
     ConnectionToken,
     Conversation,
@@ -22,6 +23,7 @@ from companion.core.models import (
     KnowledgeFileType,
     KnowledgeStatus,
     KnowledgeUpload,
+    LibrarySticker,
     MemoryCategory,
     MemoryCategoryDetails,
     MemoryCategoryOverview,
@@ -30,6 +32,7 @@ from companion.core.models import (
     RiskType,
     SafeguardEvent,
     SafeguardEventOverview,
+    StickerImage,
     StoredSetting,
     TelegramConnection,
     User,
@@ -91,6 +94,37 @@ class ChatChannel(Protocol):
 
         Args:
             chat_id: The chat to show it in.
+        """
+        ...
+
+    def send_sticker(self, chat_id: int, file_id: str) -> None:
+        """Send one sticker.
+
+        Args:
+            chat_id: The chat to send to.
+            file_id: The sticker's file ID.
+        """
+        ...
+
+    def get_sticker_set(self, name: str) -> list[ChannelSticker] | None:
+        """Look up every sticker in a sticker set.
+
+        Args:
+            name: The set's name.
+
+        Returns:
+            Its stickers in order, or None if there is no such set.
+        """
+        ...
+
+    def get_sticker_image(self, file_id: str) -> StickerImage | None:
+        """Download an image of a sticker.
+
+        Args:
+            file_id: The image's file ID.
+
+        Returns:
+            The image, or None if it isn't one a browser can show.
         """
         ...
 
@@ -969,6 +1003,64 @@ class UsageRepository(Protocol):
         ...
 
 
+class StickerRepository(Protocol):
+    """Stores the Sticker Library."""
+
+    def list_all(self) -> list[LibrarySticker]:
+        """List every sticker in the order they were added.
+
+        Returns:
+            The stickers.
+        """
+        ...
+
+    def get(self, sticker_id: UUID) -> LibrarySticker | None:
+        """Find a sticker.
+
+        Args:
+            sticker_id: The sticker's ID.
+
+        Returns:
+            The sticker, or None if there is none.
+        """
+        ...
+
+    def add_new(self, new_stickers: list[ChannelSticker], added_at: datetime) -> int:
+        """Add stickers without a note, skipping any already in the library.
+
+        Args:
+            new_stickers: The stickers, in order.
+            added_at: When they are being added.
+
+        Returns:
+            How many were added.
+        """
+        ...
+
+    def save_note(self, sticker_id: UUID, note: str) -> LibrarySticker | None:
+        """Save a sticker's "when to use" note.
+
+        Args:
+            sticker_id: The sticker's ID.
+            note: The note.
+
+        Returns:
+            The saved sticker, or None if there is none.
+        """
+        ...
+
+    def delete(self, sticker_id: UUID) -> bool:
+        """Remove a sticker.
+
+        Args:
+            sticker_id: The sticker's ID.
+
+        Returns:
+            True if it was removed; False if there was none.
+        """
+        ...
+
+
 @dataclass(frozen=True)
 class Repositories:
     """Every repository the core needs, so adapters can be swapped as one."""
@@ -984,3 +1076,4 @@ class Repositories:
     user_memory: UserMemoryRepository
     knowledge_documents: KnowledgeDocumentRepository
     usage: UsageRepository
+    stickers: StickerRepository

@@ -185,6 +185,35 @@ class ConnectionToken:
         return ConnectionTokenStatus.ACTIVE
 
 
+class MessageKind(StrEnum):
+    """What kind of message it is."""
+
+    TEXT = "text"
+    STICKER = "sticker"
+    UNSUPPORTED = "unsupported"
+
+
+@dataclass(frozen=True)
+class ChannelSticker:
+    """A sticker as the chat channel knows it.
+
+    Attributes:
+        file_id: The ID used to send the sticker.
+        file_unique_id: The ID that stays the same for the same sticker, used
+            to tell whether it is already in the Sticker Library.
+        emoji: The emoji the sticker stands for, if it has one.
+        set_name: The sticker set it belongs to, if any.
+        preview_file_id: The ID of an image of the sticker for the Dashboard;
+            None if it has no image a browser can show.
+    """
+
+    file_id: str
+    file_unique_id: str
+    emoji: str | None
+    set_name: str | None
+    preview_file_id: str | None
+
+
 @dataclass(frozen=True)
 class IncomingMessage:
     """A message a person sent to the Companion, independent of chat channel.
@@ -193,13 +222,21 @@ class IncomingMessage:
         sender_id: The sender's account ID on the chat channel.
         chat_id: The chat to reply in.
         sender_username: The sender's username on the chat channel, if any.
-        text: The message text.
+        text: The message text, or a photo's or file's caption; "" if none.
+        kind: Whether it is text, a sticker, or something the Companion
+            can't read yet, like a voice note or photo.
+        sticker: The sticker, for a sticker message.
+        attachment: What was sent instead of text, e.g. "photo" or
+            "voice note", for an unsupported message.
     """
 
     sender_id: int
     chat_id: int
     sender_username: str | None
     text: str
+    kind: MessageKind = MessageKind.TEXT
+    sticker: ChannelSticker | None = None
+    attachment: str | None = None
 
 
 class MessageDirection(StrEnum):
@@ -207,12 +244,6 @@ class MessageDirection(StrEnum):
 
     INCOMING = "incoming"
     OUTGOING = "outgoing"
-
-
-class MessageKind(StrEnum):
-    """What kind of message it is."""
-
-    TEXT = "text"
 
 
 @dataclass(frozen=True)
@@ -265,12 +296,15 @@ class ConversationTurn:
     Attributes:
         user_id: The User who sent it.
         chat_id: The chat to reply in.
-        text: The message text.
+        text: The message as the Companion reads it, e.g. "[sticker: 😂]"
+            for a sticker.
+        kind: What kind of message it is.
     """
 
     user_id: UUID
     chat_id: int
     text: str
+    kind: MessageKind = MessageKind.TEXT
 
 
 class ChatRole(StrEnum):
@@ -689,3 +723,42 @@ class WebSearchResult:
     title: str
     url: str
     content: str
+
+
+@dataclass(frozen=True)
+class LibrarySticker:
+    """A sticker in the Sticker Library.
+
+    Attributes:
+        id: Our ID for the sticker.
+        file_id: The ID used to send it on the chat channel.
+        file_unique_id: The ID that stays the same for the same sticker.
+        emoji: The emoji it stands for, if it has one.
+        set_name: The sticker set it came from, if any.
+        preview_file_id: The ID of an image of it for the Dashboard, if any.
+        note: When to use it, written by an Admin; "" until one is written,
+            and the Companion only sends stickers that have a note.
+        added_at: When it was added.
+    """
+
+    id: UUID
+    file_id: str
+    file_unique_id: str
+    emoji: str | None
+    set_name: str | None
+    preview_file_id: str | None
+    note: str
+    added_at: datetime
+
+
+@dataclass(frozen=True)
+class StickerImage:
+    """An image of a sticker, for the Dashboard to show.
+
+    Attributes:
+        content: The image's bytes.
+        media_type: Its media type, e.g. "image/webp".
+    """
+
+    content: bytes
+    media_type: str

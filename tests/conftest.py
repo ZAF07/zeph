@@ -75,7 +75,7 @@ def engine(database_url: str) -> Iterator[Engine]:
                 "conversations, conversation_messages, platform_settings, "
                 "helplines, safeguard_events, memory_categories, memory_items, "
                 "conversation_summaries, knowledge_documents, knowledge_chunks, "
-                "daily_usage CASCADE"
+                "daily_usage, stickers CASCADE"
             )
         )
     seed_platform_settings(engine, SEED_FILE)

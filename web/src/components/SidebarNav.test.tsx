@@ -41,6 +41,7 @@ describe("SidebarNav", () => {
       "Safeguard Events",
       "Knowledge",
       "Memory Categories",
+      "Sticker Library",
       "Platform settings",
     ]);
     expect(
