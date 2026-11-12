@@ -75,4 +75,4 @@ Evidence: seam 1 `tests/test_check_ins.py` (8); seam 2 `tests/test_check_in_send
 ## Completion
 
 - Completed: 2026-11-12
-- Commit: 439bdce, review fixes 2990fc1, run fixes 6e2149f
+- Commit: 439bdce, review fixes 2990fc1, run fixes 6e2149f, archive f622b6e (merged from `feat/11-basic-check-ins` in 7e67bfa)
