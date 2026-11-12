@@ -147,3 +147,17 @@ _Avoid_: Browsing, internet lookup, googling
 **Web Search Limit**:
 The most Web Searches the Companion makes for one User in a day, set by Admins; each search and each page read counts as one. The day is the User's own, so it resets at midnight in their time zone. Once it is reached the Companion replies without the web until the next day.
 _Avoid_: Search quota, web budget
+
+### Usage
+
+**Daily Message Limit**:
+The most messages a User can send the Companion in a day, set by Admins and meant to be generous. The day is the User's own, so it resets at midnight in their time zone. The Safeguard still checks every message first: a crisis always gets the Crisis Reply and never counts toward the limit. Over the limit, the Companion answers with the Limit Reply instead of a real reply until the next day.
+_Avoid_: Quota, rate limit, message cap
+
+**Limit Reply**:
+The short, in-character message (e.g. "I'm wiped for today, talk tomorrow?") sent instead of a reply once a User is over the Daily Message Limit. Its wording is set by Admins.
+_Avoid_: Error message, limit notice
+
+**Usage**:
+What each User used on each of their days, as counts only: messages, chat model tokens read and written (for everything the Companion does for them, Check-ins included), and Web Searches, plus whether the Daily Message Limit or Web Search Limit turned anything away that day. Admins see it; it never holds message content.
+_Avoid_: Billing, costs, activity log
