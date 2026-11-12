@@ -60,4 +60,4 @@ Evidence: seam 1 `tests/test_web_search.py` (9), `tests/test_admin_settings.py` 
 ## Completion
 
 - Completed: 2026-11-12
-- Commit: 562151d, review fixes c33429a (merged from `feat/09-web-search` in <merge commit>)
+- Commit: 562151d, review fixes c33429a (merged from `feat/09-web-search` in e43806b)
