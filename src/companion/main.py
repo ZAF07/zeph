@@ -16,6 +16,7 @@ from companion.adapters.pgvector.vector_store import PgvectorKnowledgeVectorStor
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.adapters.pypdf.text_extractor import PypdfTextExtractor
 from companion.adapters.scheduler import InProcessScheduler
+from companion.adapters.tavily.web_search import TavilyWebSearch
 from companion.adapters.telegram.chat_channel import TelegramChatChannel
 from companion.app import AppDependencies, create_app
 from companion.config import Settings, load_settings
@@ -31,6 +32,7 @@ from companion.core.ports import (
     KnowledgeVectorStore,
     Repositories,
     Scheduler,
+    WebSearch,
 )
 
 SEED_DIR = Path(__file__).parent / "seed"
@@ -134,6 +136,23 @@ def build_vector_store(settings: Settings, engine: Engine) -> KnowledgeVectorSto
     if settings.vector_store_adapter == "pgvector":
         return PgvectorKnowledgeVectorStore(engine)
     raise UnknownAdapterError("VECTOR_STORE_ADAPTER", settings.vector_store_adapter)
+
+
+def build_web_search(settings: Settings) -> WebSearch:
+    """Build the web search chosen in `.env`.
+
+    Args:
+        settings: The loaded settings.
+
+    Returns:
+        The web search.
+
+    Raises:
+        UnknownAdapterError: If the chosen adapter does not exist.
+    """
+    if settings.web_search_adapter == "tavily":
+        return TavilyWebSearch(settings.tavily_api_key)
+    raise UnknownAdapterError("WEB_SEARCH_ADAPTER", settings.web_search_adapter)
 
 
 def build_chat_channel(settings: Settings) -> ChatChannel:
@@ -278,6 +297,7 @@ def build_production_app() -> FastAPI:
         text_extractor=build_text_extractor(settings),
         embedder=build_embedder(settings),
         knowledge_vector_store=build_vector_store(settings, engine),
+        web_search=build_web_search(settings),
         clock=build_clock(settings),
         scheduler=build_scheduler(settings),
         telegram_webhook_secret=settings.telegram_webhook_secret,

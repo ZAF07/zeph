@@ -161,7 +161,10 @@ class LangGraphConversationEngine:
                 The reply as short messages.
             """
             reply_parts = services.response_composer.compose(
-                UUID(state["conversation_id"]), state["memory"], state["knowledge"]
+                UUID(state["conversation_id"]),
+                UUID(state["user_id"]),
+                state["memory"],
+                state["knowledge"],
             )
             return {"reply_parts": reply_parts}
 

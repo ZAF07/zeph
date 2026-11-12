@@ -8,6 +8,7 @@ from companion.core.models import (
     MessageDirection,
 )
 from companion.core.ports import ChatModel, Repositories
+from companion.core.web_search import WebSearchTools
 
 BLANK_LINE = re.compile(r"\n\s*\n")
 
@@ -70,27 +71,40 @@ def to_transcript_lines(messages: list[ConversationMessage]) -> str:
 class ResponseComposer:
     """Writes the Companion's reply to the current Conversation."""
 
-    def __init__(self, repositories: Repositories, chat_model: ChatModel) -> None:
+    def __init__(
+        self,
+        repositories: Repositories,
+        chat_model: ChatModel,
+        web_search_tools: WebSearchTools,
+    ) -> None:
         """Set up the composer.
 
         Args:
             repositories: Where Conversations and settings are stored.
             chat_model: Generates the reply.
+            web_search_tools: Offers the web tools the reply may call.
         """
         self._repositories = repositories
         self._chat_model = chat_model
+        self._web_search_tools = web_search_tools
 
     def compose(
-        self, conversation_id: UUID, memory: str = "", knowledge: str = ""
+        self,
+        conversation_id: UUID,
+        user_id: UUID,
+        memory: str = "",
+        knowledge: str = "",
     ) -> list[str]:
         """Compose a reply to the Conversation's newest message.
 
         Uses the Persona, response prompt and model from platform settings,
         then what the Companion remembers and the Knowledge that may fit, and
-        gives the model every earlier message in the Conversation.
+        gives the model every earlier message in the Conversation. The model
+        may search the web and read pages when web search is offered.
 
         Args:
             conversation_id: The Conversation to reply in.
+            user_id: The User being replied to.
             memory: The User Memory that matters for this message; "" if none.
             knowledge: The Knowledge passages that may fit; "" if none.
 
@@ -102,7 +116,8 @@ class ResponseComposer:
         """
         settings = self._repositories.platform_settings
         instructions = f"{settings.get('persona')}\n\n{settings.get('response_prompt')}"
-        for section in (memory, knowledge):
+        web_search = self._web_search_tools.offer(user_id)
+        for section in (memory, knowledge, web_search.instructions):
             if section:
                 instructions += f"\n\n{section}"
         history = to_chat_history(
@@ -112,6 +127,7 @@ class ResponseComposer:
             model=settings.get("response_model"),
             instructions=instructions,
             history=history,
+            tools=web_search.tools,
         )
         reply_parts = split_into_messages(reply)
         if not reply_parts:

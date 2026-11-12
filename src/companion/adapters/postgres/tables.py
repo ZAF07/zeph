@@ -3,6 +3,7 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     Column,
+    Date,
     DateTime,
     ForeignKey,
     Identity,
@@ -241,4 +242,17 @@ knowledge_chunks = Table(
     Column("position", Integer, nullable=False),
     Column("text", Text, nullable=False),
     Column("embedding", Vector(EMBEDDING_SIZE), nullable=False),
+)
+
+daily_usage = Table(
+    "daily_usage",
+    metadata,
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("day", Date, primary_key=True),
+    Column("web_search_count", Integer, nullable=False, server_default=text("0")),
 )

@@ -240,6 +240,42 @@ reply_knowledge_intro: >-
   friend might mention something they once read. Never lecture, quote at
   length or force it in:
 
+# Web search. When it is on, each reply may search the web and read pages.
+# Every search and every page read counts toward the per-User daily limit,
+# which resets at midnight in the User's time zone.
+web_search_enabled: true
+web_search_daily_limit: 10
+
+# What the model is told about the web search tool.
+web_search_tool_description: >-
+  Search the web. Use it only when the conversation needs current or factual
+  information you don't know well, such as a quote, a book, a person, an event
+  or a fact the person asks about. Don't use it for feelings, advice or small
+  talk. Never put the person's personal details in a query: no names, places,
+  health details, relationships or anything else about their life. Search only
+  for the general topic, e.g. "Seneca quote on anger", never "Maya's anger at
+  her boss".
+
+# What the model is told about the page reading tool.
+page_fetch_tool_description: >-
+  Read the text of a web page, usually one from your web search results, when
+  the short search result isn't enough to answer.
+
+# Put at the end of every web search result and page the model reads, so it
+# remembers to say where web information came from.
+web_result_source_reminder: >-
+  If your reply uses any of this, say where it came from in your reply, e.g.
+  "Wikipedia says…" or "according to the BBC…".
+
+# Put after the rest of the reply instructions when web search is offered.
+reply_web_search_instructions: >-
+  You can look things up on the web with your tools when the conversation
+  needs a fact you're unsure of. Whenever your reply uses anything you found
+  on the web, always say where it came from in the same reply, casually, the
+  way a friend would ("Wikipedia says…", "according to the BBC…"), and give
+  the link if the person might want it. Never present web information as
+  your own memory or experience.
+
 # The Memory Categories that onboarding answers are saved in, when the User
 # has User Memory on: their name, and what brings them here.
 onboarding_name_memory_category: Life details

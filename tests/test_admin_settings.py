@@ -27,6 +27,8 @@ def test_admin_sees_each_editable_setting_with_its_seeded_value(
     assert settings["persona"]["value"] == seeded_settings["persona"]
     assert settings["response_model"]["value"] == seeded_settings["response_model"]
     assert settings["conversation_quiet_gap_minutes"]["value"] == 60
+    assert settings["web_search_enabled"]["value"] is True
+    assert settings["web_search_daily_limit"]["value"] == 10
     assert settings["persona"]["updated_by"] is None
     assert settings["ai_notice_short"]["value"] == seeded_settings["ai_notice_short"]
     assert "welcome_message" not in settings
@@ -122,6 +124,10 @@ def test_a_shorter_quiet_gap_starts_a_new_conversation_sooner(
         {"conversation_quiet_gap_minutes": "60"},
         {"conversation_quiet_gap_minutes": True},
         {"response_model": "not-a-model"},
+        {"web_search_enabled": "yes"},
+        {"web_search_enabled": 1},
+        {"web_search_daily_limit": -1},
+        {"web_search_daily_limit": 1001},
     ],
 )
 def test_invalid_setting_changes_are_refused(
@@ -150,6 +156,28 @@ def test_a_refused_value_is_explained_in_plain_words(
     assert response.json()["detail"] == (
         "The Conversation quiet gap must be a whole number from 5 to 1440."
     )
+
+
+def test_web_search_can_be_turned_off_and_its_limit_changed(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+
+    response = client.patch(
+        "/api/admin/settings",
+        json={"values": {"web_search_enabled": False, "web_search_daily_limit": 0}},
+        headers=headers,
+    )
+
+    settings = response.json()["settings"]
+    assert settings["web_search_enabled"]["value"] is False
+    assert settings["web_search_daily_limit"]["value"] == 0
+    refused = client.patch(
+        "/api/admin/settings",
+        json={"values": {"web_search_enabled": "off"}},
+        headers=headers,
+    )
+    assert refused.json()["detail"] == "Web search must be on or off."
 
 
 def test_one_invalid_value_means_nothing_is_saved(

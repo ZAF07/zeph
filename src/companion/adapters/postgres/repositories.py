@@ -1,6 +1,6 @@
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -12,6 +12,7 @@ from companion.adapters.postgres.tables import (
     conversation_messages,
     conversation_summaries,
     conversations,
+    daily_usage,
     helplines,
     knowledge_documents,
     memory_categories,
@@ -1612,6 +1613,63 @@ class PostgresKnowledgeDocumentRepository:
             )
 
 
+class PostgresUsageRepository:
+    """Stores what each User used on each day in Postgres."""
+
+    def __init__(self, engine: Engine) -> None:
+        """Set up the repository.
+
+        Args:
+            engine: The database engine.
+        """
+        self._engine = engine
+
+    def claim_web_search(self, user_id: UUID, day: date, daily_limit: int) -> bool:
+        """Count one web search for a User's day, in one step, if under the limit.
+
+        Args:
+            user_id: The User's ID.
+            day: The User's day.
+            daily_limit: The most web searches allowed in a day.
+
+        Returns:
+            True if the search was counted; False if the limit was reached,
+            so two searches at once can never go over it.
+        """
+        if daily_limit < 1:
+            return False
+        statement = insert(daily_usage).values(
+            user_id=user_id, day=day, web_search_count=1
+        )
+        with self._engine.begin() as connection:
+            claimed = connection.execute(
+                statement.on_conflict_do_update(
+                    index_elements=[daily_usage.c.user_id, daily_usage.c.day],
+                    set_={"web_search_count": daily_usage.c.web_search_count + 1},
+                    where=daily_usage.c.web_search_count < daily_limit,
+                ).returning(daily_usage.c.web_search_count)
+            ).first()
+        return claimed is not None
+
+    def count_web_searches(self, user_id: UUID, day: date) -> int:
+        """Count a User's web searches on a day.
+
+        Args:
+            user_id: The User's ID.
+            day: The User's day.
+
+        Returns:
+            How many web searches they made.
+        """
+        with self._engine.connect() as connection:
+            count = connection.execute(
+                select(daily_usage.c.web_search_count).where(
+                    daily_usage.c.user_id == user_id, daily_usage.c.day == day
+                )
+            ).scalar()
+        return count or 0
+
+
 def build_postgres_repositories(engine: Engine) -> Repositories:
     """Build every repository on one Postgres engine.
 
@@ -1632,4 +1690,5 @@ def build_postgres_repositories(engine: Engine) -> Repositories:
         memory_categories=PostgresMemoryCategoryRepository(engine),
         user_memory=PostgresUserMemoryRepository(engine),
         knowledge_documents=PostgresKnowledgeDocumentRepository(engine),
+        usage=PostgresUsageRepository(engine),
     )

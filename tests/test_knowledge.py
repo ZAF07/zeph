@@ -707,6 +707,7 @@ def test_a_failed_document_never_reaches_the_reply(
 
     assert instructions == (
         f"{seeded_settings['persona']}\n\n{seeded_settings['response_prompt']}"
+        f"\n\n{seeded_settings['reply_web_search_instructions']}"
     )
 
 

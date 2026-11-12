@@ -16,6 +16,7 @@ class SettingKind(StrEnum):
     TEXT = "text"
     WHOLE_NUMBER = "whole_number"
     MODEL = "model"
+    ON_OFF = "on_off"
 
 
 @dataclass(frozen=True)
@@ -100,6 +101,14 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=5,
         maximum=1440,
+    ),
+    EditableSetting("web_search_enabled", "Web search", SettingKind.ON_OFF),
+    EditableSetting(
+        "web_search_daily_limit",
+        "Per-user daily web search limit",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=1000,
     ),
     EditableSetting("ai_notice", "AI notice", SettingKind.TEXT, max_length=2_000),
     EditableSetting(
@@ -256,6 +265,10 @@ class PlatformSettingsService:
                     f"The {setting.label} must be a whole number from "
                     f"{setting.minimum} to {setting.maximum}."
                 )
+            return value
+        if setting.kind == SettingKind.ON_OFF:
+            if not isinstance(value, bool):
+                raise InvalidSettingError(f"{setting.label} must be on or off.")
             return value
         if value not in self.model_choices():
             raise InvalidSettingError(

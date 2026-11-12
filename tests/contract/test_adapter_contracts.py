@@ -8,8 +8,10 @@ from companion.adapters.clerk.auth_verifier import ClerkAuthVerifier
 from companion.adapters.deepseek.chat_model import DeepSeekChatModel
 from companion.adapters.fastembed.embedder import FastEmbedEmbedder
 from companion.adapters.postgres.tables import EMBEDDING_SIZE
+from companion.adapters.tavily.web_search import TavilyWebSearch
 from companion.adapters.telegram.chat_channel import TelegramChatChannel
 from companion.core.models import ChatLine, ChatRole
+from companion.core.ports import ChatTool
 
 pytestmark = pytest.mark.contract
 
@@ -52,6 +54,51 @@ def test_deepseek_generates_a_reply() -> None:
     )
 
     assert reply.strip()
+
+
+def test_deepseek_calls_an_offered_tool_and_uses_its_result() -> None:
+    chat_model = DeepSeekChatModel(required_env("DEEPSEEK_API_KEY"))
+    queries: list[str] = []
+
+    def run_search(arguments: dict[str, object]) -> str:
+        queries.append(str(arguments.get("query", "")))
+        return "Result: the secret word of the day is 'lantern'."
+
+    reply = chat_model.generate(
+        model="deepseek-chat",
+        instructions=(
+            "Always use the web_search tool before answering. "
+            "Then answer in one short sentence."
+        ),
+        history=[ChatLine(role=ChatRole.USER, text="What's the secret word today?")],
+        tools=[
+            ChatTool(
+                name="web_search",
+                description="Search the web.",
+                parameters={
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"],
+                },
+                run=run_search,
+            )
+        ],
+    )
+
+    assert queries
+    assert "lantern" in reply.lower()
+
+
+def test_tavily_searches_the_web_and_reads_a_page() -> None:
+    web_search = TavilyWebSearch(required_env("TAVILY_API_KEY"))
+
+    results = web_search.search("Thich Nhat Hanh The Miracle of Mindfulness")
+    page = web_search.fetch_page("https://en.wikipedia.org/wiki/Thich_Nhat_Hanh")
+
+    assert results
+    assert all(result.url.startswith("http") for result in results)
+    assert any(result.title and result.content for result in results)
+    assert "Thich Nhat Hanh" in page
 
 
 def test_fastembed_embeddings_have_the_size_the_vector_store_keeps() -> None:

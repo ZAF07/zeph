@@ -87,7 +87,7 @@ export type RoleChange = {
 };
 
 /** The value of a platform setting Admins can edit. */
-export type SettingValue = string | number;
+export type SettingValue = string | number | boolean;
 
 /** A platform setting's value and when, and by whom, it was last saved. */
 export type AdminSetting = {

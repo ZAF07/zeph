@@ -5,6 +5,7 @@ import { useState } from "react";
 import { primaryButton, secondaryButton } from "@/components/button-styles";
 import { fieldLabel, inputField } from "@/components/form-styles";
 import { LoadFailed } from "@/components/LoadFailed";
+import { Switch } from "@/components/Switch";
 import {
   ApiError,
   type AdminSettings,
@@ -47,6 +48,16 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
   },
 ];
 
+const webSearchKey = "web_search_enabled";
+
+/** The daily limit row, shown only while web search is on. */
+const webSearchLimitField: NumberField = {
+  key: "web_search_daily_limit",
+  label: "Per-user daily web search limit",
+  caption: "Searches and page reads per User, reset at their midnight.",
+  unit: "per day",
+};
+
 /** The shared wording on this page. */
 const textFields: TextField[] = [
   {
@@ -66,13 +77,23 @@ const textFields: TextField[] = [
   },
 ];
 
-const numberKeys = numberSections.flatMap((section) =>
-  section.fields.map((field) => field.key),
-);
+const numberKeys = [
+  ...numberSections.flatMap((section) =>
+    section.fields.map((field) => field.key),
+  ),
+  webSearchLimitField.key,
+];
 
-const allKeys = [...numberKeys, ...textFields.map((field) => field.key)];
+const allKeys = [
+  ...numberKeys,
+  webSearchKey,
+  ...textFields.map((field) => field.key),
+];
 
 const wholeNumber = /^\d+$/;
+
+const settingRow =
+  "flex flex-wrap items-center justify-between gap-x-5 gap-y-3 border-t border-line px-5 py-3.5";
 
 /**
  * Builds the form's starting values from the saved settings.
@@ -87,8 +108,22 @@ function savedDrafts(settings: AdminSettings): Record<string, string> {
 }
 
 /**
- * The admin Platform settings page's form: timings and shared wording,
- * saved together with one button.
+ * Turns a field's typed text into the value the backend keeps.
+ *
+ * @param key - The setting's key.
+ * @param value - The typed text; "true" or "false" for the web search switch.
+ * @returns A number, a true/false, or the text itself.
+ */
+function settingValue(key: string, value: string): SettingValue {
+  if (key === webSearchKey) {
+    return value === "true";
+  }
+  return numberKeys.includes(key) ? Number(value) : value;
+}
+
+/**
+ * The admin Platform settings page's form: timings, web search and shared
+ * wording, saved together with one button.
  *
  * @returns The form, or a loading block or error with Try again.
  */
@@ -126,6 +161,30 @@ export function PlatformSettingsForm() {
   const canSave =
     changedKeys.length > 0 && isValid && saveState.kind !== "saving";
 
+  function numberRow(field: NumberField) {
+    return (
+      <div key={field.key} className={settingRow}>
+        <span className="flex min-w-0 flex-[1_1_260px] flex-col gap-0.5">
+          <label htmlFor={field.key} className="font-semibold">
+            {field.label}
+          </label>
+          <span className="text-caption text-ink-muted">{field.caption}</span>
+        </span>
+        <span className="flex items-center gap-2">
+          <input
+            id={field.key}
+            className={`${inputField} w-[110px]`}
+            type="number"
+            inputMode="numeric"
+            value={values[field.key] ?? ""}
+            onChange={(event) => edit(field.key, event.target.value)}
+          />
+          <span className="text-caption text-ink-muted">{field.unit}</span>
+        </span>
+      </div>
+    );
+  }
+
   function edit(key: string, value: string) {
     setDrafts({ ...values, [key]: value });
     setSaveState({ kind: "idle" });
@@ -134,10 +193,7 @@ export function PlatformSettingsForm() {
   async function saveChanges() {
     setSaveState({ kind: "saving" });
     const changes: Record<string, SettingValue> = Object.fromEntries(
-      changedKeys.map((key) => [
-        key,
-        numberKeys.includes(key) ? Number(values[key]) : values[key],
-      ]),
+      changedKeys.map((key) => [key, settingValue(key, values[key] ?? "")]),
     );
     try {
       await save(changes);
@@ -165,36 +221,34 @@ export function PlatformSettingsForm() {
           <h2 className="m-0 px-5 pb-2 pt-4 text-[17px] font-semibold">
             {section.heading}
           </h2>
-          {section.fields.map((field) => (
-            <div
-              key={field.key}
-              className="flex flex-wrap items-center justify-between gap-x-5 gap-y-3 border-t border-line px-5 py-3.5"
-            >
-              <span className="flex min-w-0 flex-[1_1_260px] flex-col gap-0.5">
-                <label htmlFor={field.key} className="font-semibold">
-                  {field.label}
-                </label>
-                <span className="text-caption text-ink-muted">
-                  {field.caption}
-                </span>
-              </span>
-              <span className="flex items-center gap-2">
-                <input
-                  id={field.key}
-                  className={`${inputField} w-[110px]`}
-                  type="number"
-                  inputMode="numeric"
-                  value={values[field.key] ?? ""}
-                  onChange={(event) => edit(field.key, event.target.value)}
-                />
-                <span className="text-caption text-ink-muted">
-                  {field.unit}
-                </span>
-              </span>
-            </div>
-          ))}
+          {section.fields.map(numberRow)}
         </section>
       ))}
+
+      <section
+        aria-label="Web search"
+        className="flex flex-col rounded-card border border-line bg-white"
+      >
+        <h2 className="m-0 px-5 pb-2 pt-4 text-[17px] font-semibold">
+          Web search
+        </h2>
+        <div className={settingRow}>
+          <span className="flex min-w-0 flex-[1_1_260px] flex-col gap-0.5">
+            <span className="font-semibold">Web search</span>
+            <span className="text-caption text-ink-muted">
+              Lets Zeph look things up when a User asks about current facts.
+            </span>
+          </span>
+          <Switch
+            label="Web search"
+            checked={values[webSearchKey] === "true"}
+            onChange={(checked) => edit(webSearchKey, String(checked))}
+          />
+        </div>
+        {values[webSearchKey] === "true"
+          ? numberRow(webSearchLimitField)
+          : null}
+      </section>
 
       <section
         aria-label="Wording"

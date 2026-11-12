@@ -14,12 +14,14 @@ vi.mock("@/lib/use-api-client", () => ({
   useApiClient: () => apiClient,
 }));
 
-function seeded(value: string | number) {
+function seeded(value: string | number | boolean) {
   return { value, updated_at: "2026-11-01T00:00:00Z", updated_by: null };
 }
 
 const settings: AdminSettings = {
   conversation_quiet_gap_minutes: seeded(60),
+  web_search_enabled: seeded(true),
+  web_search_daily_limit: seeded(10),
   ai_notice: seeded("I'm an AI."),
   ai_notice_short: seeded("Zeph is an AI."),
   user_memory_explanation: seeded("I can keep details."),
@@ -69,6 +71,50 @@ describe("PlatformSettingsForm", () => {
     });
     expect(await screen.findByText(/Last saved .* by Maya Lin/)).toBeVisible();
     expect(screen.getByText("Saved")).toBeVisible();
+  });
+
+  it("shows web search on, with its daily limit", async () => {
+    render(<PlatformSettingsForm />);
+
+    expect(
+      await screen.findByRole("switch", { name: "Web search" }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(
+      screen.getByLabelText("Per-user daily web search limit"),
+    ).toHaveValue(10);
+  });
+
+  it("turns web search off, hiding the limit, and saves it", async () => {
+    const user = userEvent.setup();
+    render(<PlatformSettingsForm />);
+    const webSearch = await screen.findByRole("switch", { name: "Web search" });
+
+    await user.click(webSearch);
+
+    expect(webSearch).toHaveAttribute("aria-checked", "false");
+    expect(
+      screen.queryByLabelText("Per-user daily web search limit"),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      web_search_enabled: false,
+    });
+  });
+
+  it("saves a new daily web search limit as a number", async () => {
+    const user = userEvent.setup();
+    render(<PlatformSettingsForm />);
+    const limit = await screen.findByLabelText(
+      "Per-user daily web search limit",
+    );
+
+    await user.clear(limit);
+    await user.type(limit, "0");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      web_search_daily_limit: 0,
+    });
   });
 
   it("won't save a quiet gap that is not a whole number", async () => {
