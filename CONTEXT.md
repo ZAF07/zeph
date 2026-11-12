@@ -25,8 +25,12 @@ The Companion's voice and character — human in style, honest that it is an AI.
 _Avoid_: System prompt, personality, character
 
 **Sticker Library**:
-The Admin-managed set of stickers the Companion may send, each with a note on when it fits.
+The Admin-managed set of stickers the Companion may send, at most one per reply. Each has a "when to use" note; a sticker without one is never sent. A sticker an Admin sends the Companion from their own Telegram is added to the library rather than answered. Stickers Users send are read through their emoji.
 _Avoid_: Sticker pack, emoji set
+
+**Unsupported Message**:
+Something a User sends that the Companion can't read yet, like a voice note or photo. It gets a short in-character reply asking them to type instead; any caption it carries is answered like a message.
+_Avoid_: Media message, attachment
 
 **Telegram Connection**:
 The link between a User's account and their Telegram account, made once from the Dashboard. A User must have one to talk to the Companion.
