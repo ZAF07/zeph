@@ -249,6 +249,7 @@ def _to_knowledge_document(row: Row[Any]) -> KnowledgeDocument:
         file_type=KnowledgeFileType(row.file_type),
         status=KnowledgeStatus(row.status),
         failure_reason=row.failure_reason,
+        text_edited=row.text_edited,
         created_at=row.created_at,
     )
 
@@ -1383,7 +1384,7 @@ class PostgresUserMemoryRepository:
 
 
 KNOWLEDGE_DOCUMENT_COLUMNS = [
-    column for column in knowledge_documents.c if column.name != "content"
+    column for column in knowledge_documents.c if column.name not in {"content", "text"}
 ]
 
 
@@ -1446,6 +1447,46 @@ class PostgresKnowledgeDocumentRepository:
                 )
             ).scalar_one()
         return content
+
+    def get_text(self, document_id: UUID) -> str | None:
+        """Read the text a Knowledge document's replies draw on.
+
+        Args:
+            document_id: The document's ID.
+
+        Returns:
+            The saved text, or None if none has been saved.
+        """
+        with self._engine.connect() as connection:
+            text: str | None = connection.execute(
+                select(knowledge_documents.c.text).where(
+                    knowledge_documents.c.id == document_id
+                )
+            ).scalar()
+        return text
+
+    def save_text(
+        self, document_id: UUID, text: str, edited: bool
+    ) -> KnowledgeDocument | None:
+        """Save the text a Knowledge document's replies draw on.
+
+        Args:
+            document_id: The document's ID.
+            text: The text.
+            edited: Whether an Admin wrote it, rather than it being read from
+                the file.
+
+        Returns:
+            The saved document, or None if it has been deleted.
+        """
+        with self._engine.begin() as connection:
+            row = connection.execute(
+                update(knowledge_documents)
+                .where(knowledge_documents.c.id == document_id)
+                .values(text=text, text_edited=edited)
+                .returning(*KNOWLEDGE_DOCUMENT_COLUMNS)
+            ).first()
+        return _to_knowledge_document(row) if row else None
 
     def add(self, upload: KnowledgeUpload, created_at: datetime) -> KnowledgeDocument:
         """Save a new, pending Knowledge document with its file.

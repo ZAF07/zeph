@@ -14,6 +14,7 @@ from tests.fakes import (
 )
 from tests.knowledge_helpers import (
     blank_pdf,
+    document_text,
     list_documents,
     pdf_with_text,
     upload_document,
@@ -84,8 +85,76 @@ def test_an_uploaded_text_document_starts_pending_and_becomes_ready(
         "file_type": "text",
         "status": "ready",
         "failure_reason": None,
+        "text_edited": False,
         "created_at": clock.now().isoformat().replace("+00:00", "Z"),
     }
+
+
+def test_a_document_shows_the_text_read_from_its_file(
+    client: TestClient, auth_verifier: FakeAuthVerifier, clock: FakeClock
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    uploaded = upload_document(
+        client, admin, "dhammapada.txt", "\ufeffMind is the forerunner.\n".encode()
+    ).json()
+
+    response = client.get(
+        f"/api/admin/knowledge-documents/{uploaded['id']}", headers=admin
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "id": uploaded["id"],
+        "title": "Dhammapada",
+        "source": "trans. Max Müller",
+        "tradition": "Buddhism",
+        "file_name": "dhammapada.txt",
+        "file_type": "text",
+        "status": "ready",
+        "failure_reason": None,
+        "text_edited": False,
+        "created_at": clock.now().isoformat().replace("+00:00", "Z"),
+        "text": "Mind is the forerunner.",
+    }
+
+
+def test_markdown_and_pdf_documents_show_their_text(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    markdown = upload_document(
+        client, admin, "notes.md", b"# Breath\n\nNotice the breath."
+    ).json()
+    pdf = upload_document(
+        client, admin, "verses.pdf", pdf_with_text("Mind is the forerunner")
+    ).json()
+
+    assert document_text(client, admin, markdown["id"]) == (
+        "# Breath\n\nNotice the breath."
+    )
+    assert "Mind is the forerunner" in (document_text(client, admin, pdf["id"]) or "")
+
+
+def test_a_document_whose_file_had_no_text_shows_no_text(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    scan = upload_document(client, admin, "scan.pdf", blank_pdf()).json()
+
+    response = client.get(f"/api/admin/knowledge-documents/{scan['id']}", headers=admin)
+
+    assert response.json()["status"] == "failed"
+    assert response.json()["text"] is None
+
+
+def test_viewing_a_missing_document_is_not_found(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+
+    response = client.get(f"/api/admin/knowledge-documents/{MISSING_ID}", headers=admin)
+
+    assert response.status_code == 404
 
 
 def test_markdown_and_pdf_documents_become_ready(
@@ -324,13 +393,15 @@ def test_only_admins_can_manage_knowledge(
     user = auth_headers(auth_verifier, "user_maya")
 
     listed = client.get("/api/admin/knowledge-documents", headers=user)
+    viewed = client.get(f"/api/admin/knowledge-documents/{MISSING_ID}", headers=user)
     uploaded = upload_document(client, user, "a.txt", b"words")
     deleted = client.delete(
         f"/api/admin/knowledge-documents/{MISSING_ID}", headers=user
     )
 
-    assert [listed.status_code, uploaded.status_code, deleted.status_code] == [
-        403,
-        403,
-        403,
-    ]
+    assert [
+        listed.status_code,
+        viewed.status_code,
+        uploaded.status_code,
+        deleted.status_code,
+    ] == [403, 403, 403, 403]

@@ -45,6 +45,7 @@ from companion.core.models import (
     Helpline,
     HelplineDetails,
     KnowledgeDocument,
+    KnowledgeDocumentWithText,
     KnowledgeFileType,
     KnowledgeStatus,
     KnowledgeUpload,
@@ -257,7 +258,14 @@ class KnowledgeDocumentResponse(BaseModel):
     file_type: KnowledgeFileType
     status: KnowledgeStatus
     failure_reason: str | None
+    text_edited: bool
     created_at: datetime
+
+
+class KnowledgeDocumentWithTextResponse(KnowledgeDocumentResponse):
+    """A Knowledge document with the text replies draw on; null until read."""
+
+    text: str | None
 
 
 class KnowledgeDocumentsResponse(BaseModel):
@@ -286,7 +294,25 @@ def to_knowledge_document_response(
         file_type=document.file_type,
         status=document.status,
         failure_reason=document.failure_reason,
+        text_edited=document.text_edited,
         created_at=document.created_at,
+    )
+
+
+def to_knowledge_document_with_text_response(
+    document_with_text: KnowledgeDocumentWithText,
+) -> KnowledgeDocumentWithTextResponse:
+    """Describe a Knowledge document and its text for the admin area.
+
+    Args:
+        document_with_text: The document and its text.
+
+    Returns:
+        The response body.
+    """
+    return KnowledgeDocumentWithTextResponse(
+        **to_knowledge_document_response(document_with_text.document).model_dump(),
+        text=document_with_text.text,
     )
 
 
@@ -873,6 +899,27 @@ def build_admin_api_router(
             ) from error
         background_tasks.add_task(knowledge_service.ingest, document.id)
         return to_knowledge_document_response(document)
+
+    @router.get("/knowledge-documents/{document_id}")
+    def get_knowledge_document(document_id: UUID) -> KnowledgeDocumentWithTextResponse:
+        """Show a Knowledge document with the text replies draw on.
+
+        Args:
+            document_id: The document to show.
+
+        Returns:
+            The document and its text.
+
+        Raises:
+            HTTPException: 404 if there is no such document.
+        """
+        try:
+            document_with_text = knowledge_service.get_document(document_id)
+        except KnowledgeDocumentNotFoundError as error:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "No such Knowledge document"
+            ) from error
+        return to_knowledge_document_with_text_response(document_with_text)
 
     @router.post("/knowledge-documents/{document_id}/retry")
     def retry_knowledge_document(

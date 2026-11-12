@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -7,15 +8,15 @@ import {
   deleteIconButton,
 } from "@/components/button-styles";
 import { DeleteIcon } from "@/components/DeleteIcon";
+import { KnowledgeStatusPill } from "@/components/KnowledgeStatusPill";
 import { KnowledgeUploadForm } from "@/components/KnowledgeUploadForm";
 import { LoadFailed } from "@/components/LoadFailed";
-import type {
-  KnowledgeDocument,
-  KnowledgeFileType,
-  KnowledgeStatus,
-  KnowledgeUpload,
-} from "@/lib/api-client";
+import type { KnowledgeDocument, KnowledgeUpload } from "@/lib/api-client";
 import { formatAddedDay } from "@/lib/dates";
+import {
+  knowledgeFileTypeLabels,
+  knowledgeStatusOrder,
+} from "@/lib/knowledge-labels";
 import { useApiClient } from "@/lib/use-api-client";
 
 type LoadState =
@@ -39,26 +40,6 @@ const headings = [
 const headingCell =
   "whitespace-nowrap border-b border-line bg-subtle px-[18px] py-3.5 font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted";
 
-const fileTypeLabels: Record<KnowledgeFileType, string> = {
-  text: "Text",
-  markdown: "Markdown",
-  pdf: "PDF",
-};
-
-const statuses: { status: KnowledgeStatus; label: string; pill: string }[] = [
-  { status: "ready", label: "Ready", pill: "bg-blue-tint text-blue-deep" },
-  {
-    status: "pending",
-    label: "Pending",
-    pill: "bg-yellow-tint text-yellow-deep",
-  },
-  {
-    status: "failed",
-    label: "Failed",
-    pill: "bg-danger-tint text-danger-deep",
-  },
-];
-
 /**
  * Writes the table caption, like "6 documents · 4 ready · 1 failed".
  *
@@ -69,8 +50,8 @@ function countsCaption(documents: KnowledgeDocument[]): string {
   const total = `${documents.length} ${
     documents.length === 1 ? "document" : "documents"
   }`;
-  const perStatus = statuses
-    .map(({ status }) => ({
+  const perStatus = knowledgeStatusOrder
+    .map((status) => ({
       status,
       count: documents.filter(
         (knowledgeDocument) => knowledgeDocument.status === status,
@@ -83,8 +64,9 @@ function countsCaption(documents: KnowledgeDocument[]): string {
 
 /**
  * The admin Knowledge library: upload a document, then see each one's
- * status while it is indexed, retry one that failed, or delete one. Checks
- * again every few seconds while any document is pending.
+ * status while it is indexed, open its page from its title, retry one that
+ * failed, or delete one. Checks again every few seconds while any document
+ * is pending.
  *
  * @returns The upload form and document table, or a loading, empty or error
  *   state.
@@ -243,9 +225,6 @@ export function KnowledgeLibrary() {
             </thead>
             <tbody>
               {state.documents.map((knowledgeDocument) => {
-                const status = statuses.find(
-                  (option) => option.status === knowledgeDocument.status,
-                );
                 const isBusy = busyId === knowledgeDocument.id;
                 return (
                   <tr
@@ -253,7 +232,12 @@ export function KnowledgeLibrary() {
                     className="border-b border-line last:border-b-0"
                   >
                     <td className="px-[18px] py-3.5 font-medium">
-                      {knowledgeDocument.title}
+                      <Link
+                        href={`/admin/knowledge/${knowledgeDocument.id}`}
+                        className="text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink"
+                      >
+                        {knowledgeDocument.title}
+                      </Link>
                     </td>
                     <td className="px-[18px] py-3.5">
                       {knowledgeDocument.source}
@@ -262,15 +246,13 @@ export function KnowledgeLibrary() {
                       {knowledgeDocument.tradition}
                     </td>
                     <td className="px-[18px] py-3.5">
-                      {fileTypeLabels[knowledgeDocument.file_type]}
+                      {knowledgeFileTypeLabels[knowledgeDocument.file_type]}
                     </td>
                     <td className="px-[18px] py-3.5">
                       <span className="inline-flex flex-col gap-0.5">
-                        <span
-                          className={`inline-flex w-fit items-center whitespace-nowrap rounded-full px-2.5 py-[3px] text-xs font-medium ${status?.pill ?? ""}`}
-                        >
-                          {status?.label ?? knowledgeDocument.status}
-                        </span>
+                        <KnowledgeStatusPill
+                          status={knowledgeDocument.status}
+                        />
                         {knowledgeDocument.failure_reason ? (
                           <span className="text-caption text-ink-muted">
                             {knowledgeDocument.failure_reason}

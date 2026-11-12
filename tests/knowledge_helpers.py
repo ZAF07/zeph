@@ -63,3 +63,15 @@ def list_documents(client: TestClient, admin: dict[str, str]) -> list[dict[str, 
     assert response.status_code == 200, response.text
     documents: list[dict[str, Any]] = response.json()["documents"]
     return documents
+
+
+def document_text(
+    client: TestClient, admin: dict[str, str], document_id: str
+) -> str | None:
+    """Fetch the text a Knowledge document's replies draw on, or None."""
+    response = client.get(
+        f"/api/admin/knowledge-documents/{document_id}", headers=admin
+    )
+    assert response.status_code == 200, response.text
+    text: str | None = response.json()["text"]
+    return text

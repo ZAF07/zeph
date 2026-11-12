@@ -792,6 +792,33 @@ class KnowledgeDocumentRepository(Protocol):
         """
         ...
 
+    def get_text(self, document_id: UUID) -> str | None:
+        """Read the text a Knowledge document's replies draw on.
+
+        Args:
+            document_id: The document's ID.
+
+        Returns:
+            The saved text, or None if none has been saved.
+        """
+        ...
+
+    def save_text(
+        self, document_id: UUID, text: str, edited: bool
+    ) -> KnowledgeDocument | None:
+        """Save the text a Knowledge document's replies draw on.
+
+        Args:
+            document_id: The document's ID.
+            text: The text.
+            edited: Whether an Admin wrote it, rather than it being read from
+                the file.
+
+        Returns:
+            The saved document, or None if it has been deleted.
+        """
+        ...
+
     def add(self, upload: KnowledgeUpload, created_at: datetime) -> KnowledgeDocument:
         """Save a new, pending Knowledge document with its file.
 

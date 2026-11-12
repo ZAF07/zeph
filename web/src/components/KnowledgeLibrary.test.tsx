@@ -34,6 +34,7 @@ function knowledgeDocument(
     file_type: "pdf",
     status: "ready",
     failure_reason: null,
+    text_edited: false,
     created_at: "2026-10-02T09:00:00Z",
     ...overrides,
   };
@@ -91,6 +92,9 @@ describe("KnowledgeLibrary", () => {
     expect(lettersRow.getByText("Ready")).toBeInTheDocument();
     expect(lettersRow.getByText("2 Oct")).toBeInTheDocument();
     expect(lettersRow.queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(
+      lettersRow.getByRole("link", { name: "Letters to Lucilius" }),
+    ).toHaveAttribute("href", "/admin/knowledge/letters");
     const beingRow = rowFor("Being and Time (excerpt)");
     expect(beingRow.getByText("Failed")).toBeInTheDocument();
     expect(

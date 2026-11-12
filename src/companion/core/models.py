@@ -589,6 +589,8 @@ class KnowledgeDocument:
         file_type: What kind of file it was.
         status: Whether it is pending, ready for replies, or failed.
         failure_reason: Why it failed, as Admins are told; None unless failed.
+        text_edited: Whether an Admin edited its text since it was last read
+            from its file.
         created_at: When it was uploaded.
     """
 
@@ -600,7 +602,22 @@ class KnowledgeDocument:
     file_type: KnowledgeFileType
     status: KnowledgeStatus
     failure_reason: str | None
+    text_edited: bool
     created_at: datetime
+
+
+@dataclass(frozen=True)
+class KnowledgeDocumentWithText:
+    """A Knowledge document with the text replies draw on.
+
+    Attributes:
+        document: The document.
+        text: The text read from its file or edited by an Admin; None until
+            its file has been read.
+    """
+
+    document: KnowledgeDocument
+    text: str | None
 
 
 @dataclass(frozen=True)

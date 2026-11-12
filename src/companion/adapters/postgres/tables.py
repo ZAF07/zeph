@@ -220,6 +220,8 @@ knowledge_documents = Table(
     Column("file_name", Text, nullable=False),
     Column("file_type", Text, nullable=False),
     Column("content", LargeBinary, nullable=False),
+    Column("text", Text),
+    Column("text_edited", Boolean, nullable=False, server_default="false"),
     Column("status", Text, nullable=False),
     Column("failure_reason", Text),
     Column("created_at", DateTime(timezone=True), nullable=False),

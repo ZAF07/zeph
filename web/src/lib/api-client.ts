@@ -232,7 +232,13 @@ export type KnowledgeDocument = {
   file_type: KnowledgeFileType;
   status: KnowledgeStatus;
   failure_reason: string | null;
+  text_edited: boolean;
   created_at: string;
+};
+
+/** A Knowledge document with the text replies draw on; null until read. */
+export type KnowledgeDocumentWithText = KnowledgeDocument & {
+  text: string | null;
 };
 
 /** A Knowledge document as an Admin uploads it. */
@@ -281,6 +287,7 @@ export type ApiClient = {
   archiveMemoryCategory: (id: string) => Promise<MemoryCategory>;
   restoreMemoryCategory: (id: string) => Promise<MemoryCategory>;
   listKnowledgeDocuments: () => Promise<KnowledgeDocument[]>;
+  getKnowledgeDocument: (id: string) => Promise<KnowledgeDocumentWithText>;
   uploadKnowledgeDocument: (
     upload: KnowledgeUpload,
   ) => Promise<KnowledgeDocument>;
@@ -474,6 +481,10 @@ export function createApiClient(
           "/api/admin/knowledge-documents",
         )
       ).documents,
+    getKnowledgeDocument: (id) =>
+      request<KnowledgeDocumentWithText>(
+        `/api/admin/knowledge-documents/${id}`,
+      ),
     uploadKnowledgeDocument: (upload) => {
       const form = new FormData();
       form.append("file", upload.file);
