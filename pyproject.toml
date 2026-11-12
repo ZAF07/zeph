@@ -44,8 +44,11 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "-m 'not contract'"
-markers = ["contract: needs a real external service and keys; run with `make contract`"]
+addopts = "-m 'not contract and not eval'"
+markers = [
+    "contract: needs a real external service and keys; run with `make contract`",
+    "eval: measures the Companion with the real LLM; run with `make eval`",
+]
 
 [tool.ruff]
 line-length = 88
@@ -63,6 +66,7 @@ ban-relative-imports = "all"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D"]
+"evals/test_*.py" = ["D"]
 "src/companion/adapters/postgres/migrations/**" = ["D400", "D415"]
 
 [tool.mypy]

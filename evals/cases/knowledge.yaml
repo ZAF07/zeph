@@ -1,0 +1,82 @@
+# Knowledge eval. Each case is a made-up teaching the model can't know from
+# training. It is uploaded as a Knowledge Document (next to the starter
+# library), and then changed the way an Admin can change it:
+#
+#   1. uploaded        `question` is asked; the reply should use `original`
+#   2. text edited     the text becomes `edited_text`; `question` again
+#   3. details edited  the details become `edited_details`; `source_question`
+#                      should name the new title or source, not the old
+#   4. file replaced   the file becomes `replacement`; `question` again
+#
+# Keep the three texts clearly different in their details (numbers, colours,
+# names), so the judge can tell which one a reply used. The file names decide
+# the file type: .txt or .md.
+
+- id: lantern-breath
+  question: >-
+    I keep lying awake worrying at night. how exactly does the Lantern Breath
+    practice go?
+  source_question: >-
+    Where does the Lantern Breath practice come from? Who wrote it down?
+  original:
+    file_name: lantern-breath.txt
+    title: The Lantern Breath
+    source: Notes of Teacher Orsolya Vey
+    tradition: Haldric Stoicism
+    text: >-
+      The Lantern Breath, for when worry keeps you awake. Breathe in for seven
+      counts while picturing a small blue lantern glowing behind your ribs.
+      Breathe out for seven counts as the blue lantern slowly dims. Repeat this
+      nine times, then let the lantern go dark and rest.
+  edited_text: >-
+    The Lantern Breath, for when worry keeps you awake. Breathe in for four
+    counts while picturing an amber lantern resting in your cupped hands.
+    Breathe out for eight counts as the amber lantern grows brighter. Repeat
+    this three times, then set the lantern down beside you and rest.
+  edited_details:
+    title: Night Practices of the Marrow Coast
+    source: Collected by Brother Tamsin Elk
+    tradition: Marrow Coast Contemplatives
+  replacement:
+    file_name: lantern-breath-revised.md
+    text: >-
+      # The Lantern Breath
+
+      For when worry keeps you awake. Picture a green lantern hanging from a
+      willow branch. Breathe in for five counts, hold for two, and breathe out
+      for six counts as the green lantern sways in the wind. Repeat this twelve
+      times, then let the willow branch go still.
+
+- id: pebble-practice
+  question: >-
+    I have to decide whether to move cities for a job and I'm stuck. how does
+    the Pebble Practice work again, step by step?
+  source_question: >-
+    Where does the Pebble Practice come from? Which teacher or book is it from?
+  original:
+    file_name: pebble-practice.txt
+    title: The Pebble Practice
+    source: Sayings of Mother Idrena Kosk
+    tradition: Quillon Way
+    text: >-
+      The Pebble Practice, for a hard decision. Hold three pebbles. Drop the
+      first for what you fear, the second for what you hope, and keep the
+      third for what you would regret not trying. Decide only once the third
+      pebble feels warm in your palm.
+  edited_text: >-
+    The Pebble Practice, for a hard decision. Hold five pebbles. Place one on
+    the windowsill for each person the decision touches, and keep the rest in
+    your pocket overnight. Decide at sunrise, before you speak to anyone.
+  edited_details:
+    title: The Windowsill Book
+    source: Recorded by Elder Bramwell Osk
+    tradition: Fenmoor Hermits
+  replacement:
+    file_name: pebble-practice-revised.md
+    text: >-
+      # The Pebble Practice
+
+      For a hard decision. Hold two pebbles, one in each hand, and name each
+      hand for one choice. Walk to running water and throw the pebble from the
+      hand that feels heavier. Then wait one full day and one night before you
+      decide.
