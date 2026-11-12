@@ -1,0 +1,35 @@
+# 01 — View a Knowledge Document
+
+Status: ready-for-agent
+
+## Parent
+
+`.scratch/knowledge-editing/PRD.md`
+
+## What to build
+
+An Admin opens any Knowledge Document from the Knowledge table and sees its own page: title, source / author, tradition, type, status (with the failure reason when Failed), when it was added, and the full text the Companion draws on.
+
+To make that possible, the text read from a document's file is now saved on the document, and indexing works from that saved text. Reading and indexing become two steps (Read, then Index) with the same failure reasons as today. Documents uploaded before this change get their text read from their stored file on start-up, without re-indexing.
+
+The page also offers Retry (when Failed) and Delete (confirm, then back to the list), keeps checking while the document is Pending, and has loading, not-found and error states. The list endpoint stays without text.
+
+Build order: (1) backend and seam 1 tests, which fix the API contract; (2) the Dashboard page and seam 3 tests with a mocked API client; (3) `/run` end to end.
+
+## Acceptance criteria
+
+- [ ] Uploading a text, Markdown or PDF document saves the text read from it; chunks are made from that saved text
+- [ ] `GET /api/admin/knowledge-documents/{id}` returns the document's details, `text` (null if never read) and `text_edited` (false for now); 404 if missing; 403 for non-Admins
+- [ ] Failure reasons are unchanged (unreadable PDF, scanned PDF, not UTF-8, could not index)
+- [ ] On start-up, documents with no saved text whose file can be read get their text saved, without re-indexing; the starter documents are viewable
+- [ ] Each title in the Knowledge table links to the document's page at `/admin/knowledge/<id>`
+- [ ] The page shows details, status pill, failure reason, text, Retry when Failed, and Delete with confirmation that returns to the list
+- [ ] The page checks again while Pending and shows not-found and load-error states
+- [ ] Seam 1 tests cover viewing txt/Markdown/PDF text, 404, 403 and the start-up text fill
+- [ ] Seam 3 tests cover the document page and the link from the table
+- [ ] `make check` passes
+- [ ] Verified in the running app via `/run`
+
+## Blocked by
+
+None - can start immediately
