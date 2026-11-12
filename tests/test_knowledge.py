@@ -387,6 +387,108 @@ def test_the_next_reply_cites_a_documents_new_details(
     assert "Dhammapada" not in instructions
 
 
+RIVER_PASSAGE = (
+    "Watching the river flowing past, let worries drift downstream like leaves "
+    "on moving water."
+)
+
+
+def save_text(
+    client: TestClient, admin: dict[str, str], document_id: str, text: str
+) -> Any:
+    """Save a Knowledge document's text through the admin API."""
+    return client.put(
+        f"/api/admin/knowledge-documents/{document_id}/text",
+        json={"text": text},
+        headers=admin,
+    )
+
+
+def test_editing_a_documents_text_reindexes_it_from_the_new_wording(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    uploaded = upload_document(client, admin, "breath.txt", BREATH_PASSAGES[0].encode())
+    document_id = uploaded.json()["id"]
+    connect_telegram(client, auth_verifier, chat_channel)
+
+    response = save_text(client, admin, document_id, f"\n  {RIVER_PASSAGE}  \n")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "pending"
+    assert response.json()["text"] == RIVER_PASSAGE
+    assert response.json()["text_edited"] is True
+    viewed = client.get(f"/api/admin/knowledge-documents/{document_id}", headers=admin)
+    assert viewed.json()["status"] == "ready"
+    assert viewed.json()["text_edited"] is True
+    instructions = reply_instructions(
+        client, chat_model, "watching the river and the breath"
+    )
+    assert RIVER_PASSAGE in instructions
+    assert BREATH_PASSAGES[0] not in instructions
+
+
+def test_blank_text_is_refused_and_a_missing_document_is_not_found(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    uploaded = upload_document(client, admin, "breath.txt", BREATH_PASSAGES[0].encode())
+
+    blank = save_text(client, admin, uploaded.json()["id"], " \n ")
+    missing = save_text(client, admin, MISSING_ID, RIVER_PASSAGE)
+
+    assert blank.status_code == 422
+    assert blank.json()["detail"] == "The text can’t be blank."
+    assert missing.status_code == 404
+    assert document_text(client, admin, uploaded.json()["id"]) == BREATH_PASSAGES[0]
+
+
+def test_typing_the_text_of_a_scanned_pdf_makes_it_ready(
+    client: TestClient, auth_verifier: FakeAuthVerifier, engine: Engine
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    scan = upload_document(client, admin, "scan.pdf", blank_pdf()).json()
+
+    save_text(client, admin, scan["id"], RIVER_PASSAGE)
+
+    [document] = list_documents(client, admin)
+    assert (document["status"], document["failure_reason"]) == ("ready", None)
+    assert document["file_type"] == "pdf"
+    assert document_text(client, admin, scan["id"]) == RIVER_PASSAGE
+    assert chunk_count(engine) == 1
+
+
+def test_retrying_a_failed_reindex_keeps_the_edited_text(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    embedder: FakeEmbedder,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    uploaded = upload_document(client, admin, "breath.txt", BREATH_PASSAGES[0].encode())
+    document_id = uploaded.json()["id"]
+    connect_telegram(client, auth_verifier, chat_channel)
+    embedder.failure = RuntimeError("model download failed")
+
+    save_text(client, admin, document_id, RIVER_PASSAGE)
+    [failed] = list_documents(client, admin)
+    assert failed["status"] == "failed"
+    assert failed["failure_reason"] == "Couldn’t index the document. Try again."
+    embedder.failure = None
+    client.post(f"/api/admin/knowledge-documents/{document_id}/retry", headers=admin)
+
+    [document] = list_documents(client, admin)
+    assert document["status"] == "ready"
+    assert document_text(client, admin, document_id) == RIVER_PASSAGE
+    instructions = reply_instructions(client, chat_model, "watching the river")
+    assert RIVER_PASSAGE in instructions
+    assert BREATH_PASSAGES[0] not in instructions
+
+
 def test_matching_knowledge_reaches_the_reply_with_where_it_is_from(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
@@ -505,6 +607,7 @@ def test_only_admins_can_manage_knowledge(
         json={"title": "Anything"},
         headers=user,
     )
+    text_saved = save_text(client, user, MISSING_ID, "Words")
     uploaded = upload_document(client, user, "a.txt", b"words")
     deleted = client.delete(
         f"/api/admin/knowledge-documents/{MISSING_ID}", headers=user
@@ -514,6 +617,7 @@ def test_only_admins_can_manage_knowledge(
         listed.status_code,
         viewed.status_code,
         edited.status_code,
+        text_saved.status_code,
         uploaded.status_code,
         deleted.status_code,
-    ] == [403, 403, 403, 403, 403]
+    ] == [403, 403, 403, 403, 403, 403]

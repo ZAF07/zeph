@@ -35,3 +35,7 @@ Editing happens in the Knowledge text editor from issue 01, now editable — a p
 ## Blocked by
 
 - `.scratch/knowledge-editing/issues/01-view-knowledge-document.md`
+
+## Comments
+
+**2026-11-12 — started on branch `feat/ke-03-edit-text`.** Plan: `PUT /api/admin/knowledge-documents/{id}/text` saves the trimmed text as edited, makes the document Pending and indexes in the background (Index only: issue 01's `ingest` already skips Read when text is saved, which is also the Retry and start-up rule). Dashboard: the Knowledge text editor becomes editable — Markdown formatting as pure functions behind the CodeMirror adapter, toolbar with shortcuts, undo / redo, find & replace, Unsaved / Saved, Ctrl/⌘+S, Discard, Review changes (word diff with `diff`), warning before leaving.

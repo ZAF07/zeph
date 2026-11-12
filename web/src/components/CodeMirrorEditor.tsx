@@ -1,6 +1,12 @@
 "use client";
 
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  redo,
+  undo,
+} from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { syntaxHighlighting } from "@codemirror/language";
 import {
@@ -24,11 +30,16 @@ import {
   zephEditorTheme,
   zephMarkdownHighlight,
 } from "@/components/codemirror-theme";
+import { formatShortcuts } from "@/lib/editor-shortcuts";
+import { formatMarkdown, type MarkdownFormat } from "@/lib/markdown-formatting";
 
 /** What the toolbar can ask the editor to do. */
 export type CodeMirrorEditorHandle = {
   focus: () => void;
   openFind: () => void;
+  undo: () => void;
+  redo: () => void;
+  format: (format: MarkdownFormat) => void;
 };
 
 const syncedFromValueProp = Annotation.define<boolean>();
@@ -47,9 +58,40 @@ function readOnlyExtensions(readOnly: boolean) {
 }
 
 /**
+ * Applies a Markdown format to the editor's main selection.
+ *
+ * @param view - The editor.
+ * @param format - The format.
+ * @returns False when the text is read-only, so nothing changed.
+ */
+function applyFormat(view: EditorView, format: MarkdownFormat): boolean {
+  if (view.state.readOnly) {
+    return false;
+  }
+  const { from, to } = view.state.selection.main;
+  const edit = formatMarkdown(view.state.doc.toString(), from, to, format);
+  view.dispatch({
+    changes: { from: edit.from, to: edit.to, insert: edit.insert },
+    selection: { anchor: edit.selectionFrom, head: edit.selectionTo },
+    scrollIntoView: true,
+  });
+  return true;
+}
+
+const formatKeymap = (
+  Object.entries(formatShortcuts) as [
+    MarkdownFormat,
+    (typeof formatShortcuts)[MarkdownFormat],
+  ][]
+).map(([format, shortcut]) => ({
+  key: shortcut.key,
+  run: (view: EditorView) => applyFormat(view, format),
+}));
+
+/**
  * A CodeMirror 6 Markdown editor: line numbers, soft wrap, Markdown
- * highlighting, active line, find (and replace when editable), undo / redo
- * and Ctrl/⌘+S. When read-only it can still be focused, moved through and
+ * highlighting, active line, find (and replace when editable), undo / redo,
+ * Markdown formatting shortcuts and Ctrl/⌘+S. When read-only it can still be focused, moved through and
  * searched.
  *
  * @param props - `value` is the text; `onChange` gets each edit; `readOnly`
@@ -114,6 +156,7 @@ export function CodeMirrorEditor({
                 return true;
               },
             },
+            ...formatKeymap,
             ...searchKeymap,
             ...historyKeymap,
             ...defaultKeymap,
@@ -172,6 +215,24 @@ export function CodeMirrorEditor({
       openFind: () => {
         if (viewRef.current) {
           openSearchPanel(viewRef.current);
+        }
+      },
+      undo: () => {
+        if (viewRef.current) {
+          undo(viewRef.current);
+          viewRef.current.focus();
+        }
+      },
+      redo: () => {
+        if (viewRef.current) {
+          redo(viewRef.current);
+          viewRef.current.focus();
+        }
+      },
+      format: (format) => {
+        if (viewRef.current) {
+          applyFormat(viewRef.current, format);
+          viewRef.current.focus();
         }
       },
     }),

@@ -13,6 +13,7 @@ const apiClient = {
   getKnowledgeDocument: vi.fn<ApiClient["getKnowledgeDocument"]>(),
   updateKnowledgeDocumentDetails:
     vi.fn<ApiClient["updateKnowledgeDocumentDetails"]>(),
+  saveKnowledgeDocumentText: vi.fn<ApiClient["saveKnowledgeDocumentText"]>(),
   retryKnowledgeDocument: vi.fn<ApiClient["retryKnowledgeDocument"]>(),
   deleteKnowledgeDocument: vi.fn<ApiClient["deleteKnowledgeDocument"]>(),
 };
@@ -61,7 +62,7 @@ describe("KnowledgeDocumentView", () => {
     vi.useRealTimers();
   });
 
-  it("shows the document's details and its text, read-only", async () => {
+  it("shows the document's details and its text in the editor", async () => {
     render(<KnowledgeDocumentView documentId="breathing" />);
 
     expect(
@@ -89,11 +90,28 @@ describe("KnowledgeDocumentView", () => {
     const editor = screen.getByRole("textbox", {
       name: "Text of Mindful breathing",
     });
-    expect(editor).toHaveAttribute("aria-readonly", "true");
+    expect(editor).toHaveAttribute("aria-readonly", "false");
     expect(editor).toHaveTextContent("Notice the **breath** entering.");
     expect(screen.getByText("7 words · 52 characters")).toBeInTheDocument();
     const tools = within(screen.getByRole("toolbar", { name: "Text tools" }));
-    expect(tools.getAllByRole("button")).toHaveLength(1);
+    expect(
+      tools.getAllByRole("button").map((button) => button.ariaLabel),
+    ).toEqual([
+      "Heading",
+      "Bold",
+      "Italic",
+      "Quote",
+      "Bulleted list",
+      "Numbered list",
+      "Undo",
+      "Redo",
+      "Find & replace",
+    ]);
+    expect(screen.getByText("Saved")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save text…" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Discard changes" }),
+    ).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
   });
 
@@ -168,6 +186,154 @@ describe("KnowledgeDocumentView", () => {
     ).toBeInTheDocument();
   });
 
+  it("edits the text, reviews the changes and saves it to be re-indexed", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const pending = {
+      ...breathing,
+      status: "pending" as const,
+      text_edited: true,
+      text: `Slowly.\n${breathing.text}`,
+    };
+    apiClient.saveKnowledgeDocumentText.mockResolvedValue(pending);
+    render(<KnowledgeDocumentView documentId="breathing" />);
+    const editor = await screen.findByRole("textbox", {
+      name: "Text of Mindful breathing",
+    });
+
+    await userEvent.click(editor);
+    await userEvent.paste("Slowly.\n");
+
+    expect(editor).toHaveTextContent(/^Slowly.\s*# Mindful breathing/);
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+    expect(screen.getByText("8 words · 60 characters")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Save text…" }));
+
+    const review = within(
+      screen.getByRole("dialog", { name: "Review changes" }),
+    );
+    expect(
+      review.getByText(/1 word added · 0 words removed/),
+    ).toBeInTheDocument();
+    expect(review.getByText("Slowly.").tagName).toBe("INS");
+    apiClient.getKnowledgeDocument.mockResolvedValue({
+      ...pending,
+      status: "ready",
+    });
+    await userEvent.click(
+      review.getByRole("button", { name: "Save and re-index" }),
+    );
+
+    expect(apiClient.saveKnowledgeDocumentText).toHaveBeenCalledWith(
+      "breathing",
+      `Slowly.\n${breathing.text}`,
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(
+      screen.getByText(
+        "Text saved. Zeph uses it once the document is Ready again.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Edited")).toBeInTheDocument();
+    expect(screen.getByText("Saved")).toBeInTheDocument();
+    expect(screen.getAllByText("Pending").length).toBeGreaterThan(0);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+
+    expect(screen.queryByText("Pending")).toBeNull();
+    expect(screen.getAllByText("Ready").length).toBeGreaterThan(0);
+  });
+
+  it("formats with the toolbar, undoes it and saves with Ctrl/⌘+S", async () => {
+    render(<KnowledgeDocumentView documentId="breathing" />);
+    const editor = await screen.findByRole("textbox", {
+      name: "Text of Mindful breathing",
+    });
+    await userEvent.click(editor);
+
+    await userEvent.click(screen.getByRole("button", { name: "Heading" }));
+    expect(editor).toHaveTextContent(/^Mindful breathing/);
+    await userEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(editor).toHaveTextContent(/^# Mindful breathing/);
+    await userEvent.click(screen.getByRole("button", { name: "Redo" }));
+    expect(editor).toHaveTextContent(/^Mindful breathing/);
+    await userEvent.click(screen.getByRole("button", { name: "Bold" }));
+    expect(editor).toHaveTextContent(/^\*\*\*\*Mindful breathing/);
+
+    await userEvent.keyboard("{Control>}s{/Control}");
+
+    expect(
+      screen.getByRole("dialog", { name: "Review changes" }),
+    ).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+  });
+
+  it("shows the backend's reason when it refuses the text", async () => {
+    apiClient.saveKnowledgeDocumentText.mockRejectedValue(
+      new ApiError(
+        422,
+        "/api/admin/knowledge-documents/breathing/text",
+        "The text can’t be blank.",
+      ),
+    );
+    render(<KnowledgeDocumentView documentId="breathing" />);
+    const editor = await screen.findByRole("textbox", {
+      name: "Text of Mindful breathing",
+    });
+    await userEvent.click(editor);
+    await userEvent.paste("x");
+    await userEvent.click(screen.getByRole("button", { name: "Save text…" }));
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Save and re-index" }),
+    );
+
+    expect(
+      await within(screen.getByRole("dialog")).findByRole("alert"),
+    ).toHaveTextContent("The text can’t be blank.");
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+  });
+
+  it("discards unsaved changes only after confirming", async () => {
+    const confirm = vi.spyOn(window, "confirm");
+    confirm.mockReturnValueOnce(false).mockReturnValueOnce(true);
+    render(<KnowledgeDocumentView documentId="breathing" />);
+    const editor = await screen.findByRole("textbox", {
+      name: "Text of Mindful breathing",
+    });
+    await userEvent.click(editor);
+    await userEvent.paste("x");
+    const discard = screen.getByRole("button", { name: "Discard changes" });
+
+    await userEvent.click(discard);
+    expect(editor).toHaveTextContent(/^x# Mindful/);
+    await userEvent.click(discard);
+
+    expect(confirm).toHaveBeenCalledWith("Discard your unsaved text changes?");
+    expect(editor).toHaveTextContent(/^# Mindful/);
+    expect(screen.getByText("Saved")).toBeInTheDocument();
+  });
+
+  it("asks before following a link with unsaved changes", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<KnowledgeDocumentView documentId="breathing" />);
+    const editor = await screen.findByRole("textbox", {
+      name: "Text of Mindful breathing",
+    });
+    await userEvent.click(editor);
+    await userEvent.paste("x");
+
+    await userEvent.click(screen.getByRole("link", { name: "← Knowledge" }));
+
+    expect(confirm).toHaveBeenCalledWith(
+      "You have unsaved text changes. Leave and lose them?",
+    );
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+  });
+
   it("previews the text as formatted Markdown", async () => {
     render(<KnowledgeDocumentView documentId="breathing" />);
     await screen.findByRole("textbox", { name: "Text of Mindful breathing" });
@@ -209,14 +375,19 @@ describe("KnowledgeDocumentView", () => {
     expect(
       await screen.findByText("Scanned PDF — no text found"),
     ).toBeInTheDocument();
-    expect(screen.getByText("No text yet")).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: /^Text of/ })).toBeNull();
+    expect(
+      screen.getByText(/No text could be read from this file/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Text of Being and Time (excerpt)" }),
+    ).toHaveTextContent("");
 
     await userEvent.click(screen.getByRole("button", { name: "Retry" }));
 
     expect(apiClient.retryKnowledgeDocument).toHaveBeenCalledWith("scan");
     expect(await screen.findByText("Pending")).toBeInTheDocument();
     expect(screen.queryByText("Scanned PDF — no text found")).toBeNull();
+    expect(screen.getByText("No text yet")).toBeInTheDocument();
   });
 
   it("checks again while pending until the document is ready", async () => {

@@ -8,32 +8,54 @@ import {
 } from "@/components/CodeMirrorEditor";
 import { EditorToolbarButton } from "@/components/EditorToolbarButton";
 import { MarkdownPreview } from "@/components/MarkdownPreview";
-import { editorIcons } from "@/lib/editor-icons";
+import { editorIcons, formatIcons } from "@/lib/editor-icons";
+import { formatShortcuts } from "@/lib/editor-shortcuts";
+import type { MarkdownFormat } from "@/lib/markdown-formatting";
 import { describeLength } from "@/lib/text-stats";
 
 type View = "edit" | "preview" | "split";
+
+const formatButtons: { format: MarkdownFormat; label: string }[] = [
+  { format: "heading", label: "Heading" },
+  { format: "bold", label: "Bold" },
+  { format: "italic", label: "Italic" },
+  { format: "quote", label: "Quote" },
+  { format: "bulletList", label: "Bulleted list" },
+  { format: "numberedList", label: "Numbered list" },
+];
+
+const toolbarDivider = (
+  <span aria-hidden="true" className="mx-1 h-5 w-px bg-line-strong" />
+);
 
 const paneHeight = "h-[min(68vh,640px)] min-h-[320px]";
 
 /**
  * The Knowledge text editor: the document's Markdown with line numbers,
  * highlighting and find, an Edit / Preview / Split switch (Split only on
- * wide screens) and a status bar with the word and character count.
+ * wide screens) and a status bar with the word and character count. When
+ * editable, a toolbar adds Markdown formatting, undo / redo and find &
+ * replace, each with a tooltip and shortcut.
  *
- * @param props - `value` is the text; `readOnly` hides editing controls;
- *   `label` names the editor for screen readers; `statusNote` is shown at
- *   the end of the status bar.
+ * @param props - `value` is the text; `onChange` gets each edit; `readOnly`
+ *   hides editing controls; `label` names the editor for screen readers;
+ *   `onSave` runs on Ctrl/⌘+S; `statusNote` is shown at the end of the
+ *   status bar.
  * @returns The editor.
  */
 export function KnowledgeTextEditor({
   value,
+  onChange,
   readOnly = false,
   label,
+  onSave,
   statusNote,
 }: {
   value: string;
+  onChange?: (value: string) => void;
   readOnly?: boolean;
   label: string;
+  onSave?: () => void;
   statusNote?: ReactNode;
 }) {
   const editorRef = useRef<CodeMirrorEditorHandle>(null);
@@ -60,6 +82,39 @@ export function KnowledgeTextEditor({
           aria-label="Text tools"
           className="flex flex-wrap items-center gap-0.5"
         >
+          {readOnly ? null : (
+            <>
+              {formatButtons.map((button) => (
+                <EditorToolbarButton
+                  key={button.format}
+                  label={button.label}
+                  shortcut={formatShortcuts[button.format].label}
+                  keyShortcuts={formatShortcuts[button.format].ariaKeyShortcuts}
+                  iconPath={formatIcons[button.format]}
+                  disabled={view === "preview"}
+                  onClick={() => editorRef.current?.format(button.format)}
+                />
+              ))}
+              {toolbarDivider}
+              <EditorToolbarButton
+                label="Undo"
+                shortcut="Ctrl/⌘ Z"
+                keyShortcuts="Control+Z Meta+Z"
+                iconPath={editorIcons.undo}
+                disabled={view === "preview"}
+                onClick={() => editorRef.current?.undo()}
+              />
+              <EditorToolbarButton
+                label="Redo"
+                shortcut="Ctrl/⌘ Shift Z"
+                keyShortcuts="Control+Shift+Z Meta+Shift+Z"
+                iconPath={editorIcons.redo}
+                disabled={view === "preview"}
+                onClick={() => editorRef.current?.redo()}
+              />
+              {toolbarDivider}
+            </>
+          )}
           <EditorToolbarButton
             label={readOnly ? "Find" : "Find & replace"}
             shortcut="Ctrl/⌘ F"
@@ -96,8 +151,10 @@ export function KnowledgeTextEditor({
           <CodeMirrorEditor
             ref={editorRef}
             value={value}
+            onChange={onChange}
             readOnly={readOnly}
             label={label}
+            onSave={onSave}
           />
         </div>
         {view !== "edit" ? (

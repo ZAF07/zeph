@@ -119,3 +119,20 @@ def test_documents_from_before_text_was_saved_get_it_on_start_without_reindexing
     still_failed = service.get_document(scan.id)
     assert still_failed.text is None
     assert still_failed.document.status == KnowledgeStatus.FAILED
+
+
+def test_a_text_edit_left_pending_by_a_restart_is_finished_on_the_next_start(
+    engine: Engine,
+) -> None:
+    service = knowledge_service(engine)
+    [upload, *_] = read_knowledge_seed(KNOWLEDGE_SEED_FILE)
+    document = service.upload(upload)
+    service.ingest(document.id)
+    service.save_text(document.id, "Edited by an Admin before a restart.")
+
+    service.ingest_pending()
+
+    finished = service.get_document(document.id)
+    assert finished.document.status == KnowledgeStatus.READY
+    assert finished.document.text_edited
+    assert finished.text == "Edited by an Admin before a restart."

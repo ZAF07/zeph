@@ -299,6 +299,10 @@ export type ApiClient = {
     id: string,
     change: KnowledgeDetailsChange,
   ) => Promise<KnowledgeDocumentWithText>;
+  saveKnowledgeDocumentText: (
+    id: string,
+    text: string,
+  ) => Promise<KnowledgeDocumentWithText>;
   uploadKnowledgeDocument: (
     upload: KnowledgeUpload,
   ) => Promise<KnowledgeDocument>;
@@ -501,6 +505,12 @@ export function createApiClient(
         `/api/admin/knowledge-documents/${id}`,
         "PATCH",
         change,
+      ),
+    saveKnowledgeDocumentText: (id, text) =>
+      request<KnowledgeDocumentWithText>(
+        `/api/admin/knowledge-documents/${id}/text`,
+        "PUT",
+        { text },
       ),
     uploadKnowledgeDocument: (upload) => {
       const form = new FormData();

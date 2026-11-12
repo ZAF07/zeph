@@ -41,6 +41,7 @@ NO_TEXT_REASONS = {
 BLANK_TITLE = "A document needs a title."
 BLANK_SOURCE = "A document needs a source or author."
 BLANK_TRADITION = "A document needs a tradition."
+BLANK_TEXT = "The text can’t be blank."
 INDEXING_FAILED_REASON = "Couldn’t index the document. Try again."
 BLANK_LINE = re.compile(r"\n\s*\n")
 SENTENCE_END = re.compile(r"(?<=[.!?…])\s+")
@@ -300,6 +301,31 @@ class KnowledgeService:
             raise KnowledgeDocumentNotFoundError(document_id)
         return self.get_document(document_id)
 
+    def save_text(self, document_id: UUID, text: str) -> KnowledgeDocumentWithText:
+        """Save text an Admin wrote for a document and make it pending.
+
+        The document is then indexed again from this text with `ingest`;
+        until it is ready, replies don't use it. A failed document can be
+        given its text this way, e.g. a scanned PDF's.
+
+        Args:
+            document_id: The document's ID.
+            text: The new text.
+
+        Returns:
+            The pending document and its trimmed text.
+
+        Raises:
+            InvalidKnowledgeDocumentError: If the text is blank.
+            KnowledgeDocumentNotFoundError: If there is no such document.
+        """
+        trimmed = required_detail(text, BLANK_TEXT)
+        documents = self._repositories.knowledge_documents
+        if documents.save_text(document_id, trimmed, edited=True) is None:
+            raise KnowledgeDocumentNotFoundError(document_id)
+        documents.set_status(document_id, KnowledgeStatus.PENDING, failure_reason=None)
+        return self.get_document(document_id)
+
     def ingest(self, document_id: UUID) -> None:
         """Make a pending document ready for replies.
 
@@ -398,9 +424,10 @@ class KnowledgeService:
     def ingest_pending(self) -> None:
         """Ingest every document still pending, e.g. after a restart.
 
-        Ingestion runs after an upload's response, so a restart part-way
-        leaves a document pending. Run this before the backend takes
-        requests, when nothing else is ingesting.
+        Ingestion runs after an upload's or a text edit's response, so a
+        restart part-way leaves a document pending. Edited text is kept, as
+        `ingest` only reads the file when no text is saved. Run this before
+        the backend takes requests, when nothing else is ingesting.
         """
         for document in self._repositories.knowledge_documents.list_all():
             if document.status == KnowledgeStatus.PENDING:
