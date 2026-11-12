@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
+from companion.core.message_retention import RETENTION_DAYS_SETTING
 from companion.core.models import StoredSetting, User
 from companion.core.ports import Clock, PlatformSettingsRepository
 from companion.core.safeguard import HELPLINES_PLACEHOLDER
@@ -129,6 +130,13 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         "Limit-reached reply",
         SettingKind.TEXT,
         max_length=1_000,
+    ),
+    EditableSetting(
+        RETENTION_DAYS_SETTING,
+        "Message retention",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=365,
     ),
     EditableSetting("web_search_enabled", "Web search", SettingKind.ON_OFF),
     EditableSetting(

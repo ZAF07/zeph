@@ -304,6 +304,17 @@ class ConversationEngine(Protocol):
         """
         ...
 
+    def forget_user(self, user_id: UUID) -> None:
+        """Delete everything the engine saved while answering a User.
+
+        Nothing it saves is needed by a later message, so this is safe at any
+        time between messages.
+
+        Args:
+            user_id: The User's ID.
+        """
+        ...
+
 
 class AuthVerifier(Protocol):
     """Turns a Dashboard request token into an account identity."""
@@ -316,6 +327,18 @@ class AuthVerifier(Protocol):
 
         Returns:
             The account identity, or None if the token is not valid.
+        """
+        ...
+
+
+class AuthAccounts(Protocol):
+    """Manages accounts at the auth provider."""
+
+    def delete_account(self, auth_id: str) -> None:
+        """Delete an account at the auth provider, so it can't sign in again.
+
+        Args:
+            auth_id: The auth provider's account ID.
         """
         ...
 
@@ -405,6 +428,29 @@ class UserRepository(Protocol):
 
         Returns:
             The saved User, or None if they are the last Admin.
+        """
+        ...
+
+    def delete_data(self, user_id: UUID) -> None:
+        """Delete a User's data in one step, keeping their account.
+
+        Their Conversations and messages, Conversation Summaries, Memory Items,
+        Check-in history, connection tokens and Telegram Connection go. Their
+        profile, settings, Usage and Safeguard Events stay.
+
+        Args:
+            user_id: The User's ID.
+        """
+        ...
+
+    def delete_unless_last_admin(self, user_id: UUID) -> bool:
+        """Delete a User and everything of theirs, unless they are the only Admin.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            True if they were deleted; False if they are the last Admin.
         """
         ...
 
@@ -555,6 +601,25 @@ class ConversationRepository(Protocol):
 
         Returns:
             The Conversations.
+        """
+        ...
+
+    def list_users_with_messages_sent_before(self, cutoff: datetime) -> list[UUID]:
+        """List the Users who have any message sent before a time.
+
+        Args:
+            cutoff: The time to look before.
+
+        Returns:
+            The Users' IDs.
+        """
+        ...
+
+    def delete_messages_sent_before(self, cutoff: datetime) -> None:
+        """Delete every message sent before a time; Conversations stay.
+
+        Args:
+            cutoff: Messages sent before this are deleted.
         """
         ...
 

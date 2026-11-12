@@ -165,6 +165,7 @@ def client(
         chat_model=chat_model,
         build_conversation_engine=build_conversation_engine,
         auth_verifier=auth_verifier,
+        auth_accounts=auth_verifier,
         text_extractor=PypdfTextExtractor(),
         embedder=embedder,
         knowledge_vector_store=PgvectorKnowledgeVectorStore(engine),

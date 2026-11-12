@@ -22,8 +22,10 @@ from companion.core.knowledge import KnowledgeService
 from companion.core.knowledge_retrieval import KnowledgeRetrieval
 from companion.core.memory_categories import MemoryCategoryService
 from companion.core.memory_retrieval import MemoryRetrieval
+from companion.core.message_retention import MessageRetention
 from companion.core.platform_settings import PlatformSettingsService
 from companion.core.ports import (
+    AuthAccounts,
     AuthVerifier,
     ChatChannel,
     ChatModel,
@@ -43,6 +45,7 @@ from companion.core.scheduled_work import ScheduledWork
 from companion.core.stickers import StickerLibraryService, StickerTools
 from companion.core.telegram_connection import TelegramConnectionService
 from companion.core.usage import UsageLimiter, UsageRecordingChatModel
+from companion.core.user_data import UserDataService
 from companion.core.user_memory import UserMemoryService
 from companion.core.users import UserService
 from companion.core.web_search import WebSearchTools
@@ -59,6 +62,7 @@ class AppDependencies:
         build_conversation_engine: Builds the conversation engine around the
             core services it runs.
         auth_verifier: Checks Dashboard bearer tokens.
+        auth_accounts: Deletes accounts at the auth provider.
         text_extractor: Reads the text out of uploaded Knowledge files.
         embedder: Turns text into embeddings.
         knowledge_vector_store: Stores and searches Knowledge embeddings.
@@ -78,6 +82,7 @@ class AppDependencies:
     chat_model: ChatModel
     build_conversation_engine: Callable[[ConversationServices], ConversationEngine]
     auth_verifier: AuthVerifier
+    auth_accounts: AuthAccounts
     text_extractor: DocumentTextExtractor
     embedder: Embedder
     knowledge_vector_store: KnowledgeVectorStore
@@ -181,6 +186,11 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             clock=dependencies.clock,
         ),
         check_ins=check_in_service,
+        message_retention=MessageRetention(
+            repositories=dependencies.repositories,
+            conversation_engine=conversation_engine,
+            clock=dependencies.clock,
+        ),
         clock=dependencies.clock,
     )
 
@@ -215,6 +225,11 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             user_memory_service=user_memory_service,
             check_in_service=check_in_service,
             telegram_connection_service=telegram_connection_service,
+            user_data_service=UserDataService(
+                repositories=dependencies.repositories,
+                conversation_engine=conversation_engine,
+                auth_accounts=dependencies.auth_accounts,
+            ),
             platform_settings=dependencies.repositories.platform_settings,
             telegram_bot_username=dependencies.telegram_bot_username,
         )

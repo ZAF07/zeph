@@ -161,3 +161,17 @@ _Avoid_: Error message, limit notice
 **Usage**:
 What each User used on each of their days, as counts only: messages, chat model tokens read and written (for everything the Companion does for them, Check-ins included), and Web Searches, plus whether the Daily Message Limit or Web Search Limit turned anything away that day. Admins see it; it never holds message content.
 _Avoid_: Billing, costs, activity log
+
+### Privacy
+
+**Message Retention**:
+How long a User's raw messages are kept, set by Admins in days. Older messages are deleted automatically; Conversation Summaries and Memory Items stay until the User deletes them.
+_Avoid_: Data retention, TTL, history limit
+
+**Delete My Data**:
+A User's choice to wipe their messages, User Memory, Check-in history and Telegram Connection after typing a confirmation word. Their account stays, so they can start fresh.
+_Avoid_: Reset, clear history, wipe
+
+**Account Deletion**:
+A User's choice, made only on the Dashboard, to remove everything Delete My Data removes plus their account itself. It can't be undone, and the last Admin can't do it.
+_Avoid_: Close account, deactivate, unsubscribe

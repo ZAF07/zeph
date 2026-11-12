@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { secondaryButton } from "@/components/button-styles";
+import { DeleteAccountSection } from "@/components/DeleteAccountSection";
 import { ProfileForm } from "@/components/ProfileForm";
 import { UserMemorySetting } from "@/components/UserMemorySetting";
+import { YourDataSection } from "@/components/YourDataSection";
 import type { Me, PlatformContent } from "@/lib/api-client";
 import { useApiClient } from "@/lib/use-api-client";
 
@@ -14,7 +16,8 @@ type LoadState =
   | { kind: "loaded"; me: Me; content: PlatformContent };
 
 /**
- * The editable parts of the Account & privacy page: Profile and User Memory.
+ * The editable parts of the Account & privacy page: Profile, User Memory,
+ * Your data and Delete account.
  *
  * @returns The sections, a loading block, or an error with Try again.
  */
@@ -44,6 +47,7 @@ export function AccountSettings() {
       <div aria-busy="true" className="flex flex-col gap-5">
         <span className="block h-[220px] rounded-card bg-subtle" />
         <span className="block h-[140px] rounded-card bg-subtle" />
+        <span className="block h-[240px] rounded-card bg-subtle" />
       </div>
     );
   }
@@ -78,6 +82,8 @@ export function AccountSettings() {
         enabled={state.me.user_memory_enabled}
         explanation={state.content.user_memory_explanation}
       />
+      <YourDataSection retentionDays={state.content.message_retention_days} />
+      <DeleteAccountSection />
     </div>
   );
 }

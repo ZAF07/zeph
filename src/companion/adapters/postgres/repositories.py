@@ -557,6 +557,51 @@ class PostgresUserRepository:
             ).one()
         return _to_user(row)
 
+    def delete_data(self, user_id: UUID) -> None:
+        """Delete a User's data in one step, keeping their account.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._engine.begin() as connection:
+            for table in (
+                conversation_summaries,
+                memory_items,
+                conversations,
+                check_ins,
+                connection_tokens,
+                telegram_connections,
+            ):
+                connection.execute(delete(table).where(table.c.user_id == user_id))
+
+    def delete_unless_last_admin(self, user_id: UUID) -> bool:
+        """Delete a User and everything of theirs, unless they are the only Admin.
+
+        The Admin rows are locked first, so two Admins deleting their accounts
+        at the same time can never leave the platform without an Admin. Their
+        data goes with them through the tables' cascading foreign keys.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            True if they were deleted; False if they are the last Admin.
+        """
+        with self._engine.begin() as connection:
+            admin_ids = (
+                connection.execute(
+                    select(users.c.id)
+                    .where(users.c.role == UserRole.ADMIN.value)
+                    .with_for_update()
+                )
+                .scalars()
+                .all()
+            )
+            if admin_ids == [user_id]:
+                return False
+            connection.execute(delete(users).where(users.c.id == user_id))
+        return True
+
 
 class PostgresTelegramConnectionRepository:
     """Stores Telegram Connections in Postgres."""
@@ -848,6 +893,41 @@ class PostgresConversationRepository:
                 .order_by(conversations.c.ended_at)
             ).all()
         return [_to_conversation(row) for row in rows]
+
+    def list_users_with_messages_sent_before(self, cutoff: datetime) -> list[UUID]:
+        """List the Users who have any message sent before a time.
+
+        Args:
+            cutoff: The time to look before.
+
+        Returns:
+            The Users' IDs.
+        """
+        with self._engine.connect() as connection:
+            return list(
+                connection.execute(
+                    select(conversations.c.user_id)
+                    .distinct()
+                    .join(
+                        conversation_messages,
+                        conversation_messages.c.conversation_id == conversations.c.id,
+                    )
+                    .where(conversation_messages.c.sent_at < cutoff)
+                ).scalars()
+            )
+
+    def delete_messages_sent_before(self, cutoff: datetime) -> None:
+        """Delete every message sent before a time; Conversations stay.
+
+        Args:
+            cutoff: Messages sent before this are deleted.
+        """
+        with self._engine.begin() as connection:
+            connection.execute(
+                delete(conversation_messages).where(
+                    conversation_messages.c.sent_at < cutoff
+                )
+            )
 
 
 class PostgresPlatformSettingsRepository:

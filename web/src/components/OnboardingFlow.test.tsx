@@ -28,6 +28,7 @@ const content: PlatformContent = {
   user_memory_explanation:
     "Seeded memory paragraph one.\n\nSeeded memory paragraph two.",
   onboarding_reason_choices: ["Being more present", "Relationships"],
+  message_retention_days: 30,
 };
 
 function newUser(overrides: Partial<Me> = {}): Me {

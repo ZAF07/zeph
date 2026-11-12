@@ -19,6 +19,7 @@ type NumberField = {
   label: string;
   caption: string;
   unit: string;
+  note?: string;
 };
 
 type TextField = {
@@ -61,6 +62,19 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
         caption:
           "Unanswered Check-ins in a row before Zeph pauses and asks once about fewer.",
         unit: "in a row",
+      },
+    ],
+  },
+  {
+    heading: "Data",
+    fields: [
+      {
+        key: "message_retention_days",
+        label: "Message retention",
+        caption:
+          "Messages are deleted after this many days. Shown to Users on Account & privacy.",
+        unit: "days",
+        note: "Shortening applies to existing messages within a minute.",
       },
     ],
   },
@@ -150,8 +164,8 @@ function settingValue(key: string, value: string): SettingValue {
 }
 
 /**
- * The admin Platform settings page's form: timings, web search and shared
- * wording, saved together with one button.
+ * The admin Platform settings page's form: timings, message retention, web
+ * search and shared wording, saved together with one button.
  *
  * @returns The form, or a loading block or error with Try again.
  */
@@ -198,16 +212,27 @@ export function PlatformSettingsForm() {
           </label>
           <span className="text-caption text-ink-muted">{field.caption}</span>
         </span>
-        <span className="flex items-center gap-2">
-          <input
-            id={field.key}
-            className={`${inputField} w-[110px]`}
-            type="number"
-            inputMode="numeric"
-            value={values[field.key] ?? ""}
-            onChange={(event) => edit(field.key, event.target.value)}
-          />
-          <span className="text-caption text-ink-muted">{field.unit}</span>
+        <span className="flex flex-col gap-1.5">
+          <span className="flex items-center gap-2">
+            <input
+              id={field.key}
+              className={`${inputField} w-[110px]`}
+              type="number"
+              inputMode="numeric"
+              aria-describedby={field.note ? `${field.key}-note` : undefined}
+              value={values[field.key] ?? ""}
+              onChange={(event) => edit(field.key, event.target.value)}
+            />
+            <span className="text-caption text-ink-muted">{field.unit}</span>
+          </span>
+          {field.note ? (
+            <span
+              id={`${field.key}-note`}
+              className="max-w-[220px] text-caption text-ink-muted"
+            >
+              {field.note}
+            </span>
+          ) : null}
         </span>
       </div>
     );

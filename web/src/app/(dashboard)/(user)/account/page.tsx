@@ -2,7 +2,7 @@ import { AccountSettings } from "@/components/AccountSettings";
 
 /**
  * The Account & privacy page, where a User changes their profile and
- * User Memory setting at any time.
+ * User Memory setting, and can delete their data or account.
  *
  * @returns The page.
  */
