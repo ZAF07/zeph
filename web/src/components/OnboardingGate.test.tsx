@@ -29,6 +29,7 @@ function user(onboardingCompletedAt: string | null): Me {
     user_memory_enabled: true,
     onboarding_completed_at: onboardingCompletedAt,
     role: "user",
+    changed_in_chat: {},
   };
 }
 

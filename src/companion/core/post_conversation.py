@@ -17,7 +17,7 @@ from companion.core.models import (
     MemorySource,
 )
 from companion.core.ports import Clock, Repositories
-from companion.core.response_composition import to_transcript_lines
+from companion.core.transcripts import to_transcript_lines
 from companion.core.usage import UsageRecordingChatModel
 
 logger = logging.getLogger(__name__)

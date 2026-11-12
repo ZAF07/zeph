@@ -37,6 +37,7 @@ from companion.adapters.postgres.tables import (
 )
 from companion.core.models import (
     ChannelSticker,
+    ChatSetting,
     CheckIn,
     CheckInFrequency,
     CheckInKind,
@@ -111,6 +112,11 @@ def _to_user(row: Row[Any]) -> User:
             paused_until=row.check_ins_paused_until,
             next_due_at=row.check_in_next_due_at,
         ),
+        settings_changed_in_chat={
+            ChatSetting(setting): datetime.fromisoformat(changed_at)
+            for setting, changed_at in row.settings_changed_in_chat.items()
+        },
+        data_deletion_requested_at=row.data_deletion_requested_at,
     )
 
 
@@ -441,6 +447,11 @@ class PostgresUserRepository:
                 check_ins_paused=user.check_ins.paused,
                 check_ins_paused_until=user.check_ins.paused_until,
                 check_in_next_due_at=user.check_ins.next_due_at,
+                settings_changed_in_chat={
+                    setting.value: changed_at.isoformat()
+                    for setting, changed_at in user.settings_changed_in_chat.items()
+                },
+                data_deletion_requested_at=user.data_deletion_requested_at,
             )
             .returning(users)
         )

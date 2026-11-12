@@ -141,6 +141,22 @@ class KnowledgeCase:
     replacement_text: str
 
 
+@dataclass(frozen=True)
+class SettingsCase:
+    """A message asking, or not asking, to change a setting in chat.
+
+    Attributes:
+        id: A short name for the case.
+        message: What the User sends.
+        tools: The settings tools the reply must call; empty when no setting
+            may change.
+    """
+
+    id: str
+    message: str
+    tools: list[str]
+
+
 def require_unique_ids(ids: Sequence[str], cases_file: Path) -> None:
     """Check that no two cases in a file share an ID.
 
@@ -276,6 +292,27 @@ def load_knowledge_cases(cases_file: Path) -> list[KnowledgeCase]:
             replacement_file_name=entry["replacement"]["file_name"],
             replacement_text=entry["replacement"]["text"],
         )
+        for entry in entries
+    ]
+    require_unique_ids([case.id for case in cases], cases_file)
+    return cases
+
+
+def load_settings_cases(cases_file: Path) -> list[SettingsCase]:
+    """Read the settings requests and the tools each must call.
+
+    Args:
+        cases_file: YAML list of cases with `id`, `message` and `tools`.
+
+    Returns:
+        The cases, in the order listed.
+
+    Raises:
+        InvalidEvalCasesError: If two cases share an ID.
+    """
+    entries: list[dict[str, Any]] = yaml.safe_load(cases_file.read_text())
+    cases = [
+        SettingsCase(id=entry["id"], message=entry["message"], tools=entry["tools"])
         for entry in entries
     ]
     require_unique_ids([case.id for case in cases], cases_file)

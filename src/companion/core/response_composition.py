@@ -2,6 +2,7 @@ import re
 from dataclasses import dataclass
 from uuid import UUID
 
+from companion.core.chat_settings import SettingsTools
 from companion.core.models import (
     ChatLine,
     ChatRole,
@@ -15,6 +16,7 @@ from companion.core.usage import UsageRecordingChatModel
 from companion.core.web_search import WebSearchTools
 
 BLANK_LINE = re.compile(r"\n\s*\n")
+DELETION_CANCELLED_NOTE_SETTING = "reply_data_deletion_cancelled_note"
 
 
 class EmptyReplyError(Exception):
@@ -68,24 +70,6 @@ def to_chat_history(messages: list[ConversationMessage]) -> list[ChatLine]:
     ]
 
 
-def to_transcript_lines(messages: list[ConversationMessage]) -> str:
-    """Write messages as transcript lines for a model to read, not answer.
-
-    Args:
-        messages: The messages, oldest first.
-
-    Returns:
-        One "Person: ..." or "Companion: ..." line per message.
-    """
-    speakers = {
-        MessageDirection.INCOMING: "Person",
-        MessageDirection.OUTGOING: "Companion",
-    }
-    return "\n".join(
-        f"{speakers[message.direction]}: {message.content}" for message in messages
-    )
-
-
 class ResponseComposer:
     """Writes the Companion's reply to the current Conversation."""
 
@@ -94,6 +78,7 @@ class ResponseComposer:
         repositories: Repositories,
         chat_model: UsageRecordingChatModel,
         web_search_tools: WebSearchTools,
+        settings_tools: SettingsTools,
         sticker_tools: StickerTools,
     ) -> None:
         """Set up the composer.
@@ -102,11 +87,13 @@ class ResponseComposer:
             repositories: Where Conversations and settings are stored.
             chat_model: Generates the reply and records the tokens used.
             web_search_tools: Offers the web tools the reply may call.
+            settings_tools: Offers the tools that change the User's settings.
             sticker_tools: Offers the Sticker Library to the reply.
         """
         self._repositories = repositories
         self._chat_model = chat_model
         self._web_search_tools = web_search_tools
+        self._settings_tools = settings_tools
         self._sticker_tools = sticker_tools
 
     def compose(
@@ -115,20 +102,24 @@ class ResponseComposer:
         user_id: UUID,
         memory: str = "",
         knowledge: str = "",
+        data_deletion_cancelled: bool = False,
     ) -> ComposedReply:
         """Compose a reply to the Conversation's newest message.
 
         Uses the Persona, response prompt and model from platform settings,
         then what the Companion remembers and the Knowledge that may fit, and
         gives the model every earlier message in the Conversation. The model
-        may search the web and read pages when web search is offered, and may
-        pick one sticker from the Sticker Library.
+        may search the web and read pages when web search is offered, change
+        the User's settings when they ask, and pick one sticker from the
+        Sticker Library.
 
         Args:
             conversation_id: The Conversation to reply in.
             user_id: The User being replied to.
             memory: The User Memory that matters for this message; "" if none.
             knowledge: The Knowledge passages that may fit; "" if none.
+            data_deletion_cancelled: True if this message cancelled the
+                User's request to delete their data, so the reply says so.
 
         Returns:
             The reply as short messages and an optional sticker.
@@ -139,8 +130,21 @@ class ResponseComposer:
         settings = self._repositories.platform_settings
         instructions = f"{settings.get('persona')}\n\n{settings.get('response_prompt')}"
         web_search = self._web_search_tools.offer(user_id)
+        settings_tools = self._settings_tools.offer(user_id)
         sticker_choice = self._sticker_tools.offer()
-        for section in (memory, knowledge, web_search.instructions):
+        cancelled_note = (
+            settings.get(DELETION_CANCELLED_NOTE_SETTING)
+            if data_deletion_cancelled
+            else ""
+        )
+        sections = (
+            memory,
+            knowledge,
+            web_search.instructions,
+            settings_tools.instructions,
+            cancelled_note,
+        )
+        for section in sections:
             if section:
                 instructions += f"\n\n{section}"
         history = to_chat_history(
@@ -151,7 +155,7 @@ class ResponseComposer:
             model=settings.get("response_model"),
             instructions=instructions,
             history=history,
-            tools=[*web_search.tools, *sticker_choice.tools],
+            tools=[*web_search.tools, *settings_tools.tools, *sticker_choice.tools],
         )
         reply_parts = split_into_messages(reply)
         if not reply_parts and sticker_choice.picked is None:

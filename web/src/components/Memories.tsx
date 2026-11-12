@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
 import { ConversationSummariesList } from "@/components/ConversationSummariesList";
 import { LoadFailed } from "@/components/LoadFailed";
 import { MemoryItemsList } from "@/components/MemoryItemsList";
@@ -102,6 +103,10 @@ export function Memories() {
                 onChange={(next) => void saveUserMemorySetting(next)}
               />
             </div>
+            <ChangedInChatCaption
+              changedAt={state.me.changed_in_chat.user_memory}
+              timeZone={state.me.time_zone ?? undefined}
+            />
             {switchFailed ? (
               <p role="alert" className="m-0 text-sm text-danger-deep">
                 We couldn’t change that. Please try again.

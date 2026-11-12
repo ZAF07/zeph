@@ -86,6 +86,18 @@ describe("Memories", () => {
     apiClient.deleteConversationSummary.mockResolvedValue(undefined);
   });
 
+  it("marks User Memory as changed in chat with the day", async () => {
+    apiClient.getMe.mockResolvedValue({
+      ...maya,
+      changed_in_chat: { user_memory: "2026-11-03T09:00:00Z" },
+    });
+    render(<Memories />);
+
+    expect(
+      await screen.findByText("Changed in chat · 3 Nov"),
+    ).toBeInTheDocument();
+  });
+
   it("shows Memory Items grouped by Memory Category with where they came from", async () => {
     render(<Memories />);
 

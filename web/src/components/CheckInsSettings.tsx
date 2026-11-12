@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { secondaryButton } from "@/components/button-styles";
+import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
 import { CheckInFrequencyPicker } from "@/components/CheckInFrequencyPicker";
 import { CheckInKindsList } from "@/components/CheckInKindsList";
 import { fieldLabel, inputField } from "@/components/form-styles";
@@ -69,7 +70,7 @@ export function CheckInsSettings() {
   const timeZones = useMemo(() => timeZoneOptions(timeZone), [timeZone]);
 
   async function save(
-    change: () => Promise<{ me: Me } | { checkIns: CheckIns }>,
+    change: () => Promise<{ me: Me } | { me: Me; checkIns: CheckIns }>,
   ) {
     setIsSaving(true);
     setSaveFailed(false);
@@ -85,20 +86,21 @@ export function CheckInsSettings() {
     }
   }
 
+  async function withMe(checkIns: Promise<CheckIns>) {
+    const savedCheckIns = await checkIns;
+    return { checkIns: savedCheckIns, me: await apiClient.getMe() };
+  }
+
   function changeSettings(changes: CheckInChanges) {
-    void save(async () => ({
-      checkIns: await apiClient.updateCheckIns(changes),
-    }));
+    void save(() => withMe(apiClient.updateCheckIns(changes)));
   }
 
   function pause(length: PauseLength) {
-    void save(async () => ({
-      checkIns: await apiClient.pauseCheckIns(length),
-    }));
+    void save(() => withMe(apiClient.pauseCheckIns(length)));
   }
 
   function resume() {
-    void save(async () => ({ checkIns: await apiClient.resumeCheckIns() }));
+    void save(() => withMe(apiClient.resumeCheckIns()));
   }
 
   function changeTimeZone(timeZone: string) {
@@ -108,6 +110,15 @@ export function CheckInsSettings() {
   }
 
   const checkIns = state.kind === "loaded" ? state.checkIns : null;
+  const changedInChat = state.kind === "loaded" ? state.me.changed_in_chat : {};
+  function chatCaption(changedAt: string | undefined) {
+    return (
+      <ChangedInChatCaption
+        changedAt={changedAt}
+        timeZone={timeZone ?? undefined}
+      />
+    );
+  }
   let switchLabel = "Check-ins on";
   if (checkIns && !checkIns.enabled) {
     switchLabel = "Check-ins off";
@@ -210,6 +221,7 @@ export function CheckInsSettings() {
               <SettingLabel
                 title="How often, at most"
                 caption="Zeph will often check in less than this."
+                note={chatCaption(changedInChat.check_in_frequency)}
               />
               <CheckInFrequencyPicker
                 value={checkIns.frequency}
@@ -221,6 +233,7 @@ export function CheckInsSettings() {
               <SettingLabel
                 title="Quiet hours"
                 caption="Zeph never checks in during these hours."
+                note={chatCaption(changedInChat.quiet_hours)}
               />
               <div className="flex flex-[2_1_480px] flex-col gap-3">
                 <QuietHoursFields
@@ -248,6 +261,7 @@ export function CheckInsSettings() {
                       </option>
                     ))}
                   </select>
+                  {chatCaption(changedInChat.time_zone)}
                 </label>
               </div>
             </div>
@@ -255,6 +269,7 @@ export function CheckInsSettings() {
               <SettingLabel
                 title="Need some quiet?"
                 caption="Pause without changing anything else."
+                note={chatCaption(changedInChat.check_in_pause)}
               />
               <div className="flex flex-wrap gap-2">
                 {pauseChoices.map((choice) => (
@@ -270,6 +285,10 @@ export function CheckInsSettings() {
                 ))}
               </div>
             </div>
+            <p className="m-0 px-6 pb-5 text-caption text-blue">
+              You can also just tell Zeph “take a week off from check-ins” or
+              “no messages after 9pm”.
+            </p>
           </section>
 
           <CheckInKindsList kinds={checkIns.kinds} />

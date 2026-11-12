@@ -56,6 +56,10 @@ export function YourDataSection({ retentionDays }: { retentionDays: number }) {
             history and Telegram Connection. Your account stays, so you can
             start fresh.
           </span>
+          <span className="text-caption text-blue">
+            You can also tell Zeph “delete my data” — it will ask for the
+            confirmation word.
+          </span>
         </span>
         {isConfirming ? null : (
           <button

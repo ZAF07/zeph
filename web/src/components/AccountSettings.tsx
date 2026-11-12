@@ -81,6 +81,8 @@ export function AccountSettings() {
       <UserMemorySetting
         enabled={state.me.user_memory_enabled}
         explanation={state.content.user_memory_explanation}
+        changedInChatAt={state.me.changed_in_chat.user_memory}
+        timeZone={state.me.time_zone ?? undefined}
       />
       <YourDataSection retentionDays={state.content.message_retention_days} />
       <DeleteAccountSection />

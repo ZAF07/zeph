@@ -26,7 +26,19 @@ export type TelegramConnectionStatus = {
 /** Whether a User is a plain User or an Admin. */
 export type UserRole = "user" | "admin";
 
-/** The signed-in User, with their profile and preferences. */
+/** A setting a User can change by telling Zeph in chat. */
+export type ChatSetting =
+  | "check_in_pause"
+  | "check_in_frequency"
+  | "quiet_hours"
+  | "user_memory"
+  | "time_zone";
+
+/**
+ * The signed-in User, with their profile and preferences. `changed_in_chat`
+ * says when each setting was last changed in chat; a setting changed on the
+ * Dashboard since is left out.
+ */
 export type Me = {
   id: string;
   email: string | null;
@@ -39,6 +51,7 @@ export type Me = {
   user_memory_enabled: boolean;
   onboarding_completed_at: string | null;
   role: UserRole;
+  changed_in_chat: Partial<Record<ChatSetting, string>>;
 };
 
 /** How often, at most, Zeph may send a Check-in. */

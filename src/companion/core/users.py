@@ -6,12 +6,14 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from companion.core.check_ins import CheckInService
 from companion.core.models import (
     AccountIdentity,
+    ChatSetting,
     OnboardingAnswers,
     PreferenceChanges,
     User,
     UserRole,
 )
 from companion.core.ports import Clock, UserRepository
+from companion.core.settings_changes import record_where_changed
 from companion.core.user_memory import UserMemoryService
 
 COUNTRY_CODE_PATTERN = re.compile(r"[A-Z]{2}")
@@ -189,12 +191,16 @@ class UserService:
         self._user_memory.remember_onboarding(saved)
         return saved
 
-    def update_preferences(self, user: User, changes: PreferenceChanges) -> User:
+    def update_preferences(
+        self, user: User, changes: PreferenceChanges, in_chat: bool = False
+    ) -> User:
         """Change a User's name, User Memory setting, country or time zone.
 
         Args:
             user: The User making the change.
             changes: The preferences to change; None leaves one as it is.
+            in_chat: True if the User asked for it in chat, not on the
+                Dashboard.
 
         Returns:
             The saved User.
@@ -202,8 +208,13 @@ class UserService:
         Raises:
             InvalidProfileError: If a new value is not acceptable.
         """
+        changed = []
+        if changes.user_memory_enabled is not None:
+            changed.append(ChatSetting.USER_MEMORY)
+        if changes.time_zone is not None:
+            changed.append(ChatSetting.TIME_ZONE)
         updated = replace(
-            user,
+            record_where_changed(user, changed, in_chat, self._clock.now()),
             name=clean_name(changes.name) if changes.name is not None else user.name,
             user_memory_enabled=(
                 changes.user_memory_enabled

@@ -4,7 +4,7 @@ The evals measure how the Companion behaves with the real LLM. They are not
 tests: they cost money and their results vary a little from run to run. They
 never run in `make check`.
 
-There are three:
+There are four:
 
 - **Safeguard**: about 30 labelled messages (clear crises, subtle crises and
   false alarms like "this traffic is killing me"). The goal is that every real
@@ -17,6 +17,11 @@ There are three:
   its text is edited, its details are edited and its file is replaced. After
   each change, a User asks about it and an LLM judge decides which version
   the reply used. Any reply that uses an old version fails.
+- **Settings**: about a dozen messages asking, in plain words, to change a
+  setting in chat ("give me a week off from check-ins"), plus requests that
+  must change nothing (delete my account, change my country, unclear asks,
+  everyday chat). Each passes if the reply called exactly the right settings
+  tool, or none. No judge is needed: the tools called are recorded.
 
 ## Setup
 
@@ -50,6 +55,7 @@ To run one part or one case, pass pytest options through `uv run`:
 set -a && . ./.env && set +a
 uv run pytest evals -m eval -k safeguard
 uv run pytest evals -m eval -k captioned-photo
+uv run pytest evals -m eval -k settings
 ```
 
 ## Cost
@@ -95,6 +101,10 @@ Knowledge: 8 of 8 steps right
   version" means the change didn't reach Users. "uses no version" means the
   reply didn't draw on the document at all (it wasn't found, or Zeph chose
   not to use it).
+- **Settings**: each case shows PASS or FAIL with the tools it should have
+  called and the tools it did call. A failed case also prints Zeph's reply.
+  "called no tool" on a clear request usually means Zeph asked "want me
+  to?" instead of acting.
 
 The judge is an LLM too, so it can be wrong. Read the reason before acting on
 a failure, and run again if one result looks off.
@@ -106,6 +116,8 @@ Run it after changing any of these:
 - the Safeguard prompt or model
 - the Persona, the response prompt or the response model
 - the Knowledge intro (`reply_knowledge_intro`) or `knowledge_chunks_per_reply`
+- the settings instructions (`reply_settings_instructions`) or the settings
+  tools
 - the embedding model
 - how Knowledge is read, indexed or retrieved (chunking, the text extractor,
   the vector store, the search)
@@ -124,5 +136,7 @@ at the top.
 - `knowledge.yaml`: add a made-up teaching with an original, an edited text,
   edited details and a replacement file. Make the versions differ in clear
   details (numbers, colours, names) so the judge can tell them apart.
+- `settings.yaml`: add an `id`, the `message` and the settings `tools` the
+  reply must call (`[]` when nothing may change).
 
 `make check` checks the case files can be read (`tests/test_eval_helpers.py`).

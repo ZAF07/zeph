@@ -8,6 +8,7 @@ from psycopg_pool import ConnectionPool
 
 from companion.core.conversations import ConversationServices
 from companion.core.models import ConversationTurn, MessageKind, RiskType
+from companion.core.user_data import DataDeletionAnswer
 
 
 class TurnState(TypedDict, total=False):
@@ -15,7 +16,8 @@ class TurnState(TypedDict, total=False):
 
     IDs are stored as strings so checkpoints stay plain JSON-like data.
     Every turn sets `sticker_id`, "" for none, so a sticker from an earlier
-    turn on the same thread is never sent again.
+    turn on the same thread is never sent again. Every turn past the
+    Safeguard sets `data_deletion_answer` too, for the same reason.
     """
 
     user_id: str
@@ -24,6 +26,7 @@ class TurnState(TypedDict, total=False):
     kind: str
     conversation_id: str
     risk_type: str
+    data_deletion_answer: str
     within_message_limit: bool
     memory: str
     knowledge: str
@@ -105,7 +108,7 @@ class LangGraphConversationEngine:
             return {"risk_type": risk_type.value}
 
         def after_safeguard(state: TurnState) -> str:
-            """Pick the next step: the Crisis Reply, or the daily limit check.
+            """Pick the next step: the Crisis Reply, or settling a data deletion.
 
             Args:
                 state: The graph's state so far.
@@ -114,8 +117,37 @@ class LangGraphConversationEngine:
                 The name of the next step.
             """
             if state["risk_type"] == RiskType.NONE.value:
-                return "check_message_limit"
+                return "settle_data_deletion"
             return "send_crisis_reply"
+
+        def settle_data_deletion(state: TurnState) -> TurnState:
+            """Delete the User's data if this message confirms they asked to.
+
+            Any other message cancels the request.
+
+            Args:
+                state: The graph's state so far.
+
+            Returns:
+                What the message did to a request to delete their data.
+            """
+            answer = services.data_deletion.settle(
+                UUID(state["user_id"]), state["chat_id"], state["text"]
+            )
+            return {"data_deletion_answer": answer.value}
+
+        def after_data_deletion(state: TurnState) -> str:
+            """Pick the next step: stop once the data is deleted, or go on.
+
+            Args:
+                state: The graph's state so far.
+
+            Returns:
+                The name of the next step.
+            """
+            if state["data_deletion_answer"] == DataDeletionAnswer.CONFIRMED.value:
+                return END
+            return "check_message_limit"
 
         def check_message_limit(state: TurnState) -> TurnState:
             """Count the message toward the User's daily message limit.
@@ -177,6 +209,18 @@ class LangGraphConversationEngine:
             )
             return {}
 
+        def cancel_data_deletion(state: TurnState) -> TurnState:
+            """Cancel a request to delete the User's data after a crisis message.
+
+            Args:
+                state: The graph's state so far.
+
+            Returns:
+                Whether a request was cancelled.
+            """
+            answer = services.data_deletion.cancel(UUID(state["user_id"]))
+            return {"data_deletion_answer": answer.value}
+
         def recall_memory(state: TurnState) -> TurnState:
             """Find the User Memory that matters for the message.
 
@@ -219,6 +263,8 @@ class LangGraphConversationEngine:
                 UUID(state["user_id"]),
                 state["memory"],
                 state["knowledge"],
+                data_deletion_cancelled=state["data_deletion_answer"]
+                == DataDeletionAnswer.CANCELLED.value,
             )
             sticker_id = str(reply.sticker.id) if reply.sticker else ""
             return {"reply_parts": reply.parts, "sticker_id": sticker_id}
@@ -245,6 +291,8 @@ class LangGraphConversationEngine:
         graph.add_node("record_incoming", record_incoming)
         graph.add_node("check_safeguard", check_safeguard)
         graph.add_node("send_crisis_reply", send_crisis_reply)
+        graph.add_node("cancel_data_deletion", cancel_data_deletion)
+        graph.add_node("settle_data_deletion", settle_data_deletion)
         graph.add_node("check_message_limit", check_message_limit)
         graph.add_node("send_limit_reply", send_limit_reply)
         graph.add_node("recall_memory", recall_memory)
@@ -256,9 +304,15 @@ class LangGraphConversationEngine:
         graph.add_conditional_edges(
             "check_safeguard",
             after_safeguard,
-            ["send_crisis_reply", "check_message_limit"],
+            ["send_crisis_reply", "settle_data_deletion"],
         )
-        graph.add_edge("send_crisis_reply", END)
+        graph.add_edge("send_crisis_reply", "cancel_data_deletion")
+        graph.add_edge("cancel_data_deletion", END)
+        graph.add_conditional_edges(
+            "settle_data_deletion",
+            after_data_deletion,
+            ["check_message_limit", END],
+        )
         graph.add_conditional_edges(
             "check_message_limit",
             after_message_limit,
@@ -275,15 +329,18 @@ class LangGraphConversationEngine:
         """Answer one message: save it, run the Safeguard, then reply.
 
         On a crisis the Crisis Reply is sent instead of a composed reply, and
-        the message doesn't count toward the daily message limit. Over the
-        limit, the in-character limit reply is sent and nothing is composed.
+        the message doesn't count toward the daily message limit, and cancels
+        any request to delete the User's data. Otherwise a pending request is
+        settled first: the confirmation word deletes their data, and then
+        their checkpoint thread too, with nothing composed. Over the limit,
+        the in-character limit reply is sent and nothing is composed.
         Otherwise the User Memory that matters and the Knowledge that may fit
         are recalled for the reply.
 
         Args:
             turn: The message to answer.
         """
-        self._graph.invoke(
+        final_state = self._graph.invoke(
             {
                 "user_id": str(turn.user_id),
                 "chat_id": turn.chat_id,
@@ -292,6 +349,8 @@ class LangGraphConversationEngine:
             },
             config={"configurable": {"thread_id": str(turn.user_id)}},
         )
+        if final_state.get("data_deletion_answer") == DataDeletionAnswer.CONFIRMED:
+            self.forget_user(turn.user_id)
 
     def forget_user(self, user_id: UUID) -> None:
         """Delete the User's checkpoint thread, which holds copies of their messages.

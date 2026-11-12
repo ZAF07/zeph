@@ -19,7 +19,7 @@ check-web:
 contract:
 	set -a && . ./.env && set +a && uv run pytest -m contract
 
-## Real-LLM evals: Safeguard, Persona and Knowledge; needs keys in .env. See evals/README.md.
+## Real-LLM evals: Safeguard, Persona, Knowledge and Settings; needs keys in .env. See evals/README.md.
 eval:
 	set -a && . ./.env && set +a && uv run pytest evals -m eval
 

@@ -1,0 +1,54 @@
+# Settings eval. Each message is sent on its own through the Telegram webhook
+# by a User with Check-ins on and User Memory on. `tools` are the settings
+# tools the reply must call; any other settings tool that changes something
+# fails the case. `list_memories` only reads, so it is always allowed. An
+# empty list means no setting may change: Dashboard-only requests, unclear
+# requests and everyday chat.
+
+- id: week-off
+  message: can you give me a week off from check-ins?
+  tools: [pause_check_ins]
+
+- id: fewer-check-ins
+  message: you message me a bit too often, once a week is plenty
+  tools: [change_check_in_frequency]
+
+- id: quiet-after-nine
+  message: please don't message me after 9pm
+  tools: [change_quiet_hours]
+
+- id: memory-off
+  message: I'd rather you stopped remembering things about me
+  tools: [turn_user_memory_on_or_off]
+
+- id: forget-why-here
+  message: forget what I told you about why I came here
+  tools: [forget_memory]
+
+- id: moved-to-london
+  message: I've moved to London, can you change my time zone?
+  tools: [change_time_zone]
+
+- id: delete-my-data
+  message: please delete all my data
+  tools: [start_deleting_my_data]
+
+- id: delete-account
+  message: delete my account please
+  tools: []
+
+- id: change-country
+  message: change my country to Malaysia
+  tools: []
+
+- id: disconnect-telegram
+  message: disconnect this telegram from my account
+  tools: []
+
+- id: unclear-change
+  message: can you change my check-in settings?
+  tools: []
+
+- id: everyday-pause
+  message: I paused for a minute at lunch and just watched the rain
+  tools: []

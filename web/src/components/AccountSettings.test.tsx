@@ -48,6 +48,7 @@ const onboardedUser: Me = {
   user_memory_enabled: true,
   onboarding_completed_at: "2026-11-11T09:00:00Z",
   role: "user",
+  changed_in_chat: {},
 };
 
 describe("AccountSettings", () => {
@@ -62,6 +63,45 @@ describe("AccountSettings", () => {
     apiClient.deleteMyData.mockResolvedValue(undefined);
     apiClient.deleteAccount.mockResolvedValue(undefined);
     signOut.mockResolvedValue(undefined);
+  });
+
+  it("says Delete my data can be asked for in chat", async () => {
+    render(<AccountSettings />);
+
+    expect(
+      await screen.findByText(/You can also tell Zeph “delete my data”/),
+    ).toBeInTheDocument();
+  });
+
+  it("marks the time zone and User Memory as changed in chat", async () => {
+    apiClient.getMe.mockResolvedValue({
+      ...onboardedUser,
+      changed_in_chat: {
+        time_zone: "2026-11-03T09:00:00Z",
+        user_memory: "2026-11-05T09:00:00Z",
+      },
+    });
+    render(<AccountSettings />);
+
+    expect(
+      await screen.findByText("Changed in chat · 3 Nov"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Changed in chat · 5 Nov")).toBeInTheDocument();
+  });
+
+  it("drops the time zone caption once the profile is saved", async () => {
+    apiClient.getMe.mockResolvedValue({
+      ...onboardedUser,
+      changed_in_chat: { time_zone: "2026-11-03T09:00:00Z" },
+    });
+    const user = userEvent.setup();
+    render(<AccountSettings />);
+    await screen.findByText("Changed in chat · 3 Nov");
+
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(await screen.findByText("Saved")).toBeInTheDocument();
+    expect(screen.queryByText(/Changed in chat/)).not.toBeInTheDocument();
   });
 
   it("shows the saved profile", async () => {
