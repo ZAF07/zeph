@@ -45,7 +45,7 @@ const entries: CheckInLogEntry[] = [
     outcome: "asked_about_fewer",
     kind: null,
     skip_reason: null,
-    status: "no_reply",
+    status: "sent",
   },
 ];
 
@@ -78,7 +78,7 @@ describe("CheckInLog", () => {
         "Paused",
         "—",
         "Ignore threshold reached — asked once about fewer",
-        "No reply",
+        "Waiting",
       ],
     ]);
   });

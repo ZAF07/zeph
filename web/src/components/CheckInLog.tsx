@@ -5,13 +5,16 @@ import { useCallback, useEffect, useState } from "react";
 import { inputField } from "@/components/form-styles";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LockIcon } from "@/components/LockIcon";
-import type { CheckInLogEntry, CheckInOutcome } from "@/lib/api-client";
+import type {
+  CheckInLogEntry,
+  CheckInOutcome,
+  CheckInStatus,
+} from "@/lib/api-client";
 import {
   type CheckInLogOutcomeFilter,
   filterCheckInLog,
   summarizeCheckInLog,
 } from "@/lib/check-in-log";
-import { checkInStatusLabels } from "@/lib/check-ins";
 import { formatSavedAt } from "@/lib/dates";
 import { useApiClient } from "@/lib/use-api-client";
 
@@ -38,6 +41,13 @@ const outcomePills: Record<CheckInOutcome, { label: string; pill: string }> = {
     label: "Paused",
     pill: "bg-yellow-tint text-yellow-deep",
   },
+};
+
+const replyLabels: Record<CheckInStatus, string> = {
+  sent: "Waiting",
+  replied: "Replied",
+  no_reply: "No reply",
+  skipped: "—",
 };
 
 const headings = [
@@ -249,9 +259,7 @@ export function CheckInLog() {
                     <td className={cell}>{entry.kind ?? "—"}</td>
                     <td className={cell}>{reasonText(entry)}</td>
                     <td className={`${cell} whitespace-nowrap`}>
-                      {entry.outcome === "skipped"
-                        ? "—"
-                        : checkInStatusLabels[entry.status].label}
+                      {replyLabels[entry.status]}
                     </td>
                   </tr>
                 );
