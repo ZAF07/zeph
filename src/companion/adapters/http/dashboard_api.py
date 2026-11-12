@@ -1,18 +1,24 @@
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, time
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
+from companion.core.check_ins import CheckInService, RecentCheckIn
 from companion.core.models import (
+    CheckInChanges,
+    CheckInFrequency,
+    CheckInSettings,
+    CheckInStatus,
     ConnectionToken,
     ConnectionTokenStatus,
     ConversationSummary,
     MemoryGroup,
     MemorySource,
     OnboardingAnswers,
+    PauseLength,
     PreferenceChanges,
     User,
     UserRole,
@@ -39,6 +45,9 @@ class MeResponse(BaseModel):
     role: UserRole
 
 
+DEFAULT_CHECK_INS = CheckInSettings()
+
+
 class OnboardingRequest(BaseModel):
     """Everything a new User answers during onboarding."""
 
@@ -51,6 +60,10 @@ class OnboardingRequest(BaseModel):
     user_memory_enabled: bool
     country: str
     time_zone: str
+    check_ins_enabled: bool = DEFAULT_CHECK_INS.enabled
+    check_in_frequency: CheckInFrequency = DEFAULT_CHECK_INS.frequency
+    quiet_hours_start: time = DEFAULT_CHECK_INS.quiet_hours_start
+    quiet_hours_end: time = DEFAULT_CHECK_INS.quiet_hours_end
 
 
 class PreferencesRequest(BaseModel):
@@ -60,6 +73,42 @@ class PreferencesRequest(BaseModel):
     user_memory_enabled: bool | None = None
     country: str | None = None
     time_zone: str | None = None
+
+
+class CheckInSettingsRequest(BaseModel):
+    """Check-in settings to change; a field left out stays as it is."""
+
+    enabled: bool | None = None
+    frequency: CheckInFrequency | None = None
+    quiet_hours_start: time | None = None
+    quiet_hours_end: time | None = None
+
+
+class PauseRequest(BaseModel):
+    """How long to pause Check-ins for."""
+
+    length: PauseLength
+
+
+class RecentCheckInResponse(BaseModel):
+    """A sent Check-in and whether the User replied."""
+
+    id: str
+    kind: str | None
+    sent_at: datetime
+    status: CheckInStatus
+
+
+class CheckInsResponse(BaseModel):
+    """A User's Check-in settings and recent Check-ins; never a next time."""
+
+    enabled: bool
+    frequency: CheckInFrequency
+    quiet_hours_start: time
+    quiet_hours_end: time
+    paused: bool
+    paused_until: datetime | None
+    recent: list[RecentCheckInResponse]
 
 
 class PlatformContentResponse(BaseModel):
@@ -179,6 +228,23 @@ def to_summary_response(summary: ConversationSummary) -> ConversationSummaryResp
     )
 
 
+def to_recent_check_in_response(recent: RecentCheckIn) -> RecentCheckInResponse:
+    """Describe a sent Check-in for the Dashboard; never its message.
+
+    Args:
+        recent: The Check-in and whether the User replied.
+
+    Returns:
+        The response body.
+    """
+    return RecentCheckInResponse(
+        id=str(recent.check_in.id),
+        kind=recent.check_in.kind_name,
+        sent_at=recent.check_in.sent_at,
+        status=recent.status,
+    )
+
+
 def to_me_response(user: User) -> MeResponse:
     """Describe a User for the Dashboard.
 
@@ -207,6 +273,7 @@ def build_dashboard_api_router(
     current_user: Callable[..., User],
     user_service: UserService,
     user_memory_service: UserMemoryService,
+    check_in_service: CheckInService,
     telegram_connection_service: TelegramConnectionService,
     platform_settings: PlatformSettingsRepository,
     telegram_bot_username: str,
@@ -220,6 +287,7 @@ def build_dashboard_api_router(
         current_user: The dependency that finds the User making a request.
         user_service: Keeps the User's profile.
         user_memory_service: Shows and deletes the User's User Memory.
+        check_in_service: Keeps the User's Check-in settings.
         telegram_connection_service: Issues tokens and reports connection status.
         platform_settings: Admin-managed wording shown on the Dashboard.
         telegram_bot_username: The Companion's Telegram @username, for deep links.
@@ -228,6 +296,30 @@ def build_dashboard_api_router(
         The router.
     """
     router = APIRouter(prefix="/api")
+
+    def to_check_ins_response(user: User) -> CheckInsResponse:
+        """Describe a User's Check-in settings and recent Check-ins.
+
+        Args:
+            user: The User.
+
+        Returns:
+            The response body, with the pause as it stands right now.
+        """
+        settings = user.check_ins
+        is_paused = check_in_service.is_paused(user)
+        return CheckInsResponse(
+            enabled=settings.enabled,
+            frequency=settings.frequency,
+            quiet_hours_start=settings.quiet_hours_start,
+            quiet_hours_end=settings.quiet_hours_end,
+            paused=is_paused,
+            paused_until=settings.paused_until if is_paused else None,
+            recent=[
+                to_recent_check_in_response(recent)
+                for recent in check_in_service.list_recent(user)
+            ],
+        )
 
     def to_token_response(
         token: ConnectionToken, token_status: ConnectionTokenStatus
@@ -315,6 +407,12 @@ def build_dashboard_api_router(
             user_memory_enabled=request.user_memory_enabled,
             country=request.country,
             time_zone=request.time_zone,
+            check_ins=CheckInChanges(
+                enabled=request.check_ins_enabled,
+                frequency=request.check_in_frequency,
+                quiet_hours_start=request.quiet_hours_start,
+                quiet_hours_end=request.quiet_hours_end,
+            ),
         )
         try:
             return to_me_response(user_service.complete_onboarding(user, answers))
@@ -322,6 +420,68 @@ def build_dashboard_api_router(
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
             ) from error
+
+    @router.get("/check-ins")
+    def get_check_ins(user: Annotated[User, Depends(current_user)]) -> CheckInsResponse:
+        """Return the User's Check-in settings and recent Check-ins.
+
+        Args:
+            user: The signed-in User.
+
+        Returns:
+            The settings and recent Check-ins.
+        """
+        return to_check_ins_response(user)
+
+    @router.patch("/check-ins")
+    def update_check_ins(
+        user: Annotated[User, Depends(current_user)], request: CheckInSettingsRequest
+    ) -> CheckInsResponse:
+        """Change the User's Check-in frequency or quiet hours, or turn them off.
+
+        Args:
+            user: The signed-in User.
+            request: The settings to change.
+
+        Returns:
+            The updated settings and recent Check-ins.
+        """
+        changes = CheckInChanges(
+            enabled=request.enabled,
+            frequency=request.frequency,
+            quiet_hours_start=request.quiet_hours_start,
+            quiet_hours_end=request.quiet_hours_end,
+        )
+        return to_check_ins_response(check_in_service.change_settings(user, changes))
+
+    @router.put("/check-ins/pause")
+    def pause_check_ins(
+        user: Annotated[User, Depends(current_user)], request: PauseRequest
+    ) -> CheckInsResponse:
+        """Pause the User's Check-ins for a day, a week or until they resume.
+
+        Args:
+            user: The signed-in User.
+            request: How long to pause for.
+
+        Returns:
+            The updated settings and recent Check-ins.
+        """
+        return to_check_ins_response(check_in_service.pause(user, request.length))
+
+    @router.delete("/check-ins/pause")
+    def resume_check_ins(
+        user: Annotated[User, Depends(current_user)],
+    ) -> CheckInsResponse:
+        """End the pause on the User's Check-ins.
+
+        Args:
+            user: The signed-in User.
+
+        Returns:
+            The updated settings and recent Check-ins.
+        """
+        return to_check_ins_response(check_in_service.resume(user))
 
     @router.get("/platform-content")
     def get_platform_content(

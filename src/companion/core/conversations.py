@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime
 from uuid import UUID, uuid4
 
 from companion.core.knowledge_retrieval import KnowledgeRetrieval
@@ -19,6 +19,7 @@ from companion.core.ports import (
 from companion.core.response_composition import ResponseComposer
 from companion.core.safeguard import Safeguard
 from companion.core.stickers import sticker_message_text
+from companion.core.timing import check_in_reply_window, is_open, quiet_gap
 
 
 def typing_pause_seconds(text: str, settings: PlatformSettingsRepository) -> float:
@@ -134,7 +135,10 @@ class ConversationService:
     def _open_conversation_id(self, user_id: UUID) -> UUID:
         """Find the User's open Conversation, or start a new one.
 
-        A Conversation is open until it is ended or the quiet gap passes.
+        A Conversation is open until it is ended or the quiet gap passes. A
+        new Conversation started within the reply window of the User's
+        newest Check-in answers it: it starts with that Check-in, so the
+        reply has it as context, and the Check-in is marked replied.
 
         Args:
             user_id: The User.
@@ -143,19 +147,24 @@ class ConversationService:
             The open Conversation's ID.
         """
         settings = self._repositories.platform_settings
-        quiet_gap = timedelta(minutes=settings.get("conversation_quiet_gap_minutes"))
         now = self._clock.now()
         latest = self._repositories.conversations.get_latest_for_user(user_id)
-        if (
-            latest is not None
-            and latest.ended_at is None
-            and now - latest.last_message_at < quiet_gap
-        ):
+        if latest is not None and is_open(latest, now, quiet_gap(settings)):
             return latest.id
         conversation = Conversation(
             id=uuid4(), user_id=user_id, started_at=now, last_message_at=now
         )
         self._repositories.conversations.add(conversation)
+        check_in = self._repositories.check_ins.claim_reply(
+            user_id, replied_at=now, sent_since=now - check_in_reply_window(settings)
+        )
+        if check_in is not None:
+            self._save(
+                conversation.id,
+                MessageDirection.OUTGOING,
+                check_in.message,
+                sent_at=check_in.sent_at,
+            )
         return conversation.id
 
     def _save(
@@ -164,6 +173,7 @@ class ConversationService:
         direction: MessageDirection,
         text: str,
         kind: MessageKind = MessageKind.TEXT,
+        sent_at: datetime | None = None,
     ) -> None:
         """Save one message to a Conversation.
 
@@ -172,6 +182,7 @@ class ConversationService:
             direction: Who sent it.
             text: The message as the Companion reads it.
             kind: What kind of message it is.
+            sent_at: When it was sent; now if not given.
         """
         self._repositories.conversations.add_message(
             ConversationMessage(
@@ -180,7 +191,7 @@ class ConversationService:
                 direction=direction,
                 kind=kind,
                 content=text,
-                sent_at=self._clock.now(),
+                sent_at=sent_at or self._clock.now(),
             )
         )
 

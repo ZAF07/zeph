@@ -308,3 +308,28 @@ sticker_tool_description: >-
   when the person is upset, struggling or talking about something serious.
   At most one sticker per reply. Still write your text reply as usual. The
   stickers, by number, with when each one fits:
+
+# Check-ins. On each scheduler tick, Users who are due get a Check-in written
+# by this model, from the Persona and this prompt.
+check_in_model: deepseek-chat
+
+check_in_prompt: |-
+  Now you are reaching out first with a Check-in: a short, unprompted message
+  to someone who asked you to message them now and then. It should feel like a
+  friend saying hello, not a reminder, notification or task.
+
+  You are told the kind of Check-in, what to call the person and their local
+  time. Write only the message itself, in one short text: no names, labels,
+  quotes or notes around it. Keep it light and easy to answer or ignore. Don't
+  ask more than one question, don't mention that this is a Check-in, and don't
+  pretend to remember anything you weren't told.
+
+# The fewest hours between two Check-ins, for each frequency a User can pick.
+check_in_hours_between:
+  weekly: 168
+  few_times_a_week: 56
+  most_days: 24
+
+# A User's first message within this many hours of a Check-in is its reply:
+# that Conversation starts with the Check-in. Later, the Check-in had no reply.
+check_in_reply_window_hours: 24

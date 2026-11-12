@@ -13,6 +13,7 @@ from companion.adapters.http.auth import (
 from companion.adapters.http.dashboard_api import build_dashboard_api_router
 from companion.adapters.telegram.webhook import build_telegram_webhook_router
 from companion.core.admin_users import AdminUserService
+from companion.core.check_ins import CheckInService
 from companion.core.conversations import ConversationService, ConversationServices
 from companion.core.helplines import HelplineService
 from companion.core.incoming_messages import IncomingMessageHandler
@@ -100,9 +101,16 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     user_memory_service = UserMemoryService(
         dependencies.repositories, dependencies.clock
     )
+    check_in_service = CheckInService(
+        repositories=dependencies.repositories,
+        chat_model=dependencies.chat_model,
+        chat_channel=dependencies.chat_channel,
+        clock=dependencies.clock,
+    )
     user_service = UserService(
         dependencies.repositories.users,
         user_memory_service,
+        check_in_service,
         dependencies.clock,
         dependencies.initial_admin_emails,
     )
@@ -167,6 +175,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             chat_model=dependencies.chat_model,
             clock=dependencies.clock,
         ),
+        check_ins=check_in_service,
         clock=dependencies.clock,
     )
 
@@ -199,6 +208,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             current_user=current_user,
             user_service=user_service,
             user_memory_service=user_memory_service,
+            check_in_service=check_in_service,
             telegram_connection_service=telegram_connection_service,
             platform_settings=dependencies.repositories.platform_settings,
             telegram_bot_username=dependencies.telegram_bot_username,

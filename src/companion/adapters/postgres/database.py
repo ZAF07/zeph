@@ -9,6 +9,7 @@ from sqlalchemy import Engine, exists, select
 from sqlalchemy.dialects.postgresql import insert
 
 from companion.adapters.postgres.tables import (
+    check_in_kinds,
     helplines,
     memory_categories,
     platform_settings,
@@ -119,3 +120,31 @@ def seed_memory_categories(engine: Engine, seed_file: Path) -> None:
         if connection.execute(select(exists().select_from(memory_categories))).scalar():
             return
         connection.execute(insert(memory_categories).values(rows))
+
+
+def seed_check_in_kinds(engine: Engine, seed_file: Path) -> None:
+    """Load the starting Check-in Kinds on first run.
+
+    Nothing is loaded once any Check-in Kind exists, so Admin changes are
+    never overwritten.
+
+    Args:
+        engine: The database engine.
+        seed_file: YAML file listing Kinds with `name`, `description` and
+            `allowed_without_user_memory`, in the order to show them.
+    """
+    seed = yaml.safe_load(seed_file.read_text())
+    rows = [
+        {
+            "id": uuid4(),
+            "name": kind["name"],
+            "description": kind["description"],
+            "allowed_without_user_memory": kind["allowed_without_user_memory"],
+            "sort_order": sort_order,
+        }
+        for sort_order, kind in enumerate(seed)
+    ]
+    with engine.begin() as connection:
+        if connection.execute(select(exists().select_from(check_in_kinds))).scalar():
+            return
+        connection.execute(insert(check_in_kinds).values(rows))

@@ -8,6 +8,8 @@ from companion.core.models import (
     AccountIdentity,
     ChannelSticker,
     ChatLine,
+    CheckIn,
+    CheckInKind,
     ConnectionToken,
     Conversation,
     ConversationMessage,
@@ -1061,6 +1063,69 @@ class StickerRepository(Protocol):
         ...
 
 
+class CheckInRepository(Protocol):
+    """Stores Check-in Kinds and the Check-ins sent to Users."""
+
+    def list_kinds(self) -> list[CheckInKind]:
+        """List every Check-in Kind in order.
+
+        Returns:
+            The Check-in Kinds.
+        """
+        ...
+
+    def list_due_users(self, now: datetime) -> list[User]:
+        """List onboarded Users with Check-ins on whose next one is due.
+
+        Pause and quiet hours are not checked here.
+
+        Args:
+            now: The time to check at.
+
+        Returns:
+            The Users whose next due time is at or before now, or not set.
+        """
+        ...
+
+    def add(self, check_in: CheckIn, next_due_at: datetime) -> None:
+        """Save a sent Check-in and the User's next due time, together.
+
+        Args:
+            check_in: The Check-in that was sent.
+            next_due_at: When the User's next Check-in may be sent.
+        """
+        ...
+
+    def list_recent(self, user_id: UUID, limit: int) -> list[CheckIn]:
+        """List a User's newest Check-ins, newest first.
+
+        Args:
+            user_id: The User's ID.
+            limit: The most to list.
+
+        Returns:
+            The Check-ins.
+        """
+        ...
+
+    def claim_reply(
+        self, user_id: UUID, replied_at: datetime, sent_since: datetime
+    ) -> CheckIn | None:
+        """Mark the User's newest Check-in replied, if it can still be.
+
+        Args:
+            user_id: The User's ID.
+            replied_at: When they replied.
+            sent_since: A Check-in sent at or before this can't get a reply.
+
+        Returns:
+            The Check-in they replied to, or None if their newest Check-in
+            was already replied to, was sent before `sent_since`, or they
+            have none.
+        """
+        ...
+
+
 @dataclass(frozen=True)
 class Repositories:
     """Every repository the core needs, so adapters can be swapped as one."""
@@ -1077,3 +1142,4 @@ class Repositories:
     knowledge_documents: KnowledgeDocumentRepository
     usage: UsageRepository
     stickers: StickerRepository
+    check_ins: CheckInRepository

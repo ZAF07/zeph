@@ -13,6 +13,7 @@ from sqlalchemy import (
     MetaData,
     Table,
     Text,
+    Time,
     Uuid,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -38,6 +39,18 @@ users = Table(
     Column("user_memory_enabled", Boolean, nullable=False, server_default="true"),
     Column("onboarding_completed_at", DateTime(timezone=True)),
     Column("role", Text, nullable=False, server_default="user"),
+    Column("check_ins_enabled", Boolean, nullable=False, server_default="false"),
+    Column(
+        "check_in_frequency",
+        Text,
+        nullable=False,
+        server_default="few_times_a_week",
+    ),
+    Column("quiet_hours_start", Time, nullable=False, server_default="22:00"),
+    Column("quiet_hours_end", Time, nullable=False, server_default="07:30"),
+    Column("check_ins_paused", Boolean, nullable=False, server_default="false"),
+    Column("check_ins_paused_until", DateTime(timezone=True)),
+    Column("check_in_next_due_at", DateTime(timezone=True)),
 )
 
 telegram_connections = Table(
@@ -269,4 +282,31 @@ stickers = Table(
     Column("preview_file_id", Text),
     Column("note", Text, nullable=False, server_default=""),
     Column("added_at", DateTime(timezone=True), nullable=False),
+)
+
+check_in_kinds = Table(
+    "check_in_kinds",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("name", Text, nullable=False, unique=True),
+    Column("description", Text, nullable=False),
+    Column("allowed_without_user_memory", Boolean, nullable=False),
+    Column("sort_order", Integer, nullable=False),
+)
+
+check_ins = Table(
+    "check_ins",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("kind_id", Uuid, ForeignKey("check_in_kinds.id", ondelete="SET NULL")),
+    Column("message", Text, nullable=False),
+    Column("sent_at", DateTime(timezone=True), nullable=False),
+    Column("replied_at", DateTime(timezone=True)),
 )
