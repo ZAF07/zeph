@@ -55,6 +55,20 @@ Delete and Retry stay as they are.
 34. As a User, I want the Companion never to draw on half-updated Knowledge while a document is being re-indexed, so that it doesn't mix old and new versions.
 35. As an Admin, I want documents that existed before this feature to show their text too, so that the whole library can be viewed and edited, not just new uploads.
 36. As an Admin, I want the starter documents to be viewable and editable like any other, so that I can adjust the summaries drafted for me.
+37. As an Admin, I want to read and edit a document's text in a proper editor, not a plain text box, so that working on long texts is comfortable.
+38. As an Admin, I want line numbers, soft line wrapping and Markdown highlighting in the editor, so that I can find my place and see structure at a glance.
+39. As an Admin, I want a toolbar for headings, bold, italic, quotes and lists, so that I can format Markdown without remembering its syntax.
+40. As an Admin, I want to find and replace within a document's text, so that I can fix a repeated word or name in one go.
+41. As an Admin, I want undo and redo in the editor, so that I can back out of a mistake.
+42. As an Admin, I want to switch between Edit, Preview and side-by-side views, so that I can see how the Markdown reads while I write it.
+43. As an Admin, I want to see the word and character count, so that I know how long a document is.
+44. As an Admin, I want a clear "Unsaved changes" indicator, so that I always know whether what I see is saved.
+45. As an Admin, I want to save with Ctrl/⌘+S, so that saving feels like any other editor.
+46. As an Admin, I want to review a side-by-side or inline comparison of my changes before saving, so that I re-index only what I meant to change.
+47. As an Admin, I want to discard my unsaved changes in one step, after confirming, so that I can start over.
+48. As an Admin, I want to view the text in the same editor, read-only, with find, so that reading a long document is as easy as editing it.
+49. As an Admin, I want the editor to stay quick on long documents (tens of thousands of characters), so that the larger starter texts are pleasant to work on.
+50. As an Admin, I want the editor to work with the keyboard alone and with a screen reader, and to stack sensibly on a phone, so that it is usable by everyone, everywhere.
 
 ## Implementation Decisions
 
@@ -76,7 +90,17 @@ Delete and Retry stay as they are.
   - `PUT /api/admin/knowledge-documents/{id}/text` — `{text}`; 422 if blank; 404 if missing; returns the Pending document; indexes in the background.
   - `PUT /api/admin/knowledge-documents/{id}/file` — multipart `file`; 422 for wrong type, empty or over 20 MB; 404 if missing; returns the Pending document; reads and indexes in the background.
   - Upload, list, retry and delete are unchanged, except that Retry follows the rule above.
-- **Dashboard:** a document page at `/admin/knowledge/<id>`, reached from the title in each row of the Knowledge table. It has a details form (Save), the text in an editable text area (Save text, which says it will re-index), Replace file (same drop area and rules as upload), Retry when Failed, Delete (confirm, then back to the list), status pill and failure reason, an "Edited" marker, checking again while Pending, and loading / not-found / error states. All calls go through the API client.
+- **Dashboard:** a document page at `/admin/knowledge/<id>`, reached from the title in each row of the Knowledge table. It has a details form (Save), the text in the Knowledge text editor (below; Save text says it will re-index), Replace file (same drop area and rules as upload), Retry when Failed, Delete (confirm, then back to the list), status pill and failure reason, an "Edited" marker, checking again while Pending, and loading / not-found / error states. All calls go through the API client.
+- **Knowledge text editor (must be professional, not a plain text box).** One editor component, used read-only for viewing (issue 01) and editable for editing (issue 03). Built on CodeMirror 6 (a mature, accessible, fast editor that handles long texts), styled to the Zeph design tokens. It has:
+  - line numbers, soft wrap, Markdown syntax highlighting, active-line highlight and a visible focus ring;
+  - a toolbar: Heading, Bold, Italic, Quote, Bulleted list, Numbered list, Undo, Redo, Find & replace — each with a tooltip and keyboard shortcut;
+  - an Edit / Preview / Split view switch; Preview renders the Markdown safely (no raw HTML) in Zeph's type styles; on narrow screens Split falls back to the Edit / Preview switch;
+  - a status bar with word and character count, "Unsaved changes" / "Saved" state and the document status;
+  - Ctrl/⌘+S to save; "Discard changes" with confirmation; a warning before leaving with unsaved changes;
+  - "Review changes" before saving: a comparison of saved and edited text (additions and removals highlighted), then "Save and re-index";
+  - read-only mode keeps find, line numbers and Preview but hides editing controls;
+  - full keyboard use and screen-reader labels; stays responsive on the largest starter document (~42,000 characters).
+  The editor is a client component kept behind its own small interface (value, onChange, readOnly), so pages and tests don't depend on CodeMirror directly.
 - **Design:** the admin design has no document page; it follows the existing Knowledge screen and admin form styles. Nothing tagged "Later" is involved.
 - **Domain language:** update the Knowledge Document entry in `CONTEXT.md` to say its text is viewable and editable by Admins and that editing it makes the document Pending until re-indexed.
 
@@ -91,14 +115,15 @@ Delete and Retry stay as they are.
   - Retry after a failed re-index of edited text keeps the edited text;
   - replace file: keeps ID, details and added date; new type; new text in replies; old text gone; `text_edited` cleared; unreadable replacement fails with the existing reasons; file rules enforced;
   - a document left Pending by an interrupted edit is finished on start-up; documents with no saved text get it on start-up.
-- **Seam 3: the Dashboard** with Vitest and React Testing Library, API client mocked: the document page shows details and text, saves details, saves text (shows Pending, then Ready), replaces the file, shows a backend refusal reason, Retry and Delete, the Edited marker, not-found and load-error states; the Knowledge table links each title to its page.
+- **Seam 3: the Dashboard** with Vitest and React Testing Library, API client mocked: the document page shows details and text, saves details, saves text through the editor (Unsaved indicator, Review changes, Ctrl/⌘+S, Discard, Preview renders Markdown, word count; shows Pending, then Ready), replaces the file, shows a backend refusal reason, Retry and Delete, the Edited marker, not-found and load-error states; the Knowledge table links each title to its page.
 - **Prior art:** the existing Knowledge seam 1 tests and helpers (upload, list, PDF builders, reply-instructions helper), the Knowledge seed tests for start-up behaviour, and the existing Knowledge library component tests for seam 3.
 - No new adapter contract tests: no adapter changes.
 
 ## Out of Scope
 
 - Version history or undo of past edits.
-- Editing the text in a rich or Markdown preview editor; the text is edited as plain text.
+- A WYSIWYG (rich-text) editor; the text stays Markdown, edited in a code-style editor with Preview.
+- Collaborative real-time editing.
 - Downloading the original file.
 - Editing individual chunks or choosing where chunks split.
 - Admin-managed list of traditions.
