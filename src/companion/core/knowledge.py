@@ -57,7 +57,7 @@ class InvalidKnowledgeDocumentError(ValueError):
 
 
 class KnowledgeFileStillBeingReadError(ValueError):
-    """Raised when text is saved for a document whose file is still being read."""
+    """Raised when a document's text or file changes while its file is read."""
 
 
 class KnowledgeNotRetryableError(ValueError):
@@ -340,13 +340,8 @@ class KnowledgeService:
                 the Admin's text.
         """
         trimmed = required_detail(text, BLANK_TEXT)
+        self._check_file_not_being_read(document_id)
         documents = self._repositories.knowledge_documents
-        document = self._get(document_id)
-        if (
-            document.status == KnowledgeStatus.PENDING
-            and documents.get_text(document_id) is None
-        ):
-            raise KnowledgeFileStillBeingReadError(document_id)
         if documents.save_text(document_id, trimmed, edited=True) is None:
             raise KnowledgeDocumentNotFoundError(document_id)
         documents.set_status(document_id, KnowledgeStatus.PENDING, failure_reason=None)
@@ -359,7 +354,8 @@ class KnowledgeService:
 
         Its ID, details and added date stay; its saved text and Edited flag
         are cleared, and it is pending until `ingest` has read and indexed
-        the new file. Until then, replies don't use it.
+        the new file. Until then, replies don't use it. Its old chunks are
+        removed at once, so none of the old text is left.
 
         Args:
             document_id: The document's ID.
@@ -371,11 +367,15 @@ class KnowledgeService:
         Raises:
             InvalidKnowledgeDocumentError: If the file is empty or too big.
             KnowledgeDocumentNotFoundError: If there is no such document.
+            KnowledgeFileStillBeingReadError: If its last file is still being
+                read, which could save that file's text over the new one's.
         """
         check_file_content(file.content)
+        self._check_file_not_being_read(document_id)
         documents = self._repositories.knowledge_documents
         if documents.replace_file(document_id, file) is None:
             raise KnowledgeDocumentNotFoundError(document_id)
+        self._vector_store.delete_chunks(document_id)
         return self.get_document(document_id)
 
     def ingest(self, document_id: UUID) -> None:
@@ -501,6 +501,26 @@ class KnowledgeService:
         if document is None:
             raise KnowledgeDocumentNotFoundError(document_id)
         return document
+
+    def _check_file_not_being_read(self, document_id: UUID) -> None:
+        """Make sure a document's file is not being read right now.
+
+        A pending document with no saved text is having its file read; a
+        text edit or new file then could be overwritten when the read ends.
+
+        Args:
+            document_id: The document's ID.
+
+        Raises:
+            KnowledgeDocumentNotFoundError: If there is no such document.
+            KnowledgeFileStillBeingReadError: If its file is being read.
+        """
+        document = self._get(document_id)
+        if (
+            document.status == KnowledgeStatus.PENDING
+            and self._repositories.knowledge_documents.get_text(document_id) is None
+        ):
+            raise KnowledgeFileStillBeingReadError(document_id)
 
     def _read_file(self, document: KnowledgeDocument) -> str:
         """Read the text out of a document's file.

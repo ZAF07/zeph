@@ -594,6 +594,39 @@ def test_an_unreadable_replacement_fails_with_the_usual_reason(
     assert document_text(client, admin, scan.json()["id"]) is None
 
 
+def test_a_file_cant_be_replaced_while_the_last_one_is_still_being_read(
+    client: TestClient, auth_verifier: FakeAuthVerifier, engine: Engine
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    uploaded = upload_document(client, admin, "breath.txt", BREATH_PASSAGES[0].encode())
+    with engine.begin() as connection:
+        connection.execute(
+            update(knowledge_documents).values(text=None, status="pending")
+        )
+
+    response = replace_file(
+        client, admin, uploaded.json()["id"], "river.txt", RIVER_PASSAGE.encode()
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "The file is still being read. Try again when it’s done."
+    )
+    [listed] = list_documents(client, admin)
+    assert listed["file_name"] == "breath.txt"
+
+
+def test_a_failed_replacement_leaves_none_of_the_old_text_behind(
+    client: TestClient, auth_verifier: FakeAuthVerifier, engine: Engine
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    uploaded = upload_document(client, admin, "breath.txt", BREATH_PASSAGES[0].encode())
+
+    replace_file(client, admin, uploaded.json()["id"], "scan.pdf", blank_pdf())
+
+    assert chunk_count(engine) == 0
+
+
 def test_replacement_files_follow_the_upload_rules(
     client: TestClient, auth_verifier: FakeAuthVerifier
 ) -> None:
