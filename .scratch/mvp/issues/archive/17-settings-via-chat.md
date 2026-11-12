@@ -78,4 +78,4 @@ Evidence: seam 1 `tests/test_settings_via_chat.py` (17: tools and instructions o
 ## Completion
 
 - Completed: 2026-11-12
-- Commit: 9c15133, review fixes b54cbe5
+- Commit: 9c15133, review fixes b54cbe5, archive 130e298 (merged from `settings-via-chat` in cc77a1e)
