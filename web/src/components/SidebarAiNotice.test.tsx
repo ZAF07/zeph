@@ -19,6 +19,7 @@ describe("SidebarAiNotice", () => {
       ai_notice_short: "Seeded: Zeph is an AI.",
       user_memory_explanation: "",
       onboarding_reason_choices: [],
+      message_retention_days: 30,
     });
 
     render(<SidebarAiNotice />);

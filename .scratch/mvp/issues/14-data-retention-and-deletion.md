@@ -1,6 +1,6 @@
 # 14 — Data retention and "Delete my data"
 
-Status: ready-for-agent
+Status: in-progress
 
 ## Parent
 
@@ -33,3 +33,14 @@ Build order inside this issue: (1) backend API and seam 1 tests — this fixes t
 
 - `.scratch/mvp/issues/06-user-memory.md`
 - `.scratch/mvp/issues/12-smart-check-ins.md`
+
+## Comments
+
+**2026-11-12 — started on branch `feat/14-data-retention-and-deletion`.** Plan:
+- New setting `message_retention_days` (default 30, 1–365) in the seed and on admin Platform settings (new "Data" section, as in the design). The Account & privacy page reads it through `GET /api/platform-content`.
+- Retention runs on every scheduler tick, after Check-ins: delete every message sent before now − retention days (Conversations themselves, Summaries and Memory Items stay). For each User who lost messages, the conversation engine forgets its saved state (their LangGraph checkpoint thread). The thread carries nothing from one turn to the next, so clearing it whole is safe and also removes the old checkpoints. Our clock decides, not LangGraph's own timestamps, so seam 2 tests can use the fake clock.
+- `ConversationEngine` port gains `forget_user(user_id)` (LangGraph `delete_thread`).
+- New auth port `AuthAccounts.delete_account(auth_id)`; Clerk adapter calls `DELETE /v1/users/{id}`.
+- `DELETE /api/me/data`: removes Conversations and messages, checkpoints, Conversation Summaries, Memory Items, Check-in history, connection tokens and the Telegram Connection, in one transaction. Profile, settings, Usage counts and Safeguard Events (no message content, Admin records) stay.
+- `DELETE /api/me`: the same, plus the User row (FKs cascade), then the Clerk account. Our data goes first, so if Clerk fails a retry still works. The last Admin can't delete their account (409), so there is always an Admin.
+- Dashboard: "Your data" section (retention sentence, Delete my data with type-DELETE confirm, as in the design) and "Delete account" section (type DELETE, then sign out). The design's "you can also tell Zeph" hint is left out until settings-via-chat (issue 17) exists. Export is tagged Later.

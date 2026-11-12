@@ -130,6 +130,13 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.TEXT,
         max_length=1_000,
     ),
+    EditableSetting(
+        "message_retention_days",
+        "Message retention",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=365,
+    ),
     EditableSetting("web_search_enabled", "Web search", SettingKind.ON_OFF),
     EditableSetting(
         "web_search_daily_limit",

@@ -29,6 +29,7 @@ def test_admin_sees_each_editable_setting_with_its_seeded_value(
     assert settings["conversation_quiet_gap_minutes"]["value"] == 60
     assert settings["web_search_enabled"]["value"] is True
     assert settings["web_search_daily_limit"]["value"] == 10
+    assert settings["message_retention_days"]["value"] == 30
     assert settings["persona"]["updated_by"] is None
     assert settings["ai_notice_short"]["value"] == seeded_settings["ai_notice_short"]
     assert "welcome_message" not in settings
@@ -128,6 +129,8 @@ def test_a_shorter_quiet_gap_starts_a_new_conversation_sooner(
         {"web_search_enabled": 1},
         {"web_search_daily_limit": -1},
         {"web_search_daily_limit": 1001},
+        {"message_retention_days": 0},
+        {"message_retention_days": 366},
     ],
 )
 def test_invalid_setting_changes_are_refused(

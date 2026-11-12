@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from sqlalchemy import Engine, create_engine
 
+from companion.adapters.clerk.accounts import ClerkAccounts
 from companion.adapters.clerk.auth_verifier import ClerkAuthVerifier
 from companion.adapters.clock import SystemClock
 from companion.adapters.deepseek.chat_model import DeepSeekChatModel
@@ -22,6 +23,7 @@ from companion.app import AppDependencies, create_app
 from companion.config import Settings, load_settings
 from companion.core.conversations import ConversationServices
 from companion.core.ports import (
+    AuthAccounts,
     AuthVerifier,
     ChatChannel,
     ChatModel,
@@ -192,6 +194,23 @@ def build_auth_verifier(settings: Settings) -> AuthVerifier:
     raise UnknownAdapterError("AUTH_VERIFIER_ADAPTER", settings.auth_verifier_adapter)
 
 
+def build_auth_accounts(settings: Settings) -> AuthAccounts:
+    """Build the auth accounts client for the auth provider chosen in `.env`.
+
+    Args:
+        settings: The loaded settings.
+
+    Returns:
+        The auth accounts client.
+
+    Raises:
+        UnknownAdapterError: If the chosen adapter does not exist.
+    """
+    if settings.auth_verifier_adapter == "clerk":
+        return ClerkAccounts(settings.clerk_secret_key)
+    raise UnknownAdapterError("AUTH_VERIFIER_ADAPTER", settings.auth_verifier_adapter)
+
+
 def build_clock(settings: Settings) -> Clock:
     """Build the clock chosen in `.env`.
 
@@ -295,6 +314,7 @@ def build_production_app() -> FastAPI:
         chat_model=build_chat_model(settings),
         build_conversation_engine=build_conversation_engine_factory(settings),
         auth_verifier=build_auth_verifier(settings),
+        auth_accounts=build_auth_accounts(settings),
         text_extractor=build_text_extractor(settings),
         embedder=build_embedder(settings),
         knowledge_vector_store=build_vector_store(settings, engine),

@@ -57,7 +57,9 @@ class LangGraphConversationEngine:
     """Answers a message by running the core services as LangGraph steps.
 
     Each step is a thin call into a core service (ADR-0003). Every User has
-    one checkpoint thread, keyed by their User ID.
+    one checkpoint thread, keyed by their User ID. Every value a step reads is
+    set earlier in the same turn, so a thread carries nothing from one message
+    to the next and can be deleted between messages.
     """
 
     def __init__(
@@ -69,6 +71,7 @@ class LangGraphConversationEngine:
             services: The core services each step calls.
             checkpointer: Saves the graph's state after each step.
         """
+        self._checkpointer = checkpointer
 
         def record_incoming(state: TurnState) -> TurnState:
             """Save the User's message into their open Conversation.
@@ -289,3 +292,11 @@ class LangGraphConversationEngine:
             },
             config={"configurable": {"thread_id": str(turn.user_id)}},
         )
+
+    def forget_user(self, user_id: UUID) -> None:
+        """Delete the User's checkpoint thread, which holds copies of their messages.
+
+        Args:
+            user_id: The User's ID.
+        """
+        self._checkpointer.delete_thread(str(user_id))

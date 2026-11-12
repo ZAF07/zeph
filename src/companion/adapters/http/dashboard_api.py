@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
 from companion.core.check_ins import CheckInService, RecentCheckIn
+from companion.core.message_retention import RETENTION_DAYS_SETTING
 from companion.core.models import (
     CheckInChanges,
     CheckInFrequency,
@@ -26,6 +27,7 @@ from companion.core.models import (
 )
 from companion.core.ports import PlatformSettingsRepository
 from companion.core.telegram_connection import TelegramConnectionService
+from companion.core.user_data import LastAdminError, UserDataService
 from companion.core.user_memory import MemoryNotFoundError, UserMemoryService
 from companion.core.users import InvalidProfileError, UserService
 
@@ -122,12 +124,13 @@ class CheckInsResponse(BaseModel):
 
 
 class PlatformContentResponse(BaseModel):
-    """Admin-managed wording the Dashboard shows to Users."""
+    """Admin-managed wording and settings the Dashboard shows to Users."""
 
     ai_notice: str
     ai_notice_short: str
     user_memory_explanation: str
     onboarding_reason_choices: list[str]
+    message_retention_days: int
 
 
 class ConnectionTokenResponse(BaseModel):
@@ -286,6 +289,7 @@ def build_dashboard_api_router(
     user_memory_service: UserMemoryService,
     check_in_service: CheckInService,
     telegram_connection_service: TelegramConnectionService,
+    user_data_service: UserDataService,
     platform_settings: PlatformSettingsRepository,
     telegram_bot_username: str,
 ) -> APIRouter:
@@ -300,6 +304,7 @@ def build_dashboard_api_router(
         user_memory_service: Shows and deletes the User's User Memory.
         check_in_service: Keeps the User's Check-in settings.
         telegram_connection_service: Issues tokens and reports connection status.
+        user_data_service: Deletes the User's data or account.
         platform_settings: Admin-managed wording shown on the Dashboard.
         telegram_bot_username: The Companion's Telegram @username, for deep links.
 
@@ -397,6 +402,42 @@ def build_dashboard_api_router(
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
             ) from error
+
+    @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+    def delete_account(user: Annotated[User, Depends(current_user)]) -> Response:
+        """Delete the User's account and everything of theirs.
+
+        Args:
+            user: The signed-in User.
+
+        Returns:
+            An empty response.
+
+        Raises:
+            HTTPException: 409 if they are the only Admin.
+        """
+        try:
+            user_data_service.delete_account(user)
+        except LastAdminError as error:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "You’re the only Admin. Make someone else an Admin before "
+                "deleting your account.",
+            ) from error
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @router.delete("/me/data", status_code=status.HTTP_204_NO_CONTENT)
+    def delete_my_data(user: Annotated[User, Depends(current_user)]) -> Response:
+        """Delete the User's messages, memory, Check-ins and Telegram Connection.
+
+        Args:
+            user: The signed-in User.
+
+        Returns:
+            An empty response.
+        """
+        user_data_service.delete_data(user)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @router.put("/onboarding")
     def complete_onboarding(
@@ -509,7 +550,8 @@ def build_dashboard_api_router(
             user: The signed-in User.
 
         Returns:
-            The AI notice, User Memory explanation and onboarding choices.
+            The AI notice, User Memory explanation, onboarding choices and how
+            long messages are kept.
         """
         return PlatformContentResponse(
             ai_notice=platform_settings.get("ai_notice"),
@@ -518,6 +560,7 @@ def build_dashboard_api_router(
             onboarding_reason_choices=platform_settings.get(
                 "onboarding_reason_choices"
             ),
+            message_retention_days=platform_settings.get(RETENTION_DAYS_SETTING),
         )
 
     @router.get("/telegram-connection")

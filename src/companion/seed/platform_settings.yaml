@@ -74,6 +74,11 @@ onboarding_reason_choices:
 # A message after this many quiet minutes starts a new Conversation.
 conversation_quiet_gap_minutes: 60
 
+# Raw messages (and the conversation engine's saved state) older than this many
+# days are deleted on the next scheduler tick. Conversation Summaries and
+# Memory Items stay until the User deletes them.
+message_retention_days: 30
+
 # Before each message the Companion shows typing for a while: this many
 # seconds per character, kept between the shortest and longest pause.
 typing_seconds_per_character: 0.05

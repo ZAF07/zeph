@@ -19,7 +19,7 @@ export const compactSecondaryButton =
 export const dangerButton = `${base} border border-danger-line bg-danger-tint text-danger hover:text-danger`;
 
 /** The button that confirms a destructive action. */
-export const confirmDangerButton = `${base} border border-danger bg-danger text-white hover:text-white`;
+export const confirmDangerButton = `${base} border border-danger bg-danger text-white hover:text-white disabled:cursor-not-allowed disabled:opacity-60`;
 
 /** A round icon-only delete button inside a list row. */
 export const deleteIconButton =

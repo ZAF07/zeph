@@ -118,12 +118,13 @@ export type PreferenceChanges = {
   time_zone?: string;
 };
 
-/** Admin-managed wording the Dashboard shows to Users. */
+/** Admin-managed wording and settings the Dashboard shows to Users. */
 export type PlatformContent = {
   ai_notice: string;
   ai_notice_short: string;
   user_memory_explanation: string;
   onboarding_reason_choices: string[];
+  message_retention_days: number;
 };
 
 /** A User as Admins see them: activity counts, never message text. */
@@ -376,6 +377,8 @@ export type ApiClient = {
   getMe: () => Promise<Me>;
   updatePreferences: (changes: PreferenceChanges) => Promise<Me>;
   completeOnboarding: (answers: OnboardingAnswers) => Promise<Me>;
+  deleteMyData: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   getPlatformContent: () => Promise<PlatformContent>;
   getTelegramConnection: () => Promise<TelegramConnectionStatus>;
   createConnectionToken: () => Promise<ConnectionToken>;
@@ -544,6 +547,8 @@ export function createApiClient(
     updatePreferences: (changes) => request<Me>("/api/me", "PATCH", changes),
     completeOnboarding: (answers) =>
       request<Me>("/api/onboarding", "PUT", answers),
+    deleteMyData: () => request<void>("/api/me/data", "DELETE"),
+    deleteAccount: () => request<void>("/api/me", "DELETE"),
     getPlatformContent: () => request<PlatformContent>("/api/platform-content"),
     getTelegramConnection: () =>
       request<TelegramConnectionStatus>("/api/telegram-connection"),

@@ -29,6 +29,7 @@ const settings: AdminSettings = {
   check_in_fewer_message: seeded("Would you like fewer check-ins?"),
   daily_message_limit: seeded(200),
   daily_limit_reply: seeded("I'm wiped for today, talk tomorrow?"),
+  message_retention_days: seeded(30),
 };
 
 describe("PlatformSettingsForm", () => {
@@ -117,6 +118,27 @@ describe("PlatformSettingsForm", () => {
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       daily_message_limit: 60,
       daily_limit_reply: "Out of steam, talk tomorrow?",
+    });
+  });
+
+  it("shows and saves the message retention in its Data section", async () => {
+    const user = userEvent.setup();
+    render(<PlatformSettingsForm />);
+    const retention = await screen.findByLabelText("Message retention");
+    expect(retention).toHaveValue(30);
+    expect(screen.getByRole("region", { name: "Data" })).toContainElement(
+      retention,
+    );
+    expect(retention).toHaveAccessibleDescription(
+      "Shortening applies to existing messages within a minute.",
+    );
+
+    await user.clear(retention);
+    await user.type(retention, "14");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      message_retention_days: 14,
     });
   });
 

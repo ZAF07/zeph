@@ -130,11 +130,16 @@ class FakeChatChannel:
 
 
 class FakeAuthVerifier:
-    """Auth verifier that accepts tokens handed out by `token_for`."""
+    """Auth provider that accepts tokens handed out by `token_for`.
+
+    It also stands in for the auth provider's accounts: a deleted account is
+    recorded and its tokens stop working.
+    """
 
     def __init__(self) -> None:
-        """Start with no known tokens."""
+        """Start with no known tokens and no deleted accounts."""
         self._identities_by_token: dict[str, AccountIdentity] = {}
+        self.deleted_accounts: list[str] = []
 
     def token_for(self, auth_id: str, email: str) -> str:
         """Create a token that verifies as the given account.
@@ -160,6 +165,19 @@ class FakeAuthVerifier:
             The account identity, or None if the token is unknown.
         """
         return self._identities_by_token.get(token)
+
+    def delete_account(self, auth_id: str) -> None:
+        """Record a deleted account and stop its tokens working.
+
+        Args:
+            auth_id: The account ID.
+        """
+        self.deleted_accounts.append(auth_id)
+        self._identities_by_token = {
+            token: identity
+            for token, identity in self._identities_by_token.items()
+            if identity.auth_id != auth_id
+        }
 
 
 class FakeClock:
