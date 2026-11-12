@@ -76,6 +76,10 @@ _Avoid_: Check-in history (that is the User's own "Recent check-ins")
 The web app where Users manage their account, preferences and privacy, and where Admins configure the platform.
 _Avoid_: Portal, web app, console
 
+**Chat Setting Change**:
+A change to one of a User's settings made by telling the Companion in plain words instead of on the Dashboard: pausing or resuming Check-ins, Check-in frequency, quiet hours, User Memory on or off, time zone, forgetting a Memory Item, or Delete My Data. The Dashboard marks each such setting "Changed in chat" until it is next changed there.
+_Avoid_: Chat command, slash command, bot setting
+
 **Onboarding**:
 The steps a new User completes on the Dashboard before making their Telegram Connection: what the Companion should call them, acknowledging the AI Notice, what brings them here, country and time zone, and User Memory consent. A User who has not finished it cannot use the rest of the Dashboard.
 _Avoid_: Setup, registration, sign-up (sign-up is the account creation before it)
@@ -169,7 +173,7 @@ How long a User's raw messages are kept, set by Admins in days. Older messages a
 _Avoid_: Data retention, TTL, history limit
 
 **Delete My Data**:
-A User's choice to wipe their messages, User Memory, Check-in history and Telegram Connection after typing a confirmation word. Their account stays, so they can start fresh.
+A User's choice, on the Dashboard or in chat, to wipe their messages, User Memory, Check-in history and Telegram Connection after typing a confirmation word. In chat the confirmation must be their whole next message; anything else cancels it. Their account stays, so they can start fresh.
 _Avoid_: Reset, clear history, wipe
 
 **Account Deletion**:
@@ -179,7 +183,7 @@ _Avoid_: Close account, deactivate, unsubscribe
 ### Quality
 
 **Eval**:
-A measurement of how the Companion behaves with the real LLM, run on demand (`make eval`) and never in the normal checks, because it costs money and its results vary. There are Safeguard, Persona and Knowledge Evals. Each one goes through the real reply path and uses the platform settings Admins have set.
+A measurement of how the Companion behaves with the real LLM, run on demand (`make eval`) and never in the normal checks, because it costs money and its results vary. There are Safeguard, Persona, Knowledge and Settings Evals; a Settings Eval checks that plain-words requests make exactly the right Chat Setting Change, or none. Each one goes through the real reply path and uses the platform settings Admins have set.
 _Avoid_: Test, benchmark
 
 **Missed Crisis**:
