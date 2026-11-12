@@ -72,6 +72,7 @@ describe("OnboardingFlow", () => {
       paused: false,
       paused_until: null,
       recent: [],
+      kinds: [],
     });
     apiClient.completeOnboarding.mockImplementation(async () =>
       newUser({ onboarding_completed_at: "2026-11-11T09:00:00Z" }),

@@ -30,6 +30,13 @@ function checkInsWith(overrides: Partial<CheckIns> = {}): CheckIns {
     paused: false,
     paused_until: null,
     recent: [],
+    kinds: [
+      { name: "A casual hello", description: "Just checking how you are." },
+      {
+        name: "A present-moment pause",
+        description: "A brief invitation to notice where you are.",
+      },
+    ],
     ...overrides,
   };
 }
@@ -169,21 +176,38 @@ describe("CheckInsSettings", () => {
       checkInsWith({
         recent: [
           {
-            id: "check-in-3",
-            kind: "A casual hello",
-            sent_at: "2026-11-11T10:42:00Z",
+            id: "check-in-5",
+            outcome: "asked_about_fewer",
+            kind: null,
+            decided_at: "2026-11-12T10:42:00Z",
             status: "sent",
           },
           {
-            id: "check-in-2",
+            id: "check-in-4",
+            outcome: "sent",
             kind: "A casual hello",
-            sent_at: "2026-11-09T10:42:00Z",
+            decided_at: "2026-11-11T10:42:00Z",
+            status: "no_reply",
+          },
+          {
+            id: "check-in-3",
+            outcome: "skipped",
+            kind: null,
+            decided_at: "2026-11-10T10:42:00Z",
+            status: "skipped",
+          },
+          {
+            id: "check-in-2",
+            outcome: "sent",
+            kind: "A casual hello",
+            decided_at: "2026-11-09T10:42:00Z",
             status: "replied",
           },
           {
             id: "check-in-1",
+            outcome: "sent",
             kind: null,
-            sent_at: "2026-11-05T04:15:00Z",
+            decided_at: "2026-11-05T04:15:00Z",
             status: "no_reply",
           },
         ],
@@ -195,11 +219,35 @@ describe("CheckInsSettings", () => {
       screen.getByRole("region", { name: "Recent check-ins" }),
     ).getAllByRole("listitem");
     expect(items.map((item) => item.textContent)).toEqual([
-      "A casual helloWed 11 Nov · 6:42 pmSent",
+      "Asked if you’d like fewerThu 12 Nov · 6:42 pmSent",
+      "A casual helloWed 11 Nov · 6:42 pmNo reply",
+      "Skipped — gave you some spaceTue 10 NovSkipped",
       "A casual helloMon 9 Nov · 6:42 pmReplied",
       "A check-inThu 5 Nov · 12:15 pmNo reply",
     ]);
     expect(document.body.textContent).not.toMatch(/next check-in/i);
+  });
+
+  it("lists what Zeph might reach out about, read-only, and explains the ignore rule", async () => {
+    await renderLoaded();
+
+    const kinds = within(
+      screen.getByRole("region", { name: "What Zeph might reach out about" }),
+    ).getAllByRole("listitem");
+    expect(kinds.map((kind) => kind.textContent)).toEqual([
+      "A casual helloJust checking how you are.",
+      "A present-moment pauseA brief invitation to notice where you are.",
+    ]);
+    expect(
+      within(
+        screen.getByRole("region", { name: "What Zeph might reach out about" }),
+      ).queryByRole("button"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "If a few go unanswered, Zeph will pause and ask once if you’d like fewer.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("says there are no Check-ins yet", async () => {

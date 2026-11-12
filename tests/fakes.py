@@ -260,7 +260,9 @@ class ScriptedChatModel:
     Safeguard, memory processing and memory retrieval calls are told apart
     by their instructions and kept apart from reply calls, each with its own
     script. The Safeguard defaults to "none" and retrieval to "none", so
-    tests about replies don't have to script them too.
+    tests about replies don't have to script them too. Set
+    `before_next_reply` to run something once while the next reply is being
+    "written", like a User acting during a slow model call.
     """
 
     def __init__(
@@ -291,6 +293,7 @@ class ScriptedChatModel:
         self.retrieval_calls: list[ChatModelCall] = []
         self.call_order: list[str] = []
         self.delay_seconds = 0.0
+        self.before_next_reply: Callable[[], None] | None = None
 
     def script(self, *replies: str | Exception | ToolCall) -> None:
         """Queue replies to return, one per call, in order.
@@ -376,6 +379,9 @@ class ScriptedChatModel:
             self.calls.append(call)
             self.call_order.append("reply")
             time.sleep(self.delay_seconds)
+            if self.before_next_reply is not None:
+                before_next_reply, self.before_next_reply = self.before_next_reply, None
+                before_next_reply()
             answer = self._replies.pop(0)
             while isinstance(answer, ToolCall):
                 [tool] = [tool for tool in tools if tool.name == answer.name]

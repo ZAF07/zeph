@@ -40,6 +40,10 @@ from companion.core.models import (
     CheckIn,
     CheckInFrequency,
     CheckInKind,
+    CheckInKindDetails,
+    CheckInKindOverview,
+    CheckInLogEntry,
+    CheckInOutcome,
     CheckInSettings,
     ConnectionToken,
     Conversation,
@@ -1854,7 +1858,7 @@ class PostgresStickerRepository:
 
 
 class PostgresCheckInRepository:
-    """Stores Check-in Kinds and sent Check-ins in Postgres."""
+    """Stores Check-in Kinds and Check-in decisions in Postgres."""
 
     def __init__(self, engine: Engine) -> None:
         """Set up the repository.
@@ -1875,6 +1879,113 @@ class PostgresCheckInRepository:
                 select(check_in_kinds).order_by(check_in_kinds.c.sort_order)
             ).all()
         return [_to_check_in_kind(row) for row in rows]
+
+    def list_kind_overviews(self, sent_since: datetime) -> list[CheckInKindOverview]:
+        """List every Check-in Kind in order with how often it was sent lately.
+
+        Args:
+            sent_since: Only Check-ins sent after this are counted.
+
+        Returns:
+            The Check-in Kinds with their send counts.
+        """
+        sent_count = func.count(check_ins.c.id).label("sent_count")
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                select(check_in_kinds, sent_count)
+                .outerjoin(
+                    check_ins,
+                    (check_ins.c.kind_id == check_in_kinds.c.id)
+                    & (check_ins.c.decided_at > sent_since),
+                )
+                .group_by(check_in_kinds.c.id)
+                .order_by(check_in_kinds.c.sort_order)
+            ).all()
+        return [
+            CheckInKindOverview(kind=_to_check_in_kind(row), sent_count=row.sent_count)
+            for row in rows
+        ]
+
+    def get_kind(self, kind_id: UUID) -> CheckInKind | None:
+        """Find one Check-in Kind.
+
+        Args:
+            kind_id: The Check-in Kind's ID.
+
+        Returns:
+            The Check-in Kind, or None if there is no such Kind.
+        """
+        with self._engine.connect() as connection:
+            row = connection.execute(
+                select(check_in_kinds).where(check_in_kinds.c.id == kind_id)
+            ).first()
+        return _to_check_in_kind(row) if row else None
+
+    def add_kind(self, details: CheckInKindDetails) -> CheckInKind:
+        """Add a Check-in Kind last in the list.
+
+        Args:
+            details: Its name, description and whether it is allowed without
+                User Memory.
+
+        Returns:
+            The saved Check-in Kind.
+        """
+        with self._engine.begin() as connection:
+            highest = connection.execute(
+                select(func.max(check_in_kinds.c.sort_order))
+            ).scalar()
+            row = connection.execute(
+                insert(check_in_kinds)
+                .values(
+                    id=uuid4(),
+                    name=details.name,
+                    description=details.description,
+                    allowed_without_user_memory=details.allowed_without_user_memory,
+                    sort_order=0 if highest is None else int(highest) + 1,
+                )
+                .returning(check_in_kinds)
+            ).one()
+        return _to_check_in_kind(row)
+
+    def update_kind(self, kind: CheckInKind) -> CheckInKind:
+        """Save a Check-in Kind's name, description and User Memory flag.
+
+        Args:
+            kind: The Check-in Kind with its new values.
+
+        Returns:
+            The saved Check-in Kind.
+        """
+        with self._engine.begin() as connection:
+            row = connection.execute(
+                update(check_in_kinds)
+                .where(check_in_kinds.c.id == kind.id)
+                .values(
+                    name=kind.name,
+                    description=kind.description,
+                    allowed_without_user_memory=kind.allowed_without_user_memory,
+                )
+                .returning(check_in_kinds)
+            ).one()
+        return _to_check_in_kind(row)
+
+    def delete_kind(self, kind_id: UUID) -> bool:
+        """Remove a Check-in Kind; past Check-ins of it keep no Kind.
+
+        Args:
+            kind_id: The Check-in Kind's ID.
+
+        Returns:
+            True if it was removed; False if there was no such Kind.
+        """
+        with self._engine.begin() as connection:
+            deleted = connection.execute(
+                delete(check_in_kinds)
+                .where(check_in_kinds.c.id == kind_id)
+                .returning(check_in_kinds.c.id)
+            ).first()
+        return deleted is not None
 
     def list_due_users(self, now: datetime) -> list[User]:
         """List onboarded Users with Check-ins on whose next one is due.
@@ -1898,32 +2009,41 @@ class PostgresCheckInRepository:
             ).all()
         return [_to_user(row) for row in rows]
 
-    def add(self, check_in: CheckIn, next_due_at: datetime) -> None:
-        """Save a sent Check-in and the User's next due time, together.
+    def add(
+        self, check_in: CheckIn, next_due_at: datetime, pause_until_resumed: bool
+    ) -> None:
+        """Save a Check-in decision and the User's next due time, together.
 
         Args:
-            check_in: The Check-in that was sent.
+            check_in: The Check-in decision.
             next_due_at: When the User's next Check-in may be sent.
+            pause_until_resumed: Whether to also pause the User's Check-ins
+                until they resume.
         """
+        user_changes: dict[str, Any] = {"check_in_next_due_at": next_due_at}
+        if pause_until_resumed:
+            user_changes |= {"check_ins_paused": True, "check_ins_paused_until": None}
         with self._engine.begin() as connection:
             connection.execute(
                 insert(check_ins).values(
                     id=check_in.id,
                     user_id=check_in.user_id,
+                    outcome=check_in.outcome.value,
                     kind_id=check_in.kind_id,
                     message=check_in.message,
-                    sent_at=check_in.sent_at,
+                    skip_reason=check_in.skip_reason,
+                    decided_at=check_in.decided_at,
                     replied_at=check_in.replied_at,
                 )
             )
             connection.execute(
                 update(users)
                 .where(users.c.id == check_in.user_id)
-                .values(check_in_next_due_at=next_due_at)
+                .values(**user_changes)
             )
 
     def list_recent(self, user_id: UUID, limit: int) -> list[CheckIn]:
-        """List a User's newest Check-ins, newest first.
+        """List a User's newest Check-in decisions, newest first.
 
         Args:
             user_id: The User's ID.
@@ -1936,15 +2056,43 @@ class PostgresCheckInRepository:
             rows = connection.execute(
                 self._select_check_ins()
                 .where(check_ins.c.user_id == user_id)
-                .order_by(check_ins.c.sent_at.desc())
+                .order_by(check_ins.c.decided_at.desc())
                 .limit(limit)
             ).all()
         return [self._to_check_in(row) for row in rows]
 
+    def list_log(self, since: datetime) -> list[CheckInLogEntry]:
+        """List every User's Check-in decisions since a time, newest first.
+
+        Args:
+            since: Only decisions after this are listed.
+
+        Returns:
+            The decisions with who each User is.
+        """
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                self._select_check_ins()
+                .add_columns(
+                    users.c.name.label("user_name"), users.c.email.label("user_email")
+                )
+                .join(users, users.c.id == check_ins.c.user_id)
+                .where(check_ins.c.decided_at > since)
+                .order_by(check_ins.c.decided_at.desc())
+            ).all()
+        return [
+            CheckInLogEntry(
+                check_in=self._to_check_in(row),
+                user_name=row.user_name,
+                user_email=row.user_email,
+            )
+            for row in rows
+        ]
+
     def claim_reply(
         self, user_id: UUID, replied_at: datetime, sent_since: datetime
     ) -> CheckIn | None:
-        """Mark the User's newest Check-in replied, if it can still be.
+        """Mark the User's newest sent Check-in replied, if it can still be.
 
         Args:
             user_id: The User's ID.
@@ -1952,14 +2100,17 @@ class PostgresCheckInRepository:
             sent_since: A Check-in sent at or before this can't get a reply.
 
         Returns:
-            The Check-in they replied to, or None if their newest Check-in
-            was already replied to, was sent before `sent_since`, or they
-            have none.
+            The Check-in they replied to, or None if their newest sent
+            Check-in was already replied to, was sent before `sent_since`, or
+            they have none.
         """
         newest_id = (
             select(check_ins.c.id)
-            .where(check_ins.c.user_id == user_id)
-            .order_by(check_ins.c.sent_at.desc())
+            .where(
+                check_ins.c.user_id == user_id,
+                check_ins.c.outcome != CheckInOutcome.SKIPPED.value,
+            )
+            .order_by(check_ins.c.decided_at.desc())
             .limit(1)
             .scalar_subquery()
         )
@@ -1969,7 +2120,7 @@ class PostgresCheckInRepository:
                 .where(
                     check_ins.c.id == newest_id,
                     check_ins.c.replied_at.is_(None),
-                    check_ins.c.sent_at > sent_since,
+                    check_ins.c.decided_at > sent_since,
                 )
                 .values(replied_at=replied_at)
                 .returning(check_ins.c.id)
@@ -2005,10 +2156,12 @@ class PostgresCheckInRepository:
         return CheckIn(
             id=row.id,
             user_id=row.user_id,
+            outcome=CheckInOutcome(row.outcome),
+            decided_at=row.decided_at,
             kind_id=row.kind_id,
             kind_name=row.kind_name,
             message=row.message,
-            sent_at=row.sent_at,
+            skip_reason=row.skip_reason,
             replied_at=row.replied_at,
         )
 

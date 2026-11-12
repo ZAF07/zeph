@@ -25,6 +25,8 @@ const settings: AdminSettings = {
   ai_notice: seeded("I'm an AI."),
   ai_notice_short: seeded("Zeph is an AI."),
   user_memory_explanation: seeded("I can keep details."),
+  check_in_ignore_threshold: seeded(3),
+  check_in_fewer_message: seeded("Would you like fewer check-ins?"),
 };
 
 describe("PlatformSettingsForm", () => {
@@ -71,6 +73,26 @@ describe("PlatformSettingsForm", () => {
     });
     expect(await screen.findByText(/Last saved .* by Maya Lin/)).toBeVisible();
     expect(screen.getByText("Saved")).toBeVisible();
+  });
+
+  it("shows and saves the Check-in ignore threshold and fewer message", async () => {
+    const user = userEvent.setup();
+    render(<PlatformSettingsForm />);
+    const threshold = await screen.findByLabelText("Ignore threshold");
+    expect(threshold).toHaveValue(3);
+    const message = screen.getByLabelText(/Would you like fewer\?” message/);
+    expect(message).toHaveValue("Would you like fewer check-ins?");
+
+    await user.clear(threshold);
+    await user.type(threshold, "5");
+    await user.clear(message);
+    await user.type(message, "Fewer of these?");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      check_in_ignore_threshold: 5,
+      check_in_fewer_message: "Fewer of these?",
+    });
   });
 
   it("shows web search on, with its daily limit", async () => {

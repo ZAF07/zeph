@@ -45,7 +45,7 @@ A run of messages between a User and the Companion that ends after a quiet gap (
 _Avoid_: Session, thread, chat
 
 **Check-in**:
-A message the Companion sends first, unprompted, to a User who has opted in — meant to feel like a friend reaching out, not a task reminder. Sent only when the User is due (their frequency gap has passed), not paused, outside their Quiet Hours and not mid-Conversation. The User's first message within the reply window (set by an Admin) is its reply; after that it had no reply. Users never see when the next one will come.
+A message the Companion sends first, unprompted, to a User who has opted in — meant to feel like a friend reaching out, not a task reminder. When the User is due (their frequency gap has passed), not paused, outside their Quiet Hours and not mid-Conversation, the Companion either sends one of a Check-in Kind or skips it. The User's first message within the reply window (set by an Admin) is its reply; after that it had no reply. Users never see when the next one will come.
 _Avoid_: Notification, nudge, reminder, push
 
 **Quiet Hours**:
@@ -57,8 +57,20 @@ A break from Check-ins for a day, a week or until the User resumes, which keeps 
 _Avoid_: Snooze, mute
 
 **Check-in Kind**:
-The style of a Check-in (e.g. casual hello, follow-up on something shared, present-moment prompt), chosen from the User's recent Conversation Summaries and Memory Items. Managed by Admins.
+The style of a Check-in (e.g. casual hello, follow-up on something shared, present-moment prompt), chosen from the User's recent Conversation Summaries and Memory Items. Managed by Admins; only Kinds marked "allowed without User Memory" go to a User with User Memory off. Users see the Kinds read-only.
 _Avoid_: Template, check-in type
+
+**Skipped Check-in**:
+A due Check-in the Companion chose not to send, with a reason only Admins see (e.g. the User asked for space). The next attempt waits a full frequency gap, as after a sent one. Users see it only as "gave you some space".
+_Avoid_: Cancelled, missed, failed check-in
+
+**Ignore Threshold**:
+The Admin-set number of sent Check-ins in a row with no reply after which the Companion sends one "would you like fewer?" message and puts the User on a Check-in Pause until they resume. Any message from the User starts the count again.
+_Avoid_: Ignore limit, unanswered cap
+
+**Check-in Log**:
+The Admins' record of every Check-in decision — sent with its Kind, skipped with its reason, or paused by the Ignore Threshold — and whether the User replied. Never the message text.
+_Avoid_: Check-in history (that is the User's own "Recent check-ins")
 
 **Dashboard**:
 The web app where Users manage their account, preferences and privacy, and where Admins configure the platform.

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  formatCheckInDay,
   formatCheckInSentAt,
   pausedText,
   toTimeFieldValue,
@@ -24,6 +25,12 @@ describe("check-in wording", () => {
   it("writes when a Check-in was sent", () => {
     expect(formatCheckInSentAt("2026-11-09T10:42:00Z", "Asia/Singapore")).toBe(
       "Mon 9 Nov · 6:42 pm",
+    );
+  });
+
+  it("writes the day of a skipped Check-in, without a time", () => {
+    expect(formatCheckInDay("2026-11-06T17:00:00Z", "Asia/Singapore")).toBe(
+      "Sat 7 Nov",
     );
   });
 });

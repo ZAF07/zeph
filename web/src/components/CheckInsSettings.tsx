@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { secondaryButton } from "@/components/button-styles";
 import { CheckInFrequencyPicker } from "@/components/CheckInFrequencyPicker";
+import { CheckInKindsList } from "@/components/CheckInKindsList";
 import { fieldLabel, inputField } from "@/components/form-styles";
 import { LoadFailed } from "@/components/LoadFailed";
 import { QuietHoursFields } from "@/components/QuietHoursFields";
@@ -36,7 +37,7 @@ const settingsRow =
 
 /**
  * The Check-ins page: the on/off switch, how often, quiet hours and time
- * zone, pausing, and the recent Check-ins. It never shows when the next
+ * zone, pausing, what Zeph might reach out about, and the recent Check-ins. It never shows when the next
  * Check-in will come; Zeph chooses the moment.
  *
  * @returns The page, a loading block, or an error with Try again.
@@ -121,8 +122,8 @@ export function CheckInsSettings() {
           <h1 className="m-0 text-h1 font-normal">Check-ins</h1>
           <p className="m-0 max-w-[40em] text-body text-ink-soft">
             Now and then Zeph can message you first on Telegram. There’s no
-            fixed schedule: Zeph chooses the moment, and sometimes stays quiet
-            to give you space.
+            fixed schedule: Zeph chooses the moment and the kind, and sometimes
+            stays quiet to give you space.
           </p>
         </div>
         {checkIns ? (
@@ -270,6 +271,8 @@ export function CheckInsSettings() {
               </div>
             </div>
           </section>
+
+          <CheckInKindsList kinds={checkIns.kinds} />
 
           <RecentCheckInsList
             checkIns={checkIns.recent}

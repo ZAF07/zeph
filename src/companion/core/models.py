@@ -841,6 +841,22 @@ class StickerImage:
 
 
 @dataclass(frozen=True)
+class CheckInKindDetails:
+    """What an Admin sets on a Check-in Kind.
+
+    Attributes:
+        name: Its name, e.g. "A casual hello".
+        description: What it is, as the Check-in model and Users are told.
+        allowed_without_user_memory: Whether it may be sent to a User with
+            User Memory off.
+    """
+
+    name: str
+    description: str
+    allowed_without_user_memory: bool
+
+
+@dataclass(frozen=True)
 class CheckInKind:
     """A style of Check-in the Companion can send, managed by Admins.
 
@@ -860,32 +876,85 @@ class CheckInKind:
     sort_order: int
 
 
+@dataclass(frozen=True)
+class CheckInKindOverview:
+    """A Check-in Kind and how often it was sent lately, for Admins.
+
+    Attributes:
+        kind: The Check-in Kind.
+        sent_count: How many Check-ins of this Kind were sent in the period
+            asked for.
+    """
+
+    kind: CheckInKind
+    sent_count: int
+
+
+class CheckInOutcome(StrEnum):
+    """What the Check-in service decided for a User who was due."""
+
+    SENT = "sent"
+    SKIPPED = "skipped"
+    ASKED_ABOUT_FEWER = "asked_about_fewer"
+
+
 class CheckInStatus(StrEnum):
-    """What happened after a Check-in was sent."""
+    """What happened after a Check-in decision."""
 
     SENT = "sent"
     REPLIED = "replied"
     NO_REPLY = "no_reply"
+    SKIPPED = "skipped"
 
 
 @dataclass(frozen=True)
 class CheckIn:
-    """A Check-in the Companion sent to a User.
+    """A Check-in decision for a User: sent, skipped, or asking about fewer.
 
     Attributes:
         id: Our ID for the Check-in.
-        user_id: The User it was sent to.
-        kind_id: Its Check-in Kind; None if the Kind was removed since.
-        kind_name: The Check-in Kind's name; None if it was removed since.
-        message: The text that was sent.
-        sent_at: When it was sent.
+        user_id: The User it was for.
+        outcome: Whether it was sent, skipped, or was the one "would you like
+            fewer?" message.
+        decided_at: When it was sent or skipped.
+        kind_id: Its Check-in Kind; None if skipped, asking about fewer, or
+            the Kind was removed since.
+        kind_name: The Check-in Kind's name; None when `kind_id` is.
+        message: The text that was sent; None if skipped.
+        skip_reason: Why the Check-in model skipped it; only Admins see it.
         replied_at: When the User replied, if they have.
     """
 
     id: UUID
     user_id: UUID
-    kind_id: UUID | None
-    kind_name: str | None
-    message: str
-    sent_at: datetime
+    outcome: CheckInOutcome
+    decided_at: datetime
+    kind_id: UUID | None = None
+    kind_name: str | None = None
+    message: str | None = None
+    skip_reason: str | None = None
     replied_at: datetime | None = None
+
+    @property
+    def was_sent(self) -> bool:
+        """Tell whether a message went to the User.
+
+        Returns:
+            True unless the Check-in was skipped.
+        """
+        return self.outcome != CheckInOutcome.SKIPPED
+
+
+@dataclass(frozen=True)
+class CheckInLogEntry:
+    """A Check-in decision and who it was for, for Admins. Never the message.
+
+    Attributes:
+        check_in: The Check-in decision.
+        user_name: The User's name, if known.
+        user_email: The User's email address, if known.
+    """
+
+    check_in: CheckIn
+    user_name: str | None
+    user_email: str | None
