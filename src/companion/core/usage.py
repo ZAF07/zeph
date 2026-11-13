@@ -57,7 +57,7 @@ class UsageLimiter:
             daily_limit,
         )
 
-    def has_used_up_messages(self, user_id: UUID) -> bool:
+    def has_used_up_daily_message_limit(self, user_id: UUID) -> bool:
         """Tell whether the User has used up today's daily message limit.
 
         It is used up once their message count for their day has reached the
