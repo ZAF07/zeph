@@ -171,6 +171,24 @@ export type FeatureSwitch = {
   changed_at: string | null;
 };
 
+/** An Admin's switch for one Feature for one User; "default" follows everyone's. */
+export type UserFeatureSwitch = "default" | "on" | "off";
+
+/** Why a Feature works, or doesn't, for a User right now. */
+export type FeatureReason =
+  "on_for_everyone" | "on_for_user" | "off_for_everyone" | "off_for_user";
+
+/** Whether a Feature works for one User, why, and the Admin's switch for them. */
+export type UserFeatureStatus = {
+  feature: Feature;
+  name: string;
+  works: boolean;
+  reason: FeatureReason;
+  switch: UserFeatureSwitch;
+  changed_by_email: string | null;
+  changed_at: string | null;
+};
+
 /** The value of a platform setting Admins can edit. */
 export type SettingValue = string | number;
 
@@ -461,6 +479,12 @@ export type ApiClient = {
     feature: Feature,
     on: boolean,
   ) => Promise<FeatureSwitch>;
+  listUserFeatures: (userId: string) => Promise<UserFeatureStatus[]>;
+  setFeatureForUser: (
+    userId: string,
+    feature: Feature,
+    featureSwitch: UserFeatureSwitch,
+  ) => Promise<UserFeatureStatus>;
   getAdminSettings: () => Promise<AdminSettings>;
   updateAdminSettings: (
     values: Record<string, SettingValue>,
@@ -651,6 +675,18 @@ export function createApiClient(
         .features,
     setFeatureForEveryone: (feature, on) =>
       request<FeatureSwitch>(`/api/admin/features/${feature}`, "PUT", { on }),
+    listUserFeatures: async (userId) =>
+      (
+        await request<{ features: UserFeatureStatus[] }>(
+          `/api/admin/users/${userId}/features`,
+        )
+      ).features,
+    setFeatureForUser: (userId, feature, featureSwitch) =>
+      request<UserFeatureStatus>(
+        `/api/admin/users/${userId}/features/${feature}`,
+        "PUT",
+        { switch: featureSwitch },
+      ),
     getAdminSettings: async () =>
       (await request<{ settings: AdminSettings }>("/api/admin/settings"))
         .settings,

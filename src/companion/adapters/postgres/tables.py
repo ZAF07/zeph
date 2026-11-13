@@ -335,3 +335,18 @@ feature_switches = Table(
     Column("changed_by", Uuid, ForeignKey("users.id", ondelete="SET NULL")),
     Column("changed_at", DateTime(timezone=True)),
 )
+
+user_feature_switches = Table(
+    "user_feature_switches",
+    metadata,
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("feature", Text, primary_key=True),
+    Column("is_on", Boolean, nullable=False),
+    Column("changed_by", Uuid, ForeignKey("users.id", ondelete="SET NULL")),
+    Column("changed_at", DateTime(timezone=True), nullable=False),
+)

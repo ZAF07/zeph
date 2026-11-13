@@ -5,30 +5,13 @@ import { useCallback, useEffect, useState } from "react";
 import { LoadFailed } from "@/components/LoadFailed";
 import { Switch } from "@/components/Switch";
 import type { Feature, FeatureSwitch } from "@/lib/api-client";
-import { formatSavedAt } from "@/lib/dates";
+import { lastChangeNote } from "@/lib/features";
 import { useApiClient } from "@/lib/use-api-client";
 
 type LoadState =
   | { kind: "loading" }
   | { kind: "failed" }
   | { kind: "loaded"; features: FeatureSwitch[] };
-
-/**
- * Says who last changed a Feature's switch for everyone, and when.
- *
- * @param feature - The Feature's switch.
- * @returns A note like "Changed 13 Nov, 14:20 by maya@example.com", or
- *   "Never changed".
- */
-function lastChangeNote(feature: FeatureSwitch): string {
-  if (!feature.changed_at) {
-    return "Never changed";
-  }
-  const changedBy = feature.changed_by_email
-    ? ` by ${feature.changed_by_email}`
-    : "";
-  return `Changed ${formatSavedAt(feature.changed_at)}${changedBy}`;
-}
 
 /**
  * The admin Features page's body: one row per Feature with what it does, its

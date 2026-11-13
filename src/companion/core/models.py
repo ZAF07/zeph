@@ -1047,3 +1047,46 @@ class FeatureSwitch:
     on: bool
     changed_by_email: str | None
     changed_at: datetime | None
+
+
+class UserFeatureSwitch(StrEnum):
+    """An Admin's switch for one Feature for one User.
+
+    "Default" follows the switch for everyone; "on" and "off" override it.
+    """
+
+    DEFAULT = "default"
+    ON = "on"
+    OFF = "off"
+
+
+class FeatureReason(StrEnum):
+    """Why a Feature works, or doesn't, for a User right now."""
+
+    ON_FOR_EVERYONE = "on_for_everyone"
+    ON_FOR_USER = "on_for_user"
+    OFF_FOR_EVERYONE = "off_for_everyone"
+    OFF_FOR_USER = "off_for_user"
+
+
+@dataclass(frozen=True)
+class FeatureStatus:
+    """Whether a Feature works for a User, why, and the Admin's switch for them.
+
+    Attributes:
+        feature: The Feature.
+        works: Whether it works for the User right now.
+        reason: Why it works or doesn't.
+        switch: The Admin's switch for this User.
+        changed_by_email: The email of the Admin who last changed the switch
+            for this User; None when it is "default".
+        changed_at: When the switch for this User was last changed; None
+            when it is "default".
+    """
+
+    feature: Feature
+    works: bool
+    reason: FeatureReason
+    switch: UserFeatureSwitch
+    changed_by_email: str | None
+    changed_at: datetime | None

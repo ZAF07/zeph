@@ -8,6 +8,8 @@ import { ApiError, type AdminUser, type ApiClient } from "@/lib/api-client";
 const apiClient = {
   listAdminUsers: vi.fn<ApiClient["listAdminUsers"]>(),
   changeUserRole: vi.fn<ApiClient["changeUserRole"]>(),
+  listUserFeatures: vi.fn<ApiClient["listUserFeatures"]>(),
+  setFeatureForUser: vi.fn<ApiClient["setFeatureForUser"]>(),
 };
 
 vi.mock("@/lib/use-api-client", () => ({
@@ -89,6 +91,36 @@ describe("AdminUsers", () => {
         name: "Remove Admin",
       }),
     ).toBeInTheDocument();
+  });
+
+  it("opens a User's Features panel from their row", async () => {
+    apiClient.listUserFeatures.mockResolvedValue([
+      {
+        feature: "web_search",
+        name: "Web Search",
+        works: true,
+        reason: "on_for_everyone",
+        switch: "default",
+        changed_by_email: null,
+        changed_at: null,
+      },
+    ]);
+    const user = userEvent.setup();
+    render(<AdminUsers />);
+
+    await user.click(
+      within(rowFor(await textOf("Ren Okafor"))).getByRole("button", {
+        name: "Features",
+      }),
+    );
+
+    const dialog = await screen.findByRole("dialog", {
+      name: "Features for Ren Okafor",
+    });
+    expect(apiClient.listUserFeatures).toHaveBeenCalledWith("ren");
+    expect(await within(dialog).findByText("Web Search")).toBeVisible();
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("explains when the last Admin can't be removed", async () => {

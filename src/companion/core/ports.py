@@ -1312,7 +1312,7 @@ class CheckInRepository(Protocol):
 
 
 class FeatureSwitchRepository(Protocol):
-    """Stores each Feature's switch for everyone and its last change."""
+    """Stores each Feature's switches, for everyone and per User."""
 
     def list_for_everyone(self) -> list[FeatureSwitch]:
         """List the stored switches for everyone.
@@ -1332,6 +1332,47 @@ class FeatureSwitchRepository(Protocol):
             on: Whether it is on for everyone.
             changed_at: When it is being changed.
             changed_by: The Admin changing it.
+        """
+        ...
+
+    def list_for_user(self, user_id: UUID) -> list[FeatureSwitch]:
+        """List the switches stored for one User.
+
+        Only switches set to "on" or "off" are stored.
+
+        Args:
+            user_id: The User.
+
+        Returns:
+            The User's switches, in no set order.
+        """
+        ...
+
+    def save_for_user(
+        self,
+        user_id: UUID,
+        feature: Feature,
+        on: bool,
+        changed_at: datetime,
+        changed_by: UUID,
+    ) -> None:
+        """Save a Feature's switch for one User as on or off.
+
+        Args:
+            user_id: The User.
+            feature: The Feature.
+            on: Whether it is on for the User.
+            changed_at: When it is being changed.
+            changed_by: The Admin changing it.
+        """
+        ...
+
+    def remove_for_user(self, user_id: UUID, feature: Feature) -> None:
+        """Remove a Feature's switch for one User, so it follows everyone's.
+
+        Args:
+            user_id: The User.
+            feature: The Feature.
         """
         ...
 

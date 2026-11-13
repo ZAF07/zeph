@@ -34,6 +34,7 @@ from companion.adapters.postgres.tables import (
     safeguard_events,
     stickers,
     telegram_connections,
+    user_feature_switches,
     users,
 )
 from companion.core.models import (
@@ -2382,7 +2383,7 @@ class PostgresCheckInRepository:
 
 
 class PostgresFeatureSwitchRepository:
-    """Stores each Feature's switch for everyone in Postgres."""
+    """Stores each Feature's switches, for everyone and per User, in Postgres."""
 
     def __init__(self, engine: Engine) -> None:
         """Set up the repository.
@@ -2434,6 +2435,86 @@ class PostgresFeatureSwitchRepository:
                 insert(feature_switches)
                 .values(feature=feature.value, **values)
                 .on_conflict_do_update(index_elements=["feature"], set_=values)
+            )
+
+    def list_for_user(self, user_id: UUID) -> list[FeatureSwitch]:
+        """List the switches stored for one User.
+
+        Only switches set to "on" or "off" are stored.
+
+        Args:
+            user_id: The User.
+
+        Returns:
+            The User's switches, in no set order.
+        """
+        statement = (
+            select(
+                user_feature_switches.c.feature,
+                user_feature_switches.c.is_on,
+                user_feature_switches.c.changed_at,
+                users.c.email,
+            )
+            .select_from(
+                user_feature_switches.outerjoin(
+                    users, users.c.id == user_feature_switches.c.changed_by
+                )
+            )
+            .where(user_feature_switches.c.user_id == user_id)
+        )
+        with self._engine.connect() as connection:
+            rows = connection.execute(statement).all()
+        return [
+            FeatureSwitch(
+                feature=Feature(row.feature),
+                on=row.is_on,
+                changed_by_email=row.email,
+                changed_at=row.changed_at,
+            )
+            for row in rows
+            if row.feature in Feature
+        ]
+
+    def save_for_user(
+        self,
+        user_id: UUID,
+        feature: Feature,
+        on: bool,
+        changed_at: datetime,
+        changed_by: UUID,
+    ) -> None:
+        """Save a Feature's switch for one User as on or off.
+
+        Args:
+            user_id: The User.
+            feature: The Feature.
+            on: Whether it is on for the User.
+            changed_at: When it is being changed.
+            changed_by: The Admin changing it.
+        """
+        values = {"is_on": on, "changed_at": changed_at, "changed_by": changed_by}
+        with self._engine.begin() as connection:
+            connection.execute(
+                insert(user_feature_switches)
+                .values(user_id=user_id, feature=feature.value, **values)
+                .on_conflict_do_update(
+                    index_elements=["user_id", "feature"], set_=values
+                )
+            )
+
+    def remove_for_user(self, user_id: UUID, feature: Feature) -> None:
+        """Remove a Feature's switch for one User, so it follows everyone's.
+
+        Args:
+            user_id: The User.
+            feature: The Feature.
+        """
+        with self._engine.begin() as connection:
+            connection.execute(
+                delete(user_feature_switches).where(
+                    user_feature_switches.c.user_id == user_id,
+                    user_feature_switches.c.feature == feature.value,
+                )
             )
 
 

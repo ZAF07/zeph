@@ -6,6 +6,7 @@ import { compactSecondaryButton } from "@/components/button-styles";
 import { inputField } from "@/components/form-styles";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LockIcon } from "@/components/LockIcon";
+import { UserFeaturesPanel } from "@/components/UserFeaturesPanel";
 import { ApiError, type AdminUser, type UserRole } from "@/lib/api-client";
 import { formatDay } from "@/lib/dates";
 import { useApiClient } from "@/lib/use-api-client";
@@ -63,7 +64,8 @@ function isShown(user: AdminUser, search: string, filter: Filter): boolean {
 
 /**
  * The admin Users page: everyone with an account, with counts but never
- * message text, and buttons to make or remove Admins.
+ * message text, a Features panel per User, and buttons to make or remove
+ * Admins.
  *
  * @returns The search, filters and table, or a loading, empty or error state.
  */
@@ -74,6 +76,8 @@ export function AdminUsers() {
   const [filter, setFilter] = useState<Filter>("all");
   const [flash, setFlash] = useState<Flash | null>(null);
   const [changingUserId, setChangingUserId] = useState<string | null>(null);
+  const [featuresUser, setFeaturesUser] = useState<AdminUser | null>(null);
+  const closeFeatures = useCallback(() => setFeaturesUser(null), []);
 
   const load = useCallback(async () => {
     setState({ kind: "loading" });
@@ -203,7 +207,7 @@ export function AdminUsers() {
 
       {state.kind === "loaded" && state.users.length > 0 ? (
         <>
-          <div className="overflow-x-auto rounded-xl border border-line bg-white">
+          <div className="relative overflow-x-auto rounded-xl border border-line bg-white">
             <table className="w-full min-w-[860px] border-collapse text-sm">
               <caption className="border-b border-line px-4 py-2.5 text-left">
                 <span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted">
@@ -252,7 +256,7 @@ export function AdminUsers() {
                       key={user.id}
                       className="border-b border-line last:border-b-0"
                     >
-                      <td className="px-[18px] py-3.5">
+                      <td className="min-w-[170px] px-[18px] py-3.5">
                         <span className="flex flex-col">
                           <span className="font-medium">
                             {user.name ?? user.email ?? "—"}
@@ -297,22 +301,31 @@ export function AdminUsers() {
                           {user.role === "admin" ? "Admin" : "User"}
                         </span>
                       </td>
-                      <td className="px-[18px] py-3.5 text-right">
-                        <button
-                          type="button"
-                          disabled={changingUserId === user.id}
-                          onClick={() =>
-                            void changeRole(
-                              user,
-                              user.role === "admin" ? "user" : "admin",
-                            )
-                          }
-                          className={compactSecondaryButton}
-                        >
-                          {user.role === "admin"
-                            ? "Remove Admin"
-                            : "Make Admin"}
-                        </button>
+                      <td className="px-[18px] py-3.5">
+                        <span className="flex flex-col items-stretch gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setFeaturesUser(user)}
+                            className={compactSecondaryButton}
+                          >
+                            Features
+                          </button>
+                          <button
+                            type="button"
+                            disabled={changingUserId === user.id}
+                            onClick={() =>
+                              void changeRole(
+                                user,
+                                user.role === "admin" ? "user" : "admin",
+                              )
+                            }
+                            className={compactSecondaryButton}
+                          >
+                            {user.role === "admin"
+                              ? "Remove Admin"
+                              : "Make Admin"}
+                          </button>
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -324,6 +337,10 @@ export function AdminUsers() {
             Admin can’t be demoted — promote someone else first.
           </p>
         </>
+      ) : null}
+
+      {featuresUser ? (
+        <UserFeaturesPanel user={featuresUser} onClose={closeFeatures} />
       ) : null}
     </>
   );

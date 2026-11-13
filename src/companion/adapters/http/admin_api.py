@@ -55,6 +55,8 @@ from companion.core.models import (
     CheckInOutcome,
     CheckInStatus,
     Feature,
+    FeatureReason,
+    FeatureStatus,
     FeatureSwitch,
     Helpline,
     HelplineDetails,
@@ -72,6 +74,7 @@ from companion.core.models import (
     SafeguardEventOverview,
     StoredSetting,
     User,
+    UserFeatureSwitch,
     UserOverview,
     UserRole,
 )
@@ -164,6 +167,30 @@ class FeatureSwitchRequest(BaseModel):
     """Whether a Feature should be on for everyone."""
 
     on: StrictBool
+
+
+class UserFeatureResponse(BaseModel):
+    """Whether a Feature works for one User, why, and the switch for them."""
+
+    feature: Feature
+    name: str
+    works: bool
+    reason: FeatureReason
+    switch: UserFeatureSwitch
+    changed_by_email: str | None
+    changed_at: datetime | None
+
+
+class UserFeaturesResponse(BaseModel):
+    """Every Feature's status for one User, in a set order."""
+
+    features: list[UserFeatureResponse]
+
+
+class UserFeatureSwitchRequest(BaseModel):
+    """Whether a Feature should be default, on or off for one User."""
+
+    switch: UserFeatureSwitch
 
 
 class CoreServiceResponse(BaseModel):
@@ -676,6 +703,26 @@ def to_feature_response(switch: FeatureSwitch) -> FeatureResponse:
     )
 
 
+def to_user_feature_response(status: FeatureStatus) -> UserFeatureResponse:
+    """Describe a Feature's status for one User for the admin area.
+
+    Args:
+        status: The status.
+
+    Returns:
+        The response body.
+    """
+    return UserFeatureResponse(
+        feature=status.feature,
+        name=feature_details(status.feature).name,
+        works=status.works,
+        reason=status.reason,
+        switch=status.switch,
+        changed_by_email=status.changed_by_email,
+        changed_at=status.changed_at,
+    )
+
+
 def to_admin_user_response(overview: UserOverview) -> AdminUserResponse:
     """Describe a User for the admin area.
 
@@ -774,6 +821,58 @@ def build_admin_api_router(
                 "This is the last Admin. Make someone else an Admin first.",
             ) from error
         return RoleResponse(id=str(user.id), role=user.role)
+
+    @router.get("/users/{user_id}/features")
+    def list_user_features(user_id: UUID) -> UserFeaturesResponse:
+        """Return whether each Feature works for one User, and why.
+
+        Args:
+            user_id: The User.
+
+        Returns:
+            Each Feature's status for the User.
+
+        Raises:
+            HTTPException: 404 if there is no such User.
+        """
+        try:
+            statuses = feature_service.statuses_for(user_id)
+        except UserNotFoundError as error:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "No such User") from error
+        return UserFeaturesResponse(
+            features=[
+                to_user_feature_response(feature_status) for feature_status in statuses
+            ]
+        )
+
+    @router.put("/users/{user_id}/features/{feature}")
+    def set_feature_for_user(
+        admin: Annotated[User, Depends(current_admin)],
+        user_id: UUID,
+        feature: Feature,
+        request: UserFeatureSwitchRequest,
+    ) -> UserFeatureResponse:
+        """Set a Feature to default, on or off for one User.
+
+        Args:
+            admin: The Admin making the change.
+            user_id: The User.
+            feature: The Feature.
+            request: The new switch for this User.
+
+        Returns:
+            The Feature's status for the User after the change.
+
+        Raises:
+            HTTPException: 404 if there is no such User.
+        """
+        try:
+            feature_status = feature_service.set_for_user(
+                user_id, feature, request.switch, admin
+            )
+        except UserNotFoundError as error:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "No such User") from error
+        return to_user_feature_response(feature_status)
 
     @router.get("/features")
     def list_features() -> FeaturesResponse:
