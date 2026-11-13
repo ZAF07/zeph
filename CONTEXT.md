@@ -25,7 +25,7 @@ The Companion's voice and character — human in style, honest that it is an AI.
 _Avoid_: System prompt, personality, character
 
 **Sticker Library**:
-The Admin-managed set of stickers the Companion may send, at most one per reply. Each has a "when to use" note; a sticker without one is never sent. A sticker an Admin sends the Companion from their own Telegram is added to the library rather than answered. Stickers Users send are read through their emoji.
+The Admin-managed set of stickers the Companion may send, at most one per reply. Each has a "when to use" note; a sticker without one is never sent. A sticker an Admin sends the Companion from their own Telegram is added to the library rather than answered. Stickers Users send are read through their emoji. Sending stickers is the Stickers Feature: when it doesn't work for a User, the Companion sends them none, but still reads their stickers, and Admins can still add stickers by sending them.
 _Avoid_: Sticker pack, emoji set
 
 **Shared Photo**:
@@ -143,7 +143,7 @@ _Avoid_: Recap, transcript, log
 ### Knowledge
 
 **Knowledge**:
-The curated library of philosophy, psychology and mindfulness material the Companion draws on, made of Knowledge Documents. Shared by all Users; never about any one User. The Companion brings it in only when it genuinely fits the message, lightly and in its own words, never as a lecture.
+The curated library of philosophy, psychology and mindfulness material the Companion draws on, made of Knowledge Documents. Shared by all Users; never about any one User. The Companion brings it in only when it genuinely fits the message, lightly and in its own words, never as a lecture. It is a Feature: when it doesn't work for a User, no Knowledge goes into their replies.
 _Avoid_: Wisdom base, corpus, content
 
 **Knowledge Document**:
