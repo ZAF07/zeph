@@ -105,4 +105,4 @@ Evidence: seam 1 `tests/test_sticker_adding.py` (16), `tests/test_features.py::t
 
 - Completed: 2026-11-13
 - Checks: `make check` after the rebase: ruff, ruff format, mypy clean; pytest 571 passed; eslint, prettier, tsc clean; vitest 315 passed.
-- Commit: 87c0601 "Admins chat in stickers and add them in chat through a tool or by replying "add this"", review fixes 19fcda6 "Review fixes for issue 24: log a refused sticker reaction, react inside the adding lock, move the "add this" check into StickerAdding", archive <archive commit> on branch `mvp-24-admin-stickers-in-chat` (merged into main in <merge commit>)
+- Commit: 87c0601 "Admins chat in stickers and add them in chat through a tool or by replying "add this"", review fixes 19fcda6 "Review fixes for issue 24: log a refused sticker reaction, react inside the adding lock, move the "add this" check into StickerAdding", archive a3ba603 "MVP issue 24 done: archive issue with test, run and review evidence" on branch `mvp-24-admin-stickers-in-chat` (merged into main in e2a1cb4 "Merge MVP issue 24: an Admin's sticker is now answered like any User's; Admins add stickers in chat by asking…")
