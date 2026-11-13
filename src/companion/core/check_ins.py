@@ -666,7 +666,7 @@ class CheckInService:
         connection = self._repositories.telegram_connections.get_by_user(user.id)
         if connection is None or self._has_open_conversation(user, now):
             return
-        if self._usage_limiter.has_used_up_messages(user.id):
+        if self._usage_limiter.has_used_up_daily_message_limit(user.id):
             self._skip_for_daily_limit(user, now)
             return
         next_due_at = now + self._gap(settings.frequency)
@@ -730,11 +730,8 @@ class CheckInService:
             user: A due User who has used up today's daily message limit.
             now: The current time.
         """
-        newest = self._repositories.check_ins.list_recent(user.id, 1)
-        if newest and newest[0].skipped_for_daily_limit:
-            skipped_on = users_today(user.time_zone, newest[0].decided_at)
-            if skipped_on == users_today(user.time_zone, now):
-                return
+        if self._has_limit_skip_today(user, now):
+            return
         skipped = CheckIn(
             id=uuid4(),
             user_id=user.id,
@@ -743,6 +740,24 @@ class CheckInService:
             skip_reason=DAILY_LIMIT_SKIP_REASON,
         )
         self._repositories.check_ins.add(skipped, now, pause_until_resumed=False)
+
+    def _has_limit_skip_today(self, user: User, now: datetime) -> bool:
+        """Tell whether the User's newest Check-in is a limit skip from their today.
+
+        Args:
+            user: The User.
+            now: The current time.
+
+        Returns:
+            True if a limit skip was already recorded on the User's day.
+        """
+        newest = self._repositories.check_ins.list_recent(user.id, 1)
+        return (
+            bool(newest)
+            and newest[0].skipped_for_daily_limit
+            and users_today(user.time_zone, newest[0].decided_at)
+            == users_today(user.time_zone, now)
+        )
 
     def _save_then_send(
         self,
