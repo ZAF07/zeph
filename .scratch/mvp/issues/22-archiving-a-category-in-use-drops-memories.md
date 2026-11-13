@@ -1,6 +1,6 @@
 # 22 — Archiving a category that a setting uses silently stops memories being saved
 
-Status: needs-triage
+Status: ready-for-agent
 
 ## Parent
 
@@ -12,6 +12,17 @@ When this issue is picked up, run `/grill-with-docs` first to decide the solutio
 
 - Warn the Admin (page and/or API) when they archive a category that a setting points at.
 - Refuse the archive until the setting points at another category.
+
+## Decision (grill, 2026-11-13)
+
+- Keep archiving categories (ADR 0004: it's the safe stand-in for delete). Removing it was considered and rejected.
+- Refuse to archive a category that any of the three category settings names. The settings aren't Admin-editable (seed only; a rename carries them along), so "repoint first" is not possible for an Admin.
+- These are called **Required Memory Categories** (see `CONTEXT.md`). A category is Required when one of `CATEGORY_NAME_SETTINGS` names it; no stored flag. Rename and edit stay allowed.
+- Archiving a non-Required category is unchanged: it keeps its items, gets no new ones, and its items leave replies.
+- `set_archived` refuses to archive a Required category (new error); the admin API returns 409 with a clear message, e.g. "Goals is a Required Memory Category (used by onboarding and the Home page), so it can't be archived." Restore is always allowed.
+- Admin page: keep the Archive button; on 409 show the API's message. No `required` field in the list API.
+- No migration for a Required category that's already archived (won't happen); the onboarding warning log stays as a safety net.
+- No ADR: small, easy to reverse.
 
 ## Symptom
 
@@ -50,7 +61,7 @@ The same happens for Life details (the name is lost). With Goals archived, the H
 
 ## Acceptance criteria
 
-- [ ] Solution decided with `/grill-with-docs`, and recorded here
+- [x] Solution decided with `/grill-with-docs`, and recorded here
 - [ ] Archiving a category a setting uses no longer silently loses answers
 - [ ] A test covers the fixed behaviour (seam 1, plus seam 3 if the admin page changes)
 - [ ] `make check` passes

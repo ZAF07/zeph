@@ -137,8 +137,12 @@ A single fact about a User (e.g. a goal, value or preference), belonging to one 
 _Avoid_: Memory, fact, note
 
 **Memory Category**:
-The kind of fact a Memory Item records, used to fetch only relevant items for each reply. An "always include" category's items go into every reply. Managed by Admins; each has a unique name (ignoring case). Can be archived but never deleted: an archived category keeps its Memory Items, which the User still sees and can delete, but gets no new ones and its items no longer go into replies, even if it is "always include". Restoring it undoes all that. One category (Goals, to start) holds a User's goals; the Dashboard shows its items as what the User is working toward, and renaming it keeps that link.
+The kind of fact a Memory Item records, used to fetch only relevant items for each reply. An "always include" category's items go into every reply. Managed by Admins; each has a unique name (ignoring case). Can be archived but never deleted: an archived category keeps its Memory Items, which the User still sees and can delete, but gets no new ones and its items no longer go into replies, even if it is "always include". Restoring it undoes all that. A Required Memory Category can't be archived. One category (Goals, to start) holds a User's goals; the Dashboard shows its items as what the User is working toward, and renaming it keeps that link.
 _Avoid_: Type, tag, label
+
+**Required Memory Category**:
+A Memory Category the product itself relies on: Onboarding answers are saved in it, or the Dashboard shows its items as the User's goals (Goals and Life details, to start). It can be renamed and edited like any other, but never archived.
+_Avoid_: Constant category, built-in category, core category
 
 **Conversation Summary**:
 A short account of what one Conversation covered and how the User seemed (its mood), written once, when the Conversation ends. The newest few go into every reply.
