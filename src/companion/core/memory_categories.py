@@ -12,11 +12,12 @@ from companion.core.ports import Clock, Repositories
 ONBOARDING_NAME_CATEGORY_SETTING = "onboarding_name_memory_category"
 ONBOARDING_REASONS_CATEGORY_SETTING = "onboarding_reasons_memory_category"
 HOME_GOALS_CATEGORY_SETTING = "home_goals_memory_category"
-CATEGORY_NAME_SETTINGS = (
-    ONBOARDING_NAME_CATEGORY_SETTING,
-    ONBOARDING_REASONS_CATEGORY_SETTING,
-    HOME_GOALS_CATEGORY_SETTING,
-)
+PLACE_USING_CATEGORY_SETTING = {
+    ONBOARDING_NAME_CATEGORY_SETTING: "onboarding",
+    ONBOARDING_REASONS_CATEGORY_SETTING: "onboarding",
+    HOME_GOALS_CATEGORY_SETTING: "the Home page",
+}
+CATEGORY_NAME_SETTINGS = tuple(PLACE_USING_CATEGORY_SETTING)
 
 
 class MemoryCategoryNotFoundError(LookupError):
@@ -25,6 +26,10 @@ class MemoryCategoryNotFoundError(LookupError):
 
 class InvalidMemoryCategoryError(ValueError):
     """Raised when a Memory Category's details are not valid."""
+
+
+class RequiredMemoryCategoryError(ValueError):
+    """Raised when archiving a Memory Category that a setting names."""
 
 
 class MemoryCategoryService:
@@ -117,11 +122,35 @@ class MemoryCategoryService:
 
         Raises:
             MemoryCategoryNotFoundError: If there is no such category.
+            RequiredMemoryCategoryError: If archiving a Required Memory
+                Category, which a setting names.
         """
         category = self._get(category_id)
+        if archived:
+            self._check_not_required(category)
         return self._repositories.memory_categories.update(
             replace(category, archived=archived)
         )
+
+    def _check_not_required(self, category: MemoryCategory) -> None:
+        """Refuse a Required Memory Category: one that a setting names.
+
+        Args:
+            category: The category to check.
+
+        Raises:
+            RequiredMemoryCategoryError: If a setting names the category.
+        """
+        settings = self._repositories.platform_settings
+        places_using_it: list[str] = []
+        for key, place in PLACE_USING_CATEGORY_SETTING.items():
+            if settings.get(key) == category.name and place not in places_using_it:
+                places_using_it.append(place)
+        if places_using_it:
+            raise RequiredMemoryCategoryError(
+                f"{category.name} is a Required Memory Category "
+                f"(used by {' and '.join(places_using_it)}), so it can't be archived."
+            )
 
     def _get(self, category_id: UUID) -> MemoryCategory:
         """Find a Memory Category.

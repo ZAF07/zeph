@@ -1,6 +1,6 @@
 # 22 — Archiving a category that a setting uses silently stops memories being saved
 
-Status: ready-for-agent
+Status: completed
 
 ## Parent
 
@@ -62,7 +62,18 @@ The same happens for Life details (the name is lost). With Goals archived, the H
 ## Acceptance criteria
 
 - [x] Solution decided with `/grill-with-docs`, and recorded here
-- [ ] Archiving a category a setting uses no longer silently loses answers
-- [ ] A test covers the fixed behaviour (seam 1, plus seam 3 if the admin page changes)
-- [ ] `make check` passes
-- [ ] Verified in the running app via `/run`
+- [x] Archiving a category a setting uses no longer silently loses answers
+- [x] A test covers the fixed behaviour (seam 1, plus seam 3 if the admin page changes)
+- [x] `make check` passes
+- [x] Verified in the running app via `/run`
+
+## Comments
+
+- 2026-11-13: Done. `MemoryCategoryService.set_archived` raises `RequiredMemoryCategoryError` when any category setting names the category (`PLACE_USING_CATEGORY_SETTING` is the single list; `CATEGORY_NAME_SETTINGS` is built from it). The admin API turns it into 409 with the message; the admin page shows that message. Restore, rename and edit unchanged.
+- Evidence: tests `test_a_required_category_cant_be_archived_so_onboarding_answers_are_kept`, `test_a_renamed_required_category_still_cant_be_archived` (seam 1), `shows why a Required Memory Category can't be archived` (seam 3). `make check`: ruff, mypy, 466 pytest, eslint, prettier, tsc, 299 vitest all pass.
+- /run (worktree stack, port 3010, Admin session): clicking Archive on Goals showed "Goals is a Required Memory Category (used by onboarding and the Home page), so it can't be archived."; on Life details "… (used by onboarding) …". Both stayed active in the DB. "What helps" still archived and restored normally. No page errors.
+
+## Completion
+
+- Completed: 2026-11-13
+- Commit: <to be filled in after merge>

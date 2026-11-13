@@ -424,6 +424,53 @@ def test_renaming_an_onboarding_category_keeps_onboarding_memories_working(
     assert set(memory_contents(client, headers)) == {"Life details", "Aims"}
 
 
+def test_a_required_category_cant_be_archived_so_onboarding_answers_are_kept(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    headers = auth_headers(auth_verifier, "user_maya")
+    goals = category_named(client, admin, "Goals")
+    life_details = category_named(client, admin, "Life details")
+
+    goals_response = client.post(
+        f"/api/admin/memory-categories/{goals['id']}/archive", headers=admin
+    )
+    life_details_response = client.post(
+        f"/api/admin/memory-categories/{life_details['id']}/archive", headers=admin
+    )
+
+    assert goals_response.status_code == 409
+    assert goals_response.json()["detail"] == (
+        "Goals is a Required Memory Category (used by onboarding and the "
+        "Home page), so it can't be archived."
+    )
+    assert life_details_response.status_code == 409
+    assert life_details_response.json()["detail"] == (
+        "Life details is a Required Memory Category (used by onboarding), "
+        "so it can't be archived."
+    )
+    assert category_named(client, admin, "Goals")["archived"] is False
+    assert category_named(client, admin, "Life details")["archived"] is False
+    client.put("/api/onboarding", json=onboarding_answers(), headers=headers)
+    assert set(memory_contents(client, headers)) == {"Life details", "Goals"}
+
+
+def test_a_renamed_required_category_still_cant_be_archived(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    aims = edit_category(
+        client, admin, category_named(client, admin, "Goals"), name="Aims"
+    )
+
+    response = client.post(
+        f"/api/admin/memory-categories/{aims['id']}/archive", headers=admin
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"].startswith("Aims is a Required Memory Category")
+
+
 def test_category_names_must_be_filled_in_and_unique(
     client: TestClient, auth_verifier: FakeAuthVerifier
 ) -> None:

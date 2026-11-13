@@ -48,6 +48,7 @@ from companion.core.memory_categories import (
     InvalidMemoryCategoryError,
     MemoryCategoryNotFoundError,
     MemoryCategoryService,
+    RequiredMemoryCategoryError,
 )
 from companion.core.models import (
     CheckInKind,
@@ -1237,7 +1238,8 @@ def build_admin_api_router(
             The saved category.
 
         Raises:
-            HTTPException: 404 if there is no such category.
+            HTTPException: 404 if there is no such category; 409 if it is a
+                Required Memory Category.
         """
         return set_archived(category_id, archived=True)
 
@@ -1267,7 +1269,8 @@ def build_admin_api_router(
             The saved category.
 
         Raises:
-            HTTPException: 404 if there is no such category.
+            HTTPException: 404 if there is no such category; 409 if archiving
+                a Required Memory Category.
         """
         try:
             category = memory_category_service.set_archived(category_id, archived)
@@ -1275,6 +1278,8 @@ def build_admin_api_router(
             raise HTTPException(
                 status.HTTP_404_NOT_FOUND, "No such Memory Category"
             ) from error
+        except RequiredMemoryCategoryError as error:
+            raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
         return to_memory_category_response(category)
 
     @router.get("/check-in-kinds")

@@ -9,9 +9,10 @@ import {
 import { LoadFailed } from "@/components/LoadFailed";
 import { MemoryCategoryForm } from "@/components/MemoryCategoryForm";
 import { Switch } from "@/components/Switch";
-import type {
-  MemoryCategoryInput,
-  MemoryCategoryOverview,
+import {
+  ApiError,
+  type MemoryCategoryInput,
+  type MemoryCategoryOverview,
 } from "@/lib/api-client";
 import { useApiClient } from "@/lib/use-api-client";
 
@@ -83,9 +84,12 @@ export function MemoryCategoriesManager() {
         setFlash({ text: successText, isError: false });
       }
       await load();
-    } catch {
+    } catch (error) {
       setFlash({
-        text: `Couldn’t change ${category.name}. Please try again.`,
+        text:
+          error instanceof ApiError && error.status === 409 && error.detail
+            ? error.detail
+            : `Couldn’t change ${category.name}. Please try again.`,
         isError: true,
       });
     } finally {
