@@ -14,6 +14,7 @@ from companion.core.ports import ChatChannel, Clock, Repositories
 
 TOKEN_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 START_COMMAND = "/start"
+DASHBOARD_URL_PLACEHOLDER = "{dashboard_url}"
 
 
 class OnboardingNotFinishedError(Exception):
@@ -86,7 +87,7 @@ class TelegramConnectionService:
             OnboardingNotFinishedError: If the User hasn't finished onboarding;
                 no token is made.
         """
-        if user.onboarding_completed_at is None:
+        if not user.has_finished_onboarding:
             raise OnboardingNotFinishedError()
         settings = self._repositories.platform_settings
         lifetime = timedelta(minutes=settings.get("connection_token_ttl_minutes"))
@@ -205,7 +206,7 @@ class TelegramConnectionService:
             True if the User exists and has finished onboarding.
         """
         user = self._repositories.users.get(user_id)
-        return user is not None and user.onboarding_completed_at is not None
+        return user is not None and user.has_finished_onboarding
 
     def _find_token(self, start_text: str) -> ConnectionToken | None:
         """Look up the token named in a `/start <token>` message.
@@ -228,5 +229,5 @@ class TelegramConnectionService:
             message: The message being answered.
             template: The reply text; `{dashboard_url}` is replaced.
         """
-        text = template.replace("{dashboard_url}", self._dashboard_url)
+        text = template.replace(DASHBOARD_URL_PLACEHOLDER, self._dashboard_url)
         self._chat_channel.send_text(message.chat_id, text)

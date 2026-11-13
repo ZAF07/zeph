@@ -7,6 +7,7 @@ from companion.core.message_retention import RETENTION_DAYS_SETTING
 from companion.core.models import StoredSetting, User
 from companion.core.ports import Clock, PlatformSettingsRepository
 from companion.core.safeguard import HELPLINES_PLACEHOLDER
+from companion.core.telegram_connection import DASHBOARD_URL_PLACEHOLDER
 
 MODEL_CHOICES_KEY = "available_models"
 
@@ -169,6 +170,14 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         "Limit-reached reply",
         SettingKind.TEXT,
         max_length=1_000,
+    ),
+    EditableSetting(
+        "onboarding_unfinished_reply",
+        "“Finish onboarding first” reply",
+        SettingKind.TEXT,
+        max_length=1_000,
+        required_placeholder=DASHBOARD_URL_PLACEHOLDER,
+        placeholder_meaning="the link to the Dashboard",
     ),
     EditableSetting(
         RETENTION_DAYS_SETTING,

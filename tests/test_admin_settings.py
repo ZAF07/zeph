@@ -4,9 +4,12 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import Engine, text
 
+from tests.conftest import DASHBOARD_URL
 from tests.fakes import FakeAuthVerifier, FakeChatChannel, FakeClock, ScriptedChatModel
 from tests.telegram_helpers import (
+    TELEGRAM_CHAT_ID,
     auth_headers,
     connect_telegram,
     owner_headers,
@@ -273,3 +276,67 @@ def test_every_admin_endpoint_refuses_users_who_are_not_admins(
         )
         response = client.request(method, concrete_path, headers=maya, json={})
         assert response.status_code == 403, (method, path)
+
+
+def test_the_onboarding_unfinished_reply_can_be_edited_and_is_sent(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    clock: FakeClock,
+    engine: Engine,
+    seeded_settings: dict[str, Any],
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    settings = client.get("/api/admin/settings", headers=admin).json()["settings"]
+    assert (
+        settings["onboarding_unfinished_reply"]["value"]
+        == seeded_settings["onboarding_unfinished_reply"]
+    )
+
+    saved = client.patch(
+        "/api/admin/settings",
+        json={
+            "values": {"onboarding_unfinished_reply": "Set up first: {dashboard_url}"}
+        },
+        headers=admin,
+    )
+    assert saved.status_code == 200
+    user_id = client.get(
+        "/api/me", headers=auth_headers(auth_verifier, "user_maya")
+    ).json()["id"]
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO connection_tokens "
+                "(token, user_id, created_at, expires_at) "
+                "VALUES ('OLD1-TOKN', :user_id, :now, :expires_at)"
+            ),
+            {
+                "user_id": user_id,
+                "now": clock.now(),
+                "expires_at": clock.now() + timedelta(minutes=15),
+            },
+        )
+    send_to_webhook(client, telegram_text_update("/start OLD1-TOKN"))
+
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
+        f"Set up first: {DASHBOARD_URL}"
+    ]
+
+
+def test_the_onboarding_unfinished_reply_must_keep_the_dashboard_link(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+
+    response = client.patch(
+        "/api/admin/settings",
+        json={"values": {"onboarding_unfinished_reply": "Finish setting up first."}},
+        headers=headers,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "The “Finish onboarding first” reply must include {dashboard_url}, "
+        "the link to the Dashboard."
+    )
