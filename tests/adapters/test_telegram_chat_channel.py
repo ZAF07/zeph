@@ -254,13 +254,13 @@ def test_a_refused_call_leaves_the_token_out_of_the_logged_traceback(
         [],
     )
 
-    try:
+    with pytest.raises(TelegramApiError) as raised:
         channel.send_text(999, "hello")
-    except TelegramApiError as error:
-        logging.getLogger("test").exception("Reply failed")
-        assert error.__cause__ is None
-        assert error.__suppress_context__
-        assert "123:abc" not in str(error)
+    logging.getLogger("test").error("Reply failed", exc_info=raised.value)
+
+    assert raised.value.__cause__ is None
+    assert raised.value.__suppress_context__
+    assert "123:abc" not in str(raised.value)
 
     assert "Bad Request: chat not found" in caplog.text
     assert "sendMessage" in caplog.text

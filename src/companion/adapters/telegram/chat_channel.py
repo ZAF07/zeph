@@ -46,7 +46,7 @@ class TelegramApiError(Exception):
         self.status_code = status_code
 
 
-def telegram_api_error(action: str, error: httpx.HTTPError) -> TelegramApiError:
+def to_telegram_api_error(action: str, error: httpx.HTTPError) -> TelegramApiError:
     """Turn an httpx error into a Telegram error that leaves out the URL.
 
     Args:
@@ -63,13 +63,13 @@ def telegram_api_error(action: str, error: httpx.HTTPError) -> TelegramApiError:
         )
     status_code = error.response.status_code
     message = f"Telegram {action} failed with status {status_code}"
-    description = telegram_description(error.response)
+    description = telegram_error_description(error.response)
     if description:
         message = f"{message}: {description}"
     return TelegramApiError(message, status_code)
 
 
-def telegram_description(response: httpx.Response) -> str | None:
+def telegram_error_description(response: httpx.Response) -> str | None:
     """Read Telegram's `description` from an error answer.
 
     Args:
@@ -306,7 +306,7 @@ class TelegramChatChannel:
             response = self._http.get(f"{self._file_url}/{file_path}")
             response.raise_for_status()
         except httpx.HTTPError as error:
-            raise telegram_api_error("file download", error) from None
+            raise to_telegram_api_error("file download", error) from None
         return response.content
 
     def _call(self, method: str, payload: dict[str, object]) -> dict[str, object]:
@@ -326,7 +326,7 @@ class TelegramChatChannel:
             response = self._http.post(f"{self._bot_url}/{method}", json=payload)
             response.raise_for_status()
         except httpx.HTTPError as error:
-            raise telegram_api_error(method, error) from None
+            raise to_telegram_api_error(method, error) from None
         body: dict[str, object] = response.json()
         result = body.get("result")
         return result if isinstance(result, dict) else {}
