@@ -5,7 +5,6 @@ import { useState } from "react";
 import { primaryButton, secondaryButton } from "@/components/button-styles";
 import { fieldLabel, inputField } from "@/components/form-styles";
 import { LoadFailed } from "@/components/LoadFailed";
-import { Switch } from "@/components/Switch";
 import {
   ApiError,
   type AdminSettings,
@@ -80,9 +79,7 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
   },
 ];
 
-const webSearchKey = "web_search_enabled";
-
-/** The daily limit row, shown only while web search is on. */
+/** The daily limit row; Web Search itself is switched on the Features page. */
 const webSearchLimitField: NumberField = {
   key: "web_search_daily_limit",
   label: "Per-user daily web search limit",
@@ -126,11 +123,7 @@ const numberKeys = [
   webSearchLimitField.key,
 ];
 
-const allKeys = [
-  ...numberKeys,
-  webSearchKey,
-  ...textFields.map((field) => field.key),
-];
+const allKeys = [...numberKeys, ...textFields.map((field) => field.key)];
 
 const wholeNumber = /^\d+$/;
 
@@ -153,13 +146,10 @@ function savedDrafts(settings: AdminSettings): Record<string, string> {
  * Turns a field's typed text into the value the backend keeps.
  *
  * @param key - The setting's key.
- * @param value - The typed text; "true" or "false" for the web search switch.
- * @returns A number, a true/false, or the text itself.
+ * @param value - The typed text.
+ * @returns A number, or the text itself.
  */
 function settingValue(key: string, value: string): SettingValue {
-  if (key === webSearchKey) {
-    return value === "true";
-  }
   return numberKeys.includes(key) ? Number(value) : value;
 }
 
@@ -285,22 +275,7 @@ export function PlatformSettingsForm() {
         <h2 className="m-0 px-5 pb-2 pt-4 text-[17px] font-semibold">
           Web search
         </h2>
-        <div className={settingRow}>
-          <span className="flex min-w-0 flex-[1_1_260px] flex-col gap-0.5">
-            <span className="font-semibold">Web search</span>
-            <span className="text-caption text-ink-muted">
-              Lets Zeph look things up when a User asks about current facts.
-            </span>
-          </span>
-          <Switch
-            label="Web search"
-            checked={values[webSearchKey] === "true"}
-            onChange={(checked) => edit(webSearchKey, String(checked))}
-          />
-        </div>
-        {values[webSearchKey] === "true"
-          ? numberRow(webSearchLimitField)
-          : null}
+        {numberRow(webSearchLimitField)}
       </section>
 
       <section

@@ -3,7 +3,8 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
-from companion.core.models import WebSearchResult
+from companion.core.features import FeatureService
+from companion.core.models import Feature, WebSearchResult
 from companion.core.ports import ChatTool, Clock, Repositories, WebSearch
 from companion.core.timing import user_today
 
@@ -73,25 +74,31 @@ class WebSearchTools:
     """Offers web search and page reading to replies, within the daily limit."""
 
     def __init__(
-        self, repositories: Repositories, web_search: WebSearch, clock: Clock
+        self,
+        repositories: Repositories,
+        features: FeatureService,
+        web_search: WebSearch,
+        clock: Clock,
     ) -> None:
         """Set up the web tools.
 
         Args:
             repositories: Where Users, usage and settings are stored.
+            features: Says whether Web Search works for the User.
             web_search: Searches the web and reads pages.
             clock: Tells the current time, to know the User's day.
         """
         self._repositories = repositories
+        self._features = features
         self._web_search = web_search
         self._clock = clock
 
     def offer(self, user_id: UUID) -> WebSearchOffer:
         """Pick the web tools for a reply to a User.
 
-        None are offered when web search is turned off, or once the User has
-        made `web_search_daily_limit` searches on their own day. Reading a
-        page counts as a web search too.
+        None are offered when Web Search doesn't work for the User, or once
+        they have made `web_search_daily_limit` searches on their own day.
+        Reading a page counts as a web search too.
 
         Args:
             user_id: The User being replied to.
@@ -105,7 +112,8 @@ class WebSearchTools:
         today = user_today(self._repositories.users, user_id, self._clock.now())
         source_reminder = settings.get("web_result_source_reminder")
         used_today = usage.count_web_searches(user_id, today)
-        if not settings.get("web_search_enabled") or used_today >= daily_limit:
+        works = self._features.works_for(user_id, Feature.WEB_SEARCH)
+        if not works or used_today >= daily_limit:
             return WebSearchOffer(tools=[], instructions="")
 
         def run_search(arguments: dict[str, Any]) -> str:
