@@ -116,17 +116,19 @@ def not_looked_at_note(photos_not_looked_at: int, photos_looked_at: int) -> str:
         photos_looked_at: How many were.
 
     Returns:
-        E.g. "[3 more photos in this album weren't looked at. Mention that
-        you only looked at the first 5.]"
+        E.g. "[The album had 3 more photos that you didn't look at, because
+        you look at only the first 5 in an album. They came through fine.
+        Mention briefly that you only looked at the first 5.]"
     """
-    more = (
-        "1 more photo"
-        if photos_not_looked_at == 1
-        else f"{photos_not_looked_at} more photos"
-    )
+    if photos_not_looked_at == 1:
+        more, came_through = "1 more photo", "It came through"
+    else:
+        more, came_through = f"{photos_not_looked_at} more photos", "They came through"
     return (
-        f"[{more} in this album weren't looked at. Mention that you only "
-        f"looked at the first {photos_looked_at}.]"
+        f"[The album had {more} that you didn't look at, because you look at "
+        f"only the first {photos_looked_at} in an album. {came_through} "
+        f"fine. Mention briefly that you only looked at the first "
+        f"{photos_looked_at}.]"
     )
 
 

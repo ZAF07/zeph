@@ -620,8 +620,25 @@ def test_an_album_over_the_cap_describes_only_the_first_photos_and_mentions_the_
 
     assert len(photo_viewer.calls) == 2
     assert newest_message.startswith(f"[photo 1: {DOG}] [photo 2: {BIRD}] our trip")
-    assert "3 more photos" in newest_message
+    assert "3 more photos that you didn't look at" in newest_message
+    assert "only the first 2" in newest_message
     assert "mention" in newest_message.lower()
+
+
+def test_one_photo_over_the_cap_is_named_in_the_singular(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    timer: FakeTimer,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    connect_telegram(client, auth_verifier, chat_channel)
+    change_settings(client, admin, {"photo_album_max_photos": 2})
+
+    newest_message = send_album(client, timer, chat_model, photo_count=3)
+
+    assert "1 more photo that you didn't look at" in newest_message
 
 
 def test_an_album_counts_as_one_message(
