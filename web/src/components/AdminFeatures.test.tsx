@@ -19,7 +19,7 @@ const webSearch: FeatureSwitch = {
   name: "Web Search",
   description: "Zeph can look things up on the web.",
   on: true,
-  changed_by: null,
+  changed_by_email: null,
   changed_at: null,
 };
 
@@ -54,7 +54,7 @@ describe("AdminFeatures", () => {
       {
         ...webSearch,
         on: false,
-        changed_by: "maya@example.com",
+        changed_by_email: "maya@example.com",
         changed_at: "2026-11-13T09:00:00Z",
       },
     ]);
@@ -70,7 +70,7 @@ describe("AdminFeatures", () => {
     apiClient.setFeatureForEveryone.mockResolvedValue({
       ...webSearch,
       on: false,
-      changed_by: "owner@example.com",
+      changed_by_email: "owner@example.com",
       changed_at: "2026-11-13T10:00:00Z",
     });
     const user = userEvent.setup();

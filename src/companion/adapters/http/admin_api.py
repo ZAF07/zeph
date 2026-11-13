@@ -27,7 +27,7 @@ from companion.core.check_in_kinds import (
     InvalidCheckInKindError,
 )
 from companion.core.check_ins import CheckInService, LoggedCheckIn
-from companion.core.features import FEATURES, FeatureService
+from companion.core.features import FeatureService, feature_details
 from companion.core.helplines import (
     FallbackHelplineError,
     HelplineNotFoundError,
@@ -150,7 +150,7 @@ class FeatureResponse(BaseModel):
     name: str
     description: str
     on: bool
-    changed_by: str | None
+    changed_by_email: str | None
     changed_at: datetime | None
 
 
@@ -665,13 +665,13 @@ def to_feature_response(switch: FeatureSwitch) -> FeatureResponse:
     Returns:
         The response body.
     """
-    [details] = [details for details in FEATURES if details.feature == switch.feature]
+    details = feature_details(switch.feature)
     return FeatureResponse(
         feature=switch.feature,
         name=details.name,
         description=details.description,
         on=switch.on,
-        changed_by=switch.changed_by_email,
+        changed_by_email=switch.changed_by_email,
         changed_at=switch.changed_at,
     )
 

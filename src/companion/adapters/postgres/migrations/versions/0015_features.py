@@ -21,7 +21,8 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     """Add the switches for everyone and carry Web Search's setting over.
 
-    An install with no `web_search_enabled` setting yet gets Web Search on.
+    An install with no true/false `web_search_enabled` setting gets Web
+    Search on.
     Who last saved the setting, and when, becomes the switch's last change.
     """
     op.create_table(
@@ -39,7 +40,8 @@ def upgrade() -> None:
         SELECT 'web_search',
                COALESCE(
                    (SELECT (value #>> '{}')::boolean FROM platform_settings
-                    WHERE key = 'web_search_enabled'),
+                    WHERE key = 'web_search_enabled'
+                      AND jsonb_typeof(value) = 'boolean'),
                    true
                ),
                (SELECT updated_by FROM platform_settings

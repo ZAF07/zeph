@@ -24,7 +24,9 @@ function lastChangeNote(feature: FeatureSwitch): string {
   if (!feature.changed_at) {
     return "Never changed";
   }
-  const changedBy = feature.changed_by ? ` by ${feature.changed_by}` : "";
+  const changedBy = feature.changed_by_email
+    ? ` by ${feature.changed_by_email}`
+    : "";
   return `Changed ${formatSavedAt(feature.changed_at)}${changedBy}`;
 }
 

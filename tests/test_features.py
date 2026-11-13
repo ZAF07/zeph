@@ -73,7 +73,7 @@ def test_admins_see_web_search_on_for_everyone_with_no_change_yet(
     assert web_search["name"] == "Web Search"
     assert web_search["description"]
     assert web_search["on"] is True
-    assert web_search["changed_by"] is None
+    assert web_search["changed_by_email"] is None
     assert web_search["changed_at"] is None
 
 
@@ -88,11 +88,11 @@ def test_turning_web_search_off_and_on_records_who_and_when(
     switch_for_everyone(client, admin, "web_search", on=True)
 
     assert turned_off["on"] is False
-    assert turned_off["changed_by"] == "owner@example.com"
+    assert turned_off["changed_by_email"] == "owner@example.com"
     assert turned_off["changed_at"] == "2026-11-11T10:00:00Z"
     web_search = features_by_key(client, admin)["web_search"]
     assert web_search["on"] is True
-    assert web_search["changed_by"] == "owner@example.com"
+    assert web_search["changed_by_email"] == "owner@example.com"
     assert web_search["changed_at"] == "2026-11-11T11:00:00Z"
 
 
@@ -209,6 +209,6 @@ def test_the_migration_keeps_an_existing_installs_web_search_switch(
     settings = client.get("/api/admin/settings", headers=admin).json()["settings"]
 
     assert web_search["on"] is False
-    assert web_search["changed_by"] == "owner@example.com"
+    assert web_search["changed_by_email"] == "owner@example.com"
     assert web_search["changed_at"] == "2026-11-01T08:00:00Z"
     assert "web_search_enabled" not in settings

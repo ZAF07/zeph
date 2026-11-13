@@ -34,6 +34,18 @@ FEATURES: tuple[FeatureDetails, ...] = (
 )
 
 
+def feature_details(feature: Feature) -> FeatureDetails:
+    """Find how Admins see a Feature.
+
+    Args:
+        feature: The Feature.
+
+    Returns:
+        Its name and description.
+    """
+    return next(details for details in FEATURES if details.feature == feature)
+
+
 class FeatureService:
     """Answers whether a Feature works for a User, and keeps its switches.
 
@@ -89,12 +101,10 @@ class FeatureService:
             The Admin-managed note with the Features' names and the
             Dashboard's address filled in; "" when every Feature works.
         """
-        unavailable = set(self.unavailable_for(user_id))
+        unavailable = self.unavailable_for(user_id)
         if not unavailable:
             return ""
-        names = ", ".join(
-            details.name for details in FEATURES if details.feature in unavailable
-        )
+        names = ", ".join(feature_details(feature).name for feature in unavailable)
         note: str = self._repositories.platform_settings.get(UNAVAILABLE_NOTE_SETTING)
         return note.replace("{features}", names).replace(
             "{dashboard_url}", self._dashboard_url

@@ -14,7 +14,7 @@ vi.mock("@/lib/use-api-client", () => ({
   useApiClient: () => apiClient,
 }));
 
-function seeded(value: string | number | boolean) {
+function seeded(value: string | number) {
   return { value, updated_at: "2026-11-01T00:00:00Z", updated_by: null };
 }
 

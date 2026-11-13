@@ -167,12 +167,12 @@ export type FeatureSwitch = {
   name: string;
   description: string;
   on: boolean;
-  changed_by: string | null;
+  changed_by_email: string | null;
   changed_at: string | null;
 };
 
 /** The value of a platform setting Admins can edit. */
-export type SettingValue = string | number | boolean;
+export type SettingValue = string | number;
 
 /** A platform setting's value and when, and by whom, it was last saved. */
 export type AdminSetting = {
