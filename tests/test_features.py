@@ -63,6 +63,12 @@ def web_tool_names(call: ChatModelCall) -> list[str]:
     return [tool.name for tool in call.tools if tool.name in WEB_TOOLS]
 
 
+def unavailable_note(seeded_settings: dict[str, Any], names: str) -> str:
+    """Write the seeded not-available note for the given Features' names."""
+    note: str = seeded_settings["reply_features_unavailable_note"]
+    return note.replace("{features}", names).replace("{dashboard_url}", DASHBOARD_URL)
+
+
 def switch_for_everyone(
     client: TestClient, admin: dict[str, str], feature: str, on: bool
 ) -> dict[str, Any]:
@@ -167,11 +173,7 @@ def test_with_web_search_off_replies_get_no_web_tools_and_the_unavailable_note(
     admin = owner_headers(client, auth_verifier)
     connect_telegram(client, auth_verifier, chat_channel)
     web_instructions = seeded_settings["reply_web_search_instructions"]
-    unavailable_note = (
-        seeded_settings["reply_features_unavailable_note"]
-        .replace("{features}", "Web Search")
-        .replace("{dashboard_url}", DASHBOARD_URL)
-    )
+    note = unavailable_note(seeded_settings, "Web Search")
 
     on = reply_call(client, chat_model, "who wrote Meditations?")
     switch_for_everyone(client, admin, "web_search", on=False)
@@ -180,16 +182,16 @@ def test_with_web_search_off_replies_get_no_web_tools_and_the_unavailable_note(
     back_on = reply_call(client, chat_model, "and now?")
 
     assert web_tool_names(on) == ["web_search", "fetch_page"]
-    assert unavailable_note not in on.instructions
+    assert note not in on.instructions
     assert web_tool_names(off) == []
     assert web_instructions not in off.instructions
-    assert unavailable_note in off.instructions
-    assert "Web Search" in unavailable_note
-    assert "available on their account" in unavailable_note
-    assert f"Dashboard: {DASHBOARD_URL}" in unavailable_note
+    assert note in off.instructions
+    assert "Web Search" in note
+    assert "available on their account" in note
+    assert f"Dashboard: {DASHBOARD_URL}" in note
     assert web_tool_names(back_on) == ["web_search", "fetch_page"]
     assert web_instructions in back_on.instructions
-    assert unavailable_note not in back_on.instructions
+    assert note not in back_on.instructions
 
 
 def test_the_web_search_switch_is_no_longer_a_platform_setting(
@@ -493,12 +495,6 @@ def test_account_deletion_removes_a_users_switches(
 
     assert response.status_code == 204
     assert user_switch_rows(engine, user_id) == 0
-
-
-def unavailable_note(seeded_settings: dict[str, Any], names: str) -> str:
-    """Write the seeded not-available note for the given Features' names."""
-    note: str = seeded_settings["reply_features_unavailable_note"]
-    return note.replace("{features}", names).replace("{dashboard_url}", DASHBOARD_URL)
 
 
 def sticker_tool_names(call: ChatModelCall) -> list[str]:

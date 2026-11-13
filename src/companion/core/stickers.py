@@ -273,14 +273,14 @@ class StickerTools:
             The choice, offering every sticker that has a note; none when
             Stickers doesn't work for the User.
         """
-        description = self._repositories.platform_settings.get(
-            "sticker_tool_description"
-        )
         if not self._features.works_for(user_id, Feature.STICKERS):
-            return StickerChoice([], description)
+            return StickerChoice([], "")
         stickers = [
             sticker
             for sticker in self._repositories.stickers.list_all()
             if sticker.note
         ]
-        return StickerChoice(stickers, description)
+        return StickerChoice(
+            stickers,
+            self._repositories.platform_settings.get("sticker_tool_description"),
+        )

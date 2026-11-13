@@ -44,7 +44,7 @@ FEATURES: tuple[FeatureDetails, ...] = (
         name="Stickers",
         description=(
             "Zeph can add a sticker from the Sticker Library to a reply. "
-            "Stickers Users send are still read either way."
+            "Zeph still reads the stickers a User sends either way."
         ),
     ),
     FeatureDetails(
