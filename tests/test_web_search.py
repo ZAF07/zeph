@@ -265,7 +265,8 @@ def test_with_web_search_off_the_limit_note_is_not_added(
 
     assert web_tools(call) == []
     assert seeded_settings["reply_web_search_limit_note"] not in call.instructions
-    assert "web search" in call.instructions.lower()
+    unavailable_note = seeded_settings["reply_features_unavailable_note"]
+    assert unavailable_note.split("{features}")[0] in call.instructions
 
 
 def test_an_admin_edited_limit_note_is_used_in_the_next_reply(

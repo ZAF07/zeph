@@ -109,14 +109,14 @@ class WebSearchTools:
         Returns:
             The tools and their reply instructions.
         """
+        if not self._features.works_for(user_id, Feature.WEB_SEARCH):
+            return WebSearchOffer(tools=[], instructions="")
         settings = self._repositories.platform_settings
         usage = self._repositories.usage
         daily_limit = settings.get("web_search_daily_limit")
         today = user_today(self._repositories.users, user_id, self._clock.now())
         source_reminder = settings.get("web_result_source_reminder")
         used_today = usage.count_web_searches(user_id, today)
-        if not self._features.works_for(user_id, Feature.WEB_SEARCH):
-            return WebSearchOffer(tools=[], instructions="")
         if used_today >= daily_limit:
             return WebSearchOffer(
                 tools=[], instructions=settings.get("reply_web_search_limit_note")
