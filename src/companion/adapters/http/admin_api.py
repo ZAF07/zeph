@@ -82,7 +82,7 @@ from companion.core.models import (
 from companion.core.personal_stickers import PersonalStickerService
 from companion.core.platform_settings import (
     CORE_SERVICES,
-    SETTING_LABELS,
+    EDITABLE_SETTINGS_BY_KEY,
     InvalidSettingError,
     PlatformSettingsService,
 )
@@ -205,6 +205,14 @@ class ExtraPromptResponse(BaseModel):
 
     key: str
     label: str
+    hint: str | None
+
+
+class ExtraPromptGroupResponse(BaseModel):
+    """A named group of text settings shown with a core service's prompt."""
+
+    name: str
+    prompts: list[ExtraPromptResponse]
 
 
 class CoreServiceResponse(BaseModel):
@@ -216,6 +224,7 @@ class CoreServiceResponse(BaseModel):
     prompt_key: str
     model_key: str
     extra_prompts: list[ExtraPromptResponse]
+    extra_prompt_groups: list[ExtraPromptGroupResponse]
 
 
 class CoreServicesResponse(BaseModel):
@@ -700,6 +709,19 @@ def to_settings_response(settings: list[StoredSetting]) -> SettingsResponse:
     )
 
 
+def to_extra_prompt_response(key: str) -> ExtraPromptResponse:
+    """Describe a text setting shown with a core service's prompt.
+
+    Args:
+        key: The setting's key.
+
+    Returns:
+        The setting's key, label and hint.
+    """
+    setting = EDITABLE_SETTINGS_BY_KEY[key]
+    return ExtraPromptResponse(key=key, label=setting.label, hint=setting.hint)
+
+
 def to_feature_response(switch: FeatureSwitch) -> FeatureResponse:
     """Describe a Feature's switch for everyone for the admin area.
 
@@ -981,8 +1003,17 @@ def build_admin_api_router(
                     prompt_key=service.prompt_key,
                     model_key=service.model_key,
                     extra_prompts=[
-                        ExtraPromptResponse(key=key, label=SETTING_LABELS[key])
+                        to_extra_prompt_response(key)
                         for key in service.extra_prompt_keys
+                    ],
+                    extra_prompt_groups=[
+                        ExtraPromptGroupResponse(
+                            name=group.name,
+                            prompts=[
+                                to_extra_prompt_response(key) for key in group.keys
+                            ],
+                        )
+                        for group in service.extra_prompt_groups
                     ],
                 )
                 for service in CORE_SERVICES

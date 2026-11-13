@@ -288,11 +288,17 @@ def test_an_admin_edited_limit_note_is_used_in_the_next_reply(
 
     assert edited_note in call.instructions
     services = client.get("/api/admin/core-services", headers=admin).json()
-    extra_prompts = {
-        service["name"]: [prompt["key"] for prompt in service["extra_prompts"]]
+    [response_composition] = [
+        service
         for service in services["services"]
-    }
-    assert "reply_web_search_limit_note" in extra_prompts["Response composition"]
+        if service["name"] == "Response composition"
+    ]
+    grouped_keys = [
+        prompt["key"]
+        for group in response_composition["extra_prompt_groups"]
+        for prompt in group["prompts"]
+    ]
+    assert "reply_web_search_limit_note" in grouped_keys
 
 
 def test_the_reply_still_goes_when_the_web_search_fails(

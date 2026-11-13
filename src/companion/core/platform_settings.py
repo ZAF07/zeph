@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
+from companion.core.features import FEATURES_PLACEHOLDER, UNAVAILABLE_NOTE_SETTING
 from companion.core.message_retention import RETENTION_DAYS_SETTING
 from companion.core.models import StoredSetting, User
 from companion.core.ports import Clock, PlatformSettingsRepository
@@ -21,6 +22,19 @@ class SettingKind(StrEnum):
 
 
 @dataclass(frozen=True)
+class RequiredPlaceholder:
+    """A placeholder a text setting must keep.
+
+    Attributes:
+        text: The placeholder, e.g. "{helplines}".
+        meaning: What it stands for, as Admins are told when it is missing.
+    """
+
+    text: str
+    meaning: str
+
+
+@dataclass(frozen=True)
 class EditableSetting:
     """A platform setting Admins may change, and the rule its value must meet.
 
@@ -31,10 +45,9 @@ class EditableSetting:
         minimum: The smallest allowed whole number.
         maximum: The largest allowed whole number.
         max_length: The longest allowed text.
-        required_placeholder: A placeholder the text must keep, e.g.
-            "{helplines}"; None if there is none.
-        placeholder_meaning: What the placeholder stands for, as Admins are
-            told when it is missing.
+        required_placeholders: The placeholders the text must keep.
+        hint: One line on when the setting is used, shown under its label;
+            None if it needs none.
     """
 
     key: str
@@ -43,8 +56,21 @@ class EditableSetting:
     minimum: int = 0
     maximum: int = 0
     max_length: int = 20_000
-    required_placeholder: str | None = None
-    placeholder_meaning: str = ""
+    required_placeholders: tuple[RequiredPlaceholder, ...] = ()
+    hint: str | None = None
+
+
+@dataclass(frozen=True)
+class ExtraPromptGroup:
+    """A named group of extra prompts on a core service's card.
+
+    Attributes:
+        name: The group's name, as Admins see it.
+        keys: The text settings in the group, in order.
+    """
+
+    name: str
+    keys: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -59,6 +85,8 @@ class CoreService:
         model_key: The setting holding the model it uses.
         extra_prompt_keys: Other text settings shown with its prompt, e.g.
             a tool description it uses.
+        extra_prompt_groups: Other text settings shown with its prompt in
+            named groups.
     """
 
     name: str
@@ -67,6 +95,7 @@ class CoreService:
     prompt_key: str
     model_key: str
     extra_prompt_keys: tuple[str, ...] = ()
+    extra_prompt_groups: tuple[ExtraPromptGroup, ...] = ()
 
 
 EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
@@ -78,8 +107,9 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         "Crisis Reply",
         SettingKind.TEXT,
         max_length=4_000,
-        required_placeholder=HELPLINES_PLACEHOLDER,
-        placeholder_meaning="where the Helplines go",
+        required_placeholders=(
+            RequiredPlaceholder(HELPLINES_PLACEHOLDER, "where the Helplines go"),
+        ),
     ),
     EditableSetting("response_prompt", "Response composition prompt", SettingKind.TEXT),
     EditableSetting("response_model", "Response composition model", SettingKind.MODEL),
@@ -90,10 +120,101 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         max_length=4_000,
     ),
     EditableSetting(
+        "web_search_tool_description",
+        "web_search tool description",
+        SettingKind.TEXT,
+        max_length=4_000,
+    ),
+    EditableSetting(
+        "page_fetch_tool_description",
+        "fetch_page tool description",
+        SettingKind.TEXT,
+        max_length=4_000,
+    ),
+    EditableSetting(
+        "reply_web_search_instructions",
+        "Web search instructions",
+        SettingKind.TEXT,
+        max_length=4_000,
+        hint="Added to the reply instructions when web search is offered.",
+    ),
+    EditableSetting(
         "reply_web_search_limit_note",
         "Web Search Limit reached note",
         SettingKind.TEXT,
         max_length=2_000,
+        hint=(
+            "Used instead of the web search instructions once the User has "
+            "reached their Web Search Limit for the day."
+        ),
+    ),
+    EditableSetting(
+        "web_result_source_reminder",
+        "Web source reminder",
+        SettingKind.TEXT,
+        max_length=2_000,
+        hint="Put at the end of every web search result and page the reply reads.",
+    ),
+    EditableSetting(
+        "reply_settings_instructions",
+        "Settings in Chat instructions",
+        SettingKind.TEXT,
+        max_length=4_000,
+        hint=(
+            "Added to the reply instructions, so the reply can change the "
+            "User’s settings when they ask in chat."
+        ),
+    ),
+    EditableSetting(
+        "reply_delete_data_instructions",
+        "Delete data instructions",
+        SettingKind.TEXT,
+        max_length=4_000,
+        hint=(
+            "Used instead of the Settings in Chat instructions when Settings "
+            "in Chat doesn’t work for the User."
+        ),
+    ),
+    EditableSetting(
+        "reply_data_deletion_cancelled_note",
+        "Data deletion cancelled note",
+        SettingKind.TEXT,
+        max_length=2_000,
+        hint=(
+            "Added when the User’s message cancelled their request to delete "
+            "their data."
+        ),
+    ),
+    EditableSetting(
+        "reply_memory_intro",
+        "Memory intro",
+        SettingKind.TEXT,
+        max_length=2_000,
+        hint="Put before the User Memory given to each reply.",
+    ),
+    EditableSetting(
+        "reply_knowledge_intro",
+        "Knowledge intro",
+        SettingKind.TEXT,
+        max_length=2_000,
+        hint="Put before the Knowledge passages given to each reply.",
+    ),
+    EditableSetting(
+        UNAVAILABLE_NOTE_SETTING,
+        "Features unavailable note",
+        SettingKind.TEXT,
+        max_length=2_000,
+        required_placeholders=(
+            RequiredPlaceholder(
+                FEATURES_PLACEHOLDER,
+                "the names of the Features that don’t work for them",
+            ),
+            RequiredPlaceholder(DASHBOARD_URL_PLACEHOLDER, "the link to the Dashboard"),
+        ),
+        hint=(
+            "Added when a Feature doesn’t work for the User. {features} becomes "
+            "those Features’ names and {dashboard_url} the Dashboard’s address."
+        ),
     ),
     EditableSetting(
         "memory_processing_prompt",
@@ -230,8 +351,9 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         "“Finish onboarding first” reply",
         SettingKind.TEXT,
         max_length=1_000,
-        required_placeholder=DASHBOARD_URL_PLACEHOLDER,
-        placeholder_meaning="the link to the Dashboard",
+        required_placeholders=(
+            RequiredPlaceholder(DASHBOARD_URL_PLACEHOLDER, "the link to the Dashboard"),
+        ),
     ),
     EditableSetting(
         RETENTION_DAYS_SETTING,
@@ -285,7 +407,31 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         ),
         prompt_key="response_prompt",
         model_key="response_model",
-        extra_prompt_keys=("sticker_tool_description", "reply_web_search_limit_note"),
+        extra_prompt_groups=(
+            ExtraPromptGroup(
+                "Web search",
+                (
+                    "web_search_tool_description",
+                    "page_fetch_tool_description",
+                    "reply_web_search_instructions",
+                    "reply_web_search_limit_note",
+                    "web_result_source_reminder",
+                ),
+            ),
+            ExtraPromptGroup(
+                "Settings in chat",
+                (
+                    "reply_settings_instructions",
+                    "reply_delete_data_instructions",
+                    "reply_data_deletion_cancelled_note",
+                ),
+            ),
+            ExtraPromptGroup(
+                "Memory and Knowledge", ("reply_memory_intro", "reply_knowledge_intro")
+            ),
+            ExtraPromptGroup("Features", (UNAVAILABLE_NOTE_SETTING,)),
+            ExtraPromptGroup("Stickers", ("sticker_tool_description",)),
+        ),
     ),
     CoreService(
         name="Post-conversation processing",
@@ -349,8 +495,8 @@ CORE_SERVICES: tuple[CoreService, ...] = (
 )
 
 
-SETTING_LABELS: dict[str, str] = {
-    setting.key: setting.label for setting in EDITABLE_SETTINGS
+EDITABLE_SETTINGS_BY_KEY: dict[str, EditableSetting] = {
+    setting.key: setting for setting in EDITABLE_SETTINGS
 }
 
 
@@ -439,12 +585,12 @@ class PlatformSettingsService:
                     f"The {setting.label} must be at most "
                     f"{setting.max_length} characters."
                 )
-            placeholder = setting.required_placeholder
-            if placeholder is not None and placeholder not in value:
-                raise InvalidSettingError(
-                    f"The {setting.label} must include {placeholder}, "
-                    f"{setting.placeholder_meaning}."
-                )
+            for placeholder in setting.required_placeholders:
+                if placeholder.text not in value:
+                    raise InvalidSettingError(
+                        f"The {setting.label} must include {placeholder.text}, "
+                        f"{placeholder.meaning}."
+                    )
             return value.strip()
         if setting.kind == SettingKind.WHOLE_NUMBER:
             is_whole_number = isinstance(value, int) and not isinstance(value, bool)

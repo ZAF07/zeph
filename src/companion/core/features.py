@@ -13,6 +13,7 @@ from companion.core.models import (
 from companion.core.ports import Clock, Repositories
 
 UNAVAILABLE_NOTE_SETTING = "reply_features_unavailable_note"
+FEATURES_PLACEHOLDER = "{features}"
 
 
 @dataclass(frozen=True)
@@ -235,7 +236,7 @@ class FeatureService:
             return ""
         names = ", ".join(feature_details(feature).name for feature in unavailable)
         note: str = self._repositories.platform_settings.get(UNAVAILABLE_NOTE_SETTING)
-        return note.replace("{features}", names).replace(
+        return note.replace(FEATURES_PLACEHOLDER, names).replace(
             "{dashboard_url}", self._dashboard_url
         )
 
