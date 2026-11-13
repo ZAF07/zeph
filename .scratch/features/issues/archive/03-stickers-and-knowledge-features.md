@@ -64,4 +64,4 @@ Seam 3: `web/src/components/AdminFeatures.test.tsx` (Stickers and Knowledge rows
 ## Completion
 
 - Completed: 2026-11-13
-- Commit: 41766d3 "Features issue 03: Stickers and Knowledge join the Feature list…", review fixes 88ffc67 "Features issue 03 review fixes: Web Search test reuses the unavailable_note helper…", archive <archive commit> (merged from `feat/features-03-stickers-and-knowledge` in <merge commit>)
+- Commit: 41766d3 "Features issue 03: Stickers and Knowledge join the Feature list…", review fixes 88ffc67 "Features issue 03 review fixes: Web Search test reuses the unavailable_note helper…", archive 85900de "Features issue 03 done: archive issue with run evidence…" (merged from `feat/features-03-stickers-and-knowledge` in 002aa8b "Merge Features issue 03…")
