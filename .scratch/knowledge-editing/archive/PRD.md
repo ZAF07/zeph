@@ -1,6 +1,6 @@
 # PRD: View and edit Knowledge Documents
 
-Status: ready-for-agent
+Status: completed
 
 ## Problem Statement
 
@@ -135,3 +135,15 @@ Delete and Retry stay as they are.
 - Builds on issue 08 (archived: `.scratch/mvp/issues/archive/08-knowledge.md`) and MVP PRD user stories 74–75.
 - Two Admins editing the same document at once: the last save wins, as with other admin settings.
 - The "Owner’s summary" starter documents were drafted for the owner to review; this feature is how they will be adjusted.
+
+## Completion
+
+- Completed: 2026-11-13
+- Delivered by issues 01–05 (all archived in `.scratch/knowledge-editing/issues/archive/`):
+  - 01 View a Knowledge Document: 2f399ab, review fixes 93f5122, archive a26e040
+  - 02 Edit details: 39a9c27, review fixes a670bcb, archive 2415fc2
+  - 03 Edit text: 25b5bf8, review fixes a8e76ff, archive 90cdc88
+  - 04 Replace file: 00a1e6a, review fixes 1a1adb9, archive 23bb53a
+  - 05 Flaky view test fix: fc2828f
+- Checks on close-out (main at b7915bb): ruff, ruff format, mypy pass; pytest 342 passed; pnpm lint, format:check, typecheck pass; Vitest 263 passed
+- Commit: <filled in below>
