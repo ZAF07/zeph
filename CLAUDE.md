@@ -96,6 +96,21 @@ Every piece of work — feature, refactor, or bug — gets an issue file in `.sc
 
 ---
 
+## Git workflow (parallel agents)
+
+- You are working on your own feature branch in your own worktree. Never switch branches. Never push to main.
+- Only modify files needed for your task. Avoid editing shared files (lockfiles, migrations, global config, route registries) unless the task requires it, and mention it in the PR.
+- When done:
+  1. Commit with clear messages.
+  2. git fetch origin && git rebase origin/main
+  3. Resolve any conflicts, keeping both sides' intent.
+  4. Run the full test suite and build. Fix failures.
+  5. git push -u origin HEAD
+  6. Open a PR with `gh pr create --fill` (or tell me the branch is pushed).
+- If asked to "update from main": repeat steps 2–4, then `git push --force-with-lease`.
+
+---
+
 ## Definition of done
 
 A task is done when:
