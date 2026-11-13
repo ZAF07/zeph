@@ -134,4 +134,4 @@ Evidence:
 ## Completion
 
 - Completed: 2026-11-13
-- Commit: <to be filled in after merge>
+- Commit: a1aa137 "Photos issue 07: Photo Viewing is a Feature with the User's own switch", review fix ed5d16d "Photos issue 07 review fix: pass the Photo Viewing off note to photo_marker by keyword", archive ae8ad5b "Photos issue 07 done: archive issue with test, run, eval and review evidence; glossary says Photo Viewing is a Feature with the User's own switch" (merged from `photos-07-photo-viewing-feature` in 72d2ea9 "Merge photos issue 07: Photo Viewing is a Feature with the User's own switch…"). `make check` was green on the branch rebased onto e10e3e5: Python 534 passed, web 305 passed. The last rebase, onto the issue 24 grilling, changed only docs (`.scratch/`, `CONTEXT.md`), and the merge's tree is identical to the branch tip.
