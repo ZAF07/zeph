@@ -32,12 +32,16 @@ _Avoid_: Sticker pack, emoji set
 A photo a User sent the Companion that matters to them, picked when the Conversation ends and kept as part of their User Memory, with a detailed description written when it arrived and a note on why it matters. Other photos are used only in the Conversation they came in. The Companion works from the description and looks at the photo again only when the description can't answer. It may send a User's own Shared Photo back to them, the way a friend brings up an old memory. It stays after Message Retention deletes the message it came in, until the User deletes it.
 _Avoid_: Image, picture, attachment, media
 
+**Album**:
+Several photos a User sends at once. The Companion answers them as one message with one reply, and they count as one message toward the Daily Message Limit. It looks at only the first few, as many as Admins set, and says when it didn't look at the rest.
+_Avoid_: Media group, batch, gallery
+
 **Photo Viewing**:
 A User's choice, on by default, to let the Companion look at the photos they send. When it's off, the Companion doesn't look at their photos or keep them, answers only the caption and says plainly it didn't view the photo; their Shared Photos aren't used but aren't deleted. Every photo is still checked by the Safeguard, whatever this choice, and Users are told so plainly.
 _Avoid_: Image recognition, vision, photo mode
 
 **Unsupported Message**:
-Something a User sends that the Companion can't read yet, like a voice note, video, GIF or a file that isn't a photo. It gets a short in-character reply asking them to type instead; any caption it carries is answered like a message.
+Something a User sends that the Companion can't read yet, like a voice note, video, GIF or a file that isn't a photo. It gets a short in-character reply asking them to type instead; any caption it carries is answered like a message. One sent inside an Album is part of that Album's one message.
 _Avoid_: Media message, attachment
 
 **Feature**:

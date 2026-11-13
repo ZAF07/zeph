@@ -37,3 +37,7 @@ Record the date and the result under `## Comments`. If it no longer downloads, s
 ## Blocked by
 
 - `.scratch/photos/issues/01-companion-sees-a-photo.md`
+
+### 2026-11-13 — note from issue 03
+
+- Each saved photo (`ChannelPhoto` in a message's `photos`) now holds its own `description`, so memory processing can pick Shared Photos by photo, including photos from an album, without reading them back out of the message text. Album messages read "[photo 1: …] [photo 2: …] caption".
