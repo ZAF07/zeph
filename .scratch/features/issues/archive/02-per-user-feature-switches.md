@@ -62,4 +62,4 @@ Evidence: seam 1 `tests/test_features.py` (9 new: default follows everyone with 
 ## Completion
 
 - Completed: 2026-11-13
-- Commit: <to be filled in after merge>
+- Commit: 50fdada "Features issue 02: per-User Feature switches (default/on/off) in user_feature_switches…", review fixes 0161961 "Features issue 02 review fixes: one _require_user check…", archive 3f48771 "Features issue 02 done: archive issue with run evidence…" (merged from `feat/features-02-per-user-switches` in 47245cf "Merge Features issue 02…")
