@@ -27,6 +27,7 @@ function user(onboardingCompletedAt: string | null): Me {
     time_zone: null,
     ai_notice_acknowledged_at: null,
     user_memory_enabled: true,
+    user_memory_available: true,
     onboarding_completed_at: onboardingCompletedAt,
     role: "user",
     changed_in_chat: {},

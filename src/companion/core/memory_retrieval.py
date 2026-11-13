@@ -3,11 +3,13 @@ from datetime import datetime
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
+from companion.core.features import FeatureService
 from companion.core.models import (
     ChatLine,
     ChatRole,
     ConversationMessage,
     ConversationSummary,
+    Feature,
     MemoryCategory,
     MemoryItem,
 )
@@ -122,17 +124,22 @@ class MemoryRetrieval:
     """Finds the User Memory that matters for the message being answered."""
 
     def __init__(
-        self, repositories: Repositories, chat_model: UsageRecordingChatModel
+        self,
+        repositories: Repositories,
+        features: FeatureService,
+        chat_model: UsageRecordingChatModel,
     ) -> None:
         """Set up memory retrieval.
 
         Args:
             repositories: Where Users, Conversations, User Memory and
                 settings are stored.
+            features: Says whether User Memory works for the User.
             chat_model: Picks the Memory Categories that matter and records
                 the tokens used.
         """
         self._repositories = repositories
+        self._features = features
         self._chat_model = chat_model
 
     def recall(self, user_id: UUID, conversation_id: UUID) -> str:
@@ -143,7 +150,7 @@ class MemoryRetrieval:
         the newest Conversation Summaries. Archived categories are left out.
         The call is skipped when no pickable category has items, and a
         failed call still leaves the "always include" items. Nothing is
-        used when User Memory is off.
+        used when User Memory doesn't work for the User.
 
         Args:
             user_id: The User being answered.
@@ -153,7 +160,7 @@ class MemoryRetrieval:
             The memory section for the reply instructions; "" if none.
         """
         user = self._repositories.users.get(user_id)
-        if user is None or not user.user_memory_enabled:
+        if user is None or not self._features.works_for(user_id, Feature.USER_MEMORY):
             return ""
         user_memory = self._repositories.user_memory
         items = user_memory.list_items(user_id)

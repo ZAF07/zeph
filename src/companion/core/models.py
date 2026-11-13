@@ -1031,6 +1031,8 @@ class Feature(StrEnum):
     WEB_SEARCH = "web_search"
     STICKERS = "stickers"
     KNOWLEDGE = "knowledge"
+    CHECK_INS = "check_ins"
+    USER_MEMORY = "user_memory"
 
 
 @dataclass(frozen=True)
@@ -1069,6 +1071,7 @@ class FeatureReason(StrEnum):
     ON_FOR_USER = "on_for_user"
     OFF_FOR_EVERYONE = "off_for_everyone"
     OFF_FOR_USER = "off_for_user"
+    TURNED_OFF_BY_USER = "turned_off_by_user"
 
 
 @dataclass(frozen=True)
@@ -1077,7 +1080,9 @@ class FeatureStatus:
 
     Attributes:
         feature: The Feature.
-        works: Whether it works for the User right now.
+        available: Whether the Admin side allows it for the User.
+        works: Whether it works for the User right now: it is available and,
+            where the User has their own switch, they have it on.
         reason: Why it works or doesn't.
         switch: The Admin's switch for this User.
         changed_by_email: The email of the Admin who last changed the switch
@@ -1087,6 +1092,7 @@ class FeatureStatus:
     """
 
     feature: Feature
+    available: bool
     works: bool
     reason: FeatureReason
     switch: UserFeatureSwitch

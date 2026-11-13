@@ -5,12 +5,14 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from companion.core.features import FeatureService
 from companion.core.models import (
     ChatLine,
     ChatRole,
     Conversation,
     ConversationMessage,
     ConversationSummary,
+    Feature,
     MemoryCategory,
     MemoryChanges,
     MemoryItem,
@@ -223,6 +225,7 @@ class PostConversationProcessor:
     def __init__(
         self,
         repositories: Repositories,
+        features: FeatureService,
         chat_model: UsageRecordingChatModel,
         clock: Clock,
     ) -> None:
@@ -231,21 +234,23 @@ class PostConversationProcessor:
         Args:
             repositories: Where Users, Conversations, User Memory and
                 settings are stored.
+            features: Says whether User Memory works for the User.
             chat_model: Writes the summary and the Memory Item operations,
                 and records the tokens used.
             clock: Tells the current time.
         """
         self._repositories = repositories
+        self._features = features
         self._chat_model = chat_model
         self._clock = clock
 
     def process(self, conversation: Conversation) -> None:
         """Process one ended Conversation and mark it processed.
 
-        With User Memory off nothing is saved. One model call gives the
-        summary and the operations; an unreadable answer is asked again
-        once, and if it is still unreadable nothing is saved, so a bad
-        answer is never retried forever.
+        Nothing is saved when User Memory doesn't work for the User. One
+        model call gives the summary and the operations; an unreadable
+        answer is asked again once, and if it is still unreadable nothing is
+        saved, so a bad answer is never retried forever.
 
         Args:
             conversation: The ended Conversation.
@@ -257,7 +262,11 @@ class PostConversationProcessor:
         user_memory = self._repositories.user_memory
         user = self._repositories.users.get(conversation.user_id)
         messages = self._repositories.conversations.list_messages(conversation.id)
-        if user is None or not user.user_memory_enabled or not messages:
+        if (
+            user is None
+            or not self._features.works_for(user.id, Feature.USER_MEMORY)
+            or not messages
+        ):
             user_memory.save_processed_conversation(
                 conversation.id, self._clock.now(), None, NO_CHANGES
             )

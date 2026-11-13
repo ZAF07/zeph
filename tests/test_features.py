@@ -14,6 +14,7 @@ from tests.fakes import (
     FakeChatChannel,
     FakeClock,
     FakeEmbedder,
+    FakeScheduler,
     ScriptedChatModel,
     ToolCall,
 )
@@ -29,7 +30,11 @@ from tests.telegram_helpers import (
     telegram_sticker_update,
     telegram_text_update,
 )
+from tests.test_check_in_sending import send_answer, set_up_user_with_check_ins
 from tests.test_knowledge import BREATH_PASSAGES
+from tests.test_memory_retrieval import remember_some_things
+from tests.test_post_conversation import memory_contents, quiet_gap
+from tests.test_settings_via_chat import reply_call as chat_reply_call
 from tests.test_stickers import import_calm_creatures, list_stickers, save_note
 
 WEB_TOOLS = ("web_search", "fetch_page")
@@ -95,7 +100,13 @@ def test_admins_see_every_feature_on_for_everyone_with_no_change_yet(
 
     features = features_by_key(client, admin)
 
-    assert list(features) == ["web_search", "stickers", "knowledge"]
+    assert list(features) == [
+        "web_search",
+        "stickers",
+        "knowledge",
+        "check_ins",
+        "user_memory",
+    ]
     for feature in features.values():
         assert feature["name"]
         assert feature["description"]
@@ -303,6 +314,8 @@ def test_a_user_with_no_switch_of_their_own_follows_the_switch_for_everyone(
         "web_search",
         "stickers",
         "knowledge",
+        "check_ins",
+        "user_memory",
     ]
     assert on["name"] == "Web Search"
     assert on["switch"] == "default"
@@ -643,3 +656,242 @@ def test_with_knowledge_off_for_one_user_others_still_get_passages(
     assert status["reason"] == "off_for_user"
     assert BREATH_PASSAGES[0] not in maya_call.instructions
     assert BREATH_PASSAGES[0] in owner_call.instructions
+
+
+def test_user_memory_and_check_ins_say_when_the_user_turned_them_off(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    seeded_settings: dict[str, Any],
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    connect_telegram(client, auth_verifier, chat_channel)
+    user_id = maya_id(client, auth_verifier)
+    maya = auth_headers(auth_verifier, "user_maya")
+
+    client.patch("/api/me", json={"user_memory_enabled": False}, headers=maya)
+    features = user_features_by_key(client, admin, user_id)
+    call = reply_call(client, chat_model, "hello")
+
+    assert features["user_memory"]["name"] == "User Memory"
+    assert features["user_memory"]["switch"] == "default"
+    assert features["user_memory"]["works"] is False
+    assert features["user_memory"]["reason"] == "turned_off_by_user"
+    assert features["check_ins"]["name"] == "Check-ins"
+    assert features["check_ins"]["works"] is False
+    assert features["check_ins"]["reason"] == "turned_off_by_user"
+    assert unavailable_note(seeded_settings, "User Memory") not in call.instructions
+    assert unavailable_note(seeded_settings, "Check-ins") not in call.instructions
+
+
+def test_off_for_the_user_comes_before_the_users_own_switch(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    user_id = maya_id(client, auth_verifier)
+    maya = auth_headers(auth_verifier, "user_maya")
+    client.patch("/api/me", json={"user_memory_enabled": False}, headers=maya)
+
+    switch_for_everyone(client, admin, "user_memory", on=False)
+    off_for_everyone = user_features_by_key(client, admin, user_id)["user_memory"]
+    switch_for_user(client, admin, user_id, "user_memory", "off")
+    off_for_user = user_features_by_key(client, admin, user_id)["user_memory"]
+
+    assert off_for_everyone["reason"] == "off_for_everyone"
+    assert off_for_user["reason"] == "off_for_user"
+
+
+def test_with_user_memory_off_by_an_admin_no_memory_is_used_and_the_choice_is_kept(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    connect_telegram(client, auth_verifier, chat_channel)
+    user_id = maya_id(client, auth_verifier)
+    maya = auth_headers(auth_verifier, "user_maya")
+    remember_some_things(client, chat_model, clock, scheduler, seeded_settings)
+    note = unavailable_note(seeded_settings, "User Memory")
+
+    switch_for_user(client, admin, user_id, "user_memory", "off")
+    chat_model.retrieval_calls.clear()
+    off = reply_call(client, chat_model, "my sister called")
+    retrievals_while_off = list(chat_model.retrieval_calls)
+    me_while_off = client.get("/api/me", headers=maya).json()
+    memories_while_off = memory_contents(client, maya)
+    switch_for_user(client, admin, user_id, "user_memory", "default")
+    back_on = reply_call(client, chat_model, "my sister called")
+
+    assert retrievals_while_off == []
+    assert "Sister Jo" not in off.instructions
+    assert "Talked about work and family." not in off.instructions
+    assert note in off.instructions
+    assert me_while_off["user_memory_enabled"] is True
+    assert me_while_off["user_memory_available"] is False
+    assert "Sister Jo" in memories_while_off["Relationships"]
+    assert "Talked about work and family." in back_on.instructions
+    assert note not in back_on.instructions
+    assert client.get("/api/me", headers=maya).json()["user_memory_available"]
+
+
+def test_with_user_memory_off_by_an_admin_memories_can_still_be_deleted(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    connect_telegram(client, auth_verifier, chat_channel)
+    maya = auth_headers(auth_verifier, "user_maya")
+    remember_some_things(client, chat_model, clock, scheduler, seeded_settings)
+    switch_for_everyone(client, admin, "user_memory", on=False)
+
+    summaries = client.get("/api/conversation-summaries", headers=maya).json()
+    deleted_items = client.delete("/api/memory-items", headers=maya)
+    deleted_summary = client.delete(
+        f"/api/conversation-summaries/{summaries['summaries'][0]['id']}",
+        headers=maya,
+    )
+
+    assert deleted_items.status_code == 204
+    assert deleted_summary.status_code == 204
+    assert memory_contents(client, maya) == {}
+
+
+def test_a_user_cant_change_a_switch_an_admin_turned_off(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    maya = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    switch_for_everyone(client, admin, "user_memory", on=False)
+    switch_for_everyone(client, admin, "check_ins", on=False)
+
+    memory_change = client.patch(
+        "/api/me", json={"user_memory_enabled": False}, headers=maya
+    )
+    check_ins_change = client.patch(
+        "/api/check-ins", json={"enabled": False}, headers=maya
+    )
+    name_change = client.patch("/api/me", json={"name": "May"}, headers=maya)
+    check_ins = client.get("/api/check-ins", headers=maya).json()
+
+    assert memory_change.status_code == 403
+    assert check_ins_change.status_code == 403
+    assert name_change.status_code == 200
+    assert name_change.json()["user_memory_enabled"] is True
+    assert check_ins["enabled"] is True
+    assert check_ins["available"] is False
+
+
+def test_turning_user_memory_on_in_chat_is_refused_when_an_admin_turned_it_off(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    connect_telegram(client, auth_verifier, chat_channel)
+    maya = auth_headers(auth_verifier, "user_maya")
+    client.patch("/api/me", json={"user_memory_enabled": False}, headers=maya)
+    switch_for_everyone(client, admin, "user_memory", on=False)
+    call = chat_reply_call(
+        client,
+        chat_model,
+        "please remember things again",
+        ToolCall("turn_user_memory_on_or_off", {"on": True}),
+        "It isn't available on your account.",
+    )
+
+    [tool_result] = call.tool_results
+    assert "isn't available on their account" in tool_result
+    assert client.get("/api/me", headers=maya).json()["user_memory_enabled"] is False
+
+
+def test_with_user_memory_off_by_an_admin_conversation_end_keeps_nothing(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    connect_telegram(client, auth_verifier, chat_channel)
+    maya = auth_headers(auth_verifier, "user_maya")
+    switch_for_everyone(client, admin, "user_memory", on=False)
+
+    chat_model.script("sounds lovely")
+    send_to_webhook(client, telegram_text_update("I swim every morning"))
+    clock.advance(quiet_gap(seeded_settings) + timedelta(minutes=1))
+    scheduler.tick()
+
+    assert chat_model.processing_calls == []
+    summaries = client.get("/api/conversation-summaries", headers=maya).json()
+    assert summaries["summaries"] == []
+    assert memory_contents(client, maya) == {}
+
+
+def test_with_check_ins_off_by_an_admin_none_are_sent_until_it_is_back_on(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    maya = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    user_id = maya_id(client, auth_verifier)
+    switch_for_user(client, admin, user_id, "check_ins", "off")
+    chat_model.script(send_answer("hey Maya, how's it going?"))
+
+    clock.advance(timedelta(days=2))
+    scheduler.tick()
+    sent_while_off = list(chat_channel.sent)
+    calls_while_off = list(chat_model.calls)
+    check_ins_while_off = client.get("/api/check-ins", headers=maya).json()
+    home_while_off = client.get("/api/home", headers=maya).json()["check_ins"]
+    switch_for_user(client, admin, user_id, "check_ins", "default")
+    scheduler.tick()
+
+    assert sent_while_off == []
+    assert calls_while_off == []
+    assert home_while_off["enabled"] is True
+    assert home_while_off["available"] is False
+    assert check_ins_while_off["enabled"] is True
+    assert check_ins_while_off["recent"] == []
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["hey Maya, how's it going?"]
+
+
+def test_with_user_memory_off_by_an_admin_check_ins_are_chosen_without_memory(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    switch_for_everyone(client, admin, "user_memory", on=False)
+    chat_model.script(send_answer("hey Maya, how's your day going?"))
+
+    clock.advance(timedelta(days=1))
+    scheduler.tick()
+
+    [line] = chat_model.calls[-1].history
+    assert "A casual hello" in line.text
+    assert "A follow-up" not in line.text
+    assert "New job, running on autopilot." not in line.text
+    assert "User Memory is off" in line.text

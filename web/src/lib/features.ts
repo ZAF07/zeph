@@ -22,11 +22,15 @@ export function lastChangeNote(change: {
   return `Changed ${formatSavedAt(change.changed_at)}${changedBy}`;
 }
 
+/** What a User sees on a switch an Admin has turned off for them. */
+export const notAvailableText = "Not available on your account";
+
 const reasonTexts: Record<FeatureReason, string> = {
   on_for_everyone: "On: on for everyone",
   on_for_user: "On: turned on for this User",
   off_for_everyone: "Off: turned off for everyone",
   off_for_user: "Off: turned off for this User",
+  turned_off_by_user: "Off: the User turned it off",
 };
 
 /**

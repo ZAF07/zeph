@@ -5,6 +5,7 @@ from datetime import datetime, time, timedelta
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
+from companion.core.features import FeatureService
 from companion.core.memory_retrieval import format_day, format_memory
 from companion.core.models import (
     ChatLine,
@@ -18,6 +19,7 @@ from companion.core.models import (
     CheckInOutcome,
     CheckInSettings,
     CheckInStatus,
+    Feature,
     PauseLength,
     User,
 )
@@ -242,6 +244,7 @@ def describe_check_in(
     local_time: datetime,
     recent: str,
     memory: str,
+    user_memory_works: bool,
 ) -> str:
     """Write what the Check-in model is told to decide on a Check-in.
 
@@ -251,6 +254,7 @@ def describe_check_in(
         local_time: The User's local time now.
         recent: The User's recent Check-ins, as lines.
         memory: What is remembered about the User; "" if nothing.
+        user_memory_works: Whether User Memory works for the User.
 
     Returns:
         The Kinds, what to call the User, their local time, recent
@@ -259,7 +263,7 @@ def describe_check_in(
     kind_lines = "\n".join(f"- {kind.name}: {kind.description}" for kind in kinds)
     remembered = memory or (
         "Nothing remembered about them."
-        if user.user_memory_enabled
+        if user_memory_works
         else "User Memory is off, so you know nothing else about them."
     )
     return (
@@ -321,6 +325,7 @@ class CheckInService:
     def __init__(
         self,
         repositories: Repositories,
+        features: FeatureService,
         chat_model: UsageRecordingChatModel,
         chat_channel: ChatChannel,
         clock: Clock,
@@ -330,11 +335,13 @@ class CheckInService:
         Args:
             repositories: Where Users, Check-ins, Conversations and settings
                 are stored.
+            features: Says whether Check-ins and User Memory work for a User.
             chat_model: Writes each Check-in and records the tokens used.
             chat_channel: Sends Check-ins to Users.
             clock: Tells the current time.
         """
         self._repositories = repositories
+        self._features = features
         self._chat_model = chat_model
         self._chat_channel = chat_channel
         self._clock = clock
@@ -356,8 +363,14 @@ class CheckInService:
 
         Returns:
             The saved User.
+
+        Raises:
+            FeatureNotAvailableError: If it turns Check-ins on or off while
+                the Admin side has them off; nothing is changed.
         """
         current = user.check_ins
+        if changes.enabled not in (None, current.enabled):
+            self._features.require_available(user.id, Feature.CHECK_INS)
         updated = self.settings_after(current, changes)
         changed = []
         if updated.frequency != current.frequency:
@@ -500,10 +513,10 @@ class CheckInService:
 
         Returns:
             Every Check-in Kind in order; only those allowed without User
-            Memory when the User has it off.
+            Memory when it doesn't work for the User.
         """
         kinds = self._repositories.check_ins.list_kinds()
-        if user.user_memory_enabled:
+        if self._features.works_for(user.id, Feature.USER_MEMORY):
             return kinds
         return [kind for kind in kinds if kind.allowed_without_user_memory]
 
@@ -532,7 +545,7 @@ class CheckInService:
     def send_due(self) -> None:
         """Decide on a Check-in for every User who is due one right now.
 
-        A User is due when Check-ins are on, the frequency gap has passed,
+        A User is due when Check-ins work for them, the frequency gap has passed,
         they are not paused, it is outside their quiet hours, they have a
         Telegram Connection and no open Conversation. A decision that fails
         is logged and tried again on the next tick; the others still go
@@ -560,6 +573,8 @@ class CheckInService:
         Raises:
             InvalidCheckInAnswerError: If the model's answer can't be used.
         """
+        if not self._features.works_for(user.id, Feature.CHECK_INS):
+            return
         settings = user.check_ins
         local_time = local_now(now, user.time_zone)
         if settings.is_paused_at(now) or is_in_quiet_hours(settings, local_time.time()):
@@ -671,9 +686,10 @@ class CheckInService:
 
         Returns:
             Their Memory Items by active Memory Category and their newest
-            Conversation Summaries; "" if User Memory is off or empty.
+            Conversation Summaries; "" if User Memory doesn't work for the
+            User or is empty.
         """
-        if not user.user_memory_enabled:
+        if not self._features.works_for(user.id, Feature.USER_MEMORY):
             return ""
         user_memory = self._repositories.user_memory
         settings = self._repositories.platform_settings
@@ -717,6 +733,7 @@ class CheckInService:
                 self._recent(user, CHECK_INS_TOLD_TO_MODEL), user.time_zone
             ),
             self._memory(user),
+            self._features.works_for(user.id, Feature.USER_MEMORY),
         )
         answer = self._chat_model.generate(
             user_id=user.id,

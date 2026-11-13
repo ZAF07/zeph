@@ -108,22 +108,24 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     Returns:
         The FastAPI app.
     """
-    user_memory_service = UserMemoryService(
-        dependencies.repositories, dependencies.clock
-    )
-    usage_limiter = UsageLimiter(dependencies.repositories, dependencies.clock)
-    chat_model = UsageRecordingChatModel(dependencies.chat_model, usage_limiter)
     feature_service = FeatureService(
         dependencies.repositories, dependencies.clock, dependencies.dashboard_url
     )
+    user_memory_service = UserMemoryService(
+        dependencies.repositories, feature_service, dependencies.clock
+    )
+    usage_limiter = UsageLimiter(dependencies.repositories, dependencies.clock)
+    chat_model = UsageRecordingChatModel(dependencies.chat_model, usage_limiter)
     check_in_service = CheckInService(
         repositories=dependencies.repositories,
+        features=feature_service,
         chat_model=chat_model,
         chat_channel=dependencies.chat_channel,
         clock=dependencies.clock,
     )
     user_service = UserService(
         dependencies.repositories.users,
+        feature_service,
         user_memory_service,
         check_in_service,
         dependencies.clock,
@@ -159,6 +161,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             usage_limiter=usage_limiter,
             memory_retrieval=MemoryRetrieval(
                 repositories=dependencies.repositories,
+                features=feature_service,
                 chat_model=chat_model,
             ),
             knowledge_retrieval=KnowledgeRetrieval(
@@ -202,6 +205,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         repositories=dependencies.repositories,
         post_conversation=PostConversationProcessor(
             repositories=dependencies.repositories,
+            features=feature_service,
             chat_model=chat_model,
             clock=dependencies.clock,
         ),
@@ -254,6 +258,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 repositories=dependencies.repositories,
                 check_in_service=check_in_service,
             ),
+            feature_service=feature_service,
             platform_settings=dependencies.repositories.platform_settings,
             telegram_bot_username=dependencies.telegram_bot_username,
         )

@@ -74,6 +74,7 @@ describe("UserFeaturesPanel", () => {
     ["off_for_everyone", "default", "Off: turned off for everyone"],
     ["off_for_user", "off", "Off: turned off for this User"],
     ["on_for_user", "on", "On: turned on for this User"],
+    ["turned_off_by_user", "default", "Off: the User turned it off"],
   ] as const)("explains %s", async (reason, featureSwitch, text) => {
     apiClient.listUserFeatures.mockResolvedValue([
       {

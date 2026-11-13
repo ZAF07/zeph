@@ -8,6 +8,7 @@ import { LoadFailed } from "@/components/LoadFailed";
 import { MemoryItemsList } from "@/components/MemoryItemsList";
 import { Switch } from "@/components/Switch";
 import type { ConversationSummary, Me, MemoryGroup } from "@/lib/api-client";
+import { notAvailableText } from "@/lib/features";
 import { useApiClient } from "@/lib/use-api-client";
 
 type LoadState =
@@ -76,6 +77,12 @@ export function Memories() {
   }
 
   const memoryOn = state.kind === "loaded" && state.me.user_memory_enabled;
+  const memoryUnavailable =
+    state.kind === "loaded" && !state.me.user_memory_available;
+  let switchLabel = memoryOn ? "Memory on" : "Memory paused";
+  if (memoryUnavailable) {
+    switchLabel = notAvailableText;
+  }
 
   return (
     <>
@@ -93,13 +100,11 @@ export function Memories() {
         {state.kind === "loaded" ? (
           <div className="flex flex-col items-end gap-1.5">
             <div className="flex items-center gap-3 rounded-full border border-line bg-white py-1.5 pr-1.5 pl-[18px]">
-              <span className="text-sm font-medium">
-                {memoryOn ? "Memory on" : "Memory paused"}
-              </span>
+              <span className="text-sm font-medium">{switchLabel}</span>
               <Switch
                 label="Memory"
                 checked={memoryOn}
-                disabled={isSavingSwitch}
+                disabled={isSavingSwitch || memoryUnavailable}
                 onChange={(next) => void saveUserMemorySetting(next)}
               />
             </div>
@@ -116,7 +121,17 @@ export function Memories() {
         ) : null}
       </header>
 
-      {state.kind === "loaded" && !memoryOn ? (
+      {memoryUnavailable ? (
+        <p
+          role="status"
+          className="m-0 rounded-xl bg-yellow-tint px-4 py-3.5 text-sm text-yellow-deep"
+        >
+          Memory isn’t available on your account. Zeph won’t save anything new
+          and won’t use what’s below. Nothing has been deleted.
+        </p>
+      ) : null}
+
+      {state.kind === "loaded" && !memoryUnavailable && !memoryOn ? (
         <p
           role="status"
           className="m-0 rounded-xl bg-yellow-tint px-4 py-3.5 text-sm text-yellow-deep"

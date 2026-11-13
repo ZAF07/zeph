@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
 from companion.core.check_ins import CheckInService, RecentCheckIn
+from companion.core.features import FeatureNotAvailableError, FeatureService
 from companion.core.home import Home, HomeService
 from companion.core.message_retention import RETENTION_DAYS_SETTING
 from companion.core.models import (
@@ -19,6 +20,7 @@ from companion.core.models import (
     ConnectionToken,
     ConnectionTokenStatus,
     ConversationSummary,
+    Feature,
     MemoryGroup,
     MemoryItem,
     MemorySource,
@@ -47,12 +49,14 @@ class MeResponse(BaseModel):
     time_zone: str | None
     ai_notice_acknowledged_at: datetime | None
     user_memory_enabled: bool
+    user_memory_available: bool
     onboarding_completed_at: datetime | None
     role: UserRole
     changed_in_chat: dict[ChatSetting, datetime]
 
 
 DEFAULT_CHECK_INS = CheckInSettings()
+NOT_AVAILABLE = "Not available on your account"
 
 
 class OnboardingRequest(BaseModel):
@@ -118,6 +122,7 @@ class CheckInsResponse(BaseModel):
     """A User's Check-in settings and recent Check-ins; never a next time."""
 
     enabled: bool
+    available: bool
     frequency: CheckInFrequency
     quiet_hours_start: time
     quiet_hours_end: time
@@ -188,6 +193,7 @@ class HomeCheckInsResponse(BaseModel):
     """A User's Check-in status and the last Check-in sent; never a next time."""
 
     enabled: bool
+    available: bool
     frequency: CheckInFrequency
     quiet_hours_start: time
     quiet_hours_end: time
@@ -306,11 +312,13 @@ def to_recent_check_in_response(recent: RecentCheckIn) -> RecentCheckInResponse:
     )
 
 
-def to_me_response(user: User) -> MeResponse:
+def to_me_response(user: User, user_memory_available: bool) -> MeResponse:
     """Describe a User for the Dashboard.
 
     Args:
         user: The User.
+        user_memory_available: Whether the Admin side allows User Memory
+            for them.
 
     Returns:
         The response body.
@@ -325,6 +333,7 @@ def to_me_response(user: User) -> MeResponse:
         time_zone=user.time_zone,
         ai_notice_acknowledged_at=user.ai_notice_acknowledged_at,
         user_memory_enabled=user.user_memory_enabled,
+        user_memory_available=user_memory_available,
         onboarding_completed_at=user.onboarding_completed_at,
         role=user.role,
         changed_in_chat=user.settings_changed_in_chat,
@@ -339,6 +348,7 @@ def build_dashboard_api_router(
     telegram_connection_service: TelegramConnectionService,
     user_data_service: UserDataService,
     home_service: HomeService,
+    feature_service: FeatureService,
     platform_settings: PlatformSettingsRepository,
     telegram_bot_username: str,
 ) -> APIRouter:
@@ -355,6 +365,8 @@ def build_dashboard_api_router(
         telegram_connection_service: Issues tokens and reports connection status.
         user_data_service: Deletes the User's data or account.
         home_service: Gathers what the Dashboard home shows.
+        feature_service: Says whether the Admin side allows User Memory and
+            Check-ins for the User.
         platform_settings: Admin-managed wording shown on the Dashboard.
         telegram_bot_username: The Companion's Telegram @username, for deep links.
 
@@ -363,6 +375,19 @@ def build_dashboard_api_router(
     """
     router = APIRouter(prefix="/api")
     telegram_chat_url = f"https://t.me/{telegram_bot_username}"
+
+    def me_response(user: User) -> MeResponse:
+        """Describe a User, with whether User Memory is available to them.
+
+        Args:
+            user: The User.
+
+        Returns:
+            The response body.
+        """
+        return to_me_response(
+            user, feature_service.available_for(user.id, Feature.USER_MEMORY)
+        )
 
     def to_check_ins_response(user: User) -> CheckInsResponse:
         """Describe a User's Check-in settings and recent Check-ins.
@@ -378,6 +403,7 @@ def build_dashboard_api_router(
         is_paused = check_in_service.is_paused(user)
         return CheckInsResponse(
             enabled=settings.enabled,
+            available=feature_service.available_for(user.id, Feature.CHECK_INS),
             frequency=settings.frequency,
             quiet_hours_start=settings.quiet_hours_start,
             quiet_hours_end=settings.quiet_hours_end,
@@ -440,6 +466,7 @@ def build_dashboard_api_router(
             last_conversation_at=home.last_conversation_at,
             check_ins=HomeCheckInsResponse(
                 enabled=settings.enabled,
+                available=feature_service.available_for(user.id, Feature.CHECK_INS),
                 frequency=settings.frequency,
                 quiet_hours_start=settings.quiet_hours_start,
                 quiet_hours_end=settings.quiet_hours_end,
@@ -476,7 +503,7 @@ def build_dashboard_api_router(
         Returns:
             The User.
         """
-        return to_me_response(user)
+        return me_response(user)
 
     @router.patch("/me")
     def update_me(
@@ -492,7 +519,8 @@ def build_dashboard_api_router(
             The updated User.
 
         Raises:
-            HTTPException: 422 if a new value is not acceptable.
+            HTTPException: 422 if a new value is not acceptable; 403 if it
+                changes User Memory while the Admin side has it off.
         """
         changes = PreferenceChanges(
             name=request.name,
@@ -501,11 +529,13 @@ def build_dashboard_api_router(
             time_zone=request.time_zone,
         )
         try:
-            return to_me_response(user_service.update_preferences(user, changes))
+            return me_response(user_service.update_preferences(user, changes))
         except InvalidProfileError as error:
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
             ) from error
+        except FeatureNotAvailableError as error:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, NOT_AVAILABLE) from error
 
     @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
     def delete_account(user: Annotated[User, Depends(current_user)]) -> Response:
@@ -576,7 +606,7 @@ def build_dashboard_api_router(
             ),
         )
         try:
-            return to_me_response(user_service.complete_onboarding(user, answers))
+            return me_response(user_service.complete_onboarding(user, answers))
         except InvalidProfileError as error:
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
@@ -619,6 +649,10 @@ def build_dashboard_api_router(
 
         Returns:
             The updated settings and recent Check-ins.
+
+        Raises:
+            HTTPException: 403 if it turns Check-ins on or off while the Admin
+                side has them off.
         """
         changes = CheckInChanges(
             enabled=request.enabled,
@@ -626,7 +660,11 @@ def build_dashboard_api_router(
             quiet_hours_start=request.quiet_hours_start,
             quiet_hours_end=request.quiet_hours_end,
         )
-        return to_check_ins_response(check_in_service.change_settings(user, changes))
+        try:
+            saved = check_in_service.change_settings(user, changes)
+        except FeatureNotAvailableError as error:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, NOT_AVAILABLE) from error
+        return to_check_ins_response(saved)
 
     @router.put("/check-ins/pause")
     def pause_check_ins(

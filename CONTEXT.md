@@ -41,7 +41,7 @@ Something a User sends that the Companion can't read yet, like a voice note or f
 _Avoid_: Media message, attachment
 
 **Feature**:
-An extra the Companion offers that can be switched off: Web Search, Check-ins, User Memory, Photo Viewing, Stickers, Knowledge and Settings in Chat. Admins switch each one on or off for everyone, and for individual Users; a choice for one User overrides the one for everyone. A Feature works for a User only when the Admins allow it and, where the User has their own switch, the User has it on. Delete My Data works in chat even when Settings in Chat is off. Safety and a User's rights and privacy are never Features: the Safeguard and Crisis Reply, the AI Notice, Delete My Data and seeing their own data on the Dashboard are always there.
+An extra the Companion offers that can be switched off: Web Search, Check-ins, User Memory, Photo Viewing, Stickers, Knowledge and Settings in Chat. Admins switch each one on or off for everyone, and for individual Users; a choice for one User overrides the one for everyone. A Feature works for a User only when the Admins allow it and, where the User has their own switch (User Memory, Check-ins), the User has it on. A switch the Admins don't allow shows as "Not available on your account" on the Dashboard and can't be changed; the Admins' choice never changes the User's own. Delete My Data works in chat even when Settings in Chat is off. Safety and a User's rights and privacy are never Features: the Safeguard and Crisis Reply, the AI Notice, Delete My Data and seeing their own data on the Dashboard are always there.
 _Avoid_: Capability, add-on, perk, entitlement
 
 **Telegram Connection**:
@@ -57,7 +57,7 @@ A run of messages between a User and the Companion that ends after a quiet gap (
 _Avoid_: Session, thread, chat
 
 **Check-in**:
-A message the Companion sends first, unprompted, to a User who has opted in — meant to feel like a friend reaching out, not a task reminder. When the User is due (their frequency gap has passed), not paused, outside their Quiet Hours and not mid-Conversation, the Companion either sends one of a Check-in Kind or skips it. The User's first message within the reply window (set by an Admin) is its reply; after that it had no reply. Users never see when the next one will come.
+A message the Companion sends first, unprompted, to a User who has opted in — meant to feel like a friend reaching out, not a task reminder. When the User is due (their frequency gap has passed), not paused, outside their Quiet Hours and not mid-Conversation, the Companion either sends one of a Check-in Kind or skips it. Check-ins are a Feature: when an Admin has them off for a User, none are decided or sent, and the User's own Check-in settings are kept for when they are back on. The User's first message within the reply window (set by an Admin) is its reply; after that it had no reply. Users never see when the next one will come.
 _Avoid_: Notification, nudge, reminder, push
 
 **Quiet Hours**:
@@ -125,7 +125,7 @@ _Avoid_: Alert, incident, flag
 ### User Memory
 
 **User Memory**:
-Everything the Companion has retained about a specific User, made up of Memory Items, Conversation Summaries and Shared Photos. The User can turn it off: then nothing new is kept and the Companion doesn't use what it has, but nothing is deleted until the User deletes it.
+Everything the Companion has retained about a specific User, made up of Memory Items, Conversation Summaries and Shared Photos. The User can turn it off: then nothing new is kept and the Companion doesn't use what it has, but nothing is deleted until the User deletes it. It is also a Feature: an Admin turning it off for a User has exactly the same effect, keeps the User's own choice for when it is back on, and still lets the User see and delete their memories.
 _Avoid_: Memory, profile, history, context
 
 **Memory Item**:

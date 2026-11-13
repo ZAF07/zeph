@@ -16,6 +16,7 @@ vi.mock("@/lib/use-api-client", () => ({
 function checkInsWith(overrides: Partial<HomeCheckIns> = {}): HomeCheckIns {
   return {
     enabled: true,
+    available: true,
     frequency: "few_times_a_week",
     quiet_hours_start: "22:00:00",
     quiet_hours_end: "07:30:00",
@@ -192,6 +193,22 @@ describe("DashboardHome", () => {
       within(checkIns).getByText("Zeph only replies when you message"),
     ).toBeInTheDocument();
     expect(within(checkIns).queryByText(/^Last Check-in/)).toBeNull();
+  });
+
+  it("shows Check-ins as not available when an Admin has them off", async () => {
+    apiClient.getHome.mockResolvedValue(
+      homeWith({ check_ins: checkInsWith({ available: false }) }),
+    );
+
+    render(<DashboardHome />);
+
+    await screen.findByRole("heading", { name: "Good evening, Maya." });
+    const checkIns = section("Check-ins");
+    expect(within(checkIns).getByText("Off")).toBeInTheDocument();
+    expect(
+      within(checkIns).getByText("Not available on your account"),
+    ).toBeInTheDocument();
+    expect(within(checkIns).queryByText(/A casual hello/)).toBeNull();
   });
 
   it("shows Goals and recent Memory Items, each linking to Memories", async () => {

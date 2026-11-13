@@ -24,6 +24,7 @@ const maya = userWithRole("user");
 function checkInsWith(overrides: Partial<CheckIns> = {}): CheckIns {
   return {
     enabled: true,
+    available: true,
     frequency: "few_times_a_week",
     quiet_hours_start: "22:00:00",
     quiet_hours_end: "07:30:00",
@@ -173,6 +174,24 @@ describe("CheckInsSettings", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByText("Check-ins off")).toBeInTheDocument();
+  });
+
+  it("shows Not available on your account with the switch disabled", async () => {
+    apiClient.getCheckIns.mockResolvedValue(checkInsWith({ available: false }));
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    const checkInsSwitch = screen.getByRole("switch", { name: "Check-ins" });
+    expect(checkInsSwitch).toBeDisabled();
+    expect(checkInsSwitch).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText("Not available on your account")).toBeVisible();
+    expect(
+      screen.getByText(
+        "Check-ins aren’t available on your account, so Zeph won’t message you first. Your settings are kept.",
+      ),
+    ).toBeVisible();
+    await user.click(checkInsSwitch);
+    expect(apiClient.updateCheckIns).not.toHaveBeenCalled();
   });
 
   it("pauses for a week, says until when, and can resume", async () => {
