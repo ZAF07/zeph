@@ -885,6 +885,44 @@ class PostgresConversationRepository:
                 .values(last_message_at=message.sent_at)
             )
 
+    def add_message_if_open(self, message: ConversationMessage) -> bool:
+        """Save a message, but only if its Conversation has not been ended.
+
+        The Conversation row is updated first, which locks it, so `end_quiet`
+        running at the same time either waits and then sees the new message,
+        or ends the Conversation first and the message is refused.
+
+        Args:
+            message: The message to save.
+
+        Returns:
+            True if it was saved; False if the Conversation was ended.
+        """
+        with self._engine.begin() as connection:
+            open_conversation = connection.execute(
+                update(conversations)
+                .where(
+                    conversations.c.id == message.conversation_id,
+                    conversations.c.ended_at.is_(None),
+                )
+                .values(last_message_at=message.sent_at)
+                .returning(conversations.c.id)
+            ).first()
+            if open_conversation is None:
+                return False
+            connection.execute(
+                insert(conversation_messages).values(
+                    id=message.id,
+                    conversation_id=message.conversation_id,
+                    direction=message.direction.value,
+                    kind=message.kind.value,
+                    content=message.content,
+                    sent_at=message.sent_at,
+                    photos=[asdict(photo) for photo in message.photos],
+                )
+            )
+        return True
+
     def list_messages(self, conversation_id: UUID) -> list[ConversationMessage]:
         """List a Conversation's messages in the order they were saved.
 

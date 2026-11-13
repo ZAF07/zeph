@@ -57,7 +57,7 @@ A one-time, short-lived code from the Dashboard that a User sends to the Compani
 _Avoid_: Link code, invite, pairing code
 
 **Conversation**:
-A run of messages between a User and the Companion that ends after a quiet gap (set by an Admin) with no message from either side. Once ended it never reopens: the next message starts a new Conversation. A reply to a Check-in also starts one, beginning with that Check-in.
+A run of messages between a User and the Companion that ends after a quiet gap (set by an Admin) with no message from either side. Once ended it never reopens: the next message starts a new Conversation, even one that arrives just as it ends. A reply to a Check-in also starts one, beginning with that Check-in.
 _Avoid_: Session, thread, chat
 
 **Check-in**:

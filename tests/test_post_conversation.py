@@ -1,9 +1,13 @@
 import json
 from datetime import timedelta
 from typing import Any
+from uuid import UUID
 
+import pytest
 from fastapi.testclient import TestClient
 
+from companion.adapters.postgres.repositories import PostgresConversationRepository
+from companion.core.models import Conversation
 from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
@@ -377,4 +381,56 @@ def test_an_updated_onboarding_memory_survives_answering_onboarding_again(
     assert memory_contents(client, headers)["Life details"] == [
         "Goes by May",
         "Goes by Maya",
+    ]
+
+
+def test_a_message_caught_by_the_tick_joins_a_new_conversation(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    headers = auth_headers(auth_verifier, "user_maya")
+    chat_model.script("mm, I hear you")
+    send_to_webhook(client, telegram_text_update("long day"))
+    clock.advance(quiet_gap(seeded_settings) - timedelta(seconds=30))
+    find_latest = PostgresConversationRepository.get_latest_for_user
+    ticked = False
+
+    def find_latest_then_tick_once(
+        repository: PostgresConversationRepository, user_id: UUID
+    ) -> Conversation | None:
+        nonlocal ticked
+        latest = find_latest(repository, user_id)
+        if not ticked:
+            ticked = True
+            clock.advance(timedelta(minutes=1))
+            chat_model.script_processing(processing_answer(summary="Had a long day."))
+            scheduler.tick()
+        return latest
+
+    monkeypatch.setattr(
+        PostgresConversationRepository,
+        "get_latest_for_user",
+        find_latest_then_tick_once,
+    )
+    chat_model.script("oh no, what happened?")
+    send_to_webhook(client, telegram_text_update("my boss yelled at me"))
+    clock.advance(quiet_gap(seeded_settings) + timedelta(minutes=1))
+    chat_model.script_processing(processing_answer(summary="Boss yelled at them."))
+    scheduler.tick()
+
+    first_processed, second_processed = chat_model.processing_calls
+    assert "my boss yelled at me" not in first_processed.history[0].text
+    assert "my boss yelled at me" in second_processed.history[0].text
+    assert "oh no, what happened?" in second_processed.history[0].text
+    summaries = client.get("/api/conversation-summaries", headers=headers).json()
+    assert [entry["summary"] for entry in summaries["summaries"]] == [
+        "Boss yelled at them.",
+        "Had a long day.",
     ]
