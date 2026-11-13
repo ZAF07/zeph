@@ -4,9 +4,11 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from companion.core.check_ins import CheckInService
+from companion.core.features import FeatureService
 from companion.core.models import (
     AccountIdentity,
     ChatSetting,
+    Feature,
     OnboardingAnswers,
     PreferenceChanges,
     User,
@@ -86,6 +88,7 @@ class UserService:
     def __init__(
         self,
         users: UserRepository,
+        features: FeatureService,
         user_memory: UserMemoryService,
         check_ins: CheckInService,
         clock: Clock,
@@ -95,6 +98,7 @@ class UserService:
 
         Args:
             users: Where Users are stored.
+            features: Says whether the Admin side allows User Memory.
             user_memory: Saves onboarding answers as Memory Items.
             check_ins: Works out the Check-in settings onboarding chooses.
             clock: Tells the current time.
@@ -102,6 +106,7 @@ class UserService:
                 Admins on first sign-in.
         """
         self._users = users
+        self._features = features
         self._user_memory = user_memory
         self._check_ins = check_ins
         self._clock = clock
@@ -210,9 +215,12 @@ class UserService:
 
         Raises:
             InvalidProfileError: If a new value is not acceptable.
+            FeatureNotAvailableError: If it turns User Memory on or off while
+                the Admin side has it off; nothing is changed.
         """
         changed = []
         if changes.user_memory_enabled not in (None, user.user_memory_enabled):
+            self._features.require_available(user.id, Feature.USER_MEMORY)
             changed.append(ChatSetting.USER_MEMORY)
         if changes.time_zone not in (None, user.time_zone):
             changed.append(ChatSetting.TIME_ZONE)

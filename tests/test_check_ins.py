@@ -18,6 +18,7 @@ def test_check_ins_are_off_by_default_after_onboarding(
 
     assert check_ins == {
         "enabled": False,
+        "available": True,
         "frequency": "few_times_a_week",
         "quiet_hours_start": "22:00:00",
         "quiet_hours_end": "07:30:00",

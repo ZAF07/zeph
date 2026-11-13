@@ -46,6 +46,7 @@ const onboardedUser: Me = {
   time_zone: "Asia/Singapore",
   ai_notice_acknowledged_at: "2026-11-11T09:00:00Z",
   user_memory_enabled: true,
+  user_memory_available: true,
   onboarding_completed_at: "2026-11-11T09:00:00Z",
   role: "user",
   changed_in_chat: {},
@@ -177,6 +178,24 @@ describe("AccountSettings", () => {
     await vi.waitFor(() =>
       expect(memorySwitch).toHaveAttribute("aria-checked", "false"),
     );
+  });
+
+  it("shows Not available on your account with the User Memory switch disabled", async () => {
+    apiClient.getMe.mockResolvedValue({
+      ...onboardedUser,
+      user_memory_available: false,
+    });
+    const user = userEvent.setup();
+    render(<AccountSettings />);
+    const memorySwitch = await screen.findByRole("switch", {
+      name: "Remember meaningful details",
+    });
+
+    expect(memorySwitch).toBeDisabled();
+    expect(memorySwitch).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText("Not available on your account")).toBeVisible();
+    await user.click(memorySwitch);
+    expect(apiClient.updatePreferences).not.toHaveBeenCalled();
   });
 
   it("offers Try again when the account cannot be loaded", async () => {

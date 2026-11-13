@@ -264,6 +264,30 @@ describe("Memories", () => {
     );
   });
 
+  it("shows Not available on your account with the switch disabled, and memories still deletable", async () => {
+    apiClient.getMe.mockResolvedValue({
+      ...maya,
+      user_memory_available: false,
+    });
+    const user = userEvent.setup();
+    render(<Memories />);
+
+    const memorySwitch = await screen.findByRole("switch", { name: "Memory" });
+    expect(memorySwitch).toBeDisabled();
+    expect(memorySwitch).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText("Not available on your account")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Memory isn’t available on your account. Zeph won’t save anything new and won’t use what’s below. Nothing has been deleted.",
+    );
+    await user.click(memorySwitch);
+    expect(apiClient.updatePreferences).not.toHaveBeenCalled();
+
+    await user.click(
+      screen.getByRole("button", { name: "Delete memory: Goes by Maya" }),
+    );
+    expect(apiClient.deleteMemoryItem).toHaveBeenCalledWith("item-2");
+  });
+
   it("explains when nothing has been remembered yet", async () => {
     apiClient.listMemoryGroups.mockResolvedValue([]);
     render(<Memories />);

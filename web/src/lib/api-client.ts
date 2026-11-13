@@ -37,7 +37,8 @@ export type ChatSetting =
 /**
  * The signed-in User, with their profile and preferences. `changed_in_chat`
  * says when each setting was last changed in chat; a setting changed on the
- * Dashboard since is left out.
+ * Dashboard since is left out. `user_memory_available` is false when an
+ * Admin has User Memory off for them, so they can't switch it.
  */
 export type Me = {
   id: string;
@@ -49,6 +50,7 @@ export type Me = {
   time_zone: string | null;
   ai_notice_acknowledged_at: string | null;
   user_memory_enabled: boolean;
+  user_memory_available: boolean;
   onboarding_completed_at: string | null;
   role: UserRole;
   changed_in_chat: Partial<Record<ChatSetting, string>>;
@@ -102,10 +104,12 @@ export type CheckInKindSummary = {
 /**
  * A User's Check-in settings and recent Check-ins. Quiet hours are local
  * times like "22:00:00"; `paused_until` is null while paused until resumed.
- * There is never a next Check-in time.
+ * `available` is false when an Admin has Check-ins off for them, so they
+ * can't switch them. There is never a next Check-in time.
  */
 export type CheckIns = {
   enabled: boolean;
+  available: boolean;
   frequency: CheckInFrequency;
   quiet_hours_start: string;
   quiet_hours_end: string;
@@ -159,7 +163,8 @@ export type RoleChange = {
 };
 
 /** An extra the Companion offers that Admins can switch off. */
-export type Feature = "web_search" | "stickers" | "knowledge";
+export type Feature =
+  "web_search" | "stickers" | "knowledge" | "check_ins" | "user_memory";
 
 /** A Feature's switch for everyone and who last changed it, and when. */
 export type FeatureSwitch = {
@@ -176,7 +181,11 @@ export type UserFeatureSwitch = "default" | "on" | "off";
 
 /** Why a Feature works, or doesn't, for a User right now. */
 export type FeatureReason =
-  "on_for_everyone" | "on_for_user" | "off_for_everyone" | "off_for_user";
+  | "on_for_everyone"
+  | "on_for_user"
+  | "off_for_everyone"
+  | "off_for_user"
+  | "turned_off_by_user";
 
 /** Whether a Feature works for one User, why, and the Admin's switch for them. */
 export type UserFeatureStatus = {

@@ -55,7 +55,37 @@ FEATURES: tuple[FeatureDetails, ...] = (
             "library that may fit the message."
         ),
     ),
+    FeatureDetails(
+        feature=Feature.CHECK_INS,
+        name="Check-ins",
+        description=(
+            "Zeph can message a User first now and then. It works only while "
+            "the User has Check-ins on too."
+        ),
+    ),
+    FeatureDetails(
+        feature=Feature.USER_MEMORY,
+        name="User Memory",
+        description=(
+            "Zeph keeps and uses what matters about a User. It works only "
+            "while the User has User Memory on too. Turning it off deletes "
+            "nothing."
+        ),
+    ),
 )
+
+
+class FeatureNotAvailableError(Exception):
+    """Raised when a User changes their own switch while the Admin side has it off."""
+
+    def __init__(self, feature: Feature) -> None:
+        """Remember which Feature it was.
+
+        Args:
+            feature: The Feature that isn't available.
+        """
+        super().__init__(f"{feature_details(feature).name} isn't available")
+        self.feature = feature
 
 
 def feature_details(feature: Feature) -> FeatureDetails:
@@ -103,10 +133,37 @@ class FeatureService:
         Returns:
             True if the Feature works for them.
         """
-        return feature not in self.unavailable_for(user_id)
+        return self._status(user_id, feature).works
+
+    def available_for(self, user_id: UUID, feature: Feature) -> bool:
+        """Say whether the Admin side allows a Feature for a User.
+
+        Args:
+            user_id: The User.
+            feature: The Feature.
+
+        Returns:
+            True if the Admin side allows it, whatever the User's own switch.
+        """
+        return self._status(user_id, feature).available
+
+    def require_available(self, user_id: UUID, feature: Feature) -> None:
+        """Make sure the Admin side allows a Feature for a User.
+
+        Args:
+            user_id: The User.
+            feature: The Feature.
+
+        Raises:
+            FeatureNotAvailableError: If the Admin side has it off.
+        """
+        if not self.available_for(user_id, feature):
+            raise FeatureNotAvailableError(feature)
 
     def unavailable_for(self, user_id: UUID) -> list[Feature]:
-        """List the Features that don't work for a User right now.
+        """List the Features the Admin side has off for a User.
+
+        Features the User turned off themselves aren't listed.
 
         Args:
             user_id: The User.
@@ -115,7 +172,7 @@ class FeatureService:
             The Features, in the order of `FEATURES`.
         """
         return [
-            status.feature for status in self._statuses(user_id) if not status.works
+            status.feature for status in self._statuses(user_id) if not status.available
         ]
 
     def unavailable_note(self, user_id: UUID) -> str:
@@ -241,6 +298,20 @@ class FeatureService:
         if self._repositories.users.get(user_id) is None:
             raise UserNotFoundError(user_id)
 
+    def _status(self, user_id: UUID, feature: Feature) -> FeatureStatus:
+        """Work out one Feature's status for a User.
+
+        Args:
+            user_id: The User.
+            feature: The Feature.
+
+        Returns:
+            Its status.
+        """
+        return next(
+            status for status in self._statuses(user_id) if status.feature == feature
+        )
+
     def _statuses(self, user_id: UUID) -> list[FeatureStatus]:
         """Work out each Feature's status for a User, without checking they exist.
 
@@ -250,48 +321,81 @@ class FeatureService:
         Returns:
             One status per Feature, in the order of `FEATURES`.
         """
+        user = self._repositories.users.get(user_id)
         user_switches = {
             switch.feature: switch
             for switch in self._repositories.feature_switches.list_for_user(user_id)
         }
         return [
-            status_for(everyone_switch, user_switches.get(everyone_switch.feature))
+            status_for(
+                everyone_switch,
+                user_switches.get(everyone_switch.feature),
+                own_switch_on(user, everyone_switch.feature),
+            )
             for everyone_switch in self.list_for_everyone()
         ]
 
 
+def own_switch_on(user: User | None, feature: Feature) -> bool | None:
+    """Read the User's own switch for a Feature, where they have one.
+
+    Args:
+        user: The User; None if there is no such User.
+        feature: The Feature.
+
+    Returns:
+        Whether the User has it on; None when the Feature has no switch of
+        the User's own.
+    """
+    if user is None:
+        return None
+    if feature == Feature.USER_MEMORY:
+        return user.user_memory_enabled
+    if feature == Feature.CHECK_INS:
+        return user.check_ins.enabled
+    return None
+
+
 def status_for(
-    everyone_switch: FeatureSwitch, user_switch: FeatureSwitch | None
+    everyone_switch: FeatureSwitch,
+    user_switch: FeatureSwitch | None,
+    own_switch: bool | None,
 ) -> FeatureStatus:
-    """Apply the rule: the User's switch if set, otherwise the one for everyone.
+    """Apply the rule for whether a Feature works for a User, and why.
+
+    The Admin side is the switch for this User if set, otherwise the one for
+    everyone. The Feature works when the Admin side is on and the User's own
+    switch, where they have one, is on too.
 
     Args:
         everyone_switch: The Feature's switch for everyone.
         user_switch: The Feature's switch for this User; None when "default".
+        own_switch: The User's own switch; None when they have none.
 
     Returns:
         Whether the Feature works for the User, why, and their switch.
     """
     if user_switch is None:
-        return FeatureStatus(
-            feature=everyone_switch.feature,
-            works=everyone_switch.on,
-            reason=(
-                FeatureReason.ON_FOR_EVERYONE
-                if everyone_switch.on
-                else FeatureReason.OFF_FOR_EVERYONE
-            ),
-            switch=UserFeatureSwitch.DEFAULT,
-            changed_by_email=None,
-            changed_at=None,
+        available = everyone_switch.on
+        switch = UserFeatureSwitch.DEFAULT
+        admin_reason = (
+            FeatureReason.ON_FOR_EVERYONE
+            if available
+            else FeatureReason.OFF_FOR_EVERYONE
         )
+    else:
+        available = user_switch.on
+        switch = UserFeatureSwitch.ON if available else UserFeatureSwitch.OFF
+        admin_reason = (
+            FeatureReason.ON_FOR_USER if available else FeatureReason.OFF_FOR_USER
+        )
+    turned_off_by_user = available and own_switch is False
     return FeatureStatus(
         feature=everyone_switch.feature,
-        works=user_switch.on,
-        reason=FeatureReason.ON_FOR_USER
-        if user_switch.on
-        else FeatureReason.OFF_FOR_USER,
-        switch=UserFeatureSwitch.ON if user_switch.on else UserFeatureSwitch.OFF,
-        changed_by_email=user_switch.changed_by_email,
-        changed_at=user_switch.changed_at,
+        available=available,
+        works=available and not turned_off_by_user,
+        reason=FeatureReason.TURNED_OFF_BY_USER if turned_off_by_user else admin_reason,
+        switch=switch,
+        changed_by_email=user_switch.changed_by_email if user_switch else None,
+        changed_at=user_switch.changed_at if user_switch else None,
     )

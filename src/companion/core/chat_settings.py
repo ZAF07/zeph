@@ -4,6 +4,7 @@ from typing import Any
 from uuid import UUID
 
 from companion.core.check_ins import CheckInService
+from companion.core.features import FeatureNotAvailableError
 from companion.core.memory_retrieval import format_day
 from companion.core.models import (
     CheckInChanges,
@@ -347,9 +348,17 @@ class ReplySettingsTools:
         turn_on = arguments.get("on")
         if not isinstance(turn_on, bool):
             return f"Say true for on or false for off. {NOTHING_CHANGED}"
-        self._users.update_preferences(
-            self._user(), PreferenceChanges(user_memory_enabled=turn_on), in_chat=True
-        )
+        try:
+            self._users.update_preferences(
+                self._user(),
+                PreferenceChanges(user_memory_enabled=turn_on),
+                in_chat=True,
+            )
+        except FeatureNotAvailableError:
+            return (
+                "User Memory isn't available on their account, so it can't be "
+                f"turned on or off. {NOTHING_CHANGED} Tell them so plainly."
+            )
         if turn_on:
             return f"Your memory of them is on. {TELL_THEM}"
         return (

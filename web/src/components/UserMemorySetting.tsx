@@ -11,18 +11,22 @@ import { useApiClient } from "@/lib/use-api-client";
  * The User Memory section: a switch that saves straight away, with the
  * Admin-worded explanation of what is remembered.
  *
- * @param props - `enabled` is the saved setting; `explanation` is the
- *   User Memory explanation from platform settings; `changedInChatAt` is
- *   when it was last changed in chat, if it was; `timeZone` is the User's.
+ * @param props - `enabled` is the saved setting; `available` is false when
+ *   an Admin has User Memory off for the User, which disables the switch;
+ *   `explanation` is the User Memory explanation from platform settings;
+ *   `changedInChatAt` is when it was last changed in chat, if it was;
+ *   `timeZone` is the User's.
  * @returns The section.
  */
 export function UserMemorySetting({
   enabled,
+  available,
   explanation,
   changedInChatAt,
   timeZone,
 }: {
   enabled: boolean;
+  available: boolean;
   explanation: string;
   changedInChatAt: string | undefined;
   timeZone?: string;
@@ -61,10 +65,15 @@ export function UserMemorySetting({
         <Switch
           label="Remember meaningful details"
           checked={isEnabled}
-          disabled={isSaving}
+          disabled={isSaving || !available}
           onChange={(next) => void saveUserMemorySetting(next)}
         />
       </div>
+      {available ? null : (
+        <p className="m-0 text-sm font-medium text-ink-soft">
+          Not available on your account
+        </p>
+      )}
       <ChangedInChatCaption changedAt={changedAt} timeZone={timeZone} />
       {paragraphs(explanation).map((paragraph) => (
         <p key={paragraph} className="m-0 text-[15px] text-ink-soft">

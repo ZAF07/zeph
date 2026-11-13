@@ -120,7 +120,9 @@ export function CheckInsSettings() {
     );
   }
   let switchLabel = "Check-ins on";
-  if (checkIns && !checkIns.enabled) {
+  if (checkIns && !checkIns.available) {
+    switchLabel = "Not available on your account";
+  } else if (checkIns && !checkIns.enabled) {
     switchLabel = "Check-ins off";
   } else if (checkIns?.paused) {
     switchLabel = "Paused";
@@ -143,7 +145,7 @@ export function CheckInsSettings() {
             <Switch
               label="Check-ins"
               checked={checkIns.enabled}
-              disabled={isSaving}
+              disabled={isSaving || !checkIns.available}
               onChange={(enabled) => changeSettings({ enabled })}
             />
           </div>
@@ -180,6 +182,16 @@ export function CheckInsSettings() {
             </p>
           ) : null}
 
+          {checkIns.available ? null : (
+            <p
+              role="status"
+              className="m-0 rounded-xl bg-yellow-tint px-4 py-3.5 text-sm text-yellow-deep"
+            >
+              Check-ins aren’t available on your account, so Zeph won’t message
+              you first. Your settings are kept.
+            </p>
+          )}
+
           {checkIns.enabled && checkIns.paused ? (
             <div
               role="status"
@@ -198,7 +210,7 @@ export function CheckInsSettings() {
               </button>
             </div>
           ) : null}
-          {!checkIns.enabled ? (
+          {checkIns.available && !checkIns.enabled ? (
             <p
               role="status"
               className="m-0 rounded-xl bg-yellow-tint px-4 py-3.5 text-sm text-yellow-deep"

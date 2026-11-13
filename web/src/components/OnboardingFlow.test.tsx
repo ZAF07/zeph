@@ -42,6 +42,7 @@ function newUser(overrides: Partial<Me> = {}): Me {
     time_zone: null,
     ai_notice_acknowledged_at: null,
     user_memory_enabled: true,
+    user_memory_available: true,
     onboarding_completed_at: null,
     role: "user",
     changed_in_chat: {},
@@ -68,6 +69,7 @@ describe("OnboardingFlow", () => {
     apiClient.getPlatformContent.mockResolvedValue(content);
     apiClient.getCheckIns.mockResolvedValue({
       enabled: false,
+      available: true,
       frequency: "few_times_a_week",
       quiet_hours_start: "22:00:00",
       quiet_hours_end: "07:30:00",

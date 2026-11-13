@@ -1,12 +1,14 @@
 import logging
 from uuid import UUID, uuid4
 
+from companion.core.features import FeatureService
 from companion.core.memory_categories import (
     ONBOARDING_NAME_CATEGORY_SETTING,
     ONBOARDING_REASONS_CATEGORY_SETTING,
 )
 from companion.core.models import (
     ConversationSummary,
+    Feature,
     MemoryCategory,
     MemoryGroup,
     MemoryItem,
@@ -25,15 +27,19 @@ class MemoryNotFoundError(LookupError):
 class UserMemoryService:
     """Lets a User see and delete their User Memory, and seeds it at onboarding."""
 
-    def __init__(self, repositories: Repositories, clock: Clock) -> None:
+    def __init__(
+        self, repositories: Repositories, features: FeatureService, clock: Clock
+    ) -> None:
         """Set up the service.
 
         Args:
             repositories: Where User Memory, Memory Categories and settings
                 are stored.
+            features: Says whether User Memory works for the User.
             clock: Tells the current time.
         """
         self._repositories = repositories
+        self._features = features
         self._clock = clock
 
     def list_groups(self, user_id: UUID) -> list[MemoryGroup]:
@@ -109,12 +115,12 @@ class UserMemoryService:
         Their name and "What brings you here?" answers go into the Memory
         Categories named in platform settings, replacing any earlier
         onboarding items so answering again never duplicates them. Nothing
-        changes when User Memory is off.
+        changes when User Memory doesn't work for the User.
 
         Args:
             user: The User who just finished onboarding.
         """
-        if not user.user_memory_enabled:
+        if not self._features.works_for(user.id, Feature.USER_MEMORY):
             return
         settings = self._repositories.platform_settings
         active_categories = {
