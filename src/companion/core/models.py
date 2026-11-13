@@ -745,13 +745,13 @@ class MemoryChanges:
         added: New Memory Items to save.
         updated: Existing Memory Items with their new content and category.
         removed_ids: IDs of Memory Items to delete.
-        kept_photos: New Shared Photos to save.
+        new_shared_photos: New Shared Photos to save.
     """
 
     added: list[MemoryItem]
     updated: list[MemoryItem]
     removed_ids: list[UUID]
-    kept_photos: list[SharedPhoto] = field(default_factory=list)
+    new_shared_photos: list[SharedPhoto] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

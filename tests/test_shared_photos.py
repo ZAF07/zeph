@@ -162,6 +162,7 @@ def test_photos_the_model_names_wrongly_are_skipped(
             photos_to_keep=[
                 {"photo": 7, "note": "no such photo"},
                 {"photo": "1", "note": "not a number"},
+                {"photo": True, "note": "not a number either"},
                 {"photo": 2},
                 {"photo": 1, "note": CAT_NOTE},
                 {"photo": 1, "note": "the same photo again"},

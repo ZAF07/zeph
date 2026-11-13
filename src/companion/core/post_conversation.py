@@ -229,7 +229,7 @@ def list_sent_photos(messages: list[ConversationMessage]) -> list[SentPhoto]:
     ]
 
 
-def plan_kept_photos(
+def plan_new_shared_photos(
     photos_to_keep: list[Any],
     photos_by_number: dict[int, SentPhoto],
     user_id: UUID,
@@ -256,7 +256,12 @@ def plan_kept_photos(
             continue
         number = pick.get("photo")
         note = read_text_field(pick, "note")
-        if not isinstance(number, int) or note is None or number in picked_numbers:
+        if (
+            not isinstance(number, int)
+            or isinstance(number, bool)
+            or note is None
+            or number in picked_numbers
+        ):
             continue
         sent = photos_by_number.get(number)
         if sent is None:
@@ -353,9 +358,9 @@ class PostConversationProcessor:
 
         Nothing is saved when User Memory doesn't work for the User. One
         model call gives the summary, the operations and the photos to keep
-        as Shared Photos; an unreadable
-        answer is asked again once, and if it is still unreadable nothing is
-        saved, so a bad answer is never retried forever.
+        as Shared Photos; an unreadable answer is asked again once, and if it
+        is still unreadable nothing is saved, so a bad answer is never
+        retried forever.
 
         Args:
             conversation: The ended Conversation.
@@ -408,7 +413,7 @@ class PostConversationProcessor:
         )
         changes = replace(
             changes,
-            kept_photos=plan_kept_photos(
+            new_shared_photos=plan_new_shared_photos(
                 answer.photos_to_keep, photos_by_number, user.id, conversation.id
             ),
         )

@@ -49,8 +49,8 @@ export function SharedPhotosList({
     <div className="flex flex-col gap-6">
       <p className="m-0 text-caption text-ink-muted">
         Photos you sent that Zeph thought mattered to you, with a note on why.
-        Zeph keeps only these, never screenshots, receipts or memes. They stay
-        until you delete them.
+        Zeph tries to leave out screenshots, receipts and memes. They stay until
+        you delete them.
       </p>
 
       {deleteFailed ? (

@@ -1583,10 +1583,10 @@ class PostgresUserMemoryRepository:
                         memory_items.c.id.in_(changes.removed_ids)
                     )
                 )
-            if changes.kept_photos:
+            if changes.new_shared_photos:
                 connection.execute(
                     insert(shared_photos).values(
-                        [asdict(photo) for photo in changes.kept_photos]
+                        [asdict(photo) for photo in changes.new_shared_photos]
                     )
                 )
             connection.execute(
