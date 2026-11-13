@@ -44,6 +44,14 @@ def add_shared_photo(
 ) -> str:
     """Keep a Shared Photo for the signed-in User, as memory processing would.
 
+    Args:
+        client: The backend's test client.
+        headers: The User's Dashboard API headers.
+        file_id: The photo's Telegram file ID.
+        description: What it shows.
+        note: Why it matters to them.
+        sent_at: When they sent it.
+
     Returns:
         The Shared Photo's ID.
     """
