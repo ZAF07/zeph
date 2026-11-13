@@ -70,4 +70,8 @@ Nothing. Issue 13 and the PRD cover the limit for incoming messages only. Check-
 ## Completion
 
 - Completed: 2026-11-13
-- Commit: <filled in after merge>
+- Commit: 4a53606 (merge into main): "Merge MVP issue 26: a User who has used up the Daily Message Limit gets no Check-in (nor a "would you like fewer?" message) for the rest of their day, and the Check-in model isn't asked; …"
+  - cc2813e "MVP issue 26: no Check-ins once a User has used up the Daily Message Limit"
+  - 427534a "MVP issue 26: review fixes — clearer limit check name, shared daily count read, named today-skip check"
+  - 5ea9610 "MVP issue 26 done: archive issue with test, run and review evidence; glossary gives the Admin reason for a limit skip"
+  - 12af489 "MVP issue 26: archive notes the checks after rebasing onto main"
