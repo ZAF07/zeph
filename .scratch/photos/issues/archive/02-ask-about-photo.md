@@ -55,4 +55,4 @@ When the description can't answer a follow-up ("what colour is the pot?"), the C
 ## Completion
 
 - Completed: 2026-11-13
-- Commit: <to be filled in after merge>
+- Commit: 4836c31 "Photos issue 02: the Companion can look at a photo again. When the Conversation has viewed photos, the reply is offered an ask_about_photo tool listing them by number…", review fixes 27d6aba "Photos issue 02 review fixes: the ask_about_photo tool's docstring names the "photo" argument it really reads…", archive ad1b741 "Photos issue 02 done: archive issue with test, run and review evidence…" (merged from `photos-02-ask-about-photo` in 71752c7 "Merge Photos issue 02: the Companion can look at a photo again…")
