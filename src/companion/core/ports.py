@@ -1343,8 +1343,8 @@ class PersonalStickerRepository(Protocol):
     def save_many(self, stickers: list[PersonalSticker]) -> None:
         """Keep stickers, replacing the User's own copy of the same sticker.
 
-        A sticker the User already has, by its unchanging ID, keeps its ID
-        and when it was first kept; the rest is replaced.
+        A sticker the User already has, by its unchanging ID, keeps its ID,
+        when it was first kept and its later last use; the rest is replaced.
 
         Args:
             stickers: The stickers to keep.

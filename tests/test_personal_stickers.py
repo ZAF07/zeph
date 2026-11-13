@@ -728,3 +728,34 @@ def test_only_sticker_messages_keep_a_sticker(
             )
         ).all()
     assert [tuple(row) for row in stickers] == [("incoming", "laugh")]
+
+
+def test_the_companion_sending_one_of_theirs_after_the_user_counts_as_its_last_use(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    turn_personal_stickers_on(client, owner_headers(client, auth_verifier))
+    connect_telegram(client, auth_verifier, chat_channel)
+    keep_laugh_and_seedling(client, chat_model, clock, scheduler, seeded_settings)
+    chat(client, chat_model, telegram_sticker_update("😂", "laugh"))
+    clock.advance(timedelta(minutes=1))
+    chat(client, chat_model, telegram_sticker_update("🌱", "seedling"))
+    clock.advance(timedelta(minutes=1))
+    sticker_reply_call(
+        client,
+        chat_model,
+        telegram_text_update("lol"),
+        ToolCall("send_sticker", {"number": 2}),
+        "",
+    )
+
+    end_conversation(chat_model, clock, scheduler, seeded_settings, keeping_answer())
+
+    kept = personal_stickers(client, maya_headers(auth_verifier))
+    assert chat_channel.sent_stickers[-1].file_id == "file-laugh"
+    assert [sticker["emoji"] for sticker in kept] == ["😂", "🌱"]

@@ -25,7 +25,7 @@ class FeatureDetails:
         description: A short line on what it does.
         on_by_default: Whether it is on for everyone before an Admin
             changes it.
-        needs: Another Feature it works only alongside; None if none.
+        needs_stickers: Whether it works only while Stickers works too.
         in_reply_note: Whether replies are told when it isn't available,
             so they can say so if the User asks for it.
     """
@@ -34,7 +34,7 @@ class FeatureDetails:
     name: str
     description: str
     on_by_default: bool = True
-    needs: Feature | None = None
+    needs_stickers: bool = False
     in_reply_note: bool = True
 
 
@@ -107,7 +107,7 @@ FEATURES: tuple[FeatureDetails, ...] = (
             "Turning it off deletes nothing."
         ),
         on_by_default=False,
-        needs=Feature.STICKERS,
+        needs_stickers=True,
         in_reply_note=False,
     ),
 )
@@ -360,7 +360,7 @@ class FeatureService:
     def _statuses(self, user_id: UUID) -> list[FeatureStatus]:
         """Work out each Feature's status for a User, without checking they exist.
 
-        A Feature that needs another one doesn't work while that one doesn't.
+        A Feature that needs Stickers doesn't work while Stickers doesn't.
 
         Args:
             user_id: The User.
@@ -381,8 +381,11 @@ class FeatureService:
             )
             for everyone_switch in self.list_for_everyone()
         }
+        stickers_work = statuses[Feature.STICKERS].works
         return [
-            needed_feature_applied(statuses[details.feature], statuses, details.needs)
+            stickers_off_applied(statuses[details.feature])
+            if details.needs_stickers and not stickers_work
+            else statuses[details.feature]
             for details in FEATURES
         ]
 
@@ -454,22 +457,16 @@ def status_for(
     )
 
 
-def needed_feature_applied(
-    status: FeatureStatus,
-    statuses: dict[Feature, FeatureStatus],
-    needs: Feature | None,
-) -> FeatureStatus:
-    """Turn a Feature's status off when a Feature it needs doesn't work.
+def stickers_off_applied(status: FeatureStatus) -> FeatureStatus:
+    """Turn a Feature that needs Stickers off, because Stickers doesn't work.
 
     Args:
         status: The Feature's status from its own switches.
-        statuses: Every Feature's status from its own switches.
-        needs: The Feature it needs; None if none.
 
     Returns:
-        The status, marked as not working because Stickers is off when the
-        Feature it needs doesn't work and it would work otherwise.
+        The status marked as not working because Stickers is off; unchanged
+        when it doesn't work anyway.
     """
-    if needs is None or not status.works or statuses[needs].works:
+    if not status.works:
         return status
     return replace(status, works=False, reason=FeatureReason.STICKERS_OFF)

@@ -22,8 +22,6 @@ from companion.core.usage import UsageRecordingChatModel
 
 logger = logging.getLogger(__name__)
 
-LIMIT_SETTING = "personal_stickers_limit"
-
 
 class PersonalStickerNotFoundError(LookupError):
     """Raised when a User has no Personal Sticker with the given ID."""
@@ -82,7 +80,7 @@ def read_stickers_to_keep(answer: str) -> list[Any]:
     return picks if isinstance(picks, list) else []
 
 
-def picked_notes(
+def notes_for_valid_picks(
     picks: list[Any], stickers_by_number: dict[int, SentSticker]
 ) -> dict[int, str]:
     """Check the model's picks and read the note for each sticker it kept.
@@ -276,7 +274,7 @@ class PersonalStickerKeeper:
                 )
             ],
         )
-        notes = picked_notes(read_stickers_to_keep(answer), stickers_by_number)
+        notes = notes_for_valid_picks(read_stickers_to_keep(answer), stickers_by_number)
         personal_stickers.save_many(
             plan_personal_stickers(
                 notes,
@@ -286,7 +284,9 @@ class PersonalStickerKeeper:
                 self._clock.now(),
             )
         )
-        personal_stickers.keep_most_recently_used(user_id, settings.get(LIMIT_SETTING))
+        personal_stickers.keep_most_recently_used(
+            user_id, settings.get("personal_stickers_limit")
+        )
 
 
 class PersonalStickerService:

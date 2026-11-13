@@ -2343,8 +2343,8 @@ class PostgresPersonalStickerRepository:
     def save_many(self, stickers: list[PersonalSticker]) -> None:
         """Keep stickers, replacing the User's own copy of the same sticker.
 
-        A sticker the User already has, by its unchanging ID, keeps its ID
-        and when it was first kept; the rest is replaced.
+        A sticker the User already has, by its unchanging ID, keeps its ID,
+        when it was first kept and its later last use; the rest is replaced.
 
         Args:
             stickers: The stickers to keep.
@@ -2367,7 +2367,10 @@ class PostgresPersonalStickerRepository:
                         "set_name": statement.excluded.set_name,
                         "preview_file_id": statement.excluded.preview_file_id,
                         "note": statement.excluded.note,
-                        "last_used_at": statement.excluded.last_used_at,
+                        "last_used_at": func.greatest(
+                            personal_stickers.c.last_used_at,
+                            statement.excluded.last_used_at,
+                        ),
                     },
                 )
             )
