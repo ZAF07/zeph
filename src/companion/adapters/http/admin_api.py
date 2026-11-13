@@ -14,7 +14,7 @@ from fastapi import (
     UploadFile,
     status,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, StrictBool
 
 from companion.core.admin_users import (
     AdminUserService,
@@ -27,6 +27,7 @@ from companion.core.check_in_kinds import (
     InvalidCheckInKindError,
 )
 from companion.core.check_ins import CheckInService, LoggedCheckIn
+from companion.core.features import FeatureService, feature_details
 from companion.core.helplines import (
     FallbackHelplineError,
     HelplineNotFoundError,
@@ -53,6 +54,8 @@ from companion.core.models import (
     CheckInKindDetails,
     CheckInOutcome,
     CheckInStatus,
+    Feature,
+    FeatureSwitch,
     Helpline,
     HelplineDetails,
     KnowledgeDetailsChange,
@@ -138,6 +141,29 @@ class SettingsUpdateRequest(BaseModel):
     """New values for some settings, by key; others stay as they are."""
 
     values: dict[str, Any]
+
+
+class FeatureResponse(BaseModel):
+    """A Feature's switch for everyone and its last change."""
+
+    feature: Feature
+    name: str
+    description: str
+    on: bool
+    changed_by_email: str | None
+    changed_at: datetime | None
+
+
+class FeaturesResponse(BaseModel):
+    """Every Feature's switch for everyone, in a set order."""
+
+    features: list[FeatureResponse]
+
+
+class FeatureSwitchRequest(BaseModel):
+    """Whether a Feature should be on for everyone."""
+
+    on: StrictBool
 
 
 class CoreServiceResponse(BaseModel):
@@ -630,6 +656,26 @@ def to_settings_response(settings: list[StoredSetting]) -> SettingsResponse:
     )
 
 
+def to_feature_response(switch: FeatureSwitch) -> FeatureResponse:
+    """Describe a Feature's switch for everyone for the admin area.
+
+    Args:
+        switch: The switch.
+
+    Returns:
+        The response body.
+    """
+    details = feature_details(switch.feature)
+    return FeatureResponse(
+        feature=switch.feature,
+        name=details.name,
+        description=details.description,
+        on=switch.on,
+        changed_by_email=switch.changed_by_email,
+        changed_at=switch.changed_at,
+    )
+
+
 def to_admin_user_response(overview: UserOverview) -> AdminUserResponse:
     """Describe a User for the admin area.
 
@@ -654,6 +700,7 @@ def to_admin_user_response(overview: UserOverview) -> AdminUserResponse:
 def build_admin_api_router(
     current_admin: Callable[..., User],
     admin_user_service: AdminUserService,
+    feature_service: FeatureService,
     platform_settings_service: PlatformSettingsService,
     helpline_service: HelplineService,
     safeguard: Safeguard,
@@ -672,6 +719,7 @@ def build_admin_api_router(
     Args:
         current_admin: The dependency that lets only Admins through.
         admin_user_service: Lists Users and changes roles.
+        feature_service: Reads and changes each Feature's switch.
         platform_settings_service: Reads and changes platform settings.
         helpline_service: Manages Helplines and the international fallback.
         safeguard: Lists Safeguard Events.
@@ -726,6 +774,40 @@ def build_admin_api_router(
                 "This is the last Admin. Make someone else an Admin first.",
             ) from error
         return RoleResponse(id=str(user.id), role=user.role)
+
+    @router.get("/features")
+    def list_features() -> FeaturesResponse:
+        """Return every Feature's switch for everyone.
+
+        Returns:
+            The switches with their last change.
+        """
+        return FeaturesResponse(
+            features=[
+                to_feature_response(switch)
+                for switch in feature_service.list_for_everyone()
+            ]
+        )
+
+    @router.put("/features/{feature}")
+    def set_feature_for_everyone(
+        admin: Annotated[User, Depends(current_admin)],
+        feature: Feature,
+        request: FeatureSwitchRequest,
+    ) -> FeatureResponse:
+        """Turn a Feature on or off for everyone.
+
+        Args:
+            admin: The Admin making the change.
+            feature: The Feature.
+            request: Whether it should be on.
+
+        Returns:
+            The Feature's switch after the change.
+        """
+        return to_feature_response(
+            feature_service.set_for_everyone(feature, request.on, admin)
+        )
 
     @router.get("/settings")
     def get_settings() -> SettingsResponse:

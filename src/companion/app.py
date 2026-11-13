@@ -17,6 +17,7 @@ from companion.core.chat_settings import SettingsTools
 from companion.core.check_in_kinds import CheckInKindService
 from companion.core.check_ins import CheckInService
 from companion.core.conversations import ConversationService, ConversationServices
+from companion.core.features import FeatureService
 from companion.core.helplines import HelplineService
 from companion.core.home import HomeService
 from companion.core.incoming_messages import IncomingMessageHandler
@@ -112,6 +113,9 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     )
     usage_limiter = UsageLimiter(dependencies.repositories, dependencies.clock)
     chat_model = UsageRecordingChatModel(dependencies.chat_model, usage_limiter)
+    feature_service = FeatureService(
+        dependencies.repositories, dependencies.clock, dependencies.dashboard_url
+    )
     check_in_service = CheckInService(
         repositories=dependencies.repositories,
         chat_model=chat_model,
@@ -165,8 +169,10 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             response_composer=ResponseComposer(
                 repositories=dependencies.repositories,
                 chat_model=chat_model,
+                features=feature_service,
                 web_search_tools=WebSearchTools(
                     repositories=dependencies.repositories,
+                    features=feature_service,
                     web_search=dependencies.web_search,
                     clock=dependencies.clock,
                 ),
@@ -255,6 +261,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         build_admin_api_router(
             current_admin=build_current_admin_dependency(current_user),
             admin_user_service=AdminUserService(dependencies.repositories.users),
+            feature_service=feature_service,
             platform_settings_service=PlatformSettingsService(
                 dependencies.repositories.platform_settings, dependencies.clock
             ),

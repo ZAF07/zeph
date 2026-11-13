@@ -44,6 +44,7 @@ describe("SidebarNav", () => {
       "Check-in Kinds",
       "Check-in log",
       "Sticker Library",
+      "Features",
       "Platform settings",
       "Usage",
     ]);

@@ -273,10 +273,10 @@ daily_limit_reply: >-
   I'm honestly wiped for today, my brain needs a rest. Talk tomorrow? If
   something urgent comes up, please reach out to someone you trust.
 
-# Web search. When it is on, each reply may search the web and read pages.
-# Every search and every page read counts toward the per-User daily limit,
-# which resets at midnight in the User's time zone.
-web_search_enabled: true
+# Web search. When the Web Search Feature works for a User, each reply may
+# search the web and read pages. Every search and every page read counts
+# toward the per-User daily limit, which resets at midnight in the User's
+# time zone.
 web_search_daily_limit: 10
 
 # What the model is told about the web search tool.
@@ -324,6 +324,16 @@ reply_settings_instructions: >-
   in your reply what you changed. You can't delete their account, change
   their country or disconnect Telegram: say kindly that those are on the
   Dashboard, under Account and privacy, and change nothing.
+
+# Put after the rest of the reply instructions when any Feature doesn't work
+# for the User. `{features}` is replaced with those Features' names and
+# `{dashboard_url}` with the Dashboard's address.
+reply_features_unavailable_note: >-
+  These aren't available on this person's account right now: {features}. If
+  they ask for one of them, tell them plainly and kindly that it isn't
+  available on their account, and don't pretend to do it or work around it.
+  If it's a setting they can't change in chat, say they can change their
+  settings on the Dashboard: {dashboard_url}
 
 # The word a User must reply with, as their whole message, to confirm
 # deleting their data in chat. Any other reply cancels it. Case doesn't matter.

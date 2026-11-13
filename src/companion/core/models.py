@@ -1020,3 +1020,30 @@ class CheckInLogEntry:
     check_in: CheckIn
     user_name: str | None
     user_email: str | None
+
+
+class Feature(StrEnum):
+    """An extra the Companion offers that Admins can switch off.
+
+    Safety and a User's rights and privacy are never Features.
+    """
+
+    WEB_SEARCH = "web_search"
+
+
+@dataclass(frozen=True)
+class FeatureSwitch:
+    """A Feature's switch for everyone and its last change.
+
+    Attributes:
+        feature: The Feature.
+        on: Whether the Feature is on for everyone.
+        changed_by_email: The email of the Admin who last changed it; None if
+            it still has its starting value.
+        changed_at: When it was last changed; None if it never was.
+    """
+
+    feature: Feature
+    on: bool
+    changed_by_email: str | None
+    changed_at: datetime | None

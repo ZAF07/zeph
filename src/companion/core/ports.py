@@ -20,6 +20,8 @@ from companion.core.models import (
     ConversationTurn,
     DailyUsage,
     EmbeddedChunk,
+    Feature,
+    FeatureSwitch,
     Helpline,
     HelplineDetails,
     KnowledgeChunkMatch,
@@ -1309,6 +1311,31 @@ class CheckInRepository(Protocol):
         ...
 
 
+class FeatureSwitchRepository(Protocol):
+    """Stores each Feature's switch for everyone and its last change."""
+
+    def list_for_everyone(self) -> list[FeatureSwitch]:
+        """List the stored switches for everyone.
+
+        Returns:
+            The switches that are stored, in no set order.
+        """
+        ...
+
+    def save_for_everyone(
+        self, feature: Feature, on: bool, changed_at: datetime, changed_by: UUID
+    ) -> None:
+        """Save a Feature's switch for everyone.
+
+        Args:
+            feature: The Feature.
+            on: Whether it is on for everyone.
+            changed_at: When it is being changed.
+            changed_by: The Admin changing it.
+        """
+        ...
+
+
 @dataclass(frozen=True)
 class Repositories:
     """Every repository the core needs, so adapters can be swapped as one."""
@@ -1326,3 +1353,4 @@ class Repositories:
     usage: UsageRepository
     stickers: StickerRepository
     check_ins: CheckInRepository
+    feature_switches: FeatureSwitchRepository

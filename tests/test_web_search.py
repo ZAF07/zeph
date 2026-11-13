@@ -142,7 +142,10 @@ def test_with_web_search_off_the_tools_are_not_offered(
 ) -> None:
     admin = owner_headers(client, auth_verifier)
     connect_telegram(client, auth_verifier, chat_channel)
-    change_settings(client, admin, {"web_search_enabled": False})
+    response = client.put(
+        "/api/admin/features/web_search", json={"on": False}, headers=admin
+    )
+    assert response.status_code == 200, response.text
 
     call = reply_call(client, chat_model, "who won the match last night?", "no idea")
 

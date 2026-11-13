@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from companion.core.chat_settings import SettingsTools
+from companion.core.features import FeatureService
 from companion.core.models import (
     ChatLine,
     ChatRole,
@@ -77,6 +78,7 @@ class ResponseComposer:
         self,
         repositories: Repositories,
         chat_model: UsageRecordingChatModel,
+        features: FeatureService,
         web_search_tools: WebSearchTools,
         settings_tools: SettingsTools,
         sticker_tools: StickerTools,
@@ -86,12 +88,15 @@ class ResponseComposer:
         Args:
             repositories: Where Conversations and settings are stored.
             chat_model: Generates the reply and records the tokens used.
+            features: Names the Features the User doesn't have, so the
+                reply can say so.
             web_search_tools: Offers the web tools the reply may call.
             settings_tools: Offers the tools that change the User's settings.
             sticker_tools: Offers the Sticker Library to the reply.
         """
         self._repositories = repositories
         self._chat_model = chat_model
+        self._features = features
         self._web_search_tools = web_search_tools
         self._settings_tools = settings_tools
         self._sticker_tools = sticker_tools
@@ -111,7 +116,8 @@ class ResponseComposer:
         gives the model every earlier message in the Conversation. The model
         may search the web and read pages when web search is offered, change
         the User's settings when they ask, and pick one sticker from the
-        Sticker Library.
+        Sticker Library. When a Feature doesn't work for the User, the
+        instructions say so, so the reply can tell them plainly.
 
         Args:
             conversation_id: The Conversation to reply in.
@@ -142,6 +148,7 @@ class ResponseComposer:
             knowledge,
             web_search.instructions,
             settings_tools.instructions,
+            self._features.unavailable_note(user_id),
             cancelled_note,
         )
         for section in sections:

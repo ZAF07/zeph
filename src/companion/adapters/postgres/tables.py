@@ -326,3 +326,12 @@ check_ins = Table(
     Column("decided_at", DateTime(timezone=True), nullable=False),
     Column("replied_at", DateTime(timezone=True)),
 )
+
+feature_switches = Table(
+    "feature_switches",
+    metadata,
+    Column("feature", Text, primary_key=True),
+    Column("is_on", Boolean, nullable=False),
+    Column("changed_by", Uuid, ForeignKey("users.id", ondelete="SET NULL")),
+    Column("changed_at", DateTime(timezone=True)),
+)

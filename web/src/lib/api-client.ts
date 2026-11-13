@@ -158,8 +158,21 @@ export type RoleChange = {
   role: UserRole;
 };
 
+/** An extra the Companion offers that Admins can switch off. */
+export type Feature = "web_search";
+
+/** A Feature's switch for everyone and who last changed it, and when. */
+export type FeatureSwitch = {
+  feature: Feature;
+  name: string;
+  description: string;
+  on: boolean;
+  changed_by_email: string | null;
+  changed_at: string | null;
+};
+
 /** The value of a platform setting Admins can edit. */
-export type SettingValue = string | number | boolean;
+export type SettingValue = string | number;
 
 /** A platform setting's value and when, and by whom, it was last saved. */
 export type AdminSetting = {
@@ -443,6 +456,11 @@ export type ApiClient = {
   deleteConversationSummary: (id: string) => Promise<void>;
   listAdminUsers: () => Promise<AdminUser[]>;
   changeUserRole: (userId: string, role: UserRole) => Promise<RoleChange>;
+  listFeatures: () => Promise<FeatureSwitch[]>;
+  setFeatureForEveryone: (
+    feature: Feature,
+    on: boolean,
+  ) => Promise<FeatureSwitch>;
   getAdminSettings: () => Promise<AdminSettings>;
   updateAdminSettings: (
     values: Record<string, SettingValue>,
@@ -628,6 +646,11 @@ export function createApiClient(
       (await request<{ users: AdminUser[] }>("/api/admin/users")).users,
     changeUserRole: (userId, role) =>
       request<RoleChange>(`/api/admin/users/${userId}/role`, "PUT", { role }),
+    listFeatures: async () =>
+      (await request<{ features: FeatureSwitch[] }>("/api/admin/features"))
+        .features,
+    setFeatureForEveryone: (feature, on) =>
+      request<FeatureSwitch>(`/api/admin/features/${feature}`, "PUT", { on }),
     getAdminSettings: async () =>
       (await request<{ settings: AdminSettings }>("/api/admin/settings"))
         .settings,

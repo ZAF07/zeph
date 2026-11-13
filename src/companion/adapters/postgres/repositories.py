@@ -25,6 +25,7 @@ from companion.adapters.postgres.tables import (
     conversation_summaries,
     conversations,
     daily_usage,
+    feature_switches,
     helplines,
     knowledge_documents,
     memory_categories,
@@ -51,6 +52,8 @@ from companion.core.models import (
     ConversationMessage,
     ConversationSummary,
     DailyUsage,
+    Feature,
+    FeatureSwitch,
     Helpline,
     HelplineDetails,
     KnowledgeDetailsChange,
@@ -2378,6 +2381,62 @@ class PostgresCheckInRepository:
         )
 
 
+class PostgresFeatureSwitchRepository:
+    """Stores each Feature's switch for everyone in Postgres."""
+
+    def __init__(self, engine: Engine) -> None:
+        """Set up the repository.
+
+        Args:
+            engine: The database engine.
+        """
+        self._engine = engine
+
+    def list_for_everyone(self) -> list[FeatureSwitch]:
+        """List the stored switches for everyone.
+
+        Returns:
+            The switches that are stored, in no set order.
+        """
+        statement = select(
+            feature_switches.c.feature,
+            feature_switches.c.is_on,
+            feature_switches.c.changed_at,
+            users.c.email,
+        ).select_from(feature_switches.outerjoin(users))
+        with self._engine.connect() as connection:
+            rows = connection.execute(statement).all()
+        return [
+            FeatureSwitch(
+                feature=Feature(row.feature),
+                on=row.is_on,
+                changed_by_email=row.email,
+                changed_at=row.changed_at,
+            )
+            for row in rows
+            if row.feature in Feature
+        ]
+
+    def save_for_everyone(
+        self, feature: Feature, on: bool, changed_at: datetime, changed_by: UUID
+    ) -> None:
+        """Save a Feature's switch for everyone.
+
+        Args:
+            feature: The Feature.
+            on: Whether it is on for everyone.
+            changed_at: When it is being changed.
+            changed_by: The Admin changing it.
+        """
+        values = {"is_on": on, "changed_at": changed_at, "changed_by": changed_by}
+        with self._engine.begin() as connection:
+            connection.execute(
+                insert(feature_switches)
+                .values(feature=feature.value, **values)
+                .on_conflict_do_update(index_elements=["feature"], set_=values)
+            )
+
+
 def build_postgres_repositories(engine: Engine) -> Repositories:
     """Build every repository on one Postgres engine.
 
@@ -2401,4 +2460,5 @@ def build_postgres_repositories(engine: Engine) -> Repositories:
         usage=PostgresUsageRepository(engine),
         stickers=PostgresStickerRepository(engine),
         check_ins=PostgresCheckInRepository(engine),
+        feature_switches=PostgresFeatureSwitchRepository(engine),
     )
