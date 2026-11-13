@@ -116,10 +116,12 @@ def refusal(status_code: int, description: str) -> httpx.Response:
     )
 
 
-def test_a_blocked_bot_is_told_apart_from_other_refusals() -> None:
-    channel = channel_answering(
-        lambda path, body: refusal(403, "Forbidden: bot was blocked by the user"), []
-    )
+@pytest.mark.parametrize(
+    "description",
+    ["Forbidden: bot was blocked by the user", "Forbidden: user is deactivated"],
+)
+def test_a_forbidden_answer_is_told_apart_from_other_refusals(description: str) -> None:
+    channel = channel_answering(lambda path, body: refusal(403, description), [])
 
     with pytest.raises(ChatBlockedError) as raised:
         channel.send_text(42, "hey")
@@ -133,7 +135,6 @@ def test_a_blocked_bot_is_told_apart_from_other_refusals() -> None:
     ("status_code", "description"),
     [
         (400, "Bad Request: chat not found"),
-        (403, "Forbidden: user is deactivated"),
         (429, "Too Many Requests: retry after 5"),
     ],
 )

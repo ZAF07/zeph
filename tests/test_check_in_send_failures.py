@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -290,4 +291,60 @@ def test_would_you_like_fewer_to_a_user_who_blocked_the_companion_is_skipped(
     scheduler.tick()
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
         seeded_settings["check_in_fewer_message"]
+    ]
+
+
+def test_a_pause_set_while_the_model_decides_survives_a_refused_send(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+) -> None:
+    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    chat_model.before_next_reply = lambda: client.put(
+        "/api/check-ins/pause", json={"length": "until_resumed"}, headers=headers
+    )
+    chat_channel.text_send_failures = [MessageRefusedError("Too Many Requests")]
+    chat_model.script(send_answer("hey, how's it going?"))
+
+    clock.advance(ONE_DAY)
+    scheduler.tick()
+
+    check_ins = client.get("/api/check-ins", headers=headers).json()
+    assert check_ins["paused"] is True
+    assert check_ins["recent"] == []
+
+
+def test_a_refused_check_in_whose_undo_fails_is_missed_not_sent_again(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+
+    def fail_undo(*args: object, **kwargs: object) -> None:
+        raise ConnectionError("the database dropped")
+
+    monkeypatch.setattr(PostgresCheckInRepository, "undo_add", fail_undo)
+    chat_channel.text_send_failures = [MessageRefusedError("Too Many Requests")]
+    chat_model.script(send_answer("hey, how's it going?"), send_answer("hi again!"))
+
+    with caplog.at_level(logging.ERROR):
+        clock.advance(ONE_DAY)
+        scheduler.tick()
+    assert "Could not decide on a Check-in" in caplog.text
+
+    clock.advance(ONE_DAY - timedelta(minutes=1))
+    scheduler.tick()
+    assert chat_channel.sent == []
+    assert len(chat_model.calls) == 1
+    assert [check_in["outcome"] for check_in in recent_check_ins(client, headers)] == [
+        "sent"
     ]

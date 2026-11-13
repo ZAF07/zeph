@@ -2629,16 +2629,23 @@ class PostgresCheckInRepository:
             )
 
     def undo_add(
-        self, check_in: CheckIn, settings: CheckInSettings, skipped: CheckIn | None
+        self,
+        check_in: CheckIn,
+        next_due_at: datetime,
+        end_pause: bool,
+        skipped: CheckIn | None,
     ) -> None:
         """Take back a saved Check-in that was never sent, together.
 
         Args:
             check_in: The saved Check-in to remove.
-            settings: The User's Check-in settings holding the next due time
-                and pause to put back.
+            next_due_at: When the User's next Check-in may be sent.
+            end_pause: Whether to end the pause that saving it started.
             skipped: A Skipped Check-in to save in its place; None for none.
         """
+        user_changes: dict[str, Any] = {"check_in_next_due_at": next_due_at}
+        if end_pause:
+            user_changes |= {"check_ins_paused": False, "check_ins_paused_until": None}
         with self._engine.begin() as connection:
             connection.execute(delete(check_ins).where(check_ins.c.id == check_in.id))
             if skipped is not None:
@@ -2646,11 +2653,7 @@ class PostgresCheckInRepository:
             connection.execute(
                 update(users)
                 .where(users.c.id == check_in.user_id)
-                .values(
-                    check_in_next_due_at=settings.next_due_at,
-                    check_ins_paused=settings.paused,
-                    check_ins_paused_until=settings.paused_until,
-                )
+                .values(**user_changes)
             )
 
     def remove_shared_photo(self, check_in_id: UUID) -> None:

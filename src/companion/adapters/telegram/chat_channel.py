@@ -18,7 +18,6 @@ IMAGE_SIGNATURES = (
     (b"\xff\xd8\xff", "image/jpeg"),
     (b"\x89PNG\r\n\x1a\n", "image/png"),
 )
-BLOCKED_BY_USER_DESCRIPTION = "bot was blocked by the user"
 
 
 class PhotoDownloadError(Exception):
@@ -53,15 +52,16 @@ class TelegramRefusedError(TelegramApiError, MessageRefusedError):
 
 
 class TelegramBlockedError(TelegramApiError, ChatBlockedError):
-    """Raised when Telegram won't send to someone because they blocked the bot."""
+    """Raised when Telegram won't send to someone, such as when they blocked the bot."""
 
 
 def to_telegram_api_error(action: str, error: httpx.HTTPError) -> TelegramApiError:
     """Turn an httpx error into a Telegram error that leaves out the URL.
 
-    A 4xx answer is a clear refusal, and a blocked bot is told apart from
-    the others. A 5xx answer or no answer leaves it unknown whether the
-    call went through.
+    A 4xx answer is a clear refusal. A 403 means the bot can't message
+    that person until they act, such as when they blocked it, so it is told
+    apart from the others. A 5xx answer or no answer leaves it unknown
+    whether the call went through.
 
     Args:
         action: What was being done, like the Bot API method name.
@@ -80,9 +80,7 @@ def to_telegram_api_error(action: str, error: httpx.HTTPError) -> TelegramApiErr
     description = telegram_error_description(error.response)
     if description:
         message = f"{message}: {description}"
-    if status_code == httpx.codes.FORBIDDEN and BLOCKED_BY_USER_DESCRIPTION in (
-        description or ""
-    ):
+    if status_code == httpx.codes.FORBIDDEN:
         return TelegramBlockedError(message, status_code)
     if error.response.is_client_error:
         return TelegramRefusedError(message, status_code)

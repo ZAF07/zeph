@@ -718,8 +718,8 @@ class CheckInService:
 
         Saving first means a failed save sends nothing, so a Check-in is
         never sent twice. If the chat channel clearly refuses the message,
-        the Check-in is taken back and tried again 15 minutes later. If the
-        User blocked the Companion, a Skipped Check-in takes its place and
+        the Check-in is taken back and tried again after the retry gap. If
+        the User blocked the Companion, a Skipped Check-in takes its place and
         the next attempt is one frequency gap later, with no pause. Any other
         failure, such as a timeout, may still have delivered it, so it counts
         as sent. If taking it back fails, that Check-in is missed.
@@ -747,14 +747,16 @@ class CheckInService:
                 decided_at=check_in.decided_at,
                 skip_reason=BLOCKED_SKIP_REASON,
             )
-            settings = replace(user.check_ins, next_due_at=next_due_at)
-            self._repositories.check_ins.undo_add(check_in, settings, skipped)
+            self._repositories.check_ins.undo_add(
+                check_in, next_due_at, pause_until_resumed, skipped
+            )
             return False
         except MessageRefusedError as error:
             logger.warning("The chat channel refused a Check-in: %s", error)
             retry_at = check_in.decided_at + REFUSED_CHECK_IN_RETRY_GAP
-            settings = replace(user.check_ins, next_due_at=retry_at)
-            self._repositories.check_ins.undo_add(check_in, settings, skipped=None)
+            self._repositories.check_ins.undo_add(
+                check_in, retry_at, pause_until_resumed, skipped=None
+            )
             return False
         except Exception:
             logger.exception("Could not tell if a Check-in arrived; it counts as sent")

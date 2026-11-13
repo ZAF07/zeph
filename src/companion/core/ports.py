@@ -13,7 +13,6 @@ from companion.core.models import (
     CheckInKindDetails,
     CheckInKindOverview,
     CheckInLogEntry,
-    CheckInSettings,
     ConnectionToken,
     Conversation,
     ConversationMessage,
@@ -109,7 +108,7 @@ class MessageRefusedError(Exception):
 
 
 class ChatBlockedError(Exception):
-    """Raised when the chat channel refused a message because the person blocked us."""
+    """Raised when the chat channel can't reach the person, e.g. they blocked us."""
 
 
 class ChatChannel(Protocol):
@@ -1516,17 +1515,21 @@ class CheckInRepository(Protocol):
         ...
 
     def undo_add(
-        self, check_in: CheckIn, settings: CheckInSettings, skipped: CheckIn | None
+        self,
+        check_in: CheckIn,
+        next_due_at: datetime,
+        end_pause: bool,
+        skipped: CheckIn | None,
     ) -> None:
         """Take back a saved Check-in that was never sent, together.
 
-        Only the User's next due time and pause are put back, so settings
-        the User changed meanwhile are kept.
+        Only the next due time and, when asked, the pause are changed, so
+        settings the User changed meanwhile are kept.
 
         Args:
             check_in: The saved Check-in to remove.
-            settings: The User's Check-in settings holding the next due time
-                and pause to put back.
+            next_due_at: When the User's next Check-in may be sent.
+            end_pause: Whether to end the pause that saving it started.
             skipped: A Skipped Check-in to save in its place; None for none.
         """
         ...
