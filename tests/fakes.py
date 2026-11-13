@@ -44,10 +44,19 @@ class SentSticker:
     file_id: str
 
 
+@dataclass(frozen=True)
+class SentPhoto:
+    """A photo the fake chat channel was asked to send."""
+
+    chat_id: int
+    file_id: str
+
+
 class FakeChatChannel:
     """Chat channel that records sent messages instead of sending them.
 
-    `events` lists texts, stickers and typing in the order they happened.
+    `events` lists texts, stickers, photos and typing in the order they
+    happened. Set `photo_send_failure` to make sending a photo raise it.
     Sticker sets and sticker images it knows are set by tests; set
     `sticker_lookup_failure` to make looking them up raise it. Photos are
     served from `photos`, or `FAKE_PHOTO` for any other file ID; queue
@@ -66,6 +75,8 @@ class FakeChatChannel:
         self.photos: dict[str, PhotoImage] = {}
         self.photo_download_failures: list[Exception] = []
         self.downloaded_photos: list[str] = []
+        self.sent_photos: list[SentPhoto] = []
+        self.photo_send_failure: Exception | None = None
 
     def send_text(self, chat_id: int, text: str) -> None:
         """Record a text message.
@@ -135,6 +146,21 @@ class FakeChatChannel:
         if self.photo_download_failures:
             raise self.photo_download_failures.pop(0)
         return self.photos.get(file_id, FAKE_PHOTO)
+
+    def send_photo(self, chat_id: int, file_id: str) -> None:
+        """Record a photo sent by its file ID.
+
+        Args:
+            chat_id: The chat the photo is for.
+            file_id: The photo's file ID.
+
+        Raises:
+            Exception: The `photo_send_failure` set on the fake, if any.
+        """
+        if self.photo_send_failure is not None:
+            raise self.photo_send_failure
+        self.sent_photos.append(SentPhoto(chat_id=chat_id, file_id=file_id))
+        self.events.append(f"photo: {file_id}")
 
     def show_typing(self, chat_id: int) -> None:
         """Record that typing was shown.

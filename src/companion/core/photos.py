@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 from uuid import UUID
@@ -26,6 +26,15 @@ LOOK_AGAIN_FAILED = (
 )
 
 
+NO_SUCH_SHARED_PHOTO = (
+    "There is no Shared Photo with that number. Pick one from the list, or send none."
+)
+PHOTO_ALREADY_PICKED = (
+    "A photo is already being sent with this reply, and only one can be. Now "
+    "write your text."
+)
+
+
 class SharedPhotoNotFoundError(LookupError):
     """Raised when a User has no Shared Photo with that ID."""
 
@@ -40,6 +49,15 @@ ASK_ABOUT_PHOTO_PARAMETERS: dict[str, Any] = {
         },
     },
     "required": ["photo", "question"],
+}
+
+
+SEND_PHOTO_PARAMETERS: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "photo": {"type": "integer", "description": "The photo's number."},
+    },
+    "required": ["photo"],
 }
 
 
@@ -134,6 +152,25 @@ def not_looked_at_note(photos_not_looked_at: int, photos_looked_at: int) -> str:
         f"only the first {photos_looked_at} in an album. {came_through} "
         f"fine. Mention briefly that you only looked at the first "
         f"{photos_looked_at}.]"
+    )
+
+
+def sent_shared_photo_text(description: str) -> str:
+    """Write a Shared Photo the Companion sent back, as its Conversation keeps it.
+
+    It reads as a note of what was done, not as words to send, so later
+    replies don't copy it out as text.
+
+    Args:
+        description: What the photo shows.
+
+    Returns:
+        E.g. "[You sent them back their own photo with the send_photo tool.
+        It shows: A ginger cat…]".
+    """
+    return (
+        "[You sent them back their own photo with the send_photo tool. "
+        f"It shows: {description}]"
     )
 
 
@@ -465,3 +502,96 @@ class PhotoTools:
                 run=run_ask,
             )
         ]
+
+
+class SendPhotoChoice:
+    """The send_photo tool for one reply, and the Shared Photo it picked.
+
+    At most one Shared Photo is picked per reply.
+    """
+
+    def __init__(self, shared_photos: list[SharedPhoto], description: str) -> None:
+        """Set up the choice.
+
+        Args:
+            shared_photos: The User's own Shared Photos it may send.
+            description: The Admin-set tool description, put before the list.
+        """
+        self._shared_photos = shared_photos
+        self._description = description
+        self.picked: SharedPhoto | None = None
+
+    @property
+    def tools(self) -> list[ChatTool]:
+        """The send_photo tool, or none when there is no Shared Photo to send."""
+        if not self._shared_photos:
+            return []
+        listed = "\n".join(
+            photo_tool_line(number, photo.description)
+            for number, photo in enumerate(self._shared_photos, start=1)
+        )
+        return [
+            ChatTool(
+                name="send_photo",
+                description=f"{self._description}\n\n{listed}",
+                parameters=SEND_PHOTO_PARAMETERS,
+                run=self._pick,
+            )
+        ]
+
+    def _pick(self, arguments: dict[str, Any]) -> str:
+        """Pick the Shared Photo the model chose, if it is the first one.
+
+        Args:
+            arguments: The model's arguments, with the photo's "number".
+
+        Returns:
+            What the model is told back.
+        """
+        if self.picked is not None:
+            return PHOTO_ALREADY_PICKED
+        number = arguments.get("photo")
+        if not isinstance(number, int) or isinstance(number, bool):
+            return NO_SUCH_SHARED_PHOTO
+        if not 1 <= number <= len(self._shared_photos):
+            return NO_SUCH_SHARED_PHOTO
+        self.picked = self._shared_photos[number - 1]
+        return f"Photo {number} will be sent after your text. Now write your text."
+
+
+class SendPhotoTools:
+    """Offers the send_photo tool to replies."""
+
+    def __init__(self, repositories: Repositories) -> None:
+        """Set up the send_photo tools.
+
+        Args:
+            repositories: Where Shared Photos and settings are stored.
+        """
+        self._repositories = repositories
+
+    def offer(self, user_id: UUID, shared_photo_ids: Iterable[UUID]) -> SendPhotoChoice:
+        """Start the send_photo choice for one reply to a User.
+
+        Each Shared Photo is looked up by the User's own ID, so another
+        User's photo can never be offered or sent.
+
+        Args:
+            user_id: The User being replied to.
+            shared_photo_ids: The Shared Photos that matter for the message,
+                as memory retrieval picked them.
+
+        Returns:
+            The choice, offering those of the User's Shared Photos that
+            still exist; none when there are none.
+        """
+        user_memory = self._repositories.user_memory
+        found = (
+            user_memory.get_shared_photo(user_id, photo_id)
+            for photo_id in shared_photo_ids
+        )
+        shared_photos = [photo for photo in found if photo is not None]
+        return SendPhotoChoice(
+            shared_photos,
+            self._repositories.platform_settings.get("send_photo_tool_description"),
+        )

@@ -13,10 +13,12 @@ from evals.report import EvalReport, PersonaResult, verdict_line
 from evals.token_counting_chat_model import TokenCountingChatModel
 from tests.fakes import FakeAuthVerifier, FakeChatChannel
 from tests.telegram_helpers import (
+    auth_headers,
     connect_telegram,
     send_to_webhook,
     telegram_text_update,
 )
+from tests.test_send_photo_back import add_shared_photo
 
 pytestmark = pytest.mark.eval
 
@@ -24,24 +26,37 @@ PERSONA_CASES = load_persona_cases(CASES_DIR / "persona.yaml")
 
 
 def send_and_collect_replies(
-    client: TestClient, chat_channel: FakeChatChannel, message: PersonaMessage
+    client: TestClient,
+    chat_channel: FakeChatChannel,
+    message: PersonaMessage,
+    shared_photo_descriptions: dict[str, str],
 ) -> list[str]:
-    """Send one scripted message through the webhook and return Zeph's texts.
+    """Send one scripted message through the webhook and return Zeph's replies.
 
     Args:
         client: The backend's test client.
         chat_channel: Records what Zeph sends.
         message: The scripted message, text or a photo of a test image.
+        shared_photo_descriptions: What each of the person's Shared Photos
+            shows, by file ID.
 
     Returns:
-        The texts Zeph sent in reply, in order.
+        Zeph's texts in reply, in order, then a line for any photo it sent
+        back.
     """
     already_sent = len(chat_channel.sent)
+    already_sent_photos = len(chat_channel.sent_photos)
     if message.photo:
         send_test_photo(client, chat_channel, message.photo.file_name, message.text)
     else:
         assert send_to_webhook(client, telegram_text_update(message.text)) == 200
-    return [sent.text for sent in chat_channel.sent[already_sent:]]
+    texts = [sent.text for sent in chat_channel.sent[already_sent:]]
+    photo_lines = [
+        "(sends back the person's photo that shows: "
+        f"{shared_photo_descriptions[photo.file_id]})"
+        for photo in chat_channel.sent_photos[already_sent_photos:]
+    ]
+    return texts + photo_lines
 
 
 def person_line(message: PersonaMessage) -> str:
@@ -73,16 +88,28 @@ def test_replies_keep_the_persona_rules(
     eval_report: EvalReport,
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
+    headers = auth_headers(auth_verifier, "user_maya")
+    shared_photo_descriptions = {}
+    for number, photo in enumerate(conversation.shared_photos, start=1):
+        file_id = f"shared-photo-{number}"
+        add_shared_photo(client, headers, file_id, photo.description, photo.note)
+        shared_photo_descriptions[file_id] = photo.description
     transcript_lines = []
     for message in conversation.messages:
         transcript_lines.append(person_line(message))
-        replies = send_and_collect_replies(client, chat_channel, message)
+        replies = send_and_collect_replies(
+            client, chat_channel, message, shared_photo_descriptions
+        )
         transcript_lines += [f"Zeph: {reply}" for reply in replies]
     transcript = "\n".join(transcript_lines)
 
     rules = {rule: PERSONA_CASES.rules[rule] for rule in conversation.rules}
     verdicts = judge_persona_rules(chat_model, transcript, rules)
 
+    if conversation.shared_photos:
+        assert "send_photo" in chat_model.offered_tools, (
+            "The send_photo tool was never offered, so this case tested nothing"
+        )
     eval_report.persona.append(PersonaResult(conversation.id, verdicts))
     broken = [verdict_line(verdict) for verdict in verdicts if not verdict.passed]
     assert not broken, "\n".join([transcript, "", *broken])

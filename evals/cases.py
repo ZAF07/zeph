@@ -66,6 +66,19 @@ class EvalPhoto:
 
 
 @dataclass(frozen=True)
+class EvalSharedPhoto:
+    """A Shared Photo the person already has before a scripted conversation.
+
+    Attributes:
+        description: What it shows.
+        note: Why it matters to them.
+    """
+
+    description: str
+    note: str
+
+
+@dataclass(frozen=True)
 class PersonaMessage:
     """One message the person sends in a scripted conversation.
 
@@ -87,11 +100,13 @@ class PersonaConversation:
         id: A short name for the conversation.
         messages: What the person sends, in order.
         rules: The IDs of the rules its replies are judged against.
+        shared_photos: The Shared Photos the person has before it starts.
     """
 
     id: str
     messages: list[PersonaMessage]
     rules: list[str]
+    shared_photos: list[EvalSharedPhoto] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -288,7 +303,8 @@ def load_persona_cases(cases_file: Path) -> PersonaCases:
 
     Args:
         cases_file: YAML with `rules` (ID to what the judge checks) and
-            `conversations` (each with `id`, `messages` and `rules`).
+            `conversations` (each with `id`, `messages`, `rules` and
+            optional `shared_photos`, each with `description` and `note`).
 
     Returns:
         The rules and conversations.
@@ -307,6 +323,10 @@ def load_persona_cases(cases_file: Path) -> PersonaCases:
                 to_persona_message(message, cases_file) for message in entry["messages"]
             ],
             rules=entry["rules"],
+            shared_photos=[
+                EvalSharedPhoto(description=photo["description"], note=photo["note"])
+                for photo in entry.get("shared_photos", [])
+            ],
         )
         for entry in content["conversations"]
     ]

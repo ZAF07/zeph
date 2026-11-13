@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID, uuid4
@@ -11,6 +12,7 @@ from companion.core.models import (
     MessageDirection,
     MessageKind,
 )
+from companion.core.photos import sent_shared_photo_text
 from companion.core.ports import (
     ChatChannel,
     Clock,
@@ -23,6 +25,8 @@ from companion.core.stickers import sticker_message_text
 from companion.core.timing import check_in_reply_window, is_open, quiet_gap
 from companion.core.usage import UsageLimiter
 from companion.core.user_data import ChatDataDeletion
+
+logger = logging.getLogger(__name__)
 
 
 def typing_pause_seconds(text: str, settings: PlatformSettingsRepository) -> float:
@@ -106,23 +110,30 @@ class ConversationService:
 
     def deliver_reply(
         self,
+        user_id: UUID,
         conversation_id: UUID,
         chat_id: int,
         reply_parts: list[str],
         sticker_id: UUID | None = None,
+        shared_photo_id: UUID | None = None,
     ) -> None:
         """Send the Companion's reply, one short message at a time.
 
         Before each message the Companion shows typing for a while, as a
         person would. Each message is saved as soon as it is sent. The
-        sticker, if any, goes last; it is skipped if it was removed from the
-        Sticker Library meanwhile.
+        Shared Photo, if any, comes next, then the sticker. The Shared Photo
+        is looked up by the User's own ID and skipped if it was deleted
+        meanwhile; if the chat channel refuses it, the error is logged and
+        the rest of the reply still goes. The sticker is skipped if it was
+        removed from the Sticker Library meanwhile.
 
         Args:
+            user_id: The User being answered.
             conversation_id: The Conversation being answered.
             chat_id: The chat to send to.
             reply_parts: The short messages that make up the reply, in order.
             sticker_id: The Sticker Library sticker to send after them.
+            shared_photo_id: The User's Shared Photo to send back after them.
         """
         settings = self._repositories.platform_settings
         for part in reply_parts:
@@ -130,6 +141,8 @@ class ConversationService:
             self._clock.sleep(typing_pause_seconds(part, settings))
             self._chat_channel.send_text(chat_id, part)
             self._save(conversation_id, MessageDirection.OUTGOING, part)
+        if shared_photo_id is not None:
+            self._send_shared_photo(user_id, conversation_id, chat_id, shared_photo_id)
         sticker = self._repositories.stickers.get(sticker_id) if sticker_id else None
         if sticker is not None:
             self._chat_channel.send_sticker(chat_id, sticker.file_id)
@@ -139,6 +152,32 @@ class ConversationService:
                 sticker_message_text(sticker.emoji),
                 MessageKind.STICKER,
             )
+
+    def _send_shared_photo(
+        self, user_id: UUID, conversation_id: UUID, chat_id: int, photo_id: UUID
+    ) -> None:
+        """Send one of the User's Shared Photos back and save it.
+
+        Args:
+            user_id: The User whose Shared Photo it must be.
+            conversation_id: The Conversation being answered.
+            chat_id: The chat to send to.
+            photo_id: The Shared Photo's ID.
+        """
+        photo = self._repositories.user_memory.get_shared_photo(user_id, photo_id)
+        if photo is None:
+            return
+        try:
+            self._chat_channel.send_photo(chat_id, photo.file_id)
+        except Exception:
+            logger.exception("Could not send a Shared Photo")
+            return
+        self._save(
+            conversation_id,
+            MessageDirection.OUTGOING,
+            sent_shared_photo_text(photo.description),
+            MessageKind.PHOTO,
+        )
 
     def deliver_at_once(self, conversation_id: UUID, chat_id: int, text: str) -> None:
         """Send one message straight away, without a typing pause, and save it.

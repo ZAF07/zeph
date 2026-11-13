@@ -195,6 +195,17 @@ ask_about_photo_tool_description: >-
   can't answer; most follow-ups can be answered from the description. Ask one
   clear question. The photos, by number, with their descriptions:
 
+# Put before the numbered list of the User's Shared Photos the send_photo
+# tool offers. The tool is offered only when memory retrieval picked the
+# User's Shared Photos for the message.
+send_photo_tool_description: >-
+  Send one of the person's own photos back to them, the way a friend brings up
+  an old memory ("remember this?"). Use it rarely: only when the photo really
+  fits what they're talking about and seeing it again would make them smile.
+  Never use it when they are struggling, sad, anxious or upset, and never just
+  to fill a reply. Write your text as usual; the photo is sent after it. Their
+  photos, by number:
+
 # Put in the User's message in place of a description when their photo
 # couldn't be downloaded or looked at, even after the retries.
 photo_not_viewed_note: >-
@@ -322,6 +333,13 @@ memory_retrieval_prompt: |-
 
   Answer with only the picked category names, one per line, exactly as
   written in the list. If none would help, answer "none".
+
+# How the User's Shared Photos are described to memory retrieval, which
+# picks them like a Memory Category named "Shared Photos".
+shared_photos_memory_description: >-
+  Photos the person sent you that matter to them (pets, people, places,
+  things they made or grew), with why each matters. Pick it when the message
+  is about something one of these photos might show.
 
 # Put before the User Memory given to each reply.
 reply_memory_intro: >-
