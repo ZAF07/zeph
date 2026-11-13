@@ -1,6 +1,6 @@
 # 01 — Run a stack per worktree, side by side
 
-Status: ready-for-agent
+Status: in-progress
 
 ## Parent
 
@@ -24,6 +24,7 @@ Already safe in parallel: `pytest` (testcontainers on random ports), `vitest`, e
 - **Only one stack owns Telegram.** A setting (e.g. `TELEGRAM_WEBHOOK_REGISTER`, on by default) lets `prestart.py` skip registering the webhook. ngrok runs only in the main stack. Other stacks test Telegram by posting updates straight to `localhost:<BACKEND_PORT>/telegram/webhook`; the bot's replies still go to the real chat.
 - **Run scripts per worktree.** The run-dashboard scripts read the worktree's web port and compose project, and keep the browser session inside the worktree (not a shared `$TMPDIR` folder), so `cleanup.sh` only removes its own test user. Update `SKILL.md` to match.
 - **Optional: `make db-copy`.** Copies the main stack's database into the worktree's, for runs that need an existing install (e.g. checking a migration).
+- **`make worktree-teardown`** (added 2026-11-13 at the user's request). Stops the worktree's stack and deletes its containers, images, network and database volume; refuses to run in the main folder. `CLAUDE.md`'s "When done" steps tell every agent to run it, so stacks don't pile up.
 - Document the setup in `CLAUDE.md` (Git workflow (parallel agents)) so every agent runs `make worktree-setup` first.
 
 ## Acceptance criteria
@@ -33,6 +34,7 @@ Already safe in parallel: `pytest` (testcontainers on random ports), `vitest`, e
 - [ ] Only the main stack registers the Telegram webhook; a worktree stack answers an update posted to its own webhook
 - [ ] Two agents can run `start-session.sh`, `drive.sh` and `cleanup.sh` in different worktrees at the same time without touching each other's session or test user
 - [ ] `make worktree-setup` sets up a fresh worktree in one step and never edits the main folder
+- [ ] `make worktree-teardown` leaves nothing of the worktree's stack behind (containers, images, network, volume) and refuses to run in the main folder
 - [ ] `make check` passes
 - [ ] Verified by running two stacks side by side and driving both Dashboards with the run scripts
 

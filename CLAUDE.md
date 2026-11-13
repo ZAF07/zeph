@@ -99,6 +99,8 @@ Every piece of work — feature, refactor, or bug — gets an issue file in `.sc
 ## Git workflow (parallel agents)
 
 - You are working on your own feature branch in your own worktree. Never switch branches. Never push to main.
+- **First, in a new worktree, run `make worktree-setup`.** It copies `.env` from the main folder, gives the worktree its own ports (3010/8010/5442, then 3020/8020/5452, …) and its own database, and installs packages. It never edits the main folder. Your Dashboard and backend addresses are `WEB_PORT` and `BACKEND_PORT` in the worktree's `.env`.
+- Only the main stack owns Telegram (webhook and ngrok). In a worktree, test Telegram by posting updates to `http://localhost:<BACKEND_PORT>/telegram/webhook`. `make db-copy` copies the main stack's database into the worktree's when a run needs real data.
 - Only modify files needed for your task. Avoid editing shared files (lockfiles, migrations, global config, route registries) unless the task requires it, and mention it in the PR.
 - When done:
   1. Commit with clear messages.
@@ -107,6 +109,7 @@ Every piece of work — feature, refactor, or bug — gets an issue file in `.sc
   4. Run the full test suite and build. Fix failures.
   5. git push -u origin HEAD
   6. Open a PR with `gh pr create --fill` (or tell me the branch is pushed).
+  7. Clean up what you started: `cleanup.sh` for any run-dashboard session, then `make worktree-teardown`, which stops the worktree's stack and deletes its containers, images, network and database. Leave nothing running.
 - If asked to "update from main": repeat steps 2–4, then `git push --force-with-lease`.
 
 ---

@@ -1,4 +1,11 @@
-.PHONY: check check-python check-web contract eval up restart
+.PHONY: check check-python check-web contract eval up restart worktree-setup worktree-teardown db-copy
+
+MAIN_DIR := $(shell dirname "$$(git rev-parse --path-format=absolute --git-common-dir)")
+THIS_DIR := $(shell git rev-parse --show-toplevel)
+WORKTREE_PROJECT := $(shell sed -n 's/^COMPOSE_PROJECT_NAME=//p' .env 2>/dev/null)
+WORKTREE_COMPOSE := env -u COMPOSE_PROJECT_NAME docker compose -p "$(WORKTREE_PROJECT)"
+MAIN_COMPOSE := cd "$(MAIN_DIR)" && env -u COMPOSE_PROJECT_NAME -u COMPOSE_PROFILES docker compose
+REQUIRE_WORKTREE = @test "$(THIS_DIR)" != "$(MAIN_DIR)" -a -n "$(WORKTREE_PROJECT)" || { echo "Run this in a worktree set up with make worktree-setup."; exit 1; }
 
 ## Run every check from CLAUDE.md (Python and TypeScript).
 check: check-python check-web
@@ -30,3 +37,23 @@ up:
 ## Rebuild and restart everything in the background, picking up code and .env changes.
 restart:
 	docker compose up --build --force-recreate --detach
+
+## Run once in a new git worktree: own .env, ports and database, then install packages.
+worktree-setup:
+	uv sync
+	uv run python -m scripts.worktree_setup
+	cd web && pnpm install
+
+## Stop this worktree's stack and delete its containers, images, network and database. Run when done.
+worktree-teardown:
+	$(REQUIRE_WORKTREE)
+	$(WORKTREE_COMPOSE) down --volumes --remove-orphans --rmi local
+
+## Replace this worktree's database with a copy of the main stack's (both stacks running).
+db-copy:
+	$(REQUIRE_WORKTREE)
+	$(WORKTREE_COMPOSE) stop backend
+	$(WORKTREE_COMPOSE) exec -T postgres sh -c 'dropdb --force -U "$$POSTGRES_USER" "$$POSTGRES_DB" && createdb -U "$$POSTGRES_USER" "$$POSTGRES_DB"'
+	$(MAIN_COMPOSE) exec -T postgres sh -c 'pg_dump -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' \
+		| $(WORKTREE_COMPOSE) exec -T postgres sh -c 'psql -q -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
+	$(WORKTREE_COMPOSE) start backend

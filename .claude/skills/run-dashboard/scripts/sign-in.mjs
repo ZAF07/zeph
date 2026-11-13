@@ -1,6 +1,6 @@
 import { chromium } from "playwright";
 
-const [userId, profileDir] = process.argv.slice(2);
+const [userId, profileDir, webUrl] = process.argv.slice(2);
 const response = await fetch("https://api.clerk.com/v1/sign_in_tokens", {
   method: "POST",
   headers: {
@@ -13,7 +13,7 @@ const { token } = await response.json();
 
 const context = await chromium.launchPersistentContext(profileDir);
 const page = await context.newPage();
-await page.goto(`http://localhost:3000/sign-in?__clerk_ticket=${token}`);
+await page.goto(`${webUrl}/sign-in?__clerk_ticket=${token}`);
 await page.waitForURL((url) => !url.pathname.startsWith("/sign-in"), {
   timeout: 30000,
 });
@@ -21,7 +21,7 @@ for (let attempt = 0; attempt < 10; attempt++) {
   const me = page.waitForResponse((r) => r.url().endsWith("/api/me"), {
     timeout: 15000,
   });
-  await page.goto("http://localhost:3000/");
+  await page.goto(`${webUrl}/`);
   if ((await me).ok()) {
     break;
   }
