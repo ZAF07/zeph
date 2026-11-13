@@ -66,3 +66,8 @@ None - can start immediately
 - Web Search about a photo uses description words by design: only the text reaches the reply and its tools; the image never leaves the photo service.
 - Migration 0017 also reloads `unsupported_message_reply` (not Admin-editable), since the old text said photos can't be opened.
 - `photos` on turns and saved messages is a tuple so albums (issue 03) fit without a schema change.
+
+## Completion
+
+- Completed: 2026-11-13
+- Commit: c8b6095 "Photos issue 01: the Companion sees a photo. The webhook reads photos (largest size) and JPEG/PNG/WebP files as photos…", review fixes a5c6f8f "Photos issue 01 review fixes: the Telegram channel downloads stickers and photos through one getFile-and-download path…", archive 23cacd6 "Photos issue 01 done: archive issue with run and eval evidence…" (merged from `photos-01-companion-sees-a-photo` in fedb055 "Merge Photos issue 01: the Companion sees a photo…")
