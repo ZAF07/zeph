@@ -24,7 +24,8 @@ def send_test_photo(
     """
     image_file = IMAGES_DIR / file_name
     update = telegram_photo_update(caption or None, file_unique_id=image_file.stem)
-    chat_channel.photos[f"file-{image_file.stem}"] = PhotoImage(
+    largest_file_id = update["message"]["photo"][-1]["file_id"]
+    chat_channel.photos[largest_file_id] = PhotoImage(
         content=image_file.read_bytes(), media_type=MEDIA_TYPES[image_file.suffix]
     )
     assert send_to_webhook(client, update) == 200

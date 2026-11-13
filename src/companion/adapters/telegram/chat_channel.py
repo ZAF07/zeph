@@ -147,15 +147,13 @@ class TelegramChatChannel:
         Raises:
             httpx.HTTPError: If Telegram can't be reached or fails.
         """
-        file_path = self._call("getFile", {"file_id": file_id}).get("file_path")
-        if not isinstance(file_path, str):
+        file_path = self._file_path(file_id)
+        if file_path is None:
             return None
         media_type = IMAGE_MEDIA_TYPES.get(PurePosixPath(file_path).suffix.lower())
         if media_type is None:
             return None
-        response = self._http.get(f"{self._file_url}/{file_path}")
-        response.raise_for_status()
-        return StickerImage(content=response.content, media_type=media_type)
+        return StickerImage(content=self._download(file_path), media_type=media_type)
 
     def download_photo(self, file_id: str) -> PhotoImage:
         """Download a photo someone sent.
@@ -174,15 +172,14 @@ class TelegramChatChannel:
             PhotoDownloadError: If Telegram gives no file, or it isn't a
                 JPEG, PNG or WebP image.
         """
-        file_path = self._call("getFile", {"file_id": file_id}).get("file_path")
-        if not isinstance(file_path, str):
+        file_path = self._file_path(file_id)
+        if file_path is None:
             raise PhotoDownloadError("Telegram gave no file path for the photo")
-        response = self._http.get(f"{self._file_url}/{file_path}")
-        response.raise_for_status()
-        media_type = photo_media_type(response.content)
+        content = self._download(file_path)
+        media_type = photo_media_type(content)
         if media_type is None:
             raise PhotoDownloadError("The file is not a JPEG, PNG or WebP image")
-        return PhotoImage(content=response.content, media_type=media_type)
+        return PhotoImage(content=content, media_type=media_type)
 
     def register_webhook(self, url: str, secret_token: str) -> None:
         """Tell Telegram where to post updates.
@@ -204,6 +201,34 @@ class TelegramChatChannel:
         """
         result = self._call("getMe", {})
         return str(result["username"])
+
+    def _file_path(self, file_id: str) -> str | None:
+        """Ask Telegram where a file can be downloaded from.
+
+        Args:
+            file_id: The file's ID.
+
+        Returns:
+            The file's path on Telegram's file server, or None if it gave none.
+        """
+        file_path = self._call("getFile", {"file_id": file_id}).get("file_path")
+        return file_path if isinstance(file_path, str) else None
+
+    def _download(self, file_path: str) -> bytes:
+        """Download a file from Telegram's file server.
+
+        Args:
+            file_path: The path `getFile` gave.
+
+        Returns:
+            The file's bytes.
+
+        Raises:
+            httpx.HTTPStatusError: If Telegram refuses the download.
+        """
+        response = self._http.get(f"{self._file_url}/{file_path}")
+        response.raise_for_status()
+        return response.content
 
     def _call(self, method: str, payload: dict[str, object]) -> dict[str, object]:
         """Call one Bot API method.

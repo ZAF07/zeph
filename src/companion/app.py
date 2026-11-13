@@ -203,7 +203,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         conversation_engine=conversation_engine,
         chat_channel=dependencies.chat_channel,
         sticker_library=sticker_library,
-        photos=PhotoService(
+        photo_service=PhotoService(
             repositories=dependencies.repositories,
             chat_channel=dependencies.chat_channel,
             photo_viewer=dependencies.photo_viewer,

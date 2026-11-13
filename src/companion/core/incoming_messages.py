@@ -48,7 +48,7 @@ class IncomingMessageHandler:
         conversation_engine: ConversationEngine,
         chat_channel: ChatChannel,
         sticker_library: StickerLibraryService,
-        photos: PhotoService,
+        photo_service: PhotoService,
         dashboard_url: str,
     ) -> None:
         """Set up the handler.
@@ -60,12 +60,12 @@ class IncomingMessageHandler:
             conversation_engine: Answers connected Users' messages.
             chat_channel: Sends replies that need no Conversation.
             sticker_library: Adds the stickers Admins send.
-            photos: Describes the photos Users send.
+            photo_service: Describes the photos Users send.
             dashboard_url: The Dashboard's address, put into some replies.
         """
         self._telegram_connections = telegram_connections
         self._sticker_library = sticker_library
-        self._photos = photos
+        self._photo_service = photo_service
         self._repositories = repositories
         self._conversation_engine = conversation_engine
         self._chat_channel = chat_channel
@@ -156,7 +156,7 @@ class IncomingMessageHandler:
         return ConversationTurn(
             user_id=user_id,
             chat_id=message.chat_id,
-            text=self._photos.message_text(user_id, message.photo, message.text),
+            text=self._photo_service.message_text(user_id, message.photo, message.text),
             kind=MessageKind.PHOTO,
             photos=(message.photo,),
         )
