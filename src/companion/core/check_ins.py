@@ -366,15 +366,17 @@ def read_check_in_decision(
         raise InvalidCheckInAnswerError("A send with no message")
     if not kind.sends_shared_photo:
         return CheckInDecision(kind=kind, message=message.strip())
-    number = parsed.get("photo")
+    photo_number = parsed.get("photo")
     if (
-        not isinstance(number, int)
-        or isinstance(number, bool)
-        or not 1 <= number <= len(shared_photos)
+        not isinstance(photo_number, int)
+        or isinstance(photo_number, bool)
+        or not 1 <= photo_number <= len(shared_photos)
     ):
-        raise InvalidCheckInAnswerError(f"Not a photo it was listed: {number!r}")
+        raise InvalidCheckInAnswerError(f"Not a photo it was listed: {photo_number!r}")
     return CheckInDecision(
-        kind=kind, message=message.strip(), shared_photo=shared_photos[number - 1]
+        kind=kind,
+        message=message.strip(),
+        shared_photo=shared_photos[photo_number - 1],
     )
 
 
@@ -668,6 +670,9 @@ class CheckInService:
             )
         else:
             self._chat_channel.send_text(connection.telegram_chat_id, decision.message)
+            sent_photo_id = self._send_shared_photo(
+                connection.telegram_chat_id, decision.shared_photo
+            )
             check_in = CheckIn(
                 id=uuid4(),
                 user_id=user.id,
@@ -675,9 +680,7 @@ class CheckInService:
                 decided_at=now,
                 kind_id=decision.kind.id,
                 message=decision.message,
-                shared_photo_id=self._send_shared_photo(
-                    connection.telegram_chat_id, decision.shared_photo
-                ),
+                shared_photo_id=sent_photo_id,
             )
         self._repositories.check_ins.add(
             check_in, next_due_at, pause_until_resumed=False
