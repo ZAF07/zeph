@@ -182,6 +182,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 ),
                 settings_tools=SettingsTools(
                     repositories=dependencies.repositories,
+                    features=feature_service,
                     users=user_service,
                     check_ins=check_in_service,
                     user_memory=user_memory_service,

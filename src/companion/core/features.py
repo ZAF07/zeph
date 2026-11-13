@@ -72,6 +72,15 @@ FEATURES: tuple[FeatureDetails, ...] = (
             "nothing."
         ),
     ),
+    FeatureDetails(
+        feature=Feature.SETTINGS_IN_CHAT,
+        name="Settings in Chat",
+        description=(
+            "A User can change their settings by asking Zeph in chat. Without "
+            "it they change them on the Dashboard. Deleting their data in chat "
+            "always works."
+        ),
+    ),
 )
 
 

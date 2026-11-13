@@ -171,6 +171,51 @@ describe("AdminFeatures", () => {
     ).toBeVisible();
   });
 
+  it("lists Settings in Chat with its switch and turns it off", async () => {
+    const settingsInChat: FeatureSwitch = {
+      feature: "settings_in_chat",
+      name: "Settings in Chat",
+      description: "A User can change their settings by asking Zeph in chat.",
+      on: true,
+      changed_by_email: null,
+      changed_at: null,
+    };
+    apiClient.listFeatures.mockResolvedValue([webSearch, settingsInChat]);
+    apiClient.setFeatureForEveryone.mockResolvedValue({
+      ...settingsInChat,
+      on: false,
+      changed_by_email: "owner@example.com",
+      changed_at: "2026-11-13T10:00:00Z",
+    });
+    const user = userEvent.setup();
+    render(<AdminFeatures />);
+
+    await screen.findByText("Settings in Chat");
+    const settings = within(rowFor("Settings in Chat"));
+    expect(
+      settings.getByText(
+        "A User can change their settings by asking Zeph in chat.",
+      ),
+    ).toBeVisible();
+    expect(settings.getByText("Never changed")).toBeVisible();
+
+    await user.click(
+      settings.getByRole("switch", { name: "Settings in Chat for everyone" }),
+    );
+
+    expect(apiClient.setFeatureForEveryone).toHaveBeenCalledWith(
+      "settings_in_chat",
+      false,
+    );
+    expect(settings.getByRole("switch")).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+    expect(
+      await settings.findByText(/13 Nov, .* by owner@example\.com/),
+    ).toBeVisible();
+  });
+
   it("offers Try again when the Features can't be loaded", async () => {
     apiClient.listFeatures.mockRejectedValueOnce(new Error("down"));
     const user = userEvent.setup();

@@ -325,6 +325,14 @@ reply_settings_instructions: >-
   their country or disconnect Telegram: say kindly that those are on the
   Dashboard, under Account and privacy, and change nothing.
 
+# The reply instructions about settings instead of the ones above, when
+# Settings in Chat doesn't work for the User: only deleting their data is left.
+reply_delete_data_instructions: >-
+  You can start deleting the person's data with your tool when they clearly
+  ask to delete their data. It has its own confirmation step after the tool,
+  so call it straight away. You can't change any of their other settings in
+  chat, so never say you did.
+
 # Put after the rest of the reply instructions when any Feature doesn't work
 # for the User. `{features}` is replaced with those Features' names and
 # `{dashboard_url}` with the Dashboard's address.

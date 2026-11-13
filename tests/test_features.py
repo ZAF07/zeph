@@ -34,6 +34,8 @@ from tests.test_check_in_sending import send_answer, set_up_user_with_check_ins
 from tests.test_knowledge import BREATH_PASSAGES
 from tests.test_memory_retrieval import remember_some_things
 from tests.test_post_conversation import memory_contents, quiet_gap
+from tests.test_settings_via_chat import SETTINGS_TOOLS
+from tests.test_settings_via_chat import check_ins as check_in_settings
 from tests.test_settings_via_chat import reply_call as chat_reply_call
 from tests.test_stickers import import_calm_creatures, list_stickers, save_note
 
@@ -106,6 +108,7 @@ def test_admins_see_every_feature_on_for_everyone_with_no_change_yet(
         "knowledge",
         "check_ins",
         "user_memory",
+        "settings_in_chat",
     ]
     for feature in features.values():
         assert feature["name"]
@@ -316,6 +319,7 @@ def test_a_user_with_no_switch_of_their_own_follows_the_switch_for_everyone(
         "knowledge",
         "check_ins",
         "user_memory",
+        "settings_in_chat",
     ]
     assert on["name"] == "Web Search"
     assert on["switch"] == "default"
@@ -895,3 +899,76 @@ def test_with_user_memory_off_by_an_admin_check_ins_are_chosen_without_memory(
     assert "A follow-up" not in line.text
     assert "New job, running on autopilot." not in line.text
     assert "User Memory is off" in line.text
+
+
+def settings_tool_names(call: ChatModelCall) -> list[str]:
+    """List the settings tools a reply call was offered."""
+    return [tool.name for tool in call.tools if tool.name in SETTINGS_TOOLS]
+
+
+def test_with_settings_in_chat_off_only_delete_my_data_is_offered(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    seeded_settings: dict[str, Any],
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    settings_instructions = seeded_settings["reply_settings_instructions"]
+    delete_only_instructions = seeded_settings["reply_delete_data_instructions"]
+    note = unavailable_note(seeded_settings, "Settings in Chat")
+
+    on = reply_call(client, chat_model, "hi")
+    switch_for_everyone(client, admin, "settings_in_chat", on=False)
+    off = reply_call(client, chat_model, "can you pause my check-ins for a week?")
+    paused_while_off = check_in_settings(client, headers)["paused"]
+    switch_for_everyone(client, admin, "settings_in_chat", on=True)
+    back_on = reply_call(client, chat_model, "hi again")
+
+    assert settings_tool_names(on) == SETTINGS_TOOLS
+    assert settings_instructions in on.instructions
+    assert note not in on.instructions
+    assert settings_tool_names(off) == ["start_deleting_my_data"]
+    assert settings_instructions not in off.instructions
+    assert delete_only_instructions in off.instructions
+    assert note in off.instructions
+    assert DASHBOARD_URL in off.instructions
+    assert paused_while_off is False
+    assert settings_tool_names(back_on) == SETTINGS_TOOLS
+    assert settings_instructions in back_on.instructions
+    assert note not in back_on.instructions
+
+
+def test_with_settings_in_chat_off_for_one_user_delete_my_data_still_works(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    seeded_settings: dict[str, Any],
+) -> None:
+    admin = connect_owner_telegram(client, auth_verifier, chat_channel)
+    connect_telegram(client, auth_verifier, chat_channel)
+    switch_for_user(
+        client, admin, maya_id(client, auth_verifier), "settings_in_chat", "off"
+    )
+    word = seeded_settings["data_deletion_confirmation_word"]
+
+    owner_call = owner_reply_call(client, chat_model, "hi")
+    asked = chat_reply_call(
+        client,
+        chat_model,
+        "delete my data",
+        ToolCall("start_deleting_my_data", {}),
+        "Reply to confirm.",
+    )
+    chat_channel.sent.clear()
+    assert send_to_webhook(client, telegram_text_update(word)) == 200
+
+    assert settings_tool_names(owner_call) == SETTINGS_TOOLS
+    assert settings_tool_names(asked) == ["start_deleting_my_data"]
+    [asked_result] = asked.tool_results
+    assert f'"{word}"' in asked_result
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
+        seeded_settings["data_deleted_reply"]
+    ]
