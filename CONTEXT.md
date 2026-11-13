@@ -29,7 +29,7 @@ The Admin-managed set of stickers the Companion may send, at most one per reply.
 _Avoid_: Sticker pack, emoji set
 
 **Shared Photo**:
-A photo a User sent the Companion that matters to them, picked when the Conversation ends and kept as part of their User Memory, with a detailed description written when it arrived and a note on why it matters. Other photos are used only in the Conversation they came in. The Companion works from the description and looks at the photo again only when the description can't answer. It may send a User's own Shared Photo back to them, the way a friend brings up an old memory. It stays after Message Retention deletes the message it came in, until the User deletes it.
+A photo a User sent the Companion that matters to them, picked when the Conversation ends and kept as part of their User Memory, with a detailed description written when it arrived and a note on why it matters. Other photos are used only in the Conversation they came in. The Companion works from the description and looks at the photo again only when the description can't answer. It may send a User's own Shared Photo back to them, the way a friend brings up an old memory: rarely, at most one per reply, only one that fits what they're talking about, and never when they're struggling. It stays after Message Retention deletes the message it came in, until the User deletes it.
 _Avoid_: Image, picture, attachment, media
 
 **Album**:
