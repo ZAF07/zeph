@@ -122,7 +122,7 @@ class ChatChannel(Protocol):
             text: The message text.
 
         Raises:
-            ChatBlockedError: If the person blocked the Companion.
+            ChatBlockedError: If it can't reach the person, e.g. they blocked us.
             MessageRefusedError: If the chat channel clearly refused it.
             Exception: Any other failure, such as a timeout; the message may
                 or may not have arrived.
