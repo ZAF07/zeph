@@ -35,8 +35,9 @@ class WebSearchOffer:
 
     Attributes:
         tools: The tools; empty when web search is off or used up for today.
-        instructions: The reply instructions about using the web; "" when
-            there are no tools.
+        instructions: The reply instructions about using the web; the limit
+            note once the Web Search Limit is reached; "" when Web Search
+            doesn't work for the User.
     """
 
     tools: list[ChatTool]
@@ -98,7 +99,9 @@ class WebSearchTools:
 
         None are offered when Web Search doesn't work for the User, or once
         they have made `web_search_daily_limit` searches on their own day.
-        Reading a page counts as a web search too.
+        Reading a page counts as a web search too. At the limit the
+        instructions are `reply_web_search_limit_note`, so the reply says it
+        can't check instead of claiming it searched.
 
         Args:
             user_id: The User being replied to.
@@ -112,9 +115,12 @@ class WebSearchTools:
         today = user_today(self._repositories.users, user_id, self._clock.now())
         source_reminder = settings.get("web_result_source_reminder")
         used_today = usage.count_web_searches(user_id, today)
-        works = self._features.works_for(user_id, Feature.WEB_SEARCH)
-        if not works or used_today >= daily_limit:
+        if not self._features.works_for(user_id, Feature.WEB_SEARCH):
             return WebSearchOffer(tools=[], instructions="")
+        if used_today >= daily_limit:
+            return WebSearchOffer(
+                tools=[], instructions=settings.get("reply_web_search_limit_note")
+            )
 
         def run_search(arguments: dict[str, Any]) -> str:
             """Search the web for the model, if a search is left today.

@@ -84,6 +84,12 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     EditableSetting("response_prompt", "Response composition prompt", SettingKind.TEXT),
     EditableSetting("response_model", "Response composition model", SettingKind.MODEL),
     EditableSetting(
+        "reply_web_search_limit_note",
+        "Web Search Limit reached note",
+        SettingKind.TEXT,
+        max_length=2_000,
+    ),
+    EditableSetting(
         "memory_processing_prompt",
         "Post-conversation processing prompt",
         SettingKind.TEXT,
@@ -237,6 +243,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         ),
         prompt_key="response_prompt",
         model_key="response_model",
+        extra_prompt_keys=("reply_web_search_limit_note",),
     ),
     CoreService(
         name="Post-conversation processing",

@@ -161,6 +161,7 @@ def test_at_the_daily_limit_the_tools_are_gone_until_the_users_next_day(
     chat_model: ScriptedChatModel,
     web_search: FakeWebSearch,
     clock: FakeClock,
+    seeded_settings: dict[str, Any],
 ) -> None:
     admin = owner_headers(client, auth_verifier)
     connect_telegram(client, auth_verifier, chat_channel)
@@ -185,6 +186,13 @@ def test_at_the_daily_limit_the_tools_are_gone_until_the_users_next_day(
     assert web_tools(at_limit) == []
     assert web_tools(same_local_day) == []
     assert tool_names(next_local_day) == ["web_search", "fetch_page"]
+    limit_note = seeded_settings["reply_web_search_limit_note"]
+    web_instructions = seeded_settings["reply_web_search_instructions"]
+    assert limit_note not in first.instructions
+    assert limit_note in at_limit.instructions
+    assert web_instructions not in at_limit.instructions
+    assert limit_note in same_local_day.instructions
+    assert limit_note not in next_local_day.instructions
 
 
 def test_a_search_past_the_limit_within_one_reply_is_not_made(
@@ -226,6 +234,64 @@ def test_a_limit_of_zero_offers_no_tools(
     call = reply_call(client, chat_model, "hi", "hey")
 
     assert web_tools(call) == []
+
+
+def test_the_limit_note_tells_the_companion_not_to_claim_it_searched(
+    seeded_settings: dict[str, Any],
+) -> None:
+    limit_note = seeded_settings["reply_web_search_limit_note"]
+
+    assert "until tomorrow" in limit_note
+    assert "may be out of date" in limit_note
+    assert "Never say or suggest that you searched" in limit_note
+
+
+def test_with_web_search_off_the_limit_note_is_not_added(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    seeded_settings: dict[str, Any],
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    connect_telegram(client, auth_verifier, chat_channel)
+    change_settings(client, admin, {"web_search_daily_limit": 0})
+    response = client.put(
+        "/api/admin/features/web_search", json={"on": False}, headers=admin
+    )
+    assert response.status_code == 200, response.text
+
+    call = reply_call(client, chat_model, "who won the match last night?", "no idea")
+
+    assert web_tools(call) == []
+    assert seeded_settings["reply_web_search_limit_note"] not in call.instructions
+    assert "web search" in call.instructions.lower()
+
+
+def test_an_admin_edited_limit_note_is_used_in_the_next_reply(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    connect_telegram(client, auth_verifier, chat_channel)
+    edited_note = "No more lookups today; say so and answer from memory."
+    change_settings(
+        client,
+        admin,
+        {"web_search_daily_limit": 0, "reply_web_search_limit_note": edited_note},
+    )
+
+    call = reply_call(client, chat_model, "who won the match last night?", "hmm")
+
+    assert edited_note in call.instructions
+    services = client.get("/api/admin/core-services", headers=admin).json()
+    extra_prompts = {
+        service["name"]: [prompt["key"] for prompt in service["extra_prompts"]]
+        for service in services["services"]
+    }
+    assert "reply_web_search_limit_note" in extra_prompts["Response composition"]
 
 
 def test_the_reply_still_goes_when_the_web_search_fails(
