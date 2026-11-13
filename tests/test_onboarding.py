@@ -3,22 +3,7 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from tests.fakes import FakeAuthVerifier
-from tests.telegram_helpers import auth_headers
-
-
-def onboarding_answers(**overrides: Any) -> dict[str, Any]:
-    """Build a valid onboarding request body, with any fields swapped out."""
-    answers: dict[str, Any] = {
-        "name": "Maya",
-        "ai_notice_acknowledged": True,
-        "onboarding_reasons": ["Being more present", "Relationships"],
-        "onboarding_note": "New job, running on autopilot.",
-        "user_memory_enabled": True,
-        "country": "SG",
-        "time_zone": "Asia/Singapore",
-    }
-    answers.update(overrides)
-    return answers
+from tests.telegram_helpers import auth_headers, onboarding_answers
 
 
 def test_new_user_has_not_finished_onboarding(

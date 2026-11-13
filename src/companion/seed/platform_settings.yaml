@@ -19,6 +19,11 @@ telegram_connected_elsewhere_reply: >-
   that account and disconnect Telegram there first, or use a different Telegram
   account: {dashboard_url}
 
+# Sent when someone uses a connection link before finishing onboarding.
+onboarding_unfinished_reply: >-
+  Almost there! Please finish setting up your account on the Dashboard first,
+  then connect Telegram from there: {dashboard_url}
+
 unknown_telegram_user_reply: >-
   Hi! I'm Zeph, an AI companion. To chat with me, sign up on the Dashboard and
   connect your Telegram account there first — it only takes a minute:

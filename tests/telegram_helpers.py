@@ -1,8 +1,9 @@
 from typing import Any
 
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
-from tests.conftest import INITIAL_ADMIN_EMAIL, WEBHOOK_SECRET
+from tests.conftest import INITIAL_ADMIN_EMAIL, WEBHOOK_SECRET, CompanionTestClient
 from tests.fakes import FakeAuthVerifier, FakeChatChannel
 
 TELEGRAM_USER_ID = 5551001
@@ -147,8 +148,43 @@ def auth_headers(auth_verifier: FakeAuthVerifier, auth_id: str) -> dict[str, str
     return {"Authorization": f"Bearer {token}"}
 
 
+def onboarding_answers(**overrides: Any) -> dict[str, Any]:
+    """Build a valid onboarding request body, with any fields swapped out."""
+    answers: dict[str, Any] = {
+        "name": "Maya",
+        "ai_notice_acknowledged": True,
+        "onboarding_reasons": ["Being more present", "Relationships"],
+        "onboarding_note": "New job, running on autopilot.",
+        "user_memory_enabled": True,
+        "country": "SG",
+        "time_zone": "Asia/Singapore",
+    }
+    answers.update(overrides)
+    return answers
+
+
+def mark_onboarded(client: TestClient, headers: dict[str, str]) -> None:
+    """Mark the User as onboarded unless they already are.
+
+    Only the onboarding times are set, so the User's name, answers and
+    Memory Items stay as they were. Tests of onboarding itself use the API.
+    """
+    assert isinstance(client, CompanionTestClient)
+    user_id = client.get("/api/me", headers=headers).json()["id"]
+    with client.engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE users SET onboarding_completed_at = now(), "
+                "ai_notice_acknowledged_at = now() "
+                "WHERE id = :user_id AND onboarding_completed_at IS NULL"
+            ),
+            {"user_id": user_id},
+        )
+
+
 def create_connection_token(client: TestClient, headers: dict[str, str]) -> str:
-    """Ask the Dashboard API for a connection token and return it."""
+    """Mark the User onboarded, then ask for a connection token and return it."""
+    mark_onboarded(client, headers)
     response = client.post("/api/telegram-connection/tokens", headers=headers)
     assert response.status_code == 201
     token: str = response.json()["token"]

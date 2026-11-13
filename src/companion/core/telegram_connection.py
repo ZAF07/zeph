@@ -8,11 +8,20 @@ from companion.core.models import (
     ConnectionTokenStatus,
     IncomingMessage,
     TelegramConnection,
+    User,
 )
 from companion.core.ports import ChatChannel, Clock, Repositories
 
 TOKEN_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 START_COMMAND = "/start"
+
+
+class OnboardingNotFinishedError(Exception):
+    """Raised when a User who hasn't finished onboarding asks to connect Telegram."""
+
+    def __init__(self) -> None:
+        """Set the message the Dashboard shows."""
+        super().__init__("Finish onboarding before connecting Telegram.")
 
 
 @dataclass(frozen=True)
@@ -64,20 +73,26 @@ class TelegramConnectionService:
         self._clock = clock
         self._dashboard_url = dashboard_url
 
-    def create_token(self, user_id: UUID) -> ConnectionToken:
+    def create_token(self, user: User) -> ConnectionToken:
         """Issue a new one-time connection token for a User.
 
         Args:
-            user_id: The User asking to connect Telegram.
+            user: The User asking to connect Telegram.
 
         Returns:
             The new token.
+
+        Raises:
+            OnboardingNotFinishedError: If the User hasn't finished onboarding;
+                no token is made.
         """
+        if user.onboarding_completed_at is None:
+            raise OnboardingNotFinishedError()
         settings = self._repositories.platform_settings
         lifetime = timedelta(minutes=settings.get("connection_token_ttl_minutes"))
         now = self._clock.now()
         token = ConnectionToken(
-            user_id=user_id,
+            user_id=user.id,
             token=generate_token_code(),
             created_at=now,
             expires_at=now + lifetime,
@@ -126,7 +141,8 @@ class TelegramConnectionService:
         that used the token sends it again (e.g. Telegram retrying an update).
         Replies pointing back to the Dashboard when the token is missing,
         unknown, expired or used by someone else, or when the Telegram account
-        already belongs to another User.
+        already belongs to another User. Links nothing and leaves the token
+        unused when its User hasn't finished onboarding.
 
         Args:
             message: The `/start` message.
@@ -155,6 +171,10 @@ class TelegramConnectionService:
             self._reply(message, settings.get("connection_token_invalid_reply"))
             return
 
+        if not self._has_finished_onboarding(token.user_id):
+            self._reply(message, settings.get("onboarding_unfinished_reply"))
+            return
+
         if existing is not None and existing.user_id != token.user_id:
             self._repositories.connection_tokens.mark_rejected(token.token, now)
             self._reply(message, settings.get("telegram_connected_elsewhere_reply"))
@@ -174,6 +194,18 @@ class TelegramConnectionService:
             )
         )
         self._reply(message, settings.get("welcome_message"))
+
+    def _has_finished_onboarding(self, user_id: UUID) -> bool:
+        """Tell whether a User has finished onboarding.
+
+        Args:
+            user_id: The User to check.
+
+        Returns:
+            True if the User exists and has finished onboarding.
+        """
+        user = self._repositories.users.get(user_id)
+        return user is not None and user.onboarding_completed_at is not None
 
     def _find_token(self, start_text: str) -> ConnectionToken | None:
         """Look up the token named in a `/start <token>` message.
