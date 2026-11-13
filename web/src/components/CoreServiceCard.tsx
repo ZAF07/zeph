@@ -3,20 +3,29 @@
 import { useState } from "react";
 
 import { secondaryButton } from "@/components/button-styles";
+import { ExtraPromptField } from "@/components/ExtraPromptField";
 import { fieldLabel, inputField } from "@/components/form-styles";
-import type {
-  AdminSettings,
-  CoreService,
-  SettingValue,
+import {
+  ApiError,
+  type AdminSettings,
+  type CoreService,
+  type ExtraPrompt,
+  type SettingValue,
 } from "@/lib/api-client";
 import { lastSavedNote, textSetting } from "@/lib/settings";
 
-type SaveState = "idle" | "saving" | "failed";
+type SaveState =
+  { kind: "idle" } | { kind: "saving" } | { kind: "failed"; message: string };
+
+const SAVE_FAILED_MESSAGE =
+  "Couldn’t save. The last saved prompt and model stay in use.";
 
 /**
  * One core service's card: which model it uses, its prompt and any extra
- * prompts (like a tool description), saved together. The prompt is combined
- * with the Persona when the service runs.
+ * prompts (like a tool description), saved together. Grouped extra prompts
+ * sit in groups that are folded shut until clicked. The prompt is combined
+ * with the Persona when the service runs. When the backend refuses a save,
+ * the card shows its reason.
  *
  * @param props - `service` is the core service, `modelChoices` the models
  *   Admins can pick, `settings` the saved settings, and `onSave` saves new
@@ -38,13 +47,17 @@ export function CoreServiceCard({
   const savedPrompt = textSetting(settings, service.prompt_key);
   const [model, setModel] = useState(savedModel);
   const [prompt, setPrompt] = useState(savedPrompt);
-  const extraKeys = service.extra_prompts.map(({ key }) => key);
+  const allExtraPrompts = [
+    ...service.extra_prompts,
+    ...service.extra_prompt_groups.flatMap((group) => group.prompts),
+  ];
+  const extraKeys = allExtraPrompts.map(({ key }) => key);
   const savedExtraPrompts = Object.fromEntries(
     extraKeys.map((key) => [key, textSetting(settings, key)]),
   );
   const [extraPrompts, setExtraPrompts] =
     useState<Record<string, string>>(savedExtraPrompts);
-  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
 
   const isDirty =
     model !== savedModel ||
@@ -54,11 +67,11 @@ export function CoreServiceCard({
     prompt,
     ...extraKeys.map((key) => extraPrompts[key]),
   ].every((text) => text?.trim());
-  const canSave = isDirty && allFilled && saveState !== "saving";
+  const canSave = isDirty && allFilled && saveState.kind !== "saving";
   const headingId = `service-${service.prompt_key}`;
 
   async function save() {
-    setSaveState("saving");
+    setSaveState({ kind: "saving" });
     try {
       await onSave({
         [service.prompt_key]: prompt,
@@ -71,10 +84,32 @@ export function CoreServiceCard({
           Object.entries(extraPrompts).map(([key, text]) => [key, text.trim()]),
         ),
       );
-      setSaveState("idle");
-    } catch {
-      setSaveState("failed");
+      setSaveState({ kind: "idle" });
+    } catch (failure) {
+      setSaveState({
+        kind: "failed",
+        message:
+          failure instanceof ApiError &&
+          failure.status === 422 &&
+          failure.detail
+            ? failure.detail
+            : SAVE_FAILED_MESSAGE,
+      });
     }
+  }
+
+  function extraPromptField(extraPrompt: ExtraPrompt) {
+    return (
+      <ExtraPromptField
+        key={extraPrompt.key}
+        prompt={extraPrompt}
+        value={extraPrompts[extraPrompt.key] ?? ""}
+        onChange={(text) => {
+          setExtraPrompts({ ...extraPrompts, [extraPrompt.key]: text });
+          setSaveState({ kind: "idle" });
+        }}
+      />
+    );
   }
 
   return (
@@ -101,7 +136,7 @@ export function CoreServiceCard({
             value={model}
             onChange={(event) => {
               setModel(event.target.value);
-              setSaveState("idle");
+              setSaveState({ kind: "idle" });
             }}
           >
             {modelChoices.map((choice) => (
@@ -119,27 +154,33 @@ export function CoreServiceCard({
             value={prompt}
             onChange={(event) => {
               setPrompt(event.target.value);
-              setSaveState("idle");
+              setSaveState({ kind: "idle" });
             }}
           />
         </label>
-        {service.extra_prompts.map(({ key, label }) => (
-          <label key={key} className={fieldLabel}>
-            {label}
-            <textarea
-              className={`${inputField} resize-y font-mono text-[13.5px] leading-relaxed`}
-              rows={4}
-              value={extraPrompts[key] ?? ""}
-              onChange={(event) => {
-                setExtraPrompts({ ...extraPrompts, [key]: event.target.value });
-                setSaveState("idle");
-              }}
-            />
-          </label>
+        {service.extra_prompts.map(extraPromptField)}
+        {service.extra_prompt_groups.map((group) => (
+          <details
+            key={group.name}
+            className="group rounded-input border border-line"
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+              {group.name}
+              <span
+                aria-hidden="true"
+                className="text-ink-muted transition-transform group-open:rotate-90"
+              >
+                ›
+              </span>
+            </summary>
+            <div className="flex flex-col gap-3 border-t border-line px-3.5 pb-3.5 pt-3">
+              {group.prompts.map(extraPromptField)}
+            </div>
+          </details>
         ))}
-        {saveState === "failed" ? (
+        {saveState.kind === "failed" ? (
           <p role="alert" className="m-0 text-sm text-danger-deep">
-            Couldn’t save. The last saved prompt and model stay in use.
+            {saveState.message}
           </p>
         ) : null}
       </div>
@@ -157,7 +198,7 @@ export function CoreServiceCard({
           disabled={!canSave}
           onClick={() => void save()}
         >
-          {saveState === "saving" ? "Saving…" : "Save"}
+          {saveState.kind === "saving" ? "Saving…" : "Save"}
         </button>
       </div>
     </section>

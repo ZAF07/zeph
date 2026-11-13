@@ -3,7 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PromptsAndModels } from "@/components/PromptsAndModels";
-import type { AdminSettings, ApiClient, CoreServices } from "@/lib/api-client";
+import {
+  ApiError,
+  type AdminSettings,
+  type ApiClient,
+  type CoreServices,
+} from "@/lib/api-client";
 
 const apiClient = {
   getAdminSettings: vi.fn<ApiClient["getAdminSettings"]>(),
@@ -24,6 +29,7 @@ const coreServices: CoreServices = {
       prompt_key: "response_prompt",
       model_key: "response_model",
       extra_prompts: [],
+      extra_prompt_groups: [],
     },
   ],
   model_choices: ["deepseek-chat", "deepseek-reasoner"],
@@ -130,8 +136,10 @@ describe("PromptsAndModels", () => {
             {
               key: "ask_about_photo_tool_description",
               label: "ask_about_photo tool description",
+              hint: null,
             },
           ],
+          extra_prompt_groups: [],
         },
       ],
       model_choices: ["deepseek-chat"],
@@ -172,6 +180,144 @@ describe("PromptsAndModels", () => {
       photo_model: "deepseek-chat",
       ask_about_photo_tool_description:
         "Look again only when needed. Ask one question.",
+    });
+  });
+
+  it("says why when the backend refuses a save", async () => {
+    apiClient.updateAdminSettings.mockRejectedValue(
+      new ApiError(
+        422,
+        "/api/admin/settings",
+        "The Features unavailable note must include {dashboard_url}, the link to the Dashboard.",
+      ),
+    );
+    const user = userEvent.setup();
+    render(<PromptsAndModels />);
+    const card = within(
+      await screen.findByRole("region", { name: "Response composition" }),
+    );
+
+    await user.type(card.getByLabelText("Prompt"), " Be warm.");
+    await user.click(card.getByRole("button", { name: "Save" }));
+
+    expect(
+      await card.findByText(
+        "The Features unavailable note must include {dashboard_url}, the link to the Dashboard.",
+      ),
+    ).toBeVisible();
+  });
+
+  describe("with extra prompts in groups", () => {
+    beforeEach(() => {
+      apiClient.getCoreServices.mockResolvedValue({
+        services: [
+          {
+            ...coreServices.services[0],
+            extra_prompt_groups: [
+              {
+                name: "Web search",
+                prompts: [
+                  {
+                    key: "web_search_tool_description",
+                    label: "web_search tool description",
+                    hint: null,
+                  },
+                  {
+                    key: "reply_web_search_instructions",
+                    label: "Web search instructions",
+                    hint: "Added when web search is offered.",
+                  },
+                ],
+              },
+              {
+                name: "Memory and Knowledge",
+                prompts: [
+                  {
+                    key: "reply_memory_intro",
+                    label: "Memory intro",
+                    hint: "Put before the User Memory.",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        model_choices: ["deepseek-chat"],
+      });
+      apiClient.getAdminSettings.mockResolvedValue({
+        ...settings,
+        web_search_tool_description: {
+          value: "Search the web.",
+          updated_at: "2026-11-01T00:00:00Z",
+          updated_by: null,
+        },
+        reply_web_search_instructions: {
+          value: "Say where it came from.",
+          updated_at: "2026-11-01T00:00:00Z",
+          updated_by: null,
+        },
+        reply_memory_intro: {
+          value: "What you remember:",
+          updated_at: "2026-11-01T00:00:00Z",
+          updated_by: null,
+        },
+      });
+      apiClient.updateAdminSettings.mockResolvedValue({});
+    });
+
+    it("folds each group shut until it is clicked", async () => {
+      const user = userEvent.setup();
+      render(<PromptsAndModels />);
+      const card = within(
+        await screen.findByRole("region", { name: "Response composition" }),
+      );
+      const instructions = card.getByLabelText("Web search instructions");
+      expect(instructions).not.toBeVisible();
+      expect(card.getByLabelText("Memory intro")).not.toBeVisible();
+
+      await user.click(card.getByText("Web search"));
+
+      expect(instructions).toBeVisible();
+      expect(instructions).toHaveValue("Say where it came from.");
+      expect(card.getByLabelText("web_search tool description")).toBeVisible();
+      expect(card.getByLabelText("Memory intro")).not.toBeVisible();
+    });
+
+    it("shows a hint under the labels that have one", async () => {
+      const user = userEvent.setup();
+      render(<PromptsAndModels />);
+      const card = within(
+        await screen.findByRole("region", { name: "Response composition" }),
+      );
+
+      await user.click(card.getByText("Web search"));
+
+      expect(
+        card.getByLabelText("Web search instructions"),
+      ).toHaveAccessibleDescription("Added when web search is offered.");
+      expect(
+        card.getByLabelText("web_search tool description"),
+      ).not.toHaveAccessibleDescription();
+    });
+
+    it("saves the grouped notes with the prompt and model", async () => {
+      const user = userEvent.setup();
+      render(<PromptsAndModels />);
+      const card = within(
+        await screen.findByRole("region", { name: "Response composition" }),
+      );
+
+      await user.click(card.getByText("Memory and Knowledge"));
+      await user.type(card.getByLabelText("Memory intro"), " Edited");
+      await user.click(card.getByRole("button", { name: "Save" }));
+
+      expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+        response_prompt: "Reply briefly.",
+        response_model: "deepseek-chat",
+        web_search_tool_description: "Search the web.",
+        reply_web_search_instructions: "Say where it came from.",
+        reply_memory_intro: "What you remember: Edited",
+      });
     });
   });
 

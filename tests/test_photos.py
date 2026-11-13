@@ -554,10 +554,12 @@ def test_an_edited_tool_description_is_offered_and_shows_on_the_photo_viewing_ca
         {
             "key": "ask_about_photo_tool_description",
             "label": "ask_about_photo tool description",
+            "hint": None,
         },
         {
             "key": "send_photo_tool_description",
             "label": "send_photo tool description",
+            "hint": None,
         },
     ]
 

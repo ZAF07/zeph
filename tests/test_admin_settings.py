@@ -7,7 +7,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
 from tests.conftest import DASHBOARD_URL
-from tests.fakes import FakeAuthVerifier, FakeChatChannel, FakeClock, ScriptedChatModel
+from tests.fakes import (
+    ChatModelCall,
+    FakeAuthVerifier,
+    FakeChatChannel,
+    FakeClock,
+    ScriptedChatModel,
+)
 from tests.telegram_helpers import (
     TELEGRAM_CHAT_ID,
     auth_headers,
@@ -218,10 +224,6 @@ def test_core_services_list_their_prompt_and_model_settings(
     service = response["services"][1]
     assert service["prompt_key"] == "response_prompt"
     assert service["model_key"] == "response_model"
-    assert [extra["key"] for extra in service["extra_prompts"]] == [
-        "sticker_tool_description",
-        "reply_web_search_limit_note",
-    ]
     assert response["model_choices"] == ["deepseek-chat", "deepseek-reasoner"]
 
 
@@ -349,4 +351,184 @@ def test_the_onboarding_unfinished_reply_must_keep_the_dashboard_link(
     assert response.json()["detail"] == (
         "The “Finish onboarding first” reply must include {dashboard_url}, "
         "the link to the Dashboard."
+    )
+
+
+RESPONSE_COMPOSITION_NOTE_GROUPS = {
+    "Web search": [
+        "web_search_tool_description",
+        "page_fetch_tool_description",
+        "reply_web_search_instructions",
+        "reply_web_search_limit_note",
+        "web_result_source_reminder",
+    ],
+    "Settings in chat": [
+        "reply_settings_instructions",
+        "reply_delete_data_instructions",
+        "reply_data_deletion_cancelled_note",
+    ],
+    "Memory and Knowledge": ["reply_memory_intro", "reply_knowledge_intro"],
+    "Features": ["reply_features_unavailable_note"],
+    "Stickers": ["sticker_tool_description"],
+}
+
+
+def core_services_by_name(
+    client: TestClient, headers: dict[str, str]
+) -> dict[str, Any]:
+    """List the core services as Admins see them, by name."""
+    response = client.get("/api/admin/core-services", headers=headers).json()
+    return {service["name"]: service for service in response["services"]}
+
+
+def test_response_composition_shows_every_reply_note_in_its_group(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+
+    service = core_services_by_name(client, headers)["Response composition"]
+
+    assert service["extra_prompts"] == []
+    assert {
+        group["name"]: [prompt["key"] for prompt in group["prompts"]]
+        for group in service["extra_prompt_groups"]
+    } == RESPONSE_COMPOSITION_NOTE_GROUPS
+    assert list(RESPONSE_COMPOSITION_NOTE_GROUPS) == [
+        group["name"] for group in service["extra_prompt_groups"]
+    ]
+
+
+def test_reply_notes_carry_a_hint_saying_when_they_are_used(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+    service = core_services_by_name(client, headers)["Response composition"]
+
+    prompts = {
+        prompt["key"]: prompt
+        for group in service["extra_prompt_groups"]
+        for prompt in group["prompts"]
+    }
+
+    assert prompts["reply_memory_intro"]["hint"]
+    assert prompts["reply_features_unavailable_note"]["hint"]
+    assert prompts["web_search_tool_description"]["hint"] is None
+    assert all(prompt["label"] for prompt in prompts.values())
+
+
+def test_other_core_services_keep_their_extra_prompts_in_a_flat_list(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+    services = core_services_by_name(client, headers)
+
+    photo_viewing = services["Photo viewing"]
+    memory_retrieval = services["Memory retrieval"]
+
+    assert photo_viewing["extra_prompt_groups"] == []
+    assert [prompt["key"] for prompt in photo_viewing["extra_prompts"]] == [
+        "ask_about_photo_tool_description",
+        "send_photo_tool_description",
+    ]
+    assert memory_retrieval["extra_prompt_groups"] == []
+    assert [prompt["key"] for prompt in memory_retrieval["extra_prompts"]] == [
+        "shared_photos_memory_description"
+    ]
+
+
+def test_every_reply_note_is_editable_with_its_seeded_value(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    seeded_settings: dict[str, Any],
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+    note_keys = [
+        key for keys in RESPONSE_COMPOSITION_NOTE_GROUPS.values() for key in keys
+    ]
+
+    settings = client.get("/api/admin/settings", headers=headers).json()["settings"]
+    saved = client.patch(
+        "/api/admin/settings",
+        json={"values": {key: f"{seeded_settings[key]} Edited." for key in note_keys}},
+        headers=headers,
+    )
+
+    assert {key: settings[key]["value"] for key in note_keys} == {
+        key: seeded_settings[key] for key in note_keys
+    }
+    assert saved.status_code == 200, saved.text
+    assert all(
+        saved.json()["settings"][key]["value"] == f"{seeded_settings[key]} Edited."
+        for key in note_keys
+    )
+
+
+def reply_call(
+    client: TestClient, chat_model: ScriptedChatModel, text: str
+) -> ChatModelCall:
+    """Send a Telegram message and return the reply call the model received."""
+    chat_model.calls.clear()
+    chat_model.script("ok")
+    assert send_to_webhook(client, telegram_text_update(text)) == 200
+    [call] = chat_model.calls
+    return call
+
+
+def test_saved_reply_notes_are_used_in_the_next_reply(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+    connect_telegram(client, auth_verifier, chat_channel)
+    client.patch(
+        "/api/admin/settings",
+        json={
+            "values": {
+                "reply_web_search_instructions": "Search only when asked.",
+                "web_search_tool_description": "Look things up, edited.",
+                "page_fetch_tool_description": "Read one page, edited.",
+                "reply_settings_instructions": "Change settings only when asked.",
+            }
+        },
+        headers=headers,
+    )
+
+    call = reply_call(client, chat_model, "hello there")
+
+    tool_descriptions = {tool.name: tool.description for tool in call.tools}
+    assert "Search only when asked." in call.instructions
+    assert "Change settings only when asked." in call.instructions
+    assert tool_descriptions["web_search"] == "Look things up, edited."
+    assert tool_descriptions["fetch_page"] == "Read one page, edited."
+
+
+@pytest.mark.parametrize(
+    ("note", "missing"),
+    [
+        (
+            "Not available: {features}.",
+            "{dashboard_url}, the link to the Dashboard",
+        ),
+        (
+            "Turn things on at {dashboard_url}.",
+            "{features}, the names of the Features that don’t work for them",
+        ),
+    ],
+)
+def test_the_features_unavailable_note_must_keep_both_placeholders(
+    client: TestClient, auth_verifier: FakeAuthVerifier, note: str, missing: str
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+
+    response = client.patch(
+        "/api/admin/settings",
+        json={"values": {"reply_features_unavailable_note": note}},
+        headers=headers,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        f"The Features unavailable note must include {missing}."
     )
