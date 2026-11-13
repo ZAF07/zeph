@@ -136,11 +136,18 @@ def photo_message_text(
     """
     if len(descriptions) == 1 and not photos_not_looked_at:
         markers = [
-            photo_marker(descriptions[0], not_viewed_note, None, viewing_off_note)
+            photo_marker(
+                descriptions[0], not_viewed_note, viewing_off_note=viewing_off_note
+            )
         ]
     else:
         markers = [
-            photo_marker(description, not_viewed_note, number, viewing_off_note)
+            photo_marker(
+                description,
+                not_viewed_note,
+                number,
+                viewing_off_note=viewing_off_note,
+            )
             for number, description in enumerate(descriptions, start=1)
         ]
     parts = [*markers, caption.strip()]
