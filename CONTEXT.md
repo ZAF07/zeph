@@ -185,7 +185,7 @@ _Avoid_: Billing, costs, activity log
 ### Privacy
 
 **Message Retention**:
-How long a User's raw messages are kept, set by Admins in days. Older messages are deleted automatically; Conversation Summaries and Memory Items stay until the User deletes them.
+How long a User's raw messages are kept, set by Admins in days. Older messages are deleted automatically; Conversation Summaries, Memory Items and Shared Photos stay until the User deletes them.
 _Avoid_: Data retention, TTL, history limit
 
 **Delete My Data**:
