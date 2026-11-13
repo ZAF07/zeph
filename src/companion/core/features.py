@@ -176,8 +176,7 @@ class FeatureService:
         Raises:
             UserNotFoundError: If there is no such User.
         """
-        if self._repositories.users.get(user_id) is None:
-            raise UserNotFoundError
+        self._require_user(user_id)
         return self._statuses(user_id)
 
     def set_for_user(
@@ -199,8 +198,7 @@ class FeatureService:
         Raises:
             UserNotFoundError: If there is no such User.
         """
-        if self._repositories.users.get(user_id) is None:
-            raise UserNotFoundError
+        self._require_user(user_id)
         if switch == UserFeatureSwitch.DEFAULT:
             self._repositories.feature_switches.remove_for_user(user_id, feature)
         else:
@@ -214,6 +212,18 @@ class FeatureService:
         return next(
             status for status in self._statuses(user_id) if status.feature == feature
         )
+
+    def _require_user(self, user_id: UUID) -> None:
+        """Make sure a User exists.
+
+        Args:
+            user_id: The User.
+
+        Raises:
+            UserNotFoundError: If there is no such User.
+        """
+        if self._repositories.users.get(user_id) is None:
+            raise UserNotFoundError(user_id)
 
     def _statuses(self, user_id: UUID) -> list[FeatureStatus]:
         """Work out each Feature's status for a User, without checking they exist.
@@ -229,30 +239,30 @@ class FeatureService:
             for switch in self._repositories.feature_switches.list_for_user(user_id)
         }
         return [
-            status_for(everyone, user_switches.get(everyone.feature))
-            for everyone in self.list_for_everyone()
+            status_for(everyone_switch, user_switches.get(everyone_switch.feature))
+            for everyone_switch in self.list_for_everyone()
         ]
 
 
 def status_for(
-    everyone: FeatureSwitch, for_user: FeatureSwitch | None
+    everyone_switch: FeatureSwitch, user_switch: FeatureSwitch | None
 ) -> FeatureStatus:
     """Apply the rule: the User's switch if set, otherwise the one for everyone.
 
     Args:
-        everyone: The Feature's switch for everyone.
-        for_user: The Feature's switch for this User; None when "default".
+        everyone_switch: The Feature's switch for everyone.
+        user_switch: The Feature's switch for this User; None when "default".
 
     Returns:
         Whether the Feature works for the User, why, and their switch.
     """
-    if for_user is None:
+    if user_switch is None:
         return FeatureStatus(
-            feature=everyone.feature,
-            works=everyone.on,
+            feature=everyone_switch.feature,
+            works=everyone_switch.on,
             reason=(
                 FeatureReason.ON_FOR_EVERYONE
-                if everyone.on
+                if everyone_switch.on
                 else FeatureReason.OFF_FOR_EVERYONE
             ),
             switch=UserFeatureSwitch.DEFAULT,
@@ -260,10 +270,12 @@ def status_for(
             changed_at=None,
         )
     return FeatureStatus(
-        feature=everyone.feature,
-        works=for_user.on,
-        reason=FeatureReason.ON_FOR_USER if for_user.on else FeatureReason.OFF_FOR_USER,
-        switch=UserFeatureSwitch.ON if for_user.on else UserFeatureSwitch.OFF,
-        changed_by_email=for_user.changed_by_email,
-        changed_at=for_user.changed_at,
+        feature=everyone_switch.feature,
+        works=user_switch.on,
+        reason=FeatureReason.ON_FOR_USER
+        if user_switch.on
+        else FeatureReason.OFF_FOR_USER,
+        switch=UserFeatureSwitch.ON if user_switch.on else UserFeatureSwitch.OFF,
+        changed_by_email=user_switch.changed_by_email,
+        changed_at=user_switch.changed_at,
     )

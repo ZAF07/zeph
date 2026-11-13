@@ -185,11 +185,11 @@ How long a User's raw messages are kept, set by Admins in days. Older messages a
 _Avoid_: Data retention, TTL, history limit
 
 **Delete My Data**:
-A User's choice, on the Dashboard or in chat, to wipe their messages, User Memory, Check-in history and Telegram Connection after typing a confirmation word. In chat the confirmation must be their whole next message; anything else cancels it. Their account stays, so they can start fresh.
+A User's choice, on the Dashboard or in chat, to wipe their messages, User Memory, Check-in history and Telegram Connection after typing a confirmation word. In chat the confirmation must be their whole next message; anything else cancels it. Their account stays, so they can start fresh. The Admins' Feature choices for them stay too, since they are Admin settings, not the User's data.
 _Avoid_: Reset, clear history, wipe
 
 **Account Deletion**:
-A User's choice, made only on the Dashboard, to remove everything Delete My Data removes plus their account itself. It can't be undone, and the last Admin can't do it.
+A User's choice, made only on the Dashboard, to remove everything Delete My Data removes plus their account itself and the Admins' Feature choices for them. It can't be undone, and the last Admin can't do it.
 _Avoid_: Close account, deactivate, unsubscribe
 
 ### Quality
