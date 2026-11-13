@@ -56,6 +56,8 @@ class CoreService:
         description: What the service does.
         prompt_key: The setting holding its prompt.
         model_key: The setting holding the model it uses.
+        extra_prompt_keys: Other text settings shown with its prompt, e.g.
+            a tool description it uses.
     """
 
     name: str
@@ -63,6 +65,7 @@ class CoreService:
     description: str
     prompt_key: str
     model_key: str
+    extra_prompt_keys: tuple[str, ...] = ()
 
 
 EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
@@ -99,6 +102,12 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         "photo_description_prompt", "Photo description prompt", SettingKind.TEXT
     ),
     EditableSetting("photo_model", "Photo viewing model", SettingKind.MODEL),
+    EditableSetting(
+        "ask_about_photo_tool_description",
+        "ask_about_photo tool description",
+        SettingKind.TEXT,
+        max_length=4_000,
+    ),
     EditableSetting(
         "photo_not_viewed_note",
         "“Didn’t come through” note",
@@ -220,10 +229,12 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         description=(
             "Looks at each photo a User sends and writes a detailed "
             "description. The Safeguard, the reply and memory read the "
-            "description; the photo itself is never kept."
+            "description; the photo itself is never kept. The reply can look "
+            "again with a question when the description can’t answer."
         ),
         prompt_key="photo_description_prompt",
         model_key="photo_model",
+        extra_prompt_keys=("ask_about_photo_tool_description",),
     ),
     CoreService(
         name="Check-ins",
@@ -237,6 +248,11 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         model_key="check_in_model",
     ),
 )
+
+
+SETTING_LABELS: dict[str, str] = {
+    setting.key: setting.label for setting in EDITABLE_SETTINGS
+}
 
 
 class InvalidSettingError(ValueError):

@@ -80,6 +80,7 @@ from companion.core.models import (
 )
 from companion.core.platform_settings import (
     CORE_SERVICES,
+    SETTING_LABELS,
     InvalidSettingError,
     PlatformSettingsService,
 )
@@ -193,6 +194,13 @@ class UserFeatureSwitchRequest(BaseModel):
     switch: UserFeatureSwitch
 
 
+class ExtraPromptResponse(BaseModel):
+    """A text setting shown with a core service's prompt."""
+
+    key: str
+    label: str
+
+
 class CoreServiceResponse(BaseModel):
     """A core service whose prompt and model Admins can change."""
 
@@ -201,6 +209,7 @@ class CoreServiceResponse(BaseModel):
     description: str
     prompt_key: str
     model_key: str
+    extra_prompts: list[ExtraPromptResponse]
 
 
 class CoreServicesResponse(BaseModel):
@@ -948,7 +957,8 @@ def build_admin_api_router(
         """Return the core services and the models Admins can pick.
 
         Returns:
-            The services, each naming its prompt and model settings.
+            The services, each naming its prompt, model and any extra
+            prompt settings.
         """
         return CoreServicesResponse(
             services=[
@@ -958,6 +968,10 @@ def build_admin_api_router(
                     description=service.description,
                     prompt_key=service.prompt_key,
                     model_key=service.model_key,
+                    extra_prompts=[
+                        ExtraPromptResponse(key=key, label=SETTING_LABELS[key])
+                        for key in service.extra_prompt_keys
+                    ],
                 )
                 for service in CORE_SERVICES
             ],

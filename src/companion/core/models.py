@@ -316,11 +316,13 @@ class ChannelPhoto:
         file_unique_id: The ID that stays the same for the same photo.
         too_big_to_download: True when the chat channel won't let the bot
             download it, so it can't be viewed.
+        viewed: True once the Companion has looked at it and described it.
     """
 
     file_id: str
     file_unique_id: str
     too_big_to_download: bool = False
+    viewed: bool = False
 
 
 @dataclass(frozen=True)

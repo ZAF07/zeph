@@ -12,10 +12,12 @@ from tests.fakes import (
     PHOTO_TOKENS_OUT,
     TOKENS_IN_PER_CALL,
     TOKENS_OUT_PER_CALL,
+    ChatModelCall,
     FakeAuthVerifier,
     FakeChatChannel,
     FakePhotoViewer,
     ScriptedChatModel,
+    ToolCall,
 )
 from tests.telegram_helpers import (
     TELEGRAM_CHAT_ID,
@@ -25,6 +27,7 @@ from tests.telegram_helpers import (
     telegram_file_update,
     telegram_message_update,
     telegram_photo_update,
+    telegram_text_update,
 )
 from tests.test_safeguard import use_simple_crisis_reply
 from tests.test_usage_limits import usage_rows
@@ -32,6 +35,8 @@ from tests.test_web_search import change_settings
 
 CAT = "A ginger cat asleep on a sunny windowsill next to a small cactus."
 TWENTY_MEGABYTES = 20 * 1024 * 1024
+POT_QUESTION = "What colour is the pot the cactus is in?"
+POT_ANSWER = "The pot is terracotta orange with a chipped rim."
 
 
 def send_photo_and_reply(
@@ -44,6 +49,23 @@ def send_photo_and_reply(
     chat_model.script(reply)
     assert send_to_webhook(client, update) == 200
     return chat_model.calls[-1].history[-1].text
+
+
+def ask_about_photo_tools(call: ChatModelCall) -> list[Any]:
+    """List the ask_about_photo tools a reply call was offered."""
+    return [tool for tool in call.tools if tool.name == "ask_about_photo"]
+
+
+def ask_about_the_photo(
+    client: TestClient,
+    chat_model: ScriptedChatModel,
+    arguments: dict[str, Any],
+    reply: str = "it's terracotta",
+) -> ChatModelCall:
+    """Send a follow-up question whose reply calls ask_about_photo once."""
+    chat_model.script(ToolCall("ask_about_photo", arguments), reply)
+    assert send_to_webhook(client, telegram_text_update("what colour is the pot?"))
+    return chat_model.calls[-1]
 
 
 def test_a_photo_with_a_caption_reaches_the_reply_and_safeguard_as_its_description(
@@ -88,7 +110,7 @@ def test_a_photo_without_a_caption_gets_a_real_reply_about_the_photo(
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["what a sleepy cat"]
 
 
-def test_the_saved_message_keeps_the_photos_telegram_ids(
+def test_the_saved_message_keeps_the_photos_telegram_ids_and_that_it_was_viewed(
     client: TestClient,
     engine: Engine,
     auth_verifier: FakeAuthVerifier,
@@ -111,7 +133,9 @@ def test_the_saved_message_keeps_the_photos_telegram_ids(
         if message.direction == MessageDirection.INCOMING
     ]
     assert incoming.content == f"[photo: {CAT}] meet Biscuit"
-    assert incoming.photos == (ChannelPhoto("file-photo-cat", "photo-cat"),)
+    assert incoming.photos == (
+        ChannelPhoto("file-photo-cat", "photo-cat", viewed=True),
+    )
 
 
 @pytest.mark.parametrize("mime_type", ["image/jpeg", "image/png", "image/webp"])
@@ -290,3 +314,210 @@ def test_a_photo_counts_as_one_message_and_its_tokens_go_into_usage(
     model_calls = len(chat_model.call_order)
     assert row["tokens_in"] == model_calls * TOKENS_IN_PER_CALL + PHOTO_TOKENS_IN
     assert row["tokens_out"] == model_calls * TOKENS_OUT_PER_CALL + PHOTO_TOKENS_OUT
+
+
+def test_a_follow_up_question_looks_at_the_photo_again_and_the_answer_reaches_the_reply(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    photo_viewer: FakePhotoViewer,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    cat_photo = PhotoImage(content=b"cat-jpeg", media_type="image/jpeg")
+    chat_channel.photos["file-photo-cat"] = cat_photo
+    photo_viewer.script(CAT, POT_ANSWER)
+    send_photo_and_reply(client, chat_model, telegram_photo_update("meet Biscuit"))
+
+    call = ask_about_the_photo(
+        client, chat_model, {"photo": 1, "question": POT_QUESTION}
+    )
+
+    _, look_again = photo_viewer.calls
+    assert look_again.photo == cat_photo
+    assert look_again.model == seeded_settings["photo_model"]
+    assert look_again.instructions.startswith(
+        seeded_settings["photo_description_prompt"]
+    )
+    assert look_again.instructions.endswith(POT_QUESTION)
+    [tool_result] = call.tool_results
+    assert POT_ANSWER in tool_result
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID)[-1] == "it's terracotta"
+
+
+def test_the_tool_lists_the_conversations_viewed_photos_under_the_admin_description(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    photo_viewer: FakePhotoViewer,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    dog = "A black dog chasing a red ball across a park lawn."
+    photo_viewer.script(CAT, dog)
+    send_photo_and_reply(client, chat_model, telegram_photo_update("meet Biscuit"))
+    send_photo_and_reply(
+        client, chat_model, telegram_photo_update(file_unique_id="photo-dog")
+    )
+
+    [tool] = ask_about_photo_tools(chat_model.calls[-1])
+
+    description = seeded_settings["ask_about_photo_tool_description"]
+    assert tool.description.startswith(description)
+    assert f"1. [photo: {CAT}] meet Biscuit" in tool.description
+    assert f"2. [photo: {dog}]" in tool.description
+    assert set(tool.parameters["required"]) == {"photo", "question"}
+
+
+def test_the_tool_description_says_to_use_it_only_when_the_description_cant_answer(
+    seeded_settings: dict[str, Any],
+) -> None:
+    description = seeded_settings["ask_about_photo_tool_description"].lower()
+
+    assert "only" in description
+    assert "description" in description
+
+
+def test_the_tool_looks_at_the_photo_with_the_number_it_was_given(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    photo_viewer: FakePhotoViewer,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    send_photo_and_reply(client, chat_model, telegram_photo_update())
+    send_photo_and_reply(
+        client, chat_model, telegram_photo_update(file_unique_id="photo-dog")
+    )
+
+    ask_about_the_photo(client, chat_model, {"photo": 2, "question": "Is it happy?"})
+
+    assert chat_channel.downloaded_photos[-1] == "file-photo-dog"
+
+
+def test_ask_about_photo_is_not_offered_without_viewed_photos(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    photo_viewer: FakePhotoViewer,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script("hey!")
+    assert send_to_webhook(client, telegram_text_update("hi there"))
+    no_photos = chat_model.calls[-1]
+    photo_viewer.script(*[RuntimeError("model down")] * 3)
+    send_photo_and_reply(client, chat_model, telegram_photo_update(), "resend?")
+    failed_photo = chat_model.calls[-1]
+
+    assert ask_about_photo_tools(no_photos) == []
+    assert ask_about_photo_tools(failed_photo) == []
+
+
+def test_a_failed_look_again_is_retried_then_reported_to_the_reply_in_plain_words(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    photo_viewer: FakePhotoViewer,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    admin = owner_headers(client, auth_verifier)
+    change_settings(client, admin, {"photo_retry_count": 1})
+    photo_viewer.script(CAT, RuntimeError("model down"), RuntimeError("model down"))
+    send_photo_and_reply(client, chat_model, telegram_photo_update())
+
+    with caplog.at_level(logging.ERROR):
+        call = ask_about_the_photo(
+            client,
+            chat_model,
+            {"photo": 1, "question": POT_QUESTION},
+            "I couldn't look again, sorry",
+        )
+
+    assert len(photo_viewer.calls) == 3
+    [tool_result] = call.tool_results
+    assert "couldn't look at the photo again" in tool_result.lower()
+    assert "Could not look at a photo again" in caplog.text
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID)[-1] == (
+        "I couldn't look again, sorry"
+    )
+
+
+@pytest.mark.parametrize(
+    ("arguments", "expected"),
+    [
+        ({"photo": 5, "question": POT_QUESTION}, "no photo with that number"),
+        ({"photo": "cat", "question": POT_QUESTION}, "no photo with that number"),
+        ({"photo": 1, "question": "  "}, "needs a question"),
+    ],
+)
+def test_an_unknown_photo_or_missing_question_is_said_plainly_without_a_look(
+    arguments: dict[str, Any],
+    expected: str,
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    photo_viewer: FakePhotoViewer,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    send_photo_and_reply(client, chat_model, telegram_photo_update())
+
+    call = ask_about_the_photo(client, chat_model, arguments)
+
+    [tool_result] = call.tool_results
+    assert expected in tool_result.lower()
+    assert len(photo_viewer.calls) == 1
+
+
+def test_a_look_again_puts_its_tokens_into_usage(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    photo_viewer: FakePhotoViewer,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    connect_telegram(client, auth_verifier, chat_channel)
+    send_photo_and_reply(client, chat_model, telegram_photo_update())
+
+    ask_about_the_photo(client, chat_model, {"photo": 1, "question": POT_QUESTION})
+
+    [row] = [row for row in usage_rows(client, admin) if row["message_count"]]
+    model_calls = len(chat_model.call_order)
+    assert row["tokens_in"] == model_calls * TOKENS_IN_PER_CALL + 2 * PHOTO_TOKENS_IN
+
+
+def test_an_edited_tool_description_is_offered_and_shows_on_the_photo_viewing_card(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    photo_viewer: FakePhotoViewer,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    connect_telegram(client, auth_verifier, chat_channel)
+    edited = "Look again only for small details the description left out."
+    change_settings(client, admin, {"ask_about_photo_tool_description": edited})
+
+    send_photo_and_reply(client, chat_model, telegram_photo_update())
+
+    [tool] = ask_about_photo_tools(chat_model.calls[-1])
+    assert tool.description.startswith(edited)
+    services = client.get("/api/admin/core-services", headers=admin).json()
+    [photo_viewing] = [
+        service
+        for service in services["services"]
+        if service["name"] == "Photo viewing"
+    ]
+    assert photo_viewing["extra_prompts"] == [
+        {
+            "key": "ask_about_photo_tool_description",
+            "label": "ask_about_photo tool description",
+        }
+    ]

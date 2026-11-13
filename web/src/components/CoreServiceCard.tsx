@@ -14,8 +14,9 @@ import { lastSavedNote, textSetting } from "@/lib/settings";
 type SaveState = "idle" | "saving" | "failed";
 
 /**
- * One core service's card: which model it uses and its prompt, saved
- * together. The prompt is combined with the Persona when the service runs.
+ * One core service's card: which model it uses, its prompt and any extra
+ * prompts (like a tool description), saved together. The prompt is combined
+ * with the Persona when the service runs.
  *
  * @param props - `service` is the core service, `modelChoices` the models
  *   Admins can pick, `settings` the saved settings, and `onSave` saves new
@@ -37,10 +38,23 @@ export function CoreServiceCard({
   const savedPrompt = textSetting(settings, service.prompt_key);
   const [model, setModel] = useState(savedModel);
   const [prompt, setPrompt] = useState(savedPrompt);
+  const extraKeys = service.extra_prompts.map(({ key }) => key);
+  const savedExtraPrompts = Object.fromEntries(
+    extraKeys.map((key) => [key, textSetting(settings, key)]),
+  );
+  const [extraPrompts, setExtraPrompts] =
+    useState<Record<string, string>>(savedExtraPrompts);
   const [saveState, setSaveState] = useState<SaveState>("idle");
 
-  const isDirty = model !== savedModel || prompt !== savedPrompt;
-  const canSave = isDirty && prompt.trim() !== "" && saveState !== "saving";
+  const isDirty =
+    model !== savedModel ||
+    prompt !== savedPrompt ||
+    extraKeys.some((key) => extraPrompts[key] !== savedExtraPrompts[key]);
+  const allFilled = [
+    prompt,
+    ...extraKeys.map((key) => extraPrompts[key]),
+  ].every((text) => text?.trim());
+  const canSave = isDirty && allFilled && saveState !== "saving";
   const headingId = `service-${service.prompt_key}`;
 
   async function save() {
@@ -49,8 +63,14 @@ export function CoreServiceCard({
       await onSave({
         [service.prompt_key]: prompt,
         [service.model_key]: model,
+        ...extraPrompts,
       });
       setPrompt(prompt.trim());
+      setExtraPrompts(
+        Object.fromEntries(
+          Object.entries(extraPrompts).map(([key, text]) => [key, text.trim()]),
+        ),
+      );
       setSaveState("idle");
     } catch {
       setSaveState("failed");
@@ -103,6 +123,20 @@ export function CoreServiceCard({
             }}
           />
         </label>
+        {service.extra_prompts.map(({ key, label }) => (
+          <label key={key} className={fieldLabel}>
+            {label}
+            <textarea
+              className={`${inputField} resize-y font-mono text-[13.5px] leading-relaxed`}
+              rows={4}
+              value={extraPrompts[key] ?? ""}
+              onChange={(event) => {
+                setExtraPrompts({ ...extraPrompts, [key]: event.target.value });
+                setSaveState("idle");
+              }}
+            />
+          </label>
+        ))}
         {saveState === "failed" ? (
           <p role="alert" className="m-0 text-sm text-danger-deep">
             Couldn’t save. The last saved prompt and model stay in use.
@@ -111,7 +145,11 @@ export function CoreServiceCard({
       </div>
       <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3">
         <span className="text-caption text-ink-muted">
-          {lastSavedNote(settings, [service.prompt_key, service.model_key])}
+          {lastSavedNote(settings, [
+            service.prompt_key,
+            service.model_key,
+            ...extraKeys,
+          ])}
         </span>
         <button
           type="button"

@@ -181,6 +181,15 @@ photo_description_prompt: |-
 
   Write plain sentences, no headings or lists, in English.
 
+# What the model is told about the ask_about_photo tool, which looks at a
+# photo from the Conversation again to answer a question. The viewed photos
+# are listed after it, by number.
+ask_about_photo_tool_description: >-
+  Look at a photo from this conversation again to answer a question about it,
+  e.g. a small detail or a colour. Use it only when the photo's description
+  can't answer; most follow-ups can be answered from the description. Ask one
+  clear question. The photos, by number, with their descriptions:
+
 # Put in the User's message in place of a description when their photo
 # couldn't be downloaded or looked at, even after the retries.
 photo_not_viewed_note: >-

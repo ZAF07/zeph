@@ -30,3 +30,9 @@ Photo Viewing joins the Feature list, with the User's own switch (on by default)
 - `.scratch/photos/issues/04-shared-photos.md`
 - `.scratch/features/issues/04-user-memory-and-check-ins-features.md`
 - `.scratch/features/issues/05-settings-in-chat-feature.md`
+
+## Comments
+
+### 2026-11-13 — note from issue 02
+
+- `ChannelPhoto.viewed` is set by `PhotoService.read_message` as "it was described". With Photo Viewing off the photo is still described for the Safeguard, so set `viewed` only when the reply saw the description; otherwise `ask_about_photo` would be offered for photos the User didn't let the Companion view.

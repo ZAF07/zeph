@@ -216,6 +216,12 @@ export type AdminSetting = {
 /** Every platform setting Admins can edit, by key. */
 export type AdminSettings = Record<string, AdminSetting>;
 
+/** A text setting shown with a core service's prompt, e.g. a tool description. */
+export type ExtraPrompt = {
+  key: string;
+  label: string;
+};
+
 /** A core service whose prompt and model Admins can change. */
 export type CoreService = {
   name: string;
@@ -223,6 +229,7 @@ export type CoreService = {
   description: string;
   prompt_key: string;
   model_key: string;
+  extra_prompts: ExtraPrompt[];
 };
 
 /** The core services and the models Admins can pick for them. */
