@@ -11,6 +11,7 @@ from companion.core.models import (
     UserFeatureSwitch,
 )
 from companion.core.ports import Clock, Repositories
+from companion.core.telegram_connection import DASHBOARD_URL_PLACEHOLDER
 
 UNAVAILABLE_NOTE_SETTING = "reply_features_unavailable_note"
 FEATURES_PLACEHOLDER = "{features}"
@@ -237,7 +238,7 @@ class FeatureService:
         names = ", ".join(feature_details(feature).name for feature in unavailable)
         note: str = self._repositories.platform_settings.get(UNAVAILABLE_NOTE_SETTING)
         return note.replace(FEATURES_PLACEHOLDER, names).replace(
-            "{dashboard_url}", self._dashboard_url
+            DASHBOARD_URL_PLACEHOLDER, self._dashboard_url
         )
 
     def list_for_everyone(self) -> list[FeatureSwitch]:
