@@ -65,7 +65,7 @@ A run of messages between a User and the Companion that ends after a quiet gap (
 _Avoid_: Session, thread, chat
 
 **Check-in**:
-A message the Companion sends first, unprompted, to a User who has opted in — meant to feel like a friend reaching out, not a task reminder. When the User is due (their frequency gap has passed), not paused, outside their Quiet Hours and not mid-Conversation, the Companion either sends one of a Check-in Kind or skips it. Check-ins are a Feature: when an Admin has them off for a User, none are decided or sent, and the User's own Check-in settings are kept for when they are back on. The User's first message within the reply window (set by an Admin) is its reply; after that it had no reply. Users never see when the next one will come.
+A message the Companion sends first, unprompted, to a User who has opted in — meant to feel like a friend reaching out, not a task reminder. When the User is due (their frequency gap has passed), not paused, outside their Quiet Hours and not mid-Conversation, the Companion either sends one of a Check-in Kind or skips it. Check-ins are a Feature: when an Admin has them off for a User, none are decided or sent, and the User's own Check-in settings are kept for when they are back on. The User's first message within the reply window (set by an Admin) is its reply; after that it had no reply. A User never gets the same Check-in twice: one Telegram refuses is tried again a little later, and one whose delivery is unclear counts as sent. Users never see when the next one will come.
 _Avoid_: Notification, nudge, reminder, push
 
 **Quiet Hours**:
@@ -81,7 +81,7 @@ The style of a Check-in (e.g. casual hello, follow-up on something shared, prese
 _Avoid_: Template, check-in type
 
 **Skipped Check-in**:
-A due Check-in the Companion chose not to send, with a reason only Admins see (e.g. the User asked for space). The next attempt waits a full frequency gap, as after a sent one. Users see it only as "gave you some space".
+A due Check-in the Companion chose not to send, or couldn't because the User has blocked it on Telegram, with a reason only Admins see (e.g. the User asked for space). The next attempt waits a full frequency gap, as after a sent one. Users see it only as "gave you some space".
 _Avoid_: Cancelled, missed, failed check-in
 
 **Ignore Threshold**:
