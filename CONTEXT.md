@@ -157,7 +157,7 @@ _Avoid_: Default knowledge, seed content
 ### Web
 
 **Web Search**:
-The Companion looking something up on the web while it replies — searching, or reading a page — when the Conversation needs a fact it doesn't know well. Queries carry only the general topic, never the User's personal details, and a reply that uses web information says where it came from. Admins can turn it off for everyone.
+The Companion looking something up on the web while it replies — searching, or reading a page — when the Conversation needs a fact it doesn't know well. Queries carry only the general topic, never the User's personal details, and a reply that uses web information says where it came from. It is a Feature, so Admins can turn it off; when it doesn't work for a User, the Companion tells them plainly it isn't available on their account.
 _Avoid_: Browsing, internet lookup, googling
 
 **Web Search Limit**:
