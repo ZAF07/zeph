@@ -61,3 +61,10 @@ None.
 - One choice in the tool: single stickers or whole sets.
 - Global stickers keep Admin-written notes only. No vision call to draft notes.
 - Outside adding mode, an Admin is just a User (their stickers can become their own Personal Stickers, see issue 30).
+
+**2026-11-13 — started on branch `mvp-24-admin-stickers-in-chat`.** Plan:
+- New core module `sticker_adding.py`: each Admin's adding mode lives in memory (choice, tally, chat). It holds the `start_adding_stickers` tool (offered to Admins only), the reply-"add this" path, the summary message and the quiet-gap timer (the same Timer albums use).
+- `IncomingMessageHandler`: an Admin's sticker is chat unless adding mode is on. In the mode it is added (or its set) and gets a reaction, nothing else. Any other message ends the mode: summary first, then answered as normal. An Admin's "add this" / "add this set" reply to a sticker adds it and gets the summary, without a reply from the model.
+- Webhook passes `message_id` for stickers and texts, and the sticker being replied to. Chat channel port gets `react`.
+- Settings: `sticker_adding_quiet_gap_minutes` (5, on Platform settings), `sticker_adding_summary_reply`. The old per-sticker `sticker_added_reply` / `sticker_already_in_library_reply` are dropped from the seed.
+- Telegram only allows reactions from a fixed emoji list, and ✅ isn't on it, so the reaction is 👍.

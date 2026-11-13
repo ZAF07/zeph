@@ -3,6 +3,7 @@ from typing import Any
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
+from companion.core.models import ChannelSticker
 from tests.conftest import INITIAL_ADMIN_EMAIL, WEBHOOK_SECRET, CompanionTestClient
 from tests.fakes import FakeAuthVerifier, FakeChatChannel
 
@@ -130,6 +131,35 @@ def telegram_sticker_update(
     if set_name is not None:
         sticker["set_name"] = set_name
     return telegram_message_update({"sticker": sticker}, telegram_user_id)
+
+
+def telegram_reply_to_sticker_update(
+    text: str,
+    sticker: ChannelSticker,
+    telegram_user_id: int = TELEGRAM_USER_ID,
+) -> dict[str, Any]:
+    """Build a Telegram webhook update for a text replying to a sticker message."""
+    replied_sticker: dict[str, Any] = {
+        "file_id": sticker.file_id,
+        "file_unique_id": sticker.file_unique_id,
+        "type": "regular",
+        "is_animated": False,
+        "is_video": False,
+    }
+    if sticker.emoji is not None:
+        replied_sticker["emoji"] = sticker.emoji
+    if sticker.set_name is not None:
+        replied_sticker["set_name"] = sticker.set_name
+    if sticker.preview_file_id is not None:
+        replied_sticker["thumbnail"] = {"file_id": sticker.preview_file_id}
+    update = telegram_text_update(text, telegram_user_id)
+    update["message"]["reply_to_message"] = {
+        "message_id": 9,
+        "date": 1762851500,
+        "chat": {"id": telegram_user_id, "type": "private"},
+        "sticker": replied_sticker,
+    }
+    return update
 
 
 def send_to_webhook(client: TestClient, update: dict[str, Any]) -> int:

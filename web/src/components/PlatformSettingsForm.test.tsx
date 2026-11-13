@@ -33,6 +33,7 @@ const settings: AdminSettings = {
   photo_album_wait_seconds: seeded(2),
   photo_album_max_photos: seeded(5),
   personal_stickers_limit: seeded(30),
+  sticker_adding_quiet_gap_minutes: seeded(5),
   photo_not_viewed_note: seeded("Say the photo didn't come through."),
   photo_viewing_off_note: seeded("Say you didn't look at the photo."),
   photo_viewing_explanation: seeded("When off, Zeph won't look at photos."),
@@ -83,6 +84,21 @@ describe("PlatformSettingsForm", () => {
     });
     expect(await screen.findByText(/Last saved .* by Maya Lin/)).toBeVisible();
     expect(screen.getByText("Saved")).toBeVisible();
+  });
+
+  it("shows and saves the sticker adding quiet gap", async () => {
+    const user = userEvent.setup();
+    render(<PlatformSettingsForm />);
+    const gap = await screen.findByLabelText("Sticker adding quiet gap");
+    expect(gap).toHaveValue(5);
+
+    await user.clear(gap);
+    await user.type(gap, "10");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      sticker_adding_quiet_gap_minutes: 10,
+    });
   });
 
   it("shows and saves the Check-in ignore threshold and fewer message", async () => {

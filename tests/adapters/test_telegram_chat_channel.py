@@ -63,6 +63,24 @@ def test_a_sticker_is_sent_by_its_file_id() -> None:
     assert calls == [("sendSticker", {"chat_id": 42, "sticker": "file-seedling"})]
 
 
+def test_a_reaction_is_put_on_a_message_by_its_id() -> None:
+    calls: list[tuple[str, dict[str, object]]] = []
+    channel = channel_answering(lambda path, body: ok(True), calls)
+
+    channel.react(42, 7, "👍")
+
+    assert calls == [
+        (
+            "setMessageReaction",
+            {
+                "chat_id": 42,
+                "message_id": 7,
+                "reaction": [{"type": "emoji", "emoji": "👍"}],
+            },
+        )
+    ]
+
+
 def test_a_photo_is_sent_by_its_file_id() -> None:
     calls: list[tuple[str, dict[str, object]]] = []
     channel = channel_answering(lambda path, body: ok({}), calls)

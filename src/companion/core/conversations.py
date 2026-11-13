@@ -223,6 +223,21 @@ class ConversationService:
         self._chat_channel.send_text(chat_id, text)
         self._save(conversation_id, MessageDirection.OUTGOING, text)
 
+    def deliver_notice(self, user_id: UUID, chat_id: int, text: str) -> None:
+        """Send a message the Companion wasn't asked to write, and save it.
+
+        It joins the User's open Conversation, or starts one, so later
+        replies know it was said. Used for the summary after an Admin adds
+        stickers in chat.
+
+        Args:
+            user_id: The User it is for.
+            chat_id: The chat to send to.
+            text: The message.
+        """
+        self._chat_channel.send_text(chat_id, text)
+        self._save(self._open_conversation_id(user_id), MessageDirection.OUTGOING, text)
+
     def _open_conversation_id(self, user_id: UUID) -> UUID:
         """Find the User's open Conversation, or start a new one.
 

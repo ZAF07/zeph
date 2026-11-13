@@ -1,4 +1,6 @@
 import logging
+from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
@@ -25,6 +27,19 @@ STICKER_PARAMETERS: dict[str, Any] = {
     },
     "required": ["number"],
 }
+
+
+@dataclass(frozen=True)
+class StickersAdded:
+    """What adding some stickers to the Sticker Library did.
+
+    Attributes:
+        added: How many were new and added.
+        already_there: How many were already in the library and skipped.
+    """
+
+    added: int
+    already_there: int
 
 
 class StickerNotFoundError(LookupError):
@@ -96,16 +111,45 @@ class StickerLibraryService:
         """
         return self._repositories.stickers.list_all()
 
-    def add_sent_sticker(self, sticker: ChannelSticker) -> bool:
-        """Add a sticker an Admin sent the Companion, without a note.
+    def add_stickers(self, stickers: Sequence[ChannelSticker]) -> StickersAdded:
+        """Add stickers without notes, skipping ones already in the library.
+
+        Stickers already in the library keep their notes.
 
         Args:
-            sticker: The sticker.
+            stickers: The stickers.
 
         Returns:
-            True if it was added; False if it was already in the library.
+            How many were added and how many were already there.
         """
-        return self._repositories.stickers.add_new([sticker], self._clock.now()) == 1
+        added = self._repositories.stickers.add_new(list(stickers), self._clock.now())
+        return StickersAdded(added=added, already_there=len(stickers) - added)
+
+    def find_set(self, set_name: str) -> list[ChannelSticker]:
+        """Look up every sticker in a sticker set.
+
+        Args:
+            set_name: The set's name, the part after t.me/addstickers/.
+
+        Returns:
+            Its stickers, in order.
+
+        Raises:
+            InvalidStickerError: If the name is blank.
+            StickerSetNotFoundError: If there is no such set.
+            StickerSetUnavailableError: If the chat channel didn't answer.
+        """
+        name = set_name.strip()
+        if not name:
+            raise InvalidStickerError("Enter a sticker set name.")
+        try:
+            stickers = self._chat_channel.get_sticker_set(name)
+        except Exception as error:
+            logger.exception("Could not look up a sticker set")
+            raise StickerSetUnavailableError(name) from error
+        if stickers is None:
+            raise StickerSetNotFoundError(name)
+        return stickers
 
     def import_set(self, set_name: str) -> int:
         """Add every sticker in a sticker set, without notes.
@@ -123,17 +167,7 @@ class StickerLibraryService:
             StickerSetNotFoundError: If there is no such set.
             StickerSetUnavailableError: If the chat channel didn't answer.
         """
-        name = set_name.strip()
-        if not name:
-            raise InvalidStickerError("Enter a sticker set name.")
-        try:
-            stickers = self._chat_channel.get_sticker_set(name)
-        except Exception as error:
-            logger.exception("Could not look up a sticker set")
-            raise StickerSetUnavailableError(name) from error
-        if stickers is None:
-            raise StickerSetNotFoundError(name)
-        return self._repositories.stickers.add_new(stickers, self._clock.now())
+        return self.add_stickers(self.find_set(set_name)).added
 
     def save_note(self, sticker_id: UUID, note: str) -> LibrarySticker:
         """Save when a sticker should be used.

@@ -45,6 +45,15 @@ class SentSticker:
 
 
 @dataclass(frozen=True)
+class SentReaction:
+    """A reaction the fake chat channel was asked to put on a message."""
+
+    chat_id: int
+    message_id: int
+    emoji: str
+
+
+@dataclass(frozen=True)
 class SentPhoto:
     """A photo the fake chat channel was asked to send."""
 
@@ -67,6 +76,7 @@ class FakeChatChannel:
         """Start with nothing sent and no sticker sets or images."""
         self.sent: list[SentText] = []
         self.sent_stickers: list[SentSticker] = []
+        self.reactions: list[SentReaction] = []
         self.typing_shown_in: list[int] = []
         self.events: list[str] = []
         self.sticker_sets: dict[str, list[ChannelSticker]] = {}
@@ -97,6 +107,17 @@ class FakeChatChannel:
         """
         self.sent_stickers.append(SentSticker(chat_id=chat_id, file_id=file_id))
         self.events.append(f"sticker: {file_id}")
+
+    def react(self, chat_id: int, message_id: int, emoji: str) -> None:
+        """Record a reaction.
+
+        Args:
+            chat_id: The chat the message is in.
+            message_id: The message reacted to.
+            emoji: The reaction's emoji.
+        """
+        self.reactions.append(SentReaction(chat_id, message_id, emoji))
+        self.events.append(f"reaction: {emoji}")
 
     def get_sticker_set(self, name: str) -> list[ChannelSticker] | None:
         """Return a sticker set the test set up.

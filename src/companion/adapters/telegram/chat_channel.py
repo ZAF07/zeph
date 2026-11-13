@@ -175,6 +175,23 @@ class TelegramChatChannel:
         """
         self._call("sendSticker", {"chat_id": chat_id, "sticker": file_id})
 
+    def react(self, chat_id: int, message_id: int, emoji: str) -> None:
+        """Put an emoji reaction on a message.
+
+        Args:
+            chat_id: The chat the message is in.
+            message_id: The message's ID.
+            emoji: The reaction; Telegram only allows some emoji.
+        """
+        self._call(
+            "setMessageReaction",
+            {
+                "chat_id": chat_id,
+                "message_id": message_id,
+                "reaction": [{"type": "emoji", "emoji": emoji}],
+            },
+        )
+
     def send_photo(self, chat_id: int, file_id: str) -> None:
         """Send one photo Telegram already has, by its file ID.
 

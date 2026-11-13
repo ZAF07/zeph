@@ -16,6 +16,7 @@ from companion.core.models import (
 )
 from companion.core.photos import PhotoTools, SendPhotoTools
 from companion.core.ports import Repositories
+from companion.core.sticker_adding import StickerAdding
 from companion.core.stickers import StickerTools
 from companion.core.usage import UsageRecordingChatModel
 from companion.core.web_search import WebSearchTools
@@ -90,6 +91,7 @@ class ResponseComposer:
         web_search_tools: WebSearchTools,
         settings_tools: SettingsTools,
         sticker_tools: StickerTools,
+        sticker_adding: StickerAdding,
         photo_tools: PhotoTools,
         send_photo_tools: SendPhotoTools,
     ) -> None:
@@ -103,6 +105,7 @@ class ResponseComposer:
             web_search_tools: Offers the web tools the reply may call.
             settings_tools: Offers the tools that change the User's settings.
             sticker_tools: Offers the Sticker Library to the reply.
+            sticker_adding: Offers Admins the tool to start adding stickers.
             photo_tools: Offers a look again at the Conversation's photos.
             send_photo_tools: Offers to send one of the User's Shared Photos
                 back.
@@ -113,6 +116,7 @@ class ResponseComposer:
         self._web_search_tools = web_search_tools
         self._settings_tools = settings_tools
         self._sticker_tools = sticker_tools
+        self._sticker_adding = sticker_adding
         self._photo_tools = photo_tools
         self._send_photo_tools = send_photo_tools
 
@@ -133,7 +137,8 @@ class ResponseComposer:
         may search the web and read pages when web search is offered, change
         the User's settings when they ask, pick one sticker from their
         Personal Stickers or the Sticker Library when Stickers works for
-        them, look again at a photo from the Conversation when its
+        them, start adding stickers to the Sticker Library when an Admin
+        asks, look again at a photo from the Conversation when its
         description can't answer, and send back one of the User's Shared
         Photos that matter for the message. When
         a Feature doesn't work for the User, the instructions say so, so the
@@ -191,6 +196,7 @@ class ResponseComposer:
                 *web_search.tools,
                 *settings_tools.tools,
                 *sticker_choice.tools,
+                *self._sticker_adding.tools(user_id),
                 *photo_tools,
                 *send_photo_choice.tools,
             ],

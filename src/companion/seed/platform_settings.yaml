@@ -38,14 +38,15 @@ unsupported_message_reply: >-
   Ah, I can't open voice notes, videos or files yet, sorry! Could you type it
   out for me instead?
 
-# Sent to an Admin whose sticker was added to the Sticker Library.
-sticker_added_reply: >-
-  Added that sticker to the Sticker Library ✓ I'll only send it once it has a
-  "when to use" note: {dashboard_url}/admin/stickers
+# Sent to an Admin after they add stickers in chat, in adding mode or by
+# replying "add this" to a sticker. {added} is e.g. "Added 33 stickers from
+# 1 set (2 were already there)." Left out when nothing new was added.
+sticker_adding_summary_reply: >-
+  {added} I'll only send them once they have a "when to use" note:
+  {dashboard_url}/admin/stickers
 
-# Sent to an Admin whose sticker is already in the Sticker Library.
-sticker_already_in_library_reply: >-
-  That sticker is already in the Sticker Library.
+# Adding mode ends after this many minutes without a sticker from the Admin.
+sticker_adding_quiet_gap_minutes: 5
 
 # Onboarding. The AI notice is shown on the first step with an "I understand"
 # tick; the short version stays on the Dashboard afterwards.

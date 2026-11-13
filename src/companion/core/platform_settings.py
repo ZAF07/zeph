@@ -183,6 +183,13 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         minimum=1,
         maximum=200,
     ),
+    EditableSetting(
+        "sticker_adding_quiet_gap_minutes",
+        "Sticker adding quiet gap",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=60,
+    ),
     EditableSetting("check_in_prompt", "Check-in prompt", SettingKind.TEXT),
     EditableSetting("check_in_model", "Check-in model", SettingKind.MODEL),
     EditableSetting(

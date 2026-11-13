@@ -3,7 +3,6 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from companion.core.models import ChannelSticker, StickerImage
-from tests.conftest import DASHBOARD_URL
 from tests.fakes import (
     ChatModelCall,
     FakeAuthVerifier,
@@ -13,7 +12,6 @@ from tests.fakes import (
     ToolCall,
 )
 from tests.telegram_helpers import (
-    OWNER_TELEGRAM_USER_ID,
     TELEGRAM_CHAT_ID,
     auth_headers,
     connect_owner_telegram,
@@ -87,52 +85,6 @@ def reply_call(
     assert send_to_webhook(client, update) == 200
     [call] = chat_model.calls
     return call
-
-
-def test_an_admin_sending_a_sticker_adds_it_to_the_sticker_library(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    seeded_settings: dict[str, Any],
-) -> None:
-    admin = connect_owner_telegram(client, auth_verifier, chat_channel)
-
-    update = telegram_sticker_update(
-        "🌊", "wave", telegram_user_id=OWNER_TELEGRAM_USER_ID
-    )
-    assert send_to_webhook(client, update) == 200
-
-    [sticker] = list_stickers(client, admin)
-    assert sticker["emoji"] == "🌊"
-    assert sticker["note"] == ""
-    assert sticker["set_name"] == "CalmCreatures"
-    assert sticker["has_image"] is True
-    assert chat_channel.texts_sent_to(OWNER_TELEGRAM_USER_ID) == [
-        seeded_settings["sticker_added_reply"].replace("{dashboard_url}", DASHBOARD_URL)
-    ]
-    assert chat_model.calls == []
-
-
-def test_an_admin_sending_a_sticker_already_in_the_library_does_not_add_it_twice(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    seeded_settings: dict[str, Any],
-) -> None:
-    admin = connect_owner_telegram(client, auth_verifier, chat_channel)
-    update = telegram_sticker_update(
-        "🌊", "wave", telegram_user_id=OWNER_TELEGRAM_USER_ID
-    )
-    assert send_to_webhook(client, update) == 200
-    chat_channel.sent.clear()
-
-    assert send_to_webhook(client, update) == 200
-
-    assert len(list_stickers(client, admin)) == 1
-    assert chat_channel.texts_sent_to(OWNER_TELEGRAM_USER_ID) == [
-        seeded_settings["sticker_already_in_library_reply"]
-    ]
 
 
 def test_a_users_sticker_reaches_the_companion_as_its_emoji_and_is_not_added(

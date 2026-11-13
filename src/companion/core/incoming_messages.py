@@ -13,7 +13,8 @@ from companion.core.models import (
 )
 from companion.core.photos import PhotoService
 from companion.core.ports import ChatChannel, ConversationEngine, Repositories, Timer
-from companion.core.stickers import StickerLibraryService, sticker_message_text
+from companion.core.sticker_adding import StickerAdding, add_request
+from companion.core.stickers import sticker_message_text
 from companion.core.telegram_connection import TelegramConnectionService
 
 logger = logging.getLogger(__name__)
@@ -71,7 +72,7 @@ class IncomingMessageHandler:
         repositories: Repositories,
         conversation_engine: ConversationEngine,
         chat_channel: ChatChannel,
-        sticker_library: StickerLibraryService,
+        sticker_adding: StickerAdding,
         photo_service: PhotoService,
         timer: Timer,
         dashboard_url: str,
@@ -84,13 +85,14 @@ class IncomingMessageHandler:
                 stored.
             conversation_engine: Answers connected Users' messages.
             chat_channel: Sends replies that need no Conversation.
-            sticker_library: Adds the stickers Admins send.
+            sticker_adding: Adds the stickers Admins send in adding mode or
+                reply "add this" to.
             photo_service: Describes the photos Users send.
             timer: Waits for the rest of an album to arrive.
             dashboard_url: The Dashboard's address, put into some replies.
         """
         self._telegram_connections = telegram_connections
-        self._sticker_library = sticker_library
+        self._sticker_adding = sticker_adding
         self._photo_service = photo_service
         self._timer = timer
         self._repositories = repositories
@@ -109,7 +111,10 @@ class IncomingMessageHandler:
 
         `/start <token>` makes a Telegram Connection. Anyone else without a
         Telegram Connection is pointed to the Dashboard to sign up. A sticker
-        from an Admin goes into the Sticker Library. A photo is described
+        from an Admin in adding mode goes into the Sticker Library; any other
+        message ends adding mode, with a summary of what was added, and is
+        then handled as normal. An Admin's "add this" reply to a sticker adds
+        it. A photo is described
         first, so the Safeguard and the reply read what it shows; an album's
         photos wait until `photo_album_wait_seconds` pass after the last one
         arrives, then are answered together as one message. A voice
@@ -138,17 +143,14 @@ class IncomingMessageHandler:
             )
             return
 
-        settings = self._repositories.platform_settings
-        sticker = message.sticker if message.kind == MessageKind.STICKER else None
-        if sticker is not None and self._is_admin(connection.user_id):
-            if self._sticker_library.add_sent_sticker(sticker):
-                reply = settings.get("sticker_added_reply")
-            else:
-                reply = settings.get("sticker_already_in_library_reply")
-            self._chat_channel.send_text(
-                message.chat_id, reply.replace("{dashboard_url}", self._dashboard_url)
-            )
+        if message.kind == MessageKind.STICKER and self._sticker_adding.add_if_adding(
+            connection.user_id, message
+        ):
             return
+        self._sticker_adding.finish(connection.user_id)
+        if self._added_replied_sticker(connection.user_id, message):
+            return
+        settings = self._repositories.platform_settings
         if message.album_id is not None:
             self._collect_album_item(connection.user_id, message)
             return
@@ -162,6 +164,24 @@ class IncomingMessageHandler:
             message.chat_id,
             lambda: self._turn_for(connection.user_id, message),
         )
+
+    def _added_replied_sticker(self, user_id: UUID, message: IncomingMessage) -> bool:
+        """Add the sticker an Admin replied "add this" or "add this set" to.
+
+        Args:
+            user_id: The User who sent the message.
+            message: The message.
+
+        Returns:
+            True if it was such a reply from an Admin and the sticker, or its
+            set, was added; False if the message is just chat.
+        """
+        choice = add_request(message.text)
+        sticker = message.replied_sticker
+        if sticker is None or choice is None or not self._is_admin(user_id):
+            return False
+        self._sticker_adding.add_replied(user_id, message.chat_id, sticker, choice)
+        return True
 
     def _collect_album_item(self, user_id: UUID, message: IncomingMessage) -> None:
         """Keep an album's photo or file and restart the wait for the rest of it.

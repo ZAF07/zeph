@@ -27,6 +27,7 @@ from tests.telegram_helpers import (
     connect_telegram,
     owner_headers,
     send_to_webhook,
+    telegram_reply_to_sticker_update,
     telegram_sticker_update,
     telegram_text_update,
 )
@@ -36,6 +37,7 @@ from tests.test_memory_retrieval import remember_some_things
 from tests.test_post_conversation import memory_contents, quiet_gap
 from tests.test_settings_via_chat import SETTINGS_TOOLS
 from tests.test_settings_via_chat import reply_call as chat_reply_call
+from tests.test_sticker_adding import WAVE
 from tests.test_stickers import import_calm_creatures, list_stickers, save_note
 
 WEB_TOOLS = ("web_search", "fetch_page")
@@ -581,7 +583,7 @@ def test_with_stickers_off_for_one_user_their_stickers_still_read_as_emoji(
     assert sticker_tool_names(owner_call) == ["send_sticker"]
 
 
-def test_with_stickers_off_admins_still_add_stickers_by_sending_them(
+def test_with_stickers_off_admins_still_add_stickers_in_chat(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -589,8 +591,8 @@ def test_with_stickers_off_admins_still_add_stickers_by_sending_them(
     admin = connect_owner_telegram(client, auth_verifier, chat_channel)
     switch_for_everyone(client, admin, "stickers", on=False)
 
-    update = telegram_sticker_update(
-        "🌊", "wave", telegram_user_id=OWNER_TELEGRAM_USER_ID
+    update = telegram_reply_to_sticker_update(
+        "add this", WAVE, telegram_user_id=OWNER_TELEGRAM_USER_ID
     )
     assert send_to_webhook(client, update) == 200
 
