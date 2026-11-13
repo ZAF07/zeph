@@ -81,4 +81,4 @@ Record the date and the result under `## Comments`. If it no longer downloads, s
 ## Completion
 
 - Completed: 2026-11-13
-- Commit: <to be filled in after merge>
+- Commit: 4e13764 "Photos issue 04: Shared Photos kept at Conversation end and shown on the Memories page", review fixes dd89abc "Photos issue 04 review fixes: a JSON true is no longer read as photo 1, MemoryChanges names its new Shared Photos new_shared_photos…", archive 8bfded7 "Photos issue 04 done: archive issue with test, run and review evidence…" (merged from `photos-04-shared-photos` in 1ba9bb0 "Merge pull request #1 from ZAF07/photos-04-shared-photos")
