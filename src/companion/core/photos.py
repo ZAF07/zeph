@@ -4,7 +4,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 from uuid import UUID
 
-from companion.core.models import ChannelPhoto
+from companion.core.models import ChannelPhoto, PhotoImage, SharedPhoto
 from companion.core.ports import (
     ChatChannel,
     ChatTool,
@@ -24,6 +24,11 @@ LOOK_AGAIN_FAILED = (
     "You couldn't look at the photo again just now. Answer from its "
     "description if you can; if not, say plainly that you couldn't look again."
 )
+
+
+class SharedPhotoNotFoundError(LookupError):
+    """Raised when a User has no Shared Photo with that ID."""
+
 
 ASK_ABOUT_PHOTO_PARAMETERS: dict[str, Any] = {
     "type": "object",
@@ -184,7 +189,7 @@ class PhotoService:
         """Set up the service.
 
         Args:
-            repositories: Where settings are stored.
+            repositories: Where settings and Shared Photos are stored.
             chat_channel: Downloads the photos.
             photo_viewer: Looks at each photo.
             usage_limiter: Records the tokens each look took.
@@ -210,8 +215,8 @@ class PhotoService:
             caption: The caption; "" if none.
 
         Returns:
-            The message text and the photos looked at, each marked as viewed
-            and holding its description if it was described.
+            The message text and the photos looked at, each marked as viewed,
+            holding its description if it was described, and the caption.
         """
         settings = self._repositories.platform_settings
         looked_at = photos[: settings.get("photo_album_max_photos")]
@@ -228,6 +233,7 @@ class PhotoService:
                     photo,
                     viewed=description is not None,
                     description=description or "",
+                    caption=caption.strip(),
                 )
                 for photo, description in zip(looked_at, descriptions, strict=True)
             ),
@@ -282,6 +288,53 @@ class PhotoService:
             ),
             log_action="look at a photo again",
         )
+
+    def list_shared(self, user_id: UUID) -> list[SharedPhoto]:
+        """List a User's Shared Photos, newest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Shared Photos.
+        """
+        return self._repositories.user_memory.list_shared_photos(user_id)
+
+    def delete_shared(self, user_id: UUID, photo_id: UUID) -> None:
+        """Delete one of a User's Shared Photos.
+
+        Args:
+            user_id: The User's ID.
+            photo_id: The Shared Photo's ID.
+
+        Raises:
+            SharedPhotoNotFoundError: If the User has no such Shared Photo.
+        """
+        if not self._repositories.user_memory.delete_shared_photo(user_id, photo_id):
+            raise SharedPhotoNotFoundError(photo_id)
+
+    def shared_photo_image(self, user_id: UUID, photo_id: UUID) -> PhotoImage | None:
+        """Download one of a User's Shared Photos for the Dashboard.
+
+        Args:
+            user_id: The User's ID.
+            photo_id: The Shared Photo's ID.
+
+        Returns:
+            The image, or None if it couldn't be downloaded; the error is
+            logged, never raised.
+
+        Raises:
+            SharedPhotoNotFoundError: If the User has no such Shared Photo.
+        """
+        photo = self._repositories.user_memory.get_shared_photo(user_id, photo_id)
+        if photo is None:
+            raise SharedPhotoNotFoundError(photo_id)
+        try:
+            return self._chat_channel.download_photo(photo.file_id)
+        except Exception:
+            logger.exception("Could not download a Shared Photo")
+            return None
 
     def _look(
         self,

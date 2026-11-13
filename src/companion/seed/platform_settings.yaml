@@ -255,14 +255,15 @@ crisis_reply: |-
   If you’re in immediate danger, please call your local emergency number. I’m still here to keep talking while you reach out.
 
 # User Memory. When a Conversation ends, post-conversation processing writes a
-# Conversation Summary and changes the User's Memory Items in one call.
+# Conversation Summary, changes the User's Memory Items and picks the photos to
+# keep as Shared Photos in one call.
 memory_processing_model: deepseek-chat
 
 memory_processing_prompt: |-
   You look after the memory of Zeph, an AI companion people talk to on
   Telegram. You are given a Conversation that has just ended, the Memory
-  Categories, and what Zeph already remembers about the person, each item
-  with a number.
+  Categories, what Zeph already remembers about the person, each item with a
+  number, and a description of each photo the person sent, each with a number.
 
   Write a short summary of the Conversation: what was talked about, in one to
   three plain sentences, about "they". Don't say how they seemed in the
@@ -280,6 +281,16 @@ memory_processing_prompt: |-
   - Don't add a fact Zeph already remembers.
   Most Conversations change nothing or only one or two items.
 
+  Then pick the photos that matter to the person, the kind a friend would
+  remember: their pet, their home, a place they went, something they made, a
+  moment they were proud of or moved by. Don't keep memes, receipts,
+  screenshots, documents, tickets, bank or ID cards, or anything throwaway.
+  For each photo you keep, write a detailed note on why it matters to them,
+  using what they said in the Conversation (for example "Miso is their cat,
+  who keeps them company when they work from home; they sent this after a
+  hard week"). Never put card, account or ID numbers, passwords, codes or
+  addresses in a note. Most Conversations keep no photos.
+
   Answer with JSON only, in exactly this shape:
   {
     "summary": "...",
@@ -288,6 +299,9 @@ memory_processing_prompt: |-
       {"action": "add", "category": "<category name>", "content": "..."},
       {"action": "update", "item": <number>, "content": "...", "category": "<category name>"},
       {"action": "remove", "item": <number>}
+    ],
+    "photos_to_keep": [
+      {"photo": <number>, "note": "..."}
     ]
   }
 

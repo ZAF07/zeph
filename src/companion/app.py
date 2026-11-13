@@ -278,6 +278,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 check_in_service=check_in_service,
             ),
             feature_service=feature_service,
+            photo_service=photo_service,
             platform_settings=dependencies.repositories.platform_settings,
             telegram_bot_username=dependencies.telegram_bot_username,
         )

@@ -227,6 +227,30 @@ conversation_summaries = Table(
     Column("created_at", DateTime(timezone=True), nullable=False),
 )
 
+shared_photos = Table(
+    "shared_photos",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("file_id", Text, nullable=False),
+    Column("file_unique_id", Text, nullable=False),
+    Column("description", Text, nullable=False),
+    Column("note", Text, nullable=False),
+    Column("caption", Text, nullable=False),
+    Column("sent_at", DateTime(timezone=True), nullable=False),
+    Column(
+        "conversation_id",
+        Uuid,
+        ForeignKey("conversations.id", ondelete="SET NULL"),
+    ),
+)
+
 knowledge_documents = Table(
     "knowledge_documents",
     metadata,
