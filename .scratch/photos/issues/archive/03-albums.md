@@ -65,4 +65,4 @@ Several photos sent at once (a Telegram album) get one reply, like a friend woul
 ## Completion
 
 - Completed: 2026-11-13
-- Commit: 564b9cb "Photos issue 03: albums get one reply. The webhook reads Telegram's media_group_id as the photo's album id…", review fixes c8cc6d1 "Photos issue 03 review fixes: a video or other file sent in an album joins the album's one reply as "[video]" and keeps its caption…", run fix 356e3b6 "Photos issue 03 run fix: the note for album photos past the cap says they came through fine…", archive ARCHIVE_COMMIT (merged from `photos-03-albums` in MERGE_COMMIT)
+- Commit: 564b9cb "Photos issue 03: albums get one reply. The webhook reads Telegram's media_group_id as the photo's album id…", review fixes c8cc6d1 "Photos issue 03 review fixes: a video or other file sent in an album joins the album's one reply as "[video]" and keeps its caption…", run fix 356e3b6 "Photos issue 03 run fix: the note for album photos past the cap says they came through fine…", archive 495c203 "Photos issue 03 done: archive issue with test, run and review evidence…" (merged from `photos-03-albums` in 305c2eb "Merge Photos issue 03: albums get one reply…")
