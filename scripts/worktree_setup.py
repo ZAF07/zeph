@@ -31,14 +31,14 @@ class Ports:
 
 
 def choose_ports(
-    is_port_free: Callable[[int], bool], taken_web_ports: set[int]
+    port_is_free: Callable[[int], bool], taken_web_ports: set[int]
 ) -> Ports:
     """Pick the first set of ports after the main ones that nobody uses.
 
     Slot 1 is 3010/8010/5442, slot 2 is 3020/8020/5452, and so on.
 
     Args:
-        is_port_free: Says whether a host port is free right now.
+        port_is_free: Says whether a host port is free right now.
         taken_web_ports: Web ports other worktrees have claimed, even if their
             stacks are stopped.
 
@@ -58,7 +58,7 @@ def choose_ports(
         if ports.web in taken_web_ports:
             continue
         if all(
-            is_port_free(port) for port in (ports.web, ports.backend, ports.postgres)
+            port_is_free(port) for port in (ports.web, ports.backend, ports.postgres)
         ):
             return ports
     raise RuntimeError("No free set of ports found")
@@ -77,6 +77,21 @@ def compose_project_name(folder_name: str) -> str:
     return re.sub(r"[^a-z0-9_-]", "-", folder_name.lower())
 
 
+def env_line_key(line: str) -> str | None:
+    """Find the variable a `.env` line sets.
+
+    Args:
+        line: One line of a `.env` file.
+
+    Returns:
+        The variable name, or None for comments, blanks and other lines.
+    """
+    name, separator, _ = line.partition("=")
+    if not separator or name.strip().startswith("#"):
+        return None
+    return name.strip()
+
+
 def read_env_value(env_text: str, key: str) -> str | None:
     """Find a key's value in `.env` text.
 
@@ -88,10 +103,25 @@ def read_env_value(env_text: str, key: str) -> str | None:
         The value, or None if the key is not set.
     """
     for line in env_text.splitlines():
-        name, separator, value = line.partition("=")
-        if separator and name.strip() == key:
-            return value.strip()
+        if env_line_key(line) == key:
+            return line.partition("=")[2].strip()
     return None
+
+
+def claimed_web_ports(other_worktree_env_texts: list[str]) -> set[int]:
+    """Collect the web ports other worktrees have claimed.
+
+    Args:
+        other_worktree_env_texts: Each other worktree's `.env` contents, or
+            an empty string when it has none.
+
+    Returns:
+        Each worktree's `WEB_PORT`, or the main web port when it sets none.
+    """
+    return {
+        int(read_env_value(env_text, "WEB_PORT") or MAIN_WEB_PORT)
+        for env_text in other_worktree_env_texts
+    }
 
 
 def build_worktree_env(main_env_text: str, ports: Ports, project_name: str) -> str:
@@ -122,7 +152,7 @@ def build_worktree_env(main_env_text: str, ports: Ports, project_name: str) -> s
     kept_lines = [
         line
         for line in main_env_text.splitlines()
-        if line.partition("=")[0].strip() not in worktree_values
+        if env_line_key(line) not in worktree_values
     ]
     worktree_lines = [
         "",
@@ -165,16 +195,17 @@ def git_output(*args: str) -> str:
     ).stdout.strip()
 
 
-def other_worktree_web_ports(worktree_dir: Path) -> set[int]:
-    """Collect the web ports other worktrees of this repo have claimed.
+def other_worktree_env_texts(worktree_dir: Path) -> list[str]:
+    """Read the `.env` of every other worktree of this repo.
 
     Args:
         worktree_dir: This worktree, which is left out.
 
     Returns:
-        Each other worktree's `WEB_PORT`, or 3000 when it has none.
+        Each other worktree's `.env` contents, or an empty string when it has
+        none.
     """
-    taken_ports = set()
+    env_texts = []
     for line in git_output("worktree", "list", "--porcelain").splitlines():
         if not line.startswith("worktree "):
             continue
@@ -182,9 +213,8 @@ def other_worktree_web_ports(worktree_dir: Path) -> set[int]:
         if other_dir.resolve() == worktree_dir.resolve():
             continue
         env_file = other_dir / ".env"
-        env_text = env_file.read_text() if env_file.exists() else ""
-        taken_ports.add(int(read_env_value(env_text, "WEB_PORT") or MAIN_WEB_PORT))
-    return taken_ports
+        env_texts.append(env_file.read_text() if env_file.exists() else "")
+    return env_texts
 
 
 def main() -> int:
@@ -208,7 +238,9 @@ def main() -> int:
     if not main_env.exists():
         print(f"No .env in the main folder ({main_dir}).", file=sys.stderr)
         return 1
-    ports = choose_ports(is_port_free, other_worktree_web_ports(worktree_dir))
+    ports = choose_ports(
+        is_port_free, claimed_web_ports(other_worktree_env_texts(worktree_dir))
+    )
     project_name = compose_project_name(worktree_dir.name)
     worktree_env.write_text(
         build_worktree_env(main_env.read_text(), ports, project_name)

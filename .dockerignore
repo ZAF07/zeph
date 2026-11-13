@@ -9,3 +9,4 @@ web
 docs
 tests
 .run-dashboard
+.db-copy.sql

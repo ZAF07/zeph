@@ -2,6 +2,7 @@ from scripts.worktree_setup import (
     Ports,
     build_worktree_env,
     choose_ports,
+    claimed_web_ports,
     compose_project_name,
     read_env_value,
 )
@@ -15,19 +16,19 @@ TELEGRAM_BOT_TOKEN=123:abc
 
 
 def test_first_free_slot_after_the_main_ports_is_chosen() -> None:
-    ports = choose_ports(is_port_free=lambda port: True, taken_web_ports=set())
+    ports = choose_ports(port_is_free=lambda port: True, taken_web_ports=set())
 
     assert ports == Ports(web=3010, backend=8010, postgres=5442)
 
 
 def test_slot_with_a_busy_port_is_skipped() -> None:
-    ports = choose_ports(is_port_free=lambda port: port != 8010, taken_web_ports=set())
+    ports = choose_ports(port_is_free=lambda port: port != 8010, taken_web_ports=set())
 
     assert ports == Ports(web=3020, backend=8020, postgres=5452)
 
 
 def test_slot_claimed_by_another_worktree_is_skipped_even_when_stopped() -> None:
-    ports = choose_ports(is_port_free=lambda port: True, taken_web_ports={3010})
+    ports = choose_ports(port_is_free=lambda port: True, taken_web_ports={3010})
 
     assert ports == Ports(web=3020, backend=8020, postgres=5452)
 
@@ -73,3 +74,13 @@ def test_compose_project_name_is_lower_case_with_only_safe_characters() -> None:
     assert compose_project_name("AI-Chat Companion.photos_04") == (
         "ai-chat-companion-photos_04"
     )
+
+
+def test_worktrees_without_a_web_port_claim_the_main_one() -> None:
+    claimed = claimed_web_ports(["WEB_PORT=3010\n", "POSTGRES_USER=companion\n", ""])
+
+    assert claimed == {3010, 3000}
+
+
+def test_commented_out_keys_are_not_read() -> None:
+    assert read_env_value("# WEB_PORT=3000\n", "WEB_PORT") is None

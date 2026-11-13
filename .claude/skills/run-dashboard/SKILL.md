@@ -71,6 +71,8 @@ Tips:
   The bot's replies still go to the real chat.
 - `make db-copy` (in a worktree) replaces its database with a copy of the
   main stack's, e.g. to check a migration on real data. Both stacks must run.
+  It removes Telegram links from the copy so the worktree's Check-ins never
+  reach real Users.
 
 ## 4. Clean up
 
