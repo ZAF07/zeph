@@ -1,6 +1,6 @@
 # PRD: The Companion can see photos
 
-Status: ready-for-agent
+Status: completed
 
 ## Problem Statement
 
@@ -132,3 +132,17 @@ When a Conversation ends, memory processing picks the photos that matter to the 
 - Depends on the Features PRD (`.scratch/features/PRD.md`): build its core service first.
 - Research (2026-11-13): DeepSeek's `deepseek-flash` takes images (JPEG, PNG, GIF, WebP; at most about 1024 tokens per image; images only in `user` messages). `deepseek-chat` now routes to it and described a test image correctly. Calling `deepseek-flash` by name thinks first by default, which can use all the tokens; check this when choosing the photo model.
 - Check early, in a real run, that a Telegram file id still downloads days later, since Shared Photos rely on it.
+
+## Completion
+
+- Completed: 2026-11-14
+- Delivered by issues 01–07 (all archived in `.scratch/photos/issues/archive/`):
+  - 01 The Companion sees a photo: c8b6095, review fixes a5c6f8f, archive 23cacd6
+  - 02 Ask about a photo: 4836c31, review fixes 27d6aba, archive ad1b741
+  - 03 Albums: 564b9cb, review fixes c8cc6d1, run fix 356e3b6, archive 495c203
+  - 04 Shared Photos: 4e13764, review fixes dd89abc, archive 8bfded7
+  - 05 Send a photo back: fc4d015, review fixes ae1e3c8, archive ffcf54d
+  - 06 "Look back at a photo" Check-in: 120fd3c, review fixes c208115, archive 37f7554
+  - 07 Photo Viewing Feature: a1aa137, review fix ed5d16d, archive ae8ad5b
+- Checks on close-out (main at 1e9d936): ruff, ruff format, mypy pass; pytest 597 passed; pnpm lint, format:check, typecheck pass; Vitest 321 passed
+- Commit: <to be filled in manually>

@@ -1,6 +1,6 @@
 # PRD: Features (Admin switches for everyone and for each User)
 
-Status: ready-for-agent
+Status: completed
 
 ## Problem Statement
 
@@ -105,3 +105,15 @@ In the MVP every Feature is on for everyone. Later, a plan will be a set of Feat
 
 - Decisions come from the 2026-11-13 grilling session, logged in the archived issue `.scratch/mvp/issues/archive/19-companion-pretends-to-see-photos.md`. Glossary: **Feature** in `CONTEXT.md`. Related ADRs: 0004 (settings are Admin-managed data), 0006 (settings in chat; Settings in Chat now becomes a Feature).
 - Build this before the photos PRD, which depends on the Features core service.
+
+## Completion
+
+- Completed: 2026-11-14
+- Delivered by issues 01–05 (all archived in `.scratch/features/issues/archive/`); Photo Viewing joined the Feature list in photos issue 07:
+  - 01 Features core service and Web Search switch: fb78a73, review fixes d22e509, archive 50d2560
+  - 02 Per-User Feature switches: 50fdada, review fixes 0161961, archive 3f48771
+  - 03 Stickers and Knowledge Features: 41766d3, review fixes 88ffc67, archive 85900de
+  - 04 User Memory and Check-ins Features: b7af9cb, review fixes 34e690a, archive 57014ae
+  - 05 Settings in Chat Feature: 1b8a9e2, review fixes f0833d6, archive 166f2b1
+- Checks on close-out (main at 1e9d936): ruff, ruff format, mypy pass; pytest 597 passed; pnpm lint, format:check, typecheck pass; Vitest 321 passed
+- Commit: <to be filled in manually>
