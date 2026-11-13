@@ -2,9 +2,13 @@ import json
 from collections.abc import Callable
 
 import httpx
+import pytest
 
-from companion.adapters.telegram.chat_channel import TelegramChatChannel
-from companion.core.models import ChannelSticker, StickerImage
+from companion.adapters.telegram.chat_channel import (
+    PhotoDownloadError,
+    TelegramChatChannel,
+)
+from companion.core.models import ChannelSticker, PhotoImage, StickerImage
 
 
 def test_typing_is_shown_with_a_chat_action() -> None:
@@ -134,3 +138,61 @@ def test_a_sticker_file_that_is_not_an_image_has_no_image() -> None:
     )
 
     assert channel.get_sticker_image("f2") is None
+
+
+JPEG_BYTES = b"\xff\xd8\xff\xe0jpeg-body"
+PNG_BYTES = b"\x89PNG\r\n\x1a\npng-body"
+WEBP_BYTES = b"RIFF\x10\x00\x00\x00WEBPwebp-body"
+
+
+def channel_serving_file(file_path: str, content: bytes) -> TelegramChatChannel:
+    """Build a channel whose getFile names a path that serves the given bytes."""
+
+    def answer(path: str, body: dict[str, object]) -> httpx.Response:
+        if path.endswith("/getFile"):
+            return ok({"file_id": body["file_id"], "file_path": file_path})
+        assert path == f"/file/bot123:abc/{file_path}"
+        return httpx.Response(200, content=content)
+
+    return channel_answering(answer, [])
+
+
+@pytest.mark.parametrize(
+    ("file_path", "content", "media_type"),
+    [
+        ("photos/file_3.jpg", JPEG_BYTES, "image/jpeg"),
+        ("documents/file_4", PNG_BYTES, "image/png"),
+        ("documents/scan.jpg", WEBP_BYTES, "image/webp"),
+    ],
+)
+def test_a_photo_is_downloaded_with_the_media_type_its_bytes_show(
+    file_path: str, content: bytes, media_type: str
+) -> None:
+    channel = channel_serving_file(file_path, content)
+
+    photo = channel.download_photo("p1")
+
+    assert photo == PhotoImage(content=content, media_type=media_type)
+
+
+def test_a_downloaded_file_that_is_not_a_photo_is_refused() -> None:
+    channel = channel_serving_file("documents/file_5.gif", b"GIF89a-body")
+
+    with pytest.raises(PhotoDownloadError):
+        channel.download_photo("p2")
+
+
+def test_a_photo_telegram_gives_no_path_for_is_refused() -> None:
+    channel = channel_answering(lambda path, body: ok({"file_id": "p3"}), [])
+
+    with pytest.raises(PhotoDownloadError):
+        channel.download_photo("p3")
+
+
+def test_a_photo_telegram_refuses_raises_its_error() -> None:
+    channel = channel_answering(
+        lambda path, body: httpx.Response(400, json={"ok": False}), []
+    )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        channel.download_photo("p4")

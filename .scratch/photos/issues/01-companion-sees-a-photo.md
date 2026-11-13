@@ -1,6 +1,6 @@
 # 01 — The Companion sees a photo
 
-Status: ready-for-agent
+Status: in-progress
 
 ## Parent
 
@@ -39,3 +39,14 @@ The tracer bullet: a User sends one photo and the Companion really sees it (ADR 
 ## Blocked by
 
 None - can start immediately
+
+## Comments
+
+### 2026-11-13 — plan (branch `photos-01-companion-sees-a-photo`)
+
+- Models/ports: `MessageKind.PHOTO`, `ChannelPhoto` (Telegram ids + too big to download), `PhotoImage`; chat channel port gains `download_photo`; new `PhotoViewer` port (DeepSeek adapter, image in a `user` message).
+- Core `PhotoService` (`core/photos.py`): download then look, retrying `photo_retry_count` times with a short pause; records tokens in Usage; never raises. The incoming message handler describes the photo before the turn runs, so the Safeguard reads `[photo: …] caption` from the saved message.
+- Saved message keeps the photo's Telegram ids (migration 0017 adds `conversation_messages.photos`; also reloads `unsupported_message_reply`, which said photos can't be opened; that setting isn't Admin-editable).
+- Settings: `photo_model`, `photo_description_prompt`, `photo_not_viewed_note`, `photo_retry_count`. Prompt + model on Prompts page (new "Photo viewing" core service); note and retry count on Settings page.
+- Evals: rendered test images in `evals/images/`; eval fake chat channel serves them.
+- Probe (2026-11-13): `deepseek-chat` with a PNG data URL in a `user` message described it correctly (213 tokens in).

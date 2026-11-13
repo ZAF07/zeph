@@ -29,6 +29,8 @@ const settings: AdminSettings = {
   daily_message_limit: seeded(200),
   daily_limit_reply: seeded("I'm wiped for today, talk tomorrow?"),
   message_retention_days: seeded(30),
+  photo_retry_count: seeded(2),
+  photo_not_viewed_note: seeded("Say the photo didn't come through."),
 };
 
 describe("PlatformSettingsForm", () => {
@@ -117,6 +119,29 @@ describe("PlatformSettingsForm", () => {
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       daily_message_limit: 60,
       daily_limit_reply: "Out of steam, talk tomorrow?",
+    });
+  });
+
+  it("shows and saves the photo retries and the didn't-come-through note", async () => {
+    const user = userEvent.setup();
+    render(<PlatformSettingsForm />);
+    const retries = await screen.findByLabelText("Photo retries");
+    expect(retries).toHaveValue(2);
+    expect(screen.getByRole("region", { name: "Photos" })).toContainElement(
+      retries,
+    );
+    const note = screen.getByLabelText(/Didn’t come through” note/);
+    expect(note).toHaveValue("Say the photo didn't come through.");
+
+    await user.clear(retries);
+    await user.type(retries, "3");
+    await user.clear(note);
+    await user.type(note, "It didn't load.");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      photo_retry_count: 3,
+      photo_not_viewed_note: "It didn't load.",
     });
   });
 

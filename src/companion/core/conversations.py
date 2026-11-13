@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 from companion.core.knowledge_retrieval import KnowledgeRetrieval
 from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.models import (
+    ChannelPhoto,
     Conversation,
     ConversationMessage,
     MessageDirection,
@@ -65,6 +66,7 @@ class ConversationService:
         chat_id: int,
         text: str,
         kind: MessageKind = MessageKind.TEXT,
+        photos: tuple[ChannelPhoto, ...] = (),
     ) -> UUID:
         """Save a User's message and show that the Companion is typing.
 
@@ -76,12 +78,15 @@ class ConversationService:
             chat_id: The chat it came from.
             text: The message as the Companion reads it.
             kind: What kind of message it is.
+            photos: The photos it came with, kept as chat channel IDs.
 
         Returns:
             The ID of the Conversation the message was added to.
         """
         conversation_id = self._open_conversation_id(user_id)
-        self._save(conversation_id, MessageDirection.INCOMING, text, kind)
+        self._save(
+            conversation_id, MessageDirection.INCOMING, text, kind, photos=photos
+        )
         self._chat_channel.show_typing(chat_id)
         return conversation_id
 
@@ -177,6 +182,7 @@ class ConversationService:
         text: str,
         kind: MessageKind = MessageKind.TEXT,
         sent_at: datetime | None = None,
+        photos: tuple[ChannelPhoto, ...] = (),
     ) -> None:
         """Save one message to a Conversation.
 
@@ -186,6 +192,7 @@ class ConversationService:
             text: The message as the Companion reads it.
             kind: What kind of message it is.
             sent_at: When it was sent; now if not given.
+            photos: The photos it came with.
         """
         self._repositories.conversations.add_message(
             ConversationMessage(
@@ -195,6 +202,7 @@ class ConversationService:
                 kind=kind,
                 content=text,
                 sent_at=sent_at or self._clock.now(),
+                photos=photos,
             )
         )
 

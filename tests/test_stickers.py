@@ -164,7 +164,7 @@ def test_a_sticker_without_an_emoji_still_reaches_the_companion(
     assert call.history[-1].text == "[sticker]"
 
 
-def test_voice_notes_and_photos_get_the_unsupported_reply(
+def test_voice_notes_get_the_unsupported_reply(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -173,36 +173,34 @@ def test_voice_notes_and_photos_get_the_unsupported_reply(
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
     voice = telegram_message_update({"voice": {"file_id": "v1", "duration": 3}})
-    photo = telegram_message_update({"photo": [{"file_id": "p1", "width": 90}]})
 
     assert send_to_webhook(client, voice) == 200
-    assert send_to_webhook(client, photo) == 200
 
-    unsupported_reply = seeded_settings["unsupported_message_reply"]
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
-        unsupported_reply,
-        unsupported_reply,
+        seeded_settings["unsupported_message_reply"]
     ]
     assert chat_model.calls == []
     assert chat_model.safeguard_calls == []
 
 
-def test_a_photo_caption_is_checked_and_answered_like_a_message(
+def test_a_voice_note_caption_is_checked_and_answered_like_a_message(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
     chat_model: ScriptedChatModel,
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
-    photo = telegram_message_update(
-        {"photo": [{"file_id": "p1", "width": 90}], "caption": "my new plant"}
+    voice = telegram_message_update(
+        {"voice": {"file_id": "v1", "duration": 3}, "caption": "listen to this"}
     )
 
-    call = reply_call(client, chat_model, photo, "oh I can't see photos yet")
+    call = reply_call(client, chat_model, voice, "oh I can't play voice notes yet")
 
-    assert call.history[-1].text == "[photo] my new plant"
+    assert call.history[-1].text == "[voice note] listen to this"
     assert (
-        chat_model.safeguard_calls[-1].history[-1].text.endswith("[photo] my new plant")
+        chat_model.safeguard_calls[-1]
+        .history[-1]
+        .text.endswith("[voice note] listen to this")
     )
 
 

@@ -2,8 +2,8 @@ from collections.abc import Sequence
 from dataclasses import replace
 from typing import Any
 
-from companion.core.models import ChatLine, ModelAnswer
-from companion.core.ports import ChatModel, ChatTool
+from companion.core.models import ChatLine, ModelAnswer, PhotoImage
+from companion.core.ports import ChatModel, ChatTool, PhotoViewer
 from evals.report import EvalReport
 
 
@@ -72,3 +72,33 @@ class TokenCountingChatModel:
             return tool.run(arguments)
 
         return replace(tool, run=run)
+
+
+class TokenCountingPhotoViewer:
+    """Photo viewer that adds the tokens of every look to the eval report."""
+
+    def __init__(self, photo_viewer: PhotoViewer, report: EvalReport) -> None:
+        """Wrap a photo viewer.
+
+        Args:
+            photo_viewer: The real photo viewer.
+            report: Where the tokens are added up.
+        """
+        self._photo_viewer = photo_viewer
+        self._report = report
+
+    def look(self, model: str, instructions: str, photo: PhotoImage) -> ModelAnswer:
+        """Look at a photo with the real photo viewer and count its tokens.
+
+        Args:
+            model: The model to use.
+            instructions: What to write about the photo.
+            photo: The photo's image.
+
+        Returns:
+            The real photo viewer's answer.
+        """
+        answer = self._photo_viewer.look(model, instructions, photo)
+        self._report.tokens_in += answer.tokens_in
+        self._report.tokens_out += answer.tokens_out
+        return answer

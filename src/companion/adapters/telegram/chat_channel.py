@@ -3,7 +3,7 @@ from typing import Any
 
 import httpx
 
-from companion.core.models import ChannelSticker, StickerImage
+from companion.core.models import ChannelSticker, PhotoImage, StickerImage
 
 TELEGRAM_API_URL = "https://api.telegram.org"
 IMAGE_MEDIA_TYPES = {
@@ -12,6 +12,32 @@ IMAGE_MEDIA_TYPES = {
     ".jpeg": "image/jpeg",
     ".png": "image/png",
 }
+
+IMAGE_SIGNATURES = (
+    (b"\xff\xd8\xff", "image/jpeg"),
+    (b"\x89PNG\r\n\x1a\n", "image/png"),
+)
+
+
+class PhotoDownloadError(Exception):
+    """Raised when Telegram gives no file, or a file that isn't a photo."""
+
+
+def photo_media_type(content: bytes) -> str | None:
+    """Tell what kind of image a file is from its first bytes.
+
+    Args:
+        content: The file's bytes.
+
+    Returns:
+        "image/jpeg", "image/png" or "image/webp", or None for anything else.
+    """
+    for signature, media_type in IMAGE_SIGNATURES:
+        if content.startswith(signature):
+            return media_type
+    if content[:4] == b"RIFF" and content[8:12] == b"WEBP":
+        return "image/webp"
+    return None
 
 
 def parse_sticker(sticker: dict[str, Any]) -> ChannelSticker:
@@ -130,6 +156,33 @@ class TelegramChatChannel:
         response = self._http.get(f"{self._file_url}/{file_path}")
         response.raise_for_status()
         return StickerImage(content=response.content, media_type=media_type)
+
+    def download_photo(self, file_id: str) -> PhotoImage:
+        """Download a photo someone sent.
+
+        The kind of image is read from the file itself, since a file sent as
+        a document can have any name.
+
+        Args:
+            file_id: The photo's file ID.
+
+        Returns:
+            The photo's image.
+
+        Raises:
+            httpx.HTTPError: If Telegram can't be reached or fails.
+            PhotoDownloadError: If Telegram gives no file, or it isn't a
+                JPEG, PNG or WebP image.
+        """
+        file_path = self._call("getFile", {"file_id": file_id}).get("file_path")
+        if not isinstance(file_path, str):
+            raise PhotoDownloadError("Telegram gave no file path for the photo")
+        response = self._http.get(f"{self._file_url}/{file_path}")
+        response.raise_for_status()
+        media_type = photo_media_type(response.content)
+        if media_type is None:
+            raise PhotoDownloadError("The file is not a JPEG, PNG or WebP image")
+        return PhotoImage(content=response.content, media_type=media_type)
 
     def register_webhook(self, url: str, secret_token: str) -> None:
         """Tell Telegram where to post updates.

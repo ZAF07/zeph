@@ -5,11 +5,12 @@ from fastapi import APIRouter, BackgroundTasks, Body, Header, HTTPException, sta
 
 from companion.adapters.telegram.chat_channel import parse_sticker
 from companion.core.incoming_messages import IncomingMessageHandler
-from companion.core.models import IncomingMessage, MessageKind
+from companion.core.models import ChannelPhoto, IncomingMessage, MessageKind
 
 SECRET_HEADER = "X-Telegram-Bot-Api-Secret-Token"
+BOT_DOWNLOAD_LIMIT_BYTES = 20 * 1024 * 1024
+PHOTO_FILE_TYPES = frozenset({"image/jpeg", "image/png", "image/webp"})
 ATTACHMENT_NAMES = (
-    ("photo", "photo"),
     ("voice", "voice note"),
     ("video_note", "video message"),
     ("video", "video"),
@@ -31,7 +32,7 @@ def attachment_name(message: dict[str, Any]) -> str | None:
         message: The Telegram message.
 
     Returns:
-        E.g. "photo" or "voice note"; None for anything else, like a pinned
+        E.g. "voice note" or "video"; None for anything else, like a pinned
         message or other service message.
     """
     for field, name in ATTACHMENT_NAMES:
@@ -40,11 +41,49 @@ def attachment_name(message: dict[str, Any]) -> str | None:
     return None
 
 
+def parse_photo(message: dict[str, Any]) -> ChannelPhoto | None:
+    """Read the photo in a Telegram message, if it has one.
+
+    A normal photo comes in several sizes; the largest is read. A JPEG, PNG
+    or WebP image sent as a file is a photo too, but one over the bot
+    download limit can't be viewed. A GIF is an animation, not a photo.
+
+    Args:
+        message: The Telegram message.
+
+    Returns:
+        The photo, or None if the message has none.
+    """
+    sizes = message.get("photo")
+    if isinstance(sizes, list) and sizes:
+        largest = max(
+            sizes, key=lambda size: size.get("width", 0) * size.get("height", 0)
+        )
+        return ChannelPhoto(
+            file_id=str(largest["file_id"]),
+            file_unique_id=str(largest["file_unique_id"]),
+        )
+    document = message.get("document")
+    if (
+        isinstance(document, dict)
+        and "animation" not in message
+        and document.get("mime_type") in PHOTO_FILE_TYPES
+    ):
+        file_size = document.get("file_size")
+        return ChannelPhoto(
+            file_id=str(document["file_id"]),
+            file_unique_id=str(document["file_unique_id"]),
+            too_big_to_download=isinstance(file_size, int)
+            and file_size > BOT_DOWNLOAD_LIMIT_BYTES,
+        )
+    return None
+
+
 def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
     """Turn a Telegram update into a channel-neutral incoming message.
 
-    Text and stickers are read; a voice note, photo or other attachment is
-    an unsupported message that keeps its caption.
+    Text, stickers and photos are read; a voice note, video, GIF or other
+    attachment is an unsupported message that keeps its caption.
 
     Args:
         update: The JSON body Telegram posted to the webhook.
@@ -76,10 +115,20 @@ def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
             kind=MessageKind.STICKER,
             sticker=parse_sticker(sticker),
         )
+    caption = message.get("caption")
+    photo = parse_photo(message)
+    if photo is not None:
+        return IncomingMessage(
+            sender_id,
+            chat_id,
+            username,
+            text=caption if isinstance(caption, str) else "",
+            kind=MessageKind.PHOTO,
+            photo=photo,
+        )
     attachment = attachment_name(message)
     if attachment is None:
         return None
-    caption = message.get("caption")
     return IncomingMessage(
         sender_id,
         chat_id,

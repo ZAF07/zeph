@@ -128,6 +128,8 @@ def test_a_shorter_quiet_gap_starts_a_new_conversation_sooner(
         {"web_search_daily_limit": 1001},
         {"message_retention_days": 0},
         {"message_retention_days": 366},
+        {"photo_retry_count": 6},
+        {"photo_model": "not-a-model"},
     ],
 )
 def test_invalid_setting_changes_are_refused(
@@ -202,12 +204,48 @@ def test_core_services_list_their_prompt_and_model_settings(
         "Response composition",
         "Post-conversation processing",
         "Memory retrieval",
+        "Photo viewing",
         "Check-ins",
     ]
     service = response["services"][1]
     assert service["prompt_key"] == "response_prompt"
     assert service["model_key"] == "response_model"
     assert response["model_choices"] == ["deepseek-chat", "deepseek-reasoner"]
+
+
+def test_the_photo_settings_are_editable_with_their_seeded_values(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    seeded_settings: dict[str, Any],
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+
+    settings = client.get("/api/admin/settings", headers=headers).json()["settings"]
+
+    assert settings["photo_model"]["value"] == "deepseek-chat"
+    assert settings["photo_retry_count"]["value"] == 2
+    for key in ("photo_description_prompt", "photo_not_viewed_note"):
+        assert settings[key]["value"] == seeded_settings[key]
+    response = client.get("/api/admin/core-services", headers=headers).json()
+    [photo_viewing] = [
+        service
+        for service in response["services"]
+        if service["name"] == "Photo viewing"
+    ]
+    assert photo_viewing["prompt_key"] == "photo_description_prompt"
+    assert photo_viewing["model_key"] == "photo_model"
+
+
+def test_the_photo_description_prompt_asks_for_danger_signs_and_leaves_out_secrets(
+    seeded_settings: dict[str, Any],
+) -> None:
+    prompt = seeded_settings["photo_description_prompt"].lower()
+
+    for danger_sign in ("injuries", "pills", "weapons", "goodbye"):
+        assert danger_sign in prompt
+    for secret in ("card", "account", "passport", "passwords", "codes", "addresses"):
+        assert secret in prompt
+    assert "who they are" in prompt
 
 
 def test_every_admin_endpoint_refuses_users_who_are_not_admins(

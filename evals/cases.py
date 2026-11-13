@@ -7,6 +7,7 @@ from typing import Any
 import yaml
 
 CASES_DIR = Path(__file__).parent / "cases"
+IMAGES_DIR = Path(__file__).parent / "images"
 
 
 class InvalidEvalCasesError(ValueError):
@@ -28,14 +29,18 @@ class SafeguardCase:
     Attributes:
         id: A short name for the case.
         kind: Whether it is a clear crisis, a subtle crisis or a false alarm.
-        message: The message to classify.
+        message: The message to classify, or the photo's caption; "" for a
+            photo with none.
         earlier: Messages the person sent before it, for context.
+        photo: The file name of a test image in `evals/images/` sent as a
+            photo with the message as its caption; None for a text message.
     """
 
     id: str
     kind: SafeguardCaseKind
-    message: str
+    message: str = ""
     earlier: list[str] = field(default_factory=list)
+    photo: str | None = None
 
     @property
     def is_crisis(self) -> bool:
@@ -48,16 +53,30 @@ class SafeguardCase:
 
 
 @dataclass(frozen=True)
+class EvalPhoto:
+    """A test image sent as a photo, and what it really shows.
+
+    Attributes:
+        file_name: The image's file name in `evals/images/`.
+        shows: What is really in it, as the judge is told.
+    """
+
+    file_name: str
+    shows: str
+
+
+@dataclass(frozen=True)
 class PersonaMessage:
     """One message the person sends in a scripted conversation.
 
     Attributes:
-        text: The text, or the photo's caption.
-        photo: Whether it is sent as a photo with `text` as its caption.
+        text: The text, or the photo's caption; "" for a photo with none.
+        photo: The photo it is sent as, with `text` as its caption; None for
+            a text message.
     """
 
     text: str
-    photo: bool = False
+    photo: EvalPhoto | None = None
 
 
 @dataclass(frozen=True)
@@ -142,6 +161,22 @@ class KnowledgeCase:
 
 
 @dataclass(frozen=True)
+class PhotoDescriptionCase:
+    """A test image whose description must leave some details out.
+
+    Attributes:
+        id: A short name for the case.
+        photo: The image's file name in `evals/images/`.
+        must_leave_out: Text in the image that must never be in its
+            description, like a card number or password.
+    """
+
+    id: str
+    photo: str
+    must_leave_out: list[str]
+
+
+@dataclass(frozen=True)
 class SettingsCase:
     """A message asking, or not asking, to change a setting in chat.
 
@@ -176,26 +211,50 @@ def require_unique_ids(ids: Sequence[str], cases_file: Path) -> None:
         seen.add(case_id)
 
 
+def require_image(file_name: str, cases_file: Path) -> str:
+    """Check that a test image a case names is in `evals/images/`.
+
+    Args:
+        file_name: The image's file name.
+        cases_file: The file the case came from, for the error message.
+
+    Returns:
+        The file name.
+
+    Raises:
+        InvalidEvalCasesError: If there is no such image.
+    """
+    if not (IMAGES_DIR / file_name).is_file():
+        raise InvalidEvalCasesError(
+            f"{cases_file.name}: there is no image {file_name} in evals/images"
+        )
+    return file_name
+
+
 def load_safeguard_cases(cases_file: Path) -> list[SafeguardCase]:
     """Read the labelled Safeguard messages.
 
     Args:
-        cases_file: YAML list of cases with `id`, `kind`, `message` and
-            optionally `earlier`.
+        cases_file: YAML list of cases with `id`, `kind`, and a `message`, a
+            `photo` or both, and optionally `earlier`.
 
     Returns:
         The cases, in the order listed.
 
     Raises:
-        InvalidEvalCasesError: If two cases share an ID.
+        InvalidEvalCasesError: If two cases share an ID or a case names an
+            image that isn't there.
     """
     entries: list[dict[str, Any]] = yaml.safe_load(cases_file.read_text())
     cases = [
         SafeguardCase(
             id=entry["id"],
             kind=SafeguardCaseKind(entry["kind"]),
-            message=entry["message"],
+            message=entry.get("message", ""),
             earlier=entry.get("earlier", []),
+            photo=require_image(entry["photo"], cases_file)
+            if "photo" in entry
+            else None,
         )
         for entry in entries
     ]
@@ -203,18 +262,25 @@ def load_safeguard_cases(cases_file: Path) -> list[SafeguardCase]:
     return cases
 
 
-def to_persona_message(entry: str | dict[str, str]) -> PersonaMessage:
-    """Read one scripted message: plain text, or `{photo_caption: ...}`.
+def to_persona_message(entry: str | dict[str, str], cases_file: Path) -> PersonaMessage:
+    """Read one scripted message: plain text, or `{photo, shows, caption}`.
 
     Args:
         entry: The message as written in the cases file.
+        cases_file: The file it came from, for the error message.
 
     Returns:
         The message.
+
+    Raises:
+        InvalidEvalCasesError: If it names an image that isn't there.
     """
     if isinstance(entry, str):
         return PersonaMessage(text=entry)
-    return PersonaMessage(text=entry["photo_caption"], photo=True)
+    photo = EvalPhoto(
+        file_name=require_image(entry["photo"], cases_file), shows=entry["shows"]
+    )
+    return PersonaMessage(text=entry.get("caption", ""), photo=photo)
 
 
 def load_persona_cases(cases_file: Path) -> PersonaCases:
@@ -229,14 +295,17 @@ def load_persona_cases(cases_file: Path) -> PersonaCases:
 
     Raises:
         InvalidEvalCasesError: If a conversation names a rule that isn't
-            defined, or two conversations share an ID.
+            defined or an image that isn't there, or two conversations share
+            an ID.
     """
     content: dict[str, Any] = yaml.safe_load(cases_file.read_text())
     rules: dict[str, str] = content["rules"]
     conversations = [
         PersonaConversation(
             id=entry["id"],
-            messages=[to_persona_message(message) for message in entry["messages"]],
+            messages=[
+                to_persona_message(message, cases_file) for message in entry["messages"]
+            ],
             rules=entry["rules"],
         )
         for entry in content["conversations"]
@@ -291,6 +360,33 @@ def load_knowledge_cases(cases_file: Path) -> list[KnowledgeCase]:
             edited_details=to_knowledge_details(entry["edited_details"]),
             replacement_file_name=entry["replacement"]["file_name"],
             replacement_text=entry["replacement"]["text"],
+        )
+        for entry in entries
+    ]
+    require_unique_ids([case.id for case in cases], cases_file)
+    return cases
+
+
+def load_photo_description_cases(cases_file: Path) -> list[PhotoDescriptionCase]:
+    """Read the test images and what their descriptions must leave out.
+
+    Args:
+        cases_file: YAML list of cases with `id`, `photo` and
+            `must_leave_out`.
+
+    Returns:
+        The cases, in the order listed.
+
+    Raises:
+        InvalidEvalCasesError: If two cases share an ID or a case names an
+            image that isn't there.
+    """
+    entries: list[dict[str, Any]] = yaml.safe_load(cases_file.read_text())
+    cases = [
+        PhotoDescriptionCase(
+            id=entry["id"],
+            photo=require_image(entry["photo"], cases_file),
+            must_leave_out=entry["must_leave_out"],
         )
         for entry in entries
     ]

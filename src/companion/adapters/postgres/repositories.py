@@ -38,6 +38,7 @@ from companion.adapters.postgres.tables import (
     users,
 )
 from companion.core.models import (
+    ChannelPhoto,
     ChannelSticker,
     ChatSetting,
     CheckIn,
@@ -213,6 +214,7 @@ def _to_message(row: Row[Any]) -> ConversationMessage:
         kind=MessageKind(row.kind),
         content=row.content,
         sent_at=row.sent_at,
+        photos=tuple(ChannelPhoto(**photo) for photo in row.photos),
     )
 
 
@@ -849,6 +851,7 @@ class PostgresConversationRepository:
                     kind=message.kind.value,
                     content=message.content,
                     sent_at=message.sent_at,
+                    photos=[asdict(photo) for photo in message.photos],
                 )
             )
             connection.execute(

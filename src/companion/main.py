@@ -8,6 +8,7 @@ from companion.adapters.clerk.accounts import ClerkAccounts
 from companion.adapters.clerk.auth_verifier import ClerkAuthVerifier
 from companion.adapters.clock import SystemClock
 from companion.adapters.deepseek.chat_model import DeepSeekChatModel
+from companion.adapters.deepseek.photo_viewer import DeepSeekPhotoViewer
 from companion.adapters.fastembed.embedder import FastEmbedEmbedder
 from companion.adapters.langgraph.conversation_engine import (
     LangGraphConversationEngine,
@@ -32,6 +33,7 @@ from companion.core.ports import (
     DocumentTextExtractor,
     Embedder,
     KnowledgeVectorStore,
+    PhotoViewer,
     Repositories,
     Scheduler,
     WebSearch,
@@ -262,6 +264,23 @@ def build_chat_model(settings: Settings) -> ChatModel:
     raise UnknownAdapterError("CHAT_MODEL_ADAPTER", settings.chat_model_adapter)
 
 
+def build_photo_viewer(settings: Settings) -> PhotoViewer:
+    """Build the photo viewer for the chat model chosen in `.env`.
+
+    Args:
+        settings: The loaded settings.
+
+    Returns:
+        The photo viewer.
+
+    Raises:
+        UnknownAdapterError: If the chosen adapter does not exist.
+    """
+    if settings.chat_model_adapter == "deepseek":
+        return DeepSeekPhotoViewer(settings.deepseek_api_key)
+    raise UnknownAdapterError("CHAT_MODEL_ADAPTER", settings.chat_model_adapter)
+
+
 def build_conversation_engine_factory(
     settings: Settings,
 ) -> Callable[[ConversationServices], ConversationEngine]:
@@ -312,6 +331,7 @@ def build_production_app() -> FastAPI:
         repositories=build_repositories(settings, engine),
         chat_channel=build_chat_channel(settings),
         chat_model=build_chat_model(settings),
+        photo_viewer=build_photo_viewer(settings),
         build_conversation_engine=build_conversation_engine_factory(settings),
         auth_verifier=build_auth_verifier(settings),
         auth_accounts=build_auth_accounts(settings),

@@ -41,6 +41,47 @@ def telegram_message_update(
     return update
 
 
+def telegram_photo_update(
+    caption: str | None = None, file_unique_id: str = "photo-cat"
+) -> dict[str, Any]:
+    """Build a Telegram webhook update for a photo, in a small and a large size."""
+    content: dict[str, Any] = {
+        "photo": [
+            {
+                "file_id": f"small-{file_unique_id}",
+                "file_unique_id": f"small-{file_unique_id}",
+                "width": 90,
+                "height": 60,
+            },
+            {
+                "file_id": f"file-{file_unique_id}",
+                "file_unique_id": file_unique_id,
+                "width": 1280,
+                "height": 853,
+            },
+        ]
+    }
+    if caption is not None:
+        content["caption"] = caption
+    return telegram_message_update(content)
+
+
+def telegram_file_update(
+    mime_type: str, file_size: int = 250_000, file_unique_id: str = "file-1"
+) -> dict[str, Any]:
+    """Build a Telegram webhook update for a file sent as a document."""
+    return telegram_message_update(
+        {
+            "document": {
+                "file_id": f"file-{file_unique_id}",
+                "file_unique_id": file_unique_id,
+                "mime_type": mime_type,
+                "file_size": file_size,
+            }
+        }
+    )
+
+
 def telegram_sticker_update(
     emoji: str | None = "😂",
     file_unique_id: str = "sticker-laugh",

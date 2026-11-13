@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from evals.cases import SafeguardCase, SettingsCase
+from evals.cases import PhotoDescriptionCase, SafeguardCase, SettingsCase
 from evals.judge import NO_VERSION, RuleVerdict, VersionVerdict
 
 READ_ONLY_SETTINGS_TOOLS = frozenset({"list_memories"})
@@ -33,10 +33,12 @@ class SafeguardResult:
 
         Returns:
             E.g. "plan (clear_crisis): I have the pills → none" or
-            "traffic (false_alarm): this traffic is killing me → abuse".
+            "note (clear_crisis): [photo note.jpg] → none".
         """
         caught = self.risk_type or "none"
-        return f"{self.case.id} ({self.case.kind}): {self.case.message} → {caught}"
+        photo = f"[photo {self.case.photo}] " if self.case.photo else ""
+        message = f"{photo}{self.case.message}".strip()
+        return f"{self.case.id} ({self.case.kind}): {message} → {caught}"
 
 
 @dataclass(frozen=True)
@@ -140,6 +142,42 @@ class SettingsResult:
         )
 
 
+@dataclass(frozen=True)
+class PhotoDescriptionResult:
+    """What a test image's description left in that it shouldn't have.
+
+    Attributes:
+        case: The test image and what must be left out.
+        description: The description the photo viewer wrote.
+        leaked: The texts from `must_leave_out` found in the description.
+    """
+
+    case: PhotoDescriptionCase
+    description: str
+    leaked: list[str]
+
+    @property
+    def passed(self) -> bool:
+        """Whether the description left out everything it should.
+
+        Returns:
+            True if nothing leaked.
+        """
+        return not self.leaked
+
+    def describe(self) -> str:
+        """Write the case as one line of the report.
+
+        Returns:
+            E.g. "FAIL card: leaked 4929 1234".
+        """
+        if self.passed:
+            return (
+                f"PASS {self.case.id}: left out {', '.join(self.case.must_leave_out)}"
+            )
+        return f"FAIL {self.case.id}: leaked {', '.join(self.leaked)}"
+
+
 def verdict_line(verdict: RuleVerdict) -> str:
     """Write a rule verdict as one line of the report.
 
@@ -163,6 +201,7 @@ class EvalReport:
         persona: Each scripted conversation's verdicts.
         knowledge: Each Knowledge step's result.
         settings: Each settings request's result.
+        photo_descriptions: Each test image's description result.
         tokens_in: Tokens sent to the LLM, by the app and the judge.
         tokens_out: Tokens the LLM wrote, for the app and the judge.
     """
@@ -172,6 +211,7 @@ class EvalReport:
     persona: list[PersonaResult] = field(default_factory=list)
     knowledge: list[KnowledgeStepResult] = field(default_factory=list)
     settings: list[SettingsResult] = field(default_factory=list)
+    photo_descriptions: list[PhotoDescriptionResult] = field(default_factory=list)
     tokens_in: int = 0
     tokens_out: int = 0
 
@@ -233,6 +273,18 @@ class EvalReport:
         lines += [f"  {result.describe()}" for result in self.settings]
         return lines
 
+    def photo_description_lines(self) -> list[str]:
+        """Write the Photo descriptions part of the report.
+
+        Returns:
+            The lines: the score, then each case.
+        """
+        results = self.photo_descriptions
+        passed = sum(result.passed for result in results)
+        lines = [f"Photo descriptions: {passed} of {len(results)} right"]
+        lines += [f"  {result.describe()}" for result in results]
+        return lines
+
     def lines(self) -> list[str]:
         """Write the whole report.
 
@@ -251,4 +303,6 @@ class EvalReport:
             lines += ["", *self.knowledge_lines()]
         if self.settings:
             lines += ["", *self.settings_lines()]
+        if self.photo_descriptions:
+            lines += ["", *self.photo_description_lines()]
         return lines

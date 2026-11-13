@@ -27,10 +27,10 @@ unknown_telegram_user_reply: >-
 reply_failed_message: >-
   Sorry, my thoughts got tangled for a second there. Could you send that again?
 
-# Sent when someone sends a voice note, photo or anything else that isn't text
-# or a sticker. A photo or file with a caption gets its caption answered.
+# Sent when someone sends a voice note, video, GIF or anything else that isn't
+# text, a sticker or a photo. One with a caption gets its caption answered.
 unsupported_message_reply: >-
-  Ah, I can't open voice notes, photos or files yet, sorry! Could you type it
+  Ah, I can't open voice notes, videos or files yet, sorry! Could you type it
   out for me instead?
 
 # Sent to an Admin whose sticker was added to the Sticker Library.
@@ -147,6 +147,50 @@ response_prompt: |-
     never more than four.
   - Write only the texts themselves: no names, labels, quotes or notes around
     them.
+
+# Photos (ADR-0007). Each photo a User sends (or JPEG, PNG or WebP image sent
+# as a file) is downloaded from Telegram and looked at once, before the
+# Safeguard, with the prompt below. The Safeguard, the reply and memory read
+# the description; the image itself is never kept.
+photo_model: deepseek-chat
+
+photo_description_prompt: |-
+  You look at a photo a person sent to Zeph, their AI companion, and describe
+  it for Zeph, who can't see it. Zeph and a safety check will read only your
+  description, so be detailed and accurate. Describe only what is really in
+  the photo; never guess or add details you can't see. If something is
+  unclear, say so.
+
+  Describe:
+  - the scene and setting, and the main things in it
+  - any people in plain terms (roughly how many, what they're doing, their
+    expressions), never who they are or guesses at their name or identity
+  - the mood
+  - any readable text that matters, e.g. a sign, a note or a book title
+  - for a screenshot or document, what kind it is (a bank statement, a
+    ticket, a chat) without copying it
+
+  Name any sign of danger plainly and first, never softened: injuries, blood,
+  self-harm, pills or medicine laid out, weapons, a goodbye or suicide note,
+  a dangerous place like a ledge or a bridge edge.
+
+  Never write card, account, ID or passport numbers, passwords, PINs or
+  codes, home or street addresses, or anyone's contact details, even if they
+  are readable. Say only that they are there, e.g. "a bank card (number not
+  copied)".
+
+  Write plain sentences, no headings or lists, in English.
+
+# Put in the User's message in place of a description when their photo
+# couldn't be downloaded or looked at, even after the retries.
+photo_not_viewed_note: >-
+  The photo didn't come through, so you haven't seen it. Say so honestly and
+  briefly, and never guess or pretend to know what's in it. If they sent no
+  words with it, ask them to send it again.
+
+# How many more times a photo is tried when downloading or looking at it
+# fails, with a short pause between tries.
+photo_retry_count: 2
 
 # The model the Safeguard uses to check each incoming message for crisis.
 safeguard_model: deepseek-chat

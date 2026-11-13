@@ -282,6 +282,7 @@ class MessageKind(StrEnum):
 
     TEXT = "text"
     STICKER = "sticker"
+    PHOTO = "photo"
     UNSUPPORTED = "unsupported"
 
 
@@ -307,6 +308,35 @@ class ChannelSticker:
 
 
 @dataclass(frozen=True)
+class ChannelPhoto:
+    """A photo as the chat channel knows it. We keep only these IDs, never the image.
+
+    Attributes:
+        file_id: The ID used to download or send the photo.
+        file_unique_id: The ID that stays the same for the same photo.
+        too_big_to_download: True when the chat channel won't let the bot
+            download it, so it can't be viewed.
+    """
+
+    file_id: str
+    file_unique_id: str
+    too_big_to_download: bool = False
+
+
+@dataclass(frozen=True)
+class PhotoImage:
+    """A photo's image, downloaded to be looked at and never kept.
+
+    Attributes:
+        content: The image's bytes.
+        media_type: Its media type, e.g. "image/jpeg".
+    """
+
+    content: bytes
+    media_type: str
+
+
+@dataclass(frozen=True)
 class IncomingMessage:
     """A message a person sent to the Companion, independent of chat channel.
 
@@ -315,11 +345,12 @@ class IncomingMessage:
         chat_id: The chat to reply in.
         sender_username: The sender's username on the chat channel, if any.
         text: The message text, or a photo's or file's caption; "" if none.
-        kind: Whether it is text, a sticker, or something the Companion
-            can't read yet, like a voice note or photo.
+        kind: Whether it is text, a sticker, a photo, or something the
+            Companion can't read yet, like a voice note or video.
         sticker: The sticker, for a sticker message.
-        attachment: What was sent instead of text, e.g. "photo" or
-            "voice note", for an unsupported message.
+        photo: The photo, for a photo message.
+        attachment: What was sent instead of text, e.g. "voice note", for an
+            unsupported message.
     """
 
     sender_id: int
@@ -328,6 +359,7 @@ class IncomingMessage:
     text: str
     kind: MessageKind = MessageKind.TEXT
     sticker: ChannelSticker | None = None
+    photo: ChannelPhoto | None = None
     attachment: str | None = None
 
 
@@ -369,8 +401,9 @@ class ConversationMessage:
         conversation_id: The Conversation it belongs to.
         direction: Whether the User sent it or the Companion did.
         kind: What kind of message it is.
-        content: The message text.
+        content: The message text; for a photo, its caption and description.
         sent_at: When it was sent.
+        photos: The photos the message came with, as chat channel IDs.
     """
 
     id: UUID
@@ -379,6 +412,7 @@ class ConversationMessage:
     kind: MessageKind
     content: str
     sent_at: datetime
+    photos: tuple[ChannelPhoto, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -389,14 +423,16 @@ class ConversationTurn:
         user_id: The User who sent it.
         chat_id: The chat to reply in.
         text: The message as the Companion reads it, e.g. "[sticker: 😂]"
-            for a sticker.
+            for a sticker, or "[photo: …] caption" for a photo.
         kind: What kind of message it is.
+        photos: The photos it came with.
     """
 
     user_id: UUID
     chat_id: int
     text: str
     kind: MessageKind = MessageKind.TEXT
+    photos: tuple[ChannelPhoto, ...] = ()
 
 
 class ChatRole(StrEnum):

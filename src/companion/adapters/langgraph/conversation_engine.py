@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from typing import Any, TypedDict
 from uuid import UUID
 
@@ -7,7 +8,12 @@ from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
 from companion.core.conversations import ConversationServices
-from companion.core.models import ConversationTurn, MessageKind, RiskType
+from companion.core.models import (
+    ChannelPhoto,
+    ConversationTurn,
+    MessageKind,
+    RiskType,
+)
 from companion.core.user_data import DataDeletionAnswer
 
 
@@ -24,6 +30,7 @@ class TurnState(TypedDict, total=False):
     chat_id: int
     text: str
     kind: str
+    photos: list[dict[str, Any]]
     conversation_id: str
     risk_type: str
     data_deletion_answer: str
@@ -90,6 +97,7 @@ class LangGraphConversationEngine:
                 state["chat_id"],
                 state["text"],
                 MessageKind(state["kind"]),
+                tuple(ChannelPhoto(**photo) for photo in state["photos"]),
             )
             return {"conversation_id": str(conversation_id)}
 
@@ -346,6 +354,7 @@ class LangGraphConversationEngine:
                 "chat_id": turn.chat_id,
                 "text": turn.text,
                 "kind": turn.kind.value,
+                "photos": [asdict(photo) for photo in turn.photos],
             },
             config={"configurable": {"thread_id": str(turn.user_id)}},
         )

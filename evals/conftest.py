@@ -10,6 +10,7 @@ from sqlalchemy import Engine, create_engine, text
 from testcontainers.community.postgres import PostgresContainer
 
 from companion.adapters.deepseek.chat_model import DeepSeekChatModel
+from companion.adapters.deepseek.photo_viewer import DeepSeekPhotoViewer
 from companion.adapters.fastembed.embedder import FastEmbedEmbedder
 from companion.adapters.langgraph.conversation_engine import (
     LangGraphConversationEngine,
@@ -35,7 +36,10 @@ from evals.current_settings import (
     store_platform_settings,
 )
 from evals.report import EvalReport
-from evals.token_counting_chat_model import TokenCountingChatModel
+from evals.token_counting_chat_model import (
+    TokenCountingChatModel,
+    TokenCountingPhotoViewer,
+)
 from tests.conftest import (
     BOT_USERNAME,
     CHECK_IN_KINDS_SEED_FILE,
@@ -140,6 +144,16 @@ def chat_model(
 
 
 @pytest.fixture(scope="session")
+def photo_viewer(
+    app_settings: Settings, eval_report: EvalReport
+) -> TokenCountingPhotoViewer:
+    """The real DeepSeek photo viewer, counting tokens for the report."""
+    return TokenCountingPhotoViewer(
+        DeepSeekPhotoViewer(app_settings.deepseek_api_key), eval_report
+    )
+
+
+@pytest.fixture(scope="session")
 def embedder() -> FastEmbedEmbedder:
     """The real fastembed embedder, loaded once."""
     return FastEmbedEmbedder()
@@ -189,14 +203,16 @@ def client(
     clock: FakeClock,
     chat_channel: FakeChatChannel,
     chat_model: TokenCountingChatModel,
+    photo_viewer: TokenCountingPhotoViewer,
     auth_verifier: FakeAuthVerifier,
     embedder: FastEmbedEmbedder,
 ) -> Iterator[TestClient]:
-    """A test client for the backend with the real LLM and embedder.
+    """A test client for the backend with the real LLM, photo viewer and embedder.
 
     Everything on the reply path is real except the chat channel (which
-    records), the clock (so typing pauses don't wait), auth, the scheduler and
-    web search (so no Tavily credits are spent).
+    records and serves test images as photos), the clock (so typing pauses
+    don't wait), auth, the scheduler and web search (so no Tavily credits are
+    spent).
     """
 
     def build_conversation_engine(
@@ -216,6 +232,7 @@ def client(
         repositories=build_postgres_repositories(engine),
         chat_channel=chat_channel,
         chat_model=chat_model,
+        photo_viewer=photo_viewer,
         build_conversation_engine=build_conversation_engine,
         auth_verifier=auth_verifier,
         auth_accounts=auth_verifier,

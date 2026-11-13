@@ -32,6 +32,7 @@ from tests.fakes import (
     FakeChatChannel,
     FakeClock,
     FakeEmbedder,
+    FakePhotoViewer,
     FakeScheduler,
     FakeWebSearch,
     ScriptedChatModel,
@@ -120,6 +121,12 @@ def web_search() -> FakeWebSearch:
 
 
 @pytest.fixture
+def photo_viewer() -> FakePhotoViewer:
+    """A photo viewer that returns scripted descriptions, with no model."""
+    return FakePhotoViewer()
+
+
+@pytest.fixture
 def scheduler() -> FakeScheduler:
     """A scheduler whose ticks tests run by hand."""
     return FakeScheduler()
@@ -145,6 +152,7 @@ def client(
     auth_verifier: FakeAuthVerifier,
     embedder: FakeEmbedder,
     web_search: FakeWebSearch,
+    photo_viewer: FakePhotoViewer,
     scheduler: FakeScheduler,
 ) -> Iterator[TestClient]:
     """A test client for the backend wired with fakes and the real database.
@@ -164,6 +172,7 @@ def client(
         repositories=build_postgres_repositories(engine),
         chat_channel=chat_channel,
         chat_model=chat_model,
+        photo_viewer=photo_viewer,
         build_conversation_engine=build_conversation_engine,
         auth_verifier=auth_verifier,
         auth_accounts=auth_verifier,

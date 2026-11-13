@@ -38,6 +38,7 @@ from companion.core.models import (
     MemoryChanges,
     MemoryItem,
     ModelAnswer,
+    PhotoImage,
     RiskType,
     SafeguardEvent,
     SafeguardEventOverview,
@@ -137,6 +138,21 @@ class ChatChannel(Protocol):
         """
         ...
 
+    def download_photo(self, file_id: str) -> PhotoImage:
+        """Download a photo someone sent.
+
+        Args:
+            file_id: The photo's file ID.
+
+        Returns:
+            The photo's image.
+
+        Raises:
+            Exception: If it can't be downloaded or isn't a JPEG, PNG or WebP
+                image.
+        """
+        ...
+
 
 @dataclass(frozen=True)
 class ChatTool:
@@ -176,6 +192,26 @@ class ChatModel(Protocol):
 
         Returns:
             The reply text and the tokens it took.
+        """
+        ...
+
+
+class PhotoViewer(Protocol):
+    """Looks at a photo with a model that can see images."""
+
+    def look(self, model: str, instructions: str, photo: PhotoImage) -> ModelAnswer:
+        """Look at a photo and write what the instructions ask for.
+
+        Args:
+            model: The model to use, e.g. "deepseek-chat".
+            instructions: What to write about the photo.
+            photo: The photo's image.
+
+        Returns:
+            The text and the tokens it took.
+
+        Raises:
+            Exception: If the model can't be reached or fails.
         """
         ...
 
