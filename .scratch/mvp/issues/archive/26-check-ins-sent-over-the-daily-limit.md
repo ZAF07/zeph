@@ -55,7 +55,7 @@ Nothing. Issue 13 and the PRD cover the limit for incoming messages only. Check-
     - `test_a_user_at_the_ignore_threshold_over_the_limit_is_asked_about_fewer_next_day`.
     - `test_a_limit_skip_does_not_count_toward_the_ignore_threshold`: passed before the change too, since skips were already passed over. It guards against that changing.
     - Web: `src/lib/check-ins.test.ts` (both titles), and `CheckInsSettings.test.tsx` (a limit skip in the Recent check-ins list).
-  - Checks (`make check` steps): ruff, ruff format, mypy (96 files), pytest 590 passed, ESLint, Prettier, tsc, Vitest 317 passed.
+  - Checks: `make check` passed after rebasing onto main (with issue 29): ruff, ruff format, mypy (96 files), pytest 597 passed, ESLint, Prettier, tsc, Vitest 321 passed.
   - `/run` (worktree stack on 3060/8060): an Admin test User with Check-ins on, UTC, no Quiet Hours, a fake Telegram link (chat 999000111), `daily_usage.message_count` set to 200 (the seeded limit) and the next due time 5 minutes ago.
     - The 15:26:53 tick saved one Skipped Check-in with reason "User had used up today's Daily Message Limit". At 15:29:32, after more ticks, there was still only one, and the next due time stayed at 15:26:53, so the User is still due.
     - tokens_in and tokens_out stayed 0 (the model was not called), and the backend logged no errors.
