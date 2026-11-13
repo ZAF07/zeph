@@ -23,6 +23,7 @@ The Companion can now and then send a User's own Shared Photo back, the way a fr
 - [ ] A failed send still delivers the text
 - [ ] The tool description is editable on the admin Prompts page
 - [ ] Seam 1 tests cover sending, the one-per-reply rule, other Users' photos and failure; adapter test for Telegram send photo
+- [ ] A Persona Eval: a struggling User with Shared Photos gets no photo sent back (`make eval`)
 - [ ] `make check` passes
 - [ ] Verified in the running app via `/run`
 

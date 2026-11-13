@@ -21,7 +21,7 @@ Photo Viewing joins the Feature list, with the User's own switch (on by default)
 - [ ] Existing Shared Photos aren't used while off and come back when on again
 - [ ] Users switch it on the Dashboard with the explanation text, and in chat ("stop looking at my photos") while Settings in Chat works
 - [ ] It shows on the admin Features page and per-User panel
-- [ ] Seam 1 tests cover each off case and the safety check; seam 3 tests cover the switch and text; a Persona Eval checks the off reply is honest (`make eval`)
+- [ ] Seam 1 tests cover each off case and the safety check; seam 3 tests cover the switch and text; a Persona Eval checks the off reply is honest; a Settings Eval case in `evals/cases/settings.yaml` checks "stop looking at my photos" calls the Photo Viewing tool (`make eval`)
 - [ ] `make check` passes
 - [ ] Verified in the running app via `/run`
 
