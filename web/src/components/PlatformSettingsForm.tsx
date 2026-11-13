@@ -74,6 +74,20 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
           "Extra tries when a photo fails to download or be looked at, before Zeph says it didn’t come through.",
         unit: "tries",
       },
+      {
+        key: "photo_album_wait_seconds",
+        label: "Album wait",
+        caption:
+          "Seconds to wait after an album’s last photo arrives, before Zeph answers all of it in one reply.",
+        unit: "sec",
+      },
+      {
+        key: "photo_album_max_photos",
+        label: "Most photos per album",
+        caption:
+          "Photos Zeph looks at in one album. It mentions any it didn’t look at.",
+        unit: "photos",
+      },
     ],
   },
   {

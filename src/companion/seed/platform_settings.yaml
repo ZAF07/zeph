@@ -201,6 +201,14 @@ photo_not_viewed_note: >-
 # fails, with a short pause between tries.
 photo_retry_count: 2
 
+# How many seconds to wait after an album's last photo arrives before
+# answering all its photos as one message.
+photo_album_wait_seconds: 2
+
+# The most photos looked at in one album; the Companion is told how many
+# more there were.
+photo_album_max_photos: 5
+
 # The model the Safeguard uses to check each incoming message for crisis.
 safeguard_model: deepseek-chat
 

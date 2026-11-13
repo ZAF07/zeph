@@ -20,6 +20,7 @@ from companion.adapters.pypdf.text_extractor import PypdfTextExtractor
 from companion.adapters.scheduler import InProcessScheduler
 from companion.adapters.tavily.web_search import TavilyWebSearch
 from companion.adapters.telegram.chat_channel import TelegramChatChannel
+from companion.adapters.timer import ThreadTimer
 from companion.app import AppDependencies, create_app
 from companion.config import Settings, load_settings
 from companion.core.conversations import ConversationServices
@@ -341,6 +342,7 @@ def build_production_app() -> FastAPI:
         web_search=build_web_search(settings),
         clock=build_clock(settings),
         scheduler=build_scheduler(settings),
+        timer=ThreadTimer(),
         telegram_webhook_secret=settings.telegram_webhook_secret,
         telegram_bot_username=settings.telegram_bot_username,
         dashboard_url=settings.dashboard_url,

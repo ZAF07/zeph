@@ -55,6 +55,7 @@ from tests.fakes import (
     FakeChatChannel,
     FakeClock,
     FakeScheduler,
+    FakeTimer,
     FakeWebSearch,
 )
 
@@ -242,6 +243,7 @@ def client(
         web_search=FakeWebSearch(),
         clock=clock,
         scheduler=FakeScheduler(),
+        timer=FakeTimer(),
         telegram_webhook_secret=WEBHOOK_SECRET,
         telegram_bot_username=BOT_USERNAME,
         dashboard_url=DASHBOARD_URL,

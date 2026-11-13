@@ -82,8 +82,9 @@ def parse_photo(message: dict[str, Any]) -> ChannelPhoto | None:
 def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
     """Turn a Telegram update into a channel-neutral incoming message.
 
-    Text, stickers and photos are read; a voice note, video, GIF or other
-    attachment is an unsupported message that keeps its caption.
+    Text, stickers and photos are read. A voice note, video, GIF or other
+    attachment is an unsupported message that keeps its caption. A photo or
+    attachment sent with others at once keeps the album ID they share.
 
     Args:
         update: The JSON body Telegram posted to the webhook.
@@ -116,6 +117,9 @@ def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
             sticker=parse_sticker(sticker),
         )
     caption = message.get("caption")
+    media_group_id = message.get("media_group_id")
+    album_id = str(media_group_id) if media_group_id is not None else None
+    message_id = int(message.get("message_id", 0))
     photo = parse_photo(message)
     if photo is not None:
         return IncomingMessage(
@@ -125,6 +129,8 @@ def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
             text=caption if isinstance(caption, str) else "",
             kind=MessageKind.PHOTO,
             photo=photo,
+            album_id=album_id,
+            message_id=message_id,
         )
     attachment = attachment_name(message)
     if attachment is None:
@@ -136,6 +142,8 @@ def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
         text=caption if isinstance(caption, str) else "",
         kind=MessageKind.UNSUPPORTED,
         attachment=attachment,
+        album_id=album_id,
+        message_id=message_id,
     )
 
 

@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 from uuid import UUID
@@ -42,34 +43,93 @@ class PhotoMessage:
     """A User's photo message as the Companion reads it.
 
     Attributes:
-        text: The caption with the photo's description, or with the note
+        text: The caption with each photo's description, or with the note
             that it didn't come through.
-        photo: The photo, marked as viewed when it was described.
+        photos: The photos looked at, each marked as viewed and holding its
+            description when it was described.
     """
 
     text: str
-    photo: ChannelPhoto
+    photos: tuple[ChannelPhoto, ...]
+
+
+def photo_marker(
+    description: str | None, not_viewed_note: str, number: int | None = None
+) -> str:
+    """Write one photo the way the Companion reads it.
+
+    Args:
+        description: What the photo shows; None if it couldn't be viewed.
+        not_viewed_note: What the Companion is told when it couldn't be viewed.
+        number: The photo's place in an album; None for a photo sent alone.
+
+    Returns:
+        "[photo: description]", "[photo 2: description]" in an album, or
+        "[photo that didn't come through. note]" when it couldn't be viewed.
+    """
+    name = "photo" if number is None else f"photo {number}"
+    if description is None:
+        return f"[{name} that didn't come through. {not_viewed_note}]"
+    return f"[{name}: {description}]"
 
 
 def photo_message_text(
-    caption: str, description: str | None, not_viewed_note: str
+    caption: str,
+    descriptions: Sequence[str | None],
+    not_viewed_note: str,
+    photos_not_looked_at: int = 0,
 ) -> str:
     """Write a photo message the way the Companion reads it.
 
     Args:
-        caption: The photo's caption; "" if none.
-        description: What the photo shows; None if it couldn't be viewed.
-        not_viewed_note: What the Companion is told when it couldn't be viewed.
+        caption: The caption; "" if none.
+        descriptions: What each photo shows, in order; None for one that
+            couldn't be viewed.
+        not_viewed_note: What the Companion is told when one couldn't be
+            viewed.
+        photos_not_looked_at: How many more photos came in the album that
+            weren't looked at.
 
     Returns:
-        "[photo: description] caption", or "[photo that didn't come through.
-        note] caption" when it couldn't be viewed.
+        "[photo: description] caption" for one photo, or "[photo 1: …]
+        [photo 2: …] caption" for an album, ending with a note to mention
+        any photos that weren't looked at.
     """
-    if description is None:
-        marker = f"[photo that didn't come through. {not_viewed_note}]"
+    if len(descriptions) == 1 and not photos_not_looked_at:
+        markers = [photo_marker(descriptions[0], not_viewed_note)]
     else:
-        marker = f"[photo: {description}]"
-    return f"{marker} {caption.strip()}".strip()
+        markers = [
+            photo_marker(description, not_viewed_note, number)
+            for number, description in enumerate(descriptions, start=1)
+        ]
+    parts = [*markers, caption.strip()]
+    if photos_not_looked_at:
+        parts.append(not_looked_at_note(photos_not_looked_at, len(descriptions)))
+    return " ".join(part for part in parts if part)
+
+
+def not_looked_at_note(photos_not_looked_at: int, photos_looked_at: int) -> str:
+    """Tell the Companion that some photos in an album weren't looked at.
+
+    Args:
+        photos_not_looked_at: How many weren't looked at.
+        photos_looked_at: How many were.
+
+    Returns:
+        E.g. "[The album had 3 more photos that you didn't look at, because
+        you look at only the first 5 in an album. They came through fine.
+        Mention briefly that you only looked at the first 5.]"
+    """
+    if photos_not_looked_at == 1:
+        more, came_through = "1 more photo", "It came through"
+    else:
+        more, came_through = f"{photos_not_looked_at} more photos", "They came through"
+    return (
+        f"[The album had {more} that you didn't look at, because you look at "
+        f"only the first {photos_looked_at} in an album. {came_through} "
+        f"fine. Mention briefly that you only looked at the first "
+        f"{photos_looked_at}.]"
+    )
 
 
 def photo_question_instructions(description_prompt: str, question: str) -> str:
@@ -92,19 +152,19 @@ def photo_question_instructions(description_prompt: str, question: str) -> str:
     )
 
 
-def photo_tool_line(number: int, message_text: str) -> str:
+def photo_tool_line(number: int, description: str) -> str:
     """Write one photo as the ask_about_photo tool lists it.
 
     Args:
         number: The number the model picks it by.
-        message_text: The text of the message it came with.
+        description: What the photo shows.
 
     Returns:
-        E.g. "1. [photo: A ginger cat…] meet Biscuit", shortened if long.
+        E.g. "1. A ginger cat asleep…", shortened if long.
     """
-    if len(message_text) > MAX_PHOTO_LINE_CHARACTERS:
-        message_text = message_text[: MAX_PHOTO_LINE_CHARACTERS - 1] + "…"
-    return f"{number}. {message_text}"
+    if len(description) > MAX_PHOTO_LINE_CHARACTERS:
+        description = description[: MAX_PHOTO_LINE_CHARACTERS - 1] + "…"
+    return f"{number}. {description}"
 
 
 class PhotoService:
@@ -137,26 +197,40 @@ class PhotoService:
         self._clock = clock
 
     def read_message(
-        self, user_id: UUID, photo: ChannelPhoto, caption: str
+        self, user_id: UUID, photos: Sequence[ChannelPhoto], caption: str
     ) -> PhotoMessage:
-        """Describe a User's photo and write their message as the Companion reads it.
+        """Describe a User's photos and write their message as the Companion reads it.
+
+        At most `photo_album_max_photos` are looked at; the Companion is told
+        how many more there were.
 
         Args:
-            user_id: The User who sent it.
-            photo: The photo.
-            caption: Its caption; "" if none.
+            user_id: The User who sent them.
+            photos: The photo, or an album's photos in the order sent.
+            caption: The caption; "" if none.
 
         Returns:
-            The message text and the photo, marked as viewed if it was
-            described.
+            The message text and the photos looked at, each marked as viewed
+            and holding its description if it was described.
         """
         settings = self._repositories.platform_settings
-        description = self.describe(user_id, photo)
+        looked_at = photos[: settings.get("photo_album_max_photos")]
+        descriptions = [self.describe(user_id, photo) for photo in looked_at]
         return PhotoMessage(
             text=photo_message_text(
-                caption, description, settings.get("photo_not_viewed_note")
+                caption,
+                descriptions,
+                settings.get("photo_not_viewed_note"),
+                photos_not_looked_at=len(photos) - len(looked_at),
             ),
-            photo=replace(photo, viewed=description is not None),
+            photos=tuple(
+                replace(
+                    photo,
+                    viewed=description is not None,
+                    description=description or "",
+                )
+                for photo, description in zip(looked_at, descriptions, strict=True)
+            ),
         )
 
     def describe(self, user_id: UUID, photo: ChannelPhoto) -> str | None:
@@ -276,7 +350,9 @@ class PhotoTools:
         """Pick the photo tools for a reply in a Conversation.
 
         The ask_about_photo tool lists the photos in the Conversation that
-        were viewed, by number, under the Admin-set tool description.
+        were viewed, by number and description, under the Admin-set tool
+        description. A photo saved before descriptions were kept on it is
+        listed with its message's text.
 
         Args:
             user_id: The User being replied to.
@@ -288,7 +364,7 @@ class PhotoTools:
         """
         messages = self._repositories.conversations.list_messages(conversation_id)
         viewed = [
-            (photo, message.content)
+            (photo, photo.description or message.content)
             for message in messages
             for photo in message.photos
             if photo.viewed
@@ -322,8 +398,8 @@ class PhotoTools:
             return f"Looking again at photo {number}: {answer}"
 
         listed = "\n".join(
-            photo_tool_line(number, text)
-            for number, (_, text) in enumerate(viewed, start=1)
+            photo_tool_line(number, photo_description)
+            for number, (_, photo_description) in enumerate(viewed, start=1)
         )
         description = self._repositories.platform_settings.get(
             "ask_about_photo_tool_description"

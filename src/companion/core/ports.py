@@ -87,6 +87,20 @@ class Scheduler(Protocol):
         ...
 
 
+class Timer(Protocol):
+    """Runs work once after a wait, in the background."""
+
+    def start(self, key: str, seconds: float, work: Callable[[], None]) -> None:
+        """Run work after a wait; starting the same key again restarts its wait.
+
+        Args:
+            key: Names the wait, so a later start can restart it.
+            seconds: How long to wait.
+            work: What to run when the wait ends.
+        """
+        ...
+
+
 class ChatChannel(Protocol):
     """Sends messages to people on the chat channel (Telegram for the MVP)."""
 

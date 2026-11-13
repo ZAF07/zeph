@@ -30,6 +30,8 @@ const settings: AdminSettings = {
   daily_limit_reply: seeded("I'm wiped for today, talk tomorrow?"),
   message_retention_days: seeded(30),
   photo_retry_count: seeded(2),
+  photo_album_wait_seconds: seeded(2),
+  photo_album_max_photos: seeded(5),
   photo_not_viewed_note: seeded("Say the photo didn't come through."),
 };
 
@@ -142,6 +144,29 @@ describe("PlatformSettingsForm", () => {
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       photo_retry_count: 3,
       photo_not_viewed_note: "It didn't load.",
+    });
+  });
+
+  it("shows and saves the album wait and most photos per album", async () => {
+    const user = userEvent.setup();
+    render(<PlatformSettingsForm />);
+    const wait = await screen.findByLabelText("Album wait");
+    const most = screen.getByLabelText("Most photos per album");
+    expect(wait).toHaveValue(2);
+    expect(most).toHaveValue(5);
+    const photos = screen.getByRole("region", { name: "Photos" });
+    expect(photos).toContainElement(wait);
+    expect(photos).toContainElement(most);
+
+    await user.clear(wait);
+    await user.type(wait, "4");
+    await user.clear(most);
+    await user.type(most, "8");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      photo_album_wait_seconds: 4,
+      photo_album_max_photos: 8,
     });
   });
 
