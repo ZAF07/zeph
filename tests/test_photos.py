@@ -140,7 +140,7 @@ def test_a_photo_without_a_caption_gets_a_real_reply_about_the_photo(
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["what a sleepy cat"]
 
 
-def test_the_saved_message_keeps_the_photos_telegram_ids_and_its_description(
+def test_the_saved_message_keeps_the_photos_telegram_ids_description_and_caption(
     client: TestClient,
     engine: Engine,
     auth_verifier: FakeAuthVerifier,
@@ -164,7 +164,13 @@ def test_the_saved_message_keeps_the_photos_telegram_ids_and_its_description(
     ]
     assert incoming.content == f"[photo: {CAT}] meet Biscuit"
     assert incoming.photos == (
-        ChannelPhoto("file-photo-cat", "photo-cat", viewed=True, description=CAT),
+        ChannelPhoto(
+            "file-photo-cat",
+            "photo-cat",
+            viewed=True,
+            description=CAT,
+            caption="meet Biscuit",
+        ),
     )
 
 

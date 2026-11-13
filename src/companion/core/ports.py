@@ -42,6 +42,7 @@ from companion.core.models import (
     RiskType,
     SafeguardEvent,
     SafeguardEventOverview,
+    SharedPhoto,
     StickerImage,
     StoredSetting,
     TelegramConnection,
@@ -730,7 +731,7 @@ class MemoryCategoryRepository(Protocol):
 
 
 class UserMemoryRepository(Protocol):
-    """Stores each User's Memory Items and Conversation Summaries."""
+    """Stores each User's Memory Items, Conversation Summaries and Shared Photos."""
 
     def list_items(self, user_id: UUID) -> list[MemoryItem]:
         """List a User's Memory Items in the order they were saved.
@@ -814,7 +815,43 @@ class UserMemoryRepository(Protocol):
             conversation_id: The Conversation that was processed.
             processed_at: When processing finished.
             summary: Its Conversation Summary; None when nothing is saved.
-            changes: The changes to the User's Memory Items.
+            changes: The changes to the User's Memory Items and the new
+                Shared Photos.
+        """
+        ...
+
+    def list_shared_photos(self, user_id: UUID) -> list[SharedPhoto]:
+        """List a User's Shared Photos, newest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Shared Photos.
+        """
+        ...
+
+    def get_shared_photo(self, user_id: UUID, photo_id: UUID) -> SharedPhoto | None:
+        """Find one of a User's Shared Photos.
+
+        Args:
+            user_id: The User's ID.
+            photo_id: The Shared Photo's ID.
+
+        Returns:
+            The Shared Photo, or None if the User has no such photo.
+        """
+        ...
+
+    def delete_shared_photo(self, user_id: UUID, photo_id: UUID) -> bool:
+        """Delete one of a User's Shared Photos.
+
+        Args:
+            user_id: The User's ID.
+            photo_id: The Shared Photo's ID.
+
+        Returns:
+            True if it was deleted; False if the User has no such photo.
         """
         ...
 

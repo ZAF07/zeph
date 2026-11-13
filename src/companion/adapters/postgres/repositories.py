@@ -32,6 +32,7 @@ from companion.adapters.postgres.tables import (
     memory_items,
     platform_settings,
     safeguard_events,
+    shared_photos,
     stickers,
     telegram_connections,
     user_feature_switches,
@@ -76,6 +77,7 @@ from companion.core.models import (
     RiskType,
     SafeguardEvent,
     SafeguardEventOverview,
+    SharedPhoto,
     StoredSetting,
     TelegramConnection,
     User,
@@ -316,6 +318,28 @@ def _to_summary(row: Row[Any]) -> ConversationSummary:
         summary=row.summary,
         mood=row.mood,
         created_at=row.created_at,
+    )
+
+
+def _to_shared_photo(row: Row[Any]) -> SharedPhoto:
+    """Turn a `shared_photos` row into a SharedPhoto.
+
+    Args:
+        row: The database row.
+
+    Returns:
+        The Shared Photo.
+    """
+    return SharedPhoto(
+        id=row.id,
+        user_id=row.user_id,
+        file_id=row.file_id,
+        file_unique_id=row.file_unique_id,
+        description=row.description,
+        note=row.note,
+        caption=row.caption,
+        sent_at=row.sent_at,
+        conversation_id=row.conversation_id,
     )
 
 
@@ -584,6 +608,7 @@ class PostgresUserRepository:
             for table in (
                 conversation_summaries,
                 memory_items,
+                shared_photos,
                 conversations,
                 check_ins,
                 connection_tokens,
@@ -1383,7 +1408,7 @@ class PostgresMemoryCategoryRepository:
 
 
 class PostgresUserMemoryRepository:
-    """Stores Memory Items and Conversation Summaries in Postgres."""
+    """Stores Memory Items, Conversation Summaries and Shared Photos in Postgres."""
 
     def __init__(self, engine: Engine) -> None:
         """Set up the repository.
@@ -1519,7 +1544,8 @@ class PostgresUserMemoryRepository:
             conversation_id: The Conversation that was processed.
             processed_at: When processing finished.
             summary: Its Conversation Summary; None when nothing is saved.
-            changes: The changes to the User's Memory Items.
+            changes: The changes to the User's Memory Items and the new
+                Shared Photos.
         """
         with self._engine.begin() as connection:
             if summary is not None:
@@ -1557,11 +1583,74 @@ class PostgresUserMemoryRepository:
                         memory_items.c.id.in_(changes.removed_ids)
                     )
                 )
+            if changes.kept_photos:
+                connection.execute(
+                    insert(shared_photos).values(
+                        [asdict(photo) for photo in changes.kept_photos]
+                    )
+                )
             connection.execute(
                 update(conversations)
                 .where(conversations.c.id == conversation_id)
                 .values(processed_at=processed_at)
             )
+
+    def list_shared_photos(self, user_id: UUID) -> list[SharedPhoto]:
+        """List a User's Shared Photos, newest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Shared Photos.
+        """
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                select(shared_photos)
+                .where(shared_photos.c.user_id == user_id)
+                .order_by(shared_photos.c.sent_at.desc(), shared_photos.c.id)
+            ).all()
+        return [_to_shared_photo(row) for row in rows]
+
+    def get_shared_photo(self, user_id: UUID, photo_id: UUID) -> SharedPhoto | None:
+        """Find one of a User's Shared Photos.
+
+        Args:
+            user_id: The User's ID.
+            photo_id: The Shared Photo's ID.
+
+        Returns:
+            The Shared Photo, or None if the User has no such photo.
+        """
+        with self._engine.connect() as connection:
+            row = connection.execute(
+                select(shared_photos).where(
+                    shared_photos.c.user_id == user_id,
+                    shared_photos.c.id == photo_id,
+                )
+            ).first()
+        return None if row is None else _to_shared_photo(row)
+
+    def delete_shared_photo(self, user_id: UUID, photo_id: UUID) -> bool:
+        """Delete one of a User's Shared Photos.
+
+        Args:
+            user_id: The User's ID.
+            photo_id: The Shared Photo's ID.
+
+        Returns:
+            True if it was deleted; False if the User has no such photo.
+        """
+        with self._engine.begin() as connection:
+            deleted = connection.execute(
+                delete(shared_photos)
+                .where(
+                    shared_photos.c.user_id == user_id,
+                    shared_photos.c.id == photo_id,
+                )
+                .returning(shared_photos.c.id)
+            ).first()
+        return deleted is not None
 
 
 KNOWLEDGE_DOCUMENT_COLUMNS = [

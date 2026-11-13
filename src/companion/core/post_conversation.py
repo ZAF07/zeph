@@ -1,12 +1,13 @@
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
 from companion.core.features import FeatureService
 from companion.core.models import (
+    ChannelPhoto,
     ChatLine,
     ChatRole,
     Conversation,
@@ -17,6 +18,8 @@ from companion.core.models import (
     MemoryChanges,
     MemoryItem,
     MemorySource,
+    MessageDirection,
+    SharedPhoto,
 )
 from companion.core.ports import Clock, Repositories
 from companion.core.transcripts import to_transcript_lines
@@ -36,11 +39,27 @@ class ProcessingAnswer:
         mood: How the User seemed.
         operations: The add, update and remove operations, as the model
             wrote them; each is checked before it is used.
+        photos_to_keep: The photos it picked to keep as Shared Photos, as
+            the model wrote them; each is checked before it is used.
     """
 
     summary: str
     mood: str
     operations: list[Any]
+    photos_to_keep: list[Any]
+
+
+@dataclass(frozen=True)
+class SentPhoto:
+    """A photo the User sent in a Conversation, and when.
+
+    Attributes:
+        photo: The photo, with its description and caption.
+        sent_at: When the message it came in was sent.
+    """
+
+    photo: ChannelPhoto
+    sent_at: datetime
 
 
 @dataclass(frozen=True)
@@ -86,14 +105,20 @@ def read_processing_answer(answer: str) -> ProcessingAnswer | None:
         return None
     summary, mood = parsed.get("summary"), parsed.get("mood")
     operations = parsed.get("memory_operations", [])
+    photos_to_keep = parsed.get("photos_to_keep", [])
     if not isinstance(summary, str) or not summary.strip():
         return None
     if not isinstance(mood, str) or not mood.strip():
         return None
     if not isinstance(operations, list):
         operations = []
+    if not isinstance(photos_to_keep, list):
+        photos_to_keep = []
     return ProcessingAnswer(
-        summary=summary.strip(), mood=mood.strip(), operations=operations
+        summary=summary.strip(),
+        mood=mood.strip(),
+        operations=operations,
+        photos_to_keep=photos_to_keep,
     )
 
 
@@ -186,10 +211,78 @@ def plan_memory_changes(
     return MemoryChanges(added=added, updated=updated, removed_ids=removed_ids)
 
 
+def list_sent_photos(messages: list[ConversationMessage]) -> list[SentPhoto]:
+    """List the photos the User sent in a Conversation that were viewed.
+
+    Args:
+        messages: The Conversation's messages, oldest first.
+
+    Returns:
+        The viewed photos, in the order sent.
+    """
+    return [
+        SentPhoto(photo=photo, sent_at=message.sent_at)
+        for message in messages
+        if message.direction == MessageDirection.INCOMING
+        for photo in message.photos
+        if photo.viewed and photo.description
+    ]
+
+
+def plan_kept_photos(
+    photos_to_keep: list[Any],
+    photos_by_number: dict[int, SentPhoto],
+    user_id: UUID,
+    conversation_id: UUID,
+) -> list[SharedPhoto]:
+    """Turn the photos the model picked into Shared Photos that are safe to save.
+
+    A pick is skipped when it names an unknown photo, has no note, or
+    names a photo already picked.
+
+    Args:
+        photos_to_keep: The picks, as the model wrote them.
+        photos_by_number: The photos it was shown, by number.
+        user_id: The User who sent them.
+        conversation_id: The Conversation they came in.
+
+    Returns:
+        The Shared Photos to save.
+    """
+    kept: list[SharedPhoto] = []
+    picked_numbers: set[int] = set()
+    for pick in photos_to_keep:
+        if not isinstance(pick, dict):
+            continue
+        number = pick.get("photo")
+        note = read_text_field(pick, "note")
+        if not isinstance(number, int) or note is None or number in picked_numbers:
+            continue
+        sent = photos_by_number.get(number)
+        if sent is None:
+            continue
+        picked_numbers.add(number)
+        kept.append(
+            SharedPhoto(
+                id=uuid4(),
+                user_id=user_id,
+                file_id=sent.photo.file_id,
+                file_unique_id=sent.photo.file_unique_id,
+                description=sent.photo.description,
+                note=note,
+                caption=sent.photo.caption,
+                sent_at=sent.sent_at,
+                conversation_id=conversation_id,
+            )
+        )
+    return kept
+
+
 def describe_conversation(
     messages: list[ConversationMessage],
     categories: list[MemoryCategory],
     items_by_number: dict[int, MemoryItem],
+    photos_by_number: dict[int, SentPhoto],
 ) -> str:
     """Write what the post-conversation processing model is given.
 
@@ -197,10 +290,12 @@ def describe_conversation(
         messages: The Conversation's messages, oldest first.
         categories: Every Memory Category, archived ones included.
         items_by_number: The User's current Memory Items, by number.
+        photos_by_number: The photos the User sent that were viewed, by
+            number.
 
     Returns:
         The Memory Categories new items may go in, what is already
-        remembered, and the Conversation.
+        remembered, the photos the User sent, and the Conversation.
     """
     category_names = {category.id: category.name for category in categories}
     category_lines = "\n".join(
@@ -212,15 +307,24 @@ def describe_conversation(
         f"[{number}] ({category_names.get(item.category_id, 'Other')}) {item.content}"
         for number, item in items_by_number.items()
     )
+    photo_lines = "\n".join(
+        f"[{number}] {sent.photo.description}"
+        for number, sent in photos_by_number.items()
+    )
     return (
         f"Memory Categories:\n{category_lines}\n\n"
         f"What is remembered now:\n{item_lines or 'Nothing yet.'}\n\n"
+        f"Photos the person sent:\n{photo_lines or 'None.'}\n\n"
         f"The Conversation:\n{to_transcript_lines(messages)}"
     )
 
 
 class PostConversationProcessor:
-    """Sums up each ended Conversation and updates the User's Memory Items."""
+    """Sums up each ended Conversation and updates the User's User Memory.
+
+    It changes their Memory Items and keeps the photos that matter to them
+    as Shared Photos.
+    """
 
     def __init__(
         self,
@@ -248,7 +352,8 @@ class PostConversationProcessor:
         """Process one ended Conversation and mark it processed.
 
         Nothing is saved when User Memory doesn't work for the User. One
-        model call gives the summary and the operations; an unreadable
+        model call gives the summary, the operations and the photos to keep
+        as Shared Photos; an unreadable
         answer is asked again once, and if it is still unreadable nothing is
         saved, so a bad answer is never retried forever.
 
@@ -273,8 +378,12 @@ class PostConversationProcessor:
             return
         categories = self._repositories.memory_categories.list_all()
         items_by_number = dict(enumerate(user_memory.list_items(user.id), start=1))
+        photos_by_number = dict(enumerate(list_sent_photos(messages), start=1))
         answer = self._ask(
-            user.id, describe_conversation(messages, categories, items_by_number)
+            user.id,
+            describe_conversation(
+                messages, categories, items_by_number, photos_by_number
+            ),
         )
         if answer is None:
             logger.warning("Post-conversation processing gave no readable answer")
@@ -295,6 +404,12 @@ class PostConversationProcessor:
                     for category in categories
                     if not category.archived
                 },
+            ),
+        )
+        changes = replace(
+            changes,
+            kept_photos=plan_kept_photos(
+                answer.photos_to_keep, photos_by_number, user.id, conversation.id
             ),
         )
         summary = ConversationSummary(
