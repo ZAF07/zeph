@@ -37,7 +37,7 @@ A User's choice, on by default, to let the Companion look at the photos they sen
 _Avoid_: Image recognition, vision, photo mode
 
 **Unsupported Message**:
-Something a User sends that the Companion can't read yet, like a voice note or file. It gets a short in-character reply asking them to type instead; any caption it carries is answered like a message.
+Something a User sends that the Companion can't read yet, like a voice note, video, GIF or a file that isn't a photo. It gets a short in-character reply asking them to type instead; any caption it carries is answered like a message.
 _Avoid_: Media message, attachment
 
 **Feature**:

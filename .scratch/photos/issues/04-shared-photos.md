@@ -10,6 +10,13 @@ Status: ready-for-agent
 
 Photos that matter to the User become Shared Photos in their User Memory, and Users can see and delete them.
 
+**First, before anything else:** check that an older Telegram file id still downloads, since Shared Photos rely on it (moved here from issue 01, where no days-old photo file id existed yet). Re-download this real photo file id, made on 2026-11-13 by the bot's `sendPhoto` to the owner's chat and stored on photo messages in the app's database, with `getFile` then the file download (or by sending it as a photo update to the running app's webhook):
+
+- `file_id`: `AgACAgUAAxkDAAPzavaxvf82fkk6N0Dp5dgOOelpfO4AAn0VaxsYkrFXUsuQqSSQGPsBAAMCAAN4AAM9BA`
+- `file_unique_id`: `AQADfRVrGxiSsVd9` (the eval image `evals/images/weekend-list.jpg`)
+
+Record the date and the result under `## Comments`. If it no longer downloads, stop and raise it: Shared Photos would need a different plan (ADR 0007).
+
 - When a Conversation ends, memory processing (which already reads the descriptions) also picks the photos that matter to the User, with a "why it matters" note for each. Those become Shared Photos: Telegram ids, description, note, caption, sent at, Conversation. Memes, receipts and screenshots aren't kept. The memory processing prompt changes, so the migration resets the stored prompt so the new seed loads (as migration 0012 did for the Check-in prompt).
 - With User Memory off, none are kept.
 - Shared Photos stay after Message Retention deletes their messages. Delete My Data and Account Deletion delete them.
@@ -17,6 +24,7 @@ Photos that matter to the User become Shared Photos in their User Memory, and Us
 
 ## Acceptance criteria
 
+- [ ] Checked first: the 2026-11-13 photo file id above still downloads days later (date and result recorded)
 - [ ] At Conversation end, picked photos become Shared Photos with a note; others aren't kept
 - [ ] With User Memory off, none are kept
 - [ ] Shared Photos survive Message Retention; Delete My Data and Account Deletion remove them
