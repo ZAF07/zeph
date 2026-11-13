@@ -11,6 +11,7 @@ from companion.core.models import (
     LibrarySticker,
     MessageDirection,
 )
+from companion.core.photos import PhotoTools
 from companion.core.ports import Repositories
 from companion.core.stickers import StickerTools
 from companion.core.usage import UsageRecordingChatModel
@@ -82,6 +83,7 @@ class ResponseComposer:
         web_search_tools: WebSearchTools,
         settings_tools: SettingsTools,
         sticker_tools: StickerTools,
+        photo_tools: PhotoTools,
     ) -> None:
         """Set up the composer.
 
@@ -93,6 +95,7 @@ class ResponseComposer:
             web_search_tools: Offers the web tools the reply may call.
             settings_tools: Offers the tools that change the User's settings.
             sticker_tools: Offers the Sticker Library to the reply.
+            photo_tools: Offers a look again at the Conversation's photos.
         """
         self._repositories = repositories
         self._chat_model = chat_model
@@ -100,6 +103,7 @@ class ResponseComposer:
         self._web_search_tools = web_search_tools
         self._settings_tools = settings_tools
         self._sticker_tools = sticker_tools
+        self._photo_tools = photo_tools
 
     def compose(
         self,
@@ -115,10 +119,11 @@ class ResponseComposer:
         then what the Companion remembers and the Knowledge that may fit, and
         gives the model every earlier message in the Conversation. The model
         may search the web and read pages when web search is offered, change
-        the User's settings when they ask, and pick one sticker from the
-        Sticker Library when Stickers works for them. When a Feature doesn't
-        work for the User, the instructions say so, so the reply can tell them
-        plainly.
+        the User's settings when they ask, pick one sticker from the
+        Sticker Library when Stickers works for them, and look again at a
+        photo from the Conversation when its description can't answer. When
+        a Feature doesn't work for the User, the instructions say so, so the
+        reply can tell them plainly.
 
         Args:
             conversation_id: The Conversation to reply in.
@@ -139,6 +144,7 @@ class ResponseComposer:
         web_search = self._web_search_tools.offer(user_id)
         settings_tools = self._settings_tools.offer(user_id)
         sticker_choice = self._sticker_tools.offer(user_id)
+        photo_tools = self._photo_tools.offer(user_id, conversation_id)
         cancelled_note = (
             settings.get(DELETION_CANCELLED_NOTE_SETTING)
             if data_deletion_cancelled
@@ -163,7 +169,12 @@ class ResponseComposer:
             model=settings.get("response_model"),
             instructions=instructions,
             history=history,
-            tools=[*web_search.tools, *settings_tools.tools, *sticker_choice.tools],
+            tools=[
+                *web_search.tools,
+                *settings_tools.tools,
+                *sticker_choice.tools,
+                *photo_tools,
+            ],
         )
         reply_parts = split_into_messages(reply)
         if not reply_parts and sticker_choice.picked is None:

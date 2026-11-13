@@ -26,7 +26,7 @@ from companion.core.knowledge_retrieval import KnowledgeRetrieval
 from companion.core.memory_categories import MemoryCategoryService
 from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.message_retention import MessageRetention
-from companion.core.photos import PhotoService
+from companion.core.photos import PhotoService, PhotoTools
 from companion.core.platform_settings import PlatformSettingsService
 from companion.core.ports import (
     AuthAccounts,
@@ -154,6 +154,13 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         chat_model=chat_model,
         clock=dependencies.clock,
     )
+    photo_service = PhotoService(
+        repositories=dependencies.repositories,
+        chat_channel=dependencies.chat_channel,
+        photo_viewer=dependencies.photo_viewer,
+        usage_limiter=usage_limiter,
+        clock=dependencies.clock,
+    )
     conversation_engine = dependencies.build_conversation_engine(
         ConversationServices(
             conversations=ConversationService(
@@ -193,6 +200,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                     data_deletion=chat_data_deletion,
                 ),
                 sticker_tools=StickerTools(dependencies.repositories, feature_service),
+                photo_tools=PhotoTools(dependencies.repositories, photo_service),
             ),
             data_deletion=chat_data_deletion,
         )
@@ -203,13 +211,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         conversation_engine=conversation_engine,
         chat_channel=dependencies.chat_channel,
         sticker_library=sticker_library,
-        photo_service=PhotoService(
-            repositories=dependencies.repositories,
-            chat_channel=dependencies.chat_channel,
-            photo_viewer=dependencies.photo_viewer,
-            usage_limiter=usage_limiter,
-            clock=dependencies.clock,
-        ),
+        photo_service=photo_service,
         dashboard_url=dependencies.dashboard_url,
     )
 

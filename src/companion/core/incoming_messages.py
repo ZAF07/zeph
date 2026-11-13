@@ -153,12 +153,15 @@ class IncomingMessageHandler:
                 text=readable_text(message),
                 kind=message.kind,
             )
+        photo_message = self._photo_service.read_message(
+            user_id, message.photo, message.text
+        )
         return ConversationTurn(
             user_id=user_id,
             chat_id=message.chat_id,
-            text=self._photo_service.message_text(user_id, message.photo, message.text),
+            text=photo_message.text,
             kind=MessageKind.PHOTO,
-            photos=(message.photo,),
+            photos=(photo_message.photo,),
         )
 
     def _is_admin(self, user_id: UUID) -> bool:
