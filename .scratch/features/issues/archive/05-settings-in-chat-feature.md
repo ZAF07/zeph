@@ -65,4 +65,4 @@ Evidence:
 ## Completion
 
 - Completed: 2026-11-13
-- Commit: 1b8a9e2 "Features issue 05: Settings in Chat joins the Feature list…", review fixes f0833d6 "Features issue 05 review fixes: SettingsTools.offer docstring…"
+- Commit: 1b8a9e2 "Features issue 05: Settings in Chat joins the Feature list…", review fixes f0833d6 "Features issue 05 review fixes: SettingsTools.offer docstring…", archive 166f2b1 "Features issue 05 done: archive issue with run evidence…" (merged from `feat/features-05-settings-in-chat` in e876a37 "Merge Features issue 05…")
