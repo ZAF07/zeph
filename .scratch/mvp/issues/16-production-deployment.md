@@ -17,6 +17,7 @@ Run the MVP on a single small VPS using the same Docker Compose setup and images
 - [ ] The Telegram webhook is registered to the production domain and verified with the secret token
 - [ ] Postgres data is on a persistent volume, with a documented backup and restore command
 - [ ] A deployment guide covers first setup, updating, and backups
+- [ ] The deployment guide links `docs/RESET_TELEGRAM_TOKEN_GUIDE.md`: reset the bot token when it leaks or might have (BotFather revoke → update `.env` → `make restart`), not on a schedule
 - [ ] Verified on the live server: sign up, connect Telegram, receive the welcome message
 
 ## Blocked by
