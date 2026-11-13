@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import jwt
 import pytest
@@ -7,11 +8,12 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from companion.adapters.clerk.accounts import ClerkAccounts
 from companion.adapters.clerk.auth_verifier import ClerkAuthVerifier
 from companion.adapters.deepseek.chat_model import DeepSeekChatModel
+from companion.adapters.deepseek.photo_viewer import DeepSeekPhotoViewer
 from companion.adapters.fastembed.embedder import FastEmbedEmbedder
 from companion.adapters.postgres.tables import EMBEDDING_SIZE
 from companion.adapters.tavily.web_search import TavilyWebSearch
 from companion.adapters.telegram.chat_channel import TelegramChatChannel
-from companion.core.models import ChatLine, ChatRole
+from companion.core.models import ChatLine, ChatRole, PhotoImage
 from companion.core.ports import ChatTool
 
 pytestmark = pytest.mark.contract
@@ -69,6 +71,20 @@ def test_deepseek_generates_a_reply() -> None:
     assert reply.text.strip()
     assert reply.tokens_in > 0
     assert reply.tokens_out > 0
+
+
+def test_deepseek_describes_a_photo() -> None:
+    photo_viewer = DeepSeekPhotoViewer(required_env("DEEPSEEK_API_KEY"))
+    image_file = Path(__file__).parents[2] / "evals/images/weekend-list.jpg"
+
+    answer = photo_viewer.look(
+        model="deepseek-chat",
+        instructions="Write out the handwritten list in the photo.",
+        photo=PhotoImage(content=image_file.read_bytes(), media_type="image/jpeg"),
+    )
+
+    assert "compost" in answer.text.lower()
+    assert answer.tokens_in > 0
 
 
 def test_deepseek_calls_an_offered_tool_and_uses_its_result() -> None:

@@ -8,13 +8,13 @@ from evals.cases import (
     load_persona_cases,
 )
 from evals.judge import judge_persona_rules
+from evals.photos import send_test_photo
 from evals.report import EvalReport, PersonaResult, verdict_line
 from evals.token_counting_chat_model import TokenCountingChatModel
 from tests.fakes import FakeAuthVerifier, FakeChatChannel
 from tests.telegram_helpers import (
     connect_telegram,
     send_to_webhook,
-    telegram_message_update,
     telegram_text_update,
 )
 
@@ -31,19 +31,16 @@ def send_and_collect_replies(
     Args:
         client: The backend's test client.
         chat_channel: Records what Zeph sends.
-        message: The scripted message, text or a captioned photo.
+        message: The scripted message, text or a photo of a test image.
 
     Returns:
         The texts Zeph sent in reply, in order.
     """
-    if message.photo:
-        update = telegram_message_update(
-            {"photo": [{"file_id": "photo-1", "width": 800}], "caption": message.text}
-        )
-    else:
-        update = telegram_text_update(message.text)
     already_sent = len(chat_channel.sent)
-    assert send_to_webhook(client, update) == 200
+    if message.photo:
+        send_test_photo(client, chat_channel, message.photo.file_name, message.text)
+    else:
+        assert send_to_webhook(client, telegram_text_update(message.text)) == 200
     return [sent.text for sent in chat_channel.sent[already_sent:]]
 
 
@@ -54,10 +51,11 @@ def person_line(message: PersonaMessage) -> str:
         message: The scripted message.
 
     Returns:
-        The line, e.g. "Person: hey".
+        The line, e.g. "Person: hey", or for a photo what it really shows.
     """
     if message.photo:
-        return f"Person: (sends a photo with the caption) {message.text}"
+        caption = f" with the caption: {message.text}" if message.text else ""
+        return f"Person: (sends a photo that shows: {message.photo.shows}){caption}"
     return f"Person: {message.text}"
 
 

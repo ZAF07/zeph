@@ -65,6 +65,18 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
     ],
   },
   {
+    heading: "Photos",
+    fields: [
+      {
+        key: "photo_retry_count",
+        label: "Photo retries",
+        caption:
+          "Extra tries when a photo fails to download or be looked at, before Zeph says it didn’t come through.",
+        unit: "tries",
+      },
+    ],
+  },
+  {
     heading: "Data",
     fields: [
       {
@@ -113,6 +125,11 @@ const textFields: TextField[] = [
     key: "daily_limit_reply",
     label: "Limit-reached reply",
     caption: "— sent in Telegram when a User hits the daily limit",
+  },
+  {
+    key: "photo_not_viewed_note",
+    label: "“Didn’t come through” note",
+    caption: "— tells Zeph to say honestly that a photo couldn’t be viewed",
   },
 ];
 

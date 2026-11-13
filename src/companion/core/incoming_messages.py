@@ -9,6 +9,7 @@ from companion.core.models import (
     MessageKind,
     UserRole,
 )
+from companion.core.photos import PhotoService
 from companion.core.ports import ChatChannel, ConversationEngine, Repositories
 from companion.core.stickers import StickerLibraryService, sticker_message_text
 from companion.core.telegram_connection import TelegramConnectionService
@@ -23,7 +24,7 @@ def readable_text(message: IncomingMessage) -> str:
         message: The incoming message.
 
     Returns:
-        The text; "[sticker: 😂]" for a sticker; "[photo] caption" for
+        The text; "[sticker: 😂]" for a sticker; "[voice note] caption" for
         something the Companion can't open that came with a caption.
     """
     if message.kind == MessageKind.STICKER:
@@ -47,6 +48,7 @@ class IncomingMessageHandler:
         conversation_engine: ConversationEngine,
         chat_channel: ChatChannel,
         sticker_library: StickerLibraryService,
+        photo_service: PhotoService,
         dashboard_url: str,
     ) -> None:
         """Set up the handler.
@@ -58,10 +60,12 @@ class IncomingMessageHandler:
             conversation_engine: Answers connected Users' messages.
             chat_channel: Sends replies that need no Conversation.
             sticker_library: Adds the stickers Admins send.
+            photo_service: Describes the photos Users send.
             dashboard_url: The Dashboard's address, put into some replies.
         """
         self._telegram_connections = telegram_connections
         self._sticker_library = sticker_library
+        self._photo_service = photo_service
         self._repositories = repositories
         self._conversation_engine = conversation_engine
         self._chat_channel = chat_channel
@@ -76,11 +80,13 @@ class IncomingMessageHandler:
 
         `/start <token>` makes a Telegram Connection. Anyone else without a
         Telegram Connection is pointed to the Dashboard to sign up. A sticker
-        from an Admin goes into the Sticker Library. A voice note, photo or
-        other message the Companion can't read gets the unsupported reply,
-        unless it has a caption, which is answered instead. Any other message
-        from a connected User is answered by the Companion; if that fails,
-        they get a short fallback reply instead of silence.
+        from an Admin goes into the Sticker Library. A photo is described
+        first, so the Safeguard and the reply read what it shows. A voice
+        note, video or other message the Companion can't read gets the
+        unsupported reply, unless it has a caption, which is answered
+        instead. Any other message from a connected User is answered by the
+        Companion; if that fails, they get a short fallback reply instead of
+        silence.
 
         Args:
             message: The incoming message.
@@ -118,21 +124,42 @@ class IncomingMessageHandler:
             )
             return
 
-        turn = ConversationTurn(
-            user_id=connection.user_id,
-            chat_id=message.chat_id,
-            text=readable_text(message),
-            kind=message.kind,
-        )
         with self._turn_lock_for(connection.user_id):
             try:
-                self._conversation_engine.handle(turn)
+                self._conversation_engine.handle(
+                    self._turn_for(connection.user_id, message)
+                )
             except Exception:
                 logger.exception("Could not answer a message from a User")
                 self._chat_channel.send_text(
                     message.chat_id,
                     self._repositories.platform_settings.get("reply_failed_message"),
                 )
+
+    def _turn_for(self, user_id: UUID, message: IncomingMessage) -> ConversationTurn:
+        """Turn a connected User's message into the turn the Companion answers.
+
+        Args:
+            user_id: The User who sent it.
+            message: The incoming message.
+
+        Returns:
+            The turn; a photo's text holds its description.
+        """
+        if message.photo is None:
+            return ConversationTurn(
+                user_id=user_id,
+                chat_id=message.chat_id,
+                text=readable_text(message),
+                kind=message.kind,
+            )
+        return ConversationTurn(
+            user_id=user_id,
+            chat_id=message.chat_id,
+            text=self._photo_service.message_text(user_id, message.photo, message.text),
+            kind=MessageKind.PHOTO,
+            photos=(message.photo,),
+        )
 
     def _is_admin(self, user_id: UUID) -> bool:
         """Tell whether a User is an Admin right now.

@@ -4,13 +4,16 @@ import pytest
 
 from evals.cases import (
     CASES_DIR,
+    EvalPhoto,
     InvalidEvalCasesError,
     KnowledgeDetails,
+    PhotoDescriptionCase,
     SafeguardCase,
     SafeguardCaseKind,
     SettingsCase,
     load_knowledge_cases,
     load_persona_cases,
+    load_photo_description_cases,
     load_safeguard_cases,
     load_settings_cases,
 )
@@ -25,6 +28,7 @@ from evals.report import (
     EvalReport,
     KnowledgeStepResult,
     PersonaResult,
+    PhotoDescriptionResult,
     SafeguardResult,
     SettingsResult,
 )
@@ -89,22 +93,52 @@ def test_cases_with_the_same_id_are_refused(tmp_path: Path) -> None:
         load_safeguard_cases(cases_file)
 
 
-def test_a_photo_message_is_read_from_its_caption(tmp_path: Path) -> None:
+def test_a_photo_message_is_read_with_its_image_and_what_it_shows(
+    tmp_path: Path,
+) -> None:
     cases_file = tmp_path / "persona.yaml"
     cases_file.write_text(
-        "rules:\n  photo_honesty: Can't see photos.\n"
+        "rules:\n  photo_honesty: Only what is there.\n"
         "conversations:\n"
-        "  - id: plant\n"
-        "    messages: [hi, {photo_caption: my new plant}]\n"
+        "  - id: list\n"
+        "    messages:\n"
+        "      - hi\n"
+        "      - {photo: weekend-list.jpg, caption: my list, shows: A list.}\n"
+        "      - {photo: weekend-list.jpg, shows: A list.}\n"
         "    rules: [photo_honesty]\n"
     )
 
     [conversation] = load_persona_cases(cases_file).conversations
 
+    weekend_list = EvalPhoto(file_name="weekend-list.jpg", shows="A list.")
     assert [(m.text, m.photo) for m in conversation.messages] == [
-        ("hi", False),
-        ("my new plant", True),
+        ("hi", None),
+        ("my list", weekend_list),
+        ("", weekend_list),
     ]
+
+
+def test_a_case_naming_an_image_that_is_not_there_is_refused(tmp_path: Path) -> None:
+    cases_file = tmp_path / "safeguard.yaml"
+    cases_file.write_text("- {id: a, kind: clear_crisis, photo: no-such.png}\n")
+
+    with pytest.raises(InvalidEvalCasesError, match="no-such.png"):
+        load_safeguard_cases(cases_file)
+
+
+def test_the_safeguard_cases_include_a_worrying_and_an_everyday_photo() -> None:
+    cases = load_safeguard_cases(CASES_DIR / "safeguard.yaml")
+
+    photo_kinds = {case.kind for case in cases if case.photo and not case.message}
+    assert SafeguardCaseKind.CLEAR_CRISIS in photo_kinds
+    assert SafeguardCaseKind.FALSE_ALARM in photo_kinds
+
+
+def test_the_photo_description_cases_name_text_to_leave_out() -> None:
+    cases = load_photo_description_cases(CASES_DIR / "photo_descriptions.yaml")
+
+    assert cases
+    assert all(case.must_leave_out for case in cases)
 
 
 def test_a_json_answer_is_read_with_or_without_a_code_fence() -> None:
@@ -254,3 +288,19 @@ def test_the_report_counts_settings_results() -> None:
     report = EvalReport(settings=[SettingsResult(case, ["pause_check_ins"])])
 
     assert "Settings: 1 of 1 right" in report.lines()
+
+
+def test_the_report_lists_what_each_photo_description_leaked() -> None:
+    card = PhotoDescriptionCase("card", "card.png", ["4929", "Sunflower"])
+    report = EvalReport(
+        photo_descriptions=[
+            PhotoDescriptionResult(card, "[photo: a card, 4929 …]", ["4929"]),
+            PhotoDescriptionResult(card, "[photo: a card]", []),
+        ]
+    )
+
+    text = "\n".join(report.lines())
+
+    assert "Photo descriptions: 1 of 2 right" in text
+    assert "  FAIL card: leaked 4929" in text
+    assert "  PASS card: left out 4929, Sunflower" in text

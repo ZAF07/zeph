@@ -26,6 +26,7 @@ from companion.core.knowledge_retrieval import KnowledgeRetrieval
 from companion.core.memory_categories import MemoryCategoryService
 from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.message_retention import MessageRetention
+from companion.core.photos import PhotoService
 from companion.core.platform_settings import PlatformSettingsService
 from companion.core.ports import (
     AuthAccounts,
@@ -37,6 +38,7 @@ from companion.core.ports import (
     DocumentTextExtractor,
     Embedder,
     KnowledgeVectorStore,
+    PhotoViewer,
     Repositories,
     Scheduler,
     WebSearch,
@@ -62,6 +64,7 @@ class AppDependencies:
         repositories: Where data is stored.
         chat_channel: Sends messages to people.
         chat_model: Generates the Companion's words.
+        photo_viewer: Looks at the photos Users send.
         build_conversation_engine: Builds the conversation engine around the
             core services it runs.
         auth_verifier: Checks Dashboard bearer tokens.
@@ -83,6 +86,7 @@ class AppDependencies:
     repositories: Repositories
     chat_channel: ChatChannel
     chat_model: ChatModel
+    photo_viewer: PhotoViewer
     build_conversation_engine: Callable[[ConversationServices], ConversationEngine]
     auth_verifier: AuthVerifier
     auth_accounts: AuthAccounts
@@ -199,6 +203,13 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         conversation_engine=conversation_engine,
         chat_channel=dependencies.chat_channel,
         sticker_library=sticker_library,
+        photo_service=PhotoService(
+            repositories=dependencies.repositories,
+            chat_channel=dependencies.chat_channel,
+            photo_viewer=dependencies.photo_viewer,
+            usage_limiter=usage_limiter,
+            clock=dependencies.clock,
+        ),
         dashboard_url=dependencies.dashboard_url,
     )
 

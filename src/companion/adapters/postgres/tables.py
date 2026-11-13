@@ -120,6 +120,7 @@ conversation_messages = Table(
     Column("kind", Text, nullable=False),
     Column("content", Text, nullable=False),
     Column("sent_at", DateTime(timezone=True), nullable=False),
+    Column("photos", JSONB, nullable=False, server_default="[]"),
 )
 
 platform_settings = Table(

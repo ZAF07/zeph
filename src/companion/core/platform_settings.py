@@ -95,6 +95,23 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     EditableSetting(
         "memory_retrieval_model", "Memory retrieval model", SettingKind.MODEL
     ),
+    EditableSetting(
+        "photo_description_prompt", "Photo description prompt", SettingKind.TEXT
+    ),
+    EditableSetting("photo_model", "Photo viewing model", SettingKind.MODEL),
+    EditableSetting(
+        "photo_not_viewed_note",
+        "“Didn’t come through” note",
+        SettingKind.TEXT,
+        max_length=2_000,
+    ),
+    EditableSetting(
+        "photo_retry_count",
+        "Photo retries",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=5,
+    ),
     EditableSetting("check_in_prompt", "Check-in prompt", SettingKind.TEXT),
     EditableSetting("check_in_model", "Check-in model", SettingKind.MODEL),
     EditableSetting(
@@ -196,6 +213,17 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         ),
         prompt_key="memory_retrieval_prompt",
         model_key="memory_retrieval_model",
+    ),
+    CoreService(
+        name="Photo viewing",
+        runs_when="Every photo, before the Safeguard",
+        description=(
+            "Looks at each photo a User sends and writes a detailed "
+            "description. The Safeguard, the reply and memory read the "
+            "description; the photo itself is never kept."
+        ),
+        prompt_key="photo_description_prompt",
+        model_key="photo_model",
     ),
     CoreService(
         name="Check-ins",

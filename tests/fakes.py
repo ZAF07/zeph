@@ -13,6 +13,7 @@ from companion.core.models import (
     ChannelSticker,
     ChatLine,
     ModelAnswer,
+    PhotoImage,
     StickerImage,
     WebSearchResult,
 )
@@ -20,6 +21,9 @@ from companion.core.ports import ChatTool
 
 TOKENS_IN_PER_CALL = 120
 TOKENS_OUT_PER_CALL = 30
+PHOTO_TOKENS_IN = 900
+PHOTO_TOKENS_OUT = 80
+FAKE_PHOTO = PhotoImage(content=b"fake-jpeg-bytes", media_type="image/jpeg")
 
 
 @dataclass(frozen=True)
@@ -43,7 +47,9 @@ class FakeChatChannel:
 
     `events` lists texts, stickers and typing in the order they happened.
     Sticker sets and sticker images it knows are set by tests; set
-    `sticker_lookup_failure` to make looking them up raise it.
+    `sticker_lookup_failure` to make looking them up raise it. Photos are
+    served from `photos`, or `FAKE_PHOTO` for any other file ID; queue
+    exceptions in `photo_download_failures` to make the next downloads fail.
     """
 
     def __init__(self) -> None:
@@ -55,6 +61,9 @@ class FakeChatChannel:
         self.sticker_sets: dict[str, list[ChannelSticker]] = {}
         self.sticker_images: dict[str, StickerImage] = {}
         self.sticker_lookup_failure: Exception | None = None
+        self.photos: dict[str, PhotoImage] = {}
+        self.photo_download_failures: list[Exception] = []
+        self.downloaded_photos: list[str] = []
 
     def send_text(self, chat_id: int, text: str) -> None:
         """Record a text message.
@@ -107,6 +116,23 @@ class FakeChatChannel:
         if self.sticker_lookup_failure is not None:
             raise self.sticker_lookup_failure
         return self.sticker_images.get(file_id)
+
+    def download_photo(self, file_id: str) -> PhotoImage:
+        """Record the download and return the photo the test set up.
+
+        Args:
+            file_id: The photo's file ID.
+
+        Returns:
+            The photo set up for that file ID, or `FAKE_PHOTO`.
+
+        Raises:
+            Exception: The next queued `photo_download_failures`, if any.
+        """
+        self.downloaded_photos.append(file_id)
+        if self.photo_download_failures:
+            raise self.photo_download_failures.pop(0)
+        return self.photos.get(file_id, FAKE_PHOTO)
 
     def show_typing(self, chat_id: int) -> None:
         """Record that typing was shown.
@@ -414,6 +440,66 @@ class ScriptedChatModel:
             raise answer
         return ModelAnswer(
             text=answer, tokens_in=TOKENS_IN_PER_CALL, tokens_out=TOKENS_OUT_PER_CALL
+        )
+
+
+@dataclass(frozen=True)
+class PhotoViewerCall:
+    """One look the fake photo viewer was asked for.
+
+    Attributes:
+        model: The model name asked for.
+        instructions: The instructions given.
+        photo: The photo it was shown.
+    """
+
+    model: str
+    instructions: str
+    photo: PhotoImage
+
+
+class FakePhotoViewer:
+    """Photo viewer that returns scripted descriptions and records each look.
+
+    With nothing scripted it describes every photo as `DEFAULT_DESCRIPTION`.
+    """
+
+    DEFAULT_DESCRIPTION = "A photo of a mug of tea on a wooden table."
+
+    def __init__(self) -> None:
+        """Start with nothing scripted and no looks."""
+        self._answers: list[str | Exception] = []
+        self.calls: list[PhotoViewerCall] = []
+
+    def script(self, *answers: str | Exception) -> None:
+        """Queue answers to return, one per look, in order.
+
+        Args:
+            answers: The descriptions; an exception is raised instead of
+                returned, to act like a failing model.
+        """
+        self._answers.extend(answers)
+
+    def look(self, model: str, instructions: str, photo: PhotoImage) -> ModelAnswer:
+        """Record the look and return the next scripted description.
+
+        Args:
+            model: The model name asked for.
+            instructions: The instructions given.
+            photo: The photo to look at.
+
+        Returns:
+            The description, with the same token counts for every look.
+
+        Raises:
+            Exception: The next scripted exception, if that is what's queued.
+        """
+        self.calls.append(PhotoViewerCall(model, instructions, photo))
+        answer = self._answers.pop(0) if self._answers else self.DEFAULT_DESCRIPTION
+        if isinstance(answer, Exception):
+            raise answer
+        return ModelAnswer(
+            text=answer, tokens_in=PHOTO_TOKENS_IN, tokens_out=PHOTO_TOKENS_OUT
         )
 
 

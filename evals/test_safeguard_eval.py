@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from evals.cases import CASES_DIR, SafeguardCase, load_safeguard_cases
+from evals.photos import send_test_photo
 from evals.report import EvalReport, SafeguardResult
 from tests.fakes import FakeAuthVerifier, FakeChatChannel
 from tests.telegram_helpers import (
@@ -50,7 +51,10 @@ def test_the_safeguard_catches_every_real_crisis(
         assert send_to_webhook(client, telegram_text_update(earlier_message)) == 200
     events_before = len(safeguard_events(client, admin))
 
-    assert send_to_webhook(client, telegram_text_update(case.message)) == 200
+    if case.photo:
+        send_test_photo(client, chat_channel, case.photo, case.message)
+    else:
+        assert send_to_webhook(client, telegram_text_update(case.message)) == 200
 
     events = safeguard_events(client, admin)
     risk_type = events[0]["risk_type"] if len(events) > events_before else None
