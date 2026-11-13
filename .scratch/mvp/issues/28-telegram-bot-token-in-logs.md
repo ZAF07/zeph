@@ -1,14 +1,10 @@
 # 28 — The Telegram bot token shows up in backend logs
 
-Status: needs-triage
+Status: ready-for-agent
 
 ## Parent
 
 `.scratch/mvp/PRD.md` (seen during the `/run` for `issues/archive/14-data-retention-and-deletion.md`)
-
-## Before deciding on a solution
-
-Run `/grill-with-docs` on this issue first. The user wants to grill the problem with the docs before a solution is picked, so don't start on a fix until that is done.
 
 ## Symptom
 
@@ -30,15 +26,25 @@ Deterministic. With the stack running, make any Telegram call fail, e.g. send a 
 
 - `src/companion/adapters/telegram/chat_channel.py` — the token is built into `_bot_url` and `_file_url`, and httpx errors leave the adapter as they are.
 
-## Questions for the grilling
+## Decisions (from `/grill-with-docs`, 2026-11-13)
 
-- Fix it in the Telegram adapter only (re-raise errors with the token masked), or add a log filter that masks secrets for every adapter?
-- Do other adapters put secrets in URLs or error messages (DeepSeek, Tavily, Clerk)?
-- Should httpx's own request logging be switched off or kept at WARNING on purpose, so a future log-level change doesn't start printing every URL?
-- Is rotating the token a one-off step, or should rotation be written down (e.g. in the deployment docs for issue 16)?
+- **Fix it in the Telegram adapter only, with no global log filter.** Only Telegram puts a secret in a URL. Tavily and Clerk send keys in the `Authorization` header and DeepSeek wraps its key in `SecretStr`, and httpx errors don't show headers. A filter would only match the patterns we thought of. No Telegram error text is saved to the DB or shown on the Dashboard, so logs are the only place it leaks.
+- **Also pin the `httpx` and `httpcore` loggers to WARNING at backend startup.** httpx logs every request URL at INFO. Today that's hidden only because nothing sets up logging, so raising the log level later would print the token on every call.
+- **Rotate only when there's a reason, not on a schedule:** the token leaked or might have, or someone who had it no longer should. Telegram tokens never expire. The steps are in `docs/RESET_TELEGRAM_TOKEN_GUIDE.md`, and issue 16 links to it.
+- **Rotate the current token only after the fix is running.** If you rotate first, the next failed call leaks the new token too.
+- No ADR or `CONTEXT.md` change: this is easy to undo and adds no domain terms.
+
+## What to build
+
+In `chat_channel.py`, catch `httpx.HTTPError` in `_call` and the file download and raise our own Telegram error instead. Its message holds the Bot API method name, the status code and Telegram's `description` from the response body, never the URL. Raise it `from None` so the original httpx error, URL included, isn't printed as its cause. The error keeps the status code as an attribute, because the sticker-set lookup (`except httpx.HTTPStatusError` around `getStickerSet`) treats 400 as "no such set". Update that catch and the `httpx.HTTPError` lines in the docstrings' `Raises:` sections. Connection errors (`httpx.RequestError`) get the same wrapping.
 
 ## Acceptance criteria
 
-To be written after `/grill-with-docs`.
+- [ ] A failed Telegram call or file download raises our own Telegram error whose message has the method name, status code and Telegram's `description`, and never the token; the httpx error is not chained (`from None`)
+- [ ] A test fails a Telegram call through a fake httpx transport and checks the token appears nowhere in the error text or the logged traceback
+- [ ] At startup the backend sets the `httpx` and `httpcore` loggers to WARNING, with a test
+- [ ] `/run`: a reply that fails (chat ID that doesn't exist) leaves no `api.telegram.org/bot` in `docker compose logs backend`
+- [x] `docs/RESET_TELEGRAM_TOKEN_GUIDE.md` gives Admins the steps to reset the token, and issue 16 links to it (written during the grilling)
+- [ ] **(User, after merge and deploy)** Rotate the current token by following the guide
 
 ## Comments
