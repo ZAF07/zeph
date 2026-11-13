@@ -245,7 +245,7 @@ class LangGraphConversationEngine:
                 The Knowledge to give the reply.
             """
             knowledge = services.knowledge_retrieval.recall(
-                UUID(state["conversation_id"])
+                UUID(state["user_id"]), UUID(state["conversation_id"])
             )
             return {"knowledge": knowledge}
 

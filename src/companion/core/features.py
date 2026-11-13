@@ -39,6 +39,22 @@ FEATURES: tuple[FeatureDetails, ...] = (
             "conversation needs a fact."
         ),
     ),
+    FeatureDetails(
+        feature=Feature.STICKERS,
+        name="Stickers",
+        description=(
+            "Zeph can add a sticker from the Sticker Library to a reply. "
+            "Zeph still reads the stickers a User sends either way."
+        ),
+    ),
+    FeatureDetails(
+        feature=Feature.KNOWLEDGE,
+        name="Knowledge",
+        description=(
+            "Zeph gets philosophy and mindfulness passages from the Knowledge "
+            "library that may fit the message."
+        ),
+    ),
 )
 
 

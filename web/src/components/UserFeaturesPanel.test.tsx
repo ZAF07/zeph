@@ -136,6 +136,66 @@ describe("UserFeaturesPanel", () => {
     expect(row.getByText("Off: turned off for this User")).toBeVisible();
   });
 
+  it("shows Stickers and Knowledge and turns Knowledge back on for the User", async () => {
+    apiClient.listUserFeatures.mockResolvedValue([
+      webSearch,
+      {
+        ...webSearch,
+        feature: "stickers",
+        name: "Stickers",
+        works: false,
+        reason: "off_for_everyone",
+      },
+      {
+        ...webSearch,
+        feature: "knowledge",
+        name: "Knowledge",
+        works: false,
+        reason: "off_for_user",
+        switch: "off",
+        changed_by_email: "maya@example.com",
+        changed_at: "2026-11-13T09:00:00Z",
+      },
+    ]);
+    apiClient.setFeatureForUser.mockResolvedValue({
+      ...webSearch,
+      feature: "knowledge",
+      name: "Knowledge",
+      works: true,
+      reason: "on_for_user",
+      switch: "on",
+      changed_by_email: "owner@example.com",
+      changed_at: "2026-11-13T10:00:00Z",
+    });
+    const user = userEvent.setup();
+    render(<UserFeaturesPanel user={ren} onClose={() => {}} />);
+
+    await screen.findByText("Stickers");
+    const stickers = within(rowFor("Stickers"));
+    const knowledge = within(rowFor("Knowledge"));
+    expect(stickers.getByText("Off: turned off for everyone")).toBeVisible();
+    expect(knowledge.getByText("Off: turned off for this User")).toBeVisible();
+    expect(
+      knowledge.getByText(/^Changed 13 Nov, .+ by maya@example.com$/),
+    ).toBeVisible();
+
+    await user.click(knowledge.getByRole("button", { name: "On" }));
+
+    expect(apiClient.setFeatureForUser).toHaveBeenCalledWith(
+      "ren",
+      "knowledge",
+      "on",
+    );
+    expect(knowledge.getByRole("button", { name: "On" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(
+      await knowledge.findByText("On: turned on for this User"),
+    ).toBeVisible();
+    expect(stickers.getByText("Off: turned off for everyone")).toBeVisible();
+  });
+
   it("keeps the switch as it was when a change fails", async () => {
     apiClient.setFeatureForUser.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();

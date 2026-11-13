@@ -159,7 +159,7 @@ export type RoleChange = {
 };
 
 /** An extra the Companion offers that Admins can switch off. */
-export type Feature = "web_search";
+export type Feature = "web_search" | "stickers" | "knowledge";
 
 /** A Feature's switch for everyone and who last changed it, and when. */
 export type FeatureSwitch = {

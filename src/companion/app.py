@@ -163,6 +163,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             ),
             knowledge_retrieval=KnowledgeRetrieval(
                 repositories=dependencies.repositories,
+                features=feature_service,
                 embedder=dependencies.embedder,
                 vector_store=dependencies.knowledge_vector_store,
             ),
@@ -183,7 +184,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                     user_memory=user_memory_service,
                     data_deletion=chat_data_deletion,
                 ),
-                sticker_tools=StickerTools(dependencies.repositories),
+                sticker_tools=StickerTools(dependencies.repositories, feature_service),
             ),
             data_deletion=chat_data_deletion,
         )

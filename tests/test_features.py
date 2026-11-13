@@ -13,9 +13,11 @@ from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
     FakeClock,
+    FakeEmbedder,
     ScriptedChatModel,
     ToolCall,
 )
+from tests.knowledge_helpers import upload_document
 from tests.telegram_helpers import (
     OWNER_TELEGRAM_USER_ID,
     TELEGRAM_CHAT_ID,
@@ -24,8 +26,11 @@ from tests.telegram_helpers import (
     connect_telegram,
     owner_headers,
     send_to_webhook,
+    telegram_sticker_update,
     telegram_text_update,
 )
+from tests.test_knowledge import BREATH_PASSAGES
+from tests.test_stickers import import_calm_creatures, list_stickers, save_note
 
 WEB_TOOLS = ("web_search", "fetch_page")
 
@@ -58,6 +63,12 @@ def web_tool_names(call: ChatModelCall) -> list[str]:
     return [tool.name for tool in call.tools if tool.name in WEB_TOOLS]
 
 
+def unavailable_note(seeded_settings: dict[str, Any], names: str) -> str:
+    """Write the seeded not-available note for the given Features' names."""
+    note: str = seeded_settings["reply_features_unavailable_note"]
+    return note.replace("{features}", names).replace("{dashboard_url}", DASHBOARD_URL)
+
+
 def switch_for_everyone(
     client: TestClient, admin: dict[str, str], feature: str, on: bool
 ) -> dict[str, Any]:
@@ -77,14 +88,22 @@ def features_by_key(client: TestClient, admin: dict[str, str]) -> dict[str, Any]
     return {feature["feature"]: feature for feature in response.json()["features"]}
 
 
-def test_admins_see_web_search_on_for_everyone_with_no_change_yet(
+def test_admins_see_every_feature_on_for_everyone_with_no_change_yet(
     client: TestClient, auth_verifier: FakeAuthVerifier
 ) -> None:
     admin = owner_headers(client, auth_verifier)
 
     features = features_by_key(client, admin)
 
-    assert list(features) == ["web_search"]
+    assert list(features) == ["web_search", "stickers", "knowledge"]
+    for feature in features.values():
+        assert feature["name"]
+        assert feature["description"]
+        assert feature["on"] is True
+        assert feature["changed_by_email"] is None
+        assert feature["changed_at"] is None
+    assert features["stickers"]["name"] == "Stickers"
+    assert features["knowledge"]["name"] == "Knowledge"
     web_search = features["web_search"]
     assert web_search["name"] == "Web Search"
     assert web_search["description"]
@@ -154,11 +173,7 @@ def test_with_web_search_off_replies_get_no_web_tools_and_the_unavailable_note(
     admin = owner_headers(client, auth_verifier)
     connect_telegram(client, auth_verifier, chat_channel)
     web_instructions = seeded_settings["reply_web_search_instructions"]
-    unavailable_note = (
-        seeded_settings["reply_features_unavailable_note"]
-        .replace("{features}", "Web Search")
-        .replace("{dashboard_url}", DASHBOARD_URL)
-    )
+    note = unavailable_note(seeded_settings, "Web Search")
 
     on = reply_call(client, chat_model, "who wrote Meditations?")
     switch_for_everyone(client, admin, "web_search", on=False)
@@ -167,16 +182,16 @@ def test_with_web_search_off_replies_get_no_web_tools_and_the_unavailable_note(
     back_on = reply_call(client, chat_model, "and now?")
 
     assert web_tool_names(on) == ["web_search", "fetch_page"]
-    assert unavailable_note not in on.instructions
+    assert note not in on.instructions
     assert web_tool_names(off) == []
     assert web_instructions not in off.instructions
-    assert unavailable_note in off.instructions
-    assert "Web Search" in unavailable_note
-    assert "available on their account" in unavailable_note
-    assert f"Dashboard: {DASHBOARD_URL}" in unavailable_note
+    assert note in off.instructions
+    assert "Web Search" in note
+    assert "available on their account" in note
+    assert f"Dashboard: {DASHBOARD_URL}" in note
     assert web_tool_names(back_on) == ["web_search", "fetch_page"]
     assert web_instructions in back_on.instructions
-    assert unavailable_note not in back_on.instructions
+    assert note not in back_on.instructions
 
 
 def test_the_web_search_switch_is_no_longer_a_platform_setting(
@@ -284,7 +299,11 @@ def test_a_user_with_no_switch_of_their_own_follows_the_switch_for_everyone(
     switch_for_everyone(client, admin, "web_search", on=False)
     off = user_features_by_key(client, admin, user_id)["web_search"]
 
-    assert list(user_features_by_key(client, admin, user_id)) == ["web_search"]
+    assert list(user_features_by_key(client, admin, user_id)) == [
+        "web_search",
+        "stickers",
+        "knowledge",
+    ]
     assert on["name"] == "Web Search"
     assert on["switch"] == "default"
     assert on["works"] is True
@@ -476,3 +495,151 @@ def test_account_deletion_removes_a_users_switches(
 
     assert response.status_code == 204
     assert user_switch_rows(engine, user_id) == 0
+
+
+def sticker_tool_names(call: ChatModelCall) -> list[str]:
+    """List the sticker tools a reply call was offered."""
+    return [tool.name for tool in call.tools if tool.name == "send_sticker"]
+
+
+def add_seedling_with_a_note(
+    client: TestClient, admin: dict[str, str], chat_channel: FakeChatChannel
+) -> None:
+    """Fill the Sticker Library and give the seedling sticker a note."""
+    [seedling, _] = import_calm_creatures(client, admin, chat_channel)
+    save_note(client, admin, seedling["id"], "Celebrating a small step forward")
+
+
+def test_with_stickers_off_replies_get_no_sticker_tool_and_send_no_sticker(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    seeded_settings: dict[str, Any],
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    note = unavailable_note(seeded_settings, "Stickers")
+    add_seedling_with_a_note(client, admin, chat_channel)
+    connect_telegram(client, auth_verifier, chat_channel)
+
+    on = reply_call(client, chat_model, "I went for my first run!")
+    switch_for_everyone(client, admin, "stickers", on=False)
+    off = reply_call(client, chat_model, "and again today!")
+    switch_for_everyone(client, admin, "stickers", on=True)
+    back_on = reply_call(client, chat_model, "and tomorrow too")
+
+    assert sticker_tool_names(on) == ["send_sticker"]
+    assert note not in on.instructions
+    assert sticker_tool_names(off) == []
+    assert note in off.instructions
+    assert chat_channel.sent_stickers == []
+    assert sticker_tool_names(back_on) == ["send_sticker"]
+    assert note not in back_on.instructions
+
+
+def test_with_stickers_off_for_one_user_their_stickers_still_read_as_emoji(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    seeded_settings: dict[str, Any],
+) -> None:
+    admin = connect_owner_telegram(client, auth_verifier, chat_channel)
+    add_seedling_with_a_note(client, admin, chat_channel)
+    connect_telegram(client, auth_verifier, chat_channel)
+    switch_for_user(client, admin, maya_id(client, auth_verifier), "stickers", "off")
+    chat_model.script("haha")
+
+    assert send_to_webhook(client, telegram_sticker_update("😂")) == 200
+    [maya_call] = chat_model.calls
+    owner_call = owner_reply_call(client, chat_model, "I went for my first run!")
+
+    assert maya_call.history[-1].text == "[sticker: 😂]"
+    assert sticker_tool_names(maya_call) == []
+    assert unavailable_note(seeded_settings, "Stickers") in maya_call.instructions
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["haha"]
+    assert sticker_tool_names(owner_call) == ["send_sticker"]
+
+
+def test_with_stickers_off_admins_still_add_stickers_by_sending_them(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+) -> None:
+    admin = connect_owner_telegram(client, auth_verifier, chat_channel)
+    switch_for_everyone(client, admin, "stickers", on=False)
+
+    update = telegram_sticker_update(
+        "🌊", "wave", telegram_user_id=OWNER_TELEGRAM_USER_ID
+    )
+    assert send_to_webhook(client, update) == 200
+
+    [sticker] = list_stickers(client, admin)
+    assert sticker["emoji"] == "🌊"
+
+
+def upload_breath_passage(client: TestClient, admin: dict[str, str]) -> None:
+    """Upload one Knowledge document about the breath."""
+    response = upload_document(
+        client,
+        admin,
+        "breath.md",
+        BREATH_PASSAGES[0].encode(),
+        title="On the breath",
+        source="Owner’s summary",
+        tradition="Mindfulness",
+    )
+    assert response.status_code == 201, response.text
+
+
+def test_with_knowledge_off_no_passages_go_into_the_reply(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    embedder: FakeEmbedder,
+    seeded_settings: dict[str, Any],
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    upload_breath_passage(client, admin)
+    connect_telegram(client, auth_verifier, chat_channel)
+    intro = seeded_settings["reply_knowledge_intro"]
+    note = unavailable_note(seeded_settings, "Knowledge")
+
+    on = reply_call(client, chat_model, "the breath helps me")
+    switch_for_everyone(client, admin, "knowledge", on=False)
+    searches_before = len(embedder.queries)
+    off = reply_call(client, chat_model, "the breath helps me")
+    searches_while_off = len(embedder.queries) - searches_before
+    switch_for_everyone(client, admin, "knowledge", on=True)
+    back_on = reply_call(client, chat_model, "the breath helps me")
+
+    assert BREATH_PASSAGES[0] in on.instructions
+    assert note not in on.instructions
+    assert BREATH_PASSAGES[0] not in off.instructions
+    assert intro not in off.instructions
+    assert searches_while_off == 0
+    assert note in off.instructions
+    assert BREATH_PASSAGES[0] in back_on.instructions
+    assert note not in back_on.instructions
+
+
+def test_with_knowledge_off_for_one_user_others_still_get_passages(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    admin = connect_owner_telegram(client, auth_verifier, chat_channel)
+    upload_breath_passage(client, admin)
+    connect_telegram(client, auth_verifier, chat_channel)
+    user_id = maya_id(client, auth_verifier)
+
+    status = switch_for_user(client, admin, user_id, "knowledge", "off")
+    maya_call = reply_call(client, chat_model, "the breath helps me")
+    owner_call = owner_reply_call(client, chat_model, "the breath helps me")
+
+    assert status["works"] is False
+    assert status["reason"] == "off_for_user"
+    assert BREATH_PASSAGES[0] not in maya_call.instructions
+    assert BREATH_PASSAGES[0] in owner_call.instructions
