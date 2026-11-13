@@ -1,9 +1,17 @@
+import logging
 from typing import Any
+from uuid import UUID
 
+import httpx
+import pytest
 from fastapi.testclient import TestClient
 from langgraph.checkpoint.postgres import PostgresSaver
 from sqlalchemy import Engine, text
 
+from companion.adapters.clerk.accounts import ClerkAccounts
+from companion.adapters.postgres.repositories import build_postgres_repositories
+from companion.core.models import ConversationTurn
+from companion.core.user_data import UserDataService
 from tests.conftest import DASHBOARD_URL
 from tests.fakes import (
     FakeAuthVerifier,
@@ -270,6 +278,169 @@ def test_an_admin_can_delete_their_account_while_another_admin_remains(
     assert response.status_code == 204
     assert auth_verifier.deleted_accounts == [OWNER_AUTH_ID]
     assert client.get("/api/me", headers=maya).json()["role"] == "admin"
+
+
+def pending_auth_account_deletions(engine: Engine) -> list[tuple[str, ...]]:
+    """List every row of the Clerk accounts still to delete, as plain values."""
+    with engine.connect() as connection:
+        return [
+            tuple(str(value) for value in row)
+            for row in connection.execute(
+                text("SELECT * FROM pending_auth_account_deletions ORDER BY auth_id")
+            )
+        ]
+
+
+def count_users_with_auth_id(engine: Engine, auth_id: str) -> int:
+    """Count the Users signed in with an auth provider account."""
+    with engine.connect() as connection:
+        count: int = connection.execute(
+            text("SELECT count(*) FROM users WHERE auth_id = :auth_id"),
+            {"auth_id": auth_id},
+        ).scalar_one()
+    return count
+
+
+def test_a_failed_auth_account_delete_still_deletes_the_users_data(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    clock: FakeClock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    headers = auth_headers(auth_verifier, "user_maya")
+    client.get("/api/me", headers=headers)
+    auth_verifier.failing_deletes.add("user_maya")
+
+    with caplog.at_level(logging.ERROR):
+        response = client.delete("/api/me", headers=headers)
+
+    assert response.status_code == 204
+    assert count_users_with_auth_id(engine, "user_maya") == 0
+    assert auth_verifier.deleted_accounts == []
+    assert pending_auth_account_deletions(engine) == [("user_maya", str(clock.now()))]
+    assert "Could not delete an account at the auth provider" in caplog.text
+
+
+def test_a_successful_delete_leaves_no_auth_account_to_retry(
+    client: TestClient, engine: Engine, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = auth_headers(auth_verifier, "user_maya")
+    client.get("/api/me", headers=headers)
+
+    client.delete("/api/me", headers=headers)
+
+    assert pending_auth_account_deletions(engine) == []
+
+
+def test_a_later_tick_deletes_the_auth_account_once_the_provider_works(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    scheduler: FakeScheduler,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    headers = auth_headers(auth_verifier, "user_maya")
+    client.get("/api/me", headers=headers)
+    auth_verifier.failing_deletes.add("user_maya")
+    client.delete("/api/me", headers=headers)
+
+    with caplog.at_level(logging.ERROR):
+        scheduler.tick()
+    assert len(pending_auth_account_deletions(engine)) == 1
+    assert caplog.text.count("Could not delete an account at the auth provider") == 2
+
+    auth_verifier.failing_deletes.clear()
+    scheduler.tick()
+
+    assert auth_verifier.deleted_accounts == ["user_maya"]
+    assert pending_auth_account_deletions(engine) == []
+    assert client.get("/api/me", headers=headers).status_code == 401
+
+
+def test_one_failing_retry_does_not_stop_the_others(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    scheduler: FakeScheduler,
+) -> None:
+    for auth_id in ("user_ana", "user_maya"):
+        headers = auth_headers(auth_verifier, auth_id)
+        client.get("/api/me", headers=headers)
+        auth_verifier.failing_deletes.add(auth_id)
+        client.delete("/api/me", headers=headers)
+    auth_verifier.failing_deletes = {"user_ana"}
+
+    scheduler.tick()
+
+    assert auth_verifier.deleted_accounts == ["user_maya"]
+    assert [row[0] for row in pending_auth_account_deletions(engine)] == ["user_ana"]
+
+
+def test_the_retry_also_deletes_a_user_made_by_signing_in_again(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    scheduler: FakeScheduler,
+) -> None:
+    headers = auth_headers(auth_verifier, "user_maya")
+    client.get("/api/me", headers=headers)
+    auth_verifier.failing_deletes.add("user_maya")
+    client.delete("/api/me", headers=headers)
+    assert client.get("/api/me", headers=headers).status_code == 200
+    assert count_users_with_auth_id(engine, "user_maya") == 1
+
+    auth_verifier.failing_deletes.clear()
+    scheduler.tick()
+
+    assert count_users_with_auth_id(engine, "user_maya") == 0
+    assert pending_auth_account_deletions(engine) == []
+    assert client.get("/api/me", headers=headers).status_code == 401
+
+
+class ForgetfulConversationEngine:
+    """Conversation engine that only records which Users it forgot."""
+
+    def __init__(self) -> None:
+        """Start having forgotten no one."""
+        self.forgotten: list[UUID] = []
+
+    def handle(self, turn: ConversationTurn) -> None:
+        """Ignore the turn; these tests send no messages."""
+
+    def forget_user(self, user_id: UUID) -> None:
+        """Record that the User was forgotten."""
+        self.forgotten.append(user_id)
+
+
+def test_an_account_already_gone_from_clerk_on_retry_counts_as_deleted(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    clock: FakeClock,
+) -> None:
+    client.get("/api/me", headers=auth_headers(auth_verifier, "user_maya"))
+    clerk_answers = iter([500, 404])
+    clerk = ClerkAccounts(
+        "sk_test_123",
+        http_client=httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(next(clerk_answers), json={})
+            )
+        ),
+    )
+    repositories = build_postgres_repositories(engine)
+    user_data = UserDataService(
+        repositories, ForgetfulConversationEngine(), clerk, clock
+    )
+    user = repositories.users.get_by_auth_id("user_maya")
+    assert user is not None
+
+    user_data.delete_account(user)
+    assert len(pending_auth_account_deletions(engine)) == 1
+    user_data.delete_pending_auth_accounts()
+
+    assert pending_auth_account_deletions(engine) == []
 
 
 def test_deleting_needs_sign_in(client: TestClient) -> None:

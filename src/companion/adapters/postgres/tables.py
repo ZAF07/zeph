@@ -375,3 +375,10 @@ user_feature_switches = Table(
     Column("changed_by", Uuid, ForeignKey("users.id", ondelete="SET NULL")),
     Column("changed_at", DateTime(timezone=True), nullable=False),
 )
+
+pending_auth_account_deletions = Table(
+    "pending_auth_account_deletions",
+    metadata,
+    Column("auth_id", Text, primary_key=True),
+    Column("added_at", DateTime(timezone=True), nullable=False),
+)

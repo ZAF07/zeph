@@ -5,6 +5,7 @@ from companion.core.message_retention import MessageRetention
 from companion.core.ports import Clock, Repositories
 from companion.core.post_conversation import PostConversationProcessor
 from companion.core.timing import quiet_gap
+from companion.core.user_data import UserDataService
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ class ScheduledWork:
         post_conversation: PostConversationProcessor,
         check_ins: CheckInService,
         message_retention: MessageRetention,
+        user_data: UserDataService,
         clock: Clock,
     ) -> None:
         """Set up the work.
@@ -28,19 +30,23 @@ class ScheduledWork:
             check_ins: Sends the Check-ins that are due.
             message_retention: Deletes messages older than the retention
                 period.
+            user_data: Deletes the auth accounts still to delete.
             clock: Tells the current time.
         """
         self._repositories = repositories
         self._post_conversation = post_conversation
         self._check_ins = check_ins
         self._message_retention = message_retention
+        self._user_data = user_data
         self._clock = clock
 
     def tick(self) -> None:
-        """End and process quiet Conversations, send Check-ins, delete old messages.
+        """Process quiet Conversations, send Check-ins, delete old data.
 
-        A Conversation whose processing fails stays unprocessed and is tried
-        again on the next tick; the others still go ahead.
+        Old data is messages past the retention period and auth accounts still
+        to delete. A Conversation whose processing fails, or an auth account
+        whose deletion fails, is tried again on the next tick; the others still
+        go ahead.
         """
         conversations = self._repositories.conversations
         now = self._clock.now()
@@ -55,3 +61,4 @@ class ScheduledWork:
                 logger.exception("Could not process an ended Conversation")
         self._check_ins.send_due()
         self._message_retention.delete_expired()
+        self._user_data.delete_pending_auth_accounts()

@@ -159,13 +159,15 @@ class FakeAuthVerifier:
     """Auth provider that accepts tokens handed out by `token_for`.
 
     It also stands in for the auth provider's accounts: a deleted account is
-    recorded and its tokens stop working.
+    recorded and its tokens stop working. Deleting an account listed in
+    `failing_deletes` fails, as if the auth provider were down.
     """
 
     def __init__(self) -> None:
-        """Start with no known tokens and no deleted accounts."""
+        """Start with no known tokens, no deleted accounts and no failures."""
         self._identities_by_token: dict[str, AccountIdentity] = {}
         self.deleted_accounts: list[str] = []
+        self.failing_deletes: set[str] = set()
 
     def token_for(self, auth_id: str, email: str) -> str:
         """Create a token that verifies as the given account.
@@ -197,7 +199,12 @@ class FakeAuthVerifier:
 
         Args:
             auth_id: The account ID.
+
+        Raises:
+            RuntimeError: If the account is listed in `failing_deletes`.
         """
+        if auth_id in self.failing_deletes:
+            raise RuntimeError("The auth provider is down")
         self.deleted_accounts.append(auth_id)
         self._identities_by_token = {
             token: identity

@@ -89,7 +89,8 @@ def engine(database_url: str) -> Iterator[Engine]:
                 "helplines, safeguard_events, memory_categories, memory_items, "
                 "conversation_summaries, knowledge_documents, knowledge_chunks, "
                 "daily_usage, stickers, check_in_kinds, check_ins, "
-                "feature_switches, user_feature_switches, shared_photos CASCADE"
+                "feature_switches, user_feature_switches, shared_photos, "
+                "pending_auth_account_deletions CASCADE"
             )
         )
     seed_platform_settings(engine, SEED_FILE)
