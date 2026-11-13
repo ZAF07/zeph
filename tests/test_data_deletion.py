@@ -1,6 +1,6 @@
 import logging
+from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID
 
 import httpx
 import pytest
@@ -10,13 +10,13 @@ from sqlalchemy import Engine, text
 
 from companion.adapters.clerk.accounts import ClerkAccounts
 from companion.adapters.postgres.repositories import build_postgres_repositories
-from companion.core.models import ConversationTurn
 from companion.core.user_data import UserDataService
 from tests.conftest import DASHBOARD_URL
 from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
     FakeClock,
+    FakeConversationEngine,
     FakeScheduler,
     ScriptedChatModel,
 )
@@ -301,6 +301,21 @@ def count_users_with_auth_id(engine: Engine, auth_id: str) -> int:
     return count
 
 
+def delete_account_while_auth_provider_fails(
+    client: TestClient, auth_verifier: FakeAuthVerifier, auth_id: str
+) -> dict[str, str]:
+    """Sign a User in, then delete their account while their auth delete fails.
+
+    Returns:
+        Their Dashboard API headers.
+    """
+    headers = auth_headers(auth_verifier, auth_id)
+    client.get("/api/me", headers=headers)
+    auth_verifier.failing_deletes.add(auth_id)
+    client.delete("/api/me", headers=headers)
+    return headers
+
+
 def test_a_failed_auth_account_delete_still_deletes_the_users_data(
     client: TestClient,
     engine: Engine,
@@ -340,10 +355,9 @@ def test_a_later_tick_deletes_the_auth_account_once_the_provider_works(
     scheduler: FakeScheduler,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    headers = auth_headers(auth_verifier, "user_maya")
-    client.get("/api/me", headers=headers)
-    auth_verifier.failing_deletes.add("user_maya")
-    client.delete("/api/me", headers=headers)
+    headers = delete_account_while_auth_provider_fails(
+        client, auth_verifier, "user_maya"
+    )
 
     with caplog.at_level(logging.ERROR):
         scheduler.tick()
@@ -365,10 +379,7 @@ def test_one_failing_retry_does_not_stop_the_others(
     scheduler: FakeScheduler,
 ) -> None:
     for auth_id in ("user_ana", "user_maya"):
-        headers = auth_headers(auth_verifier, auth_id)
-        client.get("/api/me", headers=headers)
-        auth_verifier.failing_deletes.add(auth_id)
-        client.delete("/api/me", headers=headers)
+        delete_account_while_auth_provider_fails(client, auth_verifier, auth_id)
     auth_verifier.failing_deletes = {"user_ana"}
 
     scheduler.tick()
@@ -383,10 +394,9 @@ def test_the_retry_also_deletes_a_user_made_by_signing_in_again(
     auth_verifier: FakeAuthVerifier,
     scheduler: FakeScheduler,
 ) -> None:
-    headers = auth_headers(auth_verifier, "user_maya")
-    client.get("/api/me", headers=headers)
-    auth_verifier.failing_deletes.add("user_maya")
-    client.delete("/api/me", headers=headers)
+    headers = delete_account_while_auth_provider_fails(
+        client, auth_verifier, "user_maya"
+    )
     assert client.get("/api/me", headers=headers).status_code == 200
     assert count_users_with_auth_id(engine, "user_maya") == 1
 
@@ -396,21 +406,6 @@ def test_the_retry_also_deletes_a_user_made_by_signing_in_again(
     assert count_users_with_auth_id(engine, "user_maya") == 0
     assert pending_auth_account_deletions(engine) == []
     assert client.get("/api/me", headers=headers).status_code == 401
-
-
-class ForgetfulConversationEngine:
-    """Conversation engine that only records which Users it forgot."""
-
-    def __init__(self) -> None:
-        """Start having forgotten no one."""
-        self.forgotten: list[UUID] = []
-
-    def handle(self, turn: ConversationTurn) -> None:
-        """Ignore the turn; these tests send no messages."""
-
-    def forget_user(self, user_id: UUID) -> None:
-        """Record that the User was forgotten."""
-        self.forgotten.append(user_id)
 
 
 def test_an_account_already_gone_from_clerk_on_retry_counts_as_deleted(
@@ -430,9 +425,7 @@ def test_an_account_already_gone_from_clerk_on_retry_counts_as_deleted(
         ),
     )
     repositories = build_postgres_repositories(engine)
-    user_data = UserDataService(
-        repositories, ForgetfulConversationEngine(), clerk, clock
-    )
+    user_data = UserDataService(repositories, FakeConversationEngine(), clerk, clock)
     user = repositories.users.get_by_auth_id("user_maya")
     assert user is not None
 
@@ -441,6 +434,21 @@ def test_an_account_already_gone_from_clerk_on_retry_counts_as_deleted(
     user_data.delete_pending_auth_accounts()
 
     assert pending_auth_account_deletions(engine) == []
+
+
+def test_deleting_an_account_twice_at_once_is_harmless(
+    client: TestClient, engine: Engine, auth_verifier: FakeAuthVerifier
+) -> None:
+    client.get("/api/me", headers=auth_headers(auth_verifier, "user_maya"))
+    users = build_postgres_repositories(engine).users
+    user = users.get_by_auth_id("user_maya")
+    assert user is not None
+
+    first = users.delete_unless_last_admin(user.id, datetime(2026, 11, 11, tzinfo=UTC))
+    second = users.delete_unless_last_admin(user.id, datetime(2026, 11, 11, tzinfo=UTC))
+
+    assert (first, second) == (True, True)
+    assert len(pending_auth_account_deletions(engine)) == 1
 
 
 def test_deleting_needs_sign_in(client: TestClient) -> None:

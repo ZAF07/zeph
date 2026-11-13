@@ -58,3 +58,13 @@ Open detail to settle while implementing: a User with a pending entry who signs 
 - [ ] `make check` passes (`pytest`, `ruff`, `ruff format`, `mypy`, `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`)
 
 ## Comments
+
+### 2026-11-13 — implemented (branch `mvp-27-clerk-delete-retry`)
+
+- New table `pending_auth_account_deletions` (`auth_id`, `added_at` only; migration 0019). `UserRepository.delete_unless_last_admin(user_id, deleted_at)` deletes the User and adds their auth ID in one transaction.
+- `UserDataService.delete_account` then tries Clerk; on success the entry is removed. Any failure is logged with the auth ID ("Could not delete an account at the auth provider (<auth_id>); will try again") and the request still returns 204, so the Dashboard signs the User out with no error. No web change was needed.
+- `ScheduledWork.tick` calls `UserDataService.delete_pending_auth_accounts()` last. Each entry is tried on its own, so one failure doesn't stop the others.
+- **Open detail, decided:** if the User signs in again before the retry works, a new empty User is made. When the retry succeeds it deletes the Clerk account (signing them out), forgets that User's conversation engine state, and deletes that User row in the same step as removing the entry (`PendingAuthAccountDeletionRepository.complete`). This means no orphan row is left that could still get Check-ins over Telegram.
+- Known small gaps, left as they are: (1) a Clerk session token can stay valid for up to about a minute after the Clerk account is deleted. A request in that window could create a new empty User with no pending entry. That User could never sign in again, but the row would stay. (2) The "User who signed in again" cleanup doesn't check whether they are the last Admin.
+- Code review fixes: a second, simultaneous DELETE no longer returns 500 (`scalar_one_or_none`); a database error after Clerk succeeds is caught and logged rather than shown to the User; the test fake moved to `tests/fakes.py`.
+- `/run` (worktree stack, ports 3020/8020): signed in a test User and opened `/account` so the backend cached Clerk's keys. Then blocked `api.clerk.com` inside the backend container (`/etc/hosts`) and pressed Delete account. Result: `DELETE /api/me -> 204`, landed on `/sign-in`, no error on the page, `users` row gone, one `pending_auth_account_deletions` row, failure logged. The next tick, with Clerk still blocked, logged again and kept the entry. After `/etc/hosts` was restored, the next tick deleted it: Clerk `GET /users/<id>` went from 200 to 404, and the pending row count went from 1 to 0.

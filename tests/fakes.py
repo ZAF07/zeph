@@ -6,12 +6,14 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
+from uuid import UUID
 
 from companion.adapters.postgres.tables import EMBEDDING_SIZE
 from companion.core.models import (
     AccountIdentity,
     ChannelSticker,
     ChatLine,
+    ConversationTurn,
     ModelAnswer,
     PhotoImage,
     StickerImage,
@@ -211,6 +213,29 @@ class FakeAuthVerifier:
             for token, identity in self._identities_by_token.items()
             if identity.auth_id != auth_id
         }
+
+
+class FakeConversationEngine:
+    """Conversation engine that only records which Users it forgot."""
+
+    def __init__(self) -> None:
+        """Start having forgotten no one."""
+        self.forgotten: list[UUID] = []
+
+    def handle(self, turn: ConversationTurn) -> None:
+        """Ignore the turn, as tests using this engine send no messages.
+
+        Args:
+            turn: The incoming turn.
+        """
+
+    def forget_user(self, user_id: UUID) -> None:
+        """Record that the User was forgotten.
+
+        Args:
+            user_id: The User's ID.
+        """
+        self.forgotten.append(user_id)
 
 
 class FakeClock:

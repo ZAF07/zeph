@@ -646,7 +646,9 @@ class PostgresUserRepository:
                 return False
             auth_id = connection.execute(
                 delete(users).where(users.c.id == user_id).returning(users.c.auth_id)
-            ).scalar_one()
+            ).scalar_one_or_none()
+            if auth_id is None:
+                return True
             connection.execute(
                 insert(pending_auth_account_deletions)
                 .values(auth_id=auth_id, added_at=deleted_at)

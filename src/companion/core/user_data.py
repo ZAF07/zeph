@@ -92,24 +92,23 @@ class UserDataService:
         """Delete an account at the auth provider and take it off the pending list.
 
         A User made with that auth ID by signing in again before now is
-        deleted too, as the account they signed in with is gone. If the auth
-        provider fails, the failure is logged and the account stays on the
-        list.
+        deleted too, as the account they signed in with is gone. If any step
+        fails, the failure is logged and the account stays on the list.
 
         Args:
             auth_id: The auth provider's account ID.
         """
         try:
             self._auth_accounts.delete_account(auth_id)
+            user_signed_in_again = self._repositories.users.get_by_auth_id(auth_id)
+            if user_signed_in_again is not None:
+                self._conversation_engine.forget_user(user_signed_in_again.id)
+            self._repositories.pending_auth_account_deletions.complete(auth_id)
         except Exception:
             logger.exception(
-                "Could not delete an account at the auth provider; will try again"
+                "Could not delete an account at the auth provider (%s); will try again",
+                auth_id,
             )
-            return
-        user_signed_in_again = self._repositories.users.get_by_auth_id(auth_id)
-        if user_signed_in_again is not None:
-            self._conversation_engine.forget_user(user_signed_in_again.id)
-        self._repositories.pending_auth_account_deletions.complete(auth_id)
 
 
 class DataDeletionAnswer(StrEnum):
