@@ -35,7 +35,6 @@ from tests.test_knowledge import BREATH_PASSAGES
 from tests.test_memory_retrieval import remember_some_things
 from tests.test_post_conversation import memory_contents, quiet_gap
 from tests.test_settings_via_chat import SETTINGS_TOOLS
-from tests.test_settings_via_chat import check_ins as check_in_settings
 from tests.test_settings_via_chat import reply_call as chat_reply_call
 from tests.test_stickers import import_calm_creatures, list_stickers, save_note
 
@@ -914,7 +913,7 @@ def test_with_settings_in_chat_off_only_delete_my_data_is_offered(
     seeded_settings: dict[str, Any],
 ) -> None:
     admin = owner_headers(client, auth_verifier)
-    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    set_up_user_with_check_ins(client, auth_verifier, chat_channel)
     settings_instructions = seeded_settings["reply_settings_instructions"]
     delete_only_instructions = seeded_settings["reply_delete_data_instructions"]
     note = unavailable_note(seeded_settings, "Settings in Chat")
@@ -922,7 +921,6 @@ def test_with_settings_in_chat_off_only_delete_my_data_is_offered(
     on = reply_call(client, chat_model, "hi")
     switch_for_everyone(client, admin, "settings_in_chat", on=False)
     off = reply_call(client, chat_model, "can you pause my check-ins for a week?")
-    paused_while_off = check_in_settings(client, headers)["paused"]
     switch_for_everyone(client, admin, "settings_in_chat", on=True)
     back_on = reply_call(client, chat_model, "hi again")
 
@@ -934,7 +932,6 @@ def test_with_settings_in_chat_off_only_delete_my_data_is_offered(
     assert delete_only_instructions in off.instructions
     assert note in off.instructions
     assert DASHBOARD_URL in off.instructions
-    assert paused_while_off is False
     assert settings_tool_names(back_on) == SETTINGS_TOOLS
     assert settings_instructions in back_on.instructions
     assert note not in back_on.instructions

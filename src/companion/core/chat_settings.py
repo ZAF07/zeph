@@ -495,7 +495,9 @@ class SettingsTools:
             user_id: The User being replied to.
 
         Returns:
-            The tools and their reply instructions.
+            The tools and their reply instructions; only the tool to delete
+            their data, with its own instructions, when Settings in Chat
+            doesn't work for them.
         """
         reply_tools = ReplySettingsTools(
             user_id,
@@ -506,15 +508,14 @@ class SettingsTools:
             self._data_deletion,
         )
         if self._features.works_for(user_id, Feature.SETTINGS_IN_CHAT):
-            return SettingsOffer(
-                tools=reply_tools.tools,
-                instructions=self._repositories.platform_settings.get(
-                    INSTRUCTIONS_SETTING
-                ),
-            )
+            tools = reply_tools.tools
+            instructions_key = INSTRUCTIONS_SETTING
+        else:
+            tools = [
+                tool for tool in reply_tools.tools if tool.name == DELETE_DATA_TOOL
+            ]
+            instructions_key = DELETE_DATA_INSTRUCTIONS_SETTING
         return SettingsOffer(
-            tools=[tool for tool in reply_tools.tools if tool.name == DELETE_DATA_TOOL],
-            instructions=self._repositories.platform_settings.get(
-                DELETE_DATA_INSTRUCTIONS_SETTING
-            ),
+            tools=tools,
+            instructions=self._repositories.platform_settings.get(instructions_key),
         )
