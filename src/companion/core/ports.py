@@ -132,6 +132,16 @@ class ChatChannel(Protocol):
         """
         ...
 
+    def react(self, chat_id: int, message_id: int, emoji: str) -> None:
+        """Put an emoji reaction on a message someone sent.
+
+        Args:
+            chat_id: The chat the message is in.
+            message_id: The message's ID.
+            emoji: The reaction.
+        """
+        ...
+
     def send_photo(self, chat_id: int, file_id: str) -> None:
         """Send one photo the chat channel already has, by its file ID.
 

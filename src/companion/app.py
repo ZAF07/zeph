@@ -52,6 +52,7 @@ from companion.core.post_conversation import PostConversationProcessor
 from companion.core.response_composition import ResponseComposer
 from companion.core.safeguard import Safeguard
 from companion.core.scheduled_work import ScheduledWork
+from companion.core.sticker_adding import StickerAdding
 from companion.core.stickers import StickerLibraryService, StickerTools
 from companion.core.telegram_connection import TelegramConnectionService
 from companion.core.usage import UsageLimiter, UsageRecordingChatModel
@@ -156,6 +157,19 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     personal_sticker_service = PersonalStickerService(
         dependencies.repositories, dependencies.chat_channel
     )
+    conversation_service = ConversationService(
+        repositories=dependencies.repositories,
+        chat_channel=dependencies.chat_channel,
+        clock=dependencies.clock,
+    )
+    sticker_adding = StickerAdding(
+        repositories=dependencies.repositories,
+        sticker_library=sticker_library,
+        chat_channel=dependencies.chat_channel,
+        deliver_notice=conversation_service.deliver_notice,
+        timer=dependencies.timer,
+        dashboard_url=dependencies.dashboard_url,
+    )
     chat_data_deletion = ChatDataDeletion(
         dependencies.repositories, dependencies.chat_channel, dependencies.clock
     )
@@ -175,11 +189,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     )
     conversation_engine = dependencies.build_conversation_engine(
         ConversationServices(
-            conversations=ConversationService(
-                repositories=dependencies.repositories,
-                chat_channel=dependencies.chat_channel,
-                clock=dependencies.clock,
-            ),
+            conversations=conversation_service,
             safeguard=safeguard,
             usage_limiter=usage_limiter,
             memory_retrieval=MemoryRetrieval(
@@ -212,6 +222,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                     data_deletion=chat_data_deletion,
                 ),
                 sticker_tools=StickerTools(dependencies.repositories, feature_service),
+                sticker_adding=sticker_adding,
                 photo_tools=PhotoTools(dependencies.repositories, photo_service),
                 send_photo_tools=SendPhotoTools(dependencies.repositories),
             ),
@@ -223,7 +234,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         repositories=dependencies.repositories,
         conversation_engine=conversation_engine,
         chat_channel=dependencies.chat_channel,
-        sticker_library=sticker_library,
+        sticker_adding=sticker_adding,
         photo_service=photo_service,
         timer=dependencies.timer,
         dashboard_url=dependencies.dashboard_url,

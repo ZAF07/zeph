@@ -33,8 +33,8 @@ function importedMessage(count: number, setName: string): string {
 }
 
 /**
- * The "Add stickers" card: import a whole sticker set by name, or send
- * stickers to Zeph from the Admin's own connected Telegram account.
+ * The "Add stickers" card: import a whole sticker set by name, or read how
+ * to add stickers in the Admin's own Telegram chat with Zeph.
  *
  * @param props - `onAdded` reloads the library after stickers are added.
  * @returns The card with its two tabs.
@@ -45,25 +45,19 @@ export function StickerAddPanel({ onAdded }: { onAdded: () => void }) {
   const [setName, setSetName] = useState("");
   const [isImporting, setIsImporting] = useState(false);
   const [flash, setFlash] = useState<Flash | null>(null);
-  const [telegramUsername, setTelegramUsername] = useState<
-    string | null | undefined
-  >(undefined);
+  const [hasTelegram, setHasTelegram] = useState<boolean | undefined>(
+    undefined,
+  );
 
   useEffect(() => {
-    if (method !== "telegram" || telegramUsername !== undefined) {
+    if (method !== "telegram" || hasTelegram !== undefined) {
       return;
     }
     apiClient
       .getTelegramConnection()
-      .then((status) =>
-        setTelegramUsername(
-          status.connection
-            ? (status.connection.telegram_username ?? "")
-            : null,
-        ),
-      )
-      .catch(() => setTelegramUsername(null));
-  }, [apiClient, method, telegramUsername]);
+      .then((status) => setHasTelegram(status.connection !== null))
+      .catch(() => setHasTelegram(false));
+  }, [apiClient, method, hasTelegram]);
 
   async function importSet(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -163,26 +157,27 @@ export function StickerAddPanel({ onAdded }: { onAdded: () => void }) {
       ) : (
         <div className="flex flex-col gap-2.5 px-5 pb-5 pt-4">
           <p className="m-0 text-[15px] text-ink-soft">
-            From the Telegram account linked to your Admin account, send any
-            sticker to Zeph. Refresh this page to see it below as “Needs a
-            note”.
+            From the Telegram account linked to your Admin account, add stickers
+            in your chat with Zeph in one of two ways:
           </p>
-          {telegramUsername === null ? (
+          <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5 text-[15px] text-ink-soft">
+            <li>
+              Tell Zeph you want to add stickers, as single stickers or whole
+              sets, then send them. Each one gets a 👍. Send any message that
+              isn’t a sticker when you’re done, and Zeph says what it added.
+            </li>
+            <li>
+              Reply “add this” to a sticker in the chat, or “add this set” for
+              its whole set.
+            </li>
+          </ul>
+          <p className="m-0 text-caption text-ink-muted">
+            Refresh this page to see them below as “Needs a note”.
+          </p>
+          {hasTelegram === false ? (
             <p className="m-0 text-caption text-ink-muted">
               Your account has no Telegram yet.{" "}
               <Link href="/connect-telegram">Connect Telegram</Link> first.
-            </p>
-          ) : null}
-          {telegramUsername ? (
-            <p
-              role="status"
-              className="m-0 flex items-center gap-2 text-caption text-ink-muted"
-            >
-              <span
-                aria-hidden="true"
-                className="size-2 rounded-full bg-orange-text"
-              />
-              Listening for stickers from @{telegramUsername}…
             </p>
           ) : null}
         </div>

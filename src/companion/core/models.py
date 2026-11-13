@@ -375,6 +375,8 @@ class IncomingMessage:
             share.
         message_id: The chat channel's ID for the message, which puts an
             album's items in the order they were sent; 0 if not known.
+        replied_sticker: The sticker this message replies to, if it replies
+            to one.
     """
 
     sender_id: int
@@ -387,6 +389,7 @@ class IncomingMessage:
     attachment: str | None = None
     album_id: str | None = None
     message_id: int = 0
+    replied_sticker: ChannelSticker | None = None
 
 
 class MessageDirection(StrEnum):

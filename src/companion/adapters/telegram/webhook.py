@@ -5,7 +5,12 @@ from fastapi import APIRouter, BackgroundTasks, Body, Header, HTTPException, sta
 
 from companion.adapters.telegram.chat_channel import parse_sticker
 from companion.core.incoming_messages import IncomingMessageHandler
-from companion.core.models import ChannelPhoto, IncomingMessage, MessageKind
+from companion.core.models import (
+    ChannelPhoto,
+    ChannelSticker,
+    IncomingMessage,
+    MessageKind,
+)
 
 SECRET_HEADER = "X-Telegram-Bot-Api-Secret-Token"
 BOT_DOWNLOAD_LIMIT_BYTES = 20 * 1024 * 1024
@@ -79,10 +84,27 @@ def parse_photo(message: dict[str, Any]) -> ChannelPhoto | None:
     return None
 
 
+def parse_replied_sticker(message: dict[str, Any]) -> ChannelSticker | None:
+    """Read the sticker a Telegram message replies to, if it replies to one.
+
+    Args:
+        message: The Telegram message.
+
+    Returns:
+        The sticker, or None if the message doesn't reply to a sticker.
+    """
+    replied = message.get("reply_to_message")
+    if not isinstance(replied, dict):
+        return None
+    sticker = replied.get("sticker")
+    return parse_sticker(sticker) if isinstance(sticker, dict) else None
+
+
 def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
     """Turn a Telegram update into a channel-neutral incoming message.
 
-    Text, stickers and photos are read. A voice note, video, GIF or other
+    Text, stickers and photos are read, and the sticker a text replies to,
+    if any. A voice note, video, GIF or other
     attachment is an unsupported message that keeps its caption. A photo or
     attachment sent with others at once keeps the album ID they share.
 
@@ -103,9 +125,17 @@ def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
     sender_id = int(sender["id"])
     chat_id = int(chat["id"])
     username = sender.get("username")
+    message_id = int(message.get("message_id", 0))
     text = message.get("text")
     if isinstance(text, str):
-        return IncomingMessage(sender_id, chat_id, username, text)
+        return IncomingMessage(
+            sender_id,
+            chat_id,
+            username,
+            text,
+            message_id=message_id,
+            replied_sticker=parse_replied_sticker(message),
+        )
     sticker = message.get("sticker")
     if isinstance(sticker, dict):
         return IncomingMessage(
@@ -115,11 +145,11 @@ def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
             text="",
             kind=MessageKind.STICKER,
             sticker=parse_sticker(sticker),
+            message_id=message_id,
         )
     caption = message.get("caption")
     media_group_id = message.get("media_group_id")
     album_id = str(media_group_id) if media_group_id is not None else None
-    message_id = int(message.get("message_id", 0))
     photo = parse_photo(message)
     if photo is not None:
         return IncomingMessage(

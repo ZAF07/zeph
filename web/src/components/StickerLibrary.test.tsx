@@ -132,7 +132,7 @@ describe("StickerLibrary", () => {
     ).toBeInTheDocument();
   });
 
-  it("tells Admins which Telegram account to send stickers from", async () => {
+  it("explains both ways to add stickers in the Telegram chat", async () => {
     render(<StickerLibrary />);
     await screen.findByText("2 stickers");
 
@@ -141,8 +141,12 @@ describe("StickerLibrary", () => {
     );
 
     expect(
-      await screen.findByText("Listening for stickers from @maya_l…"),
+      await screen.findByText(/Tell Zeph you want to add stickers/),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Reply “add this” to a sticker/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Listening for stickers/)).toBeNull();
   });
 
   it("asks Admins without Telegram to connect it first", async () => {

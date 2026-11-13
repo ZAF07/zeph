@@ -100,6 +100,13 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
           "Stickers Zeph keeps from one User. When it would keep more, it drops the one used longest ago.",
         unit: "stickers",
       },
+      {
+        key: "sticker_adding_quiet_gap_minutes",
+        label: "Sticker adding quiet gap",
+        caption:
+          "Minutes without a sticker before adding stickers in chat ends and Zeph says what was added.",
+        unit: "min",
+      },
     ],
   },
   {
