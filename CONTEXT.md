@@ -29,7 +29,7 @@ The Admin-managed set of stickers the Companion may send, at most one per reply.
 _Avoid_: Sticker pack, emoji set
 
 **Shared Photo**:
-A photo a User sent the Companion that matters to them, picked when the Conversation ends and kept as part of their User Memory, with a detailed description written when it arrived and a note on why it matters. Other photos are used only in the Conversation they came in. The Companion works from the description and looks at the photo again only when the description can't answer. It may send a User's own Shared Photo back to them, the way a friend brings up an old memory: rarely, at most one per reply, only one that fits what they're talking about, and never when they're struggling. It stays after Message Retention deletes the message it came in, until the User deletes it.
+A photo a User sent the Companion that matters to them, picked when the Conversation ends and kept as part of their User Memory, with a detailed description written when it arrived and a note on why it matters. Other photos are used only in the Conversation they came in. The Companion works from the description and looks at the photo again only when the description can't answer. It may send a User's own Shared Photo back to them, the way a friend brings up an old memory: rarely, at most one per reply, only one that fits what they're talking about, and never when they're struggling. A Check-in can also bring one back ("saw this again, how's the monstera doing?"). It stays after Message Retention deletes the message it came in, until the User deletes it.
 _Avoid_: Image, picture, attachment, media
 
 **Album**:
@@ -73,7 +73,7 @@ A break from Check-ins for a day, a week or until the User resumes, which keeps 
 _Avoid_: Snooze, mute
 
 **Check-in Kind**:
-The style of a Check-in (e.g. casual hello, follow-up on something shared, present-moment prompt), chosen from the User's recent Conversation Summaries and Memory Items. Managed by Admins; only Kinds marked "allowed without User Memory" go to a User with User Memory off. Users see the Kinds read-only.
+The style of a Check-in (e.g. casual hello, follow-up on something shared, present-moment prompt), chosen from the User's recent Conversation Summaries and Memory Items. Managed by Admins; only Kinds marked "allowed without User Memory" go to a User with User Memory off. Some Kinds send one of the User's own Shared Photos with the message (e.g. "a look back at a photo"); these always need User Memory, go only to a User who has Shared Photos, and Admins can edit or remove them but not change what they send. Users see the Kinds read-only.
 _Avoid_: Template, check-in type
 
 **Skipped Check-in**:
