@@ -90,7 +90,7 @@ def engine(database_url: str) -> Iterator[Engine]:
                 "conversation_summaries, knowledge_documents, knowledge_chunks, "
                 "daily_usage, stickers, check_in_kinds, check_ins, "
                 "feature_switches, user_feature_switches, shared_photos, "
-                "pending_auth_account_deletions CASCADE"
+                "personal_stickers, pending_auth_account_deletions CASCADE"
             )
         )
     seed_platform_settings(engine, SEED_FILE)
@@ -156,6 +156,7 @@ def chat_model(seeded_settings: dict[str, Any]) -> ScriptedChatModel:
         safeguard_prompt=seeded_settings["safeguard_prompt"],
         memory_processing_prompt=seeded_settings["memory_processing_prompt"],
         memory_retrieval_prompt=seeded_settings["memory_retrieval_prompt"],
+        sticker_keeping_prompt=seeded_settings["personal_sticker_keeping_prompt"],
     )
 
 

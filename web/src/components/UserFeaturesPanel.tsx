@@ -15,7 +15,11 @@ import { useApiClient } from "@/lib/use-api-client";
 type LoadState =
   | { kind: "loading" }
   | { kind: "failed" }
-  | { kind: "loaded"; features: UserFeatureStatus[] };
+  | {
+      kind: "loaded";
+      features: UserFeatureStatus[];
+      personalStickerCount: number;
+    };
 
 const switchOptions: { id: UserFeatureSwitch; label: string }[] = [
   { id: "default", label: "Default" },
@@ -26,8 +30,9 @@ const switchOptions: { id: UserFeatureSwitch; label: string }[] = [
 /**
  * The Features panel for one User: one row per Feature with its switch for
  * them (default, on or off), whether it works for them now and why, and the
- * last change. A switch saves as soon as it is picked. Escape closes the
- * panel, unless a change is being saved.
+ * last change, and how many Personal Stickers the User has (never which). A
+ * switch saves as soon as it is picked. Escape closes the panel, unless a
+ * change is being saved.
  *
  * @param props - `user` is the User whose Features are shown; `onClose`
  *   closes the panel.
@@ -50,9 +55,11 @@ export function UserFeaturesPanel({
   const load = useCallback(async () => {
     setState({ kind: "loading" });
     try {
+      const userFeatures = await apiClient.listUserFeatures(user.id);
       setState({
         kind: "loaded",
-        features: await apiClient.listUserFeatures(user.id),
+        features: userFeatures.features,
+        personalStickerCount: userFeatures.personal_sticker_count,
       });
     } catch {
       setState({ kind: "failed" });
@@ -95,7 +102,7 @@ export function UserFeaturesPanel({
       setState((current) =>
         current.kind === "loaded"
           ? {
-              kind: "loaded",
+              ...current,
               features: current.features.map((status) =>
                 status.feature === changed.feature ? changed : status,
               ),
@@ -222,6 +229,13 @@ export function UserFeaturesPanel({
               </li>
             ))}
           </ul>
+        ) : null}
+
+        {state.kind === "loaded" ? (
+          <p className="m-0 text-caption text-ink-muted">
+            Personal Stickers kept for {displayName}:{" "}
+            {state.personalStickerCount}
+          </p>
         ) : null}
       </div>
     </div>

@@ -31,6 +31,7 @@ from companion.adapters.postgres.tables import (
     memory_categories,
     memory_items,
     pending_auth_account_deletions,
+    personal_stickers,
     platform_settings,
     safeguard_events,
     shared_photos,
@@ -75,6 +76,7 @@ from companion.core.models import (
     MemorySource,
     MessageDirection,
     MessageKind,
+    PersonalSticker,
     RiskType,
     SafeguardEvent,
     SafeguardEventOverview,
@@ -220,6 +222,7 @@ def _to_message(row: Row[Any]) -> ConversationMessage:
         content=row.content,
         sent_at=row.sent_at,
         photos=tuple(ChannelPhoto(**photo) for photo in row.photos),
+        sticker=ChannelSticker(**row.sticker) if row.sticker else None,
     )
 
 
@@ -260,6 +263,29 @@ def _to_library_sticker(row: Row[Any]) -> LibrarySticker:
         preview_file_id=row.preview_file_id,
         note=row.note,
         added_at=row.added_at,
+    )
+
+
+def _to_personal_sticker(row: Row[Any]) -> PersonalSticker:
+    """Turn a `personal_stickers` row into a PersonalSticker.
+
+    Args:
+        row: The database row.
+
+    Returns:
+        The sticker.
+    """
+    return PersonalSticker(
+        id=row.id,
+        user_id=row.user_id,
+        file_id=row.file_id,
+        file_unique_id=row.file_unique_id,
+        emoji=row.emoji,
+        set_name=row.set_name,
+        preview_file_id=row.preview_file_id,
+        note=row.note,
+        kept_at=row.kept_at,
+        last_used_at=row.last_used_at,
     )
 
 
@@ -613,6 +639,7 @@ class PostgresUserRepository:
                 conversation_summaries,
                 memory_items,
                 shared_photos,
+                personal_stickers,
                 conversations,
                 check_ins,
                 connection_tokens,
@@ -936,6 +963,7 @@ class PostgresConversationRepository:
                     content=message.content,
                     sent_at=message.sent_at,
                     photos=[asdict(photo) for photo in message.photos],
+                    sticker=asdict(message.sticker) if message.sticker else None,
                 )
             )
             connection.execute(
@@ -978,6 +1006,7 @@ class PostgresConversationRepository:
                     content=message.content,
                     sent_at=message.sent_at,
                     photos=[asdict(photo) for photo in message.photos],
+                    sticker=asdict(message.sticker) if message.sticker else None,
                 )
             )
         return True
@@ -2262,6 +2291,168 @@ class PostgresStickerRepository:
         return removed is not None
 
 
+class PostgresPersonalStickerRepository:
+    """Stores the stickers kept from each User in Postgres."""
+
+    def __init__(self, engine: Engine) -> None:
+        """Set up the repository.
+
+        Args:
+            engine: The database engine.
+        """
+        self._engine = engine
+
+    def list_for_user(self, user_id: UUID) -> list[PersonalSticker]:
+        """List a User's Personal Stickers, most recently used first.
+
+        Args:
+            user_id: The User.
+
+        Returns:
+            The stickers.
+        """
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                select(personal_stickers)
+                .where(personal_stickers.c.user_id == user_id)
+                .order_by(
+                    personal_stickers.c.last_used_at.desc(), personal_stickers.c.id
+                )
+            ).all()
+        return [_to_personal_sticker(row) for row in rows]
+
+    def get(self, user_id: UUID, sticker_id: UUID) -> PersonalSticker | None:
+        """Find one of a User's Personal Stickers.
+
+        Args:
+            user_id: The User it must belong to.
+            sticker_id: The sticker's ID.
+
+        Returns:
+            The sticker, or None if the User has none with that ID.
+        """
+        with self._engine.connect() as connection:
+            row = connection.execute(
+                select(personal_stickers).where(
+                    personal_stickers.c.user_id == user_id,
+                    personal_stickers.c.id == sticker_id,
+                )
+            ).first()
+        return _to_personal_sticker(row) if row else None
+
+    def save_many(self, stickers: list[PersonalSticker]) -> None:
+        """Keep stickers, replacing the User's own copy of the same sticker.
+
+        A sticker the User already has, by its unchanging ID, keeps its ID,
+        when it was first kept and its later last use; the rest is replaced.
+
+        Args:
+            stickers: The stickers to keep.
+        """
+        if not stickers:
+            return
+        statement = insert(personal_stickers).values(
+            [asdict(sticker) for sticker in stickers]
+        )
+        with self._engine.begin() as connection:
+            connection.execute(
+                statement.on_conflict_do_update(
+                    index_elements=[
+                        personal_stickers.c.user_id,
+                        personal_stickers.c.file_unique_id,
+                    ],
+                    set_={
+                        "file_id": statement.excluded.file_id,
+                        "emoji": statement.excluded.emoji,
+                        "set_name": statement.excluded.set_name,
+                        "preview_file_id": statement.excluded.preview_file_id,
+                        "note": statement.excluded.note,
+                        "last_used_at": func.greatest(
+                            personal_stickers.c.last_used_at,
+                            statement.excluded.last_used_at,
+                        ),
+                    },
+                )
+            )
+
+    def mark_used(self, user_id: UUID, sticker_id: UUID, used_at: datetime) -> None:
+        """Note that one of a User's Personal Stickers was just sent.
+
+        Args:
+            user_id: The User it belongs to.
+            sticker_id: The sticker's ID.
+            used_at: When it was sent.
+        """
+        with self._engine.begin() as connection:
+            connection.execute(
+                update(personal_stickers)
+                .where(
+                    personal_stickers.c.user_id == user_id,
+                    personal_stickers.c.id == sticker_id,
+                )
+                .values(last_used_at=used_at)
+            )
+
+    def keep_most_recently_used(self, user_id: UUID, limit: int) -> None:
+        """Drop a User's Personal Stickers used longest ago, beyond a limit.
+
+        Args:
+            user_id: The User.
+            limit: How many to keep.
+        """
+        kept_ids = (
+            select(personal_stickers.c.id)
+            .where(personal_stickers.c.user_id == user_id)
+            .order_by(personal_stickers.c.last_used_at.desc(), personal_stickers.c.id)
+            .limit(limit)
+        )
+        with self._engine.begin() as connection:
+            connection.execute(
+                delete(personal_stickers).where(
+                    personal_stickers.c.user_id == user_id,
+                    personal_stickers.c.id.not_in(kept_ids),
+                )
+            )
+
+    def delete(self, user_id: UUID, sticker_id: UUID) -> bool:
+        """Remove one of a User's Personal Stickers.
+
+        Args:
+            user_id: The User it must belong to.
+            sticker_id: The sticker's ID.
+
+        Returns:
+            True if it was removed; False if the User had none with that ID.
+        """
+        with self._engine.begin() as connection:
+            removed = connection.execute(
+                delete(personal_stickers)
+                .where(
+                    personal_stickers.c.user_id == user_id,
+                    personal_stickers.c.id == sticker_id,
+                )
+                .returning(personal_stickers.c.id)
+            ).first()
+        return removed is not None
+
+    def count_for_user(self, user_id: UUID) -> int:
+        """Count a User's Personal Stickers.
+
+        Args:
+            user_id: The User.
+
+        Returns:
+            How many they have.
+        """
+        with self._engine.connect() as connection:
+            count: int = connection.execute(
+                select(func.count())
+                .select_from(personal_stickers)
+                .where(personal_stickers.c.user_id == user_id)
+            ).scalar_one()
+        return count
+
+
 class PostgresCheckInRepository:
     """Stores Check-in Kinds and Check-in decisions in Postgres."""
 
@@ -2732,6 +2923,7 @@ def build_postgres_repositories(engine: Engine) -> Repositories:
         knowledge_documents=PostgresKnowledgeDocumentRepository(engine),
         usage=PostgresUsageRepository(engine),
         stickers=PostgresStickerRepository(engine),
+        personal_stickers=PostgresPersonalStickerRepository(engine),
         check_ins=PostgresCheckInRepository(engine),
         feature_switches=PostgresFeatureSwitchRepository(engine),
         pending_auth_account_deletions=PostgresPendingAuthAccountDeletionRepository(

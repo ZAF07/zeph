@@ -7,6 +7,7 @@ from companion.core.models import (
     ChannelSticker,
     Feature,
     LibrarySticker,
+    PersonalSticker,
     StickerImage,
 )
 from companion.core.ports import ChatChannel, ChatTool, Clock, Repositories
@@ -54,17 +55,19 @@ def sticker_message_text(emoji: str | None) -> str:
     return f"[sticker: {emoji}]" if emoji else "[sticker]"
 
 
-def sticker_tool_line(number: int, sticker: LibrarySticker) -> str:
+def sticker_tool_line(number: int, sticker: LibrarySticker | PersonalSticker) -> str:
     """Write one sticker as the sticker tool lists it.
 
     Args:
         number: The number the model picks it by.
-        sticker: The sticker.
+        sticker: The sticker, from the Sticker Library or the User's own.
 
     Returns:
-        E.g. "1. 🌱 Celebrating a small step forward".
+        E.g. "1. 🌱 Celebrating a small step forward", or "1. 😂 (theirs)
+        For laughing along at a small mishap" for one of the User's own.
     """
-    parts = (f"{number}.", sticker.emoji, sticker.note)
+    theirs = "(theirs)" if isinstance(sticker, PersonalSticker) else None
+    parts = (f"{number}.", sticker.emoji, theirs, sticker.note)
     return " ".join(part for part in parts if part)
 
 
@@ -200,16 +203,18 @@ class StickerChoice:
     picked per reply.
     """
 
-    def __init__(self, stickers: list[LibrarySticker], description: str) -> None:
+    def __init__(
+        self, stickers: list[LibrarySticker | PersonalSticker], description: str
+    ) -> None:
         """Set up the choice.
 
         Args:
-            stickers: The stickers that have a note.
+            stickers: The stickers that have a note, the User's own first.
             description: The Admin-set tool description, put before the list.
         """
         self._stickers = stickers
         self._description = description
-        self.picked: LibrarySticker | None = None
+        self.picked: LibrarySticker | PersonalSticker | None = None
 
     @property
     def tools(self) -> list[ChatTool]:
@@ -251,14 +256,15 @@ class StickerChoice:
 
 
 class StickerTools:
-    """Offers the Sticker Library to replies."""
+    """Offers the User's Personal Stickers and the Sticker Library to replies."""
 
     def __init__(self, repositories: Repositories, features: FeatureService) -> None:
         """Set up the sticker tools.
 
         Args:
-            repositories: Where the Sticker Library and settings are stored.
-            features: Says whether Stickers works for the User.
+            repositories: Where the stickers and settings are stored.
+            features: Says whether Stickers and Personal Stickers work for
+                the User.
         """
         self._repositories = repositories
         self._features = features
@@ -270,17 +276,25 @@ class StickerTools:
             user_id: The User being replied to.
 
         Returns:
-            The choice, offering every sticker that has a note; none when
+            The choice, offering the User's Personal Stickers first, when
+            Personal Stickers works for them, then every Sticker Library
+            sticker that has a note and isn't one of theirs; none when
             Stickers doesn't work for the User.
         """
         if not self._features.works_for(user_id, Feature.STICKERS):
             return StickerChoice([], "")
-        stickers = [
+        theirs = (
+            self._repositories.personal_stickers.list_for_user(user_id)
+            if self._features.works_for(user_id, Feature.PERSONAL_STICKERS)
+            else []
+        )
+        their_unique_ids = {sticker.file_unique_id for sticker in theirs}
+        library = [
             sticker
             for sticker in self._repositories.stickers.list_all()
-            if sticker.note
+            if sticker.note and sticker.file_unique_id not in their_unique_ids
         ]
         return StickerChoice(
-            stickers,
+            [*theirs, *library],
             self._repositories.platform_settings.get("sticker_tool_description"),
         )

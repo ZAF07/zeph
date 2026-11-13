@@ -46,6 +46,7 @@ function newUser(overrides: Partial<Me> = {}): Me {
     user_memory_available: true,
     photo_viewing_enabled: true,
     photo_viewing_available: true,
+    personal_stickers_available: false,
     onboarding_completed_at: null,
     role: "user",
     changed_in_chat: {},

@@ -20,6 +20,7 @@ export function userWithRole(role: UserRole): Me {
     user_memory_available: true,
     photo_viewing_enabled: true,
     photo_viewing_available: true,
+    personal_stickers_available: false,
     onboarding_completed_at: "2026-11-11T09:00:00Z",
     role,
     changed_in_chat: {},

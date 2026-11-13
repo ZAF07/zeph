@@ -3,7 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { UserFeaturesPanel } from "@/components/UserFeaturesPanel";
-import type { AdminUser, ApiClient, UserFeatureStatus } from "@/lib/api-client";
+import type {
+  AdminUser,
+  ApiClient,
+  UserFeatures,
+  UserFeatureStatus,
+} from "@/lib/api-client";
 
 const apiClient = {
   listUserFeatures: vi.fn<ApiClient["listUserFeatures"]>(),
@@ -35,6 +40,14 @@ const webSearch: UserFeatureStatus = {
   changed_at: null,
 };
 
+/** Builds the per-User Features response from statuses and a sticker count. */
+function userFeatures(
+  features: UserFeatureStatus[],
+  personalStickerCount = 0,
+): UserFeatures {
+  return { features, personal_sticker_count: personalStickerCount };
+}
+
 function rowFor(name: string): HTMLElement {
   const row = screen.getByText(name).closest("li");
   if (!row) {
@@ -46,7 +59,38 @@ function rowFor(name: string): HTMLElement {
 describe("UserFeaturesPanel", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    apiClient.listUserFeatures.mockResolvedValue([webSearch]);
+    apiClient.listUserFeatures.mockResolvedValue(userFeatures([webSearch]));
+  });
+
+  it("shows only how many Personal Stickers the User has", async () => {
+    apiClient.listUserFeatures.mockResolvedValue(userFeatures([webSearch], 3));
+    render(<UserFeaturesPanel user={ren} onClose={() => {}} />);
+
+    expect(
+      await screen.findByText("Personal Stickers kept for Ren Okafor: 3"),
+    ).toBeVisible();
+  });
+
+  it("says when Personal Stickers is off because Stickers is", async () => {
+    apiClient.listUserFeatures.mockResolvedValue(
+      userFeatures([
+        {
+          ...webSearch,
+          feature: "personal_stickers",
+          name: "Personal Stickers",
+          works: false,
+          reason: "stickers_off",
+        },
+      ]),
+    );
+    render(<UserFeaturesPanel user={ren} onClose={() => {}} />);
+
+    await screen.findByText("Personal Stickers");
+    expect(
+      within(rowFor("Personal Stickers")).getByText(
+        "Off: Stickers is off for this User",
+      ),
+    ).toBeVisible();
   });
 
   it("shows each Feature's switch for the User and whether it works", async () => {
@@ -76,30 +120,34 @@ describe("UserFeaturesPanel", () => {
     ["on_for_user", "on", "On: turned on for this User"],
     ["turned_off_by_user", "default", "Off: the User turned it off"],
   ] as const)("explains %s", async (reason, featureSwitch, text) => {
-    apiClient.listUserFeatures.mockResolvedValue([
-      {
-        ...webSearch,
-        works: reason === "on_for_user",
-        reason,
-        switch: featureSwitch,
-      },
-    ]);
+    apiClient.listUserFeatures.mockResolvedValue(
+      userFeatures([
+        {
+          ...webSearch,
+          works: reason === "on_for_user",
+          reason,
+          switch: featureSwitch,
+        },
+      ]),
+    );
     render(<UserFeaturesPanel user={ren} onClose={() => {}} />);
 
     expect(await screen.findByText(text)).toBeVisible();
   });
 
   it("shows who last changed the switch for the User, and when", async () => {
-    apiClient.listUserFeatures.mockResolvedValue([
-      {
-        ...webSearch,
-        works: false,
-        reason: "off_for_user",
-        switch: "off",
-        changed_by_email: "maya@example.com",
-        changed_at: "2026-11-13T09:00:00Z",
-      },
-    ]);
+    apiClient.listUserFeatures.mockResolvedValue(
+      userFeatures([
+        {
+          ...webSearch,
+          works: false,
+          reason: "off_for_user",
+          switch: "off",
+          changed_by_email: "maya@example.com",
+          changed_at: "2026-11-13T09:00:00Z",
+        },
+      ]),
+    );
     render(<UserFeaturesPanel user={ren} onClose={() => {}} />);
 
     expect(
@@ -138,26 +186,28 @@ describe("UserFeaturesPanel", () => {
   });
 
   it("shows Stickers and Knowledge and turns Knowledge back on for the User", async () => {
-    apiClient.listUserFeatures.mockResolvedValue([
-      webSearch,
-      {
-        ...webSearch,
-        feature: "stickers",
-        name: "Stickers",
-        works: false,
-        reason: "off_for_everyone",
-      },
-      {
-        ...webSearch,
-        feature: "knowledge",
-        name: "Knowledge",
-        works: false,
-        reason: "off_for_user",
-        switch: "off",
-        changed_by_email: "maya@example.com",
-        changed_at: "2026-11-13T09:00:00Z",
-      },
-    ]);
+    apiClient.listUserFeatures.mockResolvedValue(
+      userFeatures([
+        webSearch,
+        {
+          ...webSearch,
+          feature: "stickers",
+          name: "Stickers",
+          works: false,
+          reason: "off_for_everyone",
+        },
+        {
+          ...webSearch,
+          feature: "knowledge",
+          name: "Knowledge",
+          works: false,
+          reason: "off_for_user",
+          switch: "off",
+          changed_by_email: "maya@example.com",
+          changed_at: "2026-11-13T09:00:00Z",
+        },
+      ]),
+    );
     apiClient.setFeatureForUser.mockResolvedValue({
       ...webSearch,
       feature: "knowledge",
@@ -203,7 +253,9 @@ describe("UserFeaturesPanel", () => {
       feature: "settings_in_chat",
       name: "Settings in Chat",
     };
-    apiClient.listUserFeatures.mockResolvedValue([webSearch, settingsInChat]);
+    apiClient.listUserFeatures.mockResolvedValue(
+      userFeatures([webSearch, settingsInChat]),
+    );
     apiClient.setFeatureForUser.mockResolvedValue({
       ...settingsInChat,
       works: false,
@@ -255,7 +307,7 @@ describe("UserFeaturesPanel", () => {
   it("offers Try again when the Features can't be loaded", async () => {
     apiClient.listUserFeatures
       .mockRejectedValueOnce(new Error("down"))
-      .mockResolvedValueOnce([webSearch]);
+      .mockResolvedValueOnce(userFeatures([webSearch]));
     const user = userEvent.setup();
     render(<UserFeaturesPanel user={ren} onClose={() => {}} />);
 

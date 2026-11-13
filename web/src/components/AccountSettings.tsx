@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { secondaryButton } from "@/components/button-styles";
 import { DeleteAccountSection } from "@/components/DeleteAccountSection";
+import { PersonalStickersSection } from "@/components/PersonalStickersSection";
 import { PhotoViewingSetting } from "@/components/PhotoViewingSetting";
 import { ProfileForm } from "@/components/ProfileForm";
 import { UserMemorySetting } from "@/components/UserMemorySetting";
@@ -18,7 +19,7 @@ type LoadState =
 
 /**
  * The editable parts of the Account & privacy page: Profile, User Memory,
- * Photo Viewing, Your data and Delete account.
+ * Photo Viewing, Your stickers, Your data and Delete account.
  *
  * @returns The sections, a loading block, or an error with Try again.
  */
@@ -92,6 +93,9 @@ export function AccountSettings() {
         explanation={state.content.photo_viewing_explanation}
         changedInChatAt={state.me.changed_in_chat.photo_viewing}
         timeZone={state.me.time_zone ?? undefined}
+      />
+      <PersonalStickersSection
+        available={state.me.personal_stickers_available}
       />
       <YourDataSection retentionDays={state.content.message_retention_days} />
       <DeleteAccountSection />

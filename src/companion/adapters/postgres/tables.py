@@ -14,6 +14,7 @@ from sqlalchemy import (
     Table,
     Text,
     Time,
+    UniqueConstraint,
     Uuid,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -122,6 +123,7 @@ conversation_messages = Table(
     Column("content", Text, nullable=False),
     Column("sent_at", DateTime(timezone=True), nullable=False),
     Column("photos", JSONB, nullable=False, server_default="[]"),
+    Column("sticker", JSONB(none_as_null=True)),
 )
 
 platform_settings = Table(
@@ -322,6 +324,28 @@ stickers = Table(
     Column("preview_file_id", Text),
     Column("note", Text, nullable=False, server_default=""),
     Column("added_at", DateTime(timezone=True), nullable=False),
+)
+
+personal_stickers = Table(
+    "personal_stickers",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("file_id", Text, nullable=False),
+    Column("file_unique_id", Text, nullable=False),
+    Column("emoji", Text),
+    Column("set_name", Text),
+    Column("preview_file_id", Text),
+    Column("note", Text, nullable=False),
+    Column("kept_at", DateTime(timezone=True), nullable=False),
+    Column("last_used_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("user_id", "file_unique_id"),
 )
 
 check_in_kinds = Table(

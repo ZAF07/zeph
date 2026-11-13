@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from uuid import UUID
 
 from companion.core.admin_users import UserNotFoundError
@@ -23,11 +23,19 @@ class FeatureDetails:
         feature: The Feature.
         name: Its name.
         description: A short line on what it does.
+        on_by_default: Whether it is on for everyone before an Admin
+            changes it.
+        needs_stickers: Whether it works only while Stickers works too.
+        in_reply_note: Whether replies are told when it isn't available,
+            so they can say so if the User asks for it.
     """
 
     feature: Feature
     name: str
     description: str
+    on_by_default: bool = True
+    needs_stickers: bool = False
+    in_reply_note: bool = True
 
 
 FEATURES: tuple[FeatureDetails, ...] = (
@@ -90,6 +98,18 @@ FEATURES: tuple[FeatureDetails, ...] = (
             "too. Every photo is still checked for safety either way."
         ),
     ),
+    FeatureDetails(
+        feature=Feature.PERSONAL_STICKERS,
+        name="Personal Stickers",
+        description=(
+            "Zeph keeps stickers a User sends whose meaning is clear and can "
+            "reply in them. It works only while Stickers works for the User. "
+            "Turning it off deletes nothing."
+        ),
+        on_by_default=False,
+        needs_stickers=True,
+        in_reply_note=False,
+    ),
 )
 
 
@@ -122,8 +142,8 @@ class FeatureService:
     """Answers whether a Feature works for a User, and keeps its switches.
 
     Other core services ask this instead of reading switches themselves. A
-    Feature with no saved switch is on for everyone. A User's own switch, when
-    "on" or "off", overrides the one for everyone.
+    Feature with no saved switch follows its default for everyone. A User's
+    own switch, when "on" or "off", overrides the one for everyone.
     """
 
     def __init__(
@@ -196,14 +216,21 @@ class FeatureService:
     def unavailable_note(self, user_id: UUID) -> str:
         """Write the reply note naming the Features a User doesn't have.
 
+        Features that aren't named in the reply note are left out.
+
         Args:
             user_id: The User being replied to.
 
         Returns:
             The Admin-managed note with the Features' names and the
-            Dashboard's address filled in; "" when every Feature works.
+            Dashboard's address filled in; "" when every Feature named in it
+            works.
         """
-        unavailable = self.unavailable_for(user_id)
+        unavailable = [
+            feature
+            for feature in self.unavailable_for(user_id)
+            if feature_details(feature).in_reply_note
+        ]
         if not unavailable:
             return ""
         names = ", ".join(feature_details(feature).name for feature in unavailable)
@@ -227,7 +254,7 @@ class FeatureService:
                 details.feature,
                 FeatureSwitch(
                     feature=details.feature,
-                    on=True,
+                    on=details.on_by_default,
                     changed_by_email=None,
                     changed_at=None,
                 ),
@@ -333,6 +360,8 @@ class FeatureService:
     def _statuses(self, user_id: UUID) -> list[FeatureStatus]:
         """Work out each Feature's status for a User, without checking they exist.
 
+        A Feature that needs Stickers doesn't work while Stickers doesn't.
+
         Args:
             user_id: The User.
 
@@ -344,13 +373,20 @@ class FeatureService:
             switch.feature: switch
             for switch in self._repositories.feature_switches.list_for_user(user_id)
         }
-        return [
-            status_for(
+        statuses = {
+            everyone_switch.feature: status_for(
                 everyone_switch,
                 user_switches.get(everyone_switch.feature),
                 own_switch_on(user, everyone_switch.feature),
             )
             for everyone_switch in self.list_for_everyone()
+        }
+        stickers_work = statuses[Feature.STICKERS].works
+        return [
+            stickers_off_applied(statuses[details.feature])
+            if details.needs_stickers and not stickers_work
+            else statuses[details.feature]
+            for details in FEATURES
         ]
 
 
@@ -419,3 +455,18 @@ def status_for(
         changed_by_email=user_switch.changed_by_email if user_switch else None,
         changed_at=user_switch.changed_at if user_switch else None,
     )
+
+
+def stickers_off_applied(status: FeatureStatus) -> FeatureStatus:
+    """Turn a Feature that needs Stickers off, because Stickers doesn't work.
+
+    Args:
+        status: The Feature's status from its own switches.
+
+    Returns:
+        The status marked as not working because Stickers is off; unchanged
+        when it doesn't work anyway.
+    """
+    if not status.works:
+        return status
+    return replace(status, works=False, reason=FeatureReason.STICKERS_OFF)

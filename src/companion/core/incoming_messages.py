@@ -261,6 +261,7 @@ class IncomingMessageHandler:
                 chat_id=message.chat_id,
                 text=readable_text(message),
                 kind=message.kind,
+                sticker=message.sticker,
             )
         return self._photo_turn(user_id, message.chat_id, [message.photo], message.text)
 

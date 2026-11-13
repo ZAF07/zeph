@@ -31,6 +31,7 @@ const reasonTexts: Record<FeatureReason, string> = {
   off_for_everyone: "Off: turned off for everyone",
   off_for_user: "Off: turned off for this User",
   turned_off_by_user: "Off: the User turned it off",
+  stickers_off: "Off: Stickers is off for this User",
 };
 
 /**

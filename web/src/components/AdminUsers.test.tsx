@@ -94,17 +94,20 @@ describe("AdminUsers", () => {
   });
 
   it("opens a User's Features panel from their row", async () => {
-    apiClient.listUserFeatures.mockResolvedValue([
-      {
-        feature: "web_search",
-        name: "Web Search",
-        works: true,
-        reason: "on_for_everyone",
-        switch: "default",
-        changed_by_email: null,
-        changed_at: null,
-      },
-    ]);
+    apiClient.listUserFeatures.mockResolvedValue({
+      features: [
+        {
+          feature: "web_search",
+          name: "Web Search",
+          works: true,
+          reason: "on_for_everyone",
+          switch: "default",
+          changed_by_email: null,
+          changed_at: null,
+        },
+      ],
+      personal_sticker_count: 0,
+    });
     const user = userEvent.setup();
     render(<AdminUsers />);
 

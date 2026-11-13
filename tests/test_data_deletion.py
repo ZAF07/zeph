@@ -1,3 +1,4 @@
+import json
 import logging
 from datetime import UTC, datetime
 from typing import Any
@@ -27,6 +28,7 @@ from tests.telegram_helpers import (
     owner_headers,
     send_to_webhook,
     telegram_photo_update,
+    telegram_sticker_update,
     telegram_text_update,
 )
 from tests.test_check_in_sending import (
@@ -46,6 +48,7 @@ USER_DATA_TABLES = (
     "conversation_summaries",
     "memory_items",
     "shared_photos",
+    "personal_stickers",
     "check_ins",
     "connection_tokens",
     "telegram_connections",
@@ -64,14 +67,23 @@ def set_up_user_with_every_kind_of_data(
     """Give a User messages, User Memory, a Check-in and a Telegram Connection.
 
     Their User Memory holds a Memory Item, a Conversation Summary and a
-    Shared Photo.
+    Shared Photo, and they have a Personal Sticker.
 
     Returns:
         Their Dashboard API headers and their User ID.
     """
     headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
-    chat_model.script("what a lovely desk")
+    client.put(
+        "/api/admin/features/personal_stickers",
+        json={"on": True},
+        headers=owner_headers(client, auth_verifier),
+    )
+    chat_model.script("what a lovely desk", "haha")
     send_to_webhook(client, telegram_photo_update(caption="my new desk"))
+    send_to_webhook(client, telegram_sticker_update("😂", "laugh"))
+    chat_model.script_sticker_keeping(
+        json.dumps({"stickers_to_keep": [{"sticker": 1, "note": "For a happy moment"}]})
+    )
     have_conversation(
         client,
         chat_model,
@@ -168,6 +180,8 @@ def test_delete_my_data_removes_every_kind_of_data_but_keeps_the_account(
     assert summaries == {"summaries": []}
     photos = client.get("/api/shared-photos", headers=headers).json()
     assert photos == {"photos": []}
+    stickers = client.get("/api/personal-stickers", headers=headers).json()
+    assert stickers == {"stickers": []}
     assert recent_check_ins(client, headers) == []
     connection = client.get("/api/telegram-connection", headers=headers).json()
     assert connection == {"connection": None, "latest_token": None}

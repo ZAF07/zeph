@@ -26,10 +26,15 @@ from companion.core.models import (
     MemorySource,
     OnboardingAnswers,
     PauseLength,
+    PersonalSticker,
     PreferenceChanges,
     SharedPhoto,
     User,
     UserRole,
+)
+from companion.core.personal_stickers import (
+    PersonalStickerNotFoundError,
+    PersonalStickerService,
 )
 from companion.core.photos import PhotoService, SharedPhotoNotFoundError
 from companion.core.ports import PlatformSettingsRepository
@@ -57,6 +62,7 @@ class MeResponse(BaseModel):
     user_memory_available: bool
     photo_viewing_enabled: bool
     photo_viewing_available: bool
+    personal_stickers_available: bool
     onboarding_completed_at: datetime | None
     role: UserRole
     changed_in_chat: dict[ChatSetting, datetime]
@@ -264,6 +270,22 @@ class SharedPhotosResponse(BaseModel):
     photos: list[SharedPhotoResponse]
 
 
+class PersonalStickerResponse(BaseModel):
+    """A Personal Sticker, without the chat channel's IDs."""
+
+    id: str
+    emoji: str | None
+    note: str
+    has_image: bool
+    kept_at: datetime
+
+
+class PersonalStickersResponse(BaseModel):
+    """A User's Personal Stickers, most recently used first."""
+
+    stickers: list[PersonalStickerResponse]
+
+
 def to_memory_item_response(item: MemoryItem) -> MemoryItemResponse:
     """Describe a Memory Item for the Dashboard.
 
@@ -337,6 +359,24 @@ def to_shared_photo_response(photo: SharedPhoto) -> SharedPhotoResponse:
     )
 
 
+def to_personal_sticker_response(sticker: PersonalSticker) -> PersonalStickerResponse:
+    """Describe a Personal Sticker for the Dashboard; never its chat channel IDs.
+
+    Args:
+        sticker: The Personal Sticker.
+
+    Returns:
+        The response body.
+    """
+    return PersonalStickerResponse(
+        id=str(sticker.id),
+        emoji=sticker.emoji,
+        note=sticker.note,
+        has_image=sticker.preview_file_id is not None,
+        kept_at=sticker.kept_at,
+    )
+
+
 def to_recent_check_in_response(recent: RecentCheckIn) -> RecentCheckInResponse:
     """Describe a Check-in for the Dashboard; never its message or skip reason.
 
@@ -356,7 +396,10 @@ def to_recent_check_in_response(recent: RecentCheckIn) -> RecentCheckInResponse:
 
 
 def to_me_response(
-    user: User, user_memory_available: bool, photo_viewing_available: bool
+    user: User,
+    user_memory_available: bool,
+    photo_viewing_available: bool,
+    personal_stickers_available: bool,
 ) -> MeResponse:
     """Describe a User for the Dashboard.
 
@@ -366,6 +409,8 @@ def to_me_response(
             for them.
         photo_viewing_available: Whether the Admin side allows Photo Viewing
             for them.
+        personal_stickers_available: Whether Personal Stickers works for
+            them; they have no switch of their own.
 
     Returns:
         The response body.
@@ -383,6 +428,7 @@ def to_me_response(
         user_memory_available=user_memory_available,
         photo_viewing_enabled=user.photo_viewing_enabled,
         photo_viewing_available=photo_viewing_available,
+        personal_stickers_available=personal_stickers_available,
         onboarding_completed_at=user.onboarding_completed_at,
         role=user.role,
         changed_in_chat=user.settings_changed_in_chat,
@@ -399,6 +445,7 @@ def build_dashboard_api_router(
     home_service: HomeService,
     feature_service: FeatureService,
     photo_service: PhotoService,
+    personal_sticker_service: PersonalStickerService,
     platform_settings: PlatformSettingsRepository,
     telegram_bot_username: str,
 ) -> APIRouter:
@@ -416,8 +463,11 @@ def build_dashboard_api_router(
         user_data_service: Deletes the User's data or account.
         home_service: Gathers what the Dashboard home shows.
         feature_service: Says whether the Admin side allows User Memory,
-            Check-ins and Photo Viewing for the User.
+            Check-ins and Photo Viewing for the User, and whether Personal
+            Stickers works for them.
         photo_service: Lists, downloads and deletes the User's Shared Photos.
+        personal_sticker_service: Lists, downloads and removes the User's
+            Personal Stickers.
         platform_settings: Admin-managed wording shown on the Dashboard.
         telegram_bot_username: The Companion's Telegram @username, for deep links.
 
@@ -428,7 +478,7 @@ def build_dashboard_api_router(
     telegram_chat_url = f"https://t.me/{telegram_bot_username}"
 
     def me_response(user: User) -> MeResponse:
-        """Describe a User, with whether User Memory and Photo Viewing are available.
+        """Describe a User, with which of their Features are available.
 
         Args:
             user: The User.
@@ -440,6 +490,7 @@ def build_dashboard_api_router(
             user,
             feature_service.available_for(user.id, Feature.USER_MEMORY),
             feature_service.available_for(user.id, Feature.PHOTO_VIEWING),
+            feature_service.works_for(user.id, Feature.PERSONAL_STICKERS),
         )
 
     def to_check_ins_response(user: User) -> CheckInsResponse:
@@ -1003,6 +1054,86 @@ def build_dashboard_api_router(
         except SharedPhotoNotFoundError as error:
             raise HTTPException(
                 status.HTTP_404_NOT_FOUND, "Shared Photo not found"
+            ) from error
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @router.get("/personal-stickers")
+    def list_personal_stickers(
+        user: Annotated[User, Depends(current_user)],
+    ) -> PersonalStickersResponse:
+        """Return the User's Personal Stickers, most recently used first.
+
+        Args:
+            user: The signed-in User.
+
+        Returns:
+            The Personal Stickers.
+        """
+        return PersonalStickersResponse(
+            stickers=[
+                to_personal_sticker_response(sticker)
+                for sticker in personal_sticker_service.list_for(user.id)
+            ]
+        )
+
+    @router.get("/personal-stickers/{sticker_id}/image")
+    def get_personal_sticker_image(
+        user: Annotated[User, Depends(current_user)], sticker_id: UUID
+    ) -> Response:
+        """Return the image of one of the User's Personal Stickers.
+
+        It is downloaded from the chat channel, so the bot token stays private.
+
+        Args:
+            user: The signed-in User.
+            sticker_id: The Personal Sticker's ID.
+
+        Returns:
+            The image.
+
+        Raises:
+            HTTPException: 404 if the User has no such sticker, or it has no
+                image or it couldn't be downloaded.
+        """
+        try:
+            image = personal_sticker_service.get_image(user.id, sticker_id)
+        except PersonalStickerNotFoundError as error:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "Personal Sticker not found"
+            ) from error
+        if image is None:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "This sticker has no image to show"
+            )
+        return Response(
+            content=image.content,
+            media_type=image.media_type,
+            headers={"Cache-Control": "private, max-age=86400"},
+        )
+
+    @router.delete(
+        "/personal-stickers/{sticker_id}", status_code=status.HTTP_204_NO_CONTENT
+    )
+    def delete_personal_sticker(
+        user: Annotated[User, Depends(current_user)], sticker_id: UUID
+    ) -> Response:
+        """Remove one of the User's Personal Stickers.
+
+        Args:
+            user: The signed-in User.
+            sticker_id: The Personal Sticker's ID.
+
+        Returns:
+            An empty response.
+
+        Raises:
+            HTTPException: 404 if the User has no such sticker.
+        """
+        try:
+            personal_sticker_service.remove(user.id, sticker_id)
+        except PersonalStickerNotFoundError as error:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "Personal Sticker not found"
             ) from error
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 

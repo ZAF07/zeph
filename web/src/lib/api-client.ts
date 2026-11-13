@@ -40,7 +40,8 @@ export type ChatSetting =
  * says when each setting was last changed in chat; a setting changed on the
  * Dashboard since is left out. `user_memory_available` and
  * `photo_viewing_available` are false when an Admin has that Feature off for
- * them, so they can't switch it.
+ * them, so they can't switch it. `personal_stickers_available` says whether
+ * Personal Stickers works for them; they have no switch of their own.
  */
 export type Me = {
   id: string;
@@ -55,6 +56,7 @@ export type Me = {
   user_memory_available: boolean;
   photo_viewing_enabled: boolean;
   photo_viewing_available: boolean;
+  personal_stickers_available: boolean;
   onboarding_completed_at: string | null;
   role: UserRole;
   changed_in_chat: Partial<Record<ChatSetting, string>>;
@@ -176,7 +178,8 @@ export type Feature =
   | "check_ins"
   | "user_memory"
   | "settings_in_chat"
-  | "photo_viewing";
+  | "photo_viewing"
+  | "personal_stickers";
 
 /** A Feature's switch for everyone and who last changed it, and when. */
 export type FeatureSwitch = {
@@ -197,7 +200,8 @@ export type FeatureReason =
   | "on_for_user"
   | "off_for_everyone"
   | "off_for_user"
-  | "turned_off_by_user";
+  | "turned_off_by_user"
+  | "stickers_off";
 
 /** Whether a Feature works for one User, why, and the Admin's switch for them. */
 export type UserFeatureStatus = {
@@ -208,6 +212,12 @@ export type UserFeatureStatus = {
   switch: UserFeatureSwitch;
   changed_by_email: string | null;
   changed_at: string | null;
+};
+
+/** Every Feature's status for one User, and how many Personal Stickers they have. */
+export type UserFeatures = {
+  features: UserFeatureStatus[];
+  personal_sticker_count: number;
 };
 
 /** The value of a platform setting Admins can edit. */
@@ -374,6 +384,15 @@ export type SharedPhoto = {
   sent_at: string;
 };
 
+/** A sticker Zeph kept from the User, with when to use it. */
+export type PersonalSticker = {
+  id: string;
+  emoji: string | null;
+  note: string;
+  has_image: boolean;
+  kept_at: string;
+};
+
 /** A Check-in Kind's name, description and "allowed when memory is off". */
 export type CheckInKindInput = {
   name: string;
@@ -519,6 +538,9 @@ export type ApiClient = {
   listSharedPhotos: () => Promise<SharedPhoto[]>;
   getSharedPhotoImage: (id: string) => Promise<Blob>;
   deleteSharedPhoto: (id: string) => Promise<void>;
+  listPersonalStickers: () => Promise<PersonalSticker[]>;
+  getPersonalStickerImage: (id: string) => Promise<Blob>;
+  deletePersonalSticker: (id: string) => Promise<void>;
   listAdminUsers: () => Promise<AdminUser[]>;
   changeUserRole: (userId: string, role: UserRole) => Promise<RoleChange>;
   listFeatures: () => Promise<FeatureSwitch[]>;
@@ -526,7 +548,7 @@ export type ApiClient = {
     feature: Feature,
     on: boolean,
   ) => Promise<FeatureSwitch>;
-  listUserFeatures: (userId: string) => Promise<UserFeatureStatus[]>;
+  listUserFeatures: (userId: string) => Promise<UserFeatures>;
   setFeatureForUser: (
     userId: string,
     feature: Feature,
@@ -718,6 +740,13 @@ export function createApiClient(
     getSharedPhotoImage: (id) => requestBlob(`/api/shared-photos/${id}/image`),
     deleteSharedPhoto: (id) =>
       request<void>(`/api/shared-photos/${id}`, "DELETE"),
+    listPersonalStickers: async () =>
+      (await request<{ stickers: PersonalSticker[] }>("/api/personal-stickers"))
+        .stickers,
+    getPersonalStickerImage: (id) =>
+      requestBlob(`/api/personal-stickers/${id}/image`),
+    deletePersonalSticker: (id) =>
+      request<void>(`/api/personal-stickers/${id}`, "DELETE"),
     listAdminUsers: async () =>
       (await request<{ users: AdminUser[] }>("/api/admin/users")).users,
     changeUserRole: (userId, role) =>
@@ -727,12 +756,8 @@ export function createApiClient(
         .features,
     setFeatureForEveryone: (feature, on) =>
       request<FeatureSwitch>(`/api/admin/features/${feature}`, "PUT", { on }),
-    listUserFeatures: async (userId) =>
-      (
-        await request<{ features: UserFeatureStatus[] }>(
-          `/api/admin/users/${userId}/features`,
-        )
-      ).features,
+    listUserFeatures: (userId) =>
+      request<UserFeatures>(`/api/admin/users/${userId}/features`),
     setFeatureForUser: (userId, feature, featureSwitch) =>
       request<UserFeatureStatus>(
         `/api/admin/users/${userId}/features/${feature}`,

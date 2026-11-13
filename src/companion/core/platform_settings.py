@@ -84,6 +84,12 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     EditableSetting("response_prompt", "Response composition prompt", SettingKind.TEXT),
     EditableSetting("response_model", "Response composition model", SettingKind.MODEL),
     EditableSetting(
+        "sticker_tool_description",
+        "send_sticker tool description",
+        SettingKind.TEXT,
+        max_length=4_000,
+    ),
+    EditableSetting(
         "reply_web_search_limit_note",
         "Web Search Limit reached note",
         SettingKind.TEXT,
@@ -159,6 +165,23 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=10,
+    ),
+    EditableSetting(
+        "personal_sticker_keeping_prompt",
+        "Personal Sticker keeping prompt",
+        SettingKind.TEXT,
+    ),
+    EditableSetting(
+        "personal_sticker_keeping_model",
+        "Personal Sticker keeping model",
+        SettingKind.MODEL,
+    ),
+    EditableSetting(
+        "personal_stickers_limit",
+        "Most Personal Stickers per User",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=200,
     ),
     EditableSetting("check_in_prompt", "Check-in prompt", SettingKind.TEXT),
     EditableSetting("check_in_model", "Check-in model", SettingKind.MODEL),
@@ -255,7 +278,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         ),
         prompt_key="response_prompt",
         model_key="response_model",
-        extra_prompt_keys=("reply_web_search_limit_note",),
+        extra_prompt_keys=("sticker_tool_description", "reply_web_search_limit_note"),
     ),
     CoreService(
         name="Post-conversation processing",
@@ -293,6 +316,17 @@ CORE_SERVICES: tuple[CoreService, ...] = (
             "ask_about_photo_tool_description",
             "send_photo_tool_description",
         ),
+    ),
+    CoreService(
+        name="Personal Sticker keeping",
+        runs_when="After quiet gap, when the User sent stickers",
+        description=(
+            "Keeps the stickers a User sent whose meaning was clear, each with "
+            "a “when to use” note about the moment, so Zeph can reply in their "
+            "own stickers. Runs only while Personal Stickers works for them."
+        ),
+        prompt_key="personal_sticker_keeping_prompt",
+        model_key="personal_sticker_keeping_model",
     ),
     CoreService(
         name="Check-ins",
