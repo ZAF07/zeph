@@ -72,4 +72,4 @@ The Companion can now and then send a User's own Shared Photo back, the way a fr
 ## Completion
 
 - Completed: 2026-11-13
-- Commit: fc4d015 "Photos issue 05: the Companion can send a User's own Shared Photo back", review fixes ae1e3c8 "Photos issue 05 review fixes: the Photo viewing card test checks both extra prompts in order again, and the add_shared_photo test helper documents its arguments", archive ffcf54d "Photos issue 05 done: archive issue with test, eval, run and review evidence; Shared Photo glossary says when one is sent back" on branch `photos-05-send-photo-back`
+- Commit: fc4d015 "Photos issue 05: the Companion can send a User's own Shared Photo back", review fixes ae1e3c8 "Photos issue 05 review fixes: the Photo viewing card test checks both extra prompts in order again, and the add_shared_photo test helper documents its arguments", archive ffcf54d "Photos issue 05 done: archive issue with test, eval, run and review evidence; Shared Photo glossary says when one is sent back" on branch `photos-05-send-photo-back` (merged into main in 0c10803 "Merge photos issue 05: the Companion can now and then send a User's own Shared Photo back…")
