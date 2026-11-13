@@ -116,4 +116,4 @@ In the MVP every Feature is on for everyone. Later, a plan will be a set of Feat
   - 04 User Memory and Check-ins Features: b7af9cb, review fixes 34e690a, archive 57014ae
   - 05 Settings in Chat Feature: 1b8a9e2, review fixes f0833d6, archive 166f2b1
 - Checks on close-out (main at 1e9d936): ruff, ruff format, mypy pass; pytest 597 passed; pnpm lint, format:check, typecheck pass; Vitest 321 passed
-- Commit: <to be filled in manually>
+- Archive commit: 7ff92df "updated tasks status" (Photos and Features PRDs done: mark completed and archive)

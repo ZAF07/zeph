@@ -145,4 +145,4 @@ When a Conversation ends, memory processing picks the photos that matter to the 
   - 06 "Look back at a photo" Check-in: 120fd3c, review fixes c208115, archive 37f7554
   - 07 Photo Viewing Feature: a1aa137, review fix ed5d16d, archive ae8ad5b
 - Checks on close-out (main at 1e9d936): ruff, ruff format, mypy pass; pytest 597 passed; pnpm lint, format:check, typecheck pass; Vitest 321 passed
-- Commit: <to be filled in manually>
+- Archive commit: 7ff92df "updated tasks status" (Photos and Features PRDs done: mark completed and archive)
