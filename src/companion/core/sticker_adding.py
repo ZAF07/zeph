@@ -1,3 +1,4 @@
+import logging
 import re
 import threading
 from collections.abc import Callable
@@ -13,6 +14,8 @@ from companion.core.stickers import (
     StickerSetNotFoundError,
     StickerSetUnavailableError,
 )
+
+logger = logging.getLogger(__name__)
 
 ADDING_TOOL = "start_adding_stickers"
 ADDED_REACTION = "👍"
@@ -58,22 +61,33 @@ ADDING_PARAMETERS: dict[str, Any] = {
 
 
 @dataclass
-class AddingMode:
-    """One Admin's stickers being added, and what has been added so far.
+class StickerTally:
+    """What an Admin added to the Sticker Library in chat.
 
     Attributes:
-        choice: Whether each sticker adds itself or its whole set.
-        chat_id: The chat the stickers come from; None until the first one.
         added: How many stickers were added.
         already_there: How many were already in the library and skipped.
         sets: The sticker sets added whole.
     """
 
-    choice: AddingChoice
-    chat_id: int | None = None
     added: int = 0
     already_there: int = 0
     sets: set[str] = field(default_factory=set)
+
+
+@dataclass
+class AddingMode:
+    """One Admin's adding mode: what each sticker adds, and what was added.
+
+    Attributes:
+        choice: Whether each sticker adds itself or its whole set.
+        chat_id: The chat the stickers come from; None until the first one.
+        tally: What was added so far.
+    """
+
+    choice: AddingChoice
+    chat_id: int | None = None
+    tally: StickerTally = field(default_factory=StickerTally)
 
 
 def add_request(text: str) -> AddingChoice | None:
@@ -90,22 +104,22 @@ def add_request(text: str) -> AddingChoice | None:
     return ADD_THIS_PHRASES.get(phrase)
 
 
-def added_summary(mode: AddingMode) -> str:
+def added_summary(tally: StickerTally) -> str:
     """Write what was added, as the Admin is told.
 
     Args:
-        mode: What was added.
+        tally: What was added.
 
     Returns:
         E.g. "Added 33 stickers from 1 set (2 were already there)."
     """
-    stickers = "1 sticker" if mode.added == 1 else f"{mode.added} stickers"
+    stickers = "1 sticker" if tally.added == 1 else f"{tally.added} stickers"
     summary = f"Added {stickers}"
-    if mode.sets:
-        summary += f" from {len(mode.sets)} set{'' if len(mode.sets) == 1 else 's'}"
-    if mode.already_there:
-        verb = "was" if mode.already_there == 1 else "were"
-        summary += f" ({mode.already_there} {verb} already there)"
+    if tally.sets:
+        summary += f" from {len(tally.sets)} set{'' if len(tally.sets) == 1 else 's'}"
+    if tally.already_there:
+        verb = "was" if tally.already_there == 1 else "were"
+        summary += f" ({tally.already_there} {verb} already there)"
     return f"{summary}."
 
 
@@ -119,6 +133,10 @@ class StickerAdding:
     after a quiet gap, and they are told what was added. An Admin can also
     reply "add this" or "add this set" to a sticker in the chat. Adding modes
     live in memory only, so a restart ends them.
+
+    One lock guards every adding mode and is held while a sticker is added
+    and reacted to, so the summary never comes before a sticker's reaction.
+    Only Admins in adding mode ever wait on it.
     """
 
     def __init__(
@@ -159,8 +177,7 @@ class StickerAdding:
         Returns:
             The tool for an Admin; none for anyone else.
         """
-        user = self._repositories.users.get(user_id)
-        if user is None or user.role != UserRole.ADMIN:
+        if not self._is_admin(user_id):
             return []
         return [
             ChatTool(
@@ -186,7 +203,8 @@ class StickerAdding:
         The sticker, or its whole set, is added and gets a reaction, and the
         quiet gap starts again. In whole-sets mode a set already added in
         this mode isn't looked up again, and a sticker whose set can't be
-        found is added on its own.
+        found is added on its own. A reaction the chat channel refuses is
+        logged; the sticker still counts.
 
         Args:
             user_id: The User who sent it.
@@ -204,12 +222,34 @@ class StickerAdding:
             mode.chat_id = message.chat_id
             whole_set = mode.choice == AddingChoice.WHOLE_SETS
             set_already_added = (
-                sticker.set_name is not None and sticker.set_name in mode.sets
+                sticker.set_name is not None and sticker.set_name in mode.tally.sets
             )
             if not (whole_set and set_already_added):
-                self._add(mode, sticker, whole_set)
-        self._restart_quiet_gap(user_id)
-        self._chat_channel.react(message.chat_id, message.message_id, ADDED_REACTION)
+                self._add(mode.tally, sticker, whole_set)
+            self._restart_quiet_gap(user_id)
+            self._react(message)
+        return True
+
+    def add_if_asked(self, user_id: UUID, message: IncomingMessage) -> bool:
+        """Add the sticker an Admin replied "add this" or "add this set" to.
+
+        The Admin is told what was added.
+
+        Args:
+            user_id: The User who sent the message.
+            message: The message.
+
+        Returns:
+            True if it was such a reply from an Admin and the sticker, or its
+            set, was added; False if the message is just chat.
+        """
+        choice = add_request(message.text)
+        sticker = message.replied_sticker
+        if sticker is None or choice is None or not self._is_admin(user_id):
+            return False
+        tally = StickerTally()
+        self._add(tally, sticker, choice == AddingChoice.WHOLE_SETS)
+        self._send_summary(user_id, message.chat_id, tally)
         return True
 
     def finish(self, user_id: UUID) -> None:
@@ -223,26 +263,7 @@ class StickerAdding:
         with self._guard:
             mode = self._modes.pop(user_id, None)
         if mode is not None and mode.chat_id is not None:
-            self._send_summary(user_id, mode.chat_id, mode)
-
-    def add_replied(
-        self,
-        user_id: UUID,
-        chat_id: int,
-        sticker: ChannelSticker,
-        choice: AddingChoice,
-    ) -> None:
-        """Add a sticker an Admin replied "add this" to, or its set, and say so.
-
-        Args:
-            user_id: The Admin.
-            chat_id: The chat to reply in.
-            sticker: The sticker replied to.
-            choice: Whether to add the sticker or its whole set.
-        """
-        mode = AddingMode(choice=choice, chat_id=chat_id)
-        self._add(mode, sticker, choice == AddingChoice.WHOLE_SETS)
-        self._send_summary(user_id, chat_id, mode)
+            self._send_summary(user_id, mode.chat_id, mode.tally)
 
     def _start(self, user_id: UUID, arguments: dict[str, Any]) -> str:
         """Start adding mode for an Admin, as the model asked.
@@ -260,7 +281,7 @@ class StickerAdding:
             return "The choice must be single_stickers or whole_sets. Nothing started."
         with self._guard:
             self._modes[user_id] = AddingMode(choice=choice)
-        self._restart_quiet_gap(user_id)
+            self._restart_quiet_gap(user_id)
         return (
             f"Adding mode is on for {CHOICE_WORDS[choice]}. Tell them in a few "
             f"words to send the stickers over. Each one gets a {ADDED_REACTION} "
@@ -268,11 +289,13 @@ class StickerAdding:
             "sticker, they are told what was added."
         )
 
-    def _add(self, mode: AddingMode, sticker: ChannelSticker, whole_set: bool) -> None:
-        """Add one sticker, or its whole set, and count it in the mode.
+    def _add(
+        self, tally: StickerTally, sticker: ChannelSticker, whole_set: bool
+    ) -> None:
+        """Add one sticker, or its whole set, and count it.
 
         Args:
-            mode: Where to count what was added.
+            tally: Where to count what was added.
             sticker: The sticker.
             whole_set: True to add every sticker in its set when it has one
                 that can be found.
@@ -281,12 +304,25 @@ class StickerAdding:
         if whole_set and sticker.set_name is not None:
             try:
                 stickers = self._sticker_library.find_set(sticker.set_name)
-                mode.sets.add(sticker.set_name)
+                tally.sets.add(sticker.set_name)
             except (StickerSetNotFoundError, StickerSetUnavailableError):
                 stickers = [sticker]
         result = self._sticker_library.add_stickers(stickers)
-        mode.added += result.added
-        mode.already_there += result.already_there
+        tally.added += result.added
+        tally.already_there += result.already_there
+
+    def _react(self, message: IncomingMessage) -> None:
+        """Put the "added" reaction on a sticker, logging a refusal.
+
+        Args:
+            message: The sticker message.
+        """
+        try:
+            self._chat_channel.react(
+                message.chat_id, message.message_id, ADDED_REACTION
+            )
+        except Exception:
+            logger.exception("Could not react to an added sticker")
 
     def _restart_quiet_gap(self, user_id: UUID) -> None:
         """Start the wait after which adding mode ends, again.
@@ -299,7 +335,7 @@ class StickerAdding:
             f"sticker-adding:{user_id}", minutes * 60, lambda: self.finish(user_id)
         )
 
-    def _send_summary(self, user_id: UUID, chat_id: int, mode: AddingMode) -> None:
+    def _send_summary(self, user_id: UUID, chat_id: int, tally: StickerTally) -> None:
         """Tell the Admin what was added, with a reminder to write notes.
 
         The reminder is left out when nothing new was added.
@@ -307,12 +343,24 @@ class StickerAdding:
         Args:
             user_id: The Admin.
             chat_id: The chat to send it in.
-            mode: What was added.
+            tally: What was added.
         """
-        summary = added_summary(mode)
-        if mode.added:
+        summary = added_summary(tally)
+        if tally.added:
             template = self._repositories.platform_settings.get(SUMMARY_SETTING)
             summary = template.replace("{added}", summary).replace(
                 "{dashboard_url}", self._dashboard_url
             )
         self._deliver_notice(user_id, chat_id, summary)
+
+    def _is_admin(self, user_id: UUID) -> bool:
+        """Tell whether a User is an Admin right now.
+
+        Args:
+            user_id: The User.
+
+        Returns:
+            True if they are an Admin.
+        """
+        user = self._repositories.users.get(user_id)
+        return user is not None and user.role == UserRole.ADMIN

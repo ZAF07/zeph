@@ -154,6 +154,29 @@ def test_in_single_mode_each_sticker_is_added_with_a_reaction_and_no_reply(
     assert chat_model.safeguard_calls == []
 
 
+def test_a_refused_reaction_still_adds_and_counts_the_sticker(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    seeded_settings: dict[str, Any],
+) -> None:
+    admin = connect_owner_telegram(client, auth_verifier, chat_channel)
+    start_adding(client, chat_model, chat_channel, "single_stickers")
+    chat_channel.reaction_failure = RuntimeError("Too Many Requests")
+
+    assert send_to_webhook(client, owner_sticker("🌊", "wave")) == 200
+    assert send_to_webhook(client, owner_sticker("🌙", "moon")) == 200
+
+    assert len(list_stickers(client, admin)) == 2
+    assert chat_model.calls == []
+    chat_model.script("Nice")
+    send_to_webhook(client, owner_text("done"))
+    assert chat_channel.texts_sent_to(OWNER_TELEGRAM_USER_ID)[0] == summary(
+        seeded_settings, "Added 2 stickers."
+    )
+
+
 def test_a_message_that_isnt_a_sticker_ends_adding_mode_with_a_summary_first(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,

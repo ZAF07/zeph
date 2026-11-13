@@ -9,11 +9,10 @@ from companion.core.models import (
     ConversationTurn,
     IncomingMessage,
     MessageKind,
-    UserRole,
 )
 from companion.core.photos import PhotoService
 from companion.core.ports import ChatChannel, ConversationEngine, Repositories, Timer
-from companion.core.sticker_adding import StickerAdding, add_request
+from companion.core.sticker_adding import StickerAdding
 from companion.core.stickers import sticker_message_text
 from companion.core.telegram_connection import TelegramConnectionService
 
@@ -148,7 +147,7 @@ class IncomingMessageHandler:
         ):
             return
         self._sticker_adding.finish(connection.user_id)
-        if self._added_replied_sticker(connection.user_id, message):
+        if self._sticker_adding.add_if_asked(connection.user_id, message):
             return
         settings = self._repositories.platform_settings
         if message.album_id is not None:
@@ -164,24 +163,6 @@ class IncomingMessageHandler:
             message.chat_id,
             lambda: self._turn_for(connection.user_id, message),
         )
-
-    def _added_replied_sticker(self, user_id: UUID, message: IncomingMessage) -> bool:
-        """Add the sticker an Admin replied "add this" or "add this set" to.
-
-        Args:
-            user_id: The User who sent the message.
-            message: The message.
-
-        Returns:
-            True if it was such a reply from an Admin and the sticker, or its
-            set, was added; False if the message is just chat.
-        """
-        choice = add_request(message.text)
-        sticker = message.replied_sticker
-        if sticker is None or choice is None or not self._is_admin(user_id):
-            return False
-        self._sticker_adding.add_replied(user_id, message.chat_id, sticker, choice)
-        return True
 
     def _collect_album_item(self, user_id: UUID, message: IncomingMessage) -> None:
         """Keep an album's photo or file and restart the wait for the rest of it.
@@ -313,18 +294,6 @@ class IncomingMessageHandler:
             photos=photo_message.photos,
             safeguard_text=photo_message.safeguard_text,
         )
-
-    def _is_admin(self, user_id: UUID) -> bool:
-        """Tell whether a User is an Admin right now.
-
-        Args:
-            user_id: The User.
-
-        Returns:
-            True if they are an Admin.
-        """
-        user = self._repositories.users.get(user_id)
-        return user is not None and user.role == UserRole.ADMIN
 
     def _turn_lock_for(self, user_id: UUID) -> threading.Lock:
         """Get the lock that keeps one User's turns from overlapping.
