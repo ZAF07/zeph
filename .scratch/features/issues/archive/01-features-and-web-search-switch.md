@@ -62,4 +62,4 @@ Evidence: seam 1 `tests/test_features.py` (7: Web Search listed on with no chang
 ## Completion
 
 - Completed: 2026-11-13
-- Commit: fb78a73 "Features issue 01: Features core service with Web Search as the first Feature…", review fixes d22e509 "Features issue 01 review fixes: one feature_details helper…"
+- Commit: fb78a73 "Features issue 01: Features core service with Web Search as the first Feature…", review fixes d22e509 "Features issue 01 review fixes: one feature_details helper…", archive 50d2560 "Features issue 01 done: archive issue with run evidence…" (merged from `feat/features-01-web-search-switch` in f020e5c "Merge Features issue 01…")
