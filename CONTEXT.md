@@ -21,16 +21,28 @@ The AI conversational partner a User talks to.
 _Avoid_: Bot, assistant, agent
 
 **Persona**:
-The Companion's voice and character — human in style, honest that it is an AI. Managed by Admins. Users never pick a style: the Companion adapts to how each User messages.
+The Companion's voice and character — human in style, honest that it is an AI. Managed by Admins. In the MVP there is one Persona and Users never pick a style: the Companion adapts to how each User messages. After the MVP there will be several Personas (e.g. mindfulness, Buddhist philosophy, Japanese philosophy), and Users choose one from those their plan includes.
 _Avoid_: System prompt, personality, character
 
 **Sticker Library**:
 The Admin-managed set of stickers the Companion may send, at most one per reply. Each has a "when to use" note; a sticker without one is never sent. A sticker an Admin sends the Companion from their own Telegram is added to the library rather than answered. Stickers Users send are read through their emoji.
 _Avoid_: Sticker pack, emoji set
 
+**Shared Photo**:
+A photo a User sent the Companion that matters to them, picked when the Conversation ends and kept as part of their User Memory, with a detailed description written when it arrived and a note on why it matters. Other photos are used only in the Conversation they came in. The Companion works from the description and looks at the photo again only when the description can't answer. It may send a User's own Shared Photo back to them, the way a friend brings up an old memory. It stays after Message Retention deletes the message it came in, until the User deletes it.
+_Avoid_: Image, picture, attachment, media
+
+**Photo Viewing**:
+A User's choice, on by default, to let the Companion look at the photos they send. When it's off, the Companion doesn't look at their photos or keep them, answers only the caption and says plainly it didn't view the photo; their Shared Photos aren't used but aren't deleted. Every photo is still checked by the Safeguard, whatever this choice, and Users are told so plainly.
+_Avoid_: Image recognition, vision, photo mode
+
 **Unsupported Message**:
-Something a User sends that the Companion can't read yet, like a voice note or photo. It gets a short in-character reply asking them to type instead; any caption it carries is answered like a message.
+Something a User sends that the Companion can't read yet, like a voice note or file. It gets a short in-character reply asking them to type instead; any caption it carries is answered like a message.
 _Avoid_: Media message, attachment
+
+**Feature**:
+An extra the Companion offers that can be switched off: Web Search, Check-ins, User Memory, Photo Viewing, Stickers, Knowledge and Settings in Chat. Admins switch each one on or off for everyone, and for individual Users; a choice for one User overrides the one for everyone. A Feature works for a User only when the Admins allow it and, where the User has their own switch, the User has it on. Delete My Data works in chat even when Settings in Chat is off. Safety and a User's rights and privacy are never Features: the Safeguard and Crisis Reply, the AI Notice, Delete My Data and seeing their own data on the Dashboard are always there.
+_Avoid_: Capability, add-on, perk, entitlement
 
 **Telegram Connection**:
 The link between a User's account and their Telegram account, made once from the Dashboard. A User must have one to talk to the Companion.
@@ -91,7 +103,7 @@ _Avoid_: Disclaimer, warning, terms
 ### Safety
 
 **Safeguard**:
-The check on every incoming message, read in the light of the Conversation so far, for signs of crisis (suicide or self-harm, danger to others, abuse, medical emergency). Everyday stress or sadness is not a crisis. When the Safeguard can't tell, it treats the message as a crisis: a false alarm is better than a missed crisis.
+The check on every incoming message, photos included, read in the light of the Conversation so far, for signs of crisis (suicide or self-harm, danger to others, abuse, medical emergency). Everyday stress or sadness is not a crisis. When the Safeguard can't tell, it treats the message as a crisis: a false alarm is better than a missed crisis.
 _Avoid_: Filter, moderation, guardrail
 
 **Crisis Reply**:
@@ -113,7 +125,7 @@ _Avoid_: Alert, incident, flag
 ### User Memory
 
 **User Memory**:
-Everything the Companion has retained about a specific User, made up of Memory Items and Conversation Summaries. The User can turn it off: then nothing new is kept and the Companion doesn't use what it has, but nothing is deleted until the User deletes it.
+Everything the Companion has retained about a specific User, made up of Memory Items, Conversation Summaries and Shared Photos. The User can turn it off: then nothing new is kept and the Companion doesn't use what it has, but nothing is deleted until the User deletes it.
 _Avoid_: Memory, profile, history, context
 
 **Memory Item**:
