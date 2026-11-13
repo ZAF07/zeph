@@ -88,4 +88,4 @@ Evidence:
 ## Completion
 
 - Completed: 2026-11-13
-- Commit: b7af9cb "Features issue 04: User Memory and Check-ins join the Feature list…", review fixes 34e690a "Features issue 04 review fixes: Home Check-ins card shows \"Not available on your account\"…"
+- Commit: b7af9cb "Features issue 04: User Memory and Check-ins join the Feature list…", review fixes 34e690a "Features issue 04 review fixes: Home Check-ins card shows \"Not available on your account\"…", archive 57014ae "Features issue 04 done: archive issue with run evidence…" (merged from `feat/features-04-user-memory-and-check-ins` in adf7e64 "Merge Features issue 04…"; `make check` green on main after the merge: Python 370 passed, web 287 passed)
