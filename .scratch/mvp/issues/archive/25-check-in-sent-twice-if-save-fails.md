@@ -87,3 +87,11 @@ Caveats:
 - A 400 such as "chat not found" is still a refusal retried every 15 minutes. That only happens if a Telegram link points at a chat that no longer exists.
 - When the text's result is unknown, the Shared Photo is still sent, since the Check-in counts as sent.
 - If clearing the Shared Photo after a failed photo send also fails, the Check-in keeps a photo that wasn't sent. This is logged, not a repeat send.
+
+## Completion
+
+- Completed: 2026-11-13
+- Commit: 77ed53c (merge into main): "Merge MVP issue 25: a Check-in and the "would you like fewer?" message are now saved (with the next due time, and the pause for "fewer?") before they are sent, so a failed save sends nothing and the next tick tries again; …"
+  - 73263b0 "MVP issue 25: a Check-in is saved before it is sent, so a failed save never sends it twice"
+  - dfc31a7 "MVP issue 25 review fixes: undoing a refused Check-in keeps a pause set meanwhile, and any 403 from Telegram counts as blocked"
+  - 8ac1e2c "MVP issue 25 done: archive issue with test, run and review evidence; glossary says a Skipped Check-in covers any User Telegram won't reach"
