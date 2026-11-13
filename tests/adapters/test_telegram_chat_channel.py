@@ -1,4 +1,5 @@
 import json
+import logging
 from collections.abc import Callable
 
 import httpx
@@ -6,6 +7,7 @@ import pytest
 
 from companion.adapters.telegram.chat_channel import (
     PhotoDownloadError,
+    TelegramApiError,
     TelegramChatChannel,
 )
 from companion.core.models import ChannelSticker, PhotoImage, StickerImage
@@ -78,8 +80,13 @@ def test_a_refused_photo_raises() -> None:
         [],
     )
 
-    with pytest.raises(httpx.HTTPStatusError):
+    with pytest.raises(TelegramApiError) as raised:
         channel.send_photo(42, "file-gone")
+
+    assert raised.value.status_code == 400
+    assert str(raised.value) == (
+        "Telegram sendPhoto failed with status 400: Bad Request: wrong file id"
+    )
 
 
 def test_a_sticker_set_is_read_with_an_image_for_each_sticker() -> None:
@@ -215,5 +222,66 @@ def test_a_photo_telegram_refuses_raises_its_error() -> None:
         lambda path, body: httpx.Response(400, json={"ok": False}), []
     )
 
-    with pytest.raises(httpx.HTTPStatusError):
+    with pytest.raises(TelegramApiError):
         channel.download_photo("p4")
+
+
+def test_a_refused_file_download_raises_without_the_token() -> None:
+    def answer(path: str, body: dict[str, object]) -> httpx.Response:
+        if path.endswith("/getFile"):
+            return ok({"file_id": "p5", "file_path": "photos/file_9.jpg"})
+        return httpx.Response(404, json={"ok": False, "description": "Not Found"})
+
+    channel = channel_answering(answer, [])
+
+    with pytest.raises(TelegramApiError) as raised:
+        channel.download_photo("p5")
+
+    assert raised.value.status_code == 404
+    assert (
+        str(raised.value) == "Telegram file download failed with status 404: Not Found"
+    )
+    assert "123:abc" not in str(raised.value)
+
+
+def test_a_refused_call_leaves_the_token_out_of_the_logged_traceback(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    channel = channel_answering(
+        lambda path, body: httpx.Response(
+            400, json={"ok": False, "description": "Bad Request: chat not found"}
+        ),
+        [],
+    )
+
+    with pytest.raises(TelegramApiError) as raised:
+        channel.send_text(999, "hello")
+    logging.getLogger("test").error("Reply failed", exc_info=raised.value)
+
+    assert raised.value.__cause__ is None
+    assert raised.value.__suppress_context__
+    assert "123:abc" not in str(raised.value)
+
+    assert "Bad Request: chat not found" in caplog.text
+    assert "sendMessage" in caplog.text
+    assert "123:abc" not in caplog.text
+    assert "api.telegram.org/bot" not in caplog.text
+
+
+def test_an_unreachable_telegram_raises_without_the_token() -> None:
+    def unreachable(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError(f"cannot reach {request.url}", request=request)
+
+    channel = TelegramChatChannel(
+        "123:abc",
+        http_client=httpx.Client(transport=httpx.MockTransport(unreachable)),
+    )
+
+    with pytest.raises(TelegramApiError) as raised:
+        channel.send_text(42, "hello")
+
+    assert raised.value.status_code is None
+    assert (
+        str(raised.value) == "Telegram sendMessage could not be reached: ConnectError"
+    )
+    assert raised.value.__cause__ is None

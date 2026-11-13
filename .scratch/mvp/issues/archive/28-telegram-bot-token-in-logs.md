@@ -1,6 +1,6 @@
 # 28 — The Telegram bot token shows up in backend logs
 
-Status: ready-for-agent
+Status: completed
 
 ## Parent
 
@@ -40,11 +40,28 @@ In `chat_channel.py`, catch `httpx.HTTPError` in `_call` and the file download a
 
 ## Acceptance criteria
 
-- [ ] A failed Telegram call or file download raises our own Telegram error whose message has the method name, status code and Telegram's `description`, and never the token; the httpx error is not chained (`from None`)
-- [ ] A test fails a Telegram call through a fake httpx transport and checks the token appears nowhere in the error text or the logged traceback
-- [ ] At startup the backend sets the `httpx` and `httpcore` loggers to WARNING, with a test
-- [ ] `/run`: a reply that fails (chat ID that doesn't exist) leaves no `api.telegram.org/bot` in `docker compose logs backend`
+- [x] A failed Telegram call or file download raises our own Telegram error whose message has the method name, status code and Telegram's `description`, and never the token; the httpx error is not chained (`from None`)
+- [x] A test fails a Telegram call through a fake httpx transport and checks the token appears nowhere in the error text or the logged traceback
+- [x] At startup the backend sets the `httpx` and `httpcore` loggers to WARNING, with a test
+- [x] `/run`: a reply that fails (chat ID that doesn't exist) leaves no `api.telegram.org/bot` in `docker compose logs backend`
 - [x] `docs/RESET_TELEGRAM_TOKEN_GUIDE.md` gives Admins the steps to reset the token, and issue 16 links to it (written during the grilling)
 - [ ] **(User, after merge and deploy)** Rotate the current token by following the guide
 
 ## Comments
+
+Implementation (2026-11-13): `TelegramApiError` in `src/companion/adapters/telegram/chat_channel.py` replaces every httpx error leaving `_call` and `_download`, raised `from None`. Its message is "Telegram <method> failed with status <code>: <description>" (or "could not be reached: <ErrorType>" for connection errors) and it keeps `status_code` for the sticker-set 400 check. `quiet_http_client_logs()` in `src/companion/main.py` runs first in `build_production_app`.
+
+Evidence:
+- Error text and no chaining: `tests/adapters/test_telegram_chat_channel.py` — `test_a_refused_photo_raises` (exact message, status 400), `test_a_refused_file_download_raises_without_the_token`, `test_an_unreachable_telegram_raises_without_the_token`, `test_an_unknown_sticker_set_is_none` (400 still means "no such set").
+- Token absent from the logged traceback: `test_a_refused_call_leaves_the_token_out_of_the_logged_traceback` (caplog has no `123:abc` and no `api.telegram.org/bot`; `__cause__` is None and context suppressed).
+- Logger pinning: `tests/test_config.py::test_http_client_loggers_are_pinned_to_warning`.
+- `/run` (worktree stack, backend on 8050): posted a webhook update from chat ID 1. The backend log shows `TelegramApiError: Telegram sendMessage failed with status 400: Bad Request: chat not found`, and `docker compose logs backend | grep -c api.telegram.org/bot` gives 0.
+- Checks: `uv run pytest` 508 passed, 9 deselected; `ruff check`, `ruff format --check` and `mypy src` all clean. No web changes.
+- `/code-review`: no Standards violations and no Spec findings. Applied the optional points: clearer helper names (`to_telegram_api_error`, `telegram_error_description`) and `pytest.raises` in the traceback test.
+
+Still open (User step, after merge and deploy): rotate the current token by following `docs/RESET_TELEGRAM_TOKEN_GUIDE.md`. The fix must be running first, otherwise the next failed call leaks the new token too.
+
+## Completion
+
+- Completed: 2026-11-13
+- Commit: <to be filled in after merge>

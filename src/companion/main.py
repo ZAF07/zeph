@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable
 from pathlib import Path
 
@@ -47,6 +48,7 @@ MEMORY_CATEGORIES_SEED_FILE = SEED_DIR / "memory_categories.yaml"
 CHECK_IN_KINDS_SEED_FILE = SEED_DIR / "check_in_kinds.yaml"
 KNOWLEDGE_SEED_FILE = SEED_DIR / "knowledge" / "knowledge.yaml"
 SCHEDULER_INTERVAL_SECONDS = 60
+HTTP_CLIENT_LOGGER_NAMES = ("httpx", "httpcore")
 
 
 class UnknownAdapterError(Exception):
@@ -318,6 +320,16 @@ def build_conversation_engine_factory(
     )
 
 
+def quiet_http_client_logs() -> None:
+    """Keep the HTTP client libraries from logging each request.
+
+    httpx logs every request URL at INFO, and Telegram puts the bot token in
+    its URLs, so these loggers are pinned to WARNING whatever the log level.
+    """
+    for logger_name in HTTP_CLIENT_LOGGER_NAMES:
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
+
+
 def build_production_app() -> FastAPI:
     """Build the backend app with the adapters chosen in `.env`.
 
@@ -326,6 +338,7 @@ def build_production_app() -> FastAPI:
     Returns:
         The FastAPI app.
     """
+    quiet_http_client_logs()
     settings = load_settings()
     engine = build_database_engine(settings)
     dependencies = AppDependencies(
