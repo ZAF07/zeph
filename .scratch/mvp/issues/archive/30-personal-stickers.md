@@ -92,4 +92,7 @@ Caveats:
 ## Completion
 
 - Completed: 2026-11-13
-- Commit: <to be filled in after merge>
+- Commit: c872d35 (merge into main): "Merge MVP issue 30: Personal Stickers is a Feature, off for everyone to start, that works only while Stickers does; …"
+  - e0ef800 "MVP issue 30: Personal Stickers, the Companion replies in a User's own stickers"
+  - 16bdd93 "MVP issue 30 review fixes: a Personal Sticker's last use never moves back, and the Stickers dependency says what it does"
+  - 64760a6 "MVP issue 30 done: archive issue with test, run and review evidence; glossary says a Personal Sticker is used when either side sends it"
