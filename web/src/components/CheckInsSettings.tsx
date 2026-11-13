@@ -19,6 +19,7 @@ import type {
   PauseLength,
 } from "@/lib/api-client";
 import { pausedText, toTimeFieldValue } from "@/lib/check-ins";
+import { notAvailableText } from "@/lib/features";
 import { timeZoneOptions } from "@/lib/time-zones";
 import { useApiClient } from "@/lib/use-api-client";
 
@@ -121,7 +122,7 @@ export function CheckInsSettings() {
   }
   let switchLabel = "Check-ins on";
   if (checkIns && !checkIns.available) {
-    switchLabel = "Not available on your account";
+    switchLabel = notAvailableText;
   } else if (checkIns && !checkIns.enabled) {
     switchLabel = "Check-ins off";
   } else if (checkIns?.paused) {

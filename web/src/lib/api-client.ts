@@ -311,6 +311,7 @@ export type RememberedItem = MemoryItem & { category: string };
  */
 export type HomeCheckIns = {
   enabled: boolean;
+  available: boolean;
   frequency: CheckInFrequency;
   quiet_hours_start: string;
   quiet_hours_end: string;

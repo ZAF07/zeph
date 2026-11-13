@@ -861,11 +861,14 @@ def test_with_check_ins_off_by_an_admin_none_are_sent_until_it_is_back_on(
     sent_while_off = list(chat_channel.sent)
     calls_while_off = list(chat_model.calls)
     check_ins_while_off = client.get("/api/check-ins", headers=maya).json()
+    home_while_off = client.get("/api/home", headers=maya).json()["check_ins"]
     switch_for_user(client, admin, user_id, "check_ins", "default")
     scheduler.tick()
 
     assert sent_while_off == []
     assert calls_while_off == []
+    assert home_while_off["enabled"] is True
+    assert home_while_off["available"] is False
     assert check_ins_while_off["enabled"] is True
     assert check_ins_while_off["recent"] == []
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["hey Maya, how's it going?"]

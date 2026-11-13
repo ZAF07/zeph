@@ -193,6 +193,7 @@ class HomeCheckInsResponse(BaseModel):
     """A User's Check-in status and the last Check-in sent; never a next time."""
 
     enabled: bool
+    available: bool
     frequency: CheckInFrequency
     quiet_hours_start: time
     quiet_hours_end: time
@@ -375,7 +376,7 @@ def build_dashboard_api_router(
     router = APIRouter(prefix="/api")
     telegram_chat_url = f"https://t.me/{telegram_bot_username}"
 
-    def describe_me(user: User) -> MeResponse:
+    def me_response(user: User) -> MeResponse:
         """Describe a User, with whether User Memory is available to them.
 
         Args:
@@ -465,6 +466,7 @@ def build_dashboard_api_router(
             last_conversation_at=home.last_conversation_at,
             check_ins=HomeCheckInsResponse(
                 enabled=settings.enabled,
+                available=feature_service.available_for(user.id, Feature.CHECK_INS),
                 frequency=settings.frequency,
                 quiet_hours_start=settings.quiet_hours_start,
                 quiet_hours_end=settings.quiet_hours_end,
@@ -501,7 +503,7 @@ def build_dashboard_api_router(
         Returns:
             The User.
         """
-        return describe_me(user)
+        return me_response(user)
 
     @router.patch("/me")
     def update_me(
@@ -527,7 +529,7 @@ def build_dashboard_api_router(
             time_zone=request.time_zone,
         )
         try:
-            return describe_me(user_service.update_preferences(user, changes))
+            return me_response(user_service.update_preferences(user, changes))
         except InvalidProfileError as error:
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
@@ -604,7 +606,7 @@ def build_dashboard_api_router(
             ),
         )
         try:
-            return describe_me(user_service.complete_onboarding(user, answers))
+            return me_response(user_service.complete_onboarding(user, answers))
         except InvalidProfileError as error:
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)

@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
 import { Switch } from "@/components/Switch";
+import { notAvailableText } from "@/lib/features";
 import { paragraphs } from "@/lib/paragraphs";
 import { useApiClient } from "@/lib/use-api-client";
 
@@ -71,7 +72,7 @@ export function UserMemorySetting({
       </div>
       {available ? null : (
         <p className="m-0 text-sm font-medium text-ink-soft">
-          Not available on your account
+          {notAvailableText}
         </p>
       )}
       <ChangedInChatCaption changedAt={changedAt} timeZone={timeZone} />

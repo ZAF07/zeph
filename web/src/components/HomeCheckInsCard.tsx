@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
 import type { HomeCheckIns } from "@/lib/api-client";
 import { pauseEndText } from "@/lib/check-ins";
+import { notAvailableText } from "@/lib/features";
 import {
   checkInFrequencyText,
   lastCheckInText,
@@ -14,8 +15,9 @@ const pill =
   "inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-[3px] text-xs font-medium";
 
 /**
- * The Dashboard home card for Check-ins: on, paused until a day, or off,
- * and the last Check-in sent. Never a next time.
+ * The Dashboard home card for Check-ins: on, paused until a day, off, or
+ * not available on the User's account, and the last Check-in sent. Never a
+ * next time.
  *
  * @param props - `checkIns` is the User's Check-in status; `timeZone` is
  *   theirs, to show days in.
@@ -39,7 +41,12 @@ export function HomeCheckInsCard({
       >
         Check-ins
       </h2>
-      {!checkIns.enabled ? (
+      {!checkIns.available ? (
+        <p className={statusLine}>
+          <span className={`${pill} bg-code text-ink-body`}>Off</span>
+          {notAvailableText}
+        </p>
+      ) : !checkIns.enabled ? (
         <p className={statusLine}>
           <span className={`${pill} bg-code text-ink-body`}>Off</span>
           Zeph only replies when you message
@@ -71,7 +78,7 @@ export function HomeCheckInsCard({
           </p>
         </div>
       )}
-      {checkIns.enabled ? (
+      {checkIns.available && checkIns.enabled ? (
         <p className="m-0 border-t border-line pt-3 text-[15px] text-ink-soft">
           {lastCheckInText(checkIns.last_sent, timeZone)}
         </p>

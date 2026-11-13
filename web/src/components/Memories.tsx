@@ -8,6 +8,7 @@ import { LoadFailed } from "@/components/LoadFailed";
 import { MemoryItemsList } from "@/components/MemoryItemsList";
 import { Switch } from "@/components/Switch";
 import type { ConversationSummary, Me, MemoryGroup } from "@/lib/api-client";
+import { notAvailableText } from "@/lib/features";
 import { useApiClient } from "@/lib/use-api-client";
 
 type LoadState =
@@ -76,11 +77,11 @@ export function Memories() {
   }
 
   const memoryOn = state.kind === "loaded" && state.me.user_memory_enabled;
-  const memoryAvailable =
-    state.kind !== "loaded" || state.me.user_memory_available;
+  const memoryUnavailable =
+    state.kind === "loaded" && !state.me.user_memory_available;
   let switchLabel = memoryOn ? "Memory on" : "Memory paused";
-  if (!memoryAvailable) {
-    switchLabel = "Not available on your account";
+  if (memoryUnavailable) {
+    switchLabel = notAvailableText;
   }
 
   return (
@@ -103,7 +104,7 @@ export function Memories() {
               <Switch
                 label="Memory"
                 checked={memoryOn}
-                disabled={isSavingSwitch || !memoryAvailable}
+                disabled={isSavingSwitch || memoryUnavailable}
                 onChange={(next) => void saveUserMemorySetting(next)}
               />
             </div>
@@ -120,7 +121,7 @@ export function Memories() {
         ) : null}
       </header>
 
-      {state.kind === "loaded" && !memoryAvailable ? (
+      {memoryUnavailable ? (
         <p
           role="status"
           className="m-0 rounded-xl bg-yellow-tint px-4 py-3.5 text-sm text-yellow-deep"
@@ -130,7 +131,7 @@ export function Memories() {
         </p>
       ) : null}
 
-      {state.kind === "loaded" && memoryAvailable && !memoryOn ? (
+      {state.kind === "loaded" && !memoryUnavailable && !memoryOn ? (
         <p
           role="status"
           className="m-0 rounded-xl bg-yellow-tint px-4 py-3.5 text-sm text-yellow-deep"
