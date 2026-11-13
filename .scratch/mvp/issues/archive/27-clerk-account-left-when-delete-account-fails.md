@@ -83,4 +83,4 @@ Open detail to settle while implementing: a User with a pending entry who signs 
 ## Completion
 
 - Completed: 2026-11-13
-- Commit: b596cc9 "Retry deleting the Clerk account when it fails during Delete account", 35514bf "Address review: harmless double delete, catch post-Clerk errors, log auth ID"
+- Commit: b596cc9 "Retry deleting the Clerk account when it fails during Delete account", 35514bf "Address review: harmless double delete, catch post-Clerk errors, log auth ID", archive and glossary 6cdcb62 "MVP issue 27 done: archive issue with test, run and review evidence; glossary" (merged from `mvp-27-clerk-delete-retry` in 7ff9487 "Merge MVP issue 27: a failed Clerk call during Delete account no longer leaves the Clerk account behind…")
