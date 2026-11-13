@@ -64,4 +64,4 @@ Still open (User step, after merge and deploy): rotate the current token by foll
 ## Completion
 
 - Completed: 2026-11-13
-- Commit: <to be filled in after merge>
+- Commit: 813439c "Issue 28: Telegram errors no longer carry the bot token", review fixes 45477bb "Issue 28: clearer helper names and pytest.raises in the traceback test (review)", archive d368fdc "MVP issue 28 done: archive issue with test, run and review evidence" on branch `mvp-28-telegram-token-logs` (merged into main in d30b9fa "Merge MVP issue 28: failed Telegram calls and file downloads now raise TelegramApiError with the method, status code and Telegram's description instead of an httpx error whose URL held the bot token…")
