@@ -14,9 +14,11 @@ from tests.fakes import (
     FakeChatChannel,
     FakeClock,
     ScriptedChatModel,
+    ToolCall,
 )
 from tests.telegram_helpers import (
     OWNER_TELEGRAM_USER_ID,
+    TELEGRAM_CHAT_ID,
     auth_headers,
     connect_owner_telegram,
     connect_telegram,
@@ -430,6 +432,32 @@ def test_delete_my_data_keeps_a_users_switches(
     )
 
     assert response.status_code == 204
+    assert user_features_by_key(client, admin, user_id)["web_search"]["switch"] == (
+        "off"
+    )
+
+
+def test_delete_my_data_in_chat_keeps_a_users_switches(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    seeded_settings: dict[str, Any],
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    connect_telegram(client, auth_verifier, chat_channel)
+    user_id = maya_id(client, auth_verifier)
+    switch_for_user(client, admin, user_id, "web_search", "off")
+    word = seeded_settings["data_deletion_confirmation_word"]
+    chat_model.script(ToolCall("start_deleting_my_data", {}), "Reply to confirm.")
+    assert send_to_webhook(client, telegram_text_update("delete my data")) == 200
+    chat_channel.sent.clear()
+
+    assert send_to_webhook(client, telegram_text_update(word)) == 200
+
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
+        seeded_settings["data_deleted_reply"]
+    ]
     assert user_features_by_key(client, admin, user_id)["web_search"]["switch"] == (
         "off"
     )
