@@ -9,3 +9,4 @@ Users can change their settings by talking to the Companion in plain words ("giv
 - Dashboard only: Delete account, country, and disconnecting Telegram — permanent or safety-related, so a misread message must not trigger them.
 - The tools call the same core services as the Dashboard API, so both show one state; each change is recorded as made via chat.
 - The Companion says plainly what it changed in its reply. The Safeguard still runs first, so a crisis message never triggers a tool.
+- Settings in Chat is a Feature, so Admins can switch it off for everyone or one User (ready for a lower plan). When it is off, only "Delete my data" is still offered in chat, with its confirmation word, because a User's right to wipe their data never depends on a plan; for anything else the Companion says it isn't available on their account and points them to the Dashboard.

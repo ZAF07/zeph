@@ -1033,6 +1033,7 @@ class Feature(StrEnum):
     KNOWLEDGE = "knowledge"
     CHECK_INS = "check_ins"
     USER_MEMORY = "user_memory"
+    SETTINGS_IN_CHAT = "settings_in_chat"
 
 
 @dataclass(frozen=True)

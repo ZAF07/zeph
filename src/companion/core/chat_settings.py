@@ -4,11 +4,12 @@ from typing import Any
 from uuid import UUID
 
 from companion.core.check_ins import CheckInService
-from companion.core.features import FeatureNotAvailableError
+from companion.core.features import FeatureNotAvailableError, FeatureService
 from companion.core.memory_retrieval import format_day
 from companion.core.models import (
     CheckInChanges,
     CheckInFrequency,
+    Feature,
     MemoryItem,
     PauseLength,
     PreferenceChanges,
@@ -20,6 +21,8 @@ from companion.core.user_memory import MemoryNotFoundError, UserMemoryService
 from companion.core.users import InvalidProfileError, UserService
 
 INSTRUCTIONS_SETTING = "reply_settings_instructions"
+DELETE_DATA_INSTRUCTIONS_SETTING = "reply_delete_data_instructions"
+DELETE_DATA_TOOL = "start_deleting_my_data"
 TELL_THEM = "Tell them plainly what you changed."
 NOTHING_CHANGED = "Nothing changed."
 FREQUENCY_WORDS = {
@@ -221,7 +224,7 @@ class ReplySettingsTools:
                 run=self._change_time_zone,
             ),
             ChatTool(
-                name="start_deleting_my_data",
+                name=DELETE_DATA_TOOL,
                 description=(
                     "Start deleting the person's data when they clearly ask to "
                     "delete their data. Nothing is deleted until they reply "
@@ -450,11 +453,16 @@ class ReplySettingsTools:
 
 
 class SettingsTools:
-    """Offers replies the tools to change a User's settings in chat (ADR-0006)."""
+    """Offers replies the tools to change a User's settings in chat (ADR-0006).
+
+    When Settings in Chat doesn't work for the User, only the tool to delete
+    their data is offered: deleting their data never depends on a Feature.
+    """
 
     def __init__(
         self,
         repositories: Repositories,
+        features: FeatureService,
         users: UserService,
         check_ins: CheckInService,
         user_memory: UserMemoryService,
@@ -464,12 +472,14 @@ class SettingsTools:
 
         Args:
             repositories: Where Users and settings are stored.
+            features: Says whether Settings in Chat works for the User.
             users: Changes User Memory and the time zone.
             check_ins: Changes Check-in settings.
             user_memory: Lists and forgets Memory Items.
             data_deletion: Asks to delete the User's data.
         """
         self._repositories = repositories
+        self._features = features
         self._users = users
         self._check_ins = check_ins
         self._user_memory = user_memory
@@ -485,7 +495,9 @@ class SettingsTools:
             user_id: The User being replied to.
 
         Returns:
-            The tools and their reply instructions.
+            The tools and their reply instructions; only the tool to delete
+            their data, with its own instructions, when Settings in Chat
+            doesn't work for them.
         """
         reply_tools = ReplySettingsTools(
             user_id,
@@ -495,7 +507,15 @@ class SettingsTools:
             self._user_memory,
             self._data_deletion,
         )
+        if self._features.works_for(user_id, Feature.SETTINGS_IN_CHAT):
+            tools = reply_tools.tools
+            instructions_key = INSTRUCTIONS_SETTING
+        else:
+            tools = [
+                tool for tool in reply_tools.tools if tool.name == DELETE_DATA_TOOL
+            ]
+            instructions_key = DELETE_DATA_INSTRUCTIONS_SETTING
         return SettingsOffer(
-            tools=reply_tools.tools,
-            instructions=self._repositories.platform_settings.get(INSTRUCTIONS_SETTING),
+            tools=tools,
+            instructions=self._repositories.platform_settings.get(instructions_key),
         )

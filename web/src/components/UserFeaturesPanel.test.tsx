@@ -197,6 +197,43 @@ describe("UserFeaturesPanel", () => {
     expect(stickers.getByText("Off: turned off for everyone")).toBeVisible();
   });
 
+  it("shows Settings in Chat and turns it off for the User", async () => {
+    const settingsInChat: UserFeatureStatus = {
+      ...webSearch,
+      feature: "settings_in_chat",
+      name: "Settings in Chat",
+    };
+    apiClient.listUserFeatures.mockResolvedValue([webSearch, settingsInChat]);
+    apiClient.setFeatureForUser.mockResolvedValue({
+      ...settingsInChat,
+      works: false,
+      reason: "off_for_user",
+      switch: "off",
+      changed_by_email: "owner@example.com",
+      changed_at: "2026-11-13T10:00:00Z",
+    });
+    const user = userEvent.setup();
+    render(<UserFeaturesPanel user={ren} onClose={() => {}} />);
+
+    await screen.findByText("Settings in Chat");
+    const settings = within(rowFor("Settings in Chat"));
+    expect(settings.getByText("On: on for everyone")).toBeVisible();
+
+    await user.click(settings.getByRole("button", { name: "Off" }));
+
+    expect(apiClient.setFeatureForUser).toHaveBeenCalledWith(
+      "ren",
+      "settings_in_chat",
+      "off",
+    );
+    expect(
+      await settings.findByText("Off: turned off for this User"),
+    ).toBeVisible();
+    expect(
+      settings.getByText(/^Changed 13 Nov, .+ by owner@example.com$/),
+    ).toBeVisible();
+  });
+
   it("keeps the switch as it was when a change fails", async () => {
     apiClient.setFeatureForUser.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
