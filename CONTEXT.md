@@ -25,8 +25,12 @@ The Companion's voice and character — human in style, honest that it is an AI.
 _Avoid_: System prompt, personality, character
 
 **Sticker Library**:
-The Admin-managed set of stickers the Companion may send, at most one per reply. Each has a "when to use" note; a sticker without one is never sent. A sticker an Admin sends the Companion from their own Telegram is added to the library rather than answered. Stickers Users send are read through their emoji. Sending stickers is the Stickers Feature: when it doesn't work for a User, the Companion sends them none, but still reads their stickers, and Admins can still add stickers by sending them.
+The Admin-managed set of global stickers the Companion may send to any User. Each has a "when to use" note written by an Admin; a sticker without one is never sent. Admins add stickers on the Dashboard, or in chat: by telling the Companion they want to add stickers (or whole sticker sets) and then sending them, until they send something that isn't a sticker or go quiet for a while; or by replying "add this" (or "add this set") to a sticker. Any other sticker an Admin sends is answered like any User's. Stickers Users send are read through their emoji. Sending stickers is the Stickers Feature: when it doesn't work for a User, the Companion sends them none, but still reads their stickers.
 _Avoid_: Sticker pack, emoji set
+
+**Personal Stickers**:
+The stickers the Companion has kept from one User, so it can reply in their own stickers and feel more like them. When a Conversation ends, it keeps the stickers whose meaning was clear from how the User used them, each with a "when to use" note it writes about the moment, never about the User (e.g. "for laughing at a small mishap"). It keeps a limited number, set by Admins, dropping the one used longest ago. They are not User Memory: the Companion never brings them up as something it remembers. A reply has at most one sticker, picked from the User's Personal Stickers or the Sticker Library, preferring theirs when it fits; a sticker in both counts as theirs. Personal Stickers is a Feature, off for everyone to start (a higher-plan extra), that works only when Stickers does; when it doesn't work, none are kept or sent, but none are deleted. Users see and can remove theirs on the Dashboard; Admins see only how many a User has. Delete My Data and Account Deletion remove them; Message Retention doesn't.
+_Avoid_: Sticker album, user stickers, saved stickers
 
 **Shared Photo**:
 A photo a User sent the Companion that matters to them, picked when the Conversation ends and kept as part of their User Memory, with a detailed description written when it arrived and a note on why it matters. Other photos are used only in the Conversation they came in. The Companion works from the description and looks at the photo again only when the description can't answer. It may send a User's own Shared Photo back to them, the way a friend brings up an old memory: rarely, at most one per reply, only one that fits what they're talking about, and never when they're struggling. A Check-in can also bring one back ("saw this again, how's the monstera doing?"). It stays after Message Retention deletes the message it came in, until the User deletes it.
@@ -45,7 +49,7 @@ Something a User sends that the Companion can't read yet, like a voice note, vid
 _Avoid_: Media message, attachment
 
 **Feature**:
-An extra the Companion offers that can be switched off: Web Search, Check-ins, User Memory, Photo Viewing, Stickers, Knowledge and Settings in Chat. Admins switch each one on or off for everyone, and for individual Users; a choice for one User overrides the one for everyone. A Feature works for a User only when the Admins allow it and, where the User has their own switch (User Memory, Check-ins), the User has it on. A switch the Admins don't allow shows as "Not available on your account" on the Dashboard and can't be changed; the Admins' choice never changes the User's own. When Settings in Chat is off, the Companion points the User to the Dashboard to change a setting, but Delete My Data still works in chat. Safety and a User's rights and privacy are never Features: the Safeguard and Crisis Reply, the AI Notice, Delete My Data and seeing their own data on the Dashboard are always there.
+An extra the Companion offers that can be switched off: Web Search, Check-ins, User Memory, Photo Viewing, Stickers, Personal Stickers, Knowledge and Settings in Chat. Admins switch each one on or off for everyone, and for individual Users; a choice for one User overrides the one for everyone. A Feature works for a User only when the Admins allow it and, where the User has their own switch (User Memory, Check-ins), the User has it on. A switch the Admins don't allow shows as "Not available on your account" on the Dashboard and can't be changed; the Admins' choice never changes the User's own. When Settings in Chat is off, the Companion points the User to the Dashboard to change a setting, but Delete My Data still works in chat. Safety and a User's rights and privacy are never Features: the Safeguard and Crisis Reply, the AI Notice, Delete My Data and seeing their own data on the Dashboard are always there.
 _Avoid_: Capability, add-on, perk, entitlement
 
 **Telegram Connection**:
@@ -193,7 +197,7 @@ How long a User's raw messages are kept, set by Admins in days. Older messages a
 _Avoid_: Data retention, TTL, history limit
 
 **Delete My Data**:
-A User's choice, on the Dashboard or in chat, to wipe their messages, User Memory, Check-in history and Telegram Connection after typing a confirmation word. In chat the confirmation must be their whole next message; anything else cancels it. Their account stays, so they can start fresh. The Admins' Feature choices for them stay too, since they are Admin settings, not the User's data.
+A User's choice, on the Dashboard or in chat, to wipe their messages, User Memory, Personal Stickers, Check-in history and Telegram Connection after typing a confirmation word. In chat the confirmation must be their whole next message; anything else cancels it. Their account stays, so they can start fresh. The Admins' Feature choices for them stay too, since they are Admin settings, not the User's data.
 _Avoid_: Reset, clear history, wipe
 
 **Account Deletion**:
