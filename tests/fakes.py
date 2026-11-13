@@ -65,8 +65,9 @@ class FakeChatChannel:
     """Chat channel that records sent messages instead of sending them.
 
     `events` lists texts, stickers, photos, reactions and typing in the
-    order they happened. Set `photo_send_failure` to make sending a photo
-    raise it, and `reaction_failure` to make reacting raise it.
+    order they happened. Queue exceptions in `text_send_failures` to make
+    the next text sends raise them. Set `photo_send_failure` to make sending
+    a photo raise it, and `reaction_failure` to make reacting raise it.
     Sticker sets and sticker images it knows are set by tests; set
     `sticker_lookup_failure` to make looking them up raise it. Photos are
     served from `photos`, or `FAKE_PHOTO` for any other file ID; queue
@@ -89,6 +90,7 @@ class FakeChatChannel:
         self.downloaded_photos: list[str] = []
         self.sent_photos: list[SentPhoto] = []
         self.photo_send_failure: Exception | None = None
+        self.text_send_failures: list[Exception] = []
 
     def send_text(self, chat_id: int, text: str) -> None:
         """Record a text message.
@@ -96,7 +98,13 @@ class FakeChatChannel:
         Args:
             chat_id: The chat the message is for.
             text: The message text.
+
+        Raises:
+            Exception: The first of the queued `text_send_failures`, if any;
+                the message is then not recorded.
         """
+        if self.text_send_failures:
+            raise self.text_send_failures.pop(0)
         self.sent.append(SentText(chat_id=chat_id, text=text))
         self.events.append(f"text: {text}")
 

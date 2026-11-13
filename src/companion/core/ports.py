@@ -13,6 +13,7 @@ from companion.core.models import (
     CheckInKindDetails,
     CheckInKindOverview,
     CheckInLogEntry,
+    CheckInSettings,
     ConnectionToken,
     Conversation,
     ConversationMessage,
@@ -103,6 +104,14 @@ class Timer(Protocol):
         ...
 
 
+class MessageRefusedError(Exception):
+    """Raised when the chat channel clearly refused a message, so it never arrived."""
+
+
+class ChatBlockedError(Exception):
+    """Raised when the chat channel refused a message because the person blocked us."""
+
+
 class ChatChannel(Protocol):
     """Sends messages to people on the chat channel (Telegram for the MVP)."""
 
@@ -112,6 +121,12 @@ class ChatChannel(Protocol):
         Args:
             chat_id: The chat to send to.
             text: The message text.
+
+        Raises:
+            ChatBlockedError: If the person blocked the Companion.
+            MessageRefusedError: If the chat channel clearly refused it.
+            Exception: Any other failure, such as a timeout; the message may
+                or may not have arrived.
         """
         ...
 
@@ -1497,6 +1512,30 @@ class CheckInRepository(Protocol):
             next_due_at: When the User's next Check-in may be sent.
             pause_until_resumed: Whether to also pause the User's Check-ins
                 until they resume.
+        """
+        ...
+
+    def undo_add(
+        self, check_in: CheckIn, settings: CheckInSettings, skipped: CheckIn | None
+    ) -> None:
+        """Take back a saved Check-in that was never sent, together.
+
+        Only the User's next due time and pause are put back, so settings
+        the User changed meanwhile are kept.
+
+        Args:
+            check_in: The saved Check-in to remove.
+            settings: The User's Check-in settings holding the next due time
+                and pause to put back.
+            skipped: A Skipped Check-in to save in its place; None for none.
+        """
+        ...
+
+    def remove_shared_photo(self, check_in_id: UUID) -> None:
+        """Mark a sent Check-in as having sent no Shared Photo.
+
+        Args:
+            check_in_id: The Check-in's ID.
         """
         ...
 

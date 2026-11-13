@@ -2621,23 +2621,49 @@ class PostgresCheckInRepository:
         if pause_until_resumed:
             user_changes |= {"check_ins_paused": True, "check_ins_paused_until": None}
         with self._engine.begin() as connection:
-            connection.execute(
-                insert(check_ins).values(
-                    id=check_in.id,
-                    user_id=check_in.user_id,
-                    outcome=check_in.outcome.value,
-                    kind_id=check_in.kind_id,
-                    message=check_in.message,
-                    skip_reason=check_in.skip_reason,
-                    decided_at=check_in.decided_at,
-                    replied_at=check_in.replied_at,
-                    shared_photo_id=check_in.shared_photo_id,
-                )
-            )
+            self._insert(connection, check_in)
             connection.execute(
                 update(users)
                 .where(users.c.id == check_in.user_id)
                 .values(**user_changes)
+            )
+
+    def undo_add(
+        self, check_in: CheckIn, settings: CheckInSettings, skipped: CheckIn | None
+    ) -> None:
+        """Take back a saved Check-in that was never sent, together.
+
+        Args:
+            check_in: The saved Check-in to remove.
+            settings: The User's Check-in settings holding the next due time
+                and pause to put back.
+            skipped: A Skipped Check-in to save in its place; None for none.
+        """
+        with self._engine.begin() as connection:
+            connection.execute(delete(check_ins).where(check_ins.c.id == check_in.id))
+            if skipped is not None:
+                self._insert(connection, skipped)
+            connection.execute(
+                update(users)
+                .where(users.c.id == check_in.user_id)
+                .values(
+                    check_in_next_due_at=settings.next_due_at,
+                    check_ins_paused=settings.paused,
+                    check_ins_paused_until=settings.paused_until,
+                )
+            )
+
+    def remove_shared_photo(self, check_in_id: UUID) -> None:
+        """Mark a sent Check-in as having sent no Shared Photo.
+
+        Args:
+            check_in_id: The Check-in's ID.
+        """
+        with self._engine.begin() as connection:
+            connection.execute(
+                update(check_ins)
+                .where(check_ins.c.id == check_in_id)
+                .values(shared_photo_id=None)
             )
 
     def list_recent(self, user_id: UUID, limit: int) -> list[CheckIn]:
@@ -2729,6 +2755,28 @@ class PostgresCheckInRepository:
                 self._select_check_ins().where(check_ins.c.id == claimed_id)
             ).one()
         return self._to_check_in(row)
+
+    @staticmethod
+    def _insert(connection: Connection, check_in: CheckIn) -> None:
+        """Save one Check-in decision on an open connection.
+
+        Args:
+            connection: The connection, inside a transaction.
+            check_in: The Check-in decision.
+        """
+        connection.execute(
+            insert(check_ins).values(
+                id=check_in.id,
+                user_id=check_in.user_id,
+                outcome=check_in.outcome.value,
+                kind_id=check_in.kind_id,
+                message=check_in.message,
+                skip_reason=check_in.skip_reason,
+                decided_at=check_in.decided_at,
+                replied_at=check_in.replied_at,
+                shared_photo_id=check_in.shared_photo_id,
+            )
+        )
 
     @staticmethod
     def _select_check_ins() -> Select[Any]:

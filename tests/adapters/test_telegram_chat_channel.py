@@ -11,6 +11,7 @@ from companion.adapters.telegram.chat_channel import (
     TelegramChatChannel,
 )
 from companion.core.models import ChannelSticker, PhotoImage, StickerImage
+from companion.core.ports import ChatBlockedError, MessageRefusedError
 
 
 def test_typing_is_shown_with_a_chat_action() -> None:
@@ -105,6 +106,73 @@ def test_a_refused_photo_raises() -> None:
     assert str(raised.value) == (
         "Telegram sendPhoto failed with status 400: Bad Request: wrong file id"
     )
+
+
+def refusal(status_code: int, description: str) -> httpx.Response:
+    """A Bot API answer refusing a call."""
+    return httpx.Response(
+        status_code,
+        json={"ok": False, "error_code": status_code, "description": description},
+    )
+
+
+def test_a_blocked_bot_is_told_apart_from_other_refusals() -> None:
+    channel = channel_answering(
+        lambda path, body: refusal(403, "Forbidden: bot was blocked by the user"), []
+    )
+
+    with pytest.raises(ChatBlockedError) as raised:
+        channel.send_text(42, "hey")
+
+    assert not isinstance(raised.value, MessageRefusedError)
+    assert isinstance(raised.value, TelegramApiError)
+    assert raised.value.status_code == 403
+
+
+@pytest.mark.parametrize(
+    ("status_code", "description"),
+    [
+        (400, "Bad Request: chat not found"),
+        (403, "Forbidden: user is deactivated"),
+        (429, "Too Many Requests: retry after 5"),
+    ],
+)
+def test_a_clear_refusal_is_a_message_refused_error(
+    status_code: int, description: str
+) -> None:
+    channel = channel_answering(
+        lambda path, body: refusal(status_code, description), []
+    )
+
+    with pytest.raises(MessageRefusedError) as raised:
+        channel.send_text(42, "hey")
+
+    assert isinstance(raised.value, TelegramApiError)
+    assert raised.value.status_code == status_code
+
+
+def test_a_server_error_leaves_the_result_unknown() -> None:
+    channel = channel_answering(lambda path, body: refusal(502, "Bad Gateway"), [])
+
+    with pytest.raises(TelegramApiError) as raised:
+        channel.send_text(42, "hey")
+
+    assert not isinstance(raised.value, (MessageRefusedError, ChatBlockedError))
+
+
+def test_a_timeout_leaves_the_result_unknown() -> None:
+    def time_out(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("timed out", request=request)
+
+    channel = TelegramChatChannel(
+        "123:abc", http_client=httpx.Client(transport=httpx.MockTransport(time_out))
+    )
+
+    with pytest.raises(TelegramApiError) as raised:
+        channel.send_text(42, "hey")
+
+    assert raised.value.status_code is None
+    assert not isinstance(raised.value, (MessageRefusedError, ChatBlockedError))
 
 
 def test_a_sticker_set_is_read_with_an_image_for_each_sticker() -> None:

@@ -28,7 +28,13 @@ from companion.core.models import (
     SharedPhoto,
     User,
 )
-from companion.core.ports import ChatChannel, Clock, Repositories
+from companion.core.ports import (
+    ChatBlockedError,
+    ChatChannel,
+    Clock,
+    MessageRefusedError,
+    Repositories,
+)
 from companion.core.settings_changes import record_where_changed
 from companion.core.timing import check_in_reply_window, is_open, quiet_gap
 from companion.core.usage import UsageRecordingChatModel
@@ -40,6 +46,8 @@ CHECK_INS_TOLD_TO_MODEL = 5
 CHECK_INS_LOOKED_BACK_FOR_IGNORES = 100
 CHECK_INS_LOOKED_BACK_FOR_LAST_SENT = 100
 MEMORY_INTRO = "What you remember about them:"
+REFUSED_CHECK_IN_RETRY_GAP = timedelta(minutes=15)
+BLOCKED_SKIP_REASON = "User has blocked the Companion on Telegram"
 PAUSE_LENGTHS = {
     PauseLength.DAY: timedelta(days=1),
     PauseLength.WEEK: timedelta(weeks=1),
@@ -610,8 +618,8 @@ class CheckInService:
         A User is due when Check-ins work for them, the frequency gap has passed,
         they are not paused, it is outside their quiet hours, they have a
         Telegram Connection and no open Conversation. A decision that fails
-        is logged and tried again on the next tick; the others still go
-        ahead.
+        before it is saved is logged and tried again on the next tick; the
+        others still go ahead.
         """
         now = self._clock.now()
         for user in self._repositories.check_ins.list_due_users(now):
@@ -627,8 +635,8 @@ class CheckInService:
         gets the "would you like fewer?" message and their Check-ins pause.
         Otherwise the Check-in model decides on a Kind and message, or to
         skip. Kinds that send a Shared Photo are offered only to a User with
-        Shared Photos in use. Either way the next attempt is one frequency
-        gap later.
+        Shared Photos in use. The next attempt is one frequency gap later,
+        unless the chat channel refuses the message.
 
         Args:
             user: A User whose next Check-in is due.
@@ -661,59 +669,123 @@ class CheckInService:
             return
         decision = self._decide(user, kinds, shared_photos, local_time)
         if decision.kind is None:
-            check_in = CheckIn(
+            skipped = CheckIn(
                 id=uuid4(),
                 user_id=user.id,
                 outcome=CheckInOutcome.SKIPPED,
                 decided_at=now,
                 skip_reason=decision.skip_reason,
             )
-        else:
-            self._chat_channel.send_text(connection.telegram_chat_id, decision.message)
-            sent_photo_id = self._send_shared_photo(
-                connection.telegram_chat_id, decision.shared_photo
+            self._repositories.check_ins.add(
+                skipped, next_due_at, pause_until_resumed=False
             )
-            check_in = CheckIn(
+            return
+        shared_photo = decision.shared_photo
+        check_in = CheckIn(
+            id=uuid4(),
+            user_id=user.id,
+            outcome=CheckInOutcome.SENT,
+            decided_at=now,
+            kind_id=decision.kind.id,
+            message=decision.message,
+            shared_photo_id=shared_photo.id if shared_photo is not None else None,
+        )
+        was_sent = self._save_then_send(
+            user,
+            connection.telegram_chat_id,
+            decision.message,
+            check_in,
+            next_due_at,
+            pause_until_resumed=False,
+        )
+        if (
+            was_sent
+            and shared_photo is not None
+            and not self._send_shared_photo(connection.telegram_chat_id, shared_photo)
+        ):
+            self._repositories.check_ins.remove_shared_photo(check_in.id)
+
+    def _save_then_send(
+        self,
+        user: User,
+        chat_id: int,
+        message: str,
+        check_in: CheckIn,
+        next_due_at: datetime,
+        pause_until_resumed: bool,
+    ) -> bool:
+        """Save a Check-in and the User's next due time, then send its message.
+
+        Saving first means a failed save sends nothing, so a Check-in is
+        never sent twice. If the chat channel clearly refuses the message,
+        the Check-in is taken back and tried again 15 minutes later. If the
+        User blocked the Companion, a Skipped Check-in takes its place and
+        the next attempt is one frequency gap later, with no pause. Any other
+        failure, such as a timeout, may still have delivered it, so it counts
+        as sent. If taking it back fails, that Check-in is missed.
+
+        Args:
+            user: The User it is for.
+            chat_id: Their Telegram chat.
+            message: The message to send.
+            check_in: The Check-in to save.
+            next_due_at: When their next Check-in may be sent.
+            pause_until_resumed: Whether sending it pauses their Check-ins
+                until they resume.
+
+        Returns:
+            True if the message counts as sent.
+        """
+        self._repositories.check_ins.add(check_in, next_due_at, pause_until_resumed)
+        try:
+            self._chat_channel.send_text(chat_id, message)
+        except ChatBlockedError:
+            skipped = CheckIn(
                 id=uuid4(),
                 user_id=user.id,
-                outcome=CheckInOutcome.SENT,
-                decided_at=now,
-                kind_id=decision.kind.id,
-                message=decision.message,
-                shared_photo_id=sent_photo_id,
+                outcome=CheckInOutcome.SKIPPED,
+                decided_at=check_in.decided_at,
+                skip_reason=BLOCKED_SKIP_REASON,
             )
-        self._repositories.check_ins.add(
-            check_in, next_due_at, pause_until_resumed=False
-        )
+            settings = replace(user.check_ins, next_due_at=next_due_at)
+            self._repositories.check_ins.undo_add(check_in, settings, skipped)
+            return False
+        except MessageRefusedError as error:
+            logger.warning("The chat channel refused a Check-in: %s", error)
+            retry_at = check_in.decided_at + REFUSED_CHECK_IN_RETRY_GAP
+            settings = replace(user.check_ins, next_due_at=retry_at)
+            self._repositories.check_ins.undo_add(check_in, settings, skipped=None)
+            return False
+        except Exception:
+            logger.exception("Could not tell if a Check-in arrived; it counts as sent")
+        return True
 
-    def _send_shared_photo(
-        self, chat_id: int, shared_photo: SharedPhoto | None
-    ) -> UUID | None:
-        """Send a Check-in's Shared Photo after its message, if it has one.
+    def _send_shared_photo(self, chat_id: int, shared_photo: SharedPhoto) -> bool:
+        """Send a Check-in's Shared Photo after its message.
 
         If Telegram refuses it, the error is logged and the message still
         counts as sent.
 
         Args:
             chat_id: The User's Telegram chat.
-            shared_photo: The Shared Photo to send; None if there is none.
+            shared_photo: The Shared Photo to send.
 
         Returns:
-            The sent Shared Photo's ID; None if none was sent.
+            True if the photo was sent.
         """
-        if shared_photo is None:
-            return None
         try:
             self._chat_channel.send_photo(chat_id, shared_photo.file_id)
         except Exception:
             logger.exception("Could not send the Check-in's Shared Photo")
-            return None
-        return shared_photo.id
+            return False
+        return True
 
     def _ask_about_fewer(
         self, user: User, chat_id: int, now: datetime, next_due_at: datetime
     ) -> None:
         """Send the "would you like fewer?" message and pause the User's Check-ins.
+
+        It is saved before it is sent, like any Check-in.
 
         Args:
             user: The User who ignored too many Check-ins in a row.
@@ -722,8 +794,10 @@ class CheckInService:
             next_due_at: When their next Check-in may be sent once resumed.
         """
         message = self._repositories.platform_settings.get("check_in_fewer_message")
-        self._chat_channel.send_text(chat_id, message)
-        self._repositories.check_ins.add(
+        self._save_then_send(
+            user,
+            chat_id,
+            message,
             CheckIn(
                 id=uuid4(),
                 user_id=user.id,
