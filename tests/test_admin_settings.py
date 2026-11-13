@@ -129,6 +129,10 @@ def test_a_shorter_quiet_gap_starts_a_new_conversation_sooner(
         {"message_retention_days": 0},
         {"message_retention_days": 366},
         {"photo_retry_count": 6},
+        {"photo_album_wait_seconds": 0},
+        {"photo_album_wait_seconds": 31},
+        {"photo_album_max_photos": 0},
+        {"photo_album_max_photos": 11},
         {"photo_model": "not-a-model"},
     ],
 )
@@ -224,6 +228,8 @@ def test_the_photo_settings_are_editable_with_their_seeded_values(
 
     assert settings["photo_model"]["value"] == "deepseek-chat"
     assert settings["photo_retry_count"]["value"] == 2
+    assert settings["photo_album_wait_seconds"]["value"] == 2
+    assert settings["photo_album_max_photos"]["value"] == 5
     for key in ("photo_description_prompt", "photo_not_viewed_note"):
         assert settings[key]["value"] == seeded_settings[key]
     response = client.get("/api/admin/core-services", headers=headers).json()

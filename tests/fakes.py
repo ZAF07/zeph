@@ -302,6 +302,33 @@ class FakeScheduler:
         self._tick()
 
 
+class FakeTimer:
+    """Timer that never runs on its own; tests run the waiting work by hand."""
+
+    def __init__(self) -> None:
+        """Start with nothing waiting."""
+        self._waiting: dict[str, Callable[[], None]] = {}
+        self.waits: list[tuple[str, float]] = []
+
+    def start(self, key: str, seconds: float, work: Callable[[], None]) -> None:
+        """Keep the work so a test can run it, replacing any under the same key.
+
+        Args:
+            key: Names the wait; starting it again restarts it.
+            seconds: How long the real timer would wait.
+            work: What to run when the wait ends.
+        """
+        self.waits.append((key, seconds))
+        self._waiting[key] = work
+
+    def run_waiting(self) -> None:
+        """Run all waiting work now, as if every wait had ended."""
+        waiting = list(self._waiting.values())
+        self._waiting.clear()
+        for work in waiting:
+            work()
+
+
 class ScriptedChatModel:
     """Chat model that returns pre-written replies and records each call.
 

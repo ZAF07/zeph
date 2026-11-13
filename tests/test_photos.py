@@ -3,7 +3,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.core.models import ChannelPhoto, MessageDirection, PhotoImage
@@ -16,6 +16,7 @@ from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
     FakePhotoViewer,
+    FakeTimer,
     ScriptedChatModel,
     ToolCall,
 )
@@ -37,6 +38,9 @@ CAT = "A ginger cat asleep on a sunny windowsill next to a small cactus."
 TWENTY_MEGABYTES = 20 * 1024 * 1024
 POT_QUESTION = "What colour is the pot the cactus is in?"
 POT_ANSWER = "The pot is terracotta orange with a chipped rim."
+DOG = "A black dog chasing a red ball across a park lawn."
+BIRD = "A robin perched on a snowy fence post."
+FOX = "A red fox curled up asleep in long grass."
 
 
 def send_photo_and_reply(
@@ -48,6 +52,31 @@ def send_photo_and_reply(
     """Send a photo update and return the newest message the reply was given."""
     chat_model.script(reply)
     assert send_to_webhook(client, update) == 200
+    return chat_model.calls[-1].history[-1].text
+
+
+def send_album(
+    client: TestClient,
+    timer: FakeTimer,
+    chat_model: ScriptedChatModel,
+    photo_count: int,
+    caption_on: int = 2,
+    reply: str = "what a lovely bunch",
+) -> str:
+    """Send an album's photos, let its wait end and return the newest message
+    the reply was given.
+
+    The photo numbered `caption_on` carries the caption "our trip".
+    """
+    for number in range(1, photo_count + 1):
+        update = telegram_photo_update(
+            "our trip" if number == caption_on else None,
+            file_unique_id=f"photo-{number}",
+            album_id="album-1",
+        )
+        assert send_to_webhook(client, update) == 200
+    chat_model.script(reply)
+    timer.run_waiting()
     return chat_model.calls[-1].history[-1].text
 
 
@@ -110,7 +139,7 @@ def test_a_photo_without_a_caption_gets_a_real_reply_about_the_photo(
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["what a sleepy cat"]
 
 
-def test_the_saved_message_keeps_the_photos_telegram_ids_and_that_it_was_viewed(
+def test_the_saved_message_keeps_the_photos_telegram_ids_and_its_description(
     client: TestClient,
     engine: Engine,
     auth_verifier: FakeAuthVerifier,
@@ -134,7 +163,7 @@ def test_the_saved_message_keeps_the_photos_telegram_ids_and_that_it_was_viewed(
     ]
     assert incoming.content == f"[photo: {CAT}] meet Biscuit"
     assert incoming.photos == (
-        ChannelPhoto("file-photo-cat", "photo-cat", viewed=True),
+        ChannelPhoto("file-photo-cat", "photo-cat", viewed=True, description=CAT),
     )
 
 
@@ -355,8 +384,7 @@ def test_the_tool_lists_the_conversations_viewed_photos_under_the_admin_descript
     seeded_settings: dict[str, Any],
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
-    dog = "A black dog chasing a red ball across a park lawn."
-    photo_viewer.script(CAT, dog)
+    photo_viewer.script(CAT, DOG)
     send_photo_and_reply(client, chat_model, telegram_photo_update("meet Biscuit"))
     send_photo_and_reply(
         client, chat_model, telegram_photo_update(file_unique_id="photo-dog")
@@ -366,8 +394,8 @@ def test_the_tool_lists_the_conversations_viewed_photos_under_the_admin_descript
 
     description = seeded_settings["ask_about_photo_tool_description"]
     assert tool.description.startswith(description)
-    assert f"1. [photo: {CAT}] meet Biscuit" in tool.description
-    assert f"2. [photo: {dog}]" in tool.description
+    assert f"1. {CAT}" in tool.description
+    assert f"2. {DOG}" in tool.description
     assert set(tool.parameters["required"]) == {"photo", "question"}
 
 
@@ -521,3 +549,184 @@ def test_an_edited_tool_description_is_offered_and_shows_on_the_photo_viewing_ca
             "label": "ask_about_photo tool description",
         }
     ]
+
+
+def test_an_album_gets_one_reply_that_covers_every_photo_with_the_caption(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    photo_viewer: FakePhotoViewer,
+    timer: FakeTimer,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    photo_viewer.script(DOG, BIRD, FOX)
+
+    newest_message = send_album(client, timer, chat_model, photo_count=3)
+
+    assert newest_message == (
+        f"[photo 1: {DOG}] [photo 2: {BIRD}] [photo 3: {FOX}] our trip"
+    )
+    assert chat_model.safeguard_calls[-1].history[-1].text.endswith(newest_message)
+    assert len(chat_model.calls) == 1
+    assert chat_channel.downloaded_photos == [
+        "file-photo-1",
+        "file-photo-2",
+        "file-photo-3",
+    ]
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["what a lovely bunch"]
+
+
+def test_nothing_is_answered_until_the_album_wait_after_the_last_photo_ends(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    photo_viewer: FakePhotoViewer,
+    timer: FakeTimer,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    connect_telegram(client, auth_verifier, chat_channel)
+    change_settings(client, admin, {"photo_album_wait_seconds": 4})
+
+    for number in (1, 2):
+        update = telegram_photo_update(
+            file_unique_id=f"photo-{number}", album_id="album-1"
+        )
+        assert send_to_webhook(client, update) == 200
+
+    assert chat_model.calls == []
+    assert photo_viewer.calls == []
+    [first_wait, second_wait] = timer.waits
+    assert first_wait == second_wait
+    assert first_wait[1] == 4
+
+
+def test_an_album_over_the_cap_describes_only_the_first_photos_and_mentions_the_rest(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    photo_viewer: FakePhotoViewer,
+    timer: FakeTimer,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    connect_telegram(client, auth_verifier, chat_channel)
+    change_settings(client, admin, {"photo_album_max_photos": 2})
+    photo_viewer.script(DOG, BIRD)
+
+    newest_message = send_album(client, timer, chat_model, photo_count=5, caption_on=4)
+
+    assert len(photo_viewer.calls) == 2
+    assert newest_message.startswith(f"[photo 1: {DOG}] [photo 2: {BIRD}] our trip")
+    assert "3 more photos" in newest_message
+    assert "mention" in newest_message.lower()
+
+
+def test_an_album_counts_as_one_message(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    photo_viewer: FakePhotoViewer,
+    timer: FakeTimer,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    connect_telegram(client, auth_verifier, chat_channel)
+
+    send_album(client, timer, chat_model, photo_count=3)
+
+    [row] = [row for row in usage_rows(client, admin) if row["message_count"]]
+    assert row["message_count"] == 1
+    assert row["tokens_in"] == (
+        len(chat_model.call_order) * TOKENS_IN_PER_CALL + 3 * PHOTO_TOKENS_IN
+    )
+
+
+def test_an_album_photo_that_fails_is_marked_while_the_others_are_described(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    photo_viewer: FakePhotoViewer,
+    timer: FakeTimer,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    connect_telegram(client, auth_verifier, chat_channel)
+    note = "Say it didn't come through."
+    change_settings(
+        client, admin, {"photo_retry_count": 0, "photo_not_viewed_note": note}
+    )
+    photo_viewer.script(DOG, RuntimeError("model down"))
+
+    newest_message = send_album(client, timer, chat_model, photo_count=2)
+
+    assert newest_message == (
+        f"[photo 1: {DOG}] [photo 2 that didn't come through. {note}] our trip"
+    )
+
+
+def test_two_albums_sent_together_get_a_reply_each(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    photo_viewer: FakePhotoViewer,
+    timer: FakeTimer,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    photo_viewer.script(DOG, BIRD)
+    for album in ("album-1", "album-2"):
+        update = telegram_photo_update(file_unique_id=album, album_id=album)
+        assert send_to_webhook(client, update) == 200
+    chat_model.script("nice dog", "nice bird")
+
+    timer.run_waiting()
+
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["nice dog", "nice bird"]
+
+
+def test_ask_about_photo_lists_each_album_photo_by_its_own_description(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    photo_viewer: FakePhotoViewer,
+    timer: FakeTimer,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    photo_viewer.script(DOG, BIRD, FOX)
+    send_album(client, timer, chat_model, photo_count=3)
+
+    ask_about_the_photo(client, chat_model, {"photo": 2, "question": "Is it cold?"})
+
+    [tool] = ask_about_photo_tools(chat_model.calls[-1])
+    assert f"1. {DOG}\n2. {BIRD}\n3. {FOX}" in tool.description
+    assert chat_channel.downloaded_photos[-1] == "file-photo-2"
+
+
+def test_a_photo_saved_without_its_description_is_listed_by_its_message_text(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    photo_viewer: FakePhotoViewer,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    photo_viewer.script(CAT)
+    send_photo_and_reply(client, chat_model, telegram_photo_update("meet Biscuit"))
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE conversation_messages SET photos = "
+                "jsonb_build_array((photos->0) - 'description') "
+                "WHERE photos != '[]'::jsonb"
+            )
+        )
+
+    ask_about_the_photo(client, chat_model, {"photo": 1, "question": POT_QUESTION})
+
+    [tool] = ask_about_photo_tools(chat_model.calls[-1])
+    assert f"1. [photo: {CAT}] meet Biscuit" in tool.description

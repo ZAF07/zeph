@@ -42,9 +42,14 @@ def telegram_message_update(
 
 
 def telegram_photo_update(
-    caption: str | None = None, file_unique_id: str = "photo-cat"
+    caption: str | None = None,
+    file_unique_id: str = "photo-cat",
+    album_id: str | None = None,
 ) -> dict[str, Any]:
-    """Build a Telegram webhook update for a photo, in a small and a large size."""
+    """Build a Telegram webhook update for a photo, in a small and a large size.
+
+    A photo with an album id is one of several sent together.
+    """
     content: dict[str, Any] = {
         "photo": [
             {
@@ -63,6 +68,8 @@ def telegram_photo_update(
     }
     if caption is not None:
         content["caption"] = caption
+    if album_id is not None:
+        content["media_group_id"] = album_id
     return telegram_message_update(content)
 
 

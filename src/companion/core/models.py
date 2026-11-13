@@ -317,12 +317,14 @@ class ChannelPhoto:
         too_big_to_download: True when the chat channel won't let the bot
             download it, so it can't be viewed.
         viewed: True once the Companion has looked at it and described it.
+        description: What it shows, once described; "" until then.
     """
 
     file_id: str
     file_unique_id: str
     too_big_to_download: bool = False
     viewed: bool = False
+    description: str = ""
 
 
 @dataclass(frozen=True)
@@ -353,6 +355,7 @@ class IncomingMessage:
         photo: The photo, for a photo message.
         attachment: What was sent instead of text, e.g. "voice note", for an
             unsupported message.
+        album_id: For a photo sent with others at once, the ID they share.
     """
 
     sender_id: int
@@ -363,6 +366,7 @@ class IncomingMessage:
     sticker: ChannelSticker | None = None
     photo: ChannelPhoto | None = None
     attachment: str | None = None
+    album_id: str | None = None
 
 
 class MessageDirection(StrEnum):

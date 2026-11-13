@@ -41,6 +41,7 @@ from companion.core.ports import (
     PhotoViewer,
     Repositories,
     Scheduler,
+    Timer,
     WebSearch,
 )
 from companion.core.post_conversation import PostConversationProcessor
@@ -75,6 +76,8 @@ class AppDependencies:
         web_search: Searches the web and reads pages for replies.
         clock: Tells the current time.
         scheduler: Runs the scheduled work while the app is up.
+        timer: Runs work after a wait, like answering an album once its
+            photos have all arrived.
         telegram_webhook_secret: The secret Telegram sends with each update.
         telegram_bot_username: The Companion's Telegram @username.
         dashboard_url: The Dashboard's public address.
@@ -96,6 +99,7 @@ class AppDependencies:
     web_search: WebSearch
     clock: Clock
     scheduler: Scheduler
+    timer: Timer
     telegram_webhook_secret: str
     telegram_bot_username: str
     dashboard_url: str
@@ -212,6 +216,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         chat_channel=dependencies.chat_channel,
         sticker_library=sticker_library,
         photo_service=photo_service,
+        timer=dependencies.timer,
         dashboard_url=dependencies.dashboard_url,
     )
 

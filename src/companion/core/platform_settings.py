@@ -121,6 +121,20 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         minimum=0,
         maximum=5,
     ),
+    EditableSetting(
+        "photo_album_wait_seconds",
+        "Album wait",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=30,
+    ),
+    EditableSetting(
+        "photo_album_max_photos",
+        "Most photos per album",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=10,
+    ),
     EditableSetting("check_in_prompt", "Check-in prompt", SettingKind.TEXT),
     EditableSetting("check_in_model", "Check-in model", SettingKind.MODEL),
     EditableSetting(

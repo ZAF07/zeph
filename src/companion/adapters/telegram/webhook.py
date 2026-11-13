@@ -82,7 +82,8 @@ def parse_photo(message: dict[str, Any]) -> ChannelPhoto | None:
 def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
     """Turn a Telegram update into a channel-neutral incoming message.
 
-    Text, stickers and photos are read; a voice note, video, GIF or other
+    Text, stickers and photos are read; a photo sent with others at once
+    keeps the album ID they share. A voice note, video, GIF or other
     attachment is an unsupported message that keeps its caption.
 
     Args:
@@ -118,6 +119,7 @@ def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
     caption = message.get("caption")
     photo = parse_photo(message)
     if photo is not None:
+        album_id = message.get("media_group_id")
         return IncomingMessage(
             sender_id,
             chat_id,
@@ -125,6 +127,7 @@ def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
             text=caption if isinstance(caption, str) else "",
             kind=MessageKind.PHOTO,
             photo=photo,
+            album_id=str(album_id) if album_id is not None else None,
         )
     attachment = attachment_name(message)
     if attachment is None:
