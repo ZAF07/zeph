@@ -76,4 +76,4 @@ The same happens for Life details (the name is lost). With Goals archived, the H
 ## Completion
 
 - Completed: 2026-11-13
-- Commit: <to be filled in after merge>
+- Commit: 3d4494a (Refuse to archive a Required Memory Category), merged to main in 560066b (Merge MVP issue 22)
