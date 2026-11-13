@@ -1,6 +1,6 @@
 # 27 — A failed Clerk call during Delete account leaves the Clerk account behind
 
-Status: ready-for-agent
+Status: completed
 
 ## Parent
 
@@ -49,13 +49,13 @@ Open detail to settle while implementing: a User with a pending entry who signs 
 
 ## Acceptance criteria
 
-- [ ] If Clerk fails during Delete account, the User's data is still deleted, the User is signed out, and the page doesn't show an error
-- [ ] The Clerk account is deleted on a later scheduler tick once Clerk works again, and the entry is then removed
-- [ ] Repeated Clerk failures keep the entry and are logged, without stopping other scheduled work
-- [ ] The pending list holds no personal data beyond the auth ID
-- [ ] Tests cover: Clerk fails then the retry succeeds; Clerk returns 404 on retry; the scheduler keeps going when a retry fails
-- [ ] `/run`: with Clerk made to fail, Delete account signs the User out; once Clerk is fixed, the next tick deletes the Clerk account
-- [ ] `make check` passes (`pytest`, `ruff`, `ruff format`, `mypy`, `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`)
+- [x] If Clerk fails during Delete account, the User's data is still deleted, the User is signed out, and the page doesn't show an error
+- [x] The Clerk account is deleted on a later scheduler tick once Clerk works again, and the entry is then removed
+- [x] Repeated Clerk failures keep the entry and are logged, without stopping other scheduled work
+- [x] The pending list holds no personal data beyond the auth ID
+- [x] Tests cover: Clerk fails then the retry succeeds; Clerk returns 404 on retry; the scheduler keeps going when a retry fails
+- [x] `/run`: with Clerk made to fail, Delete account signs the User out; once Clerk is fixed, the next tick deletes the Clerk account
+- [x] `make check` passes (`pytest`, `ruff`, `ruff format`, `mypy`, `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`)
 
 ## Comments
 
@@ -68,3 +68,19 @@ Open detail to settle while implementing: a User with a pending entry who signs 
 - Known small gaps, left as they are: (1) a Clerk session token can stay valid for up to about a minute after the Clerk account is deleted. A request in that window could create a new empty User with no pending entry. That User could never sign in again, but the row would stay. (2) The "User who signed in again" cleanup doesn't check whether they are the last Admin.
 - Code review fixes: a second, simultaneous DELETE no longer returns 500 (`scalar_one_or_none`); a database error after Clerk succeeds is caught and logged rather than shown to the User; the test fake moved to `tests/fakes.py`.
 - `/run` (worktree stack, ports 3020/8020): signed in a test User and opened `/account` so the backend cached Clerk's keys. Then blocked `api.clerk.com` inside the backend container (`/etc/hosts`) and pressed Delete account. Result: `DELETE /api/me -> 204`, landed on `/sign-in`, no error on the page, `users` row gone, one `pending_auth_account_deletions` row, failure logged. The next tick, with Clerk still blocked, logged again and kept the entry. After `/etc/hosts` was restored, the next tick deleted it: Clerk `GET /users/<id>` went from 200 to 404, and the pending row count went from 1 to 0.
+
+### 2026-11-13 — post-implement evidence
+
+- Criterion 1: `test_a_failed_auth_account_delete_still_deletes_the_users_data` (204, users row gone, entry saved, failure logged). `/run`: `DELETE /api/me -> 204`, landed on `/sign-in`, no error on the page.
+- Criterion 2: `test_a_later_tick_deletes_the_auth_account_once_the_provider_works`. `/run` (repeated on the final rebased code): Clerk user went from 200 to 404 on the tick after Clerk was unblocked, pending rows went from 1 to 0.
+- Criterion 3: same test (two logged failures, entry kept) plus `test_one_failing_retry_does_not_stop_the_others`. Retry runs last in `ScheduledWork.tick` and catches each entry's errors.
+- Criterion 4: migration 0019 has only the columns `auth_id` and `added_at`.
+- Criterion 5: the tests above, plus `test_an_account_already_gone_from_clerk_on_retry_counts_as_deleted` (real `ClerkAccounts` answering 500 then 404), `test_the_retry_also_deletes_a_user_made_by_signing_in_again` and `test_deleting_an_account_twice_at_once_is_harmless`.
+- Criterion 6: the `/run` evidence above. Log line: `Could not delete an account at the auth provider (user_3M3A…); will try again`.
+- Criterion 7: `make check` on the rebased branch: ruff "All checks passed!", 224 files already formatted, mypy "no issues found in 91 source files", pytest 473 passed, web lint/format/typecheck clean, vitest 299 passed.
+- Glossary: CONTEXT.md "Account Deletion" now says it always finishes, even if the sign-in account has to be removed later.
+
+## Completion
+
+- Completed: 2026-11-13
+- Commit: b596cc9 "Retry deleting the Clerk account when it fails during Delete account", 35514bf "Address review: harmless double delete, catch post-Clerk errors, log auth ID"
