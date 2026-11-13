@@ -146,4 +146,4 @@ Delete and Retry stay as they are.
   - 04 Replace file: 00a1e6a, review fixes 1a1adb9, archive 23bb53a
   - 05 Flaky view test fix: fc2828f
 - Checks on close-out (main at b7915bb): ruff, ruff format, mypy pass; pytest 342 passed; pnpm lint, format:check, typecheck pass; Vitest 263 passed
-- Commit: <filled in below>
+- Archive commit: 1b941b6 "Knowledge editing PRD done: mark completed and archive"
