@@ -81,7 +81,7 @@ The style of a Check-in (e.g. casual hello, follow-up on something shared, prese
 _Avoid_: Template, check-in type
 
 **Skipped Check-in**:
-A due Check-in the Companion chose not to send, or couldn't because Telegram won't reach the User (they blocked it, or their account is gone), with a reason only Admins see (e.g. the User asked for space). The next attempt waits a full frequency gap, as after a sent one. Users see it only as "gave you some space".
+A due Check-in the Companion chose not to send, or couldn't because Telegram won't reach the User (they blocked it, or their account is gone), with a reason only Admins see (e.g. the User asked for space). The next attempt waits a full frequency gap, as after a sent one. Users see it only as "gave you some space". One exception: a User who has used up today's Daily Message Limit gets no Check-in (nor a "would you like fewer?" message) for the rest of their day. That day gets one Skipped Check-in, which both the User and Admins see as "you'd reached today's message limit", and the User stays due, so the next one can come on their next day.
 _Avoid_: Cancelled, missed, failed check-in
 
 **Ignore Threshold**:
@@ -179,7 +179,7 @@ _Avoid_: Search quota, web budget
 ### Usage
 
 **Daily Message Limit**:
-The most messages a User can send the Companion in a day, set by Admins and meant to be generous. The day is the User's own, so it resets at midnight in their time zone. The Safeguard still checks every message first: a crisis always gets the Crisis Reply and never counts toward the limit. Over the limit, the Companion answers with the Limit Reply instead of a real reply until the next day.
+The most messages a User can send the Companion in a day, set by Admins and meant to be generous. The day is the User's own, so it resets at midnight in their time zone. The Safeguard still checks every message first: a crisis always gets the Crisis Reply and never counts toward the limit. Over the limit, the Companion answers with the Limit Reply instead of a real reply until the next day. Check-ins don't count toward it, but once a User has used it up, they get no more Check-ins that day (see Skipped Check-in).
 _Avoid_: Quota, rate limit, message cap
 
 **Limit Reply**:
