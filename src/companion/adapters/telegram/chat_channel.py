@@ -23,6 +23,69 @@ class PhotoDownloadError(Exception):
     """Raised when Telegram gives no file, or a file that isn't a photo."""
 
 
+class TelegramApiError(Exception):
+    """Raised when Telegram can't be reached or refuses a call.
+
+    Its message never holds the request URL, since Telegram puts the bot
+    token in it.
+
+    Attributes:
+        status_code: Telegram's HTTP status code, or None if it couldn't be
+            reached.
+    """
+
+    def __init__(self, message: str, status_code: int | None) -> None:
+        """Build the error.
+
+        Args:
+            message: What failed, without the request URL.
+            status_code: Telegram's HTTP status code, or None if it couldn't
+                be reached.
+        """
+        super().__init__(message)
+        self.status_code = status_code
+
+
+def telegram_api_error(action: str, error: httpx.HTTPError) -> TelegramApiError:
+    """Turn an httpx error into a Telegram error that leaves out the URL.
+
+    Args:
+        action: What was being done, like the Bot API method name.
+        error: The httpx error.
+
+    Returns:
+        The Telegram error, with the status code and Telegram's description
+        when Telegram answered.
+    """
+    if not isinstance(error, httpx.HTTPStatusError):
+        return TelegramApiError(
+            f"Telegram {action} could not be reached: {type(error).__name__}", None
+        )
+    status_code = error.response.status_code
+    message = f"Telegram {action} failed with status {status_code}"
+    description = telegram_description(error.response)
+    if description:
+        message = f"{message}: {description}"
+    return TelegramApiError(message, status_code)
+
+
+def telegram_description(response: httpx.Response) -> str | None:
+    """Read Telegram's `description` from an error answer.
+
+    Args:
+        response: Telegram's answer.
+
+    Returns:
+        The description, or None if the body has none.
+    """
+    try:
+        body = response.json()
+    except ValueError:
+        return None
+    description = body.get("description") if isinstance(body, dict) else None
+    return description if isinstance(description, str) else None
+
+
 def photo_media_type(content: bytes) -> str | None:
     """Tell what kind of image a file is from its first bytes.
 
@@ -120,7 +183,7 @@ class TelegramChatChannel:
             file_id: The photo's file ID.
 
         Raises:
-            httpx.HTTPError: If Telegram can't be reached or refuses the photo.
+            TelegramApiError: If Telegram can't be reached or refuses the photo.
         """
         self._call("sendPhoto", {"chat_id": chat_id, "photo": file_id})
 
@@ -134,12 +197,12 @@ class TelegramChatChannel:
             Its stickers in order, or None if Telegram has no such set.
 
         Raises:
-            httpx.HTTPError: If Telegram can't be reached or fails.
+            TelegramApiError: If Telegram can't be reached or fails.
         """
         try:
             result = self._call("getStickerSet", {"name": name})
-        except httpx.HTTPStatusError as error:
-            if error.response.status_code == httpx.codes.BAD_REQUEST:
+        except TelegramApiError as error:
+            if error.status_code == httpx.codes.BAD_REQUEST:
                 return None
             raise
         stickers = result.get("stickers")
@@ -157,7 +220,7 @@ class TelegramChatChannel:
             The image, or None if it isn't a WebP, JPEG or PNG image.
 
         Raises:
-            httpx.HTTPError: If Telegram can't be reached or fails.
+            TelegramApiError: If Telegram can't be reached or fails.
         """
         file_path = self._file_path(file_id)
         if file_path is None:
@@ -180,7 +243,7 @@ class TelegramChatChannel:
             The photo's image.
 
         Raises:
-            httpx.HTTPError: If Telegram can't be reached or fails.
+            TelegramApiError: If Telegram can't be reached or fails.
             PhotoDownloadError: If Telegram gives no file, or it isn't a
                 JPEG, PNG or WebP image.
         """
@@ -236,10 +299,14 @@ class TelegramChatChannel:
             The file's bytes.
 
         Raises:
-            httpx.HTTPStatusError: If Telegram refuses the download.
+            TelegramApiError: If Telegram can't be reached or refuses the
+                download.
         """
-        response = self._http.get(f"{self._file_url}/{file_path}")
-        response.raise_for_status()
+        try:
+            response = self._http.get(f"{self._file_url}/{file_path}")
+            response.raise_for_status()
+        except httpx.HTTPError as error:
+            raise telegram_api_error("file download", error) from None
         return response.content
 
     def _call(self, method: str, payload: dict[str, object]) -> dict[str, object]:
@@ -253,10 +320,13 @@ class TelegramChatChannel:
             The method's `result` value.
 
         Raises:
-            httpx.HTTPStatusError: If Telegram refuses the call.
+            TelegramApiError: If Telegram can't be reached or refuses the call.
         """
-        response = self._http.post(f"{self._bot_url}/{method}", json=payload)
-        response.raise_for_status()
+        try:
+            response = self._http.post(f"{self._bot_url}/{method}", json=payload)
+            response.raise_for_status()
+        except httpx.HTTPError as error:
+            raise telegram_api_error(method, error) from None
         body: dict[str, object] = response.json()
         result = body.get("result")
         return result if isinstance(result, dict) else {}

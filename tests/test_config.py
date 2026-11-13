@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 from sqlalchemy import create_engine
 
@@ -9,6 +11,7 @@ from companion.main import (
     build_text_extractor,
     build_vector_store,
     build_web_search,
+    quiet_http_client_logs,
 )
 
 COMPLETE_ENVIRONMENT = {
@@ -107,3 +110,15 @@ def test_an_unknown_knowledge_adapter_is_named_in_the_error() -> None:
         build_vector_store(settings, create_engine(settings.database_url))
     with pytest.raises(UnknownAdapterError, match="TEXT_EXTRACTOR_ADAPTER"):
         build_text_extractor(settings)
+
+
+def test_http_client_loggers_are_pinned_to_warning(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for logger_name in ("httpx", "httpcore"):
+        monkeypatch.setattr(logging.getLogger(logger_name), "level", logging.NOTSET)
+
+    quiet_http_client_logs()
+
+    assert logging.getLogger("httpx").level == logging.WARNING
+    assert logging.getLogger("httpcore").level == logging.WARNING
