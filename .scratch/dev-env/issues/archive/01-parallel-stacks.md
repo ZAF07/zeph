@@ -64,4 +64,4 @@ Verification, 2026-11-13 (main stack on 3000/8000/5432 kept running throughout):
 ## Completion
 
 - Completed: 2026-11-13
-- Commit: <filled in after merge>
+- Commit: c14838a "Run a Docker stack per worktree, side by side", review fixes 527ecad "Make db-copy fail safe and keep shell variables out of the stack", archive 25ad7ac "Dev-env issue 01 done: archive issue with run evidence" (merged from `dev-env-01-parallel-stacks` in 438b490 "Merge dev-env issue 01: run a Docker stack per git worktree, side by side…"; `make check` green on main after the merge: Python 464 passed, web 298 passed)
