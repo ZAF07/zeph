@@ -2,7 +2,13 @@ import logging
 from typing import Any
 from uuid import UUID
 
-from companion.core.models import ChannelSticker, LibrarySticker, StickerImage
+from companion.core.features import FeatureService
+from companion.core.models import (
+    ChannelSticker,
+    Feature,
+    LibrarySticker,
+    StickerImage,
+)
 from companion.core.ports import ChatChannel, ChatTool, Clock, Repositories
 
 logger = logging.getLogger(__name__)
@@ -247,26 +253,34 @@ class StickerChoice:
 class StickerTools:
     """Offers the Sticker Library to replies."""
 
-    def __init__(self, repositories: Repositories) -> None:
+    def __init__(self, repositories: Repositories, features: FeatureService) -> None:
         """Set up the sticker tools.
 
         Args:
             repositories: Where the Sticker Library and settings are stored.
+            features: Says whether Stickers works for the User.
         """
         self._repositories = repositories
+        self._features = features
 
-    def offer(self) -> StickerChoice:
-        """Start the sticker choice for one reply.
+    def offer(self, user_id: UUID) -> StickerChoice:
+        """Start the sticker choice for one reply to a User.
+
+        Args:
+            user_id: The User being replied to.
 
         Returns:
-            The choice, offering every sticker that has a note.
+            The choice, offering every sticker that has a note; none when
+            Stickers doesn't work for the User.
         """
+        description = self._repositories.platform_settings.get(
+            "sticker_tool_description"
+        )
+        if not self._features.works_for(user_id, Feature.STICKERS):
+            return StickerChoice([], description)
         stickers = [
             sticker
             for sticker in self._repositories.stickers.list_all()
             if sticker.note
         ]
-        return StickerChoice(
-            stickers,
-            self._repositories.platform_settings.get("sticker_tool_description"),
-        )
+        return StickerChoice(stickers, description)

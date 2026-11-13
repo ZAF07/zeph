@@ -1029,6 +1029,8 @@ class Feature(StrEnum):
     """
 
     WEB_SEARCH = "web_search"
+    STICKERS = "stickers"
+    KNOWLEDGE = "knowledge"
 
 
 @dataclass(frozen=True)

@@ -108,6 +108,69 @@ describe("AdminFeatures", () => {
     ).toHaveAttribute("aria-checked", "true");
   });
 
+  it("lists Stickers and Knowledge with their switches and turns them back on", async () => {
+    apiClient.listFeatures.mockResolvedValue([
+      webSearch,
+      {
+        feature: "stickers",
+        name: "Stickers",
+        description: "Zeph can add a sticker to a reply.",
+        on: false,
+        changed_by_email: "maya@example.com",
+        changed_at: "2026-11-13T09:00:00Z",
+      },
+      {
+        feature: "knowledge",
+        name: "Knowledge",
+        description: "Zeph gets passages that may fit the message.",
+        on: true,
+        changed_by_email: null,
+        changed_at: null,
+      },
+    ]);
+    apiClient.setFeatureForEveryone.mockResolvedValue({
+      feature: "stickers",
+      name: "Stickers",
+      description: "Zeph can add a sticker to a reply.",
+      on: true,
+      changed_by_email: "owner@example.com",
+      changed_at: "2026-11-13T10:00:00Z",
+    });
+    const user = userEvent.setup();
+    render(<AdminFeatures />);
+
+    await screen.findByText("Stickers");
+    const stickers = within(rowFor("Stickers"));
+    const knowledge = within(rowFor("Knowledge"));
+    expect(
+      stickers.getByText("Zeph can add a sticker to a reply."),
+    ).toBeVisible();
+    expect(stickers.getByText(/13 Nov, .* by maya@example\.com/)).toBeVisible();
+    expect(
+      knowledge.getByText("Zeph gets passages that may fit the message."),
+    ).toBeVisible();
+    expect(
+      knowledge.getByRole("switch", { name: "Knowledge for everyone" }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(knowledge.getByText("Never changed")).toBeVisible();
+
+    await user.click(
+      stickers.getByRole("switch", { name: "Stickers for everyone" }),
+    );
+
+    expect(apiClient.setFeatureForEveryone).toHaveBeenCalledWith(
+      "stickers",
+      true,
+    );
+    expect(stickers.getByRole("switch")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(
+      await stickers.findByText(/13 Nov, .* by owner@example\.com/),
+    ).toBeVisible();
+  });
+
   it("offers Try again when the Features can't be loaded", async () => {
     apiClient.listFeatures.mockRejectedValueOnce(new Error("down"));
     const user = userEvent.setup();

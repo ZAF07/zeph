@@ -116,8 +116,9 @@ class ResponseComposer:
         gives the model every earlier message in the Conversation. The model
         may search the web and read pages when web search is offered, change
         the User's settings when they ask, and pick one sticker from the
-        Sticker Library. When a Feature doesn't work for the User, the
-        instructions say so, so the reply can tell them plainly.
+        Sticker Library when Stickers works for them. When a Feature doesn't
+        work for the User, the instructions say so, so the reply can tell them
+        plainly.
 
         Args:
             conversation_id: The Conversation to reply in.
@@ -137,7 +138,7 @@ class ResponseComposer:
         instructions = f"{settings.get('persona')}\n\n{settings.get('response_prompt')}"
         web_search = self._web_search_tools.offer(user_id)
         settings_tools = self._settings_tools.offer(user_id)
-        sticker_choice = self._sticker_tools.offer()
+        sticker_choice = self._sticker_tools.offer(user_id)
         cancelled_note = (
             settings.get(DELETION_CANCELLED_NOTE_SETTING)
             if data_deletion_cancelled
