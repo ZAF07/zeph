@@ -25,6 +25,7 @@ from tests.telegram_helpers import (
     connect_telegram,
     owner_headers,
     send_to_webhook,
+    telegram_album_video_update,
     telegram_file_update,
     telegram_message_update,
     telegram_photo_update,
@@ -730,3 +731,85 @@ def test_a_photo_saved_without_its_description_is_listed_by_its_message_text(
 
     [tool] = ask_about_photo_tools(chat_model.calls[-1])
     assert f"1. [photo: {CAT}] meet Biscuit" in tool.description
+
+
+def test_a_video_in_an_album_joins_the_one_reply_and_its_caption_is_kept(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    photo_viewer: FakePhotoViewer,
+    timer: FakeTimer,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    photo_viewer.script(DOG)
+    send_to_webhook(client, telegram_album_video_update("our trip", message_id=11))
+    send_to_webhook(
+        client,
+        telegram_photo_update(file_unique_id="photo-1", album_id="album-1"),
+    )
+    chat_model.script("lovely")
+
+    timer.run_waiting()
+
+    assert chat_model.calls[-1].history[-1].text == f"[photo: {DOG}] [video] our trip"
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["lovely"]
+
+
+def test_an_album_of_videos_alone_gets_one_unsupported_reply(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    seeded_settings: dict[str, Any],
+    timer: FakeTimer,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    send_to_webhook(client, telegram_album_video_update(message_id=11))
+    send_to_webhook(client, telegram_album_video_update(message_id=12))
+
+    timer.run_waiting()
+
+    assert chat_model.calls == []
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
+        seeded_settings["unsupported_message_reply"]
+    ]
+
+
+def test_an_album_of_videos_with_a_caption_gets_one_reply_to_the_caption(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    timer: FakeTimer,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    send_to_webhook(client, telegram_album_video_update("our trip", message_id=11))
+    send_to_webhook(client, telegram_album_video_update(message_id=12))
+    chat_model.script("sounds fun")
+
+    timer.run_waiting()
+
+    assert chat_model.calls[-1].history[-1].text == "[video] [video] our trip"
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["sounds fun"]
+
+
+def test_album_photos_are_numbered_in_the_order_they_were_sent(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    photo_viewer: FakePhotoViewer,
+    timer: FakeTimer,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    for number, message_id in ((2, 12), (1, 11)):
+        update = telegram_photo_update(
+            file_unique_id=f"photo-{number}", album_id="album-1", message_id=message_id
+        )
+        send_to_webhook(client, update)
+    chat_model.script("nice")
+
+    timer.run_waiting()
+
+    assert chat_channel.downloaded_photos == ["file-photo-1", "file-photo-2"]

@@ -355,7 +355,10 @@ class IncomingMessage:
         photo: The photo, for a photo message.
         attachment: What was sent instead of text, e.g. "voice note", for an
             unsupported message.
-        album_id: For a photo sent with others at once, the ID they share.
+        album_id: For a photo or file sent with others at once, the ID they
+            share.
+        message_id: The chat channel's ID for the message, which puts an
+            album's items in the order they were sent; 0 if not known.
     """
 
     sender_id: int
@@ -367,6 +370,7 @@ class IncomingMessage:
     photo: ChannelPhoto | None = None
     attachment: str | None = None
     album_id: str | None = None
+    message_id: int = 0
 
 
 class MessageDirection(StrEnum):

@@ -36,6 +36,27 @@ def readable_text(message: IncomingMessage) -> str:
     return message.text
 
 
+def album_caption(messages: Sequence[IncomingMessage]) -> str:
+    """Write an album's caption, marking the files the Companion can't open.
+
+    Args:
+        messages: The album's items, in the order sent.
+
+    Returns:
+        E.g. "[video] our trip": a marker for each unsupported file, then
+        the caption from whichever item has it.
+    """
+    markers = [
+        f"[{message.attachment or 'attachment'}]"
+        for message in messages
+        if message.kind == MessageKind.UNSUPPORTED
+    ]
+    caption = next(
+        (message.text.strip() for message in messages if message.text.strip()), ""
+    )
+    return " ".join([*markers, caption]).strip()
+
+
 class IncomingMessageHandler:
     """Decides what to do with each message people send the Companion.
 
@@ -128,14 +149,13 @@ class IncomingMessageHandler:
                 message.chat_id, reply.replace("{dashboard_url}", self._dashboard_url)
             )
             return
+        if message.album_id is not None:
+            self._collect_album_item(connection.user_id, message)
+            return
         if message.kind == MessageKind.UNSUPPORTED and not message.text.strip():
             self._chat_channel.send_text(
                 message.chat_id, settings.get("unsupported_message_reply")
             )
-            return
-
-        if message.album_id is not None:
-            self._collect_album_photo(connection.user_id, message)
             return
         self._answer(
             connection.user_id,
@@ -143,12 +163,12 @@ class IncomingMessageHandler:
             lambda: self._turn_for(connection.user_id, message),
         )
 
-    def _collect_album_photo(self, user_id: UUID, message: IncomingMessage) -> None:
-        """Keep an album's photo and restart the wait for the rest of the album.
+    def _collect_album_item(self, user_id: UUID, message: IncomingMessage) -> None:
+        """Keep an album's photo or file and restart the wait for the rest of it.
 
         Args:
             user_id: The User who sent it.
-            message: The photo message, with its album ID.
+            message: The photo or file message, with its album ID.
         """
         album_key = f"{message.sender_id}:{message.album_id}"
         with self._albums_guard:
@@ -160,7 +180,11 @@ class IncomingMessageHandler:
         )
 
     def _answer_album(self, user_id: UUID, album_key: str) -> None:
-        """Answer an album's collected photos as one message.
+        """Answer an album's collected items as one message, in the order sent.
+
+        Files the Companion can't open, like a video, are marked in the text
+        ("[video] caption"). An album with no photos and no caption gets the
+        unsupported reply once.
 
         Args:
             user_id: The User who sent it.
@@ -170,13 +194,32 @@ class IncomingMessageHandler:
             messages = self._albums.pop(album_key, [])
         if not messages:
             return
-        caption = next((m.text for m in messages if m.text.strip()), "")
-        photos = [m.photo for m in messages if m.photo is not None]
+        messages.sort(key=lambda message: message.message_id)
         chat_id = messages[0].chat_id
+        photos = [message.photo for message in messages if message.photo]
+        caption = album_caption(messages)
+        if photos:
+            self._answer(
+                user_id,
+                chat_id,
+                lambda: self._photo_turn(user_id, chat_id, photos, caption),
+            )
+            return
+        if not any(message.text.strip() for message in messages):
+            self._chat_channel.send_text(
+                chat_id,
+                self._repositories.platform_settings.get("unsupported_message_reply"),
+            )
+            return
         self._answer(
             user_id,
             chat_id,
-            lambda: self._photo_turn(user_id, chat_id, photos, caption),
+            lambda: ConversationTurn(
+                user_id=user_id,
+                chat_id=chat_id,
+                text=caption,
+                kind=MessageKind.UNSUPPORTED,
+            ),
         )
 
     def _answer(

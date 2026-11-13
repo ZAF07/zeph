@@ -122,7 +122,7 @@ def not_looked_at_note(photos_not_looked_at: int, photos_looked_at: int) -> str:
     more = (
         "1 more photo"
         if photos_not_looked_at == 1
-        else (f"{photos_not_looked_at} more photos")
+        else f"{photos_not_looked_at} more photos"
     )
     return (
         f"[{more} in this album weren't looked at. Mention that you only "

@@ -21,7 +21,7 @@ class ThreadTimer:
             seconds: How long to wait.
             work: What to run when the wait ends.
         """
-        timer = threading.Timer(seconds, self._run, args=(key, work))
+        timer = threading.Timer(seconds, lambda: self._run(key, timer, work))
         timer.daemon = True
         with self._guard:
             waiting = self._timers.pop(key, None)
@@ -30,15 +30,21 @@ class ThreadTimer:
             self._timers[key] = timer
         timer.start()
 
-    def _run(self, key: str, work: Callable[[], None]) -> None:
+    def _run(self, key: str, timer: threading.Timer, work: Callable[[], None]) -> None:
         """Run the work once its wait ends; a failure is logged, not raised.
+
+        A wait that was restarted just as it ended does nothing, so only the
+        newest wait for a key runs.
 
         Args:
             key: The wait that ended.
+            timer: The timer whose wait ended.
             work: What to run.
         """
         with self._guard:
-            self._timers.pop(key, None)
+            if self._timers.get(key) is not timer:
+                return
+            del self._timers[key]
         try:
             work()
         except Exception:
