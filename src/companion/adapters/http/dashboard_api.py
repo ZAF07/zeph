@@ -116,13 +116,18 @@ class PauseRequest(BaseModel):
 
 
 class RecentCheckInResponse(BaseModel):
-    """A Check-in sent or skipped and whether the User replied; never a reason."""
+    """A Check-in sent or skipped and whether the User replied; never a reason.
+
+    `skipped_for_daily_limit` says whether it was skipped because the User had
+    used up the day's daily message limit.
+    """
 
     id: str
     outcome: CheckInOutcome
     kind: str | None
     decided_at: datetime
     status: CheckInStatus
+    skipped_for_daily_limit: bool
 
 
 class CheckInKindSummaryResponse(BaseModel):
@@ -392,6 +397,7 @@ def to_recent_check_in_response(recent: RecentCheckIn) -> RecentCheckInResponse:
         kind=recent.check_in.kind_name,
         decided_at=recent.check_in.decided_at,
         status=recent.status,
+        skipped_for_daily_limit=recent.check_in.skipped_for_daily_limit,
     )
 
 

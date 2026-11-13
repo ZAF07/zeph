@@ -239,11 +239,20 @@ describe("CheckInsSettings", () => {
       checkInsWith({
         recent: [
           {
+            id: "check-in-6",
+            outcome: "skipped",
+            kind: null,
+            decided_at: "2026-11-13T10:42:00Z",
+            status: "skipped",
+            skipped_for_daily_limit: true,
+          },
+          {
             id: "check-in-5",
             outcome: "asked_about_fewer",
             kind: null,
             decided_at: "2026-11-12T10:42:00Z",
             status: "sent",
+            skipped_for_daily_limit: false,
           },
           {
             id: "check-in-4",
@@ -251,6 +260,7 @@ describe("CheckInsSettings", () => {
             kind: "A casual hello",
             decided_at: "2026-11-11T10:42:00Z",
             status: "no_reply",
+            skipped_for_daily_limit: false,
           },
           {
             id: "check-in-3",
@@ -258,6 +268,7 @@ describe("CheckInsSettings", () => {
             kind: null,
             decided_at: "2026-11-10T10:42:00Z",
             status: "skipped",
+            skipped_for_daily_limit: false,
           },
           {
             id: "check-in-2",
@@ -265,6 +276,7 @@ describe("CheckInsSettings", () => {
             kind: "A casual hello",
             decided_at: "2026-11-09T10:42:00Z",
             status: "replied",
+            skipped_for_daily_limit: false,
           },
           {
             id: "check-in-1",
@@ -272,6 +284,7 @@ describe("CheckInsSettings", () => {
             kind: null,
             decided_at: "2026-11-05T04:15:00Z",
             status: "no_reply",
+            skipped_for_daily_limit: false,
           },
         ],
       }),
@@ -282,6 +295,7 @@ describe("CheckInsSettings", () => {
       screen.getByRole("region", { name: "Recent check-ins" }),
     ).getAllByRole("listitem");
     expect(items.map((item) => item.textContent)).toEqual([
+      "Skipped — you’d reached today’s message limitFri 13 NovSkipped",
       "Asked if you’d like fewerThu 12 Nov · 6:42 pmSent",
       "A casual helloWed 11 Nov · 6:42 pmNo reply",
       "Skipped — gave you some spaceTue 10 NovSkipped",

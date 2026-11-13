@@ -19,6 +19,7 @@ function checkInWith(overrides: Partial<RecentCheckIn> = {}): RecentCheckIn {
     kind: "A casual hello",
     decided_at: "2026-11-09T10:00:00Z",
     status: "replied",
+    skipped_for_daily_limit: false,
     ...overrides,
   };
 }

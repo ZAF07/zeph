@@ -12,6 +12,7 @@ from companion.core.memory_retrieval import (
     shared_photo_line,
 )
 from companion.core.models import (
+    DAILY_LIMIT_SKIP_REASON,
     ChatLine,
     ChatRole,
     ChatSetting,
@@ -36,8 +37,13 @@ from companion.core.ports import (
     Repositories,
 )
 from companion.core.settings_changes import record_where_changed
-from companion.core.timing import check_in_reply_window, is_open, quiet_gap
-from companion.core.usage import UsageRecordingChatModel
+from companion.core.timing import (
+    check_in_reply_window,
+    is_open,
+    quiet_gap,
+    users_today,
+)
+from companion.core.usage import UsageLimiter, UsageRecordingChatModel
 
 logger = logging.getLogger(__name__)
 
@@ -396,6 +402,7 @@ class CheckInService:
         repositories: Repositories,
         features: FeatureService,
         chat_model: UsageRecordingChatModel,
+        usage_limiter: UsageLimiter,
         chat_channel: ChatChannel,
         clock: Clock,
     ) -> None:
@@ -406,6 +413,8 @@ class CheckInService:
                 are stored.
             features: Says whether Check-ins and User Memory work for a User.
             chat_model: Writes each Check-in and records the tokens used.
+            usage_limiter: Says whether a User has used up today's daily
+                message limit.
             chat_channel: Sends Check-ins, and any Shared Photo with them,
                 to Users.
             clock: Tells the current time.
@@ -413,6 +422,7 @@ class CheckInService:
         self._repositories = repositories
         self._features = features
         self._chat_model = chat_model
+        self._usage_limiter = usage_limiter
         self._chat_channel = chat_channel
         self._clock = clock
 
@@ -631,8 +641,10 @@ class CheckInService:
     def _check_in_if_due(self, user: User, now: datetime) -> None:
         """Send, skip, or ask about fewer Check-ins, if nothing holds it back.
 
-        After the Admin-set number of ignored Check-ins in a row, the User
-        gets the "would you like fewer?" message and their Check-ins pause.
+        A User who has used up today's daily message limit gets a limit skip
+        instead and stays due. After the Admin-set number of ignored Check-ins
+        in a row, the User gets the "would you like fewer?" message and their
+        Check-ins pause.
         Otherwise the Check-in model decides on a Kind and message, or to
         skip. Kinds that send a Shared Photo are offered only to a User with
         Shared Photos in use. The next attempt is one frequency gap later,
@@ -653,6 +665,9 @@ class CheckInService:
             return
         connection = self._repositories.telegram_connections.get_by_user(user.id)
         if connection is None or self._has_open_conversation(user, now):
+            return
+        if self._usage_limiter.has_used_up_messages(user.id):
+            self._skip_for_daily_limit(user, now)
             return
         next_due_at = now + self._gap(settings.frequency)
         if self._has_ignored_too_many(user):
@@ -704,6 +719,30 @@ class CheckInService:
             and not self._send_shared_photo(connection.telegram_chat_id, shared_photo)
         ):
             self._repositories.check_ins.remove_shared_photo(check_in.id)
+
+    def _skip_for_daily_limit(self, user: User, now: datetime) -> None:
+        """Record a Skipped Check-in for a User who used up today's daily message limit.
+
+        Only one is recorded per User per day. The User stays due, so a
+        Check-in can come on their next day.
+
+        Args:
+            user: A due User who has used up today's daily message limit.
+            now: The current time.
+        """
+        newest = self._repositories.check_ins.list_recent(user.id, 1)
+        if newest and newest[0].skipped_for_daily_limit:
+            skipped_on = users_today(user.time_zone, newest[0].decided_at)
+            if skipped_on == users_today(user.time_zone, now):
+                return
+        skipped = CheckIn(
+            id=uuid4(),
+            user_id=user.id,
+            outcome=CheckInOutcome.SKIPPED,
+            decided_at=now,
+            skip_reason=DAILY_LIMIT_SKIP_REASON,
+        )
+        self._repositories.check_ins.add(skipped, now, pause_until_resumed=False)
 
     def _save_then_send(
         self,

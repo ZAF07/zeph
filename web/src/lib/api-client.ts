@@ -91,7 +91,8 @@ export type OnboardingAnswers = {
 
 /**
  * A Check-in Zeph sent or skipped, and whether the User replied. Never its
- * text or why it was skipped.
+ * text or the Check-in model's reason for a skip; only whether it was skipped
+ * because the User had reached the day's message limit.
  */
 export type RecentCheckIn = {
   id: string;
@@ -99,6 +100,7 @@ export type RecentCheckIn = {
   kind: string | null;
   decided_at: string;
   status: CheckInStatus;
+  skipped_for_daily_limit: boolean;
 };
 
 /** A Check-in Kind as Users see it, read-only. */

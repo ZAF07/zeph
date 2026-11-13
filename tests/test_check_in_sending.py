@@ -115,6 +115,7 @@ def test_a_due_user_gets_a_casual_hello_written_by_the_check_in_model(
             "kind": "A casual hello",
             "decided_at": "2026-11-12T09:00:00Z",
             "status": "sent",
+            "skipped_for_daily_limit": False,
         }
     ]
 
@@ -514,6 +515,7 @@ def test_a_skip_is_recorded_and_the_next_attempt_moves_to_the_following_slot(
         "kind": None,
         "decided_at": "2026-11-12T09:00:00Z",
         "status": "skipped",
+        "skipped_for_daily_limit": False,
     }
     clock.advance(ONE_DAY - timedelta(minutes=1))
     scheduler.tick()
