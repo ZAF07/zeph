@@ -67,3 +67,8 @@ To force it in a test: have the tick end and process the Conversation after `_op
 
 - Only the incoming User message is checked. A reply goes to the Conversation its message joined a moment ago, which can't pass the quiet gap that fast; if it ever did, saving it there (as before) beats losing it from history.
 - No retry limit on the loop: the second try always starts a new Conversation, which can't already be ended.
+
+## Completion
+
+- Completed: 2026-11-13
+- Commit: 8a351c0 "Never save a User message into a Conversation that was just ended", archive and glossary d6200cb "MVP issue 21 done: archive issue with test, run and review evidence" (merged from `mvp-21-message-lands-in-ended-conversation` in a511f9c "Merge MVP issue 21: a User message arriving just as the scheduler ends its Conversation now starts a new Conversation…")
