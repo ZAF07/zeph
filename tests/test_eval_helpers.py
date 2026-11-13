@@ -5,6 +5,7 @@ import pytest
 from evals.cases import (
     CASES_DIR,
     EvalPhoto,
+    EvalSharedPhoto,
     InvalidEvalCasesError,
     KnowledgeDetails,
     PhotoDescriptionCase,
@@ -116,6 +117,36 @@ def test_a_photo_message_is_read_with_its_image_and_what_it_shows(
         ("my list", weekend_list),
         ("", weekend_list),
     ]
+
+
+def test_a_persona_conversation_can_start_with_shared_photos(tmp_path: Path) -> None:
+    cases_file = tmp_path / "persona.yaml"
+    cases_file.write_text(
+        "rules:\n  no_photo_when_struggling: No photo.\n"
+        "conversations:\n"
+        "  - id: struggling\n"
+        "    shared_photos:\n"
+        "      - {description: A dog on a beach., note: Their late dog.}\n"
+        "    messages: [i miss him]\n"
+        "    rules: [no_photo_when_struggling]\n"
+        "  - id: plain\n"
+        "    messages: [hi]\n"
+        "    rules: [no_photo_when_struggling]\n"
+    )
+
+    struggling, plain = load_persona_cases(cases_file).conversations
+
+    assert struggling.shared_photos == [
+        EvalSharedPhoto(description="A dog on a beach.", note="Their late dog.")
+    ]
+    assert plain.shared_photos == []
+
+
+def test_the_persona_cases_include_a_struggling_user_with_shared_photos() -> None:
+    cases = load_persona_cases(CASES_DIR / "persona.yaml")
+
+    [struggling] = [c for c in cases.conversations if c.shared_photos]
+    assert "no_photo_when_struggling" in struggling.rules
 
 
 def test_a_case_naming_an_image_that_is_not_there_is_refused(tmp_path: Path) -> None:

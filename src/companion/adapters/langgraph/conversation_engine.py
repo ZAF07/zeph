@@ -21,8 +21,9 @@ class TurnState(TypedDict, total=False):
     """What the graph knows while answering one message.
 
     IDs are stored as strings so checkpoints stay plain JSON-like data.
-    Every turn sets `sticker_id`, "" for none, so a sticker from an earlier
-    turn on the same thread is never sent again. Every turn past the
+    Every turn sets `sticker_id` and `shared_photo_id`, "" for none, so a
+    sticker or photo from an earlier turn on the same thread is never sent
+    again. Every turn past the
     Safeguard sets `data_deletion_answer` too, for the same reason.
     """
 
@@ -36,9 +37,11 @@ class TurnState(TypedDict, total=False):
     data_deletion_answer: str
     within_message_limit: bool
     memory: str
+    shared_photo_ids: list[str]
     knowledge: str
     reply_parts: list[str]
     sticker_id: str
+    shared_photo_id: str
 
 
 def build_postgres_checkpointer(database_url: str) -> PostgresSaver:
@@ -236,12 +239,18 @@ class LangGraphConversationEngine:
                 state: The graph's state so far.
 
             Returns:
-                The memory to give the reply.
+                The memory to give the reply, and the IDs of the Shared
+                Photos that matter.
             """
-            memory = services.memory_retrieval.recall(
+            recalled = services.memory_retrieval.recall(
                 UUID(state["user_id"]), UUID(state["conversation_id"])
             )
-            return {"memory": memory}
+            return {
+                "memory": recalled.text,
+                "shared_photo_ids": [
+                    str(photo_id) for photo_id in recalled.shared_photo_ids
+                ],
+            }
 
         def recall_knowledge(state: TurnState) -> TurnState:
             """Find the Knowledge that may fit the message.
@@ -264,7 +273,8 @@ class LangGraphConversationEngine:
                 state: The graph's state so far.
 
             Returns:
-                The reply as short messages, and its sticker's ID or "".
+                The reply as short messages, and its sticker's and Shared
+                Photo's IDs, or "".
             """
             reply = services.response_composer.compose(
                 UUID(state["conversation_id"]),
@@ -273,9 +283,17 @@ class LangGraphConversationEngine:
                 state["knowledge"],
                 data_deletion_cancelled=state["data_deletion_answer"]
                 == DataDeletionAnswer.CANCELLED.value,
+                shared_photo_ids=[
+                    UUID(photo_id) for photo_id in state["shared_photo_ids"]
+                ],
             )
             sticker_id = str(reply.sticker.id) if reply.sticker else ""
-            return {"reply_parts": reply.parts, "sticker_id": sticker_id}
+            shared_photo_id = str(reply.shared_photo.id) if reply.shared_photo else ""
+            return {
+                "reply_parts": reply.parts,
+                "sticker_id": sticker_id,
+                "shared_photo_id": shared_photo_id,
+            }
 
         def deliver_reply(state: TurnState) -> TurnState:
             """Send the reply and save it to the Conversation.
@@ -287,11 +305,14 @@ class LangGraphConversationEngine:
                 Nothing new to add to the state.
             """
             sticker_id = state["sticker_id"]
+            shared_photo_id = state["shared_photo_id"]
             services.conversations.deliver_reply(
+                UUID(state["user_id"]),
                 UUID(state["conversation_id"]),
                 state["chat_id"],
                 state["reply_parts"],
                 UUID(sticker_id) if sticker_id else None,
+                UUID(shared_photo_id) if shared_photo_id else None,
             )
             return {}
 

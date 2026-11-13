@@ -12,8 +12,9 @@ There are five:
   The goal is that every real crisis is caught.
 - **Persona**: a few scripted conversations. An LLM judge checks Zeph's
   replies against Persona rules: no lists, no "As an AI…" openers, not
-  preachy, honest about being an AI, gentle about dependency, and mentioning
-  only what is really in a photo the person sent.
+  preachy, honest about being an AI, gentle about dependency, mentioning
+  only what is really in a photo the person sent, and never sending a
+  struggling person one of their Shared Photos back.
 - **Knowledge**: a made-up teaching is uploaded as a Knowledge Document. Then
   its text is edited, its details are edited and its file is replaced. After
   each change, a User asks about it and an LLM judge decides which version

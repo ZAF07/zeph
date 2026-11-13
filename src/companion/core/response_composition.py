@@ -1,4 +1,5 @@
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -10,8 +11,9 @@ from companion.core.models import (
     ConversationMessage,
     LibrarySticker,
     MessageDirection,
+    SharedPhoto,
 )
-from companion.core.photos import PhotoTools
+from companion.core.photos import PhotoTools, SendPhotoTools
 from companion.core.ports import Repositories
 from companion.core.stickers import StickerTools
 from companion.core.usage import UsageRecordingChatModel
@@ -22,7 +24,7 @@ DELETION_CANCELLED_NOTE_SETTING = "reply_data_deletion_cancelled_note"
 
 
 class EmptyReplyError(Exception):
-    """Raised when the chat model's reply has neither text nor a sticker."""
+    """Raised when the chat model's reply has no text, sticker or photo."""
 
 
 @dataclass(frozen=True)
@@ -31,12 +33,15 @@ class ComposedReply:
 
     Attributes:
         parts: The short text messages, in order; may be empty when the
-            reply is just a sticker.
+            reply is just a sticker or a photo.
         sticker: The one sticker to send after the text, if any.
+        shared_photo: The one Shared Photo of the User's to send back after
+            the text, if any.
     """
 
     parts: list[str]
     sticker: LibrarySticker | None
+    shared_photo: SharedPhoto | None = None
 
 
 def split_into_messages(reply: str) -> list[str]:
@@ -84,6 +89,7 @@ class ResponseComposer:
         settings_tools: SettingsTools,
         sticker_tools: StickerTools,
         photo_tools: PhotoTools,
+        send_photo_tools: SendPhotoTools,
     ) -> None:
         """Set up the composer.
 
@@ -96,6 +102,8 @@ class ResponseComposer:
             settings_tools: Offers the tools that change the User's settings.
             sticker_tools: Offers the Sticker Library to the reply.
             photo_tools: Offers a look again at the Conversation's photos.
+            send_photo_tools: Offers to send one of the User's Shared Photos
+                back.
         """
         self._repositories = repositories
         self._chat_model = chat_model
@@ -104,6 +112,7 @@ class ResponseComposer:
         self._settings_tools = settings_tools
         self._sticker_tools = sticker_tools
         self._photo_tools = photo_tools
+        self._send_photo_tools = send_photo_tools
 
     def compose(
         self,
@@ -112,6 +121,7 @@ class ResponseComposer:
         memory: str = "",
         knowledge: str = "",
         data_deletion_cancelled: bool = False,
+        shared_photo_ids: Sequence[UUID] = (),
     ) -> ComposedReply:
         """Compose a reply to the Conversation's newest message.
 
@@ -120,8 +130,9 @@ class ResponseComposer:
         gives the model every earlier message in the Conversation. The model
         may search the web and read pages when web search is offered, change
         the User's settings when they ask, pick one sticker from the
-        Sticker Library when Stickers works for them, and look again at a
-        photo from the Conversation when its description can't answer. When
+        Sticker Library when Stickers works for them, look again at a photo
+        from the Conversation when its description can't answer, and send
+        back one of the User's Shared Photos that matter for the message. When
         a Feature doesn't work for the User, the instructions say so, so the
         reply can tell them plainly.
 
@@ -132,12 +143,15 @@ class ResponseComposer:
             knowledge: The Knowledge passages that may fit; "" if none.
             data_deletion_cancelled: True if this message cancelled the
                 User's request to delete their data, so the reply says so.
+            shared_photo_ids: The User's Shared Photos that matter for the
+                message, which the reply may send one of; empty if none.
 
         Returns:
-            The reply as short messages and an optional sticker.
+            The reply as short messages, an optional sticker and an optional
+            Shared Photo.
 
         Raises:
-            EmptyReplyError: If the reply has neither text nor a sticker.
+            EmptyReplyError: If the reply has no text, sticker or photo.
         """
         settings = self._repositories.platform_settings
         instructions = f"{settings.get('persona')}\n\n{settings.get('response_prompt')}"
@@ -145,6 +159,7 @@ class ResponseComposer:
         settings_tools = self._settings_tools.offer(user_id)
         sticker_choice = self._sticker_tools.offer(user_id)
         photo_tools = self._photo_tools.offer(user_id, conversation_id)
+        send_photo_choice = self._send_photo_tools.offer(user_id, shared_photo_ids)
         cancelled_note = (
             settings.get(DELETION_CANCELLED_NOTE_SETTING)
             if data_deletion_cancelled
@@ -174,9 +189,18 @@ class ResponseComposer:
                 *settings_tools.tools,
                 *sticker_choice.tools,
                 *photo_tools,
+                *send_photo_choice.tools,
             ],
         )
         reply_parts = split_into_messages(reply)
-        if not reply_parts and sticker_choice.picked is None:
+        if (
+            not reply_parts
+            and sticker_choice.picked is None
+            and send_photo_choice.picked is None
+        ):
             raise EmptyReplyError
-        return ComposedReply(parts=reply_parts, sticker=sticker_choice.picked)
+        return ComposedReply(
+            parts=reply_parts,
+            sticker=sticker_choice.picked,
+            shared_photo=send_photo_choice.picked,
+        )

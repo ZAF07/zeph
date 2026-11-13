@@ -49,6 +49,7 @@ from tests.conftest import (
     MEMORY_CATEGORIES_SEED_FILE,
     SEED_FILE,
     WEBHOOK_SECRET,
+    CompanionTestClient,
 )
 from tests.fakes import (
     FakeAuthVerifier,
@@ -249,5 +250,5 @@ def client(
         dashboard_url=DASHBOARD_URL,
         initial_admin_emails=frozenset({INITIAL_ADMIN_EMAIL}),
     )
-    with TestClient(create_app(dependencies)) as test_client:
+    with CompanionTestClient(create_app(dependencies), engine) as test_client:
         yield test_client

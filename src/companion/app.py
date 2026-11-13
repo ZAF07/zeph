@@ -26,7 +26,7 @@ from companion.core.knowledge_retrieval import KnowledgeRetrieval
 from companion.core.memory_categories import MemoryCategoryService
 from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.message_retention import MessageRetention
-from companion.core.photos import PhotoService, PhotoTools
+from companion.core.photos import PhotoService, PhotoTools, SendPhotoTools
 from companion.core.platform_settings import PlatformSettingsService
 from companion.core.ports import (
     AuthAccounts,
@@ -205,6 +205,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 ),
                 sticker_tools=StickerTools(dependencies.repositories, feature_service),
                 photo_tools=PhotoTools(dependencies.repositories, photo_service),
+                send_photo_tools=SendPhotoTools(dependencies.repositories),
             ),
             data_deletion=chat_data_deletion,
         )

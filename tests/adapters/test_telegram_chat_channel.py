@@ -61,6 +61,27 @@ def test_a_sticker_is_sent_by_its_file_id() -> None:
     assert calls == [("sendSticker", {"chat_id": 42, "sticker": "file-seedling"})]
 
 
+def test_a_photo_is_sent_by_its_file_id() -> None:
+    calls: list[tuple[str, dict[str, object]]] = []
+    channel = channel_answering(lambda path, body: ok({}), calls)
+
+    channel.send_photo(42, "file-cat")
+
+    assert calls == [("sendPhoto", {"chat_id": 42, "photo": "file-cat"})]
+
+
+def test_a_refused_photo_raises() -> None:
+    channel = channel_answering(
+        lambda path, body: httpx.Response(
+            400, json={"ok": False, "description": "Bad Request: wrong file id"}
+        ),
+        [],
+    )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        channel.send_photo(42, "file-gone")
+
+
 def test_a_sticker_set_is_read_with_an_image_for_each_sticker() -> None:
     calls: list[tuple[str, dict[str, object]]] = []
     still = {

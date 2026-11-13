@@ -112,6 +112,18 @@ class TelegramChatChannel:
         """
         self._call("sendSticker", {"chat_id": chat_id, "sticker": file_id})
 
+    def send_photo(self, chat_id: int, file_id: str) -> None:
+        """Send one photo Telegram already has, by its file ID.
+
+        Args:
+            chat_id: The chat to send to.
+            file_id: The photo's file ID.
+
+        Raises:
+            httpx.HTTPError: If Telegram can't be reached or refuses the photo.
+        """
+        self._call("sendPhoto", {"chat_id": chat_id, "photo": file_id})
+
     def get_sticker_set(self, name: str) -> list[ChannelSticker] | None:
         """Look up every sticker in a sticker set.
 

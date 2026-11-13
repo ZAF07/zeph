@@ -131,6 +131,18 @@ class ChatChannel(Protocol):
         """
         ...
 
+    def send_photo(self, chat_id: int, file_id: str) -> None:
+        """Send one photo the chat channel already has, by its file ID.
+
+        Args:
+            chat_id: The chat to send to.
+            file_id: The photo's file ID.
+
+        Raises:
+            Exception: If the chat channel refuses the photo.
+        """
+        ...
+
     def get_sticker_set(self, name: str) -> list[ChannelSticker] | None:
         """Look up every sticker in a sticker set.
 

@@ -11,7 +11,8 @@ class TokenCountingChatModel:
     """Chat model that adds the tokens of every answer to the eval report.
 
     It also notes the name of every tool the model calls, in
-    `called_tools`, so an eval can check which tools a reply used.
+    `called_tools`, and every tool it is offered, in `offered_tools`, so an
+    eval can check which tools a reply had and used.
     """
 
     def __init__(self, chat_model: ChatModel, report: EvalReport) -> None:
@@ -24,6 +25,7 @@ class TokenCountingChatModel:
         self._chat_model = chat_model
         self._report = report
         self.called_tools: list[str] = []
+        self.offered_tools: list[str] = []
 
     def generate(
         self,
@@ -43,6 +45,7 @@ class TokenCountingChatModel:
         Returns:
             The real chat model's answer.
         """
+        self.offered_tools += [tool.name for tool in tools]
         recorded_tools = [self._recording(tool) for tool in tools]
         answer = self._chat_model.generate(model, instructions, history, recorded_tools)
         self._report.tokens_in += answer.tokens_in

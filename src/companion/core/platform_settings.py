@@ -100,12 +100,24 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         "memory_retrieval_model", "Memory retrieval model", SettingKind.MODEL
     ),
     EditableSetting(
+        "shared_photos_memory_description",
+        "Shared Photos description for memory retrieval",
+        SettingKind.TEXT,
+        max_length=2_000,
+    ),
+    EditableSetting(
         "photo_description_prompt", "Photo description prompt", SettingKind.TEXT
     ),
     EditableSetting("photo_model", "Photo viewing model", SettingKind.MODEL),
     EditableSetting(
         "ask_about_photo_tool_description",
         "ask_about_photo tool description",
+        SettingKind.TEXT,
+        max_length=4_000,
+    ),
+    EditableSetting(
+        "send_photo_tool_description",
+        "send_photo tool description",
         SettingKind.TEXT,
         max_length=4_000,
     ),
@@ -245,6 +257,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         ),
         prompt_key="memory_retrieval_prompt",
         model_key="memory_retrieval_model",
+        extra_prompt_keys=("shared_photos_memory_description",),
     ),
     CoreService(
         name="Photo viewing",
@@ -257,7 +270,10 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         ),
         prompt_key="photo_description_prompt",
         model_key="photo_model",
-        extra_prompt_keys=("ask_about_photo_tool_description",),
+        extra_prompt_keys=(
+            "ask_about_photo_tool_description",
+            "send_photo_tool_description",
+        ),
     ),
     CoreService(
         name="Check-ins",

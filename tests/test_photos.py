@@ -550,12 +550,10 @@ def test_an_edited_tool_description_is_offered_and_shows_on_the_photo_viewing_ca
         for service in services["services"]
         if service["name"] == "Photo viewing"
     ]
-    assert photo_viewing["extra_prompts"] == [
-        {
-            "key": "ask_about_photo_tool_description",
-            "label": "ask_about_photo tool description",
-        }
-    ]
+    assert photo_viewing["extra_prompts"][0] == {
+        "key": "ask_about_photo_tool_description",
+        "label": "ask_about_photo tool description",
+    }
 
 
 def test_an_album_gets_one_reply_that_covers_every_photo_with_the_caption(
