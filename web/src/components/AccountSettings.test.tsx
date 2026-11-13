@@ -16,6 +16,7 @@ const apiClient = {
   updatePreferences: vi.fn<ApiClient["updatePreferences"]>(),
   deleteMyData: vi.fn<ApiClient["deleteMyData"]>(),
   deleteAccount: vi.fn<ApiClient["deleteAccount"]>(),
+  listPersonalStickers: vi.fn<ApiClient["listPersonalStickers"]>(),
 };
 
 const signOut = vi.fn<(redirectUrl: string) => Promise<void>>();
@@ -51,6 +52,7 @@ const onboardedUser: Me = {
   user_memory_available: true,
   photo_viewing_enabled: true,
   photo_viewing_available: true,
+  personal_stickers_available: true,
   onboarding_completed_at: "2026-11-11T09:00:00Z",
   role: "user",
   changed_in_chat: {},
@@ -67,7 +69,23 @@ describe("AccountSettings", () => {
     }));
     apiClient.deleteMyData.mockResolvedValue(undefined);
     apiClient.deleteAccount.mockResolvedValue(undefined);
+    apiClient.listPersonalStickers.mockResolvedValue([]);
     signOut.mockResolvedValue(undefined);
+  });
+
+  it("shows the Your stickers section, saying when it isn't available", async () => {
+    apiClient.getMe.mockResolvedValue({
+      ...onboardedUser,
+      personal_stickers_available: false,
+    });
+    render(<AccountSettings />);
+
+    const section = await screen.findByRole("region", {
+      name: "Your stickers",
+    });
+    expect(
+      within(section).getByText("Not available on your account"),
+    ).toBeVisible();
   });
 
   it("says Delete my data can be asked for in chat", async () => {

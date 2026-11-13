@@ -30,6 +30,7 @@ function user(onboardingCompletedAt: string | null): Me {
     user_memory_available: true,
     photo_viewing_enabled: true,
     photo_viewing_available: true,
+    personal_stickers_available: false,
     onboarding_completed_at: onboardingCompletedAt,
     role: "user",
     changed_in_chat: {},

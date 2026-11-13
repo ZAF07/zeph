@@ -390,10 +390,11 @@ class FakeTimer:
 class ScriptedChatModel:
     """Chat model that returns pre-written replies and records each call.
 
-    Safeguard, memory processing and memory retrieval calls are told apart
-    by their instructions and kept apart from reply calls, each with its own
-    script. The Safeguard defaults to "none" and retrieval to "none", so
-    tests about replies don't have to script them too. Set
+    Safeguard, memory processing, memory retrieval and Personal Sticker
+    keeping calls are told apart by their instructions and kept apart from
+    reply calls, each with its own script. The Safeguard defaults to "none"
+    and retrieval to "none", so tests about replies don't have to script
+    them too. Set
     `before_next_reply` to run something once while the next reply is being
     "written", like a User acting during a slow model call.
     """
@@ -403,6 +404,7 @@ class ScriptedChatModel:
         safeguard_prompt: str = "",
         memory_processing_prompt: str = "",
         memory_retrieval_prompt: str = "",
+        sticker_keeping_prompt: str = "",
     ) -> None:
         """Start with no replies scripted, no calls and no delay.
 
@@ -412,18 +414,23 @@ class ScriptedChatModel:
                 post-conversation processing call.
             memory_retrieval_prompt: The instructions that mark a memory
                 retrieval call.
+            sticker_keeping_prompt: The instructions that mark a Personal
+                Sticker keeping call.
         """
         self._replies: list[str | Exception | ToolCall] = []
         self._safeguard_answers: list[str | Exception] = []
         self._processing_answers: list[str | Exception] = []
         self._retrieval_answers: list[str | Exception] = []
+        self._sticker_keeping_answers: list[str | Exception] = []
         self.safeguard_prompt = safeguard_prompt
         self.memory_processing_prompt = memory_processing_prompt
         self.memory_retrieval_prompt = memory_retrieval_prompt
+        self.sticker_keeping_prompt = sticker_keeping_prompt
         self.calls: list[ChatModelCall] = []
         self.safeguard_calls: list[ChatModelCall] = []
         self.processing_calls: list[ChatModelCall] = []
         self.retrieval_calls: list[ChatModelCall] = []
+        self.sticker_keeping_calls: list[ChatModelCall] = []
         self.call_order: list[str] = []
         self.delay_seconds = 0.0
         self.before_next_reply: Callable[[], None] | None = None
@@ -464,6 +471,15 @@ class ScriptedChatModel:
                 instead of returned, to act like a failing model.
         """
         self._retrieval_answers.extend(answers)
+
+    def script_sticker_keeping(self, *answers: str | Exception) -> None:
+        """Queue Personal Sticker keeping answers, one per call.
+
+        Args:
+            answers: The JSON answers; an exception is raised instead of
+                returned, to act like a failing model.
+        """
+        self._sticker_keeping_answers.extend(answers)
 
     def generate(
         self,
@@ -509,6 +525,12 @@ class ScriptedChatModel:
             answer = (
                 self._retrieval_answers.pop(0) if self._retrieval_answers else "none"
             )
+        elif (
+            self.sticker_keeping_prompt and instructions == self.sticker_keeping_prompt
+        ):
+            self.sticker_keeping_calls.append(call)
+            self.call_order.append("sticker_keeping")
+            answer = self._sticker_keeping_answers.pop(0)
         else:
             self.calls.append(call)
             self.call_order.append("reply")

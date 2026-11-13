@@ -94,7 +94,7 @@ def features_by_key(client: TestClient, admin: dict[str, str]) -> dict[str, Any]
     return {feature["feature"]: feature for feature in response.json()["features"]}
 
 
-def test_admins_see_every_feature_on_for_everyone_with_no_change_yet(
+def test_admins_see_every_feature_with_its_default_and_no_change_yet(
     client: TestClient, auth_verifier: FakeAuthVerifier
 ) -> None:
     admin = owner_headers(client, auth_verifier)
@@ -109,11 +109,12 @@ def test_admins_see_every_feature_on_for_everyone_with_no_change_yet(
         "user_memory",
         "settings_in_chat",
         "photo_viewing",
+        "personal_stickers",
     ]
-    for feature in features.values():
+    for key, feature in features.items():
         assert feature["name"]
         assert feature["description"]
-        assert feature["on"] is True
+        assert feature["on"] is (key != "personal_stickers")
         assert feature["changed_by_email"] is None
         assert feature["changed_at"] is None
     assert features["stickers"]["name"] == "Stickers"
@@ -321,6 +322,7 @@ def test_a_user_with_no_switch_of_their_own_follows_the_switch_for_everyone(
         "user_memory",
         "settings_in_chat",
         "photo_viewing",
+        "personal_stickers",
     ]
     assert on["name"] == "Web Search"
     assert on["switch"] == "default"

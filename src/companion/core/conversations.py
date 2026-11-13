@@ -7,11 +7,14 @@ from companion.core.knowledge_retrieval import KnowledgeRetrieval
 from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.models import (
     ChannelPhoto,
+    ChannelSticker,
     CheckIn,
     Conversation,
     ConversationMessage,
+    LibrarySticker,
     MessageDirection,
     MessageKind,
+    PersonalSticker,
 )
 from companion.core.photos import sent_shared_photo_text
 from companion.core.ports import (
@@ -72,6 +75,7 @@ class ConversationService:
         text: str,
         kind: MessageKind = MessageKind.TEXT,
         photos: tuple[ChannelPhoto, ...] = (),
+        sticker: ChannelSticker | None = None,
     ) -> UUID:
         """Save a User's message and show that the Companion is typing.
 
@@ -88,6 +92,7 @@ class ConversationService:
             text: The message as the Companion reads it.
             kind: What kind of message it is.
             photos: The photos it came with, kept as chat channel IDs.
+            sticker: The sticker, for a sticker message.
 
         Returns:
             The ID of the Conversation the message was added to.
@@ -104,6 +109,7 @@ class ConversationService:
                     content=text,
                     sent_at=self._clock.now(),
                     photos=photos,
+                    sticker=sticker,
                 )
             )
         self._chat_channel.show_typing(chat_id)
@@ -125,15 +131,17 @@ class ConversationService:
         Shared Photo, if any, comes next, then the sticker. The Shared Photo
         is looked up by the User's own ID and skipped if it was deleted
         meanwhile; if the chat channel refuses it, the error is logged and
-        the rest of the reply still goes. The sticker is skipped if it was
-        removed from the Sticker Library meanwhile.
+        the rest of the reply still goes. The sticker is found in the
+        Sticker Library or the User's own Personal Stickers, and skipped if
+        it was removed meanwhile; one of theirs is noted as just used.
 
         Args:
             user_id: The User being answered.
             conversation_id: The Conversation being answered.
             chat_id: The chat to send to.
             reply_parts: The short messages that make up the reply, in order.
-            sticker_id: The Sticker Library sticker to send after them.
+            sticker_id: The sticker to send after them, from the Sticker
+                Library or the User's Personal Stickers.
             shared_photo_id: The User's Shared Photo to send back after them.
         """
         settings = self._repositories.platform_settings
@@ -144,15 +152,36 @@ class ConversationService:
             self._save(conversation_id, MessageDirection.OUTGOING, part)
         if shared_photo_id is not None:
             self._send_shared_photo(user_id, conversation_id, chat_id, shared_photo_id)
-        sticker = self._repositories.stickers.get(sticker_id) if sticker_id else None
+        sticker = self._find_sticker(user_id, sticker_id) if sticker_id else None
         if sticker is not None:
             self._chat_channel.send_sticker(chat_id, sticker.file_id)
+            if isinstance(sticker, PersonalSticker):
+                self._repositories.personal_stickers.mark_used(
+                    user_id, sticker.id, self._clock.now()
+                )
             self._save(
                 conversation_id,
                 MessageDirection.OUTGOING,
                 sticker_message_text(sticker.emoji),
                 MessageKind.STICKER,
             )
+
+    def _find_sticker(
+        self, user_id: UUID, sticker_id: UUID
+    ) -> LibrarySticker | PersonalSticker | None:
+        """Find a sticker in the Sticker Library or the User's Personal Stickers.
+
+        Args:
+            user_id: The User whose Personal Stickers may hold it.
+            sticker_id: The sticker's ID.
+
+        Returns:
+            The sticker, or None if it is in neither.
+        """
+        library_sticker = self._repositories.stickers.get(sticker_id)
+        if library_sticker is not None:
+            return library_sticker
+        return self._repositories.personal_stickers.get(user_id, sticker_id)
 
     def _send_shared_photo(
         self, user_id: UUID, conversation_id: UUID, chat_id: int, photo_id: UUID

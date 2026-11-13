@@ -26,6 +26,10 @@ from companion.core.knowledge_retrieval import KnowledgeRetrieval
 from companion.core.memory_categories import MemoryCategoryService
 from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.message_retention import MessageRetention
+from companion.core.personal_stickers import (
+    PersonalStickerKeeper,
+    PersonalStickerService,
+)
 from companion.core.photos import PhotoService, PhotoTools, SendPhotoTools
 from companion.core.platform_settings import PlatformSettingsService
 from companion.core.ports import (
@@ -149,6 +153,9 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     sticker_library = StickerLibraryService(
         dependencies.repositories, dependencies.chat_channel, dependencies.clock
     )
+    personal_sticker_service = PersonalStickerService(
+        dependencies.repositories, dependencies.chat_channel
+    )
     chat_data_deletion = ChatDataDeletion(
         dependencies.repositories, dependencies.chat_channel, dependencies.clock
     )
@@ -234,6 +241,12 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             repositories=dependencies.repositories,
             features=feature_service,
             chat_model=chat_model,
+            personal_sticker_keeper=PersonalStickerKeeper(
+                repositories=dependencies.repositories,
+                features=feature_service,
+                chat_model=chat_model,
+                clock=dependencies.clock,
+            ),
             clock=dependencies.clock,
         ),
         check_ins=check_in_service,
@@ -284,6 +297,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             ),
             feature_service=feature_service,
             photo_service=photo_service,
+            personal_sticker_service=personal_sticker_service,
             platform_settings=dependencies.repositories.platform_settings,
             telegram_bot_username=dependencies.telegram_bot_username,
         )
@@ -309,6 +323,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 clock=dependencies.clock,
             ),
             sticker_library=sticker_library,
+            personal_sticker_service=personal_sticker_service,
             check_in_kind_service=CheckInKindService(
                 dependencies.repositories, dependencies.clock
             ),

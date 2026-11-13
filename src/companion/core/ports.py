@@ -38,6 +38,7 @@ from companion.core.models import (
     MemoryChanges,
     MemoryItem,
     ModelAnswer,
+    PersonalSticker,
     PhotoImage,
     RiskType,
     SafeguardEvent,
@@ -1313,6 +1314,86 @@ class StickerRepository(Protocol):
         ...
 
 
+class PersonalStickerRepository(Protocol):
+    """Stores the stickers kept from each User."""
+
+    def list_for_user(self, user_id: UUID) -> list[PersonalSticker]:
+        """List a User's Personal Stickers, most recently used first.
+
+        Args:
+            user_id: The User.
+
+        Returns:
+            The stickers.
+        """
+        ...
+
+    def get(self, user_id: UUID, sticker_id: UUID) -> PersonalSticker | None:
+        """Find one of a User's Personal Stickers.
+
+        Args:
+            user_id: The User it must belong to.
+            sticker_id: The sticker's ID.
+
+        Returns:
+            The sticker, or None if the User has none with that ID.
+        """
+        ...
+
+    def save_many(self, stickers: list[PersonalSticker]) -> None:
+        """Keep stickers, replacing the User's own copy of the same sticker.
+
+        A sticker the User already has, by its unchanging ID, keeps its ID
+        and when it was first kept; the rest is replaced.
+
+        Args:
+            stickers: The stickers to keep.
+        """
+        ...
+
+    def mark_used(self, user_id: UUID, sticker_id: UUID, used_at: datetime) -> None:
+        """Note that one of a User's Personal Stickers was just sent.
+
+        Args:
+            user_id: The User it belongs to.
+            sticker_id: The sticker's ID.
+            used_at: When it was sent.
+        """
+        ...
+
+    def keep_most_recently_used(self, user_id: UUID, limit: int) -> None:
+        """Drop a User's Personal Stickers used longest ago, beyond a limit.
+
+        Args:
+            user_id: The User.
+            limit: How many to keep.
+        """
+        ...
+
+    def delete(self, user_id: UUID, sticker_id: UUID) -> bool:
+        """Remove one of a User's Personal Stickers.
+
+        Args:
+            user_id: The User it must belong to.
+            sticker_id: The sticker's ID.
+
+        Returns:
+            True if it was removed; False if the User had none with that ID.
+        """
+        ...
+
+    def count_for_user(self, user_id: UUID) -> int:
+        """Count a User's Personal Stickers.
+
+        Args:
+            user_id: The User.
+
+        Returns:
+            How many they have.
+        """
+        ...
+
+
 class CheckInRepository(Protocol):
     """Stores Check-in Kinds and the Check-in decisions made for Users."""
 
@@ -1534,6 +1615,7 @@ class Repositories:
     knowledge_documents: KnowledgeDocumentRepository
     usage: UsageRepository
     stickers: StickerRepository
+    personal_stickers: PersonalStickerRepository
     check_ins: CheckInRepository
     feature_switches: FeatureSwitchRepository
     pending_auth_account_deletions: PendingAuthAccountDeletionRepository

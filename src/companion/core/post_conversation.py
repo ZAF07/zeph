@@ -21,6 +21,7 @@ from companion.core.models import (
     MessageDirection,
     SharedPhoto,
 )
+from companion.core.personal_stickers import PersonalStickerKeeper
 from companion.core.ports import Clock, Repositories
 from companion.core.transcripts import to_transcript_lines
 from companion.core.usage import UsageRecordingChatModel
@@ -328,7 +329,8 @@ class PostConversationProcessor:
     """Sums up each ended Conversation and updates the User's User Memory.
 
     It changes their Memory Items and keeps the photos that matter to them
-    as Shared Photos.
+    as Shared Photos. Separately from User Memory, it keeps the User's
+    Personal Stickers.
     """
 
     def __init__(
@@ -336,6 +338,7 @@ class PostConversationProcessor:
         repositories: Repositories,
         features: FeatureService,
         chat_model: UsageRecordingChatModel,
+        personal_sticker_keeper: PersonalStickerKeeper,
         clock: Clock,
     ) -> None:
         """Set up the processor.
@@ -347,18 +350,23 @@ class PostConversationProcessor:
                 User.
             chat_model: Writes the summary and the Memory Item operations,
                 and records the tokens used.
+            personal_sticker_keeper: Keeps the stickers the User sent whose
+                meaning was clear.
             clock: Tells the current time.
         """
         self._repositories = repositories
         self._features = features
         self._chat_model = chat_model
+        self._personal_sticker_keeper = personal_sticker_keeper
         self._clock = clock
 
     def process(self, conversation: Conversation) -> None:
         """Process one ended Conversation and mark it processed.
 
-        Nothing is saved when User Memory doesn't work for the User, and no
-        photo is kept when Photo Viewing doesn't. One model call gives the
+        Personal Stickers are kept first, whatever User Memory says; if that
+        fails, the failure is logged and processing goes on. Nothing more is
+        saved when User Memory doesn't work for the User, and no photo is
+        kept when Photo Viewing doesn't. One model call gives the
         summary, the operations and the photos to keep as Shared Photos; an
         unreadable answer is asked again once, and if it is still unreadable
         nothing is saved, so a bad answer is never retried forever.
@@ -373,6 +381,8 @@ class PostConversationProcessor:
         user_memory = self._repositories.user_memory
         user = self._repositories.users.get(conversation.user_id)
         messages = self._repositories.conversations.list_messages(conversation.id)
+        if user is not None:
+            self._keep_personal_stickers(user.id, messages)
         if (
             user is None
             or not self._features.works_for(user.id, Feature.USER_MEMORY)
@@ -431,6 +441,20 @@ class PostConversationProcessor:
             created_at=now,
         )
         user_memory.save_processed_conversation(conversation.id, now, summary, changes)
+
+    def _keep_personal_stickers(
+        self, user_id: UUID, messages: list[ConversationMessage]
+    ) -> None:
+        """Keep the User's Personal Stickers, logging a failure instead of raising.
+
+        Args:
+            user_id: The User whose Conversation it was.
+            messages: The Conversation's messages, oldest first.
+        """
+        try:
+            self._personal_sticker_keeper.keep_from(user_id, messages)
+        except Exception:
+            logger.exception("Could not keep Personal Stickers")
 
     def _ask(self, user_id: UUID, description: str) -> ProcessingAnswer | None:
         """Ask the model about the Conversation, once more if it can't be read.

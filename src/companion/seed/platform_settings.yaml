@@ -497,15 +497,52 @@ onboarding_reasons_memory_category: Goals
 # home.
 home_goals_memory_category: Goals
 
-# What the model is told about the sticker tool. The stickers that have a
-# "when to use" note are listed after it, by number.
+# What the model is told about the sticker tool. The person's own Personal
+# Stickers are listed after it first, marked "(theirs)", then the Sticker
+# Library stickers that have a "when to use" note, by number.
 sticker_tool_description: >-
   Send one sticker after your text, the way a friend sometimes does. Use it
   rarely: most replies have no sticker, and never two replies in a row. Only
   when the moment is light or warm and a sticker's note fits it well; never
   when the person is upset, struggling or talking about something serious.
-  At most one sticker per reply. Still write your text reply as usual. The
-  stickers, by number, with when each one fits:
+  At most one sticker per reply. Still write your text reply as usual.
+  Stickers marked "(theirs)" are ones the person sends themselves; when one
+  of theirs fits the moment, prefer it, as it feels more like them. Never
+  mention that you kept their stickers. The stickers, by number, with when
+  each one fits:
+
+# Personal Stickers. When a Conversation ends and the person sent stickers in
+# it, this model picks the ones whose meaning was clear and writes when to use
+# each. It runs only while the Personal Stickers Feature works for them.
+personal_sticker_keeping_model: deepseek-chat
+
+personal_sticker_keeping_prompt: |-
+  You help Zeph, an AI companion people talk to on Telegram, reply in the
+  person's own stickers. You are given the stickers the person sent in a
+  Conversation that has just ended, each with a number and its emoji, and the
+  Conversation, where each sticker is shown as "[sticker <number>: <emoji>]".
+  A sticker Zeph kept already shows its current note.
+
+  Pick the stickers whose meaning is clear from how the person used them, so
+  Zeph could send them back at the right moment. Skip any whose meaning isn't
+  clear. For each one you pick, write a short "when to use" note from its
+  emoji and the chat around it. The note describes the moment, never the
+  person: write "for laughing along at a small mishap", not "when Sam laughs
+  at being clumsy". Never put names, places, health details or anything else
+  personal in a note. For a sticker kept already, pick it only to write a
+  sharper note; otherwise leave it out and its note stays. Most
+  Conversations keep one sticker or none.
+
+  Answer with JSON only, in exactly this shape:
+  {
+    "stickers_to_keep": [
+      {"sticker": <number>, "note": "..."}
+    ]
+  }
+
+# The most Personal Stickers kept for one User. When a new one would go over,
+# the one used longest ago is dropped.
+personal_stickers_limit: 30
 
 # Check-ins. On each scheduler tick, this model decides for each User who is
 # due: a Check-in Kind and message, or to skip. It gets the Persona and this

@@ -10,6 +10,7 @@ from psycopg_pool import ConnectionPool
 from companion.core.conversations import ConversationServices
 from companion.core.models import (
     ChannelPhoto,
+    ChannelSticker,
     ConversationTurn,
     MessageKind,
     RiskType,
@@ -32,6 +33,7 @@ class TurnState(TypedDict, total=False):
     text: str
     kind: str
     photos: list[dict[str, Any]]
+    sticker: dict[str, Any] | None
     safeguard_text: str
     conversation_id: str
     risk_type: str
@@ -96,12 +98,14 @@ class LangGraphConversationEngine:
             Returns:
                 The ID of that Conversation.
             """
+            sticker = state.get("sticker")
             conversation_id = services.conversations.record_incoming(
                 UUID(state["user_id"]),
                 state["chat_id"],
                 state["text"],
                 MessageKind(state["kind"]),
                 tuple(ChannelPhoto(**photo) for photo in state["photos"]),
+                ChannelSticker(**sticker) if sticker else None,
             )
             return {"conversation_id": str(conversation_id)}
 
@@ -379,6 +383,7 @@ class LangGraphConversationEngine:
                 "text": turn.text,
                 "kind": turn.kind.value,
                 "photos": [asdict(photo) for photo in turn.photos],
+                "sticker": asdict(turn.sticker) if turn.sticker else None,
                 "safeguard_text": turn.safeguard_text or "",
             },
             config={"configurable": {"thread_id": str(turn.user_id)}},

@@ -11,6 +11,7 @@ from companion.core.models import (
     ConversationMessage,
     LibrarySticker,
     MessageDirection,
+    PersonalSticker,
     SharedPhoto,
 )
 from companion.core.photos import PhotoTools, SendPhotoTools
@@ -34,13 +35,14 @@ class ComposedReply:
     Attributes:
         parts: The short text messages, in order; may be empty when the
             reply is just a sticker or a photo.
-        sticker: The one sticker to send after the text, if any.
+        sticker: The one sticker to send after the text, if any, from the
+            Sticker Library or the User's Personal Stickers.
         shared_photo: The one Shared Photo of the User's to send back after
             the text, if any.
     """
 
     parts: list[str]
-    sticker: LibrarySticker | None
+    sticker: LibrarySticker | PersonalSticker | None
     shared_photo: SharedPhoto | None = None
 
 
@@ -129,10 +131,11 @@ class ResponseComposer:
         then what the Companion remembers and the Knowledge that may fit, and
         gives the model every earlier message in the Conversation. The model
         may search the web and read pages when web search is offered, change
-        the User's settings when they ask, pick one sticker from the
-        Sticker Library when Stickers works for them, look again at a photo
-        from the Conversation when its description can't answer, and send
-        back one of the User's Shared Photos that matter for the message. When
+        the User's settings when they ask, pick one sticker from their
+        Personal Stickers or the Sticker Library when Stickers works for
+        them, look again at a photo from the Conversation when its
+        description can't answer, and send back one of the User's Shared
+        Photos that matter for the message. When
         a Feature doesn't work for the User, the instructions say so, so the
         reply can tell them plainly.
 

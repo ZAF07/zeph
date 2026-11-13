@@ -1,6 +1,6 @@
 # 30 — Personal Stickers: the Companion replies in a User's own stickers
 
-Status: ready-for-agent
+Status: in-progress
 
 ## Parent
 
@@ -65,3 +65,11 @@ No design yet in `docs/design/`. Add the User page and the per-User count to the
 - Not User Memory: stickers are how the Companion talks, not something it remembers about the User.
 - Its own Feature, off by default, because it's for a higher plan after the MVP.
 - Kept even when also in the Sticker Library, so the Companion knows what is the User's.
+
+**2026-11-13 — started on branch `mvp-30-personal-stickers`.** Issue 24 is still in progress in another worktree; its block only matters for Admins' own stickers (today they go to the library and aren't saved as chat), so this goes ahead and is rebased onto main before merging. Plan:
+- Messages keep the sticker: a User's sticker turn carries its `ChannelSticker`, saved in a new `conversation_messages.sticker` column, so it can be kept when the Conversation ends.
+- New `personal_stickers` table (one row per User and sticker, with note, kept and last-used times), cascading on User delete; `users.delete_data` removes them too. Message Retention doesn't touch them.
+- Feature `PERSONAL_STICKERS`: each Feature gets a code default, and this one is off for everyone. It needs Stickers: when Stickers doesn't work it doesn't either (new reason "stickers_off"). It isn't named in the reply's "not available" note, since Users don't ask for it.
+- Keeping: a new core `PersonalStickerKeeper` makes its own model call (new prompt and model settings, a Prompts page service) when a Conversation ends, separate from post-conversation processing, so User Memory doesn't affect it. It runs only when the Feature works and the User sent stickers. Picks are checked; a pick of one already kept updates its note; any kept sticker the User sent again counts as used. Then the User's stickers over `personal_stickers_limit` (30, Platform settings) are dropped, oldest use first.
+- Sending: `send_sticker` lists theirs first "(theirs)", then library stickers with a note not already theirs. Delivery finds the sticker in the library or the User's own and marks theirs as used. `sticker_tool_description` becomes Admin-editable (Prompts page, Response composition) and says to prefer theirs; migration 0022 reloads it.
+- Dashboard: "Your stickers" section on Account & privacy (image, note, remove; "Not available on your account" when off). Admin per-User Features panel shows the count.

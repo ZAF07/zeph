@@ -91,6 +91,18 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
     ],
   },
   {
+    heading: "Stickers",
+    fields: [
+      {
+        key: "personal_stickers_limit",
+        label: "Most Personal Stickers per User",
+        caption:
+          "Stickers Zeph keeps from one User. When it would keep more, it drops the one used longest ago.",
+        unit: "stickers",
+      },
+    ],
+  },
+  {
     heading: "Data",
     fields: [
       {

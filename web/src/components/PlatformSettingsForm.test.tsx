@@ -32,6 +32,7 @@ const settings: AdminSettings = {
   photo_retry_count: seeded(2),
   photo_album_wait_seconds: seeded(2),
   photo_album_max_photos: seeded(5),
+  personal_stickers_limit: seeded(30),
   photo_not_viewed_note: seeded("Say the photo didn't come through."),
   photo_viewing_off_note: seeded("Say you didn't look at the photo."),
   photo_viewing_explanation: seeded("When off, Zeph won't look at photos."),

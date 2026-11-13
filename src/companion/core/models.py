@@ -430,6 +430,7 @@ class ConversationMessage:
         content: The message text; for a photo, its caption and description.
         sent_at: When it was sent.
         photos: The photos the message came with, as chat channel IDs.
+        sticker: The sticker a User sent, for a sticker message from them.
     """
 
     id: UUID
@@ -439,6 +440,7 @@ class ConversationMessage:
     content: str
     sent_at: datetime
     photos: tuple[ChannelPhoto, ...] = ()
+    sticker: ChannelSticker | None = None
 
 
 @dataclass(frozen=True)
@@ -455,6 +457,7 @@ class ConversationTurn:
         safeguard_text: The message as the Safeguard reads it when that
             differs from `text`: with Photo Viewing off, the Safeguard still
             reads each photo's description. None when it is the same.
+        sticker: The sticker, for a sticker message.
     """
 
     user_id: UUID
@@ -463,6 +466,7 @@ class ConversationTurn:
     kind: MessageKind = MessageKind.TEXT
     photos: tuple[ChannelPhoto, ...] = ()
     safeguard_text: str | None = None
+    sticker: ChannelSticker | None = None
 
 
 class ChatRole(StrEnum):
@@ -985,6 +989,35 @@ class LibrarySticker:
 
 
 @dataclass(frozen=True)
+class PersonalSticker:
+    """A sticker the Companion kept from one User, to reply in their own stickers.
+
+    Attributes:
+        id: Our ID for the sticker.
+        user_id: The User it was kept from.
+        file_id: The ID used to send it on the chat channel.
+        file_unique_id: The ID that stays the same for the same sticker.
+        emoji: The emoji it stands for, if it has one.
+        set_name: The sticker set it came from, if any.
+        preview_file_id: The ID of an image of it for the Dashboard, if any.
+        note: When to use it, about the moment and never about the User.
+        kept_at: When it was first kept.
+        last_used_at: When the User or the Companion last sent it.
+    """
+
+    id: UUID
+    user_id: UUID
+    file_id: str
+    file_unique_id: str
+    emoji: str | None
+    set_name: str | None
+    preview_file_id: str | None
+    note: str
+    kept_at: datetime
+    last_used_at: datetime
+
+
+@dataclass(frozen=True)
 class StickerImage:
     """An image of a sticker, for the Dashboard to show.
 
@@ -1137,6 +1170,7 @@ class Feature(StrEnum):
     USER_MEMORY = "user_memory"
     SETTINGS_IN_CHAT = "settings_in_chat"
     PHOTO_VIEWING = "photo_viewing"
+    PERSONAL_STICKERS = "personal_stickers"
 
 
 @dataclass(frozen=True)
@@ -1176,6 +1210,7 @@ class FeatureReason(StrEnum):
     OFF_FOR_EVERYONE = "off_for_everyone"
     OFF_FOR_USER = "off_for_user"
     TURNED_OFF_BY_USER = "turned_off_by_user"
+    STICKERS_OFF = "stickers_off"
 
 
 @dataclass(frozen=True)
@@ -1185,8 +1220,9 @@ class FeatureStatus:
     Attributes:
         feature: The Feature.
         available: Whether the Admin side allows it for the User.
-        works: Whether it works for the User right now: it is available and,
-            where the User has their own switch, they have it on.
+        works: Whether it works for the User right now: it is available,
+            where the User has their own switch they have it on, and the
+            Feature it needs, if any, works too.
         reason: Why it works or doesn't.
         switch: The Admin's switch for this User.
         changed_by_email: The email of the Admin who last changed the switch

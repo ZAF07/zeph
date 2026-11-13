@@ -212,11 +212,16 @@ def test_core_services_list_their_prompt_and_model_settings(
         "Post-conversation processing",
         "Memory retrieval",
         "Photo viewing",
+        "Personal Sticker keeping",
         "Check-ins",
     ]
     service = response["services"][1]
     assert service["prompt_key"] == "response_prompt"
     assert service["model_key"] == "response_model"
+    assert [extra["key"] for extra in service["extra_prompts"]] == [
+        "sticker_tool_description",
+        "reply_web_search_limit_note",
+    ]
     assert response["model_choices"] == ["deepseek-chat", "deepseek-reasoner"]
 
 

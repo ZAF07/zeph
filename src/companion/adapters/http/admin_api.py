@@ -79,6 +79,7 @@ from companion.core.models import (
     UserOverview,
     UserRole,
 )
+from companion.core.personal_stickers import PersonalStickerService
 from companion.core.platform_settings import (
     CORE_SERVICES,
     SETTING_LABELS,
@@ -184,9 +185,13 @@ class UserFeatureResponse(BaseModel):
 
 
 class UserFeaturesResponse(BaseModel):
-    """Every Feature's status for one User, in a set order."""
+    """Every Feature's status for one User, in a set order.
+
+    Admins see only how many Personal Stickers the User has, never which.
+    """
 
     features: list[UserFeatureResponse]
+    personal_sticker_count: int
 
 
 class UserFeatureSwitchRequest(BaseModel):
@@ -766,6 +771,7 @@ def build_admin_api_router(
     memory_category_service: MemoryCategoryService,
     knowledge_service: KnowledgeService,
     sticker_library: StickerLibraryService,
+    personal_sticker_service: PersonalStickerService,
     check_in_kind_service: CheckInKindService,
     check_in_service: CheckInService,
     usage_limiter: UsageLimiter,
@@ -785,6 +791,7 @@ def build_admin_api_router(
         memory_category_service: Manages Memory Categories.
         knowledge_service: Manages the Knowledge library.
         sticker_library: Manages the Sticker Library.
+        personal_sticker_service: Counts each User's Personal Stickers.
         check_in_kind_service: Manages Check-in Kinds.
         check_in_service: Lists Check-in decisions.
         usage_limiter: Reports usage per User per day.
@@ -842,7 +849,8 @@ def build_admin_api_router(
             user_id: The User.
 
         Returns:
-            Each Feature's status for the User.
+            Each Feature's status for the User, and how many Personal
+            Stickers they have.
 
         Raises:
             HTTPException: 404 if there is no such User.
@@ -854,7 +862,8 @@ def build_admin_api_router(
         return UserFeaturesResponse(
             features=[
                 to_user_feature_response(feature_status) for feature_status in statuses
-            ]
+            ],
+            personal_sticker_count=personal_sticker_service.count_for(user_id),
         )
 
     @router.put("/users/{user_id}/features/{feature}")
