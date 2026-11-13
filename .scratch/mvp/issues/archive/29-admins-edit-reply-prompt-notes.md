@@ -74,4 +74,7 @@ Evidence (2026-11-13):
 ## Completion
 
 - Completed: 2026-11-13
-- Commit: c21964c "MVP issue 29: Admins can edit every reply prompt note on the Dashboard", review fix 305d1c3 "MVP issue 29: use the shared Dashboard link placeholder in the Features unavailable note", archive (this commit) on branch `mvp-29-reply-prompt-notes`; merge into main to be recorded after merging
+- Commit: 93d274a (merge into main): "Merge MVP issue 29: Admins can edit every reply prompt note on the Dashboard; …"
+  - c21964c "MVP issue 29: Admins can edit every reply prompt note on the Dashboard"
+  - 305d1c3 "MVP issue 29: use the shared Dashboard link placeholder in the Features unavailable note"
+  - 80d214b "MVP issue 29 done: archive issue with test, run and review evidence"
