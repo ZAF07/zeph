@@ -169,7 +169,7 @@ The Companion looking something up on the web while it replies — searching, or
 _Avoid_: Browsing, internet lookup, googling
 
 **Web Search Limit**:
-The most Web Searches the Companion makes for one User in a day, set by Admins; each search and each page read counts as one. The day is the User's own, so it resets at midnight in their time zone. Once it is reached the Companion replies without the web until the next day.
+The most Web Searches the Companion makes for one User in a day, set by Admins; each search and each page read counts as one. The day is the User's own, so it resets at midnight in their time zone. Once it is reached the Companion replies without the web until the next day; when a lookup would have helped, it tells the User plainly it can't look things up again until tomorrow and answers from what it knows, never claiming it searched.
 _Avoid_: Search quota, web budget
 
 ### Usage
