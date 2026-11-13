@@ -67,4 +67,4 @@ None - can start immediately.
 ## Completion
 
 - Completed: 2026-11-13
-- Commit: <to be filled in after merge>
+- Commit: aa8ef25 "Refuse Telegram connection before onboarding is finished", cb73345 "Let Admins edit the finish-onboarding-first reply", archive d18510f "MVP issue 20 done: archive issue with test, run and review evidence", glossary 0edac5e "Glossary: a User must finish Onboarding before connecting Telegram" (merged from `mvp-20-onboarding-before-telegram` in 17d1454 "Merge MVP issue 20: onboarding must be finished before Telegram can be linked…")
