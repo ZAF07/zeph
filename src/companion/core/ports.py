@@ -103,6 +103,14 @@ class Timer(Protocol):
         ...
 
 
+class MessageRefusedError(Exception):
+    """Raised when the chat channel clearly refused a message, so it never arrived."""
+
+
+class ChatBlockedError(Exception):
+    """Raised when the chat channel can't reach the person, e.g. they blocked us."""
+
+
 class ChatChannel(Protocol):
     """Sends messages to people on the chat channel (Telegram for the MVP)."""
 
@@ -112,6 +120,12 @@ class ChatChannel(Protocol):
         Args:
             chat_id: The chat to send to.
             text: The message text.
+
+        Raises:
+            ChatBlockedError: If it can't reach the person, e.g. they blocked us.
+            MessageRefusedError: If the chat channel clearly refused it.
+            Exception: Any other failure, such as a timeout; the message may
+                or may not have arrived.
         """
         ...
 
@@ -1497,6 +1511,34 @@ class CheckInRepository(Protocol):
             next_due_at: When the User's next Check-in may be sent.
             pause_until_resumed: Whether to also pause the User's Check-ins
                 until they resume.
+        """
+        ...
+
+    def undo_add(
+        self,
+        check_in: CheckIn,
+        next_due_at: datetime,
+        end_pause: bool,
+        skipped: CheckIn | None,
+    ) -> None:
+        """Take back a saved Check-in that was never sent, together.
+
+        Only the next due time and, when asked, the pause are changed, so
+        settings the User changed meanwhile are kept.
+
+        Args:
+            check_in: The saved Check-in to remove.
+            next_due_at: When the User's next Check-in may be sent.
+            end_pause: Whether to end the pause that saving it started.
+            skipped: A Skipped Check-in to save in its place; None for none.
+        """
+        ...
+
+    def remove_shared_photo(self, check_in_id: UUID) -> None:
+        """Mark a sent Check-in as having sent no Shared Photo.
+
+        Args:
+            check_in_id: The Check-in's ID.
         """
         ...
 

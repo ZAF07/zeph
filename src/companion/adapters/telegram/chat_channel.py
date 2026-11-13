@@ -4,6 +4,7 @@ from typing import Any
 import httpx
 
 from companion.core.models import ChannelSticker, PhotoImage, StickerImage
+from companion.core.ports import ChatBlockedError, MessageRefusedError
 
 TELEGRAM_API_URL = "https://api.telegram.org"
 IMAGE_MEDIA_TYPES = {
@@ -46,8 +47,21 @@ class TelegramApiError(Exception):
         self.status_code = status_code
 
 
+class TelegramRefusedError(TelegramApiError, MessageRefusedError):
+    """Raised when Telegram answered that it won't do a call, so nothing arrived."""
+
+
+class TelegramBlockedError(TelegramApiError, ChatBlockedError):
+    """Raised when Telegram won't send to someone, such as when they blocked the bot."""
+
+
 def to_telegram_api_error(action: str, error: httpx.HTTPError) -> TelegramApiError:
     """Turn an httpx error into a Telegram error that leaves out the URL.
+
+    A 4xx answer is a clear refusal. A 403 means the bot can't message
+    that person until they act, such as when they blocked it, so it is told
+    apart from the others. A 5xx answer or no answer leaves it unknown
+    whether the call went through.
 
     Args:
         action: What was being done, like the Bot API method name.
@@ -66,6 +80,10 @@ def to_telegram_api_error(action: str, error: httpx.HTTPError) -> TelegramApiErr
     description = telegram_error_description(error.response)
     if description:
         message = f"{message}: {description}"
+    if status_code == httpx.codes.FORBIDDEN:
+        return TelegramBlockedError(message, status_code)
+    if error.response.is_client_error:
+        return TelegramRefusedError(message, status_code)
     return TelegramApiError(message, status_code)
 
 
@@ -155,6 +173,12 @@ class TelegramChatChannel:
         Args:
             chat_id: The chat to send to.
             text: The message text.
+
+        Raises:
+            TelegramBlockedError: If the person blocked the bot.
+            TelegramRefusedError: If Telegram clearly refused the message.
+            TelegramApiError: If Telegram can't be reached or fails, so the
+                message may or may not have arrived.
         """
         self._call("sendMessage", {"chat_id": chat_id, "text": text})
 

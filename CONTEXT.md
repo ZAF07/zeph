@@ -81,7 +81,7 @@ The style of a Check-in (e.g. casual hello, follow-up on something shared, prese
 _Avoid_: Template, check-in type
 
 **Skipped Check-in**:
-A due Check-in the Companion chose not to send, or couldn't because the User has blocked it on Telegram, with a reason only Admins see (e.g. the User asked for space). The next attempt waits a full frequency gap, as after a sent one. Users see it only as "gave you some space".
+A due Check-in the Companion chose not to send, or couldn't because Telegram won't reach the User (they blocked it, or their account is gone), with a reason only Admins see (e.g. the User asked for space). The next attempt waits a full frequency gap, as after a sent one. Users see it only as "gave you some space".
 _Avoid_: Cancelled, missed, failed check-in
 
 **Ignore Threshold**:
