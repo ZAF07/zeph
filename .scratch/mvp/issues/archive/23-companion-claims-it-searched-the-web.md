@@ -74,4 +74,4 @@ Features issue 03 added the not-available note (`reply_features_unavailable_note
 ## Completion
 
 - Completed: 2026-11-13
-- Commit: filled in after merge
+- Commit: 0198efe "Tell the Companion it can't search once the Web Search Limit is reached", review fixes 2e7c207 "Check the Feature before counting web searches; name the not-available note in its test", archive 4c98e80 "MVP issue 23 done: archive issue with test, run and review evidence" (merged from `mvp-23-web-search-limit-note` in 0c55315 "Merge MVP issue 23: once a User reaches their Web Search Limit, the reply gets the new Admin-editable reply_web_search_limit_note…")
