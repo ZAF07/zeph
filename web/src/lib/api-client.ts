@@ -358,6 +358,15 @@ export type ConversationSummary = {
   created_at: string;
 };
 
+/** A photo that matters to the User, kept in their User Memory. */
+export type SharedPhoto = {
+  id: string;
+  description: string;
+  note: string;
+  caption: string;
+  sent_at: string;
+};
+
 /** A Check-in Kind's name, description and "allowed when memory is off". */
 export type CheckInKindInput = {
   name: string;
@@ -494,6 +503,9 @@ export type ApiClient = {
   deleteAllMemoryItems: () => Promise<void>;
   listConversationSummaries: () => Promise<ConversationSummary[]>;
   deleteConversationSummary: (id: string) => Promise<void>;
+  listSharedPhotos: () => Promise<SharedPhoto[]>;
+  getSharedPhotoImage: (id: string) => Promise<Blob>;
+  deleteSharedPhoto: (id: string) => Promise<void>;
   listAdminUsers: () => Promise<AdminUser[]>;
   changeUserRole: (userId: string, role: UserRole) => Promise<RoleChange>;
   listFeatures: () => Promise<FeatureSwitch[]>;
@@ -688,6 +700,11 @@ export function createApiClient(
       ).summaries,
     deleteConversationSummary: (id) =>
       request<void>(`/api/conversation-summaries/${id}`, "DELETE"),
+    listSharedPhotos: async () =>
+      (await request<{ photos: SharedPhoto[] }>("/api/shared-photos")).photos,
+    getSharedPhotoImage: (id) => requestBlob(`/api/shared-photos/${id}/image`),
+    deleteSharedPhoto: (id) =>
+      request<void>(`/api/shared-photos/${id}`, "DELETE"),
     listAdminUsers: async () =>
       (await request<{ users: AdminUser[] }>("/api/admin/users")).users,
     changeUserRole: (userId, role) =>

@@ -327,6 +327,7 @@ class ChannelPhoto:
             download it, so it can't be viewed.
         viewed: True once the Companion has looked at it and described it.
         description: What it shows, once described; "" until then.
+        caption: The caption it came with, or its album's caption; "" if none.
     """
 
     file_id: str
@@ -334,6 +335,7 @@ class ChannelPhoto:
     too_big_to_download: bool = False
     viewed: bool = False
     description: str = ""
+    caption: str = ""
 
 
 @dataclass(frozen=True)
@@ -718,18 +720,47 @@ class MemoryItem:
 
 
 @dataclass(frozen=True)
+class SharedPhoto:
+    """A photo that matters to a User, kept in their User Memory.
+
+    Attributes:
+        id: Our ID for it.
+        user_id: The User who sent it.
+        file_id: The chat channel's ID used to download or send it.
+        file_unique_id: The chat channel's ID that stays the same for it.
+        description: What it shows, written when it arrived.
+        note: Why it matters to the User.
+        caption: The caption it came with; "" if none.
+        sent_at: When the User sent it.
+        conversation_id: The Conversation it came in; None once that is gone.
+    """
+
+    id: UUID
+    user_id: UUID
+    file_id: str
+    file_unique_id: str
+    description: str
+    note: str
+    caption: str
+    sent_at: datetime
+    conversation_id: UUID | None
+
+
+@dataclass(frozen=True)
 class MemoryChanges:
-    """What post-conversation processing changes in a User's Memory Items.
+    """What post-conversation processing changes in a User's User Memory.
 
     Attributes:
         added: New Memory Items to save.
         updated: Existing Memory Items with their new content and category.
         removed_ids: IDs of Memory Items to delete.
+        new_shared_photos: New Shared Photos to save.
     """
 
     added: list[MemoryItem]
     updated: list[MemoryItem]
     removed_ids: list[UUID]
+    new_shared_photos: list[SharedPhoto] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

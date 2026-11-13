@@ -30,3 +30,10 @@ The Companion can now and then send a User's own Shared Photo back, the way a fr
 ## Blocked by
 
 - `.scratch/photos/issues/04-shared-photos.md`
+
+## Comments
+
+### 2026-11-13 — note from issue 04
+
+- **Check first, before anything else:** that a days-old Telegram photo file id still downloads, since sending a Shared Photo back relies on it (moved here from issue 04, which could only check it the same day). Re-download `AgACAgUAAxkDAAPzavaxvf82fkk6N0Dp5dgOOelpfO4AAn0VaxsYkrFXUsuQqSSQGPsBAAMCAAN4AAM9BA` (`file_unique_id` `AQADfRVrGxiSsVd9`, made 2026-11-13) with `getFile` then the download, record the date and result here, and stop and raise it if it fails (ADR 0007).
+- Shared Photos now exist: `SharedPhoto` (`core/models.py`), listed by `PhotoService.list_shared` and `UserMemoryRepository.list_shared_photos`, each with `file_id`, description, note and caption.

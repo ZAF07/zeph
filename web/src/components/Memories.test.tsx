@@ -7,6 +7,7 @@ import type {
   ApiClient,
   ConversationSummary,
   MemoryGroup,
+  SharedPhoto,
 } from "@/lib/api-client";
 import { userWithRole } from "@/test/fixtures";
 
@@ -18,6 +19,9 @@ const apiClient = {
   deleteAllMemoryItems: vi.fn<ApiClient["deleteAllMemoryItems"]>(),
   listConversationSummaries: vi.fn<ApiClient["listConversationSummaries"]>(),
   deleteConversationSummary: vi.fn<ApiClient["deleteConversationSummary"]>(),
+  listSharedPhotos: vi.fn<ApiClient["listSharedPhotos"]>(),
+  getSharedPhotoImage: vi.fn<ApiClient["getSharedPhotoImage"]>(),
+  deleteSharedPhoto: vi.fn<ApiClient["deleteSharedPhoto"]>(),
 };
 
 vi.mock("@/lib/use-api-client", () => ({
@@ -75,6 +79,23 @@ const summaries: ConversationSummary[] = [
   },
 ];
 
+const sharedPhotos: SharedPhoto[] = [
+  {
+    id: "photo-1",
+    description: "A ginger cat asleep on a sunny windowsill.",
+    note: "Miso is their cat, who keeps them company at home.",
+    caption: "this is Miso",
+    sent_at: "2026-11-10T09:00:00Z",
+  },
+  {
+    id: "photo-2",
+    description: "A hand-thrown blue mug on a kitchen counter.",
+    note: "The first mug they made at their pottery class.",
+    caption: "",
+    sent_at: "2026-11-02T09:00:00Z",
+  },
+];
+
 describe("Memories", () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -84,6 +105,13 @@ describe("Memories", () => {
     apiClient.deleteMemoryItem.mockResolvedValue(undefined);
     apiClient.deleteAllMemoryItems.mockResolvedValue(undefined);
     apiClient.deleteConversationSummary.mockResolvedValue(undefined);
+    apiClient.listSharedPhotos.mockResolvedValue(sharedPhotos);
+    apiClient.getSharedPhotoImage.mockResolvedValue(
+      new Blob(["jpeg"], { type: "image/jpeg" }),
+    );
+    apiClient.deleteSharedPhoto.mockResolvedValue(undefined);
+    URL.createObjectURL = vi.fn(() => "blob:photo");
+    URL.revokeObjectURL = vi.fn();
   });
 
   it("marks User Memory as changed in chat with the day", async () => {
@@ -230,6 +258,90 @@ describe("Memories", () => {
     );
 
     expect(screen.getByText("No Conversation Summaries yet")).toBeVisible();
+  });
+
+  it("shows each Shared Photo with its photo, description, note and date", async () => {
+    const user = userEvent.setup();
+    render(<Memories />);
+
+    await user.click(await screen.findByRole("tab", { name: "Photos" }));
+
+    const cat = within(
+      screen.getByRole("listitem", { name: "Photo from Tue 10 Nov" }),
+    );
+    expect(
+      await cat.findByAltText("A ginger cat asleep on a sunny windowsill."),
+    ).toHaveAttribute("src", "blob:photo");
+    expect(
+      cat.getByText("A ginger cat asleep on a sunny windowsill."),
+    ).toBeVisible();
+    expect(
+      cat.getByText("Miso is their cat, who keeps them company at home."),
+    ).toBeVisible();
+    expect(cat.getByText("Tue 10 Nov")).toBeVisible();
+    expect(apiClient.getSharedPhotoImage).toHaveBeenCalledWith("photo-1");
+    expect(apiClient.getSharedPhotoImage).toHaveBeenCalledWith("photo-2");
+  });
+
+  it("says so when a Shared Photo's image can't be loaded", async () => {
+    apiClient.getSharedPhotoImage.mockRejectedValue(new Error("gone"));
+    const user = userEvent.setup();
+    render(<Memories />);
+
+    await user.click(await screen.findByRole("tab", { name: "Photos" }));
+
+    expect(
+      await screen.findAllByText("This photo can’t be shown right now"),
+    ).toHaveLength(2);
+    expect(
+      screen.getByText("A ginger cat asleep on a sunny windowsill."),
+    ).toBeVisible();
+  });
+
+  it("deletes a Shared Photo", async () => {
+    const user = userEvent.setup();
+    render(<Memories />);
+    await user.click(await screen.findByRole("tab", { name: "Photos" }));
+
+    await user.click(
+      screen.getByRole("button", { name: "Delete photo from Mon 2 Nov" }),
+    );
+
+    expect(apiClient.deleteSharedPhoto).toHaveBeenCalledWith("photo-2");
+    expect(
+      screen.queryByText("A hand-thrown blue mug on a kitchen counter."),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText("A ginger cat asleep on a sunny windowsill."),
+    ).toBeVisible();
+  });
+
+  it("keeps a Shared Photo and explains when deleting it fails", async () => {
+    apiClient.deleteSharedPhoto.mockRejectedValue(new Error("down"));
+    const user = userEvent.setup();
+    render(<Memories />);
+    await user.click(await screen.findByRole("tab", { name: "Photos" }));
+
+    await user.click(
+      screen.getByRole("button", { name: "Delete photo from Mon 2 Nov" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn’t delete that. Please try again.",
+    );
+    expect(
+      screen.getByText("A hand-thrown blue mug on a kitchen counter."),
+    ).toBeVisible();
+  });
+
+  it("explains when there are no Shared Photos yet", async () => {
+    apiClient.listSharedPhotos.mockResolvedValue([]);
+    const user = userEvent.setup();
+    render(<Memories />);
+
+    await user.click(await screen.findByRole("tab", { name: "Photos" }));
+
+    expect(screen.getByText("No photos kept yet")).toBeVisible();
   });
 
   it("turns User Memory off and says what that means", async () => {

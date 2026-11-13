@@ -24,10 +24,16 @@ def processing_answer(
     summary: str = "Talked about a new job.",
     mood: str = "excited",
     operations: list[dict[str, Any]] | None = None,
+    photos_to_keep: list[dict[str, Any]] | None = None,
 ) -> str:
     """Build the JSON the post-conversation processing model answers with."""
     return json.dumps(
-        {"summary": summary, "mood": mood, "memory_operations": operations or []}
+        {
+            "summary": summary,
+            "mood": mood,
+            "memory_operations": operations or [],
+            "photos_to_keep": photos_to_keep or [],
+        }
     )
 
 

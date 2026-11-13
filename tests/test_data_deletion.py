@@ -18,6 +18,7 @@ from tests.telegram_helpers import (
     auth_headers,
     owner_headers,
     send_to_webhook,
+    telegram_photo_update,
     telegram_text_update,
 )
 from tests.test_check_in_sending import (
@@ -36,6 +37,7 @@ USER_DATA_TABLES = (
     "conversations",
     "conversation_summaries",
     "memory_items",
+    "shared_photos",
     "check_ins",
     "connection_tokens",
     "telegram_connections",
@@ -53,10 +55,15 @@ def set_up_user_with_every_kind_of_data(
 ) -> tuple[dict[str, str], str]:
     """Give a User messages, User Memory, a Check-in and a Telegram Connection.
 
+    Their User Memory holds a Memory Item, a Conversation Summary and a
+    Shared Photo.
+
     Returns:
         Their Dashboard API headers and their User ID.
     """
     headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    chat_model.script("what a lovely desk")
+    send_to_webhook(client, telegram_photo_update(caption="my new desk"))
     have_conversation(
         client,
         chat_model,
@@ -69,6 +76,7 @@ def set_up_user_with_every_kind_of_data(
             operations=[
                 {"action": "add", "category": "Life details", "content": "Designer"}
             ],
+            photos_to_keep=[{"photo": 1, "note": "Their desk at the new job"}],
         ),
     )
     send_check_ins(chat_model, clock, scheduler, count=1)
@@ -150,6 +158,8 @@ def test_delete_my_data_removes_every_kind_of_data_but_keeps_the_account(
     assert memory_contents(client, headers) == {}
     summaries = client.get("/api/conversation-summaries", headers=headers).json()
     assert summaries == {"summaries": []}
+    photos = client.get("/api/shared-photos", headers=headers).json()
+    assert photos == {"photos": []}
     assert recent_check_ins(client, headers) == []
     connection = client.get("/api/telegram-connection", headers=headers).json()
     assert connection == {"connection": None, "latest_token": None}

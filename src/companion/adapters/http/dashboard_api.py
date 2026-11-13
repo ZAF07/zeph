@@ -27,9 +27,11 @@ from companion.core.models import (
     OnboardingAnswers,
     PauseLength,
     PreferenceChanges,
+    SharedPhoto,
     User,
     UserRole,
 )
+from companion.core.photos import PhotoService, SharedPhotoNotFoundError
 from companion.core.ports import PlatformSettingsRepository
 from companion.core.telegram_connection import (
     OnboardingNotFinishedError,
@@ -242,6 +244,22 @@ class ConversationSummariesResponse(BaseModel):
     summaries: list[ConversationSummaryResponse]
 
 
+class SharedPhotoResponse(BaseModel):
+    """A Shared Photo, without the chat channel's IDs."""
+
+    id: str
+    description: str
+    note: str
+    caption: str
+    sent_at: datetime
+
+
+class SharedPhotosResponse(BaseModel):
+    """A User's Shared Photos, newest first."""
+
+    photos: list[SharedPhotoResponse]
+
+
 def to_memory_item_response(item: MemoryItem) -> MemoryItemResponse:
     """Describe a Memory Item for the Dashboard.
 
@@ -294,6 +312,24 @@ def to_summary_response(summary: ConversationSummary) -> ConversationSummaryResp
         summary=summary.summary,
         mood=summary.mood,
         created_at=summary.created_at,
+    )
+
+
+def to_shared_photo_response(photo: SharedPhoto) -> SharedPhotoResponse:
+    """Describe a Shared Photo for the Dashboard; never its chat channel IDs.
+
+    Args:
+        photo: The Shared Photo.
+
+    Returns:
+        The response body.
+    """
+    return SharedPhotoResponse(
+        id=str(photo.id),
+        description=photo.description,
+        note=photo.note,
+        caption=photo.caption,
+        sent_at=photo.sent_at,
     )
 
 
@@ -352,6 +388,7 @@ def build_dashboard_api_router(
     user_data_service: UserDataService,
     home_service: HomeService,
     feature_service: FeatureService,
+    photo_service: PhotoService,
     platform_settings: PlatformSettingsRepository,
     telegram_bot_username: str,
 ) -> APIRouter:
@@ -370,6 +407,7 @@ def build_dashboard_api_router(
         home_service: Gathers what the Dashboard home shows.
         feature_service: Says whether the Admin side allows User Memory and
             Check-ins for the User.
+        photo_service: Lists, downloads and deletes the User's Shared Photos.
         platform_settings: Admin-managed wording shown on the Dashboard.
         telegram_bot_username: The Companion's Telegram @username, for deep links.
 
@@ -870,6 +908,84 @@ def build_dashboard_api_router(
         except MemoryNotFoundError as error:
             raise HTTPException(
                 status.HTTP_404_NOT_FOUND, "Conversation Summary not found"
+            ) from error
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @router.get("/shared-photos")
+    def list_shared_photos(
+        user: Annotated[User, Depends(current_user)],
+    ) -> SharedPhotosResponse:
+        """Return the User's Shared Photos, newest first.
+
+        Args:
+            user: The signed-in User.
+
+        Returns:
+            The Shared Photos.
+        """
+        return SharedPhotosResponse(
+            photos=[
+                to_shared_photo_response(photo)
+                for photo in photo_service.list_shared(user.id)
+            ]
+        )
+
+    @router.get("/shared-photos/{photo_id}/image")
+    def get_shared_photo_image(
+        user: Annotated[User, Depends(current_user)], photo_id: UUID
+    ) -> Response:
+        """Return the image of one of the User's Shared Photos.
+
+        It is downloaded from the chat channel, so the bot token stays private.
+
+        Args:
+            user: The signed-in User.
+            photo_id: The Shared Photo's ID.
+
+        Returns:
+            The image.
+
+        Raises:
+            HTTPException: 404 if the User has no such Shared Photo or it
+                couldn't be downloaded.
+        """
+        try:
+            image = photo_service.shared_photo_image(user.id, photo_id)
+        except SharedPhotoNotFoundError as error:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "Shared Photo not found"
+            ) from error
+        if image is None:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "This photo couldn't be downloaded"
+            )
+        return Response(
+            content=image.content,
+            media_type=image.media_type,
+            headers={"Cache-Control": "private, max-age=86400"},
+        )
+
+    @router.delete("/shared-photos/{photo_id}", status_code=status.HTTP_204_NO_CONTENT)
+    def delete_shared_photo(
+        user: Annotated[User, Depends(current_user)], photo_id: UUID
+    ) -> Response:
+        """Delete one of the User's Shared Photos.
+
+        Args:
+            user: The signed-in User.
+            photo_id: The Shared Photo's ID.
+
+        Returns:
+            An empty response.
+
+        Raises:
+            HTTPException: 404 if the User has no such Shared Photo.
+        """
+        try:
+            photo_service.delete_shared(user.id, photo_id)
+        except SharedPhotoNotFoundError as error:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, "Shared Photo not found"
             ) from error
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 

@@ -6,8 +6,14 @@ import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
 import { ConversationSummariesList } from "@/components/ConversationSummariesList";
 import { LoadFailed } from "@/components/LoadFailed";
 import { MemoryItemsList } from "@/components/MemoryItemsList";
+import { SharedPhotosList } from "@/components/SharedPhotosList";
 import { Switch } from "@/components/Switch";
-import type { ConversationSummary, Me, MemoryGroup } from "@/lib/api-client";
+import type {
+  ConversationSummary,
+  Me,
+  MemoryGroup,
+  SharedPhoto,
+} from "@/lib/api-client";
 import { notAvailableText } from "@/lib/features";
 import { useApiClient } from "@/lib/use-api-client";
 
@@ -19,18 +25,21 @@ type LoadState =
       me: Me;
       groups: MemoryGroup[];
       summaries: ConversationSummary[];
+      photos: SharedPhoto[];
     };
 
-type Tab = "memories" | "summaries";
+type Tab = "memories" | "summaries" | "photos";
 
 const tabs: { id: Tab; label: string }[] = [
   { id: "memories", label: "Memories" },
   { id: "summaries", label: "Conversation Summaries" },
+  { id: "photos", label: "Photos" },
 ];
 
 /**
- * The Memories page: what Zeph remembers, by Memory Category, and the
- * Conversation Summaries, each deletable, with the User Memory switch.
+ * The Memories page: what Zeph remembers, by Memory Category, the
+ * Conversation Summaries and the Shared Photos, each deletable, with the
+ * User Memory switch.
  *
  * @returns The page, a loading block, or an error with Try again.
  */
@@ -44,12 +53,13 @@ export function Memories() {
   const load = useCallback(async () => {
     setState({ kind: "loading" });
     try {
-      const [me, groups, summaries] = await Promise.all([
+      const [me, groups, summaries, photos] = await Promise.all([
         apiClient.getMe(),
         apiClient.listMemoryGroups(),
         apiClient.listConversationSummaries(),
+        apiClient.listSharedPhotos(),
       ]);
-      setState({ kind: "loaded", me, groups, summaries });
+      setState({ kind: "loaded", me, groups, summaries, photos });
     } catch {
       setState({ kind: "failed" });
     }
@@ -90,8 +100,8 @@ export function Memories() {
         <div className="flex flex-col gap-2">
           <h1 className="m-0 text-h1 font-normal">Memories</h1>
           <p className="m-0 max-w-[40em] text-body text-ink-soft">
-            What Zeph remembers, and short summaries of past Conversations.
-            Delete anything you’d rather it forgot.
+            What Zeph remembers, short summaries of past Conversations and the
+            photos it kept. Delete anything you’d rather it forgot.
           </p>
           <p className="m-0 text-caption text-blue">
             You can also tell Zeph “forget that”.
@@ -205,6 +215,18 @@ export function Memories() {
           onSummariesChange={(summaries) =>
             setState((current) =>
               current.kind === "loaded" ? { ...current, summaries } : current,
+            )
+          }
+        />
+      ) : null}
+
+      {state.kind === "loaded" && tab === "photos" ? (
+        <SharedPhotosList
+          photos={state.photos}
+          timeZone={state.me.time_zone ?? undefined}
+          onPhotosChange={(photos) =>
+            setState((current) =>
+              current.kind === "loaded" ? { ...current, photos } : current,
             )
           }
         />
