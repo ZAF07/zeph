@@ -75,11 +75,16 @@ class CheckInKindService:
         Raises:
             CheckInKindNotFoundError: If there is no such Kind.
             InvalidCheckInKindError: If the name or description is blank or
-                too long, or another Kind already has the name.
+                too long, another Kind already has the name, or a Kind that
+                sends a Shared Photo would be allowed without User Memory.
         """
         kind = self._repositories.check_ins.get_kind(kind_id)
         if kind is None:
             raise CheckInKindNotFoundError(kind_id)
+        if kind.sends_shared_photo and details.allowed_without_user_memory:
+            raise InvalidCheckInKindError(
+                "A Check-in Kind that sends a Shared Photo needs User Memory."
+            )
         checked = self._checked_details(details, editing_id=kind_id)
         return self._repositories.check_ins.update_kind(
             replace(

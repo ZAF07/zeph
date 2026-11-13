@@ -7,6 +7,7 @@ from companion.core.knowledge_retrieval import KnowledgeRetrieval
 from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.models import (
     ChannelPhoto,
+    CheckIn,
     Conversation,
     ConversationMessage,
     MessageDirection,
@@ -198,8 +199,9 @@ class ConversationService:
 
         A Conversation is open until it is ended or the quiet gap passes. A
         new Conversation started within the reply window of the User's
-        newest Check-in answers it: it starts with that Check-in, so the
-        reply has it as context, and the Check-in is marked replied.
+        newest Check-in answers it: it starts with that Check-in and any
+        Shared Photo sent with it, so the reply has them as context, and the
+        Check-in is marked replied.
 
         Args:
             user_id: The User.
@@ -219,14 +221,37 @@ class ConversationService:
         check_in = self._repositories.check_ins.claim_reply(
             user_id, replied_at=now, sent_since=now - check_in_reply_window(settings)
         )
-        if check_in is not None and check_in.message is not None:
+        if check_in is not None:
+            self._start_with_check_in(conversation.id, check_in)
+        return conversation.id
+
+    def _start_with_check_in(self, conversation_id: UUID, check_in: CheckIn) -> None:
+        """Save a Check-in and any Shared Photo sent with it to a new Conversation.
+
+        Args:
+            conversation_id: The Conversation that answers the Check-in.
+            check_in: The Check-in it answers.
+        """
+        if check_in.message is not None:
             self._save(
-                conversation.id,
+                conversation_id,
                 MessageDirection.OUTGOING,
                 check_in.message,
                 sent_at=check_in.decided_at,
             )
-        return conversation.id
+        if check_in.shared_photo_id is None:
+            return
+        photo = self._repositories.user_memory.get_shared_photo(
+            check_in.user_id, check_in.shared_photo_id
+        )
+        if photo is not None:
+            self._save(
+                conversation_id,
+                MessageDirection.OUTGOING,
+                sent_shared_photo_text(photo.description),
+                MessageKind.PHOTO,
+                sent_at=check_in.decided_at,
+            )
 
     def _save(
         self,

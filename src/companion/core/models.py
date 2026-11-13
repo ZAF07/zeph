@@ -1015,6 +1015,9 @@ class CheckInKind:
         allowed_without_user_memory: Whether it may be sent to a User with
             User Memory off.
         sort_order: Where it comes in the list.
+        sends_shared_photo: Whether one of the User's Shared Photos is sent
+            with its message. Fixed when the Kind is made; Admins can't
+            change it.
     """
 
     id: UUID
@@ -1022,6 +1025,7 @@ class CheckInKind:
     description: str
     allowed_without_user_memory: bool
     sort_order: int
+    sends_shared_photo: bool = False
 
 
 @dataclass(frozen=True)
@@ -1071,6 +1075,8 @@ class CheckIn:
         message: The text that was sent; None if skipped.
         skip_reason: Why the Check-in model skipped it; only Admins see it.
         replied_at: When the User replied, if they have.
+        shared_photo_id: The Shared Photo sent after its message; None if
+            none was sent or it was deleted since.
     """
 
     id: UUID
@@ -1082,6 +1088,7 @@ class CheckIn:
     message: str | None = None
     skip_reason: str | None = None
     replied_at: datetime | None = None
+    shared_photo_id: UUID | None = None
 
     @property
     def was_sent(self) -> bool:

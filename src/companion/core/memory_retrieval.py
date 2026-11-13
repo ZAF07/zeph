@@ -61,18 +61,21 @@ def shared_photos_group(description: str) -> MemoryCategory:
     )
 
 
-def shared_photo_line(photo: SharedPhoto, time_zone: str | None) -> str:
+def shared_photo_line(
+    photo: SharedPhoto, time_zone: str | None, bullet: str = "-"
+) -> str:
     """Write one Shared Photo as the reply's memory section lists it.
 
     Args:
         photo: The Shared Photo.
         time_zone: The User's IANA time zone, for the day it was sent.
+        bullet: What the line starts with, e.g. "-" or a number like "1.".
 
     Returns:
         E.g. '- 10 Nov 2026: A ginger cat… They said: "this is Miso". Why it
         matters: Miso is their cat.'
     """
-    line = f"- {format_day(photo.sent_at, time_zone)}: {photo.description}"
+    line = f"{bullet} {format_day(photo.sent_at, time_zone)}: {photo.description}"
     if photo.caption:
         line += f' They said: "{photo.caption}".'
     return f"{line} Why it matters: {photo.note}"

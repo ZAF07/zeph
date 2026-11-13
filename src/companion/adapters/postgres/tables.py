@@ -331,6 +331,7 @@ check_in_kinds = Table(
     Column("description", Text, nullable=False),
     Column("allowed_without_user_memory", Boolean, nullable=False),
     Column("sort_order", Integer, nullable=False),
+    Column("sends_shared_photo", Boolean, nullable=False),
 )
 
 check_ins = Table(
@@ -350,6 +351,9 @@ check_ins = Table(
     Column("skip_reason", Text),
     Column("decided_at", DateTime(timezone=True), nullable=False),
     Column("replied_at", DateTime(timezone=True)),
+    Column(
+        "shared_photo_id", Uuid, ForeignKey("shared_photos.id", ondelete="SET NULL")
+    ),
 )
 
 feature_switches = Table(

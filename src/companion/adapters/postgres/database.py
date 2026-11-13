@@ -130,8 +130,9 @@ def seed_check_in_kinds(engine: Engine, seed_file: Path) -> None:
 
     Args:
         engine: The database engine.
-        seed_file: YAML file listing Kinds with `name`, `description` and
-            `allowed_without_user_memory`, in the order to show them.
+        seed_file: YAML file listing Kinds with `name`, `description`,
+            `allowed_without_user_memory` and an optional
+            `sends_shared_photo`, in the order to show them.
     """
     seed = yaml.safe_load(seed_file.read_text())
     rows = [
@@ -141,6 +142,7 @@ def seed_check_in_kinds(engine: Engine, seed_file: Path) -> None:
             "description": kind["description"],
             "allowed_without_user_memory": kind["allowed_without_user_memory"],
             "sort_order": sort_order,
+            "sends_shared_photo": kind.get("sends_shared_photo", False),
         }
         for sort_order, kind in enumerate(seed)
     ]

@@ -13,6 +13,14 @@ def test_starting_check_in_kinds_come_from_the_seed_file(engine: Engine) -> None
         ("A follow-up", False),
         ("A present-moment pause", True),
         ("A thought to reflect on", False),
+        ("A look back at a photo", False),
+    ]
+    assert [kind.sends_shared_photo for kind in kinds] == [
+        False,
+        False,
+        False,
+        False,
+        True,
     ]
     assert kinds[0].description == "Just checking how you are."
 
@@ -21,4 +29,4 @@ def test_check_in_kinds_are_seeded_only_on_first_run(engine: Engine) -> None:
     seed_check_in_kinds(engine, CHECK_IN_KINDS_SEED_FILE)
 
     kinds = build_postgres_repositories(engine).check_ins.list_kinds()
-    assert len(kinds) == 4
+    assert len(kinds) == 5

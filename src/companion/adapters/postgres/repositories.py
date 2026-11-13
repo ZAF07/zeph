@@ -143,6 +143,7 @@ def _to_check_in_kind(row: Row[Any]) -> CheckInKind:
         description=row.description,
         allowed_without_user_memory=row.allowed_without_user_memory,
         sort_order=row.sort_order,
+        sends_shared_photo=row.sends_shared_photo,
     )
 
 
@@ -2345,6 +2346,7 @@ class PostgresCheckInRepository:
                     description=details.description,
                     allowed_without_user_memory=details.allowed_without_user_memory,
                     sort_order=0 if highest is None else int(highest) + 1,
+                    sends_shared_photo=False,
                 )
                 .returning(check_in_kinds)
             ).one()
@@ -2436,6 +2438,7 @@ class PostgresCheckInRepository:
                     skip_reason=check_in.skip_reason,
                     decided_at=check_in.decided_at,
                     replied_at=check_in.replied_at,
+                    shared_photo_id=check_in.shared_photo_id,
                 )
             )
             connection.execute(
@@ -2565,6 +2568,7 @@ class PostgresCheckInRepository:
             message=row.message,
             skip_reason=row.skip_reason,
             replied_at=row.replied_at,
+            shared_photo_id=row.shared_photo_id,
         )
 
 
