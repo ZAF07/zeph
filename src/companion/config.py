@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     telegram_bot_token: str
     telegram_bot_username: str
     telegram_webhook_secret: str
+    telegram_webhook_register: bool = True
 
     webhook_base_url: str
     dashboard_url: str

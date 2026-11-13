@@ -1,8 +1,8 @@
 #!/bin/bash
-# Delete the session's Clerk test user, its users row and the saved profile.
+# Delete this worktree's session Clerk test user, its users row and the saved profile.
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../../../.." && pwd)"
-SESSION="${TMPDIR:-/tmp}/zeph-run-playwright/session"
+SESSION="$REPO/.run-dashboard/session"
 cd "$REPO"
 set -a; . ./.env; set +a
 

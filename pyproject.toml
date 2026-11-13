@@ -71,5 +71,5 @@ ban-relative-imports = "all"
 
 [tool.mypy]
 strict = true
-files = ["src"]
+files = ["src", "scripts"]
 plugins = ["pydantic.mypy"]

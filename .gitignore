@@ -17,5 +17,9 @@ web/.next/
 web/next-env.d.ts
 web/*.tsbuildinfo
 
+# Run-dashboard browser session (per worktree)
+.run-dashboard/
+.db-copy.sql
+
 # OS
 .DS_Store
