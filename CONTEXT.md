@@ -81,7 +81,7 @@ The style of a Check-in (e.g. casual hello, follow-up on something shared, prese
 _Avoid_: Template, check-in type
 
 **Skipped Check-in**:
-A due Check-in the Companion chose not to send, or couldn't because Telegram won't reach the User (they blocked it, or their account is gone), with a reason only Admins see (e.g. the User asked for space). The next attempt waits a full frequency gap, as after a sent one. Users see it only as "gave you some space". One exception: a User who has used up today's Daily Message Limit gets no Check-in (nor a "would you like fewer?" message) for the rest of their day. That day gets one Skipped Check-in, which both the User and Admins see as "you'd reached today's message limit", and the User stays due, so the next one can come on their next day.
+A due Check-in the Companion chose not to send, or couldn't because Telegram won't reach the User (they blocked it, or their account is gone), with a reason only Admins see (e.g. the User asked for space). The next attempt waits a full frequency gap, as after a sent one. Users see it only as "gave you some space". One exception: a User who has used up today's Daily Message Limit gets no Check-in (nor a "would you like fewer?" message) for the rest of their day. That day gets one Skipped Check-in, which the User sees as "you'd reached today's message limit" and Admins see with the reason "User had used up today's Daily Message Limit", and the User stays due, so the next one can come on their next day.
 _Avoid_: Cancelled, missed, failed check-in
 
 **Ignore Threshold**:

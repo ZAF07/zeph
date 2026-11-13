@@ -1242,6 +1242,18 @@ class UsageRepository(Protocol):
         """
         ...
 
+    def count_messages(self, user_id: UUID, day: date) -> int:
+        """Count a User's messages on a day.
+
+        Args:
+            user_id: The User's ID.
+            day: The User's day.
+
+        Returns:
+            How many of their messages counted toward the daily message limit.
+        """
+        ...
+
     def claim_message(self, user_id: UUID, day: date, daily_limit: int) -> bool:
         """Count one message for a User's day, in one step, if under the limit.
 

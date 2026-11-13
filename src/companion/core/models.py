@@ -1095,6 +1095,9 @@ class CheckInOutcome(StrEnum):
     ASKED_ABOUT_FEWER = "asked_about_fewer"
 
 
+DAILY_LIMIT_SKIP_REASON = "User had used up today's Daily Message Limit"
+
+
 class CheckInStatus(StrEnum):
     """What happened after a Check-in decision."""
 
@@ -1143,6 +1146,18 @@ class CheckIn:
             True unless the Check-in was skipped.
         """
         return self.outcome != CheckInOutcome.SKIPPED
+
+    @property
+    def skipped_for_daily_limit(self) -> bool:
+        """Tell whether it was skipped because the User had used up the daily limit.
+
+        Returns:
+            True for a limit skip.
+        """
+        return (
+            self.outcome == CheckInOutcome.SKIPPED
+            and self.skip_reason == DAILY_LIMIT_SKIP_REASON
+        )
 
 
 @dataclass(frozen=True)

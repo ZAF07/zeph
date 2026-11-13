@@ -27,13 +27,17 @@ export const checkInStatusLabels: Record<
 };
 
 /**
- * Names a recent Check-in for the User: its Kind, or that Zeph gave them
- * space or asked about fewer. Never why it was skipped.
+ * Names a recent Check-in for the User: its Kind, that they had reached the
+ * day's message limit, or that Zeph gave them space or asked about fewer.
+ * Never the Check-in model's reason for a skip.
  *
  * @param checkIn - The recent Check-in.
  * @returns The line to show.
  */
 export function recentCheckInTitle(checkIn: RecentCheckIn): string {
+  if (checkIn.skipped_for_daily_limit) {
+    return "Skipped — you’d reached today’s message limit";
+  }
   if (checkIn.outcome === "skipped") {
     return "Skipped — gave you some space";
   }

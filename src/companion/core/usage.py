@@ -57,6 +57,24 @@ class UsageLimiter:
             daily_limit,
         )
 
+    def has_used_up_daily_message_limit(self, user_id: UUID) -> bool:
+        """Tell whether the User has used up today's daily message limit.
+
+        It is used up once their message count for their day has reached the
+        limit, even if no message was turned away yet.
+
+        Args:
+            user_id: The User.
+
+        Returns:
+            True if their next message today would get the limit reply.
+        """
+        daily_limit: int = self._repositories.platform_settings.get(
+            "daily_message_limit"
+        )
+        today = user_today(self._repositories.users, user_id, self._clock.now())
+        return self._repositories.usage.count_messages(user_id, today) >= daily_limit
+
     def limit_reply(self) -> str:
         """Read the in-character reply sent once the daily limit is reached.
 

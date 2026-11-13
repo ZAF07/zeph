@@ -2043,9 +2043,34 @@ class PostgresUsageRepository:
         Returns:
             How many web searches they made.
         """
+        return self._count(user_id, day, "web_search_count")
+
+    def count_messages(self, user_id: UUID, day: date) -> int:
+        """Count a User's messages on a day.
+
+        Args:
+            user_id: The User's ID.
+            day: The User's day.
+
+        Returns:
+            How many of their messages counted toward the daily message limit.
+        """
+        return self._count(user_id, day, "message_count")
+
+    def _count(self, user_id: UUID, day: date, count_column: str) -> int:
+        """Read one daily count for a User's day.
+
+        Args:
+            user_id: The User's ID.
+            day: The User's day.
+            count_column: The column holding the count.
+
+        Returns:
+            The count; 0 if nothing was recorded that day.
+        """
         with self._engine.connect() as connection:
             count = connection.execute(
-                select(daily_usage.c.web_search_count).where(
+                select(daily_usage.c[count_column]).where(
                     daily_usage.c.user_id == user_id, daily_usage.c.day == day
                 )
             ).scalar()
