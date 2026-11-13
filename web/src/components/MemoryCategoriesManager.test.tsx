@@ -236,6 +236,21 @@ describe("MemoryCategoriesManager", () => {
     );
   });
 
+  it("shows why a Required Memory Category can't be archived", async () => {
+    const user = userEvent.setup();
+    const reason =
+      "Goals is a Required Memory Category (used by onboarding and the Home page), so it can't be archived.";
+    apiClient.archiveMemoryCategory.mockRejectedValue(
+      new ApiError(409, "/api/admin/memory-categories/goals/archive", reason),
+    );
+    render(<MemoryCategoriesManager />);
+    await screen.findByText("Goals");
+
+    await user.click(rowFor("Goals").getByRole("button", { name: "Archive" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent(reason);
+  });
+
   it("shows the empty state when there are no categories", async () => {
     apiClient.listMemoryCategories.mockResolvedValue([]);
 
