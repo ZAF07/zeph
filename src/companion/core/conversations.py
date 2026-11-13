@@ -71,7 +71,11 @@ class ConversationService:
         """Save a User's message and show that the Companion is typing.
 
         The message joins the User's open Conversation, or starts a new one if
-        the quiet gap has passed since the last message.
+        the quiet gap has passed since the last message. If the scheduler ends
+        the Conversation just before the message is saved, the message is
+        refused and tried again; it then starts a new Conversation, which
+        cannot already be ended. So the message is never left out of a
+        Conversation's processing.
 
         Args:
             user_id: The User who sent it.
@@ -83,10 +87,20 @@ class ConversationService:
         Returns:
             The ID of the Conversation the message was added to.
         """
-        conversation_id = self._open_conversation_id(user_id)
-        self._save(
-            conversation_id, MessageDirection.INCOMING, text, kind, photos=photos
-        )
+        saved = False
+        while not saved:
+            conversation_id = self._open_conversation_id(user_id)
+            saved = self._repositories.conversations.add_message_if_open(
+                ConversationMessage(
+                    id=uuid4(),
+                    conversation_id=conversation_id,
+                    direction=MessageDirection.INCOMING,
+                    kind=kind,
+                    content=text,
+                    sent_at=self._clock.now(),
+                    photos=photos,
+                )
+            )
         self._chat_channel.show_typing(chat_id)
         return conversation_id
 
