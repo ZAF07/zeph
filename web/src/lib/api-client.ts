@@ -374,8 +374,14 @@ export type CheckInKindInput = {
   allowed_without_user_memory: boolean;
 };
 
-/** A Check-in Kind as Admins manage it. */
-export type CheckInKind = CheckInKindInput & { id: string };
+/**
+ * A Check-in Kind as Admins manage it. `sends_shared_photo` marks a Kind
+ * that sends one of the User's Shared Photos; Admins can't change it.
+ */
+export type CheckInKind = CheckInKindInput & {
+  id: string;
+  sends_shared_photo: boolean;
+};
 
 /** A Check-in Kind and how many Check-ins of it were sent in 30 days. */
 export type CheckInKindOverview = CheckInKind & { sent_last_30_days: number };

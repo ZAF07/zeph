@@ -14,18 +14,21 @@ import { ApiError, type CheckInKindInput } from "@/lib/api-client";
 /**
  * One Check-in Kind as an editable card: name, description, whether it is
  * allowed when User Memory is off, how often it was sent, Save and Remove.
- * A new Kind's card has Add and Cancel instead.
+ * A new Kind's card has Add and Cancel instead. A Kind that sends a Shared
+ * Photo always needs memories, so it says so instead of offering the switch.
  *
  * @param props - `initial` fills the card; `isNew` marks a Kind not saved
- *   yet; `sentLast30Days` is the send count; `onSave` saves and rejects if
- *   the backend refuses; `onRemove` removes the Kind, or `onCancel` drops a
- *   new one.
+ *   yet; `sentLast30Days` is the send count; `sendsSharedPhoto` marks a
+ *   Kind that sends a Shared Photo; `onSave` saves and rejects if the
+ *   backend refuses; `onRemove` removes the Kind, or `onCancel` drops a new
+ *   one.
  * @returns The card.
  */
 export function CheckInKindCard({
   initial,
   isNew,
   sentLast30Days,
+  sendsSharedPhoto = false,
   onSave,
   onRemove,
   onCancel,
@@ -33,6 +36,7 @@ export function CheckInKindCard({
   initial: CheckInKindInput;
   isNew: boolean;
   sentLast30Days: number;
+  sendsSharedPhoto?: boolean;
   onSave: (kind: CheckInKindInput) => Promise<void>;
   onRemove?: () => Promise<void>;
   onCancel?: () => void;
@@ -120,22 +124,31 @@ export function CheckInKindCard({
           />
         </div>
       </div>
-      <div className="flex items-center justify-between gap-4 border-t border-line px-5 py-3">
-        <span className="flex min-w-0 flex-col">
-          <span className="font-medium">Allowed when memory is off</span>
+      {sendsSharedPhoto ? (
+        <div className="flex min-w-0 flex-col border-t border-line px-5 py-3">
+          <span className="font-medium">Sends a Shared Photo</span>
           <span className="text-caption text-ink-muted">
-            {allowedWithoutMemory
-              ? "Works without memories or summaries"
-              : "Needs memories — skipped for Users with memory off"}
+            Needs memories — only for Users with memory on and a Shared Photo
           </span>
-        </span>
-        <Switch
-          label={`Allowed when memory is off: ${title}`}
-          checked={allowedWithoutMemory}
-          disabled={isBusy}
-          onChange={setAllowedWithoutMemory}
-        />
-      </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-4 border-t border-line px-5 py-3">
+          <span className="flex min-w-0 flex-col">
+            <span className="font-medium">Allowed when memory is off</span>
+            <span className="text-caption text-ink-muted">
+              {allowedWithoutMemory
+                ? "Works without memories or summaries"
+                : "Needs memories — skipped for Users with memory off"}
+            </span>
+          </span>
+          <Switch
+            label={`Allowed when memory is off: ${title}`}
+            checked={allowedWithoutMemory}
+            disabled={isBusy}
+            onChange={setAllowedWithoutMemory}
+          />
+        </div>
+      )}
       {error ? (
         <p
           role="alert"

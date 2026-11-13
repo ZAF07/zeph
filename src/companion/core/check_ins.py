@@ -6,7 +6,11 @@ from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 from companion.core.features import FeatureService
-from companion.core.memory_retrieval import format_day, format_memory
+from companion.core.memory_retrieval import (
+    format_day,
+    format_memory,
+    shared_photo_line,
+)
 from companion.core.models import (
     ChatLine,
     ChatRole,
@@ -21,6 +25,7 @@ from companion.core.models import (
     CheckInStatus,
     Feature,
     PauseLength,
+    SharedPhoto,
     User,
 )
 from companion.core.ports import ChatChannel, Clock, Repositories
@@ -81,11 +86,14 @@ class CheckInDecision:
         kind: The Check-in Kind to send; None to skip.
         message: The message to send; "" when skipping.
         skip_reason: Why it skipped; "" when sending.
+        shared_photo: The Shared Photo to send after the message; None
+            unless the Kind sends one.
     """
 
     kind: CheckInKind | None
     message: str = ""
     skip_reason: str = ""
+    shared_photo: SharedPhoto | None = None
 
 
 def is_in_quiet_hours(settings: CheckInSettings, local_time: time) -> bool:
@@ -238,6 +246,36 @@ def describe_recent_check_ins(
     return "\n".join(lines)
 
 
+def describe_shared_photos(
+    kinds: list[CheckInKind], shared_photos: list[SharedPhoto], time_zone: str | None
+) -> str:
+    """Write the User's Shared Photos for the Check-in model, numbered.
+
+    Args:
+        kinds: The Check-in Kinds it may choose from.
+        shared_photos: The User's Shared Photos, newest first.
+        time_zone: The User's IANA time zone, for the days.
+
+    Returns:
+        How to name a photo for the Kinds that send one, then one line per
+        photo; "" if no offered Kind sends a photo or there are none.
+    """
+    photo_kinds = [kind.name for kind in kinds if kind.sends_shared_photo]
+    if not photo_kinds or not shared_photos:
+        return ""
+    kind_names = " or ".join(f'"{name}"' for name in photo_kinds)
+    photo_lines = "\n".join(
+        shared_photo_line(photo, time_zone, bullet=f"{number}.")
+        for number, photo in enumerate(shared_photos, start=1)
+    )
+    return (
+        f"Photos they shared with you, newest first. If you choose {kind_names}, "
+        f'also add "photo": <the number of one photo below> to your answer; '
+        f"that photo is sent right after your message, so the message should "
+        f"be about it:\n{photo_lines}"
+    )
+
+
 def describe_check_in(
     user: User,
     kinds: list[CheckInKind],
@@ -245,6 +283,7 @@ def describe_check_in(
     recent: str,
     memory: str,
     user_memory_works: bool,
+    shared_photos: str = "",
 ) -> str:
     """Write what the Check-in model is told to decide on a Check-in.
 
@@ -255,10 +294,12 @@ def describe_check_in(
         recent: The User's recent Check-ins, as lines.
         memory: What is remembered about the User; "" if nothing.
         user_memory_works: Whether User Memory works for the User.
+        shared_photos: The User's numbered Shared Photos; "" if none are
+            offered.
 
     Returns:
         The Kinds, what to call the User, their local time, recent
-        Check-ins and what is remembered about them.
+        Check-ins, what is remembered about them and their Shared Photos.
     """
     kind_lines = "\n".join(f"- {kind.name}: {kind.description}" for kind in kinds)
     remembered = memory or (
@@ -266,31 +307,38 @@ def describe_check_in(
         if user_memory_works
         else "User Memory is off, so you know nothing else about them."
     )
+    photos = f"\n\n{shared_photos}" if shared_photos else ""
     return (
         f"Check-in Kinds you may choose from:\n{kind_lines}\n\n"
         f"What to call them: {user.name or 'unknown'}\n"
         f"Their local time: {local_time.strftime('%A, %H:%M')}\n\n"
         f"Recent Check-ins, newest first:\n{recent}\n\n"
-        f"{remembered}"
+        f"{remembered}{photos}"
     )
 
 
-def read_check_in_decision(answer: str, kinds: list[CheckInKind]) -> CheckInDecision:
+def read_check_in_decision(
+    answer: str, kinds: list[CheckInKind], shared_photos: list[SharedPhoto]
+) -> CheckInDecision:
     """Read the Check-in model's JSON decision.
 
     Text around the JSON object, such as a code fence, is ignored. The Kind
-    is matched by name, in any case, and must be one it was offered.
+    is matched by name, in any case, and must be one it was offered. A Kind
+    that sends a Shared Photo needs the number of one it was listed; any
+    other Kind's photo number is ignored.
 
     Args:
         answer: The model's answer.
         kinds: The Check-in Kinds it could choose from.
+        shared_photos: The Shared Photos it was listed, numbered from 1.
 
     Returns:
         The decision.
 
     Raises:
         InvalidCheckInAnswerError: If there is no JSON decision, the Kind is
-            not one it was offered, or the message or reason is empty.
+            not one it was offered, the message or reason is empty, or a
+            Kind that sends a photo names no listed photo.
     """
     start, end = answer.find("{"), answer.rfind("}")
     try:
@@ -316,7 +364,20 @@ def read_check_in_decision(answer: str, kinds: list[CheckInKind]) -> CheckInDeci
         raise InvalidCheckInAnswerError(f"Not a Kind it was offered: {kind_name!r}")
     if not isinstance(message, str) or not message.strip():
         raise InvalidCheckInAnswerError("A send with no message")
-    return CheckInDecision(kind=kind, message=message.strip())
+    if not kind.sends_shared_photo:
+        return CheckInDecision(kind=kind, message=message.strip())
+    photo_number = parsed.get("photo")
+    if (
+        not isinstance(photo_number, int)
+        or isinstance(photo_number, bool)
+        or not 1 <= photo_number <= len(shared_photos)
+    ):
+        raise InvalidCheckInAnswerError(f"Not a photo it was listed: {photo_number!r}")
+    return CheckInDecision(
+        kind=kind,
+        message=message.strip(),
+        shared_photo=shared_photos[photo_number - 1],
+    )
 
 
 class CheckInService:
@@ -337,7 +398,8 @@ class CheckInService:
                 are stored.
             features: Says whether Check-ins and User Memory work for a User.
             chat_model: Writes each Check-in and records the tokens used.
-            chat_channel: Sends Check-ins to Users.
+            chat_channel: Sends Check-ins, and any Shared Photo with them,
+                to Users.
             clock: Tells the current time.
         """
         self._repositories = repositories
@@ -564,7 +626,9 @@ class CheckInService:
         After the Admin-set number of ignored Check-ins in a row, the User
         gets the "would you like fewer?" message and their Check-ins pause.
         Otherwise the Check-in model decides on a Kind and message, or to
-        skip. Either way the next attempt is one frequency gap later.
+        skip. Kinds that send a Shared Photo are offered only to a User with
+        Shared Photos in use. Either way the next attempt is one frequency
+        gap later.
 
         Args:
             user: A User whose next Check-in is due.
@@ -586,11 +650,16 @@ class CheckInService:
         if self._has_ignored_too_many(user):
             self._ask_about_fewer(user, connection.telegram_chat_id, now, next_due_at)
             return
-        kinds = self.kinds_for(user)
+        shared_photos = self._shared_photos(user)
+        kinds = [
+            kind
+            for kind in self.kinds_for(user)
+            if shared_photos or not kind.sends_shared_photo
+        ]
         if not kinds:
             logger.warning("No Check-in Kind may be sent to this User")
             return
-        decision = self._decide(user, kinds, local_time)
+        decision = self._decide(user, kinds, shared_photos, local_time)
         if decision.kind is None:
             check_in = CheckIn(
                 id=uuid4(),
@@ -601,6 +670,9 @@ class CheckInService:
             )
         else:
             self._chat_channel.send_text(connection.telegram_chat_id, decision.message)
+            sent_photo_id = self._send_shared_photo(
+                connection.telegram_chat_id, decision.shared_photo
+            )
             check_in = CheckIn(
                 id=uuid4(),
                 user_id=user.id,
@@ -608,10 +680,35 @@ class CheckInService:
                 decided_at=now,
                 kind_id=decision.kind.id,
                 message=decision.message,
+                shared_photo_id=sent_photo_id,
             )
         self._repositories.check_ins.add(
             check_in, next_due_at, pause_until_resumed=False
         )
+
+    def _send_shared_photo(
+        self, chat_id: int, shared_photo: SharedPhoto | None
+    ) -> UUID | None:
+        """Send a Check-in's Shared Photo after its message, if it has one.
+
+        If Telegram refuses it, the error is logged and the message still
+        counts as sent.
+
+        Args:
+            chat_id: The User's Telegram chat.
+            shared_photo: The Shared Photo to send; None if there is none.
+
+        Returns:
+            The sent Shared Photo's ID; None if none was sent.
+        """
+        if shared_photo is None:
+            return None
+        try:
+            self._chat_channel.send_photo(chat_id, shared_photo.file_id)
+        except Exception:
+            logger.exception("Could not send the Check-in's Shared Photo")
+            return None
+        return shared_photo.id
 
     def _ask_about_fewer(
         self, user: User, chat_id: int, now: datetime, next_due_at: datetime
@@ -708,14 +805,33 @@ class CheckInService:
             MEMORY_INTRO,
         )
 
+    def _shared_photos(self, user: User) -> list[SharedPhoto]:
+        """List the User's Shared Photos a Check-in may send.
+
+        Args:
+            user: The User.
+
+        Returns:
+            Their Shared Photos, newest first; none if User Memory doesn't
+            work for the User.
+        """
+        if not self._features.works_for(user.id, Feature.USER_MEMORY):
+            return []
+        return self._repositories.user_memory.list_shared_photos(user.id)
+
     def _decide(
-        self, user: User, kinds: list[CheckInKind], local_time: datetime
+        self,
+        user: User,
+        kinds: list[CheckInKind],
+        shared_photos: list[SharedPhoto],
+        local_time: datetime,
     ) -> CheckInDecision:
         """Ask the Check-in model to choose a Kind and write the message, or skip.
 
         Args:
             user: The User it is for.
             kinds: The Check-in Kinds it may choose from.
+            shared_photos: The User's Shared Photos it may send.
             local_time: The User's local time now.
 
         Returns:
@@ -734,6 +850,7 @@ class CheckInService:
             ),
             self._memory(user),
             self._features.works_for(user.id, Feature.USER_MEMORY),
+            describe_shared_photos(kinds, shared_photos, user.time_zone),
         )
         answer = self._chat_model.generate(
             user_id=user.id,
@@ -741,7 +858,7 @@ class CheckInService:
             instructions=f"{settings.get('persona')}\n\n{settings.get('check_in_prompt')}",
             history=[ChatLine(role=ChatRole.USER, text=description)],
         )
-        return read_check_in_decision(answer, kinds)
+        return read_check_in_decision(answer, kinds, shared_photos)
 
     def _has_open_conversation(self, user: User, now: datetime) -> bool:
         """Tell whether the User is in the middle of a Conversation.

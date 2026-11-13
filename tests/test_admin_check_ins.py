@@ -70,6 +70,7 @@ def test_admin_sees_the_check_in_kinds_in_order_with_recent_sends(
         ("A follow-up", False, 0),
         ("A present-moment pause", True, 0),
         ("A thought to reflect on", False, 0),
+        ("A look back at a photo", False, 0),
     ]
     assert kinds[0]["description"] == "Just checking how you are."
 
@@ -207,7 +208,7 @@ def test_the_users_check_ins_page_lists_the_kinds_that_may_be_sent_to_them(
         "name": "A casual hello",
         "description": "Just checking how you are.",
     }
-    assert len(kinds) == 4
+    assert len(kinds) == 5
 
     client.patch("/api/me", json={"user_memory_enabled": False}, headers=maya)
 

@@ -291,12 +291,13 @@ class SafeguardEventsResponse(BaseModel):
 
 
 class CheckInKindResponse(BaseModel):
-    """A Check-in Kind as Admins see it."""
+    """A Check-in Kind as Admins see it, with whether it sends a Shared Photo."""
 
     id: str
     name: str
     description: str
     allowed_without_user_memory: bool
+    sends_shared_photo: bool
 
 
 class CheckInKindOverviewResponse(CheckInKindResponse):
@@ -587,6 +588,7 @@ def to_check_in_kind_response(kind: CheckInKind) -> CheckInKindResponse:
         name=kind.name,
         description=kind.description,
         allowed_without_user_memory=kind.allowed_without_user_memory,
+        sends_shared_photo=kind.sends_shared_photo,
     )
 
 
@@ -1336,7 +1338,9 @@ def build_admin_api_router(
 
         Raises:
             HTTPException: 404 if there is no such Kind; 422 if the name or
-                description is blank or too long, or the name is taken.
+                description is blank or too long, the name is taken, or a
+                Kind that sends a Shared Photo would be allowed without User
+                Memory.
         """
         try:
             kind = check_in_kind_service.update(kind_id, request.to_details())
