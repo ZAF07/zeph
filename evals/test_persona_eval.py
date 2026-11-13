@@ -89,6 +89,11 @@ def test_replies_keep_the_persona_rules(
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
     headers = auth_headers(auth_verifier, "user_maya")
+    if not conversation.photo_viewing:
+        response = client.patch(
+            "/api/me", json={"photo_viewing_enabled": False}, headers=headers
+        )
+        assert response.status_code == 200, response.text
     shared_photo_descriptions = {}
     for number, photo in enumerate(conversation.shared_photos, start=1):
         file_id = f"shared-photo-{number}"

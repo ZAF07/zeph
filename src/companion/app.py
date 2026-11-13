@@ -163,6 +163,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         chat_channel=dependencies.chat_channel,
         photo_viewer=dependencies.photo_viewer,
         usage_limiter=usage_limiter,
+        features=feature_service,
         clock=dependencies.clock,
     )
     conversation_engine = dependencies.build_conversation_engine(

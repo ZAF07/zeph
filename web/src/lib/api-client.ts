@@ -32,13 +32,15 @@ export type ChatSetting =
   | "check_in_frequency"
   | "quiet_hours"
   | "user_memory"
+  | "photo_viewing"
   | "time_zone";
 
 /**
  * The signed-in User, with their profile and preferences. `changed_in_chat`
  * says when each setting was last changed in chat; a setting changed on the
- * Dashboard since is left out. `user_memory_available` is false when an
- * Admin has User Memory off for them, so they can't switch it.
+ * Dashboard since is left out. `user_memory_available` and
+ * `photo_viewing_available` are false when an Admin has that Feature off for
+ * them, so they can't switch it.
  */
 export type Me = {
   id: string;
@@ -51,6 +53,8 @@ export type Me = {
   ai_notice_acknowledged_at: string | null;
   user_memory_enabled: boolean;
   user_memory_available: boolean;
+  photo_viewing_enabled: boolean;
+  photo_viewing_available: boolean;
   onboarding_completed_at: string | null;
   role: UserRole;
   changed_in_chat: Partial<Record<ChatSetting, string>>;
@@ -131,6 +135,7 @@ export type CheckInChanges = {
 export type PreferenceChanges = {
   name?: string;
   user_memory_enabled?: boolean;
+  photo_viewing_enabled?: boolean;
   country?: string;
   time_zone?: string;
 };
@@ -140,6 +145,7 @@ export type PlatformContent = {
   ai_notice: string;
   ai_notice_short: string;
   user_memory_explanation: string;
+  photo_viewing_explanation: string;
   onboarding_reason_choices: string[];
   message_retention_days: number;
 };
@@ -169,7 +175,8 @@ export type Feature =
   | "knowledge"
   | "check_ins"
   | "user_memory"
-  | "settings_in_chat";
+  | "settings_in_chat"
+  | "photo_viewing";
 
 /** A Feature's switch for everyone and who last changed it, and when. */
 export type FeatureSwitch = {

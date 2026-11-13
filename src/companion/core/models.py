@@ -104,6 +104,7 @@ class ChatSetting(StrEnum):
     CHECK_IN_FREQUENCY = "check_in_frequency"
     QUIET_HOURS = "quiet_hours"
     USER_MEMORY = "user_memory"
+    PHOTO_VIEWING = "photo_viewing"
     TIME_ZONE = "time_zone"
 
 
@@ -124,6 +125,7 @@ class User:
         ai_notice_acknowledged_at: When they ticked "I understand" on the
             AI notice, if they have.
         user_memory_enabled: Whether the Companion may keep User Memory.
+        photo_viewing_enabled: Whether the Companion may look at their photos.
         onboarding_completed_at: When they finished onboarding, if they have.
         role: Whether they are a plain User or an Admin.
         check_ins: Their Check-in settings.
@@ -144,6 +146,7 @@ class User:
     time_zone: str | None = None
     ai_notice_acknowledged_at: datetime | None = None
     user_memory_enabled: bool = True
+    photo_viewing_enabled: bool = True
     onboarding_completed_at: datetime | None = None
     role: UserRole = UserRole.USER
     check_ins: CheckInSettings = field(default_factory=CheckInSettings)
@@ -209,12 +212,14 @@ class PreferenceChanges:
     Attributes:
         name: What the Companion should call them.
         user_memory_enabled: Whether the Companion may keep User Memory.
+        photo_viewing_enabled: Whether the Companion may look at their photos.
         country: Two-letter country code.
         time_zone: IANA time zone name.
     """
 
     name: str | None = None
     user_memory_enabled: bool | None = None
+    photo_viewing_enabled: bool | None = None
     country: str | None = None
     time_zone: str | None = None
 
@@ -447,6 +452,9 @@ class ConversationTurn:
             for a sticker, or "[photo: …] caption" for a photo.
         kind: What kind of message it is.
         photos: The photos it came with.
+        safeguard_text: The message as the Safeguard reads it when that
+            differs from `text`: with Photo Viewing off, the Safeguard still
+            reads each photo's description. None when it is the same.
     """
 
     user_id: UUID
@@ -454,6 +462,7 @@ class ConversationTurn:
     text: str
     kind: MessageKind = MessageKind.TEXT
     photos: tuple[ChannelPhoto, ...] = ()
+    safeguard_text: str | None = None
 
 
 class ChatRole(StrEnum):
@@ -1127,6 +1136,7 @@ class Feature(StrEnum):
     CHECK_INS = "check_ins"
     USER_MEMORY = "user_memory"
     SETTINGS_IN_CHAT = "settings_in_chat"
+    PHOTO_VIEWING = "photo_viewing"
 
 
 @dataclass(frozen=True)

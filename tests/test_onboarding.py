@@ -32,6 +32,7 @@ def test_platform_content_comes_from_seeded_settings(
         "ai_notice": seeded_settings["ai_notice"],
         "ai_notice_short": seeded_settings["ai_notice_short"],
         "user_memory_explanation": seeded_settings["user_memory_explanation"],
+        "photo_viewing_explanation": seeded_settings["photo_viewing_explanation"],
         "onboarding_reason_choices": seeded_settings["onboarding_reason_choices"],
         "message_retention_days": seeded_settings["message_retention_days"],
     }

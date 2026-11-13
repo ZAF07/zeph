@@ -33,6 +33,8 @@ const settings: AdminSettings = {
   photo_album_wait_seconds: seeded(2),
   photo_album_max_photos: seeded(5),
   photo_not_viewed_note: seeded("Say the photo didn't come through."),
+  photo_viewing_off_note: seeded("Say you didn't look at the photo."),
+  photo_viewing_explanation: seeded("When off, Zeph won't look at photos."),
   onboarding_unfinished_reply: seeded("Finish setting up: {dashboard_url}"),
 };
 
@@ -307,5 +309,25 @@ describe("PlatformSettingsForm", () => {
     expect(
       await screen.findByLabelText("Conversation quiet gap"),
     ).toBeInTheDocument();
+  });
+
+  it("shows and saves the Photo Viewing off note and explanation", async () => {
+    const user = userEvent.setup();
+    render(<PlatformSettingsForm />);
+    const note = await screen.findByLabelText(/Photo Viewing off” note/);
+    const explanation = screen.getByLabelText(/Photo Viewing explanation/);
+    expect(note).toHaveValue("Say you didn't look at the photo.");
+    expect(explanation).toHaveValue("When off, Zeph won't look at photos.");
+
+    await user.clear(note);
+    await user.type(note, "You didn't look.");
+    await user.clear(explanation);
+    await user.type(explanation, "Off means no looking.");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      photo_viewing_off_note: "You didn't look.",
+      photo_viewing_explanation: "Off means no looking.",
+    });
   });
 });

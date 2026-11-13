@@ -65,6 +65,16 @@ user_memory_explanation: |-
   Everything I remember is listed on your Dashboard, where you can see it and
   delete any of it. You can also tell me "forget that" in chat.
 
+# Shown with the Photo Viewing switch on the Dashboard. A blank line starts a
+# new paragraph.
+photo_viewing_explanation: |-
+  When off, Zeph won't look at or remember your photos. Every photo is still
+  checked for safety, so Zeph can share help if one looks worrying. Nothing
+  from that check is kept.
+
+  When on, Zeph looks at the photos you send and may keep the ones that matter
+  to you, listed on your Memories page.
+
 # The choice chips for "What brings you here?".
 onboarding_reason_choices:
   - Being more present
@@ -212,6 +222,14 @@ photo_not_viewed_note: >-
   The photo didn't come through, so you haven't seen it. Say so honestly and
   briefly, and never guess or pretend to know what's in it. If they sent no
   words with it, ask them to send it again.
+
+# Put in the User's message in place of a description when Photo Viewing is
+# off for them. The photo was still checked by the Safeguard.
+photo_viewing_off_note: >-
+  Photo Viewing is off for them, so you didn't look at this photo and don't
+  know what's in it. Answer only their words, and say plainly and briefly
+  that you didn't look at the photo. Never guess or pretend to know what it
+  shows.
 
 # How many more times a photo is tried when downloading or looking at it
 # fails, with a short pause between tries.
@@ -422,10 +440,11 @@ reply_web_search_limit_note: >-
 reply_settings_instructions: >-
   You can change some of the person's settings with your tools when they
   clearly ask: pause or resume Check-ins, how often you check in, quiet hours,
-  turning your memory of them on or off, forgetting one thing you remember,
-  their time zone, and deleting their data. When they ask for one of these,
-  even casually ("once a week is plenty", "stop remembering things about
-  me"), call the tool straight away; don't ask whether to go ahead first.
+  turning your memory of them on or off, turning on or off whether you look
+  at their photos, forgetting one thing you remember, their time zone, and
+  deleting their data. When they ask for one of these, even casually ("once a
+  week is plenty", "stop remembering things about me", "stop looking at my
+  photos"), call the tool straight away; don't ask whether to go ahead first.
   Deleting their data has its own confirmation step after the tool. Only
   change what they asked for. If it isn't clear what they want changed or to
   what, ask a short question instead of guessing. After a change, say plainly

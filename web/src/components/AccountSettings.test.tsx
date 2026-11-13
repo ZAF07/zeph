@@ -32,6 +32,8 @@ const content: PlatformContent = {
   ai_notice: "Seeded notice.",
   ai_notice_short: "Zeph is an AI.",
   user_memory_explanation: "Seeded memory explanation.",
+  photo_viewing_explanation:
+    "When off, Zeph won’t look at or remember your photos. Every photo is still checked for safety.\n\nWhen on, Zeph looks at your photos.",
   onboarding_reason_choices: [],
   message_retention_days: 14,
 };
@@ -47,6 +49,8 @@ const onboardedUser: Me = {
   ai_notice_acknowledged_at: "2026-11-11T09:00:00Z",
   user_memory_enabled: true,
   user_memory_available: true,
+  photo_viewing_enabled: true,
+  photo_viewing_available: true,
   onboarding_completed_at: "2026-11-11T09:00:00Z",
   role: "user",
   changed_in_chat: {},
@@ -355,5 +359,85 @@ describe("AccountSettings", () => {
       "You’re the only Admin.",
     );
     expect(signOut).not.toHaveBeenCalled();
+  });
+
+  it("turns Photo Viewing off straight away, with the seeded explanation", async () => {
+    const user = userEvent.setup();
+    render(<AccountSettings />);
+    const photoSwitch = await screen.findByRole("switch", {
+      name: "Look at my photos",
+    });
+
+    expect(
+      screen.getByText(
+        "When off, Zeph won’t look at or remember your photos. Every photo is still checked for safety.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("When on, Zeph looks at your photos."),
+    ).toBeInTheDocument();
+    expect(photoSwitch).toHaveAttribute("aria-checked", "true");
+
+    await user.click(photoSwitch);
+
+    expect(apiClient.updatePreferences).toHaveBeenCalledWith({
+      photo_viewing_enabled: false,
+    });
+    await vi.waitFor(() =>
+      expect(photoSwitch).toHaveAttribute("aria-checked", "false"),
+    );
+  });
+
+  it("shows Not available on your account with the Photo Viewing switch disabled", async () => {
+    apiClient.getMe.mockResolvedValue({
+      ...onboardedUser,
+      photo_viewing_available: false,
+    });
+    const user = userEvent.setup();
+    render(<AccountSettings />);
+    const photoSwitch = await screen.findByRole("switch", {
+      name: "Look at my photos",
+    });
+    const section = screen.getByRole("region", { name: "Look at my photos" });
+
+    expect(photoSwitch).toBeDisabled();
+    expect(photoSwitch).toHaveAttribute("aria-checked", "true");
+    expect(
+      within(section).getByText("Not available on your account"),
+    ).toBeVisible();
+    await user.click(photoSwitch);
+    expect(apiClient.updatePreferences).not.toHaveBeenCalled();
+  });
+
+  it("marks Photo Viewing as changed in chat", async () => {
+    apiClient.getMe.mockResolvedValue({
+      ...onboardedUser,
+      changed_in_chat: { photo_viewing: "2026-11-07T09:00:00Z" },
+    });
+    render(<AccountSettings />);
+
+    const section = await screen.findByRole("region", {
+      name: "Look at my photos",
+    });
+    expect(
+      within(section).getByText("Changed in chat · 7 Nov"),
+    ).toBeInTheDocument();
+  });
+
+  it("tells the User when changing Photo Viewing fails", async () => {
+    apiClient.updatePreferences.mockRejectedValue(new Error("down"));
+    const user = userEvent.setup();
+    render(<AccountSettings />);
+
+    await user.click(
+      await screen.findByRole("switch", { name: "Look at my photos" }),
+    );
+
+    const section = screen.getByRole("region", { name: "Look at my photos" });
+    expect(
+      await within(section).findByText(
+        "We couldn’t change that. Please try again.",
+      ),
+    ).toBeInTheDocument();
   });
 });

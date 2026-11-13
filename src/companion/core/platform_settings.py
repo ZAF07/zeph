@@ -134,6 +134,12 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         max_length=2_000,
     ),
     EditableSetting(
+        "photo_viewing_off_note",
+        "“Photo Viewing off” note",
+        SettingKind.TEXT,
+        max_length=2_000,
+    ),
+    EditableSetting(
         "photo_retry_count",
         "Photo retries",
         SettingKind.WHOLE_NUMBER,
@@ -218,6 +224,12 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     EditableSetting(
         "user_memory_explanation",
         "Memory explanation",
+        SettingKind.TEXT,
+        max_length=4_000,
+    ),
+    EditableSetting(
+        "photo_viewing_explanation",
+        "Photo Viewing explanation",
         SettingKind.TEXT,
         max_length=4_000,
     ),

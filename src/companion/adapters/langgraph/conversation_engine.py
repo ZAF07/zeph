@@ -32,6 +32,7 @@ class TurnState(TypedDict, total=False):
     text: str
     kind: str
     photos: list[dict[str, Any]]
+    safeguard_text: str
     conversation_id: str
     risk_type: str
     data_deletion_answer: str
@@ -105,7 +106,7 @@ class LangGraphConversationEngine:
             return {"conversation_id": str(conversation_id)}
 
         def check_safeguard(state: TurnState) -> TurnState:
-            """Check the User's message for crisis.
+            """Check the User's message for crisis, as the Safeguard reads it.
 
             Args:
                 state: The graph's state so far.
@@ -114,7 +115,9 @@ class LangGraphConversationEngine:
                 The risk type the Safeguard saw.
             """
             risk_type = services.safeguard.assess(
-                UUID(state["conversation_id"]), UUID(state["user_id"])
+                UUID(state["conversation_id"]),
+                UUID(state["user_id"]),
+                state["safeguard_text"] or None,
             )
             return {"risk_type": risk_type.value}
 
@@ -376,6 +379,7 @@ class LangGraphConversationEngine:
                 "text": turn.text,
                 "kind": turn.kind.value,
                 "photos": [asdict(photo) for photo in turn.photos],
+                "safeguard_text": turn.safeguard_text or "",
             },
             config={"configurable": {"thread_id": str(turn.user_id)}},
         )

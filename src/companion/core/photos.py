@@ -4,7 +4,8 @@ from dataclasses import dataclass, replace
 from typing import Any
 from uuid import UUID
 
-from companion.core.models import ChannelPhoto, PhotoImage, SharedPhoto
+from companion.core.features import FeatureService
+from companion.core.models import ChannelPhoto, Feature, PhotoImage, SharedPhoto
 from companion.core.ports import (
     ChatChannel,
     ChatTool,
@@ -67,17 +68,24 @@ class PhotoMessage:
 
     Attributes:
         text: The caption with each photo's description, or with the note
-            that it didn't come through.
+            that it didn't come through or wasn't looked at.
         photos: The photos looked at, each marked as viewed and holding its
-            description when it was described.
+            description when the reply may see it.
+        safeguard_text: The caption with each photo's description, for the
+            Safeguard alone, when Photo Viewing is off; None when it is the
+            same as `text`.
     """
 
     text: str
     photos: tuple[ChannelPhoto, ...]
+    safeguard_text: str | None = None
 
 
 def photo_marker(
-    description: str | None, not_viewed_note: str, number: int | None = None
+    description: str | None,
+    not_viewed_note: str,
+    number: int | None = None,
+    viewing_off_note: str | None = None,
 ) -> str:
     """Write one photo the way the Companion reads it.
 
@@ -85,12 +93,17 @@ def photo_marker(
         description: What the photo shows; None if it couldn't be viewed.
         not_viewed_note: What the Companion is told when it couldn't be viewed.
         number: The photo's place in an album; None for a photo sent alone.
+        viewing_off_note: What the Companion is told when Photo Viewing is
+            off; None when it is on.
 
     Returns:
-        "[photo: description]", "[photo 2: description]" in an album, or
-        "[photo that didn't come through. note]" when it couldn't be viewed.
+        "[photo: description]", "[photo 2: description]" in an album,
+        "[photo that didn't come through. note]" when it couldn't be viewed,
+        or "[photo you didn't look at. note]" when Photo Viewing is off.
     """
     name = "photo" if number is None else f"photo {number}"
+    if viewing_off_note is not None:
+        return f"[{name} you didn't look at. {viewing_off_note}]"
     if description is None:
         return f"[{name} that didn't come through. {not_viewed_note}]"
     return f"[{name}: {description}]"
@@ -101,6 +114,7 @@ def photo_message_text(
     descriptions: Sequence[str | None],
     not_viewed_note: str,
     photos_not_looked_at: int = 0,
+    viewing_off_note: str | None = None,
 ) -> str:
     """Write a photo message the way the Companion reads it.
 
@@ -112,6 +126,8 @@ def photo_message_text(
             viewed.
         photos_not_looked_at: How many more photos came in the album that
             weren't looked at.
+        viewing_off_note: What the Companion is told when Photo Viewing is
+            off, in place of every description; None when it is on.
 
     Returns:
         "[photo: description] caption" for one photo, or "[photo 1: …]
@@ -119,10 +135,12 @@ def photo_message_text(
         any photos that weren't looked at.
     """
     if len(descriptions) == 1 and not photos_not_looked_at:
-        markers = [photo_marker(descriptions[0], not_viewed_note)]
+        markers = [
+            photo_marker(descriptions[0], not_viewed_note, None, viewing_off_note)
+        ]
     else:
         markers = [
-            photo_marker(description, not_viewed_note, number)
+            photo_marker(description, not_viewed_note, number, viewing_off_note)
             for number, description in enumerate(descriptions, start=1)
         ]
     parts = [*markers, caption.strip()]
@@ -221,6 +239,7 @@ class PhotoService:
         chat_channel: ChatChannel,
         photo_viewer: PhotoViewer,
         usage_limiter: UsageLimiter,
+        features: FeatureService,
         clock: Clock,
     ) -> None:
         """Set up the service.
@@ -230,13 +249,26 @@ class PhotoService:
             chat_channel: Downloads the photos.
             photo_viewer: Looks at each photo.
             usage_limiter: Records the tokens each look took.
+            features: Says whether Photo Viewing works for the User.
             clock: Pauses between tries.
         """
         self._repositories = repositories
         self._chat_channel = chat_channel
         self._photo_viewer = photo_viewer
         self._usage_limiter = usage_limiter
+        self._features = features
         self._clock = clock
+
+    def viewing_works_for(self, user_id: UUID) -> bool:
+        """Say whether Photo Viewing works for a User right now.
+
+        Args:
+            user_id: The User.
+
+        Returns:
+            True if the Companion may look at, keep and use their photos.
+        """
+        return self._features.works_for(user_id, Feature.PHOTO_VIEWING)
 
     def read_message(
         self, user_id: UUID, photos: Sequence[ChannelPhoto], caption: str
@@ -244,7 +276,10 @@ class PhotoService:
         """Describe a User's photos and write their message as the Companion reads it.
 
         At most `photo_album_max_photos` are looked at; the Companion is told
-        how many more there were.
+        how many more there were. Every photo is described for the Safeguard.
+        When Photo Viewing doesn't work for the User, the descriptions go to
+        the Safeguard alone: the Companion reads only the caption and the
+        "Photo Viewing off" note, and no photo is marked as viewed.
 
         Args:
             user_id: The User who sent them.
@@ -253,18 +288,33 @@ class PhotoService:
 
         Returns:
             The message text and the photos looked at, each marked as viewed,
-            holding its description if it was described, and the caption.
+            holding its description if the reply may see it, and the caption;
+            with Photo Viewing off, the Safeguard's own text too.
         """
         settings = self._repositories.platform_settings
         looked_at = photos[: settings.get("photo_album_max_photos")]
         descriptions = [self.describe(user_id, photo) for photo in looked_at]
+        described_text = photo_message_text(
+            caption,
+            descriptions,
+            settings.get("photo_not_viewed_note"),
+            photos_not_looked_at=len(photos) - len(looked_at),
+        )
+        if not self.viewing_works_for(user_id):
+            return PhotoMessage(
+                text=photo_message_text(
+                    caption,
+                    descriptions,
+                    settings.get("photo_not_viewed_note"),
+                    viewing_off_note=settings.get("photo_viewing_off_note"),
+                ),
+                photos=tuple(
+                    replace(photo, caption=caption.strip()) for photo in looked_at
+                ),
+                safeguard_text=described_text,
+            )
         return PhotoMessage(
-            text=photo_message_text(
-                caption,
-                descriptions,
-                settings.get("photo_not_viewed_note"),
-                photos_not_looked_at=len(photos) - len(looked_at),
-            ),
+            text=described_text,
             photos=tuple(
                 replace(
                     photo,
@@ -450,8 +500,10 @@ class PhotoTools:
 
         Returns:
             The ask_about_photo tool, or none when no photo in the
-            Conversation was viewed.
+            Conversation was viewed or Photo Viewing doesn't work for the User.
         """
+        if not self._photo_service.viewing_works_for(user_id):
+            return []
         messages = self._repositories.conversations.list_messages(conversation_id)
         viewed = [
             (photo, photo.description or message.content)
