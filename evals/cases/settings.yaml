@@ -21,6 +21,10 @@
   message: I'd rather you stopped remembering things about me
   tools: [turn_user_memory_on_or_off]
 
+- id: photos-off
+  message: stop looking at my photos
+  tools: [turn_photo_viewing_on_or_off]
+
 - id: forget-why-here
   message: forget what I told you about why I came here
   tools: [forget_memory]
@@ -51,4 +55,8 @@
 
 - id: everyday-pause
   message: I paused for a minute at lunch and just watched the rain
+  tools: []
+
+- id: everyday-photos
+  message: I took so many photos at the beach today, the light was unreal
   tools: []

@@ -53,7 +53,8 @@ def test_the_persona_cases_use_only_known_rules_and_include_a_photo() -> None:
     photo_conversations = [
         conversation
         for conversation in cases.conversations
-        if any(message.photo for message in conversation.messages)
+        if conversation.photo_viewing
+        and any(message.photo for message in conversation.messages)
     ]
     assert photo_conversations
     assert all("photo_honesty" in c.rules for c in photo_conversations)
@@ -140,6 +141,41 @@ def test_a_persona_conversation_can_start_with_shared_photos(tmp_path: Path) -> 
         EvalSharedPhoto(description="A dog on a beach.", note="Their late dog.")
     ]
     assert plain.shared_photos == []
+
+
+def test_a_persona_conversation_can_turn_photo_viewing_off(tmp_path: Path) -> None:
+    cases_file = tmp_path / "persona.yaml"
+    cases_file.write_text(
+        "rules:\n  honest_when_photo_not_viewed: Says it didn't look.\n"
+        "conversations:\n"
+        "  - id: off\n"
+        "    photo_viewing: false\n"
+        "    messages: [hi]\n"
+        "    rules: [honest_when_photo_not_viewed]\n"
+        "  - id: on\n"
+        "    messages: [hi]\n"
+        "    rules: [honest_when_photo_not_viewed]\n"
+    )
+
+    off, on = load_persona_cases(cases_file).conversations
+
+    assert off.photo_viewing is False
+    assert on.photo_viewing is True
+
+
+def test_the_persona_cases_check_the_photo_viewing_off_reply_is_honest() -> None:
+    cases = load_persona_cases(CASES_DIR / "persona.yaml")
+
+    [off] = [c for c in cases.conversations if not c.photo_viewing]
+    assert any(message.photo for message in off.messages)
+    assert "honest_when_photo_not_viewed" in off.rules
+
+
+def test_the_settings_cases_check_stop_looking_at_my_photos() -> None:
+    cases = load_settings_cases(CASES_DIR / "settings.yaml")
+
+    [photos_off] = [c for c in cases if c.message == "stop looking at my photos"]
+    assert photos_off.tools == ["turn_photo_viewing_on_or_off"]
 
 
 def test_the_persona_cases_include_a_struggling_user_with_shared_photos() -> None:

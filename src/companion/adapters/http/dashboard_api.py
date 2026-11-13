@@ -55,6 +55,8 @@ class MeResponse(BaseModel):
     ai_notice_acknowledged_at: datetime | None
     user_memory_enabled: bool
     user_memory_available: bool
+    photo_viewing_enabled: bool
+    photo_viewing_available: bool
     onboarding_completed_at: datetime | None
     role: UserRole
     changed_in_chat: dict[ChatSetting, datetime]
@@ -87,6 +89,7 @@ class PreferencesRequest(BaseModel):
 
     name: str | None = None
     user_memory_enabled: bool | None = None
+    photo_viewing_enabled: bool | None = None
     country: str | None = None
     time_zone: str | None = None
 
@@ -143,6 +146,7 @@ class PlatformContentResponse(BaseModel):
     ai_notice: str
     ai_notice_short: str
     user_memory_explanation: str
+    photo_viewing_explanation: str
     onboarding_reason_choices: list[str]
     message_retention_days: int
 
@@ -351,12 +355,16 @@ def to_recent_check_in_response(recent: RecentCheckIn) -> RecentCheckInResponse:
     )
 
 
-def to_me_response(user: User, user_memory_available: bool) -> MeResponse:
+def to_me_response(
+    user: User, user_memory_available: bool, photo_viewing_available: bool
+) -> MeResponse:
     """Describe a User for the Dashboard.
 
     Args:
         user: The User.
         user_memory_available: Whether the Admin side allows User Memory
+            for them.
+        photo_viewing_available: Whether the Admin side allows Photo Viewing
             for them.
 
     Returns:
@@ -373,6 +381,8 @@ def to_me_response(user: User, user_memory_available: bool) -> MeResponse:
         ai_notice_acknowledged_at=user.ai_notice_acknowledged_at,
         user_memory_enabled=user.user_memory_enabled,
         user_memory_available=user_memory_available,
+        photo_viewing_enabled=user.photo_viewing_enabled,
+        photo_viewing_available=photo_viewing_available,
         onboarding_completed_at=user.onboarding_completed_at,
         role=user.role,
         changed_in_chat=user.settings_changed_in_chat,
@@ -405,8 +415,8 @@ def build_dashboard_api_router(
         telegram_connection_service: Issues tokens and reports connection status.
         user_data_service: Deletes the User's data or account.
         home_service: Gathers what the Dashboard home shows.
-        feature_service: Says whether the Admin side allows User Memory and
-            Check-ins for the User.
+        feature_service: Says whether the Admin side allows User Memory,
+            Check-ins and Photo Viewing for the User.
         photo_service: Lists, downloads and deletes the User's Shared Photos.
         platform_settings: Admin-managed wording shown on the Dashboard.
         telegram_bot_username: The Companion's Telegram @username, for deep links.
@@ -418,7 +428,7 @@ def build_dashboard_api_router(
     telegram_chat_url = f"https://t.me/{telegram_bot_username}"
 
     def me_response(user: User) -> MeResponse:
-        """Describe a User, with whether User Memory is available to them.
+        """Describe a User, with whether User Memory and Photo Viewing are available.
 
         Args:
             user: The User.
@@ -427,7 +437,9 @@ def build_dashboard_api_router(
             The response body.
         """
         return to_me_response(
-            user, feature_service.available_for(user.id, Feature.USER_MEMORY)
+            user,
+            feature_service.available_for(user.id, Feature.USER_MEMORY),
+            feature_service.available_for(user.id, Feature.PHOTO_VIEWING),
         )
 
     def to_check_ins_response(user: User) -> CheckInsResponse:
@@ -550,7 +562,7 @@ def build_dashboard_api_router(
     def update_me(
         user: Annotated[User, Depends(current_user)], request: PreferencesRequest
     ) -> MeResponse:
-        """Change the User's name, User Memory setting, country or time zone.
+        """Change the User's name, own Feature switches, country or time zone.
 
         Args:
             user: The signed-in User.
@@ -561,11 +573,13 @@ def build_dashboard_api_router(
 
         Raises:
             HTTPException: 422 if a new value is not acceptable; 403 if it
-                changes User Memory while the Admin side has it off.
+                changes User Memory or Photo Viewing while the Admin side has
+                it off.
         """
         changes = PreferenceChanges(
             name=request.name,
             user_memory_enabled=request.user_memory_enabled,
+            photo_viewing_enabled=request.photo_viewing_enabled,
             country=request.country,
             time_zone=request.time_zone,
         )
@@ -753,6 +767,9 @@ def build_dashboard_api_router(
             ai_notice=platform_settings.get("ai_notice"),
             ai_notice_short=platform_settings.get("ai_notice_short"),
             user_memory_explanation=platform_settings.get("user_memory_explanation"),
+            photo_viewing_explanation=platform_settings.get(
+                "photo_viewing_explanation"
+            ),
             onboarding_reason_choices=platform_settings.get(
                 "onboarding_reason_choices"
             ),

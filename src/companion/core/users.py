@@ -199,10 +199,11 @@ class UserService:
     def update_preferences(
         self, user: User, changes: PreferenceChanges, in_chat: bool = False
     ) -> User:
-        """Change a User's name, User Memory setting, country or time zone.
+        """Change a User's name, own Feature switches, country or time zone.
 
-        Only the User Memory setting and time zone are marked as changed in
-        chat or on the Dashboard, and only when their value really changes.
+        Only the User Memory and Photo Viewing settings and time zone are
+        marked as changed in chat or on the Dashboard, and only when their
+        value really changes.
 
         Args:
             user: The User making the change.
@@ -215,13 +216,16 @@ class UserService:
 
         Raises:
             InvalidProfileError: If a new value is not acceptable.
-            FeatureNotAvailableError: If it turns User Memory on or off while
-                the Admin side has it off; nothing is changed.
+            FeatureNotAvailableError: If it turns User Memory or Photo Viewing
+                on or off while the Admin side has it off; nothing is changed.
         """
         changed = []
         if changes.user_memory_enabled not in (None, user.user_memory_enabled):
             self._features.require_available(user.id, Feature.USER_MEMORY)
             changed.append(ChatSetting.USER_MEMORY)
+        if changes.photo_viewing_enabled not in (None, user.photo_viewing_enabled):
+            self._features.require_available(user.id, Feature.PHOTO_VIEWING)
+            changed.append(ChatSetting.PHOTO_VIEWING)
         if changes.time_zone not in (None, user.time_zone):
             changed.append(ChatSetting.TIME_ZONE)
         updated = replace(
@@ -231,6 +235,11 @@ class UserService:
                 changes.user_memory_enabled
                 if changes.user_memory_enabled is not None
                 else user.user_memory_enabled
+            ),
+            photo_viewing_enabled=(
+                changes.photo_viewing_enabled
+                if changes.photo_viewing_enabled is not None
+                else user.photo_viewing_enabled
             ),
             country=(
                 check_country(changes.country)

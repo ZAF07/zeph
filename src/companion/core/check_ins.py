@@ -812,10 +812,12 @@ class CheckInService:
             user: The User.
 
         Returns:
-            Their Shared Photos, newest first; none if User Memory doesn't
-            work for the User.
+            Their Shared Photos, newest first; none if User Memory or Photo
+            Viewing doesn't work for the User.
         """
         if not self._features.works_for(user.id, Feature.USER_MEMORY):
+            return []
+        if not self._features.works_for(user.id, Feature.PHOTO_VIEWING):
             return []
         return self._repositories.user_memory.list_shared_photos(user.id)
 

@@ -233,7 +233,12 @@ def test_the_photo_settings_are_editable_with_their_seeded_values(
     assert settings["photo_retry_count"]["value"] == 2
     assert settings["photo_album_wait_seconds"]["value"] == 2
     assert settings["photo_album_max_photos"]["value"] == 5
-    for key in ("photo_description_prompt", "photo_not_viewed_note"):
+    for key in (
+        "photo_description_prompt",
+        "photo_not_viewed_note",
+        "photo_viewing_off_note",
+        "photo_viewing_explanation",
+    ):
         assert settings[key]["value"] == seeded_settings[key]
     response = client.get("/api/admin/core-services", headers=headers).json()
     [photo_viewing] = [

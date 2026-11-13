@@ -109,6 +109,7 @@ def _to_user(row: Row[Any]) -> User:
         time_zone=row.time_zone,
         ai_notice_acknowledged_at=row.ai_notice_acknowledged_at,
         user_memory_enabled=row.user_memory_enabled,
+        photo_viewing_enabled=row.photo_viewing_enabled,
         onboarding_completed_at=row.onboarding_completed_at,
         role=UserRole(row.role),
         check_ins=CheckInSettings(
@@ -471,6 +472,7 @@ class PostgresUserRepository:
                 time_zone=user.time_zone,
                 ai_notice_acknowledged_at=user.ai_notice_acknowledged_at,
                 user_memory_enabled=user.user_memory_enabled,
+                photo_viewing_enabled=user.photo_viewing_enabled,
                 onboarding_completed_at=user.onboarding_completed_at,
                 check_ins_enabled=user.check_ins.enabled,
                 check_in_frequency=user.check_ins.frequency.value,

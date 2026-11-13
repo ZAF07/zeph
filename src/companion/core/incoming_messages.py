@@ -280,7 +280,8 @@ class IncomingMessageHandler:
             caption: The caption; "" if none.
 
         Returns:
-            The turn, whose text holds each photo's description.
+            The turn, whose text holds each photo's description, or, with
+            Photo Viewing off, whose Safeguard text does.
         """
         photo_message = self._photo_service.read_message(user_id, photos, caption)
         return ConversationTurn(
@@ -289,6 +290,7 @@ class IncomingMessageHandler:
             text=photo_message.text,
             kind=MessageKind.PHOTO,
             photos=photo_message.photos,
+            safeguard_text=photo_message.safeguard_text,
         )
 
     def _is_admin(self, user_id: UUID) -> bool:

@@ -131,6 +131,11 @@ const textFields: TextField[] = [
     caption: "— shown when asking for User Memory consent",
   },
   {
+    key: "photo_viewing_explanation",
+    label: "Photo Viewing explanation",
+    caption: "— shown with the Photo Viewing switch on Account & privacy",
+  },
+  {
     key: "check_in_fewer_message",
     label: "“Would you like fewer?” message",
     caption: "— sent once when a User reaches the ignore threshold",
@@ -150,6 +155,12 @@ const textFields: TextField[] = [
     key: "photo_not_viewed_note",
     label: "“Didn’t come through” note",
     caption: "— tells Zeph to say honestly that a photo couldn’t be viewed",
+  },
+  {
+    key: "photo_viewing_off_note",
+    label: "“Photo Viewing off” note",
+    caption:
+      "— tells Zeph to say plainly it didn’t look at a photo while Photo Viewing is off",
   },
 ];
 

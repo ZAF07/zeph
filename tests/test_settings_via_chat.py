@@ -35,6 +35,7 @@ SETTINGS_TOOLS = [
     "change_check_in_frequency",
     "change_quiet_hours",
     "turn_user_memory_on_or_off",
+    "turn_photo_viewing_on_or_off",
     "list_memories",
     "forget_memory",
     "change_time_zone",

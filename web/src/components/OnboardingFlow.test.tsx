@@ -27,6 +27,7 @@ const content: PlatformContent = {
   ai_notice_short: "Zeph is an AI.",
   user_memory_explanation:
     "Seeded memory paragraph one.\n\nSeeded memory paragraph two.",
+  photo_viewing_explanation: "Seeded photo explanation.",
   onboarding_reason_choices: ["Being more present", "Relationships"],
   message_retention_days: 30,
 };
@@ -43,6 +44,8 @@ function newUser(overrides: Partial<Me> = {}): Me {
     ai_notice_acknowledged_at: null,
     user_memory_enabled: true,
     user_memory_available: true,
+    photo_viewing_enabled: true,
+    photo_viewing_available: true,
     onboarding_completed_at: null,
     role: "user",
     changed_in_chat: {},

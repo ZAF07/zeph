@@ -81,6 +81,15 @@ FEATURES: tuple[FeatureDetails, ...] = (
             "always works."
         ),
     ),
+    FeatureDetails(
+        feature=Feature.PHOTO_VIEWING,
+        name="Photo Viewing",
+        description=(
+            "Zeph looks at the photos a User sends and can remember the ones "
+            "that matter. It works only while the User has Photo Viewing on "
+            "too. Every photo is still checked for safety either way."
+        ),
+    ),
 )
 
 
@@ -362,6 +371,8 @@ def own_switch_on(user: User | None, feature: Feature) -> bool | None:
         return user.user_memory_enabled
     if feature == Feature.CHECK_INS:
         return user.check_ins.enabled
+    if feature == Feature.PHOTO_VIEWING:
+        return user.photo_viewing_enabled
     return None
 
 

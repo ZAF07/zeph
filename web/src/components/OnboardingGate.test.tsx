@@ -28,6 +28,8 @@ function user(onboardingCompletedAt: string | null): Me {
     ai_notice_acknowledged_at: null,
     user_memory_enabled: true,
     user_memory_available: true,
+    photo_viewing_enabled: true,
+    photo_viewing_available: true,
     onboarding_completed_at: onboardingCompletedAt,
     role: "user",
     changed_in_chat: {},

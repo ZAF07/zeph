@@ -101,12 +101,14 @@ class PersonaConversation:
         messages: What the person sends, in order.
         rules: The IDs of the rules its replies are judged against.
         shared_photos: The Shared Photos the person has before it starts.
+        photo_viewing: Whether the person has Photo Viewing on.
     """
 
     id: str
     messages: list[PersonaMessage]
     rules: list[str]
     shared_photos: list[EvalSharedPhoto] = field(default_factory=list)
+    photo_viewing: bool = True
 
 
 @dataclass(frozen=True)
@@ -303,8 +305,9 @@ def load_persona_cases(cases_file: Path) -> PersonaCases:
 
     Args:
         cases_file: YAML with `rules` (ID to what the judge checks) and
-            `conversations` (each with `id`, `messages`, `rules` and
-            optional `shared_photos`, each with `description` and `note`).
+            `conversations` (each with `id`, `messages`, `rules`, optional
+            `shared_photos`, each with `description` and `note`, and optional
+            `photo_viewing`, true unless set to false).
 
     Returns:
         The rules and conversations.
@@ -327,6 +330,7 @@ def load_persona_cases(cases_file: Path) -> PersonaCases:
                 EvalSharedPhoto(description=photo["description"], note=photo["note"])
                 for photo in entry.get("shared_photos", [])
             ],
+            photo_viewing=entry.get("photo_viewing", True),
         )
         for entry in content["conversations"]
     ]

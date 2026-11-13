@@ -343,7 +343,8 @@ class PostConversationProcessor:
         Args:
             repositories: Where Users, Conversations, User Memory and
                 settings are stored.
-            features: Says whether User Memory works for the User.
+            features: Says whether User Memory and Photo Viewing work for the
+                User.
             chat_model: Writes the summary and the Memory Item operations,
                 and records the tokens used.
             clock: Tells the current time.
@@ -356,11 +357,11 @@ class PostConversationProcessor:
     def process(self, conversation: Conversation) -> None:
         """Process one ended Conversation and mark it processed.
 
-        Nothing is saved when User Memory doesn't work for the User. One
-        model call gives the summary, the operations and the photos to keep
-        as Shared Photos; an unreadable answer is asked again once, and if it
-        is still unreadable nothing is saved, so a bad answer is never
-        retried forever.
+        Nothing is saved when User Memory doesn't work for the User, and no
+        photo is kept when Photo Viewing doesn't. One model call gives the
+        summary, the operations and the photos to keep as Shared Photos; an
+        unreadable answer is asked again once, and if it is still unreadable
+        nothing is saved, so a bad answer is never retried forever.
 
         Args:
             conversation: The ended Conversation.
@@ -383,7 +384,11 @@ class PostConversationProcessor:
             return
         categories = self._repositories.memory_categories.list_all()
         items_by_number = dict(enumerate(user_memory.list_items(user.id), start=1))
-        photos_by_number = dict(enumerate(list_sent_photos(messages), start=1))
+        photos_by_number = (
+            dict(enumerate(list_sent_photos(messages), start=1))
+            if self._features.works_for(user.id, Feature.PHOTO_VIEWING)
+            else {}
+        )
         answer = self._ask(
             user.id,
             describe_conversation(

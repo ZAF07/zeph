@@ -66,7 +66,7 @@ QUIET_HOURS_PARAMETERS: dict[str, Any] = {
         },
     },
 }
-USER_MEMORY_PARAMETERS: dict[str, Any] = {
+ON_OR_OFF_PARAMETERS: dict[str, Any] = {
     "type": "object",
     "properties": {"on": {"type": "boolean", "description": "True for on."}},
     "required": ["on"],
@@ -143,7 +143,7 @@ class ReplySettingsTools:
         Args:
             user_id: The User being replied to.
             repositories: Where Users are stored.
-            users: Changes User Memory and the time zone.
+            users: Changes User Memory, Photo Viewing and the time zone.
             check_ins: Changes Check-in settings.
             user_memory: Lists and forgets Memory Items.
             data_deletion: Asks to delete the User's data.
@@ -196,8 +196,18 @@ class ReplySettingsTools:
                     "Turn your memory of the person on or off. Off keeps what "
                     "you remember but stops saving or using it."
                 ),
-                parameters=USER_MEMORY_PARAMETERS,
+                parameters=ON_OR_OFF_PARAMETERS,
                 run=self._turn_user_memory_on_or_off,
+            ),
+            ChatTool(
+                name="turn_photo_viewing_on_or_off",
+                description=(
+                    "Turn on or off whether you look at the person's photos. "
+                    "Off means you don't look at, keep or use their photos; "
+                    "every photo is still checked for safety."
+                ),
+                parameters=ON_OR_OFF_PARAMETERS,
+                run=self._turn_photo_viewing_on_or_off,
             ),
             ChatTool(
                 name="list_memories",
@@ -369,6 +379,37 @@ class ReplySettingsTools:
             f"what you remember until they turn it on. Nothing was deleted. {TELL_THEM}"
         )
 
+    def _turn_photo_viewing_on_or_off(self, arguments: dict[str, Any]) -> str:
+        """Turn Photo Viewing on or off.
+
+        Args:
+            arguments: The model's arguments, with "on".
+
+        Returns:
+            What the model is told back.
+        """
+        turn_on = arguments.get("on")
+        if not isinstance(turn_on, bool):
+            return f"Say true for on or false for off. {NOTHING_CHANGED}"
+        try:
+            self._users.update_preferences(
+                self._user(),
+                PreferenceChanges(photo_viewing_enabled=turn_on),
+                in_chat=True,
+            )
+        except FeatureNotAvailableError:
+            return (
+                "Photo Viewing isn't available on their account, so it can't be "
+                f"turned on or off. {NOTHING_CHANGED} Tell them so plainly."
+            )
+        if turn_on:
+            return f"Photo Viewing is on: you look at the photos they send. {TELL_THEM}"
+        return (
+            "Photo Viewing is off: you won't look at, keep or use their photos "
+            "until they turn it on. Every photo is still checked for safety, "
+            f"and their Shared Photos weren't deleted. {TELL_THEM}"
+        )
+
     def _list_memories(self, arguments: dict[str, Any]) -> str:
         """List the User's Memory Items by number.
 
@@ -473,7 +514,7 @@ class SettingsTools:
         Args:
             repositories: Where Users and settings are stored.
             features: Says whether Settings in Chat works for the User.
-            users: Changes User Memory and the time zone.
+            users: Changes User Memory, Photo Viewing and the time zone.
             check_ins: Changes Check-in settings.
             user_memory: Lists and forgets Memory Items.
             data_deletion: Asks to delete the User's data.

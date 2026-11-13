@@ -202,7 +202,8 @@ class MemoryRetrieval:
         Args:
             repositories: Where Users, Conversations, User Memory and
                 settings are stored.
-            features: Says whether User Memory works for the User.
+            features: Says whether User Memory and Photo Viewing work for the
+                User.
             chat_model: Picks the Memory Categories that matter and records
                 the tokens used.
         """
@@ -220,7 +221,8 @@ class MemoryRetrieval:
         all of them go in when it is picked. Archived categories are left
         out. The call is skipped when there is nothing to pick, and a failed
         call still leaves the "always include" items. Nothing is used when
-        User Memory doesn't work for the User.
+        User Memory doesn't work for the User, and no Shared Photo is used
+        when Photo Viewing doesn't.
 
         Args:
             user_id: The User being answered.
@@ -236,7 +238,11 @@ class MemoryRetrieval:
         settings = self._repositories.platform_settings
         user_memory = self._repositories.user_memory
         items = user_memory.list_items(user_id)
-        shared_photos = user_memory.list_shared_photos(user_id)
+        shared_photos = (
+            user_memory.list_shared_photos(user_id)
+            if self._features.works_for(user_id, Feature.PHOTO_VIEWING)
+            else []
+        )
         filled_category_ids = {item.category_id for item in items}
         active_categories = [
             category

@@ -1,5 +1,6 @@
 import logging
 import re
+from dataclasses import replace
 from datetime import timedelta
 from uuid import UUID, uuid4
 
@@ -132,7 +133,9 @@ class Safeguard:
         self._chat_model = chat_model
         self._clock = clock
 
-    def assess(self, conversation_id: UUID, user_id: UUID) -> RiskType:
+    def assess(
+        self, conversation_id: UUID, user_id: UUID, newest_text: str | None = None
+    ) -> RiskType:
         """Classify the risk in the Conversation's newest message.
 
         The model sees the whole Conversation as one transcript, so a message
@@ -143,6 +146,9 @@ class Safeguard:
         Args:
             conversation_id: The Conversation the message was added to.
             user_id: The User who sent it.
+            newest_text: The newest message as the Safeguard reads it, when
+                that differs from the saved one, e.g. a photo's description
+                with Photo Viewing off; None to read the saved one.
 
         Returns:
             The risk type, or `RiskType.NONE` if it is not a crisis.
@@ -151,6 +157,8 @@ class Safeguard:
         history = to_chat_history(
             self._repositories.conversations.list_messages(conversation_id)
         )
+        if newest_text is not None:
+            history[-1] = replace(history[-1], text=newest_text)
         transcript = [ChatLine(role=ChatRole.USER, text=to_transcript(history))]
         for _ in range(2):
             answer = self._chat_model.generate(

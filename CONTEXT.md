@@ -41,7 +41,7 @@ Several photos a User sends at once. The Companion answers them as one message w
 _Avoid_: Media group, batch, gallery
 
 **Photo Viewing**:
-A User's choice, on by default, to let the Companion look at the photos they send. When it's off, the Companion doesn't look at their photos or keep them, answers only the caption and says plainly it didn't view the photo; their Shared Photos aren't used but aren't deleted. Every photo is still checked by the Safeguard, whatever this choice, and Users are told so plainly.
+A User's choice, on by default, to let the Companion look at the photos they send. When it's off, the Companion doesn't look at their photos or keep them, answers only the caption and says plainly it didn't view the photo; their Shared Photos aren't used but aren't deleted. It is a Feature, so Admins can also turn it off for everyone or for one User; Users change their own switch on the Dashboard or by asking in chat. Every photo is still checked by the Safeguard, whatever the switches say, and Users are told so plainly.
 _Avoid_: Image recognition, vision, photo mode
 
 **Unsupported Message**:
@@ -49,7 +49,7 @@ Something a User sends that the Companion can't read yet, like a voice note, vid
 _Avoid_: Media message, attachment
 
 **Feature**:
-An extra the Companion offers that can be switched off: Web Search, Check-ins, User Memory, Photo Viewing, Stickers, Personal Stickers, Knowledge and Settings in Chat. Admins switch each one on or off for everyone, and for individual Users; a choice for one User overrides the one for everyone. A Feature works for a User only when the Admins allow it and, where the User has their own switch (User Memory, Check-ins), the User has it on. A switch the Admins don't allow shows as "Not available on your account" on the Dashboard and can't be changed; the Admins' choice never changes the User's own. When Settings in Chat is off, the Companion points the User to the Dashboard to change a setting, but Delete My Data still works in chat. Safety and a User's rights and privacy are never Features: the Safeguard and Crisis Reply, the AI Notice, Delete My Data and seeing their own data on the Dashboard are always there.
+An extra the Companion offers that can be switched off: Web Search, Check-ins, User Memory, Photo Viewing, Stickers, Personal Stickers, Knowledge and Settings in Chat. Admins switch each one on or off for everyone, and for individual Users; a choice for one User overrides the one for everyone. A Feature works for a User only when the Admins allow it and, where the User has their own switch (User Memory, Check-ins, Photo Viewing), the User has it on. A switch the Admins don't allow shows as "Not available on your account" on the Dashboard and can't be changed; the Admins' choice never changes the User's own. When Settings in Chat is off, the Companion points the User to the Dashboard to change a setting, but Delete My Data still works in chat. Safety and a User's rights and privacy are never Features: the Safeguard and Crisis Reply, the AI Notice, Delete My Data and seeing their own data on the Dashboard are always there.
 _Avoid_: Capability, add-on, perk, entitlement
 
 **Telegram Connection**:
