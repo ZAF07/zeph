@@ -182,7 +182,7 @@ class PhotoService:
             user_id,
             photo,
             settings.get("photo_description_prompt"),
-            "view a photo",
+            log_action="view a photo",
         )
 
     def ask(self, user_id: UUID, photo: ChannelPhoto, question: str) -> str | None:
@@ -206,11 +206,15 @@ class PhotoService:
             photo_question_instructions(
                 settings.get("photo_description_prompt"), question
             ),
-            "look at a photo again",
+            log_action="look at a photo again",
         )
 
     def _look(
-        self, user_id: UUID, photo: ChannelPhoto, instructions: str, action: str
+        self,
+        user_id: UUID,
+        photo: ChannelPhoto,
+        instructions: str,
+        log_action: str,
     ) -> str | None:
         """Download a photo and look at it, trying again when that fails.
 
@@ -218,7 +222,8 @@ class PhotoService:
             user_id: The User whose usage the tokens go into.
             photo: The photo.
             instructions: What to write about the photo.
-            action: What is being done, for the error log, e.g. "view a photo".
+            log_action: What is being done, for the error log, e.g.
+                "view a photo".
 
         Returns:
             What the photo viewer wrote, or None after the last failed try.
@@ -234,7 +239,9 @@ class PhotoService:
                     photo=image,
                 )
             except Exception:
-                logger.exception("Could not %s (try %d of %d)", action, attempt, tries)
+                logger.exception(
+                    "Could not %s (try %d of %d)", log_action, attempt, tries
+                )
             else:
                 self._usage_limiter.record_tokens(
                     user_id, answer.tokens_in, answer.tokens_out
@@ -243,7 +250,7 @@ class PhotoService:
                     return answer.text.strip()
                 logger.error(
                     "Could not %s: the answer was empty (try %d of %d)",
-                    action,
+                    log_action,
                     attempt,
                     tries,
                 )
@@ -293,7 +300,7 @@ class PhotoTools:
             """Look at the photo the model picked again, with its question.
 
             Args:
-                arguments: The model's arguments, with the photo's "number"
+                arguments: The model's arguments, with the "photo" number
                     and the "question".
 
             Returns:

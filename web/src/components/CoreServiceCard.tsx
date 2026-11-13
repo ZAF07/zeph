@@ -38,14 +38,14 @@ export function CoreServiceCard({
   const savedPrompt = textSetting(settings, service.prompt_key);
   const [model, setModel] = useState(savedModel);
   const [prompt, setPrompt] = useState(savedPrompt);
+  const extraKeys = service.extra_prompts.map(({ key }) => key);
   const savedExtraPrompts = Object.fromEntries(
-    service.extra_prompts.map(({ key }) => [key, textSetting(settings, key)]),
+    extraKeys.map((key) => [key, textSetting(settings, key)]),
   );
   const [extraPrompts, setExtraPrompts] =
     useState<Record<string, string>>(savedExtraPrompts);
   const [saveState, setSaveState] = useState<SaveState>("idle");
 
-  const extraKeys = service.extra_prompts.map(({ key }) => key);
   const isDirty =
     model !== savedModel ||
     prompt !== savedPrompt ||

@@ -27,3 +27,9 @@ Several photos sent at once (a Telegram album) get one reply, like a friend woul
 ## Blocked by
 
 - `.scratch/photos/issues/01-companion-sees-a-photo.md`
+
+## Comments
+
+### 2026-11-13 — note from issue 02
+
+- `PhotoTools.offer` (`core/photos.py`) lists each viewed photo with its whole message text. In an album every photo would get the same line, so give each photo its own description in the tool list (and `PhotoService.read_message` takes one photo today).
