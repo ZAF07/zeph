@@ -2051,6 +2051,24 @@ class PostgresUsageRepository:
             ).scalar()
         return count or 0
 
+    def count_messages(self, user_id: UUID, day: date) -> int:
+        """Count a User's messages on a day.
+
+        Args:
+            user_id: The User's ID.
+            day: The User's day.
+
+        Returns:
+            How many of their messages counted toward the daily message limit.
+        """
+        with self._engine.connect() as connection:
+            count = connection.execute(
+                select(daily_usage.c.message_count).where(
+                    daily_usage.c.user_id == user_id, daily_usage.c.day == day
+                )
+            ).scalar()
+        return count or 0
+
     def claim_message(self, user_id: UUID, day: date, daily_limit: int) -> bool:
         """Count one message for a User's day, in one step, if under the limit.
 

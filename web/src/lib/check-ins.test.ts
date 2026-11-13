@@ -6,10 +6,37 @@ import {
   formatTimeOfDay,
   pauseEndText,
   pausedText,
+  recentCheckInTitle,
   toTimeFieldValue,
 } from "@/lib/check-ins";
 
 describe("check-in wording", () => {
+  it("says a limit skip happened because the User reached today's message limit", () => {
+    expect(
+      recentCheckInTitle({
+        id: "check-in-1",
+        outcome: "skipped",
+        kind: null,
+        decided_at: "2026-11-12T09:00:00Z",
+        status: "skipped",
+        skipped_for_daily_limit: true,
+      }),
+    ).toBe("Skipped — you’d reached today’s message limit");
+  });
+
+  it("says any other skip gave the User some space", () => {
+    expect(
+      recentCheckInTitle({
+        id: "check-in-1",
+        outcome: "skipped",
+        kind: null,
+        decided_at: "2026-11-12T09:00:00Z",
+        status: "skipped",
+        skipped_for_daily_limit: false,
+      }),
+    ).toBe("Skipped — gave you some space");
+  });
+
   it("turns a backend time of day into a time field value", () => {
     expect(toTimeFieldValue("22:00:00")).toBe("22:00");
   });
