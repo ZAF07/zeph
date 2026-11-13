@@ -6,12 +6,14 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
+from uuid import UUID
 
 from companion.adapters.postgres.tables import EMBEDDING_SIZE
 from companion.core.models import (
     AccountIdentity,
     ChannelSticker,
     ChatLine,
+    ConversationTurn,
     ModelAnswer,
     PhotoImage,
     StickerImage,
@@ -159,13 +161,15 @@ class FakeAuthVerifier:
     """Auth provider that accepts tokens handed out by `token_for`.
 
     It also stands in for the auth provider's accounts: a deleted account is
-    recorded and its tokens stop working.
+    recorded and its tokens stop working. Deleting an account listed in
+    `failing_deletes` fails, as if the auth provider were down.
     """
 
     def __init__(self) -> None:
-        """Start with no known tokens and no deleted accounts."""
+        """Start with no known tokens, no deleted accounts and no failures."""
         self._identities_by_token: dict[str, AccountIdentity] = {}
         self.deleted_accounts: list[str] = []
+        self.failing_deletes: set[str] = set()
 
     def token_for(self, auth_id: str, email: str) -> str:
         """Create a token that verifies as the given account.
@@ -197,13 +201,41 @@ class FakeAuthVerifier:
 
         Args:
             auth_id: The account ID.
+
+        Raises:
+            RuntimeError: If the account is listed in `failing_deletes`.
         """
+        if auth_id in self.failing_deletes:
+            raise RuntimeError("The auth provider is down")
         self.deleted_accounts.append(auth_id)
         self._identities_by_token = {
             token: identity
             for token, identity in self._identities_by_token.items()
             if identity.auth_id != auth_id
         }
+
+
+class FakeConversationEngine:
+    """Conversation engine that only records which Users it forgot."""
+
+    def __init__(self) -> None:
+        """Start having forgotten no one."""
+        self.forgotten: list[UUID] = []
+
+    def handle(self, turn: ConversationTurn) -> None:
+        """Ignore the turn, as tests using this engine send no messages.
+
+        Args:
+            turn: The incoming turn.
+        """
+
+    def forget_user(self, user_id: UUID) -> None:
+        """Record that the User was forgotten.
+
+        Args:
+            user_id: The User's ID.
+        """
+        self.forgotten.append(user_id)
 
 
 class FakeClock:

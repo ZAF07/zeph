@@ -220,6 +220,12 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         dashboard_url=dependencies.dashboard_url,
     )
 
+    user_data_service = UserDataService(
+        repositories=dependencies.repositories,
+        conversation_engine=conversation_engine,
+        auth_accounts=dependencies.auth_accounts,
+        clock=dependencies.clock,
+    )
     scheduled_work = ScheduledWork(
         repositories=dependencies.repositories,
         post_conversation=PostConversationProcessor(
@@ -234,6 +240,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             conversation_engine=conversation_engine,
             clock=dependencies.clock,
         ),
+        user_data=user_data_service,
         clock=dependencies.clock,
     )
 
@@ -268,11 +275,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             user_memory_service=user_memory_service,
             check_in_service=check_in_service,
             telegram_connection_service=telegram_connection_service,
-            user_data_service=UserDataService(
-                repositories=dependencies.repositories,
-                conversation_engine=conversation_engine,
-                auth_accounts=dependencies.auth_accounts,
-            ),
+            user_data_service=user_data_service,
             home_service=HomeService(
                 repositories=dependencies.repositories,
                 check_in_service=check_in_service,

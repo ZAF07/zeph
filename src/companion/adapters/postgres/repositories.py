@@ -30,6 +30,7 @@ from companion.adapters.postgres.tables import (
     knowledge_documents,
     memory_categories,
     memory_items,
+    pending_auth_account_deletions,
     platform_settings,
     safeguard_events,
     shared_photos,
@@ -616,15 +617,17 @@ class PostgresUserRepository:
             ):
                 connection.execute(delete(table).where(table.c.user_id == user_id))
 
-    def delete_unless_last_admin(self, user_id: UUID) -> bool:
+    def delete_unless_last_admin(self, user_id: UUID, deleted_at: datetime) -> bool:
         """Delete a User and everything of theirs, unless they are the only Admin.
 
         The Admin rows are locked first, so two Admins deleting their accounts
         at the same time can never leave the platform without an Admin. Their
-        data goes with them through the tables' cascading foreign keys.
+        data goes with them through the tables' cascading foreign keys, and
+        their auth ID is added to the pending auth account deletions.
 
         Args:
             user_id: The User's ID.
+            deleted_at: When they were deleted.
 
         Returns:
             True if they were deleted; False if they are the last Admin.
@@ -641,8 +644,61 @@ class PostgresUserRepository:
             )
             if admin_ids == [user_id]:
                 return False
-            connection.execute(delete(users).where(users.c.id == user_id))
+            auth_id = connection.execute(
+                delete(users).where(users.c.id == user_id).returning(users.c.auth_id)
+            ).scalar_one_or_none()
+            if auth_id is None:
+                return True
+            connection.execute(
+                insert(pending_auth_account_deletions)
+                .values(auth_id=auth_id, added_at=deleted_at)
+                .on_conflict_do_nothing()
+            )
         return True
+
+
+class PostgresPendingAuthAccountDeletionRepository:
+    """Stores the auth provider accounts still to delete in Postgres."""
+
+    def __init__(self, engine: Engine) -> None:
+        """Set up the repository.
+
+        Args:
+            engine: The database engine.
+        """
+        self._engine = engine
+
+    def list_auth_ids(self) -> list[str]:
+        """List the auth IDs of the accounts still to delete, oldest first.
+
+        Returns:
+            The auth IDs.
+        """
+        with self._engine.connect() as connection:
+            return list(
+                connection.execute(
+                    select(pending_auth_account_deletions.c.auth_id).order_by(
+                        pending_auth_account_deletions.c.added_at
+                    )
+                ).scalars()
+            )
+
+    def complete(self, auth_id: str) -> None:
+        """Mark an account deleted at the auth provider, in one step.
+
+        Any User made with that auth ID since is deleted too, with their data
+        going through the tables' cascading foreign keys.
+
+        Args:
+            auth_id: The auth provider's account ID.
+        """
+        with self._engine.begin() as connection:
+            connection.execute(delete(users).where(users.c.auth_id == auth_id))
+            connection.execute(
+                delete(pending_auth_account_deletions).where(
+                    pending_auth_account_deletions.c.auth_id == auth_id
+                )
+            )
 
 
 class PostgresTelegramConnectionRepository:
@@ -2672,4 +2728,7 @@ def build_postgres_repositories(engine: Engine) -> Repositories:
         stickers=PostgresStickerRepository(engine),
         check_ins=PostgresCheckInRepository(engine),
         feature_switches=PostgresFeatureSwitchRepository(engine),
+        pending_auth_account_deletions=PostgresPendingAuthAccountDeletionRepository(
+            engine
+        ),
     )

@@ -1,3 +1,4 @@
+import logging
 from dataclasses import replace
 from enum import StrEnum
 from uuid import UUID
@@ -14,6 +15,8 @@ from companion.core.ports import (
 CONFIRMATION_WORD_SETTING = "data_deletion_confirmation_word"
 DELETED_REPLY_SETTING = "data_deleted_reply"
 
+logger = logging.getLogger(__name__)
+
 
 class LastAdminError(Exception):
     """Raised when the only Admin asks to delete their account."""
@@ -27,6 +30,7 @@ class UserDataService:
         repositories: Repositories,
         conversation_engine: ConversationEngine,
         auth_accounts: AuthAccounts,
+        clock: Clock,
     ) -> None:
         """Set up the service.
 
@@ -34,10 +38,12 @@ class UserDataService:
             repositories: Where the User's data is stored.
             conversation_engine: Forgets what it saved for a User.
             auth_accounts: Deletes accounts at the auth provider.
+            clock: Tells the current time.
         """
         self._repositories = repositories
         self._conversation_engine = conversation_engine
         self._auth_accounts = auth_accounts
+        self._clock = clock
 
     def delete_data(self, user: User) -> None:
         """Delete the User's messages, memory, Check-ins and Telegram Connection.
@@ -53,8 +59,10 @@ class UserDataService:
     def delete_account(self, user: User) -> None:
         """Delete everything of the User's, then their account at the auth provider.
 
-        Our data goes first, so if anything fails the User can try again
-        and nothing of theirs is left behind.
+        Our data goes first, and their auth account is noted as still to
+        delete in the same step. If the auth provider then fails, the account
+        stays on that list for `delete_pending_auth_accounts` to try again;
+        the User's data is gone either way.
 
         Args:
             user: The User.
@@ -64,9 +72,43 @@ class UserDataService:
                 stay.
         """
         self._conversation_engine.forget_user(user.id)
-        if not self._repositories.users.delete_unless_last_admin(user.id):
+        if not self._repositories.users.delete_unless_last_admin(
+            user.id, self._clock.now()
+        ):
             raise LastAdminError
-        self._auth_accounts.delete_account(user.auth_id)
+        self._delete_auth_account(user.auth_id)
+
+    def delete_pending_auth_accounts(self) -> None:
+        """Try again to delete each auth account still on the pending list.
+
+        One that fails stays on the list for next time; the others still go
+        ahead.
+        """
+        pending = self._repositories.pending_auth_account_deletions
+        for auth_id in pending.list_auth_ids():
+            self._delete_auth_account(auth_id)
+
+    def _delete_auth_account(self, auth_id: str) -> None:
+        """Delete an account at the auth provider and take it off the pending list.
+
+        A User made with that auth ID by signing in again before now is
+        deleted too, as the account they signed in with is gone. If any step
+        fails, the failure is logged and the account stays on the list.
+
+        Args:
+            auth_id: The auth provider's account ID.
+        """
+        try:
+            self._auth_accounts.delete_account(auth_id)
+            user_signed_in_again = self._repositories.users.get_by_auth_id(auth_id)
+            if user_signed_in_again is not None:
+                self._conversation_engine.forget_user(user_signed_in_again.id)
+            self._repositories.pending_auth_account_deletions.complete(auth_id)
+        except Exception:
+            logger.exception(
+                "Could not delete an account at the auth provider (%s); will try again",
+                auth_id,
+            )
 
 
 class DataDeletionAnswer(StrEnum):

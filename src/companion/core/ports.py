@@ -496,14 +496,41 @@ class UserRepository(Protocol):
         """
         ...
 
-    def delete_unless_last_admin(self, user_id: UUID) -> bool:
+    def delete_unless_last_admin(self, user_id: UUID, deleted_at: datetime) -> bool:
         """Delete a User and everything of theirs, unless they are the only Admin.
+
+        In the same step, their auth provider account is added to the pending
+        auth account deletions, so it is never lost track of.
 
         Args:
             user_id: The User's ID.
+            deleted_at: When they were deleted.
 
         Returns:
             True if they were deleted; False if they are the last Admin.
+        """
+        ...
+
+
+class PendingAuthAccountDeletionRepository(Protocol):
+    """Stores the auth provider accounts still to delete, by auth ID only."""
+
+    def list_auth_ids(self) -> list[str]:
+        """List the auth IDs of the accounts still to delete, oldest first.
+
+        Returns:
+            The auth IDs.
+        """
+        ...
+
+    def complete(self, auth_id: str) -> None:
+        """Mark an account deleted at the auth provider, in one step.
+
+        Any User made with that auth ID since, by signing in again before the
+        account was deleted, is deleted with everything of theirs.
+
+        Args:
+            auth_id: The auth provider's account ID.
         """
         ...
 
@@ -1497,3 +1524,4 @@ class Repositories:
     stickers: StickerRepository
     check_ins: CheckInRepository
     feature_switches: FeatureSwitchRepository
+    pending_auth_account_deletions: PendingAuthAccountDeletionRepository

@@ -197,7 +197,7 @@ A User's choice, on the Dashboard or in chat, to wipe their messages, User Memor
 _Avoid_: Reset, clear history, wipe
 
 **Account Deletion**:
-A User's choice, made only on the Dashboard, to remove everything Delete My Data removes plus their account itself and the Admins' Feature choices for them. It can't be undone, and the last Admin can't do it.
+A User's choice, made only on the Dashboard, to remove everything Delete My Data removes plus their account itself and the Admins' Feature choices for them. It can't be undone, and the last Admin can't do it. Once confirmed it always finishes: the User is signed out at once, and if their sign-in account can't be removed right then, it is removed later without them doing anything. Anything they create by signing in again before then is removed with it.
 _Avoid_: Close account, deactivate, unsubscribe
 
 ### Quality
