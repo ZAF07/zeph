@@ -31,7 +31,10 @@ from companion.core.models import (
     UserRole,
 )
 from companion.core.ports import PlatformSettingsRepository
-from companion.core.telegram_connection import TelegramConnectionService
+from companion.core.telegram_connection import (
+    OnboardingNotFinishedError,
+    TelegramConnectionService,
+)
 from companion.core.user_data import LastAdminError, UserDataService
 from companion.core.user_memory import MemoryNotFoundError, UserMemoryService
 from companion.core.users import InvalidProfileError, UserService
@@ -761,8 +764,14 @@ def build_dashboard_api_router(
 
         Returns:
             The new token and its Telegram deep link.
+
+        Raises:
+            HTTPException: 409 if the User hasn't finished onboarding.
         """
-        token = telegram_connection_service.create_token(user.id)
+        try:
+            token = telegram_connection_service.create_token(user)
+        except OnboardingNotFinishedError as error:
+            raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
         return to_token_response(token, ConnectionTokenStatus.ACTIVE)
 
     @router.get("/memory-items")

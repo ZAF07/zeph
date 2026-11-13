@@ -141,6 +141,12 @@ const textFields: TextField[] = [
     caption: "— sent in Telegram when a User hits the daily limit",
   },
   {
+    key: "onboarding_unfinished_reply",
+    label: "“Finish onboarding first” reply",
+    caption:
+      "— sent in Telegram when someone uses a connection link before finishing onboarding; keep {dashboard_url}",
+  },
+  {
     key: "photo_not_viewed_note",
     label: "“Didn’t come through” note",
     caption: "— tells Zeph to say honestly that a photo couldn’t be viewed",

@@ -97,7 +97,7 @@ A change to one of a User's settings made by telling the Companion in plain word
 _Avoid_: Chat command, slash command, bot setting
 
 **Onboarding**:
-The steps a new User completes on the Dashboard before making their Telegram Connection: what the Companion should call them, acknowledging the AI Notice, what brings them here, country and time zone, and User Memory consent. A User who has not finished it cannot use the rest of the Dashboard.
+The steps a new User completes on the Dashboard before making their Telegram Connection: what the Companion should call them, acknowledging the AI Notice, what brings them here, country and time zone, and User Memory consent. A User who has not finished it cannot use the rest of the Dashboard, and cannot get a Connection Token or make a Telegram Connection.
 _Avoid_: Setup, registration, sign-up (sign-up is the account creation before it)
 
 **AI Notice**:

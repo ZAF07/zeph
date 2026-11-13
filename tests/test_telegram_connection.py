@@ -2,6 +2,7 @@ from datetime import timedelta
 from typing import Any
 
 from fastapi.testclient import TestClient
+from sqlalchemy import Engine, text
 
 from tests.conftest import BOT_USERNAME, DASHBOARD_URL
 from tests.fakes import FakeAuthVerifier, FakeChatChannel, FakeClock
@@ -9,6 +10,8 @@ from tests.telegram_helpers import (
     TELEGRAM_CHAT_ID,
     auth_headers,
     create_connection_token,
+    mark_onboarded,
+    onboarding_answers,
     send_to_webhook,
     telegram_text_update,
 )
@@ -21,6 +24,7 @@ def test_start_with_valid_token_connects_telegram_and_sends_welcome(
     seeded_settings: dict[str, Any],
 ) -> None:
     headers = auth_headers(auth_verifier, "user_maya")
+    mark_onboarded(client, headers)
 
     created = client.post("/api/telegram-connection/tokens", headers=headers)
     assert created.status_code == 201
@@ -187,3 +191,63 @@ def test_start_without_a_known_token_gets_reply_pointing_back_to_dashboard(
         expected_reply,
         expected_reply,
     ]
+
+
+def test_connection_token_is_refused_before_onboarding_is_finished(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = auth_headers(auth_verifier, "user_maya")
+
+    refused = client.post("/api/telegram-connection/tokens", headers=headers)
+
+    assert refused.status_code == 409
+    assert refused.json()["detail"] == "Finish onboarding before connecting Telegram."
+    status = client.get("/api/telegram-connection", headers=headers).json()
+    assert status["latest_token"] is None
+
+
+def test_connection_token_is_issued_once_onboarding_is_finished(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = auth_headers(auth_verifier, "user_maya")
+    client.put("/api/onboarding", json=onboarding_answers(), headers=headers)
+
+    created = client.post("/api/telegram-connection/tokens", headers=headers)
+
+    assert created.status_code == 201
+    assert created.json()["status"] == "active"
+
+
+def test_start_from_user_who_has_not_onboarded_links_nothing(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    clock: FakeClock,
+    engine: Engine,
+    seeded_settings: dict[str, Any],
+) -> None:
+    headers = auth_headers(auth_verifier, "user_maya")
+    user_id = client.get("/api/me", headers=headers).json()["id"]
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO connection_tokens "
+                "(token, user_id, created_at, expires_at) "
+                "VALUES ('OLD1-TOKN', :user_id, :now, :expires_at)"
+            ),
+            {
+                "user_id": user_id,
+                "now": clock.now(),
+                "expires_at": clock.now() + timedelta(minutes=15),
+            },
+        )
+
+    send_to_webhook(client, telegram_text_update("/start OLD1-TOKN"))
+
+    expected_reply = seeded_settings["onboarding_unfinished_reply"].replace(
+        "{dashboard_url}", DASHBOARD_URL
+    )
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [expected_reply]
+    status = client.get("/api/telegram-connection", headers=headers).json()
+    assert status["connection"] is None
+    assert status["latest_token"]["status"] == "active"

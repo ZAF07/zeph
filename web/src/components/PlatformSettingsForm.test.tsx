@@ -33,6 +33,7 @@ const settings: AdminSettings = {
   photo_album_wait_seconds: seeded(2),
   photo_album_max_photos: seeded(5),
   photo_not_viewed_note: seeded("Say the photo didn't come through."),
+  onboarding_unfinished_reply: seeded("Finish setting up: {dashboard_url}"),
 };
 
 describe("PlatformSettingsForm", () => {
@@ -121,6 +122,23 @@ describe("PlatformSettingsForm", () => {
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       daily_message_limit: 60,
       daily_limit_reply: "Out of steam, talk tomorrow?",
+    });
+  });
+
+  it("shows and saves the finish-onboarding-first reply", async () => {
+    const user = userEvent.setup();
+    render(<PlatformSettingsForm />);
+    const reply = await screen.findByLabelText(
+      /“Finish onboarding first” reply/,
+    );
+    expect(reply).toHaveValue("Finish setting up: {dashboard_url}");
+
+    await user.clear(reply);
+    await user.type(reply, "Set up first: {{dashboard_url}");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      onboarding_unfinished_reply: "Set up first: {dashboard_url}",
     });
   });
 

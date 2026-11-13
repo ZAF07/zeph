@@ -150,6 +150,15 @@ class User:
     settings_changed_in_chat: dict[ChatSetting, datetime] = field(default_factory=dict)
     data_deletion_requested_at: datetime | None = None
 
+    @property
+    def has_finished_onboarding(self) -> bool:
+        """Tell whether the User has finished onboarding.
+
+        Returns:
+            True once onboarding is done.
+        """
+        return self.onboarding_completed_at is not None
+
 
 @dataclass(frozen=True)
 class UserOverview:

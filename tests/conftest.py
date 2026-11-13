@@ -53,6 +53,15 @@ CHECK_IN_KINDS_SEED_FILE = SEED_DIR / "check_in_kinds.yaml"
 KNOWLEDGE_SEED_FILE = SEED_DIR / "knowledge" / "knowledge.yaml"
 
 
+class CompanionTestClient(TestClient):
+    """A test client that can also reach the test database for setup."""
+
+    def __init__(self, app: Any, engine: Engine) -> None:
+        """Wrap the app and remember the test database."""
+        super().__init__(app)
+        self.engine = engine
+
+
 @pytest.fixture(scope="session")
 def database_url() -> Iterator[str]:
     """Start a throwaway Postgres with pgvector and run migrations once."""
@@ -196,7 +205,7 @@ def client(
         dashboard_url=DASHBOARD_URL,
         initial_admin_emails=frozenset({INITIAL_ADMIN_EMAIL}),
     )
-    with TestClient(create_app(dependencies)) as test_client:
+    with CompanionTestClient(create_app(dependencies), engine) as test_client:
         yield test_client
 
 
