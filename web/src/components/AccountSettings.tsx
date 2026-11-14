@@ -80,7 +80,10 @@ export function AccountSettings() {
         timeZone={me.time_zone ?? undefined}
       />
       <PersonalStickersSection available={me.personal_stickers_available} />
-      <YourDataSection retentionDays={content.message_retention_days} />
+      <YourDataSection
+        retentionDays={content.message_retention_days}
+        deleteMyDataDescription={content.delete_my_data_description}
+      />
       <DeleteAccountSection />
     </div>
   );

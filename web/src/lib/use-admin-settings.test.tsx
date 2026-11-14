@@ -24,6 +24,7 @@ function contentWithNotice(notice: string): PlatformContent {
     user_memory_explanation: "",
     photo_viewing_explanation: "",
     message_retention_days: 30,
+    delete_my_data_description: "",
   };
 }
 

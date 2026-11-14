@@ -35,6 +35,7 @@ def test_platform_content_comes_from_seeded_settings(
         "photo_viewing_explanation": seeded_settings["photo_viewing_explanation"],
         "onboarding_reason_choices": seeded_settings["onboarding_reason_choices"],
         "message_retention_days": seeded_settings["message_retention_days"],
+        "delete_my_data_description": seeded_settings["delete_my_data_description"],
     }
 
 

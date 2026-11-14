@@ -18,6 +18,9 @@ from companion.core.models import (
     UserSnapshot,
 )
 from companion.core.platform_settings import (
+    CONFIRMATION_WORD_PLACEHOLDER,
+    DATA_DELETION_STARTED_NOTE,
+    MEMORY_OFF_CHAT_LINE,
     REPLY_DELETE_DATA_INSTRUCTIONS,
     REPLY_SETTINGS_INSTRUCTIONS,
 )
@@ -144,6 +147,7 @@ class ReplySettingsTools:
         user_memory: UserMemoryService,
         data_deletion: ChatDataDeletion,
         settings: PlatformSettings,
+        offer: ReplyOffer,
     ) -> None:
         """Set up the tools for one reply.
 
@@ -155,9 +159,12 @@ class ReplySettingsTools:
             user_memory: Lists and forgets Memory Items and Life Threads.
             data_deletion: Asks to delete the User's data.
             settings: The platform settings, read once for the reply.
+            offer: The reply's offer, given the fixed line that closes the
+                reply once User Memory is turned off.
         """
         self._user_id = user_id
         self._settings = settings
+        self._offer = offer
         self._repositories = repositories
         self._users = users
         self._check_ins = check_ins
@@ -202,8 +209,9 @@ class ReplySettingsTools:
             ChatTool(
                 name="turn_user_memory_on_or_off",
                 description=(
-                    "Turn your memory of the person on or off. Off keeps what "
-                    "you remember but stops saving or using it."
+                    "Turn your memory of the person on or off. Off deletes "
+                    "nothing: you still use what you remember but stop "
+                    "learning anything new."
                 ),
                 parameters=ON_OR_OFF_PARAMETERS,
                 run=self._turn_user_memory_on_or_off,
@@ -362,6 +370,10 @@ class ReplySettingsTools:
     def _turn_user_memory_on_or_off(self, arguments: dict[str, Any]) -> str:
         """Turn User Memory on or off.
 
+        Turning it off closes the reply with the Admin-set line saying
+        nothing is deleted, so the User is always told; turning it back on
+        in the same reply drops that line.
+
         Args:
             arguments: The model's arguments, with "on".
 
@@ -383,10 +395,14 @@ class ReplySettingsTools:
                 f"turned on or off. {NOTHING_CHANGED} Tell them so plainly."
             )
         if turn_on:
+            self._offer.closing_text = ""
             return f"Your memory of them is on. {TELL_THEM}"
+        self._offer.closing_text = self._settings.get(MEMORY_OFF_CHAT_LINE)
         return (
-            "Your memory of them is off: you won't save anything new or use "
-            f"what you remember until they turn it on. Nothing was deleted. {TELL_THEM}"
+            "Your memory of them is off: you won't learn anything new, but you "
+            "still use what you already know. Nothing was deleted. A fixed line "
+            "saying so is sent after your reply, so don't repeat it. "
+            f"{TELL_THEM}"
         )
 
     def _turn_photo_viewing_on_or_off(self, arguments: dict[str, Any]) -> str:
@@ -501,13 +517,8 @@ class ReplySettingsTools:
         """
         self._data_deletion.ask(self._user())
         word = self._data_deletion.confirmation_word(self._settings)
-        return (
-            "Nothing is deleted yet. Tell them this deletes their messages, what "
-            "you remember about them, their Check-ins and this Telegram "
-            "connection, and can't be undone; their account and settings stay. "
-            f'Ask them to reply with exactly "{word}" to confirm, on its own, with '
-            "nothing after it. Any other reply cancels it."
-        )
+        note = self._settings.get(DATA_DELETION_STARTED_NOTE)
+        return note.replace(CONFIRMATION_WORD_PLACEHOLDER, word)
 
 
 class SettingsTools:
@@ -555,6 +566,7 @@ class SettingsTools:
             their data, with its own instructions, when Settings in Chat
             doesn't work for them.
         """
+        offer = ReplyOffer()
         reply_tools = ReplySettingsTools(
             snapshot.user.id,
             self._repositories,
@@ -563,16 +575,15 @@ class SettingsTools:
             self._user_memory,
             self._data_deletion,
             snapshot.settings,
+            offer,
         )
         if snapshot.works(Feature.SETTINGS_IN_CHAT):
-            tools = reply_tools.tools
+            offer.tools = reply_tools.tools
             instructions = REPLY_SETTINGS_INSTRUCTIONS
         else:
-            tools = [
+            offer.tools = [
                 tool for tool in reply_tools.tools if tool.name == DELETE_DATA_TOOL
             ]
             instructions = REPLY_DELETE_DATA_INSTRUCTIONS
-        return ReplyOffer(
-            tools=tools,
-            instructions=snapshot.settings.get(instructions),
-        )
+        offer.instructions = snapshot.settings.get(instructions)
+        return offer

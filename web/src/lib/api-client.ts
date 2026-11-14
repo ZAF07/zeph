@@ -155,6 +155,7 @@ export type PlatformContent = {
   photo_viewing_explanation: string;
   onboarding_reason_choices: string[];
   message_retention_days: number;
+  delete_my_data_description: string;
 };
 
 /** A User as Admins see them: activity counts, never message text. */

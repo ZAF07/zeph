@@ -50,6 +50,9 @@ const settings: AdminSettings = {
   onboarding_unfinished_reply: seeded("Finish setting up: {dashboard_url}"),
   memory_paused_note: seeded("**Memory is paused.** Still used."),
   memory_not_available_note: seeded("**Memory isn’t available.** Still used."),
+  memory_off_chat_line: seeded("Nothing is deleted."),
+  delete_my_data_description: seeded("Removes everything, private notes too."),
+  data_deleted_reply: seeded("Done, all deleted."),
 };
 
 describe("PlatformSettingsForm", () => {
@@ -460,6 +463,31 @@ describe("PlatformSettingsForm", () => {
     expect(
       await screen.findByLabelText("Conversation quiet gap"),
     ).toBeInTheDocument();
+  });
+
+  it("shows and saves the memory-off line and the Delete my data wording", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const line = await screen.findByLabelText(/“Memory off” line in chat/);
+    const description = screen.getByLabelText(/“Delete my data” description/);
+    const deleted = screen.getByLabelText(/“Data deleted” reply/);
+    expect(line).toHaveValue("Nothing is deleted.");
+    expect(description).toHaveValue("Removes everything, private notes too.");
+    expect(deleted).toHaveValue("Done, all deleted.");
+
+    await user.clear(line);
+    await user.type(line, "Nothing was deleted.");
+    await user.clear(description);
+    await user.type(description, "Removes it all.");
+    await user.clear(deleted);
+    await user.type(deleted, "All gone.");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      memory_off_chat_line: "Nothing was deleted.",
+      delete_my_data_description: "Removes it all.",
+      data_deleted_reply: "All gone.",
+    });
   });
 
   it("shows and saves the Photo Viewing off note and explanation", async () => {

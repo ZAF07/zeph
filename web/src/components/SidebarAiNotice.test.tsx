@@ -22,6 +22,7 @@ describe("SidebarAiNotice", () => {
       photo_viewing_explanation: "",
       onboarding_reason_choices: [],
       message_retention_days: 30,
+      delete_my_data_description: "",
     });
 
     renderWithQueries(<SidebarAiNotice />);

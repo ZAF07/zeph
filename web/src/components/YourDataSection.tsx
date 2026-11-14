@@ -12,11 +12,18 @@ import { useApiClient } from "@/lib/use-api-client";
  * behind a type-DELETE confirmation. After a delete, every page loads its
  * data again.
  *
- * @param props - `retentionDays` is how many days messages are kept, from
+ * @param props - `retentionDays` is how many days messages are kept and
+ *   `deleteMyDataDescription` says what Delete my data removes, both from
  *   platform settings.
  * @returns The section.
  */
-export function YourDataSection({ retentionDays }: { retentionDays: number }) {
+export function YourDataSection({
+  retentionDays,
+  deleteMyDataDescription,
+}: {
+  retentionDays: number;
+  deleteMyDataDescription: string;
+}) {
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
   const [isConfirming, setIsConfirming] = useState(false);
@@ -47,9 +54,7 @@ export function YourDataSection({ retentionDays }: { retentionDays: number }) {
         <span className="flex min-w-0 flex-[1_1_260px] flex-col gap-0.5">
           <span className="font-semibold">Delete my data</span>
           <span className="text-caption text-ink-muted">
-            Removes your messages, memories, Conversation Summaries, Check-in
-            history and Telegram Connection. Your account stays, so you can
-            start fresh.
+            {deleteMyDataDescription}
           </span>
           <span className="text-caption text-blue">
             You can also tell Zeph “delete my data” — it will ask for the

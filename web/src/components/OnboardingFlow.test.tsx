@@ -31,6 +31,7 @@ const content: PlatformContent = {
   photo_viewing_explanation: "Seeded photo explanation.",
   onboarding_reason_choices: ["Being more present", "Relationships"],
   message_retention_days: 30,
+  delete_my_data_description: "",
 };
 
 function newUser(overrides: Partial<Me> = {}): Me {
