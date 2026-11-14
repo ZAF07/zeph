@@ -60,4 +60,5 @@ Users see "What's going on in your life" on the Memories page: each Life Thread'
 ## Completion
 
 - Completed: 2026-11-14
-- Commits: <filled in after merge>
+- Commits: `777a845` (Life Threads on the Memories page: Dashboard API, "What's going on" tab, forget in chat, keeping never brings back a deleted Thread), `a660839` (issue archived with evidence; Memories intro; CONTEXT.md)
+- Merged into main: `47eb24e` (branch `understanding-09-threads-memories-page`, pushed to origin)
