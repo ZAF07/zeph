@@ -107,6 +107,11 @@ conversation_quiet_gap_minutes: 60
 # album photo before answering everything they sent as one Message.
 message_wait_seconds: 4
 
+# The chat channel hides typing after about 5 seconds, so while a reply is
+# being worked on the Companion shows typing again every this many seconds,
+# until the first part of the reply is sent.
+typing_repeat_seconds: 4
+
 # Raw messages older than this many days are deleted on the next scheduler
 # tick. Conversation Summaries and Memory Items stay until the User deletes
 # them.
