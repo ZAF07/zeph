@@ -14,6 +14,7 @@ from companion.core.platform_settings import (
     REPLY_KNOWLEDGE_INTRO,
 )
 from companion.core.ports import Embedder, KnowledgeVectorStore, Repositories
+from companion.core.understanding import format_knowledge_document
 
 logger = logging.getLogger(__name__)
 
@@ -52,25 +53,45 @@ def format_knowledge(
     return intro + "\n\n" + "\n\n".join(passages)
 
 
+def names_for_document(document: KnowledgeDocument) -> set[str]:
+    """List the ways the Understanding may name a document, in lower case.
+
+    The Understanding sees each document as a listed line and sometimes
+    copies part or all of that line instead of just the title.
+
+    Args:
+        document: The document.
+
+    Returns:
+        Its title, and its listed line (without the "- ") with and without
+        the "when it helps" part.
+    """
+    listed_line = format_knowledge_document(document).removeprefix("- ")
+    quoted_with_source = f"“{document.title}” ({document.source}, {document.tradition})"
+    names = {document.title, listed_line, quoted_with_source}
+    return {name.casefold() for name in names}
+
+
 def chosen_documents(
     documents: list[KnowledgeDocument], lookup: KnowledgeLookup
 ) -> list[KnowledgeDocument]:
-    """Find the Ready documents the Understanding chose, by title.
+    """Find the Ready documents the Understanding chose, by name.
 
     Args:
         documents: Every Knowledge document.
         lookup: What the Understanding chose.
 
     Returns:
-        The Ready documents whose title it named, in any case; a title that
-        matches none is ignored.
+        The Ready documents it named by title or by their listed line, in
+        any case and with or without the line's "- "; a name that matches
+        none is ignored.
     """
-    titles = {title.casefold() for title in lookup.documents}
+    named = {name.strip().removeprefix("- ").casefold() for name in lookup.documents}
     return [
         document
         for document in documents
         if document.status == KnowledgeStatus.READY
-        and document.title.casefold() in titles
+        and not named.isdisjoint(names_for_document(document))
     ]
 
 
