@@ -7,8 +7,14 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
-from companion.core.models import ChannelSticker, IncomingMessage, User, UserRole
+from companion.core.models import (
+    ChannelSticker,
+    IncomingMessage,
+    UserRole,
+    UserSnapshot,
+)
 from companion.core.ports import ChatChannel, ChatTool, Repositories, Timer
+from companion.core.reply_tools import ReplyContext, ReplyOffer
 from companion.core.stickers import (
     StickerLibraryService,
     StickerSetNotFoundError,
@@ -168,34 +174,38 @@ class StickerAdding:
         self._modes: dict[UUID, AddingMode] = {}
         self._guard = threading.Lock()
 
-    def tools(self, user: User) -> list[ChatTool]:
+    def offer(self, snapshot: UserSnapshot, context: ReplyContext) -> ReplyOffer:
         """Offer the tool that starts adding mode, to Admins only.
 
         Args:
-            user: The User being replied to.
+            snapshot: The User being replied to.
+            context: What the reply is answering; not needed here.
 
         Returns:
-            The tool for an Admin; none for anyone else.
+            The offer with the tool for an Admin; no tool for anyone else.
         """
+        user = snapshot.user
         if user.role != UserRole.ADMIN:
-            return []
-        return [
-            ChatTool(
-                name=ADDING_TOOL,
-                description=(
-                    "Start adding stickers to the Sticker Library, when this "
-                    "Admin asks to add stickers or sticker sets. Adding is "
-                    "off right now, whatever was said earlier: it ends as "
-                    "soon as they send anything that isn't a sticker. So call "
-                    "this every time they ask, and never tell them to send "
-                    "stickers, or say adding is on, without calling it first. "
-                    "Ask whether they mean single stickers or whole sets only "
-                    "if it isn't clear."
-                ),
-                parameters=ADDING_PARAMETERS,
-                run=lambda arguments: self._start(user.id, arguments),
-            )
-        ]
+            return ReplyOffer(tools=[])
+        return ReplyOffer(
+            tools=[
+                ChatTool(
+                    name=ADDING_TOOL,
+                    description=(
+                        "Start adding stickers to the Sticker Library, when this "
+                        "Admin asks to add stickers or sticker sets. Adding is "
+                        "off right now, whatever was said earlier: it ends as "
+                        "soon as they send anything that isn't a sticker. So call "
+                        "this every time they ask, and never tell them to send "
+                        "stickers, or say adding is on, without calling it first. "
+                        "Ask whether they mean single stickers or whole sets only "
+                        "if it isn't clear."
+                    ),
+                    parameters=ADDING_PARAMETERS,
+                    run=lambda arguments: self._start(user.id, arguments),
+                )
+            ]
+        )
 
     def add_if_adding(self, user_id: UUID, message: IncomingMessage) -> bool:
         """Add a sticker an Admin sent, if they are in adding mode.

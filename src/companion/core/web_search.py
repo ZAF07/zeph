@@ -1,9 +1,9 @@
 import logging
-from dataclasses import dataclass
 from typing import Any
 
 from companion.core.models import Feature, UserSnapshot, WebSearchResult
 from companion.core.ports import ChatTool, Repositories, WebSearch
+from companion.core.reply_tools import ReplyContext, ReplyOffer
 
 logger = logging.getLogger(__name__)
 
@@ -24,21 +24,6 @@ FETCH_PARAMETERS: dict[str, Any] = {
     "properties": {"url": {"type": "string", "description": "The page's address."}},
     "required": ["url"],
 }
-
-
-@dataclass(frozen=True)
-class WebSearchOffer:
-    """The web tools a reply may use, and how the model should use them.
-
-    Attributes:
-        tools: The tools; empty when web search is off or used up for today.
-        instructions: The reply instructions about using the web; the limit
-            note once the Web Search Limit is reached; "" when Web Search
-            doesn't work for the User.
-    """
-
-    tools: list[ChatTool]
-    instructions: str
 
 
 def format_search_results(
@@ -81,7 +66,7 @@ class WebSearchTools:
         self._repositories = repositories
         self._web_search = web_search
 
-    def offer(self, snapshot: UserSnapshot) -> WebSearchOffer:
+    def offer(self, snapshot: UserSnapshot, context: ReplyContext) -> ReplyOffer:
         """Pick the web tools for a reply to a User.
 
         None are offered when Web Search doesn't work for the User, or once
@@ -92,12 +77,13 @@ class WebSearchTools:
 
         Args:
             snapshot: The User being replied to.
+            context: What the reply is answering; not needed here.
 
         Returns:
             The tools and their reply instructions.
         """
         if not snapshot.works(Feature.WEB_SEARCH):
-            return WebSearchOffer(tools=[], instructions="")
+            return ReplyOffer(tools=[])
         settings = self._repositories.platform_settings
         usage = self._repositories.usage
         daily_limit = settings.get("web_search_daily_limit")
@@ -106,7 +92,7 @@ class WebSearchTools:
         source_reminder = settings.get("web_result_source_reminder")
         used_today = usage.count_web_searches(user_id, today)
         if used_today >= daily_limit:
-            return WebSearchOffer(
+            return ReplyOffer(
                 tools=[], instructions=settings.get("reply_web_search_limit_note")
             )
 
@@ -155,7 +141,7 @@ class WebSearchTools:
                 return PAGE_FAILED
             return f"Page {url}:\n\n{text[:MAX_PAGE_CHARACTERS]}\n\n{source_reminder}"
 
-        return WebSearchOffer(
+        return ReplyOffer(
             tools=[
                 ChatTool(
                     name="web_search",

@@ -3,7 +3,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from uuid import UUID
 
-from companion.core.chat_settings import SettingsTools
 from companion.core.features import FeatureService
 from companion.core.models import (
     ChatLine,
@@ -15,12 +14,9 @@ from companion.core.models import (
     SharedPhoto,
     UserSnapshot,
 )
-from companion.core.photos import PhotoTools, SendPhotoTools
 from companion.core.ports import Repositories
-from companion.core.sticker_adding import StickerAdding
-from companion.core.stickers import StickerTools
+from companion.core.reply_tools import ReplyContext, ReplyToolProvider
 from companion.core.usage import UsageRecordingChatModel
-from companion.core.web_search import WebSearchTools
 
 BLANK_LINE = re.compile(r"\n\s*\n")
 DELETION_CANCELLED_NOTE_SETTING = "reply_data_deletion_cancelled_note"
@@ -89,12 +85,7 @@ class ResponseComposer:
         repositories: Repositories,
         chat_model: UsageRecordingChatModel,
         features: FeatureService,
-        web_search_tools: WebSearchTools,
-        settings_tools: SettingsTools,
-        sticker_tools: StickerTools,
-        sticker_adding: StickerAdding,
-        photo_tools: PhotoTools,
-        send_photo_tools: SendPhotoTools,
+        tool_providers: Sequence[ReplyToolProvider],
     ) -> None:
         """Set up the composer.
 
@@ -103,23 +94,13 @@ class ResponseComposer:
             chat_model: Generates the reply and records the tokens used.
             features: Names the Features the User doesn't have, so the
                 reply can say so.
-            web_search_tools: Offers the web tools the reply may call.
-            settings_tools: Offers the tools that change the User's settings.
-            sticker_tools: Offers the Sticker Library to the reply.
-            sticker_adding: Offers Admins the tool to start adding stickers.
-            photo_tools: Offers a look again at the Conversation's photos.
-            send_photo_tools: Offers to send one of the User's Shared Photos
-                back.
+            tool_providers: Offer the tools the reply may call, each for one
+                Feature, in the order the tools are offered.
         """
         self._repositories = repositories
         self._chat_model = chat_model
         self._features = features
-        self._web_search_tools = web_search_tools
-        self._settings_tools = settings_tools
-        self._sticker_tools = sticker_tools
-        self._sticker_adding = sticker_adding
-        self._photo_tools = photo_tools
-        self._send_photo_tools = send_photo_tools
+        self._tool_providers = tool_providers
 
     def compose(
         self,
@@ -134,16 +115,11 @@ class ResponseComposer:
 
         Uses the Persona, response prompt and model from platform settings,
         then what the Companion remembers and the Knowledge that may fit, and
-        gives the model every earlier message in the Conversation. The model
-        may search the web and read pages when web search is offered, change
-        the User's settings when they ask, pick one sticker from their
-        Personal Stickers or the Sticker Library when Stickers works for
-        them, start adding stickers to the Sticker Library when an Admin
-        asks, look again at a photo from the Conversation when its
-        description can't answer, and send back one of the User's Shared
-        Photos that matter for the message. When
-        a Feature doesn't work for the User, the instructions say so, so the
-        reply can tell them plainly.
+        gives the model every earlier message in the Conversation. Each tool
+        provider offers its tools and instructions, and a sticker or Shared
+        Photo a tool picks is sent with the reply. When a Feature doesn't
+        work for the User, the instructions say so, so the reply can tell
+        them plainly.
 
         Args:
             conversation_id: The Conversation to reply in.
@@ -163,24 +139,22 @@ class ResponseComposer:
             EmptyReplyError: If the reply has no text, sticker or photo.
         """
         settings = self._repositories.platform_settings
-        instructions = f"{settings.get('persona')}\n\n{settings.get('response_prompt')}"
-        web_search = self._web_search_tools.offer(snapshot)
-        settings_tools = self._settings_tools.offer(snapshot)
-        sticker_choice = self._sticker_tools.offer(snapshot)
-        photo_tools = self._photo_tools.offer(snapshot, conversation_id)
-        send_photo_choice = self._send_photo_tools.offer(
-            snapshot.user.id, shared_photo_ids
+        context = ReplyContext(
+            conversation_id=conversation_id, shared_photo_ids=tuple(shared_photo_ids)
         )
+        offers = [
+            provider.offer(snapshot, context) for provider in self._tool_providers
+        ]
         cancelled_note = (
             settings.get(DELETION_CANCELLED_NOTE_SETTING)
             if data_deletion_cancelled
             else ""
         )
+        instructions = f"{settings.get('persona')}\n\n{settings.get('response_prompt')}"
         sections = (
             memory,
             knowledge,
-            web_search.instructions,
-            settings_tools.instructions,
+            *(offer.instructions for offer in offers),
             self._features.unavailable_note(snapshot.unavailable_features),
             cancelled_note,
         )
@@ -195,24 +169,18 @@ class ResponseComposer:
             model=settings.get("response_model"),
             instructions=instructions,
             history=history,
-            tools=[
-                *web_search.tools,
-                *settings_tools.tools,
-                *sticker_choice.tools,
-                *self._sticker_adding.tools(snapshot.user),
-                *photo_tools,
-                *send_photo_choice.tools,
-            ],
+            tools=[tool for offer in offers for tool in offer.tools],
         )
         reply_parts = split_into_messages(reply)
-        if (
-            not reply_parts
-            and sticker_choice.picked is None
-            and send_photo_choice.picked is None
-        ):
+        sticker: LibrarySticker | PersonalSticker | None = None
+        shared_photo: SharedPhoto | None = None
+        for offer in offers:
+            if isinstance(offer.picked, SharedPhoto):
+                shared_photo = offer.picked
+            elif offer.picked is not None:
+                sticker = offer.picked
+        if not reply_parts and sticker is None and shared_photo is None:
             raise EmptyReplyError
         return ComposedReply(
-            parts=reply_parts,
-            sticker=sticker_choice.picked,
-            shared_photo=send_photo_choice.picked,
+            parts=reply_parts, sticker=sticker, shared_photo=shared_photo
         )

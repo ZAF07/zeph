@@ -44,3 +44,13 @@ class ReplyOffer:
 ## Blocked by
 
 - `.scratch/architecture/issues/03-user-snapshot.md`
+
+## Comments
+
+### 14 Nov 2026 — plan (branch `arch-05-reply-tool-providers`)
+
+- New `core/reply_tools.py`: `ReplyContext` (conversation ID, Shared Photo IDs), `ReplyOffer` (tools, instructions, `picked`), `Attachment` (sticker or Shared Photo) and the `ReplyToolProvider` protocol.
+- Each of `WebSearchTools`, `SettingsTools`, `StickerTools`, `StickerAdding`, `PhotoTools`, `SendPhotoTools` gets `offer(snapshot, context) -> ReplyOffer`. `WebSearchOffer`, `SettingsOffer`, `StickerChoice`, `SendPhotoChoice` go; the pick tools set `offer.picked` instead.
+- `ResponseComposer(repositories, chat_model, features, tool_providers)`. Order kept: providers listed in `app.py` (the wiring root; the issue says `main.py`) in today's order, so tools and instructions come out the same.
+- Instructions order kept: memory, Knowledge, each offer's instructions, unavailable Features note, deletion-cancelled note.
+- Tests: `tests/test_reply_tools.py` — composer with fake providers; one offer test per provider. Existing end-to-end tests stay as the "no behaviour change" check.

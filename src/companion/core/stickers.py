@@ -13,6 +13,7 @@ from companion.core.models import (
     UserSnapshot,
 )
 from companion.core.ports import ChatChannel, ChatTool, Clock, Repositories
+from companion.core.reply_tools import ReplyContext, ReplyOffer
 
 logger = logging.getLogger(__name__)
 
@@ -230,45 +231,24 @@ class StickerLibraryService:
             return None
 
 
-class StickerChoice:
-    """The sticker tool for one reply, and the sticker it picked.
+def sticker_offer(
+    stickers: list[LibrarySticker | PersonalSticker], description: str
+) -> ReplyOffer:
+    """Offer the sticker tool for one reply; it picks at most one sticker.
 
-    Only stickers with a "when to use" note are offered, and at most one is
-    picked per reply.
+    Args:
+        stickers: The stickers that have a note, the User's own first.
+        description: The Admin-set tool description, put before the list.
+
+    Returns:
+        The offer with the send_sticker tool, which sets `picked` when the
+        model picks a sticker; no tool when no sticker has a note.
     """
+    offer = ReplyOffer(tools=[])
+    if not stickers:
+        return offer
 
-    def __init__(
-        self, stickers: list[LibrarySticker | PersonalSticker], description: str
-    ) -> None:
-        """Set up the choice.
-
-        Args:
-            stickers: The stickers that have a note, the User's own first.
-            description: The Admin-set tool description, put before the list.
-        """
-        self._stickers = stickers
-        self._description = description
-        self.picked: LibrarySticker | PersonalSticker | None = None
-
-    @property
-    def tools(self) -> list[ChatTool]:
-        """The sticker tool, or none when no sticker has a note."""
-        if not self._stickers:
-            return []
-        listed = "\n".join(
-            sticker_tool_line(number, sticker)
-            for number, sticker in enumerate(self._stickers, start=1)
-        )
-        return [
-            ChatTool(
-                name="send_sticker",
-                description=f"{self._description}\n\n{listed}",
-                parameters=STICKER_PARAMETERS,
-                run=self._pick,
-            )
-        ]
-
-    def _pick(self, arguments: dict[str, Any]) -> str:
+    def pick(arguments: dict[str, Any]) -> str:
         """Pick the sticker the model chose, if it is the first one.
 
         Args:
@@ -277,16 +257,30 @@ class StickerChoice:
         Returns:
             What the model is told back.
         """
-        if self.picked is not None:
+        if offer.picked is not None:
             return ALREADY_PICKED
         try:
             number = int(arguments.get("number", 0))
         except (TypeError, ValueError):
             return NO_SUCH_STICKER
-        if not 1 <= number <= len(self._stickers):
+        if not 1 <= number <= len(stickers):
             return NO_SUCH_STICKER
-        self.picked = self._stickers[number - 1]
+        offer.picked = stickers[number - 1]
         return f"Sticker {number} will be sent after your text. Now write your text."
+
+    listed = "\n".join(
+        sticker_tool_line(number, sticker)
+        for number, sticker in enumerate(stickers, start=1)
+    )
+    offer.tools.append(
+        ChatTool(
+            name="send_sticker",
+            description=f"{description}\n\n{listed}",
+            parameters=STICKER_PARAMETERS,
+            run=pick,
+        )
+    )
+    return offer
 
 
 class StickerTools:
@@ -300,20 +294,21 @@ class StickerTools:
         """
         self._repositories = repositories
 
-    def offer(self, snapshot: UserSnapshot) -> StickerChoice:
-        """Start the sticker choice for one reply to a User.
+    def offer(self, snapshot: UserSnapshot, context: ReplyContext) -> ReplyOffer:
+        """Offer the sticker tool for one reply to a User.
 
         Args:
             snapshot: The User being replied to.
+            context: What the reply is answering; not needed here.
 
         Returns:
-            The choice, offering the User's Personal Stickers first, when
+            The offer, listing the User's Personal Stickers first, when
             Personal Stickers works for them, then every Sticker Library
             sticker that has a note and isn't one of theirs; none when
             Stickers doesn't work for the User.
         """
         if not snapshot.works(Feature.STICKERS):
-            return StickerChoice([], "")
+            return ReplyOffer(tools=[])
         theirs = (
             self._repositories.personal_stickers.list_for_user(snapshot.user.id)
             if snapshot.works(Feature.PERSONAL_STICKERS)
@@ -325,7 +320,7 @@ class StickerTools:
             for sticker in self._repositories.stickers.list_all()
             if sticker.note and sticker.file_unique_id not in their_unique_ids
         ]
-        return StickerChoice(
+        return sticker_offer(
             [*theirs, *library],
             self._repositories.platform_settings.get("sticker_tool_description"),
         )
