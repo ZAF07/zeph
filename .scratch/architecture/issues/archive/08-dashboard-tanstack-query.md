@@ -87,5 +87,11 @@ None.
   - Copied load/save/error code removed: `grep -rn "LoadState\|state\.kind ===\|type SaveState" web/src/components web/src/lib` finds none (outside tests). The only `useEffect` that calls `apiClient` is `TelegramConnectionCard` (kept, see Comments). `getMe()` is called only in `useMe`.
   - `pnpm lint` clean, `pnpm format:check` clean, `pnpm typecheck` clean, `pnpm test` 47 files / 330 tests passed.
   - `/run`: Home, Memories, Settings and admin pages load and save; one `/api/me` per page (see Comments).
-- Commits: to be filled in after merge
+- Commits:
+  - 8fb67fd "Dashboard: load and save backend data through TanStack Query"
+  - dbf24f7 "Review fixes: settings saves reload User pages, row actions on useMutation, useImageUrl tests"
+  - c91faee "Knowledge document page: retry and delete on useMutation"
+  - 39b2d75 "Architecture issue 08 done: archive issue with test, run and review evidence"
+  - 9c98110 "ADR 0012: the Dashboard loads and saves backend data through TanStack Query"
+  - b0a27e0 "Merge architecture issue 08: Dashboard loads and saves through TanStack Query" (merged from `arch-08-tanstack-query` into main)
 
