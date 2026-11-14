@@ -483,14 +483,16 @@ def test_the_word_with_another_text_in_one_message_cancels_and_says_why(
         ToolCall("start_deleting_my_data", {}),
         f"Reply {word} to confirm.",
     )
-    before = rows_per_table(engine, user_id, user_data_tables(engine))
+    before = rows_per_table(engine, user_id, tables_a_reply_leaves_alone(engine))
     chat_model.script("Nothing was deleted.")
 
     for text in (word, "bye for good"):
         assert post_to_webhook(client, telegram_text_update(text)) == 200
     timer.end_message_waits()
 
-    assert rows_per_table(engine, user_id, user_data_tables(engine)) == before
+    assert (
+        rows_per_table(engine, user_id, tables_a_reply_leaves_alone(engine)) == before
+    )
     instructions = chat_model.calls[-1].instructions
     assert seeded_settings["reply_data_deletion_word_not_alone_note"] in instructions
     assert seeded_settings["reply_data_deletion_cancelled_note"] not in instructions
