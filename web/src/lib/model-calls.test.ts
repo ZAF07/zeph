@@ -11,6 +11,7 @@ import {
 describe("model call labels", () => {
   it("names steps and trace kinds in plain words", () => {
     expect(modelStepLabel("understanding")).toBe("Understanding");
+    expect(modelStepLabel("life_threads")).toBe("Life Threads");
     expect(traceKindLabel("conversation_end")).toBe("Conversation end");
   });
 

@@ -29,6 +29,7 @@ const ren: AdminUser = {
   telegram_connected: true,
   conversation_count: 3,
   messages_sent: 20,
+  life_thread_count: 0,
 };
 
 const webSearch: UserFeatureStatus = {

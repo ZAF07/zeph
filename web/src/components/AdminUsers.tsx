@@ -213,6 +213,7 @@ export function AdminUsers() {
                     "Telegram",
                     "Conversations",
                     "Messages sent",
+                    "Life Threads",
                     "Role",
                   ].map((heading) => (
                     <th
@@ -220,7 +221,8 @@ export function AdminUsers() {
                       scope="col"
                       className={`whitespace-nowrap border-b border-line bg-subtle px-[18px] py-3.5 font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted ${
                         heading === "Conversations" ||
-                        heading === "Messages sent"
+                        heading === "Messages sent" ||
+                        heading === "Life Threads"
                           ? "text-right"
                           : "text-left"
                       }`}
@@ -274,6 +276,9 @@ export function AdminUsers() {
                       </td>
                       <td className="px-[18px] py-3.5 text-right tabular-nums">
                         {user.messages_sent}
+                      </td>
+                      <td className="px-[18px] py-3.5 text-right tabular-nums">
+                        {user.life_thread_count}
                       </td>
                       <td className="px-[18px] py-3.5">
                         <span

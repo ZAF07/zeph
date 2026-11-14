@@ -34,6 +34,9 @@ const settings: AdminSettings = {
   message_retention_days: seeded(30),
   older_summaries_per_reply: seeded(3),
   older_summaries_closeness_percent: seeded(68),
+  life_threads_per_reply: seeded(3),
+  life_threads_closeness_percent: seeded(68),
+  life_thread_brushed_off_wait_days: seeded(14),
   photo_retry_count: seeded(2),
   photo_album_max_photos: seeded(5),
   personal_stickers_limit: seeded(30),
@@ -175,6 +178,31 @@ describe("PlatformSettingsForm", () => {
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       older_summaries_per_reply: 5,
       older_summaries_closeness_percent: 72,
+    });
+  });
+
+  it("shows and saves the Life Thread number, closeness bar and wait", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const most = await screen.findByLabelText("Most Life Threads per reply");
+    const bar = screen.getByLabelText("Life Thread closeness bar");
+    const wait = screen.getByLabelText("Wait after a brushed-off Life Thread");
+    expect(most).toHaveValue(3);
+    expect(bar).toHaveValue(68);
+    expect(wait).toHaveValue(14);
+
+    await user.clear(most);
+    await user.type(most, "2");
+    await user.clear(bar);
+    await user.type(bar, "70");
+    await user.clear(wait);
+    await user.type(wait, "21");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      life_threads_per_reply: 2,
+      life_threads_closeness_percent: 70,
+      life_thread_brushed_off_wait_days: 21,
     });
   });
 

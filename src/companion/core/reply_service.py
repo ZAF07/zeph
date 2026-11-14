@@ -1,5 +1,6 @@
 from companion.core.conversations import ConversationService
 from companion.core.knowledge_retrieval import KnowledgeRetrieval
+from companion.core.life_threads import ThreadReminder
 from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.models import MessageToAnswer, UserSnapshot
 from companion.core.reply_gate import ReplyGate, Stopped
@@ -11,17 +12,21 @@ class ReplyService:
     """Answers a connected User's Message, one step after another (ADR-0009).
 
     The steps run in this order: the ReplyGate applies the house rules left
-    once the Message's texts are saved and checked, then the Understanding
-    works out what the User needs and which User Memory matters, then that
-    memory, any older Conversations it asked to look up and the Knowledge
-    that may fit are recalled, then the reply is composed and delivered.
-    Every step reads the User from the same snapshot.
+    once the Message's texts are saved and checked, then the Companion is
+    reminded of the User's Life Threads the Message touches, then the
+    Understanding works out what the User needs, which User Memory matters
+    and which Threads to bring up or leave alone, then that memory, any
+    older Conversations it asked to look up and the Knowledge that may fit
+    are recalled, then the reply is composed and delivered, and the Threads
+    it brought up are marked raised. Every step reads the User from the
+    same snapshot.
     """
 
     def __init__(
         self,
         reply_gate: ReplyGate,
         conversations: ConversationService,
+        thread_reminder: ThreadReminder,
         understanding: UnderstandingService,
         memory_retrieval: MemoryRetrieval,
         knowledge_retrieval: KnowledgeRetrieval,
@@ -32,6 +37,8 @@ class ReplyService:
         Args:
             reply_gate: Applies the house rules to each Message.
             conversations: Sends composed replies.
+            thread_reminder: Finds the Life Threads each Message touches and
+                marks those brought up.
             understanding: Works out what the User needs before each reply.
             memory_retrieval: Reads the User Memory and picks out what the
                 Understanding chose.
@@ -40,6 +47,7 @@ class ReplyService:
         """
         self._reply_gate = reply_gate
         self._conversations = conversations
+        self._thread_reminder = thread_reminder
         self._understanding = understanding
         self._memory_retrieval = memory_retrieval
         self._knowledge_retrieval = knowledge_retrieval
@@ -60,8 +68,9 @@ class ReplyService:
         if isinstance(gate_result, Stopped):
             return
         saved_memory = self._memory_retrieval.read(snapshot)
+        reminded = self._thread_reminder.remind(snapshot, message.conversation_id)
         understood = self._understanding.understand(
-            snapshot, message.conversation_id, saved_memory
+            snapshot, message.conversation_id, saved_memory, reminded
         )
         form = understood.understanding.form
         memory = self._memory_retrieval.recall(
@@ -86,3 +95,4 @@ class ReplyService:
             reply.sticker.id if reply.sticker else None,
             reply.shared_photo.id if reply.shared_photo else None,
         )
+        self._thread_reminder.mark_raised(message.conversation_id, form.bring_up)

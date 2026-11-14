@@ -1,13 +1,19 @@
 import json
 import logging
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from companion.core.life_threads import (
+    RemindedThread,
+    describe_reminded_threads,
+    format_threads_for_reply,
+)
 from companion.core.memory_retrieval import SavedMemory, format_day
 from companion.core.models import (
+    BringUpWay,
     ChatLine,
     ChatRole,
     ConversationMessage,
@@ -15,6 +21,8 @@ from companion.core.models import (
     ModelStep,
     MoodIntensity,
     Need,
+    ThreadLeftAlone,
+    ThreadToBringUp,
     Understanding,
     UnderstandingForm,
     UserSnapshot,
@@ -31,14 +39,7 @@ from companion.core.usage import UsageRecordingChatModel
 
 logger = logging.getLogger(__name__)
 
-LIST_FIELDS = (
-    "memory_categories",
-    "bring_up",
-    "left_alone",
-    "look_up_past",
-    "knowledge",
-    "threads_touched",
-)
+LIST_FIELDS = ("memory_categories", "look_up_past", "knowledge")
 
 
 @dataclass(frozen=True)
@@ -48,8 +49,8 @@ class UnderstoodMessage:
     Attributes:
         understanding: The Understanding, as saved.
         reply_guidance: The section of the reply instructions it adds: the
-            Need's "how to reply", the nuance and mood, and the "ask why"
-            note when it applies.
+            Need's "how to reply", the nuance and mood, the "ask why" note
+            when it applies, and the Life Threads to bring up or leave alone.
     """
 
     understanding: Understanding
@@ -95,6 +96,7 @@ def describe_message_for_understanding(
     saved: SavedMemory,
     earlier: Sequence[Understanding],
     messages: list[ConversationMessage],
+    reminded: Sequence[RemindedThread],
 ) -> str:
     """Write what the Understanding model is given about the Message.
 
@@ -105,10 +107,12 @@ def describe_message_for_understanding(
         earlier: This Conversation's earlier Understandings, oldest first.
         messages: The Conversation so far, oldest first; the User's messages
             at the end are the Message being answered.
+        reminded: The Life Threads the Message reminds the Companion of.
 
     Returns:
         The time, Needs, Goals, Memory Categories, recent Conversations,
-        earlier Understandings, earlier Conversation and latest message.
+        reminded Life Threads, earlier Understandings, earlier Conversation
+        and latest message.
     """
     fallback = fallback_need(needs)
     need_lines = "\n".join(f"- {need.name}: {need.when_it_fits}" for need in needs)
@@ -133,6 +137,8 @@ def describe_message_for_understanding(
         f"Their Goals:\n{goal_lines or 'None saved.'}\n\n"
         f"Memory Categories with something saved:\n{category_lines or 'None yet.'}"
         f"\n\nRecent Conversations, newest first:\n{summary_lines or 'None yet.'}"
+        f"\n\nLife Threads this reminds you of, open ones first:\n"
+        f"{describe_reminded_threads(reminded, snapshot.user.time_zone)}"
         f"\n\nEarlier Understandings in this Conversation, oldest first:\n"
         f"{earlier_lines or 'None yet.'}\n\n"
         f"Earlier in the Conversation:\n"
@@ -157,15 +163,154 @@ def read_text_list(value: Any) -> tuple[str, ...]:
     )
 
 
-def read_understanding_form(answer: str) -> UnderstandingForm | None:
+def read_thread(
+    value: Any, by_number: dict[int, RemindedThread]
+) -> RemindedThread | None:
+    """Find the reminded Thread a number in the form names.
+
+    Args:
+        value: The number, as the model wrote it.
+        by_number: The reminded Threads, by number.
+
+    Returns:
+        The Thread; None if the value isn't one of their numbers.
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return by_number.get(value)
+
+
+def read_threads_touched(
+    value: Any, by_number: dict[int, RemindedThread]
+) -> tuple[str, ...]:
+    """Read the Threads the form says the Message touches.
+
+    Args:
+        value: The field's value: a list of Thread numbers.
+        by_number: The reminded Threads, by number.
+
+    Returns:
+        Their titles, each once; unknown numbers are skipped.
+    """
+    if not isinstance(value, list):
+        return ()
+    found = (read_thread(number, by_number) for number in value)
+    return tuple(dict.fromkeys(item.thread.title for item in found if item))
+
+
+def read_bring_up(
+    value: Any, by_number: dict[int, RemindedThread]
+) -> tuple[ThreadToBringUp, ...]:
+    """Read the Threads the form says to bring up, and how.
+
+    Args:
+        value: The field's value: a list of {"thread", "how"} entries.
+        by_number: The reminded Threads, by number.
+
+    Returns:
+        The Threads, each once; an unknown number is skipped and an odd
+        "how" reads as weaving it in.
+    """
+    if not isinstance(value, list):
+        return ()
+    chosen: dict[UUID, ThreadToBringUp] = {}
+    for entry in value:
+        if not isinstance(entry, dict):
+            continue
+        item = read_thread(entry.get("thread"), by_number)
+        if item is None or item.thread.id in chosen:
+            continue
+        how = entry.get("how")
+        chosen[item.thread.id] = ThreadToBringUp(
+            thread_id=item.thread.id,
+            title=item.thread.title,
+            how=(
+                BringUpWay(how)
+                if how in {way.value for way in BringUpWay}
+                else BringUpWay.WEAVE
+            ),
+        )
+    return tuple(chosen.values())
+
+
+def read_left_alone(
+    value: Any, by_number: dict[int, RemindedThread]
+) -> tuple[ThreadLeftAlone, ...]:
+    """Read the Threads the form says to leave alone, and why.
+
+    Args:
+        value: The field's value: a list of {"thread", "reason"} entries.
+        by_number: The reminded Threads, by number.
+
+    Returns:
+        The Threads, each once; an unknown number is skipped.
+    """
+    if not isinstance(value, list):
+        return ()
+    chosen: dict[UUID, ThreadLeftAlone] = {}
+    for entry in value:
+        if not isinstance(entry, dict):
+            continue
+        item = read_thread(entry.get("thread"), by_number)
+        if item is None or item.thread.id in chosen:
+            continue
+        reason = entry.get("reason")
+        chosen[item.thread.id] = ThreadLeftAlone(
+            thread_id=item.thread.id,
+            title=item.thread.title,
+            reason=reason.strip() if isinstance(reason, str) else "",
+        )
+    return tuple(chosen.values())
+
+
+def keep_held_back_threads_alone(
+    form: UnderstandingForm, reminded: Sequence[RemindedThread]
+) -> UnderstandingForm:
+    """Make sure the form brings up no Thread that must be left alone.
+
+    A held-back Thread the form chose to bring up is left alone instead,
+    with the reason it is held back. One the form chose both to bring up and
+    to leave alone is left alone.
+
+    Args:
+        form: The form, as read.
+        reminded: The reminded Threads, with why any is held back.
+
+    Returns:
+        The form, bringing up only Threads that may be.
+    """
+    held_back = {item.thread.id: item.hold_back for item in reminded if item.hold_back}
+    left_alone_ids = {item.thread_id for item in form.left_alone}
+    newly_left_alone = tuple(
+        ThreadLeftAlone(item.thread_id, item.title, held_back[item.thread_id])
+        for item in form.bring_up
+        if item.thread_id in held_back and item.thread_id not in left_alone_ids
+    )
+    return replace(
+        form,
+        bring_up=tuple(
+            item
+            for item in form.bring_up
+            if item.thread_id not in held_back and item.thread_id not in left_alone_ids
+        ),
+        left_alone=form.left_alone + newly_left_alone,
+    )
+
+
+def read_understanding_form(
+    answer: str, reminded: Sequence[RemindedThread]
+) -> UnderstandingForm | None:
     """Read the Understanding model's JSON form.
 
     Text around the JSON object, such as a code fence, is ignored. A missing
     or odd mood, intensity or cause reads as an unclear, low mood whose
-    cause is known, so it never makes the reply ask why.
+    cause is known, so it never makes the reply ask why. Life Threads are
+    named by their numbers in the reminded list; no held-back Thread is
+    ever brought up.
 
     Args:
         answer: The model's answer.
+        reminded: The Life Threads the model was shown, numbered.
 
     Returns:
         The form, or None if it has no JSON object naming a Need.
@@ -186,7 +331,8 @@ def read_understanding_form(answer: str) -> UnderstandingForm | None:
     intensity = parsed.get("intensity")
     cause_known = parsed.get("cause_known")
     lists = {field: read_text_list(parsed.get(field)) for field in LIST_FIELDS}
-    return UnderstandingForm(
+    by_number = {item.number: item for item in reminded}
+    form = UnderstandingForm(
         need=need.strip(),
         nuance=nuance.strip() if isinstance(nuance, str) else "",
         mood=mood.strip() if isinstance(mood, str) else "",
@@ -196,8 +342,12 @@ def read_understanding_form(answer: str) -> UnderstandingForm | None:
             else MoodIntensity.LOW
         ),
         cause_known=cause_known if isinstance(cause_known, bool) else True,
+        bring_up=read_bring_up(parsed.get("bring_up"), by_number),
+        left_alone=read_left_alone(parsed.get("left_alone"), by_number),
+        threads_touched=read_threads_touched(parsed.get("threads_touched"), by_number),
         **lists,
     )
+    return keep_held_back_threads_alone(form, reminded)
 
 
 def fallback_form(fallback: Need) -> UnderstandingForm:
@@ -268,7 +418,7 @@ def should_ask_why(form: UnderstandingForm, earlier: Sequence[Understanding]) ->
 
 
 def format_reply_guidance(
-    need: Need, form: UnderstandingForm, ask_why_note: str
+    need: Need, form: UnderstandingForm, ask_why_note: str, threads_section: str
 ) -> str:
     """Write the Understanding's section of the reply instructions.
 
@@ -276,9 +426,12 @@ def format_reply_guidance(
         need: The Need the reply follows.
         form: This Message's form.
         ask_why_note: The "ask why" note; "" when the reply shouldn't ask.
+        threads_section: The Life Threads to bring up or leave alone; "" if
+            none matter.
 
     Returns:
-        The Need and how to reply, the nuance, the mood and the note.
+        The Need and how to reply, the nuance, the mood, the note and the
+        Life Threads.
     """
     lines = [f"What they need from you right now: {need.name}.", need.how_to_reply]
     if form.nuance:
@@ -287,7 +440,8 @@ def format_reply_guidance(
         lines.append(f"How they seem: {form.mood} ({form.intensity.value}).")
     if ask_why_note:
         lines.append(ask_why_note)
-    return "\n".join(lines)
+    guidance = "\n".join(lines)
+    return f"{guidance}\n\n{threads_section}" if threads_section else guidance
 
 
 def newest_incoming_message_id(messages: list[ConversationMessage]) -> UUID:
@@ -336,18 +490,24 @@ class UnderstandingService:
         self._clock = clock
 
     def understand(
-        self, snapshot: UserSnapshot, conversation_id: UUID, saved: SavedMemory
+        self,
+        snapshot: UserSnapshot,
+        conversation_id: UUID,
+        saved: SavedMemory,
+        reminded: Sequence[RemindedThread],
     ) -> UnderstoodMessage:
         """Make and save the Understanding of the Conversation's newest Message.
 
         An unknown Need falls back to the fallback Need; an unreadable form
         or a failed call falls back to the fallback Need with no mood and no
-        Memory Categories, so the reply still goes.
+        Memory Categories, so the reply still goes, with every reminded Life
+        Thread that isn't held back but none brought up.
 
         Args:
             snapshot: The User being answered.
             conversation_id: The Conversation the Message is in.
             saved: The User's saved memory, read for this reply.
+            reminded: The Life Threads the Message reminds the Companion of.
 
         Returns:
             The saved Understanding and what it adds to the reply.
@@ -357,16 +517,18 @@ class UnderstandingService:
         earlier = self._repositories.understandings.list_for_conversation(
             conversation_id
         )
-        form = self._ask(
+        read_form = self._ask(
             snapshot,
             describe_message_for_understanding(
-                snapshot, needs, saved, earlier, messages
+                snapshot, needs, saved, earlier, messages, reminded
             ),
+            reminded,
         )
-        if form is None:
+        if read_form is None:
             need = fallback_need(needs)
             form = fallback_form(need)
         else:
+            form = read_form
             need = find_need(needs, form.need)
         asked_why = should_ask_why(form, earlier)
         understanding = Understanding(
@@ -383,17 +545,26 @@ class UnderstandingService:
         ask_why_note = snapshot.settings.get(REPLY_ASK_WHY_NOTE) if asked_why else ""
         return UnderstoodMessage(
             understanding=understanding,
-            reply_guidance=format_reply_guidance(need, form, ask_why_note),
+            reply_guidance=format_reply_guidance(
+                need,
+                form,
+                ask_why_note,
+                format_threads_for_reply(reminded, read_form, snapshot.user.time_zone),
+            ),
         )
 
     def _ask(
-        self, snapshot: UserSnapshot, description: str
+        self,
+        snapshot: UserSnapshot,
+        description: str,
+        reminded: Sequence[RemindedThread],
     ) -> UnderstandingForm | None:
         """Ask the model to fill in the form.
 
         Args:
             snapshot: The User being answered.
             description: What the model is given about the Message.
+            reminded: The Life Threads it was shown, numbered.
 
         Returns:
             The form; None if the call failed or the answer can't be read.
@@ -410,7 +581,7 @@ class UnderstandingService:
         except Exception:
             logger.exception("The Understanding call failed; using the fallback Need")
             return None
-        form = read_understanding_form(answer)
+        form = read_understanding_form(answer, reminded)
         if form is None:
             logger.warning(
                 "The Understanding form couldn't be read; using the fallback Need"

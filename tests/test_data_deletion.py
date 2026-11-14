@@ -57,8 +57,8 @@ def set_up_user_with_every_kind_of_data(
 ) -> tuple[dict[str, str], str]:
     """Give a User messages, User Memory, a Check-in and a Telegram Connection.
 
-    Their User Memory holds a Memory Item, a Conversation Summary and a
-    Shared Photo, and they have a Personal Sticker.
+    Their User Memory holds a Memory Item, a Conversation Summary, a Shared
+    Photo and a Life Thread, and they have a Personal Sticker.
 
     Returns:
         Their Dashboard API headers and their User ID.
@@ -74,6 +74,15 @@ def set_up_user_with_every_kind_of_data(
     send_to_webhook(client, telegram_sticker_update("😂", "laugh"))
     chat_model.script_sticker_keeping(
         json.dumps({"stickers_to_keep": [{"sticker": 1, "note": "For a happy moment"}]})
+    )
+    chat_model.script_thread_keeping(
+        json.dumps(
+            {
+                "threads": [
+                    {"title": "New job", "story": "Started.", "people": ["design"]}
+                ]
+            }
+        )
     )
     have_conversation(
         client,

@@ -1,6 +1,6 @@
 # 08 — Life Threads and being reminded
 
-Status: ready-for-agent
+Status: in-progress
 
 ## Parent
 
@@ -32,3 +32,14 @@ The heart of the feature. "My sister's wedding is next week" can bring back a fa
 ## Blocked by
 
 - `.scratch/understanding/issues/04-understanding-call-with-seeded-needs.md`
+
+## Comments
+
+- Branch `understanding-08-life-threads`, worktree `ai-chat-companion-understanding-08` (ports 3220/8220/5652).
+- Plan:
+  - New `life_threads` table (migration 0030): title, story, people or things (plus lower-case name keys for matching), open or settled, last raised at and in which Conversation, last reaction, embedding.
+  - Being reminded: one SQL query per Message finds the User's Threads whose people or things appear in the last 3 User texts, or whose story is close in meaning to them (above the bar). Open first, then name matches, then closest; up to the Admin number.
+  - The Understanding sees the Threads numbered, with when each was last raised, the reaction, and a "don't bring it up" note when held back. The code also drops any bring-up of a held-back Thread.
+  - The reply gets the stories that matter, what to bring up and how, and what to leave alone. Brought-up Threads are marked raised after the reply is sent.
+  - Conversation end: a separate "Life Thread keeping" model call (own Admin prompt and model) adds and updates Threads and records reactions; skipped while User Memory doesn't work.
+  - Settings: `life_threads_per_reply`, `life_threads_closeness_percent`, `life_thread_brushed_off_wait_days`. Admin Users page shows a Life Threads count.
