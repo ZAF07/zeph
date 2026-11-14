@@ -76,4 +76,5 @@ class ReplyOffer:
   - `tests/test_reply_tools.py`: 3 composer tests with fake providers (tools and instructions in order, the context passed, picks become the sticker or Shared Photo, empty reply), 6 offer tests (one per provider).
   - `pytest` 628 passed (619 before, plus 9 new; 9 evals deselected); `ruff check .` clean; `ruff format --check` clean on code; `mypy` no issues in 101 files.
   - `/run`: web search, sticker and Shared Photo replies all worked in the real app, see Comments.
-- Commits: 60f1ff3 "Give the reply tools one interface", ffd9696 "Review fixes: write empty offers as ReplyOffer(), docstring the test pick tool"
+- Commits: 60f1ff3 "Give the reply tools one interface", ffd9696 "Review fixes: write empty offers as ReplyOffer(), docstring the test pick tool", archive 92ad558 "Architecture issue 05 done: archive issue with test, run and review evidence" (merged from `arch-05-reply-tool-providers` in 365fe56 "Merge architecture issue 05: give the reply tools one interface")
+- Checks on main after the merge: `pytest` 628 passed, `ruff check`, `ruff format --check` and `mypy` clean.
