@@ -1,18 +1,26 @@
 from uuid import UUID
 
+from companion.core.errors import ConflictError, NotFoundError
 from companion.core.models import User, UserOverview, UserRole
 from companion.core.ports import Repositories, Transaction
 
+LAST_ADMIN_DEMOTION = "This is the last Admin. Make someone else an Admin first."
 
-class UserNotFoundError(LookupError):
+
+class UserNotFoundError(NotFoundError):
     """Raised when no User has the given ID."""
 
-
-class LastAdminError(Exception):
-    """Raised when a change would leave the platform without an Admin."""
+    shown_message = "No such User"
 
 
-def refuse_if_last_admin(transaction: Transaction, user_id: UUID) -> None:
+class LastAdminError(ConflictError):
+    """Raised when a change would leave the platform without an Admin.
+
+    It is raised with the text that tells the Admin what to do instead.
+    """
+
+
+def refuse_if_last_admin(transaction: Transaction, user_id: UUID, refusal: str) -> None:
     """Make sure a User can stop being an Admin without leaving none.
 
     The Admins stay locked until the transaction ends, so two Admins removing
@@ -22,12 +30,13 @@ def refuse_if_last_admin(transaction: Transaction, user_id: UUID) -> None:
     Args:
         transaction: The transaction the change runs in.
         user_id: The User about to stop being an Admin.
+        refusal: What to tell them if they are the only Admin.
 
     Raises:
         LastAdminError: If they are the only Admin.
     """
     if transaction.lock_admins() == [user_id]:
-        raise LastAdminError
+        raise LastAdminError(refusal)
 
 
 class AdminUserService:
@@ -74,5 +83,5 @@ class AdminUserService:
         if role == UserRole.ADMIN:
             return self._repositories.users.promote_to_admin(user_id)
         with self._repositories.transaction() as transaction:
-            refuse_if_last_admin(transaction, user_id)
+            refuse_if_last_admin(transaction, user_id, LAST_ADMIN_DEMOTION)
             return transaction.repositories.users.demote_to_user(user_id)

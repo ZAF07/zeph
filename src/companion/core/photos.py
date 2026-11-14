@@ -4,6 +4,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 from uuid import UUID
 
+from companion.core.errors import NotFoundError
 from companion.core.models import (
     ChannelPhoto,
     Feature,
@@ -52,8 +53,10 @@ PHOTO_ALREADY_PICKED = (
 )
 
 
-class SharedPhotoNotFoundError(LookupError):
+class SharedPhotoNotFoundError(NotFoundError):
     """Raised when a User has no Shared Photo with that ID."""
+
+    shown_message = "Shared Photo not found"
 
 
 ASK_ABOUT_PHOTO_PARAMETERS: dict[str, Any] = {

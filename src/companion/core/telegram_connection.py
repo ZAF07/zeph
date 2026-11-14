@@ -2,6 +2,7 @@ import secrets
 from dataclasses import dataclass
 from uuid import UUID
 
+from companion.core.errors import ConflictError
 from companion.core.models import (
     ConnectionToken,
     ConnectionTokenStatus,
@@ -23,7 +24,7 @@ TOKEN_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 START_COMMAND = "/start"
 
 
-class OnboardingNotFinishedError(Exception):
+class OnboardingNotFinishedError(ConflictError):
     """Raised when a User who hasn't finished onboarding asks to connect Telegram."""
 
     def __init__(self) -> None:

@@ -16,40 +16,20 @@ from fastapi import (
 )
 from pydantic import BaseModel, StrictBool
 
-from companion.core.admin_users import (
-    AdminUserService,
-    LastAdminError,
-    UserNotFoundError,
-)
-from companion.core.check_in_kinds import (
-    CheckInKindNotFoundError,
-    CheckInKindService,
-    InvalidCheckInKindError,
-)
+from companion.core.admin_users import AdminUserService
+from companion.core.check_in_kinds import CheckInKindService
 from companion.core.check_ins import CheckInService, LoggedCheckIn
 from companion.core.features import FeatureService, feature_details
 from companion.core.helplines import (
-    FallbackHelplineError,
-    HelplineNotFoundError,
     HelplineService,
-    InvalidHelplineError,
     MoveDirection,
 )
 from companion.core.knowledge import (
     MAX_UPLOAD_BYTES,
-    InvalidKnowledgeDocumentError,
-    KnowledgeDocumentNotFoundError,
-    KnowledgeFileStillBeingReadError,
-    KnowledgeNotRetryableError,
     KnowledgeService,
     knowledge_file_type,
 )
-from companion.core.memory_categories import (
-    InvalidMemoryCategoryError,
-    MemoryCategoryNotFoundError,
-    MemoryCategoryService,
-    RequiredMemoryCategoryError,
-)
+from companion.core.memory_categories import MemoryCategoryService
 from companion.core.models import (
     CheckInKind,
     CheckInKindDetails,
@@ -83,17 +63,10 @@ from companion.core.personal_stickers import PersonalStickerService
 from companion.core.platform_settings import (
     CORE_SERVICES,
     EDITABLE_SETTINGS_BY_KEY,
-    InvalidSettingError,
     PlatformSettingsService,
 )
-from companion.core.safeguard import InvalidEventFilterError, Safeguard
-from companion.core.stickers import (
-    InvalidStickerError,
-    StickerLibraryService,
-    StickerNotFoundError,
-    StickerSetNotFoundError,
-    StickerSetUnavailableError,
-)
+from companion.core.safeguard import Safeguard
+from companion.core.stickers import StickerLibraryService
 from companion.core.usage import UsageLimiter
 
 
@@ -842,18 +815,10 @@ def build_admin_api_router(
             The User's role after the change.
 
         Raises:
-            HTTPException: 404 if there is no such User; 409 if they are the
+            CoreError: 404 if there is no such User; 409 if they are the
                 last Admin and would be demoted.
         """
-        try:
-            user = admin_user_service.change_role(user_id, request.role)
-        except UserNotFoundError as error:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "No such User") from error
-        except LastAdminError as error:
-            raise HTTPException(
-                status.HTTP_409_CONFLICT,
-                "This is the last Admin. Make someone else an Admin first.",
-            ) from error
+        user = admin_user_service.change_role(user_id, request.role)
         return RoleResponse(id=str(user.id), role=user.role)
 
     @router.get("/users/{user_id}/features")
@@ -868,12 +833,9 @@ def build_admin_api_router(
             Stickers they have.
 
         Raises:
-            HTTPException: 404 if there is no such User.
+            CoreError: 404 if there is no such User.
         """
-        try:
-            statuses = feature_service.statuses_for(user_id)
-        except UserNotFoundError as error:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "No such User") from error
+        statuses = feature_service.statuses_for(user_id)
         return UserFeaturesResponse(
             features=[
                 to_user_feature_response(feature_status) for feature_status in statuses
@@ -900,14 +862,11 @@ def build_admin_api_router(
             The Feature's status for the User after the change.
 
         Raises:
-            HTTPException: 404 if there is no such User.
+            CoreError: 404 if there is no such User.
         """
-        try:
-            feature_status = feature_service.set_for_user(
-                user_id, feature, request.switch, admin
-            )
-        except UserNotFoundError as error:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "No such User") from error
+        feature_status = feature_service.set_for_user(
+            user_id, feature, request.switch, admin
+        )
         return to_user_feature_response(feature_status)
 
     @router.get("/features")
@@ -968,15 +927,10 @@ def build_admin_api_router(
             Every editable setting after the change.
 
         Raises:
-            HTTPException: 422 if a key may not be changed or a value is not
+            CoreError: 422 if a key may not be changed or a value is not
                 valid.
         """
-        try:
-            saved = platform_settings_service.update(admin, request.values)
-        except InvalidSettingError as error:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
-            ) from error
+        saved = platform_settings_service.update(admin, request.values)
         return to_settings_response(saved)
 
     @router.get("/core-services")
@@ -1042,14 +996,9 @@ def build_admin_api_router(
             The saved Helpline.
 
         Raises:
-            HTTPException: 422 if the country or details are not valid.
+            CoreError: 422 if the country or details are not valid.
         """
-        try:
-            helpline = helpline_service.add(request.country, request.to_details())
-        except InvalidHelplineError as error:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
-            ) from error
+        helpline = helpline_service.add(request.country, request.to_details())
         return to_helpline_response(helpline)
 
     @router.put("/helplines/international-fallback")
@@ -1065,16 +1014,9 @@ def build_admin_api_router(
             The saved fallback.
 
         Raises:
-            HTTPException: 422 if the details are not valid.
+            CoreError: 422 if the details are not valid.
         """
-        try:
-            fallback = helpline_service.update_international_fallback(
-                request.to_details()
-            )
-        except InvalidHelplineError as error:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
-            ) from error
+        fallback = helpline_service.update_international_fallback(request.to_details())
         return to_helpline_response(fallback)
 
     @router.put("/helplines/{helpline_id}")
@@ -1091,21 +1033,12 @@ def build_admin_api_router(
             The saved Helpline.
 
         Raises:
-            HTTPException: 404 if there is no such Helpline; 422 if the country
+            CoreError: 404 if there is no such Helpline; 422 if the country
                 or details are not valid.
         """
-        try:
-            helpline = helpline_service.update(
-                helpline_id, request.country, request.to_details()
-            )
-        except HelplineNotFoundError as error:
-            raise HTTPException(
-                status.HTTP_404_NOT_FOUND, "No such Helpline"
-            ) from error
-        except InvalidHelplineError as error:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
-            ) from error
+        helpline = helpline_service.update(
+            helpline_id, request.country, request.to_details()
+        )
         return to_helpline_response(helpline)
 
     @router.delete("/helplines/{helpline_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -1119,20 +1052,10 @@ def build_admin_api_router(
             An empty response.
 
         Raises:
-            HTTPException: 404 if there is no such Helpline; 409 if it is the
+            CoreError: 404 if there is no such Helpline; 409 if it is the
                 international fallback.
         """
-        try:
-            helpline_service.delete(helpline_id)
-        except HelplineNotFoundError as error:
-            raise HTTPException(
-                status.HTTP_404_NOT_FOUND, "No such Helpline"
-            ) from error
-        except FallbackHelplineError as error:
-            raise HTTPException(
-                status.HTTP_409_CONFLICT,
-                "The international fallback can't be removed, only edited.",
-            ) from error
+        helpline_service.delete(helpline_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @router.post("/helplines/{helpline_id}/move")
@@ -1149,14 +1072,9 @@ def build_admin_api_router(
             Its country's Helplines in their new order.
 
         Raises:
-            HTTPException: 404 if there is no such country Helpline.
+            CoreError: 404 if there is no such country Helpline.
         """
-        try:
-            helplines = helpline_service.move(helpline_id, request.direction)
-        except HelplineNotFoundError as error:
-            raise HTTPException(
-                status.HTTP_404_NOT_FOUND, "No such Helpline"
-            ) from error
+        helplines = helpline_service.move(helpline_id, request.direction)
         return CountryHelplinesResponse(
             helplines=[to_helpline_response(helpline) for helpline in helplines]
         )
@@ -1177,14 +1095,9 @@ def build_admin_api_router(
             The events with who each User is.
 
         Raises:
-            HTTPException: 422 if `risk_type` is "none".
+            CoreError: 422 if `risk_type` is "none".
         """
-        try:
-            overviews = safeguard.list_events(days, risk_type)
-        except InvalidEventFilterError as error:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
-            ) from error
+        overviews = safeguard.list_events(days, risk_type)
         return SafeguardEventsResponse(
             events=[to_safeguard_event_response(overview) for overview in overviews]
         )
@@ -1217,15 +1130,10 @@ def build_admin_api_router(
             The saved category.
 
         Raises:
-            HTTPException: 422 if the name or description is blank or the
+            CoreError: 422 if the name or description is blank or the
                 name is taken.
         """
-        try:
-            category = memory_category_service.add(request.to_details())
-        except InvalidMemoryCategoryError as error:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
-            ) from error
+        category = memory_category_service.add(request.to_details())
         return to_memory_category_response(category)
 
     @router.put("/memory-categories/{category_id}")
@@ -1245,21 +1153,12 @@ def build_admin_api_router(
             The saved category.
 
         Raises:
-            HTTPException: 404 if there is no such category; 422 if the name
+            CoreError: 404 if there is no such category; 422 if the name
                 or description is blank or the name is taken.
         """
-        try:
-            category = memory_category_service.update(
-                admin, category_id, request.to_details()
-            )
-        except MemoryCategoryNotFoundError as error:
-            raise HTTPException(
-                status.HTTP_404_NOT_FOUND, "No such Memory Category"
-            ) from error
-        except InvalidMemoryCategoryError as error:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
-            ) from error
+        category = memory_category_service.update(
+            admin, category_id, request.to_details()
+        )
         return to_memory_category_response(category)
 
     @router.post("/memory-categories/{category_id}/archive")
@@ -1273,7 +1172,7 @@ def build_admin_api_router(
             The saved category.
 
         Raises:
-            HTTPException: 404 if there is no such category; 409 if it is a
+            CoreError: 404 if there is no such category; 409 if it is a
                 Required Memory Category.
         """
         return set_archived(category_id, archived=True)
@@ -1289,7 +1188,7 @@ def build_admin_api_router(
             The saved category.
 
         Raises:
-            HTTPException: 404 if there is no such category.
+            CoreError: 404 if there is no such category.
         """
         return set_archived(category_id, archived=False)
 
@@ -1304,17 +1203,10 @@ def build_admin_api_router(
             The saved category.
 
         Raises:
-            HTTPException: 404 if there is no such category; 409 if archiving
+            CoreError: 404 if there is no such category; 409 if archiving
                 a Required Memory Category.
         """
-        try:
-            category = memory_category_service.set_archived(category_id, archived)
-        except MemoryCategoryNotFoundError as error:
-            raise HTTPException(
-                status.HTTP_404_NOT_FOUND, "No such Memory Category"
-            ) from error
-        except RequiredMemoryCategoryError as error:
-            raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
+        category = memory_category_service.set_archived(category_id, archived)
         return to_memory_category_response(category)
 
     @router.get("/check-in-kinds")
@@ -1345,15 +1237,10 @@ def build_admin_api_router(
             The saved Check-in Kind.
 
         Raises:
-            HTTPException: 422 if the name or description is blank or too
+            CoreError: 422 if the name or description is blank or too
                 long, or the name is taken.
         """
-        try:
-            kind = check_in_kind_service.add(request.to_details())
-        except InvalidCheckInKindError as error:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
-            ) from error
+        kind = check_in_kind_service.add(request.to_details())
         return to_check_in_kind_response(kind)
 
     @router.put("/check-in-kinds/{kind_id}")
@@ -1370,19 +1257,10 @@ def build_admin_api_router(
             The saved Check-in Kind.
 
         Raises:
-            HTTPException: 404 if there is no such Kind; 422 if the name or
+            CoreError: 404 if there is no such Kind; 422 if the name or
                 description is blank or too long, or the name is taken.
         """
-        try:
-            kind = check_in_kind_service.update(kind_id, request.to_details())
-        except CheckInKindNotFoundError as error:
-            raise HTTPException(
-                status.HTTP_404_NOT_FOUND, "No such Check-in Kind"
-            ) from error
-        except InvalidCheckInKindError as error:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
-            ) from error
+        kind = check_in_kind_service.update(kind_id, request.to_details())
         return to_check_in_kind_response(kind)
 
     @router.delete("/check-in-kinds/{kind_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -1396,14 +1274,9 @@ def build_admin_api_router(
             An empty response.
 
         Raises:
-            HTTPException: 404 if there is no such Kind.
+            CoreError: 404 if there is no such Kind.
         """
-        try:
-            check_in_kind_service.remove(kind_id)
-        except CheckInKindNotFoundError as error:
-            raise HTTPException(
-                status.HTTP_404_NOT_FOUND, "No such Check-in Kind"
-            ) from error
+        check_in_kind_service.remove(kind_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @router.get("/check-ins")
@@ -1480,25 +1353,10 @@ def build_admin_api_router(
             How many stickers were added; ones already there are skipped.
 
         Raises:
-            HTTPException: 404 if there is no such set; 422 if the name is
+            CoreError: 404 if there is no such set; 422 if the name is
                 blank; 502 if Telegram didn't answer.
         """
-        try:
-            added_count = sticker_library.import_set(request.set_name)
-        except InvalidStickerError as error:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
-            ) from error
-        except StickerSetNotFoundError as error:
-            raise HTTPException(
-                status.HTTP_404_NOT_FOUND,
-                f"There is no sticker set called “{request.set_name.strip()}”.",
-            ) from error
-        except StickerSetUnavailableError as error:
-            raise HTTPException(
-                status.HTTP_502_BAD_GATEWAY,
-                "Telegram didn’t respond. Please try again.",
-            ) from error
+        added_count = sticker_library.import_set(request.set_name)
         return StickerImportResponse(added_count=added_count)
 
     @router.put("/stickers/{sticker_id}")
@@ -1515,17 +1373,10 @@ def build_admin_api_router(
             The saved sticker.
 
         Raises:
-            HTTPException: 404 if there is no such sticker; 422 if the note
+            CoreError: 404 if there is no such sticker; 422 if the note
                 is too long.
         """
-        try:
-            sticker = sticker_library.save_note(sticker_id, request.note)
-        except StickerNotFoundError as error:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "No such sticker") from error
-        except InvalidStickerError as error:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
-            ) from error
+        sticker = sticker_library.save_note(sticker_id, request.note)
         return to_sticker_response(sticker)
 
     @router.delete("/stickers/{sticker_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -1539,12 +1390,9 @@ def build_admin_api_router(
             An empty response.
 
         Raises:
-            HTTPException: 404 if there is no such sticker.
+            CoreError: 404 if there is no such sticker.
         """
-        try:
-            sticker_library.remove(sticker_id)
-        except StickerNotFoundError as error:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "No such sticker") from error
+        sticker_library.remove(sticker_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @router.get("/stickers/{sticker_id}/image")
@@ -1558,13 +1406,10 @@ def build_admin_api_router(
             The image.
 
         Raises:
-            HTTPException: 404 if there is no such sticker or it has no
-                image a browser can show.
+            CoreError: 404 if there is no such sticker.
+            HTTPException: 404 if it has no image a browser can show.
         """
-        try:
-            image = sticker_library.get_image(sticker_id)
-        except StickerNotFoundError as error:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "No such sticker") from error
+        image = sticker_library.get_image(sticker_id)
         if image is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "This sticker has no image")
         return Response(
@@ -1611,25 +1456,20 @@ def build_admin_api_router(
             The pending document.
 
         Raises:
-            HTTPException: 422 if the file type, file or details are not
+            CoreError: 422 if the file type, file or details are not
                 valid.
         """
-        try:
-            uploaded_file = to_knowledge_file(file)
-            document = knowledge_service.upload(
-                KnowledgeUpload(
-                    title=title,
-                    source=source,
-                    tradition=tradition,
-                    file_name=uploaded_file.file_name,
-                    file_type=uploaded_file.file_type,
-                    content=uploaded_file.content,
-                )
+        uploaded_file = to_knowledge_file(file)
+        document = knowledge_service.upload(
+            KnowledgeUpload(
+                title=title,
+                source=source,
+                tradition=tradition,
+                file_name=uploaded_file.file_name,
+                file_type=uploaded_file.file_type,
+                content=uploaded_file.content,
             )
-        except InvalidKnowledgeDocumentError as error:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
-            ) from error
+        )
         background_tasks.add_task(knowledge_service.ingest, document.id)
         return to_knowledge_document_response(document)
 
@@ -1644,14 +1484,9 @@ def build_admin_api_router(
             The document and its text.
 
         Raises:
-            HTTPException: 404 if there is no such document.
+            CoreError: 404 if there is no such document.
         """
-        try:
-            document_with_text = knowledge_service.get_document(document_id)
-        except KnowledgeDocumentNotFoundError as error:
-            raise HTTPException(
-                status.HTTP_404_NOT_FOUND, "No such Knowledge document"
-            ) from error
+        document_with_text = knowledge_service.get_document(document_id)
         return to_knowledge_document_with_text_response(document_with_text)
 
     @router.patch("/knowledge-documents/{document_id}")
@@ -1670,26 +1505,17 @@ def build_admin_api_router(
             The saved document and its text.
 
         Raises:
-            HTTPException: 404 if there is no such document; 422 if a given
+            CoreError: 404 if there is no such document; 422 if a given
                 detail is blank.
         """
-        try:
-            document_with_text = knowledge_service.update_details(
-                document_id,
-                KnowledgeDetailsChange(
-                    title=request.title,
-                    source=request.source,
-                    tradition=request.tradition,
-                ),
-            )
-        except KnowledgeDocumentNotFoundError as error:
-            raise HTTPException(
-                status.HTTP_404_NOT_FOUND, "No such Knowledge document"
-            ) from error
-        except InvalidKnowledgeDocumentError as error:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
-            ) from error
+        document_with_text = knowledge_service.update_details(
+            document_id,
+            KnowledgeDetailsChange(
+                title=request.title,
+                source=request.source,
+                tradition=request.tradition,
+            ),
+        )
         return to_knowledge_document_with_text_response(document_with_text)
 
     @router.put("/knowledge-documents/{document_id}/text")
@@ -1711,24 +1537,10 @@ def build_admin_api_router(
             The pending document and its text.
 
         Raises:
-            HTTPException: 404 if there is no such document; 409 if its file
+            CoreError: 404 if there is no such document; 409 if its file
                 is still being read; 422 if the text is blank.
         """
-        try:
-            document_with_text = knowledge_service.save_text(document_id, request.text)
-        except KnowledgeDocumentNotFoundError as error:
-            raise HTTPException(
-                status.HTTP_404_NOT_FOUND, "No such Knowledge document"
-            ) from error
-        except KnowledgeFileStillBeingReadError as error:
-            raise HTTPException(
-                status.HTTP_409_CONFLICT,
-                "The file is still being read. Try again when it’s done.",
-            ) from error
-        except InvalidKnowledgeDocumentError as error:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
-            ) from error
+        document_with_text = knowledge_service.save_text(document_id, request.text)
         background_tasks.add_task(knowledge_service.ingest, document_id)
         return to_knowledge_document_with_text_response(document_with_text)
 
@@ -1750,27 +1562,13 @@ def build_admin_api_router(
             The pending document, with no text yet.
 
         Raises:
-            HTTPException: 404 if there is no such document; 409 if its last
+            CoreError: 404 if there is no such document; 409 if its last
                 file is still being read; 422 if the file type or file is not
                 valid.
         """
-        try:
-            document_with_text = knowledge_service.replace_file(
-                document_id, to_knowledge_file(file)
-            )
-        except KnowledgeDocumentNotFoundError as error:
-            raise HTTPException(
-                status.HTTP_404_NOT_FOUND, "No such Knowledge document"
-            ) from error
-        except KnowledgeFileStillBeingReadError as error:
-            raise HTTPException(
-                status.HTTP_409_CONFLICT,
-                "The file is still being read. Try again when it’s done.",
-            ) from error
-        except InvalidKnowledgeDocumentError as error:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
-            ) from error
+        document_with_text = knowledge_service.replace_file(
+            document_id, to_knowledge_file(file)
+        )
         background_tasks.add_task(knowledge_service.ingest, document_id)
         return to_knowledge_document_with_text_response(document_with_text)
 
@@ -1788,19 +1586,10 @@ def build_admin_api_router(
             The pending document.
 
         Raises:
-            HTTPException: 404 if there is no such document; 409 if it has
+            CoreError: 404 if there is no such document; 409 if it has
                 not failed.
         """
-        try:
-            document = knowledge_service.retry(document_id)
-        except KnowledgeDocumentNotFoundError as error:
-            raise HTTPException(
-                status.HTTP_404_NOT_FOUND, "No such Knowledge document"
-            ) from error
-        except KnowledgeNotRetryableError as error:
-            raise HTTPException(
-                status.HTTP_409_CONFLICT, "Only a failed document can be retried."
-            ) from error
+        document = knowledge_service.retry(document_id)
         background_tasks.add_task(knowledge_service.ingest, document.id)
         return to_knowledge_document_response(document)
 
@@ -1817,14 +1606,9 @@ def build_admin_api_router(
             An empty response.
 
         Raises:
-            HTTPException: 404 if there is no such document.
+            CoreError: 404 if there is no such document.
         """
-        try:
-            knowledge_service.delete(document_id)
-        except KnowledgeDocumentNotFoundError as error:
-            raise HTTPException(
-                status.HTTP_404_NOT_FOUND, "No such Knowledge document"
-            ) from error
+        knowledge_service.delete(document_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     return router

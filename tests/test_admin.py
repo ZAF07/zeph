@@ -8,6 +8,7 @@ from sqlalchemy import Engine, text
 
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.core.admin_users import (
+    LAST_ADMIN_DEMOTION,
     AdminUserService,
     LastAdminError,
     refuse_if_last_admin,
@@ -249,7 +250,7 @@ def test_two_admins_demoting_each_other_at_the_same_moment_leave_one_admin(
 
     with ThreadPoolExecutor(max_workers=1) as pool:
         with repositories.transaction() as transaction:
-            refuse_if_last_admin(transaction, maya_id)
+            refuse_if_last_admin(transaction, maya_id, LAST_ADMIN_DEMOTION)
             demoting_the_owner: Future[User] = pool.submit(
                 admin_users.change_role, owner_id, UserRole.USER
             )

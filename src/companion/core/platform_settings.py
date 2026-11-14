@@ -4,6 +4,7 @@ from datetime import timedelta
 from enum import StrEnum
 from typing import Any
 
+from companion.core.errors import InvalidError
 from companion.core.models import CheckInFrequency, Setting, StoredSetting, User
 from companion.core.ports import Clock, PlatformSettingsRepository
 
@@ -716,7 +717,28 @@ EDITABLE_SETTINGS_BY_KEY: dict[str, EditableSetting] = {
 }
 
 
-class InvalidSettingError(ValueError):
+@dataclass(frozen=True)
+class DashboardContent:
+    """Admin-managed wording and settings the Dashboard shows to Users.
+
+    Attributes:
+        ai_notice: The full AI notice.
+        ai_notice_short: The short AI notice.
+        user_memory_explanation: What User Memory is.
+        photo_viewing_explanation: What Photo Viewing is.
+        onboarding_reason_choices: The "What brings you here?" choices.
+        message_retention_days: How many days messages are kept.
+    """
+
+    ai_notice: str
+    ai_notice_short: str
+    user_memory_explanation: str
+    photo_viewing_explanation: str
+    onboarding_reason_choices: list[str]
+    message_retention_days: int
+
+
+class InvalidSettingError(InvalidError):
     """Raised when a setting change is not allowed or its value is not valid."""
 
 
@@ -745,6 +767,23 @@ class PlatformSettingsService:
             The settings with when and by whom they were last saved.
         """
         return self._settings.get_many(list(self._editable_by_key))
+
+    def dashboard_content(self) -> DashboardContent:
+        """Read the Admin-managed wording the Dashboard shows to Users.
+
+        Returns:
+            The AI notices, explanations, onboarding choices and how long
+            messages are kept.
+        """
+        settings = self._settings.load()
+        return DashboardContent(
+            ai_notice=settings.get(AI_NOTICE),
+            ai_notice_short=settings.get(AI_NOTICE_SHORT),
+            user_memory_explanation=settings.get(USER_MEMORY_EXPLANATION),
+            photo_viewing_explanation=settings.get(PHOTO_VIEWING_EXPLANATION),
+            onboarding_reason_choices=settings.get(ONBOARDING_REASON_CHOICES),
+            message_retention_days=settings.get(MESSAGE_RETENTION_DAYS),
+        )
 
     def model_choices(self) -> list[str]:
         """List the models Admins can pick for a core service.

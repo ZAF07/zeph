@@ -4,6 +4,7 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from companion.core.check_ins import CheckInService
+from companion.core.errors import InvalidError
 from companion.core.features import FeatureService
 from companion.core.models import (
     AccountIdentity,
@@ -22,7 +23,7 @@ COUNTRY_CODE_PATTERN = re.compile(r"[A-Z]{2}")
 MAX_NAME_LENGTH = 100
 
 
-class InvalidProfileError(ValueError):
+class InvalidProfileError(InvalidError):
     """Raised when onboarding answers or preferences are not acceptable."""
 
 

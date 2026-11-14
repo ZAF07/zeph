@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
+from companion.core.errors import InvalidError, NotFoundError, OutsideServiceError
 from companion.core.models import (
     ChannelSticker,
     Feature,
@@ -44,19 +45,31 @@ class StickersAdded:
     already_there: int
 
 
-class StickerNotFoundError(LookupError):
+class StickerNotFoundError(NotFoundError):
     """Raised when no sticker in the Sticker Library has the given ID."""
 
+    shown_message = "No such sticker"
 
-class StickerSetNotFoundError(LookupError):
+
+class StickerSetNotFoundError(NotFoundError):
     """Raised when the chat channel has no sticker set with the given name."""
 
+    def __init__(self, name: str) -> None:
+        """Say which set wasn't found.
 
-class StickerSetUnavailableError(Exception):
+        Args:
+            name: The sticker set's name, without spaces around it.
+        """
+        super().__init__(f"There is no sticker set called “{name}”.")
+
+
+class StickerSetUnavailableError(OutsideServiceError):
     """Raised when the chat channel can't be asked about a sticker set."""
 
+    shown_message = "Telegram didn’t respond. Please try again."
 
-class InvalidStickerError(ValueError):
+
+class InvalidStickerError(InvalidError):
     """Raised when a sticker set name or "when to use" note is not valid."""
 
 

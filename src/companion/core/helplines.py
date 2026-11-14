@@ -1,6 +1,7 @@
 from enum import StrEnum
 from uuid import UUID
 
+from companion.core.errors import ConflictError, InvalidError, NotFoundError
 from companion.core.models import Helpline, HelplineDetails, HelplinesToShare
 from companion.core.ports import HelplineRepository
 from companion.core.users import InvalidProfileError, check_country
@@ -13,16 +14,20 @@ class MoveDirection(StrEnum):
     DOWN = "down"
 
 
-class HelplineNotFoundError(LookupError):
+class HelplineNotFoundError(NotFoundError):
     """Raised when no Helpline has the given ID."""
 
+    shown_message = "No such Helpline"
 
-class InvalidHelplineError(ValueError):
+
+class InvalidHelplineError(InvalidError):
     """Raised when a Helpline's details are not valid."""
 
 
-class FallbackHelplineError(Exception):
+class FallbackHelplineError(ConflictError):
     """Raised when a change would remove the international fallback."""
+
+    shown_message = "The international fallback can't be removed, only edited."
 
 
 def checked_details(details: HelplineDetails) -> HelplineDetails:
