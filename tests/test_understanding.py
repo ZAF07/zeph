@@ -188,6 +188,7 @@ def test_a_standout_mood_with_an_unknown_cause_asks_the_reply_to_gently_ask_why(
     chat_channel: FakeChatChannel,
     chat_model: ScriptedChatModel,
     seeded_settings: dict[str, Any],
+    engine: Engine,
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
     chat_model.script_understanding(
@@ -199,7 +200,7 @@ def test_a_standout_mood_with_an_unknown_cause_asks_the_reply_to_gently_ask_why(
 
     [reply_call] = chat_model.calls
     assert seeded_settings["reply_ask_why_note"] in reply_call.instructions
-    [saved] = saved_understandings(client.engine)  # type: ignore[attr-defined]
+    [saved] = saved_understandings(engine)
     assert saved["asked_why"] is True
 
 

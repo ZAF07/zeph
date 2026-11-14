@@ -379,7 +379,8 @@ understanding_prompt: |-
   - intensity: how strongly they seem to feel it: "low", "medium" or "high".
     Use "high" only when it stands out for them.
   - cause_known: true if they said, or you can tell from what you know, why
-    they feel this way; false if not.
+    they feel this way; false if not. When they are venting, they are telling
+    you what's wrong, so it is true.
   - memory_categories: the Memory Categories whose memories would help Zeph
     reply well, names exactly as written. Leave it empty if none would.
   Notice how their mood is moving across the Conversation, and the time and

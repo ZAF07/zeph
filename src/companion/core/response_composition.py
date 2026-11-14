@@ -120,7 +120,7 @@ class ResponseComposer:
         knowledge: str = "",
         data_deletion_note: str = "",
         shared_photo_ids: Sequence[UUID] = (),
-        understanding: str = "",
+        reply_guidance: str = "",
     ) -> ComposedReply:
         """Compose a reply to the Conversation's newest message.
 
@@ -142,7 +142,7 @@ class ResponseComposer:
                 User's request to delete their data, and why; "" if it didn't.
             shared_photo_ids: The User's Shared Photos that matter for the
                 message, which the reply may send one of; empty if none.
-            understanding: What the Understanding adds: the Need's "how to
+            reply_guidance: What the Understanding adds: the Need's "how to
                 reply", the nuance and mood; "" if none.
 
         Returns:
@@ -161,7 +161,7 @@ class ResponseComposer:
         ]
         instructions = f"{settings.get(PERSONA)}\n\n{settings.get(RESPONSE_PROMPT)}"
         sections = (
-            understanding,
+            reply_guidance,
             memory,
             knowledge,
             *(offer.instructions for offer in offers),

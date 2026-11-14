@@ -71,7 +71,7 @@ class ReplyService:
             snapshot,
             memory.text,
             knowledge,
-            understanding=understood.reply_guidance,
+            reply_guidance=understood.reply_guidance,
             data_deletion_note=gate_result.data_deletion_note,
             shared_photo_ids=memory.shared_photo_ids,
         )
