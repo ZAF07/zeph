@@ -2,10 +2,6 @@ import logging
 from uuid import UUID, uuid4
 
 from companion.core.features import FeatureService
-from companion.core.memory_categories import (
-    ONBOARDING_NAME_CATEGORY_SETTING,
-    ONBOARDING_REASONS_CATEGORY_SETTING,
-)
 from companion.core.models import (
     ConversationSummary,
     Feature,
@@ -13,14 +9,18 @@ from companion.core.models import (
     MemoryGroup,
     MemoryItem,
     MemorySource,
+    PlatformSettings,
     User,
+)
+from companion.core.platform_settings import (
+    MEMORY_NOT_AVAILABLE_NOTE,
+    MEMORY_PAUSED_NOTE,
+    ONBOARDING_NAME_MEMORY_CATEGORY,
+    ONBOARDING_REASONS_MEMORY_CATEGORY,
 )
 from companion.core.ports import Clock, Repositories
 
 logger = logging.getLogger(__name__)
-
-MEMORY_PAUSED_NOTE_SETTING = "memory_paused_note"
-MEMORY_NOT_AVAILABLE_NOTE_SETTING = "memory_not_available_note"
 
 
 class MemoryNotFoundError(LookupError):
@@ -49,7 +49,7 @@ class UserMemoryService:
         self._features = features
         self._clock = clock
 
-    def memory_note(self, user: User) -> str:
+    def memory_note(self, user: User, settings: PlatformSettings) -> str:
         """Pick the Dashboard note that says User Memory is off, and why.
 
         The Admin's switch has the final say, so its note wins over the
@@ -57,6 +57,7 @@ class UserMemoryService:
 
         Args:
             user: The User.
+            settings: The platform settings, read once per request.
 
         Returns:
             The Admin-managed "isn't available" note when the Admin side has
@@ -64,12 +65,12 @@ class UserMemoryService:
             "" when it works.
         """
         if not self._features.available_for(user.id, Feature.USER_MEMORY):
-            setting = MEMORY_NOT_AVAILABLE_NOTE_SETTING
+            note = MEMORY_NOT_AVAILABLE_NOTE
         elif not user.user_memory_enabled:
-            setting = MEMORY_PAUSED_NOTE_SETTING
+            note = MEMORY_PAUSED_NOTE
         else:
             return ""
-        return str(self._repositories.platform_settings.get(setting))
+        return settings.get(note)
 
     def list_groups(self, user_id: UUID) -> list[MemoryGroup]:
         """List a User's Memory Items by Memory Category, in category order.
@@ -151,17 +152,17 @@ class UserMemoryService:
         """
         if not self._features.works_for(user.id, Feature.USER_MEMORY):
             return
-        settings = self._repositories.platform_settings
+        settings = self._repositories.platform_settings.load()
         active_categories = {
             category.name: category
             for category in self._repositories.memory_categories.list_all()
             if not category.archived
         }
         name_category = active_categories.get(
-            settings.get(ONBOARDING_NAME_CATEGORY_SETTING)
+            settings.get(ONBOARDING_NAME_MEMORY_CATEGORY)
         )
         reasons_category = active_categories.get(
-            settings.get(ONBOARDING_REASONS_CATEGORY_SETTING)
+            settings.get(ONBOARDING_REASONS_MEMORY_CATEGORY)
         )
         facts: list[tuple[MemoryCategory | None, str]] = []
         if user.name:

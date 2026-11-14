@@ -12,21 +12,24 @@ from companion.core.models import (
     MessageDirection,
     MessageKind,
     PersonalSticker,
+    PlatformSettings,
 )
 from companion.core.photos import sent_shared_photo_text
-from companion.core.ports import (
-    ChatChannel,
-    Clock,
-    PlatformSettingsRepository,
-    Repositories,
+from companion.core.platform_settings import (
+    CHECK_IN_REPLY_WINDOW,
+    CONVERSATION_QUIET_GAP,
+    MAX_TYPING_SECONDS,
+    MIN_TYPING_SECONDS,
+    TYPING_SECONDS_PER_CHARACTER,
 )
+from companion.core.ports import ChatChannel, Clock, Repositories
 from companion.core.stickers import sticker_message_text
-from companion.core.timing import check_in_reply_window, is_open, quiet_gap
+from companion.core.timing import is_open
 
 logger = logging.getLogger(__name__)
 
 
-def typing_pause_seconds(text: str, settings: PlatformSettingsRepository) -> float:
+def typing_pause_seconds(text: str, settings: PlatformSettings) -> float:
     """Work out how long to show typing before sending a message.
 
     Longer messages take longer to "type", within the range set by Admins.
@@ -38,10 +41,10 @@ def typing_pause_seconds(text: str, settings: PlatformSettingsRepository) -> flo
     Returns:
         The pause in seconds.
     """
-    pause = len(text) * settings.get("typing_seconds_per_character")
-    shortest = settings.get("min_typing_seconds")
-    longest = settings.get("max_typing_seconds")
-    return float(min(max(pause, shortest), longest))
+    pause = len(text) * settings.get(TYPING_SECONDS_PER_CHARACTER)
+    shortest = settings.get(MIN_TYPING_SECONDS)
+    longest = settings.get(MAX_TYPING_SECONDS)
+    return min(max(pause, shortest), longest)
 
 
 class ConversationService:
@@ -66,6 +69,7 @@ class ConversationService:
         user_id: UUID,
         chat_id: int,
         text: str,
+        settings: PlatformSettings,
         kind: MessageKind = MessageKind.TEXT,
         photos: tuple[ChannelPhoto, ...] = (),
         sticker: ChannelSticker | None = None,
@@ -83,6 +87,7 @@ class ConversationService:
             user_id: The User who sent it.
             chat_id: The chat it came from.
             text: The message as the Companion reads it.
+            settings: The platform settings, read once for the reply.
             kind: What kind of message it is.
             photos: The photos it came with, kept as chat channel IDs.
             sticker: The sticker, for a sticker message.
@@ -92,7 +97,7 @@ class ConversationService:
         """
         saved = False
         while not saved:
-            conversation_id = self._open_conversation_id(user_id)
+            conversation_id = self._open_conversation_id(user_id, settings)
             saved = self._repositories.conversations.add_message_if_open(
                 ConversationMessage(
                     id=uuid4(),
@@ -114,6 +119,7 @@ class ConversationService:
         conversation_id: UUID,
         chat_id: int,
         reply_parts: list[str],
+        settings: PlatformSettings,
         sticker_id: UUID | None = None,
         shared_photo_id: UUID | None = None,
     ) -> None:
@@ -133,11 +139,11 @@ class ConversationService:
             conversation_id: The Conversation being answered.
             chat_id: The chat to send to.
             reply_parts: The short messages that make up the reply, in order.
+            settings: The platform settings, read once for the reply.
             sticker_id: The sticker to send after them, from the Sticker
                 Library or the User's Personal Stickers.
             shared_photo_id: The User's Shared Photo to send back after them.
         """
-        settings = self._repositories.platform_settings
         for part in reply_parts:
             self._chat_channel.show_typing(chat_id)
             self._clock.sleep(typing_pause_seconds(part, settings))
@@ -229,9 +235,12 @@ class ConversationService:
             text: The message.
         """
         self._chat_channel.send_text(chat_id, text)
-        self._save(self._open_conversation_id(user_id), MessageDirection.OUTGOING, text)
+        conversation_id = self._open_conversation_id(
+            user_id, self._repositories.platform_settings.load()
+        )
+        self._save(conversation_id, MessageDirection.OUTGOING, text)
 
-    def _open_conversation_id(self, user_id: UUID) -> UUID:
+    def _open_conversation_id(self, user_id: UUID, settings: PlatformSettings) -> UUID:
         """Find the User's open Conversation, or start a new one.
 
         A Conversation is open until it is ended or the quiet gap passes. A
@@ -242,21 +251,25 @@ class ConversationService:
 
         Args:
             user_id: The User.
+            settings: Holds the quiet gap and the reply window.
 
         Returns:
             The open Conversation's ID.
         """
-        settings = self._repositories.platform_settings
         now = self._clock.now()
         latest = self._repositories.conversations.get_latest_for_user(user_id)
-        if latest is not None and is_open(latest, now, quiet_gap(settings)):
+        if latest is not None and is_open(
+            latest, now, settings.get(CONVERSATION_QUIET_GAP)
+        ):
             return latest.id
         conversation = Conversation(
             id=uuid4(), user_id=user_id, started_at=now, last_message_at=now
         )
         self._repositories.conversations.add(conversation)
         check_in = self._repositories.check_ins.claim_reply(
-            user_id, replied_at=now, sent_since=now - check_in_reply_window(settings)
+            user_id,
+            replied_at=now,
+            sent_since=now - settings.get(CHECK_IN_REPLY_WINDOW),
         )
         if check_in is not None:
             self._start_with_check_in(conversation.id, check_in)
@@ -305,6 +318,7 @@ class ConversationService:
             conversation_id: The Conversation.
             direction: Who sent it.
             text: The message as the Companion reads it.
+            settings: The platform settings, read once for the reply.
             kind: What kind of message it is.
             sent_at: When it was sent; now if not given.
             photos: The photos it came with.

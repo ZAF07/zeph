@@ -13,6 +13,11 @@ from companion.core.models import (
     UserRole,
     UserSnapshot,
 )
+from companion.core.platform_settings import (
+    DASHBOARD_URL_PLACEHOLDER,
+    STICKER_ADDING_QUIET_GAP,
+    STICKER_ADDING_SUMMARY_REPLY,
+)
 from companion.core.ports import ChatChannel, ChatTool, Repositories, Timer
 from companion.core.reply_tools import ReplyContext, ReplyOffer
 from companion.core.stickers import (
@@ -25,8 +30,6 @@ logger = logging.getLogger(__name__)
 
 ADDING_TOOL = "start_adding_stickers"
 ADDED_REACTION = "👍"
-QUIET_GAP_SETTING = "sticker_adding_quiet_gap_minutes"
-SUMMARY_SETTING = "sticker_adding_summary_reply"
 NOT_WORDS = re.compile(r"[^\w\s]")
 
 
@@ -340,9 +343,13 @@ class StickerAdding:
         Args:
             user_id: The Admin in adding mode.
         """
-        minutes = self._repositories.platform_settings.get(QUIET_GAP_SETTING)
+        quiet_gap = self._repositories.platform_settings.load().get(
+            STICKER_ADDING_QUIET_GAP
+        )
         self._timer.start(
-            f"sticker-adding:{user_id}", minutes * 60, lambda: self.finish(user_id)
+            f"sticker-adding:{user_id}",
+            quiet_gap.total_seconds(),
+            lambda: self.finish(user_id),
         )
 
     def _send_summary(self, user_id: UUID, chat_id: int, tally: StickerTally) -> None:
@@ -357,9 +364,11 @@ class StickerAdding:
         """
         summary = added_summary(tally)
         if tally.added:
-            template = self._repositories.platform_settings.get(SUMMARY_SETTING)
+            template = self._repositories.platform_settings.load().get(
+                STICKER_ADDING_SUMMARY_REPLY
+            )
             summary = template.replace("{added}", summary).replace(
-                "{dashboard_url}", self._dashboard_url
+                DASHBOARD_URL_PLACEHOLDER, self._dashboard_url
             )
         self._deliver_notice(user_id, chat_id, summary)
 

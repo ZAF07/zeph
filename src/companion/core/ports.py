@@ -41,6 +41,7 @@ from companion.core.models import (
     NextDueTimeChange,
     PersonalSticker,
     PhotoImage,
+    PlatformSettings,
     RiskType,
     SafeguardEvent,
     SafeguardEventOverview,
@@ -990,17 +991,11 @@ class UserMemoryRepository(Protocol):
 class PlatformSettingsRepository(Protocol):
     """Stores admin-managed platform settings and content."""
 
-    def get(self, key: str) -> Any:
-        """Read one setting.
-
-        Args:
-            key: The setting's key.
+    def load(self) -> PlatformSettings:
+        """Read every setting in one query.
 
         Returns:
-            The setting's value.
-
-        Raises:
-            KeyError: If the setting does not exist.
+            The settings as they are now.
         """
         ...
 

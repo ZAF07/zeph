@@ -12,6 +12,7 @@ from companion.core.models import (
     StickerImage,
     UserSnapshot,
 )
+from companion.core.platform_settings import STICKER_TOOL_DESCRIPTION
 from companion.core.ports import ChatChannel, ChatTool, Clock, Repositories
 from companion.core.reply_tools import ReplyContext, ReplyOffer
 
@@ -322,5 +323,5 @@ class StickerTools:
         ]
         return sticker_offer(
             [*theirs, *library],
-            self._repositories.platform_settings.get("sticker_tool_description"),
+            snapshot.settings.get(STICKER_TOOL_DESCRIPTION),
         )

@@ -9,7 +9,6 @@ from pydantic import BaseModel, Field
 from companion.core.check_ins import CheckInService, RecentCheckIn
 from companion.core.features import FeatureNotAvailableError, FeatureService
 from companion.core.home import Home, HomeService
-from companion.core.message_retention import RETENTION_DAYS_SETTING
 from companion.core.models import (
     ChatSetting,
     CheckInChanges,
@@ -27,6 +26,7 @@ from companion.core.models import (
     OnboardingAnswers,
     PauseLength,
     PersonalSticker,
+    PlatformSettings,
     PreferenceChanges,
     SharedPhoto,
     User,
@@ -37,6 +37,14 @@ from companion.core.personal_stickers import (
     PersonalStickerService,
 )
 from companion.core.photos import PhotoService, SharedPhotoNotFoundError
+from companion.core.platform_settings import (
+    AI_NOTICE,
+    AI_NOTICE_SHORT,
+    MESSAGE_RETENTION_DAYS,
+    ONBOARDING_REASON_CHOICES,
+    PHOTO_VIEWING_EXPLANATION,
+    USER_MEMORY_EXPLANATION,
+)
 from companion.core.ports import PlatformSettingsRepository
 from companion.core.telegram_connection import (
     OnboardingNotFinishedError,
@@ -500,7 +508,7 @@ def build_dashboard_api_router(
         return to_me_response(
             user,
             feature_service.available_for(user.id, Feature.USER_MEMORY),
-            user_memory_service.memory_note(user),
+            user_memory_service.memory_note(user, platform_settings.load()),
             feature_service.available_for(user.id, Feature.PHOTO_VIEWING),
             feature_service.works_for(user.id, Feature.PERSONAL_STICKERS),
         )
@@ -555,12 +563,15 @@ def build_dashboard_api_router(
             status=token_status,
         )
 
-    def to_home_response(user: User, home: Home) -> HomeResponse:
+    def to_home_response(
+        user: User, home: Home, current_settings: PlatformSettings
+    ) -> HomeResponse:
         """Describe a User's Dashboard home.
 
         Args:
             user: The User.
             home: What their home shows.
+            current_settings: The platform settings, read once for the request.
 
         Returns:
             The response body, with the pause as it stands right now.
@@ -597,7 +608,7 @@ def build_dashboard_api_router(
                     else None
                 ),
             ),
-            memory_note=user_memory_service.memory_note(user),
+            memory_note=user_memory_service.memory_note(user, current_settings),
             goals=[to_memory_item_response(item) for item in home.goals],
             recently_remembered=[
                 RememberedItemResponse(
@@ -606,7 +617,7 @@ def build_dashboard_api_router(
                 )
                 for remembered in home.recently_remembered
             ],
-            ai_notice=platform_settings.get("ai_notice_short"),
+            ai_notice=current_settings.get(AI_NOTICE_SHORT),
         )
 
     @router.get("/me")
@@ -741,7 +752,8 @@ def build_dashboard_api_router(
             Their Telegram Connection, Check-in status, Goals, newest Memory
             Items and the AI notice.
         """
-        return to_home_response(user, home_service.get(user))
+        settings = platform_settings.load()
+        return to_home_response(user, home_service.get(user, settings), settings)
 
     @router.get("/check-ins")
     def get_check_ins(user: Annotated[User, Depends(current_user)]) -> CheckInsResponse:
@@ -826,17 +838,14 @@ def build_dashboard_api_router(
             The AI notice, User Memory explanation, onboarding choices and how
             long messages are kept.
         """
+        settings = platform_settings.load()
         return PlatformContentResponse(
-            ai_notice=platform_settings.get("ai_notice"),
-            ai_notice_short=platform_settings.get("ai_notice_short"),
-            user_memory_explanation=platform_settings.get("user_memory_explanation"),
-            photo_viewing_explanation=platform_settings.get(
-                "photo_viewing_explanation"
-            ),
-            onboarding_reason_choices=platform_settings.get(
-                "onboarding_reason_choices"
-            ),
-            message_retention_days=platform_settings.get(RETENTION_DAYS_SETTING),
+            ai_notice=settings.get(AI_NOTICE),
+            ai_notice_short=settings.get(AI_NOTICE_SHORT),
+            user_memory_explanation=settings.get(USER_MEMORY_EXPLANATION),
+            photo_viewing_explanation=settings.get(PHOTO_VIEWING_EXPLANATION),
+            onboarding_reason_choices=settings.get(ONBOARDING_REASON_CHOICES),
+            message_retention_days=settings.get(MESSAGE_RETENTION_DAYS),
         )
 
     @router.get("/telegram-connection")

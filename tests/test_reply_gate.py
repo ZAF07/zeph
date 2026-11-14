@@ -1,7 +1,13 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from companion.core.models import MessageToAnswer, RiskType, User, UserSnapshot
+from companion.core.models import (
+    MessageToAnswer,
+    PlatformSettings,
+    RiskType,
+    User,
+    UserSnapshot,
+)
 from companion.core.reply_gate import ReplyGate, ReplyNeeded, Stopped, StopReason
 from companion.core.user_data import DataDeletionAnswer
 
@@ -32,7 +38,8 @@ class FakeConversations:
             user_id: The User who sent it.
             chat_id: The chat it came from.
             text: The message.
-            *details: Its kind, photos and sticker, which are ignored.
+            *details: The platform settings, its kind, photos and sticker,
+                which are ignored.
 
         Returns:
             The Conversation's ID.
@@ -165,8 +172,11 @@ class FakeUsageLimiter:
         self.calls.append("claim_message")
         return self.within_limit
 
-    def limit_reply(self) -> str:
+    def limit_reply(self, settings: PlatformSettings) -> str:
         """Read the Limit Reply.
+
+        Args:
+            settings: The platform settings, which are ignored.
 
         Returns:
             The Limit Reply.
@@ -199,7 +209,13 @@ def check_message(
     )
     now = datetime(2026, 11, 14, 9, 0, tzinfo=UTC)
     user = User(id=uuid4(), auth_id="user_maya", email=None, created_at=now)
-    snapshot = UserSnapshot(user=user, local_now=now, today=now.date(), features=())
+    snapshot = UserSnapshot(
+        user=user,
+        local_now=now,
+        today=now.date(),
+        features=(),
+        settings=PlatformSettings({}),
+    )
     result = gate.check(
         MessageToAnswer(user_id=user.id, chat_id=CHAT_ID, text="hi"), snapshot
     )

@@ -2,7 +2,11 @@ import logging
 from dataclasses import replace
 from enum import StrEnum
 
-from companion.core.models import User, UserSnapshot
+from companion.core.models import PlatformSettings, User, UserSnapshot
+from companion.core.platform_settings import (
+    DATA_DELETED_REPLY,
+    DATA_DELETION_CONFIRMATION_WORD,
+)
 from companion.core.ports import (
     AuthAccounts,
     ChatChannel,
@@ -10,9 +14,6 @@ from companion.core.ports import (
     ConversationEngine,
     Repositories,
 )
-
-CONFIRMATION_WORD_SETTING = "data_deletion_confirmation_word"
-DELETED_REPLY_SETTING = "data_deleted_reply"
 
 logger = logging.getLogger(__name__)
 
@@ -141,14 +142,16 @@ class ChatDataDeletion:
         self._chat_channel = chat_channel
         self._clock = clock
 
-    def confirmation_word(self) -> str:
+    def confirmation_word(self, settings: PlatformSettings) -> str:
         """Read the word a User must reply with to confirm.
+
+        Args:
+            settings: The platform settings, read once for the reply.
 
         Returns:
             The confirmation word Admins set, e.g. "DELETE".
         """
-        word: str = self._repositories.platform_settings.get(CONFIRMATION_WORD_SETTING)
-        return word
+        return settings.get(DATA_DELETION_CONFIRMATION_WORD)
 
     def ask(self, user: User) -> None:
         """Note that the User asked to delete their data, pending confirmation.
@@ -180,12 +183,13 @@ class ChatDataDeletion:
         """
         if not self._clear_request(snapshot):
             return DataDeletionAnswer.NOTHING_ASKED
-        if text.strip().casefold() != self.confirmation_word().casefold():
+        if (
+            text.strip().casefold()
+            != self.confirmation_word(snapshot.settings).casefold()
+        ):
             return DataDeletionAnswer.CANCELLED
         self._repositories.users.delete_data(snapshot.user.id)
-        self._chat_channel.send_text(
-            chat_id, self._repositories.platform_settings.get(DELETED_REPLY_SETTING)
-        )
+        self._chat_channel.send_text(chat_id, snapshot.settings.get(DATA_DELETED_REPLY))
         return DataDeletionAnswer.CONFIRMED
 
     def cancel(self, snapshot: UserSnapshot) -> DataDeletionAnswer:

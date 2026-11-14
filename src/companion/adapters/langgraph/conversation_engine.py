@@ -208,11 +208,14 @@ class LangGraphConversationEngine:
                 "shared_photo_id": shared_photo_id,
             }
 
-        def deliver_reply(state: ReplyState) -> ReplyState:
+        def deliver_reply(
+            state: ReplyState, runtime: Runtime[UserSnapshot]
+        ) -> ReplyState:
             """Send the reply and save it to the Conversation.
 
             Args:
                 state: The graph's state so far.
+                runtime: Holds the User snapshot.
 
             Returns:
                 Nothing new to add to the state.
@@ -224,6 +227,7 @@ class LangGraphConversationEngine:
                 UUID(state["conversation_id"]),
                 state["chat_id"],
                 state["reply_parts"],
+                runtime.context.settings,
                 UUID(sticker_id) if sticker_id else None,
                 UUID(shared_photo_id) if shared_photo_id else None,
             )

@@ -3,7 +3,7 @@ from uuid import UUID
 
 from companion.core.admin_users import UserNotFoundError
 from companion.core.features import feature_statuses, switches_for_everyone
-from companion.core.models import UserSnapshot
+from companion.core.models import PlatformSettings, UserSnapshot
 from companion.core.ports import Clock, Repositories
 from companion.core.timing import local_now, users_today
 
@@ -25,11 +25,12 @@ class UserSnapshotLoader:
         self._repositories = repositories
         self._clock = clock
 
-    def load(self, user_id: UUID) -> UserSnapshot:
+    def load(self, user_id: UUID, settings: PlatformSettings) -> UserSnapshot:
         """Read one User's snapshot.
 
         Args:
             user_id: The User.
+            settings: The platform settings, read once for the reply or tick.
 
         Returns:
             Their snapshot.
@@ -37,31 +38,36 @@ class UserSnapshotLoader:
         Raises:
             UserNotFoundError: If there is no such User.
         """
-        snapshot = self.find(user_id)
+        snapshot = self.find(user_id, settings)
         if snapshot is None:
             raise UserNotFoundError(user_id)
         return snapshot
 
-    def find(self, user_id: UUID) -> UserSnapshot | None:
+    def find(self, user_id: UUID, settings: PlatformSettings) -> UserSnapshot | None:
         """Read one User's snapshot, if they still exist.
 
         Args:
             user_id: The User.
+            settings: The platform settings, read once for the reply or tick.
 
         Returns:
             Their snapshot, or None if there is no such User.
         """
-        snapshots = self.load_many([user_id])
+        snapshots = self.load_many([user_id], settings)
         return snapshots[0] if snapshots else None
 
-    def load_many(self, user_ids: Sequence[UUID]) -> list[UserSnapshot]:
+    def load_many(
+        self, user_ids: Sequence[UUID], settings: PlatformSettings
+    ) -> list[UserSnapshot]:
         """Read many Users' snapshots in three queries.
 
         The switches for everyone are read once and every User's own
-        switches in one more query.
+        switches in one more query. The platform settings are read by the
+        caller, once for the whole reply or tick, and shared by every snapshot.
 
         Args:
             user_ids: The Users.
+            settings: The platform settings, read once for the reply or tick.
 
         Returns:
             One snapshot per User found, in the order given; Users that don't
@@ -87,6 +93,7 @@ class UserSnapshotLoader:
                         user, everyone_switches, switches_by_user.get(user.id, [])
                     )
                 ),
+                settings=settings,
             )
             for user in found
         ]

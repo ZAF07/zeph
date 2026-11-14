@@ -1,6 +1,5 @@
 import secrets
 from dataclasses import dataclass
-from datetime import timedelta
 from uuid import UUID
 
 from companion.core.models import (
@@ -10,11 +9,18 @@ from companion.core.models import (
     TelegramConnection,
     User,
 )
+from companion.core.platform_settings import (
+    CONNECTION_TOKEN_INVALID_REPLY,
+    CONNECTION_TOKEN_TTL,
+    DASHBOARD_URL_PLACEHOLDER,
+    ONBOARDING_UNFINISHED_REPLY,
+    TELEGRAM_CONNECTED_ELSEWHERE_REPLY,
+    WELCOME_MESSAGE,
+)
 from companion.core.ports import ChatChannel, Clock, Repositories
 
 TOKEN_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 START_COMMAND = "/start"
-DASHBOARD_URL_PLACEHOLDER = "{dashboard_url}"
 
 
 class OnboardingNotFinishedError(Exception):
@@ -89,8 +95,8 @@ class TelegramConnectionService:
         """
         if not user.has_finished_onboarding:
             raise OnboardingNotFinishedError()
-        settings = self._repositories.platform_settings
-        lifetime = timedelta(minutes=settings.get("connection_token_ttl_minutes"))
+        settings = self._repositories.platform_settings.load()
+        lifetime = settings.get(CONNECTION_TOKEN_TTL)
         now = self._clock.now()
         token = ConnectionToken(
             user_id=user.id,
@@ -150,11 +156,11 @@ class TelegramConnectionService:
         Args:
             message: The `/start` message.
         """
-        settings = self._repositories.platform_settings
+        settings = self._repositories.platform_settings.load()
         token = self._find_token(message.text)
         now = self._clock.now()
         if token is None:
-            self._reply(message, settings.get("connection_token_invalid_reply"))
+            self._reply(message, settings.get(CONNECTION_TOKEN_INVALID_REPLY))
             return
 
         existing = self._repositories.telegram_connections.get_by_telegram_user(
@@ -167,24 +173,24 @@ class TelegramConnectionService:
             and existing.user_id == token.user_id
         )
         if already_connected_by_this_token:
-            self._reply(message, settings.get("welcome_message"))
+            self._reply(message, settings.get(WELCOME_MESSAGE))
             return
 
         if token_status != ConnectionTokenStatus.ACTIVE:
-            self._reply(message, settings.get("connection_token_invalid_reply"))
+            self._reply(message, settings.get(CONNECTION_TOKEN_INVALID_REPLY))
             return
 
         if not self._has_finished_onboarding(token.user_id):
-            self._reply(message, settings.get("onboarding_unfinished_reply"))
+            self._reply(message, settings.get(ONBOARDING_UNFINISHED_REPLY))
             return
 
         if existing is not None and existing.user_id != token.user_id:
             self._repositories.connection_tokens.mark_rejected(token.token, now)
-            self._reply(message, settings.get("telegram_connected_elsewhere_reply"))
+            self._reply(message, settings.get(TELEGRAM_CONNECTED_ELSEWHERE_REPLY))
             return
 
         if not self._repositories.connection_tokens.claim(token.token, now):
-            self._reply(message, settings.get("connection_token_invalid_reply"))
+            self._reply(message, settings.get(CONNECTION_TOKEN_INVALID_REPLY))
             return
 
         self._repositories.telegram_connections.save(
@@ -197,7 +203,7 @@ class TelegramConnectionService:
             )
         )
         self._repositories.check_ins.set_due_now_unless_due_later(token.user_id, now)
-        self._reply(message, settings.get("welcome_message"))
+        self._reply(message, settings.get(WELCOME_MESSAGE))
 
     def _has_finished_onboarding(self, user_id: UUID) -> bool:
         """Tell whether a User has finished onboarding.

@@ -14,12 +14,17 @@ from companion.core.models import (
     SharedPhoto,
     UserSnapshot,
 )
+from companion.core.platform_settings import (
+    PERSONA,
+    REPLY_DATA_DELETION_CANCELLED_NOTE,
+    RESPONSE_MODEL,
+    RESPONSE_PROMPT,
+)
 from companion.core.ports import Repositories
 from companion.core.reply_tools import ReplyContext, ReplyToolProvider
 from companion.core.usage import UsageRecordingChatModel
 
 BLANK_LINE = re.compile(r"\n\s*\n")
-DELETION_CANCELLED_NOTE_SETTING = "reply_data_deletion_cancelled_note"
 
 
 class EmptyReplyError(Exception):
@@ -138,7 +143,7 @@ class ResponseComposer:
         Raises:
             EmptyReplyError: If the reply has no text, sticker or photo.
         """
-        settings = self._repositories.platform_settings
+        settings = snapshot.settings
         context = ReplyContext(
             conversation_id=conversation_id, shared_photo_ids=tuple(shared_photo_ids)
         )
@@ -146,16 +151,16 @@ class ResponseComposer:
             provider.offer(snapshot, context) for provider in self._tool_providers
         ]
         cancelled_note = (
-            settings.get(DELETION_CANCELLED_NOTE_SETTING)
+            settings.get(REPLY_DATA_DELETION_CANCELLED_NOTE)
             if data_deletion_cancelled
             else ""
         )
-        instructions = f"{settings.get('persona')}\n\n{settings.get('response_prompt')}"
+        instructions = f"{settings.get(PERSONA)}\n\n{settings.get(RESPONSE_PROMPT)}"
         sections = (
             memory,
             knowledge,
             *(offer.instructions for offer in offers),
-            self._features.unavailable_note(snapshot.unavailable_features),
+            self._features.unavailable_note(snapshot.unavailable_features, settings),
             cancelled_note,
         )
         for section in sections:
@@ -166,7 +171,7 @@ class ResponseComposer:
         )
         reply = self._chat_model.generate(
             snapshot=snapshot,
-            model=settings.get("response_model"),
+            model=settings.get(RESPONSE_MODEL),
             instructions=instructions,
             history=history,
             tools=[tool for offer in offers for tool in offer.tools],

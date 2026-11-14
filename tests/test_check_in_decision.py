@@ -27,6 +27,7 @@ from companion.core.models import (
     Conversation,
     Feature,
     FeatureSwitch,
+    PlatformSettings,
     User,
     UserSnapshot,
 )
@@ -108,6 +109,7 @@ def facts(
         local_now=local_now(user.time_zone, now),
         today=users_today(user.time_zone, now),
         features=tuple(feature_statuses(user, everyone, [])),
+        settings=PlatformSettings({}),
     )
     defaults: dict[str, Any] = {
         "telegram_chat_id": CHAT_ID,

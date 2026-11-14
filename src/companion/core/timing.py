@@ -2,31 +2,6 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from companion.core.models import Conversation
-from companion.core.ports import PlatformSettingsRepository
-
-
-def quiet_gap(settings: PlatformSettingsRepository) -> timedelta:
-    """Read how long with no message ends a Conversation.
-
-    Args:
-        settings: Holds the Admin-set quiet gap.
-
-    Returns:
-        The quiet gap.
-    """
-    return timedelta(minutes=settings.get("conversation_quiet_gap_minutes"))
-
-
-def check_in_reply_window(settings: PlatformSettingsRepository) -> timedelta:
-    """Read how long after a Check-in the User's first message is its reply.
-
-    Args:
-        settings: Holds the reply window.
-
-    Returns:
-        The reply window.
-    """
-    return timedelta(hours=settings.get("check_in_reply_window_hours"))
 
 
 def is_open(conversation: Conversation, now: datetime, gap: timedelta) -> bool:

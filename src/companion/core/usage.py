@@ -3,7 +3,12 @@ from dataclasses import dataclass
 from datetime import timedelta
 from uuid import UUID
 
-from companion.core.models import ChatLine, DailyUsage, UserSnapshot
+from companion.core.models import ChatLine, DailyUsage, PlatformSettings, UserSnapshot
+from companion.core.platform_settings import (
+    DAILY_LIMIT_REPLY,
+    DAILY_MESSAGE_LIMIT,
+    WEB_SEARCH_DAILY_LIMIT,
+)
 from companion.core.ports import ChatModel, ChatTool, Clock, Repositories
 from companion.core.timing import users_today
 
@@ -50,7 +55,7 @@ class UsageLimiter:
             True if it was counted and may be answered; False if the User has
             already reached `daily_message_limit` today.
         """
-        daily_limit = self._repositories.platform_settings.get("daily_message_limit")
+        daily_limit = snapshot.settings.get(DAILY_MESSAGE_LIMIT)
         return self._repositories.usage.claim_message(
             snapshot.user.id, snapshot.today, daily_limit
         )
@@ -70,22 +75,29 @@ class UsageLimiter:
             The IDs of those whose next message today would get the limit
             reply.
         """
-        daily_limit: int = self._repositories.platform_settings.get(
-            "daily_message_limit"
-        )
+        daily_limits = {
+            snapshot.user.id: snapshot.settings.get(DAILY_MESSAGE_LIMIT)
+            for snapshot in snapshots
+        }
         counts = self._repositories.usage.count_messages_on_days(
             {snapshot.user.id: snapshot.today for snapshot in snapshots}
         )
-        return {user_id for user_id, count in counts.items() if count >= daily_limit}
+        return {
+            user_id
+            for user_id, count in counts.items()
+            if count >= daily_limits[user_id]
+        }
 
-    def limit_reply(self) -> str:
+    def limit_reply(self, settings: PlatformSettings) -> str:
         """Read the in-character reply sent once the daily limit is reached.
+
+        Args:
+            settings: The platform settings, read once for the reply.
 
         Returns:
             The Admin-set wording.
         """
-        reply: str = self._repositories.platform_settings.get("daily_limit_reply")
-        return reply
+        return settings.get(DAILY_LIMIT_REPLY)
 
     def record_tokens(
         self, snapshot: UserSnapshot, tokens_in: int, tokens_out: int
@@ -112,7 +124,7 @@ class UsageLimiter:
         Returns:
             The usage and the limits in force now.
         """
-        settings = self._repositories.platform_settings
+        settings = self._repositories.platform_settings.load()
         now = self._clock.now()
         earliest_possible_day = now.date() - timedelta(days=days)
         rows = [
@@ -122,8 +134,8 @@ class UsageLimiter:
         ]
         return UsageReport(
             rows=rows,
-            daily_message_limit=settings.get("daily_message_limit"),
-            web_search_daily_limit=settings.get("web_search_daily_limit"),
+            daily_message_limit=settings.get(DAILY_MESSAGE_LIMIT),
+            web_search_daily_limit=settings.get(WEB_SEARCH_DAILY_LIMIT),
         )
 
 

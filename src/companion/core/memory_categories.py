@@ -7,17 +7,18 @@ from companion.core.models import (
     MemoryCategoryOverview,
     User,
 )
+from companion.core.platform_settings import (
+    HOME_GOALS_MEMORY_CATEGORY,
+    ONBOARDING_NAME_MEMORY_CATEGORY,
+    ONBOARDING_REASONS_MEMORY_CATEGORY,
+)
 from companion.core.ports import Clock, Repositories
 
-ONBOARDING_NAME_CATEGORY_SETTING = "onboarding_name_memory_category"
-ONBOARDING_REASONS_CATEGORY_SETTING = "onboarding_reasons_memory_category"
-HOME_GOALS_CATEGORY_SETTING = "home_goals_memory_category"
 PLACE_USING_CATEGORY_SETTING = {
-    ONBOARDING_NAME_CATEGORY_SETTING: "onboarding",
-    ONBOARDING_REASONS_CATEGORY_SETTING: "onboarding",
-    HOME_GOALS_CATEGORY_SETTING: "the Home page",
+    ONBOARDING_NAME_MEMORY_CATEGORY: "onboarding",
+    ONBOARDING_REASONS_MEMORY_CATEGORY: "onboarding",
+    HOME_GOALS_MEMORY_CATEGORY: "the Home page",
 }
-CATEGORY_NAME_SETTINGS = tuple(PLACE_USING_CATEGORY_SETTING)
 
 
 class MemoryCategoryNotFoundError(LookupError):
@@ -141,10 +142,10 @@ class MemoryCategoryService:
         Raises:
             RequiredMemoryCategoryError: If a setting names the category.
         """
-        settings = self._repositories.platform_settings
+        settings = self._repositories.platform_settings.load()
         places_using_it: list[str] = []
-        for key, place in PLACE_USING_CATEGORY_SETTING.items():
-            if settings.get(key) == category.name and place not in places_using_it:
+        for setting, place in PLACE_USING_CATEGORY_SETTING.items():
+            if settings.get(setting) == category.name and place not in places_using_it:
                 places_using_it.append(place)
         if places_using_it:
             raise RequiredMemoryCategoryError(
@@ -212,11 +213,13 @@ class MemoryCategoryService:
             old_name: The category's old name.
             new_name: Its new name.
         """
-        settings = self._repositories.platform_settings
+        settings = self._repositories.platform_settings.load()
         renamed = {
-            key: new_name
-            for key in CATEGORY_NAME_SETTINGS
-            if settings.get(key) == old_name
+            setting.key: new_name
+            for setting in PLACE_USING_CATEGORY_SETTING
+            if settings.get(setting) == old_name
         }
         if renamed:
-            settings.save_many(renamed, self._clock.now(), admin.id)
+            self._repositories.platform_settings.save_many(
+                renamed, self._clock.now(), admin.id
+            )

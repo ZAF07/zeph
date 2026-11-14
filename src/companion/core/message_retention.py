@@ -1,8 +1,8 @@
 from datetime import timedelta
 
+from companion.core.models import PlatformSettings
+from companion.core.platform_settings import MESSAGE_RETENTION_DAYS
 from companion.core.ports import Clock, ConversationEngine, Repositories
-
-RETENTION_DAYS_SETTING = "message_retention_days"
 
 
 class MessageRetention:
@@ -29,16 +29,17 @@ class MessageRetention:
         self._conversation_engine = conversation_engine
         self._clock = clock
 
-    def delete_expired(self) -> None:
+    def delete_expired(self, settings: PlatformSettings) -> None:
         """Delete messages older than the retention period.
 
         What the conversation engine saved for each User with old messages is
         deleted first, as it holds copies of their messages. If that fails,
         the messages stay too, so the next tick tries again.
+
+        Args:
+            settings: Holds the retention period, read once for the tick.
         """
-        retention = timedelta(
-            days=self._repositories.platform_settings.get(RETENTION_DAYS_SETTING)
-        )
+        retention = timedelta(days=settings.get(MESSAGE_RETENTION_DAYS))
         cutoff = self._clock.now() - retention
         conversations = self._repositories.conversations
         for user_id in conversations.list_users_with_messages_sent_before(cutoff):

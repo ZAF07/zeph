@@ -40,19 +40,22 @@ SNAPSHOT_TABLES = ("users", "feature_switches", "user_feature_switches")
 
 
 @contextmanager
-def reads_by_table(engine: Engine) -> Iterator[dict[str, int]]:
-    """Count the SELECT statements whose main table is a User or switch table.
+def reads_by_table(
+    engine: Engine, tables: tuple[str, ...] = SNAPSHOT_TABLES
+) -> Iterator[dict[str, int]]:
+    """Count the SELECT statements whose main table is one of `tables`.
 
     A table only joined in, like `users` for who changed a switch, isn't
     counted.
 
     Args:
         engine: The database engine the app uses.
+        tables: The tables to count; the User and switch tables by default.
 
     Yields:
         The counts by table name, filled in while the block runs.
     """
-    counts = dict.fromkeys(SNAPSHOT_TABLES, 0)
+    counts = dict.fromkeys(tables, 0)
 
     def count(
         connection: Any,
@@ -64,7 +67,7 @@ def reads_by_table(engine: Engine) -> Iterator[dict[str, int]]:
     ) -> None:
         if not statement.lstrip().upper().startswith("SELECT"):
             return
-        for table in SNAPSHOT_TABLES:
+        for table in tables:
             if re.search(rf"\bFROM {table}\b", statement):
                 counts[table] += 1
 
@@ -186,8 +189,9 @@ def test_snapshots_hold_the_same_feature_statuses_as_the_feature_service(
     features.set_for_user(maya.id, Feature.WEB_SEARCH, UserFeatureSwitch.OFF, admin)
     repositories.users.update(replace(maya, time_zone="Asia/Singapore"))
     loader = UserSnapshotLoader(repositories, clock)
+    settings = repositories.platform_settings.load()
 
-    snapshots = loader.load_many([sam.id, uuid4(), maya.id])
+    snapshots = loader.load_many([sam.id, uuid4(), maya.id], settings)
 
     assert [snapshot.user.id for snapshot in snapshots] == [sam.id, maya.id]
     for snapshot in snapshots:
@@ -201,6 +205,7 @@ def test_snapshots_hold_the_same_feature_statuses_as_the_feature_service(
     ]
     assert maya_snapshot.local_now.utcoffset() == timedelta(hours=8)
     assert maya_snapshot.today == (clock.now() + timedelta(hours=8)).date()
-    assert loader.load(maya.id) == maya_snapshot
+    assert maya_snapshot.settings == settings
+    assert loader.load(maya.id, settings) == maya_snapshot
     with pytest.raises(UserNotFoundError):
-        loader.load(uuid4())
+        loader.load(uuid4(), settings)

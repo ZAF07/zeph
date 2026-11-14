@@ -11,9 +11,14 @@ from companion.core.models import (
     Feature,
     MemoryItem,
     PauseLength,
+    PlatformSettings,
     PreferenceChanges,
     User,
     UserSnapshot,
+)
+from companion.core.platform_settings import (
+    REPLY_DELETE_DATA_INSTRUCTIONS,
+    REPLY_SETTINGS_INSTRUCTIONS,
 )
 from companion.core.ports import ChatTool, Repositories
 from companion.core.reply_tools import ReplyContext, ReplyOffer
@@ -21,8 +26,6 @@ from companion.core.user_data import ChatDataDeletion
 from companion.core.user_memory import MemoryNotFoundError, UserMemoryService
 from companion.core.users import InvalidProfileError, UserService
 
-INSTRUCTIONS_SETTING = "reply_settings_instructions"
-DELETE_DATA_INSTRUCTIONS_SETTING = "reply_delete_data_instructions"
 DELETE_DATA_TOOL = "start_deleting_my_data"
 TELL_THEM = "Tell them plainly what you changed."
 NOTHING_CHANGED = "Nothing changed."
@@ -125,6 +128,7 @@ class ReplySettingsTools:
         check_ins: CheckInService,
         user_memory: UserMemoryService,
         data_deletion: ChatDataDeletion,
+        settings: PlatformSettings,
     ) -> None:
         """Set up the tools for one reply.
 
@@ -135,8 +139,10 @@ class ReplySettingsTools:
             check_ins: Changes Check-in settings.
             user_memory: Lists and forgets Memory Items.
             data_deletion: Asks to delete the User's data.
+            settings: The platform settings, read once for the reply.
         """
         self._user_id = user_id
+        self._settings = settings
         self._repositories = repositories
         self._users = users
         self._check_ins = check_ins
@@ -471,7 +477,7 @@ class ReplySettingsTools:
             What the model is told back, with the confirmation word.
         """
         self._data_deletion.ask(self._user())
-        word = self._data_deletion.confirmation_word()
+        word = self._data_deletion.confirmation_word(self._settings)
         return (
             "Nothing is deleted yet. Tell them this deletes their messages, what "
             "you remember about them, their Check-ins and this Telegram "
@@ -533,16 +539,17 @@ class SettingsTools:
             self._check_ins,
             self._user_memory,
             self._data_deletion,
+            snapshot.settings,
         )
         if snapshot.works(Feature.SETTINGS_IN_CHAT):
             tools = reply_tools.tools
-            instructions_key = INSTRUCTIONS_SETTING
+            instructions = REPLY_SETTINGS_INSTRUCTIONS
         else:
             tools = [
                 tool for tool in reply_tools.tools if tool.name == DELETE_DATA_TOOL
             ]
-            instructions_key = DELETE_DATA_INSTRUCTIONS_SETTING
+            instructions = REPLY_DELETE_DATA_INSTRUCTIONS
         return ReplyOffer(
             tools=tools,
-            instructions=self._repositories.platform_settings.get(instructions_key),
+            instructions=snapshot.settings.get(instructions),
         )

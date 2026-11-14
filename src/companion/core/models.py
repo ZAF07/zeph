@@ -1,3 +1,4 @@
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from enum import StrEnum
@@ -1269,24 +1270,68 @@ class FeatureStatus:
 
 
 @dataclass(frozen=True)
-class UserSnapshot:
-    """A User as they were when a reply or Check-in tick started.
+class Setting[T]:
+    """A platform setting's key and how to read its stored value.
 
-    Read once and passed to every step, so no step reads the User or the
-    Feature switches again, and a switch changed halfway through doesn't
-    change what the rest of the reply or tick does.
+    Attributes:
+        key: The setting's key.
+        read: Turns the stored value into the value callers use; raises if
+            the stored value has the wrong shape.
+    """
+
+    key: str
+    read: Callable[[Any], T]
+
+
+@dataclass(frozen=True)
+class PlatformSettings:
+    """The platform settings as they were when read.
+
+    Read once per reply, Check-in tick or Dashboard request, so a setting an
+    Admin changes halfway through is seen from the next one on.
+
+    Attributes:
+        values: Every setting's stored value, by key.
+    """
+
+    values: Mapping[str, Any]
+
+    def get[T](self, setting: Setting[T]) -> T:
+        """Read one setting.
+
+        Args:
+            setting: The setting's typed key.
+
+        Returns:
+            Its value, read into the setting's type.
+
+        Raises:
+            KeyError: If the setting is not stored.
+        """
+        return setting.read(self.values[setting.key])
+
+
+@dataclass(frozen=True)
+class UserSnapshot:
+    """A User, and the platform settings, as they were when a reply or tick started.
+
+    Read once and passed to every step, so no step reads the User, the
+    Feature switches or the platform settings again, and a change made
+    halfway through doesn't change what the rest of the reply or tick does.
 
     Attributes:
         user: The User.
         local_now: The time where they live when it was read.
         today: Their day when it was read.
         features: Each Feature's status for them, in the order of `FEATURES`.
+        settings: The platform settings, read once for the reply or tick.
     """
 
     user: User
     local_now: datetime
     today: date
     features: tuple[FeatureStatus, ...]
+    settings: PlatformSettings
 
     def works(self, feature: Feature) -> bool:
         """Say whether a Feature works for the User.

@@ -18,10 +18,15 @@ from companion.core.models import (
     MemoryItem,
     MemorySource,
     MessageDirection,
+    PlatformSettings,
     SharedPhoto,
     UserSnapshot,
 )
 from companion.core.personal_stickers import PersonalStickerKeeper
+from companion.core.platform_settings import (
+    MEMORY_PROCESSING_MODEL,
+    MEMORY_PROCESSING_PROMPT,
+)
 from companion.core.ports import Clock, Repositories
 from companion.core.transcripts import to_transcript_lines
 from companion.core.usage import UsageRecordingChatModel
@@ -361,7 +366,7 @@ class PostConversationProcessor:
         self._personal_sticker_keeper = personal_sticker_keeper
         self._clock = clock
 
-    def process(self, conversation: Conversation) -> None:
+    def process(self, conversation: Conversation, settings: PlatformSettings) -> None:
         """Process one ended Conversation and mark it processed.
 
         Personal Stickers are kept first, whatever User Memory says; if that
@@ -374,13 +379,14 @@ class PostConversationProcessor:
 
         Args:
             conversation: The ended Conversation.
+            settings: The platform settings, read once for the tick.
 
         Raises:
             Exception: Whatever the chat model raises; the Conversation stays
                 unprocessed so the next tick tries again.
         """
         user_memory = self._repositories.user_memory
-        snapshot = self._user_snapshots.find(conversation.user_id)
+        snapshot = self._user_snapshots.find(conversation.user_id, settings)
         messages = self._repositories.conversations.list_messages(conversation.id)
         if snapshot is not None:
             self._keep_personal_stickers(snapshot, messages)
@@ -464,12 +470,12 @@ class PostConversationProcessor:
         Returns:
             The answer, or None if both answers were unreadable.
         """
-        settings = self._repositories.platform_settings
+        settings = snapshot.settings
         for _ in range(2):
             answer = self._chat_model.generate(
                 snapshot=snapshot,
-                model=settings.get("memory_processing_model"),
-                instructions=settings.get("memory_processing_prompt"),
+                model=settings.get(MEMORY_PROCESSING_MODEL),
+                instructions=settings.get(MEMORY_PROCESSING_PROMPT),
                 history=[ChatLine(role=ChatRole.USER, text=description)],
             )
             processing_answer = read_processing_answer(answer)

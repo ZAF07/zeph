@@ -8,14 +8,16 @@ from companion.core.models import (
     FeatureReason,
     FeatureStatus,
     FeatureSwitch,
+    PlatformSettings,
     User,
     UserFeatureSwitch,
 )
+from companion.core.platform_settings import (
+    DASHBOARD_URL_PLACEHOLDER,
+    FEATURES_PLACEHOLDER,
+    REPLY_FEATURES_UNAVAILABLE_NOTE,
+)
 from companion.core.ports import Clock, Repositories
-from companion.core.telegram_connection import DASHBOARD_URL_PLACEHOLDER
-
-UNAVAILABLE_NOTE_SETTING = "reply_features_unavailable_note"
-FEATURES_PLACEHOLDER = "{features}"
 
 
 @dataclass(frozen=True)
@@ -219,7 +221,9 @@ class FeatureService:
         if not self.available_for(user_id, feature):
             raise FeatureNotAvailableError(feature)
 
-    def unavailable_note(self, unavailable: Sequence[Feature]) -> str:
+    def unavailable_note(
+        self, unavailable: Sequence[Feature], settings: PlatformSettings
+    ) -> str:
         """Write the reply note naming the Features a User doesn't have.
 
         Features that aren't named in the reply note are left out. User
@@ -229,6 +233,7 @@ class FeatureService:
         Args:
             unavailable: The Features the Admin side has off for the User
                 being replied to.
+            settings: The platform settings, read once for the reply.
 
         Returns:
             The Admin-managed note with the Features' names and the
@@ -243,7 +248,7 @@ class FeatureService:
         names = ", ".join(
             feature_details(feature).name_in_reply_note for feature in named
         )
-        note: str = self._repositories.platform_settings.get(UNAVAILABLE_NOTE_SETTING)
+        note = settings.get(REPLY_FEATURES_UNAVAILABLE_NOTE)
         return note.replace(FEATURES_PLACEHOLDER, names).replace(
             DASHBOARD_URL_PLACEHOLDER, self._dashboard_url
         )
