@@ -9,6 +9,7 @@ export const modelSteps: { id: ModelStep; label: string }[] = [
   { id: "check_in", label: "Check-in" },
   { id: "conversation_end", label: "Conversation end" },
   { id: "life_threads", label: "Life Threads" },
+  { id: "portrait", label: "User Portrait" },
   { id: "personal_stickers", label: "Personal Stickers" },
 ];
 
@@ -16,6 +17,7 @@ const traceKindLabels: Record<TraceKind, string> = {
   message: "Message",
   check_in: "Check-in",
   conversation_end: "Conversation end",
+  portrait_rewrite: "Portrait rewrite",
 };
 
 /**

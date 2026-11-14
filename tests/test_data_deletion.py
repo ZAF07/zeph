@@ -58,7 +58,8 @@ def set_up_user_with_every_kind_of_data(
     """Give a User messages, User Memory, a Check-in and a Telegram Connection.
 
     Their User Memory holds a Memory Item, a Conversation Summary, a Shared
-    Photo and a Life Thread, and they have a Personal Sticker.
+    Photo, a Life Thread and a User Portrait, and they have a Personal
+    Sticker.
 
     Returns:
         Their Dashboard API headers and their User ID.
@@ -84,6 +85,7 @@ def set_up_user_with_every_kind_of_data(
             }
         )
     )
+    chat_model.script_portrait("A designer who just started a new job.")
     have_conversation(
         client,
         chat_model,
@@ -210,6 +212,8 @@ def test_delete_my_data_removes_every_kind_of_data_but_keeps_the_account(
     assert photos == {"photos": []}
     stickers = client.get("/api/personal-stickers", headers=headers).json()
     assert stickers == {"stickers": []}
+    portrait = client.get("/api/user-portrait", headers=headers).json()
+    assert portrait == {"portrait": None}
     assert recent_check_ins(client, headers) == []
     connection = client.get("/api/telegram-connection", headers=headers).json()
     assert connection == {"connection": None, "latest_token": None}

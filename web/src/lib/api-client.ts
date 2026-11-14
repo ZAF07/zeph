@@ -168,6 +168,7 @@ export type AdminUser = {
   conversation_count: number;
   messages_sent: number;
   life_thread_count: number;
+  has_portrait: boolean;
 };
 
 /** A User's role after a change. */
@@ -386,12 +387,19 @@ export type Home = {
   ai_notice: string;
 };
 
-/** A short account of one Conversation and how the User seemed. */
+/** A short account of one Conversation, how the User seemed and what Zeph offered. */
 export type ConversationSummary = {
   id: string;
   summary: string;
   mood: string;
+  offered: string;
   created_at: string;
+};
+
+/** Zeph's short picture of the User: who they are and what helps them. */
+export type UserPortrait = {
+  text: string;
+  updated_at: string;
 };
 
 /** An ongoing story in the User's life that Zeph follows. */
@@ -469,7 +477,8 @@ export type CheckInLogEntry = {
 };
 
 /** What a Model Call Log trace was for. */
-export type TraceKind = "message" | "check_in" | "conversation_end";
+export type TraceKind =
+  "message" | "check_in" | "conversation_end" | "portrait_rewrite";
 
 /** Which step of the Companion's work a model call was for. */
 export type ModelStep =
@@ -480,6 +489,7 @@ export type ModelStep =
   | "check_in"
   | "conversation_end"
   | "life_threads"
+  | "portrait"
   | "personal_stickers";
 
 /** A Model Call Log trace in a list: who, when and totals. Never content. */
@@ -656,6 +666,8 @@ export type ApiClient = {
   deleteConversationSummary: (id: string) => Promise<void>;
   listLifeThreads: () => Promise<LifeThread[]>;
   deleteLifeThread: (id: string) => Promise<void>;
+  getUserPortrait: () => Promise<UserPortrait | null>;
+  deleteUserPortrait: () => Promise<void>;
   listSharedPhotos: () => Promise<SharedPhoto[]>;
   getSharedPhotoImage: (id: string) => Promise<Blob>;
   deleteSharedPhoto: (id: string) => Promise<void>;
@@ -869,6 +881,10 @@ export function createApiClient(
       (await request<{ threads: LifeThread[] }>("/api/life-threads")).threads,
     deleteLifeThread: (id) =>
       request<void>(`/api/life-threads/${id}`, "DELETE"),
+    getUserPortrait: async () =>
+      (await request<{ portrait: UserPortrait | null }>("/api/user-portrait"))
+        .portrait,
+    deleteUserPortrait: () => request<void>("/api/user-portrait", "DELETE"),
     listSharedPhotos: async () =>
       (await request<{ photos: SharedPhoto[] }>("/api/shared-photos")).photos,
     getSharedPhotoImage: (id) => requestBlob(`/api/shared-photos/${id}/image`),

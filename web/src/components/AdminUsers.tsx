@@ -220,6 +220,7 @@ export function AdminUsers() {
                     "Conversations",
                     "Messages sent",
                     "Life Threads",
+                    "Portrait",
                     "Role",
                   ].map((heading) => (
                     <th
@@ -281,6 +282,9 @@ export function AdminUsers() {
                       </td>
                       <td className="px-[18px] py-3.5 text-right tabular-nums">
                         {user.life_thread_count}
+                      </td>
+                      <td className="px-[18px] py-3.5">
+                        {user.has_portrait ? "Yes" : "No"}
                       </td>
                       <td className="px-[18px] py-3.5">
                         <span

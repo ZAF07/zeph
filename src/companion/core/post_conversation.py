@@ -6,6 +6,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from companion.core.life_threads import LifeThreadKeeper
+from companion.core.memory_retrieval import format_time
 from companion.core.model_call_log import start_trace
 from companion.core.models import (
     ChannelPhoto,
@@ -24,6 +25,7 @@ from companion.core.models import (
     PlatformSettings,
     SharedPhoto,
     TraceKind,
+    Understanding,
     UserSnapshot,
 )
 from companion.core.personal_stickers import PersonalStickerKeeper
@@ -34,6 +36,7 @@ from companion.core.platform_settings import (
 from companion.core.ports import Clock, Embedder, Repositories
 from companion.core.transcripts import to_transcript_lines
 from companion.core.usage import UsageRecordingChatModel
+from companion.core.user_portrait import PortraitWriter
 from companion.core.user_snapshot import UserSnapshotLoader
 
 logger = logging.getLogger(__name__)
@@ -47,7 +50,9 @@ class ProcessingAnswer:
 
     Attributes:
         summary: What was talked about.
-        mood: How the User seemed.
+        mood: How the User seemed, as an arc when it moved.
+        offered: What the Companion offered and how it landed; "" if
+            nothing.
         operations: The add, update and remove operations, as the model
             wrote them; each is checked before it is used.
         photos_to_keep: The photos it picked to keep as Shared Photos, as
@@ -56,6 +61,7 @@ class ProcessingAnswer:
 
     summary: str
     mood: str
+    offered: str
     operations: list[Any]
     photos_to_keep: list[Any]
 
@@ -115,6 +121,7 @@ def read_processing_answer(answer: str) -> ProcessingAnswer | None:
     if not isinstance(parsed, dict):
         return None
     summary, mood = parsed.get("summary"), parsed.get("mood")
+    offered = parsed.get("offered")
     operations = parsed.get("memory_operations", [])
     photos_to_keep = parsed.get("photos_to_keep", [])
     if not isinstance(summary, str) or not summary.strip():
@@ -128,6 +135,7 @@ def read_processing_answer(answer: str) -> ProcessingAnswer | None:
     return ProcessingAnswer(
         summary=summary.strip(),
         mood=mood.strip(),
+        offered=offered.strip() if isinstance(offered, str) else "",
         operations=operations,
         photos_to_keep=photos_to_keep,
     )
@@ -294,11 +302,31 @@ def plan_new_shared_photos(
     return kept
 
 
+def describe_moods(understandings: list[Understanding], time_zone: str | None) -> str:
+    """Write how the Companion read the User's mood at each Message.
+
+    Args:
+        understandings: The Conversation's Understandings, oldest first.
+        time_zone: The User's IANA time zone, for the times.
+
+    Returns:
+        One line per Understanding, e.g. "- 17:02: anxious (high)"; "" if
+        there are none.
+    """
+    return "\n".join(
+        f"- {format_time(understanding.made_at, time_zone)}: "
+        f"{understanding.form.mood or 'unclear'} "
+        f"({understanding.form.intensity.value})"
+        for understanding in understandings
+    )
+
+
 def describe_conversation(
     messages: list[ConversationMessage],
     categories: list[MemoryCategory],
     items_by_number: dict[int, MemoryItem],
     photos_by_number: dict[int, SentPhoto],
+    moods: str = "",
 ) -> str:
     """Write what the post-conversation processing model is given.
 
@@ -308,10 +336,13 @@ def describe_conversation(
         items_by_number: The User's current Memory Items, by number.
         photos_by_number: The photos the User sent that were viewed, by
             number.
+        moods: How the Companion read their mood at each Message, from
+            `describe_moods`.
 
     Returns:
         The Memory Categories new items may go in, what is already
-        remembered, the photos the User sent, and the Conversation.
+        remembered, the photos the User sent, how they seemed through it,
+        and the Conversation.
     """
     category_names = {category.id: category.name for category in categories}
     category_lines = "\n".join(
@@ -331,6 +362,7 @@ def describe_conversation(
         f"Memory Categories:\n{category_lines}\n\n"
         f"What is remembered now:\n{item_lines or 'Nothing yet.'}\n\n"
         f"Photos the person sent:\n{photo_lines or 'None.'}\n\n"
+        f"How Zeph read their mood at each message:\n{moods or 'Not read.'}\n\n"
         f"The Conversation:\n{to_transcript_lines(messages)}"
     )
 
@@ -339,7 +371,9 @@ class PostConversationProcessor:
     """Sums up each ended Conversation and updates the User's User Memory.
 
     It changes their Memory Items, keeps the photos that matter to them as
-    Shared Photos and updates their Life Threads. Each Summary is embedded,
+    Shared Photos, updates their Life Threads and then rewrites their User
+    Portrait. Each Summary records how their mood moved and what the
+    Companion offered and how it landed, and is embedded,
     so it can be found by meaning however old it is. Separately from User
     Memory, it keeps the User's Personal Stickers.
     """
@@ -351,6 +385,7 @@ class PostConversationProcessor:
         chat_model: UsageRecordingChatModel,
         personal_sticker_keeper: PersonalStickerKeeper,
         life_thread_keeper: LifeThreadKeeper,
+        portrait_writer: PortraitWriter,
         embedder: Embedder,
         clock: Clock,
     ) -> None:
@@ -366,6 +401,7 @@ class PostConversationProcessor:
             personal_sticker_keeper: Keeps the stickers the User sent whose
                 meaning was clear.
             life_thread_keeper: Starts and adds to the User's Life Threads.
+            portrait_writer: Rewrites the User's Portrait.
             embedder: Embeds each Summary, so it can be found by meaning.
             clock: Tells the current time.
         """
@@ -374,6 +410,7 @@ class PostConversationProcessor:
         self._chat_model = chat_model
         self._personal_sticker_keeper = personal_sticker_keeper
         self._life_thread_keeper = life_thread_keeper
+        self._portrait_writer = portrait_writer
         self._embedder = embedder
         self._clock = clock
 
@@ -387,9 +424,9 @@ class PostConversationProcessor:
         summary, the operations and the photos to keep as Shared Photos; an
         unreadable answer is asked again once, and if it is still unreadable
         nothing is saved, so a bad answer is never retried forever. Once the
-        Conversation is marked processed, its Life Threads are kept; if that
-        fails, the failure is logged and not tried again, so no Thread is
-        ever added twice.
+        Conversation is marked processed, its Life Threads are kept and then
+        the User Portrait is rewritten; if either fails, the failure is
+        logged and not tried again, so no Thread is ever added twice.
 
         Args:
             conversation: The ended Conversation.
@@ -419,10 +456,14 @@ class PostConversationProcessor:
             if snapshot.works(Feature.PHOTO_VIEWING)
             else {}
         )
+        moods = describe_moods(
+            self._repositories.understandings.list_for_conversation(conversation.id),
+            snapshot.user.time_zone,
+        )
         answer = self._ask(
             snapshot,
             describe_conversation(
-                messages, categories, items_by_number, photos_by_number
+                messages, categories, items_by_number, photos_by_number, moods
             ),
         )
         if answer is None:
@@ -440,6 +481,7 @@ class PostConversationProcessor:
                 photos_by_number,
             )
         self._keep_life_threads(snapshot, conversation.id, messages)
+        self._write_portrait(snapshot)
 
     def _save_memory(
         self,
@@ -489,6 +531,7 @@ class PostConversationProcessor:
             summary=answer.summary,
             mood=answer.mood,
             created_at=now,
+            offered=answer.offered,
         )
         self._repositories.user_memory.save_processed_conversation(
             conversation.id, now, summary, changes, self._embed(summary)
@@ -511,6 +554,17 @@ class PostConversationProcessor:
             self._life_thread_keeper.keep_from(snapshot, conversation_id, messages)
         except Exception:
             logger.exception("Could not keep Life Threads")
+
+    def _write_portrait(self, snapshot: UserSnapshot) -> None:
+        """Rewrite the User's Portrait, logging a failure instead of raising.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+        """
+        try:
+            self._portrait_writer.write(snapshot)
+        except Exception:
+            logger.exception("Could not write the User Portrait")
 
     def _embed(self, summary: ConversationSummary) -> list[float] | None:
         """Embed a Summary, logging a failure instead of raising.

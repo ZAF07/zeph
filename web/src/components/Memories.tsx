@@ -11,23 +11,26 @@ import { MemoryNote } from "@/components/MemoryNote";
 import { MemoryItemsList } from "@/components/MemoryItemsList";
 import { SharedPhotosList } from "@/components/SharedPhotosList";
 import { Switch } from "@/components/Switch";
+import { UserPortraitSection } from "@/components/UserPortraitSection";
 import { notAvailableText } from "@/lib/features";
 import { queryKeys, useMe, useUpdatePreferences } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
-type Tab = "memories" | "threads" | "summaries" | "photos";
+type Tab = "memories" | "portrait" | "threads" | "summaries" | "photos";
 
 const tabs: { id: Tab; label: string }[] = [
   { id: "memories", label: "Memories" },
+  { id: "portrait", label: "About you" },
   { id: "threads", label: "What’s going on" },
   { id: "summaries", label: "Conversation Summaries" },
   { id: "photos", label: "Photos" },
 ];
 
 /**
- * The Memories page: what Zeph remembers, by Memory Category, the Life
- * Threads it follows, the Conversation Summaries and the Shared Photos, each
- * deletable, with the User Memory switch.
+ * The Memories page: what Zeph remembers, by Memory Category, its User
+ * Portrait of the User, the Life Threads it follows, the Conversation
+ * Summaries and the Shared Photos, each deletable, with the User Memory
+ * switch.
  *
  * @returns The page, a loading block, or an error with Try again.
  */
@@ -48,6 +51,10 @@ export function Memories() {
     queryKey: queryKeys.lifeThreads,
     queryFn: () => apiClient.listLifeThreads(),
   });
+  const portraitQuery = useQuery({
+    queryKey: queryKeys.userPortrait,
+    queryFn: () => apiClient.getUserPortrait(),
+  });
   const photosQuery = useQuery({
     queryKey: queryKeys.sharedPhotos,
     queryFn: () => apiClient.listSharedPhotos(),
@@ -55,6 +62,7 @@ export function Memories() {
   const queries = [
     meQuery,
     groupsQuery,
+    portraitQuery,
     threadsQuery,
     summariesQuery,
     photosQuery,
@@ -65,7 +73,10 @@ export function Memories() {
   const threads = threadsQuery.data;
   const summaries = summariesQuery.data;
   const photos = photosQuery.data;
-  const isLoaded = Boolean(me && groups && threads && summaries && photos);
+  const portrait = portraitQuery.data;
+  const isLoaded = Boolean(
+    me && groups && portrait !== undefined && threads && summaries && photos,
+  );
   const loadFailed = !isLoaded && queries.some((query) => query.isError);
   const timeZone = me?.time_zone ?? undefined;
 
@@ -82,9 +93,9 @@ export function Memories() {
         <div className="flex flex-col gap-2">
           <h1 className="m-0 text-h1 font-normal">Memories</h1>
           <p className="m-0 max-w-[40em] text-body text-ink-soft">
-            What Zeph remembers, what’s going on in your life, short summaries
-            of past Conversations and the photos it kept. Delete anything you’d
-            rather it forgot.
+            What Zeph remembers, what it knows about you, what’s going on in
+            your life, short summaries of past Conversations and the photos it
+            kept. Delete anything you’d rather it forgot.
           </p>
           <p className="m-0 text-caption text-blue">
             You can also tell Zeph “forget that”.
@@ -168,6 +179,10 @@ export function Memories() {
 
       {isLoaded && groups && tab === "memories" ? (
         <MemoryItemsList groups={groups} timeZone={timeZone} />
+      ) : null}
+
+      {isLoaded && portrait !== undefined && tab === "portrait" ? (
+        <UserPortraitSection portrait={portrait} timeZone={timeZone} />
       ) : null}
 
       {isLoaded && threads && tab === "threads" ? (

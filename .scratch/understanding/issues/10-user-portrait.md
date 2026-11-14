@@ -1,6 +1,6 @@
 # 10 — User Portrait
 
-Status: ready-for-agent
+Status: in-progress
 
 ## Parent
 
@@ -31,3 +31,15 @@ The Companion has a sense of who the User is as a whole (`CONTEXT.md` "User Port
 ## Blocked by
 
 - `.scratch/understanding/issues/09-threads-on-memories-page.md`
+
+## Comments
+
+**Plan (14 Nov 2026, branch `understanding-10-user-portrait`, worktree `ai-chat-companion-understanding-10`):**
+
+- Summaries: the Conversation-end call is shown the Conversation's Understandings (time, mood, intensity) and writes `mood` as an arc plus a new `offered` field (what Zeph offered and how it landed). New column `conversation_summaries.offered`. Replies, the Understanding and the Dashboard show it.
+- New `user_portraits` table (one row per User): text, when its inputs were read, when a rewrite was asked for.
+- `PortraitWriter` (own Admin prompt and model, step `portrait`): writes the Portrait from Memory Items, Life Threads and the newest Summaries only, never from the old Portrait, so a deleted thing can't survive a rewrite. Runs at Conversation end after Life Thread keeping, only while User Memory works.
+- Used every time: the Portrait joins `SavedMemory`, so the Understanding sees it and the reply's memory section starts with it, also when the Understanding fails.
+- Deleting a Memory Item or Thread (Dashboard or chat) asks for a rewrite in the database; the next scheduler tick (every minute) rewrites it. Survives restarts and merges several deletes into one rewrite.
+- Deleting the Portrait clears it (row kept, text emptied, time noted), so a Conversation-end write already under way can't bring it back. A save only lands if its inputs were read after the last save or clear.
+- Dashboard API `GET/DELETE /api/user-portrait`; Memories page "About you" tab ("What I know about you"); Admin Users page shows only whether a User has one. Delete My Data and Account Deletion remove it.

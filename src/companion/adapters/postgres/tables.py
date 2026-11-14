@@ -278,6 +278,7 @@ conversation_summaries = Table(
     Column("mood", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("embedding", Vector(EMBEDDING_SIZE)),
+    Column("offered", Text, nullable=False, server_default=""),
 )
 
 life_threads = Table(
@@ -308,6 +309,25 @@ life_threads = Table(
     Column("last_reaction", Text),
     Column("embedding", Vector(EMBEDDING_SIZE)),
     Index("life_threads_name_keys", "name_keys", postgresql_using="gin"),
+)
+
+user_portraits = Table(
+    "user_portraits",
+    metadata,
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("text", Text),
+    Column("written_at", DateTime(timezone=True)),
+    Column("rewrite_requested_at", DateTime(timezone=True)),
+    Index(
+        "ix_user_portraits_rewrite_requested_at",
+        "rewrite_requested_at",
+        postgresql_where=text("rewrite_requested_at IS NOT NULL"),
+    ),
 )
 
 shared_photos = Table(

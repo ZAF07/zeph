@@ -97,6 +97,20 @@ def format_day(moment: datetime, time_zone: str | None) -> str:
     return f"{local.day} {local:%b %Y}"
 
 
+def format_time(moment: datetime, time_zone: str | None) -> str:
+    """Write a time of day like "17:02" in the User's time zone.
+
+    Args:
+        moment: The moment.
+        time_zone: The User's IANA time zone, if known; UTC otherwise.
+
+    Returns:
+        The time.
+    """
+    local = moment.astimezone(ZoneInfo(time_zone)) if time_zone else moment
+    return f"{local:%H:%M}"
+
+
 def summary_line(summary: ConversationSummary, time_zone: str | None) -> str:
     """Write one Conversation Summary as the reply's memory section lists it.
 
@@ -105,12 +119,14 @@ def summary_line(summary: ConversationSummary, time_zone: str | None) -> str:
         time_zone: The User's IANA time zone, for the day it was written.
 
     Returns:
-        E.g. "- 9 Nov 2026: Talked about a new job. They seemed excited."
+        E.g. "- 9 Nov 2026: Talked about a new job. They seemed excited.
+        Suggested a walk; they said it helped."
     """
-    return (
+    line = (
         f"- {format_day(summary.created_at, time_zone)}: {summary.summary} "
         f"They seemed {summary.mood}."
     )
+    return f"{line} {summary.offered}" if summary.offered else line
 
 
 def format_memory(
@@ -121,6 +137,7 @@ def format_memory(
     intro: str,
     shared_photos: Sequence[SharedPhoto] = (),
     older_summaries: Sequence[ConversationSummary] = (),
+    portrait: str = "",
 ) -> str:
     """Write the User Memory part of the reply instructions.
 
@@ -133,11 +150,13 @@ def format_memory(
         shared_photos: The Shared Photos that matter for the message.
         older_summaries: Older Conversation Summaries found by meaning,
             closest first.
+        portrait: The User Portrait; "" if they have none.
 
     Returns:
-        The memory section, or "" if there is nothing to tell.
+        The memory section, starting with the Portrait, or "" if there is
+        nothing to tell.
     """
-    sections = []
+    sections = [f"Who they are:\n{portrait}"] if portrait else []
     for category in categories:
         lines = [
             f"- {item.content}" for item in items if item.category_id == category.id
@@ -177,6 +196,7 @@ class SavedMemory:
         pickable: The categories the Understanding may pick: active ones
             with items that aren't "always include", then the "Shared
             Photos" group when the User has Shared Photos.
+        portrait: The User Portrait; "" if they have none.
     """
 
     categories: list[MemoryCategory]
@@ -184,6 +204,7 @@ class SavedMemory:
     summaries: list[ConversationSummary]
     shared_photos: list[SharedPhoto]
     pickable: list[MemoryCategory]
+    portrait: str = ""
 
     def items_in(self, category_name: str) -> list[MemoryItem]:
         """List the Memory Items in one category, found by name ignoring case.
@@ -218,7 +239,8 @@ class MemoryRetrieval:
     def read(self, snapshot: UserSnapshot) -> SavedMemory:
         """Read what the Companion has saved about the User, once per reply.
 
-        Archived categories are left out. What is saved is used even while
+        Archived categories are left out. The User Portrait is read too.
+        What is saved is used even while
         User Memory is off, since off only stops learning; no Shared Photo
         is used when Photo Viewing doesn't work.
 
@@ -252,6 +274,7 @@ class MemoryRetrieval:
             pickable.append(
                 shared_photos_group(settings.get(SHARED_PHOTOS_MEMORY_DESCRIPTION))
             )
+        portrait = self._repositories.user_portraits.find(user_id)
         return SavedMemory(
             categories=active_categories,
             items=items,
@@ -260,6 +283,7 @@ class MemoryRetrieval:
             ),
             shared_photos=shared_photos,
             pickable=pickable,
+            portrait=portrait.text if portrait else "",
         )
 
     def recall(
@@ -271,7 +295,8 @@ class MemoryRetrieval:
     ) -> RecalledMemory:
         """Pick out what the Companion remembers that matters for the message.
 
-        Memory Items from every "always include" category go in, plus those
+        The User Portrait goes first. Memory Items from every "always
+        include" category go in, plus those
         from the categories the Understanding picked, plus the newest
         Conversation Summaries, plus older Summaries found by meaning. All
         the User's Shared Photos go in when the Understanding picked "Shared
@@ -316,6 +341,7 @@ class MemoryRetrieval:
                 snapshot.settings.get(REPLY_MEMORY_INTRO),
                 relevant_photos,
                 self._find_older_summaries(snapshot, saved, look_up_past),
+                saved.portrait,
             ),
             shared_photo_ids=tuple(photo.id for photo in relevant_photos),
         )
