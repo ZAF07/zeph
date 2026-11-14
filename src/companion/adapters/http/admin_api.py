@@ -20,10 +20,7 @@ from companion.core.admin_users import AdminUserService
 from companion.core.check_in_kinds import CheckInKindService
 from companion.core.check_ins import CheckInService, LoggedCheckIn
 from companion.core.features import FeatureService, feature_details
-from companion.core.helplines import (
-    HelplineService,
-    MoveDirection,
-)
+from companion.core.helplines import HelplineService
 from companion.core.knowledge import (
     MAX_UPLOAD_BYTES,
     KnowledgeService,
@@ -57,6 +54,9 @@ from companion.core.models import (
     ModelCallTraceDetails,
     ModelCallTraceOverview,
     ModelStep,
+    MoveDirection,
+    Need,
+    NeedDetails,
     RiskType,
     SafeguardEventOverview,
     StoredSetting,
@@ -66,6 +66,7 @@ from companion.core.models import (
     UserOverview,
     UserRole,
 )
+from companion.core.needs import NeedService
 from companion.core.personal_stickers import PersonalStickerService
 from companion.core.platform_settings import (
     CORE_SERVICES,
@@ -261,7 +262,7 @@ class HelplineRequest(HelplineDetailsRequest):
 
 
 class MoveRequest(BaseModel):
-    """Which way to move a Helpline in its country's list."""
+    """Which way to move a Helpline or Need in its list."""
 
     direction: MoveDirection
 
@@ -318,6 +319,42 @@ class CheckInKindRequest(BaseModel):
             The details.
         """
         return CheckInKindDetails(name=self.name, description=self.description)
+
+
+class NeedResponse(BaseModel):
+    """A Need as Admins see it."""
+
+    id: str
+    name: str
+    when_it_fits: str
+    how_to_reply: str
+    is_fallback: bool
+
+
+class NeedsResponse(BaseModel):
+    """Every Need in order."""
+
+    needs: list[NeedResponse]
+
+
+class NeedRequest(BaseModel):
+    """A Need's name, when it fits and how to reply."""
+
+    name: str
+    when_it_fits: str
+    how_to_reply: str
+
+    def to_details(self) -> NeedDetails:
+        """Turn the request into Need details.
+
+        Returns:
+            The details.
+        """
+        return NeedDetails(
+            name=self.name,
+            when_it_fits=self.when_it_fits,
+            how_to_reply=self.how_to_reply,
+        )
 
 
 class CheckInLogEntryResponse(BaseModel):
@@ -657,6 +694,36 @@ def to_check_in_kind_response(kind: CheckInKind) -> CheckInKindResponse:
     )
 
 
+def to_need_response(need: Need) -> NeedResponse:
+    """Describe a Need for the admin area.
+
+    Args:
+        need: The Need.
+
+    Returns:
+        The response body.
+    """
+    return NeedResponse(
+        id=str(need.id),
+        name=need.name,
+        when_it_fits=need.when_it_fits,
+        how_to_reply=need.how_to_reply,
+        is_fallback=need.is_fallback,
+    )
+
+
+def to_needs_response(needs: list[Need]) -> NeedsResponse:
+    """Describe every Need for the admin area.
+
+    Args:
+        needs: The Needs, in order.
+
+    Returns:
+        The response body.
+    """
+    return NeedsResponse(needs=[to_need_response(need) for need in needs])
+
+
 def to_check_in_log_entry_response(logged: LoggedCheckIn) -> CheckInLogEntryResponse:
     """Describe a Check-in decision for the admin area; never its message.
 
@@ -952,6 +1019,7 @@ def build_admin_api_router(
     check_in_service: CheckInService,
     usage_limiter: UsageLimiter,
     model_call_log: ModelCallLog,
+    need_service: NeedService,
 ) -> APIRouter:
     """Build the admin API routes.
 
@@ -973,6 +1041,7 @@ def build_admin_api_router(
         check_in_service: Lists Check-in decisions.
         usage_limiter: Reports usage per User per day.
         model_call_log: Lists and opens Model Call Log traces.
+        need_service: Manages Needs.
 
     Returns:
         The router.
@@ -1468,6 +1537,81 @@ def build_admin_api_router(
         """
         check_in_kind_service.remove(kind_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @router.get("/needs")
+    def list_needs() -> NeedsResponse:
+        """List every Need in order.
+
+        Returns:
+            The Needs.
+        """
+        return to_needs_response(need_service.list_all())
+
+    @router.post("/needs", status_code=status.HTTP_201_CREATED)
+    def add_need(request: NeedRequest) -> NeedResponse:
+        """Add a Need last in the list.
+
+        Args:
+            request: The Need.
+
+        Returns:
+            The saved Need.
+
+        Raises:
+            CoreError: 422 if a field is blank or too long, or the name is
+                taken.
+        """
+        return to_need_response(need_service.add(request.to_details()))
+
+    @router.put("/needs/{need_id}")
+    def update_need(need_id: UUID, request: NeedRequest) -> NeedResponse:
+        """Change a Need's name, when it fits and how to reply.
+
+        Args:
+            need_id: The Need to change.
+            request: Its new values.
+
+        Returns:
+            The saved Need.
+
+        Raises:
+            CoreError: 404 if there is no such Need; 422 if a field is blank
+                or too long, or the name is taken.
+        """
+        return to_need_response(need_service.update(need_id, request.to_details()))
+
+    @router.delete("/needs/{need_id}", status_code=status.HTTP_204_NO_CONTENT)
+    def delete_need(need_id: UUID) -> Response:
+        """Remove a Need; saved Understandings keep its name.
+
+        Args:
+            need_id: The Need to remove.
+
+        Returns:
+            An empty response.
+
+        Raises:
+            CoreError: 404 if there is no such Need; 409 if it is the
+                fallback Need.
+        """
+        need_service.delete(need_id)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @router.post("/needs/{need_id}/move")
+    def move_need(need_id: UUID, request: MoveRequest) -> NeedsResponse:
+        """Move a Need up or down in the list.
+
+        Args:
+            need_id: The Need to move.
+            request: Which way to move it.
+
+        Returns:
+            Every Need in the new order.
+
+        Raises:
+            CoreError: 404 if there is no such Need.
+        """
+        return to_needs_response(need_service.move(need_id, request.direction))
 
     @router.get("/check-ins")
     def list_check_in_log(

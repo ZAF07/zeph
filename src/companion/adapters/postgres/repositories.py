@@ -95,6 +95,7 @@ from companion.core.models import (
     ModelStep,
     MoodIntensity,
     Need,
+    NeedDetails,
     NextDueTimeChange,
     OfferedTool,
     PersonalSticker,
@@ -174,6 +175,25 @@ def _to_user(row: Row[Any]) -> User:
             for setting, changed_at in row.settings_changed_in_chat.items()
         },
         data_deletion_requested_at=row.data_deletion_requested_at,
+    )
+
+
+def _to_need(row: Row[Any]) -> Need:
+    """Turn a `needs` row into a Need.
+
+    Args:
+        row: The row.
+
+    Returns:
+        The Need.
+    """
+    return Need(
+        id=row.id,
+        name=row.name,
+        when_it_fits=row.when_it_fits,
+        how_to_reply=row.how_to_reply,
+        sort_order=row.sort_order,
+        is_fallback=row.is_fallback,
     )
 
 
@@ -1523,17 +1543,91 @@ class PostgresNeedRepository:
         """
         with self._database.connect() as connection:
             rows = connection.execute(select(needs).order_by(needs.c.sort_order)).all()
-        return [
-            Need(
-                id=row.id,
-                name=row.name,
-                when_it_fits=row.when_it_fits,
-                how_to_reply=row.how_to_reply,
-                sort_order=row.sort_order,
-                is_fallback=row.is_fallback,
-            )
-            for row in rows
-        ]
+        return [_to_need(row) for row in rows]
+
+    def get(self, need_id: UUID) -> Need | None:
+        """Find one Need.
+
+        Args:
+            need_id: The Need's ID.
+
+        Returns:
+            The Need, or None if there is no such Need.
+        """
+        with self._database.connect() as connection:
+            row = connection.execute(select(needs).where(needs.c.id == need_id)).first()
+        return _to_need(row) if row else None
+
+    def add(self, details: NeedDetails) -> Need:
+        """Add a Need last in the list; it is never the fallback.
+
+        Args:
+            details: Its name, when it fits and how to reply.
+
+        Returns:
+            The saved Need.
+        """
+        with self._database.begin() as connection:
+            highest = connection.execute(select(func.max(needs.c.sort_order))).scalar()
+            row = connection.execute(
+                insert(needs)
+                .values(
+                    id=uuid4(),
+                    name=details.name,
+                    when_it_fits=details.when_it_fits,
+                    how_to_reply=details.how_to_reply,
+                    sort_order=0 if highest is None else int(highest) + 1,
+                    is_fallback=False,
+                )
+                .returning(needs)
+            ).one()
+        return _to_need(row)
+
+    def update(self, need_id: UUID, details: NeedDetails) -> Need:
+        """Save a Need's name, when it fits and how to reply.
+
+        Args:
+            need_id: The Need's ID.
+            details: Its new values.
+
+        Returns:
+            The saved Need.
+        """
+        with self._database.begin() as connection:
+            row = connection.execute(
+                update(needs)
+                .where(needs.c.id == need_id)
+                .values(
+                    name=details.name,
+                    when_it_fits=details.when_it_fits,
+                    how_to_reply=details.how_to_reply,
+                )
+                .returning(needs)
+            ).one()
+        return _to_need(row)
+
+    def delete(self, need_id: UUID) -> None:
+        """Remove a Need.
+
+        Args:
+            need_id: The Need's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(delete(needs).where(needs.c.id == need_id))
+
+    def set_sort_orders(self, sort_orders: Mapping[UUID, int]) -> None:
+        """Save new sort orders for several Needs in one step.
+
+        Args:
+            sort_orders: The new sort order for each Need ID.
+        """
+        with self._database.begin() as connection:
+            for need_id, sort_order in sort_orders.items():
+                connection.execute(
+                    update(needs)
+                    .where(needs.c.id == need_id)
+                    .values(sort_order=sort_order)
+                )
 
 
 class PostgresUnderstandingRepository:

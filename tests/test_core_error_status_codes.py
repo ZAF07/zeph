@@ -40,6 +40,7 @@ from companion.core.memory_categories import (
     RequiredMemoryCategoryError,
 )
 from companion.core.models import Feature
+from companion.core.needs import FallbackNeedError, InvalidNeedError, NeedNotFoundError
 from companion.core.personal_stickers import PersonalStickerNotFoundError
 from companion.core.photos import SharedPhotoNotFoundError
 from companion.core.platform_settings import InvalidSettingError
@@ -82,6 +83,7 @@ ERRORS_WITH_STATUS_AND_DETAIL: list[tuple[CoreError, type[CoreError], int, str]]
         "No such Memory Category",
     ),
     (CheckInKindNotFoundError(uuid4()), NotFoundError, 404, "No such Check-in Kind"),
+    (NeedNotFoundError(uuid4()), NotFoundError, 404, "No such Need"),
     (StickerNotFoundError(uuid4()), NotFoundError, 404, "No such sticker"),
     (
         StickerSetNotFoundError("cats"),
@@ -122,6 +124,7 @@ ERRORS_WITH_STATUS_AND_DETAIL: list[tuple[CoreError, type[CoreError], int, str]]
     ),
     (InvalidMemoryCategoryError("Needs a name."), InvalidError, 422, "Needs a name."),
     (InvalidCheckInKindError("Needs a name."), InvalidError, 422, "Needs a name."),
+    (InvalidNeedError("Needs a name."), InvalidError, 422, "Needs a name."),
     (
         InvalidStickerError("Enter a sticker set name."),
         InvalidError,
@@ -158,6 +161,12 @@ ERRORS_WITH_STATUS_AND_DETAIL: list[tuple[CoreError, type[CoreError], int, str]]
         ConflictError,
         409,
         "The international fallback can't be removed, only edited.",
+    ),
+    (
+        FallbackNeedError(),
+        ConflictError,
+        409,
+        "The fallback Need can't be deleted, only edited.",
     ),
     (
         RequiredMemoryCategoryError("Goals is used by the Home page."),

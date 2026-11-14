@@ -41,6 +41,7 @@ export const queryKeys = {
     filter,
   ],
   checkInKinds: ["check-in-kinds"],
+  needs: ["needs"],
   checkInLog: (days: number) => ["check-in-log", days],
   modelCallTraces: (filter: ModelCallTraceFilter) => [
     "model-call-traces",

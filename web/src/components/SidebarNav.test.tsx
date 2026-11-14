@@ -42,6 +42,7 @@ describe("SidebarNav", () => {
       "Safeguard Events",
       "Knowledge",
       "Memory Categories",
+      "Needs",
       "Check-in Kinds",
       "Check-in log",
       "Sticker Library",

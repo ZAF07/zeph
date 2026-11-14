@@ -1,17 +1,14 @@
-from enum import StrEnum
 from uuid import UUID
 
 from companion.core.errors import ConflictError, InvalidError, NotFoundError
-from companion.core.models import Helpline, HelplineDetails, HelplinesToShare
+from companion.core.models import (
+    Helpline,
+    HelplineDetails,
+    HelplinesToShare,
+    MoveDirection,
+)
 from companion.core.ports import HelplineRepository
 from companion.core.users import InvalidProfileError, check_country
-
-
-class MoveDirection(StrEnum):
-    """Which way to move a Helpline in its country's list."""
-
-    UP = "up"
-    DOWN = "down"
 
 
 class HelplineNotFoundError(NotFoundError):

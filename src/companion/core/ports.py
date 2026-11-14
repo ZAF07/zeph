@@ -43,6 +43,7 @@ from companion.core.models import (
     ModelCallTraceOverview,
     ModelStep,
     Need,
+    NeedDetails,
     NextDueTimeChange,
     PersonalSticker,
     PhotoImage,
@@ -838,6 +839,56 @@ class NeedRepository(Protocol):
 
         Returns:
             The Needs.
+        """
+        ...
+
+    def get(self, need_id: UUID) -> Need | None:
+        """Find one Need.
+
+        Args:
+            need_id: The Need's ID.
+
+        Returns:
+            The Need, or None if there is no such Need.
+        """
+        ...
+
+    def add(self, details: NeedDetails) -> Need:
+        """Add a Need last in the list; it is never the fallback.
+
+        Args:
+            details: Its name, when it fits and how to reply.
+
+        Returns:
+            The saved Need.
+        """
+        ...
+
+    def update(self, need_id: UUID, details: NeedDetails) -> Need:
+        """Save a Need's name, when it fits and how to reply.
+
+        Args:
+            need_id: The Need's ID.
+            details: Its new values.
+
+        Returns:
+            The saved Need.
+        """
+        ...
+
+    def delete(self, need_id: UUID) -> None:
+        """Remove a Need.
+
+        Args:
+            need_id: The Need's ID.
+        """
+        ...
+
+    def set_sort_orders(self, sort_orders: Mapping[UUID, int]) -> None:
+        """Save new sort orders for several Needs in one step.
+
+        Args:
+            sort_orders: The new sort order for each Need ID.
         """
         ...
 

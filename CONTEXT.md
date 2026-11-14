@@ -175,7 +175,7 @@ _Avoid_: Profile, persona (Persona is the Companion's voice), bio
 ### Understanding
 
 **Need**:
-What the User wants from the Companion right now (e.g. to be heard, to think it through, advice, accountability on a Goal). Before each reply the Companion picks the one that fits best, fresh for every message. Managed by Admins: each has a name, when it fits, and how to reply, and only the picked Need's "how to reply" shapes the reply. One fallback Need ("Ask more", to start) is used when it isn't clear, or when the Understanding can't be made; it can be edited but never deleted. Any other Need can be deleted.
+What the User wants from the Companion right now (e.g. to be heard, to think it through, advice, accountability on a Goal). Before each reply the Companion picks the one that fits best, fresh for every message. Managed by Admins: each has a name, when it fits, and how to reply, and only the picked Need's "how to reply" shapes the reply. One fallback Need ("Ask more", to start) is used when it isn't clear, or when the Understanding can't be made; it can be edited but never deleted. Any other Need can be deleted; Understandings that named it keep the name. No two Needs share a name, ignoring case, and Admins set the order they are listed in. Changes reach the next reply.
 _Avoid_: Intent, mode, mood (mood is how a User seemed in a Conversation Summary)
 
 **Understanding**:
