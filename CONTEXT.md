@@ -77,7 +77,7 @@ A break from Check-ins for a day, a week or until the User resumes, which keeps 
 _Avoid_: Snooze, mute
 
 **Check-in Kind**:
-The style of a Check-in (e.g. casual hello, follow-up on something shared, present-moment prompt), chosen from the User's recent Conversation Summaries and Memory Items. Managed by Admins; only Kinds marked "allowed without User Memory" go to a User with User Memory off. Some Kinds send one of the User's own Shared Photos with the message (e.g. "a look back at a photo"); these always need User Memory, go only to a User who has Shared Photos, and Admins can edit or remove them but not change what they send. Users see the Kinds read-only.
+The style of a Check-in (e.g. casual hello, follow-up on something shared, present-moment prompt), chosen from the User's recent Conversation Summaries and Memory Items. Managed by Admins; any Kind can go to a User whether or not User Memory is on, since off only stops learning. Some Kinds send one of the User's own Shared Photos with the message (e.g. "a look back at a photo"); these go only to a User who has Shared Photos and Photo Viewing working, and Admins can edit or remove them but not change what they send. Users see the Kinds read-only.
 _Avoid_: Template, check-in type
 
 **Skipped Check-in**:
