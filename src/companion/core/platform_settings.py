@@ -146,6 +146,7 @@ MEMORY_NOT_AVAILABLE_NOTE = Setting("memory_not_available_note", read_text)
 ONBOARDING_REASON_CHOICES = Setting("onboarding_reason_choices", read_text_list)
 CONVERSATION_QUIET_GAP = Setting("conversation_quiet_gap_minutes", read_minutes)
 MESSAGE_WAIT_SECONDS = Setting("message_wait_seconds", read_whole_number)
+TYPING_REPEAT_SECONDS = Setting("typing_repeat_seconds", read_whole_number)
 MESSAGE_RETENTION_DAYS = Setting("message_retention_days", read_whole_number)
 TYPING_SECONDS_PER_CHARACTER = Setting("typing_seconds_per_character", read_number)
 MIN_TYPING_SECONDS = Setting("min_typing_seconds", read_number)
@@ -549,6 +550,13 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=30,
+    ),
+    EditableSetting(
+        TYPING_REPEAT_SECONDS.key,
+        "Typing repeat",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=5,
     ),
     EditableSetting(
         DAILY_MESSAGE_LIMIT.key,

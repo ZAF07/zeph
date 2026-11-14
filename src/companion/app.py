@@ -59,6 +59,7 @@ from companion.core.scheduled_work import ScheduledWork
 from companion.core.sticker_adding import StickerAdding
 from companion.core.stickers import StickerLibraryService, StickerTools
 from companion.core.telegram_connection import TelegramConnectionService
+from companion.core.typing_keeper import TypingKeeper
 from companion.core.usage import UsageLimiter, UsageRecordingChatModel
 from companion.core.user_data import ChatDataDeletion, UserDataService
 from companion.core.user_memory import UserMemoryService
@@ -130,6 +131,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     Returns:
         The FastAPI app.
     """
+    typing_keeper = TypingKeeper(dependencies.chat_channel, dependencies.timer)
     feature_service = FeatureService(
         dependencies.repositories, dependencies.clock, dependencies.dashboard_url
     )
@@ -157,7 +159,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         user_snapshots=user_snapshots,
         chat_model=chat_model,
         usage_limiter=usage_limiter,
-        chat_channel=dependencies.chat_channel,
+        chat_channel=typing_keeper,
         clock=dependencies.clock,
     )
     user_service = UserService(
@@ -170,32 +172,32 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     )
     telegram_connection_service = TelegramConnectionService(
         repositories=dependencies.repositories,
-        chat_channel=dependencies.chat_channel,
+        chat_channel=typing_keeper,
         clock=dependencies.clock,
         dashboard_url=dependencies.dashboard_url,
     )
     helpline_service = HelplineService(dependencies.repositories.helplines)
     sticker_library = StickerLibraryService(
-        dependencies.repositories, dependencies.chat_channel, dependencies.clock
+        dependencies.repositories, typing_keeper, dependencies.clock
     )
     personal_sticker_service = PersonalStickerService(
-        dependencies.repositories, dependencies.chat_channel
+        dependencies.repositories, typing_keeper
     )
     conversation_service = ConversationService(
         repositories=dependencies.repositories,
-        chat_channel=dependencies.chat_channel,
+        chat_channel=typing_keeper,
         clock=dependencies.clock,
     )
     sticker_adding = StickerAdding(
         repositories=dependencies.repositories,
         sticker_library=sticker_library,
-        chat_channel=dependencies.chat_channel,
+        chat_channel=typing_keeper,
         deliver_notice=conversation_service.deliver_notice,
         timer=dependencies.timer,
         dashboard_url=dependencies.dashboard_url,
     )
     chat_data_deletion = ChatDataDeletion(
-        dependencies.repositories, dependencies.chat_channel, dependencies.clock
+        dependencies.repositories, typing_keeper, dependencies.clock
     )
     safeguard = Safeguard(
         repositories=dependencies.repositories,
@@ -205,7 +207,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     )
     photo_service = PhotoService(
         repositories=dependencies.repositories,
-        chat_channel=dependencies.chat_channel,
+        chat_channel=typing_keeper,
         chat_model=chat_model,
         clock=dependencies.clock,
     )
@@ -255,7 +257,8 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         repositories=dependencies.repositories,
         reply_gate=reply_gate,
         reply_service=reply_service,
-        chat_channel=dependencies.chat_channel,
+        chat_channel=typing_keeper,
+        typing_keeper=typing_keeper,
         sticker_adding=sticker_adding,
         photo_service=photo_service,
         user_snapshots=user_snapshots,

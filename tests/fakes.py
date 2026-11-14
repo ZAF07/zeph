@@ -20,6 +20,7 @@ from companion.core.models import (
     WebSearchResult,
 )
 from companion.core.ports import ChatTool
+from companion.core.typing_keeper import TYPING_WAIT_PREFIX
 
 TOKENS_IN_PER_CALL = 120
 TOKENS_OUT_PER_CALL = 30
@@ -402,6 +403,12 @@ class FakeTimer:
     def end_message_waits(self) -> None:
         """Run the waiting Message work now, as if each User had paused."""
         keys = [key for key in self._waiting if key.startswith(MESSAGE_WAIT_PREFIX)]
+        for key in keys:
+            self._waiting.pop(key)()
+
+    def end_typing_waits(self) -> None:
+        """Run the waiting typing work now, as if each typing wait had ended."""
+        keys = [key for key in self._waiting if key.startswith(TYPING_WAIT_PREFIX)]
         for key in keys:
             self._waiting.pop(key)()
 

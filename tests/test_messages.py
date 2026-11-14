@@ -3,6 +3,7 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
+from companion.core.incoming_messages import MESSAGE_WAIT_PREFIX
 from tests.fakes import FakeAuthVerifier, FakeChatChannel, FakeTimer, ScriptedChatModel
 from tests.telegram_helpers import (
     TELEGRAM_CHAT_ID,
@@ -89,7 +90,9 @@ def test_the_wait_is_the_admins_message_wait_setting(
 
     post_texts(client, "hey", "you there?")
 
-    [first_wait, second_wait] = timer.waits
+    [first_wait, second_wait] = [
+        wait for wait in timer.waits if wait[0].startswith(MESSAGE_WAIT_PREFIX)
+    ]
     assert first_wait == second_wait
     assert first_wait[1] == 7
 

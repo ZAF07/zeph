@@ -22,6 +22,7 @@ function seeded(value: string | number) {
 const settings: AdminSettings = {
   conversation_quiet_gap_minutes: seeded(60),
   message_wait_seconds: seeded(4),
+  typing_repeat_seconds: seeded(4),
   web_search_daily_limit: seeded(10),
   ai_notice: seeded("I'm an AI."),
   ai_notice_short: seeded("Zeph is an AI."),
@@ -209,6 +210,24 @@ describe("PlatformSettingsForm", () => {
 
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       message_wait_seconds: 6,
+    });
+  });
+
+  it("shows and saves the typing repeat in its Conversations section", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const repeat = await screen.findByLabelText("Typing repeat");
+    expect(repeat).toHaveValue(4);
+    expect(
+      screen.getByRole("region", { name: "Conversations" }),
+    ).toContainElement(repeat);
+
+    await user.clear(repeat);
+    await user.type(repeat, "3");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      typing_repeat_seconds: 3,
     });
   });
 

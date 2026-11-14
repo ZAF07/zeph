@@ -22,6 +22,7 @@ from companion.core.platform_settings import (
     DASHBOARD_URL_PLACEHOLDER,
     MESSAGE_WAIT_SECONDS,
     REPLY_FAILED_MESSAGE,
+    TYPING_REPEAT_SECONDS,
     UNKNOWN_TELEGRAM_USER_REPLY,
     UNSUPPORTED_MESSAGE_REPLY,
 )
@@ -31,6 +32,7 @@ from companion.core.reply_service import ReplyService
 from companion.core.sticker_adding import StickerAdding
 from companion.core.stickers import sticker_message_text
 from companion.core.telegram_connection import TelegramConnectionService
+from companion.core.typing_keeper import TypingKeeper
 from companion.core.user_snapshot import UserSnapshotLoader
 
 logger = logging.getLogger(__name__)
@@ -150,6 +152,8 @@ class IncomingMessageHandler:
     text is saved and checked by the Safeguard as it arrives, so a crisis
     is never held back by the wait. A User's turns run one at a time, so a
     text that arrives while a reply is being written starts a new Message.
+    From the first text until something is sent back, typing is shown again
+    every `typing_repeat_seconds`, so the chat never looks dead.
     """
 
     def __init__(
@@ -159,6 +163,7 @@ class IncomingMessageHandler:
         reply_gate: ReplyGate,
         reply_service: ReplyService,
         chat_channel: ChatChannel,
+        typing_keeper: TypingKeeper,
         sticker_adding: StickerAdding,
         photo_service: PhotoService,
         user_snapshots: UserSnapshotLoader,
@@ -174,6 +179,7 @@ class IncomingMessageHandler:
             reply_gate: Saves each text and checks it for crisis.
             reply_service: Answers connected Users' Messages.
             chat_channel: Sends replies that need no Conversation.
+            typing_keeper: Keeps typing shown while a Message is answered.
             sticker_adding: Adds the stickers Admins send in adding mode or
                 reply "add this" to.
             photo_service: Describes the photos Users send.
@@ -190,6 +196,7 @@ class IncomingMessageHandler:
         self._reply_gate = reply_gate
         self._reply_service = reply_service
         self._chat_channel = chat_channel
+        self._typing_keeper = typing_keeper
         self._dashboard_url = dashboard_url
         self._turn_locks: defaultdict[UUID, threading.Lock] = defaultdict(
             threading.Lock
@@ -287,6 +294,9 @@ class IncomingMessageHandler:
         try:
             with self._turn_lock_for(user_id):
                 settings = self._repositories.platform_settings.load()
+                self._typing_keeper.keep_up(
+                    message.chat_id, settings.get(TYPING_REPEAT_SECONDS)
+                )
                 with self._pending_messages_guard:
                     trace = self._pending_messages.setdefault(
                         user_id, PendingMessage(chat_id=message.chat_id)
@@ -374,7 +384,8 @@ class IncomingMessageHandler:
         with no photos and no caption gets the unsupported reply. The
         platform settings and the User are read once, inside their turn, and
         that snapshot is used for the whole reply. If the reply fails the
-        User gets a short fallback reply instead of silence.
+        User gets a short fallback reply instead of silence. Typing is kept
+        up until something is sent, and always stops once the answer ends.
 
         Args:
             user_id: The User who paused.
@@ -386,6 +397,9 @@ class IncomingMessageHandler:
             if pending is None:
                 return
             settings = self._repositories.platform_settings.load()
+            self._typing_keeper.keep_up(
+                pending.chat_id, settings.get(TYPING_REPEAT_SECONDS)
+            )
             try:
                 snapshot = self._user_snapshots.load(user_id, settings, pending.trace)
                 for album_items in group_albums(pending.album_items):
@@ -414,6 +428,8 @@ class IncomingMessageHandler:
                 self._chat_channel.send_text(
                     pending.chat_id, settings.get(REPLY_FAILED_MESSAGE)
                 )
+            finally:
+                self._typing_keeper.stop(pending.chat_id)
 
     def _album_text_to_screen(
         self,

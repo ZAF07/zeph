@@ -49,6 +49,13 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
         unit: "sec",
       },
       {
+        key: "typing_repeat_seconds",
+        label: "Typing repeat",
+        caption:
+          "Telegram hides “typing” after about 5 seconds, so while a reply is being written Zeph shows it again this often, until the reply starts.",
+        unit: "sec",
+      },
+      {
         key: "daily_message_limit",
         label: "Daily message limit",
         caption: "Per User. Safety replies never count toward it.",
