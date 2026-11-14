@@ -7,6 +7,8 @@ from uuid import UUID
 
 from companion.core.errors import ConflictError, InvalidError, NotFoundError
 from companion.core.models import (
+    ChatLine,
+    ChatRole,
     EmbeddedChunk,
     KnowledgeDetailsChange,
     KnowledgeDocument,
@@ -16,7 +18,12 @@ from companion.core.models import (
     KnowledgeStatus,
     KnowledgeUpload,
 )
+from companion.core.platform_settings import (
+    KNOWLEDGE_WHEN_IT_HELPS_MODEL,
+    KNOWLEDGE_WHEN_IT_HELPS_PROMPT,
+)
 from companion.core.ports import (
+    ChatModel,
     Clock,
     DocumentTextExtractor,
     Embedder,
@@ -29,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 CHUNK_MAX_CHARACTERS = 1_000
+DRAFT_TEXT_MAX_CHARACTERS = 6_000
 FILE_TYPES_BY_EXTENSION = {
     ".txt": KnowledgeFileType.TEXT,
     ".md": KnowledgeFileType.MARKDOWN,
@@ -216,13 +224,31 @@ def check_file_content(content: bytes) -> None:
         raise InvalidKnowledgeDocumentError("The file is bigger than 20 MB.")
 
 
+def describe_document_for_drafting(document: KnowledgeDocument, text: str) -> str:
+    """Write what the model is given to draft a document's "when it helps".
+
+    Args:
+        document: The document.
+        text: Its text; only the start is given.
+
+    Returns:
+        Its title, source, tradition and the start of its text.
+    """
+    return (
+        f"Title: {document.title}\n"
+        f"Source: {document.source}\n"
+        f"Tradition: {document.tradition}\n\n"
+        f"Text:\n{text[:DRAFT_TEXT_MAX_CHARACTERS]}"
+    )
+
+
 class KnowledgeService:
     """Lets Admins build the Knowledge library the Companion draws on.
 
     An uploaded document starts pending. Ingestion reads its file's text and
     saves it on the document, then splits that text into chunks, embeds them
-    and stores them; then the document is ready for replies, or failed with a
-    reason Admins can read.
+    and stores them, and drafts its "when it helps" if it has none; then the
+    document is ready for replies, or failed with a reason Admins can read.
     """
 
     def __init__(
@@ -231,21 +257,25 @@ class KnowledgeService:
         text_extractor: DocumentTextExtractor,
         embedder: Embedder,
         vector_store: KnowledgeVectorStore,
+        chat_model: ChatModel,
         clock: Clock,
     ) -> None:
         """Set up the service.
 
         Args:
-            repositories: Where Knowledge documents are stored.
+            repositories: Where Knowledge documents and settings are stored.
             text_extractor: Reads the text out of uploaded files.
             embedder: Turns chunks into embeddings.
             vector_store: Stores the chunks' embeddings.
+            chat_model: Drafts each document's "when it helps". It is for no
+                User, so it isn't counted in usage or the Model Call Log.
             clock: Tells the current time.
         """
         self._repositories = repositories
         self._text_extractor = text_extractor
         self._embedder = embedder
         self._vector_store = vector_store
+        self._chat_model = chat_model
         self._clock = clock
 
     def list_documents(self) -> list[KnowledgeDocument]:
@@ -299,10 +329,11 @@ class KnowledgeService:
     def update_details(
         self, document_id: UUID, change: KnowledgeDetailsChange
     ) -> KnowledgeDocumentWithText:
-        """Change a document's title, source or tradition.
+        """Change a document's title, source, tradition or "when it helps".
 
         Takes effect straight away with no re-indexing: replies read a
-        document's details when they are composed.
+        document's details when they are composed. "When it helps" may be
+        blank.
 
         Args:
             document_id: The document's ID.
@@ -319,6 +350,9 @@ class KnowledgeService:
             title=optional_detail(change.title, BLANK_TITLE),
             source=optional_detail(change.source, BLANK_SOURCE),
             tradition=optional_detail(change.tradition, BLANK_TRADITION),
+            when_it_helps=(
+                None if change.when_it_helps is None else change.when_it_helps.strip()
+            ),
         )
         documents = self._repositories.knowledge_documents
         if documents.update_details(document_id, cleaned) is None:
@@ -556,7 +590,8 @@ class KnowledgeService:
         Its old chunks are swapped for the new ones in one step, only when
         indexing succeeds; otherwise it is marked failed. If an Admin saved
         newer text meanwhile, this older run stops and leaves the document to
-        the run that indexes the newer text.
+        the run that indexes the newer text. A document with no "when it
+        helps" gets one drafted before it is ready.
 
         Args:
             document_id: The document's ID.
@@ -579,7 +614,41 @@ class KnowledgeService:
             logger.exception("Could not index Knowledge document %s", document_id)
             self._fail(document_id, INDEXING_FAILED_REASON)
             return
+        self._draft_when_it_helps(document_id, text)
         documents.set_status(document_id, KnowledgeStatus.READY, failure_reason=None)
+
+    def _draft_when_it_helps(self, document_id: UUID, text: str) -> None:
+        """Draft a document's "when it helps" if it has none.
+
+        A failed draft is logged and leaves it blank, for an Admin to write.
+        A description an Admin saves while the draft is written is kept.
+
+        Args:
+            document_id: The document's ID.
+            text: Its text.
+        """
+        documents = self._repositories.knowledge_documents
+        document = documents.get(document_id)
+        if document is None or document.when_it_helps:
+            return
+        settings = self._repositories.platform_settings.load()
+        try:
+            answer = self._chat_model.generate(
+                model=settings.get(KNOWLEDGE_WHEN_IT_HELPS_MODEL),
+                instructions=settings.get(KNOWLEDGE_WHEN_IT_HELPS_PROMPT),
+                history=[
+                    ChatLine(
+                        role=ChatRole.USER,
+                        text=describe_document_for_drafting(document, text),
+                    )
+                ],
+            )
+        except Exception:
+            logger.exception(
+                "Could not draft when Knowledge document %s helps", document_id
+            )
+            return
+        documents.fill_blank_when_it_helps(document_id, answer.text.strip())
 
     def _fail(self, document_id: UUID, reason: str) -> None:
         """Mark a document failed with the reason Admins are shown.

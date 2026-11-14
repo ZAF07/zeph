@@ -21,6 +21,7 @@ from companion.main import (
     MEMORY_CATEGORIES_SEED_FILE,
     NEEDS_SEED_FILE,
     SEED_FILE,
+    build_chat_model,
     build_clock,
     build_database_engine,
     build_embedder,
@@ -54,9 +55,10 @@ def prepare() -> None:
     """Get everything ready before the backend starts serving.
 
     Checks settings, migrates the database, loads seed data (embedding the
-    starter Knowledge on first run, finishing any upload a restart
-    interrupted and saving the text of documents uploaded before text was
-    saved) and registers the Telegram webhook unless turned off.
+    starter Knowledge and drafting when each document helps on first run,
+    finishing any upload a restart interrupted and saving the text of
+    documents uploaded before text was saved) and registers the Telegram
+    webhook unless turned off.
     """
     settings = load_settings()
     migrate(settings.database_url)
@@ -71,6 +73,7 @@ def prepare() -> None:
         text_extractor=build_text_extractor(settings),
         embedder=build_embedder(settings),
         vector_store=build_vector_store(settings, engine),
+        chat_model=build_chat_model(settings),
         clock=build_clock(settings),
     )
     knowledge_service.ingest_pending()

@@ -30,7 +30,8 @@ const libraryPath = "/admin/knowledge";
  * One Knowledge document's page: its details (editable), status and why it
  * failed, Replace file, the text Zeph draws on in the Knowledge text editor
  * (editable), Retry when it failed and Delete. Checks again every few
- * seconds while the document is pending.
+ * seconds while the document is pending. The Details form starts afresh when
+ * the status changes, so a "when it helps" drafted while it was pending shows.
  *
  * @param props - `documentId` is the document to show.
  * @returns The page body, or a loading, not-found or error state.
@@ -221,6 +222,7 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
       ) : null}
 
       <KnowledgeDetailsForm
+        key={knowledgeDocument.status}
         knowledgeDocument={knowledgeDocument}
         onSave={(change) => saveDetails(knowledgeDocument, change)}
       />

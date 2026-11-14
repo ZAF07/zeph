@@ -381,6 +381,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 text_extractor=dependencies.text_extractor,
                 embedder=dependencies.embedder,
                 vector_store=dependencies.knowledge_vector_store,
+                chat_model=dependencies.chat_model,
                 clock=dependencies.clock,
             ),
             sticker_library=sticker_library,

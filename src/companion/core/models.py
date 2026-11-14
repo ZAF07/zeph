@@ -880,6 +880,19 @@ class ThreadLeftAlone:
 
 
 @dataclass(frozen=True)
+class KnowledgeLookup:
+    """The Knowledge the Understanding chose to search for a reply.
+
+    Attributes:
+        documents: The titles of the Knowledge documents to search.
+        search: The phrase to search them with.
+    """
+
+    documents: tuple[str, ...]
+    search: str
+
+
+@dataclass(frozen=True)
 class UnderstandingForm:
     """The form the Understanding model fills in before each reply.
 
@@ -893,7 +906,7 @@ class UnderstandingForm:
         bring_up: The Life Threads to bring up, and how.
         left_alone: The Life Threads to leave alone, and why.
         look_up_past: Phrases to search older Summaries with.
-        knowledge: Knowledge to look up; empty until it is used.
+        knowledge: The Knowledge to search; None when no Knowledge fits.
         threads_touched: The titles of the Life Threads the Message touches.
     """
 
@@ -906,7 +919,7 @@ class UnderstandingForm:
     bring_up: tuple[ThreadToBringUp, ...] = ()
     left_alone: tuple[ThreadLeftAlone, ...] = ()
     look_up_past: tuple[str, ...] = ()
-    knowledge: tuple[str, ...] = ()
+    knowledge: KnowledgeLookup | None = None
     threads_touched: tuple[str, ...] = ()
 
 
@@ -1135,11 +1148,13 @@ class KnowledgeDetailsChange:
         title: Its new title.
         source: Who wrote or translated it.
         tradition: The tradition it belongs to.
+        when_it_helps: When the document fits what a User needs.
     """
 
     title: str | None = None
     source: str | None = None
     tradition: str | None = None
+    when_it_helps: str | None = None
 
 
 @dataclass(frozen=True)
@@ -1158,6 +1173,8 @@ class KnowledgeDocument:
         text_edited: Whether an Admin edited its text since it was last read
             from its file.
         created_at: When it was uploaded.
+        when_it_helps: When it fits what a User needs, as the Understanding
+            reads it; "" until drafted or written by an Admin.
     """
 
     id: UUID
@@ -1170,6 +1187,7 @@ class KnowledgeDocument:
     failure_reason: str | None
     text_edited: bool
     created_at: datetime
+    when_it_helps: str
 
 
 @dataclass(frozen=True)

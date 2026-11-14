@@ -104,6 +104,18 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
     ],
   },
   {
+    heading: "Knowledge",
+    fields: [
+      {
+        key: "knowledge_closeness_percent",
+        label: "Knowledge closeness bar",
+        caption:
+          "How close in meaning a passage must be to what Zeph searches for, inside the documents it chose. Fitting passages score about 65–75; unrelated ones about 50.",
+        unit: "%",
+      },
+    ],
+  },
+  {
     heading: "Check-ins",
     fields: [
       {

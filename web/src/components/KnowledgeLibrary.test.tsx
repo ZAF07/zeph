@@ -37,6 +37,7 @@ function knowledgeDocument(
     failure_reason: null,
     text_edited: false,
     created_at: "2026-10-02T09:00:00Z",
+    when_it_helps: "",
     ...overrides,
   };
 }

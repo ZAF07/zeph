@@ -75,3 +75,15 @@ def document_text(
     assert response.status_code == 200, response.text
     text: str | None = response.json()["text"]
     return text
+
+
+def set_knowledge_closeness(
+    client: TestClient, admin: dict[str, str], percent: int
+) -> None:
+    """Set how close a Knowledge passage must be to go into a reply."""
+    response = client.patch(
+        "/api/admin/settings",
+        json={"values": {"knowledge_closeness_percent": percent}},
+        headers=admin,
+    )
+    assert response.status_code == 200, response.text

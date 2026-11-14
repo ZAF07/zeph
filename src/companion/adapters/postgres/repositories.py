@@ -122,6 +122,7 @@ from companion.core.models import (
     UserRole,
 )
 from companion.core.ports import Repositories, Transaction
+from companion.core.understanding import read_knowledge_lookup
 
 
 class Database(Protocol):
@@ -469,6 +470,7 @@ def _to_knowledge_document(row: Row[Any]) -> KnowledgeDocument:
         failure_reason=row.failure_reason,
         text_edited=row.text_edited,
         created_at=row.created_at,
+        when_it_helps=row.when_it_helps,
     )
 
 
@@ -1756,7 +1758,7 @@ def _to_understanding_form(stored: dict[str, Any]) -> UnderstandingForm:
             for item in stored["left_alone"]
         ),
         look_up_past=tuple(stored["look_up_past"]),
-        knowledge=tuple(stored["knowledge"]),
+        knowledge=read_knowledge_lookup(stored["knowledge"]),
         threads_touched=tuple(stored["threads_touched"]),
     )
 
@@ -2588,6 +2590,26 @@ class PostgresKnowledgeDocumentRepository:
                 .returning(*KNOWLEDGE_DOCUMENT_COLUMNS)
             ).first()
         return _to_knowledge_document(row) if row else None
+
+    def fill_blank_when_it_helps(self, document_id: UUID, when_it_helps: str) -> None:
+        """Save a Knowledge document's "when it helps" only if it is still blank.
+
+        Checked in the same step as the save, so a description an Admin
+        saved meanwhile is never overwritten.
+
+        Args:
+            document_id: The document's ID.
+            when_it_helps: The description.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                update(knowledge_documents)
+                .where(
+                    knowledge_documents.c.id == document_id,
+                    knowledge_documents.c.when_it_helps == "",
+                )
+                .values(when_it_helps=when_it_helps)
+            )
 
     def replace_file(
         self, document_id: UUID, file: KnowledgeFile

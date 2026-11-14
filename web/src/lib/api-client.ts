@@ -599,6 +599,8 @@ export type KnowledgeDocument = {
   failure_reason: string | null;
   text_edited: boolean;
   created_at: string;
+  /** When it fits what a User needs, as the Understanding reads it; "" until drafted. */
+  when_it_helps: string;
 };
 
 /** A Knowledge document with the text replies draw on; null until read. */
@@ -611,6 +613,7 @@ export type KnowledgeDetailsChange = {
   title?: string;
   source?: string;
   tradition?: string;
+  when_it_helps?: string;
 };
 
 /** A Knowledge document as an Admin uploads it. */

@@ -1,19 +1,19 @@
 import logging
-from uuid import UUID
 
 from companion.core.models import (
     Feature,
     KnowledgeChunkMatch,
     KnowledgeDocument,
+    KnowledgeLookup,
     KnowledgeStatus,
     UserSnapshot,
 )
 from companion.core.platform_settings import (
     KNOWLEDGE_CHUNKS_PER_REPLY,
+    KNOWLEDGE_CLOSENESS_PERCENT,
     REPLY_KNOWLEDGE_INTRO,
 )
 from companion.core.ports import Embedder, KnowledgeVectorStore, Repositories
-from companion.core.transcripts import split_off_latest_message
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +52,30 @@ def format_knowledge(
     return intro + "\n\n" + "\n\n".join(passages)
 
 
+def chosen_documents(
+    documents: list[KnowledgeDocument], lookup: KnowledgeLookup
+) -> list[KnowledgeDocument]:
+    """Find the Ready documents the Understanding chose, by title.
+
+    Args:
+        documents: Every Knowledge document.
+        lookup: What the Understanding chose.
+
+    Returns:
+        The Ready documents whose title it named, in any case; a title that
+        matches none is ignored.
+    """
+    titles = {title.casefold() for title in lookup.documents}
+    return [
+        document
+        for document in documents
+        if document.status == KnowledgeStatus.READY
+        and document.title.casefold() in titles
+    ]
+
+
 class KnowledgeRetrieval:
-    """Finds the Knowledge that may fit the message being answered."""
+    """Finds passages in the Knowledge documents the Understanding chose."""
 
     def __init__(
         self,
@@ -64,50 +86,47 @@ class KnowledgeRetrieval:
         """Set up Knowledge retrieval.
 
         Args:
-            repositories: Where Conversations, Knowledge documents and
-                settings are stored.
-            embedder: Embeds the message to search with.
+            repositories: Where Knowledge documents are stored.
+            embedder: Embeds the Understanding's search phrase.
             vector_store: Finds the closest Knowledge chunks.
         """
         self._repositories = repositories
         self._embedder = embedder
         self._vector_store = vector_store
 
-    def recall(self, snapshot: UserSnapshot, conversation_id: UUID) -> str:
-        """Write the Knowledge passages closest to the latest Message.
+    def recall(self, snapshot: UserSnapshot, lookup: KnowledgeLookup | None) -> str:
+        """Write the passages from the chosen documents closest to the phrase.
 
-        The latest Message, all its texts, is embedded and the top few
-        chunks, as many as the `knowledge_chunks_per_reply` setting says, are
-        given with where they come from. Nothing is searched when Knowledge
-        doesn't work for the User. If the search fails the reply goes ahead
-        without them.
+        Only the chosen Ready documents are searched, and only passages at
+        least as close as the Admin-set bar count, at most
+        `knowledge_chunks_per_reply`, given with where they come from.
+        Nothing is searched when the Understanding chose nothing or
+        Knowledge doesn't work for the User. If the search fails the reply
+        goes ahead without them.
 
         Args:
             snapshot: The User being replied to.
-            conversation_id: The Conversation the message is in.
+            lookup: What the Understanding chose to search; None for nothing.
 
         Returns:
             The Knowledge section for the reply instructions; "" if none.
         """
-        if not snapshot.works(Feature.KNOWLEDGE):
+        if lookup is None or not snapshot.works(Feature.KNOWLEDGE):
             return ""
         settings = snapshot.settings
         limit = settings.get(KNOWLEDGE_CHUNKS_PER_REPLY)
-        messages = self._repositories.conversations.list_messages(conversation_id)
-        _, latest_text = split_off_latest_message(messages)
-        if limit < 1 or not latest_text:
+        documents = self._repositories.knowledge_documents.list_all()
+        chosen = chosen_documents(documents, lookup)
+        if limit < 1 or not chosen:
             return ""
         try:
             matches = self._vector_store.search(
-                self._embedder.embed_query(latest_text), limit
+                self._embedder.embed_query(lookup.search),
+                [document.id for document in chosen],
+                min_closeness=settings.get(KNOWLEDGE_CLOSENESS_PERCENT) / 100,
+                limit=limit,
             )
         except Exception:
             logger.exception("Knowledge retrieval could not search Knowledge")
             return ""
-        if not matches:
-            return ""
-        return format_knowledge(
-            matches,
-            self._repositories.knowledge_documents.list_all(),
-            settings.get(REPLY_KNOWLEDGE_INTRO),
-        )
+        return format_knowledge(matches, chosen, settings.get(REPLY_KNOWLEDGE_INTRO))

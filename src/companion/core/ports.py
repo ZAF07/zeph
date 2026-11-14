@@ -377,11 +377,21 @@ class KnowledgeVectorStore(Protocol):
         """
         ...
 
-    def search(self, embedding: list[float], limit: int) -> list[KnowledgeChunkMatch]:
-        """Find the chunks closest to an embedding.
+    def search(
+        self,
+        embedding: list[float],
+        document_ids: Sequence[UUID],
+        min_closeness: float,
+        limit: int,
+    ) -> list[KnowledgeChunkMatch]:
+        """Find the chunks of some documents closest to an embedding.
+
+        Closeness is cosine similarity.
 
         Args:
             embedding: What to search with.
+            document_ids: The documents to search; only their chunks count.
+            min_closeness: How close a chunk must be, from 0 to 1.
             limit: The most chunks to return.
 
         Returns:
@@ -1484,6 +1494,18 @@ class KnowledgeDocumentRepository(Protocol):
 
         Returns:
             The saved document, or None if there is none.
+        """
+        ...
+
+    def fill_blank_when_it_helps(self, document_id: UUID, when_it_helps: str) -> None:
+        """Save a Knowledge document's "when it helps" only if it is still blank.
+
+        Checked in the same step as the save, so a description an Admin
+        saved meanwhile is never overwritten.
+
+        Args:
+            document_id: The document's ID.
+            when_it_helps: The description.
         """
         ...
 

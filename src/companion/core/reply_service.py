@@ -14,12 +14,12 @@ class ReplyService:
     The steps run in this order: the ReplyGate applies the house rules left
     once the Message's texts are saved and checked, then the Companion is
     reminded of the User's Life Threads the Message touches, then the
-    Understanding works out what the User needs, which User Memory matters
-    and which Threads to bring up or leave alone, then that memory, any
-    older Conversations it asked to look up and the Knowledge that may fit
-    are recalled, then the reply is composed and delivered, and the Threads
-    it brought up are marked raised. Every step reads the User from the
-    same snapshot.
+    Understanding works out what the User needs, which User Memory matters,
+    which Threads to bring up or leave alone and which Knowledge documents
+    fit, then that memory, any older Conversations it asked to look up and
+    passages from the Knowledge documents it chose are recalled, then the
+    reply is composed and delivered, and the Threads it brought up are
+    marked raised. Every step reads the User from the same snapshot.
     """
 
     def __init__(
@@ -42,7 +42,8 @@ class ReplyService:
             understanding: Works out what the User needs before each reply.
             memory_retrieval: Reads the User Memory and picks out what the
                 Understanding chose.
-            knowledge_retrieval: Finds the Knowledge that may fit a message.
+            knowledge_retrieval: Finds passages in the Knowledge documents the
+                Understanding chose.
             response_composer: Writes the Companion's reply.
         """
         self._reply_gate = reply_gate
@@ -76,7 +77,7 @@ class ReplyService:
         memory = self._memory_retrieval.recall(
             snapshot, saved_memory, form.memory_categories, form.look_up_past
         )
-        knowledge = self._knowledge_retrieval.recall(snapshot, message.conversation_id)
+        knowledge = self._knowledge_retrieval.recall(snapshot, form.knowledge)
         reply = self._response_composer.compose(
             message.conversation_id,
             snapshot,

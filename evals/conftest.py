@@ -207,6 +207,7 @@ def client(
     spent). The Model Call Log keeps full content for every call, as Eval
     runs do (ADR-0010).
     """
+    timer = FakeTimer()
     dependencies = AppDependencies(
         repositories=build_postgres_repositories(engine),
         chat_channel=chat_channel,
@@ -220,12 +221,12 @@ def client(
         web_search=FakeWebSearch(),
         clock=clock,
         scheduler=FakeScheduler(),
-        timer=FakeTimer(),
+        timer=timer,
         telegram_webhook_secret=WEBHOOK_SECRET,
         telegram_bot_username=BOT_USERNAME,
         dashboard_url=DASHBOARD_URL,
         initial_admin_emails=frozenset({INITIAL_ADMIN_EMAIL}),
         model_call_content_for_everyone=True,
     )
-    with CompanionTestClient(create_app(dependencies), engine) as test_client:
+    with CompanionTestClient(create_app(dependencies), engine, timer) as test_client:
         yield test_client
