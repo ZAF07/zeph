@@ -57,10 +57,11 @@ Routes in `adapters/http/dashboard_api.py` and `admin_api.py` catch core errors 
   - Handlers registered once; no hand mapping: `add_core_error_handlers(app)` at `src/companion/app.py:295` only; `grep "except " src/companion/adapters/http/` finds none.
   - Every core error has a base class and keeps its status: `tests/test_core_error_status_codes.py`, 29 cases (each error, its base, status and exact body) plus one showing a new error gets its status from its base.
   - Home and Check-ins make one core call each; no settings reads in routes: `get_home` → `home_service.get(user)`, `get_check_ins` → `check_in_service.page(user)`; `grep "platform_settings\.|\.load()"` in `dashboard_api.py` finds none.
-  - Checks: `pytest` 735 passed (9 evals deselected); `ruff check .` and `ruff format --check .` clean; `mypy` no issues in 106 files.
+  - Checks (after rebase on the Understanding docs): `pytest` 735 passed (9 evals deselected); `ruff check .` and `ruff format --check .` clean; `mypy` no issues in 106 files.
   - `/run`: see Comments.
 - Commits:
-  - 01893bd "Architecture issue 09: map core errors to HTTP once"
-  - db97ff4 "Review fixes: one helper each for the /me and Check-ins responses"
-  - <archive and merge commits to be added>
+  - 0261446 "Architecture issue 09: map core errors to HTTP once"
+  - 77f2f1c "Review fixes: one helper each for the /me and Check-ins responses"
+  - 4c2092e "Architecture issue 09 done: archive issue with test, run and review evidence; ADR 0011 says core errors carry their kind and HTTP maps each kind once"
+  - 52031d4 "Merge architecture issue 09: map core errors to HTTP once; …" (merged into main)
 
