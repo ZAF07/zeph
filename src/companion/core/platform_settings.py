@@ -88,6 +88,18 @@ def read_hours(value: Any) -> timedelta:
     return timedelta(hours=read_whole_number(value))
 
 
+def read_days(value: Any) -> timedelta:
+    """Read a stored setting that holds a number of days.
+
+    Args:
+        value: The stored value.
+
+    Returns:
+        That many days.
+    """
+    return timedelta(days=read_whole_number(value))
+
+
 def read_text_list(value: Any) -> list[str]:
     """Read a stored setting that holds a list of texts.
 
@@ -184,6 +196,13 @@ OLDER_SUMMARIES_PER_REPLY = Setting("older_summaries_per_reply", read_whole_numb
 OLDER_SUMMARIES_CLOSENESS_PERCENT = Setting(
     "older_summaries_closeness_percent", read_whole_number
 )
+LIFE_THREADS_PER_REPLY = Setting("life_threads_per_reply", read_whole_number)
+LIFE_THREADS_CLOSENESS_PERCENT = Setting(
+    "life_threads_closeness_percent", read_whole_number
+)
+LIFE_THREAD_BRUSHED_OFF_WAIT = Setting("life_thread_brushed_off_wait_days", read_days)
+LIFE_THREAD_KEEPING_MODEL = Setting("life_thread_keeping_model", read_text)
+LIFE_THREAD_KEEPING_PROMPT = Setting("life_thread_keeping_prompt", read_text)
 KNOWLEDGE_CHUNKS_PER_REPLY = Setting("knowledge_chunks_per_reply", read_whole_number)
 REPLY_KNOWLEDGE_INTRO = Setting("reply_knowledge_intro", read_text)
 DAILY_MESSAGE_LIMIT = Setting("daily_message_limit", read_whole_number)
@@ -510,6 +529,16 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         maximum=10,
     ),
     EditableSetting(
+        LIFE_THREAD_KEEPING_PROMPT.key,
+        "Life Thread keeping prompt",
+        SettingKind.TEXT,
+    ),
+    EditableSetting(
+        LIFE_THREAD_KEEPING_MODEL.key,
+        "Life Thread keeping model",
+        SettingKind.MODEL,
+    ),
+    EditableSetting(
         PERSONAL_STICKER_KEEPING_PROMPT.key,
         "Personal Sticker keeping prompt",
         SettingKind.TEXT,
@@ -561,6 +590,27 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=0,
         maximum=100,
+    ),
+    EditableSetting(
+        LIFE_THREADS_PER_REPLY.key,
+        "Most Life Threads per reply",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=10,
+    ),
+    EditableSetting(
+        LIFE_THREADS_CLOSENESS_PERCENT.key,
+        "Life Thread closeness bar",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=100,
+    ),
+    EditableSetting(
+        LIFE_THREAD_BRUSHED_OFF_WAIT.key,
+        "Wait after a brushed-off Life Thread",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=365,
     ),
     EditableSetting(
         CONVERSATION_QUIET_GAP.key,
@@ -714,8 +764,10 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         description=(
             "Reads what the User just said and picks the Need that fits, how "
             "they seem and whether Zeph knows why, and the Memory Categories "
-            "that matter. The reply follows the Need’s “how to reply” and gets "
-            "only those memories plus the always-included ones."
+            "that matter. It sees the Life Threads the message reminds Zeph "
+            "of and picks which to bring up or leave alone. The reply follows "
+            "the Need’s “how to reply” and gets only those memories plus the "
+            "always-included ones."
         ),
         prompt_key=UNDERSTANDING_PROMPT.key,
         model_key=UNDERSTANDING_MODEL.key,
@@ -736,6 +788,19 @@ CORE_SERVICES: tuple[CoreService, ...] = (
             ASK_ABOUT_PHOTO_TOOL_DESCRIPTION.key,
             SEND_PHOTO_TOOL_DESCRIPTION.key,
         ),
+    ),
+    CoreService(
+        name="Life Thread keeping",
+        runs_when="After quiet gap, while User Memory works",
+        description=(
+            "Starts and adds to the User’s Life Threads: the ongoing stories "
+            "in their life, open or settled, with the people or things in "
+            "them. Records how the User took each Thread Zeph brought up, so "
+            "it isn’t raised again too soon, or at all once they asked to "
+            "drop it."
+        ),
+        prompt_key=LIFE_THREAD_KEEPING_PROMPT.key,
+        model_key=LIFE_THREAD_KEEPING_MODEL.key,
     ),
     CoreService(
         name="Personal Sticker keeping",

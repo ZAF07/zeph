@@ -89,6 +89,7 @@ class AdminUserResponse(BaseModel):
     telegram_connected: bool
     conversation_count: int
     messages_sent: int
+    life_thread_count: int
 
 
 class RoleRequest(BaseModel):
@@ -1001,6 +1002,7 @@ def to_admin_user_response(overview: UserOverview) -> AdminUserResponse:
         telegram_connected=overview.telegram_connected,
         conversation_count=overview.conversation_count,
         messages_sent=overview.messages_sent,
+        life_thread_count=overview.life_thread_count,
     )
 
 

@@ -23,6 +23,12 @@ const filters: { id: Filter; label: string }[] = [
   { id: "telegram_not_connected", label: "Telegram not connected" },
 ];
 
+const countHeadings = new Set([
+  "Conversations",
+  "Messages sent",
+  "Life Threads",
+]);
+
 const pill =
   "inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-[3px] text-xs font-medium";
 
@@ -213,16 +219,14 @@ export function AdminUsers() {
                     "Telegram",
                     "Conversations",
                     "Messages sent",
+                    "Life Threads",
                     "Role",
                   ].map((heading) => (
                     <th
                       key={heading}
                       scope="col"
                       className={`whitespace-nowrap border-b border-line bg-subtle px-[18px] py-3.5 font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted ${
-                        heading === "Conversations" ||
-                        heading === "Messages sent"
-                          ? "text-right"
-                          : "text-left"
+                        countHeadings.has(heading) ? "text-right" : "text-left"
                       }`}
                     >
                       {heading}
@@ -274,6 +278,9 @@ export function AdminUsers() {
                       </td>
                       <td className="px-[18px] py-3.5 text-right tabular-nums">
                         {user.messages_sent}
+                      </td>
+                      <td className="px-[18px] py-3.5 text-right tabular-nums">
+                        {user.life_thread_count}
                       </td>
                       <td className="px-[18px] py-3.5">
                         <span

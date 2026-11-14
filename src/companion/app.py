@@ -24,6 +24,7 @@ from companion.core.home import HomeService
 from companion.core.incoming_messages import IncomingMessageHandler
 from companion.core.knowledge import KnowledgeService
 from companion.core.knowledge_retrieval import KnowledgeRetrieval
+from companion.core.life_threads import LifeThreadKeeper, ThreadReminder
 from companion.core.me import MeService
 from companion.core.memory_categories import MemoryCategoryService
 from companion.core.memory_retrieval import MemoryRetrieval
@@ -222,6 +223,11 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     reply_service = ReplyService(
         reply_gate=reply_gate,
         conversations=conversation_service,
+        thread_reminder=ThreadReminder(
+            repositories=dependencies.repositories,
+            embedder=dependencies.embedder,
+            clock=dependencies.clock,
+        ),
         understanding=UnderstandingService(
             repositories=dependencies.repositories,
             chat_model=chat_model,
@@ -286,6 +292,12 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             personal_sticker_keeper=PersonalStickerKeeper(
                 repositories=dependencies.repositories,
                 chat_model=chat_model,
+                clock=dependencies.clock,
+            ),
+            life_thread_keeper=LifeThreadKeeper(
+                repositories=dependencies.repositories,
+                chat_model=chat_model,
+                embedder=dependencies.embedder,
                 clock=dependencies.clock,
             ),
             embedder=dependencies.embedder,

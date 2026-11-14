@@ -80,6 +80,27 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
           "How close in meaning an older Summary must be to what Zeph looks up. Real matches score about 70–80; unrelated ones up to about 65.",
         unit: "%",
       },
+      {
+        key: "life_threads_per_reply",
+        label: "Most Life Threads per reply",
+        caption:
+          "How many of the User’s Life Threads a message can remind Zeph of. Open ones come first.",
+        unit: "threads",
+      },
+      {
+        key: "life_threads_closeness_percent",
+        label: "Life Thread closeness bar",
+        caption:
+          "How close in meaning a Thread’s story must be to the User’s last few messages. A Thread naming someone or something they mention always counts.",
+        unit: "%",
+      },
+      {
+        key: "life_thread_brushed_off_wait_days",
+        label: "Wait after a brushed-off Life Thread",
+        caption:
+          "How long Zeph waits before bringing up a Thread again after the User brushed it off. One they asked to drop is never brought up again.",
+        unit: "days",
+      },
     ],
   },
   {

@@ -17,7 +17,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Uuid,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.sql import text
 
 EMBEDDING_SIZE = 384
@@ -278,6 +278,36 @@ conversation_summaries = Table(
     Column("mood", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("embedding", Vector(EMBEDDING_SIZE)),
+)
+
+life_threads = Table(
+    "life_threads",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("title", Text, nullable=False),
+    Column("story", Text, nullable=False),
+    Column("people", ARRAY(Text), nullable=False),
+    Column("name_keys", ARRAY(Text), nullable=False),
+    Column("is_open", Boolean, nullable=False),
+    Column("started_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("last_raised_at", DateTime(timezone=True)),
+    Column(
+        "last_raised_conversation_id",
+        Uuid,
+        ForeignKey("conversations.id", ondelete="SET NULL"),
+        index=True,
+    ),
+    Column("last_reaction", Text),
+    Column("embedding", Vector(EMBEDDING_SIZE)),
+    Index("life_threads_name_keys", "name_keys", postgresql_using="gin"),
 )
 
 shared_photos = Table(

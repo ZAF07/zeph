@@ -167,6 +167,7 @@ export type AdminUser = {
   telegram_connected: boolean;
   conversation_count: number;
   messages_sent: number;
+  life_thread_count: number;
 };
 
 /** A User's role after a change. */
@@ -469,6 +470,7 @@ export type ModelStep =
   | "photo"
   | "check_in"
   | "conversation_end"
+  | "life_threads"
   | "personal_stickers";
 
 /** A Model Call Log trace in a list: who, when and totals. Never content. */

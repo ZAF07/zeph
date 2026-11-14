@@ -189,12 +189,15 @@ class UserOverview:
         telegram_connected: Whether they have a Telegram Connection.
         conversation_count: How many Conversations they have had.
         messages_sent: How many messages they have sent the Companion.
+        life_thread_count: How many Life Threads the Companion follows for
+            them.
     """
 
     user: User
     telegram_connected: bool
     conversation_count: int
     messages_sent: int
+    life_thread_count: int
 
 
 @dataclass(frozen=True)
@@ -781,6 +784,101 @@ class MoodIntensity(StrEnum):
     HIGH = "high"
 
 
+class ThreadReaction(StrEnum):
+    """How the User took it when the Companion brought up a Life Thread."""
+
+    ENGAGED = "engaged"
+    BRUSHED_OFF = "brushed_off"
+    ASKED_TO_DROP = "asked_to_drop"
+
+
+@dataclass(frozen=True)
+class LifeThread:
+    """An ongoing story in a User's life, followed across Conversations.
+
+    Attributes:
+        id: Our ID for the Thread.
+        user_id: The User whose story it is.
+        title: A short name for it, e.g. "Falling-out with Mei".
+        story: The running story, with dates.
+        people: The people or things in it, e.g. ("Mei", "sister").
+        is_open: Whether it is open (unresolved or upcoming); else settled.
+        started_at: When it was started.
+        updated_at: When its story last changed.
+        last_raised_at: When the Companion last brought it up; None if never.
+        last_raised_conversation_id: The Conversation it was last brought up
+            in; None if never, or if that Conversation is gone.
+        last_reaction: How the User took it the last time it was brought up;
+            None if never, or not yet known.
+    """
+
+    id: UUID
+    user_id: UUID
+    title: str
+    story: str
+    people: tuple[str, ...]
+    is_open: bool
+    started_at: datetime
+    updated_at: datetime
+    last_raised_at: datetime | None = None
+    last_raised_conversation_id: UUID | None = None
+    last_reaction: ThreadReaction | None = None
+
+
+@dataclass(frozen=True)
+class LifeThreadToSave:
+    """A new or changed Life Thread, with what it is found by.
+
+    Attributes:
+        thread: The Thread.
+        name_keys: Its people or things in lower case, one word apart, so a
+            message naming one finds it.
+        embedding: Its title and story embedded, so it can be found by
+            meaning; None to keep the one it has, or have none.
+    """
+
+    thread: LifeThread
+    name_keys: tuple[str, ...]
+    embedding: list[float] | None
+
+
+class BringUpWay(StrEnum):
+    """How the reply should bring up something from the past."""
+
+    LEAD = "lead"
+    WEAVE = "weave"
+
+
+@dataclass(frozen=True)
+class ThreadToBringUp:
+    """A Life Thread the Understanding chose to bring up, and how.
+
+    Attributes:
+        thread_id: The Thread's ID.
+        title: Its title when it was chosen.
+        how: Lead with it, or weave it in.
+    """
+
+    thread_id: UUID
+    title: str
+    how: BringUpWay
+
+
+@dataclass(frozen=True)
+class ThreadLeftAlone:
+    """A Life Thread the Understanding chose to leave alone, and why.
+
+    Attributes:
+        thread_id: The Thread's ID.
+        title: Its title when it was chosen.
+        reason: Why it is left alone.
+    """
+
+    thread_id: UUID
+    title: str
+    reason: str
+
+
 @dataclass(frozen=True)
 class UnderstandingForm:
     """The form the Understanding model fills in before each reply.
@@ -792,13 +890,11 @@ class UnderstandingForm:
         intensity: How strongly they seem to feel it.
         cause_known: Whether the Companion knows why they feel that way.
         memory_categories: The Memory Categories whose items matter, by name.
-        bring_up: What from the past to bring up; empty until it is used.
-        left_alone: What from the past to leave alone; empty until it is used.
-        look_up_past: Phrases to search older Summaries with; empty until it
-            is used.
+        bring_up: The Life Threads to bring up, and how.
+        left_alone: The Life Threads to leave alone, and why.
+        look_up_past: Phrases to search older Summaries with.
         knowledge: Knowledge to look up; empty until it is used.
-        threads_touched: The Life Threads the Message touches; empty until
-            it is used.
+        threads_touched: The titles of the Life Threads the Message touches.
     """
 
     need: str
@@ -807,8 +903,8 @@ class UnderstandingForm:
     intensity: MoodIntensity
     cause_known: bool
     memory_categories: tuple[str, ...] = ()
-    bring_up: tuple[str, ...] = ()
-    left_alone: tuple[str, ...] = ()
+    bring_up: tuple[ThreadToBringUp, ...] = ()
+    left_alone: tuple[ThreadLeftAlone, ...] = ()
     look_up_past: tuple[str, ...] = ()
     knowledge: tuple[str, ...] = ()
     threads_touched: tuple[str, ...] = ()
@@ -1477,6 +1573,7 @@ class ModelStep(StrEnum):
     PHOTO = "photo"
     CHECK_IN = "check_in"
     CONVERSATION_END = "conversation_end"
+    LIFE_THREADS = "life_threads"
     PERSONAL_STICKERS = "personal_stickers"
 
 

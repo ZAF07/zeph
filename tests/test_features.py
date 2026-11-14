@@ -638,7 +638,9 @@ def test_with_knowledge_off_no_passages_go_into_the_reply(
     switch_for_everyone(client, admin, "knowledge", on=False)
     searches_before = len(embedder.queries)
     off = reply_call(client, chat_model, "the breath helps me")
-    searches_while_off = len(embedder.queries) - searches_before
+    knowledge_searches_while_off = embedder.queries[searches_before:].count(
+        "the breath helps me"
+    )
     switch_for_everyone(client, admin, "knowledge", on=True)
     back_on = reply_call(client, chat_model, "the breath helps me")
 
@@ -646,7 +648,7 @@ def test_with_knowledge_off_no_passages_go_into_the_reply(
     assert note not in on.instructions
     assert BREATH_PASSAGES[0] not in off.instructions
     assert intro not in off.instructions
-    assert searches_while_off == 0
+    assert knowledge_searches_while_off == 0
     assert note in off.instructions
     assert BREATH_PASSAGES[0] in back_on.instructions
     assert note not in back_on.instructions

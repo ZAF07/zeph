@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from companion.core.life_threads import LifeThreadKeeper
 from companion.core.model_call_log import start_trace
 from companion.core.models import (
     ChannelPhoto,
@@ -337,10 +338,10 @@ def describe_conversation(
 class PostConversationProcessor:
     """Sums up each ended Conversation and updates the User's User Memory.
 
-    It changes their Memory Items and keeps the photos that matter to them
-    as Shared Photos. Each Summary is embedded, so it can be found by
-    meaning however old it is. Separately from User Memory, it keeps the User's
-    Personal Stickers.
+    It changes their Memory Items, keeps the photos that matter to them as
+    Shared Photos and updates their Life Threads. Each Summary is embedded,
+    so it can be found by meaning however old it is. Separately from User
+    Memory, it keeps the User's Personal Stickers.
     """
 
     def __init__(
@@ -349,6 +350,7 @@ class PostConversationProcessor:
         user_snapshots: UserSnapshotLoader,
         chat_model: UsageRecordingChatModel,
         personal_sticker_keeper: PersonalStickerKeeper,
+        life_thread_keeper: LifeThreadKeeper,
         embedder: Embedder,
         clock: Clock,
     ) -> None:
@@ -363,6 +365,7 @@ class PostConversationProcessor:
                 and records the tokens used.
             personal_sticker_keeper: Keeps the stickers the User sent whose
                 meaning was clear.
+            life_thread_keeper: Starts and adds to the User's Life Threads.
             embedder: Embeds each Summary, so it can be found by meaning.
             clock: Tells the current time.
         """
@@ -370,6 +373,7 @@ class PostConversationProcessor:
         self._user_snapshots = user_snapshots
         self._chat_model = chat_model
         self._personal_sticker_keeper = personal_sticker_keeper
+        self._life_thread_keeper = life_thread_keeper
         self._embedder = embedder
         self._clock = clock
 
@@ -382,7 +386,10 @@ class PostConversationProcessor:
         kept when Photo Viewing doesn't. One model call gives the
         summary, the operations and the photos to keep as Shared Photos; an
         unreadable answer is asked again once, and if it is still unreadable
-        nothing is saved, so a bad answer is never retried forever.
+        nothing is saved, so a bad answer is never retried forever. Once the
+        Conversation is marked processed, its Life Threads are kept; if that
+        fails, the failure is logged and not tried again, so no Thread is
+        ever added twice.
 
         Args:
             conversation: The ended Conversation.
@@ -423,7 +430,37 @@ class PostConversationProcessor:
             user_memory.save_processed_conversation(
                 conversation.id, self._clock.now(), None, NO_CHANGES
             )
-            return
+        else:
+            self._save_memory(
+                snapshot,
+                conversation,
+                answer,
+                categories,
+                items_by_number,
+                photos_by_number,
+            )
+        self._keep_life_threads(snapshot, conversation.id, messages)
+
+    def _save_memory(
+        self,
+        snapshot: UserSnapshot,
+        conversation: Conversation,
+        answer: ProcessingAnswer,
+        categories: list[MemoryCategory],
+        items_by_number: dict[int, MemoryItem],
+        photos_by_number: dict[int, SentPhoto],
+    ) -> None:
+        """Save the Summary, Memory Item changes and Shared Photos; mark it processed.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            conversation: The ended Conversation.
+            answer: What the model said about it.
+            categories: Every Memory Category, archived ones included.
+            items_by_number: The User's Memory Items, by the number shown.
+            photos_by_number: The photos it was shown, by number.
+        """
+        user_id = snapshot.user.id
         now = self._clock.now()
         changes = plan_memory_changes(
             answer.operations,
@@ -453,9 +490,27 @@ class PostConversationProcessor:
             mood=answer.mood,
             created_at=now,
         )
-        user_memory.save_processed_conversation(
+        self._repositories.user_memory.save_processed_conversation(
             conversation.id, now, summary, changes, self._embed(summary)
         )
+
+    def _keep_life_threads(
+        self,
+        snapshot: UserSnapshot,
+        conversation_id: UUID,
+        messages: list[ConversationMessage],
+    ) -> None:
+        """Keep the User's Life Threads, logging a failure instead of raising.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            conversation_id: The ended Conversation.
+            messages: Its messages, oldest first.
+        """
+        try:
+            self._life_thread_keeper.keep_from(snapshot, conversation_id, messages)
+        except Exception:
+            logger.exception("Could not keep Life Threads")
 
     def _embed(self, summary: ConversationSummary) -> list[float] | None:
         """Embed a Summary, logging a failure instead of raising.

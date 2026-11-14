@@ -32,6 +32,8 @@ from companion.core.models import (
     KnowledgeStatus,
     KnowledgeUpload,
     LibrarySticker,
+    LifeThread,
+    LifeThreadToSave,
     MemoryCategory,
     MemoryCategoryDetails,
     MemoryCategoryOverview,
@@ -912,6 +914,83 @@ class UnderstandingRepository(Protocol):
 
         Returns:
             The Understandings.
+        """
+        ...
+
+
+class LifeThreadRepository(Protocol):
+    """Stores each User's Life Threads, found by name or by meaning."""
+
+    def find_reminded(
+        self,
+        user_id: UUID,
+        named: Sequence[str],
+        embedding: list[float] | None,
+        min_closeness: float,
+        limit: int,
+    ) -> list[LifeThread]:
+        """Find the User's Threads a message reminds the Companion of.
+
+        A Thread counts if one of its name keys is among the names given,
+        however close its story is, or if its story is at least as close in
+        meaning as asked. Open Threads come first, then those named, then
+        the closest. Age doesn't matter.
+
+        Args:
+            user_id: The User's ID; only their Threads are searched.
+            named: The words and short phrases in the message, in lower case
+                and one word apart, e.g. "mei", "my sister".
+            embedding: The message embedded; None to find by name only.
+            min_closeness: How close in meaning a story must be, from 0 to 1.
+            limit: The most to return.
+
+        Returns:
+            The Threads, in that order.
+        """
+        ...
+
+    def list_raised_in(self, conversation_id: UUID) -> list[LifeThread]:
+        """List the Threads last brought up in a Conversation.
+
+        Args:
+            conversation_id: The Conversation's ID.
+
+        Returns:
+            The Threads, oldest started first.
+        """
+        ...
+
+    def save_many(self, threads: Sequence[LifeThreadToSave]) -> None:
+        """Add new Threads and save changed ones, in one step.
+
+        A changed Thread saved with no embedding keeps the one it had.
+
+        Args:
+            threads: The new and changed Threads.
+        """
+        ...
+
+    def mark_raised(
+        self, thread_ids: Sequence[UUID], conversation_id: UUID, raised_at: datetime
+    ) -> None:
+        """Note that Threads were just brought up in a Conversation.
+
+        The last reaction stays until the Conversation's end records a new
+        one, so a brushed-off Thread raised while User Memory is off still
+        waits.
+
+        Args:
+            thread_ids: The Threads' IDs.
+            conversation_id: The Conversation they were brought up in.
+            raised_at: When the reply that brought them up was sent.
+        """
+        ...
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete every one of a User's Life Threads.
+
+        Args:
+            user_id: The User's ID.
         """
         ...
 
@@ -1998,6 +2077,7 @@ class Repositories:
     needs: NeedRepository
     understandings: UnderstandingRepository
     user_memory: UserMemoryRepository
+    life_threads: LifeThreadRepository
     knowledge_documents: KnowledgeDocumentRepository
     usage: UsageRepository
     stickers: StickerRepository

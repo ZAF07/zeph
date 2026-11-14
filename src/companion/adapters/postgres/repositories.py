@@ -33,6 +33,7 @@ from companion.adapters.postgres.tables import (
     feature_switches,
     helplines,
     knowledge_documents,
+    life_threads,
     memory_categories,
     memory_items,
     model_calls,
@@ -50,6 +51,7 @@ from companion.adapters.postgres.tables import (
 )
 from companion.core.features import feature_details
 from companion.core.models import (
+    BringUpWay,
     ChannelPhoto,
     ChannelSticker,
     ChatLine,
@@ -79,6 +81,8 @@ from companion.core.models import (
     KnowledgeStatus,
     KnowledgeUpload,
     LibrarySticker,
+    LifeThread,
+    LifeThreadToSave,
     MemoryCategory,
     MemoryCategoryDetails,
     MemoryCategoryOverview,
@@ -106,6 +110,9 @@ from companion.core.models import (
     SharedPhoto,
     StoredSetting,
     TelegramConnection,
+    ThreadLeftAlone,
+    ThreadReaction,
+    ThreadToBringUp,
     ToolCallRecord,
     TraceKind,
     Understanding,
@@ -626,6 +633,12 @@ class PostgresUserRepository:
             )
             .scalar_subquery()
         )
+        life_thread_count = (
+            select(func.count())
+            .select_from(life_threads)
+            .where(life_threads.c.user_id == users.c.id)
+            .scalar_subquery()
+        )
         telegram_connected = (
             select(telegram_connections.c.user_id)
             .where(telegram_connections.c.user_id == users.c.id)
@@ -636,6 +649,7 @@ class PostgresUserRepository:
             telegram_connected.label("telegram_connected"),
             conversation_count.label("conversation_count"),
             messages_sent.label("messages_sent"),
+            life_thread_count.label("life_thread_count"),
         ).order_by(users.c.created_at.desc())
         with self._database.connect() as connection:
             rows = connection.execute(statement).all()
@@ -645,6 +659,7 @@ class PostgresUserRepository:
                 telegram_connected=row.telegram_connected,
                 conversation_count=row.conversation_count,
                 messages_sent=row.messages_sent,
+                life_thread_count=row.life_thread_count,
             )
             for row in rows
         ]
@@ -1654,7 +1669,7 @@ class PostgresUnderstandingRepository:
                     user_id=understanding.user_id,
                     conversation_id=understanding.conversation_id,
                     message_id=understanding.message_id,
-                    form=asdict(understanding.form),
+                    form=_understanding_form_values(understanding.form),
                     need=understanding.need,
                     asked_why=understanding.asked_why,
                     made_at=understanding.made_at,
@@ -1691,6 +1706,23 @@ class PostgresUnderstandingRepository:
         ]
 
 
+def _understanding_form_values(form: UnderstandingForm) -> dict[str, Any]:
+    """Turn an Understanding form into JSON to save.
+
+    Args:
+        form: The form.
+
+    Returns:
+        The form, with each Thread's ID as text.
+    """
+    values = asdict(form)
+    for field_name in ("bring_up", "left_alone"):
+        values[field_name] = [
+            {**item, "thread_id": str(item["thread_id"])} for item in values[field_name]
+        ]
+    return values
+
+
 def _to_understanding_form(stored: dict[str, Any]) -> UnderstandingForm:
     """Turn a saved form back into an Understanding form.
 
@@ -1707,8 +1739,22 @@ def _to_understanding_form(stored: dict[str, Any]) -> UnderstandingForm:
         intensity=MoodIntensity(stored["intensity"]),
         cause_known=stored["cause_known"],
         memory_categories=tuple(stored["memory_categories"]),
-        bring_up=tuple(stored["bring_up"]),
-        left_alone=tuple(stored["left_alone"]),
+        bring_up=tuple(
+            ThreadToBringUp(
+                thread_id=UUID(item["thread_id"]),
+                title=item["title"],
+                how=BringUpWay(item["how"]),
+            )
+            for item in stored["bring_up"]
+        ),
+        left_alone=tuple(
+            ThreadLeftAlone(
+                thread_id=UUID(item["thread_id"]),
+                title=item["title"],
+                reason=item["reason"],
+            )
+            for item in stored["left_alone"]
+        ),
         look_up_past=tuple(stored["look_up_past"]),
         knowledge=tuple(stored["knowledge"]),
         threads_touched=tuple(stored["threads_touched"]),
@@ -1825,6 +1871,196 @@ class PostgresMemoryCategoryRepository:
                 .returning(memory_categories)
             ).one()
         return _to_memory_category(row)
+
+
+LIFE_THREAD_COLUMNS = [
+    column for column in life_threads.c if column.name not in {"embedding", "name_keys"}
+]
+
+
+def _to_life_thread(row: Row[Any]) -> LifeThread:
+    """Turn a `life_threads` row into a LifeThread.
+
+    Args:
+        row: The row.
+
+    Returns:
+        The Life Thread.
+    """
+    return LifeThread(
+        id=row.id,
+        user_id=row.user_id,
+        title=row.title,
+        story=row.story,
+        people=tuple(row.people),
+        is_open=row.is_open,
+        started_at=row.started_at,
+        updated_at=row.updated_at,
+        last_raised_at=row.last_raised_at,
+        last_raised_conversation_id=row.last_raised_conversation_id,
+        last_reaction=(
+            ThreadReaction(row.last_reaction) if row.last_reaction else None
+        ),
+    )
+
+
+class PostgresLifeThreadRepository:
+    """Stores Life Threads in Postgres, each with its name keys and embedding."""
+
+    def __init__(self, database: Database) -> None:
+        """Set up the repository.
+
+        Args:
+            database: Where to run queries: the engine, or one transaction.
+        """
+        self._database = database
+
+    def find_reminded(
+        self,
+        user_id: UUID,
+        named: Sequence[str],
+        embedding: list[float] | None,
+        min_closeness: float,
+        limit: int,
+    ) -> list[LifeThread]:
+        """Find the User's Threads a message reminds the Companion of.
+
+        A Thread counts if one of its name keys is among the names given,
+        however close its story is, or if its story is at least as close in
+        meaning as asked. Open Threads come first, then those named, then
+        the closest. Age doesn't matter.
+
+        Args:
+            user_id: The User's ID; only their Threads are searched.
+            named: The words and short phrases in the message, in lower case
+                and one word apart, e.g. "mei", "my sister".
+            embedding: The message embedded; None to find by name only.
+            min_closeness: How close in meaning a story must be, from 0 to 1.
+            limit: The most to return.
+
+        Returns:
+            The Threads, in that order.
+        """
+        if limit < 1:
+            return []
+        is_named = life_threads.c.name_keys.overlap(list(named))
+        if embedding is None:
+            found = is_named
+            closest_first = []
+        else:
+            distance = life_threads.c.embedding.cosine_distance(embedding)
+            found = or_(is_named, distance <= 1 - min_closeness)
+            closest_first = [distance.asc().nulls_last()]
+        statement = (
+            select(*LIFE_THREAD_COLUMNS)
+            .where(life_threads.c.user_id == user_id, found)
+            .order_by(
+                life_threads.c.is_open.desc(),
+                is_named.desc(),
+                *closest_first,
+                life_threads.c.updated_at.desc(),
+            )
+            .limit(limit)
+        )
+        with self._database.connect() as connection:
+            rows = connection.execute(statement).all()
+        return [_to_life_thread(row) for row in rows]
+
+    def list_raised_in(self, conversation_id: UUID) -> list[LifeThread]:
+        """List the Threads last brought up in a Conversation.
+
+        Args:
+            conversation_id: The Conversation's ID.
+
+        Returns:
+            The Threads, oldest started first.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(*LIFE_THREAD_COLUMNS)
+                .where(life_threads.c.last_raised_conversation_id == conversation_id)
+                .order_by(life_threads.c.started_at)
+            ).all()
+        return [_to_life_thread(row) for row in rows]
+
+    def save_many(self, threads: Sequence[LifeThreadToSave]) -> None:
+        """Add new Threads and save changed ones, in one step.
+
+        A changed Thread saved with no embedding keeps the one it had.
+
+        Args:
+            threads: The new and changed Threads.
+        """
+        if not threads:
+            return
+        statement = insert(life_threads).values(
+            [
+                {
+                    **asdict(to_save.thread),
+                    "people": list(to_save.thread.people),
+                    "last_reaction": to_save.thread.last_reaction,
+                    "name_keys": list(to_save.name_keys),
+                    "embedding": to_save.embedding,
+                }
+                for to_save in threads
+            ]
+        )
+        changed = statement.excluded
+        with self._database.begin() as connection:
+            connection.execute(
+                statement.on_conflict_do_update(
+                    index_elements=[life_threads.c.id],
+                    set_={
+                        "title": changed.title,
+                        "story": changed.story,
+                        "people": changed.people,
+                        "name_keys": changed.name_keys,
+                        "is_open": changed.is_open,
+                        "updated_at": changed.updated_at,
+                        "last_reaction": changed.last_reaction,
+                        "embedding": func.coalesce(
+                            changed.embedding, life_threads.c.embedding
+                        ),
+                    },
+                )
+            )
+
+    def mark_raised(
+        self, thread_ids: Sequence[UUID], conversation_id: UUID, raised_at: datetime
+    ) -> None:
+        """Note that Threads were just brought up in a Conversation.
+
+        The last reaction stays until the Conversation's end records a new
+        one, so a brushed-off Thread raised while User Memory is off still
+        waits.
+
+        Args:
+            thread_ids: The Threads' IDs.
+            conversation_id: The Conversation they were brought up in.
+            raised_at: When the reply that brought them up was sent.
+        """
+        if not thread_ids:
+            return
+        with self._database.begin() as connection:
+            connection.execute(
+                update(life_threads)
+                .where(life_threads.c.id.in_(thread_ids))
+                .values(
+                    last_raised_at=raised_at,
+                    last_raised_conversation_id=conversation_id,
+                )
+            )
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete every one of a User's Life Threads.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(life_threads).where(life_threads.c.user_id == user_id)
+            )
 
 
 class PostgresUserMemoryRepository:
@@ -3904,6 +4140,7 @@ def _build_repositories(
         needs=PostgresNeedRepository(database),
         understandings=PostgresUnderstandingRepository(database),
         user_memory=PostgresUserMemoryRepository(database),
+        life_threads=PostgresLifeThreadRepository(database),
         knowledge_documents=PostgresKnowledgeDocumentRepository(database),
         usage=PostgresUsageRepository(database),
         stickers=PostgresStickerRepository(database),

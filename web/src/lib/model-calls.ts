@@ -8,6 +8,7 @@ export const modelSteps: { id: ModelStep; label: string }[] = [
   { id: "reply", label: "Reply" },
   { id: "check_in", label: "Check-in" },
   { id: "conversation_end", label: "Conversation end" },
+  { id: "life_threads", label: "Life Threads" },
   { id: "personal_stickers", label: "Personal Stickers" },
 ];
 

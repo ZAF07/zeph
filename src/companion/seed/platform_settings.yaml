@@ -368,8 +368,9 @@ understanding_prompt: |-
   You help Zeph, an AI companion, understand a person before it replies. You
   are given the time where they are, the Needs Zeph can meet, their Goals,
   the Memory Categories Zeph has saved something in, their recent
-  Conversations, what you understood earlier in this Conversation, and the
-  Conversation so far, ending with their latest message.
+  Conversations, the Life Threads (ongoing stories in their life) this
+  message reminds Zeph of, what you understood earlier in this Conversation,
+  and the Conversation so far, ending with their latest message.
 
   Work out what they want from Zeph right now, fresh for this message:
   - need: the one Need that fits best, its name exactly as written. If it
@@ -387,6 +388,16 @@ understanding_prompt: |-
     interview at Acme") for older Conversations to look up, when they ask
     about or mention something from the past that isn't in the recent
     Conversations. Leave it empty if nothing needs looking up.
+  - threads_touched: the numbers of the Life Threads this message is about
+    or touches.
+  - bring_up: the Life Threads Zeph should bring up, the way a friend who
+    remembers would ("how are things with Mei now?"), each with how: "lead"
+    to lead with it, or "weave" to weave it in if the moment allows. Only
+    when it fits: an open Thread the message connects to, when they have
+    room for it. Usually at most one. Never one marked "don't bring it up".
+  - left_alone: the Life Threads the message touches that Zeph should not
+    raise, each with a short reason (e.g. "they're struggling with something
+    else", "too painful right now").
   Notice how their mood is moving across the Conversation, and the time and
   day: 2am on a Sunday reads differently from lunchtime on a Tuesday.
 
@@ -398,11 +409,11 @@ understanding_prompt: |-
     "intensity": "low" | "medium" | "high",
     "cause_known": true | false,
     "memory_categories": ["<category name>"],
-    "bring_up": [],
-    "left_alone": [],
+    "bring_up": [{"thread": <number>, "how": "lead" | "weave"}],
+    "left_alone": [{"thread": <number>, "reason": "..."}],
     "look_up_past": ["<search phrase>"],
     "knowledge": [],
-    "threads_touched": []
+    "threads_touched": [<number>]
   }
 
 # Added to the reply's instructions when the person's mood stands out (high
@@ -438,6 +449,24 @@ older_summaries_per_reply: 3
 # be to a look-up phrase to go into the reply. With the bge-small embedder,
 # real matches score about 70 to 80 and unrelated ones up to about 65.
 older_summaries_closeness_percent: 68
+
+# Life Threads. Before each reply, the User's last few texts are matched
+# against their Threads: by a person or thing named in a Thread, or by
+# meaning. Open Threads come first. At most this many go to the
+# Understanding, which picks what to bring up or leave alone.
+life_threads_per_reply: 3
+
+# How close in meaning (cosine similarity, as a percent) a Thread's story must
+# be to the User's last few texts to remind the Companion of it. With the
+# bge-small embedder, short messages about a Thread score about 65 to 72 and
+# unrelated ones up to about 55. A Thread that names someone or something in
+# the texts counts whatever its closeness.
+life_threads_closeness_percent: 62
+
+# After the User brushes off a Thread the Companion brought up, it waits this
+# many days before bringing it up again. A Thread they asked to drop is never
+# brought up again unless they raise it.
+life_thread_brushed_off_wait_days: 14
 
 # Knowledge. Before each reply the message is matched against the Knowledge
 # library, and this many of the closest passages go into the reply.
@@ -593,6 +622,48 @@ sticker_tool_description: >-
   of theirs fits the moment, prefer it, as it feels more like them. Never
   mention that you kept their stickers. The stickers, by number, with when
   each one fits:
+
+# When a Conversation ends and User Memory works for the User, this call
+# starts and adds to their Life Threads, and records how they took each
+# Thread the Companion brought up.
+life_thread_keeping_model: deepseek-chat
+
+life_thread_keeping_prompt: |-
+  You keep the Life Threads of a person who talks with Zeph, an AI
+  companion. A Life Thread is an ongoing story in their life, followed
+  across Conversations: a falling-out with their sister, a job hunt, a
+  presentation on Thursday. You are given today's date, the Threads Zeph
+  already follows that this Conversation may touch, and the Conversation.
+
+  For each story in the Conversation that matters in their life:
+  - If it belongs to a Thread you were given, update that Thread: add what
+    is new to its story with dates (keep the old parts, short), add people
+    or things named, and say whether it is still open (unresolved or
+    upcoming) or now settled.
+  - If it is a new story, start a Thread: a short title, the story so far
+    with dates (e.g. "On 14 Nov 2026 they said..."), the people or things in
+    it, and whether it is open or settled.
+  List each person or thing on its own, the way they'd say it in a message:
+  names and the words they use for them, e.g. ["Mei", "sister", "mum"],
+  never "Mei (sister)". Zeph is reminded of a Thread when they say one.
+  Leave out small talk and one-off moments that won't matter later. Write
+  dates as days, never "yesterday" or "next week".
+
+  For each Thread marked "brought up in this Conversation", say how they
+  took it: "engaged" if they talked about it, "brushed_off" if they changed
+  the subject or gave a short answer, "asked_to_drop" if they asked Zeph not
+  to bring it up.
+
+  Answer with JSON only, in exactly this shape, leaving out Threads with
+  nothing new:
+  {
+    "threads": [
+      {"thread": <number>, "title": "...", "story": "...",
+       "people": ["..."], "open": true | false,
+       "reaction": "engaged" | "brushed_off" | "asked_to_drop"},
+      {"title": "...", "story": "...", "people": ["..."], "open": true}
+    ]
+  }
 
 # Personal Stickers. When a Conversation ends and the person sent stickers in
 # it, this model picks the ones whose meaning was clear and writes when to use

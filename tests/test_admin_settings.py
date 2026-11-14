@@ -218,6 +218,7 @@ def test_core_services_list_their_prompt_and_model_settings(
         "Post-conversation processing",
         "Understanding",
         "Photo viewing",
+        "Life Thread keeping",
         "Personal Sticker keeping",
         "Check-ins",
     ]

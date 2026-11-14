@@ -435,6 +435,9 @@ def understanding_answer(
     cause_known: bool = True,
     nuance: str = "Just saying hi.",
     look_up_past: Sequence[str] = (),
+    bring_up: Sequence[dict[str, Any]] = (),
+    left_alone: Sequence[dict[str, Any]] = (),
+    threads_touched: Sequence[int] = (),
 ) -> str:
     """Build the form the Understanding model answers with.
 
@@ -446,6 +449,11 @@ def understanding_answer(
         cause_known: Whether the Companion knows why they feel that way.
         nuance: One sentence on what fits.
         look_up_past: Phrases to search older Conversation Summaries with.
+        bring_up: The Life Threads to bring up, e.g. {"thread": 1, "how":
+            "lead"}.
+        left_alone: The Life Threads to leave alone, e.g. {"thread": 1,
+            "reason": "..."}.
+        threads_touched: The numbers of the Life Threads the message touches.
 
     Returns:
         The form as JSON.
@@ -458,11 +466,11 @@ def understanding_answer(
             "intensity": intensity,
             "cause_known": cause_known,
             "memory_categories": list(memory_categories),
-            "bring_up": [],
-            "left_alone": [],
+            "bring_up": list(bring_up),
+            "left_alone": list(left_alone),
             "look_up_past": list(look_up_past),
             "knowledge": [],
-            "threads_touched": [],
+            "threads_touched": list(threads_touched),
         }
     )
 
@@ -470,11 +478,12 @@ def understanding_answer(
 class ScriptedChatModel:
     """Chat model that returns pre-written replies and records each call.
 
-    Safeguard, memory processing, Understanding and Personal Sticker
-    keeping calls are told apart by their instructions and kept apart from
-    reply calls, each with its own script. The Safeguard defaults to "none"
-    and the Understanding to `understanding_answer()`, so tests about replies
-    don't have to script them too. Set
+    Safeguard, memory processing, Understanding, Life Thread keeping and
+    Personal Sticker keeping calls are told apart by their instructions and
+    kept apart from reply calls, each with its own script. The Safeguard
+    defaults to "none", the Understanding to `understanding_answer()` and
+    Life Thread keeping to no Threads, so tests about replies don't have to
+    script them too. Set
     `before_next_reply` to run something once while the next reply is being
     "written", like a User acting during a slow model call, and
     `before_next_safeguard` likewise while the next text is being checked.
@@ -486,6 +495,7 @@ class ScriptedChatModel:
         memory_processing_prompt: str = "",
         understanding_prompt: str = "",
         sticker_keeping_prompt: str = "",
+        thread_keeping_prompt: str = "",
     ) -> None:
         """Start with no replies scripted, no calls and no delay.
 
@@ -497,21 +507,26 @@ class ScriptedChatModel:
                 Understanding call.
             sticker_keeping_prompt: The instructions that mark a Personal
                 Sticker keeping call.
+            thread_keeping_prompt: The instructions that mark a Life Thread
+                keeping call.
         """
         self._replies: list[str | Exception | ToolCall] = []
         self._safeguard_answers: list[str | Exception] = []
         self._processing_answers: list[str | Exception] = []
         self._understanding_answers: list[str | Exception] = []
         self._sticker_keeping_answers: list[str | Exception] = []
+        self._thread_keeping_answers: list[str | Exception] = []
         self.safeguard_prompt = safeguard_prompt
         self.memory_processing_prompt = memory_processing_prompt
         self.understanding_prompt = understanding_prompt
         self.sticker_keeping_prompt = sticker_keeping_prompt
+        self.thread_keeping_prompt = thread_keeping_prompt
         self.calls: list[ChatModelCall] = []
         self.safeguard_calls: list[ChatModelCall] = []
         self.processing_calls: list[ChatModelCall] = []
         self.understanding_calls: list[ChatModelCall] = []
         self.sticker_keeping_calls: list[ChatModelCall] = []
+        self.thread_keeping_calls: list[ChatModelCall] = []
         self.call_order: list[str] = []
         self.delay_seconds = 0.0
         self.before_next_reply: Callable[[], None] | None = None
@@ -554,6 +569,15 @@ class ScriptedChatModel:
                 failing model.
         """
         self._understanding_answers.extend(answers)
+
+    def script_thread_keeping(self, *answers: str | Exception) -> None:
+        """Queue Life Thread keeping answers, one per call.
+
+        Args:
+            answers: The JSON answers; an exception is raised instead of
+                returned, to act like a failing model.
+        """
+        self._thread_keeping_answers.extend(answers)
 
     def script_sticker_keeping(self, *answers: str | Exception) -> None:
         """Queue Personal Sticker keeping answers, one per call.
@@ -613,6 +637,14 @@ class ScriptedChatModel:
                 self._understanding_answers.pop(0)
                 if self._understanding_answers
                 else understanding_answer()
+            )
+        elif self.thread_keeping_prompt and instructions == self.thread_keeping_prompt:
+            self.thread_keeping_calls.append(call)
+            self.call_order.append("thread_keeping")
+            answer = (
+                self._thread_keeping_answers.pop(0)
+                if self._thread_keeping_answers
+                else json.dumps({"threads": []})
             )
         elif (
             self.sticker_keeping_prompt and instructions == self.sticker_keeping_prompt

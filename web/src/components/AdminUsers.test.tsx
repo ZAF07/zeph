@@ -26,6 +26,7 @@ const maya: AdminUser = {
   telegram_connected: true,
   conversation_count: 41,
   messages_sent: 612,
+  life_thread_count: 7,
 };
 
 const ren: AdminUser = {
@@ -37,6 +38,7 @@ const ren: AdminUser = {
   telegram_connected: false,
   conversation_count: 0,
   messages_sent: 0,
+  life_thread_count: 0,
 };
 
 function rowFor(name: string): HTMLElement {
@@ -63,6 +65,10 @@ describe("AdminUsers", () => {
     expect(mayaRow.getByText("Connected")).toBeInTheDocument();
     expect(mayaRow.getByText("41")).toBeInTheDocument();
     expect(mayaRow.getByText("612")).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "Life Threads" }),
+    ).toBeInTheDocument();
+    expect(mayaRow.getByText("7")).toBeInTheDocument();
     expect(mayaRow.getByText("Admin")).toBeInTheDocument();
     expect(
       within(rowFor("Ren Okafor")).getByText("Not connected"),

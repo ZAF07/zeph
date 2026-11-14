@@ -149,6 +149,7 @@ def chat_model(seeded_settings: dict[str, Any]) -> ScriptedChatModel:
         memory_processing_prompt=seeded_settings["memory_processing_prompt"],
         understanding_prompt=seeded_settings["understanding_prompt"],
         sticker_keeping_prompt=seeded_settings["personal_sticker_keeping_prompt"],
+        thread_keeping_prompt=seeded_settings["life_thread_keeping_prompt"],
     )
 
 
