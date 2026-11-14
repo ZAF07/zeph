@@ -82,8 +82,9 @@ export function Memories() {
         <div className="flex flex-col gap-2">
           <h1 className="m-0 text-h1 font-normal">Memories</h1>
           <p className="m-0 max-w-[40em] text-body text-ink-soft">
-            What Zeph remembers, short summaries of past Conversations and the
-            photos it kept. Delete anything you’d rather it forgot.
+            What Zeph remembers, what’s going on in your life, short summaries
+            of past Conversations and the photos it kept. Delete anything you’d
+            rather it forgot.
           </p>
           <p className="m-0 text-caption text-blue">
             You can also tell Zeph “forget that”.

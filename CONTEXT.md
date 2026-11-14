@@ -109,7 +109,7 @@ The web app where Users manage their account, preferences and privacy, and where
 _Avoid_: Portal, web app, console
 
 **Chat Setting Change**:
-A change to one of a User's settings made by telling the Companion in plain words instead of on the Dashboard: pausing or resuming Check-ins, Check-in frequency, quiet hours, User Memory on or off, time zone, forgetting a Memory Item or Life Thread, or Delete My Data. The Dashboard marks each such setting "Changed in chat" until it is next changed there.
+A change to one of a User's settings made by telling the Companion in plain words instead of on the Dashboard: pausing or resuming Check-ins, Check-in frequency, quiet hours, User Memory on or off, time zone, forgetting a Memory Item or Life Thread, or Delete My Data. The Dashboard marks each such setting "Changed in chat" until it is next changed there; a forgotten Memory Item or Life Thread is simply gone, so there is nothing left to mark.
 _Avoid_: Chat command, slash command, bot setting
 
 **Onboarding**:
@@ -165,7 +165,7 @@ A short account of what one Conversation covered, how the User seemed (its mood)
 _Avoid_: Recap, transcript, log
 
 **Life Thread**:
-An ongoing story in a User's life followed across Conversations, which the User sees and can delete (on the Dashboard or by asking in chat), but not edit (e.g. a falling-out with their sister, a job hunt, a presentation on Thursday): a short running story with dates, the people or things in it, and whether it is open (unresolved or upcoming) or settled. Added to or started when a Conversation ends. The Companion is reminded of a Thread when the User mentions someone or something in it, or talks about something close to it, however long ago it was, and may bring it up the way a friend would. Open Threads matter more than settled ones. Each Thread remembers when the Companion last brought it up and how the User took it (engaged, brushed it off, asked to drop it), so it is never raised twice in one Conversation, waits a while after being brushed off, and is never raised again once they asked to drop it, unless they bring it up themselves. Admins set how close in meaning a Thread must be, how many can come to mind for one Message, and how long a brushed-off one waits.
+An ongoing story in a User's life followed across Conversations, which the User sees and can delete (on the Memories page, under "What's going on in your life", or by asking in chat), but not edit (e.g. a falling-out with their sister, a job hunt, a presentation on Thursday): a short running story with dates, the people or things in it, and whether it is open (unresolved or upcoming) or settled. Added to or started when a Conversation ends. A deleted Thread is gone at once and never comes back, even from a Conversation end already under way. The Companion is reminded of a Thread when the User mentions someone or something in it, or talks about something close to it, however long ago it was, and may bring it up the way a friend would. Open Threads matter more than settled ones. Each Thread remembers when the Companion last brought it up and how the User took it (engaged, brushed it off, asked to drop it), so it is never raised twice in one Conversation, waits a while after being brushed off, and is never raised again once they asked to drop it, unless they bring it up themselves. Admins set how close in meaning a Thread must be, how many can come to mind for one Message, and how long a brushed-off one waits.
 _Avoid_: Topic, storyline, episode, case
 
 **User Portrait**:
