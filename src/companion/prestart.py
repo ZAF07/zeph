@@ -8,6 +8,7 @@ from companion.adapters.postgres.database import (
     seed_check_in_kinds,
     seed_helplines,
     seed_memory_categories,
+    seed_needs,
     seed_platform_settings,
 )
 from companion.adapters.telegram.chat_channel import TelegramChatChannel
@@ -18,6 +19,7 @@ from companion.main import (
     HELPLINES_SEED_FILE,
     KNOWLEDGE_SEED_FILE,
     MEMORY_CATEGORIES_SEED_FILE,
+    NEEDS_SEED_FILE,
     SEED_FILE,
     build_clock,
     build_database_engine,
@@ -63,6 +65,7 @@ def prepare() -> None:
     seed_helplines(engine, HELPLINES_SEED_FILE)
     seed_memory_categories(engine, MEMORY_CATEGORIES_SEED_FILE)
     seed_check_in_kinds(engine, CHECK_IN_KINDS_SEED_FILE)
+    seed_needs(engine, NEEDS_SEED_FILE)
     knowledge_service = KnowledgeService(
         repositories=build_repositories(settings, engine),
         text_extractor=build_text_extractor(settings),

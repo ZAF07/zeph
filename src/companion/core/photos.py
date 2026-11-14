@@ -637,7 +637,7 @@ class SendPhotoTools:
         Args:
             snapshot: The User being replied to.
             context: What the reply is answering, with the Shared Photos that
-                matter for the message, as memory retrieval picked them.
+                matter for the message, as the Understanding picked them.
 
         Returns:
             The offer, listing those of the User's Shared Photos that still

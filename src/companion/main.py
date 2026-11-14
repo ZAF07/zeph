@@ -40,6 +40,7 @@ SEED_FILE = SEED_DIR / "platform_settings.yaml"
 HELPLINES_SEED_FILE = SEED_DIR / "helplines.yaml"
 MEMORY_CATEGORIES_SEED_FILE = SEED_DIR / "memory_categories.yaml"
 CHECK_IN_KINDS_SEED_FILE = SEED_DIR / "check_in_kinds.yaml"
+NEEDS_SEED_FILE = SEED_DIR / "needs.yaml"
 KNOWLEDGE_SEED_FILE = SEED_DIR / "knowledge" / "knowledge.yaml"
 SCHEDULER_INTERVAL_SECONDS = 60
 HTTP_CLIENT_LOGGER_NAMES = ("httpx", "httpcore")

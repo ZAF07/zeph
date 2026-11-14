@@ -448,7 +448,7 @@ export type TraceKind = "message" | "check_in" | "conversation_end";
 /** Which step of the Companion's work a model call was for. */
 export type ModelStep =
   | "safeguard"
-  | "memory_picking"
+  | "understanding"
   | "reply"
   | "photo"
   | "check_in"

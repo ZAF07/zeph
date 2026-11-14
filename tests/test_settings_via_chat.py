@@ -72,9 +72,14 @@ def me(client: TestClient, headers: dict[str, str]) -> dict[str, Any]:
 def tables_a_reply_leaves_alone(engine: Engine) -> list[str]:
     """List the per-User tables a cancelled Delete My Data must not change.
 
-    The Model Call Log is left out: every reply adds to it.
+    The Model Call Log and Understandings are left out: every reply adds to
+    them.
     """
-    return [table for table in user_data_tables(engine) if table != "model_calls"]
+    return [
+        table
+        for table in user_data_tables(engine)
+        if table not in ("model_calls", "understandings")
+    ]
 
 
 def test_settings_tools_are_offered_with_their_instructions(

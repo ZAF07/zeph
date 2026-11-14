@@ -1,6 +1,6 @@
 # 04 — Understanding call with seeded Needs
 
-Status: ready-for-agent
+Status: in-progress
 
 ## Parent
 
@@ -35,3 +35,13 @@ Before every reply the Companion makes an **Understanding** (`CONTEXT.md`). One 
 
 - `.scratch/understanding/issues/02-reply-service-in-core-remove-langgraph.md`
 - `.scratch/messages/issues/archive/01-answer-texts-in-a-row-as-one-message.md` (completed 14 Nov 2026)
+
+## Comments
+
+- Branch `understanding-04-understanding-call`, worktree `ai-chat-companion-understanding-04` (ports 3200/8200/5632).
+- Plan:
+  - `needs` table (platform data, seeded once from `seed/needs.yaml`, like Check-in Kinds) and `understandings` table (Message, Conversation, User, the form, the Need by name, whether the reply was asked to gently ask why, when made). Its message and Conversation links cascade, so Message Retention, Delete My Data and Account Deletion remove it with the Message. Migration 0028; it also drops old `memory_picking` Model Call Log rows (platform not live).
+  - New core `UnderstandingService`: one cheap call (`understanding_model`, `understanding_prompt`) given the Needs, Goals, Memory Category names with items (plus "Shared Photos" as before), newest Summaries, this Conversation's earlier Understandings, the Conversation and the local time and weekday. Reads the JSON form; unknown Need → fallback Need; unreadable or failed → fallback form. Saved before the reply call.
+  - `MemoryRetrieval` no longer calls a model: it fetches the Memory Items of the categories the Understanding chose, plus "always include", the newest Summaries and Shared Photos when picked. The memory-retrieval prompt and model settings go.
+  - The reply gets a Need section: the Need's name and "how to reply", the nuance and mood. The Admin-editable "ask why" note is added only when intensity is high, `cause_known` is false and the previous Understanding in the Conversation didn't already ask.
+  - Prompts and Models: "Memory retrieval" card becomes "Understanding". Model Call Log step `memory_picking` becomes `understanding`.

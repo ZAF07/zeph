@@ -36,6 +36,7 @@ from companion.adapters.postgres.tables import (
     memory_categories,
     memory_items,
     model_calls,
+    needs,
     pending_auth_account_deletions,
     personal_stickers,
     platform_settings,
@@ -43,6 +44,7 @@ from companion.adapters.postgres.tables import (
     shared_photos,
     stickers,
     telegram_connections,
+    understandings,
     user_feature_switches,
     users,
 )
@@ -91,6 +93,8 @@ from companion.core.models import (
     ModelCallTraceDetails,
     ModelCallTraceOverview,
     ModelStep,
+    MoodIntensity,
+    Need,
     NextDueTimeChange,
     OfferedTool,
     PersonalSticker,
@@ -103,6 +107,8 @@ from companion.core.models import (
     TelegramConnection,
     ToolCallRecord,
     TraceKind,
+    Understanding,
+    UnderstandingForm,
     User,
     UserOverview,
     UserRole,
@@ -1491,6 +1497,123 @@ class PostgresSafeguardEventRepository:
             connection.execute(
                 delete(safeguard_events).where(safeguard_events.c.user_id == user_id)
             )
+
+
+class PostgresNeedRepository:
+    """Stores Needs in Postgres."""
+
+    def __init__(self, database: Database) -> None:
+        """Set up the repository.
+
+        Args:
+            database: Where to run queries: the engine, or one transaction.
+        """
+        self._database = database
+
+    def list_all(self) -> list[Need]:
+        """List every Need in sort order.
+
+        Returns:
+            The Needs.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(select(needs).order_by(needs.c.sort_order)).all()
+        return [
+            Need(
+                id=row.id,
+                name=row.name,
+                when_it_fits=row.when_it_fits,
+                how_to_reply=row.how_to_reply,
+                sort_order=row.sort_order,
+                is_fallback=row.is_fallback,
+            )
+            for row in rows
+        ]
+
+
+class PostgresUnderstandingRepository:
+    """Stores Understandings in Postgres, each with its Message."""
+
+    def __init__(self, database: Database) -> None:
+        """Set up the repository.
+
+        Args:
+            database: Where to run queries: the engine, or one transaction.
+        """
+        self._database = database
+
+    def add(self, understanding: Understanding) -> None:
+        """Save an Understanding.
+
+        Args:
+            understanding: The Understanding to save.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                insert(understandings).values(
+                    id=understanding.id,
+                    user_id=understanding.user_id,
+                    conversation_id=understanding.conversation_id,
+                    message_id=understanding.message_id,
+                    form=asdict(understanding.form),
+                    need=understanding.need,
+                    asked_why=understanding.asked_why,
+                    made_at=understanding.made_at,
+                )
+            )
+
+    def list_for_conversation(self, conversation_id: UUID) -> list[Understanding]:
+        """List a Conversation's Understandings, oldest first.
+
+        Args:
+            conversation_id: The Conversation's ID.
+
+        Returns:
+            The Understandings.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(understandings)
+                .where(understandings.c.conversation_id == conversation_id)
+                .order_by(understandings.c.position)
+            ).all()
+        return [
+            Understanding(
+                id=row.id,
+                user_id=row.user_id,
+                conversation_id=row.conversation_id,
+                message_id=row.message_id,
+                form=_to_understanding_form(row.form),
+                need=row.need,
+                asked_why=row.asked_why,
+                made_at=row.made_at,
+            )
+            for row in rows
+        ]
+
+
+def _to_understanding_form(stored: dict[str, Any]) -> UnderstandingForm:
+    """Turn a saved form back into an Understanding form.
+
+    Args:
+        stored: The form as saved.
+
+    Returns:
+        The form.
+    """
+    return UnderstandingForm(
+        need=stored["need"],
+        nuance=stored["nuance"],
+        mood=stored["mood"],
+        intensity=MoodIntensity(stored["intensity"]),
+        cause_known=stored["cause_known"],
+        memory_categories=tuple(stored["memory_categories"]),
+        bring_up=tuple(stored["bring_up"]),
+        left_alone=tuple(stored["left_alone"]),
+        look_up_past=tuple(stored["look_up_past"]),
+        knowledge=tuple(stored["knowledge"]),
+        threads_touched=tuple(stored["threads_touched"]),
+    )
 
 
 class PostgresMemoryCategoryRepository:
@@ -3628,6 +3751,8 @@ def _build_repositories(
         helplines=PostgresHelplineRepository(database),
         safeguard_events=PostgresSafeguardEventRepository(database),
         memory_categories=PostgresMemoryCategoryRepository(database),
+        needs=PostgresNeedRepository(database),
+        understandings=PostgresUnderstandingRepository(database),
         user_memory=PostgresUserMemoryRepository(database),
         knowledge_documents=PostgresKnowledgeDocumentRepository(database),
         usage=PostgresUsageRepository(database),

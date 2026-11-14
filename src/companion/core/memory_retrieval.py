@@ -1,4 +1,3 @@
-import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -6,29 +5,19 @@ from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 from companion.core.models import (
-    ChatLine,
-    ChatRole,
-    ConversationMessage,
     ConversationSummary,
     Feature,
     MemoryCategory,
     MemoryItem,
-    ModelStep,
     SharedPhoto,
     UserSnapshot,
 )
 from companion.core.platform_settings import (
-    MEMORY_RETRIEVAL_MODEL,
-    MEMORY_RETRIEVAL_PROMPT,
     RECENT_CONVERSATION_SUMMARIES,
     REPLY_MEMORY_INTRO,
     SHARED_PHOTOS_MEMORY_DESCRIPTION,
 )
 from companion.core.ports import Repositories
-from companion.core.transcripts import split_off_latest_message, to_transcript_lines
-from companion.core.usage import UsageRecordingChatModel
-
-logger = logging.getLogger(__name__)
 
 SHARED_PHOTOS_GROUP_NAME = "Shared Photos"
 
@@ -48,10 +37,10 @@ class RecalledMemory:
 
 
 def shared_photos_group(description: str) -> MemoryCategory:
-    """Make the "Shared Photos" group that memory retrieval picks like a category.
+    """Make the "Shared Photos" group the Understanding picks like a category.
 
     Shared Photos have no Memory Category, so they are offered to the
-    picking call as one extra category, after the real ones.
+    Understanding as one extra category, after the real ones.
 
     Args:
         description: The Admin-set description of Shared Photos.
@@ -87,52 +76,6 @@ def shared_photo_line(
     if photo.caption:
         line += f' They said: "{photo.caption}".'
     return f"{line} Why it matters: {photo.note}"
-
-
-def describe_message_for_picking(
-    categories: list[MemoryCategory], messages: list[ConversationMessage]
-) -> str:
-    """Write what the memory retrieval model is given to pick categories.
-
-    Args:
-        categories: The Memory Categories it may pick from.
-        messages: The Conversation so far, oldest first; the User's messages
-            at the end are the Message being answered.
-
-    Returns:
-        The categories, the earlier Conversation and the latest message.
-    """
-    category_lines = "\n".join(
-        f"- {category.name}: {category.description}" for category in categories
-    )
-    earlier, latest_text = split_off_latest_message(messages)
-    return (
-        f"Memory Categories:\n{category_lines}\n\n"
-        f"Earlier in the Conversation:\n"
-        f"{to_transcript_lines(earlier) or 'Nothing yet.'}\n\n"
-        f"Latest message:\nPerson: {latest_text}"
-    )
-
-
-def read_picked_categories(
-    answer: str, categories: list[MemoryCategory]
-) -> list[MemoryCategory]:
-    """Read which categories the memory retrieval model picked.
-
-    Each line of the answer may name one category, in any case and with
-    bullets or punctuation around it; anything else is ignored.
-
-    Args:
-        answer: The model's answer.
-        categories: The Memory Categories it could pick from.
-
-    Returns:
-        The picked categories, in their usual order.
-    """
-    picked_names = {line.strip(" -*•.,\"'").lower() for line in answer.splitlines()}
-    return [
-        category for category in categories if category.name.lower() in picked_names
-    ]
 
 
 def format_day(moment: datetime, time_zone: str | None) -> str:
@@ -196,45 +139,67 @@ def format_memory(
     return intro + "\n\n" + "\n\n".join(sections)
 
 
+@dataclass(frozen=True)
+class SavedMemory:
+    """What the Companion has saved about a User, read once for a reply.
+
+    Attributes:
+        categories: The active Memory Categories, in order.
+        items: The User's Memory Items.
+        summaries: The newest Conversation Summaries, newest first.
+        shared_photos: The User's Shared Photos; empty when Photo Viewing
+            doesn't work for them.
+        pickable: The categories the Understanding may pick: active ones
+            with items that aren't "always include", then the "Shared
+            Photos" group when the User has Shared Photos.
+    """
+
+    categories: list[MemoryCategory]
+    items: list[MemoryItem]
+    summaries: list[ConversationSummary]
+    shared_photos: list[SharedPhoto]
+    pickable: list[MemoryCategory]
+
+    def items_in(self, category_name: str) -> list[MemoryItem]:
+        """List the Memory Items in one category, found by name ignoring case.
+
+        Args:
+            category_name: The category's name, e.g. "Goals".
+
+        Returns:
+            Its items; none if there is no such active category.
+        """
+        category_ids = {
+            category.id
+            for category in self.categories
+            if category.name.lower() == category_name.lower()
+        }
+        return [item for item in self.items if item.category_id in category_ids]
+
+
 class MemoryRetrieval:
     """Finds the User Memory that matters for the message being answered."""
 
-    def __init__(
-        self,
-        repositories: Repositories,
-        chat_model: UsageRecordingChatModel,
-    ) -> None:
+    def __init__(self, repositories: Repositories) -> None:
         """Set up memory retrieval.
 
         Args:
-            repositories: Where Conversations, User Memory and settings are
-                stored.
-            chat_model: Picks the Memory Categories that matter and records
-                the tokens used.
+            repositories: Where User Memory and Memory Categories are stored.
         """
         self._repositories = repositories
-        self._chat_model = chat_model
 
-    def recall(self, snapshot: UserSnapshot, conversation_id: UUID) -> RecalledMemory:
-        """Find what the Companion remembers that matters for the newest message.
+    def read(self, snapshot: UserSnapshot) -> SavedMemory:
+        """Read what the Companion has saved about the User, once per reply.
 
-        Memory Items from every "always include" category go in, plus those
-        from the categories a cheap model call picks for the message, plus
-        the newest Conversation Summaries. The User's Shared Photos are
-        offered to the same call as one more category, "Shared Photos", and
-        all of them go in when it is picked. Archived categories are left
-        out. The call is skipped when there is nothing to pick, and a failed
-        call still leaves the "always include" items. What is saved is used
-        even while User Memory is off, since off only stops learning; no
-        Shared Photo is used when Photo Viewing doesn't work.
+        Archived categories are left out. What is saved is used even while
+        User Memory is off, since off only stops learning; no Shared Photo
+        is used when Photo Viewing doesn't work.
 
         Args:
             snapshot: The User being answered.
-            conversation_id: The Conversation the message is in.
 
         Returns:
-            The memory section for the reply instructions and the Shared
-            Photos that matter.
+            Their saved memory, and the categories the Understanding may pick.
         """
         user_id = snapshot.user.id
         settings = snapshot.settings
@@ -256,69 +221,69 @@ class MemoryRetrieval:
             for category in active_categories
             if not category.always_include and category.id in filled_category_ids
         ]
-        photos_group = shared_photos_group(
-            settings.get(SHARED_PHOTOS_MEMORY_DESCRIPTION)
-        )
         if shared_photos:
-            pickable.append(photos_group)
-        picked = self._pick(pickable, snapshot, conversation_id)
+            pickable.append(
+                shared_photos_group(settings.get(SHARED_PHOTOS_MEMORY_DESCRIPTION))
+            )
+        return SavedMemory(
+            categories=active_categories,
+            items=items,
+            summaries=user_memory.list_summaries(
+                user_id, limit=settings.get(RECENT_CONVERSATION_SUMMARIES)
+            ),
+            shared_photos=shared_photos,
+            pickable=pickable,
+        )
+
+    def recall(
+        self,
+        snapshot: UserSnapshot,
+        saved: SavedMemory,
+        picked_categories: Sequence[str],
+    ) -> RecalledMemory:
+        """Pick out what the Companion remembers that matters for the message.
+
+        Memory Items from every "always include" category go in, plus those
+        from the categories the Understanding picked, plus the newest
+        Conversation Summaries. All the User's Shared Photos go in when the
+        Understanding picked "Shared Photos". A picked name that isn't one
+        of the pickable categories is ignored.
+
+        Args:
+            snapshot: The User being answered.
+            saved: Their saved memory, read for this reply.
+            picked_categories: The names of the categories the Understanding
+                picked, in any case.
+
+        Returns:
+            The memory section for the reply instructions and the Shared
+            Photos that matter.
+        """
+        picked_names = {name.strip().lower() for name in picked_categories}
+        picked = [
+            category
+            for category in saved.pickable
+            if category.name.lower() in picked_names
+        ]
         picked_ids = {category.id for category in picked}
-        relevant_photos = shared_photos if photos_group in picked else []
+        relevant_photos = (
+            saved.shared_photos
+            if any(category.name == SHARED_PHOTOS_GROUP_NAME for category in picked)
+            else []
+        )
         chosen = [
             category
-            for category in active_categories
+            for category in saved.categories
             if category.always_include or category.id in picked_ids
         ]
-        summaries = user_memory.list_summaries(
-            user_id, limit=settings.get(RECENT_CONVERSATION_SUMMARIES)
-        )
         return RecalledMemory(
             text=format_memory(
                 chosen,
-                items,
-                summaries,
+                saved.items,
+                saved.summaries,
                 snapshot.user.time_zone,
-                settings.get(REPLY_MEMORY_INTRO),
+                snapshot.settings.get(REPLY_MEMORY_INTRO),
                 relevant_photos,
             ),
             shared_photo_ids=tuple(photo.id for photo in relevant_photos),
         )
-
-    def _pick(
-        self,
-        categories: list[MemoryCategory],
-        snapshot: UserSnapshot,
-        conversation_id: UUID,
-    ) -> list[MemoryCategory]:
-        """Ask the model which categories matter for the newest message.
-
-        Args:
-            categories: The categories it may pick from.
-            snapshot: The User being answered.
-            conversation_id: The Conversation the message is in.
-
-        Returns:
-            The picked categories; none if there were none to pick from or
-            the call failed.
-        """
-        if not categories:
-            return []
-        settings = snapshot.settings
-        messages = self._repositories.conversations.list_messages(conversation_id)
-        try:
-            answer = self._chat_model.generate(
-                snapshot=snapshot,
-                step=ModelStep.MEMORY_PICKING,
-                model=settings.get(MEMORY_RETRIEVAL_MODEL),
-                instructions=settings.get(MEMORY_RETRIEVAL_PROMPT),
-                history=[
-                    ChatLine(
-                        role=ChatRole.USER,
-                        text=describe_message_for_picking(categories, messages),
-                    )
-                ],
-            )
-        except Exception:
-            logger.exception("Memory retrieval could not pick Memory Categories")
-            return []
-        return read_picked_categories(answer, categories)

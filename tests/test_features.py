@@ -734,15 +734,15 @@ def test_with_user_memory_off_by_an_admin_memory_is_still_used_and_the_choice_is
     note = unavailable_note(seeded_settings, USER_MEMORY_IN_REPLY_NOTE)
 
     switch_for_user(client, admin, user_id, "user_memory", "off")
-    chat_model.retrieval_calls.clear()
+    chat_model.understanding_calls.clear()
     off = reply_call(client, chat_model, "my sister called")
-    retrievals_while_off = list(chat_model.retrieval_calls)
+    understandings_while_off = list(chat_model.understanding_calls)
     me_while_off = client.get("/api/me", headers=maya).json()
     memories_while_off = memory_contents(client, maya)
     switch_for_user(client, admin, user_id, "user_memory", "default")
     back_on = reply_call(client, chat_model, "my sister called")
 
-    assert len(retrievals_while_off) == 1
+    assert len(understandings_while_off) == 1
     assert "Talked about work and family." in off.instructions
     assert note in off.instructions
     assert unavailable_note(seeded_settings, "User Memory") not in off.instructions

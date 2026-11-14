@@ -731,6 +731,94 @@ class MemoryCategory:
 
 
 @dataclass(frozen=True)
+class Need:
+    """What a User may want from the Companion right now. Managed by Admins.
+
+    Attributes:
+        id: Our ID for the Need.
+        name: Its name, e.g. "Be heard".
+        when_it_fits: When to pick it, as the Understanding model is told.
+        how_to_reply: How to reply when it is picked, as the reply is told.
+        sort_order: Where it comes in the list, lowest first.
+        is_fallback: Whether it is the one used when it isn't clear.
+    """
+
+    id: UUID
+    name: str
+    when_it_fits: str
+    how_to_reply: str
+    sort_order: int
+    is_fallback: bool
+
+
+class MoodIntensity(StrEnum):
+    """How strongly a User seems to feel their mood."""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+@dataclass(frozen=True)
+class UnderstandingForm:
+    """The form the Understanding model fills in before each reply.
+
+    Attributes:
+        need: The picked Need's name.
+        nuance: One sentence on what fits this moment.
+        mood: How the User seems, e.g. "frustrated".
+        intensity: How strongly they seem to feel it.
+        cause_known: Whether the Companion knows why they feel that way.
+        memory_categories: The Memory Categories whose items matter, by name.
+        bring_up: What from the past to bring up; empty until it is used.
+        left_alone: What from the past to leave alone; empty until it is used.
+        look_up_past: Phrases to search older Summaries with; empty until it
+            is used.
+        knowledge: Knowledge to look up; empty until it is used.
+        threads_touched: The Life Threads the Message touches; empty until
+            it is used.
+    """
+
+    need: str
+    nuance: str
+    mood: str
+    intensity: MoodIntensity
+    cause_known: bool
+    memory_categories: tuple[str, ...] = ()
+    bring_up: tuple[str, ...] = ()
+    left_alone: tuple[str, ...] = ()
+    look_up_past: tuple[str, ...] = ()
+    knowledge: tuple[str, ...] = ()
+    threads_touched: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class Understanding:
+    """The Companion's private read of one Message, made before it replies.
+
+    Attributes:
+        id: Our ID for the Understanding.
+        user_id: The User who sent the Message.
+        conversation_id: The Conversation the Message is in.
+        message_id: The Message's newest text, which it is removed with.
+        form: What the Understanding model decided.
+        need: The Need the reply followed, by name.
+        asked_why: Whether the reply was asked to gently ask why they feel
+            the way they do.
+        made_at: When it was made.
+    """
+
+    id: UUID
+    user_id: UUID
+    conversation_id: UUID
+    message_id: UUID
+    form: UnderstandingForm
+    need: str
+    asked_why: bool
+    made_at: datetime
+
+
+@dataclass(frozen=True)
 class MemoryCategoryDetails:
     """A Memory Category's details, as an Admin enters them.
 
@@ -1362,7 +1450,7 @@ class ModelStep(StrEnum):
     """Which step of the Companion's work a model call was for."""
 
     SAFEGUARD = "safeguard"
-    MEMORY_PICKING = "memory_picking"
+    UNDERSTANDING = "understanding"
     REPLY = "reply"
     PHOTO = "photo"
     CHECK_IN = "check_in"

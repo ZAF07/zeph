@@ -3,7 +3,7 @@ import type { ModelStep, TraceKind } from "@/lib/api-client";
 /** The steps Admins filter the Model Call Log by, in order, with labels. */
 export const modelSteps: { id: ModelStep; label: string }[] = [
   { id: "safeguard", label: "Safeguard" },
-  { id: "memory_picking", label: "Memory picking" },
+  { id: "understanding", label: "Understanding" },
   { id: "photo", label: "Photo" },
   { id: "reply", label: "Reply" },
   { id: "check_in", label: "Check-in" },
@@ -21,7 +21,7 @@ const traceKindLabels: Record<TraceKind, string> = {
  * Names a step in plain words.
  *
  * @param step - The step.
- * @returns Its label, e.g. "Memory picking".
+ * @returns Its label, e.g. "Understanding".
  */
 export function modelStepLabel(step: ModelStep): string {
   return modelSteps.find((option) => option.id === step)?.label ?? step;

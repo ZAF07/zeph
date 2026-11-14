@@ -10,7 +10,7 @@ import {
 
 describe("model call labels", () => {
   it("names steps and trace kinds in plain words", () => {
-    expect(modelStepLabel("memory_picking")).toBe("Memory picking");
+    expect(modelStepLabel("understanding")).toBe("Understanding");
     expect(traceKindLabel("conversation_end")).toBe("Conversation end");
   });
 

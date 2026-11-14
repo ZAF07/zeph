@@ -17,6 +17,7 @@ from companion.adapters.postgres.database import (
     seed_check_in_kinds,
     seed_helplines,
     seed_memory_categories,
+    seed_needs,
     seed_platform_settings,
 )
 from companion.adapters.postgres.repositories import build_postgres_repositories
@@ -41,6 +42,7 @@ from tests.conftest import (
     HELPLINES_SEED_FILE,
     INITIAL_ADMIN_EMAIL,
     MEMORY_CATEGORIES_SEED_FILE,
+    NEEDS_SEED_FILE,
     SEED_FILE,
     WEBHOOK_SECRET,
     CompanionTestClient,
@@ -164,6 +166,7 @@ def engine(
     seed_helplines(engine, HELPLINES_SEED_FILE)
     seed_memory_categories(engine, MEMORY_CATEGORIES_SEED_FILE)
     seed_check_in_kinds(engine, CHECK_IN_KINDS_SEED_FILE)
+    seed_needs(engine, NEEDS_SEED_FILE)
     yield engine
     engine.dispose()
 

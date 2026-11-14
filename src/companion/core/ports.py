@@ -42,6 +42,7 @@ from companion.core.models import (
     ModelCallTraceDetails,
     ModelCallTraceOverview,
     ModelStep,
+    Need,
     NextDueTimeChange,
     PersonalSticker,
     PhotoImage,
@@ -53,6 +54,7 @@ from companion.core.models import (
     StickerImage,
     StoredSetting,
     TelegramConnection,
+    Understanding,
     User,
     UserOverview,
     WebSearchResult,
@@ -824,6 +826,41 @@ class MemoryCategoryRepository(Protocol):
 
         Returns:
             The saved category.
+        """
+        ...
+
+
+class NeedRepository(Protocol):
+    """Stores Needs."""
+
+    def list_all(self) -> list[Need]:
+        """List every Need in sort order.
+
+        Returns:
+            The Needs.
+        """
+        ...
+
+
+class UnderstandingRepository(Protocol):
+    """Stores the Understanding made for each answered Message."""
+
+    def add(self, understanding: Understanding) -> None:
+        """Save an Understanding.
+
+        Args:
+            understanding: The Understanding to save.
+        """
+        ...
+
+    def list_for_conversation(self, conversation_id: UUID) -> list[Understanding]:
+        """List a Conversation's Understandings, oldest first.
+
+        Args:
+            conversation_id: The Conversation's ID.
+
+        Returns:
+            The Understandings.
         """
         ...
 
@@ -1878,6 +1915,8 @@ class Repositories:
     helplines: HelplineRepository
     safeguard_events: SafeguardEventRepository
     memory_categories: MemoryCategoryRepository
+    needs: NeedRepository
+    understandings: UnderstandingRepository
     user_memory: UserMemoryRepository
     knowledge_documents: KnowledgeDocumentRepository
     usage: UsageRepository

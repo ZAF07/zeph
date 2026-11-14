@@ -229,7 +229,7 @@ ask_about_photo_tool_description: >-
   clear question. The photos, by number, with their descriptions:
 
 # Put before the numbered list of the User's Shared Photos the send_photo
-# tool offers. The tool is offered only when memory retrieval picked the
+# tool offers. The tool is offered only when the Understanding picked the
 # User's Shared Photos for the message.
 send_photo_tool_description: >-
   Send one of the person's own photos back to them, the way a friend brings up
@@ -358,20 +358,57 @@ memory_processing_prompt: |-
     ]
   }
 
-# Before each reply, memory retrieval picks the Memory Categories that matter
-# for the message with a cheap call.
-memory_retrieval_model: deepseek-chat
+# Before each reply, the Understanding call reads what the person just said
+# and fills in a form: which Need fits, how they seem, whether the Companion
+# knows why, and which Memory Categories matter. The reply follows the
+# picked Need's "how to reply".
+understanding_model: deepseek-chat
 
-memory_retrieval_prompt: |-
-  You help Zeph, an AI companion, remember the right things. You are given a
-  list of Memory Categories and the person's latest message with the
-  Conversation before it. Pick the categories whose memories would help Zeph
-  reply well to that message.
+understanding_prompt: |-
+  You help Zeph, an AI companion, understand a person before it replies. You
+  are given the time where they are, the Needs Zeph can meet, their Goals,
+  the Memory Categories Zeph has saved something in, their recent
+  Conversations, what you understood earlier in this Conversation, and the
+  Conversation so far, ending with their latest message.
 
-  Answer with only the picked category names, one per line, exactly as
-  written in the list. If none would help, answer "none".
+  Work out what they want from Zeph right now, fresh for this message:
+  - need: the one Need that fits best, its name exactly as written. If it
+    isn't clear, pick the fallback Need.
+  - nuance: one sentence on what would fit this moment.
+  - mood: a word or two for how they seem right now.
+  - intensity: how strongly they seem to feel it: "low", "medium" or "high".
+    Use "high" only when it stands out for them.
+  - cause_known: true if they said, or you can tell from what you know, why
+    they feel this way; false if not.
+  - memory_categories: the Memory Categories whose memories would help Zeph
+    reply well, names exactly as written. Leave it empty if none would.
+  Notice how their mood is moving across the Conversation, and the time and
+  day: 2am on a Sunday reads differently from lunchtime on a Tuesday.
 
-# How the User's Shared Photos are described to memory retrieval, which
+  Answer with JSON only, in exactly this shape:
+  {
+    "need": "<Need name>",
+    "nuance": "...",
+    "mood": "...",
+    "intensity": "low" | "medium" | "high",
+    "cause_known": true | false,
+    "memory_categories": ["<category name>"],
+    "bring_up": [],
+    "left_alone": [],
+    "look_up_past": [],
+    "knowledge": [],
+    "threads_touched": []
+  }
+
+# Added to the reply's instructions when the person's mood stands out (high
+# intensity) and the Companion doesn't know why, unless the previous reply in
+# the Conversation already asked.
+reply_ask_why_note: >-
+  Their mood stands out and you don't know why. Unless they're venting, gently
+  ask what's going on, in your own words and only once, the way a friend
+  would. If they're venting, just listen.
+
+# How the User's Shared Photos are described to the Understanding call, which
 # picks them like a Memory Category named "Shared Photos".
 shared_photos_memory_description: >-
   Photos the person sent you that matter to them (pets, people, places,

@@ -8,6 +8,7 @@ from tests.fakes import (
     FakeClock,
     FakeScheduler,
     ScriptedChatModel,
+    understanding_answer,
 )
 from tests.telegram_helpers import (
     auth_headers,
@@ -286,7 +287,9 @@ def test_onboarding_memories_reach_the_first_reply(
     headers = auth_headers(auth_verifier, "user_maya")
     client.put("/api/onboarding", json=onboarding_answers(), headers=headers)
     connect_telegram(client, auth_verifier, chat_channel)
-    chat_model.script_retrieval("Life details\nGoals")
+    chat_model.script_understanding(
+        understanding_answer(memory_categories=["Life details", "Goals"])
+    )
     chat_model.script("hi Maya")
 
     send_to_webhook(client, telegram_text_update("hello"))

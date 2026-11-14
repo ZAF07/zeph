@@ -170,8 +170,9 @@ SAFEGUARD_PROMPT = Setting("safeguard_prompt", read_text)
 CRISIS_REPLY = Setting("crisis_reply", read_text)
 MEMORY_PROCESSING_MODEL = Setting("memory_processing_model", read_text)
 MEMORY_PROCESSING_PROMPT = Setting("memory_processing_prompt", read_text)
-MEMORY_RETRIEVAL_MODEL = Setting("memory_retrieval_model", read_text)
-MEMORY_RETRIEVAL_PROMPT = Setting("memory_retrieval_prompt", read_text)
+UNDERSTANDING_MODEL = Setting("understanding_model", read_text)
+UNDERSTANDING_PROMPT = Setting("understanding_prompt", read_text)
+REPLY_ASK_WHY_NOTE = Setting("reply_ask_why_note", read_text)
 SHARED_PHOTOS_MEMORY_DESCRIPTION = Setting(
     "shared_photos_memory_description", read_text
 )
@@ -444,15 +445,21 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         "Post-conversation processing model",
         SettingKind.MODEL,
     ),
+    EditableSetting(UNDERSTANDING_PROMPT.key, "Understanding prompt", SettingKind.TEXT),
+    EditableSetting(UNDERSTANDING_MODEL.key, "Understanding model", SettingKind.MODEL),
     EditableSetting(
-        MEMORY_RETRIEVAL_PROMPT.key, "Memory retrieval prompt", SettingKind.TEXT
-    ),
-    EditableSetting(
-        MEMORY_RETRIEVAL_MODEL.key, "Memory retrieval model", SettingKind.MODEL
+        REPLY_ASK_WHY_NOTE.key,
+        "“Gently ask why” note",
+        SettingKind.TEXT,
+        max_length=2_000,
+        hint=(
+            "Added when the User’s mood stands out and Zeph doesn’t know why, "
+            "unless the previous reply already asked."
+        ),
     ),
     EditableSetting(
         SHARED_PHOTOS_MEMORY_DESCRIPTION.key,
-        "Shared Photos description for memory retrieval",
+        "Shared Photos description for the Understanding",
         SettingKind.TEXT,
         max_length=2_000,
     ),
@@ -668,6 +675,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
                 "Memory and Knowledge",
                 (REPLY_MEMORY_INTRO.key, REPLY_KNOWLEDGE_INTRO.key),
             ),
+            ExtraPromptGroup("Understanding", (REPLY_ASK_WHY_NOTE.key,)),
             ExtraPromptGroup("Features", (REPLY_FEATURES_UNAVAILABLE_NOTE.key,)),
             ExtraPromptGroup("Stickers", (STICKER_TOOL_DESCRIPTION.key,)),
         ),
@@ -683,14 +691,16 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         model_key=MEMORY_PROCESSING_MODEL.key,
     ),
     CoreService(
-        name="Memory retrieval",
-        runs_when="Every reply",
+        name="Understanding",
+        runs_when="Every reply, before it is written",
         description=(
-            "Picks the Memory Categories that matter for the message, so the "
-            "reply gets only relevant memories plus the always-included ones."
+            "Reads what the User just said and picks the Need that fits, how "
+            "they seem and whether Zeph knows why, and the Memory Categories "
+            "that matter. The reply follows the Need’s “how to reply” and gets "
+            "only those memories plus the always-included ones."
         ),
-        prompt_key=MEMORY_RETRIEVAL_PROMPT.key,
-        model_key=MEMORY_RETRIEVAL_MODEL.key,
+        prompt_key=UNDERSTANDING_PROMPT.key,
+        model_key=UNDERSTANDING_MODEL.key,
         extra_prompt_keys=(SHARED_PHOTOS_MEMORY_DESCRIPTION.key,),
     ),
     CoreService(

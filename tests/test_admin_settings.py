@@ -216,7 +216,7 @@ def test_core_services_list_their_prompt_and_model_settings(
         "Safeguard",
         "Response composition",
         "Post-conversation processing",
-        "Memory retrieval",
+        "Understanding",
         "Photo viewing",
         "Personal Sticker keeping",
         "Check-ins",
@@ -395,6 +395,7 @@ RESPONSE_COMPOSITION_NOTE_GROUPS = {
         "reply_data_deletion_word_not_alone_note",
     ],
     "Memory and Knowledge": ["reply_memory_intro", "reply_knowledge_intro"],
+    "Understanding": ["reply_ask_why_note"],
     "Features": ["reply_features_unavailable_note"],
     "Stickers": ["sticker_tool_description"],
 }
@@ -450,15 +451,15 @@ def test_other_core_services_keep_their_extra_prompts_in_a_flat_list(
     services = core_services_by_name(client, headers)
 
     photo_viewing = services["Photo viewing"]
-    memory_retrieval = services["Memory retrieval"]
+    understanding = services["Understanding"]
 
     assert photo_viewing["extra_prompt_groups"] == []
     assert [prompt["key"] for prompt in photo_viewing["extra_prompts"]] == [
         "ask_about_photo_tool_description",
         "send_photo_tool_description",
     ]
-    assert memory_retrieval["extra_prompt_groups"] == []
-    assert [prompt["key"] for prompt in memory_retrieval["extra_prompts"]] == [
+    assert understanding["extra_prompt_groups"] == []
+    assert [prompt["key"] for prompt in understanding["extra_prompts"]] == [
         "shared_photos_memory_description"
     ]
 

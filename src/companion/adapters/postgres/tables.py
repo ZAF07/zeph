@@ -179,6 +179,55 @@ memory_categories = Table(
     Column("sort_order", Integer, nullable=False),
 )
 
+needs = Table(
+    "needs",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("name", Text, nullable=False, unique=True),
+    Column("when_it_fits", Text, nullable=False),
+    Column("how_to_reply", Text, nullable=False),
+    Column("sort_order", Integer, nullable=False),
+    Column("is_fallback", Boolean, nullable=False, server_default="false"),
+    Index(
+        "needs_one_fallback",
+        "is_fallback",
+        unique=True,
+        postgresql_where=text("is_fallback"),
+    ),
+)
+
+understandings = Table(
+    "understandings",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("position", BigInteger, Identity(), nullable=False, unique=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column(
+        "conversation_id",
+        Uuid,
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column(
+        "message_id",
+        Uuid,
+        ForeignKey("conversation_messages.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("form", JSONB, nullable=False),
+    Column("need", Text, nullable=False),
+    Column("asked_why", Boolean, nullable=False),
+    Column("made_at", DateTime(timezone=True), nullable=False),
+)
+
 memory_items = Table(
     "memory_items",
     metadata,
