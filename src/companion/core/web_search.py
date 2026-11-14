@@ -83,7 +83,7 @@ class WebSearchTools:
             The tools and their reply instructions.
         """
         if not snapshot.works(Feature.WEB_SEARCH):
-            return ReplyOffer(tools=[])
+            return ReplyOffer()
         settings = self._repositories.platform_settings
         usage = self._repositories.usage
         daily_limit = settings.get("web_search_daily_limit")

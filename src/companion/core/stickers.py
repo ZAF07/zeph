@@ -244,7 +244,7 @@ def sticker_offer(
         The offer with the send_sticker tool, which sets `picked` when the
         model picks a sticker; no tool when no sticker has a note.
     """
-    offer = ReplyOffer(tools=[])
+    offer = ReplyOffer()
     if not stickers:
         return offer
 
@@ -308,7 +308,7 @@ class StickerTools:
             Stickers doesn't work for the User.
         """
         if not snapshot.works(Feature.STICKERS):
-            return ReplyOffer(tools=[])
+            return ReplyOffer()
         theirs = (
             self._repositories.personal_stickers.list_for_user(snapshot.user.id)
             if snapshot.works(Feature.PERSONAL_STICKERS)

@@ -505,7 +505,7 @@ class PhotoTools:
             User.
         """
         if not snapshot.works(Feature.PHOTO_VIEWING):
-            return ReplyOffer(tools=[])
+            return ReplyOffer()
         messages = self._repositories.conversations.list_messages(
             context.conversation_id
         )
@@ -516,7 +516,7 @@ class PhotoTools:
             if photo.viewed
         ]
         if not viewed:
-            return ReplyOffer(tools=[])
+            return ReplyOffer()
 
         def run_ask(arguments: dict[str, Any]) -> str:
             """Look at the photo the model picked again, with its question.
@@ -573,7 +573,7 @@ def send_photo_offer(shared_photos: list[SharedPhoto], description: str) -> Repl
         The offer with the send_photo tool, which sets `picked` when the model
         picks a Shared Photo; no tool when there is no Shared Photo to send.
     """
-    offer = ReplyOffer(tools=[])
+    offer = ReplyOffer()
     if not shared_photos:
         return offer
 

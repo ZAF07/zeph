@@ -117,9 +117,10 @@ class FakeProvider:
 
 def picking_offer(name: str, attachment: Attachment) -> ReplyOffer:
     """Make an offer with one tool that picks the attachment when called."""
-    offer = ReplyOffer(tools=[])
+    offer = ReplyOffer()
 
     def pick(arguments: dict[str, Any]) -> str:
+        """Pick the attachment, as a real pick tool would."""
         offer.picked = attachment
         return "picked"
 
@@ -257,7 +258,7 @@ def test_a_reply_with_only_a_pick_is_sent_but_one_with_nothing_is_empty(
     assert reply.sticker == sticker
 
     nothing_picked = build_composer(
-        repositories, chat_model, [FakeProvider(ReplyOffer(tools=[]))]
+        repositories, chat_model, [FakeProvider(ReplyOffer())]
     )
     with pytest.raises(EmptyReplyError):
         nothing_picked.compose(uuid4(), snapshot_for(user))
@@ -270,7 +271,7 @@ def test_web_search_offers_its_tools_until_the_daily_limit(
     provider = WebSearchTools(repositories, FakeWebSearch())
     settings = repositories.platform_settings
 
-    assert provider.offer(snapshot_for(user), no_context()) == ReplyOffer(tools=[])
+    assert provider.offer(snapshot_for(user), no_context()) == ReplyOffer()
 
     snapshot = snapshot_for(user, Feature.WEB_SEARCH)
     offer = provider.offer(snapshot, no_context())
@@ -359,7 +360,7 @@ def test_stickers_offer_their_own_first_and_pick_only_one(
     repositories.personal_stickers.save_many([theirs])
     provider = StickerTools(repositories)
 
-    assert provider.offer(snapshot_for(user), no_context()) == ReplyOffer(tools=[])
+    assert provider.offer(snapshot_for(user), no_context()) == ReplyOffer()
 
     offer = provider.offer(
         snapshot_for(user, Feature.STICKERS, Feature.PERSONAL_STICKERS), no_context()
@@ -393,7 +394,7 @@ def test_sticker_adding_is_offered_to_admins_only(
     user = snapshot_for(add_user(repositories))
 
     assert tool_names(provider.offer(admin, no_context())) == [ADDING_TOOL]
-    assert provider.offer(user, no_context()) == ReplyOffer(tools=[])
+    assert provider.offer(user, no_context()) == ReplyOffer()
 
 
 def test_photo_viewing_offers_a_look_again_at_viewed_photos_only(
@@ -435,10 +436,11 @@ def test_photo_viewing_offers_a_look_again_at_viewed_photos_only(
     )
     context = ReplyContext(conversation_id=conversation_id)
 
-    assert provider.offer(snapshot_for(user), context) == ReplyOffer(tools=[])
-    assert provider.offer(
-        snapshot_for(user, Feature.PHOTO_VIEWING), no_context()
-    ) == ReplyOffer(tools=[])
+    assert provider.offer(snapshot_for(user), context) == ReplyOffer()
+    assert (
+        provider.offer(snapshot_for(user, Feature.PHOTO_VIEWING), no_context())
+        == ReplyOffer()
+    )
 
     offer = provider.offer(snapshot_for(user, Feature.PHOTO_VIEWING), context)
     [tool] = offer.tools
@@ -479,7 +481,7 @@ def test_send_photo_offers_only_the_users_own_shared_photos_and_picks_one(
     provider = SendPhotoTools(repositories)
     snapshot = snapshot_for(user)
 
-    assert provider.offer(snapshot, no_context()) == ReplyOffer(tools=[])
+    assert provider.offer(snapshot, no_context()) == ReplyOffer()
 
     offer = provider.offer(
         snapshot,

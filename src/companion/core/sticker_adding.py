@@ -186,7 +186,7 @@ class StickerAdding:
         """
         user = snapshot.user
         if user.role != UserRole.ADMIN:
-            return ReplyOffer(tools=[])
+            return ReplyOffer()
         return ReplyOffer(
             tools=[
                 ChatTool(
