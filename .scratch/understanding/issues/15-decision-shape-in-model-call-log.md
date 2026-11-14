@@ -1,6 +1,6 @@
 # 15 — Decision shape in the Model Call Log
 
-Status: ready-for-agent
+Status: in-progress
 
 ## Parent
 

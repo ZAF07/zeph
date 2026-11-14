@@ -24,7 +24,7 @@ const plainUsersTrace: ModelCallTraceDetails = {
   user_name: "Maya Lin",
   user_email: "maya@example.com",
   started_at: "2026-11-14T10:30:00Z",
-  steps: ["safeguard", "reply"],
+  steps: ["safeguard", "understanding", "reply"],
   tokens_in: 1200,
   tokens_out: 80,
   duration_ms: 2400,
@@ -42,6 +42,30 @@ const plainUsersTrace: ModelCallTraceDetails = {
       error: null,
       tools_called: [],
       content: null,
+      understanding_shape: null,
+    },
+    {
+      id: "c4",
+      step: "understanding",
+      model: "deepseek-chat",
+      started_at: "2026-11-14T10:30:00Z",
+      duration_ms: 600,
+      tokens_in: 800,
+      tokens_out: 60,
+      error: null,
+      tools_called: [],
+      content: null,
+      understanding_shape: {
+        need: "Be heard",
+        intensity: "high",
+        cause_known: false,
+        threads_reminded: 3,
+        threads_led_with: 1,
+        threads_woven_in: 1,
+        threads_left_alone: 1,
+        threads_held_back: 1,
+        past_look_ups: 2,
+      },
     },
     {
       id: "c2",
@@ -54,6 +78,7 @@ const plainUsersTrace: ModelCallTraceDetails = {
       error: "TimeoutError",
       tools_called: ["web_search"],
       content: null,
+      understanding_shape: null,
     },
   ],
 };
@@ -94,6 +119,7 @@ const adminsTrace: ModelCallTraceDetails = {
         response: "They guide ships home.",
         reasoning: "They want facts.",
       },
+      understanding_shape: null,
     },
   ],
 };
@@ -116,9 +142,31 @@ describe("ModelCallTraceView", () => {
     expect(within(reply).getByText("web_search")).toBeInTheDocument();
     expect(within(reply).getByText("TimeoutError")).toBeInTheDocument();
     expect(screen.getAllByText("No content kept for this User")).toHaveLength(
-      2,
+      3,
     );
     expect(screen.queryByText("Instructions")).not.toBeInTheDocument();
+  });
+
+  it("shows the shape of the Understanding's decision", async () => {
+    apiClient.getModelCallTrace.mockResolvedValue(plainUsersTrace);
+
+    renderWithQueries(<ModelCallTraceView traceId="t1" />);
+
+    const understanding = await screen.findByRole("article", {
+      name: "Understanding",
+    });
+    const factValue = (label: string) =>
+      within(understanding).getByText(label).nextElementSibling?.textContent;
+    expect(factValue("Need picked")).toBe("Be heard");
+    expect(factValue("Mood intensity")).toBe("High");
+    expect(factValue("Cause known")).toBe("No");
+    expect(factValue("Life Threads reminded")).toBe("3");
+    expect(factValue("Threads brought up")).toBe("2 (1 lead, 1 weave)");
+    expect(factValue("Threads left alone")).toBe("1");
+    expect(factValue("Threads held back")).toBe("1");
+    expect(factValue("Past look-ups")).toBe("2");
+    const reply = screen.getByRole("article", { name: "Reply" });
+    expect(within(reply).queryByText("Need picked")).not.toBeInTheDocument();
   });
 
   it("shows full content for an Admin's own chat, tool calls included", async () => {

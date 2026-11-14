@@ -236,6 +236,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         understanding=UnderstandingService(
             repositories=dependencies.repositories,
             chat_model=chat_model,
+            model_call_log=model_call_log,
             clock=dependencies.clock,
         ),
         memory_retrieval=MemoryRetrieval(

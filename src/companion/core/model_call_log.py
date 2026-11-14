@@ -17,6 +17,7 @@ from companion.core.models import (
     ModelStep,
     OfferedTool,
     TraceKind,
+    UnderstandingShape,
     UserRole,
     UserSnapshot,
 )
@@ -68,9 +69,10 @@ class ModelCallLog:
     """Records every model call in the Model Call Log, at the right level (ADR-0010).
 
     Every call keeps its step, model, tokens, time taken, error and the tools
-    it called. What the model was given and answered is kept only when the
-    User is an Admin, or when every call keeps it (an Eval run). Developer
-    logs, when on, get the full content of every call instead.
+    it called, and an Understanding call the shape of its decision. What the
+    model was given and answered is kept only when the User is an Admin, or
+    when every call keeps it (an Eval run). Developer logs, when on, get the
+    full content of every call instead.
     """
 
     def __init__(
@@ -150,6 +152,24 @@ class ModelCallLog:
             self._repositories.model_calls.add(call)
         except Exception:
             logger.exception("Could not save a Model Call Log entry")
+
+    def record_understanding_shape(
+        self, snapshot: UserSnapshot, shape: UnderstandingShape
+    ) -> None:
+        """Record the shape of the Understanding its trace's call just made.
+
+        Saving never raises: a failure is logged and the reply goes on.
+
+        Args:
+            snapshot: The User the Understanding was for, with its trace.
+            shape: The Understanding's shape.
+        """
+        try:
+            self._repositories.model_calls.set_understanding_shape(
+                snapshot.trace.id, shape
+            )
+        except Exception:
+            logger.exception("Could not save an Understanding's shape")
 
     def list_traces(
         self,

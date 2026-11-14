@@ -577,4 +577,5 @@ model_calls = Table(
     Column("error", Text),
     Column("tools_called", JSONB, nullable=False, server_default="[]"),
     Column("content", JSONB(none_as_null=True)),
+    Column("understanding_shape", JSONB(none_as_null=True)),
 )

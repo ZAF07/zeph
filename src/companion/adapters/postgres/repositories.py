@@ -125,6 +125,7 @@ from companion.core.models import (
     TraceKind,
     Understanding,
     UnderstandingForm,
+    UnderstandingShape,
     User,
     UserOverview,
     UserPortrait,
@@ -4488,6 +4489,20 @@ def _to_model_call_content(values: dict[str, Any]) -> ModelCallContent:
     )
 
 
+def _to_understanding_shape(values: dict[str, Any]) -> UnderstandingShape:
+    """Read an Understanding call's stored shape.
+
+    Args:
+        values: The stored JSON.
+
+    Returns:
+        The shape.
+    """
+    return UnderstandingShape(
+        **{**values, "intensity": MoodIntensity(values["intensity"])}
+    )
+
+
 def _to_model_call(row: Row[Any]) -> ModelCall:
     """Turn a `model_calls` row into a model call.
 
@@ -4510,6 +4525,11 @@ def _to_model_call(row: Row[Any]) -> ModelCall:
         error=row.error,
         tools_called=tuple(row.tools_called),
         content=_to_model_call_content(row.content) if row.content else None,
+        understanding_shape=(
+            _to_understanding_shape(row.understanding_shape)
+            if row.understanding_shape
+            else None
+        ),
     )
 
 
@@ -4546,7 +4566,38 @@ class PostgresModelCallRepository:
                     error=call.error,
                     tools_called=list(call.tools_called),
                     content=asdict(call.content) if call.content else None,
+                    understanding_shape=(
+                        asdict(call.understanding_shape)
+                        if call.understanding_shape
+                        else None
+                    ),
                 )
+            )
+
+    def set_understanding_shape(
+        self, trace_id: UUID, shape: UnderstandingShape
+    ) -> None:
+        """Save the Understanding's shape on a trace's newest Understanding call.
+
+        Args:
+            trace_id: The trace's ID.
+            shape: The Understanding's shape.
+        """
+        newest_understanding_call = (
+            select(model_calls.c.id)
+            .where(
+                model_calls.c.trace_id == trace_id,
+                model_calls.c.step == ModelStep.UNDERSTANDING.value,
+            )
+            .order_by(model_calls.c.position.desc())
+            .limit(1)
+            .scalar_subquery()
+        )
+        with self._database.begin() as connection:
+            connection.execute(
+                update(model_calls)
+                .where(model_calls.c.id == newest_understanding_call)
+                .values(understanding_shape=asdict(shape))
             )
 
     def list_traces(

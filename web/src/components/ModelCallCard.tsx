@@ -7,11 +7,13 @@ import {
   formatDuration,
   formatTokens,
   modelStepLabel,
+  understandingShapeFacts,
 } from "@/lib/model-calls";
 
 /**
  * One model call in a trace: its step, model, tokens, time taken, the tools
- * it called and its error, then its content when it was kept.
+ * it called, its error and the shape of its Understanding, then its content
+ * when it was kept.
  *
  * @param props - `call` is the model call.
  * @returns The call's card.
@@ -29,6 +31,9 @@ export function ModelCallCard({ call }: { call: ModelCall }) {
       label: "Tools called",
       value: call.tools_called.length > 0 ? call.tools_called.join(", ") : "—",
     },
+    ...(call.understanding_shape
+      ? understandingShapeFacts(call.understanding_shape)
+      : []),
   ];
   return (
     <article

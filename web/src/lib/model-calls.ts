@@ -1,4 +1,8 @@
-import type { ModelStep, TraceKind } from "@/lib/api-client";
+import type {
+  ModelStep,
+  TraceKind,
+  UnderstandingShape,
+} from "@/lib/api-client";
 
 /** The steps Admins filter the Model Call Log by, in order, with labels. */
 export const modelSteps: { id: ModelStep; label: string }[] = [
@@ -84,4 +88,39 @@ export function describeSteps(steps: ModelStep[]): string {
       count > 1 ? `${modelStepLabel(step)} ×${count}` : modelStepLabel(step),
     )
     .join(" → ");
+}
+
+const intensityLabels: Record<UnderstandingShape["intensity"], string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+};
+
+/**
+ * Lists the facts of an Understanding's shape, as labels and values.
+ *
+ * @param shape - The Understanding's shape.
+ * @returns E.g. "Need picked: Be heard", "Threads brought up: 2 (1 lead,
+ * 1 weave)".
+ */
+export function understandingShapeFacts(
+  shape: UnderstandingShape,
+): { label: string; value: string }[] {
+  const broughtUp = shape.threads_led_with + shape.threads_woven_in;
+  return [
+    { label: "Need picked", value: shape.need },
+    { label: "Mood intensity", value: intensityLabels[shape.intensity] },
+    { label: "Cause known", value: shape.cause_known ? "Yes" : "No" },
+    { label: "Life Threads reminded", value: String(shape.threads_reminded) },
+    {
+      label: "Threads brought up",
+      value:
+        broughtUp > 0
+          ? `${broughtUp} (${shape.threads_led_with} lead, ${shape.threads_woven_in} weave)`
+          : "0",
+    },
+    { label: "Threads left alone", value: String(shape.threads_left_alone) },
+    { label: "Threads held back", value: String(shape.threads_held_back) },
+    { label: "Past look-ups", value: String(shape.past_look_ups) },
+  ];
 }

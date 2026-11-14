@@ -1770,6 +1770,34 @@ class ModelCallContent:
 
 
 @dataclass(frozen=True)
+class UnderstandingShape:
+    """The shape of an Understanding, kept for every User. Never any words.
+
+    Attributes:
+        need: The Need the reply followed, by name.
+        intensity: How strongly the User seemed to feel their mood.
+        cause_known: Whether the Companion knew why they felt that way.
+        threads_reminded: How many Life Threads the Message reminded it of.
+        threads_led_with: How many Threads the reply was to lead with.
+        threads_woven_in: How many Threads the reply was to weave in.
+        threads_left_alone: How many Threads were left alone, held-back ones
+            included.
+        threads_held_back: How many reminded Threads were held back.
+        past_look_ups: How many phrases older Summaries were searched with.
+    """
+
+    need: str
+    intensity: MoodIntensity
+    cause_known: bool
+    threads_reminded: int
+    threads_led_with: int
+    threads_woven_in: int
+    threads_left_alone: int
+    threads_held_back: int
+    past_look_ups: int
+
+
+@dataclass(frozen=True)
 class ModelCall:
     """One model call in the Model Call Log.
 
@@ -1788,6 +1816,8 @@ class ModelCall:
             of its decision, kept for every User.
         content: What it was given and answered; None unless the call was at
             the full-content level.
+        understanding_shape: The shape of the Understanding it made, kept for
+            every User; None for other steps.
     """
 
     id: UUID
@@ -1802,6 +1832,7 @@ class ModelCall:
     error: str | None
     tools_called: tuple[str, ...]
     content: ModelCallContent | None
+    understanding_shape: UnderstandingShape | None = None
 
 
 @dataclass(frozen=True)

@@ -18,6 +18,7 @@ from companion.core.life_threads import (
     format_threads_for_reply,
 )
 from companion.core.memory_retrieval import SavedMemory, format_day, summary_line
+from companion.core.model_call_log import ModelCallLog
 from companion.core.models import (
     BringUpWay,
     ChatLine,
@@ -36,6 +37,7 @@ from companion.core.models import (
     ThreadToBringUp,
     Understanding,
     UnderstandingForm,
+    UnderstandingShape,
     UserSnapshot,
 )
 from companion.core.platform_settings import (
@@ -557,6 +559,34 @@ def format_reply_guidance(
     return "\n\n".join(["\n".join(lines), *sections])
 
 
+def describe_understanding_shape(
+    need: Need, form: UnderstandingForm, reminded: Sequence[RemindedThread]
+) -> UnderstandingShape:
+    """Describe the shape of an Understanding for the Model Call Log.
+
+    Args:
+        need: The Need the reply follows.
+        form: The form the reply follows.
+        reminded: The Life Threads the Message reminded the Companion of.
+
+    Returns:
+        The Need, intensity, whether the cause is known and how many Life
+        Threads and past look-ups there were; never any words.
+    """
+    ways = [item.how for item in form.bring_up]
+    return UnderstandingShape(
+        need=need.name,
+        intensity=form.intensity,
+        cause_known=form.cause_known,
+        threads_reminded=len(reminded),
+        threads_led_with=ways.count(BringUpWay.LEAD),
+        threads_woven_in=ways.count(BringUpWay.WEAVE),
+        threads_left_alone=len(form.left_alone),
+        threads_held_back=sum(1 for item in reminded if item.hold_back),
+        past_look_ups=len(form.look_up_past),
+    )
+
+
 def newest_incoming_message_id(messages: list[ConversationMessage]) -> UUID:
     """Find the newest text the User sent, which the Understanding goes with.
 
@@ -589,6 +619,7 @@ class UnderstandingService:
         self,
         repositories: Repositories,
         chat_model: UsageRecordingChatModel,
+        model_call_log: ModelCallLog,
         clock: Clock,
     ) -> None:
         """Set up the service.
@@ -597,10 +628,12 @@ class UnderstandingService:
             repositories: Where Needs, Conversations and Understandings are
                 stored.
             chat_model: Fills in the form and records the tokens used.
+            model_call_log: Records the shape of each Understanding.
             clock: Tells the current time.
         """
         self._repositories = repositories
         self._chat_model = chat_model
+        self._model_call_log = model_call_log
         self._clock = clock
 
     def understand(
@@ -613,9 +646,10 @@ class UnderstandingService:
     ) -> UnderstoodMessage:
         """Make and save the Understanding of the Conversation's newest Message.
 
-        An unknown Need falls back to the fallback Need; an unreadable form
-        or a failed call falls back to the fallback Need with no mood and no
-        Memory Categories, so the reply still goes, with every reminded Life
+        Its shape goes into the Model Call Log, for every User. An unknown
+        Need falls back to the fallback Need; an unreadable form or a failed
+        call falls back to the fallback Need with no mood and no Memory
+        Categories, so the reply still goes, with every reminded Life
         Thread that isn't held back but no Thread or Curiosity brought up.
 
         Args:
@@ -666,6 +700,9 @@ class UnderstandingService:
             made_at=self._clock.now(),
         )
         self._repositories.understandings.add(understanding)
+        self._model_call_log.record_understanding_shape(
+            snapshot, describe_understanding_shape(need, form, reminded)
+        )
         ask_why_note = snapshot.settings.get(REPLY_ASK_WHY_NOTE) if asked_why else ""
         return UnderstoodMessage(
             understanding=understanding,
