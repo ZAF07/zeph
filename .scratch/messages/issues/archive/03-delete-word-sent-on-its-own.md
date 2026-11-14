@@ -43,7 +43,12 @@ No change to when data is deleted:
 ## Completion
 
 - Completed: 2026-11-14
-- Commit: <to be filled in after merge>
+- Commits:
+  - `56262d1` Messages issue 03: say the Delete My Data word must be sent on its own
+  - `84e2e2e` Messages issue 03 done: archive issue with test, run and review evidence
+  - `6ca7b99` Messages issue 03: after rebase, the new test ignores Model Call Log rows
+  - `9ca95f8` Merge messages issue 03 into main
+- After rebasing onto the Model Call Log (understanding issue 03): full backend suite 766 passed, plus the one test then fixed (`tests/test_settings_via_chat.py` 18 passed); web 342 passed; `/run` repeated for both cases on the rebased backend.
 
 ## Blocked by
 
