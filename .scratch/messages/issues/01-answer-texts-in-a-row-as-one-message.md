@@ -4,7 +4,7 @@ Status: ready-for-agent
 
 ## Parent
 
-Split out of the Understanding grilling (`.scratch/understanding/issues/01-understanding-before-reply.md`, 14 Nov 2026). Blocks `.scratch/understanding/issues/04-understanding-call-with-seeded-needs.md`.
+Split out of the Understanding grilling (`.scratch/understanding/issues/archive/01-understanding-before-reply.md`, 14 Nov 2026). Blocks `.scratch/understanding/issues/04-understanding-call-with-seeded-needs.md`.
 
 ## What to build
 

@@ -1,6 +1,6 @@
 # 01 — Understanding: the Companion works out what the User needs before replying
 
-Status: needs-triage
+Status: completed
 
 ## Idea (from the User, during the architecture grilling, 14 Nov 2026)
 
@@ -64,4 +64,10 @@ The Companion is not just a chat companion. It helps Users understand themselves
 
 ## Next
 
-Grilled 14 Nov 2026 (decisions above; LangGraph settled in ADR-0009). PRD written: `.scratch/understanding/PRD.md` (ready-for-agent). Next: `/to-issues`. Suggested order: Message grouping (own issue) and remove LangGraph first, then Model Call Log, then Understanding and the rest. File the split-out issues (Message grouping, keep typing visible, Eval dashboard PRD) at the same time.
+Grilled 14 Nov 2026 (decisions above; LangGraph settled in ADR-0009). PRD written: `.scratch/understanding/PRD.md` (ready-for-agent). Issues written: `.scratch/understanding/issues/02`–`14`. Suggested order: Message grouping (own issue) and remove LangGraph first, then Model Call Log, then Understanding and the rest. File the split-out issues (Message grouping, keep typing visible, Eval dashboard PRD) at the same time.
+
+## Completion
+
+- Completed: 2026-11-14
+- Outcome: grilled with `/grill-with-docs`; decisions above. Glossary terms added to `CONTEXT.md` (Message, Life Thread, User Portrait, Need, Understanding, Curiosity, Model Call Log), ADR-0009 and ADR-0010, PRD at `.scratch/understanding/PRD.md`, issues 02–14 in `.scratch/understanding/issues/`, split-out issues in `.scratch/messages/` and `.scratch/eval-dashboard/`.
+- Commit: 4112623 "Understanding: grilling decisions, PRD and issues", a87fa9d "Glossary: Curiosities is a Feature" (merged in 0dd3772)
