@@ -2,7 +2,6 @@ from datetime import timedelta
 from typing import Any
 
 from fastapi.testclient import TestClient
-from langgraph.checkpoint.postgres import PostgresSaver
 from sqlalchemy import Engine
 
 from tests.fakes import (
@@ -26,7 +25,6 @@ from tests.test_data_deletion import (
     set_up_user_with_every_kind_of_data,
     user_data_tables,
 )
-from tests.test_message_retention import has_checkpoints
 from tests.test_post_conversation import memory_contents
 
 SETTINGS_TOOLS = [
@@ -356,7 +354,6 @@ def test_a_dashboard_change_clears_the_changed_in_chat_mark(
 def test_delete_my_data_in_chat_only_deletes_after_the_confirmation_word(
     client: TestClient,
     engine: Engine,
-    checkpointer: PostgresSaver,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
     chat_model: ScriptedChatModel,
@@ -397,7 +394,6 @@ def test_delete_my_data_in_chat_only_deletes_after_the_confirmation_word(
         seeded_settings["data_deleted_reply"]
     ]
     assert rows_per_table(engine, user_id, data_tables) == dict.fromkeys(data_tables, 0)
-    assert not has_checkpoints(checkpointer, user_id)
     assert me(client, headers)["name"] == "Maya"
     assert_treated_as_unknown_telegram_user(
         client, chat_channel, chat_model, seeded_settings

@@ -5,7 +5,6 @@ from typing import Any
 import httpx
 import pytest
 from fastapi.testclient import TestClient
-from langgraph.checkpoint.postgres import PostgresSaver
 from sqlalchemy import Engine, text
 
 from companion.adapters.clerk.accounts import ClerkAccounts
@@ -16,7 +15,6 @@ from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
     FakeClock,
-    FakeConversationEngine,
     FakeScheduler,
     ScriptedChatModel,
 )
@@ -35,7 +33,6 @@ from tests.test_check_in_sending import (
     send_check_ins,
     set_up_user_with_check_ins,
 )
-from tests.test_message_retention import has_checkpoints
 from tests.test_post_conversation import (
     have_conversation,
     memory_contents,
@@ -166,7 +163,6 @@ def assert_treated_as_unknown_telegram_user(
 def test_delete_my_data_removes_every_kind_of_data_but_keeps_the_account(
     client: TestClient,
     engine: Engine,
-    checkpointer: PostgresSaver,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
     chat_model: ScriptedChatModel,
@@ -188,7 +184,6 @@ def test_delete_my_data_removes_every_kind_of_data_but_keeps_the_account(
     tables_without_test_data = [table for table, count in before.items() if count == 0]
     assert tables_without_test_data == []
     kept_before = rows_per_table(engine, user_id, list(TABLES_KEPT_BY_DELETE_MY_DATA))
-    assert has_checkpoints(checkpointer, user_id)
 
     response = client.delete("/api/me/data", headers=headers)
 
@@ -199,7 +194,6 @@ def test_delete_my_data_removes_every_kind_of_data_but_keeps_the_account(
         == kept_before
     )
     assert message_count(engine) == 0
-    assert not has_checkpoints(checkpointer, user_id)
     assert memory_contents(client, headers) == {}
     summaries = client.get("/api/conversation-summaries", headers=headers).json()
     assert summaries == {"summaries": []}
@@ -252,7 +246,6 @@ def test_delete_my_data_leaves_other_users_alone(
 def test_delete_account_removes_the_user_and_their_auth_account(
     client: TestClient,
     engine: Engine,
-    checkpointer: PostgresSaver,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
     chat_model: ScriptedChatModel,
@@ -283,7 +276,6 @@ def test_delete_account_removes_the_user_and_their_auth_account(
     every_table = tables_with_a_user_id_column(engine)
     assert rows_per_table(engine, user_id, every_table) == dict.fromkeys(every_table, 0)
     assert message_count(engine) == 0
-    assert not has_checkpoints(checkpointer, user_id)
     assert client.get("/api/me", headers=headers).status_code == 401
     assert_treated_as_unknown_telegram_user(
         client, chat_channel, chat_model, seeded_settings
@@ -466,7 +458,7 @@ def test_an_account_already_gone_from_clerk_on_retry_counts_as_deleted(
         ),
     )
     repositories = build_postgres_repositories(engine)
-    user_data = UserDataService(repositories, FakeConversationEngine(), clerk, clock)
+    user_data = UserDataService(repositories, clerk, clock)
     user = repositories.users.get_by_auth_id("user_maya")
     assert user is not None
 
@@ -486,9 +478,7 @@ def test_deleting_an_account_twice_is_harmless(
     client.get("/api/me", headers=auth_headers(auth_verifier, "user_maya"))
     auth_verifier.failing_deletes.add("user_maya")
     repositories = build_postgres_repositories(engine)
-    user_data = UserDataService(
-        repositories, FakeConversationEngine(), auth_verifier, clock
-    )
+    user_data = UserDataService(repositories, auth_verifier, clock)
     user = repositories.users.get_by_auth_id("user_maya")
     assert user is not None
 

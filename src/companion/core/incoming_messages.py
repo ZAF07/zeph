@@ -19,7 +19,8 @@ from companion.core.platform_settings import (
     UNKNOWN_TELEGRAM_USER_REPLY,
     UNSUPPORTED_MESSAGE_REPLY,
 )
-from companion.core.ports import ChatChannel, ConversationEngine, Repositories, Timer
+from companion.core.ports import ChatChannel, Repositories, Timer
+from companion.core.reply_service import ReplyService
 from companion.core.sticker_adding import StickerAdding
 from companion.core.stickers import sticker_message_text
 from companion.core.telegram_connection import TelegramConnectionService
@@ -78,7 +79,7 @@ class IncomingMessageHandler:
         self,
         telegram_connections: TelegramConnectionService,
         repositories: Repositories,
-        conversation_engine: ConversationEngine,
+        reply_service: ReplyService,
         chat_channel: ChatChannel,
         sticker_adding: StickerAdding,
         photo_service: PhotoService,
@@ -92,7 +93,7 @@ class IncomingMessageHandler:
             telegram_connections: Handles `/start <token>` messages.
             repositories: Where Users, Telegram Connections and settings are
                 stored.
-            conversation_engine: Answers connected Users' messages.
+            reply_service: Answers connected Users' messages.
             chat_channel: Sends replies that need no Conversation.
             sticker_adding: Adds the stickers Admins send in adding mode or
                 reply "add this" to.
@@ -107,7 +108,7 @@ class IncomingMessageHandler:
         self._user_snapshots = user_snapshots
         self._timer = timer
         self._repositories = repositories
-        self._conversation_engine = conversation_engine
+        self._reply_service = reply_service
         self._chat_channel = chat_channel
         self._dashboard_url = dashboard_url
         self._turn_locks: defaultdict[UUID, threading.Lock] = defaultdict(
@@ -263,7 +264,7 @@ class IncomingMessageHandler:
             settings = self._repositories.platform_settings.load()
             try:
                 snapshot = self._user_snapshots.load(user_id, settings)
-                self._conversation_engine.handle(build_message(snapshot), snapshot)
+                self._reply_service.handle(build_message(snapshot), snapshot)
             except Exception:
                 logger.exception("Could not answer a message from a User")
                 self._chat_channel.send_text(

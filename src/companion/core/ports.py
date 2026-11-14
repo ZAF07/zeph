@@ -37,7 +37,6 @@ from companion.core.models import (
     MemoryCategoryOverview,
     MemoryChanges,
     MemoryItem,
-    MessageToAnswer,
     ModelAnswer,
     NextDueTimeChange,
     PersonalSticker,
@@ -52,7 +51,6 @@ from companion.core.models import (
     TelegramConnection,
     User,
     UserOverview,
-    UserSnapshot,
     WebSearchResult,
 )
 
@@ -379,34 +377,6 @@ class KnowledgeVectorStore(Protocol):
 
         Returns:
             The closest chunks, best match first.
-        """
-        ...
-
-
-class ConversationEngine(Protocol):
-    """Runs the steps of answering a connected User's message."""
-
-    def handle(self, message: MessageToAnswer, snapshot: UserSnapshot) -> None:
-        """Answer one message: apply the house rules, then reply if needed.
-
-        When the ReplyGate stops the reply nothing is composed;
-        otherwise the reply is given the User Memory that matters and the
-        Knowledge that may fit. Every step reads the User from the snapshot.
-
-        Args:
-            message: The message to answer.
-            snapshot: The User who sent it, read once as the reply starts.
-        """
-        ...
-
-    def forget_user(self, user_id: UUID) -> None:
-        """Delete everything the engine saved while answering a User.
-
-        Nothing it saves is needed by a later message, so this is safe at any
-        time between messages.
-
-        Args:
-            user_id: The User's ID.
         """
         ...
 
@@ -781,17 +751,6 @@ class ConversationRepository(Protocol):
 
         Returns:
             The Conversations.
-        """
-        ...
-
-    def list_users_with_messages_sent_before(self, cutoff: datetime) -> list[UUID]:
-        """List the Users who have any message sent before a time.
-
-        Args:
-            cutoff: The time to look before.
-
-        Returns:
-            The Users' IDs.
         """
         ...
 

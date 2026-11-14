@@ -1129,28 +1129,6 @@ class PostgresConversationRepository:
             ).all()
         return [_to_conversation(row) for row in rows]
 
-    def list_users_with_messages_sent_before(self, cutoff: datetime) -> list[UUID]:
-        """List the Users who have any message sent before a time.
-
-        Args:
-            cutoff: The time to look before.
-
-        Returns:
-            The Users' IDs.
-        """
-        with self._database.connect() as connection:
-            return list(
-                connection.execute(
-                    select(conversations.c.user_id)
-                    .distinct()
-                    .join(
-                        conversation_messages,
-                        conversation_messages.c.conversation_id == conversations.c.id,
-                    )
-                    .where(conversation_messages.c.sent_at < cutoff)
-                ).scalars()
-            )
-
     def delete_messages_sent_before(self, cutoff: datetime) -> None:
         """Delete every message sent before a time; Conversations stay.
 

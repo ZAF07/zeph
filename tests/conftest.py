@@ -7,14 +7,9 @@ from typing import Any
 import pytest
 import yaml
 from fastapi.testclient import TestClient
-from langgraph.checkpoint.postgres import PostgresSaver
 from sqlalchemy import Engine, create_engine, text
 from testcontainers.community.postgres import PostgresContainer
 
-from companion.adapters.langgraph.conversation_engine import (
-    LangGraphConversationEngine,
-    build_postgres_checkpointer,
-)
 from companion.adapters.pgvector.vector_store import PgvectorKnowledgeVectorStore
 from companion.adapters.postgres.database import (
     migrate,
@@ -26,7 +21,6 @@ from companion.adapters.postgres.database import (
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.adapters.pypdf.text_extractor import PypdfTextExtractor
 from companion.app import AppDependencies, create_app
-from companion.core.conversation_services import ConversationServices
 from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
@@ -69,12 +63,6 @@ def database_url() -> Iterator[str]:
         url = postgres.get_connection_url()
         migrate(url)
         yield url
-
-
-@pytest.fixture(scope="session")
-def checkpointer(database_url: str) -> PostgresSaver:
-    """The LangGraph Postgres checkpointer, set up once on the test database."""
-    return build_postgres_checkpointer(database_url)
 
 
 @pytest.fixture
@@ -163,7 +151,6 @@ def chat_model(seeded_settings: dict[str, Any]) -> ScriptedChatModel:
 @pytest.fixture
 def client(
     engine: Engine,
-    checkpointer: PostgresSaver,
     clock: FakeClock,
     chat_channel: FakeChatChannel,
     chat_model: ScriptedChatModel,
@@ -176,23 +163,16 @@ def client(
 ) -> Iterator[TestClient]:
     """A test client for the backend wired with fakes and the real database.
 
-    The conversation engine is the real LangGraph one, so tests run the same
-    graph as production. Knowledge uses the real pgvector store and text
-    extractor with a fake embedder. The app is started, so its scheduler has
-    the tick.
+    Replies run through the real core services, as in production. Knowledge
+    uses the real pgvector store and text extractor with a fake embedder. The
+    app is started, so its scheduler has the tick.
     """
-
-    def build_conversation_engine(
-        services: ConversationServices,
-    ) -> LangGraphConversationEngine:
-        return LangGraphConversationEngine(services, checkpointer)
 
     dependencies = AppDependencies(
         repositories=build_postgres_repositories(engine),
         chat_channel=chat_channel,
         chat_model=chat_model,
         photo_viewer=photo_viewer,
-        build_conversation_engine=build_conversation_engine,
         auth_verifier=auth_verifier,
         auth_accounts=auth_verifier,
         text_extractor=PypdfTextExtractor(),

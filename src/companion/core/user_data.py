@@ -9,13 +9,7 @@ from companion.core.platform_settings import (
     DATA_DELETED_REPLY,
     DATA_DELETION_CONFIRMATION_WORD,
 )
-from companion.core.ports import (
-    AuthAccounts,
-    ChatChannel,
-    Clock,
-    ConversationEngine,
-    Repositories,
-)
+from companion.core.ports import AuthAccounts, ChatChannel, Clock, Repositories
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +24,7 @@ def delete_user_data(repositories: Repositories, user_id: UUID) -> None:
     Their Conversations and messages, Memory Items, Conversation Summaries,
     Shared Photos, Personal Stickers, Check-in history, connection tokens and
     Telegram Connection go. Their profile, settings, Usage, Safeguard Events
-    and Feature Switches stay. The conversation engine's saved state is left
-    to the caller.
+    and Feature Switches stay.
 
     Args:
         repositories: Where the User's data is stored.
@@ -74,7 +67,6 @@ class UserDataService:
     def __init__(
         self,
         repositories: Repositories,
-        conversation_engine: ConversationEngine,
         auth_accounts: AuthAccounts,
         clock: Clock,
     ) -> None:
@@ -82,12 +74,10 @@ class UserDataService:
 
         Args:
             repositories: Where the User's data is stored.
-            conversation_engine: Forgets what it saved for a User.
             auth_accounts: Deletes accounts at the auth provider.
             clock: Tells the current time.
         """
         self._repositories = repositories
-        self._conversation_engine = conversation_engine
         self._auth_accounts = auth_accounts
         self._clock = clock
 
@@ -100,7 +90,6 @@ class UserDataService:
             user: The User.
         """
         delete_user_data(self._repositories, user.id)
-        self._conversation_engine.forget_user(user.id)
 
     def delete_account(self, user: User) -> None:
         """Delete everything of the User's, then their account at the auth provider.
@@ -117,7 +106,6 @@ class UserDataService:
             LastAdminError: If they are the only Admin; their account and data
                 stay.
         """
-        self._conversation_engine.forget_user(user.id)
         with self._repositories.transaction() as transaction:
             refuse_if_last_admin(transaction, user.id, LAST_ADMIN_ACCOUNT_DELETION)
             if _delete_user(transaction.repositories, user.id):
@@ -152,7 +140,6 @@ class UserDataService:
                 in_transaction = transaction.repositories
                 user_signed_in_again = in_transaction.users.get_by_auth_id(auth_id)
                 if user_signed_in_again is not None:
-                    self._conversation_engine.forget_user(user_signed_in_again.id)
                     _delete_user(in_transaction, user_signed_in_again.id)
                 in_transaction.pending_auth_account_deletions.complete(auth_id)
         except Exception:
@@ -175,8 +162,7 @@ class ChatDataDeletion:
 
     The User's next message settles the request: only the confirmation word
     deletes their data; anything else cancels it. It deletes the same data as
-    `UserDataService.delete_data`, but leaves forgetting the conversation
-    engine's saved state to the engine itself, which is running the turn.
+    `UserDataService.delete_data`.
     """
 
     def __init__(

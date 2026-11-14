@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 
@@ -17,7 +17,6 @@ from companion.core.admin_users import AdminUserService
 from companion.core.chat_settings import SettingsTools
 from companion.core.check_in_kinds import CheckInKindService
 from companion.core.check_ins import CheckInService
-from companion.core.conversation_services import ConversationServices
 from companion.core.conversations import ConversationService
 from companion.core.features import FeatureService
 from companion.core.helplines import HelplineService
@@ -41,7 +40,6 @@ from companion.core.ports import (
     ChatChannel,
     ChatModel,
     Clock,
-    ConversationEngine,
     DocumentTextExtractor,
     Embedder,
     KnowledgeVectorStore,
@@ -53,6 +51,7 @@ from companion.core.ports import (
 )
 from companion.core.post_conversation import PostConversationProcessor
 from companion.core.reply_gate import ReplyGate
+from companion.core.reply_service import ReplyService
 from companion.core.response_composition import ResponseComposer
 from companion.core.safeguard import Safeguard
 from companion.core.scheduled_work import ScheduledWork
@@ -76,8 +75,6 @@ class AppDependencies:
         chat_channel: Sends messages to people.
         chat_model: Generates the Companion's words.
         photo_viewer: Looks at the photos Users send.
-        build_conversation_engine: Builds the conversation engine around the
-            core services it runs.
         auth_verifier: Checks Dashboard bearer tokens.
         auth_accounts: Deletes accounts at the auth provider.
         text_extractor: Reads the text out of uploaded Knowledge files.
@@ -100,7 +97,6 @@ class AppDependencies:
     chat_channel: ChatChannel
     chat_model: ChatModel
     photo_viewer: PhotoViewer
-    build_conversation_engine: Callable[[ConversationServices], ConversationEngine]
     auth_verifier: AuthVerifier
     auth_accounts: AuthAccounts
     text_extractor: DocumentTextExtractor
@@ -194,52 +190,50 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         usage_limiter=usage_limiter,
         clock=dependencies.clock,
     )
-    conversation_engine = dependencies.build_conversation_engine(
-        ConversationServices(
-            reply_gate=ReplyGate(
-                conversations=conversation_service,
-                safeguard=safeguard,
-                data_deletion=chat_data_deletion,
-                usage_limiter=usage_limiter,
-            ),
+    reply_service = ReplyService(
+        reply_gate=ReplyGate(
             conversations=conversation_service,
-            memory_retrieval=MemoryRetrieval(
-                repositories=dependencies.repositories,
-                chat_model=chat_model,
-            ),
-            knowledge_retrieval=KnowledgeRetrieval(
-                repositories=dependencies.repositories,
-                embedder=dependencies.embedder,
-                vector_store=dependencies.knowledge_vector_store,
-            ),
-            response_composer=ResponseComposer(
-                repositories=dependencies.repositories,
-                chat_model=chat_model,
-                features=feature_service,
-                tool_providers=[
-                    WebSearchTools(
-                        repositories=dependencies.repositories,
-                        web_search=dependencies.web_search,
-                    ),
-                    SettingsTools(
-                        repositories=dependencies.repositories,
-                        users=user_service,
-                        check_ins=check_in_service,
-                        user_memory=user_memory_service,
-                        data_deletion=chat_data_deletion,
-                    ),
-                    StickerTools(dependencies.repositories),
-                    sticker_adding,
-                    PhotoTools(dependencies.repositories, photo_service),
-                    SendPhotoTools(dependencies.repositories),
-                ],
-            ),
-        )
+            safeguard=safeguard,
+            data_deletion=chat_data_deletion,
+            usage_limiter=usage_limiter,
+        ),
+        conversations=conversation_service,
+        memory_retrieval=MemoryRetrieval(
+            repositories=dependencies.repositories,
+            chat_model=chat_model,
+        ),
+        knowledge_retrieval=KnowledgeRetrieval(
+            repositories=dependencies.repositories,
+            embedder=dependencies.embedder,
+            vector_store=dependencies.knowledge_vector_store,
+        ),
+        response_composer=ResponseComposer(
+            repositories=dependencies.repositories,
+            chat_model=chat_model,
+            features=feature_service,
+            tool_providers=[
+                WebSearchTools(
+                    repositories=dependencies.repositories,
+                    web_search=dependencies.web_search,
+                ),
+                SettingsTools(
+                    repositories=dependencies.repositories,
+                    users=user_service,
+                    check_ins=check_in_service,
+                    user_memory=user_memory_service,
+                    data_deletion=chat_data_deletion,
+                ),
+                StickerTools(dependencies.repositories),
+                sticker_adding,
+                PhotoTools(dependencies.repositories, photo_service),
+                SendPhotoTools(dependencies.repositories),
+            ],
+        ),
     )
     incoming_message_handler = IncomingMessageHandler(
         telegram_connections=telegram_connection_service,
         repositories=dependencies.repositories,
-        conversation_engine=conversation_engine,
+        reply_service=reply_service,
         chat_channel=dependencies.chat_channel,
         sticker_adding=sticker_adding,
         photo_service=photo_service,
@@ -250,7 +244,6 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
 
     user_data_service = UserDataService(
         repositories=dependencies.repositories,
-        conversation_engine=conversation_engine,
         auth_accounts=dependencies.auth_accounts,
         clock=dependencies.clock,
     )
@@ -270,7 +263,6 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         check_ins=check_in_service,
         message_retention=MessageRetention(
             repositories=dependencies.repositories,
-            conversation_engine=conversation_engine,
             clock=dependencies.clock,
         ),
         user_data=user_data_service,
