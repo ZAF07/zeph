@@ -622,3 +622,28 @@ def test_a_person_written_with_a_note_in_brackets_is_found_by_either_word(
     assert "Falling-out with Mei" in by_relation
     assert "Falling-out with Mei" in by_full_name
     assert "Falling-out with Mei" not in by_part_of_a_name
+
+
+def test_raising_a_brushed_off_thread_again_with_user_memory_off_keeps_the_wait(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    headers = auth_headers(auth_verifier, "user_maya")
+    start_mei_thread(client, chat_model, clock, scheduler, seeded_settings)
+    raise_and_react(
+        client, chat_model, clock, scheduler, seeded_settings, "brushed_off"
+    )
+    clock.advance(timedelta(days=15))
+    client.patch("/api/me", json={"user_memory_enabled": False}, headers=headers)
+    raise_and_react(client, chat_model, clock, scheduler, seeded_settings, "engaged")
+
+    clock.advance(timedelta(days=3))
+    seen = understanding_sees(client, chat_model, "Mei texted me")
+
+    assert "Don't bring it up: they brushed it off" in seen

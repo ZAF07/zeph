@@ -2030,8 +2030,9 @@ class PostgresLifeThreadRepository:
     ) -> None:
         """Note that Threads were just brought up in a Conversation.
 
-        How the User took it is not known yet, so the last reaction is
-        cleared until the Conversation ends.
+        The last reaction stays until the Conversation's end records a new
+        one, so a brushed-off Thread raised while User Memory is off still
+        waits.
 
         Args:
             thread_ids: The Threads' IDs.
@@ -2047,7 +2048,6 @@ class PostgresLifeThreadRepository:
                 .values(
                     last_raised_at=raised_at,
                     last_raised_conversation_id=conversation_id,
-                    last_reaction=None,
                 )
             )
 

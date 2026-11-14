@@ -23,6 +23,12 @@ const filters: { id: Filter; label: string }[] = [
   { id: "telegram_not_connected", label: "Telegram not connected" },
 ];
 
+const countHeadings = new Set([
+  "Conversations",
+  "Messages sent",
+  "Life Threads",
+]);
+
 const pill =
   "inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-[3px] text-xs font-medium";
 
@@ -220,11 +226,7 @@ export function AdminUsers() {
                       key={heading}
                       scope="col"
                       className={`whitespace-nowrap border-b border-line bg-subtle px-[18px] py-3.5 font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted ${
-                        heading === "Conversations" ||
-                        heading === "Messages sent" ||
-                        heading === "Life Threads"
-                          ? "text-right"
-                          : "text-left"
+                        countHeadings.has(heading) ? "text-right" : "text-left"
                       }`}
                     >
                       {heading}

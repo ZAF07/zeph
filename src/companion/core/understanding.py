@@ -517,18 +517,18 @@ class UnderstandingService:
         earlier = self._repositories.understandings.list_for_conversation(
             conversation_id
         )
-        read_form = self._ask(
+        model_form = self._ask(
             snapshot,
             describe_message_for_understanding(
                 snapshot, needs, saved, earlier, messages, reminded
             ),
             reminded,
         )
-        if read_form is None:
+        if model_form is None:
             need = fallback_need(needs)
             form = fallback_form(need)
         else:
-            form = read_form
+            form = model_form
             need = find_need(needs, form.need)
         asked_why = should_ask_why(form, earlier)
         understanding = Understanding(
@@ -549,7 +549,7 @@ class UnderstandingService:
                 need,
                 form,
                 ask_why_note,
-                format_threads_for_reply(reminded, read_form, snapshot.user.time_zone),
+                format_threads_for_reply(reminded, model_form, snapshot.user.time_zone),
             ),
         )
 

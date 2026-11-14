@@ -623,9 +623,6 @@ sticker_tool_description: >-
   mention that you kept their stickers. The stickers, by number, with when
   each one fits:
 
-# Personal Stickers. When a Conversation ends and the person sent stickers in
-# it, this model picks the ones whose meaning was clear and writes when to use
-# each. It runs only while the Personal Stickers Feature works for them.
 # When a Conversation ends and User Memory works for the User, this call
 # starts and adds to their Life Threads, and records how they took each
 # Thread the Companion brought up.
@@ -668,6 +665,9 @@ life_thread_keeping_prompt: |-
     ]
   }
 
+# Personal Stickers. When a Conversation ends and the person sent stickers in
+# it, this model picks the ones whose meaning was clear and writes when to use
+# each. It runs only while the Personal Stickers Feature works for them.
 personal_sticker_keeping_model: deepseek-chat
 
 personal_sticker_keeping_prompt: |-

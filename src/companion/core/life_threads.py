@@ -222,7 +222,7 @@ def describe_reminded_threads(
             reaction = (
                 REACTION_WORDS[thread.last_reaction]
                 if thread.last_reaction
-                else "not known yet how they took it"
+                else "not known how they took it"
             )
             line += (
                 f" Last brought up {format_day(thread.last_raised_at, time_zone)}; "
@@ -295,6 +295,44 @@ def format_threads_for_reply(
     return "\n\n".join(sections)
 
 
+def find_threads_in(
+    repositories: Repositories,
+    embedder: Embedder,
+    snapshot: UserSnapshot,
+    texts: Sequence[str],
+    limit: int,
+) -> list[LifeThread]:
+    """Find the User's Threads that some of their texts name or are close to.
+
+    A Thread counts if the texts name someone or something in it, or if its
+    story is at least as close in meaning as the Admin-set bar. If the texts
+    can't be embedded, the failure is logged and Threads are found by name
+    only.
+
+    Args:
+        repositories: Where Life Threads are stored.
+        embedder: Embeds the texts.
+        snapshot: The User whose Threads are searched.
+        texts: Their texts, oldest first.
+        limit: The most Threads to return.
+
+    Returns:
+        The Threads, open first, then those named, then the closest.
+    """
+    try:
+        embedding: list[float] | None = embedder.embed_query("\n".join(texts))
+    except Exception:
+        logger.exception("Could not embed the texts to find Life Threads by")
+        embedding = None
+    return repositories.life_threads.find_reminded(
+        snapshot.user.id,
+        name_phrases(texts),
+        embedding,
+        min_closeness=snapshot.settings.get(LIFE_THREADS_CLOSENESS_PERCENT) / 100,
+        limit=limit,
+    )
+
+
 class ThreadReminder:
     """Reminds the Companion of the User's Life Threads before each reply.
 
@@ -340,12 +378,8 @@ class ThreadReminder:
         recent_texts = incoming_texts(messages)[-RECENT_TEXTS_TO_REMIND:]
         if limit < 1 or not recent_texts:
             return []
-        threads = self._repositories.life_threads.find_reminded(
-            snapshot.user.id,
-            name_phrases(recent_texts),
-            self._embed("\n".join(recent_texts)),
-            min_closeness=settings.get(LIFE_THREADS_CLOSENESS_PERCENT) / 100,
-            limit=limit,
+        threads = find_threads_in(
+            self._repositories, self._embedder, snapshot, recent_texts, limit
         )
         now = self._clock.now()
         wait = settings.get(LIFE_THREAD_BRUSHED_OFF_WAIT)
@@ -372,21 +406,6 @@ class ThreadReminder:
         self._repositories.life_threads.mark_raised(
             [item.thread_id for item in brought_up], conversation_id, self._clock.now()
         )
-
-    def _embed(self, text: str) -> list[float] | None:
-        """Embed the User's last few texts, logging a failure instead of raising.
-
-        Args:
-            text: The texts, one per line.
-
-        Returns:
-            The embedding; None if embedding failed.
-        """
-        try:
-            return self._embedder.embed_query(text)
-        except Exception:
-            logger.exception("Could not embed the texts to find Life Threads by")
-            return None
 
 
 def read_thread_keeping_answer(answer: str) -> list[Any] | None:
@@ -614,12 +633,12 @@ class LifeThreadKeeper:
             return
         raised = threads.list_raised_in(conversation_id)
         raised_ids = {thread.id for thread in raised}
-        reminded = threads.find_reminded(
-            snapshot.user.id,
-            name_phrases(texts),
-            self._embed_query("\n".join(texts)),
-            min_closeness=snapshot.settings.get(LIFE_THREADS_CLOSENESS_PERCENT) / 100,
-            limit=MOST_THREADS_AT_CONVERSATION_END,
+        reminded = find_threads_in(
+            self._repositories,
+            self._embedder,
+            snapshot,
+            texts,
+            MOST_THREADS_AT_CONVERSATION_END,
         )
         known_threads = {thread.id: thread for thread in [*raised, *reminded]}
         known = dict(enumerate(known_threads.values(), start=1))
@@ -657,21 +676,6 @@ class LifeThreadKeeper:
             name_keys=name_keys(thread.people),
             embedding=embedding,
         )
-
-    def _embed_query(self, text: str) -> list[float] | None:
-        """Embed the Conversation's texts, logging a failure instead of raising.
-
-        Args:
-            text: The User's texts, one per line.
-
-        Returns:
-            The embedding; None if embedding failed.
-        """
-        try:
-            return self._embedder.embed_query(text)
-        except Exception:
-            logger.exception("Could not embed the Conversation to find Life Threads")
-            return None
 
     def _ask(self, snapshot: UserSnapshot, description: str) -> list[Any] | None:
         """Ask the model about the Threads, once more if it can't be read.
