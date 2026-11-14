@@ -71,7 +71,7 @@ Knowledge comes in only when it genuinely fits. Each Knowledge Document gets a "
 - **Existing Knowledge Evals still pass:**
   - `uv run pytest evals -m eval -k knowledge` on the rebased code: 8 of 8 steps right (52,770 tokens in, 3,419 out). Every step passed: uploaded, text edited, details edited and file replaced, for both lantern-breath and pebble-practice.
 - **Checks pass:**
-  - Python: `ruff check`, `ruff format --check` and `mypy` are clean. `pytest` 839 passed, 9 deselected (on the rebased branch).
+  - Python: `ruff check`, `ruff format --check` and `mypy` are clean. `pytest` 845 passed, 9 deselected (on the branch rebased onto main after issues 08 and 09).
   - Web: `pnpm lint`, `pnpm format:check` and `pnpm typecheck` are clean; `pnpm test` 358 passed.
 - **/run** (real worktree app in a one-off backend container: real Postgres, DeepSeek and fastembed, only the Telegram channel recorded; an Admin User so the Model Call Log keeps full content):
   - A vent ("my manager just took credit for my whole project… I'm so angry I could scream"): Need Be heard, `knowledge: null`, no Knowledge in the reply.
@@ -89,4 +89,5 @@ Knowledge comes in only when it genuinely fits. Each Knowledge Document gets a "
 ## Completion
 
 - Completed: 2026-11-14
-- Commits: to be filled in after merge
+- Commits: `397fae5` (Knowledge "when it helps", chosen by the Understanding; includes the review fixes and the Eval client fix, squashed before rebasing onto issue 08), `77f1d62` (issue archived with evidence), `b16ccff` (CONTEXT.md: how the Understanding chooses Knowledge)
+- Merged into main: `849ebfe` (branch `understanding-07-knowledge-when-it-helps`, pushed to origin)
