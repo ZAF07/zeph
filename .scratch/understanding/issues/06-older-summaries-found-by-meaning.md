@@ -1,6 +1,6 @@
 # 06 — Older Conversation Summaries found by meaning
 
-Status: ready-for-agent
+Status: in-progress
 
 ## Parent
 

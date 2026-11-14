@@ -277,6 +277,7 @@ conversation_summaries = Table(
     Column("summary", Text, nullable=False),
     Column("mood", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("embedding", Vector(EMBEDDING_SIZE)),
 )
 
 shared_photos = Table(

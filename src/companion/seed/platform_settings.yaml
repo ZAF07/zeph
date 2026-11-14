@@ -383,6 +383,10 @@ understanding_prompt: |-
     you what's wrong, so it is true.
   - memory_categories: the Memory Categories whose memories would help Zeph
     reply well, names exactly as written. Leave it empty if none would.
+  - look_up_past: short search phrases (a few words each, e.g. "job
+    interview at Acme") for older Conversations to look up, when they ask
+    about or mention something from the past that isn't in the recent
+    Conversations. Leave it empty if nothing needs looking up.
   Notice how their mood is moving across the Conversation, and the time and
   day: 2am on a Sunday reads differently from lunchtime on a Tuesday.
 
@@ -396,7 +400,7 @@ understanding_prompt: |-
     "memory_categories": ["<category name>"],
     "bring_up": [],
     "left_alone": [],
-    "look_up_past": [],
+    "look_up_past": ["<search phrase>"],
     "knowledge": [],
     "threads_touched": []
   }
@@ -423,6 +427,17 @@ reply_memory_intro: >-
 
 # How many of the newest Conversation Summaries go into each reply.
 recent_conversation_summaries: 3
+
+# Older Conversation Summaries found by meaning. When the Understanding asks
+# to look up the past, its phrases are matched against the User's own
+# Summaries; at most this many of the closest go into the reply, beyond the
+# newest ones above.
+older_summaries_per_reply: 3
+
+# How close in meaning (cosine similarity, as a percent) an older Summary must
+# be to a look-up phrase to go into the reply. With the bge-small embedder,
+# real matches score about 70 to 80 and unrelated ones up to about 65.
+older_summaries_closeness_percent: 68
 
 # Knowledge. Before each reply the message is matched against the Knowledge
 # library, and this many of the closest passages go into the reply.

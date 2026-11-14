@@ -922,6 +922,32 @@ class UserMemoryRepository(Protocol):
         """
         ...
 
+    def find_summaries_by_meaning(
+        self,
+        user_id: UUID,
+        embeddings: Sequence[list[float]],
+        min_closeness: float,
+        limit: int,
+        leave_out: Sequence[UUID] = (),
+    ) -> list[ConversationSummary]:
+        """Find a User's Conversation Summaries closest in meaning to any search.
+
+        Closeness is cosine similarity. Summaries with no embedding are never
+        found.
+
+        Args:
+            user_id: The User's ID; only their Summaries are searched.
+            embeddings: The searches, one embedding each.
+            min_closeness: How close a Summary must be to one search, from 0
+                to 1.
+            limit: The most to return.
+            leave_out: Summaries not to return, e.g. ones already given.
+
+        Returns:
+            The closest Summaries, closest first.
+        """
+        ...
+
     def delete_summary(self, user_id: UUID, summary_id: UUID) -> bool:
         """Delete one of a User's Conversation Summaries.
 
@@ -940,6 +966,7 @@ class UserMemoryRepository(Protocol):
         processed_at: datetime,
         summary: ConversationSummary | None,
         changes: MemoryChanges,
+        summary_embedding: list[float] | None = None,
     ) -> None:
         """Save what processing an ended Conversation produced, in one step.
 
@@ -952,6 +979,8 @@ class UserMemoryRepository(Protocol):
             summary: Its Conversation Summary; None when nothing is saved.
             changes: The changes to the User's Memory Items and the new
                 Shared Photos.
+            summary_embedding: The Summary's embedding, so it can be found
+                by meaning; None if it has none.
         """
         ...
 

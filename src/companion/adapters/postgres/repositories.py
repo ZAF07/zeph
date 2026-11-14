@@ -376,6 +376,11 @@ def _memory_item_values(item: MemoryItem) -> dict[str, Any]:
     }
 
 
+SUMMARY_COLUMNS = [
+    column for column in conversation_summaries.c if column.name != "embedding"
+]
+
+
 def _to_summary(row: Row[Any]) -> ConversationSummary:
     """Turn a `conversation_summaries` row into a ConversationSummary.
 
@@ -1819,9 +1824,56 @@ class PostgresUserMemoryRepository:
             The Conversation Summaries.
         """
         statement = (
-            select(conversation_summaries)
+            select(*SUMMARY_COLUMNS)
             .where(conversation_summaries.c.user_id == user_id)
             .order_by(conversation_summaries.c.created_at.desc())
+            .limit(limit)
+        )
+        with self._database.connect() as connection:
+            rows = connection.execute(statement).all()
+        return [_to_summary(row) for row in rows]
+
+    def find_summaries_by_meaning(
+        self,
+        user_id: UUID,
+        embeddings: Sequence[list[float]],
+        min_closeness: float,
+        limit: int,
+        leave_out: Sequence[UUID] = (),
+    ) -> list[ConversationSummary]:
+        """Find a User's Conversation Summaries closest in meaning to any search.
+
+        Closeness is cosine similarity. Summaries with no embedding are never
+        found.
+
+        Args:
+            user_id: The User's ID; only their Summaries are searched.
+            embeddings: The searches, one embedding each.
+            min_closeness: How close a Summary must be to one search, from 0
+                to 1.
+            limit: The most to return.
+            leave_out: Summaries not to return, e.g. ones already given.
+
+        Returns:
+            The closest Summaries, closest first.
+        """
+        if not embeddings or limit < 1:
+            return []
+        distance = func.least(
+            *(
+                conversation_summaries.c.embedding.cosine_distance(embedding)
+                for embedding in embeddings
+            )
+        )
+        statement = (
+            select(*SUMMARY_COLUMNS)
+            .where(
+                conversation_summaries.c.user_id == user_id,
+                conversation_summaries.c.embedding.is_not(None),
+                conversation_summaries.c.id.not_in(leave_out),
+                distance <= 1 - min_closeness,
+            )
+            .order_by(distance)
             .limit(limit)
         )
         with self._database.connect() as connection:
@@ -1855,6 +1907,7 @@ class PostgresUserMemoryRepository:
         processed_at: datetime,
         summary: ConversationSummary | None,
         changes: MemoryChanges,
+        summary_embedding: list[float] | None = None,
     ) -> None:
         """Save what processing an ended Conversation produced, in one step.
 
@@ -1867,6 +1920,8 @@ class PostgresUserMemoryRepository:
             summary: Its Conversation Summary; None when nothing is saved.
             changes: The changes to the User's Memory Items and the new
                 Shared Photos.
+            summary_embedding: The Summary's embedding, so it can be found
+                by meaning; None if it has none.
         """
         with self._database.begin() as connection:
             if summary is not None:
@@ -1878,6 +1933,7 @@ class PostgresUserMemoryRepository:
                         summary=summary.summary,
                         mood=summary.mood,
                         created_at=summary.created_at,
+                        embedding=summary_embedding,
                     )
                 )
             if changes.added:

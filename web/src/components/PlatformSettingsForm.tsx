@@ -64,6 +64,25 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
     ],
   },
   {
+    heading: "Memory",
+    fields: [
+      {
+        key: "older_summaries_per_reply",
+        label: "Most older Conversations per reply",
+        caption:
+          "When Zeph looks up the past, how many older Conversation Summaries it may add, beyond the newest ones.",
+        unit: "summaries",
+      },
+      {
+        key: "older_summaries_closeness_percent",
+        label: "Older Conversation closeness bar",
+        caption:
+          "How close in meaning an older Summary must be to what Zeph looks up. Real matches score about 70–80; unrelated ones up to about 65.",
+        unit: "%",
+      },
+    ],
+  },
+  {
     heading: "Check-ins",
     fields: [
       {

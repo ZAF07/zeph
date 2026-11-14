@@ -180,6 +180,10 @@ REPLY_MEMORY_INTRO = Setting("reply_memory_intro", read_text)
 RECENT_CONVERSATION_SUMMARIES = Setting(
     "recent_conversation_summaries", read_whole_number
 )
+OLDER_SUMMARIES_PER_REPLY = Setting("older_summaries_per_reply", read_whole_number)
+OLDER_SUMMARIES_CLOSENESS_PERCENT = Setting(
+    "older_summaries_closeness_percent", read_whole_number
+)
 KNOWLEDGE_CHUNKS_PER_REPLY = Setting("knowledge_chunks_per_reply", read_whole_number)
 REPLY_KNOWLEDGE_INTRO = Setting("reply_knowledge_intro", read_text)
 DAILY_MESSAGE_LIMIT = Setting("daily_message_limit", read_whole_number)
@@ -543,6 +547,20 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         "“Would you like fewer?” message",
         SettingKind.TEXT,
         max_length=1_000,
+    ),
+    EditableSetting(
+        OLDER_SUMMARIES_PER_REPLY.key,
+        "Most older Conversations per reply",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=10,
+    ),
+    EditableSetting(
+        OLDER_SUMMARIES_CLOSENESS_PERCENT.key,
+        "Older Conversation closeness bar",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=100,
     ),
     EditableSetting(
         CONVERSATION_QUIET_GAP.key,
