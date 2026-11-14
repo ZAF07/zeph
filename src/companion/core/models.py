@@ -731,6 +731,21 @@ class MemoryCategory:
 
 
 @dataclass(frozen=True)
+class NeedDetails:
+    """What an Admin sets on a Need.
+
+    Attributes:
+        name: Its name, e.g. "Be heard".
+        when_it_fits: When to pick it, as the Understanding model is told.
+        how_to_reply: How to reply when it is picked, as the reply is told.
+    """
+
+    name: str
+    when_it_fits: str
+    how_to_reply: str
+
+
+@dataclass(frozen=True)
 class Need:
     """What a User may want from the Companion right now. Managed by Admins.
 

@@ -29,6 +29,7 @@ from companion.core.memory_categories import MemoryCategoryService
 from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.message_retention import MessageRetention
 from companion.core.model_call_log import ModelCallLog
+from companion.core.needs import NeedService
 from companion.core.personal_stickers import (
     PersonalStickerKeeper,
     PersonalStickerService,
@@ -378,6 +379,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             check_in_service=check_in_service,
             usage_limiter=usage_limiter,
             model_call_log=model_call_log,
+            need_service=NeedService(dependencies.repositories),
         )
     )
     app.include_router(

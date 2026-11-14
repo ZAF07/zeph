@@ -429,6 +429,22 @@ export type CheckInKind = CheckInKindInput & {
 /** A Check-in Kind and how many Check-ins of it were sent in 30 days. */
 export type CheckInKindOverview = CheckInKind & { sent_last_30_days: number };
 
+/** A Need's name, when it fits and how to reply. */
+export type NeedInput = {
+  name: string;
+  when_it_fits: string;
+  how_to_reply: string;
+};
+
+/**
+ * A Need as Admins manage it. `is_fallback` marks the one used when it
+ * isn't clear what the User needs; it can be edited but not deleted.
+ */
+export type Need = NeedInput & {
+  id: string;
+  is_fallback: boolean;
+};
+
 /** One Check-in decision in the admin log. Never the message text. */
 export type CheckInLogEntry = {
   id: string;
@@ -664,6 +680,11 @@ export type ApiClient = {
     kind: CheckInKindInput,
   ) => Promise<CheckInKind>;
   removeCheckInKind: (id: string) => Promise<void>;
+  listNeeds: () => Promise<Need[]>;
+  addNeed: (need: NeedInput) => Promise<Need>;
+  updateNeed: (id: string, need: NeedInput) => Promise<Need>;
+  deleteNeed: (id: string) => Promise<void>;
+  moveNeed: (id: string, direction: MoveDirection) => Promise<Need[]>;
   listCheckInLog: (days: number) => Promise<CheckInLogEntry[]>;
   listModelCallTraces: (
     filter: ModelCallTraceFilter,
@@ -917,6 +938,20 @@ export function createApiClient(
       request<CheckInKind>(`/api/admin/check-in-kinds/${id}`, "PUT", kind),
     removeCheckInKind: (id) =>
       request<void>(`/api/admin/check-in-kinds/${id}`, "DELETE"),
+    listNeeds: async () =>
+      (await request<{ needs: Need[] }>("/api/admin/needs")).needs,
+    addNeed: (need) => request<Need>("/api/admin/needs", "POST", need),
+    updateNeed: (id, need) =>
+      request<Need>(`/api/admin/needs/${id}`, "PUT", need),
+    deleteNeed: (id) => request<void>(`/api/admin/needs/${id}`, "DELETE"),
+    moveNeed: async (id, direction) =>
+      (
+        await request<{ needs: Need[] }>(
+          `/api/admin/needs/${id}/move`,
+          "POST",
+          { direction },
+        )
+      ).needs,
     listCheckInLog: async (days) =>
       (
         await request<{ entries: CheckInLogEntry[] }>(
