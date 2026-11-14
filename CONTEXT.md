@@ -161,7 +161,7 @@ A Memory Category the product itself relies on: Onboarding answers are saved in 
 _Avoid_: Constant category, built-in category, core category
 
 **Conversation Summary**:
-A short account of what one Conversation covered, how the User seemed (its mood), and what the Companion offered and how it landed (e.g. "suggested a walk; they said it helped"), written once, when the Conversation ends. The newest few go into every reply; older ones are found by meaning when the Understanding asks to look up the past, however old they are: only the User's own, only those close enough (an Admin-set bar), up to an Admin-set number, each with its date.
+A short account of what one Conversation covered, how the User seemed (its mood, as an arc when it moved, e.g. "anxious at first, calmer by the end", read from the Conversation's Understandings), and what the Companion offered and how it landed (e.g. "suggested a walk; they said it helped"), written once, when the Conversation ends. The newest few go into every reply; older ones are found by meaning when the Understanding asks to look up the past, however old they are: only the User's own, only those close enough (an Admin-set bar), up to an Admin-set number, each with its date.
 _Avoid_: Recap, transcript, log
 
 **Life Thread**:
@@ -169,7 +169,7 @@ An ongoing story in a User's life followed across Conversations, which the User 
 _Avoid_: Topic, storyline, episode, case
 
 **User Portrait**:
-A short, living picture of a User: who they are, what's going on in their life now, themes they keep coming back to, what has helped them and what hasn't, where they stand on their Goals, and open questions the Companion is still curious about (e.g. "low on Sunday nights, not sure why"), which it may gently explore when the moment is right. Rewritten from their User Memory when a Conversation ends, and used for every reply. Users see it and can delete it, but not edit it. When they delete a Memory Item or Life Thread, the Portrait is rewritten without it straight away, so a deleted thing is truly forgotten.
+A short, living picture of a User: who they are, what's going on in their life now, themes they keep coming back to, what has helped them and what hasn't, where they stand on their Goals, and open questions the Companion is still curious about (e.g. "low on Sunday nights, not sure why"), which it may gently explore when the moment is right. Rewritten from their Memory Items, Life Threads and recent Conversation Summaries (never from the old Portrait) when a Conversation ends while User Memory works, and used for every reply. Users see it under "What I know about you" on the Memories page and can delete it, but not edit it; a deleted Portrait is gone until a later Conversation end with User Memory working. When they delete a Memory Item, Life Thread or Conversation Summary, the Portrait is rewritten without it within a minute, even while User Memory is off (that only forgets); if it can't be rewritten, it is deleted instead, so a deleted thing is never used again. The same fact can still appear if it lives on in another memory the User kept. Admins see only whether a User has one.
 _Avoid_: Profile, persona (Persona is the Companion's voice), bio
 
 ### Understanding
