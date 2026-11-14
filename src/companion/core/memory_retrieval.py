@@ -220,9 +220,9 @@ class MemoryRetrieval:
         offered to the same call as one more category, "Shared Photos", and
         all of them go in when it is picked. Archived categories are left
         out. The call is skipped when there is nothing to pick, and a failed
-        call still leaves the "always include" items. Nothing is used when
-        User Memory doesn't work for the User, and no Shared Photo is used
-        when Photo Viewing doesn't.
+        call still leaves the "always include" items. What is saved is used
+        even while User Memory is off, since off only stops learning; no
+        Shared Photo is used when Photo Viewing doesn't work.
 
         Args:
             user_id: The User being answered.
@@ -233,7 +233,7 @@ class MemoryRetrieval:
             Photos that matter.
         """
         user = self._repositories.users.get(user_id)
-        if user is None or not self._features.works_for(user_id, Feature.USER_MEMORY):
+        if user is None:
             return RecalledMemory(text="")
         settings = self._repositories.platform_settings
         user_memory = self._repositories.user_memory

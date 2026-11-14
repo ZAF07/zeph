@@ -40,7 +40,9 @@ export type ChatSetting =
  * says when each setting was last changed in chat; a setting changed on the
  * Dashboard since is left out. `user_memory_available` and
  * `photo_viewing_available` are false when an Admin has that Feature off for
- * them, so they can't switch it. `personal_stickers_available` says whether
+ * them, so they can't switch it. `memory_note` is the Admin-worded note
+ * saying User Memory is off and why; "" while it works.
+ * `personal_stickers_available` says whether
  * Personal Stickers works for them; they have no switch of their own.
  */
 export type Me = {
@@ -54,6 +56,7 @@ export type Me = {
   ai_notice_acknowledged_at: string | null;
   user_memory_enabled: boolean;
   user_memory_available: boolean;
+  memory_note: string;
   photo_viewing_enabled: boolean;
   photo_viewing_available: boolean;
   personal_stickers_available: boolean;
@@ -365,7 +368,9 @@ export type HomeCheckIns = {
 
 /**
  * What the Dashboard home shows a User. `goals` and `recently_remembered`
- * are newest first, and empty while User Memory is off.
+ * are newest first, shown whether or not User Memory is on. `memory_note`
+ * is the Admin-worded note saying User Memory is off and why; "" while it
+ * works.
  */
 export type Home = {
   name: string | null;
@@ -374,7 +379,7 @@ export type Home = {
   telegram_chat_url: string;
   last_conversation_at: string | null;
   check_ins: HomeCheckIns;
-  user_memory_enabled: boolean;
+  memory_note: string;
   goals: MemoryItem[];
   recently_remembered: RememberedItem[];
   ai_notice: string;

@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
+import { MemoryNote } from "@/components/MemoryNote";
 import { Switch } from "@/components/Switch";
 import { notAvailableText } from "@/lib/features";
 import { paragraphs } from "@/lib/paragraphs";
@@ -15,6 +16,7 @@ import { useApiClient } from "@/lib/use-api-client";
  * @param props - `enabled` is the saved setting; `available` is false when
  *   an Admin has User Memory off for the User, which disables the switch;
  *   `explanation` is the User Memory explanation from platform settings;
+ *   `note` is the note saying User Memory is off and why, "" while on;
  *   `changedInChatAt` is when it was last changed in chat, if it was;
  *   `timeZone` is the User's.
  * @returns The section.
@@ -23,12 +25,14 @@ export function UserMemorySetting({
   enabled,
   available,
   explanation,
+  note,
   changedInChatAt,
   timeZone,
 }: {
   enabled: boolean;
   available: boolean;
   explanation: string;
+  note: string;
   changedInChatAt: string | undefined;
   timeZone?: string;
 }) {
@@ -37,6 +41,7 @@ export function UserMemorySetting({
   const [isSaving, setIsSaving] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const [changedAt, setChangedAt] = useState(changedInChatAt);
+  const [shownNote, setShownNote] = useState(note);
 
   async function saveUserMemorySetting(next: boolean) {
     setIsSaving(true);
@@ -46,6 +51,7 @@ export function UserMemorySetting({
         user_memory_enabled: next,
       });
       setIsEnabled(me.user_memory_enabled);
+      setShownNote(me.memory_note);
       setChangedAt(me.changed_in_chat.user_memory);
     } catch {
       setSaveFailed(true);
@@ -76,6 +82,7 @@ export function UserMemorySetting({
         </p>
       )}
       <ChangedInChatCaption changedAt={changedAt} timeZone={timeZone} />
+      <MemoryNote note={shownNote} />
       {paragraphs(explanation).map((paragraph) => (
         <p key={paragraph} className="m-0 text-[15px] text-ink-soft">
           {paragraph}

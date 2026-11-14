@@ -49,6 +49,7 @@ const onboardedUser: Me = {
   time_zone: "Asia/Singapore",
   ai_notice_acknowledged_at: "2026-11-11T09:00:00Z",
   user_memory_enabled: true,
+  memory_note: "",
   user_memory_available: true,
   photo_viewing_enabled: true,
   photo_viewing_available: true,
@@ -183,6 +184,11 @@ describe("AccountSettings", () => {
   });
 
   it("turns User Memory off straight away, with the seeded explanation", async () => {
+    apiClient.updatePreferences.mockResolvedValue({
+      ...onboardedUser,
+      user_memory_enabled: false,
+      memory_note: "**Memory is paused.** Zeph won’t learn anything new.",
+    });
     const user = userEvent.setup();
     render(<AccountSettings />);
     const memorySwitch = await screen.findByRole("switch", {
@@ -199,6 +205,9 @@ describe("AccountSettings", () => {
     });
     await vi.waitFor(() =>
       expect(memorySwitch).toHaveAttribute("aria-checked", "false"),
+    );
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Memory is paused. Zeph won’t learn anything new",
     );
   });
 

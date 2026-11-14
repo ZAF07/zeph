@@ -226,7 +226,7 @@ def test_another_users_shared_photo_is_never_shown_or_sent(
     assert chat_channel.sent_photos == []
 
 
-def test_with_user_memory_off_no_shared_photos_are_shown_and_the_tool_is_not_offered(
+def test_with_user_memory_off_shared_photos_are_still_shown_and_the_tool_offered(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -238,9 +238,9 @@ def test_with_user_memory_off_no_shared_photos_are_shown_and_the_tool_is_not_off
 
     call = reply_call(client, chat_model, telegram_text_update("Miso!"), "hi")
 
-    assert chat_model.retrieval_calls == []
-    assert CAT not in call.instructions
-    assert send_photo_tools(call) == []
+    assert len(chat_model.retrieval_calls) == 1
+    assert CAT in call.instructions
+    assert send_photo_tools(call) != []
 
 
 def test_when_telegram_refuses_the_photo_the_text_still_goes_out_and_it_is_logged(

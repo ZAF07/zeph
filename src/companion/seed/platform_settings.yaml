@@ -76,6 +76,19 @@ photo_viewing_explanation: |-
   When on, Zeph looks at the photos you send and may keep the ones that matter
   to you, listed on your Memories page.
 
+# Shown on the Dashboard (Home, Memories and next to the switch) while the
+# User has User Memory off. **Bold** marks the opening words.
+memory_paused_note: >-
+  **Memory is paused.** Zeph won’t learn anything new, but still uses what it
+  already knows about you. Delete any memory you don’t want Zeph to use.
+
+# Shown on the Dashboard instead of the note above while an Admin has User
+# Memory off for the User.
+memory_not_available_note: >-
+  **Memory isn’t available on your account.** Zeph won’t learn anything new,
+  but still uses what it already knows about you. Delete any memory you don’t
+  want Zeph to use.
+
 # The choice chips for "What brings you here?".
 onboarding_reason_choices:
   - Being more present

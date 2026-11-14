@@ -38,6 +38,8 @@ const settings: AdminSettings = {
   photo_viewing_off_note: seeded("Say you didn't look at the photo."),
   photo_viewing_explanation: seeded("When off, Zeph won't look at photos."),
   onboarding_unfinished_reply: seeded("Finish setting up: {dashboard_url}"),
+  memory_paused_note: seeded("**Memory is paused.** Still used."),
+  memory_not_available_note: seeded("**Memory isn’t available.** Still used."),
 };
 
 describe("PlatformSettingsForm", () => {
@@ -66,6 +68,12 @@ describe("PlatformSettingsForm", () => {
     );
     expect(screen.getByLabelText(/Memory explanation/)).toHaveValue(
       "I can keep details.",
+    );
+    expect(screen.getByLabelText(/Memory is paused” note/)).toHaveValue(
+      "**Memory is paused.** Still used.",
+    );
+    expect(screen.getByLabelText(/Memory isn’t available” note/)).toHaveValue(
+      "**Memory isn’t available.** Still used.",
     );
     expect(screen.getByText("Using the starting values")).toBeVisible();
   });

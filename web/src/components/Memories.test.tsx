@@ -348,6 +348,8 @@ describe("Memories", () => {
     apiClient.updatePreferences.mockResolvedValue({
       ...maya,
       user_memory_enabled: false,
+      memory_note:
+        "**Memory is paused.** Zeph won’t learn anything new, but still uses what it already knows about you.",
     });
     const user = userEvent.setup();
     render(<Memories />);
@@ -362,13 +364,18 @@ describe("Memories", () => {
     });
     expect(await screen.findByText("Memory paused")).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent(
-      "Memory is paused. Zeph won’t save anything new and won’t use what’s below until you turn it back on. Nothing has been deleted.",
+      "Memory is paused. Zeph won’t learn anything new, but still uses what it already knows about you.",
     );
     expect(screen.getByText("Goes by Maya")).toBeVisible();
   });
 
   it("shows the notice straight away when User Memory is already off", async () => {
-    apiClient.getMe.mockResolvedValue({ ...maya, user_memory_enabled: false });
+    apiClient.getMe.mockResolvedValue({
+      ...maya,
+      user_memory_enabled: false,
+      memory_note:
+        "**Memory is paused.** Zeph won’t learn anything new, but still uses what it already knows about you.",
+    });
     render(<Memories />);
 
     expect(await screen.findByRole("status")).toHaveTextContent(
@@ -380,6 +387,8 @@ describe("Memories", () => {
     apiClient.getMe.mockResolvedValue({
       ...maya,
       user_memory_available: false,
+      memory_note:
+        "**Memory isn’t available on your account.** Zeph won’t learn anything new.",
     });
     const user = userEvent.setup();
     render(<Memories />);
@@ -389,7 +398,7 @@ describe("Memories", () => {
     expect(memorySwitch).toHaveAttribute("aria-checked", "true");
     expect(screen.getByText("Not available on your account")).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent(
-      "Memory isn’t available on your account. Zeph won’t save anything new and won’t use what’s below. Nothing has been deleted.",
+      "Memory isn’t available on your account. Zeph won’t learn anything new.",
     );
     await user.click(memorySwitch);
     expect(apiClient.updatePreferences).not.toHaveBeenCalled();

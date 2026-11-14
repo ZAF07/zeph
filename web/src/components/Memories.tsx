@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
 import { ConversationSummariesList } from "@/components/ConversationSummariesList";
 import { LoadFailed } from "@/components/LoadFailed";
+import { MemoryNote } from "@/components/MemoryNote";
 import { MemoryItemsList } from "@/components/MemoryItemsList";
 import { SharedPhotosList } from "@/components/SharedPhotosList";
 import { Switch } from "@/components/Switch";
@@ -131,24 +132,8 @@ export function Memories() {
         ) : null}
       </header>
 
-      {memoryUnavailable ? (
-        <p
-          role="status"
-          className="m-0 rounded-xl bg-yellow-tint px-4 py-3.5 text-sm text-yellow-deep"
-        >
-          Memory isn’t available on your account. Zeph won’t save anything new
-          and won’t use what’s below. Nothing has been deleted.
-        </p>
-      ) : null}
-
-      {state.kind === "loaded" && !memoryUnavailable && !memoryOn ? (
-        <p
-          role="status"
-          className="m-0 rounded-xl bg-yellow-tint px-4 py-3.5 text-sm text-yellow-deep"
-        >
-          Memory is paused. Zeph won’t save anything new and won’t use what’s
-          below until you turn it back on. Nothing has been deleted.
-        </p>
+      {state.kind === "loaded" ? (
+        <MemoryNote note={state.me.memory_note} />
       ) : null}
 
       <div
@@ -198,7 +183,6 @@ export function Memories() {
       {state.kind === "loaded" && tab === "memories" ? (
         <MemoryItemsList
           groups={state.groups}
-          memoryOn={memoryOn}
           timeZone={state.me.time_zone ?? undefined}
           onGroupsChange={(groups) =>
             setState((current) =>

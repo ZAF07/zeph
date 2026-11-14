@@ -296,7 +296,6 @@ def describe_check_in(
     local_time: datetime,
     recent: str,
     memory: str,
-    user_memory_works: bool,
     shared_photos: str = "",
 ) -> str:
     """Write what the Check-in model is told to decide on a Check-in.
@@ -307,7 +306,6 @@ def describe_check_in(
         local_time: The User's local time now.
         recent: The User's recent Check-ins, as lines.
         memory: What is remembered about the User; "" if nothing.
-        user_memory_works: Whether User Memory works for the User.
         shared_photos: The User's numbered Shared Photos; "" if none are
             offered.
 
@@ -316,11 +314,7 @@ def describe_check_in(
         Check-ins, what is remembered about them and their Shared Photos.
     """
     kind_lines = "\n".join(f"- {kind.name}: {kind.description}" for kind in kinds)
-    remembered = memory or (
-        "Nothing remembered about them."
-        if user_memory_works
-        else "User Memory is off, so you know nothing else about them."
-    )
+    remembered = memory or "Nothing remembered about them."
     photos = f"\n\n{shared_photos}" if shared_photos else ""
     return (
         f"Check-in Kinds you may choose from:\n{kind_lines}\n\n"
@@ -913,11 +907,9 @@ class CheckInService:
 
         Returns:
             Their Memory Items by active Memory Category and their newest
-            Conversation Summaries; "" if User Memory doesn't work for the
-            User or is empty.
+            Conversation Summaries, even while User Memory is off; "" if
+            nothing is remembered.
         """
-        if not self._features.works_for(user.id, Feature.USER_MEMORY):
-            return ""
         user_memory = self._repositories.user_memory
         settings = self._repositories.platform_settings
         categories = [
@@ -943,7 +935,8 @@ class CheckInService:
 
         Returns:
             Their Shared Photos, newest first; none if User Memory or Photo
-            Viewing doesn't work for the User.
+            Viewing doesn't work for the User, since only Check-in Kinds
+            that need User Memory send one.
         """
         if not self._features.works_for(user.id, Feature.USER_MEMORY):
             return []
@@ -981,7 +974,6 @@ class CheckInService:
                 self._recent(user, CHECK_INS_TOLD_TO_MODEL), user.time_zone
             ),
             self._memory(user),
-            self._features.works_for(user.id, Feature.USER_MEMORY),
             describe_shared_photos(kinds, shared_photos, user.time_zone),
         )
         answer = self._chat_model.generate(

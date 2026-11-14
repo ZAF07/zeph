@@ -257,6 +257,23 @@ def test_the_photo_settings_are_editable_with_their_seeded_values(
     assert photo_viewing["model_key"] == "photo_model"
 
 
+def test_the_memory_notes_are_editable_with_their_seeded_values(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    seeded_settings: dict[str, Any],
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+
+    settings = client.get("/api/admin/settings", headers=headers).json()["settings"]
+
+    for key in ("memory_paused_note", "memory_not_available_note"):
+        assert settings[key]["value"] == seeded_settings[key]
+    assert seeded_settings["memory_paused_note"].startswith("**Memory is paused.**")
+    assert seeded_settings["memory_not_available_note"].startswith(
+        "**Memory isn’t available on your account.**"
+    )
+
+
 def test_the_photo_description_prompt_asks_for_danger_signs_and_leaves_out_secrets(
     seeded_settings: dict[str, Any],
 ) -> None:

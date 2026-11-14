@@ -18,19 +18,16 @@ import { useApiClient } from "@/lib/use-api-client";
  * and "Delete all memories" with a confirm step.
  *
  * @param props - `groups` are the User's Memory Items by category,
- *   `memoryOn` is whether User Memory is on (items are dimmed when off),
  *   `timeZone` is the User's time zone, and `onGroupsChange` gets the
  *   groups left after a delete.
  * @returns The tab's content.
  */
 export function MemoryItemsList({
   groups,
-  memoryOn,
   timeZone,
   onGroupsChange,
 }: {
   groups: MemoryGroup[];
-  memoryOn: boolean;
   timeZone?: string;
   onGroupsChange: (groups: MemoryGroup[]) => void;
 }) {
@@ -108,9 +105,7 @@ export function MemoryItemsList({
             {group.items.map((item) => (
               <li
                 key={item.id}
-                className={`flex flex-wrap items-center gap-3 border-t border-line py-3.5 pr-3 pl-6 first:border-t-0 ${
-                  memoryOn ? "" : "opacity-60"
-                }`}
+                className="flex flex-wrap items-center gap-3 border-t border-line py-3.5 pr-3 pl-6 first:border-t-0"
               >
                 <span className="flex min-w-0 flex-auto flex-col gap-1">
                   <span className="text-base">{item.content}</span>

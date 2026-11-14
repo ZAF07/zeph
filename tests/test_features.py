@@ -711,7 +711,7 @@ def test_off_for_the_user_comes_before_the_users_own_switch(
     assert off_for_user["reason"] == "off_for_user"
 
 
-def test_with_user_memory_off_by_an_admin_no_memory_is_used_and_the_choice_is_kept(
+def test_with_user_memory_off_by_an_admin_memory_is_still_used_and_the_choice_is_kept(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -736,9 +736,8 @@ def test_with_user_memory_off_by_an_admin_no_memory_is_used_and_the_choice_is_ke
     switch_for_user(client, admin, user_id, "user_memory", "default")
     back_on = reply_call(client, chat_model, "my sister called")
 
-    assert retrievals_while_off == []
-    assert "Sister Jo" not in off.instructions
-    assert "Talked about work and family." not in off.instructions
+    assert len(retrievals_while_off) == 1
+    assert "Talked about work and family." in off.instructions
     assert note in off.instructions
     assert me_while_off["user_memory_enabled"] is True
     assert me_while_off["user_memory_available"] is False
@@ -883,7 +882,7 @@ def test_with_check_ins_off_by_an_admin_none_are_sent_until_it_is_back_on(
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["hey Maya, how's it going?"]
 
 
-def test_with_user_memory_off_by_an_admin_check_ins_are_chosen_without_memory(
+def test_with_user_memory_off_by_an_admin_check_ins_still_use_existing_memory(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -902,8 +901,8 @@ def test_with_user_memory_off_by_an_admin_check_ins_are_chosen_without_memory(
     [line] = chat_model.calls[-1].history
     assert "A casual hello" in line.text
     assert "A follow-up" not in line.text
-    assert "New job, running on autopilot." not in line.text
-    assert "User Memory is off" in line.text
+    assert "New job, running on autopilot." in line.text
+    assert "User Memory is off" not in line.text
 
 
 def settings_tool_names(call: ChatModelCall) -> list[str]:

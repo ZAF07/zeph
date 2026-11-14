@@ -60,6 +60,7 @@ class MeResponse(BaseModel):
     ai_notice_acknowledged_at: datetime | None
     user_memory_enabled: bool
     user_memory_available: bool
+    memory_note: str
     photo_viewing_enabled: bool
     photo_viewing_available: bool
     personal_stickers_available: bool
@@ -232,7 +233,7 @@ class HomeResponse(BaseModel):
     telegram_chat_url: str
     last_conversation_at: datetime | None
     check_ins: HomeCheckInsResponse
-    user_memory_enabled: bool
+    memory_note: str
     goals: list[MemoryItemResponse]
     recently_remembered: list[RememberedItemResponse]
     ai_notice: str
@@ -404,6 +405,7 @@ def to_recent_check_in_response(recent: RecentCheckIn) -> RecentCheckInResponse:
 def to_me_response(
     user: User,
     user_memory_available: bool,
+    memory_note: str,
     photo_viewing_available: bool,
     personal_stickers_available: bool,
 ) -> MeResponse:
@@ -413,6 +415,8 @@ def to_me_response(
         user: The User.
         user_memory_available: Whether the Admin side allows User Memory
             for them.
+        memory_note: The Admin-managed note saying User Memory is off and
+            why; "" when it works.
         photo_viewing_available: Whether the Admin side allows Photo Viewing
             for them.
         personal_stickers_available: Whether Personal Stickers works for
@@ -432,6 +436,7 @@ def to_me_response(
         ai_notice_acknowledged_at=user.ai_notice_acknowledged_at,
         user_memory_enabled=user.user_memory_enabled,
         user_memory_available=user_memory_available,
+        memory_note=memory_note,
         photo_viewing_enabled=user.photo_viewing_enabled,
         photo_viewing_available=photo_viewing_available,
         personal_stickers_available=personal_stickers_available,
@@ -495,6 +500,7 @@ def build_dashboard_api_router(
         return to_me_response(
             user,
             feature_service.available_for(user.id, Feature.USER_MEMORY),
+            user_memory_service.memory_note(user),
             feature_service.available_for(user.id, Feature.PHOTO_VIEWING),
             feature_service.works_for(user.id, Feature.PERSONAL_STICKERS),
         )
@@ -591,7 +597,7 @@ def build_dashboard_api_router(
                     else None
                 ),
             ),
-            user_memory_enabled=user.user_memory_enabled,
+            memory_note=user_memory_service.memory_note(user),
             goals=[to_memory_item_response(item) for item in home.goals],
             recently_remembered=[
                 RememberedItemResponse(
