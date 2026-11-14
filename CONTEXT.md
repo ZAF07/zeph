@@ -40,6 +40,10 @@ _Avoid_: Sticker album, user stickers, saved stickers
 A photo a User sent the Companion that matters to them, picked when the Conversation ends and kept as part of their User Memory, with a detailed description written when it arrived and a note on why it matters. Other photos are used only in the Conversation they came in. The Companion works from the description and looks at the photo again only when the description can't answer. It may send a User's own Shared Photo back to them, the way a friend brings up an old memory: rarely, at most one per reply, only one that fits what they're talking about, and never when they're struggling. A Check-in can also bring one back ("saw this again, how's the monstera doing?"). It stays after Message Retention deletes the message it came in, until the User deletes it.
 _Avoid_: Image, picture, attachment, media
 
+**Message**:
+Everything a User sends the Companion before pausing: one text, several texts in a row, or an Album. The Companion waits a few seconds (set by Admins) after the last one, then answers them together with one reply, which may go out as several short texts. It counts as one toward the Daily Message Limit. The Safeguard still checks each text as it arrives, so a crisis is never held back by the wait.
+_Avoid_: Burst, batch, text (a text is one piece of a Message)
+
 **Album**:
 Several photos a User sends at once. The Companion answers them as one message with one reply, and they count as one message toward the Daily Message Limit. It looks at only the first few, as many as Admins set, and says when it didn't look at the rest.
 _Avoid_: Media group, batch, gallery
@@ -53,7 +57,7 @@ Something a User sends that the Companion can't read yet, like a voice note, vid
 _Avoid_: Media message, attachment
 
 **Feature**:
-An extra the Companion offers that can be switched off: Web Search, Check-ins, User Memory, Photo Viewing, Stickers, Personal Stickers, Knowledge and Settings in Chat. Admins switch each one on or off for everyone, and for individual Users; a choice for one User overrides the one for everyone. A Feature works for a User only when the Admins allow it and, where the User has their own switch (User Memory, Check-ins, Photo Viewing), the User has it on. A switch the Admins don't allow shows as "Not available on your account" on the Dashboard and can't be changed; the Admins' choice never changes the User's own. A switch changed while a reply or Check-in is under way applies from the next one; the one under way finishes as it started. When Settings in Chat is off, the Companion points the User to the Dashboard to change a setting, but Delete My Data still works in chat. Safety and a User's rights and privacy are never Features: the Safeguard and Crisis Reply, the AI Notice, Delete My Data and seeing their own data on the Dashboard are always there.
+An extra the Companion offers that can be switched off: Web Search, Check-ins, User Memory, Photo Viewing, Stickers, Personal Stickers, Knowledge, Curiosities and Settings in Chat. Admins switch each one on or off for everyone, and for individual Users; a choice for one User overrides the one for everyone. A Feature works for a User only when the Admins allow it and, where the User has their own switch (User Memory, Check-ins, Photo Viewing), the User has it on. A switch the Admins don't allow shows as "Not available on your account" on the Dashboard and can't be changed; the Admins' choice never changes the User's own. A switch changed while a reply or Check-in is under way applies from the next one; the one under way finishes as it started. When Settings in Chat is off, the Companion points the User to the Dashboard to change a setting, but Delete My Data still works in chat. Safety and a User's rights and privacy are never Features: the Safeguard and Crisis Reply, the AI Notice, Delete My Data and seeing their own data on the Dashboard are always there.
 _Avoid_: Capability, add-on, perk, entitlement
 
 **Telegram Connection**:
@@ -105,7 +109,7 @@ The web app where Users manage their account, preferences and privacy, and where
 _Avoid_: Portal, web app, console
 
 **Chat Setting Change**:
-A change to one of a User's settings made by telling the Companion in plain words instead of on the Dashboard: pausing or resuming Check-ins, Check-in frequency, quiet hours, User Memory on or off, time zone, forgetting a Memory Item, or Delete My Data. The Dashboard marks each such setting "Changed in chat" until it is next changed there.
+A change to one of a User's settings made by telling the Companion in plain words instead of on the Dashboard: pausing or resuming Check-ins, Check-in frequency, quiet hours, User Memory on or off, time zone, forgetting a Memory Item or Life Thread, or Delete My Data. The Dashboard marks each such setting "Changed in chat" until it is next changed there.
 _Avoid_: Chat command, slash command, bot setting
 
 **Onboarding**:
@@ -141,7 +145,7 @@ _Avoid_: Alert, incident, flag
 ### User Memory
 
 **User Memory**:
-Everything the Companion has retained about a specific User, made up of Memory Items, Conversation Summaries and Shared Photos. The User can turn it off: then the Companion stops learning (nothing new is kept) but still uses what it already has, and nothing is deleted until the User deletes it. It is also a Feature, and the Admin's switch has the final say: an Admin turning it off for a User has exactly the same effect and keeps the User's own choice for when it is back on. Whichever switch is off, the User can always see and delete their memories on the Dashboard.
+Everything the Companion has retained about a specific User, made up of Memory Items, Conversation Summaries, Life Threads, their User Portrait and Shared Photos. The User can turn it off: then the Companion stops learning (nothing new is kept) but still uses what it already has, and nothing is deleted until the User deletes it. Users are told this plainly wherever they turn it off, and that Delete My Data is how to remove everything. It is also a Feature, and the Admin's switch has the final say: an Admin turning it off for a User has exactly the same effect and keeps the User's own choice for when it is back on. Whichever switch is off, the User can always see and delete their memories on the Dashboard.
 _Avoid_: Memory, profile, history, context
 
 **Memory Item**:
@@ -157,8 +161,30 @@ A Memory Category the product itself relies on: Onboarding answers are saved in 
 _Avoid_: Constant category, built-in category, core category
 
 **Conversation Summary**:
-A short account of what one Conversation covered and how the User seemed (its mood), written once, when the Conversation ends. The newest few go into every reply.
+A short account of what one Conversation covered, how the User seemed (its mood), and what the Companion offered and how it landed (e.g. "suggested a walk; they said it helped"), written once, when the Conversation ends. The newest few go into every reply; older ones are found by meaning when the Companion looks for something from the past.
 _Avoid_: Recap, transcript, log
+
+**Life Thread**:
+An ongoing story in a User's life followed across Conversations, which the User sees and can delete (on the Dashboard or by asking in chat), but not edit (e.g. a falling-out with their sister, a job hunt, a presentation on Thursday): a short running story with dates, the people or things in it, and whether it is open (unresolved or upcoming) or settled. Added to or started when a Conversation ends. The Companion is reminded of a Thread when the User mentions someone or something in it, or talks about something close to it, however long ago it was, and may bring it up the way a friend would. Each Thread remembers when the Companion last brought it up and how the User took it (engaged, brushed it off, asked to drop it), so it is not raised again too soon, or at all once they asked to drop it.
+_Avoid_: Topic, storyline, episode, case
+
+**User Portrait**:
+A short, living picture of a User: who they are, what's going on in their life now, themes they keep coming back to, what has helped them and what hasn't, where they stand on their Goals, and open questions the Companion is still curious about (e.g. "low on Sunday nights, not sure why"), which it may gently explore when the moment is right. Rewritten from their User Memory when a Conversation ends, and used for every reply. Users see it and can delete it, but not edit it. When they delete a Memory Item or Life Thread, the Portrait is rewritten without it straight away, so a deleted thing is truly forgotten.
+_Avoid_: Profile, persona (Persona is the Companion's voice), bio
+
+### Understanding
+
+**Need**:
+What the User wants from the Companion right now (e.g. to be heard, to think it through, advice, accountability on a Goal). Before each reply the Companion picks the one that fits best, fresh for every message. Managed by Admins: each has a name, when it fits, and how to reply, and only the picked Need's "how to reply" shapes the reply. One fallback Need ("Ask more", to start) is used when it isn't clear; it can be edited but never deleted. Any other Need can be deleted.
+_Avoid_: Intent, mode, mood (mood is how a User seemed in a Conversation Summary)
+
+**Understanding**:
+The Companion's private read of what a User just said, made before it replies: when it came (in their time zone), how they seemed and how strongly, whether it knows why they feel that way, which Need fits, which Life Threads it touches, and what the Companion chose to bring up or leave alone (and why). Each Understanding sees the earlier ones in the same Conversation, so the Companion knows what it already raised and how the User's mood is moving. When their mood stands out and it doesn't know why, the Companion gently asks, in its own voice. Users don't see Understandings; what is learned from them (their User Portrait, Life Threads) is theirs to see and delete. Removed with the messages it was made for.
+_Avoid_: Analysis, classification, note, intent detection
+
+**Curiosity**:
+Something the Companion wants to ask or talk about with a User later, worked out when a Conversation ends from what it knows about them (e.g. "how did the presentation go?", "they've seemed low on Sunday nights, wonder why"). It is saved, not sent: when the User next talks to the Companion it may open with one, weave it in or wait for a better moment, and one Check-in Kind starts a Conversation with one. Each has what to ask and why, a "not before" day (or anytime), how sensitive it is, and whether it is waiting, was raised (and how the User took it) or is no longer relevant. Curiosities are internal: they aren't User Memory and Users don't see them, but Delete My Data and Account Deletion remove them, and deleting the Memory Item or Life Thread one came from removes it too. While User Memory is off no new ones are made, and waiting ones are still used. It is a Feature, and Admins set how many are raised per Conversation and how many Curiosity Check-ins a User gets per week, and how many can wait at once.
+_Avoid_: Probe, question bank, prompt, talking point
 
 ### Knowledge
 
@@ -167,7 +193,7 @@ The curated library of philosophy, psychology and mindfulness material the Compa
 _Avoid_: Wisdom base, corpus, content
 
 **Knowledge Document**:
-One text in the Knowledge library (text, Markdown or PDF), with a title, a source or author, and a tradition; Admins can change those details at any time and replies use them straight away. It is Pending until it is made ready, then Ready (used in replies) or Failed (with a reason; an Admin can retry it). Only Ready documents are ever used. Its text, read from its file, is what replies draw on; Admins can view and edit it on the document's page, and an edit makes the document Pending until it is re-indexed (it is then marked Edited, as it no longer matches its file word for word). Replacing its file keeps the document, its details and when it was added, reads the new file's text and clears Edited. Deleting one removes it from replies at once.
+One text in the Knowledge library (text, Markdown or PDF), with a title, a source or author, a tradition, and a "when it helps" description (drafted by the Companion when it is made ready) that the Companion reads to decide whether the document fits what the User needs; Admins can change those details at any time and replies use them straight away. It is Pending until it is made ready, then Ready (used in replies) or Failed (with a reason; an Admin can retry it). Only Ready documents are ever used. Its text, read from its file, is what replies draw on; Admins can view and edit it on the document's page, and an edit makes the document Pending until it is re-indexed (it is then marked Edited, as it no longer matches its file word for word). Replacing its file keeps the document, its details and when it was added, reads the new file's text and clears Edited. Deleting one removes it from replies at once.
 _Avoid_: File, article, resource
 
 **Starter Knowledge**:
@@ -205,12 +231,16 @@ How long a User's raw messages are kept, set by Admins in days. Older messages a
 _Avoid_: Data retention, TTL, history limit
 
 **Delete My Data**:
-A User's choice, on the Dashboard or in chat, to wipe their messages, User Memory, Personal Stickers, Check-in history and Telegram Connection after typing a confirmation word. In chat the confirmation must be their whole next message; anything else cancels it. Their account stays, so they can start fresh. The Admins' Feature choices for them stay too, since they are Admin settings, not the User's data.
+A User's choice, on the Dashboard or in chat, to wipe their messages, User Memory, Personal Stickers, Check-in history and Telegram Connection after typing a confirmation word, along with everything the Companion keeps about them that they don't see (Understandings and Curiosities). Users are told it removes everything, private notes included. In chat the confirmation must be their whole next message; anything else cancels it. Their account stays, so they can start fresh. The Admins' Feature choices for them stay too, since they are Admin settings, not the User's data.
 _Avoid_: Reset, clear history, wipe
 
 **Account Deletion**:
 A User's choice, made only on the Dashboard, to remove everything Delete My Data removes plus their account itself and the Admins' Feature choices for them. It can't be undone, and the last Admin can't do it. Once confirmed it always finishes: the User is signed out at once, and if their sign-in account can't be removed right then, it is removed later without them doing anything. Anything they create by signing in again before then is removed with it.
 _Avoid_: Close account, deactivate, unsubscribe
+
+**Model Call Log**:
+The Admins' record of every model call the Companion makes, grouped by the Message or Check-in it was for. For every User it holds no content: which steps ran, the model, tokens, time taken, errors and the shape of each decision (e.g. which Need was picked, how many Life Threads were found, whether one was brought up). Full content (what the model was given, what it answered, its tool calls and its reasoning) is kept only for Admins' own chats and Evals. Removed with the User's messages.
+_Avoid_: Trace, debug log, LLM log
 
 ### Quality
 
