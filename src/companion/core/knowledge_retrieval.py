@@ -8,6 +8,10 @@ from companion.core.models import (
     KnowledgeStatus,
     UserSnapshot,
 )
+from companion.core.platform_settings import (
+    KNOWLEDGE_CHUNKS_PER_REPLY,
+    REPLY_KNOWLEDGE_INTRO,
+)
 from companion.core.ports import Embedder, KnowledgeVectorStore, Repositories
 
 logger = logging.getLogger(__name__)
@@ -85,8 +89,8 @@ class KnowledgeRetrieval:
         """
         if not snapshot.works(Feature.KNOWLEDGE):
             return ""
-        settings = self._repositories.platform_settings
-        limit = settings.get("knowledge_chunks_per_reply")
+        settings = snapshot.settings
+        limit = settings.get(KNOWLEDGE_CHUNKS_PER_REPLY)
         messages = self._repositories.conversations.list_messages(conversation_id)
         if limit < 1 or not messages:
             return ""
@@ -102,5 +106,5 @@ class KnowledgeRetrieval:
         return format_knowledge(
             matches,
             self._repositories.knowledge_documents.list_all(),
-            settings.get("reply_knowledge_intro"),
+            settings.get(REPLY_KNOWLEDGE_INTRO),
         )

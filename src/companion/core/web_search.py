@@ -2,6 +2,14 @@ import logging
 from typing import Any
 
 from companion.core.models import Feature, UserSnapshot, WebSearchResult
+from companion.core.platform_settings import (
+    PAGE_FETCH_TOOL_DESCRIPTION,
+    REPLY_WEB_SEARCH_INSTRUCTIONS,
+    REPLY_WEB_SEARCH_LIMIT_NOTE,
+    WEB_RESULT_SOURCE_REMINDER,
+    WEB_SEARCH_DAILY_LIMIT,
+    WEB_SEARCH_TOOL_DESCRIPTION,
+)
 from companion.core.ports import ChatTool, Repositories, WebSearch
 from companion.core.reply_tools import ReplyContext, ReplyOffer
 
@@ -84,16 +92,16 @@ class WebSearchTools:
         """
         if not snapshot.works(Feature.WEB_SEARCH):
             return ReplyOffer()
-        settings = self._repositories.platform_settings
+        settings = snapshot.settings
         usage = self._repositories.usage
-        daily_limit = settings.get("web_search_daily_limit")
+        daily_limit = settings.get(WEB_SEARCH_DAILY_LIMIT)
         user_id = snapshot.user.id
         today = snapshot.today
-        source_reminder = settings.get("web_result_source_reminder")
+        source_reminder = settings.get(WEB_RESULT_SOURCE_REMINDER)
         used_today = usage.count_web_searches(user_id, today)
         if used_today >= daily_limit:
             return ReplyOffer(
-                tools=[], instructions=settings.get("reply_web_search_limit_note")
+                tools=[], instructions=settings.get(REPLY_WEB_SEARCH_LIMIT_NOTE)
             )
 
         def run_search(arguments: dict[str, Any]) -> str:
@@ -145,16 +153,16 @@ class WebSearchTools:
             tools=[
                 ChatTool(
                     name="web_search",
-                    description=settings.get("web_search_tool_description"),
+                    description=settings.get(WEB_SEARCH_TOOL_DESCRIPTION),
                     parameters=SEARCH_PARAMETERS,
                     run=run_search,
                 ),
                 ChatTool(
                     name="fetch_page",
-                    description=settings.get("page_fetch_tool_description"),
+                    description=settings.get(PAGE_FETCH_TOOL_DESCRIPTION),
                     parameters=FETCH_PARAMETERS,
                     run=run_fetch,
                 ),
             ],
-            instructions=settings.get("reply_web_search_instructions"),
+            instructions=settings.get(REPLY_WEB_SEARCH_INSTRUCTIONS),
         )

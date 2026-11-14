@@ -2,8 +2,13 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from companion.core.check_ins import CheckInService, RecentCheckIn
-from companion.core.memory_categories import HOME_GOALS_CATEGORY_SETTING
-from companion.core.models import MemoryItem, TelegramConnection, User
+from companion.core.models import (
+    MemoryItem,
+    PlatformSettings,
+    TelegramConnection,
+    User,
+)
+from companion.core.platform_settings import HOME_GOALS_MEMORY_CATEGORY
 from companion.core.ports import Repositories
 
 RECENTLY_REMEMBERED_LIMIT = 3
@@ -63,11 +68,12 @@ class HomeService:
         self._repositories = repositories
         self._check_in_service = check_in_service
 
-    def get(self, user: User) -> Home:
+    def get(self, user: User, settings: PlatformSettings) -> Home:
         """Gather a User's Dashboard home.
 
         Args:
             user: The signed-in User.
+            settings: The platform settings, read once for the request.
 
         Returns:
             Their Telegram Connection, Check-in status, Goals and newest
@@ -76,7 +82,7 @@ class HomeService:
         latest_conversation = self._repositories.conversations.get_latest_for_user(
             user.id
         )
-        goals, recently_remembered = self._goals_and_recently_remembered(user)
+        goals, recently_remembered = self._goals_and_recently_remembered(user, settings)
         return Home(
             telegram_connection=self._repositories.telegram_connections.get_by_user(
                 user.id
@@ -85,18 +91,19 @@ class HomeService:
                 latest_conversation.last_message_at if latest_conversation else None
             ),
             check_ins_paused=self._check_in_service.is_paused(user),
-            last_check_in=self._check_in_service.last_sent(user),
+            last_check_in=self._check_in_service.last_sent(user, settings),
             goals=goals,
             recently_remembered=recently_remembered,
         )
 
     def _goals_and_recently_remembered(
-        self, user: User
+        self, user: User, settings: PlatformSettings
     ) -> tuple[list[MemoryItem], list[RememberedItem]]:
         """Pick a User's Goals and newest Memory Items.
 
         Args:
             user: The User.
+            settings: Holds which Memory Category is the Goals one.
 
         Returns:
             Their Memory Items in the Goals Memory Category, and their
@@ -106,9 +113,7 @@ class HomeService:
             category.id: category.name
             for category in self._repositories.memory_categories.list_all()
         }
-        goals_name = self._repositories.platform_settings.get(
-            HOME_GOALS_CATEGORY_SETTING
-        )
+        goals_name = settings.get(HOME_GOALS_MEMORY_CATEGORY)
         newest_first = sorted(
             self._repositories.user_memory.list_items(user.id),
             key=lambda item: item.updated_at,

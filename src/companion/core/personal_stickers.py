@@ -16,6 +16,11 @@ from companion.core.models import (
     StickerImage,
     UserSnapshot,
 )
+from companion.core.platform_settings import (
+    PERSONAL_STICKER_KEEPING_MODEL,
+    PERSONAL_STICKER_KEEPING_PROMPT,
+    PERSONAL_STICKERS_LIMIT,
+)
 from companion.core.ports import ChatChannel, Clock, Repositories
 from companion.core.transcripts import to_transcript_lines
 from companion.core.usage import UsageRecordingChatModel
@@ -260,11 +265,11 @@ class PersonalStickerKeeper:
             sticker.file_unique_id: sticker
             for sticker in personal_stickers.list_for_user(user_id)
         }
-        settings = self._repositories.platform_settings
+        settings = snapshot.settings
         answer = self._chat_model.generate(
             snapshot=snapshot,
-            model=settings.get("personal_sticker_keeping_model"),
-            instructions=settings.get("personal_sticker_keeping_prompt"),
+            model=settings.get(PERSONAL_STICKER_KEEPING_MODEL),
+            instructions=settings.get(PERSONAL_STICKER_KEEPING_PROMPT),
             history=[
                 ChatLine(
                     role=ChatRole.USER,
@@ -285,7 +290,7 @@ class PersonalStickerKeeper:
             )
         )
         personal_stickers.keep_most_recently_used(
-            user_id, settings.get("personal_stickers_limit")
+            user_id, settings.get(PERSONAL_STICKERS_LIMIT)
         )
 
 

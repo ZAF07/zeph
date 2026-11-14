@@ -3,13 +3,12 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
+import yaml
 from sqlalchemy import Engine, text
 
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.core.chat_settings import (
-    DELETE_DATA_INSTRUCTIONS_SETTING,
     DELETE_DATA_TOOL,
-    INSTRUCTIONS_SETTING,
     ChatDataDeletion,
     SettingsTools,
 )
@@ -27,6 +26,7 @@ from companion.core.models import (
     MessageDirection,
     MessageKind,
     PersonalSticker,
+    PlatformSettings,
     SharedPhoto,
     User,
     UserFeatureSwitch,
@@ -34,6 +34,13 @@ from companion.core.models import (
     UserSnapshot,
 )
 from companion.core.photos import PhotoService, PhotoTools, SendPhotoTools
+from companion.core.platform_settings import (
+    REPLY_DELETE_DATA_INSTRUCTIONS,
+    REPLY_SETTINGS_INSTRUCTIONS,
+    REPLY_WEB_SEARCH_INSTRUCTIONS,
+    REPLY_WEB_SEARCH_LIMIT_NOTE,
+    WEB_SEARCH_DAILY_LIMIT,
+)
 from companion.core.ports import ChatTool, Repositories
 from companion.core.reply_tools import Attachment, ReplyContext, ReplyOffer
 from companion.core.response_composition import EmptyReplyError, ResponseComposer
@@ -44,6 +51,7 @@ from companion.core.user_memory import UserMemoryService
 from companion.core.user_snapshot import UserSnapshotLoader
 from companion.core.users import UserService
 from companion.core.web_search import WebSearchTools
+from tests.conftest import SEED_FILE
 from tests.fakes import (
     FakeChatChannel,
     FakeClock,
@@ -88,7 +96,13 @@ def snapshot_for(user: User, *working: Feature) -> UserSnapshot:
         )
         for feature in Feature
     )
-    return UserSnapshot(user=user, local_now=NOW, today=NOW.date(), features=statuses)
+    return UserSnapshot(
+        user=user,
+        local_now=NOW,
+        today=NOW.date(),
+        features=statuses,
+        settings=PlatformSettings(yaml.safe_load(SEED_FILE.read_text())),
+    )
 
 
 def tool_names(offer: ReplyOffer) -> list[str]:
@@ -269,21 +283,21 @@ def test_web_search_offers_its_tools_until_the_daily_limit(
 ) -> None:
     user = add_user(repositories)
     provider = WebSearchTools(repositories, FakeWebSearch())
-    settings = repositories.platform_settings
+    settings = repositories.platform_settings.load()
 
     assert provider.offer(snapshot_for(user), no_context()) == ReplyOffer()
 
     snapshot = snapshot_for(user, Feature.WEB_SEARCH)
     offer = provider.offer(snapshot, no_context())
     assert tool_names(offer) == ["web_search", "fetch_page"]
-    assert offer.instructions == settings.get("reply_web_search_instructions")
+    assert offer.instructions == settings.get(REPLY_WEB_SEARCH_INSTRUCTIONS)
     assert offer.picked is None
 
-    daily_limit = settings.get("web_search_daily_limit")
+    daily_limit = settings.get(WEB_SEARCH_DAILY_LIMIT)
     for _ in range(daily_limit):
         repositories.usage.claim_web_search(user.id, snapshot.today, daily_limit)
     assert provider.offer(snapshot, no_context()) == ReplyOffer(
-        tools=[], instructions=settings.get("reply_web_search_limit_note")
+        tools=[], instructions=settings.get(REPLY_WEB_SEARCH_LIMIT_NOTE)
     )
 
 
@@ -320,16 +334,16 @@ def test_settings_in_chat_offers_every_settings_tool_or_only_deleting_data(
 ) -> None:
     user = add_user(repositories)
     provider = build_settings_tools(repositories)
-    settings = repositories.platform_settings
+    settings = repositories.platform_settings.load()
 
     on = provider.offer(snapshot_for(user, Feature.SETTINGS_IN_CHAT), no_context())
     assert DELETE_DATA_TOOL in tool_names(on)
     assert len(on.tools) > 1
-    assert on.instructions == settings.get(INSTRUCTIONS_SETTING)
+    assert on.instructions == settings.get(REPLY_SETTINGS_INSTRUCTIONS)
 
     off = provider.offer(snapshot_for(user), no_context())
     assert tool_names(off) == [DELETE_DATA_TOOL]
-    assert off.instructions == settings.get(DELETE_DATA_INSTRUCTIONS_SETTING)
+    assert off.instructions == settings.get(REPLY_DELETE_DATA_INSTRUCTIONS)
 
 
 def test_stickers_offer_their_own_first_and_pick_only_one(

@@ -2,9 +2,9 @@ import logging
 
 from companion.core.check_ins import CheckInService
 from companion.core.message_retention import MessageRetention
+from companion.core.platform_settings import CONVERSATION_QUIET_GAP
 from companion.core.ports import Clock, Repositories
 from companion.core.post_conversation import PostConversationProcessor
-from companion.core.timing import quiet_gap
 from companion.core.user_data import UserDataService
 
 logger = logging.getLogger(__name__)
@@ -46,19 +46,20 @@ class ScheduledWork:
         Old data is messages past the retention period and auth accounts still
         to delete. A Conversation whose processing fails, or an auth account
         whose deletion fails, is tried again on the next tick; the others still
-        go ahead.
+        go ahead. The platform settings are read once, at the start, for the
+        whole tick.
         """
+        settings = self._repositories.platform_settings.load()
         conversations = self._repositories.conversations
         now = self._clock.now()
         conversations.end_quiet(
-            quiet_since=now - quiet_gap(self._repositories.platform_settings),
-            ended_at=now,
+            quiet_since=now - settings.get(CONVERSATION_QUIET_GAP), ended_at=now
         )
         for conversation in conversations.list_ended_unprocessed():
             try:
-                self._post_conversation.process(conversation)
+                self._post_conversation.process(conversation, settings)
             except Exception:
                 logger.exception("Could not process an ended Conversation")
-        self._check_ins.send_due()
-        self._message_retention.delete_expired()
+        self._check_ins.send_due(settings)
+        self._message_retention.delete_expired(settings)
         self._user_data.delete_pending_auth_accounts()

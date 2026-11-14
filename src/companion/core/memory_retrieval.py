@@ -16,6 +16,13 @@ from companion.core.models import (
     SharedPhoto,
     UserSnapshot,
 )
+from companion.core.platform_settings import (
+    MEMORY_RETRIEVAL_MODEL,
+    MEMORY_RETRIEVAL_PROMPT,
+    RECENT_CONVERSATION_SUMMARIES,
+    REPLY_MEMORY_INTRO,
+    SHARED_PHOTOS_MEMORY_DESCRIPTION,
+)
 from companion.core.ports import Repositories
 from companion.core.transcripts import to_transcript_lines
 from companion.core.usage import UsageRecordingChatModel
@@ -229,7 +236,7 @@ class MemoryRetrieval:
             Photos that matter.
         """
         user_id = snapshot.user.id
-        settings = self._repositories.platform_settings
+        settings = snapshot.settings
         user_memory = self._repositories.user_memory
         items = user_memory.list_items(user_id)
         shared_photos = (
@@ -249,7 +256,7 @@ class MemoryRetrieval:
             if not category.always_include and category.id in filled_category_ids
         ]
         photos_group = shared_photos_group(
-            settings.get("shared_photos_memory_description")
+            settings.get(SHARED_PHOTOS_MEMORY_DESCRIPTION)
         )
         if shared_photos:
             pickable.append(photos_group)
@@ -262,7 +269,7 @@ class MemoryRetrieval:
             if category.always_include or category.id in picked_ids
         ]
         summaries = user_memory.list_summaries(
-            user_id, limit=settings.get("recent_conversation_summaries")
+            user_id, limit=settings.get(RECENT_CONVERSATION_SUMMARIES)
         )
         return RecalledMemory(
             text=format_memory(
@@ -270,7 +277,7 @@ class MemoryRetrieval:
                 items,
                 summaries,
                 snapshot.user.time_zone,
-                settings.get("reply_memory_intro"),
+                settings.get(REPLY_MEMORY_INTRO),
                 relevant_photos,
             ),
             shared_photo_ids=tuple(photo.id for photo in relevant_photos),
@@ -295,13 +302,13 @@ class MemoryRetrieval:
         """
         if not categories:
             return []
-        settings = self._repositories.platform_settings
+        settings = snapshot.settings
         messages = self._repositories.conversations.list_messages(conversation_id)
         try:
             answer = self._chat_model.generate(
                 snapshot=snapshot,
-                model=settings.get("memory_retrieval_model"),
-                instructions=settings.get("memory_retrieval_prompt"),
+                model=settings.get(MEMORY_RETRIEVAL_MODEL),
+                instructions=settings.get(MEMORY_RETRIEVAL_PROMPT),
                 history=[
                     ChatLine(
                         role=ChatRole.USER,

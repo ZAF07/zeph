@@ -11,6 +11,16 @@ from companion.core.models import (
     SharedPhoto,
     UserSnapshot,
 )
+from companion.core.platform_settings import (
+    ASK_ABOUT_PHOTO_TOOL_DESCRIPTION,
+    PHOTO_ALBUM_MAX_PHOTOS,
+    PHOTO_DESCRIPTION_PROMPT,
+    PHOTO_MODEL,
+    PHOTO_NOT_VIEWED_NOTE,
+    PHOTO_RETRY_COUNT,
+    PHOTO_VIEWING_OFF_NOTE,
+    SEND_PHOTO_TOOL_DESCRIPTION,
+)
 from companion.core.ports import (
     ChatChannel,
     ChatTool,
@@ -290,13 +300,13 @@ class PhotoService:
             holding its description if the reply may see it, and the caption;
             with Photo Viewing off, the Safeguard's own text too.
         """
-        settings = self._repositories.platform_settings
-        looked_at = photos[: settings.get("photo_album_max_photos")]
+        settings = snapshot.settings
+        looked_at = photos[: settings.get(PHOTO_ALBUM_MAX_PHOTOS)]
         descriptions = [self.describe(snapshot, photo) for photo in looked_at]
         described_text = photo_message_text(
             caption,
             descriptions,
-            settings.get("photo_not_viewed_note"),
+            settings.get(PHOTO_NOT_VIEWED_NOTE),
             photos_not_looked_at=len(photos) - len(looked_at),
         )
         if not snapshot.works(Feature.PHOTO_VIEWING):
@@ -304,8 +314,8 @@ class PhotoService:
                 text=photo_message_text(
                     caption,
                     descriptions,
-                    settings.get("photo_not_viewed_note"),
-                    viewing_off_note=settings.get("photo_viewing_off_note"),
+                    settings.get(PHOTO_NOT_VIEWED_NOTE),
+                    viewing_off_note=settings.get(PHOTO_VIEWING_OFF_NOTE),
                 ),
                 photos=tuple(
                     replace(photo, caption=caption.strip()) for photo in looked_at
@@ -343,11 +353,11 @@ class PhotoService:
         if photo.too_big_to_download:
             logger.error("Could not view a photo: it is too big to download")
             return None
-        settings = self._repositories.platform_settings
+        settings = snapshot.settings
         return self._look(
             snapshot,
             photo,
-            settings.get("photo_description_prompt"),
+            settings.get(PHOTO_DESCRIPTION_PROMPT),
             log_action="view a photo",
         )
 
@@ -367,12 +377,12 @@ class PhotoService:
             The answer, or None if it still couldn't be looked at; the
             error is logged, never raised.
         """
-        settings = self._repositories.platform_settings
+        settings = snapshot.settings
         return self._look(
             snapshot,
             photo,
             photo_question_instructions(
-                settings.get("photo_description_prompt"), question
+                settings.get(PHOTO_DESCRIPTION_PROMPT), question
             ),
             log_action="look at a photo again",
         )
@@ -443,13 +453,13 @@ class PhotoService:
         Returns:
             What the photo viewer wrote, or None after the last failed try.
         """
-        settings = self._repositories.platform_settings
-        tries = 1 + settings.get("photo_retry_count")
+        settings = snapshot.settings
+        tries = 1 + settings.get(PHOTO_RETRY_COUNT)
         for attempt in range(1, tries + 1):
             try:
                 image = self._chat_channel.download_photo(photo.file_id)
                 answer = self._photo_viewer.look(
-                    model=settings.get("photo_model"),
+                    model=settings.get(PHOTO_MODEL),
                     instructions=instructions,
                     photo=image,
                 )
@@ -547,9 +557,7 @@ class PhotoTools:
             photo_tool_line(number, photo_description)
             for number, (_, photo_description) in enumerate(viewed, start=1)
         )
-        description = self._repositories.platform_settings.get(
-            "ask_about_photo_tool_description"
-        )
+        description = snapshot.settings.get(ASK_ABOUT_PHOTO_TOOL_DESCRIPTION)
         return ReplyOffer(
             tools=[
                 ChatTool(
@@ -645,5 +653,5 @@ class SendPhotoTools:
         shared_photos = [photo for photo in found if photo is not None]
         return send_photo_offer(
             shared_photos,
-            self._repositories.platform_settings.get("send_photo_tool_description"),
+            snapshot.settings.get(SEND_PHOTO_TOOL_DESCRIPTION),
         )

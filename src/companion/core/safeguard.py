@@ -14,13 +14,18 @@ from companion.core.models import (
     SafeguardEventOverview,
     UserSnapshot,
 )
+from companion.core.platform_settings import (
+    CRISIS_REPLY,
+    HELPLINES_PLACEHOLDER,
+    SAFEGUARD_MODEL,
+    SAFEGUARD_PROMPT,
+)
 from companion.core.ports import Clock, Repositories
 from companion.core.response_composition import to_chat_history
 from companion.core.usage import UsageRecordingChatModel
 
 logger = logging.getLogger(__name__)
 
-HELPLINES_PLACEHOLDER = "{helplines}"
 WORD = re.compile(r"[a-z_]+")
 CRISIS_LABELS = frozenset(
     {
@@ -157,7 +162,7 @@ class Safeguard:
         Returns:
             The risk type, or `RiskType.NONE` if it is not a crisis.
         """
-        settings = self._repositories.platform_settings
+        settings = snapshot.settings
         history = to_chat_history(
             self._repositories.conversations.list_messages(conversation_id)
         )
@@ -167,8 +172,8 @@ class Safeguard:
         for _ in range(2):
             answer = self._chat_model.generate(
                 snapshot=snapshot,
-                model=settings.get("safeguard_model"),
-                instructions=settings.get("safeguard_prompt"),
+                model=settings.get(SAFEGUARD_MODEL),
+                instructions=settings.get(SAFEGUARD_PROMPT),
                 history=transcript,
             )
             risk_type = read_risk_type(answer)
@@ -202,7 +207,7 @@ class Safeguard:
                 helplines_country=to_share.country,
             )
         )
-        wording: str = self._repositories.platform_settings.get("crisis_reply")
+        wording = snapshot.settings.get(CRISIS_REPLY)
         return wording.replace(
             HELPLINES_PLACEHOLDER, format_helplines(to_share.helplines)
         )

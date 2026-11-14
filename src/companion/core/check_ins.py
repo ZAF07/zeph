@@ -31,7 +31,6 @@ from companion.core.models import (
     ChatSetting,
     CheckIn,
     CheckInChanges,
-    CheckInFrequency,
     CheckInKind,
     CheckInLogEntry,
     CheckInOutcome,
@@ -40,9 +39,21 @@ from companion.core.models import (
     Feature,
     NextDueTimeChange,
     PauseLength,
+    PlatformSettings,
     SharedPhoto,
     User,
     UserSnapshot,
+)
+from companion.core.platform_settings import (
+    CHECK_IN_FEWER_MESSAGE,
+    CHECK_IN_GAPS,
+    CHECK_IN_IGNORE_THRESHOLD,
+    CHECK_IN_MODEL,
+    CHECK_IN_PROMPT,
+    CHECK_IN_REPLY_WINDOW,
+    CONVERSATION_QUIET_GAP,
+    PERSONA,
+    RECENT_CONVERSATION_SUMMARIES,
 )
 from companion.core.ports import (
     ChatBlockedError,
@@ -52,11 +63,7 @@ from companion.core.ports import (
     Repositories,
 )
 from companion.core.settings_changes import record_where_changed
-from companion.core.timing import (
-    check_in_reply_window,
-    quiet_gap,
-    users_today,
-)
+from companion.core.timing import users_today
 from companion.core.usage import UsageLimiter, UsageRecordingChatModel
 from companion.core.user_snapshot import UserSnapshotLoader
 
@@ -603,19 +610,26 @@ class CheckInService:
         Returns:
             Each Check-in and its status, newest first.
         """
-        return self._recent(user, RECENT_CHECK_INS_LIMIT)
+        return self._recent(
+            user, RECENT_CHECK_INS_LIMIT, self._repositories.platform_settings.load()
+        )
 
-    def last_sent(self, user: User) -> RecentCheckIn | None:
+    def last_sent(
+        self, user: User, platform_settings: PlatformSettings
+    ) -> RecentCheckIn | None:
         """Find the newest Check-in that was actually sent to a User.
 
         Args:
             user: The User.
+            platform_settings: Holds the reply window, read once per request.
 
         Returns:
             The newest Check-in that wasn't skipped, with its status, or None
             if none was sent lately.
         """
-        recent = self._recent(user, CHECK_INS_LOOKED_BACK_FOR_LAST_SENT)
+        recent = self._recent(
+            user, CHECK_INS_LOOKED_BACK_FOR_LAST_SENT, platform_settings
+        )
         return next(
             (
                 entry
@@ -650,14 +664,14 @@ class CheckInService:
         statuses = check_in_statuses(
             [entry.check_in for entry in entries],
             now,
-            check_in_reply_window(self._repositories.platform_settings),
+            self._repositories.platform_settings.load().get(CHECK_IN_REPLY_WINDOW),
         )
         return [
             LoggedCheckIn(entry=entry, status=status)
             for entry, status in zip(entries, statuses, strict=True)
         ]
 
-    def send_due(self) -> None:
+    def send_due(self, platform_settings: PlatformSettings) -> None:
         """Decide on a Check-in for every User who is due one right now.
 
         Facts about every due User are gathered together in a few queries,
@@ -665,13 +679,18 @@ class CheckInService:
         their next due time saved together at the end, so they aren't read
         again until then. A decision that fails before it is saved is logged
         and tried again on the next tick; the others still go ahead.
+
+        Args:
+            platform_settings: The platform settings, read once for the tick.
         """
         now = self._clock.now()
         due_users = self._repositories.check_ins.list_due_users(now)
         if not due_users:
             return
-        snapshots = self._user_snapshots.load_many([user.id for user in due_users])
-        rules = self._rules()
+        snapshots = self._user_snapshots.load_many(
+            [user.id for user in due_users], platform_settings
+        )
+        rules = self._rules(platform_settings)
         plans = [
             (facts.snapshot, decide_check_in(facts, rules, now))
             for facts in self._gather_facts(snapshots, rules)
@@ -683,7 +702,7 @@ class CheckInService:
             if not isinstance(plan, HoldBack)
         ]
         fewer_message: str = (
-            self._repositories.platform_settings.get("check_in_fewer_message")
+            platform_settings.get(CHECK_IN_FEWER_MESSAGE)
             if any(isinstance(plan, AskAboutFewer) for _, plan in to_carry_out)
             else ""
         )
@@ -714,17 +733,19 @@ class CheckInService:
                 due_time_changes.append(change)
         self._repositories.check_ins.save_next_due_times(due_time_changes)
 
-    def _rules(self) -> CheckInRules:
+    def _rules(self, platform_settings: PlatformSettings) -> CheckInRules:
         """Read the Admin-set Check-in rules and Kinds, once per tick.
+
+        Args:
+            platform_settings: The platform settings, read once for the tick.
 
         Returns:
             The rules.
         """
-        settings = self._repositories.platform_settings
         return CheckInRules(
-            frequency_gaps=self._frequency_gaps(),
-            quiet_gap=quiet_gap(settings),
-            ignore_threshold=settings.get("check_in_ignore_threshold"),
+            frequency_gaps=platform_settings.get(CHECK_IN_GAPS),
+            quiet_gap=platform_settings.get(CONVERSATION_QUIET_GAP),
+            ignore_threshold=platform_settings.get(CHECK_IN_IGNORE_THRESHOLD),
             kinds=tuple(self.list_kinds()),
         )
 
@@ -994,12 +1015,15 @@ class CheckInService:
             pause_until_resumed=True,
         )
 
-    def _recent(self, user: User, limit: int) -> list[RecentCheckIn]:
+    def _recent(
+        self, user: User, limit: int, platform_settings: PlatformSettings
+    ) -> list[RecentCheckIn]:
         """List a User's newest Check-in decisions with their statuses.
 
         Args:
             user: The User.
             limit: The most to list.
+            platform_settings: Holds the reply window.
 
         Returns:
             Each Check-in and its status, newest first.
@@ -1008,18 +1032,19 @@ class CheckInService:
         statuses = check_in_statuses(
             recent,
             self._clock.now(),
-            check_in_reply_window(self._repositories.platform_settings),
+            platform_settings.get(CHECK_IN_REPLY_WINDOW),
         )
         return [
             RecentCheckIn(check_in=check_in, status=status)
             for check_in, status in zip(recent, statuses, strict=True)
         ]
 
-    def _memory(self, user: User) -> str:
+    def _memory(self, user: User, platform_settings: PlatformSettings) -> str:
         """Write what is remembered about the User, for the Check-in model.
 
         Args:
             user: The User.
+            platform_settings: Holds how many Conversation Summaries to give.
 
         Returns:
             Their Memory Items by active Memory Category and their newest
@@ -1027,7 +1052,6 @@ class CheckInService:
             nothing is remembered.
         """
         user_memory = self._repositories.user_memory
-        settings = self._repositories.platform_settings
         categories = [
             category
             for category in self._repositories.memory_categories.list_all()
@@ -1037,7 +1061,7 @@ class CheckInService:
             categories,
             user_memory.list_items(user.id),
             user_memory.list_summaries(
-                user.id, limit=settings.get("recent_conversation_summaries")
+                user.id, limit=platform_settings.get(RECENT_CONVERSATION_SUMMARIES)
             ),
             user.time_zone,
             MEMORY_INTRO,
@@ -1063,39 +1087,25 @@ class CheckInService:
         Raises:
             InvalidCheckInAnswerError: If the answer can't be used.
         """
-        settings = self._repositories.platform_settings
+        settings = snapshot.settings
         user = snapshot.user
         description = describe_check_in(
             user,
             kinds,
             snapshot.local_now,
             describe_recent_check_ins(
-                self._recent(user, CHECK_INS_TOLD_TO_MODEL), user.time_zone
+                self._recent(user, CHECK_INS_TOLD_TO_MODEL, settings), user.time_zone
             ),
-            self._memory(user),
+            self._memory(user, settings),
             describe_shared_photos(kinds, shared_photos, user.time_zone),
         )
         answer = self._chat_model.generate(
             snapshot=snapshot,
-            model=settings.get("check_in_model"),
-            instructions=f"{settings.get('persona')}\n\n{settings.get('check_in_prompt')}",
+            model=settings.get(CHECK_IN_MODEL),
+            instructions=f"{settings.get(PERSONA)}\n\n{settings.get(CHECK_IN_PROMPT)}",
             history=[ChatLine(role=ChatRole.USER, text=description)],
         )
         return read_check_in_decision(answer, kinds, shared_photos)
-
-    def _frequency_gaps(self) -> dict[CheckInFrequency, timedelta]:
-        """Look up the fewest time between two Check-ins for each frequency.
-
-        Returns:
-            The gap per frequency.
-        """
-        hours_between = self._repositories.platform_settings.get(
-            "check_in_hours_between"
-        )
-        return {
-            frequency: timedelta(hours=hours_between[frequency.value])
-            for frequency in CheckInFrequency
-        }
 
     def _with_next_due_time(
         self, current: CheckInSettings, updated: CheckInSettings
@@ -1115,7 +1125,10 @@ class CheckInService:
         return replace(
             updated,
             next_due_at=next_due_after_change(
-                current, updated, self._frequency_gaps(), self._clock.now()
+                current,
+                updated,
+                self._repositories.platform_settings.load().get(CHECK_IN_GAPS),
+                self._clock.now(),
             ),
         )
 

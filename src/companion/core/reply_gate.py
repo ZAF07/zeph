@@ -91,6 +91,7 @@ class ReplyGate:
             message.user_id,
             message.chat_id,
             message.text,
+            snapshot.settings,
             message.kind,
             message.photos,
             message.sticker,
@@ -112,7 +113,9 @@ class ReplyGate:
             return Stopped(StopReason.DATA_DELETED)
         if not self._usage_limiter.claim_message(snapshot):
             self._conversations.deliver_at_once(
-                conversation_id, message.chat_id, self._usage_limiter.limit_reply()
+                conversation_id,
+                message.chat_id,
+                self._usage_limiter.limit_reply(snapshot.settings),
             )
             return Stopped(StopReason.OVER_LIMIT)
         data_deletion_cancelled = data_deletion_answer == DataDeletionAnswer.CANCELLED

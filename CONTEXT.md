@@ -24,6 +24,10 @@ _Avoid_: Bot, assistant, agent
 The Companion's voice and character — human in style, honest that it is an AI. Managed by Admins. In the MVP there is one Persona and Users never pick a style: the Companion adapts to how each User messages. After the MVP there will be several Personas (e.g. mindfulness, Buddhist philosophy, Japanese philosophy), and Users choose one from those their plan includes.
 _Avoid_: System prompt, personality, character
 
+**Platform Settings**:
+Everything Admins set that shapes how the Companion behaves for all Users: the Persona, each core service's prompt and model, wording such as the Crisis Reply and the Limit Reply, and limits such as the Daily Message Limit or the Conversation quiet gap. A change an Admin saves applies from the next reply or Check-in; one already under way finishes with the Platform Settings it started with.
+_Avoid_: Config, system settings, admin config
+
 **Sticker Library**:
 The Admin-managed set of global stickers the Companion may send to any User. Each has a "when to use" note written by an Admin; a sticker without one is never sent. Admins add stickers on the Dashboard, or in chat: by telling the Companion they want to add stickers (or whole sticker sets) and then sending them, until they send something that isn't a sticker or go quiet for a while; or by replying "add this" (or "add this set") to a sticker. Any other sticker an Admin sends is answered like any User's. Stickers Users send are read through their emoji. Sending stickers is the Stickers Feature: when it doesn't work for a User, the Companion sends them none, but still reads their stickers.
 _Avoid_: Sticker pack, emoji set
@@ -211,7 +215,7 @@ _Avoid_: Close account, deactivate, unsubscribe
 ### Quality
 
 **Eval**:
-A measurement of how the Companion behaves with the real LLM, run on demand (`make eval`) and never in the normal checks, because it costs money and its results vary. There are Safeguard, Persona, Knowledge and Settings Evals; a Settings Eval checks that plain-words requests make exactly the right Chat Setting Change, or none. Each one goes through the real reply path and uses the platform settings Admins have set.
+A measurement of how the Companion behaves with the real LLM, run on demand (`make eval`) and never in the normal checks, because it costs money and its results vary. There are Safeguard, Persona, Knowledge and Settings Evals; a Settings Eval checks that plain-words requests make exactly the right Chat Setting Change, or none. Each one goes through the real reply path and uses the Platform Settings Admins have set.
 _Avoid_: Test, benchmark
 
 **Missed Crisis**:

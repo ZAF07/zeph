@@ -12,6 +12,13 @@ from companion.core.models import (
     UserSnapshot,
 )
 from companion.core.photos import PhotoService
+from companion.core.platform_settings import (
+    DASHBOARD_URL_PLACEHOLDER,
+    PHOTO_ALBUM_WAIT_SECONDS,
+    REPLY_FAILED_MESSAGE,
+    UNKNOWN_TELEGRAM_USER_REPLY,
+    UNSUPPORTED_MESSAGE_REPLY,
+)
 from companion.core.ports import ChatChannel, ConversationEngine, Repositories, Timer
 from companion.core.sticker_adding import StickerAdding
 from companion.core.stickers import sticker_message_text
@@ -139,11 +146,12 @@ class IncomingMessageHandler:
             message.sender_id
         )
         if connection is None:
-            reply = self._repositories.platform_settings.get(
-                "unknown_telegram_user_reply"
+            reply = self._repositories.platform_settings.load().get(
+                UNKNOWN_TELEGRAM_USER_REPLY
             )
             self._chat_channel.send_text(
-                message.chat_id, reply.replace("{dashboard_url}", self._dashboard_url)
+                message.chat_id,
+                reply.replace(DASHBOARD_URL_PLACEHOLDER, self._dashboard_url),
             )
             return
 
@@ -154,13 +162,15 @@ class IncomingMessageHandler:
         self._sticker_adding.finish(connection.user_id)
         if self._sticker_adding.add_if_asked(connection.user_id, message):
             return
-        settings = self._repositories.platform_settings
         if message.album_id is not None:
             self._collect_album_item(connection.user_id, message)
             return
         if message.kind == MessageKind.UNSUPPORTED and not message.text.strip():
             self._chat_channel.send_text(
-                message.chat_id, settings.get("unsupported_message_reply")
+                message.chat_id,
+                self._repositories.platform_settings.load().get(
+                    UNSUPPORTED_MESSAGE_REPLY
+                ),
             )
             return
         self._answer(
@@ -181,7 +191,7 @@ class IncomingMessageHandler:
             self._albums.setdefault(album_key, []).append(message)
         self._timer.start(
             album_key,
-            self._repositories.platform_settings.get("photo_album_wait_seconds"),
+            self._repositories.platform_settings.load().get(PHOTO_ALBUM_WAIT_SECONDS),
             lambda: self._answer_album(user_id, album_key),
         )
 
@@ -216,7 +226,9 @@ class IncomingMessageHandler:
         if not any(message.text.strip() for message in messages):
             self._chat_channel.send_text(
                 chat_id,
-                self._repositories.platform_settings.get("unsupported_message_reply"),
+                self._repositories.platform_settings.load().get(
+                    UNSUPPORTED_MESSAGE_REPLY
+                ),
             )
             return
         self._answer(
@@ -238,8 +250,8 @@ class IncomingMessageHandler:
     ) -> None:
         """Answer a User's message after their earlier ones, with a fallback on failure.
 
-        The User is read once, inside their turn, and that snapshot is used
-        for the whole reply.
+        The platform settings and the User are read once, inside their turn,
+        and that snapshot is used for the whole reply.
 
         Args:
             user_id: The User who sent it.
@@ -248,14 +260,14 @@ class IncomingMessageHandler:
                 User snapshot.
         """
         with self._turn_lock_for(user_id):
+            settings = self._repositories.platform_settings.load()
             try:
-                user = self._user_snapshots.load(user_id)
-                self._conversation_engine.handle(build_message(user), user)
+                snapshot = self._user_snapshots.load(user_id, settings)
+                self._conversation_engine.handle(build_message(snapshot), snapshot)
             except Exception:
                 logger.exception("Could not answer a message from a User")
                 self._chat_channel.send_text(
-                    chat_id,
-                    self._repositories.platform_settings.get("reply_failed_message"),
+                    chat_id, settings.get(REPLY_FAILED_MESSAGE)
                 )
 
     def _message_to_answer(

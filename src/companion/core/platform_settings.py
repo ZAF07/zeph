@@ -1,20 +1,215 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import timedelta
 from enum import StrEnum
 from typing import Any
 
-from companion.core.features import FEATURES_PLACEHOLDER, UNAVAILABLE_NOTE_SETTING
-from companion.core.message_retention import RETENTION_DAYS_SETTING
-from companion.core.models import StoredSetting, User
+from companion.core.models import CheckInFrequency, Setting, StoredSetting, User
 from companion.core.ports import Clock, PlatformSettingsRepository
-from companion.core.safeguard import HELPLINES_PLACEHOLDER
-from companion.core.telegram_connection import DASHBOARD_URL_PLACEHOLDER
-from companion.core.user_memory import (
-    MEMORY_NOT_AVAILABLE_NOTE_SETTING,
-    MEMORY_PAUSED_NOTE_SETTING,
-)
 
-MODEL_CHOICES_KEY = "available_models"
+HELPLINES_PLACEHOLDER = "{helplines}"
+FEATURES_PLACEHOLDER = "{features}"
+DASHBOARD_URL_PLACEHOLDER = "{dashboard_url}"
+
+
+def read_text(value: Any) -> str:
+    """Read a stored text setting.
+
+    Args:
+        value: The stored value.
+
+    Returns:
+        The text.
+
+    Raises:
+        TypeError: If the value is not text.
+    """
+    if not isinstance(value, str):
+        raise TypeError(f"Expected text, got {value!r}.")
+    return value
+
+
+def read_whole_number(value: Any) -> int:
+    """Read a stored whole-number setting.
+
+    Args:
+        value: The stored value.
+
+    Returns:
+        The whole number.
+
+    Raises:
+        TypeError: If the value is not a whole number.
+    """
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise TypeError(f"Expected a whole number, got {value!r}.")
+    return value
+
+
+def read_number(value: Any) -> float:
+    """Read a stored number setting, whole or not.
+
+    Args:
+        value: The stored value.
+
+    Returns:
+        The number.
+
+    Raises:
+        TypeError: If the value is not a number.
+    """
+    if not isinstance(value, int | float) or isinstance(value, bool):
+        raise TypeError(f"Expected a number, got {value!r}.")
+    return float(value)
+
+
+def read_minutes(value: Any) -> timedelta:
+    """Read a stored setting that holds a number of minutes.
+
+    Args:
+        value: The stored value.
+
+    Returns:
+        That many minutes.
+    """
+    return timedelta(minutes=read_whole_number(value))
+
+
+def read_hours(value: Any) -> timedelta:
+    """Read a stored setting that holds a number of hours.
+
+    Args:
+        value: The stored value.
+
+    Returns:
+        That many hours.
+    """
+    return timedelta(hours=read_whole_number(value))
+
+
+def read_text_list(value: Any) -> list[str]:
+    """Read a stored setting that holds a list of texts.
+
+    Args:
+        value: The stored value.
+
+    Returns:
+        The texts.
+
+    Raises:
+        TypeError: If the value is not a list of texts.
+    """
+    if not isinstance(value, list):
+        raise TypeError(f"Expected a list, got {value!r}.")
+    return [read_text(item) for item in value]
+
+
+def read_check_in_gaps(value: Any) -> dict[CheckInFrequency, timedelta]:
+    """Read the fewest hours between two Check-ins, for each frequency.
+
+    Args:
+        value: The stored value: hours by frequency, e.g. {"weekly": 168}.
+
+    Returns:
+        The gap for each frequency.
+
+    Raises:
+        TypeError: If the value is not a mapping of hours.
+        KeyError: If a frequency is missing.
+    """
+    if not isinstance(value, dict):
+        raise TypeError(f"Expected hours by frequency, got {value!r}.")
+    return {
+        frequency: read_hours(value[frequency.value]) for frequency in CheckInFrequency
+    }
+
+
+CONNECTION_TOKEN_TTL = Setting("connection_token_ttl_minutes", read_minutes)
+WELCOME_MESSAGE = Setting("welcome_message", read_text)
+CONNECTION_TOKEN_INVALID_REPLY = Setting("connection_token_invalid_reply", read_text)
+TELEGRAM_CONNECTED_ELSEWHERE_REPLY = Setting(
+    "telegram_connected_elsewhere_reply", read_text
+)
+ONBOARDING_UNFINISHED_REPLY = Setting("onboarding_unfinished_reply", read_text)
+UNKNOWN_TELEGRAM_USER_REPLY = Setting("unknown_telegram_user_reply", read_text)
+REPLY_FAILED_MESSAGE = Setting("reply_failed_message", read_text)
+UNSUPPORTED_MESSAGE_REPLY = Setting("unsupported_message_reply", read_text)
+STICKER_ADDING_SUMMARY_REPLY = Setting("sticker_adding_summary_reply", read_text)
+STICKER_ADDING_QUIET_GAP = Setting("sticker_adding_quiet_gap_minutes", read_minutes)
+AI_NOTICE = Setting("ai_notice", read_text)
+AI_NOTICE_SHORT = Setting("ai_notice_short", read_text)
+USER_MEMORY_EXPLANATION = Setting("user_memory_explanation", read_text)
+PHOTO_VIEWING_EXPLANATION = Setting("photo_viewing_explanation", read_text)
+MEMORY_PAUSED_NOTE = Setting("memory_paused_note", read_text)
+MEMORY_NOT_AVAILABLE_NOTE = Setting("memory_not_available_note", read_text)
+ONBOARDING_REASON_CHOICES = Setting("onboarding_reason_choices", read_text_list)
+CONVERSATION_QUIET_GAP = Setting("conversation_quiet_gap_minutes", read_minutes)
+MESSAGE_RETENTION_DAYS = Setting("message_retention_days", read_whole_number)
+TYPING_SECONDS_PER_CHARACTER = Setting("typing_seconds_per_character", read_number)
+MIN_TYPING_SECONDS = Setting("min_typing_seconds", read_number)
+MAX_TYPING_SECONDS = Setting("max_typing_seconds", read_number)
+AVAILABLE_MODELS = Setting("available_models", read_text_list)
+RESPONSE_MODEL = Setting("response_model", read_text)
+PERSONA = Setting("persona", read_text)
+RESPONSE_PROMPT = Setting("response_prompt", read_text)
+PHOTO_MODEL = Setting("photo_model", read_text)
+PHOTO_DESCRIPTION_PROMPT = Setting("photo_description_prompt", read_text)
+ASK_ABOUT_PHOTO_TOOL_DESCRIPTION = Setting(
+    "ask_about_photo_tool_description", read_text
+)
+SEND_PHOTO_TOOL_DESCRIPTION = Setting("send_photo_tool_description", read_text)
+PHOTO_NOT_VIEWED_NOTE = Setting("photo_not_viewed_note", read_text)
+PHOTO_VIEWING_OFF_NOTE = Setting("photo_viewing_off_note", read_text)
+PHOTO_RETRY_COUNT = Setting("photo_retry_count", read_whole_number)
+PHOTO_ALBUM_WAIT_SECONDS = Setting("photo_album_wait_seconds", read_whole_number)
+PHOTO_ALBUM_MAX_PHOTOS = Setting("photo_album_max_photos", read_whole_number)
+SAFEGUARD_MODEL = Setting("safeguard_model", read_text)
+SAFEGUARD_PROMPT = Setting("safeguard_prompt", read_text)
+CRISIS_REPLY = Setting("crisis_reply", read_text)
+MEMORY_PROCESSING_MODEL = Setting("memory_processing_model", read_text)
+MEMORY_PROCESSING_PROMPT = Setting("memory_processing_prompt", read_text)
+MEMORY_RETRIEVAL_MODEL = Setting("memory_retrieval_model", read_text)
+MEMORY_RETRIEVAL_PROMPT = Setting("memory_retrieval_prompt", read_text)
+SHARED_PHOTOS_MEMORY_DESCRIPTION = Setting(
+    "shared_photos_memory_description", read_text
+)
+REPLY_MEMORY_INTRO = Setting("reply_memory_intro", read_text)
+RECENT_CONVERSATION_SUMMARIES = Setting(
+    "recent_conversation_summaries", read_whole_number
+)
+KNOWLEDGE_CHUNKS_PER_REPLY = Setting("knowledge_chunks_per_reply", read_whole_number)
+REPLY_KNOWLEDGE_INTRO = Setting("reply_knowledge_intro", read_text)
+DAILY_MESSAGE_LIMIT = Setting("daily_message_limit", read_whole_number)
+DAILY_LIMIT_REPLY = Setting("daily_limit_reply", read_text)
+WEB_SEARCH_DAILY_LIMIT = Setting("web_search_daily_limit", read_whole_number)
+WEB_SEARCH_TOOL_DESCRIPTION = Setting("web_search_tool_description", read_text)
+PAGE_FETCH_TOOL_DESCRIPTION = Setting("page_fetch_tool_description", read_text)
+WEB_RESULT_SOURCE_REMINDER = Setting("web_result_source_reminder", read_text)
+REPLY_WEB_SEARCH_INSTRUCTIONS = Setting("reply_web_search_instructions", read_text)
+REPLY_WEB_SEARCH_LIMIT_NOTE = Setting("reply_web_search_limit_note", read_text)
+REPLY_SETTINGS_INSTRUCTIONS = Setting("reply_settings_instructions", read_text)
+REPLY_DELETE_DATA_INSTRUCTIONS = Setting("reply_delete_data_instructions", read_text)
+REPLY_FEATURES_UNAVAILABLE_NOTE = Setting("reply_features_unavailable_note", read_text)
+DATA_DELETION_CONFIRMATION_WORD = Setting("data_deletion_confirmation_word", read_text)
+DATA_DELETED_REPLY = Setting("data_deleted_reply", read_text)
+REPLY_DATA_DELETION_CANCELLED_NOTE = Setting(
+    "reply_data_deletion_cancelled_note", read_text
+)
+ONBOARDING_NAME_MEMORY_CATEGORY = Setting("onboarding_name_memory_category", read_text)
+ONBOARDING_REASONS_MEMORY_CATEGORY = Setting(
+    "onboarding_reasons_memory_category", read_text
+)
+HOME_GOALS_MEMORY_CATEGORY = Setting("home_goals_memory_category", read_text)
+STICKER_TOOL_DESCRIPTION = Setting("sticker_tool_description", read_text)
+PERSONAL_STICKER_KEEPING_MODEL = Setting("personal_sticker_keeping_model", read_text)
+PERSONAL_STICKER_KEEPING_PROMPT = Setting("personal_sticker_keeping_prompt", read_text)
+PERSONAL_STICKERS_LIMIT = Setting("personal_stickers_limit", read_whole_number)
+CHECK_IN_MODEL = Setting("check_in_model", read_text)
+CHECK_IN_PROMPT = Setting("check_in_prompt", read_text)
+CHECK_IN_IGNORE_THRESHOLD = Setting("check_in_ignore_threshold", read_whole_number)
+CHECK_IN_FEWER_MESSAGE = Setting("check_in_fewer_message", read_text)
+CHECK_IN_GAPS = Setting("check_in_hours_between", read_check_in_gaps)
+CHECK_IN_REPLY_WINDOW = Setting("check_in_reply_window_hours", read_hours)
 
 
 class SettingKind(StrEnum):
@@ -103,11 +298,11 @@ class CoreService:
 
 
 EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
-    EditableSetting("persona", "Persona", SettingKind.TEXT),
-    EditableSetting("safeguard_prompt", "Safeguard prompt", SettingKind.TEXT),
-    EditableSetting("safeguard_model", "Safeguard model", SettingKind.MODEL),
+    EditableSetting(PERSONA.key, "Persona", SettingKind.TEXT),
+    EditableSetting(SAFEGUARD_PROMPT.key, "Safeguard prompt", SettingKind.TEXT),
+    EditableSetting(SAFEGUARD_MODEL.key, "Safeguard model", SettingKind.MODEL),
     EditableSetting(
-        "crisis_reply",
+        CRISIS_REPLY.key,
         "Crisis Reply",
         SettingKind.TEXT,
         max_length=4_000,
@@ -115,35 +310,39 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
             RequiredPlaceholder(HELPLINES_PLACEHOLDER, "where the Helplines go"),
         ),
     ),
-    EditableSetting("response_prompt", "Response composition prompt", SettingKind.TEXT),
-    EditableSetting("response_model", "Response composition model", SettingKind.MODEL),
     EditableSetting(
-        "sticker_tool_description",
+        RESPONSE_PROMPT.key, "Response composition prompt", SettingKind.TEXT
+    ),
+    EditableSetting(
+        RESPONSE_MODEL.key, "Response composition model", SettingKind.MODEL
+    ),
+    EditableSetting(
+        STICKER_TOOL_DESCRIPTION.key,
         "send_sticker tool description",
         SettingKind.TEXT,
         max_length=4_000,
     ),
     EditableSetting(
-        "web_search_tool_description",
+        WEB_SEARCH_TOOL_DESCRIPTION.key,
         "web_search tool description",
         SettingKind.TEXT,
         max_length=4_000,
     ),
     EditableSetting(
-        "page_fetch_tool_description",
+        PAGE_FETCH_TOOL_DESCRIPTION.key,
         "fetch_page tool description",
         SettingKind.TEXT,
         max_length=4_000,
     ),
     EditableSetting(
-        "reply_web_search_instructions",
+        REPLY_WEB_SEARCH_INSTRUCTIONS.key,
         "Web search instructions",
         SettingKind.TEXT,
         max_length=4_000,
         hint="Added to the reply instructions when web search is offered.",
     ),
     EditableSetting(
-        "reply_web_search_limit_note",
+        REPLY_WEB_SEARCH_LIMIT_NOTE.key,
         "Web Search Limit reached note",
         SettingKind.TEXT,
         max_length=2_000,
@@ -153,14 +352,14 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         ),
     ),
     EditableSetting(
-        "web_result_source_reminder",
+        WEB_RESULT_SOURCE_REMINDER.key,
         "Web source reminder",
         SettingKind.TEXT,
         max_length=2_000,
         hint="Put at the end of every web search result and page the reply reads.",
     ),
     EditableSetting(
-        "reply_settings_instructions",
+        REPLY_SETTINGS_INSTRUCTIONS.key,
         "Settings in Chat instructions",
         SettingKind.TEXT,
         max_length=4_000,
@@ -170,7 +369,7 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         ),
     ),
     EditableSetting(
-        "reply_delete_data_instructions",
+        REPLY_DELETE_DATA_INSTRUCTIONS.key,
         "Delete data instructions",
         SettingKind.TEXT,
         max_length=4_000,
@@ -180,7 +379,7 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         ),
     ),
     EditableSetting(
-        "reply_data_deletion_cancelled_note",
+        REPLY_DATA_DELETION_CANCELLED_NOTE.key,
         "Data deletion cancelled note",
         SettingKind.TEXT,
         max_length=2_000,
@@ -190,21 +389,21 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         ),
     ),
     EditableSetting(
-        "reply_memory_intro",
+        REPLY_MEMORY_INTRO.key,
         "Memory intro",
         SettingKind.TEXT,
         max_length=2_000,
         hint="Put before the User Memory given to each reply.",
     ),
     EditableSetting(
-        "reply_knowledge_intro",
+        REPLY_KNOWLEDGE_INTRO.key,
         "Knowledge intro",
         SettingKind.TEXT,
         max_length=2_000,
         hint="Put before the Knowledge passages given to each reply.",
     ),
     EditableSetting(
-        UNAVAILABLE_NOTE_SETTING,
+        REPLY_FEATURES_UNAVAILABLE_NOTE.key,
         "Features unavailable note",
         SettingKind.TEXT,
         max_length=2_000,
@@ -221,137 +420,137 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         ),
     ),
     EditableSetting(
-        "memory_processing_prompt",
+        MEMORY_PROCESSING_PROMPT.key,
         "Post-conversation processing prompt",
         SettingKind.TEXT,
     ),
     EditableSetting(
-        "memory_processing_model",
+        MEMORY_PROCESSING_MODEL.key,
         "Post-conversation processing model",
         SettingKind.MODEL,
     ),
     EditableSetting(
-        "memory_retrieval_prompt", "Memory retrieval prompt", SettingKind.TEXT
+        MEMORY_RETRIEVAL_PROMPT.key, "Memory retrieval prompt", SettingKind.TEXT
     ),
     EditableSetting(
-        "memory_retrieval_model", "Memory retrieval model", SettingKind.MODEL
+        MEMORY_RETRIEVAL_MODEL.key, "Memory retrieval model", SettingKind.MODEL
     ),
     EditableSetting(
-        "shared_photos_memory_description",
+        SHARED_PHOTOS_MEMORY_DESCRIPTION.key,
         "Shared Photos description for memory retrieval",
         SettingKind.TEXT,
         max_length=2_000,
     ),
     EditableSetting(
-        "photo_description_prompt", "Photo description prompt", SettingKind.TEXT
+        PHOTO_DESCRIPTION_PROMPT.key, "Photo description prompt", SettingKind.TEXT
     ),
-    EditableSetting("photo_model", "Photo viewing model", SettingKind.MODEL),
+    EditableSetting(PHOTO_MODEL.key, "Photo viewing model", SettingKind.MODEL),
     EditableSetting(
-        "ask_about_photo_tool_description",
+        ASK_ABOUT_PHOTO_TOOL_DESCRIPTION.key,
         "ask_about_photo tool description",
         SettingKind.TEXT,
         max_length=4_000,
     ),
     EditableSetting(
-        "send_photo_tool_description",
+        SEND_PHOTO_TOOL_DESCRIPTION.key,
         "send_photo tool description",
         SettingKind.TEXT,
         max_length=4_000,
     ),
     EditableSetting(
-        "photo_not_viewed_note",
+        PHOTO_NOT_VIEWED_NOTE.key,
         "“Didn’t come through” note",
         SettingKind.TEXT,
         max_length=2_000,
     ),
     EditableSetting(
-        "photo_viewing_off_note",
+        PHOTO_VIEWING_OFF_NOTE.key,
         "“Photo Viewing off” note",
         SettingKind.TEXT,
         max_length=2_000,
     ),
     EditableSetting(
-        "photo_retry_count",
+        PHOTO_RETRY_COUNT.key,
         "Photo retries",
         SettingKind.WHOLE_NUMBER,
         minimum=0,
         maximum=5,
     ),
     EditableSetting(
-        "photo_album_wait_seconds",
+        PHOTO_ALBUM_WAIT_SECONDS.key,
         "Album wait",
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=30,
     ),
     EditableSetting(
-        "photo_album_max_photos",
+        PHOTO_ALBUM_MAX_PHOTOS.key,
         "Most photos per album",
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=10,
     ),
     EditableSetting(
-        "personal_sticker_keeping_prompt",
+        PERSONAL_STICKER_KEEPING_PROMPT.key,
         "Personal Sticker keeping prompt",
         SettingKind.TEXT,
     ),
     EditableSetting(
-        "personal_sticker_keeping_model",
+        PERSONAL_STICKER_KEEPING_MODEL.key,
         "Personal Sticker keeping model",
         SettingKind.MODEL,
     ),
     EditableSetting(
-        "personal_stickers_limit",
+        PERSONAL_STICKERS_LIMIT.key,
         "Most Personal Stickers per User",
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=200,
     ),
     EditableSetting(
-        "sticker_adding_quiet_gap_minutes",
+        STICKER_ADDING_QUIET_GAP.key,
         "Sticker adding quiet gap",
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=60,
     ),
-    EditableSetting("check_in_prompt", "Check-in prompt", SettingKind.TEXT),
-    EditableSetting("check_in_model", "Check-in model", SettingKind.MODEL),
+    EditableSetting(CHECK_IN_PROMPT.key, "Check-in prompt", SettingKind.TEXT),
+    EditableSetting(CHECK_IN_MODEL.key, "Check-in model", SettingKind.MODEL),
     EditableSetting(
-        "check_in_ignore_threshold",
+        CHECK_IN_IGNORE_THRESHOLD.key,
         "Ignore threshold",
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=10,
     ),
     EditableSetting(
-        "check_in_fewer_message",
+        CHECK_IN_FEWER_MESSAGE.key,
         "“Would you like fewer?” message",
         SettingKind.TEXT,
         max_length=1_000,
     ),
     EditableSetting(
-        "conversation_quiet_gap_minutes",
+        CONVERSATION_QUIET_GAP.key,
         "Conversation quiet gap",
         SettingKind.WHOLE_NUMBER,
         minimum=5,
         maximum=1440,
     ),
     EditableSetting(
-        "daily_message_limit",
+        DAILY_MESSAGE_LIMIT.key,
         "Daily message limit",
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=10_000,
     ),
     EditableSetting(
-        "daily_limit_reply",
+        DAILY_LIMIT_REPLY.key,
         "Limit-reached reply",
         SettingKind.TEXT,
         max_length=1_000,
     ),
     EditableSetting(
-        "onboarding_unfinished_reply",
+        ONBOARDING_UNFINISHED_REPLY.key,
         "“Finish onboarding first” reply",
         SettingKind.TEXT,
         max_length=1_000,
@@ -360,43 +559,43 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         ),
     ),
     EditableSetting(
-        RETENTION_DAYS_SETTING,
+        MESSAGE_RETENTION_DAYS.key,
         "Message retention",
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=365,
     ),
     EditableSetting(
-        "web_search_daily_limit",
+        WEB_SEARCH_DAILY_LIMIT.key,
         "Per-user daily web search limit",
         SettingKind.WHOLE_NUMBER,
         minimum=0,
         maximum=1000,
     ),
-    EditableSetting("ai_notice", "AI notice", SettingKind.TEXT, max_length=2_000),
+    EditableSetting(AI_NOTICE.key, "AI notice", SettingKind.TEXT, max_length=2_000),
     EditableSetting(
-        "ai_notice_short", "Short AI notice", SettingKind.TEXT, max_length=200
+        AI_NOTICE_SHORT.key, "Short AI notice", SettingKind.TEXT, max_length=200
     ),
     EditableSetting(
-        "user_memory_explanation",
+        USER_MEMORY_EXPLANATION.key,
         "Memory explanation",
         SettingKind.TEXT,
         max_length=4_000,
     ),
     EditableSetting(
-        "photo_viewing_explanation",
+        PHOTO_VIEWING_EXPLANATION.key,
         "Photo Viewing explanation",
         SettingKind.TEXT,
         max_length=4_000,
     ),
     EditableSetting(
-        MEMORY_PAUSED_NOTE_SETTING,
+        MEMORY_PAUSED_NOTE.key,
         "“Memory is paused” note",
         SettingKind.TEXT,
         max_length=1_000,
     ),
     EditableSetting(
-        MEMORY_NOT_AVAILABLE_NOTE_SETTING,
+        MEMORY_NOT_AVAILABLE_NOTE.key,
         "“Memory isn’t available” note",
         SettingKind.TEXT,
         max_length=1_000,
@@ -411,8 +610,8 @@ CORE_SERVICES: tuple[CoreService, ...] = (
             "Checks each message for crisis. On a crisis Zeph sends the Crisis "
             "Reply with Helplines instead of a normal reply."
         ),
-        prompt_key="safeguard_prompt",
-        model_key="safeguard_model",
+        prompt_key=SAFEGUARD_PROMPT.key,
+        model_key=SAFEGUARD_MODEL.key,
     ),
     CoreService(
         name="Response composition",
@@ -421,32 +620,33 @@ CORE_SERVICES: tuple[CoreService, ...] = (
             "Writes Zeph’s reply from the Persona, the relevant memories, recent "
             "Conversation Summaries, Knowledge and the Conversation so far."
         ),
-        prompt_key="response_prompt",
-        model_key="response_model",
+        prompt_key=RESPONSE_PROMPT.key,
+        model_key=RESPONSE_MODEL.key,
         extra_prompt_groups=(
             ExtraPromptGroup(
                 "Web search",
                 (
-                    "web_search_tool_description",
-                    "page_fetch_tool_description",
-                    "reply_web_search_instructions",
-                    "reply_web_search_limit_note",
-                    "web_result_source_reminder",
+                    WEB_SEARCH_TOOL_DESCRIPTION.key,
+                    PAGE_FETCH_TOOL_DESCRIPTION.key,
+                    REPLY_WEB_SEARCH_INSTRUCTIONS.key,
+                    REPLY_WEB_SEARCH_LIMIT_NOTE.key,
+                    WEB_RESULT_SOURCE_REMINDER.key,
                 ),
             ),
             ExtraPromptGroup(
                 "Settings in chat",
                 (
-                    "reply_settings_instructions",
-                    "reply_delete_data_instructions",
-                    "reply_data_deletion_cancelled_note",
+                    REPLY_SETTINGS_INSTRUCTIONS.key,
+                    REPLY_DELETE_DATA_INSTRUCTIONS.key,
+                    REPLY_DATA_DELETION_CANCELLED_NOTE.key,
                 ),
             ),
             ExtraPromptGroup(
-                "Memory and Knowledge", ("reply_memory_intro", "reply_knowledge_intro")
+                "Memory and Knowledge",
+                (REPLY_MEMORY_INTRO.key, REPLY_KNOWLEDGE_INTRO.key),
             ),
-            ExtraPromptGroup("Features", (UNAVAILABLE_NOTE_SETTING,)),
-            ExtraPromptGroup("Stickers", ("sticker_tool_description",)),
+            ExtraPromptGroup("Features", (REPLY_FEATURES_UNAVAILABLE_NOTE.key,)),
+            ExtraPromptGroup("Stickers", (STICKER_TOOL_DESCRIPTION.key,)),
         ),
     ),
     CoreService(
@@ -456,8 +656,8 @@ CORE_SERVICES: tuple[CoreService, ...] = (
             "After a Conversation goes quiet, writes the Conversation Summary "
             "and mood, and adds, updates or removes Memory Items by category."
         ),
-        prompt_key="memory_processing_prompt",
-        model_key="memory_processing_model",
+        prompt_key=MEMORY_PROCESSING_PROMPT.key,
+        model_key=MEMORY_PROCESSING_MODEL.key,
     ),
     CoreService(
         name="Memory retrieval",
@@ -466,9 +666,9 @@ CORE_SERVICES: tuple[CoreService, ...] = (
             "Picks the Memory Categories that matter for the message, so the "
             "reply gets only relevant memories plus the always-included ones."
         ),
-        prompt_key="memory_retrieval_prompt",
-        model_key="memory_retrieval_model",
-        extra_prompt_keys=("shared_photos_memory_description",),
+        prompt_key=MEMORY_RETRIEVAL_PROMPT.key,
+        model_key=MEMORY_RETRIEVAL_MODEL.key,
+        extra_prompt_keys=(SHARED_PHOTOS_MEMORY_DESCRIPTION.key,),
     ),
     CoreService(
         name="Photo viewing",
@@ -479,11 +679,11 @@ CORE_SERVICES: tuple[CoreService, ...] = (
             "description; the photo itself is never kept. The reply can look "
             "again with a question when the description can’t answer."
         ),
-        prompt_key="photo_description_prompt",
-        model_key="photo_model",
+        prompt_key=PHOTO_DESCRIPTION_PROMPT.key,
+        model_key=PHOTO_MODEL.key,
         extra_prompt_keys=(
-            "ask_about_photo_tool_description",
-            "send_photo_tool_description",
+            ASK_ABOUT_PHOTO_TOOL_DESCRIPTION.key,
+            SEND_PHOTO_TOOL_DESCRIPTION.key,
         ),
     ),
     CoreService(
@@ -494,8 +694,8 @@ CORE_SERVICES: tuple[CoreService, ...] = (
             "a “when to use” note about the moment, so Zeph can reply in their "
             "own stickers. Runs only while Personal Stickers works for them."
         ),
-        prompt_key="personal_sticker_keeping_prompt",
-        model_key="personal_sticker_keeping_model",
+        prompt_key=PERSONAL_STICKER_KEEPING_PROMPT.key,
+        model_key=PERSONAL_STICKER_KEEPING_MODEL.key,
     ),
     CoreService(
         name="Check-ins",
@@ -505,8 +705,8 @@ CORE_SERVICES: tuple[CoreService, ...] = (
             "Check-in Kind to use and what to say, or to skip and give space, "
             "from their recent Conversation Summaries and Memory Items."
         ),
-        prompt_key="check_in_prompt",
-        model_key="check_in_model",
+        prompt_key=CHECK_IN_PROMPT.key,
+        model_key=CHECK_IN_MODEL.key,
     ),
 )
 
@@ -552,8 +752,7 @@ class PlatformSettingsService:
         Returns:
             The model names.
         """
-        choices: list[str] = self._settings.get(MODEL_CHOICES_KEY)
-        return choices
+        return self._settings.load().get(AVAILABLE_MODELS)
 
     def update(self, admin: User, values: Mapping[str, Any]) -> list[StoredSetting]:
         """Check and save setting changes, all together or not at all.

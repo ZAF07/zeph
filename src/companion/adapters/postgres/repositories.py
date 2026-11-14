@@ -82,6 +82,7 @@ from companion.core.models import (
     MessageKind,
     NextDueTimeChange,
     PersonalSticker,
+    PlatformSettings,
     RiskType,
     SafeguardEvent,
     SafeguardEventOverview,
@@ -1172,25 +1173,17 @@ class PostgresPlatformSettingsRepository:
         """
         self._engine = engine
 
-    def get(self, key: str) -> Any:
-        """Read one setting.
-
-        Args:
-            key: The setting's key.
+    def load(self) -> PlatformSettings:
+        """Read every setting in one query.
 
         Returns:
-            The setting's value.
-
-        Raises:
-            KeyError: If the setting does not exist.
+            The settings as they are now.
         """
         with self._engine.connect() as connection:
-            row = connection.execute(
-                select(platform_settings.c.value).where(platform_settings.c.key == key)
-            ).first()
-        if row is None:
-            raise KeyError(key)
-        return row.value
+            rows = connection.execute(
+                select(platform_settings.c.key, platform_settings.c.value)
+            ).all()
+        return PlatformSettings({row.key: row.value for row in rows})
 
     def get_many(self, keys: Sequence[str]) -> list[StoredSetting]:
         """Read several settings with when and by whom they were last saved.
