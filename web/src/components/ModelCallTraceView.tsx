@@ -8,13 +8,15 @@ import { LoadFailed } from "@/components/LoadFailed";
 import { ModelCallCard } from "@/components/ModelCallCard";
 import { ApiError } from "@/lib/api-client";
 import { formatSavedAt } from "@/lib/dates";
-import { formatDuration, traceKindLabel } from "@/lib/model-calls";
+import {
+  formatDuration,
+  formatTokens,
+  traceKindLabel,
+} from "@/lib/model-calls";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 const logPath = "/admin/model-calls";
-
-const numberFormat = new Intl.NumberFormat("en");
 
 /**
  * One Model Call Log trace: what it was for, who and when, its totals, then
@@ -86,7 +88,7 @@ export function ModelCallTraceView({ traceId }: { traceId: string }) {
   const totals = [
     {
       label: "Tokens",
-      value: `${numberFormat.format(trace.tokens_in)} in / ${numberFormat.format(trace.tokens_out)} out`,
+      value: formatTokens(trace.tokens_in, trace.tokens_out),
     },
     { label: "Time taken", value: formatDuration(trace.duration_ms) },
     { label: "Model calls", value: String(trace.calls.length) },

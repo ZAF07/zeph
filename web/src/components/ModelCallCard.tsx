@@ -3,9 +3,11 @@ import { useId } from "react";
 import { LockIcon } from "@/components/LockIcon";
 import { ModelCallContentDetails } from "@/components/ModelCallContentDetails";
 import type { ModelCall } from "@/lib/api-client";
-import { formatDuration, modelStepLabel } from "@/lib/model-calls";
-
-const numberFormat = new Intl.NumberFormat("en");
+import {
+  formatDuration,
+  formatTokens,
+  modelStepLabel,
+} from "@/lib/model-calls";
 
 /**
  * One model call in a trace: its step, model, tokens, time taken, the tools
@@ -20,7 +22,7 @@ export function ModelCallCard({ call }: { call: ModelCall }) {
     { label: "Model", value: call.model },
     {
       label: "Tokens",
-      value: `${numberFormat.format(call.tokens_in)} in / ${numberFormat.format(call.tokens_out)} out`,
+      value: formatTokens(call.tokens_in, call.tokens_out),
     },
     { label: "Time taken", value: formatDuration(call.duration_ms) },
     {

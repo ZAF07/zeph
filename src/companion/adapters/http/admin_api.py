@@ -52,6 +52,7 @@ from companion.core.models import (
     LibrarySticker,
     MemoryCategory,
     MemoryCategoryDetails,
+    ModelCall,
     ModelCallContent,
     ModelCallTraceDetails,
     ModelCallTraceOverview,
@@ -799,6 +800,31 @@ def to_model_call_content_response(
     )
 
 
+def to_model_call_response(call: ModelCall) -> ModelCallResponse:
+    """Describe one model call in a trace for the admin area.
+
+    Args:
+        call: The model call.
+
+    Returns:
+        The response body; `content` is null unless it was kept.
+    """
+    return ModelCallResponse(
+        id=str(call.id),
+        step=call.step,
+        model=call.model,
+        started_at=call.started_at,
+        duration_ms=call.duration_ms,
+        tokens_in=call.tokens_in,
+        tokens_out=call.tokens_out,
+        error=call.error,
+        tools_called=list(call.tools_called),
+        content=(
+            to_model_call_content_response(call.content) if call.content else None
+        ),
+    )
+
+
 def to_model_call_trace_details_response(
     details: ModelCallTraceDetails,
 ) -> ModelCallTraceDetailsResponse:
@@ -812,25 +838,7 @@ def to_model_call_trace_details_response(
     """
     return ModelCallTraceDetailsResponse(
         **to_model_call_trace_response(details.overview).model_dump(),
-        calls=[
-            ModelCallResponse(
-                id=str(call.id),
-                step=call.step,
-                model=call.model,
-                started_at=call.started_at,
-                duration_ms=call.duration_ms,
-                tokens_in=call.tokens_in,
-                tokens_out=call.tokens_out,
-                error=call.error,
-                tools_called=list(call.tools_called),
-                content=(
-                    to_model_call_content_response(call.content)
-                    if call.content
-                    else None
-                ),
-            )
-            for call in details.calls
-        ],
+        calls=[to_model_call_response(call) for call in details.calls],
     )
 
 

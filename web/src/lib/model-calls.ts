@@ -37,6 +37,19 @@ export function traceKindLabel(kind: TraceKind): string {
   return traceKindLabels[kind];
 }
 
+const numberFormat = new Intl.NumberFormat("en");
+
+/**
+ * Writes the tokens a model call or trace took.
+ *
+ * @param tokensIn - Tokens the model read.
+ * @param tokensOut - Tokens the model wrote.
+ * @returns E.g. "1,200 in / 80 out".
+ */
+export function formatTokens(tokensIn: number, tokensOut: number): string {
+  return `${numberFormat.format(tokensIn)} in / ${numberFormat.format(tokensOut)} out`;
+}
+
 /**
  * Writes how long something took, like "850 ms" or "2.4 s".
  *

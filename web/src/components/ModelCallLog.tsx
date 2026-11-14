@@ -12,6 +12,7 @@ import { formatSavedAt } from "@/lib/dates";
 import {
   describeSteps,
   formatDuration,
+  formatTokens,
   modelSteps,
   traceKindLabel,
 } from "@/lib/model-calls";
@@ -36,8 +37,6 @@ const headings = [
 ];
 
 const cell = "px-[18px] py-3.5";
-
-const numberFormat = new Intl.NumberFormat("en");
 
 /**
  * The admin Model Call Log: one trace per Message, Check-in or Conversation
@@ -208,7 +207,7 @@ export function ModelCallLog() {
                   </td>
                   <td className={cell}>{describeSteps(trace.steps)}</td>
                   <td className={`${cell} whitespace-nowrap`}>
-                    {`${numberFormat.format(trace.tokens_in)} in / ${numberFormat.format(trace.tokens_out)} out`}
+                    {formatTokens(trace.tokens_in, trace.tokens_out)}
                   </td>
                   <td className={`${cell} whitespace-nowrap`}>
                     {formatDuration(trace.duration_ms)}

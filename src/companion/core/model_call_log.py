@@ -1,7 +1,7 @@
 import json
 import logging
 from collections.abc import Sequence
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 
@@ -25,6 +25,25 @@ from companion.core.ports import ChatTool, Clock, Repositories
 logger = logging.getLogger(__name__)
 
 TRACES_LISTED_AT_MOST = 200
+
+
+@dataclass(frozen=True)
+class ModelCallRequest:
+    """What a model call asks: the step it is for and what the model is given.
+
+    Attributes:
+        step: Which step it is for.
+        model: The model asked, e.g. "deepseek-chat".
+        instructions: What the model is told to be and do.
+        history: The lines it is given, oldest first.
+        tools: The tools it is offered.
+    """
+
+    step: ModelStep
+    model: str
+    instructions: str
+    history: tuple[ChatLine, ...]
+    tools: Sequence[ChatTool]
 
 
 def start_trace(kind: TraceKind) -> ModelCallTrace:
@@ -79,14 +98,9 @@ class ModelCallLog:
     def record(
         self,
         snapshot: UserSnapshot,
-        step: ModelStep,
-        model: str,
-        instructions: str,
-        history: Sequence[ChatLine],
-        tools: Sequence[ChatTool],
+        request: ModelCallRequest,
         started_at: datetime,
-        answer: ModelAnswer | None,
-        error: Exception | None,
+        outcome: ModelAnswer | Exception,
     ) -> None:
         """Record one model call that has just ended.
 
@@ -94,24 +108,20 @@ class ModelCallLog:
 
         Args:
             snapshot: The User the call was for, with the trace it belongs to.
-            step: Which step it was for.
-            model: The model asked.
-            instructions: What the model was told to be and do.
-            history: The lines it was given, oldest first.
-            tools: The tools it was offered.
-            started_at: When it started.
-            answer: Its answer; None if it failed.
-            error: What it failed with; None if it worked.
+            request: What the model was asked.
+            started_at: When the call started.
+            outcome: The model's answer, or what the call failed with.
         """
-        duration = self._clock.now() - started_at
+        answer = outcome if isinstance(outcome, ModelAnswer) else None
+        tool_calls = answer.tool_calls if answer else ()
         content = ModelCallContent(
-            instructions=instructions,
-            history=tuple(history),
+            instructions=request.instructions,
+            history=request.history,
             tools_offered=tuple(
                 OfferedTool(tool.name, tool.description, tool.parameters)
-                for tool in tools
+                for tool in request.tools
             ),
-            tool_calls=answer.tool_calls if answer else (),
+            tool_calls=tool_calls,
             response=answer.text if answer else "",
             reasoning=answer.reasoning if answer else None,
         )
@@ -119,22 +129,20 @@ class ModelCallLog:
             id=uuid4(),
             trace=snapshot.trace,
             user_id=snapshot.user.id,
-            step=step,
-            model=model,
+            step=request.step,
+            model=request.model,
             started_at=started_at,
-            duration_ms=duration // timedelta(milliseconds=1),
+            duration_ms=(self._clock.now() - started_at) // timedelta(milliseconds=1),
             tokens_in=answer.tokens_in if answer else 0,
             tokens_out=answer.tokens_out if answer else 0,
-            error=type(error).__name__ if error else None,
-            tools_called=tuple(
-                tool_call.name for tool_call in (answer.tool_calls if answer else ())
-            ),
+            error=None if answer else type(outcome).__name__,
+            tools_called=tuple(tool_call.name for tool_call in tool_calls),
             content=content if self._keeps_content(snapshot) else None,
         )
         if self._developer_logs:
             logger.info(
                 "Model call %s for trace %s: %s",
-                step.value,
+                request.step.value,
                 snapshot.trace.id,
                 json.dumps(asdict(content), default=str, ensure_ascii=False),
             )

@@ -1,13 +1,14 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from uuid import UUID
 
-from companion.core.model_call_log import ModelCallLog
+from companion.core.model_call_log import ModelCallLog, ModelCallRequest
 from companion.core.models import (
     ChatLine,
     ChatRole,
     DailyUsage,
+    ModelAnswer,
     ModelStep,
     PhotoImage,
     PlatformSettings,
@@ -203,37 +204,14 @@ class UsageRecordingChatModel:
         Raises:
             Exception: Whatever the chat model raises, once it is recorded.
         """
-        started_at = self._clock.now()
-        try:
-            answer = self._chat_model.generate(
-                model=model, instructions=instructions, history=history, tools=tools
-            )
-        except Exception as error:
-            self._model_call_log.record(
-                snapshot,
-                step,
-                model,
-                instructions,
-                history,
-                tools,
-                started_at,
-                None,
-                error,
-            )
-            raise
-        self._usage_limiter.record_tokens(snapshot, answer.tokens_in, answer.tokens_out)
-        self._model_call_log.record(
+        request = ModelCallRequest(step, model, instructions, tuple(history), tools)
+        return self._ask_and_record(
             snapshot,
-            step,
-            model,
-            instructions,
-            history,
-            tools,
-            started_at,
-            answer,
-            None,
+            request,
+            lambda: self._chat_model.generate(
+                model=model, instructions=instructions, history=history, tools=tools
+            ),
         )
-        return answer.text
 
     def look(
         self, snapshot: UserSnapshot, model: str, instructions: str, photo: PhotoImage
@@ -255,35 +233,46 @@ class UsageRecordingChatModel:
         Raises:
             Exception: Whatever the photo viewer raises, once it is recorded.
         """
-        history = [ChatLine(role=ChatRole.USER, text="[photo]")]
+        request = ModelCallRequest(
+            step=ModelStep.PHOTO,
+            model=model,
+            instructions=instructions,
+            history=(ChatLine(role=ChatRole.USER, text="[photo]"),),
+            tools=(),
+        )
+        return self._ask_and_record(
+            snapshot,
+            request,
+            lambda: self._photo_viewer.look(
+                model=model, instructions=instructions, photo=photo
+            ),
+        )
+
+    def _ask_and_record(
+        self,
+        snapshot: UserSnapshot,
+        request: ModelCallRequest,
+        ask: Callable[[], ModelAnswer],
+    ) -> str:
+        """Ask the model, then record the call, failed or not, and its tokens.
+
+        Args:
+            snapshot: The User the call is for.
+            request: What the model is asked.
+            ask: Makes the call.
+
+        Returns:
+            The answer text.
+
+        Raises:
+            Exception: Whatever the call raises, once it is recorded.
+        """
         started_at = self._clock.now()
         try:
-            answer = self._photo_viewer.look(
-                model=model, instructions=instructions, photo=photo
-            )
+            answer = ask()
         except Exception as error:
-            self._model_call_log.record(
-                snapshot,
-                ModelStep.PHOTO,
-                model,
-                instructions,
-                history,
-                (),
-                started_at,
-                None,
-                error,
-            )
+            self._model_call_log.record(snapshot, request, started_at, error)
             raise
         self._usage_limiter.record_tokens(snapshot, answer.tokens_in, answer.tokens_out)
-        self._model_call_log.record(
-            snapshot,
-            ModelStep.PHOTO,
-            model,
-            instructions,
-            history,
-            (),
-            started_at,
-            answer,
-            None,
-        )
+        self._model_call_log.record(snapshot, request, started_at, answer)
         return answer.text

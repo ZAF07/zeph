@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
 from companion.adapters.postgres.repositories import build_postgres_repositories
-from companion.core.model_call_log import ModelCallLog
+from companion.core.model_call_log import ModelCallLog, ModelCallRequest
 from companion.core.models import (
     ChatLine,
     ChatRole,
@@ -317,14 +317,15 @@ def record_one_call(
     snapshot = snapshot_for(add_user(repositories))
     log.record(
         snapshot,
-        ModelStep.REPLY,
-        "deepseek-chat",
-        "Be kind.",
-        [ChatLine(ChatRole.USER, SECRET_WORDS)],
-        (),
+        ModelCallRequest(
+            step=ModelStep.REPLY,
+            model="deepseek-chat",
+            instructions="Be kind.",
+            history=(ChatLine(ChatRole.USER, SECRET_WORDS),),
+            tools=(),
+        ),
         clock.now(),
         ModelAnswer(text="that sounds lovely", reasoning="They seem excited."),
-        None,
     )
     return log.open_trace(snapshot.trace.id)
 

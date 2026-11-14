@@ -19,6 +19,7 @@ from companion.adapters.telegram.chat_channel import TelegramChatChannel
 from companion.adapters.timer import ThreadTimer
 from companion.app import AppDependencies, create_app
 from companion.config import Settings, load_settings
+from companion.core.model_call_log import logger as model_call_logger
 from companion.core.ports import (
     AuthAccounts,
     AuthVerifier,
@@ -42,7 +43,6 @@ CHECK_IN_KINDS_SEED_FILE = SEED_DIR / "check_in_kinds.yaml"
 KNOWLEDGE_SEED_FILE = SEED_DIR / "knowledge" / "knowledge.yaml"
 SCHEDULER_INTERVAL_SECONDS = 60
 HTTP_CLIENT_LOGGER_NAMES = ("httpx", "httpcore")
-MODEL_CALL_LOGGER_NAME = "companion.core.model_call_log"
 
 
 class UnknownAdapterError(Exception):
@@ -299,7 +299,6 @@ def show_model_call_developer_logs(enabled: bool) -> None:
     """
     if not enabled:
         return
-    model_call_logger = logging.getLogger(MODEL_CALL_LOGGER_NAME)
     model_call_logger.setLevel(logging.INFO)
     if not model_call_logger.handlers:
         model_call_logger.addHandler(logging.StreamHandler())
