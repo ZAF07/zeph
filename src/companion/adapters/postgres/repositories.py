@@ -1839,7 +1839,7 @@ class PostgresUserMemoryRepository:
         embeddings: Sequence[list[float]],
         min_closeness: float,
         limit: int,
-        leave_out: Sequence[UUID] = (),
+        leave_out: Sequence[UUID],
     ) -> list[ConversationSummary]:
         """Find a User's Conversation Summaries closest in meaning to any search.
 

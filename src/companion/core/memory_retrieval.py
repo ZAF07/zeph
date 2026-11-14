@@ -267,7 +267,7 @@ class MemoryRetrieval:
         snapshot: UserSnapshot,
         saved: SavedMemory,
         picked_categories: Sequence[str],
-        look_up_past: Sequence[str] = (),
+        look_up_past: Sequence[str],
     ) -> RecalledMemory:
         """Pick out what the Companion remembers that matters for the message.
 
