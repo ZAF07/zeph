@@ -65,4 +65,4 @@ Note: the Check-in decision is now a pure module (`.scratch/architecture/issues/
 ## Completion
 
 - Completed: 2026-11-14
-- Commit: <to be filled in after merge>
+- Commit: bcd9e26 "Understanding issue 12: "Something I've been wondering" Check-in asks one of the User's due Curiosities", review fixes f68cd31 "Understanding issue 12 review fixes: one shared due-Curiosities filter, tests for the User's time zone and a send that may have arrived", archive 50e9208 "Understanding issue 12 done: archive issue with test, run and review evidence; migration renumbered to 0035 after issue 13; glossary says how the Curiosity Check-in Kind is offered and counted" on branch `understanding-12-curiosity-check-in-kind` (merged into main in 99ef031 "Merge understanding issue 12: "Something I've been wondering" Check-in Kind — a new seeded fixed-behaviour Kind (raises_curiosity; …) … migration 0035 adds the flag, check_ins.curiosity_id and the Kind for existing installs")
