@@ -52,3 +52,8 @@ None - can start immediately.
   - Existing end-to-end tests pass with only wiring and fixture changes: 734 passed (see Comments for what changed in tests).
   - `uv run ruff check .`: all checks passed. `uv run ruff format --check .`: 292 files already formatted. `uv run mypy`: no issues in 105 source files. `uv run pytest`: 734 passed, 9 deselected.
   - `/run` in a worktree: normal, crisis and over-limit messages each got the right reply (see Comments).
+- Commits:
+  - 10d39c9 "Understanding issue 02: replies run in a core ReplyService; LangGraph removed"
+  - 412599b "Understanding issue 02: review fixes — drop stale engine references, clearer gate result name"
+  - 304b03c "Understanding issue 02 done: archive issue with test, run and review evidence"
+  - ca2eb6d "Merge understanding issue 02: replies run in a core ReplyService; LangGraph removed" (merged from `understanding-02-reply-service` into main)
