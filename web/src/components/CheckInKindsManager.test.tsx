@@ -24,7 +24,6 @@ const hello: CheckInKindOverview = {
   id: "kind-hello",
   name: "A casual hello",
   description: "Just checking how you are.",
-  allowed_without_user_memory: true,
   sends_shared_photo: false,
   sent_last_30_days: 12,
 };
@@ -33,7 +32,6 @@ const followUp: CheckInKindOverview = {
   id: "kind-follow-up",
   name: "A follow-up",
   description: "On something you shared.",
-  allowed_without_user_memory: false,
   sends_shared_photo: false,
   sent_last_30_days: 1,
 };
@@ -42,7 +40,6 @@ const lookBack: CheckInKindOverview = {
   id: "kind-look-back",
   name: "A look back at a photo",
   description: "One of the photos you shared.",
-  allowed_without_user_memory: false,
   sends_shared_photo: true,
   sent_last_30_days: 2,
 };
@@ -57,7 +54,7 @@ describe("CheckInKindsManager", () => {
     apiClient.listCheckInKinds.mockResolvedValue([hello, followUp]);
   });
 
-  it("shows each Kind with its description, memory rule and sends", async () => {
+  it("shows each Kind with its description and sends, with no memory switch", async () => {
     render(<CheckInKindsManager />);
 
     const card = await findCard("A casual hello");
@@ -65,31 +62,26 @@ describe("CheckInKindsManager", () => {
     expect(card.getByLabelText(/Description/)).toHaveValue(
       "Just checking how you are.",
     );
-    expect(card.getByRole("switch")).toHaveAttribute("aria-checked", "true");
+    expect(card.queryByRole("switch")).not.toBeInTheDocument();
+    expect(card.queryByText(/memory/i)).not.toBeInTheDocument();
     expect(card.getByText("Sent 12 times in 30 days")).toBeInTheDocument();
     const followUpCard = await findCard("A follow-up");
-    expect(
-      followUpCard.getByText(
-        "Needs memories — skipped for Users with memory off",
-      ),
-    ).toBeInTheDocument();
+    expect(followUpCard.queryByRole("switch")).not.toBeInTheDocument();
     expect(
       followUpCard.getByText("Sent 1 time in 30 days"),
     ).toBeInTheDocument();
   });
 
-  it("says a Kind sends a Shared Photo and offers no memory switch for it", async () => {
+  it("says a Kind sends a Shared Photo and needs Photo Viewing", async () => {
     apiClient.listCheckInKinds.mockResolvedValue([hello, lookBack]);
     render(<CheckInKindsManager />);
 
     const card = await findCard("A look back at a photo");
     expect(card.getByText("Sends a Shared Photo")).toBeInTheDocument();
     expect(
-      card.getByText(
-        "Needs memories — only for Users with memory on and a Shared Photo",
-      ),
+      card.getByText("Only for Users with Photo Viewing on and a Shared Photo"),
     ).toBeInTheDocument();
-    expect(card.queryByRole("switch")).not.toBeInTheDocument();
+    expect(card.queryByText(/memory/i)).not.toBeInTheDocument();
     expect(card.getByRole("button", { name: "Remove" })).toBeInTheDocument();
     const helloCard = await findCard("A casual hello");
     expect(
@@ -106,13 +98,11 @@ describe("CheckInKindsManager", () => {
 
     await user.clear(card.getByLabelText(/Description/));
     await user.type(card.getByLabelText(/Description/), "A light hello.");
-    await user.click(card.getByRole("switch"));
     await user.click(card.getByRole("button", { name: "Save" }));
 
     expect(apiClient.updateCheckInKind).toHaveBeenCalledWith("kind-hello", {
       name: "A casual hello",
       description: "A light hello.",
-      allowed_without_user_memory: false,
     });
     expect(
       await screen.findByText("Saved A casual hello."),
@@ -133,13 +123,11 @@ describe("CheckInKindsManager", () => {
       card.getByLabelText(/Description/),
       "One small good thing.",
     );
-    await user.click(card.getByRole("switch"));
     await user.click(card.getByRole("button", { name: "Add" }));
 
     expect(apiClient.addCheckInKind).toHaveBeenCalledWith({
       name: "A gratitude nudge",
       description: "One small good thing.",
-      allowed_without_user_memory: true,
     });
     expect(
       await screen.findByText("Added A gratitude nudge."),

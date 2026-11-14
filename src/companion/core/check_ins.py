@@ -579,20 +579,15 @@ class CheckInService:
             None,
         )
 
-    def kinds_for(self, user: User) -> list[CheckInKind]:
-        """List the Check-in Kinds that may be sent to a User.
+    def list_kinds(self) -> list[CheckInKind]:
+        """List the Check-in Kinds, which may all be sent to any User.
 
-        Args:
-            user: The User.
+        User Memory being off only stops learning, so it limits no Kind.
 
         Returns:
-            Every Check-in Kind in order; only those allowed without User
-            Memory when it doesn't work for the User.
+            Every Check-in Kind in order.
         """
-        kinds = self._repositories.check_ins.list_kinds()
-        if self._features.works_for(user.id, Feature.USER_MEMORY):
-            return kinds
-        return [kind for kind in kinds if kind.allowed_without_user_memory]
+        return self._repositories.check_ins.list_kinds()
 
     def list_log(self, days: int) -> list[LoggedCheckIn]:
         """List every User's Check-in decisions from the last few days.
@@ -670,7 +665,7 @@ class CheckInService:
         shared_photos = self._shared_photos(user)
         kinds = [
             kind
-            for kind in self.kinds_for(user)
+            for kind in self.list_kinds()
             if shared_photos or not kind.sends_shared_photo
         ]
         if not kinds:
@@ -934,12 +929,9 @@ class CheckInService:
             user: The User.
 
         Returns:
-            Their Shared Photos, newest first; none if User Memory or Photo
-            Viewing doesn't work for the User, since only Check-in Kinds
-            that need User Memory send one.
+            Their Shared Photos, newest first; none if Photo Viewing doesn't
+            work for the User.
         """
-        if not self._features.works_for(user.id, Feature.USER_MEMORY):
-            return []
         if not self._features.works_for(user.id, Feature.PHOTO_VIEWING):
             return []
         return self._repositories.user_memory.list_shared_photos(user.id)

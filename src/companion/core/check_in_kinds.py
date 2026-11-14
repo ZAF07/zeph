@@ -49,8 +49,7 @@ class CheckInKindService:
         """Add a Check-in Kind last in the list.
 
         Args:
-            details: Its name, description and whether it is allowed without
-                User Memory.
+            details: Its name and description.
 
         Returns:
             The saved Check-in Kind.
@@ -63,11 +62,11 @@ class CheckInKindService:
         return self._repositories.check_ins.add_kind(checked)
 
     def update(self, kind_id: UUID, details: CheckInKindDetails) -> CheckInKind:
-        """Change a Check-in Kind's name, description and User Memory flag.
+        """Change a Check-in Kind's name and description.
 
         Args:
             kind_id: The Check-in Kind's ID.
-            details: Its new name, description and User Memory flag.
+            details: Its new name and description.
 
         Returns:
             The saved Check-in Kind.
@@ -75,24 +74,14 @@ class CheckInKindService:
         Raises:
             CheckInKindNotFoundError: If there is no such Kind.
             InvalidCheckInKindError: If the name or description is blank or
-                too long, another Kind already has the name, or a Kind that
-                sends a Shared Photo would be allowed without User Memory.
+                too long, or another Kind already has the name.
         """
         kind = self._repositories.check_ins.get_kind(kind_id)
         if kind is None:
             raise CheckInKindNotFoundError(kind_id)
-        if kind.sends_shared_photo and details.allowed_without_user_memory:
-            raise InvalidCheckInKindError(
-                "A Check-in Kind that sends a Shared Photo needs User Memory."
-            )
         checked = self._checked_details(details, editing_id=kind_id)
         return self._repositories.check_ins.update_kind(
-            replace(
-                kind,
-                name=checked.name,
-                description=checked.description,
-                allowed_without_user_memory=checked.allowed_without_user_memory,
-            )
+            replace(kind, name=checked.name, description=checked.description)
         )
 
     def remove(self, kind_id: UUID) -> None:

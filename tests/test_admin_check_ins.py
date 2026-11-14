@@ -37,7 +37,6 @@ def add_kind(
     body = {
         "name": "A gratitude nudge",
         "description": "One small thing that went well today.",
-        "allowed_without_user_memory": True,
     }
     body.update(overrides)
     response = client.post("/api/admin/check-in-kinds", json=body, headers=admin)
@@ -62,16 +61,14 @@ def test_admin_sees_the_check_in_kinds_in_order_with_recent_sends(
 
     kinds = list_kinds(client, admin)
 
-    assert [
-        (kind["name"], kind["allowed_without_user_memory"], kind["sent_last_30_days"])
-        for kind in kinds
-    ] == [
-        ("A casual hello", True, 1),
-        ("A follow-up", False, 0),
-        ("A present-moment pause", True, 0),
-        ("A thought to reflect on", False, 0),
-        ("A look back at a photo", False, 0),
+    assert [(kind["name"], kind["sent_last_30_days"]) for kind in kinds] == [
+        ("A casual hello", 1),
+        ("A follow-up", 0),
+        ("A present-moment pause", 0),
+        ("A thought to reflect on", 0),
+        ("A look back at a photo", 0),
     ]
+    assert not any("allowed_without_user_memory" in kind for kind in kinds)
     assert kinds[0]["description"] == "Just checking how you are."
 
 
@@ -89,13 +86,12 @@ def test_admin_can_add_edit_and_remove_check_in_kinds(
         json={
             "name": "A small win",
             "description": "Ask about one thing that went well.",
-            "allowed_without_user_memory": False,
         },
         headers=admin,
     )
     assert response.status_code == 200, response.text
     assert response.json()["name"] == "A small win"
-    assert response.json()["allowed_without_user_memory"] is False
+    assert "allowed_without_user_memory" not in response.json()
 
     response = client.delete(f"/api/admin/check-in-kinds/{added['id']}", headers=admin)
     assert response.status_code == 204
@@ -109,28 +105,20 @@ def test_bad_check_in_kinds_are_refused(
     hello_id = list_kinds(client, admin)[0]["id"]
 
     for body in (
-        {"name": " ", "description": "Something", "allowed_without_user_memory": True},
-        {"name": "Hi", "description": " ", "allowed_without_user_memory": True},
-        {
-            "name": "a casual HELLO",
-            "description": "Taken name",
-            "allowed_without_user_memory": True,
-        },
+        {"name": " ", "description": "Something"},
+        {"name": "Hi", "description": " "},
+        {"name": "a casual HELLO", "description": "Taken name"},
     ):
         response = client.post("/api/admin/check-in-kinds", json=body, headers=admin)
         assert response.status_code == 422, body
 
     response = client.put(
         f"/api/admin/check-in-kinds/{hello_id}",
-        json={
-            "name": "A follow-up",
-            "description": "Taken name",
-            "allowed_without_user_memory": True,
-        },
+        json={"name": "A follow-up", "description": "Taken name"},
         headers=admin,
     )
     assert response.status_code == 422
-    missing = {"name": "X", "description": "Y", "allowed_without_user_memory": True}
+    missing = {"name": "X", "description": "Y"}
     assert (
         client.put(
             f"/api/admin/check-in-kinds/{MISSING_ID}", json=missing, headers=admin
@@ -212,11 +200,7 @@ def test_the_users_check_ins_page_lists_the_kinds_that_may_be_sent_to_them(
 
     client.patch("/api/me", json={"user_memory_enabled": False}, headers=maya)
 
-    kinds = client.get("/api/check-ins", headers=maya).json()["kinds"]
-    assert [kind["name"] for kind in kinds] == [
-        "A casual hello",
-        "A present-moment pause",
-    ]
+    assert client.get("/api/check-ins", headers=maya).json()["kinds"] == kinds
 
 
 def test_admin_can_set_the_ignore_threshold_and_would_you_like_fewer_message(

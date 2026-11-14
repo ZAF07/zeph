@@ -531,7 +531,7 @@ def build_dashboard_api_router(
             ],
             kinds=[
                 CheckInKindSummaryResponse(name=kind.name, description=kind.description)
-                for kind in check_in_service.kinds_for(user)
+                for kind in check_in_service.list_kinds()
             ],
         )
 

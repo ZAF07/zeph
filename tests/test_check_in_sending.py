@@ -2,6 +2,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import pytest
 import yaml
 from fastapi.testclient import TestClient
 
@@ -17,6 +18,7 @@ from tests.telegram_helpers import (
     TELEGRAM_CHAT_ID,
     auth_headers,
     connect_telegram,
+    owner_headers,
     send_to_webhook,
     telegram_text_update,
 )
@@ -603,60 +605,66 @@ def test_a_reply_to_a_check_in_resets_the_ignored_count(
     ]
 
 
-def test_with_user_memory_off_only_kinds_allowed_without_user_memory_are_chosen(
+def turn_user_memory_off(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-    scheduler: FakeScheduler,
+    headers: dict[str, str],
+    switch: str,
 ) -> None:
-    headers = set_up_user_with_check_ins(
-        client, auth_verifier, chat_channel, user_memory_enabled=False
-    )
-    chat_model.script(
-        send_answer("hey, how did that thing go?", kind="A follow-up"),
-        send_answer("hey Maya, how's your day going?"),
-    )
+    """Turn User Memory off with the User's switch, the Admin's, or both.
 
-    clock.advance(ONE_DAY)
-    scheduler.tick()
-
-    assert chat_channel.sent == []
-    [line] = chat_model.calls[-1].history
-    assert "A casual hello" in line.text
-    assert "A present-moment pause" in line.text
-    assert "A follow-up" not in line.text
-    assert "A thought to reflect on" not in line.text
-    assert "New job, running on autopilot." not in line.text
-
-    clock.advance(timedelta(minutes=5))
-    scheduler.tick()
-    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
-        "hey Maya, how's your day going?"
-    ]
-    assert recent_check_ins(client, headers)[0]["kind"] == "A casual hello"
+    Args:
+        client: The backend's test client.
+        auth_verifier: The fake auth verifier.
+        headers: The User's Dashboard API headers.
+        switch: "user", "admin" or "both".
+    """
+    if switch in ("user", "both"):
+        response = client.patch(
+            "/api/me", json={"user_memory_enabled": False}, headers=headers
+        )
+        assert response.status_code == 200, response.text
+    if switch in ("admin", "both"):
+        response = client.put(
+            "/api/admin/features/user_memory",
+            json={"on": False},
+            headers=owner_headers(client, auth_verifier),
+        )
+        assert response.status_code == 200, response.text
 
 
-def test_with_user_memory_turned_off_later_check_ins_still_use_existing_memory(
+@pytest.mark.parametrize("switch", ["user", "admin", "both"])
+def test_with_user_memory_off_every_kind_is_offered_and_saved_memory_is_used(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
     chat_model: ScriptedChatModel,
     clock: FakeClock,
     scheduler: FakeScheduler,
+    switch: str,
 ) -> None:
     headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
-    client.patch("/api/me", json={"user_memory_enabled": False}, headers=headers)
-    chat_model.script(send_answer("hey Maya, how's the new job?"))
+    turn_user_memory_off(client, auth_verifier, headers, switch)
+    chat_model.script(
+        send_answer("hey Maya, how's the new job going?", kind="A follow-up")
+    )
 
     clock.advance(ONE_DAY)
     scheduler.tick()
 
     [line] = chat_model.calls[-1].history
+    for kind in seeded_check_in_kinds():
+        assert kind in line.text
     assert "New job, running on autopilot." in line.text
     assert "User Memory is off" not in line.text
-    assert "A follow-up" not in line.text
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
+        "hey Maya, how's the new job going?"
+    ]
+    assert recent_check_ins(client, headers)[0]["kind"] == "A follow-up"
+    assert [
+        kind["name"]
+        for kind in client.get("/api/check-ins", headers=headers).json()["kinds"]
+    ] == [kind["name"] for kind in yaml.safe_load(CHECK_IN_KINDS_SEED_FILE.read_text())]
 
 
 def test_an_answer_that_is_not_a_decision_sends_nothing_and_is_tried_again(

@@ -35,6 +35,7 @@ from tests.test_check_in_sending import (
     recent_check_ins,
     send_answer,
     set_up_user_with_check_ins,
+    turn_user_memory_off,
 )
 from tests.test_onboarding import onboarding_answers
 from tests.test_send_photo_back import add_shared_photo
@@ -176,17 +177,51 @@ def test_with_no_shared_photos_the_look_back_kind_is_never_offered(
     assert chat_channel.sent_photos == []
 
 
-def test_with_user_memory_off_the_look_back_kind_and_photos_are_never_offered(
+@pytest.mark.parametrize("switch", ["user", "admin", "both"])
+def test_with_user_memory_off_the_look_back_kind_still_sends_a_shared_photo(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
     chat_model: ScriptedChatModel,
     clock: FakeClock,
     scheduler: FakeScheduler,
+    switch: str,
 ) -> None:
-    set_up_user_with_shared_photos(
-        client, auth_verifier, chat_channel, user_memory_enabled=False
-    )
+    headers = set_up_user_with_shared_photos(client, auth_verifier, chat_channel)
+    turn_user_memory_off(client, auth_verifier, headers, switch)
+    chat_model.script(look_back_answer("how's the monstera?", 2))
+
+    clock.advance(ONE_DAY)
+    scheduler.tick()
+
+    [line] = chat_model.calls[-1].history
+    assert LOOK_BACK in line.text
+    assert MONSTERA in line.text
+    assert chat_channel.events == [
+        "text: how's the monstera?",
+        "photo: monstera-file-id",
+    ]
+
+
+@pytest.mark.parametrize("switch", ["user", "admin"])
+def test_with_photo_viewing_off_the_look_back_kind_and_photos_are_never_offered(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    switch: str,
+) -> None:
+    headers = set_up_user_with_shared_photos(client, auth_verifier, chat_channel)
+    if switch == "user":
+        client.patch("/api/me", json={"photo_viewing_enabled": False}, headers=headers)
+    else:
+        client.put(
+            "/api/admin/features/photo_viewing",
+            json={"on": False},
+            headers=owner_headers(client, auth_verifier),
+        )
     chat_model.script(
         look_back_answer("how's the monstera?", 1),
         send_answer("hey Maya, how's your day?"),
@@ -290,7 +325,7 @@ def test_a_failed_photo_send_still_sends_the_message_and_logs_the_error(
     ]
 
 
-def test_the_users_check_ins_page_lists_the_look_back_kind_only_with_user_memory(
+def test_the_users_check_ins_page_lists_the_look_back_kind_with_user_memory_off(
     client: TestClient, auth_verifier: FakeAuthVerifier
 ) -> None:
     maya = auth_headers(auth_verifier, "user_maya")
@@ -302,7 +337,7 @@ def test_the_users_check_ins_page_lists_the_look_back_kind_only_with_user_memory
 
     client.patch("/api/me", json={"user_memory_enabled": False}, headers=maya)
 
-    assert LOOK_BACK not in [
+    assert LOOK_BACK in [
         kind["name"]
         for kind in client.get("/api/check-ins", headers=maya).json()["kinds"]
     ]
@@ -316,7 +351,7 @@ def test_admin_sees_the_look_back_kind_and_can_edit_and_remove_it(
         kind for kind in list_kinds(client, admin) if kind["sends_shared_photo"]
     ]
     assert look_back["name"] == LOOK_BACK
-    assert look_back["allowed_without_user_memory"] is False
+    assert "allowed_without_user_memory" not in look_back
     assert [kind["sends_shared_photo"] for kind in list_kinds(client, admin)] == [
         False,
         False,
@@ -330,25 +365,12 @@ def test_admin_sees_the_look_back_kind_and_can_edit_and_remove_it(
         json={
             "name": "Remember this?",
             "description": "A photo you shared, sent back with a word about it.",
-            "allowed_without_user_memory": False,
         },
         headers=admin,
     )
     assert edited.status_code == 200, edited.text
     assert edited.json()["sends_shared_photo"] is True
     assert edited.json()["name"] == "Remember this?"
-
-    refused = client.put(
-        f"/api/admin/check-in-kinds/{look_back['id']}",
-        json={
-            "name": "Remember this?",
-            "description": "A photo you shared.",
-            "allowed_without_user_memory": True,
-        },
-        headers=admin,
-    )
-    assert refused.status_code == 422
-    assert "User Memory" in refused.json()["detail"]
 
     removed = client.delete(
         f"/api/admin/check-in-kinds/{look_back['id']}", headers=admin
@@ -375,7 +397,6 @@ def test_an_edited_look_back_kind_still_sends_its_photo(
         json={
             "name": "Remember this?",
             "description": "A photo you shared, sent back with a word about it.",
-            "allowed_without_user_memory": False,
         },
         headers=admin,
     )

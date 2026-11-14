@@ -1,28 +1,23 @@
 # Starting Check-in Kinds (ADR-0004). Loaded on first run only, when there are
 # no Check-in Kinds at all; after that Admins manage them.
 # The description tells the Check-in model what the Kind is, and Users see it
-# on their Check-ins page. With User Memory off, only Kinds allowed without
-# User Memory are sent. A Kind with `sends_shared_photo: true` sends one of the
-# User's Shared Photos with its message; it is offered only to Users with User
-# Memory on and at least one Shared Photo. Admins can't change that flag.
+# on their Check-ins page. Every Kind can be sent whether or not User Memory
+# is on. A Kind with `sends_shared_photo: true` sends one of the User's Shared
+# Photos with its message; it is offered only to Users with Photo Viewing
+# working and at least one Shared Photo. Admins can't change that flag.
 
 - name: A casual hello
   description: Just checking how you are.
-  allowed_without_user_memory: true
 
 - name: A follow-up
   description: On something you shared, like a decision or a hard day.
-  allowed_without_user_memory: false
 
 - name: A present-moment pause
   description: A brief invitation to notice where you are.
-  allowed_without_user_memory: true
 
 - name: A thought to reflect on
   description: An idea that might fit what’s on your mind.
-  allowed_without_user_memory: false
 
 - name: A look back at a photo
   description: One of the photos you shared, sent back with a word about it.
-  allowed_without_user_memory: false
   sends_shared_photo: true
