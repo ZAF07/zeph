@@ -530,6 +530,21 @@ class ChatLine:
 
 
 @dataclass(frozen=True)
+class ToolCallRecord:
+    """One tool call the chat model made on the way to its answer.
+
+    Attributes:
+        name: The tool's name, e.g. "web_search".
+        arguments: The arguments the model called it with.
+        result: What the model was told back.
+    """
+
+    name: str
+    arguments: dict[str, Any]
+    result: str
+
+
+@dataclass(frozen=True)
 class ModelAnswer:
     """What the chat model answered, and how many tokens it took.
 
@@ -537,11 +552,15 @@ class ModelAnswer:
         text: The answer text.
         tokens_in: Tokens the model read, across every round of tool calls.
         tokens_out: Tokens the model wrote, across every round of tool calls.
+        tool_calls: The tool calls it made first, in order.
+        reasoning: The model's reasoning, when it gives one.
     """
 
     text: str
     tokens_in: int = 0
     tokens_out: int = 0
+    tool_calls: tuple[ToolCallRecord, ...] = ()
+    reasoning: str | None = None
 
 
 @dataclass(frozen=True)
@@ -1331,6 +1350,154 @@ class PlatformSettings:
         return setting.read(self.values[setting.key])
 
 
+class TraceKind(StrEnum):
+    """What a Model Call Log trace was for."""
+
+    MESSAGE = "message"
+    CHECK_IN = "check_in"
+    CONVERSATION_END = "conversation_end"
+
+
+class ModelStep(StrEnum):
+    """Which step of the Companion's work a model call was for."""
+
+    SAFEGUARD = "safeguard"
+    MEMORY_PICKING = "memory_picking"
+    REPLY = "reply"
+    PHOTO = "photo"
+    CHECK_IN = "check_in"
+    CONVERSATION_END = "conversation_end"
+    PERSONAL_STICKERS = "personal_stickers"
+
+
+@dataclass(frozen=True)
+class ModelCallTrace:
+    """The Model Call Log trace that one Message's or Check-in's model calls share.
+
+    Attributes:
+        id: The trace's ID.
+        kind: What it is for.
+    """
+
+    id: UUID
+    kind: TraceKind
+
+
+@dataclass(frozen=True)
+class OfferedTool:
+    """A tool the chat model was offered, as kept in the Model Call Log.
+
+    Attributes:
+        name: The tool's name.
+        description: What the model was told about it.
+        parameters: JSON Schema of the arguments it takes.
+    """
+
+    name: str
+    description: str
+    parameters: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ModelCallContent:
+    """What a model call was given and answered. Kept only at the full-content level.
+
+    Attributes:
+        instructions: What the model was told to be and do.
+        history: The lines it was given, oldest first.
+        tools_offered: The tools it could call.
+        tool_calls: The tool calls it made, with their results.
+        response: Its answer; "" if the call failed.
+        reasoning: Its reasoning, when it gave one.
+    """
+
+    instructions: str
+    history: tuple[ChatLine, ...]
+    tools_offered: tuple[OfferedTool, ...]
+    tool_calls: tuple[ToolCallRecord, ...]
+    response: str
+    reasoning: str | None
+
+
+@dataclass(frozen=True)
+class ModelCall:
+    """One model call in the Model Call Log.
+
+    Attributes:
+        id: The entry's ID.
+        trace: The trace it belongs to.
+        user_id: The User it was for.
+        step: Which step it was for.
+        model: The model asked, e.g. "deepseek-chat".
+        started_at: When the call started.
+        duration_ms: How long it took, in milliseconds.
+        tokens_in: Tokens the model read.
+        tokens_out: Tokens the model wrote.
+        error: The kind of error it failed with; None if it worked.
+        tools_called: The names of the tools it called, in order; the shape
+            of its decision, kept for every User.
+        content: What it was given and answered; None unless the call was at
+            the full-content level.
+    """
+
+    id: UUID
+    trace: ModelCallTrace
+    user_id: UUID
+    step: ModelStep
+    model: str
+    started_at: datetime
+    duration_ms: int
+    tokens_in: int
+    tokens_out: int
+    error: str | None
+    tools_called: tuple[str, ...]
+    content: ModelCallContent | None
+
+
+@dataclass(frozen=True)
+class ModelCallTraceOverview:
+    """A Model Call Log trace in a list: who, when, and a total of its calls.
+
+    Attributes:
+        trace: The trace.
+        user_id: The User it was for.
+        user_name: The User's name, if known.
+        user_email: The User's email address, if known.
+        started_at: When its first call started.
+        steps: The steps its calls were for, in order.
+        tokens_in: Tokens read across its calls.
+        tokens_out: Tokens written across its calls.
+        duration_ms: Time taken across its calls, in milliseconds.
+        error_count: How many of its calls failed.
+        has_content: Whether its calls kept full content.
+    """
+
+    trace: ModelCallTrace
+    user_id: UUID
+    user_name: str | None
+    user_email: str | None
+    started_at: datetime
+    steps: tuple[ModelStep, ...]
+    tokens_in: int
+    tokens_out: int
+    duration_ms: int
+    error_count: int
+    has_content: bool
+
+
+@dataclass(frozen=True)
+class ModelCallTraceDetails:
+    """One Model Call Log trace with every call in it.
+
+    Attributes:
+        overview: The trace and who it was for.
+        calls: Its calls, in the order they started.
+    """
+
+    overview: ModelCallTraceOverview
+    calls: tuple[ModelCall, ...]
+
+
 @dataclass(frozen=True)
 class UserSnapshot:
     """A User, and the platform settings, as they were when a reply or tick started.
@@ -1345,6 +1512,8 @@ class UserSnapshot:
         today: Their day when it was read.
         features: Each Feature's status for them, in the order of `FEATURES`.
         settings: The platform settings, read once for the reply or tick.
+        trace: The Model Call Log trace this reply's or tick's model calls
+            for the User are grouped under.
     """
 
     user: User
@@ -1352,6 +1521,7 @@ class UserSnapshot:
     today: date
     features: tuple[FeatureStatus, ...]
     settings: PlatformSettings
+    trace: ModelCallTrace
 
     def works(self, feature: Feature) -> bool:
         """Say whether a Feature works for the User.

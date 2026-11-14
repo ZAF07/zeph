@@ -10,6 +10,7 @@ from companion.core.models import (
     ChatLine,
     ChatRole,
     Helpline,
+    ModelStep,
     RiskType,
     SafeguardEvent,
     SafeguardEventOverview,
@@ -172,6 +173,7 @@ class Safeguard:
         for _ in range(2):
             answer = self._chat_model.generate(
                 snapshot=snapshot,
+                step=ModelStep.SAFEGUARD,
                 model=settings.get(SAFEGUARD_MODEL),
                 instructions=settings.get(SAFEGUARD_PROMPT),
                 history=transcript,

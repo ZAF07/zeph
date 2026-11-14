@@ -3,9 +3,11 @@ from uuid import UUID, uuid4
 
 from companion.core.models import (
     MessageToAnswer,
+    ModelCallTrace,
     PlatformSettings,
     RiskType,
     TextToScreen,
+    TraceKind,
     User,
     UserSnapshot,
 )
@@ -222,6 +224,7 @@ def build_gate(
         today=now.date(),
         features=(),
         settings=PlatformSettings({}),
+        trace=ModelCallTrace(id=uuid4(), kind=TraceKind.MESSAGE),
     )
     return gate, snapshot, calls, conversations.sent
 

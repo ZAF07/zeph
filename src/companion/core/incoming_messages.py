@@ -5,13 +5,16 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from uuid import UUID
 
+from companion.core.model_call_log import start_trace
 from companion.core.models import (
     ChannelPhoto,
     IncomingMessage,
     MessageKind,
     MessageToAnswer,
+    ModelCallTrace,
     PlatformSettings,
     TextToScreen,
+    TraceKind,
     UserSnapshot,
 )
 from companion.core.photos import PhotoService
@@ -116,12 +119,17 @@ class PendingMessage:
         texts: Its screened texts as the Companion reads them, in order.
         album_items: Its Album photos and files, screened together once the
             User pauses.
+        trace: The Model Call Log trace every model call for it goes in,
+            from the first text's Safeguard check to the reply.
     """
 
     chat_id: int
     conversation_id: UUID | None = None
     texts: list[str] = field(default_factory=list)
     album_items: list[IncomingMessage] = field(default_factory=list)
+    trace: ModelCallTrace = field(
+        default_factory=lambda: start_trace(TraceKind.MESSAGE)
+    )
 
     def add_screened(self, conversation_id: UUID, text: str) -> None:
         """Add a text that passed the Safeguard.
@@ -279,8 +287,12 @@ class IncomingMessageHandler:
         try:
             with self._turn_lock_for(user_id):
                 settings = self._repositories.platform_settings.load()
+                with self._pending_messages_guard:
+                    trace = self._pending_messages.setdefault(
+                        user_id, PendingMessage(chat_id=message.chat_id)
+                    ).trace
                 try:
-                    snapshot = self._user_snapshots.load(user_id, settings)
+                    snapshot = self._user_snapshots.load(user_id, settings, trace)
                     text = self._text_to_screen(snapshot, message)
                     result = self._reply_gate.screen(text, snapshot)
                 except Exception:
@@ -375,7 +387,7 @@ class IncomingMessageHandler:
                 return
             settings = self._repositories.platform_settings.load()
             try:
-                snapshot = self._user_snapshots.load(user_id, settings)
+                snapshot = self._user_snapshots.load(user_id, settings, pending.trace)
                 for album_items in group_albums(pending.album_items):
                     album_text = self._album_text_to_screen(
                         snapshot, pending.chat_id, album_items

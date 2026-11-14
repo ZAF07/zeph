@@ -10,8 +10,9 @@ from companion.adapters.deepseek.chat_model import (
     MAX_TOOL_ROUNDS,
     answer_with_tools,
     to_langchain_messages,
+    to_model_answer,
 )
-from companion.core.models import ChatLine, ChatRole
+from companion.core.models import ChatLine, ChatRole, ToolCallRecord
 from companion.core.ports import ChatTool
 
 
@@ -161,3 +162,46 @@ def test_a_response_without_usage_counts_as_no_tokens() -> None:
     )
 
     assert (reply.tokens_in, reply.tokens_out) == (0, 0)
+
+
+def test_every_tool_call_is_reported_with_its_arguments_and_result() -> None:
+    broken_call = AIMessage(
+        "",
+        invalid_tool_calls=[
+            {
+                "name": "web_search",
+                "args": '{"query": ',
+                "id": "c2",
+                "error": "bad JSON",
+                "type": "invalid_tool_call",
+            }
+        ],
+    )
+    chat = ScriptedLangChainModel(
+        asks_for_search("seneca", "c1"), broken_call, AIMessage("Seneca was a Stoic.")
+    )
+
+    reply = answer_with_tools(
+        chat.invoke, ScriptedLangChainModel().invoke, [], [search_tool()]
+    )
+
+    assert reply.tool_calls == (
+        ToolCallRecord("web_search", {"query": "seneca"}, "results for seneca"),
+        ToolCallRecord(
+            "web_search",
+            {"raw": '{"query": '},
+            "The arguments for web_search were not valid JSON. Try again.",
+        ),
+    )
+
+
+def test_the_models_reasoning_is_kept_when_it_gives_one() -> None:
+    thinking = AIMessage(
+        "Seneca was a Stoic.",
+        additional_kwargs={"reasoning_content": "They asked about Seneca."},
+    )
+
+    assert to_model_answer(thinking.text, [thinking]).reasoning == (
+        "They asked about Seneca."
+    )
+    assert to_model_answer("hi", [AIMessage("hi")]).reasoning is None

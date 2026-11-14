@@ -16,6 +16,7 @@ from companion.core.models import (
     ModelAnswer,
     PhotoImage,
     StickerImage,
+    ToolCallRecord,
     WebSearchResult,
 )
 from companion.core.ports import ChatTool
@@ -523,6 +524,7 @@ class ScriptedChatModel:
         call = ChatModelCall(
             model=model, instructions=instructions, history=history, tools=list(tools)
         )
+        tool_calls: list[ToolCallRecord] = []
         if self.safeguard_prompt and instructions == self.safeguard_prompt:
             self.safeguard_calls.append(call)
             self.call_order.append("safeguard")
@@ -567,12 +569,17 @@ class ScriptedChatModel:
             answer = self._replies.pop(0)
             while isinstance(answer, ToolCall):
                 [tool] = [tool for tool in tools if tool.name == answer.name]
-                call.tool_results.append(tool.run(answer.arguments))
+                result = tool.run(answer.arguments)
+                call.tool_results.append(result)
+                tool_calls.append(ToolCallRecord(answer.name, answer.arguments, result))
                 answer = self._replies.pop(0)
         if isinstance(answer, Exception):
             raise answer
         return ModelAnswer(
-            text=answer, tokens_in=TOKENS_IN_PER_CALL, tokens_out=TOKENS_OUT_PER_CALL
+            text=answer,
+            tokens_in=TOKENS_IN_PER_CALL,
+            tokens_out=TOKENS_OUT_PER_CALL,
+            tool_calls=tuple(tool_calls),
         )
 
 

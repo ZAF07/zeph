@@ -12,6 +12,7 @@ import {
 import type {
   CheckIns,
   Me,
+  ModelCallTraceFilter,
   OnboardingAnswers,
   PlatformContent,
   PreferenceChanges,
@@ -41,6 +42,11 @@ export const queryKeys = {
   ],
   checkInKinds: ["check-in-kinds"],
   checkInLog: (days: number) => ["check-in-log", days],
+  modelCallTraces: (filter: ModelCallTraceFilter) => [
+    "model-call-traces",
+    filter,
+  ],
+  modelCallTrace: (traceId: string) => ["model-call-trace", traceId],
   usage: (days: number) => ["usage", days],
   memoryCategories: ["memory-categories"],
   knowledgeDocuments: ["knowledge-documents"],

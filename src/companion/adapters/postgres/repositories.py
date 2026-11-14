@@ -20,7 +20,7 @@ from sqlalchemy import (
     tuple_,
     update,
 )
-from sqlalchemy.dialects.postgresql import distinct_on, insert
+from sqlalchemy.dialects.postgresql import aggregate_order_by, distinct_on, insert
 
 from companion.adapters.postgres.tables import (
     check_in_kinds,
@@ -35,6 +35,7 @@ from companion.adapters.postgres.tables import (
     knowledge_documents,
     memory_categories,
     memory_items,
+    model_calls,
     pending_auth_account_deletions,
     personal_stickers,
     platform_settings,
@@ -49,6 +50,8 @@ from companion.core.features import feature_details
 from companion.core.models import (
     ChannelPhoto,
     ChannelSticker,
+    ChatLine,
+    ChatRole,
     ChatSetting,
     CheckIn,
     CheckInFrequency,
@@ -82,7 +85,14 @@ from companion.core.models import (
     MemorySource,
     MessageDirection,
     MessageKind,
+    ModelCall,
+    ModelCallContent,
+    ModelCallTrace,
+    ModelCallTraceDetails,
+    ModelCallTraceOverview,
+    ModelStep,
     NextDueTimeChange,
+    OfferedTool,
     PersonalSticker,
     PlatformSettings,
     RiskType,
@@ -91,6 +101,8 @@ from companion.core.models import (
     SharedPhoto,
     StoredSetting,
     TelegramConnection,
+    ToolCallRecord,
+    TraceKind,
     User,
     UserOverview,
     UserRole,
@@ -3368,6 +3380,232 @@ def build_postgres_repositories(engine: Engine) -> Repositories:
     return _build_repositories(engine, partial(_begin_transaction, engine))
 
 
+def _to_model_call_content(values: dict[str, Any]) -> ModelCallContent:
+    """Read a model call's stored content.
+
+    Args:
+        values: The stored JSON.
+
+    Returns:
+        The content.
+    """
+    return ModelCallContent(
+        instructions=values["instructions"],
+        history=tuple(
+            ChatLine(role=ChatRole(line["role"]), text=line["text"])
+            for line in values["history"]
+        ),
+        tools_offered=tuple(OfferedTool(**tool) for tool in values["tools_offered"]),
+        tool_calls=tuple(ToolCallRecord(**call) for call in values["tool_calls"]),
+        response=values["response"],
+        reasoning=values["reasoning"],
+    )
+
+
+def _to_model_call(row: Row[Any]) -> ModelCall:
+    """Turn a `model_calls` row into a model call.
+
+    Args:
+        row: The row.
+
+    Returns:
+        The model call.
+    """
+    return ModelCall(
+        id=row.id,
+        trace=ModelCallTrace(id=row.trace_id, kind=TraceKind(row.trace_kind)),
+        user_id=row.user_id,
+        step=ModelStep(row.step),
+        model=row.model,
+        started_at=row.started_at,
+        duration_ms=row.duration_ms,
+        tokens_in=row.tokens_in,
+        tokens_out=row.tokens_out,
+        error=row.error,
+        tools_called=tuple(row.tools_called),
+        content=_to_model_call_content(row.content) if row.content else None,
+    )
+
+
+class PostgresModelCallRepository:
+    """Stores the Model Call Log in Postgres, one row per model call."""
+
+    def __init__(self, database: Database) -> None:
+        """Set up the repository.
+
+        Args:
+            database: Where to run queries: the engine, or one transaction.
+        """
+        self._database = database
+
+    def add(self, call: ModelCall) -> None:
+        """Save one model call.
+
+        Args:
+            call: The call to save.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                insert(model_calls).values(
+                    id=call.id,
+                    trace_id=call.trace.id,
+                    trace_kind=call.trace.kind.value,
+                    user_id=call.user_id,
+                    step=call.step.value,
+                    model=call.model,
+                    started_at=call.started_at,
+                    duration_ms=call.duration_ms,
+                    tokens_in=call.tokens_in,
+                    tokens_out=call.tokens_out,
+                    error=call.error,
+                    tools_called=list(call.tools_called),
+                    content=asdict(call.content) if call.content else None,
+                )
+            )
+
+    def list_traces(
+        self,
+        user_id: UUID | None,
+        since: datetime | None,
+        step: ModelStep | None,
+        errors_only: bool,
+        limit: int,
+    ) -> list[ModelCallTraceOverview]:
+        """List traces with who they were for, newest first.
+
+        Args:
+            user_id: Only this User's traces; None for every User.
+            since: Only traces started at or after this time; None for all time.
+            step: Only traces with a call for this step; None for every step.
+            errors_only: Only traces with a failed call.
+            limit: The most traces to list.
+
+        Returns:
+            The traces.
+        """
+        started_at = func.min(model_calls.c.started_at)
+        error_count = func.count(model_calls.c.error)
+        statement = (
+            self._trace_overview_select().order_by(started_at.desc()).limit(limit)
+        )
+        if user_id is not None:
+            statement = statement.where(model_calls.c.user_id == user_id)
+        if since is not None:
+            statement = statement.having(started_at >= since)
+        if step is not None:
+            statement = statement.having(func.bool_or(model_calls.c.step == step.value))
+        if errors_only:
+            statement = statement.having(error_count > 0)
+        with self._database.connect() as connection:
+            rows = connection.execute(statement).all()
+        return [self._to_trace_overview(row) for row in rows]
+
+    def get_trace(self, trace_id: UUID) -> ModelCallTraceDetails | None:
+        """Read one trace with every call in it.
+
+        Args:
+            trace_id: The trace's ID.
+
+        Returns:
+            The trace, or None if there is no such trace.
+        """
+        with self._database.connect() as connection:
+            overview_row = connection.execute(
+                self._trace_overview_select().where(model_calls.c.trace_id == trace_id)
+            ).one_or_none()
+            if overview_row is None:
+                return None
+            call_rows = connection.execute(
+                select(model_calls)
+                .where(model_calls.c.trace_id == trace_id)
+                .order_by(model_calls.c.position)
+            ).all()
+        return ModelCallTraceDetails(
+            overview=self._to_trace_overview(overview_row),
+            calls=tuple(_to_model_call(row) for row in call_rows),
+        )
+
+    def delete_started_before(self, cutoff: datetime) -> None:
+        """Delete every call that started before a time.
+
+        Args:
+            cutoff: Calls that started before this are deleted.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(model_calls).where(model_calls.c.started_at < cutoff)
+            )
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's calls.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(model_calls).where(model_calls.c.user_id == user_id)
+            )
+
+    @staticmethod
+    def _trace_overview_select() -> Select[Any]:
+        """Build the query that sums each trace's calls, with who it was for.
+
+        Returns:
+            The query, grouped by trace.
+        """
+        return (
+            select(
+                model_calls.c.trace_id,
+                model_calls.c.trace_kind,
+                model_calls.c.user_id,
+                users.c.name.label("user_name"),
+                users.c.email.label("user_email"),
+                func.min(model_calls.c.started_at).label("started_at"),
+                func.array_agg(
+                    aggregate_order_by(model_calls.c.step, model_calls.c.position)
+                ).label("steps"),
+                func.sum(model_calls.c.tokens_in).label("tokens_in"),
+                func.sum(model_calls.c.tokens_out).label("tokens_out"),
+                func.sum(model_calls.c.duration_ms).label("duration_ms"),
+                func.count(model_calls.c.error).label("error_count"),
+                func.bool_or(model_calls.c.content.is_not(None)).label("has_content"),
+            )
+            .select_from(model_calls.join(users))
+            .group_by(
+                model_calls.c.trace_id,
+                model_calls.c.trace_kind,
+                model_calls.c.user_id,
+                users.c.name,
+                users.c.email,
+            )
+        )
+
+    @staticmethod
+    def _to_trace_overview(row: Row[Any]) -> ModelCallTraceOverview:
+        """Turn a summed trace row into a trace overview.
+
+        Args:
+            row: The row from `_trace_overview_select`.
+
+        Returns:
+            The trace overview.
+        """
+        return ModelCallTraceOverview(
+            trace=ModelCallTrace(id=row.trace_id, kind=TraceKind(row.trace_kind)),
+            user_id=row.user_id,
+            user_name=row.user_name,
+            user_email=row.user_email,
+            started_at=row.started_at,
+            steps=tuple(ModelStep(step) for step in row.steps),
+            tokens_in=row.tokens_in,
+            tokens_out=row.tokens_out,
+            duration_ms=row.duration_ms,
+            error_count=row.error_count,
+            has_content=row.has_content,
+        )
+
+
 def _build_repositories(
     database: Database,
     transaction: Callable[[], AbstractContextManager[Transaction]],
@@ -3400,5 +3638,6 @@ def _build_repositories(
         pending_auth_account_deletions=PostgresPendingAuthAccountDeletionRepository(
             database
         ),
+        model_calls=PostgresModelCallRepository(database),
         transaction=transaction,
     )

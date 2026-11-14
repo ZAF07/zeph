@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from companion.core.model_call_log import start_trace
 from companion.core.models import (
     ChannelPhoto,
     ChatLine,
@@ -18,8 +19,10 @@ from companion.core.models import (
     MemoryItem,
     MemorySource,
     MessageDirection,
+    ModelStep,
     PlatformSettings,
     SharedPhoto,
+    TraceKind,
     UserSnapshot,
 )
 from companion.core.personal_stickers import PersonalStickerKeeper
@@ -386,7 +389,9 @@ class PostConversationProcessor:
                 unprocessed so the next tick tries again.
         """
         user_memory = self._repositories.user_memory
-        snapshot = self._user_snapshots.find(conversation.user_id, settings)
+        snapshot = self._user_snapshots.find(
+            conversation.user_id, settings, start_trace(TraceKind.CONVERSATION_END)
+        )
         messages = self._repositories.conversations.list_messages(conversation.id)
         if snapshot is not None:
             self._keep_personal_stickers(snapshot, messages)
@@ -474,6 +479,7 @@ class PostConversationProcessor:
         for _ in range(2):
             answer = self._chat_model.generate(
                 snapshot=snapshot,
+                step=ModelStep.CONVERSATION_END,
                 model=settings.get(MEMORY_PROCESSING_MODEL),
                 instructions=settings.get(MEMORY_PROCESSING_PROMPT),
                 history=[ChatLine(role=ChatRole.USER, text=description)],

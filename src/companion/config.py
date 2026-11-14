@@ -60,6 +60,8 @@ class Settings(BaseSettings):
     web_search_adapter: str = "tavily"
     scheduler_adapter: str = "in_process"
 
+    model_call_developer_logs: bool = False
+
     @property
     def initial_admin_email_set(self) -> frozenset[str]:
         """Split the comma-separated initial Admin emails.

@@ -13,6 +13,7 @@ from companion.core.models import (
     Feature,
     MemoryCategory,
     MemoryItem,
+    ModelStep,
     SharedPhoto,
     UserSnapshot,
 )
@@ -307,6 +308,7 @@ class MemoryRetrieval:
         try:
             answer = self._chat_model.generate(
                 snapshot=snapshot,
+                step=ModelStep.MEMORY_PICKING,
                 model=settings.get(MEMORY_RETRIEVAL_MODEL),
                 instructions=settings.get(MEMORY_RETRIEVAL_PROMPT),
                 history=[

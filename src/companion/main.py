@@ -19,6 +19,7 @@ from companion.adapters.telegram.chat_channel import TelegramChatChannel
 from companion.adapters.timer import ThreadTimer
 from companion.app import AppDependencies, create_app
 from companion.config import Settings, load_settings
+from companion.core.model_call_log import logger as model_call_logger
 from companion.core.ports import (
     AuthAccounts,
     AuthVerifier,
@@ -287,6 +288,22 @@ def quiet_http_client_logs() -> None:
         logging.getLogger(logger_name).setLevel(logging.WARNING)
 
 
+def show_model_call_developer_logs(enabled: bool) -> None:
+    """Print the Model Call Log's developer logs, for local and worktree runs.
+
+    They hold every model call's full content at INFO, which nothing else
+    prints, so the log gets its own handler. Off, nothing changes.
+
+    Args:
+        enabled: Whether developer logs are on (`MODEL_CALL_DEVELOPER_LOGS`).
+    """
+    if not enabled:
+        return
+    model_call_logger.setLevel(logging.INFO)
+    if not model_call_logger.handlers:
+        model_call_logger.addHandler(logging.StreamHandler())
+
+
 def build_production_app() -> FastAPI:
     """Build the backend app with the adapters chosen in `.env`.
 
@@ -297,6 +314,7 @@ def build_production_app() -> FastAPI:
     """
     quiet_http_client_logs()
     settings = load_settings()
+    show_model_call_developer_logs(settings.model_call_developer_logs)
     engine = build_database_engine(settings)
     dependencies = AppDependencies(
         repositories=build_repositories(settings, engine),
@@ -317,5 +335,6 @@ def build_production_app() -> FastAPI:
         dashboard_url=settings.dashboard_url,
         cors_origins=[settings.dashboard_url],
         initial_admin_emails=settings.initial_admin_email_set,
+        model_call_developer_logs=settings.model_call_developer_logs,
     )
     return create_app(dependencies)

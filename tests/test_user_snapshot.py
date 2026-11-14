@@ -17,6 +17,7 @@ from companion.core.models import (
     CheckInSettings,
     Feature,
     TelegramConnection,
+    TraceKind,
     User,
     UserFeatureSwitch,
     UserRole,
@@ -191,7 +192,9 @@ def test_snapshots_hold_the_same_feature_statuses_as_the_feature_service(
     loader = UserSnapshotLoader(repositories, clock)
     settings = repositories.platform_settings.load()
 
-    snapshots = loader.load_many([sam.id, uuid4(), maya.id], settings)
+    snapshots = loader.load_many(
+        [sam.id, uuid4(), maya.id], settings, TraceKind.CHECK_IN
+    )
 
     assert [snapshot.user.id for snapshot in snapshots] == [sam.id, maya.id]
     for snapshot in snapshots:
@@ -206,6 +209,8 @@ def test_snapshots_hold_the_same_feature_statuses_as_the_feature_service(
     assert maya_snapshot.local_now.utcoffset() == timedelta(hours=8)
     assert maya_snapshot.today == (clock.now() + timedelta(hours=8)).date()
     assert maya_snapshot.settings == settings
-    assert loader.load(maya.id, settings) == maya_snapshot
+    assert maya_snapshot.trace.kind == TraceKind.CHECK_IN
+    assert snapshots[0].trace.id != maya_snapshot.trace.id
+    assert loader.load(maya.id, settings, maya_snapshot.trace) == maya_snapshot
     with pytest.raises(UserNotFoundError):
-        loader.load(uuid4(), settings)
+        loader.load(uuid4(), settings, maya_snapshot.trace)

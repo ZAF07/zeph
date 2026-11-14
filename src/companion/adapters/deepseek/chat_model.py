@@ -11,7 +11,7 @@ from langchain_core.messages import (
 from langchain_deepseek import ChatDeepSeek
 from pydantic import SecretStr
 
-from companion.core.models import ChatLine, ChatRole, ModelAnswer
+from companion.core.models import ChatLine, ChatRole, ModelAnswer, ToolCallRecord
 from companion.core.ports import ChatTool
 
 MAX_TOOL_ROUNDS = 4
@@ -59,20 +59,37 @@ def to_tool_schema(tool: ChatTool) -> dict[str, Any]:
     }
 
 
-def to_model_answer(text: str, responses: Sequence[AIMessage]) -> ModelAnswer:
-    """Put the reply text together with the tokens every response took.
+def to_model_answer(
+    text: str,
+    responses: Sequence[AIMessage],
+    tool_calls: Sequence[ToolCallRecord] = (),
+) -> ModelAnswer:
+    """Put the reply text together with the tokens, tool calls and reasoning.
 
     Args:
         text: The reply text.
         responses: Every response the model gave on the way to the reply.
+        tool_calls: The tool calls made on the way, with their results.
 
     Returns:
-        The answer; a response with no usage counts as no tokens.
+        The answer; a response with no usage counts as no tokens, and the
+        reasoning is None when no response had any.
     """
     usages = [response.usage_metadata for response in responses]
     tokens_in = sum(usage["input_tokens"] for usage in usages if usage)
     tokens_out = sum(usage["output_tokens"] for usage in usages if usage)
-    return ModelAnswer(text=text, tokens_in=tokens_in, tokens_out=tokens_out)
+    reasonings = [
+        str(response.additional_kwargs["reasoning_content"])
+        for response in responses
+        if response.additional_kwargs.get("reasoning_content")
+    ]
+    return ModelAnswer(
+        text=text,
+        tokens_in=tokens_in,
+        tokens_out=tokens_out,
+        tool_calls=tuple(tool_calls),
+        reasoning="\n\n".join(reasonings) if reasonings else None,
+    )
 
 
 def answer_with_tools(
@@ -94,23 +111,24 @@ def answer_with_tools(
         tools: The tools the model may call.
 
     Returns:
-        The reply text and the tokens every round took.
+        The reply text, the tokens every round took and every tool call made;
+        a broken call's arguments are kept as given, under "raw".
     """
     tools_by_name = {tool.name: tool for tool in tools}
     responses: list[AIMessage] = []
+    tool_calls: list[ToolCallRecord] = []
     for _ in range(MAX_TOOL_ROUNDS):
         response = ask(messages)
         responses.append(response)
         if not response.tool_calls and not response.invalid_tool_calls:
-            return to_model_answer(response.text, responses)
+            return to_model_answer(response.text, responses, tool_calls)
         messages.append(response)
         for broken_call in response.invalid_tool_calls:
-            messages.append(
-                ToolMessage(
-                    f"The arguments for {broken_call['name']} were not valid "
-                    "JSON. Try again.",
-                    tool_call_id=broken_call["id"] or "",
-                )
+            name = broken_call["name"] or ""
+            result = f"The arguments for {name} were not valid JSON. Try again."
+            messages.append(ToolMessage(result, tool_call_id=broken_call["id"] or ""))
+            tool_calls.append(
+                ToolCallRecord(name, {"raw": broken_call["args"]}, result)
             )
         for tool_call in response.tool_calls:
             tool = tools_by_name.get(tool_call["name"])
@@ -120,8 +138,13 @@ def answer_with_tools(
                 else f"There is no tool called {tool_call['name']}."
             )
             messages.append(ToolMessage(result, tool_call_id=tool_call["id"]))
+            tool_calls.append(
+                ToolCallRecord(tool_call["name"], tool_call["args"], result)
+            )
     final_response = ask_without_tools(messages)
-    return to_model_answer(final_response.text, [*responses, final_response])
+    return to_model_answer(
+        final_response.text, [*responses, final_response], tool_calls
+    )
 
 
 class DeepSeekChatModel:

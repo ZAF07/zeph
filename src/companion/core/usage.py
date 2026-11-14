@@ -1,15 +1,25 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from uuid import UUID
 
-from companion.core.models import ChatLine, DailyUsage, PlatformSettings, UserSnapshot
+from companion.core.model_call_log import ModelCallLog, ModelCallRequest
+from companion.core.models import (
+    ChatLine,
+    ChatRole,
+    DailyUsage,
+    ModelAnswer,
+    ModelStep,
+    PhotoImage,
+    PlatformSettings,
+    UserSnapshot,
+)
 from companion.core.platform_settings import (
     DAILY_LIMIT_REPLY,
     DAILY_MESSAGE_LIMIT,
     WEB_SEARCH_DAILY_LIMIT,
 )
-from companion.core.ports import ChatModel, ChatTool, Clock, Repositories
+from companion.core.ports import ChatModel, ChatTool, Clock, PhotoViewer, Repositories
 from companion.core.timing import users_today
 
 
@@ -140,30 +150,49 @@ class UsageLimiter:
 
 
 class UsageRecordingChatModel:
-    """Asks the chat model for a User and adds the tokens to their usage."""
+    """Asks the chat model or photo viewer for a User, recording each call.
 
-    def __init__(self, chat_model: ChatModel, usage_limiter: UsageLimiter) -> None:
+    The tokens are added to the User's usage, and every call goes into the
+    Model Call Log, failed ones included, so no service has to log itself.
+    """
+
+    def __init__(
+        self,
+        chat_model: ChatModel,
+        photo_viewer: PhotoViewer,
+        usage_limiter: UsageLimiter,
+        model_call_log: ModelCallLog,
+        clock: Clock,
+    ) -> None:
         """Set up the wrapper.
 
         Args:
             chat_model: Generates the answers.
+            photo_viewer: Looks at photos.
             usage_limiter: Records the tokens each answer took.
+            model_call_log: Records each call.
+            clock: Tells when each call starts.
         """
         self._chat_model = chat_model
+        self._photo_viewer = photo_viewer
         self._usage_limiter = usage_limiter
+        self._model_call_log = model_call_log
+        self._clock = clock
 
     def generate(
         self,
         snapshot: UserSnapshot,
+        step: ModelStep,
         model: str,
         instructions: str,
         history: list[ChatLine],
         tools: Sequence[ChatTool] = (),
     ) -> str:
-        """Generate an answer for a User and record the tokens it took.
+        """Generate an answer for a User and record the call.
 
         Args:
             snapshot: The User the answer is for.
+            step: Which step the answer is for.
             model: The model to use, e.g. "deepseek-chat".
             instructions: What the model should be and do.
             history: The Conversation so far, oldest first.
@@ -171,9 +200,79 @@ class UsageRecordingChatModel:
 
         Returns:
             The answer text.
+
+        Raises:
+            Exception: Whatever the chat model raises, once it is recorded.
         """
-        answer = self._chat_model.generate(
-            model=model, instructions=instructions, history=history, tools=tools
+        request = ModelCallRequest(step, model, instructions, tuple(history), tools)
+        return self._ask_and_record(
+            snapshot,
+            request,
+            lambda: self._chat_model.generate(
+                model=model, instructions=instructions, history=history, tools=tools
+            ),
         )
+
+    def look(
+        self, snapshot: UserSnapshot, model: str, instructions: str, photo: PhotoImage
+    ) -> str:
+        """Look at a photo for a User and record the call.
+
+        The Model Call Log keeps the instructions and the answer, never the
+        image.
+
+        Args:
+            snapshot: The User who sent the photo.
+            model: The model to use, e.g. "deepseek-chat".
+            instructions: What to write about the photo.
+            photo: The photo's image.
+
+        Returns:
+            The text.
+
+        Raises:
+            Exception: Whatever the photo viewer raises, once it is recorded.
+        """
+        request = ModelCallRequest(
+            step=ModelStep.PHOTO,
+            model=model,
+            instructions=instructions,
+            history=(ChatLine(role=ChatRole.USER, text="[photo]"),),
+            tools=(),
+        )
+        return self._ask_and_record(
+            snapshot,
+            request,
+            lambda: self._photo_viewer.look(
+                model=model, instructions=instructions, photo=photo
+            ),
+        )
+
+    def _ask_and_record(
+        self,
+        snapshot: UserSnapshot,
+        request: ModelCallRequest,
+        ask: Callable[[], ModelAnswer],
+    ) -> str:
+        """Ask the model, then record the call, failed or not, and its tokens.
+
+        Args:
+            snapshot: The User the call is for.
+            request: What the model is asked.
+            ask: Makes the call.
+
+        Returns:
+            The answer text.
+
+        Raises:
+            Exception: Whatever the call raises, once it is recorded.
+        """
+        started_at = self._clock.now()
+        try:
+            answer = ask()
+        except Exception as error:
+            self._model_call_log.record(snapshot, request, started_at, error)
+            raise
         self._usage_limiter.record_tokens(snapshot, answer.tokens_in, answer.tokens_out)
+        self._model_call_log.record(snapshot, request, started_at, answer)
         return answer.text

@@ -10,6 +10,7 @@ from companion.core.models import (
     ConversationMessage,
     LibrarySticker,
     MessageDirection,
+    ModelStep,
     PersonalSticker,
     SharedPhoto,
     UserSnapshot,
@@ -176,6 +177,7 @@ class ResponseComposer:
         )
         reply = self._chat_model.generate(
             snapshot=snapshot,
+            step=ModelStep.REPLY,
             model=settings.get(RESPONSE_MODEL),
             instructions=instructions,
             history=history,

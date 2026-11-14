@@ -12,6 +12,7 @@ from companion.main import (
     build_vector_store,
     build_web_search,
     quiet_http_client_logs,
+    show_model_call_developer_logs,
 )
 
 COMPLETE_ENVIRONMENT = {
@@ -122,3 +123,25 @@ def test_http_client_loggers_are_pinned_to_warning(
 
     assert logging.getLogger("httpx").level == logging.WARNING
     assert logging.getLogger("httpcore").level == logging.WARNING
+
+
+def test_model_call_developer_logs_are_off_unless_turned_on() -> None:
+    assert load_settings(COMPLETE_ENVIRONMENT).model_call_developer_logs is False
+    turned_on = {**COMPLETE_ENVIRONMENT, "MODEL_CALL_DEVELOPER_LOGS": "true"}
+    assert load_settings(turned_on).model_call_developer_logs is True
+
+
+def test_model_call_developer_logs_are_printed_only_when_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model_call_logger = logging.getLogger("companion.core.model_call_log")
+    monkeypatch.setattr(model_call_logger, "level", logging.NOTSET)
+    monkeypatch.setattr(model_call_logger, "handlers", [])
+
+    show_model_call_developer_logs(False)
+    assert model_call_logger.level == logging.NOTSET
+    assert model_call_logger.handlers == []
+
+    show_model_call_developer_logs(True)
+    assert model_call_logger.level == logging.INFO
+    assert len(model_call_logger.handlers) == 1

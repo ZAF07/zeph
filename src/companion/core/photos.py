@@ -26,11 +26,10 @@ from companion.core.ports import (
     ChatChannel,
     ChatTool,
     Clock,
-    PhotoViewer,
     Repositories,
 )
 from companion.core.reply_tools import ReplyContext, ReplyOffer
-from companion.core.usage import UsageLimiter
+from companion.core.usage import UsageRecordingChatModel
 
 logger = logging.getLogger(__name__)
 
@@ -263,8 +262,7 @@ class PhotoService:
         self,
         repositories: Repositories,
         chat_channel: ChatChannel,
-        photo_viewer: PhotoViewer,
-        usage_limiter: UsageLimiter,
+        chat_model: UsageRecordingChatModel,
         clock: Clock,
     ) -> None:
         """Set up the service.
@@ -272,14 +270,12 @@ class PhotoService:
         Args:
             repositories: Where settings and Shared Photos are stored.
             chat_channel: Downloads the photos.
-            photo_viewer: Looks at each photo.
-            usage_limiter: Records the tokens each look took.
+            chat_model: Looks at each photo and records the look.
             clock: Pauses between tries.
         """
         self._repositories = repositories
         self._chat_channel = chat_channel
-        self._photo_viewer = photo_viewer
-        self._usage_limiter = usage_limiter
+        self._chat_model = chat_model
         self._clock = clock
 
     def read_message(
@@ -447,7 +443,8 @@ class PhotoService:
         """Download a photo and look at it, trying again when that fails.
 
         Args:
-            snapshot: The User whose usage the tokens go into.
+            snapshot: The User who sent the photo, for usage and the Model Call
+                Log.
             photo: The photo.
             instructions: What to write about the photo.
             log_action: What is being done, for the error log, e.g.
@@ -461,7 +458,8 @@ class PhotoService:
         for attempt in range(1, tries + 1):
             try:
                 image = self._chat_channel.download_photo(photo.file_id)
-                answer = self._photo_viewer.look(
+                answer = self._chat_model.look(
+                    snapshot=snapshot,
                     model=settings.get(PHOTO_MODEL),
                     instructions=instructions,
                     photo=image,
@@ -471,11 +469,8 @@ class PhotoService:
                     "Could not %s (try %d of %d)", log_action, attempt, tries
                 )
             else:
-                self._usage_limiter.record_tokens(
-                    snapshot, answer.tokens_in, answer.tokens_out
-                )
-                if answer.text.strip():
-                    return answer.text.strip()
+                if answer.strip():
+                    return answer.strip()
                 logger.error(
                     "Could not %s: the answer was empty (try %d of %d)",
                     log_action,
