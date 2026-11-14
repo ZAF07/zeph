@@ -8,6 +8,7 @@ from tests.fakes import (
     FakeClock,
     FakeScheduler,
     ScriptedChatModel,
+    understanding_answer,
 )
 from tests.telegram_helpers import (
     auth_headers,
@@ -175,11 +176,11 @@ def test_a_new_category_is_used_by_the_next_processing_and_retrieval(
     assert memory_contents(client, headers) == {"Work": ["Manager moves deadlines"]}
 
     chat_model.calls.clear()
-    chat_model.script_retrieval("Work")
+    chat_model.script_understanding(understanding_answer(memory_categories=["Work"]))
     chat_model.script("ugh, again?")
     send_to_webhook(client, telegram_text_update("deadline moved AGAIN"))
 
-    assert "- Work:" in chat_model.retrieval_calls[-1].history[0].text
+    assert "- Work:" in chat_model.understanding_calls[-1].history[0].text
     assert "Manager moves deadlines" in chat_model.calls[-1].instructions
 
 
@@ -233,7 +234,7 @@ def test_an_archived_category_keeps_its_items_but_gets_no_new_ones(
     chat_model.calls.clear()
     chat_model.script("mm")
     send_to_webhook(client, telegram_text_update("long day"))
-    assert chat_model.retrieval_calls == []
+    assert "- What helps" not in chat_model.understanding_calls[-1].history[0].text
     assert "Swimming" not in chat_model.calls[-1].instructions
 
 
@@ -407,7 +408,8 @@ def test_admins_can_rename_describe_and_toggle_always_include(
     chat_model.calls.clear()
     chat_model.script("mm")
     send_to_webhook(client, telegram_text_update("long day"))
-    assert chat_model.retrieval_calls == []
+    understanding_text = chat_model.understanding_calls[-1].history[0].text
+    assert "- What steadies them" not in understanding_text
     reply_instructions = chat_model.calls[-1].instructions
     assert "What steadies them:\n- Swimming" in reply_instructions
 

@@ -60,6 +60,7 @@ from companion.core.sticker_adding import StickerAdding
 from companion.core.stickers import StickerLibraryService, StickerTools
 from companion.core.telegram_connection import TelegramConnectionService
 from companion.core.typing_keeper import TypingKeeper
+from companion.core.understanding import UnderstandingService
 from companion.core.usage import UsageLimiter, UsageRecordingChatModel
 from companion.core.user_data import ChatDataDeletion, UserDataService
 from companion.core.user_memory import UserMemoryService
@@ -220,10 +221,12 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     reply_service = ReplyService(
         reply_gate=reply_gate,
         conversations=conversation_service,
-        memory_retrieval=MemoryRetrieval(
+        understanding=UnderstandingService(
             repositories=dependencies.repositories,
             chat_model=chat_model,
+            clock=dependencies.clock,
         ),
+        memory_retrieval=MemoryRetrieval(repositories=dependencies.repositories),
         knowledge_retrieval=KnowledgeRetrieval(
             repositories=dependencies.repositories,
             embedder=dependencies.embedder,

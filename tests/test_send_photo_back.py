@@ -16,6 +16,7 @@ from tests.fakes import (
     ScriptedChatModel,
     SentPhoto,
     ToolCall,
+    understanding_answer,
 )
 from tests.telegram_helpers import (
     TELEGRAM_CHAT_ID,
@@ -106,7 +107,9 @@ def test_a_relevant_shared_photo_reaches_the_reply_and_can_be_sent_back(
     seeded_settings: dict[str, Any],
 ) -> None:
     connect_maya_with_a_shared_cat(client, auth_verifier, chat_channel)
-    chat_model.script_retrieval("Shared Photos")
+    chat_model.script_understanding(
+        understanding_answer(memory_categories=["Shared Photos"])
+    )
 
     call = reply_call(
         client,
@@ -116,9 +119,9 @@ def test_a_relevant_shared_photo_reaches_the_reply_and_can_be_sent_back(
         "classic Miso, remember this sleepy face?",
     )
 
-    [retrieval_call] = chat_model.retrieval_calls
+    [understanding_call] = chat_model.understanding_calls
     group_description = seeded_settings["shared_photos_memory_description"]
-    assert f"- Shared Photos: {group_description}" in retrieval_call.history[0].text
+    assert f"- Shared Photos: {group_description}" in understanding_call.history[0].text
     assert CAT in call.instructions
     assert CAT_NOTE in call.instructions
     [tool] = send_photo_tools(call)
@@ -170,7 +173,9 @@ def test_a_reply_sends_at_most_one_shared_photo_after_the_text_and_before_a_stic
         GARDEN_NOTE,
         sent_at=datetime(2026, 11, 12, 9, tzinfo=UTC),
     )
-    chat_model.script_retrieval("Shared Photos")
+    chat_model.script_understanding(
+        understanding_answer(memory_categories=["Shared Photos"])
+    )
 
     call = reply_call(
         client,
@@ -207,7 +212,9 @@ def test_another_users_shared_photo_is_never_shown_or_sent(
         client, admin, "file-owners-dog", OWNERS_DOG, "Their dog."
     )
     connect_maya_with_a_shared_cat(client, auth_verifier, chat_channel)
-    chat_model.script_retrieval("Shared Photos")
+    chat_model.script_understanding(
+        understanding_answer(memory_categories=["Shared Photos"])
+    )
 
     call = reply_call(
         client,
@@ -234,11 +241,13 @@ def test_with_user_memory_off_shared_photos_are_still_shown_and_the_tool_offered
 ) -> None:
     headers = connect_maya_with_a_shared_cat(client, auth_verifier, chat_channel)
     client.patch("/api/me", json={"user_memory_enabled": False}, headers=headers)
-    chat_model.script_retrieval("Shared Photos")
+    chat_model.script_understanding(
+        understanding_answer(memory_categories=["Shared Photos"])
+    )
 
     call = reply_call(client, chat_model, telegram_text_update("Miso!"), "hi")
 
-    assert len(chat_model.retrieval_calls) == 1
+    assert len(chat_model.understanding_calls) == 1
     assert CAT in call.instructions
     assert send_photo_tools(call) != []
 
@@ -251,7 +260,9 @@ def test_when_telegram_refuses_the_photo_the_text_still_goes_out_and_it_is_logge
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     connect_maya_with_a_shared_cat(client, auth_verifier, chat_channel)
-    chat_model.script_retrieval("Shared Photos")
+    chat_model.script_understanding(
+        understanding_answer(memory_categories=["Shared Photos"])
+    )
     chat_channel.photo_send_failure = RuntimeError("Bad Request: wrong file id")
 
     with caplog.at_level(logging.ERROR):
@@ -297,14 +308,16 @@ def test_edited_send_photo_settings_are_used_and_show_on_the_prompts_page(
             "shared_photos_memory_description": edited_group,
         },
     )
-    chat_model.script_retrieval("Shared Photos")
+    chat_model.script_understanding(
+        understanding_answer(memory_categories=["Shared Photos"])
+    )
 
     call = reply_call(client, chat_model, telegram_text_update("Miso!"), "hi")
 
     [tool] = send_photo_tools(call)
     assert tool.description.startswith(edited_tool)
     assert f"- Shared Photos: {edited_group}" in (
-        chat_model.retrieval_calls[0].history[0].text
+        chat_model.understanding_calls[0].history[0].text
     )
     services = client.get("/api/admin/core-services", headers=admin).json()
     extra_prompts = {
@@ -312,4 +325,4 @@ def test_edited_send_photo_settings_are_used_and_show_on_the_prompts_page(
         for service in services["services"]
     }
     assert "send_photo_tool_description" in extra_prompts["Photo viewing"]
-    assert "shared_photos_memory_description" in extra_prompts["Memory retrieval"]
+    assert "shared_photos_memory_description" in extra_prompts["Understanding"]

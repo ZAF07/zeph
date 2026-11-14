@@ -705,11 +705,8 @@ def test_a_failed_document_never_reaches_the_reply(
 
     instructions = reply_instructions(client, chat_model, "notice the breath")
 
-    assert instructions == (
-        f"{seeded_settings['persona']}\n\n{seeded_settings['response_prompt']}"
-        f"\n\n{seeded_settings['reply_web_search_instructions']}"
-        f"\n\n{seeded_settings['reply_settings_instructions']}"
-    )
+    assert seeded_settings["reply_knowledge_intro"] not in instructions
+    assert instructions.endswith(seeded_settings["reply_settings_instructions"])
 
 
 def test_a_deleted_document_and_its_chunks_are_gone_from_replies(

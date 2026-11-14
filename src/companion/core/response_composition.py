@@ -120,11 +120,13 @@ class ResponseComposer:
         knowledge: str = "",
         data_deletion_note: str = "",
         shared_photo_ids: Sequence[UUID] = (),
+        reply_guidance: str = "",
     ) -> ComposedReply:
         """Compose a reply to the Conversation's newest message.
 
         Uses the Persona, response prompt and model from platform settings,
-        then what the Companion remembers and the Knowledge that may fit, and
+        then what the Understanding found the User needs, what the Companion
+        remembers and the Knowledge that may fit, and
         gives the model every earlier message in the Conversation. Each tool
         provider offers its tools and instructions, and a sticker or Shared
         Photo a tool picks is sent with the reply. When a Feature doesn't
@@ -140,6 +142,8 @@ class ResponseComposer:
                 User's request to delete their data, and why; "" if it didn't.
             shared_photo_ids: The User's Shared Photos that matter for the
                 message, which the reply may send one of; empty if none.
+            reply_guidance: What the Understanding adds: the Need's "how to
+                reply", the nuance and mood; "" if none.
 
         Returns:
             The reply as short messages, an optional sticker and an optional
@@ -157,6 +161,7 @@ class ResponseComposer:
         ]
         instructions = f"{settings.get(PERSONA)}\n\n{settings.get(RESPONSE_PROMPT)}"
         sections = (
+            reply_guidance,
             memory,
             knowledge,
             *(offer.instructions for offer in offers),

@@ -4,14 +4,16 @@ from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.models import MessageToAnswer, UserSnapshot
 from companion.core.reply_gate import ReplyGate, Stopped
 from companion.core.response_composition import ResponseComposer
+from companion.core.understanding import UnderstandingService
 
 
 class ReplyService:
     """Answers a connected User's Message, one step after another (ADR-0009).
 
     The steps run in this order: the ReplyGate applies the house rules left
-    once the Message's texts are saved and checked, then the User Memory that
-    matters and the Knowledge that may fit are recalled, then the reply is
+    once the Message's texts are saved and checked, then the Understanding
+    works out what the User needs and which User Memory matters, then that
+    memory and the Knowledge that may fit are recalled, then the reply is
     composed and delivered. Every step reads the User from the same snapshot.
     """
 
@@ -19,6 +21,7 @@ class ReplyService:
         self,
         reply_gate: ReplyGate,
         conversations: ConversationService,
+        understanding: UnderstandingService,
         memory_retrieval: MemoryRetrieval,
         knowledge_retrieval: KnowledgeRetrieval,
         response_composer: ResponseComposer,
@@ -28,12 +31,15 @@ class ReplyService:
         Args:
             reply_gate: Applies the house rules to each Message.
             conversations: Sends composed replies.
-            memory_retrieval: Finds the User Memory that matters for a message.
+            understanding: Works out what the User needs before each reply.
+            memory_retrieval: Reads the User Memory and picks out what the
+                Understanding chose.
             knowledge_retrieval: Finds the Knowledge that may fit a message.
             response_composer: Writes the Companion's reply.
         """
         self._reply_gate = reply_gate
         self._conversations = conversations
+        self._understanding = understanding
         self._memory_retrieval = memory_retrieval
         self._knowledge_retrieval = knowledge_retrieval
         self._response_composer = response_composer
@@ -52,13 +58,20 @@ class ReplyService:
         gate_result = self._reply_gate.check(message, snapshot)
         if isinstance(gate_result, Stopped):
             return
-        memory = self._memory_retrieval.recall(snapshot, message.conversation_id)
+        saved_memory = self._memory_retrieval.read(snapshot)
+        understood = self._understanding.understand(
+            snapshot, message.conversation_id, saved_memory
+        )
+        memory = self._memory_retrieval.recall(
+            snapshot, saved_memory, understood.understanding.form.memory_categories
+        )
         knowledge = self._knowledge_retrieval.recall(snapshot, message.conversation_id)
         reply = self._response_composer.compose(
             message.conversation_id,
             snapshot,
             memory.text,
             knowledge,
+            reply_guidance=understood.reply_guidance,
             data_deletion_note=gate_result.data_deletion_note,
             shared_photo_ids=memory.shared_photo_ids,
         )

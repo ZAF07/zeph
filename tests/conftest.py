@@ -16,6 +16,7 @@ from companion.adapters.postgres.database import (
     seed_check_in_kinds,
     seed_helplines,
     seed_memory_categories,
+    seed_needs,
     seed_platform_settings,
 )
 from companion.adapters.postgres.repositories import build_postgres_repositories
@@ -44,6 +45,7 @@ SEED_FILE = SEED_DIR / "platform_settings.yaml"
 HELPLINES_SEED_FILE = SEED_DIR / "helplines.yaml"
 MEMORY_CATEGORIES_SEED_FILE = SEED_DIR / "memory_categories.yaml"
 CHECK_IN_KINDS_SEED_FILE = SEED_DIR / "check_in_kinds.yaml"
+NEEDS_SEED_FILE = SEED_DIR / "needs.yaml"
 KNOWLEDGE_SEED_FILE = SEED_DIR / "knowledge" / "knowledge.yaml"
 
 
@@ -79,13 +81,14 @@ def engine(database_url: str) -> Iterator[Engine]:
                 "conversation_summaries, knowledge_documents, knowledge_chunks, "
                 "daily_usage, stickers, check_in_kinds, check_ins, "
                 "feature_switches, user_feature_switches, shared_photos, "
-                "personal_stickers, pending_auth_account_deletions CASCADE"
+                "personal_stickers, pending_auth_account_deletions, needs CASCADE"
             )
         )
     seed_platform_settings(engine, SEED_FILE)
     seed_helplines(engine, HELPLINES_SEED_FILE)
     seed_memory_categories(engine, MEMORY_CATEGORIES_SEED_FILE)
     seed_check_in_kinds(engine, CHECK_IN_KINDS_SEED_FILE)
+    seed_needs(engine, NEEDS_SEED_FILE)
     yield engine
     engine.dispose()
 
@@ -144,7 +147,7 @@ def chat_model(seeded_settings: dict[str, Any]) -> ScriptedChatModel:
     return ScriptedChatModel(
         safeguard_prompt=seeded_settings["safeguard_prompt"],
         memory_processing_prompt=seeded_settings["memory_processing_prompt"],
-        memory_retrieval_prompt=seeded_settings["memory_retrieval_prompt"],
+        understanding_prompt=seeded_settings["understanding_prompt"],
         sticker_keeping_prompt=seeded_settings["personal_sticker_keeping_prompt"],
     )
 

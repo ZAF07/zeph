@@ -175,11 +175,11 @@ _Avoid_: Profile, persona (Persona is the Companion's voice), bio
 ### Understanding
 
 **Need**:
-What the User wants from the Companion right now (e.g. to be heard, to think it through, advice, accountability on a Goal). Before each reply the Companion picks the one that fits best, fresh for every message. Managed by Admins: each has a name, when it fits, and how to reply, and only the picked Need's "how to reply" shapes the reply. One fallback Need ("Ask more", to start) is used when it isn't clear; it can be edited but never deleted. Any other Need can be deleted.
+What the User wants from the Companion right now (e.g. to be heard, to think it through, advice, accountability on a Goal). Before each reply the Companion picks the one that fits best, fresh for every message. Managed by Admins: each has a name, when it fits, and how to reply, and only the picked Need's "how to reply" shapes the reply. One fallback Need ("Ask more", to start) is used when it isn't clear, or when the Understanding can't be made; it can be edited but never deleted. Any other Need can be deleted.
 _Avoid_: Intent, mode, mood (mood is how a User seemed in a Conversation Summary)
 
 **Understanding**:
-The Companion's private read of what a User just said, made before it replies: when it came (in their time zone), how they seemed and how strongly, whether it knows why they feel that way, which Need fits, which Life Threads it touches, and what the Companion chose to bring up or leave alone (and why). Each Understanding sees the earlier ones in the same Conversation, so the Companion knows what it already raised and how the User's mood is moving. When their mood stands out and it doesn't know why, the Companion gently asks, in its own voice. Users don't see Understandings; what is learned from them (their User Portrait, Life Threads) is theirs to see and delete. Removed with the messages it was made for.
+The Companion's private read of what a User just said, made before it replies: when it came (in their time zone), how they seemed and how strongly, whether it knows why they feel that way, which Need fits, which Life Threads it touches, and what the Companion chose to bring up or leave alone (and why). Each Understanding sees the earlier ones in the same Conversation, so the Companion knows what it already raised and how the User's mood is moving. When their mood stands out and it doesn't know why, the Companion gently asks, in its own voice, but never while they're venting and never twice in a row. Users don't see Understandings; what is learned from them (their User Portrait, Life Threads) is theirs to see and delete. Removed with the messages it was made for.
 _Avoid_: Analysis, classification, note, intent detection
 
 **Curiosity**:

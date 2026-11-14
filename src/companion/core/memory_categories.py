@@ -41,7 +41,7 @@ class MemoryCategoryService:
 
     Categories are never deleted, because Memory Items belong to them. An
     archived category keeps its items but gets no new ones. Post-conversation
-    processing and memory retrieval read the list fresh each time, so changes
+    processing and the Understanding read the list fresh each time, so changes
     take effect straight away.
     """
 

@@ -99,7 +99,7 @@ def test_a_plain_users_message_makes_a_trace_with_no_content(
     assert trace["has_content"] is False
     opened = open_trace(client, admin, trace["trace_id"])
     steps = [call["step"] for call in opened["calls"]]
-    assert steps == ["safeguard", "reply"]
+    assert steps == ["safeguard", "understanding", "reply"]
     reply = opened["calls"][-1]
     assert reply["model"]
     assert reply["tokens_in"] > 0
@@ -110,7 +110,7 @@ def test_a_plain_users_message_makes_a_trace_with_no_content(
     assert all(call["content"] is None for call in opened["calls"])
     assert "lighthouse" not in str(opened)
     stored = stored_model_calls(engine)
-    assert len(stored) == 2
+    assert len(stored) == 3
     assert not any("lighthouse" in row for row in stored)
 
 
@@ -159,7 +159,7 @@ def test_texts_sent_in_a_row_make_one_trace_for_their_message(
 
     admin = owner_headers(client, auth_verifier)
     [trace] = list_traces(client, admin)
-    assert trace["steps"] == ["safeguard", "safeguard", "reply"]
+    assert trace["steps"] == ["safeguard", "safeguard", "understanding", "reply"]
 
 
 def test_a_failing_model_call_shows_its_error(

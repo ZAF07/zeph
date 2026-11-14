@@ -1,4 +1,5 @@
 import hashlib
+import json
 import math
 import re
 import time
@@ -426,14 +427,52 @@ class FakeTimer:
             self._waiting.pop(key)()
 
 
+def understanding_answer(
+    need: str = "Just chatting",
+    memory_categories: Sequence[str] = (),
+    mood: str = "relaxed",
+    intensity: str = "low",
+    cause_known: bool = True,
+    nuance: str = "Just saying hi.",
+) -> str:
+    """Build the form the Understanding model answers with.
+
+    Args:
+        need: The Need's name.
+        memory_categories: The Memory Categories whose items matter.
+        mood: How the User seems.
+        intensity: How strongly: "low", "medium" or "high".
+        cause_known: Whether the Companion knows why they feel that way.
+        nuance: One sentence on what fits.
+
+    Returns:
+        The form as JSON.
+    """
+    return json.dumps(
+        {
+            "need": need,
+            "nuance": nuance,
+            "mood": mood,
+            "intensity": intensity,
+            "cause_known": cause_known,
+            "memory_categories": list(memory_categories),
+            "bring_up": [],
+            "left_alone": [],
+            "look_up_past": [],
+            "knowledge": [],
+            "threads_touched": [],
+        }
+    )
+
+
 class ScriptedChatModel:
     """Chat model that returns pre-written replies and records each call.
 
-    Safeguard, memory processing, memory retrieval and Personal Sticker
+    Safeguard, memory processing, Understanding and Personal Sticker
     keeping calls are told apart by their instructions and kept apart from
     reply calls, each with its own script. The Safeguard defaults to "none"
-    and retrieval to "none", so tests about replies don't have to script
-    them too. Set
+    and the Understanding to `understanding_answer()`, so tests about replies
+    don't have to script them too. Set
     `before_next_reply` to run something once while the next reply is being
     "written", like a User acting during a slow model call, and
     `before_next_safeguard` likewise while the next text is being checked.
@@ -443,7 +482,7 @@ class ScriptedChatModel:
         self,
         safeguard_prompt: str = "",
         memory_processing_prompt: str = "",
-        memory_retrieval_prompt: str = "",
+        understanding_prompt: str = "",
         sticker_keeping_prompt: str = "",
     ) -> None:
         """Start with no replies scripted, no calls and no delay.
@@ -452,24 +491,24 @@ class ScriptedChatModel:
             safeguard_prompt: The instructions that mark a Safeguard call.
             memory_processing_prompt: The instructions that mark a
                 post-conversation processing call.
-            memory_retrieval_prompt: The instructions that mark a memory
-                retrieval call.
+            understanding_prompt: The instructions that mark an
+                Understanding call.
             sticker_keeping_prompt: The instructions that mark a Personal
                 Sticker keeping call.
         """
         self._replies: list[str | Exception | ToolCall] = []
         self._safeguard_answers: list[str | Exception] = []
         self._processing_answers: list[str | Exception] = []
-        self._retrieval_answers: list[str | Exception] = []
+        self._understanding_answers: list[str | Exception] = []
         self._sticker_keeping_answers: list[str | Exception] = []
         self.safeguard_prompt = safeguard_prompt
         self.memory_processing_prompt = memory_processing_prompt
-        self.memory_retrieval_prompt = memory_retrieval_prompt
+        self.understanding_prompt = understanding_prompt
         self.sticker_keeping_prompt = sticker_keeping_prompt
         self.calls: list[ChatModelCall] = []
         self.safeguard_calls: list[ChatModelCall] = []
         self.processing_calls: list[ChatModelCall] = []
-        self.retrieval_calls: list[ChatModelCall] = []
+        self.understanding_calls: list[ChatModelCall] = []
         self.sticker_keeping_calls: list[ChatModelCall] = []
         self.call_order: list[str] = []
         self.delay_seconds = 0.0
@@ -504,14 +543,15 @@ class ScriptedChatModel:
         """
         self._processing_answers.extend(answers)
 
-    def script_retrieval(self, *answers: str | Exception) -> None:
-        """Queue memory retrieval answers, one per call.
+    def script_understanding(self, *answers: str | Exception) -> None:
+        """Queue Understanding answers, one per call.
 
         Args:
-            answers: The picked category names; an exception is raised
-                instead of returned, to act like a failing model.
+            answers: The forms, e.g. from `understanding_answer()`; an
+                exception is raised instead of returned, to act like a
+                failing model.
         """
-        self._retrieval_answers.extend(answers)
+        self._understanding_answers.extend(answers)
 
     def script_sticker_keeping(self, *answers: str | Exception) -> None:
         """Queue Personal Sticker keeping answers, one per call.
@@ -564,14 +604,13 @@ class ScriptedChatModel:
             self.processing_calls.append(call)
             self.call_order.append("processing")
             answer = self._processing_answers.pop(0)
-        elif (
-            self.memory_retrieval_prompt
-            and instructions == self.memory_retrieval_prompt
-        ):
-            self.retrieval_calls.append(call)
-            self.call_order.append("retrieval")
+        elif self.understanding_prompt and instructions == self.understanding_prompt:
+            self.understanding_calls.append(call)
+            self.call_order.append("understanding")
             answer = (
-                self._retrieval_answers.pop(0) if self._retrieval_answers else "none"
+                self._understanding_answers.pop(0)
+                if self._understanding_answers
+                else understanding_answer()
             )
         elif (
             self.sticker_keeping_prompt and instructions == self.sticker_keeping_prompt

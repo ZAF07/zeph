@@ -63,7 +63,14 @@ def test_safeguard_checks_every_message_before_the_reply_is_written(
     send_to_webhook(client, telegram_text_update("hi zeph"))
     send_to_webhook(client, telegram_text_update("work was fine today"))
 
-    assert chat_model.call_order == ["safeguard", "reply", "safeguard", "reply"]
+    assert chat_model.call_order == [
+        "safeguard",
+        "understanding",
+        "reply",
+        "safeguard",
+        "understanding",
+        "reply",
+    ]
     first, second = chat_model.safeguard_calls
     assert first.model == seeded_settings["safeguard_model"]
     assert first.history == [

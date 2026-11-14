@@ -12,6 +12,7 @@ from companion.adapters.postgres.tables import (
     check_in_kinds,
     helplines,
     memory_categories,
+    needs,
     platform_settings,
 )
 
@@ -148,3 +149,33 @@ def seed_check_in_kinds(engine: Engine, seed_file: Path) -> None:
         if connection.execute(select(exists().select_from(check_in_kinds))).scalar():
             return
         connection.execute(insert(check_in_kinds).values(rows))
+
+
+def seed_needs(engine: Engine, seed_file: Path) -> None:
+    """Load the starting Needs on first run.
+
+    Nothing is loaded once any Need exists, so Admin changes are never
+    overwritten.
+
+    Args:
+        engine: The database engine.
+        seed_file: YAML file listing Needs with `name`, `when_it_fits`,
+            `how_to_reply` and an optional `fallback`, in the order to show
+            them.
+    """
+    seed = yaml.safe_load(seed_file.read_text())
+    rows = [
+        {
+            "id": uuid4(),
+            "name": need["name"],
+            "when_it_fits": need["when_it_fits"],
+            "how_to_reply": need["how_to_reply"],
+            "sort_order": sort_order,
+            "is_fallback": need.get("fallback", False),
+        }
+        for sort_order, need in enumerate(seed)
+    ]
+    with engine.begin() as connection:
+        if connection.execute(select(exists().select_from(needs))).scalar():
+            return
+        connection.execute(insert(needs).values(rows))
