@@ -62,7 +62,7 @@ The Companion has things it's been meaning to ask (`CONTEXT.md` "Curiosity").
 - **User Memory off:** `test_with_user_memory_off_none_are_made_but_waiting_ones_are_still_raised` (no keeping call; the waiting one still reaches the reply and is raised).
 - **Not exposed; Delete My Data and Account Deletion remove them:** `test_no_dashboard_or_user_api_shows_curiosities` (`/api/me`, memory items, Life Threads, summaries, admin users and a User's Features). `tests/test_data_deletion.py`: the setup now makes a Curiosity, so `curiosities` is one of the per-User tables that must hold data before and none after Delete My Data and Account Deletion.
 - **Settings:** `web/src/components/PlatformSettingsForm.test.tsx` "shows and saves the Curiosity limits"; "Curiosity keeping" on Prompts and Models (`tests/test_admin_settings.py`).
-- **Checks:** `make check`: `pytest` 858 passed, 9 deselected; `ruff check`, `ruff format --check`, `mypy` clean; `pnpm lint`, `format:check`, `typecheck` clean; `pnpm test` 364 passed (51 files).
+- **Checks (`make check`, after rebasing onto main with the User Portrait and parallel tests):** `pytest` 878 passed; `ruff check`, `ruff format --check`, `mypy` clean; `pnpm lint`, `format:check`, `typecheck` clean; `pnpm test` 369 passed (51 files).
 - **/run in the worktree:** the real app ran in a one-off backend container on the worktree's own database (migration 0033 applied on start) with DeepSeek and the fastembed embedder; only the chat channel was a recorder and the clock was set back to Monday 9 Nov 2026 for the first Conversation (worktree Telegram can't send to a fake chat; the main stack wasn't running, so an onboarded Admin was inserted with SQL instead of `make db-copy`).
   - Conversation 1 (Mon 9 Nov): "ugh I have a big presentation to the board on Thursday and I'm so nervous", "it's the budget for my team. if it goes badly we might lose two people". At its end the real keeper saved one Curiosity: "How did Thursday go — did the budget land okay?", not before 2026-11-13, sensitivity high, sourced from the new Memory Item and the new "Board presentation on team budget" Thread.
   - Conversation 2 (now, Sat 14 Nov): "hey zeph". The Understanding was shown "(raised 0 of at most 1 in this Conversation): [1] How did Thursday go — did the budget land okay? …" and chose `{"curiosity": 1, "how": "lead"}`. Zeph replied "Hey! How's it going?" / "How'd Thursday go — did the budget land okay?". The Curiosity became `raised`.
@@ -75,4 +75,4 @@ The Companion has things it's been meaning to ask (`CONTEXT.md` "Curiosity").
 ## Completion
 
 - Completed: 2026-11-14
-- Commits: `cf613a4` (Curiosities, with review fix and CONTEXT.md)
+- Commits: `c9b9bff` (Curiosities, with review fix and CONTEXT.md), `a8d968c` (issue archived with evidence), `f92382a` (a chosen Curiosity is asked in this reply, also when woven in; migration renumbered to 0033)
