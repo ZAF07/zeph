@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { HomeMemoryPausedNote } from "@/components/HomeMemoryPausedNote";
 import type { MemoryItem } from "@/lib/api-client";
 import { memorySourceLabel } from "@/lib/memories";
 
@@ -9,16 +8,14 @@ import { memorySourceLabel } from "@/lib/memories";
  * with a link to Memories.
  *
  * @param props - `goals` are the Goals Memory Items, newest first;
- *   `memoryOn` says whether User Memory is on; `timeZone` is the User's.
+ *   `timeZone` is the User's.
  * @returns The section.
  */
 export function HomeGoals({
   goals,
-  memoryOn,
   timeZone,
 }: {
   goals: MemoryItem[];
-  memoryOn: boolean;
   timeZone?: string;
 }) {
   return (
@@ -37,9 +34,7 @@ export function HomeGoals({
           See in Memories
         </Link>
       </div>
-      {!memoryOn ? (
-        <HomeMemoryPausedNote />
-      ) : goals.length === 0 ? (
+      {goals.length === 0 ? (
         <div className="flex flex-col gap-1 rounded-card border border-dashed border-line-strong px-6 py-8 text-center">
           <span className="text-h3">Nothing here yet</span>
           <p className="m-0 text-caption text-ink-muted">

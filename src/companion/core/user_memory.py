@@ -19,13 +19,20 @@ from companion.core.ports import Clock, Repositories
 
 logger = logging.getLogger(__name__)
 
+MEMORY_PAUSED_NOTE_SETTING = "memory_paused_note"
+MEMORY_NOT_AVAILABLE_NOTE_SETTING = "memory_not_available_note"
+
 
 class MemoryNotFoundError(LookupError):
     """Raised when a User has no Memory Item or Conversation Summary with that ID."""
 
 
 class UserMemoryService:
-    """Lets a User see and delete their User Memory, and seeds it at onboarding."""
+    """Lets a User see and delete their User Memory, and seeds it at onboarding.
+
+    While User Memory is off the Companion stops learning but keeps using what
+    it has, so only saving is stopped here.
+    """
 
     def __init__(
         self, repositories: Repositories, features: FeatureService, clock: Clock
@@ -41,6 +48,29 @@ class UserMemoryService:
         self._repositories = repositories
         self._features = features
         self._clock = clock
+
+    def memory_note(self, user: User) -> str:
+        """Pick the Dashboard note that says User Memory is off, and why.
+
+        The Admin's switch has the final say, so its note wins over the
+        User's own.
+
+        Args:
+            user: The User.
+
+        Returns:
+            The Admin-managed "isn't available" note when the Admin side has
+            User Memory off, the "paused" note when the User has it off, and
+            "" when it works.
+        """
+        settings = self._repositories.platform_settings
+        if not self._features.available_for(user.id, Feature.USER_MEMORY):
+            note: str = settings.get(MEMORY_NOT_AVAILABLE_NOTE_SETTING)
+            return note
+        if not user.user_memory_enabled:
+            paused_note: str = settings.get(MEMORY_PAUSED_NOTE_SETTING)
+            return paused_note
+        return ""
 
     def list_groups(self, user_id: UUID) -> list[MemoryGroup]:
         """List a User's Memory Items by Memory Category, in category order.

@@ -47,6 +47,7 @@ function homeWith(overrides: Partial<Home> = {}): Home {
     last_conversation_at: "2026-11-11T11:48:00Z",
     check_ins: checkInsWith(),
     user_memory_enabled: true,
+    memory_note: "",
     goals: [
       {
         id: "g1",
@@ -258,26 +259,42 @@ describe("DashboardHome", () => {
     ).toBeInTheDocument();
   });
 
-  it("says Memory is paused instead of showing empty lists", async () => {
+  it("keeps showing Goals and Recently remembered with the note while memory is off", async () => {
     apiClient.getHome.mockResolvedValue(
       homeWith({
         user_memory_enabled: false,
-        goals: [],
-        recently_remembered: [],
+        memory_note:
+          "**Memory is paused.** Zeph won’t learn anything new, but still uses what it already knows about you.",
       }),
     );
 
     render(<DashboardHome />);
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
-    for (const name of ["What you’re working toward", "Recently remembered"]) {
-      const memorySection = section(name);
-      expect(
-        within(memorySection).getByText(/Memory is paused/),
-      ).toBeInTheDocument();
-      expect(within(memorySection).queryByText("Nothing here yet")).toBeNull();
-      expect(within(memorySection).queryByText(/No memories yet/)).toBeNull();
-    }
+    const note = screen.getByRole("status");
+    expect(note).toHaveTextContent(
+      "Memory is paused. Zeph won’t learn anything new, but still uses what it already knows about you.",
+    );
+    expect(within(note).getByText("Memory is paused.").tagName).toBe("STRONG");
+    expect(
+      within(section("What you’re working toward")).getByText(
+        "Be present at dinner",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(section("Recently remembered")).getByText(
+        "Sister Jo is moving abroad",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no memory note while memory is on", async () => {
+    apiClient.getHome.mockResolvedValue(homeWith());
+
+    render(<DashboardHome />);
+
+    await screen.findByRole("heading", { name: "Good evening, Maya." });
+    expect(screen.queryByRole("status")).toBeNull();
   });
 
   it("shows the AI notice and that Zeph doesn't count streaks", async () => {

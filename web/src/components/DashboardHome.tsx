@@ -8,6 +8,7 @@ import { HomeCheckInsCard } from "@/components/HomeCheckInsCard";
 import { HomeGoals } from "@/components/HomeGoals";
 import { HomeTelegramCard } from "@/components/HomeTelegramCard";
 import { LoadFailed } from "@/components/LoadFailed";
+import { MemoryNote } from "@/components/MemoryNote";
 import { RecentlyRemembered } from "@/components/RecentlyRemembered";
 import type { Home } from "@/lib/api-client";
 import { greeting, todayHeading } from "@/lib/home";
@@ -101,14 +102,10 @@ export function DashboardHome() {
             ) : null}
             <HomeCheckInsCard checkIns={home.check_ins} timeZone={timeZone} />
           </div>
-          <HomeGoals
-            goals={home.goals}
-            memoryOn={home.user_memory_enabled}
-            timeZone={timeZone}
-          />
+          <MemoryNote note={home.memory_note} />
+          <HomeGoals goals={home.goals} timeZone={timeZone} />
           <RecentlyRemembered
             items={home.recently_remembered}
-            memoryOn={home.user_memory_enabled}
             timeZone={timeZone}
           />
           <footer className="flex flex-col gap-1.5 border-t border-line pt-5">

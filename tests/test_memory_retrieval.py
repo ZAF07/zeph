@@ -115,7 +115,7 @@ def test_only_the_newest_conversation_summaries_reach_the_reply(
         assert f"Summary number {number}." in reply_call.instructions
 
 
-def test_with_user_memory_off_replies_use_no_memory(
+def test_with_user_memory_off_replies_still_use_existing_memory(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -128,15 +128,16 @@ def test_with_user_memory_off_replies_use_no_memory(
     remember_some_things(client, chat_model, clock, scheduler, seeded_settings)
     headers = auth_headers(auth_verifier, "user_maya")
     client.patch("/api/me", json={"user_memory_enabled": False}, headers=headers)
-    chat_model.script("hey")
+    chat_model.script_retrieval("Relationships")
+    chat_model.script("aw, Jo")
 
     send_to_webhook(client, telegram_text_update("my sister called"))
 
-    assert chat_model.retrieval_calls == []
+    assert len(chat_model.retrieval_calls) == 1
     [reply_call] = chat_model.calls
-    assert "Sister Jo" not in reply_call.instructions
-    assert "Likes Stoicism" not in reply_call.instructions
-    assert "Talked about work and family." not in reply_call.instructions
+    assert "Sister Jo" in reply_call.instructions
+    assert "Likes Stoicism" in reply_call.instructions
+    assert "Talked about work and family." in reply_call.instructions
 
 
 def test_reply_still_gets_always_include_memories_when_picking_fails(

@@ -84,6 +84,7 @@ export function AccountSettings() {
         enabled={state.me.user_memory_enabled}
         available={state.me.user_memory_available}
         explanation={state.content.user_memory_explanation}
+        note={state.me.memory_note}
         changedInChatAt={state.me.changed_in_chat.user_memory}
         timeZone={state.me.time_zone ?? undefined}
       />

@@ -32,10 +32,10 @@ class Home:
             Conversation was sent, if they have had one.
         check_ins_paused: Whether their Check-ins are paused right now.
         last_check_in: The newest Check-in sent to them, if any.
-        goals: Their Memory Items in the Goals Memory Category, newest first;
-            empty while User Memory is off.
-        recently_remembered: Their newest Memory Items, newest first; empty
-            while User Memory is off.
+        goals: Their Memory Items in the Goals Memory Category, newest first,
+            shown whether or not User Memory is on.
+        recently_remembered: Their newest Memory Items, newest first, shown
+            whether or not User Memory is on.
     """
 
     telegram_connection: TelegramConnection | None
@@ -70,17 +70,13 @@ class HomeService:
             user: The signed-in User.
 
         Returns:
-            Their Telegram Connection, Check-in status and, if User Memory is
-            on, their Goals and newest Memory Items.
+            Their Telegram Connection, Check-in status, Goals and newest
+            Memory Items.
         """
         latest_conversation = self._repositories.conversations.get_latest_for_user(
             user.id
         )
-        goals, recently_remembered = (
-            self._goals_and_recently_remembered(user)
-            if user.user_memory_enabled
-            else ([], [])
-        )
+        goals, recently_remembered = self._goals_and_recently_remembered(user)
         return Home(
             telegram_connection=self._repositories.telegram_connections.get_by_user(
                 user.id

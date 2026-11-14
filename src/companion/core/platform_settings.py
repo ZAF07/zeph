@@ -9,6 +9,10 @@ from companion.core.models import StoredSetting, User
 from companion.core.ports import Clock, PlatformSettingsRepository
 from companion.core.safeguard import HELPLINES_PLACEHOLDER
 from companion.core.telegram_connection import DASHBOARD_URL_PLACEHOLDER
+from companion.core.user_memory import (
+    MEMORY_NOT_AVAILABLE_NOTE_SETTING,
+    MEMORY_PAUSED_NOTE_SETTING,
+)
 
 MODEL_CHOICES_KEY = "available_models"
 
@@ -384,6 +388,18 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         "Photo Viewing explanation",
         SettingKind.TEXT,
         max_length=4_000,
+    ),
+    EditableSetting(
+        MEMORY_PAUSED_NOTE_SETTING,
+        "“Memory is paused” note",
+        SettingKind.TEXT,
+        max_length=1_000,
+    ),
+    EditableSetting(
+        MEMORY_NOT_AVAILABLE_NOTE_SETTING,
+        "“Memory isn’t available” note",
+        SettingKind.TEXT,
+        max_length=1_000,
     ),
 )
 

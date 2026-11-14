@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { HomeMemoryPausedNote } from "@/components/HomeMemoryPausedNote";
 import type { RememberedItem } from "@/lib/api-client";
 import { formatShortDay } from "@/lib/dates";
 
@@ -9,16 +8,14 @@ import { formatShortDay } from "@/lib/dates";
  * Category and date, and a link to Memories.
  *
  * @param props - `items` are the newest Memory Items, newest first;
- *   `memoryOn` says whether User Memory is on; `timeZone` is the User's.
+ *   `timeZone` is the User's.
  * @returns The section.
  */
 export function RecentlyRemembered({
   items,
-  memoryOn,
   timeZone,
 }: {
   items: RememberedItem[];
-  memoryOn: boolean;
   timeZone?: string;
 }) {
   return (
@@ -40,9 +37,7 @@ export function RecentlyRemembered({
           Review all
         </Link>
       </div>
-      {!memoryOn ? (
-        <HomeMemoryPausedNote />
-      ) : items.length === 0 ? (
+      {items.length === 0 ? (
         <p className="m-0 border-t border-line pt-3.5 text-caption text-ink-muted">
           No memories yet. They’ll appear after your first Conversation.
         </p>

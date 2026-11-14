@@ -77,9 +77,9 @@ FEATURES: tuple[FeatureDetails, ...] = (
         feature=Feature.USER_MEMORY,
         name="User Memory",
         description=(
-            "Zeph keeps and uses what matters about a User. It works only "
-            "while the User has User Memory on too. Turning it off deletes "
-            "nothing."
+            "Zeph learns what matters about a User. It works only while the "
+            "User has User Memory on too. Turning it off stops learning, but "
+            "Zeph still uses what it already knows and deletes nothing."
         ),
     ),
     FeatureDetails(

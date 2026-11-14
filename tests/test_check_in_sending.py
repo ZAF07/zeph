@@ -638,6 +638,27 @@ def test_with_user_memory_off_only_kinds_allowed_without_user_memory_are_chosen(
     assert recent_check_ins(client, headers)[0]["kind"] == "A casual hello"
 
 
+def test_with_user_memory_turned_off_later_check_ins_still_use_existing_memory(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+) -> None:
+    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    client.patch("/api/me", json={"user_memory_enabled": False}, headers=headers)
+    chat_model.script(send_answer("hey Maya, how's the new job?"))
+
+    clock.advance(ONE_DAY)
+    scheduler.tick()
+
+    [line] = chat_model.calls[-1].history
+    assert "New job, running on autopilot." in line.text
+    assert "User Memory is off" not in line.text
+    assert "A follow-up" not in line.text
+
+
 def test_an_answer_that_is_not_a_decision_sends_nothing_and_is_tried_again(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,

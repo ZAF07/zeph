@@ -18,6 +18,7 @@ export function userWithRole(role: UserRole): Me {
     ai_notice_acknowledged_at: "2026-11-11T09:00:00Z",
     user_memory_enabled: true,
     user_memory_available: true,
+    memory_note: "",
     photo_viewing_enabled: true,
     photo_viewing_available: true,
     personal_stickers_available: false,

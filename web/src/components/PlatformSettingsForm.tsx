@@ -155,6 +155,18 @@ const textFields: TextField[] = [
     caption: "— shown with the Photo Viewing switch on Account & privacy",
   },
   {
+    key: "memory_paused_note",
+    label: "“Memory is paused” note",
+    caption:
+      "— shown on Home, Memories and by the switch while a User has memory off; **bold** marks the opening words",
+  },
+  {
+    key: "memory_not_available_note",
+    label: "“Memory isn’t available” note",
+    caption:
+      "— shown instead while an Admin has memory off for the User; **bold** marks the opening words",
+  },
+  {
     key: "check_in_fewer_message",
     label: "“Would you like fewer?” message",
     caption: "— sent once when a User reaches the ignore threshold",
