@@ -1,6 +1,6 @@
 # 14 — Understanding Eval
 
-Status: ready-for-agent
+Status: completed
 
 ## Parent
 
@@ -23,12 +23,12 @@ Cases:
 
 ## Acceptance criteria
 
-- [ ] Cases live in data files and are loaded by the Eval
-- [ ] Every case runs through the real reply path with real models
-- [ ] Report shows pass/fail per case, the Judge's reasons, and Understanding time and tokens
-- [ ] Existing Persona, Knowledge, Safeguard and Settings Evals still pass
-- [ ] Eval runs record full content in the Model Call Log
-- [ ] `ruff`, `ruff format --check`, `mypy` pass; `make eval` run once with results reported in Comments
+- [x] Cases live in data files and are loaded by the Eval (`evals/cases/understanding.yaml`, `load_understanding_cases`; `tests/test_understanding_eval_helpers.py`)
+- [x] Every case runs through the real reply path with real models (Telegram webhook, real DeepSeek and fastembed, `evals/conftest.py`)
+- [x] Report shows pass/fail per case, the Judge's reasons, and Understanding time and tokens (see Comments)
+- [x] Existing Persona, Knowledge, Safeguard and Settings Evals still pass — no regression: Safeguard 32/32, Knowledge 8/8; Persona `struggling-with-shared-photos` and Settings `forget-why-here` fail on plain `main` too, filed as issue 18
+- [x] Eval runs record full content in the Model Call Log (`full content` check passes for every Message)
+- [x] `ruff`, `ruff format --check`, `mypy` pass; `make eval` run once with results reported in Comments (also `pytest`: 920 passed)
 
 ## Blocked by
 
@@ -102,3 +102,12 @@ Tokens used (app and judge): 58389 in, 2700 out
 ```
 
 `reminded-of-sister` passed this run (it failed in the two before), so results vary from run to run.
+
+### 2026-11-14 — after rebasing on issue 15
+
+Rebased on `main` with issue 15 (Model Call Log decision shape). `make check-python`: 924 passed. Understanding eval rerun: 7 of 13 messages passed (26 of 32 checks, 8 of 9 rules); Understanding calls 1360 ms on average (slowest 1703 ms), 1492 tokens in and 131 out on average. The failures are the same kinds as before (Need picks, Mei not brought up, asked why → issue 17; Knowledge named by its whole line → bug 16), plus the vent case choosing The Second Arrow this time. The model's choices vary from run to run; the harness ran every case cleanly.
+
+## Completion
+
+- Completed: 2026-11-14
+- Commit: <to be filled in after merge>
