@@ -50,4 +50,5 @@ Admins manage Needs on the Dashboard, like Check-in Kinds: add, edit (name, "whe
 ## Completion
 
 - Completed: 2026-11-14
-- Commits: `4153b62` (Needs admin page), `1fffc47` (review fixes)
+- Commits: `2a45449` (Needs admin page), `eea8f59` (review fixes: `MoveDirection` in models, plain length checks, named `Flash` type, no unreachable 409 branch), `ca4a1c6` (issue archived, CONTEXT.md)
+- Merged into main: `693b09b` (branch `understanding-05-needs-admin`, pushed to origin)
