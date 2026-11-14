@@ -1,7 +1,9 @@
 import json
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
+from typing import Any
 from uuid import UUID, uuid4
 
 from companion.core.check_in_decision import (
@@ -18,6 +20,7 @@ from companion.core.check_in_decision import (
     next_due_after_quiet_hours_move,
     retry_after_refusal,
 )
+from companion.core.curiosities import is_due
 from companion.core.features import FeatureService
 from companion.core.memory_retrieval import (
     format_day,
@@ -36,6 +39,7 @@ from companion.core.models import (
     CheckInOutcome,
     CheckInSettings,
     CheckInStatus,
+    Curiosity,
     Feature,
     ModelStep,
     NextDueTimeChange,
@@ -54,6 +58,7 @@ from companion.core.platform_settings import (
     CHECK_IN_PROMPT,
     CHECK_IN_REPLY_WINDOW,
     CONVERSATION_QUIET_GAP,
+    CURIOSITY_CHECK_INS_PER_WEEK,
     PERSONA,
     RECENT_CONVERSATION_SUMMARIES,
 )
@@ -76,6 +81,7 @@ CHECK_INS_TOLD_TO_MODEL = 5
 CHECK_INS_LOOKED_BACK_FOR_LAST_SENT = 100
 MEMORY_INTRO = "What you remember about them:"
 BLOCKED_SKIP_REASON = "User has blocked the Companion on Telegram"
+CURIOSITY_CHECK_INS_COUNTED_OVER = timedelta(days=7)
 PAUSE_LENGTHS = {
     PauseLength.DAY: timedelta(days=1),
     PauseLength.WEEK: timedelta(weeks=1),
@@ -143,12 +149,15 @@ class CheckInDecision:
         skip_reason: Why it skipped; "" when sending.
         shared_photo: The Shared Photo to send after the message; None
             unless the Kind sends one.
+        curiosity: The Curiosity the message asks; None unless the Kind
+            asks one.
     """
 
     kind: CheckInKind | None
     message: str = ""
     skip_reason: str = ""
     shared_photo: SharedPhoto | None = None
+    curiosity: Curiosity | None = None
 
 
 def check_in_status(
@@ -332,6 +341,37 @@ def describe_shared_photos(
     )
 
 
+def describe_due_curiosities_for_check_in(
+    kinds: list[CheckInKind], due_curiosities: list[Curiosity]
+) -> str:
+    """Write the User's due Curiosities for the Check-in model, numbered.
+
+    Args:
+        kinds: The Check-in Kinds it may choose from.
+        due_curiosities: The User's waiting Curiosities whose day has come,
+            oldest first.
+
+    Returns:
+        How to name a Curiosity for the Kinds that ask one, then one line
+        per Curiosity; "" if no offered Kind asks one or none is due.
+    """
+    curiosity_kinds = [kind.name for kind in kinds if kind.raises_curiosity]
+    if not curiosity_kinds or not due_curiosities:
+        return ""
+    kind_names = " or ".join(f'"{name}"' for name in curiosity_kinds)
+    curiosity_lines = "\n".join(
+        f"{number}. {curiosity.question} Why: {curiosity.why} "
+        f"Sensitivity: {curiosity.sensitivity.value}."
+        for number, curiosity in enumerate(due_curiosities, start=1)
+    )
+    return (
+        f"Things you've been wondering about them, oldest first. If you "
+        f'choose {kind_names}, also add "curiosity": <the number of one '
+        f"below> to your answer; your message should ask it the way a friend "
+        f"would:\n{curiosity_lines}"
+    )
+
+
 def describe_check_in(
     user: User,
     kinds: list[CheckInKind],
@@ -339,6 +379,7 @@ def describe_check_in(
     recent: str,
     memory: str,
     shared_photos: str = "",
+    due_curiosities: str = "",
 ) -> str:
     """Write what the Check-in model is told to decide on a Check-in.
 
@@ -350,37 +391,64 @@ def describe_check_in(
         memory: What is remembered about the User; "" if nothing.
         shared_photos: The User's numbered Shared Photos; "" if none are
             offered.
+        due_curiosities: The User's numbered due Curiosities; "" if none
+            are offered.
 
     Returns:
         The Kinds, what to call the User, their local time, recent
-        Check-ins, what is remembered about them and their Shared Photos.
+        Check-ins, what is remembered about them, their Shared Photos and
+        their due Curiosities.
     """
     kind_lines = "\n".join(f"- {kind.name}: {kind.description}" for kind in kinds)
     remembered = memory or "Nothing remembered about them."
-    photos = f"\n\n{shared_photos}" if shared_photos else ""
+    extras = "".join(
+        f"\n\n{extra}" for extra in (shared_photos, due_curiosities) if extra
+    )
     return (
         f"Check-in Kinds you may choose from:\n{kind_lines}\n\n"
         f"What to call them: {user.name or 'unknown'}\n"
         f"Their local time: {local_time.strftime('%A, %H:%M')}\n\n"
         f"Recent Check-ins, newest first:\n{recent}\n\n"
-        f"{remembered}{photos}"
+        f"{remembered}{extras}"
     )
 
 
+def read_listed_number(parsed: dict[str, Any], key: str, listed: int) -> int | None:
+    """Read the number of something the Check-in model was listed.
+
+    Args:
+        parsed: The model's JSON decision.
+        key: The field's name, e.g. "photo".
+        listed: How many were listed, numbered from 1.
+
+    Returns:
+        The number; None if it isn't a whole number in the list.
+    """
+    number = parsed.get(key)
+    if isinstance(number, bool) or not isinstance(number, int):
+        return None
+    return number if 1 <= number <= listed else None
+
+
 def read_check_in_decision(
-    answer: str, kinds: list[CheckInKind], shared_photos: list[SharedPhoto]
+    answer: str,
+    kinds: list[CheckInKind],
+    shared_photos: list[SharedPhoto],
+    due_curiosities: Sequence[Curiosity] = (),
 ) -> CheckInDecision:
     """Read the Check-in model's JSON decision.
 
     Text around the JSON object, such as a code fence, is ignored. The Kind
     is matched by name, in any case, and must be one it was offered. A Kind
-    that sends a Shared Photo needs the number of one it was listed; any
-    other Kind's photo number is ignored.
+    that sends a Shared Photo needs the number of one it was listed, and a
+    Kind that asks a Curiosity the number of one it was listed; any other
+    Kind's photo or Curiosity number is ignored.
 
     Args:
         answer: The model's answer.
         kinds: The Check-in Kinds it could choose from.
         shared_photos: The Shared Photos it was listed, numbered from 1.
+        due_curiosities: The Curiosities it was listed, numbered from 1.
 
     Returns:
         The decision.
@@ -388,7 +456,8 @@ def read_check_in_decision(
     Raises:
         InvalidCheckInAnswerError: If there is no JSON decision, the Kind is
             not one it was offered, the message or reason is empty, or a
-            Kind that sends a photo names no listed photo.
+            Kind that sends a photo or asks a Curiosity names none it was
+            listed.
     """
     start, end = answer.find("{"), answer.rfind("}")
     try:
@@ -414,20 +483,29 @@ def read_check_in_decision(
         raise InvalidCheckInAnswerError(f"Not a Kind it was offered: {kind_name!r}")
     if not isinstance(message, str) or not message.strip():
         raise InvalidCheckInAnswerError("A send with no message")
-    if not kind.sends_shared_photo:
-        return CheckInDecision(kind=kind, message=message.strip())
-    photo_number = parsed.get("photo")
-    if (
-        not isinstance(photo_number, int)
-        or isinstance(photo_number, bool)
-        or not 1 <= photo_number <= len(shared_photos)
-    ):
-        raise InvalidCheckInAnswerError(f"Not a photo it was listed: {photo_number!r}")
-    return CheckInDecision(
-        kind=kind,
-        message=message.strip(),
-        shared_photo=shared_photos[photo_number - 1],
-    )
+    if kind.sends_shared_photo:
+        photo_number = read_listed_number(parsed, "photo", len(shared_photos))
+        if photo_number is None:
+            raise InvalidCheckInAnswerError(
+                f"Not a photo it was listed: {parsed.get('photo')!r}"
+            )
+        return CheckInDecision(
+            kind=kind,
+            message=message.strip(),
+            shared_photo=shared_photos[photo_number - 1],
+        )
+    if kind.raises_curiosity:
+        curiosity_number = read_listed_number(parsed, "curiosity", len(due_curiosities))
+        if curiosity_number is None:
+            raise InvalidCheckInAnswerError(
+                f"Not a Curiosity it was listed: {parsed.get('curiosity')!r}"
+            )
+        return CheckInDecision(
+            kind=kind,
+            message=message.strip(),
+            curiosity=due_curiosities[curiosity_number - 1],
+        )
+    return CheckInDecision(kind=kind, message=message.strip())
 
 
 class CheckInService:
@@ -785,6 +863,9 @@ class CheckInService:
             frequency_gaps=platform_settings.get(CHECK_IN_GAPS),
             quiet_gap=platform_settings.get(CONVERSATION_QUIET_GAP),
             ignore_threshold=platform_settings.get(CHECK_IN_IGNORE_THRESHOLD),
+            curiosity_check_ins_per_week=platform_settings.get(
+                CURIOSITY_CHECK_INS_PER_WEEK
+            ),
             kinds=tuple(self.list_kinds()),
         )
 
@@ -819,6 +900,10 @@ class CheckInService:
         with_shared_photos = repositories.user_memory.list_users_with_shared_photos(
             user_ids
         )
+        waiting_curiosities = repositories.curiosities.list_waiting_for_users(user_ids)
+        curiosity_check_ins = repositories.check_ins.count_curiosity_check_ins_since(
+            user_ids, self._clock.now() - CURIOSITY_CHECK_INS_COUNTED_OVER
+        )
         all_facts = []
         for snapshot in snapshots:
             user_id = snapshot.user.id
@@ -840,6 +925,11 @@ class CheckInService:
                         conversation.started_at if conversation is not None else None,
                     ),
                     has_shared_photos=user_id in with_shared_photos,
+                    has_due_curiosity=any(
+                        is_due(curiosity, snapshot.today)
+                        for curiosity in waiting_curiosities.get(user_id, [])
+                    ),
+                    curiosity_check_ins_this_week=curiosity_check_ins.get(user_id, 0),
                 )
             )
         return all_facts
@@ -874,9 +964,11 @@ class CheckInService:
     ) -> None:
         """Let the Check-in model send a Kind and message, or skip.
 
-        Kinds that send a Shared Photo come with the User's Shared Photos.
-        The next attempt is one frequency gap later, unless the chat channel
-        refuses the message.
+        Kinds that send a Shared Photo come with the User's Shared Photos,
+        and Kinds that ask a Curiosity with their due Curiosities. A
+        Curiosity is marked raised once its message counts as sent. The next
+        attempt is one frequency gap later, unless the chat channel refuses
+        the message.
 
         Args:
             snapshot: The User, as read for this tick.
@@ -893,7 +985,16 @@ class CheckInService:
             if any(kind.sends_shared_photo for kind in kinds)
             else []
         )
-        decision = self._decide(snapshot, kinds, shared_photos)
+        due_curiosities = (
+            [
+                curiosity
+                for curiosity in self._repositories.curiosities.list_waiting(user.id)
+                if is_due(curiosity, snapshot.today)
+            ]
+            if any(kind.raises_curiosity for kind in kinds)
+            else []
+        )
+        decision = self._decide(snapshot, kinds, shared_photos, due_curiosities)
         if decision.kind is None:
             skipped = CheckIn(
                 id=uuid4(),
@@ -907,6 +1008,7 @@ class CheckInService:
             )
             return
         shared_photo = decision.shared_photo
+        curiosity = decision.curiosity
         check_in = CheckIn(
             id=uuid4(),
             user_id=user.id,
@@ -915,6 +1017,7 @@ class CheckInService:
             kind_id=decision.kind.id,
             message=decision.message,
             shared_photo_id=shared_photo.id if shared_photo is not None else None,
+            curiosity_id=curiosity.id if curiosity is not None else None,
         )
         was_sent = self._save_then_send(
             user,
@@ -924,6 +1027,8 @@ class CheckInService:
             plan.next_due_at,
             pause_until_resumed=False,
         )
+        if was_sent and curiosity is not None:
+            self._repositories.curiosities.mark_raised([curiosity.id], None, now)
         if (
             was_sent
             and shared_photo is not None
@@ -1111,6 +1216,7 @@ class CheckInService:
         snapshot: UserSnapshot,
         kinds: list[CheckInKind],
         shared_photos: list[SharedPhoto],
+        due_curiosities: list[Curiosity],
     ) -> CheckInDecision:
         """Ask the Check-in model to choose a Kind and write the message, or skip.
 
@@ -1119,6 +1225,7 @@ class CheckInService:
                 this tick.
             kinds: The Check-in Kinds it may choose from.
             shared_photos: The User's Shared Photos it may send.
+            due_curiosities: The User's due Curiosities it may ask.
 
         Returns:
             The decision.
@@ -1137,6 +1244,7 @@ class CheckInService:
             ),
             self._memory(user, settings),
             describe_shared_photos(kinds, shared_photos, user.time_zone),
+            describe_due_curiosities_for_check_in(kinds, due_curiosities),
         )
         answer = self._chat_model.generate(
             snapshot=snapshot,
@@ -1145,7 +1253,7 @@ class CheckInService:
             instructions=f"{settings.get(PERSONA)}\n\n{settings.get(CHECK_IN_PROMPT)}",
             history=[ChatLine(role=ChatRole.USER, text=description)],
         )
-        return read_check_in_decision(answer, kinds, shared_photos)
+        return read_check_in_decision(answer, kinds, shared_photos, due_curiosities)
 
     def _with_next_due_time(
         self, current: CheckInSettings, updated: CheckInSettings

@@ -1158,16 +1158,44 @@ class CuriosityRepository(Protocol):
         """
         ...
 
+    def list_waiting_for_users(
+        self, user_ids: Sequence[UUID]
+    ) -> dict[UUID, list[Curiosity]]:
+        """List many Users' waiting Curiosities, in one query.
+
+        Args:
+            user_ids: The Users' IDs.
+
+        Returns:
+            Each User's waiting Curiosities, oldest first; a User with none
+            is left out.
+        """
+        ...
+
     def mark_raised(
-        self, curiosity_ids: Sequence[UUID], conversation_id: UUID, raised_at: datetime
+        self,
+        curiosity_ids: Sequence[UUID],
+        conversation_id: UUID | None,
+        raised_at: datetime,
     ) -> None:
-        """Note that waiting Curiosities were just raised in a Conversation.
+        """Note that waiting Curiosities were just raised.
 
         Args:
             curiosity_ids: The Curiosities' IDs; any no longer waiting is
                 left as it is.
-            conversation_id: The Conversation they were raised in.
-            raised_at: When the reply that raised them was sent.
+            conversation_id: The Conversation they were raised in; None when
+                a Check-in raised them and no Conversation has started yet.
+            raised_at: When the reply or Check-in that raised them was sent.
+        """
+        ...
+
+    def link_to_conversation(self, curiosity_id: UUID, conversation_id: UUID) -> None:
+        """Note the Conversation a Check-in's Curiosity was raised in.
+
+        Args:
+            curiosity_id: The Curiosity's ID; left as it is unless it was
+                raised with no Conversation.
+            conversation_id: The Conversation the User's reply started.
         """
         ...
 
@@ -2097,6 +2125,20 @@ class CheckInRepository(Protocol):
 
         Args:
             check_in_id: The Check-in's ID.
+        """
+        ...
+
+    def count_curiosity_check_ins_since(
+        self, user_ids: Sequence[UUID], since: datetime
+    ) -> dict[UUID, int]:
+        """Count many Users' sent Check-ins that asked a Curiosity, in one query.
+
+        Args:
+            user_ids: The Users' IDs.
+            since: Only Check-ins sent after this are counted.
+
+        Returns:
+            Each User's count; a User with none is left out.
         """
         ...
 

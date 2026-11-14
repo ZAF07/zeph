@@ -65,9 +65,13 @@ def set_up_user_with_check_ins(
 
 
 def seeded_check_in_kinds() -> list[str]:
-    """The names of the seeded Check-in Kinds that send no Shared Photo."""
+    """The names of the seeded Check-in Kinds that send no Shared Photo or Curiosity."""
     kinds: list[dict[str, Any]] = yaml.safe_load(CHECK_IN_KINDS_SEED_FILE.read_text())
-    return [kind["name"] for kind in kinds if not kind.get("sends_shared_photo")]
+    return [
+        kind["name"]
+        for kind in kinds
+        if not kind.get("sends_shared_photo") and not kind.get("raises_curiosity")
+    ]
 
 
 def recent_check_ins(

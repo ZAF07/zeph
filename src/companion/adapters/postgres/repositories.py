@@ -229,6 +229,7 @@ def _to_check_in_kind(row: Row[Any]) -> CheckInKind:
         description=row.description,
         sort_order=row.sort_order,
         sends_shared_photo=row.sends_shared_photo,
+        raises_curiosity=row.raises_curiosity,
     )
 
 
@@ -2501,16 +2502,46 @@ class PostgresCuriosityRepository:
             and curiosity.source_life_thread_id in found_threads | {None}
         ]
 
+    def list_waiting_for_users(
+        self, user_ids: Sequence[UUID]
+    ) -> dict[UUID, list[Curiosity]]:
+        """List many Users' waiting Curiosities, in one query.
+
+        Args:
+            user_ids: The Users' IDs.
+
+        Returns:
+            Each User's waiting Curiosities, oldest first; a User with none
+            is left out.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(curiosities)
+                .where(
+                    curiosities.c.user_id.in_(user_ids),
+                    curiosities.c.state == CuriosityState.WAITING,
+                )
+                .order_by(curiosities.c.position)
+            ).all()
+        waiting_by_user: dict[UUID, list[Curiosity]] = {}
+        for row in rows:
+            waiting_by_user.setdefault(row.user_id, []).append(_to_curiosity(row))
+        return waiting_by_user
+
     def mark_raised(
-        self, curiosity_ids: Sequence[UUID], conversation_id: UUID, raised_at: datetime
+        self,
+        curiosity_ids: Sequence[UUID],
+        conversation_id: UUID | None,
+        raised_at: datetime,
     ) -> None:
-        """Note that waiting Curiosities were just raised in a Conversation.
+        """Note that waiting Curiosities were just raised.
 
         Args:
             curiosity_ids: The Curiosities' IDs; any no longer waiting is
                 left as it is.
-            conversation_id: The Conversation they were raised in.
-            raised_at: When the reply that raised them was sent.
+            conversation_id: The Conversation they were raised in; None when
+                a Check-in raised them and no Conversation has started yet.
+            raised_at: When the reply or Check-in that raised them was sent.
         """
         if not curiosity_ids:
             return
@@ -2526,6 +2557,25 @@ class PostgresCuriosityRepository:
                     raised_at=raised_at,
                     raised_conversation_id=conversation_id,
                 )
+            )
+
+    def link_to_conversation(self, curiosity_id: UUID, conversation_id: UUID) -> None:
+        """Note the Conversation a Check-in's Curiosity was raised in.
+
+        Args:
+            curiosity_id: The Curiosity's ID; left as it is unless it was
+                raised with no Conversation.
+            conversation_id: The Conversation the User's reply started.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                update(curiosities)
+                .where(
+                    curiosities.c.id == curiosity_id,
+                    curiosities.c.state == CuriosityState.RAISED,
+                    curiosities.c.raised_conversation_id.is_(None),
+                )
+                .values(raised_conversation_id=conversation_id)
             )
 
     def delete_for_user(self, user_id: UUID) -> None:
@@ -3723,6 +3773,7 @@ class PostgresCheckInRepository:
                     description=details.description,
                     sort_order=0 if highest is None else int(highest) + 1,
                     sends_shared_photo=False,
+                    raises_curiosity=False,
                 )
                 .returning(check_in_kinds)
             ).one()
@@ -3982,6 +4033,32 @@ class PostgresCheckInRepository:
             recent_by_user.setdefault(row.user_id, []).append(self._to_check_in(row))
         return recent_by_user
 
+    def count_curiosity_check_ins_since(
+        self, user_ids: Sequence[UUID], since: datetime
+    ) -> dict[UUID, int]:
+        """Count many Users' sent Check-ins that asked a Curiosity, in one query.
+
+        Args:
+            user_ids: The Users' IDs.
+            since: Only Check-ins sent after this are counted.
+
+        Returns:
+            Each User's count; a User with none is left out.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(check_ins.c.user_id, func.count().label("sent_count"))
+                .join(check_in_kinds, check_ins.c.kind_id == check_in_kinds.c.id)
+                .where(
+                    check_ins.c.user_id.in_(user_ids),
+                    check_ins.c.outcome == CheckInOutcome.SENT.value,
+                    check_ins.c.decided_at > since,
+                    check_in_kinds.c.raises_curiosity,
+                )
+                .group_by(check_ins.c.user_id)
+            ).all()
+        return {row.user_id: row.sent_count for row in rows}
+
     def list_log(self, since: datetime) -> list[CheckInLogEntry]:
         """List every User's Check-in decisions since a time, newest first.
 
@@ -4072,6 +4149,7 @@ class PostgresCheckInRepository:
                 decided_at=check_in.decided_at,
                 replied_at=check_in.replied_at,
                 shared_photo_id=check_in.shared_photo_id,
+                curiosity_id=check_in.curiosity_id,
             )
         )
 
@@ -4107,6 +4185,7 @@ class PostgresCheckInRepository:
             skip_reason=row.skip_reason,
             replied_at=row.replied_at,
             shared_photo_id=row.shared_photo_id,
+            curiosity_id=row.curiosity_id,
         )
 
     def delete_for_user(self, user_id: UUID) -> None:

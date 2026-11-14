@@ -209,6 +209,9 @@ CURIOSITIES_PER_CONVERSATION = Setting(
     "curiosities_per_conversation", read_whole_number
 )
 CURIOSITIES_WAITING_LIMIT = Setting("curiosities_waiting_limit", read_whole_number)
+CURIOSITY_CHECK_INS_PER_WEEK = Setting(
+    "curiosity_check_ins_per_week", read_whole_number
+)
 CURIOSITY_KEEPING_MODEL = Setting("curiosity_keeping_model", read_text)
 CURIOSITY_KEEPING_PROMPT = Setting("curiosity_keeping_prompt", read_text)
 PORTRAIT_MODEL = Setting("portrait_model", read_text)
@@ -683,6 +686,13 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=50,
+    ),
+    EditableSetting(
+        CURIOSITY_CHECK_INS_PER_WEEK.key,
+        "Most Curiosity Check-ins per week",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=7,
     ),
     EditableSetting(
         KNOWLEDGE_CLOSENESS_PERCENT.key,

@@ -120,6 +120,13 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
           "When a Conversation’s end makes more, Zeph closes the oldest waiting ones.",
         unit: "waiting",
       },
+      {
+        key: "curiosity_check_ins_per_week",
+        label: "Most Curiosity Check-ins per week",
+        caption:
+          "How many “Something I’ve been wondering” Check-ins a User can get in any 7 days. 0 means none.",
+        unit: "per week",
+      },
     ],
   },
   {

@@ -137,8 +137,9 @@ FEATURES: tuple[FeatureDetails, ...] = (
         name="Curiosities",
         description=(
             "Zeph saves things it wants to ask a User later and may bring one "
-            "up when they talk. Users never see them. New ones are made only "
-            "while User Memory works. Turning it off deletes nothing."
+            "up when they talk or in a Check-in. Users never see them. New ones "
+            "are made only while User Memory works. Turning it off deletes "
+            "nothing."
         ),
         in_reply_note=False,
     ),

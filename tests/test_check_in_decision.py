@@ -46,6 +46,13 @@ PHOTO_LOOK_BACK = CheckInKind(
     sort_order=1,
     sends_shared_photo=True,
 )
+WONDERING = CheckInKind(
+    id=uuid4(),
+    name="Something I've been wondering",
+    description="A question about something they shared",
+    sort_order=2,
+    raises_curiosity=True,
+)
 GAPS = {
     CheckInFrequency.WEEKLY: timedelta(hours=168),
     CheckInFrequency.FEW_TIMES_A_WEEK: timedelta(hours=48),
@@ -56,7 +63,8 @@ RULES = CheckInRules(
     frequency_gaps=GAPS,
     quiet_gap=QUIET_GAP,
     ignore_threshold=3,
-    kinds=(HELLO, PHOTO_LOOK_BACK),
+    curiosity_check_ins_per_week=1,
+    kinds=(HELLO, PHOTO_LOOK_BACK, WONDERING),
 )
 NEXT_GAP = NOW + timedelta(hours=24)
 
@@ -121,6 +129,8 @@ def facts(
         "limit_skip_today": False,
         "ignored_in_a_row": 0,
         "has_shared_photos": False,
+        "has_due_curiosity": False,
+        "curiosity_check_ins_this_week": 0,
     }
     return CheckInFacts(snapshot=snapshot, **(defaults | changes))
 
@@ -332,6 +342,30 @@ ASK_MODEL = AskModel(kinds=(HELLO,), telegram_chat_id=CHAT_ID, next_due_at=NEXT_
             id="User Memory off: every Kind still offered",
         ),
         pytest.param(
+            facts(has_due_curiosity=True),
+            NOW,
+            replace(ASK_MODEL, kinds=(HELLO, WONDERING)),
+            id="a due Curiosity: the wondering Kind offered",
+        ),
+        pytest.param(
+            facts(has_due_curiosity=True, admin_off=(Feature.CURIOSITIES,)),
+            NOW,
+            ASK_MODEL,
+            id="a due Curiosity with Curiosities off: no wondering Kind",
+        ),
+        pytest.param(
+            facts(has_due_curiosity=True, curiosity_check_ins_this_week=1),
+            NOW,
+            ASK_MODEL,
+            id="a due Curiosity over the weekly limit: no wondering Kind",
+        ),
+        pytest.param(
+            facts(has_due_curiosity=True, user={"user_memory_enabled": False}),
+            NOW,
+            replace(ASK_MODEL, kinds=(HELLO, WONDERING)),
+            id="User Memory off: a due Curiosity still offered",
+        ),
+        pytest.param(
             facts(check_ins={"frequency": CheckInFrequency.WEEKLY}),
             NOW,
             replace(ASK_MODEL, next_due_at=NOW + timedelta(hours=168)),
@@ -346,7 +380,7 @@ def test_decide_check_in(
 
 
 def test_with_no_kind_that_may_be_sent_the_user_stays_due() -> None:
-    only_photo_kinds = replace(RULES, kinds=(PHOTO_LOOK_BACK,))
+    only_photo_kinds = replace(RULES, kinds=(PHOTO_LOOK_BACK, WONDERING))
 
     assert decide_check_in(facts(), only_photo_kinds, NOW) == HoldBack(
         HoldBackReason.NO_KIND_TO_SEND, retry_at=WAS_DUE_AT

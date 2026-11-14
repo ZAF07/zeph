@@ -132,7 +132,8 @@ def seed_check_in_kinds(engine: Engine, seed_file: Path) -> None:
     Args:
         engine: The database engine.
         seed_file: YAML file listing Kinds with `name`, `description` and
-            an optional `sends_shared_photo`, in the order to show them.
+            optional `sends_shared_photo` and `raises_curiosity`, in the
+            order to show them.
     """
     seed = yaml.safe_load(seed_file.read_text())
     rows = [
@@ -142,6 +143,7 @@ def seed_check_in_kinds(engine: Engine, seed_file: Path) -> None:
             "description": kind["description"],
             "sort_order": sort_order,
             "sends_shared_photo": kind.get("sends_shared_photo", False),
+            "raises_curiosity": kind.get("raises_curiosity", False),
         }
         for sort_order, kind in enumerate(seed)
     ]

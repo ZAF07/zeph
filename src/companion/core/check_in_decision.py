@@ -37,12 +37,15 @@ class CheckInRules:
         quiet_gap: How long with no message ends a Conversation.
         ignore_threshold: How many ignored Check-ins in a row bring the
             "would you like fewer?" message.
+        curiosity_check_ins_per_week: The most Check-ins that ask a
+            Curiosity one User gets in 7 days.
         kinds: Every Check-in Kind, in order.
     """
 
     frequency_gaps: Mapping[CheckInFrequency, timedelta]
     quiet_gap: timedelta
     ignore_threshold: int
+    curiosity_check_ins_per_week: int
     kinds: tuple[CheckInKind, ...]
 
 
@@ -63,6 +66,10 @@ class CheckInFacts:
         ignored_in_a_row: How many sent Check-ins in a row they ignored,
             counted at most up to the ignore threshold.
         has_shared_photos: Whether they have any Shared Photos.
+        has_due_curiosity: Whether they have a waiting Curiosity whose day
+            has come.
+        curiosity_check_ins_this_week: How many Check-ins that ask a
+            Curiosity were sent to them in the last 7 days.
     """
 
     snapshot: UserSnapshot
@@ -72,6 +79,8 @@ class CheckInFacts:
     limit_skip_today: bool
     ignored_in_a_row: int
     has_shared_photos: bool
+    has_due_curiosity: bool
+    curiosity_check_ins_this_week: int
 
 
 @dataclass(frozen=True)
@@ -133,7 +142,9 @@ def decide_check_in(
     Checked in this order: Check-ins off, paused, Quiet Hours, no Telegram
     Connection, mid-Conversation, the Daily Message Limit, ignored too many,
     and whether any Kind may be sent. Photo Kinds are offered only with
-    Shared Photos and Photo Viewing working.
+    Shared Photos and Photo Viewing working. Kinds that ask a Curiosity are
+    offered only with a Curiosity due, Curiosities working and the weekly
+    limit not reached.
 
     Args:
         facts: What is known about the User.
@@ -177,10 +188,16 @@ def decide_check_in(
     photos_may_be_sent = facts.has_shared_photos and snapshot.works(
         Feature.PHOTO_VIEWING
     )
+    curiosity_may_be_asked = (
+        facts.has_due_curiosity
+        and snapshot.works(Feature.CURIOSITIES)
+        and facts.curiosity_check_ins_this_week < rules.curiosity_check_ins_per_week
+    )
     kinds = tuple(
         kind
         for kind in rules.kinds
-        if photos_may_be_sent or not kind.sends_shared_photo
+        if (photos_may_be_sent or not kind.sends_shared_photo)
+        and (curiosity_may_be_asked or not kind.raises_curiosity)
     )
     if not kinds:
         return HoldBack(HoldBackReason.NO_KIND_TO_SEND, retry_at=current_due_at)

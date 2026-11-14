@@ -107,6 +107,19 @@ def format_date(day: date) -> str:
     return f"{day.day} {day:%b %Y}"
 
 
+def is_due(curiosity: Curiosity, today: date) -> bool:
+    """Tell whether a Curiosity's day has come.
+
+    Args:
+        curiosity: The Curiosity.
+        today: The day it is in the User's time zone.
+
+    Returns:
+        True if it has no "not before" day or that day has come.
+    """
+    return curiosity.not_before is None or curiosity.not_before <= today
+
+
 def describe_due_curiosities(due: DueCuriosities, time_zone: str | None) -> str:
     """Write the due Curiosities as the Understanding model reads them.
 
@@ -191,7 +204,7 @@ class CuriosityRaiser:
         waiting = [
             curiosity
             for curiosity in store.list_waiting(snapshot.user.id)
-            if curiosity.not_before is None or curiosity.not_before <= snapshot.today
+            if is_due(curiosity, snapshot.today)
         ]
         return DueCuriosities(
             offered=tuple(
