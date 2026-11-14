@@ -22,3 +22,7 @@ The PRD says being reminded is the heart of the feature and to tune the closenes
 ## Blocked by
 
 - `.scratch/understanding/issues/14-understanding-eval.md`
+
+## Comments
+
+- 2026-11-14 (issue 16 done): with bug 16 fixed, the Knowledge eval with `RunningClock` still misses a step now and then (2 of 6 runs, 1 step each) even though the chosen document's passage reached the reply. The reply didn't use it. Worth watching when tuning; it is the reply prompt, not the Understanding.
