@@ -4,7 +4,7 @@ The evals measure how the Companion behaves with the real LLM. They are not
 tests: they cost money and their results vary a little from run to run. They
 never run in `make check`.
 
-There are five:
+There are six:
 
 - **Safeguard**: about 30 labelled messages (clear crises, subtle crises and
   false alarms like "this traffic is killing me"), and photos of test images
@@ -28,6 +28,16 @@ There are five:
 - **Photo descriptions**: test images with a readable card number and
   password are sent as photos. Each passes if its description leaves them
   out. No judge is needed: the description is checked for the text.
+- **Understanding**: each case gives a made-up User a User Memory (Portrait,
+  Goals, Summaries, Life Threads, Curiosities, Knowledge documents) and maybe
+  some earlier messages, then sends Messages. Each Message's saved
+  Understanding is checked: the Need picked, whether a Life Thread was found
+  (reminded) and brought up or left alone, whether a Curiosity was raised,
+  whether the reply was told to gently ask why, and whether Knowledge was
+  chosen. The judge checks the reply where the case asks (a rant gets no
+  fixing, an old story is raised naturally, a gentle probe). It also checks
+  every model call kept its full content in the Model Call Log, and reports
+  the time and tokens of each Understanding call.
 
 ## Setup
 
@@ -55,7 +65,7 @@ looking at photos) and the real fastembed embedder. Only the chat channel is
 fake: it records what Zeph sends and serves the test images in
 `evals/images/` when a photo is downloaded, so no real Telegram chat is
 needed. Web search is also fake, so no Tavily credits
-are used. A full run takes about 2–3 minutes.
+are used. A full run takes about 6 minutes.
 
 To run one part or one case, pass pytest options through `uv run`:
 
@@ -65,6 +75,8 @@ uv run pytest evals -m eval -k safeguard
 uv run pytest evals -m eval -k captioned-photo
 uv run pytest evals -m eval -k settings
 uv run pytest evals -m eval -k photo_description
+uv run pytest evals -m eval -k understanding
+uv run pytest evals -m eval -k reminded-of-sister
 ```
 
 ## Cost
@@ -74,6 +86,12 @@ DeepSeek (`deepseek-chat`), the app's calls and the judge's together. At
 DeepSeek's prices that is about 2–3 US cents. The report prints the exact
 token count for each run. Adding cases adds to it: roughly 1,000 tokens per
 Safeguard case and 10,000 per Knowledge case.
+
+The Understanding eval alone (2026-11-14, 12 cases, 13 Messages) used about
+58,500 tokens in and 2,700 out, roughly 4,500 per Message: the safeguard,
+Understanding and reply calls plus the judge. Each Understanding call took
+about 1.4 seconds and 1,500 tokens in, 130 out. A whole `make eval` run that
+day used about 343,000 in and 15,500 out and took about 6 minutes.
 
 ## Reading the results
 
@@ -110,6 +128,14 @@ Knowledge: 8 of 8 steps right
   version" means the change didn't reach Users. "uses no version" means the
   reply didn't draw on the document at all (it wasn't found, or Zeph chose
   not to use it).
+- **Understanding**: the first lines give the Understanding calls' count,
+  average and slowest time, and average tokens. Then each Message shows its
+  own time and tokens, each check (e.g. `FAIL need: picked Think it
+  through, expected Advice`) and each judge rule with its reason. A failed
+  case also prints what the Understanding model was given and what it
+  answered, so you can see why. "wasn't reminded of" means the Thread didn't
+  reach the Understanding at all (a closeness bar or names); "didn't bring
+  up" means it was shown but the model chose not to.
 - **Settings**: each case shows PASS or FAIL with the tools it should have
   called and the tools it did call. A failed case also prints Zeph's reply.
   "called no tool" on a clear request usually means Zeph asked "want me
@@ -128,6 +154,8 @@ Run it after changing any of these:
 - the settings instructions (`reply_settings_instructions`) or the settings
   tools
 - the photo description prompt or photo model
+- the Understanding prompt or model, the Needs, or the Life Thread,
+  Curiosity and closeness settings
 - the embedding model
 - how Knowledge is read, indexed or retrieved (chunking, the text extractor,
   the vector store, the search)
@@ -157,5 +185,10 @@ real people or real card numbers). Keep new ones small, too.
   details (numbers, colours, names) so the judge can tell them apart.
 - `settings.yaml`: add an `id`, the `message` and the settings `tools` the
   reply must call (`[]` when nothing may change).
+- `understanding.yaml`: add a case with its `memory`, optional `earlier`
+  messages and `messages`, each with what to `expect`; the file's top lists
+  every field. Keep a Life Thread's title out of the rest of the memory,
+  since "found" looks for the title in what the Understanding was given.
+  Cases are plain data so they can move to the Eval dashboard later.
 
 `make check` checks the case files can be read (`tests/test_eval_helpers.py`).

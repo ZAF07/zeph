@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 
 from evals.cases import PhotoDescriptionCase, SafeguardCase, SettingsCase
 from evals.judge import NO_VERSION, RuleVerdict, VersionVerdict
+from evals.understanding_checks import CheckResult
 
 READ_ONLY_SETTINGS_TOOLS = frozenset({"list_memories"})
 
@@ -178,6 +179,99 @@ class PhotoDescriptionResult:
         return f"FAIL {self.case.id}: leaked {', '.join(self.leaked)}"
 
 
+@dataclass(frozen=True)
+class UnderstandingCallStats:
+    """How long one Understanding call took and the tokens it used.
+
+    Attributes:
+        duration_ms: How long it took, in milliseconds.
+        tokens_in: Tokens the model read.
+        tokens_out: Tokens the model wrote.
+    """
+
+    duration_ms: int
+    tokens_in: int
+    tokens_out: int
+
+
+@dataclass(frozen=True)
+class UnderstandingMessageResult:
+    """How one Message of an Understanding case went.
+
+    Attributes:
+        case_id: The case's ID.
+        message: What the person sent.
+        checks: Each check on its Understanding.
+        verdicts: The Judge's verdict on each rule for its reply.
+        call: Its Understanding call's time and tokens; None if no call was
+            logged.
+    """
+
+    case_id: str
+    message: str
+    checks: list[CheckResult]
+    verdicts: list[RuleVerdict]
+    call: UnderstandingCallStats | None
+
+    @property
+    def passed(self) -> bool:
+        """Whether its Understanding call was logged and everything passed.
+
+        Returns:
+            True if it did.
+        """
+        return (
+            self.call is not None
+            and all(check.passed for check in self.checks)
+            and all(verdict.passed for verdict in self.verdicts)
+        )
+
+    def describe(self) -> list[str]:
+        """Write the Message's outcome as lines of the report.
+
+        Returns:
+            E.g. "ugh (1200 ms, 2000 in, 150 out)", then "  PASS need:
+            picked Be heard" and "  FAIL no_fixing: Suggests a lawyer.".
+        """
+        if self.call is None:
+            heading = f"{self.message} (no Understanding call was logged)"
+        else:
+            heading = (
+                f"{self.message} ({self.call.duration_ms} ms, "
+                f"{self.call.tokens_in} in, {self.call.tokens_out} out)"
+            )
+        check_lines = [
+            f"  {'PASS' if check.passed else 'FAIL'} {check.name}: {check.detail}"
+            for check in self.checks
+        ]
+        verdict_lines = [f"  {verdict_line(verdict)}" for verdict in self.verdicts]
+        return [heading, *check_lines, *verdict_lines]
+
+
+def understanding_calls_line(calls: list[UnderstandingCallStats]) -> str:
+    """Write the Understanding calls' average time and tokens on one line.
+
+    Args:
+        calls: Every Understanding call the eval logged.
+
+    Returns:
+        E.g. "Understanding calls: 2, 1500 ms on average (slowest 1800 ms),
+        2200 tokens in and 200 out on average".
+    """
+    if not calls:
+        return "Understanding calls: 0"
+    count = len(calls)
+    average_ms = sum(call.duration_ms for call in calls) // count
+    slowest_ms = max(call.duration_ms for call in calls)
+    average_in = sum(call.tokens_in for call in calls) // count
+    average_out = sum(call.tokens_out for call in calls) // count
+    return (
+        f"Understanding calls: {count}, {average_ms} ms on average "
+        f"(slowest {slowest_ms} ms), {average_in} tokens in and "
+        f"{average_out} out on average"
+    )
+
+
 def verdict_line(verdict: RuleVerdict) -> str:
     """Write a rule verdict as one line of the report.
 
@@ -202,6 +296,7 @@ class EvalReport:
         knowledge: Each Knowledge step's result.
         settings: Each settings request's result.
         photo_descriptions: Each test image's description result.
+        understanding: Each Understanding case Message's result.
         tokens_in: Tokens sent to the LLM, by the app and the judge.
         tokens_out: Tokens the LLM wrote, for the app and the judge.
     """
@@ -212,6 +307,7 @@ class EvalReport:
     knowledge: list[KnowledgeStepResult] = field(default_factory=list)
     settings: list[SettingsResult] = field(default_factory=list)
     photo_descriptions: list[PhotoDescriptionResult] = field(default_factory=list)
+    understanding: list[UnderstandingMessageResult] = field(default_factory=list)
     tokens_in: int = 0
     tokens_out: int = 0
 
@@ -285,6 +381,35 @@ class EvalReport:
         lines += [f"  {result.describe()}" for result in results]
         return lines
 
+    def understanding_lines(self) -> list[str]:
+        """Write the Understanding part of the report.
+
+        Returns:
+            The lines: the score, the Understanding calls' time and tokens,
+            then each case's Messages.
+        """
+        results = self.understanding
+        checks = [check for result in results for check in result.checks]
+        verdicts = [verdict for result in results for verdict in result.verdicts]
+        lines = [
+            f"Understanding: {sum(result.passed for result in results)} of "
+            f"{len(results)} messages passed "
+            f"({sum(check.passed for check in checks)} of {len(checks)} checks, "
+            f"{sum(verdict.passed for verdict in verdicts)} of {len(verdicts)} "
+            "rules)",
+            "  "
+            + understanding_calls_line(
+                [result.call for result in results if result.call is not None]
+            ),
+        ]
+        case_id = None
+        for result in results:
+            if result.case_id != case_id:
+                case_id = result.case_id
+                lines.append(f"  {case_id}")
+            lines += [f"    {line}" for line in result.describe()]
+        return lines
+
     def lines(self) -> list[str]:
         """Write the whole report.
 
@@ -305,4 +430,6 @@ class EvalReport:
             lines += ["", *self.settings_lines()]
         if self.photo_descriptions:
             lines += ["", *self.photo_description_lines()]
+        if self.understanding:
+            lines += ["", *self.understanding_lines()]
         return lines

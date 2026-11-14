@@ -245,7 +245,7 @@ _Avoid_: Trace, debug log, LLM log
 ### Quality
 
 **Eval**:
-A measurement of how the Companion behaves with the real LLM, run on demand (`make eval`) and never in the normal checks, because it costs money and its results vary. There are Safeguard, Persona, Knowledge and Settings Evals; a Settings Eval checks that plain-words requests make exactly the right Chat Setting Change, or none. Each one goes through the real reply path and uses the Platform Settings Admins have set.
+A measurement of how the Companion behaves with the real LLM, run on demand (`make eval`) and never in the normal checks, because it costs money and its results vary. There are Safeguard, Persona, Knowledge, Settings, Photo description and Understanding Evals; a Settings Eval checks that plain-words requests make exactly the right Chat Setting Change, or none, and an Understanding Eval gives a made-up User a User Memory and checks each Message's Understanding (the Need picked, Life Threads found, brought up or left alone, Curiosities, asking why, Knowledge) and its time and tokens. Each one goes through the real reply path and uses the Platform Settings Admins have set. Its cases are data files, not code.
 _Avoid_: Test, benchmark
 
 **Missed Crisis**:
@@ -257,5 +257,5 @@ An everyday message that the Safeguard treats as a crisis, such as "this traffic
 _Avoid_: False positive
 
 **Judge**:
-The LLM that marks a Persona or Knowledge Eval: for each Persona rule it says whether the replies keep it, and for a Knowledge Eval it says which version of a document a reply used. It always gives a reason. It can be wrong.
+The LLM that marks a Persona, Knowledge or Understanding Eval: for each rule it says whether the replies keep it, and for a Knowledge Eval it says which version of a document a reply used. It always gives a reason. It can be wrong.
 _Avoid_: Grader, evaluator
