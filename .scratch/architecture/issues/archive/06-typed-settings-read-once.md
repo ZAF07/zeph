@@ -77,3 +77,5 @@ None. Fits well with issue 03 (loaded at the same points as the `UserSnapshot`).
   - 2c5f2e9 "Review fixes: drop stray settings arg from _save docstring, use the dashboard_url placeholder"
   - 24588f7 "Architecture issue 06 done: archive issue with test, run and review evidence"
   - 0b6ec07 "Glossary: Platform Settings"
+  - 17aed00 "Architecture issue 06: record commits in the archived issue"
+  - 1634a1c "Merge architecture issue 06: typed platform settings, read once" (merged from `arch-06-typed-settings` into main)
