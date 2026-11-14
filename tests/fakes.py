@@ -486,7 +486,8 @@ class ScriptedChatModel:
     script them too. Set
     `before_next_reply` to run something once while the next reply is being
     "written", like a User acting during a slow model call, and
-    `before_next_safeguard` likewise while the next text is being checked.
+    `before_next_safeguard` likewise while the next text is being checked,
+    and `before_next_thread_keeping` while the next Life Threads are kept.
     """
 
     def __init__(
@@ -531,6 +532,7 @@ class ScriptedChatModel:
         self.delay_seconds = 0.0
         self.before_next_reply: Callable[[], None] | None = None
         self.before_next_safeguard: Callable[[], None] | None = None
+        self.before_next_thread_keeping: Callable[[], None] | None = None
 
     def script(self, *replies: str | Exception | ToolCall) -> None:
         """Queue replies to return, one per call, in order.
@@ -641,6 +643,10 @@ class ScriptedChatModel:
         elif self.thread_keeping_prompt and instructions == self.thread_keeping_prompt:
             self.thread_keeping_calls.append(call)
             self.call_order.append("thread_keeping")
+            if self.before_next_thread_keeping is not None:
+                before_next_thread_keeping = self.before_next_thread_keeping
+                self.before_next_thread_keeping = None
+                before_next_thread_keeping()
             answer = (
                 self._thread_keeping_answers.pop(0)
                 if self._thread_keeping_answers

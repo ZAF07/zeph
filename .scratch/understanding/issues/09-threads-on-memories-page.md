@@ -1,6 +1,6 @@
 # 09 — Life Threads on the Memories page
 
-Status: ready-for-agent
+Status: in-progress
 
 ## Parent
 
@@ -23,3 +23,14 @@ Users see "What's going on in your life" on the Memories page: each Life Thread'
 ## Blocked by
 
 - `.scratch/understanding/issues/08-life-threads-and-being-reminded.md`
+
+## Comments
+
+**Plan (14 Nov 2026, branch `understanding-09-threads-memories-page`):**
+
+- Backend: Life Thread repository gets `list_for_user` and `delete`; `UserMemoryService` gets `list_threads` / `delete_thread`; Dashboard API `GET /api/life-threads` (open first, then latest updated) and `DELETE /api/life-threads/{id}` (404 if not the User's).
+- Conversation-end keeping only updates Threads it changed (never re-inserts), so a Thread deleted while keeping runs stays deleted.
+- Chat: `list_memories` also lists the User's Threads, numbered after the Memory Items; `forget_memory` forgets either. No new tool.
+- "Changed in chat": a forgotten Thread is gone, so there is nothing left to mark (same as forgetting a Memory Item today). No caption applies.
+- Dashboard: a "What's going on" tab on the Memories page, styled like the Conversation Summaries list (the design file has no Threads section). Shown whether User Memory is on or off.
+- No migration needed.

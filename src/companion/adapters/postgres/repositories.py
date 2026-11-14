@@ -1983,47 +1983,70 @@ class PostgresLifeThreadRepository:
             ).all()
         return [_to_life_thread(row) for row in rows]
 
-    def save_many(self, threads: Sequence[LifeThreadToSave]) -> None:
+    def save_many(
+        self,
+        added: Sequence[LifeThreadToSave],
+        changed: Sequence[LifeThreadToSave],
+    ) -> None:
         """Add new Threads and save changed ones, in one step.
 
-        A changed Thread saved with no embedding keeps the one it had.
+        A changed Thread saved with no embedding keeps the one it had. A
+        changed Thread that was deleted meanwhile stays deleted.
 
         Args:
-            threads: The new and changed Threads.
+            added: The new Threads.
+            changed: The changed Threads.
         """
-        if not threads:
-            return
-        statement = insert(life_threads).values(
-            [
-                {
-                    **asdict(to_save.thread),
-                    "people": list(to_save.thread.people),
-                    "last_reaction": to_save.thread.last_reaction,
-                    "name_keys": list(to_save.name_keys),
-                    "embedding": to_save.embedding,
-                }
-                for to_save in threads
-            ]
-        )
-        changed = statement.excluded
         with self._database.begin() as connection:
-            connection.execute(
-                statement.on_conflict_do_update(
-                    index_elements=[life_threads.c.id],
-                    set_={
-                        "title": changed.title,
-                        "story": changed.story,
-                        "people": changed.people,
-                        "name_keys": changed.name_keys,
-                        "is_open": changed.is_open,
-                        "updated_at": changed.updated_at,
-                        "last_reaction": changed.last_reaction,
-                        "embedding": func.coalesce(
-                            changed.embedding, life_threads.c.embedding
-                        ),
-                    },
+            if added:
+                connection.execute(
+                    insert(life_threads).values(
+                        [
+                            {
+                                **asdict(to_save.thread),
+                                "people": list(to_save.thread.people),
+                                "last_reaction": to_save.thread.last_reaction,
+                                "name_keys": list(to_save.name_keys),
+                                "embedding": to_save.embedding,
+                            }
+                            for to_save in added
+                        ]
+                    )
                 )
-            )
+            if changed:
+                connection.execute(
+                    update(life_threads)
+                    .where(life_threads.c.id == bindparam("thread_id"))
+                    .values(
+                        title=bindparam("new_title"),
+                        story=bindparam("new_story"),
+                        people=bindparam("new_people"),
+                        name_keys=bindparam("new_name_keys"),
+                        is_open=bindparam("new_is_open"),
+                        updated_at=bindparam("new_updated_at"),
+                        last_reaction=bindparam("new_last_reaction"),
+                        embedding=func.coalesce(
+                            bindparam(
+                                "new_embedding", type_=life_threads.c.embedding.type
+                            ),
+                            life_threads.c.embedding,
+                        ),
+                    ),
+                    [
+                        {
+                            "thread_id": to_save.thread.id,
+                            "new_title": to_save.thread.title,
+                            "new_story": to_save.thread.story,
+                            "new_people": list(to_save.thread.people),
+                            "new_name_keys": list(to_save.name_keys),
+                            "new_is_open": to_save.thread.is_open,
+                            "new_updated_at": to_save.thread.updated_at,
+                            "new_last_reaction": to_save.thread.last_reaction,
+                            "new_embedding": to_save.embedding,
+                        }
+                        for to_save in changed
+                    ],
+                )
 
     def mark_raised(
         self, thread_ids: Sequence[UUID], conversation_id: UUID, raised_at: datetime
@@ -2050,6 +2073,45 @@ class PostgresLifeThreadRepository:
                     last_raised_conversation_id=conversation_id,
                 )
             )
+
+    def list_for_user(self, user_id: UUID) -> list[LifeThread]:
+        """List a User's Threads, open first, then the latest updated.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Threads.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(*LIFE_THREAD_COLUMNS)
+                .where(life_threads.c.user_id == user_id)
+                .order_by(
+                    life_threads.c.is_open.desc(), life_threads.c.updated_at.desc()
+                )
+            ).all()
+        return [_to_life_thread(row) for row in rows]
+
+    def delete(self, user_id: UUID, thread_id: UUID) -> bool:
+        """Delete one of a User's Threads.
+
+        Args:
+            user_id: The User's ID.
+            thread_id: The Thread's ID.
+
+        Returns:
+            True if it was deleted; False if the User has no such Thread.
+        """
+        with self._database.begin() as connection:
+            deleted = connection.execute(
+                delete(life_threads)
+                .where(
+                    life_threads.c.user_id == user_id, life_threads.c.id == thread_id
+                )
+                .returning(life_threads.c.id)
+            ).first()
+        return deleted is not None
 
     def delete_for_user(self, user_id: UUID) -> None:
         """Delete every one of a User's Life Threads.

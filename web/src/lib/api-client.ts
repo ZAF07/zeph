@@ -394,6 +394,15 @@ export type ConversationSummary = {
   created_at: string;
 };
 
+/** An ongoing story in the User's life that Zeph follows. */
+export type LifeThread = {
+  id: string;
+  title: string;
+  story: string;
+  is_open: boolean;
+  updated_at: string;
+};
+
 /** A photo that matters to the User, kept in their User Memory. */
 export type SharedPhoto = {
   id: string;
@@ -642,6 +651,8 @@ export type ApiClient = {
   deleteAllMemoryItems: () => Promise<void>;
   listConversationSummaries: () => Promise<ConversationSummary[]>;
   deleteConversationSummary: (id: string) => Promise<void>;
+  listLifeThreads: () => Promise<LifeThread[]>;
+  deleteLifeThread: (id: string) => Promise<void>;
   listSharedPhotos: () => Promise<SharedPhoto[]>;
   getSharedPhotoImage: (id: string) => Promise<Blob>;
   deleteSharedPhoto: (id: string) => Promise<void>;
@@ -851,6 +862,10 @@ export function createApiClient(
       ).summaries,
     deleteConversationSummary: (id) =>
       request<void>(`/api/conversation-summaries/${id}`, "DELETE"),
+    listLifeThreads: async () =>
+      (await request<{ threads: LifeThread[] }>("/api/life-threads")).threads,
+    deleteLifeThread: (id) =>
+      request<void>(`/api/life-threads/${id}`, "DELETE"),
     listSharedPhotos: async () =>
       (await request<{ photos: SharedPhoto[] }>("/api/shared-photos")).photos,
     getSharedPhotoImage: (id) => requestBlob(`/api/shared-photos/${id}/image`),
