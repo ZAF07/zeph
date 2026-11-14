@@ -38,14 +38,14 @@ None - can start immediately.
 - `IncomingMessageHandler` keeps one pending Message per User. Each text (or single photo, sticker, captioned file) is screened at once under the User's turn lock, then the per-User wait restarts. Album items join the pending Message unscreened and are described and screened together when the wait ends, as today.
 - When the wait ends: pop the pending Message under the turn lock, screen any Albums, then run the reply (Delete My Data, limit, compose, deliver) once. A crisis drops the pending Message.
 - The reply call and the memory/Knowledge lookups read the trailing run of the User's texts as one latest Message (consecutive incoming messages are merged into one line).
-- One setting `message_wait_seconds` ("Message wait", Conversations section, default 4) replaces `photo_album_wait_seconds`; migration 0025 removes the old row.
+- One setting `message_wait_seconds` ("Message wait", Conversations section, default 4) replaces `photo_album_wait_seconds`; migration 0026 removes the old row.
 - Tests: `send_to_webhook` posts and then ends the wait (a User who pauses); a new `post_to_webhook` posts without ending it, for grouping tests.
 
 ### Evidence (14 Nov 2026)
 
 - Three texts in the wait get one reply that sees all three as the latest Message: `tests/test_messages.py::test_texts_sent_in_a_row_get_one_reply_that_sees_them_as_one_message` (reply call's last line is `hey\nrough day\nmy boss yelled at me`).
 - A text after the wait starts a new Message: `test_a_text_after_the_wait_starts_a_new_message`; a text sent while a reply is written is answered after it: `test_a_text_sent_while_a_reply_is_written_starts_a_new_message_answered_after`.
-- Admin setting: `message_wait_seconds` ("Message wait", Conversations section, seeded 4, 1–30); `test_the_wait_is_the_admins_message_wait_setting`, `tests/test_admin_settings.py::test_the_message_wait_is_editable_with_a_seeded_value_of_a_few_seconds`, `web/src/components/PlatformSettingsForm.test.tsx` ("shows and saves the message wait in its Conversations section"). Migration 0025 removes the old `photo_album_wait_seconds` row.
+- Admin setting: `message_wait_seconds` ("Message wait", Conversations section, seeded 4, 1–30); `test_the_wait_is_the_admins_message_wait_setting`, `tests/test_admin_settings.py::test_the_message_wait_is_editable_with_a_seeded_value_of_a_few_seconds`, `web/src/components/PlatformSettingsForm.test.tsx` ("shows and saves the message wait in its Conversations section"). Migration 0026 removes the old `photo_album_wait_seconds` row.
 - Crisis inside a group gets the Crisis Reply at once and the rest isn't answered: `test_a_crisis_text_gets_the_crisis_reply_at_once_and_the_rest_is_not_answered`; each text is checked on arrival: `test_the_safeguard_checks_each_text_as_it_arrives_without_waiting`.
 - Counts once: `test_a_message_of_several_texts_counts_once_toward_the_daily_limit`.
 - Albums as today: every test in `tests/test_photos.py` passes (one reply, one count, photo cap); two Albums together are now one Message (`test_two_albums_sent_together_are_one_message_with_one_reply`); text + Album together: `test_a_text_and_an_album_sent_together_get_one_reply`.
