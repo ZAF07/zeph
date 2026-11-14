@@ -1,7 +1,9 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import asdict
 from datetime import date, datetime
-from typing import Any
+from functools import partial
+from typing import Any, Protocol
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -93,7 +95,27 @@ from companion.core.models import (
     UserOverview,
     UserRole,
 )
-from companion.core.ports import Repositories
+from companion.core.ports import Repositories, Transaction
+
+
+class Database(Protocol):
+    """Where a repository runs its queries: the engine, or one open transaction."""
+
+    def connect(self) -> AbstractContextManager[Connection]:
+        """Open a connection for reading.
+
+        Returns:
+            The connection, as a context manager.
+        """
+        ...
+
+    def begin(self) -> AbstractContextManager[Connection]:
+        """Open a connection whose changes are saved together.
+
+        Returns:
+            The connection, as a context manager.
+        """
+        ...
 
 
 def _to_user(row: Row[Any]) -> User:
@@ -420,13 +442,13 @@ def _to_helpline(row: Row[Any]) -> Helpline:
 class PostgresUserRepository:
     """Stores Users in Postgres."""
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, database: Database) -> None:
         """Set up the repository.
 
         Args:
-            engine: The database engine.
+            database: Where to run queries: the engine, or one transaction.
         """
-        self._engine = engine
+        self._database = database
 
     def get(self, user_id: UUID) -> User | None:
         """Find a User by our ID.
@@ -437,7 +459,7 @@ class PostgresUserRepository:
         Returns:
             The User, or None if there is none.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             row = connection.execute(select(users).where(users.c.id == user_id)).first()
         return _to_user(row) if row else None
 
@@ -450,7 +472,7 @@ class PostgresUserRepository:
         Returns:
             The Users found, in the order of the IDs given.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 select(users).where(users.c.id.in_(user_ids))
             ).all()
@@ -466,7 +488,7 @@ class PostgresUserRepository:
         Returns:
             The User, or None if there is none.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             row = connection.execute(
                 select(users).where(users.c.auth_id == auth_id)
             ).first()
@@ -492,7 +514,7 @@ class PostgresUserRepository:
             )
             .on_conflict_do_nothing(index_elements=[users.c.auth_id])
         )
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(statement)
             row = connection.execute(
                 select(users).where(users.c.auth_id == user.auth_id)
@@ -536,7 +558,7 @@ class PostgresUserRepository:
             )
             .returning(users)
         )
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             row = connection.execute(statement).one()
         return _to_user(row)
 
@@ -572,7 +594,7 @@ class PostgresUserRepository:
             conversation_count.label("conversation_count"),
             messages_sent.label("messages_sent"),
         ).order_by(users.c.created_at.desc())
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(statement).all()
         return [
             UserOverview(
@@ -590,7 +612,7 @@ class PostgresUserRepository:
         Returns:
             How many Admins there are.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             admin_count = connection.execute(
                 select(func.count())
                 .select_from(users)
@@ -607,7 +629,7 @@ class PostgresUserRepository:
         Returns:
             The saved User.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             row = connection.execute(
                 update(users)
                 .where(users.c.id == user_id)
@@ -616,31 +638,16 @@ class PostgresUserRepository:
             ).one()
         return _to_user(row)
 
-    def demote_unless_last_admin(self, user_id: UUID) -> User | None:
-        """Make an Admin a plain User, in one step, unless they are the only one.
-
-        The Admin rows are locked first, so a second demotion running at the
-        same time waits and then sees this one.
+    def demote_to_user(self, user_id: UUID) -> User:
+        """Make an Admin a plain User.
 
         Args:
             user_id: The Admin's ID.
 
         Returns:
-            The saved User, or None if they are the last Admin.
+            The saved User.
         """
-        with self._engine.begin() as connection:
-            admin_ids = (
-                connection.execute(
-                    select(users.c.id)
-                    .where(users.c.role == UserRole.ADMIN.value)
-                    .with_for_update()
-                )
-                .scalars()
-                .all()
-            )
-            other_admins = [admin_id for admin_id in admin_ids if admin_id != user_id]
-            if not other_admins:
-                return None
+        with self._database.begin() as connection:
             row = connection.execute(
                 update(users)
                 .where(users.c.id == user_id)
@@ -649,75 +656,35 @@ class PostgresUserRepository:
             ).one()
         return _to_user(row)
 
-    def delete_data(self, user_id: UUID) -> None:
-        """Delete a User's data in one step, keeping their account.
+    def delete(self, user_id: UUID) -> bool:
+        """Delete a User: their profile and settings.
+
+        Any rows of theirs still left go through the tables' cascading
+        foreign keys.
 
         Args:
             user_id: The User's ID.
-        """
-        with self._engine.begin() as connection:
-            for table in (
-                conversation_summaries,
-                memory_items,
-                shared_photos,
-                personal_stickers,
-                conversations,
-                check_ins,
-                connection_tokens,
-                telegram_connections,
-            ):
-                connection.execute(delete(table).where(table.c.user_id == user_id))
-
-    def delete_unless_last_admin(self, user_id: UUID, deleted_at: datetime) -> bool:
-        """Delete a User and everything of theirs, unless they are the only Admin.
-
-        The Admin rows are locked first, so two Admins deleting their accounts
-        at the same time can never leave the platform without an Admin. Their
-        data goes with them through the tables' cascading foreign keys, and
-        their auth ID is added to the pending auth account deletions.
-
-        Args:
-            user_id: The User's ID.
-            deleted_at: When they were deleted.
 
         Returns:
-            True if they were deleted; False if they are the last Admin.
+            True if they were deleted; False if there was no such User.
         """
-        with self._engine.begin() as connection:
-            admin_ids = (
-                connection.execute(
-                    select(users.c.id)
-                    .where(users.c.role == UserRole.ADMIN.value)
-                    .with_for_update()
-                )
-                .scalars()
-                .all()
-            )
-            if admin_ids == [user_id]:
-                return False
-            auth_id = connection.execute(
-                delete(users).where(users.c.id == user_id).returning(users.c.auth_id)
+        with self._database.begin() as connection:
+            deleted_id = connection.execute(
+                delete(users).where(users.c.id == user_id).returning(users.c.id)
             ).scalar_one_or_none()
-            if auth_id is None:
-                return True
-            connection.execute(
-                insert(pending_auth_account_deletions)
-                .values(auth_id=auth_id, added_at=deleted_at)
-                .on_conflict_do_nothing()
-            )
-        return True
+        return deleted_id is not None
 
 
 class PostgresPendingAuthAccountDeletionRepository:
     """Stores the auth provider accounts still to delete in Postgres."""
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, database: Database) -> None:
         """Set up the repository.
 
         Args:
-            engine: The database engine.
+            database: Where to run queries: the engine, or one transaction.
         """
-        self._engine = engine
+        self._database = database
 
     def list_auth_ids(self) -> list[str]:
         """List the auth IDs of the accounts still to delete, oldest first.
@@ -725,7 +692,7 @@ class PostgresPendingAuthAccountDeletionRepository:
         Returns:
             The auth IDs.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             return list(
                 connection.execute(
                     select(pending_auth_account_deletions.c.auth_id).order_by(
@@ -734,17 +701,29 @@ class PostgresPendingAuthAccountDeletionRepository:
                 ).scalars()
             )
 
-    def complete(self, auth_id: str) -> None:
-        """Mark an account deleted at the auth provider, in one step.
+    def add(self, auth_id: str, added_at: datetime) -> None:
+        """Note an auth provider account as still to delete.
 
-        Any User made with that auth ID since is deleted too, with their data
-        going through the tables' cascading foreign keys.
+        Adding one already on the list changes nothing.
+
+        Args:
+            auth_id: The auth provider's account ID.
+            added_at: When it was added.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                insert(pending_auth_account_deletions)
+                .values(auth_id=auth_id, added_at=added_at)
+                .on_conflict_do_nothing()
+            )
+
+    def complete(self, auth_id: str) -> None:
+        """Take an account off the list, once it is deleted at the auth provider.
 
         Args:
             auth_id: The auth provider's account ID.
         """
-        with self._engine.begin() as connection:
-            connection.execute(delete(users).where(users.c.auth_id == auth_id))
+        with self._database.begin() as connection:
             connection.execute(
                 delete(pending_auth_account_deletions).where(
                     pending_auth_account_deletions.c.auth_id == auth_id
@@ -755,13 +734,13 @@ class PostgresPendingAuthAccountDeletionRepository:
 class PostgresTelegramConnectionRepository:
     """Stores Telegram Connections in Postgres."""
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, database: Database) -> None:
         """Set up the repository.
 
         Args:
-            engine: The database engine.
+            database: Where to run queries: the engine, or one transaction.
         """
-        self._engine = engine
+        self._database = database
 
     def get_by_user(self, user_id: UUID) -> TelegramConnection | None:
         """Find a User's Telegram Connection.
@@ -772,7 +751,7 @@ class PostgresTelegramConnectionRepository:
         Returns:
             The connection, or None if the User has none.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             row = connection.execute(
                 select(telegram_connections).where(
                     telegram_connections.c.user_id == user_id
@@ -791,7 +770,7 @@ class PostgresTelegramConnectionRepository:
         Returns:
             Each User's connection; a User with none is left out.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 select(telegram_connections).where(
                     telegram_connections.c.user_id.in_(user_ids)
@@ -808,7 +787,7 @@ class PostgresTelegramConnectionRepository:
         Returns:
             The connection, or None if the account is not connected.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             row = connection.execute(
                 select(telegram_connections).where(
                     telegram_connections.c.telegram_user_id == telegram_user_id
@@ -836,20 +815,33 @@ class PostgresTelegramConnectionRepository:
                 index_elements=[telegram_connections.c.user_id], set_=values
             )
         )
-        with self._engine.begin() as db:
+        with self._database.begin() as db:
             db.execute(statement)
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's Telegram Connection.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(telegram_connections).where(
+                    telegram_connections.c.user_id == user_id
+                )
+            )
 
 
 class PostgresConnectionTokenRepository:
     """Stores connection tokens in Postgres."""
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, database: Database) -> None:
         """Set up the repository.
 
         Args:
-            engine: The database engine.
+            database: Where to run queries: the engine, or one transaction.
         """
-        self._engine = engine
+        self._database = database
 
     def add(self, token: ConnectionToken) -> None:
         """Save a new connection token.
@@ -857,7 +849,7 @@ class PostgresConnectionTokenRepository:
         Args:
             token: The token to save.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(
                 insert(connection_tokens).values(
                     token=token.token,
@@ -878,7 +870,7 @@ class PostgresConnectionTokenRepository:
         Returns:
             The token, or None if there is none.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             row = connection.execute(
                 select(connection_tokens).where(connection_tokens.c.token == token)
             ).first()
@@ -893,7 +885,7 @@ class PostgresConnectionTokenRepository:
         Returns:
             The newest token, or None if the User has never asked for one.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             row = connection.execute(
                 select(connection_tokens)
                 .where(connection_tokens.c.user_id == user_id)
@@ -913,7 +905,7 @@ class PostgresConnectionTokenRepository:
             True if this call claimed the token; False if it was already used,
             refused or expired, so two requests can never both use one token.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             claimed = connection.execute(
                 update(connection_tokens)
                 .where(
@@ -934,24 +926,35 @@ class PostgresConnectionTokenRepository:
             token: The code.
             rejected_at: When it was refused.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(
                 update(connection_tokens)
                 .where(connection_tokens.c.token == token)
                 .values(rejected_at=rejected_at)
             )
 
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete every connection token of a User's.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(connection_tokens).where(connection_tokens.c.user_id == user_id)
+            )
+
 
 class PostgresConversationRepository:
     """Stores Conversations and their messages in Postgres."""
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, database: Database) -> None:
         """Set up the repository.
 
         Args:
-            engine: The database engine.
+            database: Where to run queries: the engine, or one transaction.
         """
-        self._engine = engine
+        self._database = database
 
     def get_latest_for_user(self, user_id: UUID) -> Conversation | None:
         """Find a User's newest Conversation.
@@ -962,7 +965,7 @@ class PostgresConversationRepository:
         Returns:
             The newest Conversation, or None if the User has never had one.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             row = connection.execute(
                 select(conversations)
                 .where(conversations.c.user_id == user_id)
@@ -983,7 +986,7 @@ class PostgresConversationRepository:
             Each User's newest Conversation; a User who never had one is
             left out.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 select(conversations)
                 .where(conversations.c.user_id.in_(user_ids))
@@ -1000,7 +1003,7 @@ class PostgresConversationRepository:
         Args:
             conversation: The Conversation to save.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(
                 insert(conversations).values(
                     id=conversation.id,
@@ -1016,7 +1019,7 @@ class PostgresConversationRepository:
         Args:
             message: The message to save.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(
                 insert(conversation_messages).values(
                     id=message.id,
@@ -1048,7 +1051,7 @@ class PostgresConversationRepository:
         Returns:
             True if it was saved; False if the Conversation was ended.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             open_conversation = connection.execute(
                 update(conversations)
                 .where(
@@ -1083,7 +1086,7 @@ class PostgresConversationRepository:
         Returns:
             The messages.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 select(conversation_messages)
                 .where(conversation_messages.c.conversation_id == conversation_id)
@@ -1099,7 +1102,7 @@ class PostgresConversationRepository:
                 this time are ended.
             ended_at: When they are being ended.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(
                 update(conversations)
                 .where(
@@ -1115,7 +1118,7 @@ class PostgresConversationRepository:
         Returns:
             The Conversations.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 select(conversations)
                 .where(
@@ -1135,7 +1138,7 @@ class PostgresConversationRepository:
         Returns:
             The Users' IDs.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             return list(
                 connection.execute(
                     select(conversations.c.user_id)
@@ -1154,24 +1157,37 @@ class PostgresConversationRepository:
         Args:
             cutoff: Messages sent before this are deleted.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(
                 delete(conversation_messages).where(
                     conversation_messages.c.sent_at < cutoff
                 )
             )
 
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's Conversations and their messages.
+
+        The messages go through the table's cascading foreign key.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(conversations).where(conversations.c.user_id == user_id)
+            )
+
 
 class PostgresPlatformSettingsRepository:
     """Reads platform settings from Postgres."""
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, database: Database) -> None:
         """Set up the repository.
 
         Args:
-            engine: The database engine.
+            database: Where to run queries: the engine, or one transaction.
         """
-        self._engine = engine
+        self._database = database
 
     def load(self) -> PlatformSettings:
         """Read every setting in one query.
@@ -1179,7 +1195,7 @@ class PostgresPlatformSettingsRepository:
         Returns:
             The settings as they are now.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 select(platform_settings.c.key, platform_settings.c.value)
             ).all()
@@ -1204,7 +1220,7 @@ class PostgresPlatformSettingsRepository:
             .select_from(platform_settings.outerjoin(users))
             .where(platform_settings.c.key.in_(keys))
         )
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = {row.key: row for row in connection.execute(statement).all()}
         return [
             StoredSetting(
@@ -1227,7 +1243,7 @@ class PostgresPlatformSettingsRepository:
             updated_at: When they are being saved.
             updated_by: The Admin saving them.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             for key, value in values.items():
                 connection.execute(
                     update(platform_settings)
@@ -1239,13 +1255,13 @@ class PostgresPlatformSettingsRepository:
 class PostgresHelplineRepository:
     """Stores Helplines in Postgres; the international fallback has no country."""
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, database: Database) -> None:
         """Set up the repository.
 
         Args:
-            engine: The database engine.
+            database: Where to run queries: the engine, or one transaction.
         """
-        self._engine = engine
+        self._database = database
 
     def list_countries(self) -> list[Helpline]:
         """List every country's Helplines, by country and then sort order.
@@ -1253,7 +1269,7 @@ class PostgresHelplineRepository:
         Returns:
             The Helplines, without the international fallback.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 select(helplines)
                 .where(helplines.c.country.is_not(None))
@@ -1270,7 +1286,7 @@ class PostgresHelplineRepository:
         Returns:
             The Helplines; empty if the country has none.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 select(helplines)
                 .where(helplines.c.country == country)
@@ -1287,7 +1303,7 @@ class PostgresHelplineRepository:
         Returns:
             The Helpline, or None if there is none.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             row = connection.execute(
                 select(helplines).where(helplines.c.id == helpline_id)
             ).first()
@@ -1299,7 +1315,7 @@ class PostgresHelplineRepository:
         Returns:
             The international fallback.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             row = connection.execute(
                 select(helplines).where(helplines.c.country.is_(None))
             ).one()
@@ -1315,7 +1331,7 @@ class PostgresHelplineRepository:
         Returns:
             The saved Helpline.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             row = connection.execute(
                 insert(helplines)
                 .values(
@@ -1343,7 +1359,7 @@ class PostgresHelplineRepository:
         Returns:
             The saved Helpline.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             current_country = connection.execute(
                 select(helplines.c.country).where(helplines.c.id == helpline_id)
             ).scalar_one()
@@ -1369,7 +1385,7 @@ class PostgresHelplineRepository:
         Args:
             helpline_id: The Helpline's ID.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(delete(helplines).where(helplines.c.id == helpline_id))
 
     def set_sort_orders(self, sort_orders: Mapping[UUID, int]) -> None:
@@ -1378,7 +1394,7 @@ class PostgresHelplineRepository:
         Args:
             sort_orders: The new sort order for each Helpline ID.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             for helpline_id, sort_order in sort_orders.items():
                 connection.execute(
                     update(helplines)
@@ -1408,13 +1424,13 @@ class PostgresHelplineRepository:
 class PostgresSafeguardEventRepository:
     """Stores Safeguard Events in Postgres. There is no column for message text."""
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, database: Database) -> None:
         """Set up the repository.
 
         Args:
-            engine: The database engine.
+            database: Where to run queries: the engine, or one transaction.
         """
-        self._engine = engine
+        self._database = database
 
     def add(self, event: SafeguardEvent) -> None:
         """Save a Safeguard Event.
@@ -1422,7 +1438,7 @@ class PostgresSafeguardEventRepository:
         Args:
             event: The event to save.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(
                 insert(safeguard_events).values(
                     id=event.id,
@@ -1458,7 +1474,7 @@ class PostgresSafeguardEventRepository:
             statement = statement.where(safeguard_events.c.created_at >= since)
         if risk_type is not None:
             statement = statement.where(safeguard_events.c.risk_type == risk_type.value)
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(statement).all()
         return [
             SafeguardEventOverview(
@@ -1475,17 +1491,28 @@ class PostgresSafeguardEventRepository:
             for row in rows
         ]
 
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's Safeguard Events.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(safeguard_events).where(safeguard_events.c.user_id == user_id)
+            )
+
 
 class PostgresMemoryCategoryRepository:
     """Stores Memory Categories in Postgres."""
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, database: Database) -> None:
         """Set up the repository.
 
         Args:
-            engine: The database engine.
+            database: Where to run queries: the engine, or one transaction.
         """
-        self._engine = engine
+        self._database = database
 
     def list_all(self) -> list[MemoryCategory]:
         """List every Memory Category, archived ones included, in sort order.
@@ -1493,7 +1520,7 @@ class PostgresMemoryCategoryRepository:
         Returns:
             The categories.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 select(memory_categories).order_by(memory_categories.c.sort_order)
             ).all()
@@ -1506,7 +1533,7 @@ class PostgresMemoryCategoryRepository:
             The categories, archived ones included.
         """
         item_count = func.count(memory_items.c.id).label("item_count")
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 select(memory_categories, item_count)
                 .outerjoin(
@@ -1531,7 +1558,7 @@ class PostgresMemoryCategoryRepository:
         Returns:
             The category, or None if there is none.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             row = connection.execute(
                 select(memory_categories).where(memory_categories.c.id == category_id)
             ).first()
@@ -1546,7 +1573,7 @@ class PostgresMemoryCategoryRepository:
         Returns:
             The saved category.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             highest = connection.execute(
                 select(func.max(memory_categories.c.sort_order))
             ).scalar()
@@ -1573,7 +1600,7 @@ class PostgresMemoryCategoryRepository:
         Returns:
             The saved category.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             row = connection.execute(
                 update(memory_categories)
                 .where(memory_categories.c.id == category.id)
@@ -1591,13 +1618,13 @@ class PostgresMemoryCategoryRepository:
 class PostgresUserMemoryRepository:
     """Stores Memory Items, Conversation Summaries and Shared Photos in Postgres."""
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, database: Database) -> None:
         """Set up the repository.
 
         Args:
-            engine: The database engine.
+            database: Where to run queries: the engine, or one transaction.
         """
-        self._engine = engine
+        self._database = database
 
     def list_items(self, user_id: UUID) -> list[MemoryItem]:
         """List a User's Memory Items in the order they were saved.
@@ -1608,7 +1635,7 @@ class PostgresUserMemoryRepository:
         Returns:
             The Memory Items.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 select(memory_items)
                 .where(memory_items.c.user_id == user_id)
@@ -1626,7 +1653,7 @@ class PostgresUserMemoryRepository:
         Returns:
             True if it was deleted; False if the User has no such item.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             deleted = connection.execute(
                 delete(memory_items)
                 .where(memory_items.c.user_id == user_id, memory_items.c.id == item_id)
@@ -1640,7 +1667,7 @@ class PostgresUserMemoryRepository:
         Args:
             user_id: The User's ID.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(
                 delete(memory_items).where(memory_items.c.user_id == user_id)
             )
@@ -1652,7 +1679,7 @@ class PostgresUserMemoryRepository:
             user_id: The User's ID.
             items: The new Memory Items from onboarding.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(
                 delete(memory_items).where(
                     memory_items.c.user_id == user_id,
@@ -1684,7 +1711,7 @@ class PostgresUserMemoryRepository:
             .order_by(conversation_summaries.c.created_at.desc())
             .limit(limit)
         )
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(statement).all()
         return [_to_summary(row) for row in rows]
 
@@ -1698,7 +1725,7 @@ class PostgresUserMemoryRepository:
         Returns:
             True if it was deleted; False if the User has no such summary.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             deleted = connection.execute(
                 delete(conversation_summaries)
                 .where(
@@ -1728,7 +1755,7 @@ class PostgresUserMemoryRepository:
             changes: The changes to the User's Memory Items and the new
                 Shared Photos.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             if summary is not None:
                 connection.execute(
                     insert(conversation_summaries).values(
@@ -1785,7 +1812,7 @@ class PostgresUserMemoryRepository:
         Returns:
             The Shared Photos.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 select(shared_photos)
                 .where(shared_photos.c.user_id == user_id)
@@ -1802,7 +1829,7 @@ class PostgresUserMemoryRepository:
         Returns:
             The IDs of those with at least one Shared Photo.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             found = connection.execute(
                 select(shared_photos.c.user_id)
                 .where(shared_photos.c.user_id.in_(user_ids))
@@ -1820,7 +1847,7 @@ class PostgresUserMemoryRepository:
         Returns:
             The Shared Photo, or None if the User has no such photo.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             row = connection.execute(
                 select(shared_photos).where(
                     shared_photos.c.user_id == user_id,
@@ -1839,7 +1866,7 @@ class PostgresUserMemoryRepository:
         Returns:
             True if it was deleted; False if the User has no such photo.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             deleted = connection.execute(
                 delete(shared_photos)
                 .where(
@@ -1850,6 +1877,25 @@ class PostgresUserMemoryRepository:
             ).first()
         return deleted is not None
 
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's Memory Items, Conversation Summaries and Shared Photos.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(memory_items).where(memory_items.c.user_id == user_id)
+            )
+            connection.execute(
+                delete(conversation_summaries).where(
+                    conversation_summaries.c.user_id == user_id
+                )
+            )
+            connection.execute(
+                delete(shared_photos).where(shared_photos.c.user_id == user_id)
+            )
+
 
 KNOWLEDGE_DOCUMENT_COLUMNS = [
     column for column in knowledge_documents.c if column.name not in {"content", "text"}
@@ -1859,13 +1905,13 @@ KNOWLEDGE_DOCUMENT_COLUMNS = [
 class PostgresKnowledgeDocumentRepository:
     """Stores Knowledge documents and their uploaded files in Postgres."""
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, database: Database) -> None:
         """Set up the repository.
 
         Args:
-            engine: The database engine.
+            database: Where to run queries: the engine, or one transaction.
         """
-        self._engine = engine
+        self._database = database
 
     def list_all(self) -> list[KnowledgeDocument]:
         """List every Knowledge document, newest upload first.
@@ -1873,7 +1919,7 @@ class PostgresKnowledgeDocumentRepository:
         Returns:
             The documents.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 select(*KNOWLEDGE_DOCUMENT_COLUMNS).order_by(
                     knowledge_documents.c.created_at.desc(),
@@ -1891,7 +1937,7 @@ class PostgresKnowledgeDocumentRepository:
         Returns:
             The document, or None if there is none.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             row = connection.execute(
                 select(*KNOWLEDGE_DOCUMENT_COLUMNS).where(
                     knowledge_documents.c.id == document_id
@@ -1908,7 +1954,7 @@ class PostgresKnowledgeDocumentRepository:
         Returns:
             The file's bytes.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             content: bytes = connection.execute(
                 select(knowledge_documents.c.content).where(
                     knowledge_documents.c.id == document_id
@@ -1925,7 +1971,7 @@ class PostgresKnowledgeDocumentRepository:
         Returns:
             The saved text, or None if none has been saved.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             text: str | None = connection.execute(
                 select(knowledge_documents.c.text).where(
                     knowledge_documents.c.id == document_id
@@ -1947,7 +1993,7 @@ class PostgresKnowledgeDocumentRepository:
         Returns:
             The saved document, or None if it has been deleted.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             row = connection.execute(
                 update(knowledge_documents)
                 .where(knowledge_documents.c.id == document_id)
@@ -1973,7 +2019,7 @@ class PostgresKnowledgeDocumentRepository:
         }
         if not values:
             return self.get(document_id)
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             row = connection.execute(
                 update(knowledge_documents)
                 .where(knowledge_documents.c.id == document_id)
@@ -1996,7 +2042,7 @@ class PostgresKnowledgeDocumentRepository:
         Returns:
             The saved document, or None if there is none.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             row = connection.execute(
                 update(knowledge_documents)
                 .where(knowledge_documents.c.id == document_id)
@@ -2023,7 +2069,7 @@ class PostgresKnowledgeDocumentRepository:
         Returns:
             The saved document.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             row = connection.execute(
                 insert(knowledge_documents)
                 .values(
@@ -2054,7 +2100,7 @@ class PostgresKnowledgeDocumentRepository:
         Returns:
             The saved document, or None if it has been deleted.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             row = connection.execute(
                 update(knowledge_documents)
                 .where(knowledge_documents.c.id == document_id)
@@ -2069,7 +2115,7 @@ class PostgresKnowledgeDocumentRepository:
         Args:
             document_id: The document's ID.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(
                 delete(knowledge_documents).where(
                     knowledge_documents.c.id == document_id
@@ -2080,13 +2126,13 @@ class PostgresKnowledgeDocumentRepository:
 class PostgresUsageRepository:
     """Stores what each User used on each day in Postgres."""
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, database: Database) -> None:
         """Set up the repository.
 
         Args:
-            engine: The database engine.
+            database: Where to run queries: the engine, or one transaction.
         """
-        self._engine = engine
+        self._database = database
 
     def claim_web_search(self, user_id: UUID, day: date, daily_limit: int) -> bool:
         """Count one web search for a User's day, in one step, if under the limit.
@@ -2140,7 +2186,7 @@ class PostgresUsageRepository:
         """
         if not days:
             return {}
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 select(daily_usage.c.user_id, daily_usage.c.message_count).where(
                     tuple_(daily_usage.c.user_id, daily_usage.c.day).in_(
@@ -2163,7 +2209,7 @@ class PostgresUsageRepository:
         Returns:
             The count; 0 if nothing was recorded that day.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             count = connection.execute(
                 select(daily_usage.c[count_column]).where(
                     daily_usage.c.user_id == user_id, daily_usage.c.day == day
@@ -2209,7 +2255,7 @@ class PostgresUsageRepository:
         """
         count = daily_usage.c[count_column]
         key = {"user_id": user_id, "day": day}
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             claimed = False
             if daily_limit >= 1:
                 counted = connection.execute(
@@ -2248,7 +2294,7 @@ class PostgresUsageRepository:
         statement = insert(daily_usage).values(
             user_id=user_id, day=day, tokens_in=tokens_in, tokens_out=tokens_out
         )
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(
                 statement.on_conflict_do_update(
                     index_elements=[daily_usage.c.user_id, daily_usage.c.day],
@@ -2268,7 +2314,7 @@ class PostgresUsageRepository:
         Returns:
             One entry per User per day, newest day first, then by User.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 select(
                     daily_usage,
@@ -2301,17 +2347,28 @@ class PostgresUsageRepository:
             for row in rows
         ]
 
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's Usage.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(daily_usage).where(daily_usage.c.user_id == user_id)
+            )
+
 
 class PostgresStickerRepository:
     """Stores the Sticker Library in Postgres."""
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, database: Database) -> None:
         """Set up the repository.
 
         Args:
-            engine: The database engine.
+            database: Where to run queries: the engine, or one transaction.
         """
-        self._engine = engine
+        self._database = database
 
     def list_all(self) -> list[LibrarySticker]:
         """List every sticker in the order they were added.
@@ -2319,7 +2376,7 @@ class PostgresStickerRepository:
         Returns:
             The stickers.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 select(stickers).order_by(stickers.c.position)
             ).all()
@@ -2334,7 +2391,7 @@ class PostgresStickerRepository:
         Returns:
             The sticker, or None if there is none.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             row = connection.execute(
                 select(stickers).where(stickers.c.id == sticker_id)
             ).first()
@@ -2365,7 +2422,7 @@ class PostgresStickerRepository:
             }
             for sticker in new_stickers
         ]
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             added = connection.execute(
                 insert(stickers)
                 .values(rows)
@@ -2384,7 +2441,7 @@ class PostgresStickerRepository:
         Returns:
             The saved sticker, or None if there is none.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             row = connection.execute(
                 update(stickers)
                 .where(stickers.c.id == sticker_id)
@@ -2402,7 +2459,7 @@ class PostgresStickerRepository:
         Returns:
             True if it was removed; False if there was none.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             removed = connection.execute(
                 delete(stickers)
                 .where(stickers.c.id == sticker_id)
@@ -2414,13 +2471,13 @@ class PostgresStickerRepository:
 class PostgresPersonalStickerRepository:
     """Stores the stickers kept from each User in Postgres."""
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, database: Database) -> None:
         """Set up the repository.
 
         Args:
-            engine: The database engine.
+            database: Where to run queries: the engine, or one transaction.
         """
-        self._engine = engine
+        self._database = database
 
     def list_for_user(self, user_id: UUID) -> list[PersonalSticker]:
         """List a User's Personal Stickers, most recently used first.
@@ -2431,7 +2488,7 @@ class PostgresPersonalStickerRepository:
         Returns:
             The stickers.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 select(personal_stickers)
                 .where(personal_stickers.c.user_id == user_id)
@@ -2451,7 +2508,7 @@ class PostgresPersonalStickerRepository:
         Returns:
             The sticker, or None if the User has none with that ID.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             row = connection.execute(
                 select(personal_stickers).where(
                     personal_stickers.c.user_id == user_id,
@@ -2474,7 +2531,7 @@ class PostgresPersonalStickerRepository:
         statement = insert(personal_stickers).values(
             [asdict(sticker) for sticker in stickers]
         )
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(
                 statement.on_conflict_do_update(
                     index_elements=[
@@ -2503,7 +2560,7 @@ class PostgresPersonalStickerRepository:
             sticker_id: The sticker's ID.
             used_at: When it was sent.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(
                 update(personal_stickers)
                 .where(
@@ -2526,7 +2583,7 @@ class PostgresPersonalStickerRepository:
             .order_by(personal_stickers.c.last_used_at.desc(), personal_stickers.c.id)
             .limit(limit)
         )
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(
                 delete(personal_stickers).where(
                     personal_stickers.c.user_id == user_id,
@@ -2544,7 +2601,7 @@ class PostgresPersonalStickerRepository:
         Returns:
             True if it was removed; False if the User had none with that ID.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             removed = connection.execute(
                 delete(personal_stickers)
                 .where(
@@ -2564,7 +2621,7 @@ class PostgresPersonalStickerRepository:
         Returns:
             How many they have.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             count: int = connection.execute(
                 select(func.count())
                 .select_from(personal_stickers)
@@ -2572,17 +2629,28 @@ class PostgresPersonalStickerRepository:
             ).scalar_one()
         return count
 
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's Personal Stickers.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(personal_stickers).where(personal_stickers.c.user_id == user_id)
+            )
+
 
 class PostgresCheckInRepository:
     """Stores Check-in Kinds and Check-in decisions in Postgres."""
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, database: Database) -> None:
         """Set up the repository.
 
         Args:
-            engine: The database engine.
+            database: Where to run queries: the engine, or one transaction.
         """
-        self._engine = engine
+        self._database = database
 
     def list_kinds(self) -> list[CheckInKind]:
         """List every Check-in Kind in order.
@@ -2590,7 +2658,7 @@ class PostgresCheckInRepository:
         Returns:
             The Check-in Kinds.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 select(check_in_kinds).order_by(check_in_kinds.c.sort_order)
             ).all()
@@ -2606,7 +2674,7 @@ class PostgresCheckInRepository:
             The Check-in Kinds with their send counts.
         """
         sent_count = func.count(check_ins.c.id).label("sent_count")
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 select(check_in_kinds, sent_count)
                 .outerjoin(
@@ -2631,7 +2699,7 @@ class PostgresCheckInRepository:
         Returns:
             The Check-in Kind, or None if there is no such Kind.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             row = connection.execute(
                 select(check_in_kinds).where(check_in_kinds.c.id == kind_id)
             ).first()
@@ -2646,7 +2714,7 @@ class PostgresCheckInRepository:
         Returns:
             The saved Check-in Kind.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             highest = connection.execute(
                 select(func.max(check_in_kinds.c.sort_order))
             ).scalar()
@@ -2672,7 +2740,7 @@ class PostgresCheckInRepository:
         Returns:
             The saved Check-in Kind.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             row = connection.execute(
                 update(check_in_kinds)
                 .where(check_in_kinds.c.id == kind.id)
@@ -2690,7 +2758,7 @@ class PostgresCheckInRepository:
         Returns:
             True if it was removed; False if there was no such Kind.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             deleted = connection.execute(
                 delete(check_in_kinds)
                 .where(check_in_kinds.c.id == kind_id)
@@ -2737,7 +2805,7 @@ class PostgresCheckInRepository:
                 admin_side_on.is_(True),
             )
         )
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(statement).all()
         return [_to_user(row) for row in rows]
 
@@ -2763,7 +2831,7 @@ class PostgresCheckInRepository:
             )
             .values(check_in_next_due_at=bindparam("becomes", type_=due_type))
         )
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(
                 statement,
                 [
@@ -2786,7 +2854,7 @@ class PostgresCheckInRepository:
             user_id: The User's ID.
             now: The current time.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(
                 update(users)
                 .where(
@@ -2814,7 +2882,7 @@ class PostgresCheckInRepository:
         user_changes: dict[str, Any] = {"check_in_next_due_at": next_due_at}
         if pause_until_resumed:
             user_changes |= {"check_ins_paused": True, "check_ins_paused_until": None}
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             self._insert(connection, check_in)
             connection.execute(
                 update(users)
@@ -2840,7 +2908,7 @@ class PostgresCheckInRepository:
         user_changes: dict[str, Any] = {"check_in_next_due_at": next_due_at}
         if end_pause:
             user_changes |= {"check_ins_paused": False, "check_ins_paused_until": None}
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(delete(check_ins).where(check_ins.c.id == check_in.id))
             if skipped is not None:
                 self._insert(connection, skipped)
@@ -2856,7 +2924,7 @@ class PostgresCheckInRepository:
         Args:
             check_in_id: The Check-in's ID.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(
                 update(check_ins)
                 .where(check_ins.c.id == check_in_id)
@@ -2873,7 +2941,7 @@ class PostgresCheckInRepository:
         Returns:
             The Check-ins.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 self._select_check_ins()
                 .where(check_ins.c.user_id == user_id)
@@ -2906,7 +2974,7 @@ class PostgresCheckInRepository:
         if sent_only:
             ranked = ranked.where(check_ins.c.outcome != CheckInOutcome.SKIPPED.value)
         ranked_check_ins = ranked.subquery()
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 select(ranked_check_ins)
                 .where(ranked_check_ins.c.place <= limit)
@@ -2926,7 +2994,7 @@ class PostgresCheckInRepository:
         Returns:
             The decisions with who each User is.
         """
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(
                 self._select_check_ins()
                 .add_columns(
@@ -2970,7 +3038,7 @@ class PostgresCheckInRepository:
             .limit(1)
             .scalar_subquery()
         )
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             claimed_id = connection.execute(
                 update(check_ins)
                 .where(
@@ -3044,17 +3112,26 @@ class PostgresCheckInRepository:
             shared_photo_id=row.shared_photo_id,
         )
 
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's Check-in history.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(delete(check_ins).where(check_ins.c.user_id == user_id))
+
 
 class PostgresFeatureSwitchRepository:
     """Stores each Feature's switches, for everyone and per User, in Postgres."""
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, database: Database) -> None:
         """Set up the repository.
 
         Args:
-            engine: The database engine.
+            database: Where to run queries: the engine, or one transaction.
         """
-        self._engine = engine
+        self._database = database
 
     def list_for_everyone(self) -> list[FeatureSwitch]:
         """List the stored switches for everyone.
@@ -3068,7 +3145,7 @@ class PostgresFeatureSwitchRepository:
             feature_switches.c.changed_at,
             users.c.email,
         ).select_from(feature_switches.outerjoin(users))
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(statement).all()
         return [
             FeatureSwitch(
@@ -3093,7 +3170,7 @@ class PostgresFeatureSwitchRepository:
             changed_by: The Admin changing it.
         """
         values = {"is_on": on, "changed_at": changed_at, "changed_by": changed_by}
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(
                 insert(feature_switches)
                 .values(feature=feature.value, **values)
@@ -3140,7 +3217,7 @@ class PostgresFeatureSwitchRepository:
             )
             .where(user_feature_switches.c.user_id.in_(user_ids))
         )
-        with self._engine.connect() as connection:
+        with self._database.connect() as connection:
             rows = connection.execute(statement).all()
         switches_by_user: dict[UUID, list[FeatureSwitch]] = {}
         for row in rows:
@@ -3173,7 +3250,7 @@ class PostgresFeatureSwitchRepository:
             changed_by: The Admin changing it.
         """
         values = {"is_on": on, "changed_at": changed_at, "changed_by": changed_by}
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(
                 insert(user_feature_switches)
                 .values(user_id=user_id, feature=feature.value, **values)
@@ -3189,13 +3266,116 @@ class PostgresFeatureSwitchRepository:
             user_id: The User.
             feature: The Feature.
         """
-        with self._engine.begin() as connection:
+        with self._database.begin() as connection:
             connection.execute(
                 delete(user_feature_switches).where(
                     user_feature_switches.c.user_id == user_id,
                     user_feature_switches.c.feature == feature.value,
                 )
             )
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's own Feature Switches.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(user_feature_switches).where(
+                    user_feature_switches.c.user_id == user_id
+                )
+            )
+
+
+class _TransactionConnection:
+    """Lends every repository the one connection of an open transaction."""
+
+    def __init__(self, connection: Connection) -> None:
+        """Set up the lender.
+
+        Args:
+            connection: The transaction's connection.
+        """
+        self._connection = connection
+
+    @contextmanager
+    def connect(self) -> Iterator[Connection]:
+        """Lend the transaction's connection, leaving it open.
+
+        Yields:
+            The connection.
+        """
+        yield self._connection
+
+    def begin(self) -> AbstractContextManager[Connection]:
+        """Lend the transaction's connection; its changes are saved with the rest.
+
+        Returns:
+            The connection, as a context manager.
+        """
+        return self.connect()
+
+
+class PostgresTransaction:
+    """One Postgres transaction across every repository."""
+
+    def __init__(self, connection: Connection) -> None:
+        """Set up the transaction.
+
+        Args:
+            connection: The connection the transaction runs on.
+        """
+        self._connection = connection
+        self._repositories = _build_repositories(
+            _TransactionConnection(connection), self._join
+        )
+
+    @property
+    def repositories(self) -> Repositories:
+        """The repositories, each working inside this transaction."""
+        return self._repositories
+
+    def lock_admins(self) -> list[UUID]:
+        """Lock the Admin rows until the transaction ends, and list them.
+
+        Rows are locked in ID order, so two transactions locking them never
+        deadlock.
+
+        Returns:
+            The IDs of the Users who are Admins.
+        """
+        return list(
+            self._connection.execute(
+                select(users.c.id)
+                .where(users.c.role == UserRole.ADMIN.value)
+                .order_by(users.c.id)
+                .with_for_update()
+            ).scalars()
+        )
+
+    @contextmanager
+    def _join(self) -> Iterator["PostgresTransaction"]:
+        """Join this transaction, for a transaction started inside it.
+
+        Yields:
+            This transaction.
+        """
+        yield self
+
+
+@contextmanager
+def _begin_transaction(engine: Engine) -> Iterator[Transaction]:
+    """Start a transaction, saved when the block ends and undone if it fails.
+
+    Args:
+        engine: The database engine.
+
+    Yields:
+        The transaction.
+    """
+    with engine.begin() as connection:
+        yield PostgresTransaction(connection)
 
 
 def build_postgres_repositories(engine: Engine) -> Repositories:
@@ -3207,23 +3387,40 @@ def build_postgres_repositories(engine: Engine) -> Repositories:
     Returns:
         The repositories.
     """
+    return _build_repositories(engine, partial(_begin_transaction, engine))
+
+
+def _build_repositories(
+    database: Database,
+    transaction: Callable[[], AbstractContextManager[Transaction]],
+) -> Repositories:
+    """Build every repository on one database.
+
+    Args:
+        database: Where to run queries: the engine, or one transaction.
+        transaction: Starts a transaction across the repositories.
+
+    Returns:
+        The repositories.
+    """
     return Repositories(
-        users=PostgresUserRepository(engine),
-        telegram_connections=PostgresTelegramConnectionRepository(engine),
-        connection_tokens=PostgresConnectionTokenRepository(engine),
-        conversations=PostgresConversationRepository(engine),
-        platform_settings=PostgresPlatformSettingsRepository(engine),
-        helplines=PostgresHelplineRepository(engine),
-        safeguard_events=PostgresSafeguardEventRepository(engine),
-        memory_categories=PostgresMemoryCategoryRepository(engine),
-        user_memory=PostgresUserMemoryRepository(engine),
-        knowledge_documents=PostgresKnowledgeDocumentRepository(engine),
-        usage=PostgresUsageRepository(engine),
-        stickers=PostgresStickerRepository(engine),
-        personal_stickers=PostgresPersonalStickerRepository(engine),
-        check_ins=PostgresCheckInRepository(engine),
-        feature_switches=PostgresFeatureSwitchRepository(engine),
+        users=PostgresUserRepository(database),
+        telegram_connections=PostgresTelegramConnectionRepository(database),
+        connection_tokens=PostgresConnectionTokenRepository(database),
+        conversations=PostgresConversationRepository(database),
+        platform_settings=PostgresPlatformSettingsRepository(database),
+        helplines=PostgresHelplineRepository(database),
+        safeguard_events=PostgresSafeguardEventRepository(database),
+        memory_categories=PostgresMemoryCategoryRepository(database),
+        user_memory=PostgresUserMemoryRepository(database),
+        knowledge_documents=PostgresKnowledgeDocumentRepository(database),
+        usage=PostgresUsageRepository(database),
+        stickers=PostgresStickerRepository(database),
+        personal_stickers=PostgresPersonalStickerRepository(database),
+        check_ins=PostgresCheckInRepository(database),
+        feature_switches=PostgresFeatureSwitchRepository(database),
         pending_auth_account_deletions=PostgresPendingAuthAccountDeletionRepository(
-            engine
+            database
         ),
+        transaction=transaction,
     )

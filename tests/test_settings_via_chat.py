@@ -21,10 +21,10 @@ from tests.telegram_helpers import (
 )
 from tests.test_check_in_sending import set_up_user_with_check_ins
 from tests.test_data_deletion import (
-    USER_DATA_TABLES,
     assert_treated_as_unknown_telegram_user,
     rows_per_table,
     set_up_user_with_every_kind_of_data,
+    user_data_tables,
 )
 from tests.test_message_retention import has_checkpoints
 from tests.test_post_conversation import memory_contents
@@ -383,7 +383,10 @@ def test_delete_my_data_in_chat_only_deletes_after_the_confirmation_word(
         f"Reply {word} to confirm.",
     )
     assert f'"{word}"' in call.tool_results[0]
-    assert all(count > 0 for count in rows_per_table(engine, user_id).values())
+    data_tables = user_data_tables(engine)
+    assert all(
+        count > 0 for count in rows_per_table(engine, user_id, data_tables).values()
+    )
 
     chat_channel.sent.clear()
     chat_model.calls.clear()
@@ -393,7 +396,7 @@ def test_delete_my_data_in_chat_only_deletes_after_the_confirmation_word(
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
         seeded_settings["data_deleted_reply"]
     ]
-    assert rows_per_table(engine, user_id) == dict.fromkeys(USER_DATA_TABLES, 0)
+    assert rows_per_table(engine, user_id, data_tables) == dict.fromkeys(data_tables, 0)
     assert not has_checkpoints(checkpointer, user_id)
     assert me(client, headers)["name"] == "Maya"
     assert_treated_as_unknown_telegram_user(
@@ -428,14 +431,14 @@ def test_any_other_reply_cancels_delete_my_data(
         ToolCall("start_deleting_my_data", {}),
         f"Reply {word} to confirm.",
     )
-    before = rows_per_table(engine, user_id)
+    before = rows_per_table(engine, user_id, user_data_tables(engine))
 
     cancelled = reply_call(
         client, chat_model, f"hmm, {word.lower()} everything? no wait", "Okay."
     )
     later = reply_call(client, chat_model, word, "Hm?")
 
-    assert rows_per_table(engine, user_id) == before
+    assert rows_per_table(engine, user_id, user_data_tables(engine)) == before
     cancel_note = seeded_settings["reply_data_deletion_cancelled_note"]
     assert cancel_note in cancelled.instructions
     assert cancel_note not in later.instructions
@@ -490,11 +493,11 @@ def test_a_crisis_message_cancels_a_pending_delete_my_data(
     )
     chat_model.script_safeguard("suicide_or_self_harm")
     send_to_webhook(client, telegram_text_update("I want to end it all"))
-    before = rows_per_table(engine, user_id)
+    before = rows_per_table(engine, user_id, user_data_tables(engine))
 
     reply_call(client, chat_model, word, "Hm?")
 
-    assert rows_per_table(engine, user_id) == before
+    assert rows_per_table(engine, user_id, user_data_tables(engine)) == before
 
 
 def test_saving_the_profile_without_changing_the_time_zone_keeps_its_mark(

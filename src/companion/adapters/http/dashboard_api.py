@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
+from companion.core.admin_users import LastAdminError
 from companion.core.check_ins import CheckInService, RecentCheckIn
 from companion.core.features import FeatureNotAvailableError, FeatureService
 from companion.core.home import Home, HomeService
@@ -50,7 +51,7 @@ from companion.core.telegram_connection import (
     OnboardingNotFinishedError,
     TelegramConnectionService,
 )
-from companion.core.user_data import LastAdminError, UserDataService
+from companion.core.user_data import UserDataService
 from companion.core.user_memory import MemoryNotFoundError, UserMemoryService
 from companion.core.users import InvalidProfileError, UserService
 

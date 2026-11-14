@@ -1,7 +1,9 @@
 import logging
 from dataclasses import replace
 from enum import StrEnum
+from uuid import UUID
 
+from companion.core.admin_users import refuse_if_last_admin
 from companion.core.models import PlatformSettings, User, UserSnapshot
 from companion.core.platform_settings import (
     DATA_DELETED_REPLY,
@@ -18,8 +20,48 @@ from companion.core.ports import (
 logger = logging.getLogger(__name__)
 
 
-class LastAdminError(Exception):
-    """Raised when the only Admin asks to delete their account."""
+def delete_user_data(repositories: Repositories, user_id: UUID) -> None:
+    """Delete a User's data in one transaction, keeping their account.
+
+    Their Conversations and messages, Memory Items, Conversation Summaries,
+    Shared Photos, Personal Stickers, Check-in history, connection tokens and
+    Telegram Connection go. Their profile, settings, Usage, Safeguard Events
+    and Feature Switches stay. The conversation engine's saved state is left
+    to the caller.
+
+    Args:
+        repositories: Where the User's data is stored.
+        user_id: The User's ID.
+    """
+    with repositories.transaction() as transaction:
+        in_transaction = transaction.repositories
+        in_transaction.conversations.delete_for_user(user_id)
+        in_transaction.user_memory.delete_for_user(user_id)
+        in_transaction.personal_stickers.delete_for_user(user_id)
+        in_transaction.check_ins.delete_for_user(user_id)
+        in_transaction.connection_tokens.delete_for_user(user_id)
+        in_transaction.telegram_connections.delete_for_user(user_id)
+
+
+def _delete_user(repositories: Repositories, user_id: UUID) -> bool:
+    """Delete everything of a User's and then the User, in one transaction.
+
+    Beyond their data, their Usage, Safeguard Events and Feature Switches go.
+
+    Args:
+        repositories: Where the User and their data are stored.
+        user_id: The User's ID.
+
+    Returns:
+        True if they were deleted; False if there was no such User.
+    """
+    with repositories.transaction() as transaction:
+        in_transaction = transaction.repositories
+        delete_user_data(in_transaction, user_id)
+        in_transaction.usage.delete_for_user(user_id)
+        in_transaction.safeguard_events.delete_for_user(user_id)
+        in_transaction.feature_switches.delete_for_user(user_id)
+        return in_transaction.users.delete(user_id)
 
 
 class UserDataService:
@@ -53,7 +95,7 @@ class UserDataService:
         Args:
             user: The User.
         """
-        self._repositories.users.delete_data(user.id)
+        delete_user_data(self._repositories, user.id)
         self._conversation_engine.forget_user(user.id)
 
     def delete_account(self, user: User) -> None:
@@ -72,10 +114,12 @@ class UserDataService:
                 stay.
         """
         self._conversation_engine.forget_user(user.id)
-        if not self._repositories.users.delete_unless_last_admin(
-            user.id, self._clock.now()
-        ):
-            raise LastAdminError
+        with self._repositories.transaction() as transaction:
+            refuse_if_last_admin(transaction, user.id)
+            if _delete_user(transaction.repositories, user.id):
+                transaction.repositories.pending_auth_account_deletions.add(
+                    user.auth_id, self._clock.now()
+                )
         self._delete_auth_account(user.auth_id)
 
     def delete_pending_auth_accounts(self) -> None:
@@ -100,10 +144,13 @@ class UserDataService:
         """
         try:
             self._auth_accounts.delete_account(auth_id)
-            user_signed_in_again = self._repositories.users.get_by_auth_id(auth_id)
-            if user_signed_in_again is not None:
-                self._conversation_engine.forget_user(user_signed_in_again.id)
-            self._repositories.pending_auth_account_deletions.complete(auth_id)
+            with self._repositories.transaction() as transaction:
+                in_transaction = transaction.repositories
+                user_signed_in_again = in_transaction.users.get_by_auth_id(auth_id)
+                if user_signed_in_again is not None:
+                    self._conversation_engine.forget_user(user_signed_in_again.id)
+                    _delete_user(in_transaction, user_signed_in_again.id)
+                in_transaction.pending_auth_account_deletions.complete(auth_id)
         except Exception:
             logger.exception(
                 "Could not delete an account at the auth provider (%s); will try again",
@@ -188,7 +235,7 @@ class ChatDataDeletion:
             != self.confirmation_word(snapshot.settings).casefold()
         ):
             return DataDeletionAnswer.CANCELLED
-        self._repositories.users.delete_data(snapshot.user.id)
+        delete_user_data(self._repositories, snapshot.user.id)
         self._chat_channel.send_text(chat_id, snapshot.settings.get(DATA_DELETED_REPLY))
         return DataDeletionAnswer.CONFIRMED
 
