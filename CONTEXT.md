@@ -41,11 +41,11 @@ A photo a User sent the Companion that matters to them, picked when the Conversa
 _Avoid_: Image, picture, attachment, media
 
 **Message**:
-Everything a User sends the Companion before pausing: one text, several texts in a row, or an Album. The Companion waits a few seconds (set by Admins) after the last one, then answers them together with one reply, which may go out as several short texts. It counts as one toward the Daily Message Limit. The Safeguard still checks each text as it arrives, so a crisis is never held back by the wait.
+Everything a User sends the Companion before pausing: one text, several texts in a row, or an Album. The Companion waits a few seconds (set by Admins) after the last one, then answers them together with one reply, which may go out as several short texts. It counts as one toward the Daily Message Limit. The Safeguard still checks each text as it arrives, so a crisis is never held back by the wait; a crisis gets the Crisis Reply at once and the rest of that Message isn't answered normally. A text sent while a reply is being written starts the next Message.
 _Avoid_: Burst, batch, text (a text is one piece of a Message)
 
 **Album**:
-Several photos a User sends at once. The Companion answers them as one message with one reply, and they count as one message toward the Daily Message Limit. It looks at only the first few, as many as Admins set, and says when it didn't look at the rest.
+Several photos a User sends at once. An Album is one text of a Message, so it is answered with everything else sent before the pause, in one reply, counting once toward the Daily Message Limit. It is described and checked by the Safeguard once the wait ends. The Companion looks at only the first few photos, as many as Admins set, and says when it didn't look at the rest.
 _Avoid_: Media group, batch, gallery
 
 **Photo Viewing**:
@@ -123,7 +123,7 @@ _Avoid_: Disclaimer, warning, terms
 ### Safety
 
 **Safeguard**:
-The check on every incoming message, photos included, read in the light of the Conversation so far, for signs of crisis (suicide or self-harm, danger to others, abuse, medical emergency). Everyday stress or sadness is not a crisis. When the Safeguard can't tell, it treats the message as a crisis: a false alarm is better than a missed crisis.
+The check on every text a User sends, photos included, as it arrives and read in the light of the Conversation so far, for signs of crisis (suicide or self-harm, danger to others, abuse, medical emergency). Everyday stress or sadness is not a crisis. When the Safeguard can't tell, it treats the message as a crisis: a false alarm is better than a missed crisis.
 _Avoid_: Filter, moderation, guardrail
 
 **Crisis Reply**:
@@ -213,7 +213,7 @@ _Avoid_: Search quota, web budget
 ### Usage
 
 **Daily Message Limit**:
-The most messages a User can send the Companion in a day, set by Admins and meant to be generous. The day is the User's own, so it resets at midnight in their time zone. The Safeguard still checks every message first: a crisis always gets the Crisis Reply and never counts toward the limit. Over the limit, the Companion answers with the Limit Reply instead of a real reply until the next day. Check-ins don't count toward it, but once a User has used it up, they get no more Check-ins that day (see Skipped Check-in).
+The most Messages a User can send the Companion in a day, set by Admins and meant to be generous; several texts in a row are one Message. The day is the User's own, so it resets at midnight in their time zone. The Safeguard still checks every text first: a crisis always gets the Crisis Reply and never counts toward the limit. Over the limit, the Companion answers with the Limit Reply instead of a real reply until the next day. Check-ins don't count toward it, but once a User has used it up, they get no more Check-ins that day (see Skipped Check-in).
 _Avoid_: Quota, rate limit, message cap
 
 **Limit Reply**:

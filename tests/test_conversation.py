@@ -1,5 +1,4 @@
 import json
-from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from typing import Any
 
@@ -235,25 +234,3 @@ def test_user_gets_a_fallback_reply_when_the_model_returns_nothing(
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
         seeded_settings["reply_failed_message"]
     ]
-
-
-def test_messages_sent_at_once_are_answered_one_after_another(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-) -> None:
-    connect_telegram(client, auth_verifier, chat_channel)
-    chat_model.script("first reply", "second reply")
-    chat_model.delay_seconds = 0.3
-
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        statuses = list(
-            pool.map(
-                lambda text: send_to_webhook(client, telegram_text_update(text)),
-                ["one", "two"],
-            )
-        )
-
-    assert statuses == [200, 200]
-    assert len(chat_model.calls[1].history) == 3

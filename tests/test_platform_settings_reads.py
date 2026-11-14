@@ -22,7 +22,7 @@ from tests.test_user_snapshot import add_due_users, reads_by_table
 SETTINGS_TABLE = ("platform_settings",)
 
 
-def test_a_reply_reads_the_platform_settings_once(
+def test_a_text_and_its_reply_each_read_the_platform_settings_once(
     client: TestClient,
     engine: Engine,
     auth_verifier: FakeAuthVerifier,
@@ -38,7 +38,7 @@ def test_a_reply_reads_the_platform_settings_once(
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID)[-1] == (
         "hey, good to hear from you"
     )
-    assert reads == {"platform_settings": 1}
+    assert reads == {"platform_settings": 2}
 
 
 def test_a_tick_reads_the_platform_settings_once(

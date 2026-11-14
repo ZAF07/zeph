@@ -5,10 +5,17 @@ from companion.core.models import (
     MessageToAnswer,
     PlatformSettings,
     RiskType,
+    TextToScreen,
     User,
     UserSnapshot,
 )
-from companion.core.reply_gate import ReplyGate, ReplyNeeded, Stopped, StopReason
+from companion.core.reply_gate import (
+    ReplyGate,
+    ReplyNeeded,
+    Screened,
+    Stopped,
+    StopReason,
+)
 from companion.core.user_data import DataDeletionAnswer
 
 CHAT_ID = 42
@@ -184,20 +191,20 @@ class FakeUsageLimiter:
         return LIMIT_REPLY
 
 
-def check_message(
+def build_gate(
     risk_type: RiskType = RiskType.NONE,
     data_deletion_answer: DataDeletionAnswer = DataDeletionAnswer.NOTHING_ASKED,
     within_limit: bool = True,
-) -> tuple[Stopped | ReplyNeeded, list[str], list[str]]:
-    """Run one message through a ReplyGate built from fakes.
+) -> tuple[ReplyGate, UserSnapshot, list[str], list[str]]:
+    """Build a ReplyGate from fakes.
 
     Args:
         risk_type: The risk the Safeguard sees.
-        data_deletion_answer: What the message does to a Delete My Data.
-        within_limit: Whether the message is within the Daily Message Limit.
+        data_deletion_answer: What the Message does to a Delete My Data.
+        within_limit: Whether the Message is within the Daily Message Limit.
 
     Returns:
-        The gate's result, the calls made in order, and the replies sent.
+        The gate, the User, the calls made in order, and the replies sent.
     """
     calls: list[str] = []
     conversations = FakeConversations(calls)
@@ -216,14 +223,57 @@ def check_message(
         features=(),
         settings=PlatformSettings({}),
     )
-    result = gate.check(
-        MessageToAnswer(user_id=user.id, chat_id=CHAT_ID, text="hi"), snapshot
+    return gate, snapshot, calls, conversations.sent
+
+
+def screen_text(
+    risk_type: RiskType = RiskType.NONE,
+) -> tuple[Stopped | Screened, list[str], list[str]]:
+    """Run one text through a ReplyGate built from fakes.
+
+    Args:
+        risk_type: The risk the Safeguard sees.
+
+    Returns:
+        The gate's result, the calls made in order, and the replies sent.
+    """
+    gate, snapshot, calls, sent = build_gate(risk_type=risk_type)
+    result = gate.screen(
+        TextToScreen(user_id=snapshot.user.id, chat_id=CHAT_ID, text="hi"), snapshot
     )
-    return result, calls, conversations.sent
+    return result, calls, sent
 
 
-def test_a_crisis_sends_the_crisis_reply_cancels_deletion_and_is_not_counted() -> None:
-    result, calls, sent = check_message(risk_type=RiskType.SUICIDE_OR_SELF_HARM)
+def check_message(
+    data_deletion_answer: DataDeletionAnswer = DataDeletionAnswer.NOTHING_ASKED,
+    within_limit: bool = True,
+) -> tuple[Stopped | ReplyNeeded, list[str], list[str]]:
+    """Run one screened Message through a ReplyGate built from fakes.
+
+    Args:
+        data_deletion_answer: What the Message does to a Delete My Data.
+        within_limit: Whether the Message is within the Daily Message Limit.
+
+    Returns:
+        The gate's result, the calls made in order, and the replies sent.
+    """
+    gate, snapshot, calls, sent = build_gate(
+        data_deletion_answer=data_deletion_answer, within_limit=within_limit
+    )
+    result = gate.check(
+        MessageToAnswer(
+            user_id=snapshot.user.id,
+            chat_id=CHAT_ID,
+            conversation_id=CONVERSATION_ID,
+            text="hi\nyou there?",
+        ),
+        snapshot,
+    )
+    return result, calls, sent
+
+
+def test_a_crisis_text_sends_the_crisis_reply_and_cancels_deletion() -> None:
+    result, calls, sent = screen_text(risk_type=RiskType.SUICIDE_OR_SELF_HARM)
 
     assert result == Stopped(StopReason.CRISIS)
     assert sent == [CRISIS_REPLY]
@@ -236,6 +286,14 @@ def test_a_crisis_sends_the_crisis_reply_cancels_deletion_and_is_not_counted() -
     ]
 
 
+def test_a_normal_text_is_saved_and_checked_but_not_counted() -> None:
+    result, calls, sent = screen_text()
+
+    assert result == Screened(CONVERSATION_ID)
+    assert sent == []
+    assert calls == ["record_incoming", "assess"]
+
+
 def test_a_confirmed_deletion_stops_the_reply() -> None:
     result, calls, sent = check_message(
         data_deletion_answer=DataDeletionAnswer.CONFIRMED
@@ -243,13 +301,13 @@ def test_a_confirmed_deletion_stops_the_reply() -> None:
 
     assert result == Stopped(StopReason.DATA_DELETED)
     assert sent == []
-    assert calls == ["record_incoming", "assess", "settle"]
+    assert calls == ["settle"]
 
 
 def test_a_message_with_a_pending_deletion_cancels_it_and_needs_a_reply() -> None:
     result, _, _ = check_message(data_deletion_answer=DataDeletionAnswer.CANCELLED)
 
-    assert result == ReplyNeeded(CONVERSATION_ID, data_deletion_cancelled=True)
+    assert result == ReplyNeeded(data_deletion_cancelled=True)
 
 
 def test_a_message_over_the_limit_sends_the_limit_reply() -> None:
@@ -257,18 +315,12 @@ def test_a_message_over_the_limit_sends_the_limit_reply() -> None:
 
     assert result == Stopped(StopReason.OVER_LIMIT)
     assert sent == [LIMIT_REPLY]
-    assert calls == [
-        "record_incoming",
-        "assess",
-        "settle",
-        "claim_message",
-        "deliver_at_once",
-    ]
+    assert calls == ["settle", "claim_message", "deliver_at_once"]
 
 
-def test_a_normal_message_needs_a_reply() -> None:
+def test_a_normal_message_counts_once_and_needs_a_reply() -> None:
     result, calls, sent = check_message()
 
-    assert result == ReplyNeeded(CONVERSATION_ID, data_deletion_cancelled=False)
+    assert result == ReplyNeeded(data_deletion_cancelled=False)
     assert sent == []
-    assert calls == ["record_incoming", "assess", "settle", "claim_message"]
+    assert calls == ["settle", "claim_message"]

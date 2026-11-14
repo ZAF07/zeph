@@ -34,4 +34,4 @@ Before every reply the Companion makes an **Understanding** (`CONTEXT.md`). One 
 ## Blocked by
 
 - `.scratch/understanding/issues/02-reply-service-in-core-remove-langgraph.md`
-- `.scratch/messages/issues/01-answer-texts-in-a-row-as-one-message.md`
+- `.scratch/messages/issues/archive/01-answer-texts-in-a-row-as-one-message.md` (completed 14 Nov 2026)

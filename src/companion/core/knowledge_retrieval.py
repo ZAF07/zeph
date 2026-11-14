@@ -13,6 +13,7 @@ from companion.core.platform_settings import (
     REPLY_KNOWLEDGE_INTRO,
 )
 from companion.core.ports import Embedder, KnowledgeVectorStore, Repositories
+from companion.core.transcripts import split_off_latest_message
 
 logger = logging.getLogger(__name__)
 
@@ -73,12 +74,13 @@ class KnowledgeRetrieval:
         self._vector_store = vector_store
 
     def recall(self, snapshot: UserSnapshot, conversation_id: UUID) -> str:
-        """Write the Knowledge passages closest to the newest message.
+        """Write the Knowledge passages closest to the latest Message.
 
-        The newest message is embedded and the top few chunks, as many as the
-        `knowledge_chunks_per_reply` setting says, are given with where they
-        come from. Nothing is searched when Knowledge doesn't work for the
-        User. If the search fails the reply goes ahead without them.
+        The latest Message, all its texts, is embedded and the top few
+        chunks, as many as the `knowledge_chunks_per_reply` setting says, are
+        given with where they come from. Nothing is searched when Knowledge
+        doesn't work for the User. If the search fails the reply goes ahead
+        without them.
 
         Args:
             snapshot: The User being replied to.
@@ -92,11 +94,12 @@ class KnowledgeRetrieval:
         settings = snapshot.settings
         limit = settings.get(KNOWLEDGE_CHUNKS_PER_REPLY)
         messages = self._repositories.conversations.list_messages(conversation_id)
-        if limit < 1 or not messages:
+        _, latest_text = split_off_latest_message(messages)
+        if limit < 1 or not latest_text:
             return ""
         try:
             matches = self._vector_store.search(
-                self._embedder.embed_query(messages[-1].content), limit
+                self._embedder.embed_query(latest_text), limit
             )
         except Exception:
             logger.exception("Knowledge retrieval could not search Knowledge")

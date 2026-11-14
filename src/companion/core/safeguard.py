@@ -164,11 +164,10 @@ class Safeguard:
             The risk type, or `RiskType.NONE` if it is not a crisis.
         """
         settings = snapshot.settings
-        history = to_chat_history(
-            self._repositories.conversations.list_messages(conversation_id)
-        )
+        messages = self._repositories.conversations.list_messages(conversation_id)
         if newest_text is not None:
-            history[-1] = replace(history[-1], text=newest_text)
+            messages[-1] = replace(messages[-1], content=newest_text)
+        history = to_chat_history(messages)
         transcript = [ChatLine(role=ChatRole.USER, text=to_transcript(history))]
         for _ in range(2):
             answer = self._chat_model.generate(

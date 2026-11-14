@@ -24,6 +24,7 @@ from tests.telegram_helpers import (
     TELEGRAM_CHAT_ID,
     connect_telegram,
     owner_headers,
+    post_to_webhook,
     send_to_webhook,
     telegram_album_video_update,
     telegram_file_update,
@@ -75,7 +76,7 @@ def send_album(
             file_unique_id=f"photo-{number}",
             album_id="album-1",
         )
-        assert send_to_webhook(client, update) == 200
+        assert post_to_webhook(client, update) == 200
     chat_model.script(reply)
     timer.run_waiting()
     return chat_model.calls[-1].history[-1].text
@@ -590,7 +591,7 @@ def test_an_album_gets_one_reply_that_covers_every_photo_with_the_caption(
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["what a lovely bunch"]
 
 
-def test_nothing_is_answered_until_the_album_wait_after_the_last_photo_ends(
+def test_nothing_is_answered_until_the_message_wait_after_the_last_photo_ends(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -600,19 +601,19 @@ def test_nothing_is_answered_until_the_album_wait_after_the_last_photo_ends(
 ) -> None:
     admin = owner_headers(client, auth_verifier)
     connect_telegram(client, auth_verifier, chat_channel)
-    change_settings(client, admin, {"photo_album_wait_seconds": 4})
+    change_settings(client, admin, {"message_wait_seconds": 6})
 
     for number in (1, 2):
         update = telegram_photo_update(
             file_unique_id=f"photo-{number}", album_id="album-1"
         )
-        assert send_to_webhook(client, update) == 200
+        assert post_to_webhook(client, update) == 200
 
     assert chat_model.calls == []
     assert photo_viewer.calls == []
     [first_wait, second_wait] = timer.waits
     assert first_wait == second_wait
-    assert first_wait[1] == 4
+    assert first_wait[1] == 6
 
 
 def test_an_album_over_the_cap_describes_only_the_first_photos_and_mentions_the_rest(
@@ -696,7 +697,7 @@ def test_an_album_photo_that_fails_is_marked_while_the_others_are_described(
     )
 
 
-def test_two_albums_sent_together_get_a_reply_each(
+def test_two_albums_sent_together_are_one_message_with_one_reply(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -708,12 +709,15 @@ def test_two_albums_sent_together_get_a_reply_each(
     photo_viewer.script(DOG, BIRD)
     for album in ("album-1", "album-2"):
         update = telegram_photo_update(file_unique_id=album, album_id=album)
-        assert send_to_webhook(client, update) == 200
-    chat_model.script("nice dog", "nice bird")
+        assert post_to_webhook(client, update) == 200
+    chat_model.script("nice dog and bird")
 
     timer.run_waiting()
 
-    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["nice dog", "nice bird"]
+    [reply_call] = chat_model.calls
+    assert DOG in reply_call.history[-1].text
+    assert BIRD in reply_call.history[-1].text
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["nice dog and bird"]
 
 
 def test_ask_about_photo_lists_each_album_photo_by_its_own_description(
@@ -772,8 +776,8 @@ def test_a_video_in_an_album_joins_the_one_reply_and_its_caption_is_kept(
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
     photo_viewer.script(DOG)
-    send_to_webhook(client, telegram_album_video_update("our trip", message_id=11))
-    send_to_webhook(
+    post_to_webhook(client, telegram_album_video_update("our trip", message_id=11))
+    post_to_webhook(
         client,
         telegram_photo_update(file_unique_id="photo-1", album_id="album-1"),
     )
@@ -794,8 +798,8 @@ def test_an_album_of_videos_alone_gets_one_unsupported_reply(
     timer: FakeTimer,
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
-    send_to_webhook(client, telegram_album_video_update(message_id=11))
-    send_to_webhook(client, telegram_album_video_update(message_id=12))
+    post_to_webhook(client, telegram_album_video_update(message_id=11))
+    post_to_webhook(client, telegram_album_video_update(message_id=12))
 
     timer.run_waiting()
 
@@ -813,8 +817,8 @@ def test_an_album_of_videos_with_a_caption_gets_one_reply_to_the_caption(
     timer: FakeTimer,
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
-    send_to_webhook(client, telegram_album_video_update("our trip", message_id=11))
-    send_to_webhook(client, telegram_album_video_update(message_id=12))
+    post_to_webhook(client, telegram_album_video_update("our trip", message_id=11))
+    post_to_webhook(client, telegram_album_video_update(message_id=12))
     chat_model.script("sounds fun")
 
     timer.run_waiting()
@@ -836,7 +840,7 @@ def test_album_photos_are_numbered_in_the_order_they_were_sent(
         update = telegram_photo_update(
             file_unique_id=f"photo-{number}", album_id="album-1", message_id=message_id
         )
-        send_to_webhook(client, update)
+        post_to_webhook(client, update)
     chat_model.script("nice")
 
     timer.run_waiting()

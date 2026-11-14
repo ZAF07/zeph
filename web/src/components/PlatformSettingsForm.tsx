@@ -42,6 +42,13 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
         unit: "min",
       },
       {
+        key: "message_wait_seconds",
+        label: "Message wait",
+        caption:
+          "Seconds Zeph waits after a User’s last text or photo, then answers everything they sent in one reply.",
+        unit: "sec",
+      },
+      {
         key: "daily_message_limit",
         label: "Daily message limit",
         caption: "Per User. Safety replies never count toward it.",
@@ -70,13 +77,6 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
         caption:
           "Extra tries when a photo fails to download or be looked at, before Zeph says it didn’t come through.",
         unit: "tries",
-      },
-      {
-        key: "photo_album_wait_seconds",
-        label: "Album wait",
-        caption:
-          "Seconds to wait after an album’s last photo arrives, before Zeph answers all of it in one reply.",
-        unit: "sec",
       },
       {
         key: "photo_album_max_photos",

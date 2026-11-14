@@ -83,8 +83,8 @@ class AppDependencies:
         web_search: Searches the web and reads pages for replies.
         clock: Tells the current time.
         scheduler: Runs the scheduled work while the app is up.
-        timer: Runs work after a wait, like answering an album once its
-            photos have all arrived.
+        timer: Runs work after a wait, like answering a Message once its
+            User has paused.
         telegram_webhook_secret: The secret Telegram sends with each update.
         telegram_bot_username: The Companion's Telegram @username.
         dashboard_url: The Dashboard's public address.
@@ -190,13 +190,14 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         usage_limiter=usage_limiter,
         clock=dependencies.clock,
     )
+    reply_gate = ReplyGate(
+        conversations=conversation_service,
+        safeguard=safeguard,
+        data_deletion=chat_data_deletion,
+        usage_limiter=usage_limiter,
+    )
     reply_service = ReplyService(
-        reply_gate=ReplyGate(
-            conversations=conversation_service,
-            safeguard=safeguard,
-            data_deletion=chat_data_deletion,
-            usage_limiter=usage_limiter,
-        ),
+        reply_gate=reply_gate,
         conversations=conversation_service,
         memory_retrieval=MemoryRetrieval(
             repositories=dependencies.repositories,
@@ -233,6 +234,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     incoming_message_handler = IncomingMessageHandler(
         telegram_connections=telegram_connection_service,
         repositories=dependencies.repositories,
+        reply_gate=reply_gate,
         reply_service=reply_service,
         chat_channel=dependencies.chat_channel,
         sticker_adding=sticker_adding,

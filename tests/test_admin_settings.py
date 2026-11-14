@@ -138,8 +138,8 @@ def test_a_shorter_quiet_gap_starts_a_new_conversation_sooner(
         {"message_retention_days": 0},
         {"message_retention_days": 366},
         {"photo_retry_count": 6},
-        {"photo_album_wait_seconds": 0},
-        {"photo_album_wait_seconds": 31},
+        {"message_wait_seconds": 0},
+        {"message_wait_seconds": 31},
         {"photo_album_max_photos": 0},
         {"photo_album_max_photos": 11},
         {"photo_model": "not-a-model"},
@@ -238,7 +238,6 @@ def test_the_photo_settings_are_editable_with_their_seeded_values(
 
     assert settings["photo_model"]["value"] == "deepseek-chat"
     assert settings["photo_retry_count"]["value"] == 2
-    assert settings["photo_album_wait_seconds"]["value"] == 2
     assert settings["photo_album_max_photos"]["value"] == 5
     for key in (
         "photo_description_prompt",
@@ -255,6 +254,16 @@ def test_the_photo_settings_are_editable_with_their_seeded_values(
     ]
     assert photo_viewing["prompt_key"] == "photo_description_prompt"
     assert photo_viewing["model_key"] == "photo_model"
+
+
+def test_the_message_wait_is_editable_with_a_seeded_value_of_a_few_seconds(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+
+    settings = client.get("/api/admin/settings", headers=headers).json()["settings"]
+
+    assert settings["message_wait_seconds"]["value"] == 4
 
 
 def test_the_memory_notes_are_editable_with_their_seeded_values(

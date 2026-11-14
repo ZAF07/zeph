@@ -65,21 +65,26 @@ def split_into_messages(reply: str) -> list[str]:
 def to_chat_history(messages: list[ConversationMessage]) -> list[ChatLine]:
     """Turn a Conversation's saved messages into history for the chat model.
 
+    The User's messages in a row are one Message, so they become one line
+    with each text on its own line.
+
     Args:
         messages: The messages, oldest first.
 
     Returns:
-        One line per message, saying who said it.
+        One line per Message or Companion message, saying who said it.
     """
-    return [
-        ChatLine(
-            role=ChatRole.USER
-            if message.direction == MessageDirection.INCOMING
-            else ChatRole.COMPANION,
-            text=message.content,
-        )
-        for message in messages
-    ]
+    history: list[ChatLine] = []
+    for message in messages:
+        if message.direction == MessageDirection.OUTGOING:
+            history.append(ChatLine(role=ChatRole.COMPANION, text=message.content))
+        elif history and history[-1].role == ChatRole.USER:
+            history[-1] = ChatLine(
+                role=ChatRole.USER, text=f"{history[-1].text}\n{message.content}"
+            )
+        else:
+            history.append(ChatLine(role=ChatRole.USER, text=message.content))
+    return history
 
 
 class ResponseComposer:
