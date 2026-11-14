@@ -123,7 +123,7 @@ _Avoid_: Disclaimer, warning, terms
 ### Safety
 
 **Safeguard**:
-The check on every incoming message, photos included, read in the light of the Conversation so far, for signs of crisis (suicide or self-harm, danger to others, abuse, medical emergency). Everyday stress or sadness is not a crisis. When the Safeguard can't tell, it treats the message as a crisis: a false alarm is better than a missed crisis.
+The check on every text a User sends, photos included, as it arrives and read in the light of the Conversation so far, for signs of crisis (suicide or self-harm, danger to others, abuse, medical emergency). Everyday stress or sadness is not a crisis. When the Safeguard can't tell, it treats the message as a crisis: a false alarm is better than a missed crisis.
 _Avoid_: Filter, moderation, guardrail
 
 **Crisis Reply**:
@@ -213,7 +213,7 @@ _Avoid_: Search quota, web budget
 ### Usage
 
 **Daily Message Limit**:
-The most messages a User can send the Companion in a day, set by Admins and meant to be generous. The day is the User's own, so it resets at midnight in their time zone. The Safeguard still checks every message first: a crisis always gets the Crisis Reply and never counts toward the limit. Over the limit, the Companion answers with the Limit Reply instead of a real reply until the next day. Check-ins don't count toward it, but once a User has used it up, they get no more Check-ins that day (see Skipped Check-in).
+The most Messages a User can send the Companion in a day, set by Admins and meant to be generous; several texts in a row are one Message. The day is the User's own, so it resets at midnight in their time zone. The Safeguard still checks every text first: a crisis always gets the Crisis Reply and never counts toward the limit. Over the limit, the Companion answers with the Limit Reply instead of a real reply until the next day. Check-ins don't count toward it, but once a User has used it up, they get no more Check-ins that day (see Skipped Check-in).
 _Avoid_: Quota, rate limit, message cap
 
 **Limit Reply**:
