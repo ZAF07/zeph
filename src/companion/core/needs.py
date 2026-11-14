@@ -1,8 +1,7 @@
 from uuid import UUID
 
 from companion.core.errors import ConflictError, InvalidError, NotFoundError
-from companion.core.helplines import MoveDirection
-from companion.core.models import Need, NeedDetails
+from companion.core.models import MoveDirection, Need, NeedDetails
 from companion.core.ports import Repositories
 
 MAX_NAME_LENGTH = 80
@@ -167,15 +166,18 @@ class NeedService:
             raise InvalidNeedError(
                 "A Need needs a name, when it fits and how to reply."
             )
-        for label, value, limit in (
-            ("name", checked.name, MAX_NAME_LENGTH),
-            ("“when it fits”", checked.when_it_fits, MAX_WHEN_IT_FITS_LENGTH),
-            ("“how to reply”", checked.how_to_reply, MAX_HOW_TO_REPLY_LENGTH),
-        ):
-            if len(value) > limit:
-                raise InvalidNeedError(
-                    f"The {label} must be at most {limit} characters."
-                )
+        if len(checked.name) > MAX_NAME_LENGTH:
+            raise InvalidNeedError(
+                f"The name must be at most {MAX_NAME_LENGTH} characters."
+            )
+        if len(checked.when_it_fits) > MAX_WHEN_IT_FITS_LENGTH:
+            raise InvalidNeedError(
+                f"“When it fits” must be at most {MAX_WHEN_IT_FITS_LENGTH} characters."
+            )
+        if len(checked.how_to_reply) > MAX_HOW_TO_REPLY_LENGTH:
+            raise InvalidNeedError(
+                f"“How to reply” must be at most {MAX_HOW_TO_REPLY_LENGTH} characters."
+            )
         is_taken = any(
             need.name.lower() == checked.name.lower() and need.id != editing_id
             for need in self._repositories.needs.list_all()

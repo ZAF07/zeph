@@ -20,10 +20,7 @@ from companion.core.admin_users import AdminUserService
 from companion.core.check_in_kinds import CheckInKindService
 from companion.core.check_ins import CheckInService, LoggedCheckIn
 from companion.core.features import FeatureService, feature_details
-from companion.core.helplines import (
-    HelplineService,
-    MoveDirection,
-)
+from companion.core.helplines import HelplineService
 from companion.core.knowledge import (
     MAX_UPLOAD_BYTES,
     KnowledgeService,
@@ -57,6 +54,7 @@ from companion.core.models import (
     ModelCallTraceDetails,
     ModelCallTraceOverview,
     ModelStep,
+    MoveDirection,
     Need,
     NeedDetails,
     RiskType,

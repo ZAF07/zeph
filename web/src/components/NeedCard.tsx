@@ -68,9 +68,7 @@ export function NeedCard({
       await action();
     } catch (failure) {
       setError(
-        failure instanceof ApiError &&
-          (failure.status === 422 || failure.status === 409) &&
-          failure.detail
+        failure instanceof ApiError && failure.status === 422 && failure.detail
           ? failure.detail
           : failureText,
       );

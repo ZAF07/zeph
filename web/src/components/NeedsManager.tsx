@@ -10,6 +10,8 @@ import type { MoveDirection, Need, NeedInput } from "@/lib/api-client";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
+type Flash = { text: string; isError: boolean };
+
 const emptyNeed: NeedInput = { name: "", when_it_fits: "", how_to_reply: "" };
 
 /**
@@ -23,9 +25,7 @@ export function NeedsManager() {
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
-  const [flash, setFlash] = useState<{ text: string; isError: boolean } | null>(
-    null,
-  );
+  const [flash, setFlash] = useState<Flash | null>(null);
   const needsQuery = useQuery({
     queryKey: queryKeys.needs,
     queryFn: () => apiClient.listNeeds(),

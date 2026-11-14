@@ -730,6 +730,13 @@ class MemoryCategory:
     sort_order: int
 
 
+class MoveDirection(StrEnum):
+    """Which way to move a Helpline or Need in its list."""
+
+    UP = "up"
+    DOWN = "down"
+
+
 @dataclass(frozen=True)
 class NeedDetails:
     """What an Admin sets on a Need.
