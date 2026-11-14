@@ -81,6 +81,22 @@ class CheckInSettings:
 
 
 @dataclass(frozen=True)
+class NextDueTimeChange:
+    """A new next due time for a User's Check-ins.
+
+    Attributes:
+        user_id: The User's ID.
+        read_as: Their due time as it was read; the change is only saved
+            if it is still this.
+        becomes: The due time to save; None for none.
+    """
+
+    user_id: UUID
+    read_as: datetime | None
+    becomes: datetime | None
+
+
+@dataclass(frozen=True)
 class CheckInChanges:
     """Check-in settings a User wants to change; None leaves one as it is.
 

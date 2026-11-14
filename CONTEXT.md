@@ -65,7 +65,7 @@ A run of messages between a User and the Companion that ends after a quiet gap (
 _Avoid_: Session, thread, chat
 
 **Check-in**:
-A message the Companion sends first, unprompted, to a User who has opted in — meant to feel like a friend reaching out, not a task reminder. When the User is due (their frequency gap has passed), not paused, outside their Quiet Hours and not mid-Conversation, the Companion either sends one of a Check-in Kind or skips it. Check-ins are a Feature: when an Admin has them off for a User, none are decided or sent, and the User's own Check-in settings are kept for when they are back on. The User's first message within the reply window (set by an Admin) is its reply; after that it had no reply. A User never gets the same Check-in twice: one Telegram refuses is tried again a little later, and one whose delivery is unclear counts as sent. Users never see when the next one will come.
+A message the Companion sends first, unprompted, to a User who has opted in — meant to feel like a friend reaching out, not a task reminder. When the User is due (their frequency gap has passed), not paused, outside their Quiet Hours, has a Telegram Connection and is not mid-Conversation, the Companion either sends one of a Check-in Kind or skips it. Otherwise it is a Held-back Check-in. Check-ins are a Feature: when an Admin has them off for a User, none are decided or sent, and the User's own Check-in settings are kept for when they are back on. The User's first message within the reply window (set by an Admin) is its reply; after that it had no reply. A User never gets the same Check-in twice: one Telegram refuses is tried again a little later, and one whose delivery is unclear counts as sent. Users never see when the next one will come.
 _Avoid_: Notification, nudge, reminder, push
 
 **Quiet Hours**:
@@ -79,6 +79,10 @@ _Avoid_: Snooze, mute
 **Check-in Kind**:
 The style of a Check-in (e.g. casual hello, follow-up on something shared, present-moment prompt), chosen from the User's recent Conversation Summaries and Memory Items. Managed by Admins; any Kind can go to a User whether or not User Memory is on, since off only stops learning. Some Kinds send one of the User's own Shared Photos with the message (e.g. "a look back at a photo"); these go only to a User who has Shared Photos and Photo Viewing working, and Admins can edit or remove them but not change what they send. Users see the Kinds read-only.
 _Avoid_: Template, check-in type
+
+**Held-back Check-in**:
+A due Check-in that waits because something stops it for now: the User paused, it is their Quiet Hours, they have no Telegram Connection, or they are mid-Conversation. Nothing is sent or logged; it is decided again once that ends, when the pause ends or Quiet Hours end, when the Conversation could end, or when the User resumes or connects Telegram. If the User changes the setting that held it back, it is decided again straight away.
+_Avoid_: Skipped (a skip is a decision and is logged)
 
 **Skipped Check-in**:
 A due Check-in the Companion chose not to send, or couldn't because Telegram won't reach the User (they blocked it, or their account is gone), with a reason only Admins see (e.g. the User asked for space). The next attempt waits a full frequency gap, as after a sent one. Users see it only as "gave you some space". One exception: a User who has used up today's Daily Message Limit gets no Check-in (nor a "would you like fewer?" message) for the rest of their day. That day gets one Skipped Check-in, which the User sees as "you'd reached today's message limit" and Admins see with the reason "User had used up today's Daily Message Limit", and the User stays due, so the next one can come on their next day.

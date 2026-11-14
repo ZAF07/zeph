@@ -1,9 +1,23 @@
 import json
 import logging
 from dataclasses import dataclass, replace
-from datetime import datetime, time, timedelta
+from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 
+from companion.core.check_in_decision import (
+    AskAboutFewer,
+    AskModel,
+    CheckInFacts,
+    CheckInPlan,
+    CheckInRules,
+    HoldBack,
+    HoldBackReason,
+    SkipForDailyLimit,
+    decide_check_in,
+    next_due_after_change,
+    next_due_after_quiet_hours_move,
+    retry_after_refusal,
+)
 from companion.core.features import FeatureService
 from companion.core.memory_retrieval import (
     format_day,
@@ -24,6 +38,7 @@ from companion.core.models import (
     CheckInSettings,
     CheckInStatus,
     Feature,
+    NextDueTimeChange,
     PauseLength,
     SharedPhoto,
     User,
@@ -39,7 +54,6 @@ from companion.core.ports import (
 from companion.core.settings_changes import record_where_changed
 from companion.core.timing import (
     check_in_reply_window,
-    is_open,
     quiet_gap,
     users_today,
 )
@@ -50,10 +64,8 @@ logger = logging.getLogger(__name__)
 
 RECENT_CHECK_INS_LIMIT = 10
 CHECK_INS_TOLD_TO_MODEL = 5
-CHECK_INS_LOOKED_BACK_FOR_IGNORES = 100
 CHECK_INS_LOOKED_BACK_FOR_LAST_SENT = 100
 MEMORY_INTRO = "What you remember about them:"
-REFUSED_CHECK_IN_RETRY_GAP = timedelta(minutes=15)
 BLOCKED_SKIP_REASON = "User has blocked the Companion on Telegram"
 PAUSE_LENGTHS = {
     PauseLength.DAY: timedelta(days=1),
@@ -109,27 +121,6 @@ class CheckInDecision:
     message: str = ""
     skip_reason: str = ""
     shared_photo: SharedPhoto | None = None
-
-
-def is_in_quiet_hours(settings: CheckInSettings, local_time: time) -> bool:
-    """Tell whether a local time falls in a User's quiet hours.
-
-    Quiet hours may run past midnight, e.g. 22:00 until 07:30. When they
-    start and end at the same time there are none.
-
-    Args:
-        settings: The User's Check-in settings.
-        local_time: The time of day where the User is.
-
-    Returns:
-        True if it is quiet hours.
-    """
-    start, end = settings.quiet_hours_start, settings.quiet_hours_end
-    if start < end:
-        return start <= local_time < end
-    if start > end:
-        return local_time >= start or local_time < end
-    return False
 
 
 def check_in_status(
@@ -215,6 +206,41 @@ def ignored_in_a_row(
             break
         count += 1
     return count
+
+
+def is_limit_skip_on_their_today(
+    newest: CheckIn | None, snapshot: UserSnapshot
+) -> bool:
+    """Tell whether the User's newest Check-in is a limit skip from their today.
+
+    Args:
+        newest: The User's newest Check-in; None if they have none.
+        snapshot: The User, with their day, as read for this tick.
+
+    Returns:
+        True if a limit skip was already recorded on the User's day.
+    """
+    return (
+        newest is not None
+        and newest.skipped_for_daily_limit
+        and users_today(snapshot.user.time_zone, newest.decided_at) == snapshot.today
+    )
+
+
+def due_time_change(user: User, plan: HoldBack) -> NextDueTimeChange | None:
+    """Work out the change to a held-back User's next due time.
+
+    Args:
+        user: The User, as read for this tick.
+        plan: Why they are held back and until when.
+
+    Returns:
+        The change; None if their due time stays as it is.
+    """
+    read_as = user.check_ins.next_due_at
+    if plan.retry_at == read_as:
+        return None
+    return NextDueTimeChange(user_id=user.id, read_as=read_as, becomes=plan.retry_at)
 
 
 def describe_recent_check_ins(
@@ -449,8 +475,35 @@ class CheckInService:
             changed.append(ChatSetting.QUIET_HOURS)
         if updated.enabled != current.enabled:
             changed.append(ChatSetting.CHECK_IN_PAUSE)
-        recorded = record_where_changed(user, changed, in_chat, self._clock.now())
+        now = self._clock.now()
+        if ChatSetting.QUIET_HOURS in changed and updated.next_due_at == (
+            current.next_due_at
+        ):
+            updated = replace(
+                updated,
+                next_due_at=next_due_after_quiet_hours_move(
+                    current, user.time_zone, now
+                ),
+            )
+        recorded = record_where_changed(user, changed, in_chat, now)
         return self._save(recorded, updated)
+
+    def settings_after_time_zone_change(self, user: User) -> CheckInSettings:
+        """Work out a User's Check-in settings for when their time zone changes.
+
+        Args:
+            user: The User, with their time zone before the change.
+
+        Returns:
+            Their Check-in settings, due now if they were held back until
+            Quiet Hours end in the old time zone.
+        """
+        return replace(
+            user.check_ins,
+            next_due_at=next_due_after_quiet_hours_move(
+                user.check_ins, user.time_zone, self._clock.now()
+            ),
+        )
 
     def settings_after(
         self, current: CheckInSettings, changes: CheckInChanges
@@ -523,12 +576,12 @@ class CheckInService:
         Returns:
             The saved User.
         """
+        current = user.check_ins
         recorded = record_where_changed(
             user, [ChatSetting.CHECK_IN_PAUSE], in_chat, self._clock.now()
         )
-        return self._save(
-            recorded, replace(user.check_ins, paused=False, paused_until=None)
-        )
+        resumed = replace(current, paused=False, paused_until=None)
+        return self._save(recorded, self._with_next_due_time(current, resumed))
 
     def is_paused(self, user: User) -> bool:
         """Tell whether a User's Check-ins are paused right now.
@@ -607,67 +660,179 @@ class CheckInService:
     def send_due(self) -> None:
         """Decide on a Check-in for every User who is due one right now.
 
-        A User is due when Check-ins work for them, the frequency gap has passed,
-        they are not paused, it is outside their quiet hours, they have a
-        Telegram Connection and no open Conversation. Every due User and their
-        Features are read once, together, at the start of the tick. A decision
-        that fails before it is saved is logged and tried again on the next
-        tick; the others still go ahead.
+        Facts about every due User are gathered together in a few queries,
+        then `decide_check_in` says what to do for each. Held-back Users get
+        their next due time saved together at the end, so they aren't read
+        again until then. A decision that fails before it is saved is logged
+        and tried again on the next tick; the others still go ahead.
         """
         now = self._clock.now()
         due_users = self._repositories.check_ins.list_due_users(now)
+        if not due_users:
+            return
         snapshots = self._user_snapshots.load_many([user.id for user in due_users])
-        for snapshot in snapshots:
+        rules = self._rules()
+        plans = [
+            (facts.snapshot, decide_check_in(facts, rules, now))
+            for facts in self._gather_facts(snapshots, rules)
+        ]
+        self._hold_back(plans)
+        to_carry_out = [
+            (snapshot, plan)
+            for snapshot, plan in plans
+            if not isinstance(plan, HoldBack)
+        ]
+        fewer_message: str = (
+            self._repositories.platform_settings.get("check_in_fewer_message")
+            if any(isinstance(plan, AskAboutFewer) for _, plan in to_carry_out)
+            else ""
+        )
+        for snapshot, plan in to_carry_out:
             try:
-                self._check_in_if_due(snapshot, now)
+                self._carry_out(snapshot, plan, now, fewer_message)
             except Exception:
                 logger.exception("Could not decide on a Check-in")
 
-    def _check_in_if_due(self, snapshot: UserSnapshot, now: datetime) -> None:
-        """Send, skip, or ask about fewer Check-ins, if nothing holds it back.
+    def _hold_back(self, plans: list[tuple[UserSnapshot, CheckInPlan]]) -> None:
+        """Save every held-back User's next due time, in one statement.
 
-        A User who has used up today's daily message limit gets a limit skip
-        instead and stays due. After the Admin-set number of ignored Check-ins
-        in a row, the User gets the "would you like fewer?" message and their
-        Check-ins pause.
-        Otherwise the Check-in model decides on a Kind and message, or to
-        skip. Kinds that send a Shared Photo are offered only to a User with
-        Shared Photos in use. The next attempt is one frequency gap later,
-        unless the chat channel refuses the message.
+        This is done before any Check-in is sent, so a User who resumes or
+        connects Telegram meanwhile changes their due time after it is read,
+        and their change wins.
 
         Args:
-            snapshot: A User whose next Check-in is due, as read for this tick.
+            plans: Each due User and what to do for them.
+        """
+        due_time_changes = []
+        for snapshot, plan in plans:
+            if not isinstance(plan, HoldBack):
+                continue
+            if plan.reason == HoldBackReason.NO_KIND_TO_SEND:
+                logger.warning("No Check-in Kind may be sent to this User")
+            change = due_time_change(snapshot.user, plan)
+            if change is not None:
+                due_time_changes.append(change)
+        self._repositories.check_ins.save_next_due_times(due_time_changes)
+
+    def _rules(self) -> CheckInRules:
+        """Read the Admin-set Check-in rules and Kinds, once per tick.
+
+        Returns:
+            The rules.
+        """
+        settings = self._repositories.platform_settings
+        return CheckInRules(
+            frequency_gaps=self._frequency_gaps(),
+            quiet_gap=quiet_gap(settings),
+            ignore_threshold=settings.get("check_in_ignore_threshold"),
+            kinds=tuple(self.list_kinds()),
+        )
+
+    def _gather_facts(
+        self, snapshots: list[UserSnapshot], rules: CheckInRules
+    ) -> list[CheckInFacts]:
+        """Gather what is needed to decide on every due User's Check-in.
+
+        Each kind of fact is read for all Users in one query, so the number
+        of queries stays the same however many Users are due.
+
+        Args:
+            snapshots: The due Users, as read for this tick.
+            rules: The Admin-set Check-in rules.
+
+        Returns:
+            One set of facts per User, in the same order.
+        """
+        user_ids = [snapshot.user.id for snapshot in snapshots]
+        repositories = self._repositories
+        connections = repositories.telegram_connections.list_for_users(user_ids)
+        conversations = repositories.conversations.list_latest_for_users(user_ids)
+        used_up_limit = self._usage_limiter.users_who_used_up_daily_message_limit(
+            snapshots
+        )
+        newest = repositories.check_ins.list_recent_for_users(
+            user_ids, 1, sent_only=False
+        )
+        newest_sent = repositories.check_ins.list_recent_for_users(
+            user_ids, rules.ignore_threshold, sent_only=True
+        )
+        with_shared_photos = repositories.user_memory.list_users_with_shared_photos(
+            user_ids
+        )
+        all_facts = []
+        for snapshot in snapshots:
+            user_id = snapshot.user.id
+            connection = connections.get(user_id)
+            conversation = conversations.get(user_id)
+            all_facts.append(
+                CheckInFacts(
+                    snapshot=snapshot,
+                    telegram_chat_id=(
+                        connection.telegram_chat_id if connection is not None else None
+                    ),
+                    latest_conversation=conversation,
+                    used_up_daily_message_limit=user_id in used_up_limit,
+                    limit_skip_today=is_limit_skip_on_their_today(
+                        next(iter(newest.get(user_id, [])), None), snapshot
+                    ),
+                    ignored_in_a_row=ignored_in_a_row(
+                        newest_sent.get(user_id, []),
+                        conversation.started_at if conversation is not None else None,
+                    ),
+                    has_shared_photos=user_id in with_shared_photos,
+                )
+            )
+        return all_facts
+
+    def _carry_out(
+        self,
+        snapshot: UserSnapshot,
+        plan: CheckInPlan,
+        now: datetime,
+        fewer_message: str,
+    ) -> None:
+        """Skip for the Daily Message Limit, ask about fewer, or ask the model.
+
+        Args:
+            snapshot: The User, as read for this tick.
+            plan: What `decide_check_in` said to do; not a hold back.
+            now: The current time.
+            fewer_message: The Admin-set "would you like fewer?" message.
+
+        Raises:
+            InvalidCheckInAnswerError: If the model's answer can't be used.
+        """
+        if isinstance(plan, SkipForDailyLimit):
+            self._skip_for_daily_limit(snapshot.user, now)
+        elif isinstance(plan, AskAboutFewer):
+            self._ask_about_fewer(snapshot.user, plan, fewer_message, now)
+        elif isinstance(plan, AskModel):
+            self._check_in_with_model(snapshot, plan, now)
+
+    def _check_in_with_model(
+        self, snapshot: UserSnapshot, plan: AskModel, now: datetime
+    ) -> None:
+        """Let the Check-in model send a Kind and message, or skip.
+
+        Kinds that send a Shared Photo come with the User's Shared Photos.
+        The next attempt is one frequency gap later, unless the chat channel
+        refuses the message.
+
+        Args:
+            snapshot: The User, as read for this tick.
+            plan: The Kinds it may pick from, the chat, and the next due time.
             now: The current time.
 
         Raises:
             InvalidCheckInAnswerError: If the model's answer can't be used.
         """
-        if not snapshot.works(Feature.CHECK_INS):
-            return
         user = snapshot.user
-        settings = user.check_ins
-        local_time = snapshot.local_now
-        if settings.is_paused_at(now) or is_in_quiet_hours(settings, local_time.time()):
-            return
-        connection = self._repositories.telegram_connections.get_by_user(user.id)
-        if connection is None or self._has_open_conversation(user, now):
-            return
-        if self._usage_limiter.has_used_up_daily_message_limit(snapshot):
-            self._skip_for_daily_limit(user, now)
-            return
-        next_due_at = now + self._gap(settings.frequency)
-        if self._has_ignored_too_many(user):
-            self._ask_about_fewer(user, connection.telegram_chat_id, now, next_due_at)
-            return
-        shared_photos = self._shared_photos(snapshot)
-        kinds = [
-            kind
-            for kind in self.list_kinds()
-            if shared_photos or not kind.sends_shared_photo
-        ]
-        if not kinds:
-            logger.warning("No Check-in Kind may be sent to this User")
-            return
+        kinds = list(plan.kinds)
+        shared_photos = (
+            self._repositories.user_memory.list_shared_photos(user.id)
+            if any(kind.sends_shared_photo for kind in kinds)
+            else []
+        )
         decision = self._decide(snapshot, kinds, shared_photos)
         if decision.kind is None:
             skipped = CheckIn(
@@ -678,7 +843,7 @@ class CheckInService:
                 skip_reason=decision.skip_reason,
             )
             self._repositories.check_ins.add(
-                skipped, next_due_at, pause_until_resumed=False
+                skipped, plan.next_due_at, pause_until_resumed=False
             )
             return
         shared_photo = decision.shared_photo
@@ -693,31 +858,28 @@ class CheckInService:
         )
         was_sent = self._save_then_send(
             user,
-            connection.telegram_chat_id,
+            plan.telegram_chat_id,
             decision.message,
             check_in,
-            next_due_at,
+            plan.next_due_at,
             pause_until_resumed=False,
         )
         if (
             was_sent
             and shared_photo is not None
-            and not self._send_shared_photo(connection.telegram_chat_id, shared_photo)
+            and not self._send_shared_photo(plan.telegram_chat_id, shared_photo)
         ):
             self._repositories.check_ins.remove_shared_photo(check_in.id)
 
     def _skip_for_daily_limit(self, user: User, now: datetime) -> None:
         """Record a Skipped Check-in for a User who used up today's daily message limit.
 
-        Only one is recorded per User per day. The User stays due, so a
-        Check-in can come on their next day.
+        The User stays due, so a Check-in can come on their next day.
 
         Args:
             user: A due User who has used up today's daily message limit.
             now: The current time.
         """
-        if self._has_limit_skip_today(user, now):
-            return
         skipped = CheckIn(
             id=uuid4(),
             user_id=user.id,
@@ -726,24 +888,6 @@ class CheckInService:
             skip_reason=DAILY_LIMIT_SKIP_REASON,
         )
         self._repositories.check_ins.add(skipped, now, pause_until_resumed=False)
-
-    def _has_limit_skip_today(self, user: User, now: datetime) -> bool:
-        """Tell whether the User's newest Check-in is a limit skip from their today.
-
-        Args:
-            user: The User.
-            now: The current time.
-
-        Returns:
-            True if a limit skip was already recorded on the User's day.
-        """
-        newest = self._repositories.check_ins.list_recent(user.id, 1)
-        return (
-            bool(newest)
-            and newest[0].skipped_for_daily_limit
-            and users_today(user.time_zone, newest[0].decided_at)
-            == users_today(user.time_zone, now)
-        )
 
     def _save_then_send(
         self,
@@ -793,7 +937,7 @@ class CheckInService:
             return False
         except MessageRefusedError as error:
             logger.warning("The chat channel refused a Check-in: %s", error)
-            retry_at = check_in.decided_at + REFUSED_CHECK_IN_RETRY_GAP
+            retry_at = retry_after_refusal(check_in.decided_at)
             self._repositories.check_ins.undo_add(
                 check_in, retry_at, pause_until_resumed, skipped=None
             )
@@ -823,7 +967,7 @@ class CheckInService:
         return True
 
     def _ask_about_fewer(
-        self, user: User, chat_id: int, now: datetime, next_due_at: datetime
+        self, user: User, plan: AskAboutFewer, message: str, now: datetime
     ) -> None:
         """Send the "would you like fewer?" message and pause the User's Check-ins.
 
@@ -831,14 +975,13 @@ class CheckInService:
 
         Args:
             user: The User who ignored too many Check-ins in a row.
-            chat_id: Their Telegram chat.
+            plan: Their Telegram chat and next due time once resumed.
+            message: The Admin-set "would you like fewer?" message.
             now: The current time.
-            next_due_at: When their next Check-in may be sent once resumed.
         """
-        message = self._repositories.platform_settings.get("check_in_fewer_message")
         self._save_then_send(
             user,
-            chat_id,
+            plan.telegram_chat_id,
             message,
             CheckIn(
                 id=uuid4(),
@@ -847,7 +990,7 @@ class CheckInService:
                 decided_at=now,
                 message=message,
             ),
-            next_due_at,
+            plan.next_due_at,
             pause_until_resumed=True,
         )
 
@@ -871,25 +1014,6 @@ class CheckInService:
             RecentCheckIn(check_in=check_in, status=status)
             for check_in, status in zip(recent, statuses, strict=True)
         ]
-
-    def _has_ignored_too_many(self, user: User) -> bool:
-        """Tell whether the User ignored the Admin-set number of Check-ins in a row.
-
-        Args:
-            user: The User.
-
-        Returns:
-            True if it is time to ask whether they'd like fewer.
-        """
-        threshold: int = self._repositories.platform_settings.get(
-            "check_in_ignore_threshold"
-        )
-        recent = self._repositories.check_ins.list_recent(
-            user.id, CHECK_INS_LOOKED_BACK_FOR_IGNORES
-        )
-        latest = self._repositories.conversations.get_latest_for_user(user.id)
-        started_at = latest.started_at if latest is not None else None
-        return ignored_in_a_row(recent, started_at) >= threshold
 
     def _memory(self, user: User) -> str:
         """Write what is remembered about the User, for the Check-in model.
@@ -918,20 +1042,6 @@ class CheckInService:
             user.time_zone,
             MEMORY_INTRO,
         )
-
-    def _shared_photos(self, snapshot: UserSnapshot) -> list[SharedPhoto]:
-        """List the User's Shared Photos a Check-in may send.
-
-        Args:
-            snapshot: The User, as read for this tick.
-
-        Returns:
-            Their Shared Photos, newest first; none if Photo Viewing doesn't
-            work for the User.
-        """
-        if not snapshot.works(Feature.PHOTO_VIEWING):
-            return []
-        return self._repositories.user_memory.list_shared_photos(snapshot.user.id)
 
     def _decide(
         self,
@@ -973,33 +1083,19 @@ class CheckInService:
         )
         return read_check_in_decision(answer, kinds, shared_photos)
 
-    def _has_open_conversation(self, user: User, now: datetime) -> bool:
-        """Tell whether the User is in the middle of a Conversation.
-
-        Args:
-            user: The User.
-            now: The current time.
+    def _frequency_gaps(self) -> dict[CheckInFrequency, timedelta]:
+        """Look up the fewest time between two Check-ins for each frequency.
 
         Returns:
-            True if their newest Conversation is still open.
-        """
-        latest = self._repositories.conversations.get_latest_for_user(user.id)
-        gap = quiet_gap(self._repositories.platform_settings)
-        return latest is not None and is_open(latest, now, gap)
-
-    def _gap(self, frequency: CheckInFrequency) -> timedelta:
-        """Look up the fewest hours between two Check-ins for a frequency.
-
-        Args:
-            frequency: The User's frequency.
-
-        Returns:
-            The gap.
+            The gap per frequency.
         """
         hours_between = self._repositories.platform_settings.get(
             "check_in_hours_between"
         )
-        return timedelta(hours=hours_between[frequency.value])
+        return {
+            frequency: timedelta(hours=hours_between[frequency.value])
+            for frequency in CheckInFrequency
+        }
 
     def _with_next_due_time(
         self, current: CheckInSettings, updated: CheckInSettings
@@ -1011,17 +1107,17 @@ class CheckInService:
             updated: The settings after the change.
 
         Returns:
-            The updated settings, due one gap from now if Check-ins were
-            just turned on or the frequency changed, and with no due time or
-            pause when off.
+            The updated settings with no due time or pause when off,
+            otherwise with the due time from `next_due_after_change`.
         """
         if not updated.enabled:
             return replace(updated, paused=False, paused_until=None, next_due_at=None)
-        if not current.enabled or current.frequency != updated.frequency:
-            return replace(
-                updated, next_due_at=self._clock.now() + self._gap(updated.frequency)
-            )
-        return updated
+        return replace(
+            updated,
+            next_due_at=next_due_after_change(
+                current, updated, self._frequency_gaps(), self._clock.now()
+            ),
+        )
 
     def _save(self, user: User, settings: CheckInSettings) -> User:
         """Save a User's new Check-in settings.

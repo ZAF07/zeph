@@ -38,6 +38,7 @@ from companion.core.models import (
     MemoryItem,
     MessageToAnswer,
     ModelAnswer,
+    NextDueTimeChange,
     PersonalSticker,
     PhotoImage,
     RiskType,
@@ -599,6 +600,19 @@ class TelegramConnectionRepository(Protocol):
         """
         ...
 
+    def list_for_users(
+        self, user_ids: Sequence[UUID]
+    ) -> dict[UUID, TelegramConnection]:
+        """Find many Users' Telegram Connections, in one query.
+
+        Args:
+            user_ids: The Users' IDs.
+
+        Returns:
+            Each User's connection; a User with none is left out.
+        """
+        ...
+
     def get_by_telegram_user(self, telegram_user_id: int) -> TelegramConnection | None:
         """Find the Telegram Connection for a Telegram account.
 
@@ -686,6 +700,20 @@ class ConversationRepository(Protocol):
 
         Returns:
             The newest Conversation, or None if the User has never had one.
+        """
+        ...
+
+    def list_latest_for_users(
+        self, user_ids: Sequence[UUID]
+    ) -> dict[UUID, Conversation]:
+        """Find many Users' newest Conversations, in one query.
+
+        Args:
+            user_ids: The Users' IDs.
+
+        Returns:
+            Each User's newest Conversation; a User who never had one is
+            left out.
         """
         ...
 
@@ -920,6 +948,17 @@ class UserMemoryRepository(Protocol):
 
         Returns:
             The Shared Photos.
+        """
+        ...
+
+    def list_users_with_shared_photos(self, user_ids: Sequence[UUID]) -> set[UUID]:
+        """Find which of many Users have any Shared Photos, in one query.
+
+        Args:
+            user_ids: The Users' IDs.
+
+        Returns:
+            The IDs of those with at least one Shared Photo.
         """
         ...
 
@@ -1267,6 +1306,17 @@ class UsageRepository(Protocol):
         """
         ...
 
+    def count_messages_on_days(self, days: Mapping[UUID, date]) -> dict[UUID, int]:
+        """Count many Users' messages, each on their own day, in one query.
+
+        Args:
+            days: Each User's ID and their day.
+
+        Returns:
+            Each User's count; 0 if nothing was recorded that day.
+        """
+        ...
+
     def claim_message(self, user_id: UUID, day: date, daily_limit: int) -> bool:
         """Count one message for a User's day, in one step, if under the limit.
 
@@ -1512,13 +1562,39 @@ class CheckInRepository(Protocol):
     def list_due_users(self, now: datetime) -> list[User]:
         """List onboarded Users with Check-ins on whose next one is due.
 
-        Pause and quiet hours are not checked here.
+        Users whose Check-ins are off on the Admin side, for everyone or for
+        them, are left out but stay due. Pause and quiet hours are not
+        checked here.
 
         Args:
             now: The time to check at.
 
         Returns:
-            The Users whose next due time is at or before now, or not set.
+            The Users whose next due time is at or before now; a User with no
+            due time is never due.
+        """
+        ...
+
+    def save_next_due_times(self, changes: Sequence[NextDueTimeChange]) -> None:
+        """Save many Users' next due times, in one statement.
+
+        A User whose due time changed since it was read is left as it is, so
+        a settings change made meanwhile is kept.
+
+        Args:
+            changes: Each User's due time as read and the one to save.
+        """
+        ...
+
+    def set_due_now_unless_due_later(self, user_id: UUID, now: datetime) -> None:
+        """Make a User with Check-ins on due now, unless they are due later.
+
+        A due time of now also wins over a tick that read the old one and is
+        holding the User back meanwhile.
+
+        Args:
+            user_id: The User's ID.
+            now: The current time.
         """
         ...
 
@@ -1575,6 +1651,21 @@ class CheckInRepository(Protocol):
 
         Returns:
             The Check-ins.
+        """
+        ...
+
+    def list_recent_for_users(
+        self, user_ids: Sequence[UUID], limit: int, sent_only: bool
+    ) -> dict[UUID, list[CheckIn]]:
+        """List many Users' newest Check-in decisions, in one query.
+
+        Args:
+            user_ids: The Users' IDs.
+            limit: The most to list per User.
+            sent_only: Whether to leave out Skipped Check-ins.
+
+        Returns:
+            Each User's Check-ins, newest first; a User with none is left out.
         """
         ...
 
