@@ -6,6 +6,7 @@ import {
   formatTokens,
   modelStepLabel,
   traceKindLabel,
+  understandingShapeFacts,
 } from "@/lib/model-calls";
 
 describe("model call labels", () => {
@@ -30,5 +31,22 @@ describe("model call labels", () => {
     expect(describeSteps(["safeguard", "safeguard", "reply"])).toBe(
       "Safeguard ×2 → Reply",
     );
+  });
+
+  it("writes an Understanding with no Threads brought up as 0", () => {
+    const facts = understandingShapeFacts({
+      need: "Ask more",
+      intensity: "low",
+      cause_known: true,
+      threads_reminded: 0,
+      threads_led_with: 0,
+      threads_woven_in: 0,
+      threads_left_alone: 0,
+      threads_held_back: 0,
+      past_look_ups: 0,
+    });
+    expect(facts).toContainEqual({ label: "Threads brought up", value: "0" });
+    expect(facts).toContainEqual({ label: "Cause known", value: "Yes" });
+    expect(facts).toContainEqual({ label: "Mood intensity", value: "Low" });
   });
 });

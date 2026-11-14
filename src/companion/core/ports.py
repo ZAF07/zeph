@@ -60,6 +60,7 @@ from companion.core.models import (
     StoredSetting,
     TelegramConnection,
     Understanding,
+    UnderstandingShape,
     User,
     UserOverview,
     UserPortrait,
@@ -1544,6 +1545,17 @@ class ModelCallRepository(Protocol):
 
         Args:
             call: The call to save.
+        """
+        ...
+
+    def set_understanding_shape(
+        self, trace_id: UUID, shape: UnderstandingShape
+    ) -> None:
+        """Save the Understanding's shape on a trace's newest Understanding call.
+
+        Args:
+            trace_id: The trace's ID.
+            shape: The Understanding's shape.
         """
         ...
 

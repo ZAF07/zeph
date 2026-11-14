@@ -530,6 +530,19 @@ export type ModelCallContent = {
   reasoning: string | null;
 };
 
+/** The shape of an Understanding: the Need and counts, never any words. */
+export type UnderstandingShape = {
+  need: string;
+  intensity: "low" | "medium" | "high";
+  cause_known: boolean;
+  threads_reminded: number;
+  threads_led_with: number;
+  threads_woven_in: number;
+  threads_left_alone: number;
+  threads_held_back: number;
+  past_look_ups: number;
+};
+
 /** One model call in a trace; `content` is null unless it was kept. */
 export type ModelCall = {
   id: string;
@@ -542,6 +555,7 @@ export type ModelCall = {
   error: string | null;
   tools_called: string[];
   content: ModelCallContent | null;
+  understanding_shape: UnderstandingShape | null;
 };
 
 /** One Model Call Log trace with every call in it, in order. */

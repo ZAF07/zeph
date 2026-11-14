@@ -239,7 +239,7 @@ A User's choice, made only on the Dashboard, to remove everything Delete My Data
 _Avoid_: Close account, deactivate, unsubscribe
 
 **Model Call Log**:
-The Admins' record of every model call the Companion makes, grouped by what it was for: a Message, a Check-in, or the work done when a Conversation ends. For every User it holds no content: which steps ran, the model, tokens, time taken, errors and the shape of each decision (e.g. which Need was picked, how many Life Threads were found, whether one was brought up). Full content (what the model was given, what it answered, its tool calls and its reasoning) is kept only for Admins' own chats and Evals. Removed with the User's messages.
+The Admins' record of every model call the Companion makes, grouped by what it was for: a Message, a Check-in, or the work done when a Conversation ends. For every User it holds no content: which steps ran, the model, tokens, time taken, errors and the shape of each decision, never its words: for an Understanding, the Need picked, the mood's intensity and whether its cause was known, and how many Life Threads it was reminded of, brought up (led with or woven in), left alone and held back, and how many past look-ups it asked for; when the Understanding couldn't be made, the fallback it used. Full content (what the model was given, what it answered, its tool calls and its reasoning) is kept only for Admins' own chats and Evals. Removed with the User's messages.
 _Avoid_: Trace, debug log, LLM log
 
 ### Quality

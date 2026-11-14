@@ -54,6 +54,7 @@ from companion.core.models import (
     ModelCallTraceDetails,
     ModelCallTraceOverview,
     ModelStep,
+    MoodIntensity,
     MoveDirection,
     Need,
     NeedDetails,
@@ -61,6 +62,7 @@ from companion.core.models import (
     SafeguardEventOverview,
     StoredSetting,
     TraceKind,
+    UnderstandingShape,
     User,
     UserFeatureSwitch,
     UserOverview,
@@ -441,6 +443,20 @@ class ModelCallContentResponse(BaseModel):
     reasoning: str | None
 
 
+class UnderstandingShapeResponse(BaseModel):
+    """The shape of an Understanding: the Need and counts, never any words."""
+
+    need: str
+    intensity: MoodIntensity
+    cause_known: bool
+    threads_reminded: int
+    threads_led_with: int
+    threads_woven_in: int
+    threads_left_alone: int
+    threads_held_back: int
+    past_look_ups: int
+
+
 class ModelCallResponse(BaseModel):
     """One model call in a trace; `content` is null unless full content was kept."""
 
@@ -454,6 +470,7 @@ class ModelCallResponse(BaseModel):
     error: str | None
     tools_called: list[str]
     content: ModelCallContentResponse | None
+    understanding_shape: UnderstandingShapeResponse | None
 
 
 class ModelCallTraceResponse(BaseModel):
@@ -878,6 +895,30 @@ def to_model_call_content_response(
     )
 
 
+def to_understanding_shape_response(
+    shape: UnderstandingShape,
+) -> UnderstandingShapeResponse:
+    """Describe an Understanding's shape for the admin area.
+
+    Args:
+        shape: The shape.
+
+    Returns:
+        The response body.
+    """
+    return UnderstandingShapeResponse(
+        need=shape.need,
+        intensity=shape.intensity,
+        cause_known=shape.cause_known,
+        threads_reminded=shape.threads_reminded,
+        threads_led_with=shape.threads_led_with,
+        threads_woven_in=shape.threads_woven_in,
+        threads_left_alone=shape.threads_left_alone,
+        threads_held_back=shape.threads_held_back,
+        past_look_ups=shape.past_look_ups,
+    )
+
+
 def to_model_call_response(call: ModelCall) -> ModelCallResponse:
     """Describe one model call in a trace for the admin area.
 
@@ -899,6 +940,11 @@ def to_model_call_response(call: ModelCall) -> ModelCallResponse:
         tools_called=list(call.tools_called),
         content=(
             to_model_call_content_response(call.content) if call.content else None
+        ),
+        understanding_shape=(
+            to_understanding_shape_response(call.understanding_shape)
+            if call.understanding_shape
+            else None
         ),
     )
 
