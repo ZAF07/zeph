@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import timedelta
+from uuid import UUID
 
 from companion.core.models import ChatLine, DailyUsage, UserSnapshot
 from companion.core.ports import ChatModel, ChatTool, Clock, Repositories
@@ -54,25 +55,28 @@ class UsageLimiter:
             snapshot.user.id, snapshot.today, daily_limit
         )
 
-    def has_used_up_daily_message_limit(self, snapshot: UserSnapshot) -> bool:
-        """Tell whether the User has used up today's daily message limit.
+    def users_who_used_up_daily_message_limit(
+        self, snapshots: Sequence[UserSnapshot]
+    ) -> set[UUID]:
+        """Find which Users have used up today's daily message limit, in one query.
 
         It is used up once their message count for their day has reached the
         limit, even if no message was turned away yet.
 
         Args:
-            snapshot: The User, as read when the tick started.
+            snapshots: The Users, as read when the tick started.
 
         Returns:
-            True if their next message today would get the limit reply.
+            The IDs of those whose next message today would get the limit
+            reply.
         """
         daily_limit: int = self._repositories.platform_settings.get(
             "daily_message_limit"
         )
-        count = self._repositories.usage.count_messages(
-            snapshot.user.id, snapshot.today
+        counts = self._repositories.usage.count_messages_on_days(
+            {snapshot.user.id: snapshot.today for snapshot in snapshots}
         )
-        return count >= daily_limit
+        return {user_id for user_id, count in counts.items() if count >= daily_limit}
 
     def limit_reply(self) -> str:
         """Read the in-character reply sent once the daily limit is reached.

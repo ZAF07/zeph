@@ -9,13 +9,15 @@ from sqlalchemy import (
     Engine,
     Row,
     Select,
+    and_,
+    bindparam,
     delete,
     func,
-    or_,
     select,
+    tuple_,
     update,
 )
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.dialects.postgresql import distinct_on, insert
 
 from companion.adapters.postgres.tables import (
     check_in_kinds,
@@ -40,6 +42,7 @@ from companion.adapters.postgres.tables import (
     user_feature_switches,
     users,
 )
+from companion.core.features import feature_details
 from companion.core.models import (
     ChannelPhoto,
     ChannelSticker,
@@ -76,6 +79,7 @@ from companion.core.models import (
     MemorySource,
     MessageDirection,
     MessageKind,
+    NextDueTimeChange,
     PersonalSticker,
     RiskType,
     SafeguardEvent,
@@ -774,6 +778,25 @@ class PostgresTelegramConnectionRepository:
             ).first()
         return _to_connection(row) if row else None
 
+    def list_for_users(
+        self, user_ids: Sequence[UUID]
+    ) -> dict[UUID, TelegramConnection]:
+        """Find many Users' Telegram Connections, in one query.
+
+        Args:
+            user_ids: The Users' IDs.
+
+        Returns:
+            Each User's connection; a User with none is left out.
+        """
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                select(telegram_connections).where(
+                    telegram_connections.c.user_id.in_(user_ids)
+                )
+            ).all()
+        return {row.user_id: _to_connection(row) for row in rows}
+
     def get_by_telegram_user(self, telegram_user_id: int) -> TelegramConnection | None:
         """Find the Telegram Connection for a Telegram account.
 
@@ -945,6 +968,29 @@ class PostgresConversationRepository:
                 .limit(1)
             ).first()
         return _to_conversation(row) if row else None
+
+    def list_latest_for_users(
+        self, user_ids: Sequence[UUID]
+    ) -> dict[UUID, Conversation]:
+        """Find many Users' newest Conversations, in one query.
+
+        Args:
+            user_ids: The Users' IDs.
+
+        Returns:
+            Each User's newest Conversation; a User who never had one is
+            left out.
+        """
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                select(conversations)
+                .where(conversations.c.user_id.in_(user_ids))
+                .order_by(
+                    conversations.c.user_id, conversations.c.last_message_at.desc()
+                )
+                .ext(distinct_on(conversations.c.user_id))
+            ).all()
+        return {row.user_id: _to_conversation(row) for row in rows}
 
     def add(self, conversation: Conversation) -> None:
         """Save a new Conversation.
@@ -1753,6 +1799,23 @@ class PostgresUserMemoryRepository:
             ).all()
         return [_to_shared_photo(row) for row in rows]
 
+    def list_users_with_shared_photos(self, user_ids: Sequence[UUID]) -> set[UUID]:
+        """Find which of many Users have any Shared Photos, in one query.
+
+        Args:
+            user_ids: The Users' IDs.
+
+        Returns:
+            The IDs of those with at least one Shared Photo.
+        """
+        with self._engine.connect() as connection:
+            found = connection.execute(
+                select(shared_photos.c.user_id)
+                .where(shared_photos.c.user_id.in_(user_ids))
+                .distinct()
+            ).scalars()
+            return set(found)
+
     def get_shared_photo(self, user_id: UUID, photo_id: UUID) -> SharedPhoto | None:
         """Find one of a User's Shared Photos.
 
@@ -2071,6 +2134,29 @@ class PostgresUsageRepository:
             How many of their messages counted toward the daily message limit.
         """
         return self._count(user_id, day, "message_count")
+
+    def count_messages_on_days(self, days: Mapping[UUID, date]) -> dict[UUID, int]:
+        """Count many Users' messages, each on their own day, in one query.
+
+        Args:
+            days: Each User's ID and their day.
+
+        Returns:
+            Each User's count; 0 if nothing was recorded that day.
+        """
+        if not days:
+            return {}
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                select(daily_usage.c.user_id, daily_usage.c.message_count).where(
+                    tuple_(daily_usage.c.user_id, daily_usage.c.day).in_(
+                        list(days.items())
+                    )
+                )
+            ).all()
+        counts = dict.fromkeys(days, 0)
+        counts |= {row.user_id: row.message_count or 0 for row in rows}
+        return counts
 
     def _count(self, user_id: UUID, day: date, count_column: str) -> int:
         """Read one daily count for a User's day.
@@ -2621,24 +2707,98 @@ class PostgresCheckInRepository:
     def list_due_users(self, now: datetime) -> list[User]:
         """List onboarded Users with Check-ins on whose next one is due.
 
+        Users whose Check-ins are off on the Admin side, for everyone or for
+        them, are left out but stay due.
+
         Args:
             now: The time to check at.
 
         Returns:
-            The Users whose next due time is at or before now, or not set.
+            The Users whose next due time is at or before now; a User with no
+            due time is never due.
         """
-        with self._engine.connect() as connection:
-            rows = connection.execute(
-                select(users).where(
-                    users.c.check_ins_enabled.is_(True),
-                    users.c.onboarding_completed_at.is_not(None),
-                    or_(
-                        users.c.check_in_next_due_at.is_(None),
-                        users.c.check_in_next_due_at <= now,
+        check_ins_feature = Feature.CHECK_INS.value
+        admin_side_on = func.coalesce(
+            user_feature_switches.c.is_on,
+            feature_switches.c.is_on,
+            feature_details(Feature.CHECK_INS).on_by_default,
+        )
+        statement = (
+            select(users)
+            .select_from(
+                users.outerjoin(
+                    user_feature_switches,
+                    and_(
+                        user_feature_switches.c.user_id == users.c.id,
+                        user_feature_switches.c.feature == check_ins_feature,
                     ),
+                ).outerjoin(
+                    feature_switches, feature_switches.c.feature == check_ins_feature
                 )
-            ).all()
+            )
+            .where(
+                users.c.check_ins_enabled.is_(True),
+                users.c.onboarding_completed_at.is_not(None),
+                users.c.check_in_next_due_at <= now,
+                admin_side_on.is_(True),
+            )
+        )
+        with self._engine.connect() as connection:
+            rows = connection.execute(statement).all()
         return [_to_user(row) for row in rows]
+
+    def save_next_due_times(self, changes: Sequence[NextDueTimeChange]) -> None:
+        """Save many Users' next due times, in one statement.
+
+        A User whose due time changed since it was read is left as it is, so
+        a settings change made meanwhile is kept.
+
+        Args:
+            changes: Each User's due time as read and the one to save.
+        """
+        if not changes:
+            return
+        due_type = users.c.check_in_next_due_at.type
+        statement = (
+            update(users)
+            .where(
+                users.c.id == bindparam("changed_user_id"),
+                users.c.check_in_next_due_at.is_not_distinct_from(
+                    bindparam("read_as", type_=due_type)
+                ),
+            )
+            .values(check_in_next_due_at=bindparam("becomes", type_=due_type))
+        )
+        with self._engine.begin() as connection:
+            connection.execute(
+                statement,
+                [
+                    {
+                        "changed_user_id": change.user_id,
+                        "read_as": change.read_as,
+                        "becomes": change.becomes,
+                    }
+                    for change in changes
+                ],
+            )
+
+    def set_next_due_time_if_none(self, user_id: UUID, due_at: datetime) -> None:
+        """Give a User with Check-ins on but no due time one.
+
+        Args:
+            user_id: The User's ID.
+            due_at: Their new next due time.
+        """
+        with self._engine.begin() as connection:
+            connection.execute(
+                update(users)
+                .where(
+                    users.c.id == user_id,
+                    users.c.check_ins_enabled.is_(True),
+                    users.c.check_in_next_due_at.is_(None),
+                )
+                .values(check_in_next_due_at=due_at)
+            )
 
     def add(
         self, check_in: CheckIn, next_due_at: datetime, pause_until_resumed: bool
@@ -2721,6 +2881,41 @@ class PostgresCheckInRepository:
                 .limit(limit)
             ).all()
         return [self._to_check_in(row) for row in rows]
+
+    def list_recent_for_users(
+        self, user_ids: Sequence[UUID], limit: int, sent_only: bool
+    ) -> dict[UUID, list[CheckIn]]:
+        """List many Users' newest Check-in decisions, in one query.
+
+        Args:
+            user_ids: The Users' IDs.
+            limit: The most to list per User.
+            sent_only: Whether to leave out Skipped Check-ins.
+
+        Returns:
+            Each User's Check-ins, newest first; a User with none is left out.
+        """
+        newest_first = func.row_number().over(
+            partition_by=check_ins.c.user_id, order_by=check_ins.c.decided_at.desc()
+        )
+        ranked = (
+            self._select_check_ins()
+            .add_columns(newest_first.label("place"))
+            .where(check_ins.c.user_id.in_(user_ids))
+        )
+        if sent_only:
+            ranked = ranked.where(check_ins.c.outcome != CheckInOutcome.SKIPPED.value)
+        ranked_check_ins = ranked.subquery()
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                select(ranked_check_ins)
+                .where(ranked_check_ins.c.place <= limit)
+                .order_by(ranked_check_ins.c.user_id, ranked_check_ins.c.place)
+            ).all()
+        recent_by_user: dict[UUID, list[CheckIn]] = {}
+        for row in rows:
+            recent_by_user.setdefault(row.user_id, []).append(self._to_check_in(row))
+        return recent_by_user
 
     def list_log(self, since: datetime) -> list[CheckInLogEntry]:
         """List every User's Check-in decisions since a time, newest first.

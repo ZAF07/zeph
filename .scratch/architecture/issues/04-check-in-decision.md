@@ -1,6 +1,6 @@
 # 04 — Pull the Check-in decision into a pure module
 
-Status: ready-for-agent
+Status: in-progress
 
 ## Parent
 
@@ -47,3 +47,18 @@ Gather facts → decide (pure) → act.
 ## Blocked by
 
 - `.scratch/architecture/issues/03-user-snapshot.md`
+
+## Comments
+
+### 14 Nov 2026 — plan
+
+Branch `arch-04-check-in-decision`, worktree `ai-chat-companion-arch-04`, built on issue 03's branch (not merged yet); rebase on main once it lands.
+
+- New pure module `core/check_in_decision.py`: `CheckInRules` (Admin settings and Kinds, read once per tick), `CheckInFacts`, the four results, `decide_check_in(facts, rules, now)`, and the next-due rules (frequency gap, retry gap, Quiet Hours end, due time after a settings change, resume or pause change). Rules are a separate argument so the facts stay per User.
+- "No due time" becomes `next_due_at = NULL`. Today NULL means "due now", so the due query drops that, and migration 0024 gives any Check-ins-on User with no due time a due time of now (keeps them due).
+- `HoldBack.retry_at` equal to the current due time means "stays due" (Admin turned Check-ins off between the query and the snapshot, no Kind can be sent, limit skip already today). Nothing is written then.
+- Held-back due times are saved in one statement per tick, only where the due time hasn't changed since it was read (so a settings change made meanwhile wins).
+- Resuming, or changing a pause, sets a due time of now when the pause had set it (none, or equal to the old pause end). Connecting Telegram sets a due time of now when there is none.
+- Bulk reads for all due Users: Telegram Connections, newest Conversations, message counts for each User's day, newest Check-in, newest sent Check-ins (up to the ignore threshold), who has Shared Photos.
+- Due query also leaves out Users whose Check-ins are off on the Admin side.
+- Known edge (accepted): a User held back until Quiet Hours end who then changes their Quiet Hours or time zone waits until the old end time (at most a day).

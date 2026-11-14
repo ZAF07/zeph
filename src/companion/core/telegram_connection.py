@@ -143,7 +143,9 @@ class TelegramConnectionService:
         Replies pointing back to the Dashboard when the token is missing,
         unknown, expired or used by someone else, or when the Telegram account
         already belongs to another User. Links nothing and leaves the token
-        unused when its User hasn't finished onboarding.
+        unused when its User hasn't finished onboarding. A User with
+        Check-ins on but no due time, held back for having no Telegram
+        Connection, is due again from now.
 
         Args:
             message: The `/start` message.
@@ -194,6 +196,7 @@ class TelegramConnectionService:
                 connected_at=now,
             )
         )
+        self._repositories.check_ins.set_next_due_time_if_none(token.user_id, now)
         self._reply(message, settings.get("welcome_message"))
 
     def _has_finished_onboarding(self, user_id: UUID) -> bool:
