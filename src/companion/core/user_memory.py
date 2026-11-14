@@ -63,14 +63,13 @@ class UserMemoryService:
             User Memory off, the "paused" note when the User has it off, and
             "" when it works.
         """
-        settings = self._repositories.platform_settings
         if not self._features.available_for(user.id, Feature.USER_MEMORY):
-            note: str = settings.get(MEMORY_NOT_AVAILABLE_NOTE_SETTING)
-            return note
-        if not user.user_memory_enabled:
-            paused_note: str = settings.get(MEMORY_PAUSED_NOTE_SETTING)
-            return paused_note
-        return ""
+            setting = MEMORY_NOT_AVAILABLE_NOTE_SETTING
+        elif not user.user_memory_enabled:
+            setting = MEMORY_PAUSED_NOTE_SETTING
+        else:
+            return ""
+        return str(self._repositories.platform_settings.get(setting))
 
     def list_groups(self, user_id: UUID) -> list[MemoryGroup]:
         """List a User's Memory Items by Memory Category, in category order.

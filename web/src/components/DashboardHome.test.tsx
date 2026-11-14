@@ -46,7 +46,6 @@ function homeWith(overrides: Partial<Home> = {}): Home {
     telegram_chat_url: "https://t.me/zeph_bot",
     last_conversation_at: "2026-11-11T11:48:00Z",
     check_ins: checkInsWith(),
-    user_memory_enabled: true,
     memory_note: "",
     goals: [
       {
@@ -262,7 +261,6 @@ describe("DashboardHome", () => {
   it("keeps showing Goals and Recently remembered with the note while memory is off", async () => {
     apiClient.getHome.mockResolvedValue(
       homeWith({
-        user_memory_enabled: false,
         memory_note:
           "**Memory is paused.** Zeph won’t learn anything new, but still uses what it already knows about you.",
       }),

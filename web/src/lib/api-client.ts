@@ -379,7 +379,6 @@ export type Home = {
   telegram_chat_url: string;
   last_conversation_at: string | null;
   check_ins: HomeCheckIns;
-  user_memory_enabled: boolean;
   memory_note: string;
   goals: MemoryItem[];
   recently_remembered: RememberedItem[];

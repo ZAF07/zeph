@@ -12,6 +12,7 @@ from tests.fakes import (
 from tests.telegram_helpers import (
     auth_headers,
     connect_telegram,
+    owner_headers,
     send_to_webhook,
     telegram_text_update,
 )
@@ -262,6 +263,18 @@ def test_onboarding_with_user_memory_off_saves_no_memory_items(
     )
 
     assert client.get("/api/memory-items", headers=headers).json() == {"groups": []}
+
+
+def test_onboarding_with_user_memory_off_by_an_admin_saves_no_memory_items(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    headers = auth_headers(auth_verifier, "user_maya")
+    client.put("/api/admin/features/user_memory", json={"on": False}, headers=admin)
+
+    client.put("/api/onboarding", json=onboarding_answers(), headers=headers)
+
+    assert client.get("/api/memory-items", headers=headers).json()["groups"] == []
 
 
 def test_onboarding_memories_reach_the_first_reply(

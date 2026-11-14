@@ -55,7 +55,6 @@ def test_a_new_user_sees_telegram_not_connected_and_nothing_remembered(
     assert home["last_conversation_at"] is None
     assert home["check_ins"]["enabled"] is False
     assert home["check_ins"]["last_sent"] is None
-    assert home["user_memory_enabled"] is True
     assert home["goals"] == []
     assert home["recently_remembered"] == []
 
@@ -155,7 +154,7 @@ def test_with_user_memory_paused_home_shows_memories_with_the_paused_note(
 
     home = get_home(client, headers)
 
-    assert home["user_memory_enabled"] is False
+    assert home["goals"] != []
     assert home["recently_remembered"] != []
     assert home["memory_note"] == seeded_settings["memory_paused_note"]
     assert me["memory_note"] == seeded_settings["memory_paused_note"]
@@ -180,6 +179,24 @@ def test_with_user_memory_off_by_an_admin_home_shows_the_not_available_note(
         client.get("/api/me", headers=headers).json()["memory_note"]
         == seeded_settings["memory_not_available_note"]
     )
+
+
+def test_with_only_the_admins_switch_off_home_shows_the_not_available_note(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    seeded_settings: dict[str, Any],
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    headers = auth_headers(auth_verifier, "user_maya")
+    client.put("/api/onboarding", json=onboarding_answers(), headers=headers)
+    client.put("/api/admin/features/user_memory", json={"on": False}, headers=admin)
+
+    home = get_home(client, headers)
+
+    assert client.get("/api/me", headers=headers).json()["user_memory_enabled"]
+    assert home["goals"] != []
+    assert home["recently_remembered"] != []
+    assert home["memory_note"] == seeded_settings["memory_not_available_note"]
 
 
 def test_an_edited_memory_note_is_shown_as_set(

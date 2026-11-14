@@ -233,7 +233,6 @@ class HomeResponse(BaseModel):
     telegram_chat_url: str
     last_conversation_at: datetime | None
     check_ins: HomeCheckInsResponse
-    user_memory_enabled: bool
     memory_note: str
     goals: list[MemoryItemResponse]
     recently_remembered: list[RememberedItemResponse]
@@ -598,7 +597,6 @@ def build_dashboard_api_router(
                     else None
                 ),
             ),
-            user_memory_enabled=user.user_memory_enabled,
             memory_note=user_memory_service.memory_note(user),
             goals=[to_memory_item_response(item) for item in home.goals],
             recently_remembered=[

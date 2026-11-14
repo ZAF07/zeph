@@ -935,7 +935,8 @@ class CheckInService:
 
         Returns:
             Their Shared Photos, newest first; none if User Memory or Photo
-            Viewing doesn't work for the User.
+            Viewing doesn't work for the User, since only Check-in Kinds
+            that need User Memory send one.
         """
         if not self._features.works_for(user.id, Feature.USER_MEMORY):
             return []
