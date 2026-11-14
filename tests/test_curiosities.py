@@ -216,6 +216,26 @@ def test_a_curiosity_brought_up_reaches_the_reply_and_is_marked_raised(
     assert PRESENTATION not in next_message
 
 
+def test_a_curiosity_woven_in_is_still_asked_in_this_reply(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    presentation_is_due(client, chat_model, clock, scheduler, seeded_settings)
+
+    chat_model.script_understanding(
+        understanding_answer(bring_up=[{"curiosity": 1, "how": "weave"}])
+    )
+    instructions = reply_instructions(client, chat_model, "work was long today")
+
+    assert f"- {PRESENTATION} Ask it in this reply, after answering" in instructions
+
+
 def test_no_curiosity_is_offered_once_the_admin_set_number_was_raised(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,

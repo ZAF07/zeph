@@ -47,7 +47,10 @@ logger = logging.getLogger(__name__)
 RECENTLY_RAISED_TO_SHOW = 10
 HOW_TO_RAISE_WORDS = {
     BringUpWay.LEAD: "Open with it.",
-    BringUpWay.WEAVE: "Ask it when it fits what they're talking about.",
+    BringUpWay.WEAVE: (
+        "Ask it in this reply, after answering what they said, tied to it "
+        "where you can."
+    ),
 }
 
 

@@ -406,12 +406,13 @@ understanding_prompt: |-
     to lead with it, or "weave" to weave it in if the moment allows. Only
     when it fits: an open Thread the message connects to, when they have
     room for it. Usually at most one. Never one marked "don't bring it up".
-    Curiosities go here too, as {"curiosity": <number>, "how": ...}: "lead"
-    to open with it, usually at the start of a Conversation when they're
-    just saying hi, or "weave" to ask it when it fits what they're talking
-    about. Leave it for a better moment when they're upset, busy with
-    something else, or it's sensitive and the moment isn't right. Never more
-    than the Conversation has left.
+    Curiosities go here too, as {"curiosity": <number>, "how": ...}, only
+    when Zeph should ask it in this very reply: "lead" to open with it,
+    usually at the start of a Conversation when they're just saying hi, or
+    "weave" to ask it after answering what they said, when it connects.
+    Otherwise leave it out for a better moment: when they're upset, busy
+    with something else, or it's sensitive and the moment isn't right.
+    Never more than the Conversation has left.
   - left_alone: the Life Threads the message touches that Zeph should not
     raise, each with a short reason (e.g. "they're struggling with something
     else", "too painful right now").
