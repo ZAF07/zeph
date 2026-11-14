@@ -48,3 +48,9 @@ Users must understand that User Memory off never deletes anything (it only stops
 - **/code-review:**
   - Standards: no hard breaches. Fixed: migration keys as one SQL tuple like 0032; seed lines wrapped. Kept: the tool setting `closing_text` on its offer follows how `picked` already works; the new Dashboard field follows the existing platform-content path.
   - Spec: nothing missing. Fixed: Delete My Data wording now also lists stickers, as CONTEXT.md does. Making `data_deleted_reply` editable kept (story 64).
+
+## Completion
+
+- Completed: 2026-11-14
+- Commits: `d6b3757` (wording, settings, closing line, migration 0034, tests), `8577be5` (review fixes: stickers in Delete My Data wording, migration style, seed wrap), `5fa97f6` (issue archived with evidence)
+- Merged into main: `81fa5d9` (branch `understanding-13-clear-wording`, pushed to origin)
