@@ -262,7 +262,7 @@ Under the hood, replies move out of LangGraph into plain core code (ADR-0009).
 
 ## Further Notes
 
-- Decisions and reasons are in `.scratch/understanding/issues/01-understanding-before-reply.md` (grilled 14 Nov 2026). New terms in `CONTEXT.md`: Message, Life Thread, User Portrait, Need, Understanding, Curiosity, Model Call Log. ADRs: 0009 (replies in plain core code), 0010 (Model Call Log levels).
+- Decisions and reasons are in `.scratch/understanding/issues/archive/01-understanding-before-reply.md` (grilled 14 Nov 2026). New terms in `CONTEXT.md`: Message, Life Thread, User Portrait, Need, Understanding, Curiosity, Model Call Log. ADRs: 0009 (replies in plain core code), 0010 (Model Call Log levels).
 - Suggested slice order: remove LangGraph (pure refactor) → Model Call Log → Needs and the Understanding call (replacing memory picking) → Summary embeddings and `look_up_past` → Knowledge "when it helps" and scoped search → Life Threads and being reminded → User Portrait → Curiosities (Feature, limits, Check-in Kind) → Dashboard Memories sections and delete cascades → messaging changes → Understanding Eval. Message grouping lands before the Understanding slices.
 - Latency: two model calls per reply as today, plus fast local searches. The Understanding call adds a few hundred input tokens (Portrait, descriptions); watch it in the Eval report.
 - Being reminded is the heart of this feature; tune its closeness bars and prompt with the Eval before anything else.
