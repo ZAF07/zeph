@@ -491,6 +491,28 @@ def build_dashboard_api_router(
     router = APIRouter(prefix="/api")
     telegram_chat_url = f"https://t.me/{telegram_bot_username}"
 
+    def me_response(user: User) -> MeResponse:
+        """Describe a User, with which of their Features are available.
+
+        Args:
+            user: The User.
+
+        Returns:
+            The response body.
+        """
+        return to_me_response(me_service.describe(user))
+
+    def check_ins_response(user: User) -> CheckInsResponse:
+        """Describe a User's Check-ins page.
+
+        Args:
+            user: The User.
+
+        Returns:
+            The response body.
+        """
+        return to_check_ins_response(check_in_service.page(user))
+
     def to_token_response(
         token: ConnectionToken, token_status: ConnectionTokenStatus
     ) -> ConnectionTokenResponse:
@@ -575,7 +597,7 @@ def build_dashboard_api_router(
         Returns:
             The User.
         """
-        return to_me_response(me_service.describe(user))
+        return me_response(user)
 
     @router.patch("/me")
     def update_me(
@@ -601,9 +623,7 @@ def build_dashboard_api_router(
             country=request.country,
             time_zone=request.time_zone,
         )
-        return to_me_response(
-            me_service.describe(user_service.update_preferences(user, changes))
-        )
+        return me_response(user_service.update_preferences(user, changes))
 
     @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
     def delete_account(user: Annotated[User, Depends(current_user)]) -> Response:
@@ -666,9 +686,7 @@ def build_dashboard_api_router(
                 quiet_hours_end=request.quiet_hours_end,
             ),
         )
-        return to_me_response(
-            me_service.describe(user_service.complete_onboarding(user, answers))
-        )
+        return me_response(user_service.complete_onboarding(user, answers))
 
     @router.get("/home")
     def get_home(user: Annotated[User, Depends(current_user)]) -> HomeResponse:
@@ -693,7 +711,7 @@ def build_dashboard_api_router(
         Returns:
             The settings and recent Check-ins.
         """
-        return to_check_ins_response(check_in_service.page(user))
+        return check_ins_response(user)
 
     @router.patch("/check-ins")
     def update_check_ins(
@@ -718,8 +736,7 @@ def build_dashboard_api_router(
             quiet_hours_start=request.quiet_hours_start,
             quiet_hours_end=request.quiet_hours_end,
         )
-        saved = check_in_service.change_settings(user, changes)
-        return to_check_ins_response(check_in_service.page(saved))
+        return check_ins_response(check_in_service.change_settings(user, changes))
 
     @router.put("/check-ins/pause")
     def pause_check_ins(
@@ -734,8 +751,7 @@ def build_dashboard_api_router(
         Returns:
             The updated settings and recent Check-ins.
         """
-        paused = check_in_service.pause(user, request.length)
-        return to_check_ins_response(check_in_service.page(paused))
+        return check_ins_response(check_in_service.pause(user, request.length))
 
     @router.delete("/check-ins/pause")
     def resume_check_ins(
@@ -749,8 +765,7 @@ def build_dashboard_api_router(
         Returns:
             The updated settings and recent Check-ins.
         """
-        resumed = check_in_service.resume(user)
-        return to_check_ins_response(check_in_service.page(resumed))
+        return check_ins_response(check_in_service.resume(user))
 
     @router.get("/platform-content")
     def get_platform_content(
