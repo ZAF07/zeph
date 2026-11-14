@@ -99,3 +99,4 @@ Branch `arch-04-check-in-decision`, worktree `ai-chat-companion-arch-04`, built 
   - 38f589c "Review fixes: resume or connect mid-tick wins, Quiet Hours moves, flat reads"
   - af36178 "Architecture issue 04 done: archive issue with test, run and review evidence"
   - c8c7ce0 "Glossary: Held-back Check-in"
+  - 867b493 "Merge architecture issue 04: pull the Check-in decision into a pure module" (merged into main)
