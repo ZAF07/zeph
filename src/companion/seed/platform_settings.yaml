@@ -98,8 +98,8 @@ memory_not_available_note: >-
 # Shown under "Delete my data" on Account & privacy.
 delete_my_data_description: >-
   Removes your messages, memories, the private notes Zeph keeps to follow up
-  with you, Conversation Summaries, Check-in history and Telegram Connection.
-  Your account stays, so you can start fresh.
+  with you, Conversation Summaries, your stickers, Check-in history and
+  Telegram Connection. Your account stays, so you can start fresh.
 
 # The choice chips for "What brings you here?".
 onboarding_reason_choices:
@@ -656,9 +656,10 @@ memory_off_chat_line: >-
 data_deletion_started_note: >-
   Nothing is deleted yet. Tell them this deletes their messages, what you
   remember about them, the private notes you keep to follow up with them,
-  their Check-ins and this Telegram connection, and can't be undone; their
-  account and settings stay. Ask them to reply with exactly "{word}" to
-  confirm, on its own, with nothing after it. Any other reply cancels it.
+  their stickers, their Check-ins and this Telegram connection, and can't be
+  undone; their account and settings stay. Ask them to reply with exactly
+  "{word}" to confirm, on its own, with nothing after it. Any other reply
+  cancels it.
 
 # The word a User must reply with, on its own as their whole Message, to
 # confirm deleting their data in chat. Any other reply cancels it. Case
@@ -669,8 +670,9 @@ data_deletion_confirmation_word: DELETE
 # Telegram Connection is gone, so it says how to come back.
 data_deleted_reply: >-
   Done. I've deleted our messages, what I remembered about you, my private
-  notes and your Check-ins, and disconnected this chat. Your account and settings are still
-  there. If you'd like to talk again, connect Telegram from the Dashboard.
+  notes and your Check-ins, and disconnected this chat. Your account and
+  settings are still there. If you'd like to talk again, connect Telegram from
+  the Dashboard.
 
 # Put after the reply instructions when the User's message cancelled their
 # request to delete their data.

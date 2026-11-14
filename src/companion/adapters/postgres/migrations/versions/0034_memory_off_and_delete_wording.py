@@ -18,17 +18,17 @@ down_revision: str | None = "0033"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-RELOADED_KEYS = (
-    "'user_memory_explanation', 'memory_paused_note', "
-    "'memory_not_available_note', 'data_deleted_reply'"
+RELOADED_SETTINGS = (
+    "('user_memory_explanation', 'memory_paused_note', "
+    "'memory_not_available_note', 'data_deleted_reply')"
 )
 
 
 def upgrade() -> None:
     """Reload the reworded settings from the seed on next start."""
-    op.execute(f"DELETE FROM platform_settings WHERE key IN ({RELOADED_KEYS})")
+    op.execute(f"DELETE FROM platform_settings WHERE key IN {RELOADED_SETTINGS}")
 
 
 def downgrade() -> None:
     """Reload the reworded settings from the seed on next start."""
-    op.execute(f"DELETE FROM platform_settings WHERE key IN ({RELOADED_KEYS})")
+    op.execute(f"DELETE FROM platform_settings WHERE key IN {RELOADED_SETTINGS}")
