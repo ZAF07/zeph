@@ -7,13 +7,14 @@ from langgraph.graph import END, START, StateGraph
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
+from companion.core.conversation_services import ConversationServices
 from companion.core.models import (
     ChannelPhoto,
     ChannelSticker,
     MessageKind,
     MessageToAnswer,
 )
-from companion.core.reply_gate import ConversationServices, Stopped, StopReason
+from companion.core.reply_gate import Stopped, StopReason
 
 
 class ReplyState(TypedDict, total=False):

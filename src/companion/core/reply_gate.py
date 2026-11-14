@@ -3,10 +3,7 @@ from enum import StrEnum
 from uuid import UUID
 
 from companion.core.conversations import ConversationService
-from companion.core.knowledge_retrieval import KnowledgeRetrieval
-from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.models import MessageToAnswer, RiskType
-from companion.core.response_composition import ResponseComposer
 from companion.core.safeguard import Safeguard
 from companion.core.usage import UsageLimiter
 from companion.core.user_data import ChatDataDeletion, DataDeletionAnswer
@@ -96,7 +93,7 @@ class ReplyGate:
             message.sticker,
         )
         risk_type = self._safeguard.assess(
-            conversation_id, message.user_id, message.safeguard_text or None
+            conversation_id, message.user_id, message.safeguard_text
         )
         if risk_type != RiskType.NONE:
             crisis_reply = self._safeguard.respond_to_crisis(message.user_id, risk_type)
@@ -115,27 +112,5 @@ class ReplyGate:
                 conversation_id, message.chat_id, self._usage_limiter.limit_reply()
             )
             return Stopped(StopReason.OVER_LIMIT)
-        return ReplyNeeded(
-            conversation_id,
-            data_deletion_cancelled=data_deletion_answer
-            == DataDeletionAnswer.CANCELLED,
-        )
-
-
-@dataclass(frozen=True)
-class ConversationServices:
-    """The core services the conversation engine runs.
-
-    Attributes:
-        reply_gate: Saves each message and applies the house rules.
-        conversations: Sends composed replies.
-        memory_retrieval: Finds the User Memory that matters for a message.
-        knowledge_retrieval: Finds the Knowledge that may fit a message.
-        response_composer: Writes the Companion's reply.
-    """
-
-    reply_gate: ReplyGate
-    conversations: ConversationService
-    memory_retrieval: MemoryRetrieval
-    knowledge_retrieval: KnowledgeRetrieval
-    response_composer: ResponseComposer
+        data_deletion_cancelled = data_deletion_answer == DataDeletionAnswer.CANCELLED
+        return ReplyNeeded(conversation_id, data_deletion_cancelled)

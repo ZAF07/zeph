@@ -16,6 +16,7 @@ from companion.core.admin_users import AdminUserService
 from companion.core.chat_settings import SettingsTools
 from companion.core.check_in_kinds import CheckInKindService
 from companion.core.check_ins import CheckInService
+from companion.core.conversation_services import ConversationServices
 from companion.core.conversations import ConversationService
 from companion.core.features import FeatureService
 from companion.core.helplines import HelplineService
@@ -49,7 +50,7 @@ from companion.core.ports import (
     WebSearch,
 )
 from companion.core.post_conversation import PostConversationProcessor
-from companion.core.reply_gate import ConversationServices, ReplyGate
+from companion.core.reply_gate import ReplyGate
 from companion.core.response_composition import ResponseComposer
 from companion.core.safeguard import Safeguard
 from companion.core.scheduled_work import ScheduledWork

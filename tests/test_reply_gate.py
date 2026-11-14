@@ -11,22 +11,42 @@ LIMIT_REPLY = "I'm wiped for today, talk tomorrow?"
 
 
 class FakeConversations:
-    """Saves messages and sends replies into a shared call log."""
+    """Saves messages and sends replies, noting each call in a shared log."""
 
     def __init__(self, calls: list[str]) -> None:
-        """Start with no messages sent."""
+        """Start with no replies sent.
+
+        Args:
+            calls: The shared log of calls made, in order.
+        """
         self.calls = calls
         self.sent: list[str] = []
 
     def record_incoming(
-        self, user_id: UUID, chat_id: int, text: str, *args: object
+        self, user_id: UUID, chat_id: int, text: str, *details: object
     ) -> UUID:
-        """Note the message was saved and hand back the Conversation's ID."""
+        """Note that the message was saved.
+
+        Args:
+            user_id: The User who sent it.
+            chat_id: The chat it came from.
+            text: The message.
+            *details: Its kind, photos and sticker, which are ignored.
+
+        Returns:
+            The Conversation's ID.
+        """
         self.calls.append("record_incoming")
         return CONVERSATION_ID
 
     def deliver_at_once(self, conversation_id: UUID, chat_id: int, text: str) -> None:
-        """Note the reply that was sent."""
+        """Note the reply that was sent.
+
+        Args:
+            conversation_id: The Conversation.
+            chat_id: The chat to reply in.
+            text: The reply.
+        """
         self.calls.append("deliver_at_once")
         self.sent.append(text)
 
@@ -35,19 +55,41 @@ class FakeSafeguard:
     """Sees the risk it was told to see."""
 
     def __init__(self, calls: list[str], risk_type: RiskType) -> None:
-        """Remember what risk to report."""
+        """Remember what risk to report.
+
+        Args:
+            calls: The shared log of calls made, in order.
+            risk_type: The risk every message is seen to have.
+        """
         self.calls = calls
         self.risk_type = risk_type
 
     def assess(
         self, conversation_id: UUID, user_id: UUID, newest_text: str | None = None
     ) -> RiskType:
-        """Report the set risk."""
+        """Report the set risk.
+
+        Args:
+            conversation_id: The Conversation.
+            user_id: The User.
+            newest_text: The message as the Safeguard reads it, if different.
+
+        Returns:
+            The set risk.
+        """
         self.calls.append("assess")
         return self.risk_type
 
     def respond_to_crisis(self, user_id: UUID, risk_type: RiskType) -> str:
-        """Hand back the Crisis Reply."""
+        """Write the Crisis Reply.
+
+        Args:
+            user_id: The User in crisis.
+            risk_type: The risk seen.
+
+        Returns:
+            The Crisis Reply.
+        """
         self.calls.append("respond_to_crisis")
         return CRISIS_REPLY
 
@@ -56,17 +98,38 @@ class FakeDataDeletion:
     """Settles a Delete My Data with a set answer."""
 
     def __init__(self, calls: list[str], answer: DataDeletionAnswer) -> None:
-        """Remember what answer to give."""
+        """Remember what answer to give.
+
+        Args:
+            calls: The shared log of calls made, in order.
+            answer: What every message does to a Delete My Data.
+        """
         self.calls = calls
         self.answer = answer
 
     def settle(self, user_id: UUID, chat_id: int, text: str) -> DataDeletionAnswer:
-        """Give the set answer."""
+        """Settle a pending Delete My Data.
+
+        Args:
+            user_id: The User.
+            chat_id: The chat to reply in.
+            text: The message.
+
+        Returns:
+            The set answer.
+        """
         self.calls.append("settle")
         return self.answer
 
     def cancel(self, user_id: UUID) -> DataDeletionAnswer:
-        """Note the cancel."""
+        """Cancel a pending Delete My Data.
+
+        Args:
+            user_id: The User.
+
+        Returns:
+            That a request was cancelled.
+        """
         self.calls.append("cancel")
         return DataDeletionAnswer.CANCELLED
 
@@ -75,17 +138,33 @@ class FakeUsageLimiter:
     """Lets a message through, or not, as told."""
 
     def __init__(self, calls: list[str], within_limit: bool) -> None:
-        """Remember whether the User is within the limit."""
+        """Remember whether the User is within the limit.
+
+        Args:
+            calls: The shared log of calls made, in order.
+            within_limit: Whether every message is within the limit.
+        """
         self.calls = calls
         self.within_limit = within_limit
 
     def claim_message(self, user_id: UUID) -> bool:
-        """Count the message."""
+        """Count the message.
+
+        Args:
+            user_id: The User who sent it.
+
+        Returns:
+            Whether it is within the limit.
+        """
         self.calls.append("claim_message")
         return self.within_limit
 
     def limit_reply(self) -> str:
-        """Hand back the Limit Reply."""
+        """Read the Limit Reply.
+
+        Returns:
+            The Limit Reply.
+        """
         return LIMIT_REPLY
 
 
@@ -95,6 +174,11 @@ def check_message(
     within_limit: bool = True,
 ) -> tuple[Stopped | ReplyNeeded, list[str], list[str]]:
     """Run one message through a ReplyGate built from fakes.
+
+    Args:
+        risk_type: The risk the Safeguard sees.
+        data_deletion_answer: What the message does to a Delete My Data.
+        within_limit: Whether the message is within the Daily Message Limit.
 
     Returns:
         The gate's result, the calls made in order, and the replies sent.
@@ -132,7 +216,7 @@ def test_a_confirmed_deletion_stops_the_reply() -> None:
 
     assert result == Stopped(StopReason.DATA_DELETED)
     assert sent == []
-    assert "claim_message" not in calls
+    assert calls == ["record_incoming", "assess", "settle"]
 
 
 def test_a_message_with_a_pending_deletion_cancels_it_and_needs_a_reply() -> None:
