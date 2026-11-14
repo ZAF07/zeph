@@ -13,6 +13,7 @@ from companion.core.models import (
 )
 from companion.core.photos import PhotoService
 from companion.core.platform_settings import (
+    DASHBOARD_URL_PLACEHOLDER,
     PHOTO_ALBUM_WAIT_SECONDS,
     REPLY_FAILED_MESSAGE,
     UNKNOWN_TELEGRAM_USER_REPLY,
@@ -149,7 +150,8 @@ class IncomingMessageHandler:
                 UNKNOWN_TELEGRAM_USER_REPLY
             )
             self._chat_channel.send_text(
-                message.chat_id, reply.replace("{dashboard_url}", self._dashboard_url)
+                message.chat_id,
+                reply.replace(DASHBOARD_URL_PLACEHOLDER, self._dashboard_url),
             )
             return
 

@@ -318,7 +318,6 @@ class ConversationService:
             conversation_id: The Conversation.
             direction: Who sent it.
             text: The message as the Companion reads it.
-            settings: The platform settings, read once for the reply.
             kind: What kind of message it is.
             sent_at: When it was sent; now if not given.
             photos: The photos it came with.
