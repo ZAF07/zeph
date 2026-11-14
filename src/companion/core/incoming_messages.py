@@ -1,6 +1,6 @@
 import logging
 import threading
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from uuid import UUID
@@ -33,6 +33,18 @@ from companion.core.user_snapshot import UserSnapshotLoader
 logger = logging.getLogger(__name__)
 
 MESSAGE_WAIT_PREFIX = "message:"
+
+
+def message_wait_key(user_id: UUID) -> str:
+    """Name the wait for a User to pause, so each new text restarts it.
+
+    Args:
+        user_id: The User.
+
+    Returns:
+        The timer key for that User's Message wait.
+    """
+    return f"{MESSAGE_WAIT_PREFIX}{user_id}"
 
 
 def readable_text(message: IncomingMessage) -> str:
@@ -176,6 +188,7 @@ class IncomingMessageHandler:
         )
         self._turn_locks_guard = threading.Lock()
         self._pending_messages: dict[UUID, PendingMessage] = {}
+        self._texts_being_checked: Counter[UUID] = Counter()
         self._pending_messages_guard = threading.Lock()
 
     def handle(self, message: IncomingMessage) -> None:
@@ -251,34 +264,82 @@ class IncomingMessageHandler:
     def _screen_text(self, user_id: UUID, message: IncomingMessage) -> None:
         """Save a text and check it for crisis now, then restart the wait.
 
-        A crisis gets the Crisis Reply straight away and drops the rest of
-        the User's Message, so it isn't answered normally.
+        While the text is being checked, the wait ending doesn't answer the
+        Message, so a slow check never splits it. A crisis gets the Crisis
+        Reply straight away and drops the rest of the User's Message, so it
+        isn't answered normally. A check that fails gets the fallback reply
+        and drops the rest of the Message too.
 
         Args:
             user_id: The User who sent it.
             message: The incoming message.
         """
-        with self._turn_lock_for(user_id):
-            settings = self._repositories.platform_settings.load()
-            try:
-                snapshot = self._user_snapshots.load(user_id, settings)
-                text = self._text_to_screen(snapshot, message)
-                result = self._reply_gate.screen(text, snapshot)
-            except Exception:
-                logger.exception("Could not check a text from a User")
-                self._chat_channel.send_text(
-                    message.chat_id, settings.get(REPLY_FAILED_MESSAGE)
-                )
-                return
-            with self._pending_messages_guard:
-                if isinstance(result, Stopped):
-                    self._pending_messages.pop(user_id, None)
+        with self._pending_messages_guard:
+            self._texts_being_checked[user_id] += 1
+        try:
+            with self._turn_lock_for(user_id):
+                settings = self._repositories.platform_settings.load()
+                try:
+                    snapshot = self._user_snapshots.load(user_id, settings)
+                    text = self._text_to_screen(snapshot, message)
+                    result = self._reply_gate.screen(text, snapshot)
+                except Exception:
+                    logger.exception("Could not check a text from a User")
+                    self._drop_pending_message(user_id)
+                    self._chat_channel.send_text(
+                        message.chat_id, settings.get(REPLY_FAILED_MESSAGE)
+                    )
                     return
-                pending = self._pending_messages.setdefault(
-                    user_id, PendingMessage(chat_id=message.chat_id)
-                )
-                pending.add_screened(result.conversation_id, text.text)
+                if isinstance(result, Stopped):
+                    self._drop_pending_message(user_id)
+                    return
+                with self._pending_messages_guard:
+                    pending = self._pending_messages.setdefault(
+                        user_id, PendingMessage(chat_id=message.chat_id)
+                    )
+                    pending.add_screened(result.conversation_id, text.text)
+        finally:
+            with self._pending_messages_guard:
+                self._texts_being_checked[user_id] -= 1
+                if not self._texts_being_checked[user_id]:
+                    del self._texts_being_checked[user_id]
         self._restart_wait(user_id, settings)
+
+    def _drop_pending_message(self, user_id: UUID) -> None:
+        """Forget what the User has sent so far, so it isn't answered normally.
+
+        Args:
+            user_id: The User.
+        """
+        with self._pending_messages_guard:
+            self._pending_messages.pop(user_id, None)
+
+    def _take_pending_message(self, user_id: UUID) -> PendingMessage | None:
+        """Take the User's Message to answer, unless a text of theirs is being checked.
+
+        Args:
+            user_id: The User.
+
+        Returns:
+            The Message, or None if there is none or a text is still being
+            checked; that text restarts the wait once checked.
+        """
+        with self._pending_messages_guard:
+            if self._texts_being_checked[user_id]:
+                return None
+            return self._pending_messages.pop(user_id, None)
+
+    def _is_checking_a_text(self, user_id: UUID) -> bool:
+        """Tell whether a text from the User is waiting for or being checked.
+
+        Args:
+            user_id: The User.
+
+        Returns:
+            True while any of their texts is not yet checked.
+        """
+        with self._pending_messages_guard:
+            return bool(self._texts_being_checked[user_id])
 
     def _restart_wait(self, user_id: UUID, settings: PlatformSettings) -> None:
         """Start the wait for the User to pause, restarting any wait under way.
@@ -288,7 +349,7 @@ class IncomingMessageHandler:
             settings: The platform settings, which say how long to wait.
         """
         self._timer.start(
-            f"{MESSAGE_WAIT_PREFIX}{user_id}",
+            message_wait_key(user_id),
             settings.get(MESSAGE_WAIT_SECONDS),
             lambda: self._answer_message(user_id),
         )
@@ -306,9 +367,10 @@ class IncomingMessageHandler:
         Args:
             user_id: The User who paused.
         """
+        if self._is_checking_a_text(user_id):
+            return
         with self._turn_lock_for(user_id):
-            with self._pending_messages_guard:
-                pending = self._pending_messages.pop(user_id, None)
+            pending = self._take_pending_message(user_id)
             if pending is None:
                 return
             settings = self._repositories.platform_settings.load()

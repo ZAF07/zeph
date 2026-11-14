@@ -41,11 +41,11 @@ A photo a User sent the Companion that matters to them, picked when the Conversa
 _Avoid_: Image, picture, attachment, media
 
 **Message**:
-Everything a User sends the Companion before pausing: one text, several texts in a row, or an Album. The Companion waits a few seconds (set by Admins) after the last one, then answers them together with one reply, which may go out as several short texts. It counts as one toward the Daily Message Limit. The Safeguard still checks each text as it arrives, so a crisis is never held back by the wait.
+Everything a User sends the Companion before pausing: one text, several texts in a row, or an Album. The Companion waits a few seconds (set by Admins) after the last one, then answers them together with one reply, which may go out as several short texts. It counts as one toward the Daily Message Limit. The Safeguard still checks each text as it arrives, so a crisis is never held back by the wait; a crisis gets the Crisis Reply at once and the rest of that Message isn't answered normally. A text sent while a reply is being written starts the next Message.
 _Avoid_: Burst, batch, text (a text is one piece of a Message)
 
 **Album**:
-Several photos a User sends at once. The Companion answers them as one message with one reply, and they count as one message toward the Daily Message Limit. It looks at only the first few, as many as Admins set, and says when it didn't look at the rest.
+Several photos a User sends at once. An Album is one text of a Message, so it is answered with everything else sent before the pause, in one reply, counting once toward the Daily Message Limit. It is described and checked by the Safeguard once the wait ends. The Companion looks at only the first few photos, as many as Admins set, and says when it didn't look at the rest.
 _Avoid_: Media group, batch, gallery
 
 **Photo Viewing**:

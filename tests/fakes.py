@@ -414,7 +414,8 @@ class ScriptedChatModel:
     and retrieval to "none", so tests about replies don't have to script
     them too. Set
     `before_next_reply` to run something once while the next reply is being
-    "written", like a User acting during a slow model call.
+    "written", like a User acting during a slow model call, and
+    `before_next_safeguard` likewise while the next text is being checked.
     """
 
     def __init__(
@@ -452,6 +453,7 @@ class ScriptedChatModel:
         self.call_order: list[str] = []
         self.delay_seconds = 0.0
         self.before_next_reply: Callable[[], None] | None = None
+        self.before_next_safeguard: Callable[[], None] | None = None
 
     def script(self, *replies: str | Exception | ToolCall) -> None:
         """Queue replies to return, one per call, in order.
@@ -524,6 +526,12 @@ class ScriptedChatModel:
         if self.safeguard_prompt and instructions == self.safeguard_prompt:
             self.safeguard_calls.append(call)
             self.call_order.append("safeguard")
+            if self.before_next_safeguard is not None:
+                before_next, self.before_next_safeguard = (
+                    self.before_next_safeguard,
+                    None,
+                )
+                before_next()
             answer = (
                 self._safeguard_answers.pop(0) if self._safeguard_answers else "none"
             )

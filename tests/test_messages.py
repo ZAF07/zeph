@@ -1,4 +1,5 @@
 import threading
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -182,3 +183,42 @@ def test_a_text_sent_while_a_reply_is_written_starts_a_new_message_answered_afte
         "first reply",
         "second reply",
     ]
+
+
+def test_a_text_that_fails_to_be_checked_drops_the_rest_of_the_message(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    timer: FakeTimer,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script_safeguard("none", RuntimeError("model down"))
+
+    post_texts(client, "hey", "rough day")
+    timer.end_message_waits()
+
+    assert chat_model.calls == []
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
+        seeded_settings["reply_failed_message"]
+    ]
+
+
+def test_the_wait_ending_while_a_text_is_checked_leaves_it_in_the_same_message(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    timer: FakeTimer,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script("oh no")
+    post_texts(client, "hey")
+    chat_model.before_next_safeguard = timer.end_message_waits
+
+    post_texts(client, "rough day")
+    timer.end_message_waits()
+
+    [reply_call] = chat_model.calls
+    assert reply_call.history[-1].text == "hey\nrough day"
