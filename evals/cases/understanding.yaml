@@ -1,0 +1,274 @@
+# Understanding eval. Each case gives the person a made-up User Memory and,
+# optionally, messages already in an open Conversation. Then its Messages are
+# sent one by one through the Telegram webhook, and each Message's
+# Understanding (and, for rules, Zeph's reply) is checked.
+#
+# `now` is when the first Message is sent (UTC, which is also the person's
+# time zone). 2026-11-13 is a Friday. A case can set its own `now`.
+#
+# memory (every part optional):
+#   portrait: the User Portrait
+#   items: {<Memory Category name>: [<Memory Item>, ...]}   e.g. Goals
+#   summaries: [{days_ago, summary, mood}]   earlier Conversations
+#   threads:                                 Life Threads
+#     - title: Falling-out with Mei          checks name a Thread by its title;
+#                                            keep it out of the other memory
+#       story: ...
+#       people: [Mei, sister]                found when a message names one
+#       open: true                           default true
+#       updated_days_ago: 270
+#       raised_days_ago: 5                   when Zeph last brought it up
+#       reaction: brushed_off                engaged | brushed_off | asked_to_drop
+#       raised_in_this_conversation: true    needs `earlier` lines
+#   curiosities: [{question, why, not_before_days_ago, sensitivity}]
+#                not_before_days_ago: 0 is today, 1 yesterday, null any time
+#   knowledge_documents: [{title, source, tradition, when_it_helps, text}]
+#
+# earlier: [{person: ...}, {zeph: ...}]   already in the open Conversation
+#
+# messages: [{text, expect}]. Everything in expect is optional:
+#   need: [<Need>, ...]          the Needs that may be picked
+#   found: [<Thread title>]      the Companion is reminded of it
+#   raised: [<Thread title>]     the Understanding brings it up
+#   not_raised: [<Thread title>] it doesn't
+#   curiosity_raised: true|false
+#   asked_why: true|false        the reply is told to gently ask why
+#   knowledge: true|false        Knowledge documents are chosen
+#   rules: [<rule id>]           the Judge checks Zeph's reply against these
+
+now: 2026-11-13T18:30:00
+
+rules:
+  no_fixing: >-
+    Zeph's last reply doesn't try to fix it: no advice, tips, solutions,
+    silver linings or lessons. Reflecting back what happened and how it feels,
+    and a short question that invites more, are fine.
+  raises_sister_naturally: >-
+    Zeph's last reply brings up the old falling-out with Mei (the person's
+    sister), or asks how things are with her now, in a natural and caring way,
+    the way a friend who remembers would. It doesn't recite the old story or
+    sound like it is reading from notes.
+  leaves_sister_alone: >-
+    Zeph's last reply doesn't bring up the old falling-out or argument with
+    Mei. Mentioning the wedding itself is fine.
+  no_repeat_falling_out: >-
+    Zeph's last reply doesn't ask again about the falling-out with Mei or how
+    things are with her now, which it already asked earlier in this
+    conversation. Talking about the toast is fine.
+  leaves_dad_alone: >-
+    Zeph's last reply doesn't bring up how things have been with the person's
+    dad since the divorce, or any old tension with him. Talking about the
+    dinner or the food is fine.
+  gentle_probe: >-
+    Zeph's last reply gently asks what's behind how they feel, once, warmly
+    and in its own words, like a friend would. It doesn't fire off several
+    questions or sound like an interview or a therapist.
+  asks_about_presentation: >-
+    Zeph's last reply asks how the presentation to the board went, naturally
+    and warmly.
+  no_teaching: >-
+    Zeph's last reply doesn't quote or teach any idea, teaching, philosophy,
+    story or technique.
+
+cases:
+  - id: rant-is-heard
+    memory: &maya
+      portrait: >-
+        Maya is 34, a nurse in Melbourne who grew up in Penang. She works
+        long shifts and is close to a few old friends. She likes to be
+        listened to before being given ideas; pep talks annoy her. Walks by
+        the river help her think.
+      items:
+        Goals: [Run three times a week]
+        What helps: [Long walks by the river after a hard shift]
+      summaries:
+        - days_ago: 4
+          summary: Maya talked about a tiring run of night shifts.
+          mood: tired
+    messages:
+      - text: >-
+          my landlord STILL hasn't fixed the heating. it's been three weeks
+          and I'm freezing in my own flat. I'm so done with him
+        expect:
+          need: [Be heard]
+          rules: [no_fixing]
+
+  - id: advice-is-asked-for
+    memory: *maya
+    messages:
+      - text: >-
+          should I take the job offer in Singapore or stay where I am? the pay
+          is 30% more but I'd be leaving my friends. what would you do?
+        expect:
+          need: [Advice]
+
+  - id: small-talk
+    memory: *maya
+    messages:
+      - text: haha just saw a dog wearing tiny yellow rain boots outside the café
+        expect:
+          need: [Just chatting]
+
+  - id: goal-slip
+    memory: *maya
+    messages:
+      - text: skipped my runs again this week. third week in a row tbh
+        expect:
+          need: [Accountability]
+
+  - id: reminded-of-sister
+    memory:
+      portrait: >-
+        Maya is 34, a nurse in Melbourne who grew up in Penang. Family
+        matters a lot to her, even when it is hard. Pep talks annoy her.
+      threads:
+        - &mei
+          title: Falling-out with Mei
+          story: >-
+            Maya and her younger sister Mei had a big argument about who
+            should care for their mum after her fall. Mei said Maya had
+            abandoned the family by moving away. They stopped talking, and
+            Maya said she missed her but didn't know how to reach out.
+          people: [Mei, sister]
+          updated_days_ago: 270
+    messages:
+      - text: my sister's wedding is next week
+        expect:
+          found: [Falling-out with Mei]
+          raised: [Falling-out with Mei]
+          rules: [raises_sister_naturally]
+
+  - id: sister-left-alone-while-struggling
+    memory:
+      portrait: >-
+        Maya is 34, a nurse in Melbourne who grew up in Penang. Family
+        matters a lot to her, even when it is hard. Pep talks annoy her.
+      threads: [*mei]
+    messages:
+      - text: >-
+          everything is falling apart. got told today my contract won't be
+          renewed, and I still have to fly out for my sister's wedding next
+          week. I can't think straight
+        expect:
+          found: [Falling-out with Mei]
+          not_raised: [Falling-out with Mei]
+          rules: [leaves_sister_alone]
+
+  - id: sister-not-raised-twice
+    memory:
+      portrait: >-
+        Maya is 34, a nurse in Melbourne who grew up in Penang. Family
+        matters a lot to her, even when it is hard.
+      threads:
+        - <<: *mei
+          raised_in_this_conversation: true
+    earlier:
+      - person: my sister's wedding is next week
+      - zeph: >-
+          oh wow, next week already! how are things with Mei these days,
+          after everything with your mum?
+      - person: better actually, we talked a bit in the spring
+      - zeph: I'm really glad you two found your way back to talking
+    messages:
+      - text: she asked me to give a toast at the wedding though. kinda nervous
+        expect:
+          found: [Falling-out with Mei]
+          not_raised: [Falling-out with Mei]
+          rules: [no_repeat_falling_out]
+
+  - id: brushed-off-not-raised-too-soon
+    memory:
+      portrait: >-
+        Maya is 34, a nurse in Melbourne who grew up in Penang. Her parents
+        divorced last year.
+      threads:
+        - title: Things with Dad since the divorce
+          story: >-
+            Since her parents' divorce Maya has felt her dad leans on her too
+            much. She feels guilty when she doesn't call and resentful when
+            she does.
+          people: [Dad, father]
+          updated_days_ago: 40
+          raised_days_ago: 5
+          reaction: brushed_off
+    messages:
+      - text: had dinner at my dad's last night, he made his famous laksa
+        expect:
+          found: [Things with Dad since the divorce]
+          not_raised: [Things with Dad since the divorce]
+          rules: [leaves_dad_alone]
+
+  - id: strong-mood-unknown-cause
+    memory: *maya
+    messages:
+      - text: >-
+          honestly I'm in the BEST mood today, like I'm buzzing and can't sit
+          still haha
+        expect:
+          asked_why: true
+          rules: [gentle_probe]
+
+  - id: curiosity-raised-once
+    memory:
+      portrait: >-
+        Maya is 34, a nurse in Melbourne who grew up in Penang. She is
+        studying part time for a ward manager role.
+      summaries:
+        - days_ago: 3
+          summary: >-
+            Maya was nervous about presenting her ward's staffing numbers to
+            the hospital board on Thursday.
+          mood: anxious
+      curiosities:
+        - question: How did the presentation to the board go on Thursday?
+          why: She was nervous about presenting her ward's numbers to the board.
+          not_before_days_ago: 0
+    messages:
+      - text: finally friday. what a week
+        expect:
+          curiosity_raised: true
+          rules: [asks_about_presentation]
+      - text: yeah it was a lot. anyway I'm making pasta tonight
+        expect:
+          curiosity_raised: false
+
+  - id: knowledge-for-a-reflective-question
+    memory: &maya-with-arrow
+      portrait: >-
+        Maya is 34, a nurse in Melbourne. She is hard on herself and replays
+        small mistakes for days.
+      knowledge_documents:
+        -
+          title: The Second Arrow
+          source: Owner's notes
+          tradition: Buddhism
+          when_it_helps: >-
+            When they wonder why they keep making a hard moment worse with
+            their own judgement of it, or ask how to stop replaying a mistake.
+          text: >-
+            The Second Arrow. When something painful happens, it is like being
+            struck by an arrow. That first arrow is the event itself: the
+            mistake, the loss, the harsh word. Then we often shoot a second
+            arrow into ourselves: "I'm so stupid, this always happens, everyone
+            saw." The first arrow can't always be avoided. The second one is
+            ours to put down. When you notice yourself replaying it, name it
+            softly, "second arrow", and come back to what is in front of you.
+    messages:
+      - text: >-
+          why do I always beat myself up so much after a small mistake at
+          work? like I replay it for days
+        expect:
+          need: [Think it through]
+          knowledge: true
+
+  - id: no-knowledge-for-a-vent
+    memory: *maya-with-arrow
+    messages:
+      - text: >-
+          ugh I made one dumb mistake in a handover today and the charge nurse
+          called it out in front of everyone. so embarrassing. I just want to
+          scream
+        expect:
+          need: [Be heard]
+          knowledge: false
+          rules: [no_fixing, no_teaching]
