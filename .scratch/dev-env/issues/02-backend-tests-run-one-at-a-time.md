@@ -1,6 +1,6 @@
 # 02 — Backend tests take about 12 minutes because they run one at a time
 
-Status: needs-triage
+Status: in-progress
 
 ## Symptom
 
@@ -33,3 +33,15 @@ Run `uv run pytest --durations=20` first to see whether a few slow tests are mos
 - [ ] Every test still passes, run in parallel and run on its own
 - [ ] `make check` (or whatever runs the full suite) uses the faster way
 - [ ] Quality gates pass: `uv run pytest`, `uv run ruff check`, `uv run ruff format --check`, `uv run mypy src`
+
+## Comments
+
+Diagnosis, 14 Nov 2026 (worktree `ai-chat-companion-dev-env-02`, 10 cores):
+
+- **Baseline, one at a time:** 834 passed in 288s (4m48s), load about 7. The 12 minutes in the symptom was mostly other agents' runs competing for the machine.
+- **No slow outliers.** `--durations=40`: the slowest is the 7s Postgres start, then nothing over 1.2s. Time is spread across 834 tests at about 0.35s each, with only 38% CPU used (waiting on the database). Per-test setup on a quiet machine is about 0.3s: TRUNCATE 0.13s, building the app 0.1s, seeding 0.04s.
+- **Plain `-n auto` broke:** 349 passed, 485 errors in 53s. Each of the 10 workers started its own Postgres plus a Ryuk cleanup container at once; some Ryuk containers were not ready in time (`ConnectionError: Port mapping for container ... and port 8080 is not available`), and the Postgres containers of those workers were left running.
+- **Confirmed cause and fix:** tests ran one at a time; running them in parallel needs one shared Postgres, not one per worker. `tests/conftest.py` now starts one Postgres in the main pytest process (`pytest_configure`) and hands its URL to each xdist worker (`pytest_configure_node`); each worker makes its own database `companion_test_<worker id>` and migrates it. Migration tests downgrade only their own worker's database.
+- `pytest-xdist` added to dev dependencies; `-n auto` is in pytest's `addopts`, so plain `uv run pytest` and `make check` run in parallel. `make contract` and `make eval` pass `-n 0`: they call real services.
+- **After, in parallel:** 836 passed in 72.5s, 92.5s and 77.9s on three runs (load 6 to 10). No test containers left afterwards.
+- A small run pays about 3s for starting workers (2 files: 3.1s with `-n 0`, 6.0s with `-n auto`). Use `-n 0` for quick single-file runs.

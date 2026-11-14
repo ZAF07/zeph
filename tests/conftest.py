@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 import yaml
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, create_engine, text
+from sqlalchemy import Engine, create_engine, make_url, text
 from testcontainers.community.postgres import PostgresContainer
 
 from companion.adapters.pgvector.vector_store import PgvectorKnowledgeVectorStore
@@ -38,6 +38,7 @@ WEBHOOK_SECRET = "test-webhook-secret"
 BOT_USERNAME = "zeph_test_bot"
 DASHBOARD_URL = "http://dashboard.test"
 INITIAL_ADMIN_EMAIL = "owner@example.com"
+POSTGRES_CONTAINER = pytest.StashKey[PostgresContainer]()
 os.environ.setdefault("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/var/run/docker.sock")
 
 SEED_DIR = Path(__file__).parent.parent / "src/companion/seed"
@@ -59,13 +60,88 @@ class CompanionTestClient(TestClient):
         self.timer = timer
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    """Start one throwaway Postgres with pgvector for the whole test run.
+
+    Only the main pytest process starts it. Parallel workers (pytest-xdist)
+    are handed its URL, so a run uses one container however many workers
+    it has.
+
+    Args:
+        config: This pytest process's config, which keeps the container.
+    """
+    if hasattr(config, "workerinput"):
+        return
+    postgres = PostgresContainer("pgvector/pgvector:pg16", driver="psycopg")
+    postgres.start()
+    config.stash[POSTGRES_CONTAINER] = postgres
+
+
+def pytest_unconfigure(config: pytest.Config) -> None:
+    """Stop the test run's Postgres once the run is over.
+
+    Args:
+        config: This pytest process's config, which keeps the container.
+    """
+    postgres = config.stash.get(POSTGRES_CONTAINER, None)
+    if postgres is not None:
+        postgres.stop()
+
+
+@pytest.hookimpl(optionalhook=True)
+def pytest_configure_node(node: Any) -> None:
+    """Hand a starting pytest-xdist worker the test run's Postgres URL.
+
+    Args:
+        node: The worker being started.
+    """
+    node.workerinput["server_url"] = server_url(node.config)
+
+
+def server_url(config: pytest.Config) -> str:
+    """The URL of the test run's Postgres, as seen from this process.
+
+    Args:
+        config: This pytest process's config.
+
+    Returns:
+        The URL of the Postgres the main process started.
+    """
+    if hasattr(config, "workerinput"):
+        url: str = config.workerinput["server_url"]
+        return url
+    return config.stash[POSTGRES_CONTAINER].get_connection_url()
+
+
+def worker_database_name(worker_id: str) -> str:
+    """Name of the database one pytest process runs its tests against.
+
+    Args:
+        worker_id: The pytest-xdist worker id, or "master" when not parallel.
+
+    Returns:
+        A database name only this process uses.
+    """
+    return f"companion_test_{worker_id}"
+
+
 @pytest.fixture(scope="session")
-def database_url() -> Iterator[str]:
-    """Start a throwaway Postgres with pgvector and run migrations once."""
-    with PostgresContainer("pgvector/pgvector:pg16", driver="psycopg") as postgres:
-        url = postgres.get_connection_url()
-        migrate(url)
-        yield url
+def database_url(request: pytest.FixtureRequest, worker_id: str) -> str:
+    """Make this process its own empty database and run migrations once.
+
+    Each parallel worker gets its own database in the shared Postgres, so
+    tests in different workers never see each other's data.
+    """
+    url = make_url(server_url(request.config))
+    database_name = worker_database_name(worker_id)
+    server = create_engine(url, isolation_level="AUTOCOMMIT")
+    with server.connect() as connection:
+        connection.execute(text(f'DROP DATABASE IF EXISTS "{database_name}"'))
+        connection.execute(text(f'CREATE DATABASE "{database_name}"'))
+    server.dispose()
+    database_url = url.set(database=database_name).render_as_string(hide_password=False)
+    migrate(database_url)
+    return database_url
 
 
 @pytest.fixture
