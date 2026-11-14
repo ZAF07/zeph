@@ -48,22 +48,24 @@ class ReplyService:
             message: The message to answer.
             snapshot: The User who sent it, read once as the reply starts.
         """
-        checked = self._reply_gate.check(message, snapshot)
-        if isinstance(checked, Stopped):
+        gate_result = self._reply_gate.check(message, snapshot)
+        if isinstance(gate_result, Stopped):
             return
-        memory = self._memory_retrieval.recall(snapshot, checked.conversation_id)
-        knowledge = self._knowledge_retrieval.recall(snapshot, checked.conversation_id)
+        memory = self._memory_retrieval.recall(snapshot, gate_result.conversation_id)
+        knowledge = self._knowledge_retrieval.recall(
+            snapshot, gate_result.conversation_id
+        )
         reply = self._response_composer.compose(
-            checked.conversation_id,
+            gate_result.conversation_id,
             snapshot,
             memory.text,
             knowledge,
-            data_deletion_cancelled=checked.data_deletion_cancelled,
+            data_deletion_cancelled=gate_result.data_deletion_cancelled,
             shared_photo_ids=memory.shared_photo_ids,
         )
         self._conversations.deliver_reply(
             message.user_id,
-            checked.conversation_id,
+            gate_result.conversation_id,
             message.chat_id,
             reply.parts,
             snapshot.settings,
