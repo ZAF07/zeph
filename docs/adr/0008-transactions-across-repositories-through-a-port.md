@@ -4,7 +4,7 @@ Core gets one database transaction across several repositories through a transac
 
 ## Consequences
 
-- Every repository that holds per-User data has `delete_for_user(user_id)`. Delete My Data and Account Deletion call them all inside one transaction, and a test fails if a per-User table isn't covered.
+- Every repository that holds per-User rows has `delete_for_user(user_id)`. Account Deletion calls them all inside one transaction; Delete My Data calls all but Usage, Safeguard Events and Feature Switches, which stay with the account. A test fails if a table with a `user_id` column isn't cleared by Delete My Data and isn't on the list of tables it keeps.
 - Ports stay free of SQL: the transaction and locks are port methods; the Postgres adapter implements them.
 - One `LastAdminError`, in core.
 - Any future "all or nothing" change uses the same port rather than a new combined SQL method.
