@@ -26,6 +26,7 @@ const hello: CheckInKindOverview = {
   name: "A casual hello",
   description: "Just checking how you are.",
   sends_shared_photo: false,
+  raises_curiosity: false,
   sent_last_30_days: 12,
 };
 
@@ -34,6 +35,7 @@ const followUp: CheckInKindOverview = {
   name: "A follow-up",
   description: "On something you shared.",
   sends_shared_photo: false,
+  raises_curiosity: false,
   sent_last_30_days: 1,
 };
 
@@ -42,7 +44,17 @@ const lookBack: CheckInKindOverview = {
   name: "A look back at a photo",
   description: "One of the photos you shared.",
   sends_shared_photo: true,
+  raises_curiosity: false,
   sent_last_30_days: 2,
+};
+
+const wondering: CheckInKindOverview = {
+  id: "kind-wondering",
+  name: "Something I've been wondering",
+  description: "A question about something you mentioned.",
+  sends_shared_photo: false,
+  raises_curiosity: true,
+  sent_last_30_days: 3,
 };
 
 async function findCard(name: string) {
@@ -87,6 +99,26 @@ describe("CheckInKindsManager", () => {
     const helloCard = await findCard("A casual hello");
     expect(
       helloCard.queryByText("Sends a Shared Photo"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("says a Kind asks a Curiosity and when it is sent", async () => {
+    apiClient.listCheckInKinds.mockResolvedValue([hello, wondering]);
+    renderWithQueries(<CheckInKindsManager />);
+
+    const card = await findCard("Something I've been wondering");
+    expect(
+      card.getByText("Asks something Zeph has been wondering"),
+    ).toBeInTheDocument();
+    expect(
+      card.getByText(
+        "Only when a Curiosity is due, within the weekly Curiosity Check-in limit",
+      ),
+    ).toBeInTheDocument();
+    expect(card.queryByText("Sends a Shared Photo")).not.toBeInTheDocument();
+    const helloCard = await findCard("A casual hello");
+    expect(
+      helloCard.queryByText("Asks something Zeph has been wondering"),
     ).not.toBeInTheDocument();
   });
 

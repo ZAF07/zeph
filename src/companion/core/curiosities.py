@@ -107,6 +107,23 @@ def format_date(day: date) -> str:
     return f"{day.day} {day:%b %Y}"
 
 
+def due_curiosities(waiting: Sequence[Curiosity], today: date) -> list[Curiosity]:
+    """Keep the waiting Curiosities whose day has come.
+
+    Args:
+        waiting: A User's waiting Curiosities.
+        today: The day it is in the User's time zone.
+
+    Returns:
+        Those with no "not before" day or whose day has come, in order.
+    """
+    return [
+        curiosity
+        for curiosity in waiting
+        if curiosity.not_before is None or curiosity.not_before <= today
+    ]
+
+
 def describe_due_curiosities(due: DueCuriosities, time_zone: str | None) -> str:
     """Write the due Curiosities as the Understanding model reads them.
 
@@ -188,11 +205,7 @@ class CuriosityRaiser:
         raised_here = len(store.list_raised_in(conversation_id))
         if raised_here >= per_conversation:
             return DueCuriosities((), raised_here, per_conversation)
-        waiting = [
-            curiosity
-            for curiosity in store.list_waiting(snapshot.user.id)
-            if curiosity.not_before is None or curiosity.not_before <= snapshot.today
-        ]
+        waiting = due_curiosities(store.list_waiting(snapshot.user.id), snapshot.today)
         return DueCuriosities(
             offered=tuple(
                 NumberedCuriosity(number, curiosity)

@@ -67,6 +67,7 @@ def test_admin_sees_the_check_in_kinds_in_order_with_recent_sends(
         ("A present-moment pause", 0),
         ("A thought to reflect on", 0),
         ("A look back at a photo", 0),
+        ("Something I've been wondering", 0),
     ]
     assert not any("allowed_without_user_memory" in kind for kind in kinds)
     assert kinds[0]["description"] == "Just checking how you are."
@@ -196,7 +197,7 @@ def test_the_users_check_ins_page_lists_the_kinds_that_may_be_sent_to_them(
         "name": "A casual hello",
         "description": "Just checking how you are.",
     }
-    assert len(kinds) == 5
+    assert len(kinds) == 6
 
     client.patch("/api/me", json={"user_memory_enabled": False}, headers=maya)
 

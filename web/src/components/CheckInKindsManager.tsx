@@ -119,6 +119,7 @@ export function CheckInKindsManager() {
               isNew={false}
               sentLast30Days={kind.sent_last_30_days}
               sendsSharedPhoto={kind.sends_shared_photo}
+              raisesCuriosity={kind.raises_curiosity}
               onSave={(input) => save(kind, input)}
               onRemove={() => remove(kind)}
             />

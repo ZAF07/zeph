@@ -358,6 +358,7 @@ def test_admin_sees_the_look_back_kind_and_can_edit_and_remove_it(
         False,
         False,
         True,
+        False,
     ]
 
     edited = client.put(
@@ -472,6 +473,7 @@ def test_an_existing_install_gets_the_look_back_kind_last(
         ("A hello", False, 0),
         ("A nudge", False, 3),
         (LOOK_BACK, True, 4),
+        ("Something I've been wondering", False, 5),
     ]
 
 
@@ -492,4 +494,5 @@ def test_a_fresh_install_gets_every_kind_from_the_seed_file(
         ("A present-moment pause", False),
         ("A thought to reflect on", False),
         (LOOK_BACK, True),
+        ("Something I've been wondering", False),
     ]

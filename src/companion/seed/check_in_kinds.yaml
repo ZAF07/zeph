@@ -4,7 +4,11 @@
 # on their Check-ins page. Every Kind can be sent whether or not User Memory
 # is on. A Kind with `sends_shared_photo: true` sends one of the User's Shared
 # Photos with its message; it is offered only to Users with Photo Viewing
-# working and at least one Shared Photo. Admins can't change that flag.
+# working and at least one Shared Photo. A Kind with `raises_curiosity: true`
+# asks one of the User's Curiosities; it is offered only to Users with
+# Curiosities working, a Curiosity whose day has come, and fewer than
+# `curiosity_check_ins_per_week` such Check-ins in the last 7 days. Admins
+# can't change either flag.
 
 - name: A casual hello
   description: Just checking how you are.
@@ -21,3 +25,7 @@
 - name: A look back at a photo
   description: One of the photos you shared, sent back with a word about it.
   sends_shared_photo: true
+
+- name: Something I've been wondering
+  description: A question about something you mentioned, asked when the time is right.
+  raises_curiosity: true

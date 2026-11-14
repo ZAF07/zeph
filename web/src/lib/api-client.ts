@@ -438,11 +438,13 @@ export type CheckInKindInput = {
 
 /**
  * A Check-in Kind as Admins manage it. `sends_shared_photo` marks a Kind
- * that sends one of the User's Shared Photos; Admins can't change it.
+ * that sends one of the User's Shared Photos and `raises_curiosity` one
+ * that asks one of their Curiosities; Admins can't change either.
  */
 export type CheckInKind = CheckInKindInput & {
   id: string;
   sends_shared_photo: boolean;
+  raises_curiosity: boolean;
 };
 
 /** A Check-in Kind and how many Check-ins of it were sent in 30 days. */

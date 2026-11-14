@@ -288,12 +288,17 @@ class SafeguardEventsResponse(BaseModel):
 
 
 class CheckInKindResponse(BaseModel):
-    """A Check-in Kind as Admins see it, with whether it sends a Shared Photo."""
+    """A Check-in Kind as Admins see it, with its fixed behaviour.
+
+    `sends_shared_photo` and `raises_curiosity` say whether it sends a
+    Shared Photo or asks a Curiosity; Admins can't change them.
+    """
 
     id: str
     name: str
     description: str
     sends_shared_photo: bool
+    raises_curiosity: bool
 
 
 class CheckInKindOverviewResponse(CheckInKindResponse):
@@ -696,6 +701,7 @@ def to_check_in_kind_response(kind: CheckInKind) -> CheckInKindResponse:
         name=kind.name,
         description=kind.description,
         sends_shared_photo=kind.sends_shared_photo,
+        raises_curiosity=kind.raises_curiosity,
     )
 
 

@@ -39,6 +39,7 @@ const settings: AdminSettings = {
   life_thread_brushed_off_wait_days: seeded(14),
   curiosities_per_conversation: seeded(1),
   curiosities_waiting_limit: seeded(10),
+  curiosity_check_ins_per_week: seeded(1),
   knowledge_closeness_percent: seeded(60),
   photo_retry_count: seeded(2),
   photo_album_max_photos: seeded(5),
@@ -219,18 +220,23 @@ describe("PlatformSettingsForm", () => {
       "Most Curiosities raised per Conversation",
     );
     const waiting = screen.getByLabelText("Most Curiosities waiting at once");
+    const perWeek = screen.getByLabelText("Most Curiosity Check-ins per week");
     expect(raised).toHaveValue(1);
     expect(waiting).toHaveValue(10);
+    expect(perWeek).toHaveValue(1);
 
     await user.clear(raised);
     await user.type(raised, "2");
     await user.clear(waiting);
     await user.type(waiting, "20");
+    await user.clear(perWeek);
+    await user.type(perWeek, "3");
     await user.click(screen.getByRole("button", { name: "Save settings" }));
 
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       curiosities_per_conversation: 2,
       curiosities_waiting_limit: 20,
+      curiosity_check_ins_per_week: 3,
     });
   });
 

@@ -13,11 +13,13 @@ import { ApiError, type CheckInKindInput } from "@/lib/api-client";
 /**
  * One Check-in Kind as an editable card: name, description, how often it
  * was sent, Save and Remove. A new Kind's card has Add and Cancel instead.
- * A Kind that sends a Shared Photo says so, and who it goes to.
+ * A Kind that sends a Shared Photo or asks a Curiosity says so, and when
+ * it goes out.
  *
  * @param props - `initial` fills the card; `isNew` marks a Kind not saved
  *   yet; `sentLast30Days` is the send count; `sendsSharedPhoto` marks a
- *   Kind that sends a Shared Photo; `onSave` saves and rejects if the
+ *   Kind that sends a Shared Photo; `raisesCuriosity` marks a Kind that
+ *   asks a Curiosity; `onSave` saves and rejects if the
  *   backend refuses; `onRemove` removes the Kind, or `onCancel` drops a new
  *   one.
  * @returns The card.
@@ -27,6 +29,7 @@ export function CheckInKindCard({
   isNew,
   sentLast30Days,
   sendsSharedPhoto = false,
+  raisesCuriosity = false,
   onSave,
   onRemove,
   onCancel,
@@ -35,6 +38,7 @@ export function CheckInKindCard({
   isNew: boolean;
   sentLast30Days: number;
   sendsSharedPhoto?: boolean;
+  raisesCuriosity?: boolean;
   onSave: (kind: CheckInKindInput) => Promise<void>;
   onRemove?: () => Promise<void>;
   onCancel?: () => void;
@@ -117,6 +121,17 @@ export function CheckInKindCard({
           <span className="font-medium">Sends a Shared Photo</span>
           <span className="text-caption text-ink-muted">
             Only for Users with Photo Viewing on and a Shared Photo
+          </span>
+        </div>
+      ) : null}
+      {raisesCuriosity ? (
+        <div className="flex min-w-0 flex-col border-t border-line px-5 py-3">
+          <span className="font-medium">
+            Asks something Zeph has been wondering
+          </span>
+          <span className="text-caption text-ink-muted">
+            Only when a Curiosity is due, within the weekly Curiosity Check-in
+            limit
           </span>
         </div>
       ) : null}

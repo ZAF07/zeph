@@ -519,6 +519,10 @@ curiosities_per_conversation: 1
 # makes more, the oldest waiting ones are closed.
 curiosities_waiting_limit: 10
 
+# How many "Something I've been wondering" Check-ins a User can get in any 7
+# days. That Check-in Kind asks one of their Curiosities whose day has come.
+curiosity_check_ins_per_week: 1
+
 # Knowledge. When the Understanding chooses Knowledge documents, its search
 # phrase is matched against those documents only, and at most this many of the
 # closest passages go into the reply.

@@ -278,10 +278,17 @@ class ConversationService:
     def _start_with_check_in(self, conversation_id: UUID, check_in: CheckIn) -> None:
         """Save a Check-in and any Shared Photo sent with it to a new Conversation.
 
+        A Curiosity the Check-in asked is noted as raised in this
+        Conversation.
+
         Args:
             conversation_id: The Conversation that answers the Check-in.
             check_in: The Check-in it answers.
         """
+        if check_in.curiosity_id is not None:
+            self._repositories.curiosities.link_to_conversation(
+                check_in.curiosity_id, conversation_id
+            )
         if check_in.message is not None:
             self._save(
                 conversation_id,
