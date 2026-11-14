@@ -434,6 +434,7 @@ def understanding_answer(
     intensity: str = "low",
     cause_known: bool = True,
     nuance: str = "Just saying hi.",
+    look_up_past: Sequence[str] = (),
 ) -> str:
     """Build the form the Understanding model answers with.
 
@@ -444,6 +445,7 @@ def understanding_answer(
         intensity: How strongly: "low", "medium" or "high".
         cause_known: Whether the Companion knows why they feel that way.
         nuance: One sentence on what fits.
+        look_up_past: Phrases to search older Conversation Summaries with.
 
     Returns:
         The form as JSON.
@@ -458,7 +460,7 @@ def understanding_answer(
             "memory_categories": list(memory_categories),
             "bring_up": [],
             "left_alone": [],
-            "look_up_past": [],
+            "look_up_past": list(look_up_past),
             "knowledge": [],
             "threads_touched": [],
         }

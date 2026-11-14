@@ -32,6 +32,8 @@ const settings: AdminSettings = {
   daily_message_limit: seeded(200),
   daily_limit_reply: seeded("I'm wiped for today, talk tomorrow?"),
   message_retention_days: seeded(30),
+  older_summaries_per_reply: seeded(3),
+  older_summaries_closeness_percent: seeded(68),
   photo_retry_count: seeded(2),
   photo_album_max_photos: seeded(5),
   personal_stickers_limit: seeded(30),
@@ -151,6 +153,28 @@ describe("PlatformSettingsForm", () => {
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       daily_message_limit: 60,
       daily_limit_reply: "Out of steam, talk tomorrow?",
+    });
+  });
+
+  it("shows and saves the older Conversation limit and closeness bar", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const most = await screen.findByLabelText(
+      "Most older Conversations per reply",
+    );
+    const bar = screen.getByLabelText("Older Conversation closeness bar");
+    expect(most).toHaveValue(3);
+    expect(bar).toHaveValue(68);
+
+    await user.clear(most);
+    await user.type(most, "5");
+    await user.clear(bar);
+    await user.type(bar, "72");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      older_summaries_per_reply: 5,
+      older_summaries_closeness_percent: 72,
     });
   });
 

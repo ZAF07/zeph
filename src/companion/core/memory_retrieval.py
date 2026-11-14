@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -13,11 +14,15 @@ from companion.core.models import (
     UserSnapshot,
 )
 from companion.core.platform_settings import (
+    OLDER_SUMMARIES_CLOSENESS_PERCENT,
+    OLDER_SUMMARIES_PER_REPLY,
     RECENT_CONVERSATION_SUMMARIES,
     REPLY_MEMORY_INTRO,
     SHARED_PHOTOS_MEMORY_DESCRIPTION,
 )
-from companion.core.ports import Repositories
+from companion.core.ports import Embedder, Repositories
+
+logger = logging.getLogger(__name__)
 
 SHARED_PHOTOS_GROUP_NAME = "Shared Photos"
 
@@ -92,6 +97,22 @@ def format_day(moment: datetime, time_zone: str | None) -> str:
     return f"{local.day} {local:%b %Y}"
 
 
+def summary_line(summary: ConversationSummary, time_zone: str | None) -> str:
+    """Write one Conversation Summary as the reply's memory section lists it.
+
+    Args:
+        summary: The Conversation Summary.
+        time_zone: The User's IANA time zone, for the day it was written.
+
+    Returns:
+        E.g. "- 9 Nov 2026: Talked about a new job. They seemed excited."
+    """
+    return (
+        f"- {format_day(summary.created_at, time_zone)}: {summary.summary} "
+        f"They seemed {summary.mood}."
+    )
+
+
 def format_memory(
     categories: list[MemoryCategory],
     items: list[MemoryItem],
@@ -99,6 +120,7 @@ def format_memory(
     time_zone: str | None,
     intro: str,
     shared_photos: Sequence[SharedPhoto] = (),
+    older_summaries: Sequence[ConversationSummary] = (),
 ) -> str:
     """Write the User Memory part of the reply instructions.
 
@@ -109,6 +131,8 @@ def format_memory(
         summaries: The newest Conversation Summaries, newest first.
         time_zone: The User's IANA time zone, for the days.
         shared_photos: The Shared Photos that matter for the message.
+        older_summaries: Older Conversation Summaries found by meaning,
+            closest first.
 
     Returns:
         The memory section, or "" if there is nothing to tell.
@@ -121,13 +145,14 @@ def format_memory(
         if lines:
             sections.append(f"{category.name}:\n" + "\n".join(lines))
     if summaries:
-        summary_lines = [
-            f"- {format_day(summary.created_at, time_zone)}: {summary.summary} "
-            f"They seemed {summary.mood}."
-            for summary in summaries
-        ]
+        summary_lines = [summary_line(summary, time_zone) for summary in summaries]
         sections.append(
             "Recent Conversations, newest first:\n" + "\n".join(summary_lines)
+        )
+    if older_summaries:
+        older_lines = [summary_line(summary, time_zone) for summary in older_summaries]
+        sections.append(
+            "Older Conversations that may matter:\n" + "\n".join(older_lines)
         )
     if shared_photos:
         photo_lines = [shared_photo_line(photo, time_zone) for photo in shared_photos]
@@ -180,13 +205,15 @@ class SavedMemory:
 class MemoryRetrieval:
     """Finds the User Memory that matters for the message being answered."""
 
-    def __init__(self, repositories: Repositories) -> None:
+    def __init__(self, repositories: Repositories, embedder: Embedder) -> None:
         """Set up memory retrieval.
 
         Args:
             repositories: Where User Memory and Memory Categories are stored.
+            embedder: Embeds the phrases older Summaries are searched with.
         """
         self._repositories = repositories
+        self._embedder = embedder
 
     def read(self, snapshot: UserSnapshot) -> SavedMemory:
         """Read what the Companion has saved about the User, once per reply.
@@ -240,20 +267,24 @@ class MemoryRetrieval:
         snapshot: UserSnapshot,
         saved: SavedMemory,
         picked_categories: Sequence[str],
+        look_up_past: Sequence[str],
     ) -> RecalledMemory:
         """Pick out what the Companion remembers that matters for the message.
 
         Memory Items from every "always include" category go in, plus those
         from the categories the Understanding picked, plus the newest
-        Conversation Summaries. All the User's Shared Photos go in when the
-        Understanding picked "Shared Photos". A picked name that isn't one
-        of the pickable categories is ignored.
+        Conversation Summaries, plus older Summaries found by meaning. All
+        the User's Shared Photos go in when the Understanding picked "Shared
+        Photos". A picked name that isn't one of the pickable categories is
+        ignored.
 
         Args:
             snapshot: The User being answered.
             saved: Their saved memory, read for this reply.
             picked_categories: The names of the categories the Understanding
                 picked, in any case.
+            look_up_past: The Understanding's phrases to search older
+                Summaries with; none searches nothing.
 
         Returns:
             The memory section for the reply instructions and the Shared
@@ -284,6 +315,44 @@ class MemoryRetrieval:
                 snapshot.user.time_zone,
                 snapshot.settings.get(REPLY_MEMORY_INTRO),
                 relevant_photos,
+                self._find_older_summaries(snapshot, saved, look_up_past),
             ),
             shared_photo_ids=tuple(photo.id for photo in relevant_photos),
         )
+
+    def _find_older_summaries(
+        self,
+        snapshot: UserSnapshot,
+        saved: SavedMemory,
+        look_up_past: Sequence[str],
+    ) -> list[ConversationSummary]:
+        """Find the User's older Summaries closest in meaning to the phrases.
+
+        Only the User's own Summaries are searched, leaving out the newest
+        ones already given. Only those at least as close as the Admin-set
+        bar count, up to the Admin-set number. If the search fails the reply
+        goes ahead without them.
+
+        Args:
+            snapshot: The User being answered.
+            saved: Their saved memory, read for this reply.
+            look_up_past: The phrases to search with.
+
+        Returns:
+            The older Summaries, closest first; none if no phrase was given.
+        """
+        settings = snapshot.settings
+        limit = settings.get(OLDER_SUMMARIES_PER_REPLY)
+        if not look_up_past or limit < 1:
+            return []
+        try:
+            return self._repositories.user_memory.find_summaries_by_meaning(
+                snapshot.user.id,
+                [self._embedder.embed_query(phrase) for phrase in look_up_past],
+                min_closeness=settings.get(OLDER_SUMMARIES_CLOSENESS_PERCENT) / 100,
+                limit=limit,
+                leave_out=[summary.id for summary in saved.summaries],
+            )
+        except Exception:
+            logger.exception("Could not search older Conversation Summaries")
+            return []

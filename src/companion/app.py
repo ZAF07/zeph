@@ -226,7 +226,9 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             chat_model=chat_model,
             clock=dependencies.clock,
         ),
-        memory_retrieval=MemoryRetrieval(repositories=dependencies.repositories),
+        memory_retrieval=MemoryRetrieval(
+            repositories=dependencies.repositories, embedder=dependencies.embedder
+        ),
         knowledge_retrieval=KnowledgeRetrieval(
             repositories=dependencies.repositories,
             embedder=dependencies.embedder,
@@ -285,6 +287,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 chat_model=chat_model,
                 clock=dependencies.clock,
             ),
+            embedder=dependencies.embedder,
             clock=dependencies.clock,
         ),
         check_ins=check_in_service,

@@ -30,7 +30,7 @@ from companion.core.platform_settings import (
     MEMORY_PROCESSING_MODEL,
     MEMORY_PROCESSING_PROMPT,
 )
-from companion.core.ports import Clock, Repositories
+from companion.core.ports import Clock, Embedder, Repositories
 from companion.core.transcripts import to_transcript_lines
 from companion.core.usage import UsageRecordingChatModel
 from companion.core.user_snapshot import UserSnapshotLoader
@@ -338,7 +338,8 @@ class PostConversationProcessor:
     """Sums up each ended Conversation and updates the User's User Memory.
 
     It changes their Memory Items and keeps the photos that matter to them
-    as Shared Photos. Separately from User Memory, it keeps the User's
+    as Shared Photos. Each Summary is embedded, so it can be found by
+    meaning however old it is. Separately from User Memory, it keeps the User's
     Personal Stickers.
     """
 
@@ -348,6 +349,7 @@ class PostConversationProcessor:
         user_snapshots: UserSnapshotLoader,
         chat_model: UsageRecordingChatModel,
         personal_sticker_keeper: PersonalStickerKeeper,
+        embedder: Embedder,
         clock: Clock,
     ) -> None:
         """Set up the processor.
@@ -361,12 +363,14 @@ class PostConversationProcessor:
                 and records the tokens used.
             personal_sticker_keeper: Keeps the stickers the User sent whose
                 meaning was clear.
+            embedder: Embeds each Summary, so it can be found by meaning.
             clock: Tells the current time.
         """
         self._repositories = repositories
         self._user_snapshots = user_snapshots
         self._chat_model = chat_model
         self._personal_sticker_keeper = personal_sticker_keeper
+        self._embedder = embedder
         self._clock = clock
 
     def process(self, conversation: Conversation, settings: PlatformSettings) -> None:
@@ -449,7 +453,26 @@ class PostConversationProcessor:
             mood=answer.mood,
             created_at=now,
         )
-        user_memory.save_processed_conversation(conversation.id, now, summary, changes)
+        user_memory.save_processed_conversation(
+            conversation.id, now, summary, changes, self._embed(summary)
+        )
+
+    def _embed(self, summary: ConversationSummary) -> list[float] | None:
+        """Embed a Summary, logging a failure instead of raising.
+
+        Args:
+            summary: The Summary.
+
+        Returns:
+            Its embedding; None if embedding failed, so the Summary is still
+            saved but only found as one of the newest.
+        """
+        try:
+            [embedding] = self._embedder.embed_passages([summary.summary])
+        except Exception:
+            logger.exception("Could not embed the Conversation Summary")
+            return None
+        return embedding
 
     def _keep_personal_stickers(
         self, snapshot: UserSnapshot, messages: list[ConversationMessage]

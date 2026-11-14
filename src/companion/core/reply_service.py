@@ -13,8 +13,9 @@ class ReplyService:
     The steps run in this order: the ReplyGate applies the house rules left
     once the Message's texts are saved and checked, then the Understanding
     works out what the User needs and which User Memory matters, then that
-    memory and the Knowledge that may fit are recalled, then the reply is
-    composed and delivered. Every step reads the User from the same snapshot.
+    memory, any older Conversations it asked to look up and the Knowledge
+    that may fit are recalled, then the reply is composed and delivered.
+    Every step reads the User from the same snapshot.
     """
 
     def __init__(
@@ -62,8 +63,9 @@ class ReplyService:
         understood = self._understanding.understand(
             snapshot, message.conversation_id, saved_memory
         )
+        form = understood.understanding.form
         memory = self._memory_retrieval.recall(
-            snapshot, saved_memory, understood.understanding.form.memory_categories
+            snapshot, saved_memory, form.memory_categories, form.look_up_past
         )
         knowledge = self._knowledge_retrieval.recall(snapshot, message.conversation_id)
         reply = self._response_composer.compose(
