@@ -11,6 +11,7 @@ from companion.core.ports import Clock, PlatformSettingsRepository
 HELPLINES_PLACEHOLDER = "{helplines}"
 FEATURES_PLACEHOLDER = "{features}"
 DASHBOARD_URL_PLACEHOLDER = "{dashboard_url}"
+CONFIRMATION_WORD_PLACEHOLDER = "{word}"
 
 
 def read_text(value: Any) -> str:
@@ -155,6 +156,7 @@ USER_MEMORY_EXPLANATION = Setting("user_memory_explanation", read_text)
 PHOTO_VIEWING_EXPLANATION = Setting("photo_viewing_explanation", read_text)
 MEMORY_PAUSED_NOTE = Setting("memory_paused_note", read_text)
 MEMORY_NOT_AVAILABLE_NOTE = Setting("memory_not_available_note", read_text)
+DELETE_MY_DATA_DESCRIPTION = Setting("delete_my_data_description", read_text)
 ONBOARDING_REASON_CHOICES = Setting("onboarding_reason_choices", read_text_list)
 CONVERSATION_QUIET_GAP = Setting("conversation_quiet_gap_minutes", read_minutes)
 MESSAGE_WAIT_SECONDS = Setting("message_wait_seconds", read_whole_number)
@@ -229,6 +231,8 @@ REPLY_DELETE_DATA_INSTRUCTIONS = Setting("reply_delete_data_instructions", read_
 REPLY_FEATURES_UNAVAILABLE_NOTE = Setting("reply_features_unavailable_note", read_text)
 DATA_DELETION_CONFIRMATION_WORD = Setting("data_deletion_confirmation_word", read_text)
 DATA_DELETED_REPLY = Setting("data_deleted_reply", read_text)
+DATA_DELETION_STARTED_NOTE = Setting("data_deletion_started_note", read_text)
+MEMORY_OFF_CHAT_LINE = Setting("memory_off_chat_line", read_text)
 REPLY_DATA_DELETION_CANCELLED_NOTE = Setting(
     "reply_data_deletion_cancelled_note", read_text
 )
@@ -416,6 +420,19 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         hint=(
             "Used instead of the Settings in Chat instructions when Settings "
             "in Chat doesn’t work for the User."
+        ),
+    ),
+    EditableSetting(
+        DATA_DELETION_STARTED_NOTE.key,
+        "Data deletion started note",
+        SettingKind.TEXT,
+        max_length=2_000,
+        hint=(
+            "What the reply is told once the User asks in chat to delete their "
+            "data, so it can explain and ask for the confirmation word."
+        ),
+        required_placeholders=(
+            RequiredPlaceholder(CONFIRMATION_WORD_PLACEHOLDER, "the confirmation word"),
         ),
     ),
     EditableSetting(
@@ -759,6 +776,24 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.TEXT,
         max_length=1_000,
     ),
+    EditableSetting(
+        MEMORY_OFF_CHAT_LINE.key,
+        "“Memory off” line in chat",
+        SettingKind.TEXT,
+        max_length=1_000,
+    ),
+    EditableSetting(
+        DELETE_MY_DATA_DESCRIPTION.key,
+        "“Delete my data” description",
+        SettingKind.TEXT,
+        max_length=1_000,
+    ),
+    EditableSetting(
+        DATA_DELETED_REPLY.key,
+        "“Data deleted” reply",
+        SettingKind.TEXT,
+        max_length=1_000,
+    ),
 )
 
 CORE_SERVICES: tuple[CoreService, ...] = (
@@ -797,6 +832,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
                 (
                     REPLY_SETTINGS_INSTRUCTIONS.key,
                     REPLY_DELETE_DATA_INSTRUCTIONS.key,
+                    DATA_DELETION_STARTED_NOTE.key,
                     REPLY_DATA_DELETION_CANCELLED_NOTE.key,
                     REPLY_DATA_DELETION_WORD_NOT_ALONE_NOTE.key,
                 ),
@@ -944,6 +980,7 @@ class DashboardContent:
         photo_viewing_explanation: What Photo Viewing is.
         onboarding_reason_choices: The "What brings you here?" choices.
         message_retention_days: How many days messages are kept.
+        delete_my_data_description: What Delete My Data removes.
     """
 
     ai_notice: str
@@ -952,6 +989,7 @@ class DashboardContent:
     photo_viewing_explanation: str
     onboarding_reason_choices: list[str]
     message_retention_days: int
+    delete_my_data_description: str
 
 
 class InvalidSettingError(InvalidError):
@@ -988,8 +1026,8 @@ class PlatformSettingsService:
         """Read the Admin-managed wording the Dashboard shows to Users.
 
         Returns:
-            The AI notices, explanations, onboarding choices and how long
-            messages are kept.
+            The AI notices, explanations, onboarding choices, how long
+            messages are kept and what Delete My Data removes.
         """
         settings = self._settings.load()
         return DashboardContent(
@@ -999,6 +1037,7 @@ class PlatformSettingsService:
             photo_viewing_explanation=settings.get(PHOTO_VIEWING_EXPLANATION),
             onboarding_reason_choices=settings.get(ONBOARDING_REASON_CHOICES),
             message_retention_days=settings.get(MESSAGE_RETENTION_DAYS),
+            delete_my_data_description=settings.get(DELETE_MY_DATA_DESCRIPTION),
         )
 
     def model_choices(self) -> list[str]:

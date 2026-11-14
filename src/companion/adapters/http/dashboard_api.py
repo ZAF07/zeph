@@ -153,6 +153,7 @@ class PlatformContentResponse(BaseModel):
     photo_viewing_explanation: str
     onboarding_reason_choices: list[str]
     message_retention_days: int
+    delete_my_data_description: str
 
 
 class ConnectionTokenResponse(BaseModel):
@@ -827,8 +828,8 @@ def build_dashboard_api_router(
             user: The signed-in User.
 
         Returns:
-            The AI notice, User Memory explanation, onboarding choices and how
-            long messages are kept.
+            The AI notice, User Memory explanation, onboarding choices, how
+            long messages are kept and what Delete My Data removes.
         """
         content = platform_settings_service.dashboard_content()
         return PlatformContentResponse(
@@ -838,6 +839,7 @@ def build_dashboard_api_router(
             photo_viewing_explanation=content.photo_viewing_explanation,
             onboarding_reason_choices=content.onboarding_reason_choices,
             message_retention_days=content.message_retention_days,
+            delete_my_data_description=content.delete_my_data_description,
         )
 
     @router.get("/telegram-connection")

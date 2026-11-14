@@ -264,6 +264,65 @@ def test_turning_user_memory_off_and_on_in_chat(
     assert "user_memory" in me(client, headers)["changed_in_chat"]
 
 
+def test_turning_user_memory_off_in_chat_always_sends_the_fixed_line(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    seeded_settings: dict[str, Any],
+) -> None:
+    set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    fixed_line = seeded_settings["memory_off_chat_line"]
+    assert "Nothing is deleted" in fixed_line
+    assert "Delete My Data" in fixed_line
+
+    chat_channel.sent.clear()
+    off = reply_call(
+        client,
+        chat_model,
+        "stop remembering things about me",
+        ToolCall("turn_user_memory_on_or_off", {"on": False}),
+        "Okay, memory is off.",
+    )
+
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
+        "Okay, memory is off.",
+        fixed_line,
+    ]
+    assert "still use what you already know" in off.tool_results[0]
+
+    chat_channel.sent.clear()
+    reply_call(
+        client,
+        chat_model,
+        "actually turn memory back on",
+        ToolCall("turn_user_memory_on_or_off", {"on": True}),
+        "Memory's back on.",
+    )
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["Memory's back on."]
+
+
+def test_the_memory_off_line_is_not_sent_when_memory_was_not_turned_off(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    chat_channel.sent.clear()
+
+    reply_call(
+        client,
+        chat_model,
+        "stop remembering things about me",
+        ToolCall("turn_user_memory_on_or_off", {"on": "nope"}),
+        "Did you want memory off?",
+    )
+
+    assert me(client, headers)["user_memory_enabled"] is True
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["Did you want memory off?"]
+
+
 def test_forgetting_a_named_memory_item_in_chat(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
@@ -396,6 +455,7 @@ def test_delete_my_data_in_chat_only_deletes_after_the_confirmation_word(
     )
     assert f'"{word}"' in call.tool_results[0]
     assert "on its own, with nothing after it" in call.tool_results[0]
+    assert "private notes" in call.tool_results[0]
     data_tables = user_data_tables(engine)
     assert all(
         count > 0 for count in rows_per_table(engine, user_id, data_tables).values()

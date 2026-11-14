@@ -129,7 +129,8 @@ class ResponseComposer:
         remembers and the Knowledge that may fit, and
         gives the model every earlier message in the Conversation. Each tool
         provider offers its tools and instructions, and a sticker or Shared
-        Photo a tool picks is sent with the reply. When a Feature doesn't
+        Photo a tool picks is sent with the reply, after any fixed text a
+        tool asked to close the reply with. When a Feature doesn't
         work for the User, the instructions say so, so the reply can tell
         them plainly.
 
@@ -183,6 +184,7 @@ class ResponseComposer:
             tools=[tool for offer in offers for tool in offer.tools],
         )
         reply_parts = split_into_messages(reply)
+        reply_parts += [offer.closing_text for offer in offers if offer.closing_text]
         sticker: LibrarySticker | PersonalSticker | None = None
         shared_photo: SharedPhoto | None = None
         for offer in offers:

@@ -38,6 +38,8 @@ const content: PlatformContent = {
     "When off, Zeph won’t look at or remember your photos. Every photo is still checked for safety.\n\nWhen on, Zeph looks at your photos.",
   onboarding_reason_choices: [],
   message_retention_days: 14,
+  delete_my_data_description:
+    "Removes your messages, memories and the private notes Zeph keeps.",
 };
 
 const onboardedUser: Me = {
@@ -87,6 +89,19 @@ describe("AccountSettings", () => {
     });
     expect(
       within(section).getByText("Not available on your account"),
+    ).toBeVisible();
+  });
+
+  it("says what Delete my data removes, private notes included", async () => {
+    renderWithQueries(<AccountSettings />);
+
+    const yourData = within(
+      await screen.findByRole("region", { name: "Your data" }),
+    );
+    expect(
+      yourData.getByText(
+        "Removes your messages, memories and the private notes Zeph keeps.",
+      ),
     ).toBeVisible();
   });
 

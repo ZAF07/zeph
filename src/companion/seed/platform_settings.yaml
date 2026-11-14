@@ -63,8 +63,12 @@ user_memory_explanation: |-
   So you don't have to repeat yourself, I can keep meaningful details — your
   goals, what helps you, the people you mention.
 
-  Everything I remember is listed on your Dashboard, where you can see it and
-  delete any of it. You can also tell me "forget that" in chat.
+  You can see what I remember on your Dashboard and delete any of it, or tell
+  me "forget that" in chat.
+
+  I also keep a few private notes to follow up with you, like something to ask
+  about later. You won't see these, and Delete My Data removes them along with
+  everything else.
 
 # Shown with the Photo Viewing switch on the Dashboard. A blank line starts a
 # new paragraph.
@@ -79,15 +83,23 @@ photo_viewing_explanation: |-
 # Shown on the Dashboard (Home, Memories and next to the switch) while the
 # User has User Memory off. **Bold** marks the opening words.
 memory_paused_note: >-
-  **Memory is paused.** Zeph won’t learn anything new, but still uses what it
-  already knows about you. Delete any memory you don’t want Zeph to use.
+  **Memory is paused.** Nothing is deleted. Zeph won’t learn anything new, but
+  still uses what it already knows about you. Delete any memory you don’t want
+  Zeph to use, or use Delete My Data to remove everything.
 
 # Shown on the Dashboard instead of the note above while an Admin has User
 # Memory off for the User.
 memory_not_available_note: >-
-  **Memory isn’t available on your account.** Zeph won’t learn anything new,
-  but still uses what it already knows about you. Delete any memory you don’t
-  want Zeph to use.
+  **Memory isn’t available on your account.** Nothing is deleted. Zeph won’t
+  learn anything new, but still uses what it already knows about you. Delete
+  any memory you don’t want Zeph to use, or use Delete My Data to remove
+  everything.
+
+# Shown under "Delete my data" on Account & privacy.
+delete_my_data_description: >-
+  Removes your messages, memories, the private notes Zeph keeps to follow up
+  with you, Conversation Summaries, Check-in history and Telegram Connection.
+  Your account stays, so you can start fresh.
 
 # The choice chips for "What brings you here?".
 onboarding_reason_choices:
@@ -632,6 +644,22 @@ reply_features_unavailable_note: >-
   If it's a setting they can't change in chat, say they can change their
   settings on the Dashboard: {dashboard_url}
 
+# Sent as its own message after the reply whenever a User turns User Memory
+# off in chat, so they always know nothing was deleted.
+memory_off_chat_line: >-
+  Nothing is deleted. I'll still use what I know, I just won't learn anything
+  new. Use Delete My Data to remove everything.
+
+# What the reply is told once a User asks in chat to delete their data, so it
+# can explain and ask for the confirmation word. `{word}` is replaced with
+# the confirmation word.
+data_deletion_started_note: >-
+  Nothing is deleted yet. Tell them this deletes their messages, what you
+  remember about them, the private notes you keep to follow up with them,
+  their Check-ins and this Telegram connection, and can't be undone; their
+  account and settings stay. Ask them to reply with exactly "{word}" to
+  confirm, on its own, with nothing after it. Any other reply cancels it.
+
 # The word a User must reply with, on its own as their whole Message, to
 # confirm deleting their data in chat. Any other reply cancels it. Case
 # doesn't matter.
@@ -640,8 +668,8 @@ data_deletion_confirmation_word: DELETE
 # Sent once a User's data is deleted in chat. It is not saved, and their
 # Telegram Connection is gone, so it says how to come back.
 data_deleted_reply: >-
-  Done. I've deleted our messages, what I remembered about you and your
-  Check-ins, and disconnected this chat. Your account and settings are still
+  Done. I've deleted our messages, what I remembered about you, my private
+  notes and your Check-ins, and disconnected this chat. Your account and settings are still
   there. If you'd like to talk again, connect Telegram from the Dashboard.
 
 # Put after the reply instructions when the User's message cancelled their

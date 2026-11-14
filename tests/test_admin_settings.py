@@ -395,6 +395,7 @@ RESPONSE_COMPOSITION_NOTE_GROUPS = {
     "Settings in chat": [
         "reply_settings_instructions",
         "reply_delete_data_instructions",
+        "data_deletion_started_note",
         "reply_data_deletion_cancelled_note",
         "reply_data_deletion_word_not_alone_note",
     ],

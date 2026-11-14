@@ -242,6 +242,22 @@ const textFields: TextField[] = [
       "— shown instead while an Admin has memory off for the User; **bold** marks the opening words",
   },
   {
+    key: "memory_off_chat_line",
+    label: "“Memory off” line in chat",
+    caption:
+      "— always sent as its own message after the reply when a User turns memory off in chat",
+  },
+  {
+    key: "delete_my_data_description",
+    label: "“Delete my data” description",
+    caption: "— shown under Delete my data on Account & privacy",
+  },
+  {
+    key: "data_deleted_reply",
+    label: "“Data deleted” reply",
+    caption: "— sent in Telegram once a User’s data is deleted in chat",
+  },
+  {
     key: "check_in_fewer_message",
     label: "“Would you like fewer?” message",
     caption: "— sent once when a User reaches the ignore threshold",

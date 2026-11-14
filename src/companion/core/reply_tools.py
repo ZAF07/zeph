@@ -37,11 +37,14 @@ class ReplyOffer:
         instructions: What to add to the reply's instructions; "" if nothing.
         picked: The sticker or Shared Photo a tool picked while the reply was
             written, to send after its text; None until one is picked.
+        closing_text: A fixed text a tool asked to send, word for word, as
+            the last text message of the reply; "" if none.
     """
 
     tools: list[ChatTool] = field(default_factory=list)
     instructions: str = ""
     picked: Attachment | None = None
+    closing_text: str = ""
 
 
 class ReplyToolProvider(Protocol):
