@@ -63,4 +63,9 @@ None - can start immediately.
 ## Completion
 
 - Completed: 2026-11-14
-- Commit: <to be filled in after merge>
+- Commits:
+  - `90860c1` Messages issue 01: answer texts sent in a row as one Message
+  - `3a25d46` Review fixes: a failed check drops the rest of the Message; a slow check never splits it
+  - `d30d773` Messages issue 01 done: archive issue with test, run and review evidence; CONTEXT.md says the Safeguard checks each text and the Daily Message Limit counts Messages
+  - `aa4b2a7` Messages issue 01: migration renumbered to 0026 after rebase
+  - `e3e4a65` Merge messages issue 01 into main
