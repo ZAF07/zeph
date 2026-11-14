@@ -76,4 +76,5 @@ The heart of the feature. "My sister's wedding is next week" can bring back a fa
 ## Completion
 
 - Completed: 2026-11-14
-- Commits: `5619848` (Life Threads and being reminded), `3ec3da5` (review fixes: keep the last reaction when a Thread is raised, one shared Thread search, seed comment)
+- Commits: `5619848` (Life Threads and being reminded), `3ec3da5` (review fixes: keep the last reaction when a Thread is raised, one shared Thread search, seed comment), `41aa9de` (issue archived with evidence; CONTEXT.md: Life Threads)
+- Merged into main: `8035b83` (branch `understanding-08-life-threads`, pushed to origin)
