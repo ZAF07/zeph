@@ -60,4 +60,4 @@ None.
 ## Completion
 
 - Completed: 2026-11-14
-- Commit: f1a1709 "Move the house rules of a message into a core ReplyGate", review fixes c550222 "Give ConversationServices its own module; full docstrings on ReplyGate test fakes"
+- Commit: f1a1709 "Move the house rules of a message into a core ReplyGate", review fixes c550222 "Give ConversationServices its own module; full docstrings on ReplyGate test fakes", archive cf9c8aa "Architecture issue 01 done: archive issue with test, run and review evidence" (merged from `arch-01-reply-gate` in 0f11f29 "Merge architecture issue 01: the house rules of a message move out of the LangGraph edges into a core ReplyGate.check that returns Stopped(reason) or ReplyNeeded; the graph keeps only the reply step; ConversationTurn is renamed MessageToAnswer and TurnState ReplyState")
