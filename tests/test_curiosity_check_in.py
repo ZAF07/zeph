@@ -80,6 +80,7 @@ def set_up_user_with_due_curiosities(
     scheduler: FakeScheduler,
     seeded_settings: dict[str, Any],
     curiosities: list[dict[str, Any]] | None = None,
+    **overrides: Any,
 ) -> dict[str, str]:
     """Set up a User with Check-ins on, keep Curiosities, and move to their day.
 
@@ -96,11 +97,14 @@ def set_up_user_with_due_curiosities(
         scheduler: The fake scheduler.
         seeded_settings: The seeded platform settings.
         curiosities: The Curiosities the keeping model writes.
+        **overrides: Onboarding answers to change.
 
     Returns:
         The User's Dashboard API headers.
     """
-    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    headers = set_up_user_with_check_ins(
+        client, auth_verifier, chat_channel, **overrides
+    )
     end_conversation(
         client,
         chat_model,
@@ -244,6 +248,38 @@ def test_the_kind_is_not_offered_before_a_curiosity_is_due(
     assert WONDERING_OFFERED not in saw
     assert PRESENTATION not in saw
     assert [sent.text for sent in chat_channel.sent] == ["hey Maya, happy friday!"]
+
+
+def test_a_curiosity_is_due_on_its_day_in_the_users_time_zone(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    set_up_user_with_due_curiosities(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        [new_curiosity(not_before="2026-11-14")],
+        quiet_hours_start="03:00",
+        quiet_hours_end="04:00",
+    )
+    clock.advance(timedelta(hours=7))
+    chat_model.script(wondering_answer("so... how did the presentation go?", 1))
+
+    scheduler.tick()
+
+    assert clock.now().day == 13
+    saw = check_in_model_saw(chat_model)
+    assert WONDERING_OFFERED in saw
+    assert f"1. {PRESENTATION}" in saw
 
 
 def test_the_kind_is_not_offered_with_curiosities_off(
@@ -423,6 +459,34 @@ def test_a_refused_check_in_leaves_its_curiosity_waiting(
     [curiosity] = stored_curiosities(engine)
     assert curiosity["state"] == "waiting"
     assert curiosity["raised_at"] is None
+
+
+def test_a_check_in_that_may_have_arrived_marks_its_curiosity_raised(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+    engine: Engine,
+) -> None:
+    set_up_user_with_due_curiosities(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+    )
+    chat_channel.text_send_failures = [TimeoutError("Telegram took too long")]
+    chat_model.script(wondering_answer("how did the presentation go?", 1))
+
+    scheduler.tick()
+
+    [curiosity] = stored_curiosities(engine)
+    assert curiosity["state"] == "raised"
 
 
 def test_admin_sees_the_kind_and_can_edit_its_wording_but_not_what_it_does(

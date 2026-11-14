@@ -107,17 +107,21 @@ def format_date(day: date) -> str:
     return f"{day.day} {day:%b %Y}"
 
 
-def is_due(curiosity: Curiosity, today: date) -> bool:
-    """Tell whether a Curiosity's day has come.
+def due_curiosities(waiting: Sequence[Curiosity], today: date) -> list[Curiosity]:
+    """Keep the waiting Curiosities whose day has come.
 
     Args:
-        curiosity: The Curiosity.
+        waiting: A User's waiting Curiosities.
         today: The day it is in the User's time zone.
 
     Returns:
-        True if it has no "not before" day or that day has come.
+        Those with no "not before" day or whose day has come, in order.
     """
-    return curiosity.not_before is None or curiosity.not_before <= today
+    return [
+        curiosity
+        for curiosity in waiting
+        if curiosity.not_before is None or curiosity.not_before <= today
+    ]
 
 
 def describe_due_curiosities(due: DueCuriosities, time_zone: str | None) -> str:
@@ -201,11 +205,7 @@ class CuriosityRaiser:
         raised_here = len(store.list_raised_in(conversation_id))
         if raised_here >= per_conversation:
             return DueCuriosities((), raised_here, per_conversation)
-        waiting = [
-            curiosity
-            for curiosity in store.list_waiting(snapshot.user.id)
-            if is_due(curiosity, snapshot.today)
-        ]
+        waiting = due_curiosities(store.list_waiting(snapshot.user.id), snapshot.today)
         return DueCuriosities(
             offered=tuple(
                 NumberedCuriosity(number, curiosity)

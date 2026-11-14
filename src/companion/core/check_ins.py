@@ -20,7 +20,7 @@ from companion.core.check_in_decision import (
     next_due_after_quiet_hours_move,
     retry_after_refusal,
 )
-from companion.core.curiosities import is_due
+from companion.core.curiosities import due_curiosities
 from companion.core.features import FeatureService
 from companion.core.memory_retrieval import (
     format_day,
@@ -925,9 +925,10 @@ class CheckInService:
                         conversation.started_at if conversation is not None else None,
                     ),
                     has_shared_photos=user_id in with_shared_photos,
-                    has_due_curiosity=any(
-                        is_due(curiosity, snapshot.today)
-                        for curiosity in waiting_curiosities.get(user_id, [])
+                    has_due_curiosity=bool(
+                        due_curiosities(
+                            waiting_curiosities.get(user_id, []), snapshot.today
+                        )
                     ),
                     curiosity_check_ins_this_week=curiosity_check_ins.get(user_id, 0),
                 )
@@ -985,16 +986,14 @@ class CheckInService:
             if any(kind.sends_shared_photo for kind in kinds)
             else []
         )
-        due_curiosities = (
-            [
-                curiosity
-                for curiosity in self._repositories.curiosities.list_waiting(user.id)
-                if is_due(curiosity, snapshot.today)
-            ]
+        curiosities_to_ask = (
+            due_curiosities(
+                self._repositories.curiosities.list_waiting(user.id), snapshot.today
+            )
             if any(kind.raises_curiosity for kind in kinds)
             else []
         )
-        decision = self._decide(snapshot, kinds, shared_photos, due_curiosities)
+        decision = self._decide(snapshot, kinds, shared_photos, curiosities_to_ask)
         if decision.kind is None:
             skipped = CheckIn(
                 id=uuid4(),
