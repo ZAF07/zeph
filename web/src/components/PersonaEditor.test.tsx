@@ -1,9 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PersonaEditor } from "@/components/PersonaEditor";
 import type { AdminSettings, ApiClient } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   getAdminSettings: vi.fn<ApiClient["getAdminSettings"]>(),
@@ -36,7 +37,7 @@ describe("PersonaEditor", () => {
   });
 
   it("shows the saved Persona, its length and who saved it", async () => {
-    render(<PersonaEditor />);
+    renderWithQueries(<PersonaEditor />);
 
     expect(await screen.findByLabelText("Persona text")).toHaveValue(
       "You are Zeph.",
@@ -48,7 +49,7 @@ describe("PersonaEditor", () => {
 
   it("saves an edited Persona", async () => {
     const user = userEvent.setup();
-    render(<PersonaEditor />);
+    renderWithQueries(<PersonaEditor />);
     const editor = await screen.findByLabelText("Persona text");
 
     await user.type(editor, " Be kind.");
@@ -66,7 +67,7 @@ describe("PersonaEditor", () => {
 
   it("discards unsaved edits", async () => {
     const user = userEvent.setup();
-    render(<PersonaEditor />);
+    renderWithQueries(<PersonaEditor />);
     const editor = await screen.findByLabelText("Persona text");
 
     await user.type(editor, " Oops.");
@@ -77,7 +78,7 @@ describe("PersonaEditor", () => {
 
   it("won't save an unchanged or empty Persona", async () => {
     const user = userEvent.setup();
-    render(<PersonaEditor />);
+    renderWithQueries(<PersonaEditor />);
     const editor = await screen.findByLabelText("Persona text");
 
     expect(screen.getByRole("button", { name: "Save Persona" })).toBeDisabled();
@@ -88,7 +89,7 @@ describe("PersonaEditor", () => {
   it("keeps the edit and says so when saving fails", async () => {
     apiClient.updateAdminSettings.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    render(<PersonaEditor />);
+    renderWithQueries(<PersonaEditor />);
     const editor = await screen.findByLabelText("Persona text");
 
     await user.type(editor, " Be kind.");
@@ -107,7 +108,7 @@ describe("PersonaEditor", () => {
       .mockRejectedValueOnce(new Error("down"))
       .mockResolvedValue(settings);
     const user = userEvent.setup();
-    render(<PersonaEditor />);
+    renderWithQueries(<PersonaEditor />);
 
     await user.click(await screen.findByRole("button", { name: "Try again" }));
 

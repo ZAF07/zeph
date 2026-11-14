@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useState } from "react";
 
 import { compactSecondaryButton } from "@/components/button-styles";
 import { inputField } from "@/components/form-styles";
@@ -9,12 +10,8 @@ import { LockIcon } from "@/components/LockIcon";
 import { UserFeaturesPanel } from "@/components/UserFeaturesPanel";
 import { ApiError, type AdminUser, type UserRole } from "@/lib/api-client";
 import { formatDay } from "@/lib/dates";
+import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
-
-type LoadState =
-  | { kind: "loading" }
-  | { kind: "failed" }
-  | { kind: "loaded"; users: AdminUser[] };
 
 type Filter = "all" | "admins" | "telegram_not_connected";
 
@@ -71,43 +68,31 @@ function isShown(user: AdminUser, search: string, filter: Filter): boolean {
  */
 export function AdminUsers() {
   const apiClient = useApiClient();
-  const [state, setState] = useState<LoadState>({ kind: "loading" });
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [flash, setFlash] = useState<Flash | null>(null);
-  const [changingUserId, setChangingUserId] = useState<string | null>(null);
   const [featuresUser, setFeaturesUser] = useState<AdminUser | null>(null);
   const closeFeatures = useCallback(() => setFeaturesUser(null), []);
 
-  const load = useCallback(async () => {
-    setState({ kind: "loading" });
-    try {
-      setState({ kind: "loaded", users: await apiClient.listAdminUsers() });
-    } catch {
-      setState({ kind: "failed" });
-    }
-  }, [apiClient]);
+  const usersQuery = useQuery({
+    queryKey: queryKeys.adminUsers,
+    queryFn: () => apiClient.listAdminUsers(),
+  });
+  const users = usersQuery.data;
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  async function changeRole(target: AdminUser, role: UserRole) {
-    const displayName = target.name ?? target.email ?? "This User";
-    setChangingUserId(target.id);
-    setFlash(null);
-    try {
-      const change = await apiClient.changeUserRole(target.id, role);
-      setState((current) =>
-        current.kind === "loaded"
-          ? {
-              kind: "loaded",
-              users: current.users.map((user) =>
-                user.id === change.id ? { ...user, role: change.role } : user,
-              ),
-            }
-          : current,
+  const changeRole = useMutation({
+    mutationFn: ({ target, role }: { target: AdminUser; role: UserRole }) =>
+      apiClient.changeUserRole(target.id, role),
+    onMutate: () => setFlash(null),
+    onSuccess: (change, { target }) => {
+      queryClient.setQueryData<AdminUser[]>(queryKeys.adminUsers, (current) =>
+        current?.map((user) =>
+          user.id === change.id ? { ...user, role: change.role } : user,
+        ),
       );
+      void queryClient.invalidateQueries({ queryKey: queryKeys.me });
+      const displayName = target.name ?? target.email ?? "This User";
       setFlash({
         text:
           change.role === "admin"
@@ -115,7 +100,9 @@ export function AdminUsers() {
             : `${displayName} is no longer an Admin.`,
         isError: false,
       });
-    } catch (error) {
+    },
+    onError: (error, { target }) => {
+      const displayName = target.name ?? target.email ?? "This User";
       const isLastAdmin = error instanceof ApiError && error.status === 409;
       setFlash({
         text: isLastAdmin
@@ -123,10 +110,8 @@ export function AdminUsers() {
           : `Couldn’t change ${displayName}’s role. Please try again.`,
         isError: true,
       });
-    } finally {
-      setChangingUserId(null);
-    }
-  }
+    },
+  });
 
   return (
     <>
@@ -177,7 +162,7 @@ export function AdminUsers() {
         </p>
       ) : null}
 
-      {state.kind === "loading" ? (
+      {usersQuery.isPending ? (
         <div
           aria-busy="true"
           aria-label="Loading users"
@@ -185,15 +170,15 @@ export function AdminUsers() {
         />
       ) : null}
 
-      {state.kind === "failed" ? (
+      {!users && usersQuery.isError ? (
         <LoadFailed
           title="Couldn’t load users"
           body="The user list didn’t respond. No roles were changed."
-          onRetry={() => void load()}
+          onRetry={() => void usersQuery.refetch()}
         />
       ) : null}
 
-      {state.kind === "loaded" && state.users.length === 0 ? (
+      {users && users.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
           <span className="text-[22px] font-medium tracking-[-0.02em]">
             No users yet
@@ -205,7 +190,7 @@ export function AdminUsers() {
         </div>
       ) : null}
 
-      {state.kind === "loaded" && state.users.length > 0 ? (
+      {users && users.length > 0 ? (
         <>
           <div className="relative overflow-x-auto rounded-xl border border-line bg-white">
             <table className="w-full min-w-[860px] border-collapse text-sm">
@@ -214,10 +199,10 @@ export function AdminUsers() {
                   <LockIcon />
                   No message content ·{" "}
                   {countOf(
-                    state.users.filter((user) => user.role === "admin").length,
+                    users.filter((user) => user.role === "admin").length,
                     "Admin",
                   )}{" "}
-                  · {countOf(state.users.length, "User")}
+                  · {countOf(users.length, "User")}
                 </span>
               </caption>
               <thead>
@@ -249,7 +234,7 @@ export function AdminUsers() {
                 </tr>
               </thead>
               <tbody>
-                {state.users
+                {users
                   .filter((user) => isShown(user, search, filter))
                   .map((user) => (
                     <tr
@@ -312,12 +297,15 @@ export function AdminUsers() {
                           </button>
                           <button
                             type="button"
-                            disabled={changingUserId === user.id}
+                            disabled={
+                              changeRole.isPending &&
+                              changeRole.variables.target.id === user.id
+                            }
                             onClick={() =>
-                              void changeRole(
-                                user,
-                                user.role === "admin" ? "user" : "admin",
-                              )
+                              changeRole.mutate({
+                                target: user,
+                                role: user.role === "admin" ? "user" : "admin",
+                              })
                             }
                             className={compactSecondaryButton}
                           >

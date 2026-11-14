@@ -11,7 +11,10 @@ import {
   type SettingValue,
 } from "@/lib/api-client";
 import { lastSavedNote, textSetting } from "@/lib/settings";
-import { useAdminSettings } from "@/lib/use-admin-settings";
+import {
+  useAdminSettings,
+  useSaveAdminSettings,
+} from "@/lib/use-admin-settings";
 
 type NumberField = {
   key: string;
@@ -26,12 +29,6 @@ type TextField = {
   label: string;
   caption: string;
 };
-
-type SaveState =
-  | { kind: "idle" }
-  | { kind: "saving" }
-  | { kind: "saved" }
-  | { kind: "failed"; message: string };
 
 /** The number settings on this page, grouped by section. */
 const numberSections: { heading: string; fields: NumberField[] }[] = [
@@ -239,11 +236,21 @@ function settingValue(key: string, value: string): SettingValue {
  * @returns The form, or a loading block or error with Try again.
  */
 export function PlatformSettingsForm() {
-  const { state, reload, save } = useAdminSettings();
+  const settingsQuery = useAdminSettings();
+  const saveSettings = useSaveAdminSettings();
   const [drafts, setDrafts] = useState<Record<string, string> | null>(null);
-  const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
+  const settings = settingsQuery.data;
 
-  if (state.kind === "loading") {
+  if (!settings) {
+    if (settingsQuery.isError) {
+      return (
+        <LoadFailed
+          title="Couldn’t load platform settings"
+          body="The platform keeps running on the last saved values."
+          onRetry={() => void settingsQuery.refetch()}
+        />
+      );
+    }
     return (
       <div
         aria-busy="true"
@@ -253,24 +260,18 @@ export function PlatformSettingsForm() {
     );
   }
 
-  if (state.kind === "failed") {
-    return (
-      <LoadFailed
-        title="Couldn’t load platform settings"
-        body="The platform keeps running on the last saved values."
-        onRetry={reload}
-      />
-    );
-  }
-
-  const saved = savedDrafts(state.settings);
+  const saved = savedDrafts(settings);
   const values = drafts ?? saved;
   const changedKeys = allKeys.filter((key) => values[key] !== saved[key]);
   const isValid =
     numberKeys.every((key) => wholeNumber.test(values[key] ?? "")) &&
     textFields.every((field) => (values[field.key] ?? "").trim() !== "");
-  const canSave =
-    changedKeys.length > 0 && isValid && saveState.kind !== "saving";
+  const canSave = changedKeys.length > 0 && isValid && !saveSettings.isPending;
+  const { error } = saveSettings;
+  const failureMessage =
+    error instanceof ApiError && error.status === 422 && error.detail
+      ? error.detail
+      : "Couldn’t save. The platform keeps running on the last saved values.";
 
   function numberRow(field: NumberField) {
     return (
@@ -309,27 +310,14 @@ export function PlatformSettingsForm() {
 
   function edit(key: string, value: string) {
     setDrafts({ ...values, [key]: value });
-    setSaveState({ kind: "idle" });
+    saveSettings.reset();
   }
 
-  async function saveChanges() {
-    setSaveState({ kind: "saving" });
+  function saveChanges() {
     const changes: Record<string, SettingValue> = Object.fromEntries(
       changedKeys.map((key) => [key, settingValue(key, values[key] ?? "")]),
     );
-    try {
-      await save(changes);
-      setDrafts(null);
-      setSaveState({ kind: "saved" });
-    } catch (error) {
-      setSaveState({
-        kind: "failed",
-        message:
-          error instanceof ApiError && error.status === 422 && error.detail
-            ? error.detail
-            : "Couldn’t save. The platform keeps running on the last saved values.",
-      });
-    }
+    saveSettings.mutate(changes, { onSuccess: () => setDrafts(null) });
   }
 
   return (
@@ -384,19 +372,19 @@ export function PlatformSettingsForm() {
         </div>
       </section>
 
-      {saveState.kind === "failed" ? (
+      {saveSettings.isError ? (
         <p
           role="alert"
           className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3.5 text-sm text-danger-deep"
         >
-          {saveState.message}
+          {failureMessage}
         </p>
       ) : null}
 
       <div className="sticky bottom-4 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-white px-4 py-3 shadow-[0_12px_24px_-16px_rgba(0,0,0,0.35)]">
         <span className="text-caption text-ink-muted">
-          {lastSavedNote(state.settings, allKeys)}
-          {saveState.kind === "saved" ? (
+          {lastSavedNote(settings, allKeys)}
+          {saveSettings.isSuccess ? (
             <span role="status" className="ml-2 text-blue-deep">
               Saved
             </span>
@@ -409,7 +397,7 @@ export function PlatformSettingsForm() {
             disabled={changedKeys.length === 0}
             onClick={() => {
               setDrafts(null);
-              setSaveState({ kind: "idle" });
+              saveSettings.reset();
             }}
           >
             Discard
@@ -418,9 +406,9 @@ export function PlatformSettingsForm() {
             type="button"
             className={primaryButton}
             disabled={!canSave}
-            onClick={() => void saveChanges()}
+            onClick={saveChanges}
           >
-            {saveState.kind === "saving" ? "Saving…" : "Save settings"}
+            {saveSettings.isPending ? "Saving…" : "Save settings"}
           </button>
         </span>
       </div>

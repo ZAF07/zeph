@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { QRCodeSVG } from "qrcode.react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -13,6 +14,7 @@ import type {
   ConnectionToken,
   TelegramConnectionStatus,
 } from "@/lib/api-client";
+import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 const POLL_INTERVAL_MS = 3000;
@@ -71,12 +73,14 @@ function minutesLeft(expiresAt: string): number {
  * The Connect Telegram card. Shows every state of the link: ready (QR code,
  * `/start` code, Open in Telegram), waiting for hello, connected, expired or
  * already used, linked to another account, and couldn't create a link. It
- * checks the backend every few seconds so it updates on its own.
+ * checks the backend every few seconds so it updates on its own, and once
+ * connected Home loads again so it shows the connection.
  *
  * @returns The card.
  */
 export function TelegramConnectionCard() {
   const apiClient = useApiClient();
+  const queryClient = useQueryClient();
   const [view, setView] = useState<View>({ kind: "loading" });
   const viewRef = useRef(view);
   viewRef.current = view;
@@ -116,6 +120,13 @@ export function TelegramConnectionCard() {
     }
     void loadOrCreateLink();
   }, [apiClient, createLink]);
+
+  const isConnected = view.kind === "connected";
+  useEffect(() => {
+    if (isConnected) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.home });
+    }
+  }, [isConnected, queryClient]);
 
   const isPolling = view.kind === "ready" || view.kind === "waiting";
   useEffect(() => {

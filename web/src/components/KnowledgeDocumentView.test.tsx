@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -8,6 +8,7 @@ import {
   type ApiClient,
   type KnowledgeDocumentWithText,
 } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   getKnowledgeDocument: vi.fn<ApiClient["getKnowledgeDocument"]>(),
@@ -65,7 +66,7 @@ describe("KnowledgeDocumentView", () => {
   });
 
   it("shows the document's details and its text in the editor", async () => {
-    render(<KnowledgeDocumentView documentId="breathing" />);
+    renderWithQueries(<KnowledgeDocumentView documentId="breathing" />);
 
     expect(
       await screen.findByRole("heading", {
@@ -123,7 +124,7 @@ describe("KnowledgeDocumentView", () => {
       title: "On the breath",
       tradition: "Buddhism",
     });
-    render(<KnowledgeDocumentView documentId="breathing" />);
+    renderWithQueries(<KnowledgeDocumentView documentId="breathing" />);
     const details = within(
       await screen.findByRole("form", { name: "Details" }),
     );
@@ -169,7 +170,7 @@ describe("KnowledgeDocumentView", () => {
         "A document needs a tradition.",
       ),
     );
-    render(<KnowledgeDocumentView documentId="breathing" />);
+    renderWithQueries(<KnowledgeDocumentView documentId="breathing" />);
     const details = within(
       await screen.findByRole("form", { name: "Details" }),
     );
@@ -197,7 +198,7 @@ describe("KnowledgeDocumentView", () => {
       text: `Slowly.\n${breathing.text}`,
     };
     apiClient.saveKnowledgeDocumentText.mockResolvedValue(pending);
-    render(<KnowledgeDocumentView documentId="breathing" />);
+    renderWithQueries(<KnowledgeDocumentView documentId="breathing" />);
     const editor = await screen.findByRole("textbox", {
       name: "Text of Mindful breathing",
     });
@@ -248,7 +249,7 @@ describe("KnowledgeDocumentView", () => {
   });
 
   it("formats with the toolbar, undoes it and saves with Ctrl/⌘+S", async () => {
-    render(<KnowledgeDocumentView documentId="breathing" />);
+    renderWithQueries(<KnowledgeDocumentView documentId="breathing" />);
     const editor = await screen.findByRole("textbox", {
       name: "Text of Mindful breathing",
     });
@@ -281,7 +282,7 @@ describe("KnowledgeDocumentView", () => {
         "The text can’t be blank.",
       ),
     );
-    render(<KnowledgeDocumentView documentId="breathing" />);
+    renderWithQueries(<KnowledgeDocumentView documentId="breathing" />);
     const editor = await screen.findByRole("textbox", {
       name: "Text of Mindful breathing",
     });
@@ -302,7 +303,7 @@ describe("KnowledgeDocumentView", () => {
   it("discards unsaved changes only after confirming", async () => {
     const confirm = vi.spyOn(window, "confirm");
     confirm.mockReturnValueOnce(false).mockReturnValueOnce(true);
-    render(<KnowledgeDocumentView documentId="breathing" />);
+    renderWithQueries(<KnowledgeDocumentView documentId="breathing" />);
     const editor = await screen.findByRole("textbox", {
       name: "Text of Mindful breathing",
     });
@@ -321,7 +322,7 @@ describe("KnowledgeDocumentView", () => {
 
   it("asks before following a link with unsaved changes", async () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    render(<KnowledgeDocumentView documentId="breathing" />);
+    renderWithQueries(<KnowledgeDocumentView documentId="breathing" />);
     const editor = await screen.findByRole("textbox", {
       name: "Text of Mindful breathing",
     });
@@ -350,7 +351,7 @@ describe("KnowledgeDocumentView", () => {
       text_edited: false,
       text: null,
     });
-    render(<KnowledgeDocumentView documentId="breathing" />);
+    renderWithQueries(<KnowledgeDocumentView documentId="breathing" />);
     const replace = within(
       await screen.findByRole("form", { name: "Replace file" }),
     );
@@ -393,7 +394,7 @@ describe("KnowledgeDocumentView", () => {
         "The file is empty.",
       ),
     );
-    render(<KnowledgeDocumentView documentId="breathing" />);
+    renderWithQueries(<KnowledgeDocumentView documentId="breathing" />);
     const replace = within(
       await screen.findByRole("form", { name: "Replace file" }),
     );
@@ -415,7 +416,7 @@ describe("KnowledgeDocumentView", () => {
   });
 
   it("previews the text as formatted Markdown", async () => {
-    render(<KnowledgeDocumentView documentId="breathing" />);
+    renderWithQueries(<KnowledgeDocumentView documentId="breathing" />);
     await screen.findByRole("textbox", { name: "Text of Mindful breathing" });
 
     await userEvent.click(screen.getByRole("button", { name: "Preview" }));
@@ -433,7 +434,7 @@ describe("KnowledgeDocumentView", () => {
       text_edited: true,
     });
 
-    render(<KnowledgeDocumentView documentId="breathing" />);
+    renderWithQueries(<KnowledgeDocumentView documentId="breathing" />);
 
     expect(await screen.findByText("Edited")).toBeInTheDocument();
   });
@@ -450,7 +451,7 @@ describe("KnowledgeDocumentView", () => {
       status: "pending",
       failure_reason: null,
     });
-    render(<KnowledgeDocumentView documentId="scan" />);
+    renderWithQueries(<KnowledgeDocumentView documentId="scan" />);
 
     expect(
       await screen.findByText("Scanned PDF — no text found"),
@@ -477,7 +478,7 @@ describe("KnowledgeDocumentView", () => {
       status: "pending",
       text: null,
     });
-    render(<KnowledgeDocumentView documentId="breathing" />);
+    renderWithQueries(<KnowledgeDocumentView documentId="breathing" />);
     expect(await screen.findByText("Pending")).toBeInTheDocument();
 
     await act(async () => {
@@ -494,7 +495,7 @@ describe("KnowledgeDocumentView", () => {
     apiClient.deleteKnowledgeDocument.mockResolvedValue(undefined);
     const confirm = vi.spyOn(window, "confirm");
     confirm.mockReturnValueOnce(false).mockReturnValueOnce(true);
-    render(<KnowledgeDocumentView documentId="breathing" />);
+    renderWithQueries(<KnowledgeDocumentView documentId="breathing" />);
     const remove = await screen.findByRole("button", {
       name: "Delete document",
     });
@@ -515,7 +516,7 @@ describe("KnowledgeDocumentView", () => {
       new ApiError(404, "/api/admin/knowledge-documents/gone"),
     );
 
-    render(<KnowledgeDocumentView documentId="gone" />);
+    renderWithQueries(<KnowledgeDocumentView documentId="gone" />);
 
     expect(
       await screen.findByRole("heading", {
@@ -533,7 +534,7 @@ describe("KnowledgeDocumentView", () => {
         new ApiError(500, "/api/admin/knowledge-documents"),
       )
       .mockResolvedValueOnce(breathing);
-    render(<KnowledgeDocumentView documentId="breathing" />);
+    renderWithQueries(<KnowledgeDocumentView documentId="breathing" />);
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Couldn’t load the document");

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { deleteIconButton } from "@/components/button-styles";
 import { DeleteIcon } from "@/components/DeleteIcon";
 import type { ConversationSummary } from "@/lib/api-client";
 import { formatWeekdayDay } from "@/lib/dates";
+import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 /**
@@ -13,37 +14,28 @@ import { useApiClient } from "@/lib/use-api-client";
  * with how the User seemed; each summary can be deleted.
  *
  * @param props - `summaries` are the User's Conversation Summaries, newest
- *   first, `timeZone` is the User's time zone, and `onSummariesChange` gets
- *   the summaries left after a delete.
+ *   first, and `timeZone` is the User's time zone.
  * @returns The tab's content.
  */
 export function ConversationSummariesList({
   summaries,
   timeZone,
-  onSummariesChange,
 }: {
   summaries: ConversationSummary[];
   timeZone?: string;
-  onSummariesChange: (summaries: ConversationSummary[]) => void;
 }) {
   const apiClient = useApiClient();
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteFailed, setDeleteFailed] = useState(false);
+  const queryClient = useQueryClient();
 
-  async function deleteSummary(summaryId: string) {
-    setIsDeleting(true);
-    setDeleteFailed(false);
-    try {
-      await apiClient.deleteConversationSummary(summaryId);
-      onSummariesChange(
-        summaries.filter((summary) => summary.id !== summaryId),
-      );
-    } catch {
-      setDeleteFailed(true);
-    } finally {
-      setIsDeleting(false);
-    }
-  }
+  const deleteSummary = useMutation({
+    mutationFn: (summaryId: string) =>
+      apiClient.deleteConversationSummary(summaryId),
+    onSuccess: (_, summaryId) =>
+      queryClient.setQueryData(
+        queryKeys.conversationSummaries,
+        summaries.filter((item) => item.id !== summaryId),
+      ),
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -52,7 +44,7 @@ export function ConversationSummariesList({
         where you left off. These stay until you delete them.
       </p>
 
-      {deleteFailed ? (
+      {deleteSummary.isError ? (
         <p role="alert" className="m-0 text-sm text-danger-deep">
           We couldn’t delete that. Please try again.
         </p>
@@ -84,8 +76,8 @@ export function ConversationSummariesList({
                   type="button"
                   aria-label={`Delete summary from ${day}`}
                   className={deleteIconButton}
-                  disabled={isDeleting}
-                  onClick={() => void deleteSummary(summary.id)}
+                  disabled={deleteSummary.isPending}
+                  onClick={() => deleteSummary.mutate(summary.id)}
                 >
                   <DeleteIcon />
                 </button>

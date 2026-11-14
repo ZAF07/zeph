@@ -1,10 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
 
 import type { PersonalSticker } from "@/lib/api-client";
+import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
+import { useImageUrl } from "@/lib/use-image-url";
 
 /**
  * A Personal Sticker's image, loaded through the API client. Shows the
@@ -20,31 +21,12 @@ export function PersonalStickerPicture({
   sticker: PersonalSticker;
 }) {
   const apiClient = useApiClient();
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const imageUrl = useImageUrl(
+    queryKeys.personalStickerImage(sticker.id),
+    () => apiClient.getPersonalStickerImage(sticker.id),
+    sticker.has_image,
+  ).url;
   const label = `Sticker: ${sticker.emoji ?? "no emoji"}`;
-
-  useEffect(() => {
-    if (!sticker.has_image) {
-      return;
-    }
-    let objectUrl: string | null = null;
-    let cancelled = false;
-    apiClient
-      .getPersonalStickerImage(sticker.id)
-      .then((image) => {
-        if (!cancelled) {
-          objectUrl = URL.createObjectURL(image);
-          setImageUrl(objectUrl);
-        }
-      })
-      .catch(() => setImageUrl(null));
-    return () => {
-      cancelled = true;
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-  }, [apiClient, sticker.id, sticker.has_image]);
 
   if (imageUrl) {
     return (

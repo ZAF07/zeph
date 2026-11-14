@@ -1,9 +1,10 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AdminFeatures } from "@/components/AdminFeatures";
 import type { ApiClient, FeatureSwitch } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   listFeatures: vi.fn<ApiClient["listFeatures"]>(),
@@ -38,7 +39,7 @@ describe("AdminFeatures", () => {
   });
 
   it("lists each Feature with its description, switch and last change", async () => {
-    render(<AdminFeatures />);
+    renderWithQueries(<AdminFeatures />);
 
     await screen.findByText("Web Search");
     const row = within(rowFor("Web Search"));
@@ -58,7 +59,7 @@ describe("AdminFeatures", () => {
         changed_at: "2026-11-13T09:00:00Z",
       },
     ]);
-    render(<AdminFeatures />);
+    renderWithQueries(<AdminFeatures />);
 
     await screen.findByText("Web Search");
     const row = within(rowFor("Web Search"));
@@ -74,7 +75,7 @@ describe("AdminFeatures", () => {
       changed_at: "2026-11-13T10:00:00Z",
     });
     const user = userEvent.setup();
-    render(<AdminFeatures />);
+    renderWithQueries(<AdminFeatures />);
 
     await user.click(
       await screen.findByRole("switch", { name: "Web Search for everyone" }),
@@ -94,7 +95,7 @@ describe("AdminFeatures", () => {
   it("keeps the switch as it was when the change fails", async () => {
     apiClient.setFeatureForEveryone.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    render(<AdminFeatures />);
+    renderWithQueries(<AdminFeatures />);
 
     await user.click(
       await screen.findByRole("switch", { name: "Web Search for everyone" }),
@@ -137,7 +138,7 @@ describe("AdminFeatures", () => {
       changed_at: "2026-11-13T10:00:00Z",
     });
     const user = userEvent.setup();
-    render(<AdminFeatures />);
+    renderWithQueries(<AdminFeatures />);
 
     await screen.findByText("Stickers");
     const stickers = within(rowFor("Stickers"));
@@ -188,7 +189,7 @@ describe("AdminFeatures", () => {
       changed_at: "2026-11-13T10:00:00Z",
     });
     const user = userEvent.setup();
-    render(<AdminFeatures />);
+    renderWithQueries(<AdminFeatures />);
 
     await screen.findByText("Settings in Chat");
     const settings = within(rowFor("Settings in Chat"));
@@ -219,7 +220,7 @@ describe("AdminFeatures", () => {
   it("offers Try again when the Features can't be loaded", async () => {
     apiClient.listFeatures.mockRejectedValueOnce(new Error("down"));
     const user = userEvent.setup();
-    render(<AdminFeatures />);
+    renderWithQueries(<AdminFeatures />);
 
     await user.click(await screen.findByRole("button", { name: "Try again" }));
 

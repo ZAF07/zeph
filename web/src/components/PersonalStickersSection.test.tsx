@@ -1,9 +1,10 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PersonalStickersSection } from "@/components/PersonalStickersSection";
 import type { ApiClient, PersonalSticker } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   listPersonalStickers: vi.fn<ApiClient["listPersonalStickers"]>(),
@@ -42,7 +43,7 @@ describe("PersonalStickersSection", () => {
   });
 
   it("shows each kept sticker with its image and when Zeph uses it", async () => {
-    render(<PersonalStickersSection available />);
+    renderWithQueries(<PersonalStickersSection available />);
 
     const section = await screen.findByRole("region", {
       name: "Your stickers",
@@ -65,7 +66,7 @@ describe("PersonalStickersSection", () => {
 
   it("removes a sticker", async () => {
     const user = userEvent.setup();
-    render(<PersonalStickersSection available />);
+    renderWithQueries(<PersonalStickersSection available />);
 
     await user.click(
       await screen.findByRole("button", { name: "Remove sticker 🤗" }),
@@ -79,7 +80,7 @@ describe("PersonalStickersSection", () => {
   it("says when a sticker couldn't be removed and keeps it", async () => {
     apiClient.deletePersonalSticker.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    render(<PersonalStickersSection available />);
+    renderWithQueries(<PersonalStickersSection available />);
 
     await user.click(
       await screen.findByRole("button", { name: "Remove sticker 🤗" }),
@@ -92,7 +93,7 @@ describe("PersonalStickersSection", () => {
   });
 
   it("still shows kept stickers when the Feature isn't available", async () => {
-    render(<PersonalStickersSection available={false} />);
+    renderWithQueries(<PersonalStickersSection available={false} />);
 
     expect(
       await screen.findByText("Not available on your account"),
@@ -105,7 +106,7 @@ describe("PersonalStickersSection", () => {
 
   it("says when no sticker is kept yet", async () => {
     apiClient.listPersonalStickers.mockResolvedValue([]);
-    render(<PersonalStickersSection available />);
+    renderWithQueries(<PersonalStickersSection available />);
 
     expect(await screen.findByText("No stickers kept yet")).toBeVisible();
   });
@@ -115,7 +116,7 @@ describe("PersonalStickersSection", () => {
       .mockRejectedValueOnce(new Error("down"))
       .mockResolvedValueOnce([laugh]);
     const user = userEvent.setup();
-    render(<PersonalStickersSection available />);
+    renderWithQueries(<PersonalStickersSection available />);
 
     await user.click(await screen.findByRole("button", { name: "Try again" }));
 

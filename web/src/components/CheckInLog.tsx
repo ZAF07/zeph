@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { inputField } from "@/components/form-styles";
 import { LoadFailed } from "@/components/LoadFailed";
@@ -16,12 +17,8 @@ import {
   summarizeCheckInLog,
 } from "@/lib/check-in-log";
 import { formatSavedAt } from "@/lib/dates";
+import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
-
-type LoadState =
-  | { kind: "loading" }
-  | { kind: "failed" }
-  | { kind: "loaded"; entries: CheckInLogEntry[] };
 
 const periods = [
   { days: 7, label: "Last 7 days" },
@@ -83,28 +80,17 @@ function reasonText(entry: CheckInLogEntry): string {
  */
 export function CheckInLog() {
   const apiClient = useApiClient();
-  const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [days, setDays] = useState(7);
   const [outcome, setOutcome] = useState<CheckInLogOutcomeFilter>("all");
   const [userQuery, setUserQuery] = useState("");
 
-  const load = useCallback(async () => {
-    setState({ kind: "loading" });
-    try {
-      setState({
-        kind: "loaded",
-        entries: await apiClient.listCheckInLog(days),
-      });
-    } catch {
-      setState({ kind: "failed" });
-    }
-  }, [apiClient, days]);
+  const logQuery = useQuery({
+    queryKey: queryKeys.checkInLog(days),
+    queryFn: () => apiClient.listCheckInLog(days),
+  });
+  const isLoaded = logQuery.data !== undefined;
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const entries = state.kind === "loaded" ? state.entries : [];
+  const entries = logQuery.data ?? [];
   const summary = summarizeCheckInLog(entries);
   const shown = filterCheckInLog(entries, outcome, userQuery);
   const totals = [
@@ -171,7 +157,7 @@ export function CheckInLog() {
         </label>
       </div>
 
-      {state.kind === "loading" ? (
+      {logQuery.isPending ? (
         <div
           aria-busy="true"
           aria-label="Loading log"
@@ -179,15 +165,15 @@ export function CheckInLog() {
         />
       ) : null}
 
-      {state.kind === "failed" ? (
+      {!isLoaded && logQuery.isError ? (
         <LoadFailed
           title="Couldn’t load the Check-in log"
           body="Check-ins are still being scheduled as normal."
-          onRetry={() => void load()}
+          onRetry={() => void logQuery.refetch()}
         />
       ) : null}
 
-      {state.kind === "loaded" ? (
+      {isLoaded ? (
         <dl className="m-0 grid grid-cols-[repeat(auto-fit,minmax(min(180px,100%),1fr))] gap-3">
           {totals.map((total) => (
             <div
@@ -201,7 +187,7 @@ export function CheckInLog() {
         </dl>
       ) : null}
 
-      {state.kind === "loaded" && entries.length === 0 ? (
+      {isLoaded && entries.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
           <span className="text-[22px] font-medium tracking-[-0.02em]">
             No Check-in decisions yet
@@ -213,7 +199,7 @@ export function CheckInLog() {
         </div>
       ) : null}
 
-      {state.kind === "loaded" && entries.length > 0 ? (
+      {isLoaded && entries.length > 0 ? (
         <div className="overflow-x-auto rounded-xl border border-line bg-white">
           <table className="w-full min-w-[820px] border-collapse text-sm">
             <caption className="border-b border-line px-4 py-2.5 text-left">

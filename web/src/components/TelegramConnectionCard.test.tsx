@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -8,6 +8,7 @@ import type {
   ConnectionToken,
   TelegramConnectionStatus,
 } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   getTelegramConnection: vi.fn<ApiClient["getTelegramConnection"]>(),
@@ -54,7 +55,7 @@ describe("TelegramConnectionCard", () => {
   it("shows the link ready: QR code, /start code and Open in Telegram", async () => {
     apiClient.getTelegramConnection.mockResolvedValue(notConnected());
 
-    render(<TelegramConnectionCard />);
+    renderWithQueries(<TelegramConnectionCard />);
 
     const openLink = await screen.findByRole("link", {
       name: "Open in Telegram",
@@ -76,7 +77,7 @@ describe("TelegramConnectionCard", () => {
       connectionToken({ token: "NEW1-CODE" }),
     );
 
-    render(<TelegramConnectionCard />);
+    renderWithQueries(<TelegramConnectionCard />);
 
     expect(await screen.findByText("/start NEW1-CODE")).toBeInTheDocument();
   });
@@ -85,7 +86,7 @@ describe("TelegramConnectionCard", () => {
     const user = userEvent.setup();
     apiClient.getTelegramConnection.mockResolvedValueOnce(notConnected());
 
-    render(<TelegramConnectionCard />);
+    renderWithQueries(<TelegramConnectionCard />);
     await user.click(
       await screen.findByRole("link", { name: "Open in Telegram" }),
     );
@@ -109,7 +110,7 @@ describe("TelegramConnectionCard", () => {
     const user = userEvent.setup();
     apiClient.getTelegramConnection.mockResolvedValue(notConnected());
 
-    render(<TelegramConnectionCard />);
+    renderWithQueries(<TelegramConnectionCard />);
     await user.click(
       await screen.findByRole("link", { name: "Open in Telegram" }),
     );
@@ -124,7 +125,7 @@ describe("TelegramConnectionCard", () => {
     const user = userEvent.setup();
     apiClient.getTelegramConnection.mockResolvedValueOnce(notConnected());
 
-    render(<TelegramConnectionCard />);
+    renderWithQueries(<TelegramConnectionCard />);
     await screen.findByText("/start 7Q2K-ZEPH");
 
     apiClient.getTelegramConnection.mockResolvedValue(
@@ -152,7 +153,7 @@ describe("TelegramConnectionCard", () => {
       notConnected(connectionToken({ status: "connected_elsewhere" })),
     );
 
-    render(<TelegramConnectionCard />);
+    renderWithQueries(<TelegramConnectionCard />);
 
     expect(
       await screen.findByText(
@@ -169,7 +170,7 @@ describe("TelegramConnectionCard", () => {
     apiClient.getTelegramConnection.mockResolvedValue(notConnected(null));
     apiClient.createConnectionToken.mockRejectedValueOnce(new Error("down"));
 
-    render(<TelegramConnectionCard />);
+    renderWithQueries(<TelegramConnectionCard />);
 
     expect(
       await screen.findByText("We couldn’t create your link"),
@@ -184,7 +185,7 @@ describe("TelegramConnectionCard", () => {
   it("shows connected straight away when Telegram is already connected", async () => {
     apiClient.getTelegramConnection.mockResolvedValue(connected);
 
-    render(<TelegramConnectionCard />);
+    renderWithQueries(<TelegramConnectionCard />);
 
     expect(await screen.findByText(/Connected as @maya_l/)).toBeInTheDocument();
     expect(apiClient.createConnectionToken).not.toHaveBeenCalled();

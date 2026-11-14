@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -8,6 +8,7 @@ import {
   type ApiClient,
   type CheckInKindOverview,
 } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   listCheckInKinds: vi.fn<ApiClient["listCheckInKinds"]>(),
@@ -55,7 +56,7 @@ describe("CheckInKindsManager", () => {
   });
 
   it("shows each Kind with its description and sends, with no memory switch", async () => {
-    render(<CheckInKindsManager />);
+    renderWithQueries(<CheckInKindsManager />);
 
     const card = await findCard("A casual hello");
     expect(card.getByLabelText("Name")).toHaveValue("A casual hello");
@@ -74,7 +75,7 @@ describe("CheckInKindsManager", () => {
 
   it("says a Kind sends a Shared Photo and needs Photo Viewing", async () => {
     apiClient.listCheckInKinds.mockResolvedValue([hello, lookBack]);
-    render(<CheckInKindsManager />);
+    renderWithQueries(<CheckInKindsManager />);
 
     const card = await findCard("A look back at a photo");
     expect(card.getByText("Sends a Shared Photo")).toBeInTheDocument();
@@ -92,7 +93,7 @@ describe("CheckInKindsManager", () => {
   it("saves an edited Kind", async () => {
     apiClient.updateCheckInKind.mockResolvedValue(hello);
     const user = userEvent.setup();
-    render(<CheckInKindsManager />);
+    renderWithQueries(<CheckInKindsManager />);
     const card = await findCard("A casual hello");
     expect(card.getByRole("button", { name: "Save" })).toBeDisabled();
 
@@ -112,7 +113,7 @@ describe("CheckInKindsManager", () => {
   it("adds a new Kind", async () => {
     apiClient.addCheckInKind.mockResolvedValue({ ...hello, id: "new" });
     const user = userEvent.setup();
-    render(<CheckInKindsManager />);
+    renderWithQueries(<CheckInKindsManager />);
     await user.click(
       await screen.findByRole("button", { name: "Add Check-in Kind" }),
     );
@@ -143,7 +144,7 @@ describe("CheckInKindsManager", () => {
       ),
     );
     const user = userEvent.setup();
-    render(<CheckInKindsManager />);
+    renderWithQueries(<CheckInKindsManager />);
     const card = await findCard("A casual hello");
 
     await user.clear(card.getByLabelText("Name"));
@@ -158,7 +159,7 @@ describe("CheckInKindsManager", () => {
   it("removes a Kind after confirming", async () => {
     apiClient.removeCheckInKind.mockResolvedValue();
     const user = userEvent.setup();
-    render(<CheckInKindsManager />);
+    renderWithQueries(<CheckInKindsManager />);
     const card = await findCard("A follow-up");
 
     await user.click(card.getByRole("button", { name: "Remove" }));
@@ -175,14 +176,14 @@ describe("CheckInKindsManager", () => {
 
   it("explains what happens with no Kinds", async () => {
     apiClient.listCheckInKinds.mockResolvedValue([]);
-    render(<CheckInKindsManager />);
+    renderWithQueries(<CheckInKindsManager />);
 
     expect(await screen.findByText("No Check-in Kinds")).toBeInTheDocument();
   });
 
   it("offers Try again when the Kinds can't load", async () => {
     apiClient.listCheckInKinds.mockRejectedValue(new Error("down"));
-    render(<CheckInKindsManager />);
+    renderWithQueries(<CheckInKindsManager />);
 
     expect(
       await screen.findByText("Couldn’t load Check-in Kinds"),

@@ -1,16 +1,16 @@
 "use client";
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { dangerButton } from "@/components/button-styles";
 import { DeleteConfirmation } from "@/components/DeleteConfirmation";
 import { useApiClient } from "@/lib/use-api-client";
 
-type DeleteState = "idle" | "confirming" | "deleting" | "deleted" | "failed";
-
 /**
  * The Your data section: how long messages are kept, and Delete my data
- * behind a type-DELETE confirmation.
+ * behind a type-DELETE confirmation. After a delete, every page loads its
+ * data again.
  *
  * @param props - `retentionDays` is how many days messages are kept, from
  *   platform settings.
@@ -18,19 +18,14 @@ type DeleteState = "idle" | "confirming" | "deleting" | "deleted" | "failed";
  */
 export function YourDataSection({ retentionDays }: { retentionDays: number }) {
   const apiClient = useApiClient();
-  const [deleteState, setDeleteState] = useState<DeleteState>("idle");
-  const isConfirming =
-    deleteState === "confirming" || deleteState === "deleting";
+  const queryClient = useQueryClient();
+  const [isConfirming, setIsConfirming] = useState(false);
 
-  async function deleteMyData() {
-    setDeleteState("deleting");
-    try {
-      await apiClient.deleteMyData();
-      setDeleteState("deleted");
-    } catch {
-      setDeleteState("failed");
-    }
-  }
+  const deleteMyData = useMutation({
+    mutationFn: () => apiClient.deleteMyData(),
+    onSuccess: () => void queryClient.invalidateQueries(),
+    onSettled: () => setIsConfirming(false),
+  });
 
   return (
     <section
@@ -65,7 +60,10 @@ export function YourDataSection({ retentionDays }: { retentionDays: number }) {
           <button
             type="button"
             className={dangerButton}
-            onClick={() => setDeleteState("confirming")}
+            onClick={() => {
+              deleteMyData.reset();
+              setIsConfirming(true);
+            }}
           >
             Delete my data
           </button>
@@ -76,19 +74,19 @@ export function YourDataSection({ retentionDays }: { retentionDays: number }) {
           <DeleteConfirmation
             confirmLabel="Delete my data"
             cancelLabel="Cancel"
-            isDeleting={deleteState === "deleting"}
-            onConfirm={() => void deleteMyData()}
-            onCancel={() => setDeleteState("idle")}
+            isDeleting={deleteMyData.isPending}
+            onConfirm={() => deleteMyData.mutate()}
+            onCancel={() => setIsConfirming(false)}
           />
         </div>
       ) : null}
-      {deleteState === "deleted" ? (
+      {deleteMyData.isSuccess ? (
         <p role="status" className="m-0 px-6 pb-5 text-sm text-blue-deep">
           Your data has been deleted. Connect Telegram again whenever you want
           to start fresh.
         </p>
       ) : null}
-      {deleteState === "failed" ? (
+      {deleteMyData.isError ? (
         <p role="alert" className="m-0 px-6 pb-5 text-sm text-danger-deep">
           We couldn’t delete your data. Please try again.
         </p>

@@ -1,12 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import { secondaryButton } from "@/components/button-styles";
-import { useApiClient } from "@/lib/use-api-client";
-
-type GateState = "checking" | "onboarded" | "failed";
+import { useMe } from "@/lib/queries";
 
 /**
  * Shows the Dashboard only to Users who have finished onboarding; anyone
@@ -16,33 +14,22 @@ type GateState = "checking" | "onboarded" | "failed";
  * @returns The page, a loading block, or an error with Try again.
  */
 export function OnboardingGate({ children }: { children: ReactNode }) {
-  const apiClient = useApiClient();
+  const me = useMe();
   const router = useRouter();
-  const [state, setState] = useState<GateState>("checking");
-
-  const check = useCallback(async () => {
-    setState("checking");
-    try {
-      const me = await apiClient.getMe();
-      if (me.onboarding_completed_at) {
-        setState("onboarded");
-      } else {
-        router.replace("/onboarding");
-      }
-    } catch {
-      setState("failed");
-    }
-  }, [apiClient, router]);
+  const isNotOnboarded =
+    me.data !== undefined && !me.data.onboarding_completed_at;
 
   useEffect(() => {
-    void check();
-  }, [check]);
+    if (isNotOnboarded) {
+      router.replace("/onboarding");
+    }
+  }, [isNotOnboarded, router]);
 
-  if (state === "onboarded") {
+  if (me.data?.onboarding_completed_at) {
     return <>{children}</>;
   }
 
-  if (state === "failed") {
+  if (me.isError) {
     return (
       <div
         role="alert"
@@ -54,7 +41,7 @@ export function OnboardingGate({ children }: { children: ReactNode }) {
         <button
           type="button"
           className={`${secondaryButton} bg-white`}
-          onClick={() => void check()}
+          onClick={() => void me.refetch()}
         >
           Try again
         </button>

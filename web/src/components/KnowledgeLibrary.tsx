@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 import {
   compactSecondaryButton,
@@ -17,12 +18,8 @@ import {
   knowledgeFileTypeLabels,
   knowledgeStatusOrder,
 } from "@/lib/knowledge-labels";
+import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
-
-type LoadState =
-  | { kind: "loading" }
-  | { kind: "failed" }
-  | { kind: "loaded"; documents: KnowledgeDocument[] };
 
 type Flash = { text: string; isError: boolean };
 
@@ -73,38 +70,27 @@ function countsCaption(documents: KnowledgeDocument[]): string {
  */
 export function KnowledgeLibrary() {
   const apiClient = useApiClient();
-  const [state, setState] = useState<LoadState>({ kind: "loading" });
+  const queryClient = useQueryClient();
   const [flash, setFlash] = useState<Flash | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      setState({
-        kind: "loaded",
-        documents: await apiClient.listKnowledgeDocuments(),
-      });
-    } catch {
-      setState({ kind: "failed" });
-    }
-  }, [apiClient]);
+  const documentsQuery = useQuery({
+    queryKey: queryKeys.knowledgeDocuments,
+    queryFn: () => apiClient.listKnowledgeDocuments(),
+    refetchInterval: (query) =>
+      query.state.data?.some(
+        (knowledgeDocument) => knowledgeDocument.status === "pending",
+      )
+        ? pendingCheckMilliseconds
+        : false,
+  });
+  const documents = documentsQuery.data;
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const hasPending =
-    state.kind === "loaded" &&
-    state.documents.some(
-      (knowledgeDocument) => knowledgeDocument.status === "pending",
-    );
-
-  useEffect(() => {
-    if (!hasPending) {
-      return;
-    }
-    const timer = setTimeout(() => void load(), pendingCheckMilliseconds);
-    return () => clearTimeout(timer);
-  }, [hasPending, load, state]);
+  async function reloadDocuments() {
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.knowledgeDocuments,
+    });
+  }
 
   async function upload(newDocument: KnowledgeUpload) {
     setFlash(null);
@@ -113,7 +99,7 @@ export function KnowledgeLibrary() {
       text: `Uploaded ${uploaded.title}. It’s being indexed now.`,
       isError: false,
     });
-    await load();
+    await reloadDocuments();
   }
 
   async function runRowAction(
@@ -128,7 +114,7 @@ export function KnowledgeLibrary() {
       if (successText) {
         setFlash({ text: successText, isError: false });
       }
-      await load();
+      await reloadDocuments();
     } catch {
       setFlash({
         text: `Couldn’t change ${knowledgeDocument.title}. Please try again.`,
@@ -173,7 +159,7 @@ export function KnowledgeLibrary() {
         </p>
       ) : null}
 
-      {state.kind === "loading" ? (
+      {documentsQuery.isPending ? (
         <div
           aria-busy="true"
           aria-label="Loading documents"
@@ -181,15 +167,15 @@ export function KnowledgeLibrary() {
         />
       ) : null}
 
-      {state.kind === "failed" ? (
+      {!documents && documentsQuery.isError ? (
         <LoadFailed
           title="Couldn’t load the document list"
           body="Zeph keeps using documents that are already Ready."
-          onRetry={() => void load()}
+          onRetry={() => void documentsQuery.refetch()}
         />
       ) : null}
 
-      {state.kind === "loaded" && state.documents.length === 0 ? (
+      {documents && documents.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
           <span className="text-[22px] font-medium tracking-[-0.02em]">
             The library is empty
@@ -201,11 +187,11 @@ export function KnowledgeLibrary() {
         </div>
       ) : null}
 
-      {state.kind === "loaded" && state.documents.length > 0 ? (
+      {documents && documents.length > 0 ? (
         <div className="overflow-x-auto rounded-xl border border-line bg-white">
           <table className="w-full min-w-[860px] border-collapse text-sm">
             <caption className="border-b border-line px-4 py-2.5 text-left text-caption text-ink-muted">
-              {countsCaption(state.documents)}
+              {countsCaption(documents)}
             </caption>
             <thead>
               <tr>
@@ -224,7 +210,7 @@ export function KnowledgeLibrary() {
               </tr>
             </thead>
             <tbody>
-              {state.documents.map((knowledgeDocument) => {
+              {documents.map((knowledgeDocument) => {
                 const isBusy = busyId === knowledgeDocument.id;
                 return (
                   <tr

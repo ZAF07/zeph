@@ -1,8 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { AdminGate } from "@/components/AdminGate";
 import { OnboardingGate } from "@/components/OnboardingGate";
+import { SidebarAdminBadge } from "@/components/SidebarAdminBadge";
 import type { ApiClient, Me } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   getMe: vi.fn<ApiClient["getMe"]>(),
@@ -46,7 +49,7 @@ describe("OnboardingGate", () => {
   it("sends a User who has not finished onboarding to onboarding", async () => {
     apiClient.getMe.mockResolvedValue(user(null));
 
-    render(<OnboardingGate>Connect Telegram page</OnboardingGate>);
+    renderWithQueries(<OnboardingGate>Connect Telegram page</OnboardingGate>);
 
     await vi.waitFor(() =>
       expect(router.replace).toHaveBeenCalledWith("/onboarding"),
@@ -57,7 +60,7 @@ describe("OnboardingGate", () => {
   it("shows the page to a User who has finished onboarding", async () => {
     apiClient.getMe.mockResolvedValue(user("2026-11-11T09:00:00Z"));
 
-    render(<OnboardingGate>Connect Telegram page</OnboardingGate>);
+    renderWithQueries(<OnboardingGate>Connect Telegram page</OnboardingGate>);
 
     expect(
       await screen.findByText("Connect Telegram page"),
@@ -68,11 +71,31 @@ describe("OnboardingGate", () => {
   it("does not show the page when the check fails", async () => {
     apiClient.getMe.mockRejectedValue(new Error("down"));
 
-    render(<OnboardingGate>Connect Telegram page</OnboardingGate>);
+    renderWithQueries(<OnboardingGate>Connect Telegram page</OnboardingGate>);
 
     expect(
       await screen.findByRole("button", { name: "Try again" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Connect Telegram page")).not.toBeInTheDocument();
+  });
+
+  it("loads the User once for the gates, the sidebar and the page", async () => {
+    apiClient.getMe.mockResolvedValue({
+      ...user("2026-11-11T09:00:00Z"),
+      role: "admin",
+    });
+
+    renderWithQueries(
+      <>
+        <SidebarAdminBadge />
+        <OnboardingGate>
+          <AdminGate>Admin page</AdminGate>
+        </OnboardingGate>
+      </>,
+    );
+
+    expect(await screen.findByText("Admin page")).toBeInTheDocument();
+    expect(screen.getByText("Admin")).toBeInTheDocument();
+    expect(apiClient.getMe).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import {
@@ -11,68 +12,60 @@ import {
 import { DeleteIcon } from "@/components/DeleteIcon";
 import type { MemoryGroup } from "@/lib/api-client";
 import { memorySourceLabel } from "@/lib/memories";
+import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 /**
  * The Memories tab: Memory Items grouped by Memory Category, each deletable,
  * and "Delete all memories" with a confirm step.
  *
- * @param props - `groups` are the User's Memory Items by category,
- *   `timeZone` is the User's time zone, and `onGroupsChange` gets the
- *   groups left after a delete.
+ * @param props - `groups` are the User's Memory Items by category, and
+ *   `timeZone` is the User's time zone.
  * @returns The tab's content.
  */
 export function MemoryItemsList({
   groups,
   timeZone,
-  onGroupsChange,
 }: {
   groups: MemoryGroup[];
   timeZone?: string;
-  onGroupsChange: (groups: MemoryGroup[]) => void;
 }) {
   const apiClient = useApiClient();
+  const queryClient = useQueryClient();
   const [isConfirmingDeleteAll, setIsConfirmingDeleteAll] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteFailed, setDeleteFailed] = useState(false);
   const memoryCount = groups.reduce(
     (count, group) => count + group.items.length,
     0,
   );
 
-  async function deleteItem(itemId: string) {
-    setIsDeleting(true);
-    setDeleteFailed(false);
-    try {
-      await apiClient.deleteMemoryItem(itemId);
-      onGroupsChange(
+  function showGroupsLeft(groupsLeft: MemoryGroup[]) {
+    queryClient.setQueryData(queryKeys.memoryGroups, groupsLeft);
+    void queryClient.invalidateQueries({ queryKey: queryKeys.home });
+  }
+
+  const deleteItem = useMutation({
+    mutationFn: (itemId: string) => apiClient.deleteMemoryItem(itemId),
+    onSuccess: (_, itemId) =>
+      showGroupsLeft(
         groups
           .map((group) => ({
             ...group,
             items: group.items.filter((item) => item.id !== itemId),
           }))
           .filter((group) => group.items.length > 0),
-      );
-    } catch {
-      setDeleteFailed(true);
-    } finally {
-      setIsDeleting(false);
-    }
-  }
+      ),
+  });
 
-  async function deleteAll() {
-    setIsDeleting(true);
-    setDeleteFailed(false);
-    try {
-      await apiClient.deleteAllMemoryItems();
+  const deleteAll = useMutation({
+    mutationFn: () => apiClient.deleteAllMemoryItems(),
+    onSuccess: () => {
       setIsConfirmingDeleteAll(false);
-      onGroupsChange([]);
-    } catch {
-      setDeleteFailed(true);
-    } finally {
-      setIsDeleting(false);
-    }
-  }
+      showGroupsLeft([]);
+    },
+  });
+
+  const isDeleting = deleteItem.isPending || deleteAll.isPending;
+  const deleteFailed = deleteItem.isError || deleteAll.isError;
 
   return (
     <div className="flex flex-col gap-[42px]">
@@ -123,7 +116,10 @@ export function MemoryItemsList({
                   aria-label={`Delete memory: ${item.content}`}
                   className={deleteIconButton}
                   disabled={isDeleting}
-                  onClick={() => void deleteItem(item.id)}
+                  onClick={() => {
+                    deleteAll.reset();
+                    deleteItem.mutate(item.id);
+                  }}
                 >
                   <DeleteIcon />
                 </button>
@@ -171,7 +167,10 @@ export function MemoryItemsList({
                 type="button"
                 className={confirmDangerButton}
                 disabled={isDeleting}
-                onClick={() => void deleteAll()}
+                onClick={() => {
+                  deleteItem.reset();
+                  deleteAll.mutate();
+                }}
               >
                 Yes, delete all
               </button>

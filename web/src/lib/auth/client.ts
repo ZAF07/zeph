@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth, useClerk } from "@clerk/nextjs";
+import { useQueryClient } from "@tanstack/react-query";
 
 /**
  * Gives client components a way to get the signed-in User's session token.
@@ -13,11 +14,17 @@ export function useSessionToken(): () => Promise<string | null> {
 }
 
 /**
- * Gives client components a way to sign the User out.
+ * Gives client components a way to sign the User out. It also empties the
+ * cache of backend data, so the next person to sign in on this tab never
+ * sees the last one's.
  *
  * @returns A function that signs out, then opens the given page.
  */
 export function useSignOut(): (redirectUrl: string) => Promise<void> {
   const { signOut } = useClerk();
-  return (redirectUrl) => signOut({ redirectUrl });
+  const queryClient = useQueryClient();
+  return async (redirectUrl) => {
+    await signOut({ redirectUrl });
+    queryClient.clear();
+  };
 }

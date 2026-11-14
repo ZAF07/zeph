@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -9,6 +9,7 @@ import {
   type Helpline,
   type Helplines,
 } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   listHelplines: vi.fn<ApiClient["listHelplines"]>(),
@@ -73,7 +74,7 @@ describe("HelplinesManager", () => {
   });
 
   it("lists every country's Helplines with the fallback last", async () => {
-    render(<HelplinesManager />);
+    renderWithQueries(<HelplinesManager />);
 
     await screen.findByText("Samaritans of Singapore (SOS)");
     const sosRow = within(rowFor("Samaritans of Singapore (SOS)"));
@@ -92,7 +93,7 @@ describe("HelplinesManager", () => {
 
   it("filters by country", async () => {
     const user = userEvent.setup();
-    render(<HelplinesManager />);
+    renderWithQueries(<HelplinesManager />);
     await screen.findByText("Samaritans");
 
     await user.selectOptions(screen.getByLabelText("Country"), "Singapore");
@@ -106,7 +107,7 @@ describe("HelplinesManager", () => {
       helpline("chat", "SG", "CHAT", "6493 6500", 2),
     );
     const user = userEvent.setup();
-    render(<HelplinesManager />);
+    renderWithQueries(<HelplinesManager />);
     await screen.findByText("Samaritans");
 
     await user.click(screen.getByRole("button", { name: "Add Helpline" }));
@@ -130,7 +131,7 @@ describe("HelplinesManager", () => {
   it("edits a Helpline", async () => {
     apiClient.updateHelpline.mockResolvedValue({ ...imh, hours: "Mon–Fri" });
     const user = userEvent.setup();
-    render(<HelplinesManager />);
+    renderWithQueries(<HelplinesManager />);
     await screen.findByText("IMH Mental Health Helpline");
 
     await user.click(
@@ -159,7 +160,7 @@ describe("HelplinesManager", () => {
       new ApiError(422, "/api/admin/helplines/imh", "A Helpline needs a name."),
     );
     const user = userEvent.setup();
-    render(<HelplinesManager />);
+    renderWithQueries(<HelplinesManager />);
     await screen.findByText("IMH Mental Health Helpline");
 
     await user.click(
@@ -179,7 +180,7 @@ describe("HelplinesManager", () => {
   it("edits the international fallback without a country", async () => {
     apiClient.updateInternationalFallback.mockResolvedValue(fallback);
     const user = userEvent.setup();
-    render(<HelplinesManager />);
+    renderWithQueries(<HelplinesManager />);
     await screen.findByText("Find A Helpline");
 
     await user.click(
@@ -204,7 +205,7 @@ describe("HelplinesManager", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     apiClient.deleteHelpline.mockResolvedValue();
     const user = userEvent.setup();
-    render(<HelplinesManager />);
+    renderWithQueries(<HelplinesManager />);
     await screen.findByText("Samaritans");
 
     await user.click(screen.getByRole("button", { name: "Remove Samaritans" }));
@@ -217,7 +218,7 @@ describe("HelplinesManager", () => {
   it("keeps a Helpline when removing is not confirmed", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(false);
     const user = userEvent.setup();
-    render(<HelplinesManager />);
+    renderWithQueries(<HelplinesManager />);
     await screen.findByText("Samaritans");
 
     await user.click(screen.getByRole("button", { name: "Remove Samaritans" }));
@@ -228,7 +229,7 @@ describe("HelplinesManager", () => {
   it("moves a Helpline within its country, but not past the ends", async () => {
     apiClient.moveHelpline.mockResolvedValue([imh, sos]);
     const user = userEvent.setup();
-    render(<HelplinesManager />);
+    renderWithQueries(<HelplinesManager />);
     await screen.findByText("Samaritans");
 
     expect(
@@ -256,7 +257,7 @@ describe("HelplinesManager", () => {
   it("says so when a row change fails", async () => {
     apiClient.moveHelpline.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    render(<HelplinesManager />);
+    renderWithQueries(<HelplinesManager />);
     await screen.findByText("Samaritans");
 
     await user.click(
@@ -277,7 +278,7 @@ describe("HelplinesManager", () => {
       helplines: [],
       international_fallback: fallback,
     });
-    render(<HelplinesManager />);
+    renderWithQueries(<HelplinesManager />);
 
     expect(await screen.findByText("No Helplines yet")).toBeVisible();
     expect(screen.getByText("Find A Helpline")).toBeVisible();
@@ -288,7 +289,7 @@ describe("HelplinesManager", () => {
       .mockRejectedValueOnce(new Error("down"))
       .mockResolvedValue(seeded);
     const user = userEvent.setup();
-    render(<HelplinesManager />);
+    renderWithQueries(<HelplinesManager />);
 
     await user.click(await screen.findByRole("button", { name: "Try again" }));
 

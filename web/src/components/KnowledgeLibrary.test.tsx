@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -8,6 +8,7 @@ import {
   type ApiClient,
   type KnowledgeDocument,
 } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   listKnowledgeDocuments: vi.fn<ApiClient["listKnowledgeDocuments"]>(),
@@ -79,7 +80,7 @@ describe("KnowledgeLibrary", () => {
   });
 
   it("lists documents with their type, status and why one failed", async () => {
-    render(<KnowledgeLibrary />);
+    renderWithQueries(<KnowledgeLibrary />);
 
     await screen.findByText("Letters to Lucilius");
     expect(
@@ -105,7 +106,7 @@ describe("KnowledgeLibrary", () => {
 
   it("uploads a document with its title, source and tradition", async () => {
     apiClient.uploadKnowledgeDocument.mockResolvedValue(notes);
-    render(<KnowledgeLibrary />);
+    renderWithQueries(<KnowledgeLibrary />);
     await screen.findByText("Letters to Lucilius");
     const upload = screen.getByRole("button", { name: "Upload" });
     expect(upload).toBeDisabled();
@@ -141,7 +142,7 @@ describe("KnowledgeLibrary", () => {
   });
 
   it("suggests a title from the file name", async () => {
-    render(<KnowledgeLibrary />);
+    renderWithQueries(<KnowledgeLibrary />);
     await screen.findByText("Letters to Lucilius");
 
     await chooseFile("tao-te-ching.txt");
@@ -157,7 +158,7 @@ describe("KnowledgeLibrary", () => {
         "The file is bigger than 20 MB.",
       ),
     );
-    render(<KnowledgeLibrary />);
+    renderWithQueries(<KnowledgeLibrary />);
     await screen.findByText("Letters to Lucilius");
 
     await chooseFile("huge.txt");
@@ -175,7 +176,7 @@ describe("KnowledgeLibrary", () => {
       status: "pending",
       failure_reason: null,
     });
-    render(<KnowledgeLibrary />);
+    renderWithQueries(<KnowledgeLibrary />);
     await screen.findByText("Being and Time (excerpt)");
     apiClient.listKnowledgeDocuments.mockResolvedValue([
       letters,
@@ -195,7 +196,7 @@ describe("KnowledgeLibrary", () => {
   it("deletes a document after confirming", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     apiClient.deleteKnowledgeDocument.mockResolvedValue();
-    render(<KnowledgeLibrary />);
+    renderWithQueries(<KnowledgeLibrary />);
     await screen.findByText("Letters to Lucilius");
     apiClient.listKnowledgeDocuments.mockResolvedValue([being]);
 
@@ -215,7 +216,7 @@ describe("KnowledgeLibrary", () => {
 
   it("keeps a document when deleting is not confirmed", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(false);
-    render(<KnowledgeLibrary />);
+    renderWithQueries(<KnowledgeLibrary />);
     await screen.findByText("Letters to Lucilius");
 
     await userEvent.click(
@@ -228,7 +229,7 @@ describe("KnowledgeLibrary", () => {
   it("checks again while a document is pending until it is ready", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     apiClient.listKnowledgeDocuments.mockResolvedValue([notes]);
-    render(<KnowledgeLibrary />);
+    renderWithQueries(<KnowledgeLibrary />);
     await screen.findByText("Pending");
     apiClient.listKnowledgeDocuments.mockResolvedValue([
       { ...notes, status: "ready" },
@@ -250,7 +251,7 @@ describe("KnowledgeLibrary", () => {
 
   it("explains an empty library", async () => {
     apiClient.listKnowledgeDocuments.mockResolvedValue([]);
-    render(<KnowledgeLibrary />);
+    renderWithQueries(<KnowledgeLibrary />);
 
     expect(await screen.findByText("The library is empty")).toBeInTheDocument();
     expect(
@@ -260,7 +261,7 @@ describe("KnowledgeLibrary", () => {
 
   it("shows an error with Try again when the list can't load", async () => {
     apiClient.listKnowledgeDocuments.mockRejectedValueOnce(new Error("down"));
-    render(<KnowledgeLibrary />);
+    renderWithQueries(<KnowledgeLibrary />);
 
     expect(
       await screen.findByText("Couldn’t load the document list"),

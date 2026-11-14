@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
 import { ConversationSummariesList } from "@/components/ConversationSummariesList";
@@ -9,25 +10,9 @@ import { MemoryNote } from "@/components/MemoryNote";
 import { MemoryItemsList } from "@/components/MemoryItemsList";
 import { SharedPhotosList } from "@/components/SharedPhotosList";
 import { Switch } from "@/components/Switch";
-import type {
-  ConversationSummary,
-  Me,
-  MemoryGroup,
-  SharedPhoto,
-} from "@/lib/api-client";
 import { notAvailableText } from "@/lib/features";
+import { queryKeys, useMe, useUpdatePreferences } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
-
-type LoadState =
-  | { kind: "loading" }
-  | { kind: "failed" }
-  | {
-      kind: "loaded";
-      me: Me;
-      groups: MemoryGroup[];
-      summaries: ConversationSummary[];
-      photos: SharedPhoto[];
-    };
 
 type Tab = "memories" | "summaries" | "photos";
 
@@ -46,50 +31,33 @@ const tabs: { id: Tab; label: string }[] = [
  */
 export function Memories() {
   const apiClient = useApiClient();
-  const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [tab, setTab] = useState<Tab>("memories");
-  const [isSavingSwitch, setIsSavingSwitch] = useState(false);
-  const [switchFailed, setSwitchFailed] = useState(false);
+  const updatePreferences = useUpdatePreferences();
+  const meQuery = useMe();
+  const groupsQuery = useQuery({
+    queryKey: queryKeys.memoryGroups,
+    queryFn: () => apiClient.listMemoryGroups(),
+  });
+  const summariesQuery = useQuery({
+    queryKey: queryKeys.conversationSummaries,
+    queryFn: () => apiClient.listConversationSummaries(),
+  });
+  const photosQuery = useQuery({
+    queryKey: queryKeys.sharedPhotos,
+    queryFn: () => apiClient.listSharedPhotos(),
+  });
+  const queries = [meQuery, groupsQuery, summariesQuery, photosQuery];
 
-  const load = useCallback(async () => {
-    setState({ kind: "loading" });
-    try {
-      const [me, groups, summaries, photos] = await Promise.all([
-        apiClient.getMe(),
-        apiClient.listMemoryGroups(),
-        apiClient.listConversationSummaries(),
-        apiClient.listSharedPhotos(),
-      ]);
-      setState({ kind: "loaded", me, groups, summaries, photos });
-    } catch {
-      setState({ kind: "failed" });
-    }
-  }, [apiClient]);
+  const me = meQuery.data;
+  const groups = groupsQuery.data;
+  const summaries = summariesQuery.data;
+  const photos = photosQuery.data;
+  const isLoaded = Boolean(me && groups && summaries && photos);
+  const loadFailed = !isLoaded && queries.some((query) => query.isError);
+  const timeZone = me?.time_zone ?? undefined;
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  async function saveUserMemorySetting(enabled: boolean) {
-    setIsSavingSwitch(true);
-    setSwitchFailed(false);
-    try {
-      const me = await apiClient.updatePreferences({
-        user_memory_enabled: enabled,
-      });
-      setState((current) =>
-        current.kind === "loaded" ? { ...current, me } : current,
-      );
-    } catch {
-      setSwitchFailed(true);
-    } finally {
-      setIsSavingSwitch(false);
-    }
-  }
-
-  const memoryOn = state.kind === "loaded" && state.me.user_memory_enabled;
-  const memoryUnavailable =
-    state.kind === "loaded" && !state.me.user_memory_available;
+  const memoryOn = me?.user_memory_enabled ?? false;
+  const memoryUnavailable = me !== undefined && !me.user_memory_available;
   let switchLabel = memoryOn ? "Memory on" : "Memory paused";
   if (memoryUnavailable) {
     switchLabel = notAvailableText;
@@ -108,22 +76,24 @@ export function Memories() {
             You can also tell Zeph “forget that”.
           </p>
         </div>
-        {state.kind === "loaded" ? (
+        {me ? (
           <div className="flex flex-col items-end gap-1.5">
             <div className="flex items-center gap-3 rounded-full border border-line bg-white py-1.5 pr-1.5 pl-[18px]">
               <span className="text-sm font-medium">{switchLabel}</span>
               <Switch
                 label="Memory"
                 checked={memoryOn}
-                disabled={isSavingSwitch || memoryUnavailable}
-                onChange={(next) => void saveUserMemorySetting(next)}
+                disabled={updatePreferences.isPending || memoryUnavailable}
+                onChange={(next) =>
+                  updatePreferences.mutate({ user_memory_enabled: next })
+                }
               />
             </div>
             <ChangedInChatCaption
-              changedAt={state.me.changed_in_chat.user_memory}
-              timeZone={state.me.time_zone ?? undefined}
+              changedAt={me.changed_in_chat.user_memory}
+              timeZone={timeZone}
             />
-            {switchFailed ? (
+            {updatePreferences.isError ? (
               <p role="alert" className="m-0 text-sm text-danger-deep">
                 We couldn’t change that. Please try again.
               </p>
@@ -132,9 +102,7 @@ export function Memories() {
         ) : null}
       </header>
 
-      {state.kind === "loaded" ? (
-        <MemoryNote note={state.me.memory_note} />
-      ) : null}
+      {me ? <MemoryNote note={me.memory_note} /> : null}
 
       <div
         role="tablist"
@@ -159,7 +127,7 @@ export function Memories() {
         ))}
       </div>
 
-      {state.kind === "loading" ? (
+      {!isLoaded && !loadFailed ? (
         <div
           aria-busy="true"
           aria-label="Loading memories"
@@ -172,48 +140,28 @@ export function Memories() {
         </div>
       ) : null}
 
-      {state.kind === "failed" ? (
+      {loadFailed ? (
         <LoadFailed
           title="We couldn’t load your memories"
           body="Something went wrong on our side. Nothing has been deleted."
-          onRetry={() => void load()}
+          onRetry={() => {
+            for (const query of queries) {
+              void query.refetch();
+            }
+          }}
         />
       ) : null}
 
-      {state.kind === "loaded" && tab === "memories" ? (
-        <MemoryItemsList
-          groups={state.groups}
-          timeZone={state.me.time_zone ?? undefined}
-          onGroupsChange={(groups) =>
-            setState((current) =>
-              current.kind === "loaded" ? { ...current, groups } : current,
-            )
-          }
-        />
+      {isLoaded && groups && tab === "memories" ? (
+        <MemoryItemsList groups={groups} timeZone={timeZone} />
       ) : null}
 
-      {state.kind === "loaded" && tab === "summaries" ? (
-        <ConversationSummariesList
-          summaries={state.summaries}
-          timeZone={state.me.time_zone ?? undefined}
-          onSummariesChange={(summaries) =>
-            setState((current) =>
-              current.kind === "loaded" ? { ...current, summaries } : current,
-            )
-          }
-        />
+      {isLoaded && summaries && tab === "summaries" ? (
+        <ConversationSummariesList summaries={summaries} timeZone={timeZone} />
       ) : null}
 
-      {state.kind === "loaded" && tab === "photos" ? (
-        <SharedPhotosList
-          photos={state.photos}
-          timeZone={state.me.time_zone ?? undefined}
-          onPhotosChange={(photos) =>
-            setState((current) =>
-              current.kind === "loaded" ? { ...current, photos } : current,
-            )
-          }
-        />
+      {isLoaded && photos && tab === "photos" ? (
+        <SharedPhotosList photos={photos} timeZone={timeZone} />
       ) : null}
     </>
   );

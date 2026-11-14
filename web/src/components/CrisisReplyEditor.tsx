@@ -7,15 +7,12 @@ import { fieldLabel, inputField } from "@/components/form-styles";
 import { LoadFailed } from "@/components/LoadFailed";
 import { ApiError } from "@/lib/api-client";
 import { lastSavedNote, textSetting } from "@/lib/settings";
-import { useAdminSettings } from "@/lib/use-admin-settings";
+import {
+  useAdminSettings,
+  useSaveAdminSettings,
+} from "@/lib/use-admin-settings";
 
 const crisisReplyKey = "crisis_reply";
-
-type SaveState =
-  | { kind: "idle" }
-  | { kind: "saving" }
-  | { kind: "saved" }
-  | { kind: "failed"; message: string };
 
 /**
  * The Safety page's Crisis Reply section: the wording sent when the
@@ -24,11 +21,21 @@ type SaveState =
  * @returns The editor, or a loading block or error with Try again.
  */
 export function CrisisReplyEditor() {
-  const { state, reload, save } = useAdminSettings();
+  const settingsQuery = useAdminSettings();
+  const saveSettings = useSaveAdminSettings();
   const [draft, setDraft] = useState<string | null>(null);
-  const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
+  const settings = settingsQuery.data;
 
-  if (state.kind === "loading") {
+  if (!settings) {
+    if (settingsQuery.isError) {
+      return (
+        <LoadFailed
+          title="Couldn’t load the Crisis Reply"
+          body="Zeph keeps using the last saved Crisis Reply."
+          onRetry={() => void settingsQuery.refetch()}
+        />
+      );
+    }
     return (
       <div
         aria-busy="true"
@@ -38,36 +45,21 @@ export function CrisisReplyEditor() {
     );
   }
 
-  if (state.kind === "failed") {
-    return (
-      <LoadFailed
-        title="Couldn’t load the Crisis Reply"
-        body="Zeph keeps using the last saved Crisis Reply."
-        onRetry={reload}
-      />
-    );
-  }
-
-  const saved = textSetting(state.settings, crisisReplyKey);
+  const saved = textSetting(settings, crisisReplyKey);
   const value = draft ?? saved;
   const canSave =
-    value !== saved && value.trim() !== "" && saveState.kind !== "saving";
+    value !== saved && value.trim() !== "" && !saveSettings.isPending;
+  const { error } = saveSettings;
+  const failureMessage =
+    error instanceof ApiError && error.status === 422 && error.detail
+      ? error.detail
+      : "Couldn’t save. Zeph keeps using the last saved Crisis Reply.";
 
-  async function saveCrisisReply() {
-    setSaveState({ kind: "saving" });
-    try {
-      await save({ [crisisReplyKey]: value });
-      setDraft(null);
-      setSaveState({ kind: "saved" });
-    } catch (error) {
-      setSaveState({
-        kind: "failed",
-        message:
-          error instanceof ApiError && error.status === 422 && error.detail
-            ? error.detail
-            : "Couldn’t save. Zeph keeps using the last saved Crisis Reply.",
-      });
-    }
+  function saveCrisisReply() {
+    saveSettings.mutate(
+      { [crisisReplyKey]: value },
+      { onSuccess: () => setDraft(null) },
+    );
   }
 
   return (
@@ -95,22 +87,22 @@ export function CrisisReplyEditor() {
           value={value}
           onChange={(event) => {
             setDraft(event.target.value);
-            setSaveState({ kind: "idle" });
+            saveSettings.reset();
           }}
         />
       </label>
-      {saveState.kind === "failed" ? (
+      {saveSettings.isError ? (
         <p
           role="alert"
           className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3.5 text-sm text-danger-deep"
         >
-          {saveState.message}
+          {failureMessage}
         </p>
       ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="text-caption text-ink-muted">
-          {lastSavedNote(state.settings, [crisisReplyKey])}
-          {saveState.kind === "saved" ? (
+          {lastSavedNote(settings, [crisisReplyKey])}
+          {saveSettings.isSuccess ? (
             <span role="status" className="ml-2 text-blue-deep">
               Saved
             </span>
@@ -120,9 +112,9 @@ export function CrisisReplyEditor() {
           type="button"
           className={primaryButton}
           disabled={!canSave}
-          onClick={() => void saveCrisisReply()}
+          onClick={saveCrisisReply}
         >
-          {saveState.kind === "saving" ? "Saving…" : "Save Crisis Reply"}
+          {saveSettings.isPending ? "Saving…" : "Save Crisis Reply"}
         </button>
       </div>
     </section>

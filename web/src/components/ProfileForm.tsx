@@ -7,9 +7,7 @@ import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
 import { fieldCaption, fieldLabel, inputField } from "@/components/form-styles";
 import { LocationFields } from "@/components/LocationFields";
 import type { Me } from "@/lib/api-client";
-import { useApiClient } from "@/lib/use-api-client";
-
-type SaveState = "idle" | "saving" | "saved" | "failed";
+import { useUpdatePreferences } from "@/lib/queries";
 
 /**
  * The Profile section: what Zeph calls the User, their email, country and
@@ -19,51 +17,40 @@ type SaveState = "idle" | "saving" | "saved" | "failed";
  * @returns The form.
  */
 export function ProfileForm({ me }: { me: Me }) {
-  const apiClient = useApiClient();
+  const updatePreferences = useUpdatePreferences();
   const [name, setName] = useState(me.name ?? "");
   const [country, setCountry] = useState(me.country ?? "");
   const [timeZone, setTimeZone] = useState(me.time_zone ?? "");
-  const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [timeZoneChangedInChatAt, setTimeZoneChangedInChatAt] = useState(
-    me.changed_in_chat.time_zone,
-  );
 
   const canSave =
     name.trim() !== "" &&
     country !== "" &&
     timeZone !== "" &&
-    saveState !== "saving";
+    !updatePreferences.isPending;
 
-  async function save(event: FormEvent<HTMLFormElement>) {
+  function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSave) {
       return;
     }
-    setSaveState("saving");
-    try {
-      const saved = await apiClient.updatePreferences({
-        name: name.trim(),
-        country,
-        time_zone: timeZone,
-      });
-      setTimeZoneChangedInChatAt(saved.changed_in_chat.time_zone);
-      setSaveState("saved");
-    } catch {
-      setSaveState("failed");
-    }
+    updatePreferences.mutate({
+      name: name.trim(),
+      country,
+      time_zone: timeZone,
+    });
   }
 
   function clearSavedOnEdit<T>(setter: (value: T) => void) {
     return (value: T) => {
       setter(value);
-      setSaveState("idle");
+      updatePreferences.reset();
     };
   }
 
   return (
     <form
       aria-labelledby="profile-heading"
-      onSubmit={(event) => void save(event)}
+      onSubmit={save}
       className="flex flex-col gap-5 rounded-card border border-line bg-white p-8"
     >
       <h2 id="profile-heading" className="m-0 text-[17px] font-semibold">
@@ -95,21 +82,21 @@ export function ProfileForm({ me }: { me: Me }) {
         onTimeZoneChange={clearSavedOnEdit(setTimeZone)}
         timeZoneNote={
           <ChangedInChatCaption
-            changedAt={timeZoneChangedInChatAt}
+            changedAt={me.changed_in_chat.time_zone}
             timeZone={me.time_zone ?? undefined}
           />
         }
       />
       <div className="flex flex-wrap items-center gap-3">
         <button type="submit" className={primaryButton} disabled={!canSave}>
-          {saveState === "saving" ? "Saving…" : "Save changes"}
+          {updatePreferences.isPending ? "Saving…" : "Save changes"}
         </button>
-        {saveState === "saved" ? (
+        {updatePreferences.isSuccess ? (
           <p role="status" className="m-0 text-sm text-blue-deep">
             Saved
           </p>
         ) : null}
-        {saveState === "failed" ? (
+        {updatePreferences.isError ? (
           <p role="alert" className="m-0 text-sm text-danger-deep">
             We couldn’t save that. Please try again.
           </p>

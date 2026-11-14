@@ -1,9 +1,10 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DashboardHome } from "@/components/DashboardHome";
 import type { ApiClient, Home, HomeCheckIns } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   getHome: vi.fn<ApiClient["getHome"]>(),
@@ -89,7 +90,7 @@ describe("DashboardHome", () => {
   it("greets the User and shows who Telegram is connected as", async () => {
     apiClient.getHome.mockResolvedValue(homeWith());
 
-    render(<DashboardHome />);
+    renderWithQueries(<DashboardHome />);
 
     expect(
       await screen.findByRole("heading", { name: "Good evening, Maya." }),
@@ -116,7 +117,7 @@ describe("DashboardHome", () => {
       homeWith({ telegram_connection: null, last_conversation_at: null }),
     );
 
-    render(<DashboardHome />);
+    renderWithQueries(<DashboardHome />);
 
     const banner = await screen.findByRole("region", {
       name: "Zeph can’t reach you yet.",
@@ -131,7 +132,7 @@ describe("DashboardHome", () => {
   it("shows Check-ins on, with quiet hours and the last Check-in sent", async () => {
     apiClient.getHome.mockResolvedValue(homeWith());
 
-    render(<DashboardHome />);
+    renderWithQueries(<DashboardHome />);
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     const checkIns = section("Check-ins");
@@ -164,7 +165,7 @@ describe("DashboardHome", () => {
       }),
     );
 
-    render(<DashboardHome />);
+    renderWithQueries(<DashboardHome />);
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     const checkIns = section("Check-ins");
@@ -185,7 +186,7 @@ describe("DashboardHome", () => {
       homeWith({ check_ins: checkInsWith({ enabled: false }) }),
     );
 
-    render(<DashboardHome />);
+    renderWithQueries(<DashboardHome />);
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     const checkIns = section("Check-ins");
@@ -201,7 +202,7 @@ describe("DashboardHome", () => {
       homeWith({ check_ins: checkInsWith({ available: false }) }),
     );
 
-    render(<DashboardHome />);
+    renderWithQueries(<DashboardHome />);
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     const checkIns = section("Check-ins");
@@ -215,7 +216,7 @@ describe("DashboardHome", () => {
   it("shows Goals and recent Memory Items, each linking to Memories", async () => {
     apiClient.getHome.mockResolvedValue(homeWith());
 
-    render(<DashboardHome />);
+    renderWithQueries(<DashboardHome />);
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     const goals = section("What you’re working toward");
@@ -243,7 +244,7 @@ describe("DashboardHome", () => {
       homeWith({ goals: [], recently_remembered: [] }),
     );
 
-    render(<DashboardHome />);
+    renderWithQueries(<DashboardHome />);
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     expect(
@@ -266,7 +267,7 @@ describe("DashboardHome", () => {
       }),
     );
 
-    render(<DashboardHome />);
+    renderWithQueries(<DashboardHome />);
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     const note = screen.getByRole("status");
@@ -289,7 +290,7 @@ describe("DashboardHome", () => {
   it("shows no memory note while memory is on", async () => {
     apiClient.getHome.mockResolvedValue(homeWith());
 
-    render(<DashboardHome />);
+    renderWithQueries(<DashboardHome />);
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     expect(screen.queryByRole("status")).toBeNull();
@@ -298,7 +299,7 @@ describe("DashboardHome", () => {
   it("shows the AI notice and that Zeph doesn't count streaks", async () => {
     apiClient.getHome.mockResolvedValue(homeWith());
 
-    render(<DashboardHome />);
+    renderWithQueries(<DashboardHome />);
 
     expect(
       await screen.findByText(
@@ -314,7 +315,7 @@ describe("DashboardHome", () => {
     apiClient.getHome.mockRejectedValueOnce(new Error("down"));
     apiClient.getHome.mockResolvedValueOnce(homeWith());
 
-    render(<DashboardHome />);
+    renderWithQueries(<DashboardHome />);
 
     expect(
       await screen.findByText("We couldn’t load your Dashboard"),

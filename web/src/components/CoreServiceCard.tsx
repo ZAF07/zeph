@@ -10,12 +10,9 @@ import {
   type AdminSettings,
   type CoreService,
   type ExtraPrompt,
-  type SettingValue,
 } from "@/lib/api-client";
 import { lastSavedNote, textSetting } from "@/lib/settings";
-
-type SaveState =
-  { kind: "idle" } | { kind: "saving" } | { kind: "failed"; message: string };
+import { useSaveAdminSettings } from "@/lib/use-admin-settings";
 
 const SAVE_FAILED_MESSAGE =
   "Couldn’t save. The last saved prompt and model stay in use.";
@@ -28,21 +25,19 @@ const SAVE_FAILED_MESSAGE =
  * the card shows its reason.
  *
  * @param props - `service` is the core service, `modelChoices` the models
- *   Admins can pick, `settings` the saved settings, and `onSave` saves new
- *   values and rejects if the backend refuses them.
+ *   Admins can pick, and `settings` the saved settings.
  * @returns The card.
  */
 export function CoreServiceCard({
   service,
   modelChoices,
   settings,
-  onSave,
 }: {
   service: CoreService;
   modelChoices: string[];
   settings: AdminSettings;
-  onSave: (values: Record<string, SettingValue>) => Promise<void>;
 }) {
+  const saveSettings = useSaveAdminSettings();
   const savedModel = textSetting(settings, service.model_key);
   const savedPrompt = textSetting(settings, service.prompt_key);
   const [model, setModel] = useState(savedModel);
@@ -57,7 +52,6 @@ export function CoreServiceCard({
   );
   const [extraPrompts, setExtraPrompts] =
     useState<Record<string, string>>(savedExtraPrompts);
-  const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
 
   const isDirty =
     model !== savedModel ||
@@ -67,35 +61,35 @@ export function CoreServiceCard({
     prompt,
     ...extraKeys.map((key) => extraPrompts[key]),
   ].every((text) => text?.trim());
-  const canSave = isDirty && allFilled && saveState.kind !== "saving";
+  const canSave = isDirty && allFilled && !saveSettings.isPending;
+  const { error } = saveSettings;
+  const failureMessage =
+    error instanceof ApiError && error.status === 422 && error.detail
+      ? error.detail
+      : SAVE_FAILED_MESSAGE;
   const headingId = `service-${service.prompt_key}`;
 
-  async function save() {
-    setSaveState({ kind: "saving" });
-    try {
-      await onSave({
+  function save() {
+    saveSettings.mutate(
+      {
         [service.prompt_key]: prompt,
         [service.model_key]: model,
         ...extraPrompts,
-      });
-      setPrompt(prompt.trim());
-      setExtraPrompts(
-        Object.fromEntries(
-          Object.entries(extraPrompts).map(([key, text]) => [key, text.trim()]),
-        ),
-      );
-      setSaveState({ kind: "idle" });
-    } catch (failure) {
-      setSaveState({
-        kind: "failed",
-        message:
-          failure instanceof ApiError &&
-          failure.status === 422 &&
-          failure.detail
-            ? failure.detail
-            : SAVE_FAILED_MESSAGE,
-      });
-    }
+      },
+      {
+        onSuccess: () => {
+          setPrompt(prompt.trim());
+          setExtraPrompts(
+            Object.fromEntries(
+              Object.entries(extraPrompts).map(([key, text]) => [
+                key,
+                text.trim(),
+              ]),
+            ),
+          );
+        },
+      },
+    );
   }
 
   function extraPromptField(extraPrompt: ExtraPrompt) {
@@ -106,7 +100,7 @@ export function CoreServiceCard({
         value={extraPrompts[extraPrompt.key] ?? ""}
         onChange={(text) => {
           setExtraPrompts({ ...extraPrompts, [extraPrompt.key]: text });
-          setSaveState({ kind: "idle" });
+          saveSettings.reset();
         }}
       />
     );
@@ -136,7 +130,7 @@ export function CoreServiceCard({
             value={model}
             onChange={(event) => {
               setModel(event.target.value);
-              setSaveState({ kind: "idle" });
+              saveSettings.reset();
             }}
           >
             {modelChoices.map((choice) => (
@@ -154,7 +148,7 @@ export function CoreServiceCard({
             value={prompt}
             onChange={(event) => {
               setPrompt(event.target.value);
-              setSaveState({ kind: "idle" });
+              saveSettings.reset();
             }}
           />
         </label>
@@ -178,9 +172,9 @@ export function CoreServiceCard({
             </div>
           </details>
         ))}
-        {saveState.kind === "failed" ? (
+        {saveSettings.isError ? (
           <p role="alert" className="m-0 text-sm text-danger-deep">
-            {saveState.message}
+            {failureMessage}
           </p>
         ) : null}
       </div>
@@ -196,9 +190,9 @@ export function CoreServiceCard({
           type="button"
           className={secondaryButton}
           disabled={!canSave}
-          onClick={() => void save()}
+          onClick={save}
         >
-          {saveState.kind === "saving" ? "Saving…" : "Save"}
+          {saveSettings.isPending ? "Saving…" : "Save"}
         </button>
       </div>
     </section>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { dangerButton } from "@/components/button-styles";
@@ -7,12 +8,6 @@ import { DeleteConfirmation } from "@/components/DeleteConfirmation";
 import { ApiError } from "@/lib/api-client";
 import { useSignOut } from "@/lib/auth/client";
 import { useApiClient } from "@/lib/use-api-client";
-
-type DeleteState =
-  | { kind: "idle" }
-  | { kind: "confirming" }
-  | { kind: "deleting" }
-  | { kind: "failed"; message: string };
 
 /**
  * The Delete account section: deletes the User's account and everything of
@@ -23,28 +18,18 @@ type DeleteState =
 export function DeleteAccountSection() {
   const apiClient = useApiClient();
   const signOut = useSignOut();
-  const [deleteState, setDeleteState] = useState<DeleteState>({
-    kind: "idle",
-  });
-  const isConfirming =
-    deleteState.kind === "confirming" || deleteState.kind === "deleting";
+  const [isConfirming, setIsConfirming] = useState(false);
 
-  async function deleteAccount() {
-    setDeleteState({ kind: "deleting" });
-    try {
-      await apiClient.deleteAccount();
-    } catch (error) {
-      setDeleteState({
-        kind: "failed",
-        message:
-          error instanceof ApiError && error.status === 409 && error.detail
-            ? error.detail
-            : "We couldn’t delete your account. Please try again.",
-      });
-      return;
-    }
-    await signOut("/sign-in");
-  }
+  const deleteAccount = useMutation({
+    mutationFn: () => apiClient.deleteAccount(),
+    onSuccess: () => signOut("/sign-in"),
+    onError: () => setIsConfirming(false),
+  });
+  const { error } = deleteAccount;
+  const failureMessage =
+    error instanceof ApiError && error.status === 409 && error.detail
+      ? error.detail
+      : "We couldn’t delete your account. Please try again.";
 
   return (
     <section
@@ -65,22 +50,25 @@ export function DeleteAccountSection() {
         <DeleteConfirmation
           confirmLabel="Permanently delete account"
           cancelLabel="Keep my account"
-          isDeleting={deleteState.kind === "deleting"}
-          onConfirm={() => void deleteAccount()}
-          onCancel={() => setDeleteState({ kind: "idle" })}
+          isDeleting={deleteAccount.isPending}
+          onConfirm={() => deleteAccount.mutate()}
+          onCancel={() => setIsConfirming(false)}
         />
       ) : (
         <button
           type="button"
           className={`${dangerButton} self-start`}
-          onClick={() => setDeleteState({ kind: "confirming" })}
+          onClick={() => {
+            deleteAccount.reset();
+            setIsConfirming(true);
+          }}
         >
           Delete my account
         </button>
       )}
-      {deleteState.kind === "failed" ? (
+      {deleteAccount.isError ? (
         <p role="alert" className="m-0 text-sm text-danger-deep">
-          {deleteState.message}
+          {failureMessage}
         </p>
       ) : null}
     </section>

@@ -1,9 +1,10 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SidebarNav } from "@/components/SidebarNav";
 import type { ApiClient } from "@/lib/api-client";
 import { userWithRole } from "@/test/fixtures";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   getMe: vi.fn<ApiClient["getMe"]>(),
@@ -29,7 +30,7 @@ describe("SidebarNav", () => {
   it("shows the Admin group to an Admin, marking the page being viewed", async () => {
     apiClient.getMe.mockResolvedValue(userWithRole("admin"));
 
-    render(<SidebarNav items={userItems} />);
+    renderWithQueries(<SidebarNav items={userItems} />);
 
     const adminGroup = await screen.findByRole("group", { name: "Admin" });
     const links = within(adminGroup).getAllByRole("link");
@@ -57,7 +58,7 @@ describe("SidebarNav", () => {
     apiClient.getMe.mockResolvedValue(userWithRole("admin"));
     navigation.pathname = "/admin/knowledge/letters";
 
-    render(<SidebarNav items={userItems} />);
+    renderWithQueries(<SidebarNav items={userItems} />);
 
     const adminGroup = await screen.findByRole("group", { name: "Admin" });
     expect(
@@ -68,7 +69,7 @@ describe("SidebarNav", () => {
   it("hides the Admin group from a User who is not an Admin", async () => {
     apiClient.getMe.mockResolvedValue(userWithRole("user"));
 
-    render(<SidebarNav items={userItems} />);
+    renderWithQueries(<SidebarNav items={userItems} />);
 
     await vi.waitFor(() => expect(apiClient.getMe).toHaveBeenCalled());
     expect(screen.getByRole("link", { name: "Home" })).toBeInTheDocument();
