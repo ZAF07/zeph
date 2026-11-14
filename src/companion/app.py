@@ -18,6 +18,7 @@ from companion.core.chat_settings import SettingsTools
 from companion.core.check_in_kinds import CheckInKindService
 from companion.core.check_ins import CheckInService
 from companion.core.conversations import ConversationService
+from companion.core.curiosities import CuriosityKeeper, CuriosityRaiser
 from companion.core.features import FeatureService
 from companion.core.helplines import HelplineService
 from companion.core.home import HomeService
@@ -229,6 +230,9 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             embedder=dependencies.embedder,
             clock=dependencies.clock,
         ),
+        curiosity_raiser=CuriosityRaiser(
+            repositories=dependencies.repositories, clock=dependencies.clock
+        ),
         understanding=UnderstandingService(
             repositories=dependencies.repositories,
             chat_model=chat_model,
@@ -302,6 +306,12 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 clock=dependencies.clock,
             ),
             life_thread_keeper=LifeThreadKeeper(
+                repositories=dependencies.repositories,
+                chat_model=chat_model,
+                embedder=dependencies.embedder,
+                clock=dependencies.clock,
+            ),
+            curiosity_keeper=CuriosityKeeper(
                 repositories=dependencies.repositories,
                 chat_model=chat_model,
                 embedder=dependencies.embedder,

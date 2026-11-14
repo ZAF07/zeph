@@ -1,6 +1,6 @@
 # 11 — Curiosities
 
-Status: ready-for-agent
+Status: in-progress
 
 ## Parent
 
@@ -31,3 +31,14 @@ The Companion has things it's been meaning to ask (`CONTEXT.md` "Curiosity").
 ## Blocked by
 
 - `.scratch/understanding/issues/08-life-threads-and-being-reminded.md`
+
+## Comments
+
+- Branch `understanding-11-curiosities`, worktree `ai-chat-companion-understanding-11` (ports 3210/8210/5642).
+- Plan:
+  - New `curiosities` table (migration 0032): what to ask, why, not-before day (or none), sensitivity (low / medium / high), state (waiting / raised / closed), reaction, source Memory Item or Life Thread, raised at and in which Conversation. The source columns are foreign keys with `ON DELETE CASCADE`, so every way a Memory Item or Thread is deleted (Dashboard, "forget that" in chat, a memory processing "remove") takes its Curiosities with it.
+  - New Feature **Curiosities** (on for everyone at the start, like the other non-plan Features; not in the reply's "unavailable" note, since Users don't know about it).
+  - Conversation end: a separate "Curiosity keeping" model call (own Admin prompt and model, step `curiosities` in the Model Call Log), run after Life Thread keeping, only while User Memory and Curiosities work. It sees today's date, the User's Memory Items and the Threads the Conversation touches (to name a source), the waiting Curiosities and those raised in this Conversation, recently raised ones (so it doesn't ask again), and the Conversation. It adds new ones, edits or closes waiting ones, and records how the User took raised ones. Over the waiting limit, the oldest waiting ones are closed.
+  - Reply: before the Understanding, the code lists waiting Curiosities whose day has come (in the User's time zone), with how many were raised in this Conversation and the limit; none once the limit is reached or when the Feature is off. The Understanding may put one in `bring_up` as `{"curiosity": n, "how": ...}`; the code caps it at what's left of the limit. The reply gets the question, why, and how to bring it up. It is marked raised after the reply is sent.
+  - Settings: `curiosities_per_conversation` (1), `curiosities_waiting_limit` (10) on Settings; prompt and model on Prompts and Models.
+  - Delete My Data and Account Deletion delete them; no Dashboard or User API returns them.

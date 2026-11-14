@@ -30,6 +30,7 @@ from companion.adapters.postgres.tables import (
     conversation_messages,
     conversation_summaries,
     conversations,
+    curiosities,
     daily_usage,
     feature_switches,
     helplines,
@@ -71,6 +72,11 @@ from companion.core.models import (
     Conversation,
     ConversationMessage,
     ConversationSummary,
+    Curiosity,
+    CuriosityChanges,
+    CuriositySensitivity,
+    CuriosityState,
+    CuriosityToRaise,
     DailyUsage,
     Feature,
     FeatureSwitch,
@@ -1729,13 +1735,17 @@ def _understanding_form_values(form: UnderstandingForm) -> dict[str, Any]:
         form: The form.
 
     Returns:
-        The form, with each Thread's ID as text.
+        The form, with each Thread's and Curiosity's ID as text.
     """
     values = asdict(form)
     for field_name in ("bring_up", "left_alone"):
         values[field_name] = [
             {**item, "thread_id": str(item["thread_id"])} for item in values[field_name]
         ]
+    values["curiosities"] = [
+        {**item, "curiosity_id": str(item["curiosity_id"])}
+        for item in values["curiosities"]
+    ]
     return values
 
 
@@ -1774,6 +1784,15 @@ def _to_understanding_form(stored: dict[str, Any]) -> UnderstandingForm:
         look_up_past=tuple(stored["look_up_past"]),
         knowledge=read_knowledge_lookup(stored["knowledge"]),
         threads_touched=tuple(stored["threads_touched"]),
+        curiosities=tuple(
+            CuriosityToRaise(
+                curiosity_id=UUID(item["curiosity_id"]),
+                question=item["question"],
+                why=item["why"],
+                how=BringUpWay(item["how"]),
+            )
+            for item in stored.get("curiosities", [])
+        ),
     )
 
 
@@ -2281,6 +2300,243 @@ class PostgresUserPortraitRepository:
         with self._database.begin() as connection:
             connection.execute(
                 delete(user_portraits).where(user_portraits.c.user_id == user_id)
+            )
+
+
+def _to_curiosity(row: Row[Any]) -> Curiosity:
+    """Turn a `curiosities` row into a Curiosity.
+
+    Args:
+        row: The row.
+
+    Returns:
+        The Curiosity.
+    """
+    return Curiosity(
+        id=row.id,
+        user_id=row.user_id,
+        question=row.question,
+        why=row.why,
+        not_before=row.not_before,
+        sensitivity=CuriositySensitivity(row.sensitivity),
+        state=CuriosityState(row.state),
+        created_at=row.created_at,
+        source_memory_item_id=row.source_memory_item_id,
+        source_life_thread_id=row.source_life_thread_id,
+        raised_at=row.raised_at,
+        raised_conversation_id=row.raised_conversation_id,
+        reaction=ThreadReaction(row.reaction) if row.reaction else None,
+    )
+
+
+class PostgresCuriosityRepository:
+    """Stores Curiosities in Postgres.
+
+    The source Memory Item and Life Thread columns delete a Curiosity with
+    its source.
+    """
+
+    def __init__(self, database: Database) -> None:
+        """Set up the repository.
+
+        Args:
+            database: Where to run queries: the engine, or one transaction.
+        """
+        self._database = database
+
+    def list_waiting(self, user_id: UUID) -> list[Curiosity]:
+        """List a User's waiting Curiosities, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Curiosities.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(curiosities)
+                .where(
+                    curiosities.c.user_id == user_id,
+                    curiosities.c.state == CuriosityState.WAITING,
+                )
+                .order_by(curiosities.c.position)
+            ).all()
+        return [_to_curiosity(row) for row in rows]
+
+    def list_raised_in(self, conversation_id: UUID) -> list[Curiosity]:
+        """List the Curiosities raised in a Conversation, first raised first.
+
+        Args:
+            conversation_id: The Conversation's ID.
+
+        Returns:
+            The Curiosities.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(curiosities)
+                .where(curiosities.c.raised_conversation_id == conversation_id)
+                .order_by(curiosities.c.raised_at, curiosities.c.position)
+            ).all()
+        return [_to_curiosity(row) for row in rows]
+
+    def list_recently_raised(self, user_id: UUID, limit: int) -> list[Curiosity]:
+        """List the Curiosities most recently raised with a User, newest first.
+
+        Args:
+            user_id: The User's ID.
+            limit: The most to return.
+
+        Returns:
+            The Curiosities.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(curiosities)
+                .where(
+                    curiosities.c.user_id == user_id,
+                    curiosities.c.state == CuriosityState.RAISED,
+                )
+                .order_by(curiosities.c.raised_at.desc(), curiosities.c.position)
+                .limit(limit)
+            ).all()
+        return [_to_curiosity(row) for row in rows]
+
+    def save_changes(self, changes: CuriosityChanges) -> None:
+        """Add, update and record reactions to Curiosities, in one step.
+
+        A new one whose Memory Item or Life Thread was deleted meanwhile is
+        not added: the sources still there are locked until the step ends,
+        so they can't be deleted halfway. An updated one is saved only while
+        it is still waiting, and a reaction only on one that was raised.
+
+        Args:
+            changes: The changes.
+        """
+        with self._database.begin() as connection:
+            added = self._with_sources_still_there(connection, changes.added)
+            if added:
+                connection.execute(
+                    insert(curiosities).values(
+                        [
+                            {**asdict(curiosity), "reaction": curiosity.reaction}
+                            for curiosity in added
+                        ]
+                    )
+                )
+            if changes.updated:
+                connection.execute(
+                    update(curiosities)
+                    .where(
+                        curiosities.c.id == bindparam("curiosity_id"),
+                        curiosities.c.state == CuriosityState.WAITING,
+                    )
+                    .values(
+                        question=bindparam("new_question"),
+                        why=bindparam("new_why"),
+                        not_before=bindparam("new_not_before"),
+                        sensitivity=bindparam("new_sensitivity"),
+                        state=bindparam("new_state"),
+                    ),
+                    [
+                        {
+                            "curiosity_id": curiosity.id,
+                            "new_question": curiosity.question,
+                            "new_why": curiosity.why,
+                            "new_not_before": curiosity.not_before,
+                            "new_sensitivity": curiosity.sensitivity,
+                            "new_state": curiosity.state,
+                        }
+                        for curiosity in changes.updated
+                    ],
+                )
+            if changes.reactions:
+                connection.execute(
+                    update(curiosities)
+                    .where(
+                        curiosities.c.id == bindparam("curiosity_id"),
+                        curiosities.c.state == CuriosityState.RAISED,
+                    )
+                    .values(reaction=bindparam("new_reaction")),
+                    [
+                        {"curiosity_id": curiosity_id, "new_reaction": reaction}
+                        for curiosity_id, reaction in changes.reactions.items()
+                    ],
+                )
+
+    def _with_sources_still_there(
+        self, connection: Connection, added: Sequence[Curiosity]
+    ) -> list[Curiosity]:
+        """Keep the new Curiosities whose source, if any, still exists.
+
+        Args:
+            connection: The connection the step runs on; the sources found
+                are locked against deletion until it ends.
+            added: The new Curiosities.
+
+        Returns:
+            Those to add.
+        """
+        item_ids = {curiosity.source_memory_item_id for curiosity in added} - {None}
+        thread_ids = {curiosity.source_life_thread_id for curiosity in added} - {None}
+        found_items = set(
+            connection.execute(
+                select(memory_items.c.id)
+                .where(memory_items.c.id.in_(item_ids))
+                .with_for_update(read=True)
+            ).scalars()
+        )
+        found_threads = set(
+            connection.execute(
+                select(life_threads.c.id)
+                .where(life_threads.c.id.in_(thread_ids))
+                .with_for_update(read=True)
+            ).scalars()
+        )
+        return [
+            curiosity
+            for curiosity in added
+            if curiosity.source_memory_item_id in found_items | {None}
+            and curiosity.source_life_thread_id in found_threads | {None}
+        ]
+
+    def mark_raised(
+        self, curiosity_ids: Sequence[UUID], conversation_id: UUID, raised_at: datetime
+    ) -> None:
+        """Note that waiting Curiosities were just raised in a Conversation.
+
+        Args:
+            curiosity_ids: The Curiosities' IDs; any no longer waiting is
+                left as it is.
+            conversation_id: The Conversation they were raised in.
+            raised_at: When the reply that raised them was sent.
+        """
+        if not curiosity_ids:
+            return
+        with self._database.begin() as connection:
+            connection.execute(
+                update(curiosities)
+                .where(
+                    curiosities.c.id.in_(curiosity_ids),
+                    curiosities.c.state == CuriosityState.WAITING,
+                )
+                .values(
+                    state=CuriosityState.RAISED,
+                    raised_at=raised_at,
+                    raised_conversation_id=conversation_id,
+                )
+            )
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete every one of a User's Curiosities.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(curiosities).where(curiosities.c.user_id == user_id)
             )
 
 
@@ -4383,6 +4639,7 @@ def _build_repositories(
         understandings=PostgresUnderstandingRepository(database),
         user_memory=PostgresUserMemoryRepository(database),
         life_threads=PostgresLifeThreadRepository(database),
+        curiosities=PostgresCuriosityRepository(database),
         user_portraits=PostgresUserPortraitRepository(database),
         knowledge_documents=PostgresKnowledgeDocumentRepository(database),
         usage=PostgresUsageRepository(database),

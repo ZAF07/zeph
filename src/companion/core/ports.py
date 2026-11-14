@@ -18,6 +18,8 @@ from companion.core.models import (
     Conversation,
     ConversationMessage,
     ConversationSummary,
+    Curiosity,
+    CuriosityChanges,
     DailyUsage,
     EmbeddedChunk,
     Feature,
@@ -1096,6 +1098,81 @@ class UserPortraitRepository(Protocol):
 
     def delete_for_user(self, user_id: UUID) -> None:
         """Delete a User's Portrait and any rewrite asked for.
+
+        Args:
+            user_id: The User's ID.
+        """
+        ...
+
+
+class CuriosityRepository(Protocol):
+    """Stores each User's Curiosities, which are internal and never shown.
+
+    Deleting the Memory Item or Life Thread a Curiosity came from deletes
+    the Curiosity too, however the item or Thread is deleted.
+    """
+
+    def list_waiting(self, user_id: UUID) -> list[Curiosity]:
+        """List a User's waiting Curiosities, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Curiosities.
+        """
+        ...
+
+    def list_raised_in(self, conversation_id: UUID) -> list[Curiosity]:
+        """List the Curiosities raised in a Conversation, first raised first.
+
+        Args:
+            conversation_id: The Conversation's ID.
+
+        Returns:
+            The Curiosities.
+        """
+        ...
+
+    def list_recently_raised(self, user_id: UUID, limit: int) -> list[Curiosity]:
+        """List the Curiosities most recently raised with a User, newest first.
+
+        Args:
+            user_id: The User's ID.
+            limit: The most to return.
+
+        Returns:
+            The Curiosities.
+        """
+        ...
+
+    def save_changes(self, changes: CuriosityChanges) -> None:
+        """Add, update and record reactions to Curiosities, in one step.
+
+        A new one whose Memory Item or Life Thread was deleted meanwhile is
+        not added. An updated one is saved only while it is still waiting,
+        and a reaction only on one that was raised.
+
+        Args:
+            changes: The changes.
+        """
+        ...
+
+    def mark_raised(
+        self, curiosity_ids: Sequence[UUID], conversation_id: UUID, raised_at: datetime
+    ) -> None:
+        """Note that waiting Curiosities were just raised in a Conversation.
+
+        Args:
+            curiosity_ids: The Curiosities' IDs; any no longer waiting is
+                left as it is.
+            conversation_id: The Conversation they were raised in.
+            raised_at: When the reply that raised them was sent.
+        """
+        ...
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete every one of a User's Curiosities.
 
         Args:
             user_id: The User's ID.
@@ -2198,6 +2275,7 @@ class Repositories:
     understandings: UnderstandingRepository
     user_memory: UserMemoryRepository
     life_threads: LifeThreadRepository
+    curiosities: CuriosityRepository
     user_portraits: UserPortraitRepository
     knowledge_documents: KnowledgeDocumentRepository
     usage: UsageRepository

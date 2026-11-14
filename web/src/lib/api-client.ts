@@ -489,6 +489,7 @@ export type ModelStep =
   | "check_in"
   | "conversation_end"
   | "life_threads"
+  | "curiosities"
   | "portrait"
   | "personal_stickers";
 

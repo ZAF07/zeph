@@ -59,7 +59,7 @@ def set_up_user_with_every_kind_of_data(
 
     Their User Memory holds a Memory Item, a Conversation Summary, a Shared
     Photo, a Life Thread and a User Portrait, and they have a Personal
-    Sticker.
+    Sticker and a Curiosity.
 
     Returns:
         Their Dashboard API headers and their User ID.
@@ -86,6 +86,11 @@ def set_up_user_with_every_kind_of_data(
         )
     )
     chat_model.script_portrait("A designer who just started a new job.")
+    chat_model.script_curiosity_keeping(
+        json.dumps(
+            {"curiosities": [{"ask": "How is the new job?", "why": "Just started."}]}
+        )
+    )
     have_conversation(
         client,
         chat_model,

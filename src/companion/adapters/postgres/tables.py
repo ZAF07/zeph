@@ -330,6 +330,46 @@ user_portraits = Table(
     ),
 )
 
+curiosities = Table(
+    "curiosities",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("position", BigInteger, Identity(), nullable=False, unique=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("question", Text, nullable=False),
+    Column("why", Text, nullable=False),
+    Column("not_before", Date),
+    Column("sensitivity", Text, nullable=False),
+    Column("state", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column(
+        "source_memory_item_id",
+        Uuid,
+        ForeignKey("memory_items.id", ondelete="CASCADE"),
+        index=True,
+    ),
+    Column(
+        "source_life_thread_id",
+        Uuid,
+        ForeignKey("life_threads.id", ondelete="CASCADE"),
+        index=True,
+    ),
+    Column("raised_at", DateTime(timezone=True)),
+    Column(
+        "raised_conversation_id",
+        Uuid,
+        ForeignKey("conversations.id", ondelete="SET NULL"),
+        index=True,
+    ),
+    Column("reaction", Text),
+    Index("ix_curiosities_user_id_state", "user_id", "state"),
+)
+
 shared_photos = Table(
     "shared_photos",
     metadata,

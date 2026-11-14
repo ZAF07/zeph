@@ -119,6 +119,7 @@ def test_admins_see_every_feature_with_its_default_and_no_change_yet(
         "settings_in_chat",
         "photo_viewing",
         "personal_stickers",
+        "curiosities",
     ]
     for key, feature in features.items():
         assert feature["name"]
@@ -332,6 +333,7 @@ def test_a_user_with_no_switch_of_their_own_follows_the_switch_for_everyone(
         "settings_in_chat",
         "photo_viewing",
         "personal_stickers",
+        "curiosities",
     ]
     assert on["name"] == "Web Search"
     assert on["switch"] == "default"

@@ -1,4 +1,5 @@
 from companion.core.conversations import ConversationService
+from companion.core.curiosities import CuriosityRaiser
 from companion.core.knowledge_retrieval import KnowledgeRetrieval
 from companion.core.life_threads import ThreadReminder
 from companion.core.memory_retrieval import MemoryRetrieval
@@ -13,13 +14,14 @@ class ReplyService:
 
     The steps run in this order: the ReplyGate applies the house rules left
     once the Message's texts are saved and checked, then the Companion is
-    reminded of the User's Life Threads the Message touches, then the
-    Understanding works out what the User needs, which User Memory matters,
-    which Threads to bring up or leave alone and which Knowledge documents
-    fit, then that memory, any older Conversations it asked to look up and
-    passages from the Knowledge documents it chose are recalled, then the
-    reply is composed and delivered, and the Threads it brought up are
-    marked raised. Every step reads the User from the same snapshot.
+    reminded of the User's Life Threads the Message touches and lists the
+    Curiosities whose day has come, then the Understanding works out what
+    the User needs, which User Memory matters, which Threads and Curiosities
+    to bring up and which Knowledge documents fit, then that memory, any
+    older Conversations it asked to look up and passages from the Knowledge
+    documents it chose are recalled, then the reply is composed and
+    delivered, and the Threads and Curiosities it brought up are marked
+    raised. Every step reads the User from the same snapshot.
     """
 
     def __init__(
@@ -27,6 +29,7 @@ class ReplyService:
         reply_gate: ReplyGate,
         conversations: ConversationService,
         thread_reminder: ThreadReminder,
+        curiosity_raiser: CuriosityRaiser,
         understanding: UnderstandingService,
         memory_retrieval: MemoryRetrieval,
         knowledge_retrieval: KnowledgeRetrieval,
@@ -39,6 +42,8 @@ class ReplyService:
             conversations: Sends composed replies.
             thread_reminder: Finds the Life Threads each Message touches and
                 marks those brought up.
+            curiosity_raiser: Lists the Curiosities whose day has come and
+                marks those brought up.
             understanding: Works out what the User needs before each reply.
             memory_retrieval: Reads the User Memory and picks out what the
                 Understanding chose.
@@ -49,6 +54,7 @@ class ReplyService:
         self._reply_gate = reply_gate
         self._conversations = conversations
         self._thread_reminder = thread_reminder
+        self._curiosity_raiser = curiosity_raiser
         self._understanding = understanding
         self._memory_retrieval = memory_retrieval
         self._knowledge_retrieval = knowledge_retrieval
@@ -70,8 +76,9 @@ class ReplyService:
             return
         saved_memory = self._memory_retrieval.read(snapshot)
         reminded = self._thread_reminder.remind(snapshot, message.conversation_id)
+        due = self._curiosity_raiser.due(snapshot, message.conversation_id)
         understood = self._understanding.understand(
-            snapshot, message.conversation_id, saved_memory, reminded
+            snapshot, message.conversation_id, saved_memory, reminded, due
         )
         form = understood.understanding.form
         memory = self._memory_retrieval.recall(
@@ -97,3 +104,4 @@ class ReplyService:
             reply.shared_photo.id if reply.shared_photo else None,
         )
         self._thread_reminder.mark_raised(message.conversation_id, form.bring_up)
+        self._curiosity_raiser.mark_raised(message.conversation_id, form.curiosities)
