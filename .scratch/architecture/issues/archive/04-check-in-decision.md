@@ -92,5 +92,10 @@ Branch `arch-04-check-in-decision`, worktree `ai-chat-companion-arch-04`, built 
   - Held-back due times, resume and connect: `test_a_user_in_quiet_hours_is_due_again_when_they_end_and_not_reloaded_before`, `test_a_user_paused_until_resumed_has_no_due_time_until_they_resume`, `test_a_user_held_back_to_the_end_of_a_timed_pause_gets_one_when_resuming_early`, `test_a_user_with_no_telegram_connection_gets_a_due_time_once_they_connect`, plus the two mid-tick race tests.
   - Admin-off in SQL: `test_users_with_check_ins_off_by_an_admin_are_not_loaded_and_stay_due` (no switch reads while off, sent on the first tick after it is back on) and `test_with_check_ins_off_by_an_admin_none_are_sent_until_it_is_back_on`.
   - Flat queries: `test_reads_per_tick_stay_the_same_as_due_users_grow` (every SELECT by table, equal for 5 and 15 due Users across all five no-model paths).
-  - Checks: `pytest` 678 passed (9 evals deselected), `ruff check` and `ruff format --check` clean, `mypy src` no issues in 101 files.
+  - Checks (after rebase on issue 05): `pytest` 687 passed (9 evals deselected), `ruff check` and `ruff format --check` clean, `mypy src` no issues in 102 files.
   - `/run`: due User sent; User in Quiet Hours held back to the Quiet Hours end and sent after shifting DB times. See Comments.
+- Commits:
+  - 4e4afc1 "Pull the Check-in decision into a pure module"
+  - 38f589c "Review fixes: resume or connect mid-tick wins, Quiet Hours moves, flat reads"
+  - af36178 "Architecture issue 04 done: archive issue with test, run and review evidence"
+  - c8c7ce0 "Glossary: Held-back Check-in"
