@@ -56,5 +56,5 @@ None.
 ## Completion
 
 - Completed: 2026-11-14
-- Commit: to be filled in after merge
+- Commit: 2fec7d7 "User Memory off means stop learning, keep using", review fixes 4220766 "Review fixes: test every switch combination, drop unused Home field", archive 261dc41 "Architecture issue 02 done: archive issue with test, run and review evidence" (merged from `arch-02-memory-off-stop-learning` in e504d70 "Merge architecture issue 02: User Memory off means stop learning, keep using; whichever switch is off (the User's or the Admin's), replies and Check-ins still use saved Memory Items, Conversation Summaries and Goals while nothing new is saved; Home always shows Goals and Recently remembered; two admin-editable notes (memory_paused_note, memory_not_available_note) are sent as memory_note and shown on Home, Memories and by the switch")
 
