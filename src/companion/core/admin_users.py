@@ -37,7 +37,8 @@ class AdminUserService:
         """Set up the service.
 
         Args:
-            repositories: Where Users are stored.
+            repositories: Where Users are stored, and how to change them in
+                one transaction.
         """
         self._repositories = repositories
 

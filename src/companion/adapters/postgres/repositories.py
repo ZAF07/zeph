@@ -657,9 +657,10 @@ class PostgresUserRepository:
         return _to_user(row)
 
     def delete(self, user_id: UUID) -> bool:
-        """Delete a User and what stays with their account.
+        """Delete a User: their profile and settings.
 
-        Those rows go through the tables' cascading foreign keys.
+        Any rows of theirs still left go through the tables' cascading
+        foreign keys.
 
         Args:
             user_id: The User's ID.
@@ -1489,6 +1490,17 @@ class PostgresSafeguardEventRepository:
             )
             for row in rows
         ]
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's Safeguard Events.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(safeguard_events).where(safeguard_events.c.user_id == user_id)
+            )
 
 
 class PostgresMemoryCategoryRepository:
@@ -2334,6 +2346,17 @@ class PostgresUsageRepository:
             )
             for row in rows
         ]
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's Usage.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(daily_usage).where(daily_usage.c.user_id == user_id)
+            )
 
 
 class PostgresStickerRepository:
@@ -3248,6 +3271,19 @@ class PostgresFeatureSwitchRepository:
                 delete(user_feature_switches).where(
                     user_feature_switches.c.user_id == user_id,
                     user_feature_switches.c.feature == feature.value,
+                )
+            )
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's own Feature Switches.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(user_feature_switches).where(
+                    user_feature_switches.c.user_id == user_id
                 )
             )
 

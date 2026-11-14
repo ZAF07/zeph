@@ -44,7 +44,9 @@ def delete_user_data(repositories: Repositories, user_id: UUID) -> None:
 
 
 def _delete_user(repositories: Repositories, user_id: UUID) -> bool:
-    """Delete a User's data and then the User, in one transaction.
+    """Delete everything of a User's and then the User, in one transaction.
+
+    Beyond their data, their Usage, Safeguard Events and Feature Switches go.
 
     Args:
         repositories: Where the User and their data are stored.
@@ -54,8 +56,12 @@ def _delete_user(repositories: Repositories, user_id: UUID) -> bool:
         True if they were deleted; False if there was no such User.
     """
     with repositories.transaction() as transaction:
-        delete_user_data(transaction.repositories, user_id)
-        return transaction.repositories.users.delete(user_id)
+        in_transaction = transaction.repositories
+        delete_user_data(in_transaction, user_id)
+        in_transaction.usage.delete_for_user(user_id)
+        in_transaction.safeguard_events.delete_for_user(user_id)
+        in_transaction.feature_switches.delete_for_user(user_id)
+        return in_transaction.users.delete(user_id)
 
 
 class UserDataService:

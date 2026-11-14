@@ -212,14 +212,16 @@ def test_two_admins_demoting_each_other_at_once_leave_one_admin(
 
 
 def wait_until_a_query_waits_on_a_lock(engine: Engine) -> None:
-    """Wait until another database session is blocked on a row lock."""
+    """Wait until another database session is blocked locking the Admin rows."""
     deadline = time.monotonic() + 10
     while time.monotonic() < deadline:
         with engine.connect() as connection:
             waiting = connection.execute(
                 text(
                     "SELECT count(*) FROM pg_stat_activity "
-                    "WHERE wait_event_type = 'Lock'"
+                    "WHERE wait_event_type = 'Lock' "
+                    "AND datname = current_database() "
+                    "AND query ILIKE '%FOR UPDATE%'"
                 )
             ).scalar_one()
         if waiting:

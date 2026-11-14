@@ -535,10 +535,7 @@ class UserRepository(Protocol):
         ...
 
     def delete(self, user_id: UUID) -> bool:
-        """Delete a User and what stays with their account.
-
-        Their profile, settings, Usage, Safeguard Events and Feature Switches
-        go with them.
+        """Delete a User: their profile and settings.
 
         Args:
             user_id: The User's ID.
@@ -1158,6 +1155,14 @@ class SafeguardEventRepository(Protocol):
         """
         ...
 
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's Safeguard Events.
+
+        Args:
+            user_id: The User's ID.
+        """
+        ...
+
 
 class KnowledgeDocumentRepository(Protocol):
     """Stores Knowledge documents and their uploaded files."""
@@ -1371,6 +1376,14 @@ class UsageRepository(Protocol):
 
         Returns:
             One entry per User per day, newest day first, then by User.
+        """
+        ...
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's Usage.
+
+        Args:
+            user_id: The User's ID.
         """
         ...
 
@@ -1812,6 +1825,14 @@ class FeatureSwitchRepository(Protocol):
         Args:
             user_id: The User.
             feature: The Feature.
+        """
+        ...
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's own Feature Switches.
+
+        Args:
+            user_id: The User's ID.
         """
         ...
 
