@@ -13,6 +13,7 @@ from sqlalchemy import (
     bindparam,
     delete,
     func,
+    or_,
     select,
     tuple_,
     update,
@@ -2782,12 +2783,15 @@ class PostgresCheckInRepository:
                 ],
             )
 
-    def set_next_due_time_if_none(self, user_id: UUID, due_at: datetime) -> None:
-        """Give a User with Check-ins on but no due time one.
+    def set_due_now_unless_due_later(self, user_id: UUID, now: datetime) -> None:
+        """Make a User with Check-ins on due now, unless they are due later.
+
+        A due time of now also wins over a tick that read the old one and is
+        holding the User back meanwhile.
 
         Args:
             user_id: The User's ID.
-            due_at: Their new next due time.
+            now: The current time.
         """
         with self._engine.begin() as connection:
             connection.execute(
@@ -2795,9 +2799,12 @@ class PostgresCheckInRepository:
                 .where(
                     users.c.id == user_id,
                     users.c.check_ins_enabled.is_(True),
-                    users.c.check_in_next_due_at.is_(None),
+                    or_(
+                        users.c.check_in_next_due_at.is_(None),
+                        users.c.check_in_next_due_at <= now,
+                    ),
                 )
-                .values(check_in_next_due_at=due_at)
+                .values(check_in_next_due_at=now)
             )
 
     def add(

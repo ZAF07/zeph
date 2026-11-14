@@ -8,12 +8,14 @@ from companion.core.check_in_decision import (
     AskAboutFewer,
     AskModel,
     CheckInFacts,
+    CheckInPlan,
     CheckInRules,
     HoldBack,
     HoldBackReason,
     SkipForDailyLimit,
     decide_check_in,
     next_due_after_change,
+    next_due_after_quiet_hours_move,
     retry_after_refusal,
 )
 from companion.core.features import FeatureService
@@ -206,21 +208,39 @@ def ignored_in_a_row(
     return count
 
 
-def is_limit_skip_on_their_today(newest: list[CheckIn], snapshot: UserSnapshot) -> bool:
+def is_limit_skip_on_their_today(
+    newest: CheckIn | None, snapshot: UserSnapshot
+) -> bool:
     """Tell whether the User's newest Check-in is a limit skip from their today.
 
     Args:
-        newest: The User's newest Check-in, if any, in a list.
+        newest: The User's newest Check-in; None if they have none.
         snapshot: The User, with their day, as read for this tick.
 
     Returns:
         True if a limit skip was already recorded on the User's day.
     """
     return (
-        bool(newest)
-        and newest[0].skipped_for_daily_limit
-        and users_today(snapshot.user.time_zone, newest[0].decided_at) == snapshot.today
+        newest is not None
+        and newest.skipped_for_daily_limit
+        and users_today(snapshot.user.time_zone, newest.decided_at) == snapshot.today
     )
+
+
+def due_time_change(user: User, plan: HoldBack) -> NextDueTimeChange | None:
+    """Work out the change to a held-back User's next due time.
+
+    Args:
+        user: The User, as read for this tick.
+        plan: Why they are held back and until when.
+
+    Returns:
+        The change; None if their due time stays as it is.
+    """
+    read_as = user.check_ins.next_due_at
+    if plan.retry_at == read_as:
+        return None
+    return NextDueTimeChange(user_id=user.id, read_as=read_as, becomes=plan.retry_at)
 
 
 def describe_recent_check_ins(
@@ -455,8 +475,35 @@ class CheckInService:
             changed.append(ChatSetting.QUIET_HOURS)
         if updated.enabled != current.enabled:
             changed.append(ChatSetting.CHECK_IN_PAUSE)
-        recorded = record_where_changed(user, changed, in_chat, self._clock.now())
+        now = self._clock.now()
+        if ChatSetting.QUIET_HOURS in changed and updated.next_due_at == (
+            current.next_due_at
+        ):
+            updated = replace(
+                updated,
+                next_due_at=next_due_after_quiet_hours_move(
+                    current, user.time_zone, now
+                ),
+            )
+        recorded = record_where_changed(user, changed, in_chat, now)
         return self._save(recorded, updated)
+
+    def settings_after_time_zone_change(self, user: User) -> CheckInSettings:
+        """Work out a User's Check-in settings for when their time zone changes.
+
+        Args:
+            user: The User, with their time zone before the change.
+
+        Returns:
+            Their Check-in settings, due now if they were held back until
+            Quiet Hours end in the old time zone.
+        """
+        return replace(
+            user.check_ins,
+            next_due_at=next_due_after_quiet_hours_move(
+                user.check_ins, user.time_zone, self._clock.now()
+            ),
+        )
 
     def settings_after(
         self, current: CheckInSettings, changes: CheckInChanges
@@ -625,18 +672,46 @@ class CheckInService:
             return
         snapshots = self._user_snapshots.load_many([user.id for user in due_users])
         rules = self._rules()
-        due_time_changes = []
-        for facts in self._gather_facts(snapshots, rules):
+        plans = [
+            (facts.snapshot, decide_check_in(facts, rules, now))
+            for facts in self._gather_facts(snapshots, rules)
+        ]
+        self._hold_back(plans)
+        to_carry_out = [
+            (snapshot, plan)
+            for snapshot, plan in plans
+            if not isinstance(plan, HoldBack)
+        ]
+        fewer_message: str = (
+            self._repositories.platform_settings.get("check_in_fewer_message")
+            if any(isinstance(plan, AskAboutFewer) for _, plan in to_carry_out)
+            else ""
+        )
+        for snapshot, plan in to_carry_out:
             try:
-                plan = decide_check_in(facts, rules, now)
-                if isinstance(plan, HoldBack):
-                    change = self._hold_back(facts.snapshot.user, plan)
-                    if change is not None:
-                        due_time_changes.append(change)
-                else:
-                    self._carry_out(facts.snapshot, plan, now)
+                self._carry_out(snapshot, plan, now, fewer_message)
             except Exception:
                 logger.exception("Could not decide on a Check-in")
+
+    def _hold_back(self, plans: list[tuple[UserSnapshot, CheckInPlan]]) -> None:
+        """Save every held-back User's next due time, in one statement.
+
+        This is done before any Check-in is sent, so a User who resumes or
+        connects Telegram meanwhile changes their due time after it is read,
+        and their change wins.
+
+        Args:
+            plans: Each due User and what to do for them.
+        """
+        due_time_changes = []
+        for snapshot, plan in plans:
+            if not isinstance(plan, HoldBack):
+                continue
+            if plan.reason == HoldBackReason.NO_KIND_TO_SEND:
+                logger.warning("No Check-in Kind may be sent to this User")
+            change = due_time_change(snapshot.user, plan)
+            if change is not None:
+                due_time_changes.append(change)
         self._repositories.check_ins.save_next_due_times(due_time_changes)
 
     def _rules(self) -> CheckInRules:
@@ -698,7 +773,7 @@ class CheckInService:
                     latest_conversation=conversation,
                     used_up_daily_message_limit=user_id in used_up_limit,
                     limit_skip_today=is_limit_skip_on_their_today(
-                        newest.get(user_id, []), snapshot
+                        next(iter(newest.get(user_id, [])), None), snapshot
                     ),
                     ignored_in_a_row=ignored_in_a_row(
                         newest_sent.get(user_id, []),
@@ -709,37 +784,20 @@ class CheckInService:
             )
         return all_facts
 
-    def _hold_back(self, user: User, plan: HoldBack) -> NextDueTimeChange | None:
-        """Work out the due time change for a held-back User.
-
-        Args:
-            user: The User, as read for this tick.
-            plan: Why they are held back and until when.
-
-        Returns:
-            The change to their next due time; None if it stays as it is.
-        """
-        if plan.reason == HoldBackReason.NO_KIND_TO_SEND:
-            logger.warning("No Check-in Kind may be sent to this User")
-        read_as = user.check_ins.next_due_at
-        if plan.retry_at == read_as:
-            return None
-        return NextDueTimeChange(
-            user_id=user.id, read_as=read_as, becomes=plan.retry_at
-        )
-
     def _carry_out(
         self,
         snapshot: UserSnapshot,
-        plan: SkipForDailyLimit | AskAboutFewer | AskModel,
+        plan: CheckInPlan,
         now: datetime,
+        fewer_message: str,
     ) -> None:
         """Skip for the Daily Message Limit, ask about fewer, or ask the model.
 
         Args:
             snapshot: The User, as read for this tick.
-            plan: What `decide_check_in` said to do.
+            plan: What `decide_check_in` said to do; not a hold back.
             now: The current time.
+            fewer_message: The Admin-set "would you like fewer?" message.
 
         Raises:
             InvalidCheckInAnswerError: If the model's answer can't be used.
@@ -747,10 +805,8 @@ class CheckInService:
         if isinstance(plan, SkipForDailyLimit):
             self._skip_for_daily_limit(snapshot.user, now)
         elif isinstance(plan, AskAboutFewer):
-            self._ask_about_fewer(
-                snapshot.user, plan.telegram_chat_id, now, plan.next_due_at
-            )
-        else:
+            self._ask_about_fewer(snapshot.user, plan, fewer_message, now)
+        elif isinstance(plan, AskModel):
             self._check_in_with_model(snapshot, plan, now)
 
     def _check_in_with_model(
@@ -911,7 +967,7 @@ class CheckInService:
         return True
 
     def _ask_about_fewer(
-        self, user: User, chat_id: int, now: datetime, next_due_at: datetime
+        self, user: User, plan: AskAboutFewer, message: str, now: datetime
     ) -> None:
         """Send the "would you like fewer?" message and pause the User's Check-ins.
 
@@ -919,14 +975,13 @@ class CheckInService:
 
         Args:
             user: The User who ignored too many Check-ins in a row.
-            chat_id: Their Telegram chat.
+            plan: Their Telegram chat and next due time once resumed.
+            message: The Admin-set "would you like fewer?" message.
             now: The current time.
-            next_due_at: When their next Check-in may be sent once resumed.
         """
-        message = self._repositories.platform_settings.get("check_in_fewer_message")
         self._save_then_send(
             user,
-            chat_id,
+            plan.telegram_chat_id,
             message,
             CheckIn(
                 id=uuid4(),
@@ -935,7 +990,7 @@ class CheckInService:
                 decided_at=now,
                 message=message,
             ),
-            next_due_at,
+            plan.next_due_at,
             pause_until_resumed=True,
         )
 
@@ -1052,15 +1107,17 @@ class CheckInService:
             updated: The settings after the change.
 
         Returns:
-            The updated settings with the due time from
-            `next_due_after_change`, and no pause when off.
+            The updated settings with no due time or pause when off,
+            otherwise with the due time from `next_due_after_change`.
         """
-        next_due_at = next_due_after_change(
-            current, updated, self._frequency_gaps(), self._clock.now()
-        )
         if not updated.enabled:
             return replace(updated, paused=False, paused_until=None, next_due_at=None)
-        return replace(updated, next_due_at=next_due_at)
+        return replace(
+            updated,
+            next_due_at=next_due_after_change(
+                current, updated, self._frequency_gaps(), self._clock.now()
+            ),
+        )
 
     def _save(self, user: User, settings: CheckInSettings) -> User:
         """Save a User's new Check-in settings.

@@ -1586,12 +1586,15 @@ class CheckInRepository(Protocol):
         """
         ...
 
-    def set_next_due_time_if_none(self, user_id: UUID, due_at: datetime) -> None:
-        """Give a User with Check-ins on but no due time one.
+    def set_due_now_unless_due_later(self, user_id: UUID, now: datetime) -> None:
+        """Make a User with Check-ins on due now, unless they are due later.
+
+        A due time of now also wins over a tick that read the old one and is
+        holding the User back meanwhile.
 
         Args:
             user_id: The User's ID.
-            due_at: Their new next due time.
+            now: The current time.
         """
         ...
 

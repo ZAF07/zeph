@@ -226,8 +226,10 @@ class UserService:
         if changes.photo_viewing_enabled not in (None, user.photo_viewing_enabled):
             self._features.require_available(user.id, Feature.PHOTO_VIEWING)
             changed.append(ChatSetting.PHOTO_VIEWING)
+        check_ins = user.check_ins
         if changes.time_zone not in (None, user.time_zone):
             changed.append(ChatSetting.TIME_ZONE)
+            check_ins = self._check_ins.settings_after_time_zone_change(user)
         updated = replace(
             record_where_changed(user, changed, in_chat, self._clock.now()),
             name=clean_name(changes.name) if changes.name is not None else user.name,
@@ -251,5 +253,6 @@ class UserService:
                 if changes.time_zone is not None
                 else user.time_zone
             ),
+            check_ins=check_ins,
         )
         return self._users.update(updated)

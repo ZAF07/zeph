@@ -2,7 +2,7 @@ import re
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import replace
-from datetime import datetime, time, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -10,7 +10,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, event, text
 
 from companion.adapters.postgres.repositories import build_postgres_repositories
-from companion.core.models import Conversation, User
+from companion.core.models import (
+    CheckIn,
+    CheckInOutcome,
+    Conversation,
+    NextDueTimeChange,
+    User,
+)
 from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
@@ -34,8 +40,7 @@ from tests.test_check_in_sending import (
 from tests.test_features import switch_for_everyone
 from tests.test_onboarding import onboarding_answers
 from tests.test_user_snapshot import add_due_users, reads_by_table
-
-SINGAPORE_QUIET_HOURS_END = time(7, 30)
+from tests.test_web_search import change_settings
 
 
 @contextmanager
@@ -92,10 +97,13 @@ def maya_id(client: TestClient, headers: dict[str, str]) -> UUID:
     return UUID(client.get("/api/me", headers=headers).json()["id"])
 
 
-def hold_back_in_different_ways(
+def due_users_needing_no_model(
     engine: Engine, clock: FakeClock, users: list[User]
 ) -> None:
-    """Hold each due User back: by turns Quiet Hours, mid-Conversation, no Telegram.
+    """Make each due User need no model call, in turns of five ways.
+
+    Held back by Quiet Hours, mid-Conversation or no Telegram Connection;
+    over the Daily Message Limit (set to 1); or ignored three Check-ins.
 
     Args:
         engine: The test database.
@@ -105,7 +113,7 @@ def hold_back_in_different_ways(
     repositories = build_postgres_repositories(engine)
     now = clock.now()
     for number, user in enumerate(users):
-        reason = number % 3
+        reason = number % 5
         if reason == 0:
             quiet_now = (now - timedelta(hours=1)).time()
             stored = repositories.users.get(user.id)
@@ -129,32 +137,53 @@ def hold_back_in_different_ways(
                     last_message_at=now - timedelta(minutes=1),
                 )
             )
-        else:
+        elif reason == 2:
             with engine.begin() as connection:
                 connection.execute(
                     text("DELETE FROM telegram_connections WHERE user_id = :id"),
                     {"id": user.id},
                 )
+        elif reason == 3:
+            repositories.usage.claim_message(user.id, now.date(), 1)
+        else:
+            for days_ago in (3, 2, 1):
+                repositories.check_ins.add(
+                    CheckIn(
+                        id=uuid4(),
+                        user_id=user.id,
+                        outcome=CheckInOutcome.SENT,
+                        decided_at=now - timedelta(days=days_ago),
+                        message="hey",
+                    ),
+                    now,
+                    pause_until_resumed=False,
+                )
 
 
 def test_reads_per_tick_stay_the_same_as_due_users_grow(
     client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
     engine: Engine,
     chat_model: ScriptedChatModel,
     clock: FakeClock,
     scheduler: FakeScheduler,
 ) -> None:
-    hold_back_in_different_ways(engine, clock, add_due_users(engine, clock, 3))
-    with selects_by_table(engine) as reads_for_three:
+    change_settings(
+        client, owner_headers(client, auth_verifier), {"daily_message_limit": 1}
+    )
+    due_users_needing_no_model(engine, clock, add_due_users(engine, clock, 5))
+    with selects_by_table(engine) as reads_for_five:
         scheduler.tick()
 
     clock.advance(timedelta(minutes=1))
-    hold_back_in_different_ways(engine, clock, add_due_users(engine, clock, 9))
-    with selects_by_table(engine) as reads_for_nine:
+    due_users_needing_no_model(engine, clock, add_due_users(engine, clock, 15))
+    with selects_by_table(engine) as reads_for_fifteen:
         scheduler.tick()
 
     assert chat_model.calls == []
-    assert reads_for_nine == reads_for_three
+    assert len(chat_channel.sent) == 1 + 3
+    assert reads_for_fifteen == reads_for_five
 
 
 def test_a_user_in_quiet_hours_is_due_again_when_they_end_and_not_reloaded_before(
@@ -322,3 +351,98 @@ def test_users_with_check_ins_off_by_an_admin_are_not_loaded_and_stay_due(
     assert due_while_off is not None
     assert due_while_off < clock.now()
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["hey, it's been a while"]
+
+
+def test_a_user_who_resumes_while_a_tick_holds_them_back_stays_due(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    clock: FakeClock,
+    engine: Engine,
+) -> None:
+    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    user_id = maya_id(client, headers)
+    client.put(
+        "/api/check-ins/pause", json={"length": "until_resumed"}, headers=headers
+    )
+    clock.advance(ONE_DAY + timedelta(minutes=1))
+    due_as_the_tick_read_it = next_due_at(engine, user_id)
+
+    client.delete("/api/check-ins/pause", headers=headers)
+    build_postgres_repositories(engine).check_ins.save_next_due_times(
+        [
+            NextDueTimeChange(
+                user_id=user_id, read_as=due_as_the_tick_read_it, becomes=None
+            )
+        ]
+    )
+
+    assert next_due_at(engine, user_id) == clock.now()
+
+
+def test_a_user_who_connects_telegram_while_a_tick_holds_them_back_stays_due(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    clock: FakeClock,
+    engine: Engine,
+) -> None:
+    headers = auth_headers(auth_verifier, "user_maya")
+    answers = onboarding_answers(check_ins_enabled=True, check_in_frequency="most_days")
+    client.put("/api/onboarding", json=answers, headers=headers)
+    user_id = maya_id(client, headers)
+    clock.advance(ONE_DAY + timedelta(minutes=1))
+    due_as_the_tick_read_it = next_due_at(engine, user_id)
+
+    token = create_connection_token(client, headers)
+    send_to_webhook(client, telegram_text_update(f"/start {token}"))
+    build_postgres_repositories(engine).check_ins.save_next_due_times(
+        [
+            NextDueTimeChange(
+                user_id=user_id, read_as=due_as_the_tick_read_it, becomes=None
+            )
+        ]
+    )
+
+    assert next_due_at(engine, user_id) == clock.now()
+
+
+def test_changing_quiet_hours_while_held_back_by_them_is_due_again_now(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+) -> None:
+    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    clock.advance(ONE_DAY + timedelta(hours=6))
+    scheduler.tick()
+
+    client.patch(
+        "/api/check-ins",
+        json={"quiet_hours_start": "23:30", "quiet_hours_end": "07:30"},
+        headers=headers,
+    )
+    chat_model.script(send_answer("still up? how was today?"))
+    scheduler.tick()
+
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["still up? how was today?"]
+
+
+def test_changing_time_zone_while_held_back_by_quiet_hours_is_due_again_now(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+) -> None:
+    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    clock.advance(ONE_DAY + timedelta(hours=6))
+    scheduler.tick()
+
+    client.patch("/api/me", json={"time_zone": "Europe/London"}, headers=headers)
+    chat_model.script(send_answer("good afternoon from Zeph!"))
+    scheduler.tick()
+
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["good afternoon from Zeph!"]

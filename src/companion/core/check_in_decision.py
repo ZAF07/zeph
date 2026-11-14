@@ -11,7 +11,7 @@ from companion.core.models import (
     Feature,
     UserSnapshot,
 )
-from companion.core.timing import is_open
+from companion.core.timing import is_open, local_now
 
 REFUSED_CHECK_IN_RETRY_GAP = timedelta(minutes=15)
 
@@ -146,9 +146,9 @@ def decide_check_in(
     """
     snapshot = facts.snapshot
     settings = snapshot.user.check_ins
-    stays_due = settings.next_due_at
+    current_due_at = settings.next_due_at
     if not snapshot.works(Feature.CHECK_INS):
-        return HoldBack(HoldBackReason.CHECK_INS_OFF, retry_at=stays_due)
+        return HoldBack(HoldBackReason.CHECK_INS_OFF, retry_at=current_due_at)
     if settings.is_paused_at(now):
         return HoldBack(HoldBackReason.PAUSED, retry_at=settings.paused_until)
     if is_in_quiet_hours(settings, snapshot.local_now.time()):
@@ -167,7 +167,9 @@ def decide_check_in(
         )
     if facts.used_up_daily_message_limit:
         if facts.limit_skip_today:
-            return HoldBack(HoldBackReason.LIMIT_SKIP_DONE_TODAY, retry_at=stays_due)
+            return HoldBack(
+                HoldBackReason.LIMIT_SKIP_DONE_TODAY, retry_at=current_due_at
+            )
         return SkipForDailyLimit()
     next_due_at = next_due_after_check_in(settings.frequency, rules.frequency_gaps, now)
     if facts.ignored_in_a_row >= rules.ignore_threshold:
@@ -181,7 +183,7 @@ def decide_check_in(
         if photos_may_be_sent or not kind.sends_shared_photo
     )
     if not kinds:
-        return HoldBack(HoldBackReason.NO_KIND_TO_SEND, retry_at=stays_due)
+        return HoldBack(HoldBackReason.NO_KIND_TO_SEND, retry_at=current_due_at)
     return AskModel(kinds=kinds, telegram_chat_id=chat_id, next_due_at=next_due_at)
 
 
@@ -268,8 +270,10 @@ def next_due_after_change(
     """Work out the next due time after the User changes their Check-in settings.
 
     A pause holds a due User back with no due time, or until the pause ends.
-    So when the pause changes or ends, a due time the pause set becomes now,
-    and the next tick decides again.
+    So when the pause changes or ends, a due time the pause set, or one
+    already passed, becomes now, and the next tick decides again. A due time
+    of now also wins over a tick that read the old one and is holding the
+    User back meanwhile.
 
     Args:
         before: The settings before the change.
@@ -280,7 +284,7 @@ def next_due_after_change(
     Returns:
         None when off; one frequency gap from now when just turned on or the
         frequency changed; now when the pause changed and had set the due
-        time; otherwise the due time as it was.
+        time or it had passed; otherwise the due time as it was.
     """
     if not after.enabled:
         return None
@@ -291,8 +295,40 @@ def next_due_after_change(
         after.paused_until,
     )
     pause_set_due_time = before.paused and (
-        before.next_due_at is None or before.next_due_at == before.paused_until
+        before.next_due_at is None
+        or before.next_due_at == before.paused_until
+        or before.next_due_at <= now
     )
     if pause_changed and pause_set_due_time:
         return now
     return after.next_due_at
+
+
+def next_due_after_quiet_hours_move(
+    before: CheckInSettings, time_zone: str | None, now: datetime
+) -> datetime | None:
+    """Work out the next due time after the User's Quiet Hours or time zone change.
+
+    A User held back by Quiet Hours is due when the old Quiet Hours end. So
+    that due time, or one already passed, becomes now, and the next tick
+    decides with the new Quiet Hours.
+
+    Args:
+        before: The settings before the change.
+        time_zone: The User's time zone before the change.
+        now: The current time.
+
+    Returns:
+        Now if the old Quiet Hours set the due time or it had passed;
+        otherwise the due time as it was.
+    """
+    due_at = before.next_due_at
+    if due_at is None:
+        return None
+    if due_at <= now:
+        return now
+    old_local_now = local_now(time_zone, now)
+    set_by_quiet_hours = is_in_quiet_hours(
+        before, old_local_now.time()
+    ) and due_at == quiet_hours_end_after(before, old_local_now)
+    return now if set_by_quiet_hours else due_at

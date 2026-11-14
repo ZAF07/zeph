@@ -17,6 +17,7 @@ from companion.core.check_in_decision import (
     decide_check_in,
     next_due_after_change,
     next_due_after_check_in,
+    next_due_after_quiet_hours_move,
 )
 from companion.core.features import feature_statuses, switches_for_everyone
 from companion.core.models import (
@@ -430,9 +431,67 @@ PAUSE_END = NOW + timedelta(days=3)
             None,
             id="other changes while paused until resumed: still none",
         ),
+        pytest.param(
+            replace(ON, paused=True, next_due_at=NOW - timedelta(minutes=1)),
+            replace(ON, next_due_at=NOW - timedelta(minutes=1)),
+            NOW,
+            id="resumed after the due time passed, while a tick holds it back: now",
+        ),
     ],
 )
 def test_next_due_after_change(
     before: CheckInSettings, after: CheckInSettings, expected: datetime | None
 ) -> None:
     assert next_due_after_change(before, after, GAPS, NOW) == expected
+
+
+HELD_TO_QUIET_HOURS_END = replace(ON, next_due_at=at_singapore_time(7, 30, 1))
+
+
+@pytest.mark.parametrize(
+    ("before", "time_zone", "now", "expected"),
+    [
+        pytest.param(
+            HELD_TO_QUIET_HOURS_END,
+            "Asia/Singapore",
+            at_singapore_time(23),
+            at_singapore_time(23),
+            id="held back until Quiet Hours end: now",
+        ),
+        pytest.param(
+            HELD_TO_QUIET_HOURS_END,
+            "Asia/Singapore",
+            at_singapore_time(17),
+            HELD_TO_QUIET_HOURS_END.next_due_at,
+            id="outside Quiet Hours, due later: kept",
+        ),
+        pytest.param(
+            HELD_TO_QUIET_HOURS_END,
+            "Europe/London",
+            at_singapore_time(23),
+            HELD_TO_QUIET_HOURS_END.next_due_at,
+            id="the due time isn't when Quiet Hours end there: kept",
+        ),
+        pytest.param(
+            replace(ON, next_due_at=NOW - timedelta(minutes=1)),
+            "Asia/Singapore",
+            NOW,
+            NOW,
+            id="the due time passed: now",
+        ),
+        pytest.param(
+            replace(ON, next_due_at=None),
+            "Asia/Singapore",
+            NOW,
+            None,
+            id="no due time: still none",
+        ),
+    ],
+)
+def test_next_due_after_quiet_hours_move(
+    before: CheckInSettings,
+    time_zone: str,
+    now: datetime,
+    expected: datetime | None,
+) -> None:
+    assert next_due_after_quiet_hours_move(before, time_zone, now) == expected
