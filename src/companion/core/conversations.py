@@ -1,10 +1,7 @@
 import logging
-from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from companion.core.knowledge_retrieval import KnowledgeRetrieval
-from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.models import (
     ChannelPhoto,
     ChannelSticker,
@@ -23,12 +20,8 @@ from companion.core.ports import (
     PlatformSettingsRepository,
     Repositories,
 )
-from companion.core.response_composition import ResponseComposer
-from companion.core.safeguard import Safeguard
 from companion.core.stickers import sticker_message_text
 from companion.core.timing import check_in_reply_window, is_open, quiet_gap
-from companion.core.usage import UsageLimiter
-from companion.core.user_data import ChatDataDeletion
 
 logger = logging.getLogger(__name__)
 
@@ -327,26 +320,3 @@ class ConversationService:
                 photos=photos,
             )
         )
-
-
-@dataclass(frozen=True)
-class ConversationServices:
-    """The core services the conversation engine runs, step by step.
-
-    Attributes:
-        conversations: Saves messages and sends replies.
-        safeguard: Checks each message for crisis and writes the Crisis Reply.
-        usage_limiter: Keeps each User within the daily message limit.
-        memory_retrieval: Finds the User Memory that matters for a message.
-        knowledge_retrieval: Finds the Knowledge that may fit a message.
-        response_composer: Writes the Companion's reply.
-        data_deletion: Settles a Delete My Data the User asked for in chat.
-    """
-
-    conversations: ConversationService
-    safeguard: Safeguard
-    usage_limiter: UsageLimiter
-    memory_retrieval: MemoryRetrieval
-    knowledge_retrieval: KnowledgeRetrieval
-    response_composer: ResponseComposer
-    data_deletion: ChatDataDeletion

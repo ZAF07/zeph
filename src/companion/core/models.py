@@ -447,7 +447,7 @@ class ConversationMessage:
 
 
 @dataclass(frozen=True)
-class ConversationTurn:
+class MessageToAnswer:
     """A connected User's message that the Companion should answer.
 
     Attributes:

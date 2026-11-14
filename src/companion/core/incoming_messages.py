@@ -6,9 +6,9 @@ from uuid import UUID
 
 from companion.core.models import (
     ChannelPhoto,
-    ConversationTurn,
     IncomingMessage,
     MessageKind,
+    MessageToAnswer,
 )
 from companion.core.photos import PhotoService
 from companion.core.ports import ChatChannel, ConversationEngine, Repositories, Timer
@@ -161,7 +161,7 @@ class IncomingMessageHandler:
         self._answer(
             connection.user_id,
             message.chat_id,
-            lambda: self._turn_for(connection.user_id, message),
+            lambda: self._message_to_answer(connection.user_id, message),
         )
 
     def _collect_album_item(self, user_id: UUID, message: IncomingMessage) -> None:
@@ -203,7 +203,9 @@ class IncomingMessageHandler:
             self._answer(
                 user_id,
                 chat_id,
-                lambda: self._photo_turn(user_id, chat_id, photos, caption),
+                lambda: self._photo_message_to_answer(
+                    user_id, chat_id, photos, caption
+                ),
             )
             return
         if not any(message.text.strip() for message in messages):
@@ -215,7 +217,7 @@ class IncomingMessageHandler:
         self._answer(
             user_id,
             chat_id,
-            lambda: ConversationTurn(
+            lambda: MessageToAnswer(
                 user_id=user_id,
                 chat_id=chat_id,
                 text=caption,
@@ -227,18 +229,18 @@ class IncomingMessageHandler:
         self,
         user_id: UUID,
         chat_id: int,
-        build_turn: Callable[[], ConversationTurn],
+        build_message: Callable[[], MessageToAnswer],
     ) -> None:
         """Answer a User's message after their earlier ones, with a fallback on failure.
 
         Args:
             user_id: The User who sent it.
             chat_id: The chat to reply in.
-            build_turn: Turns the message into the turn the Companion answers.
+            build_message: Builds the message the Companion answers.
         """
         with self._turn_lock_for(user_id):
             try:
-                self._conversation_engine.handle(build_turn())
+                self._conversation_engine.handle(build_message())
             except Exception:
                 logger.exception("Could not answer a message from a User")
                 self._chat_channel.send_text(
@@ -246,34 +248,38 @@ class IncomingMessageHandler:
                     self._repositories.platform_settings.get("reply_failed_message"),
                 )
 
-    def _turn_for(self, user_id: UUID, message: IncomingMessage) -> ConversationTurn:
-        """Turn a connected User's message into the turn the Companion answers.
+    def _message_to_answer(
+        self, user_id: UUID, message: IncomingMessage
+    ) -> MessageToAnswer:
+        """Turn a connected User's message into the message the Companion answers.
 
         Args:
             user_id: The User who sent it.
             message: The incoming message.
 
         Returns:
-            The turn; a photo's text holds its description.
+            The message to answer; a photo's text holds its description.
         """
         if message.photo is None:
-            return ConversationTurn(
+            return MessageToAnswer(
                 user_id=user_id,
                 chat_id=message.chat_id,
                 text=readable_text(message),
                 kind=message.kind,
                 sticker=message.sticker,
             )
-        return self._photo_turn(user_id, message.chat_id, [message.photo], message.text)
+        return self._photo_message_to_answer(
+            user_id, message.chat_id, [message.photo], message.text
+        )
 
-    def _photo_turn(
+    def _photo_message_to_answer(
         self,
         user_id: UUID,
         chat_id: int,
         photos: Sequence[ChannelPhoto],
         caption: str,
-    ) -> ConversationTurn:
-        """Describe a User's photos and turn them into the turn the Companion answers.
+    ) -> MessageToAnswer:
+        """Describe a User's photos and turn them into the message to answer.
 
         Args:
             user_id: The User who sent them.
@@ -282,11 +288,11 @@ class IncomingMessageHandler:
             caption: The caption; "" if none.
 
         Returns:
-            The turn, whose text holds each photo's description, or, with
+            The message to answer, whose text holds each photo's description, or, with
             Photo Viewing off, whose Safeguard text does.
         """
         photo_message = self._photo_service.read_message(user_id, photos, caption)
-        return ConversationTurn(
+        return MessageToAnswer(
             user_id=user_id,
             chat_id=chat_id,
             text=photo_message.text,

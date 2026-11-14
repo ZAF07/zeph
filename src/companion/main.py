@@ -24,7 +24,7 @@ from companion.adapters.telegram.chat_channel import TelegramChatChannel
 from companion.adapters.timer import ThreadTimer
 from companion.app import AppDependencies, create_app
 from companion.config import Settings, load_settings
-from companion.core.conversations import ConversationServices
+from companion.core.conversation_services import ConversationServices
 from companion.core.ports import (
     AuthAccounts,
     AuthVerifier,

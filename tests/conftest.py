@@ -26,7 +26,7 @@ from companion.adapters.postgres.database import (
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.adapters.pypdf.text_extractor import PypdfTextExtractor
 from companion.app import AppDependencies, create_app
-from companion.core.conversations import ConversationServices
+from companion.core.conversation_services import ConversationServices
 from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
