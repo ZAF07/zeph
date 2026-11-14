@@ -110,4 +110,8 @@ Rebased on `main` with issue 15 (Model Call Log decision shape). `make check-pyt
 ## Completion
 
 - Completed: 2026-11-14
-- Commit: <to be filled in after merge>
+- Commits:
+  - `a1f2e0e` Understanding issue 14: Understanding Eval through the real reply path
+  - `dec59bf` Understanding issue 14 review fixes: Knowledge must reach the reply, titles only in Threads, split eval test
+  - `cb5f2c4` Understanding issue 14 done: archive issue with eval, review and check evidence; glossary names the Understanding Eval
+  - `bb3e33c` Merge understanding issue 14: Understanding Eval (into `main`)
