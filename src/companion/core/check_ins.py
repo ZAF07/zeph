@@ -579,15 +579,13 @@ class CheckInService:
             None,
         )
 
-    def kinds_for(self, user: User) -> list[CheckInKind]:
-        """List the Check-in Kinds that may be sent to a User.
+    def list_kinds(self) -> list[CheckInKind]:
+        """List the Check-in Kinds, which may all be sent to any User.
 
-        Args:
-            user: The User.
+        User Memory being off only stops learning, so it limits no Kind.
 
         Returns:
-            Every Check-in Kind in order, whether or not User Memory works
-            for the User, since it being off only stops learning.
+            Every Check-in Kind in order.
         """
         return self._repositories.check_ins.list_kinds()
 
@@ -667,7 +665,7 @@ class CheckInService:
         shared_photos = self._shared_photos(user)
         kinds = [
             kind
-            for kind in self.kinds_for(user)
+            for kind in self.list_kinds()
             if shared_photos or not kind.sends_shared_photo
         ]
         if not kinds:

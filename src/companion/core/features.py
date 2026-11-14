@@ -31,7 +31,7 @@ class FeatureDetails:
         in_reply_note: Whether replies are told when it isn't available,
             so they can say so if the User asks for it.
         reply_note_name: What replies are told it is called when it isn't
-            available; "" to use its name.
+            available; None to use its name.
     """
 
     feature: Feature
@@ -40,7 +40,16 @@ class FeatureDetails:
     on_by_default: bool = True
     needs_stickers: bool = False
     in_reply_note: bool = True
-    reply_note_name: str = ""
+    reply_note_name: str | None = None
+
+    @property
+    def name_in_reply_note(self) -> str:
+        """What replies are told this Feature is called when it isn't available.
+
+        Returns:
+            Its reply note name, or its name if it has none.
+        """
+        return self.reply_note_name or self.name
 
 
 FEATURES: tuple[FeatureDetails, ...] = (
@@ -245,8 +254,7 @@ class FeatureService:
         if not unavailable:
             return ""
         names = ", ".join(
-            feature_details(feature).reply_note_name or feature_details(feature).name
-            for feature in unavailable
+            feature_details(feature).name_in_reply_note for feature in unavailable
         )
         note: str = self._repositories.platform_settings.get(UNAVAILABLE_NOTE_SETTING)
         return note.replace(FEATURES_PLACEHOLDER, names).replace(
