@@ -55,3 +55,9 @@ Status: completed
   - Standards: no hard violations. Fixed: the unused defaults for `look_up_past` and `leave_out` are now required.
   - Kept as they are: the embedding passed beside the Summary rather than on it (it's a storage detail), and the separate embed-and-log blocks (each logs its own message).
   - Spec: nothing missing. The Understanding prompt reload is deliberate (see the decisions above).
+
+## Completion
+
+- Completed: 2026-11-14
+- Commits: `3f17e4f` (older Summaries found by meaning), `9fb8091` (review fixes: `look_up_past` and `leave_out` are required), `51349b9` (issue archived with evidence), `09896d6` (CONTEXT.md: how older Summaries are found)
+- Merged into main: `fe532e1` (branch `understanding-06-older-summaries`, pushed to origin)
