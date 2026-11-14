@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 from uuid import UUID
@@ -18,6 +18,7 @@ from companion.core.ports import (
     PhotoViewer,
     Repositories,
 )
+from companion.core.reply_tools import ReplyContext, ReplyOffer
 from companion.core.usage import UsageLimiter
 
 logger = logging.getLogger(__name__)
@@ -486,7 +487,7 @@ class PhotoTools:
         self._repositories = repositories
         self._photo_service = photo_service
 
-    def offer(self, snapshot: UserSnapshot, conversation_id: UUID) -> list[ChatTool]:
+    def offer(self, snapshot: UserSnapshot, context: ReplyContext) -> ReplyOffer:
         """Pick the photo tools for a reply in a Conversation.
 
         The ask_about_photo tool lists the photos in the Conversation that
@@ -496,15 +497,18 @@ class PhotoTools:
 
         Args:
             snapshot: The User being replied to.
-            conversation_id: The Conversation being replied in.
+            context: What the reply is answering, with its Conversation.
 
         Returns:
-            The ask_about_photo tool, or none when no photo in the
-            Conversation was viewed or Photo Viewing doesn't work for the User.
+            The offer with the ask_about_photo tool; no tool when no photo in
+            the Conversation was viewed or Photo Viewing doesn't work for the
+            User.
         """
         if not snapshot.works(Feature.PHOTO_VIEWING):
-            return []
-        messages = self._repositories.conversations.list_messages(conversation_id)
+            return ReplyOffer()
+        messages = self._repositories.conversations.list_messages(
+            context.conversation_id
+        )
         viewed = [
             (photo, photo.description or message.content)
             for message in messages
@@ -512,7 +516,7 @@ class PhotoTools:
             if photo.viewed
         ]
         if not viewed:
-            return []
+            return ReplyOffer()
 
         def run_ask(arguments: dict[str, Any]) -> str:
             """Look at the photo the model picked again, with its question.
@@ -546,52 +550,34 @@ class PhotoTools:
         description = self._repositories.platform_settings.get(
             "ask_about_photo_tool_description"
         )
-        return [
-            ChatTool(
-                name="ask_about_photo",
-                description=f"{description}\n\n{listed}",
-                parameters=ASK_ABOUT_PHOTO_PARAMETERS,
-                run=run_ask,
-            )
-        ]
-
-
-class SendPhotoChoice:
-    """The send_photo tool for one reply, and the Shared Photo it picked.
-
-    At most one Shared Photo is picked per reply.
-    """
-
-    def __init__(self, shared_photos: list[SharedPhoto], description: str) -> None:
-        """Set up the choice.
-
-        Args:
-            shared_photos: The User's own Shared Photos it may send.
-            description: The Admin-set tool description, put before the list.
-        """
-        self._shared_photos = shared_photos
-        self._description = description
-        self.picked: SharedPhoto | None = None
-
-    @property
-    def tools(self) -> list[ChatTool]:
-        """The send_photo tool, or none when there is no Shared Photo to send."""
-        if not self._shared_photos:
-            return []
-        listed = "\n".join(
-            photo_tool_line(number, photo.description)
-            for number, photo in enumerate(self._shared_photos, start=1)
+        return ReplyOffer(
+            tools=[
+                ChatTool(
+                    name="ask_about_photo",
+                    description=f"{description}\n\n{listed}",
+                    parameters=ASK_ABOUT_PHOTO_PARAMETERS,
+                    run=run_ask,
+                )
+            ]
         )
-        return [
-            ChatTool(
-                name="send_photo",
-                description=f"{self._description}\n\n{listed}",
-                parameters=SEND_PHOTO_PARAMETERS,
-                run=self._pick,
-            )
-        ]
 
-    def _pick(self, arguments: dict[str, Any]) -> str:
+
+def send_photo_offer(shared_photos: list[SharedPhoto], description: str) -> ReplyOffer:
+    """Offer the send_photo tool for one reply; it picks at most one photo.
+
+    Args:
+        shared_photos: The User's own Shared Photos it may send.
+        description: The Admin-set tool description, put before the list.
+
+    Returns:
+        The offer with the send_photo tool, which sets `picked` when the model
+        picks a Shared Photo; no tool when there is no Shared Photo to send.
+    """
+    offer = ReplyOffer()
+    if not shared_photos:
+        return offer
+
+    def pick(arguments: dict[str, Any]) -> str:
         """Pick the Shared Photo the model chose, if it is the first one.
 
         Args:
@@ -600,15 +586,29 @@ class SendPhotoChoice:
         Returns:
             What the model is told back.
         """
-        if self.picked is not None:
+        if offer.picked is not None:
             return PHOTO_ALREADY_PICKED
         number = arguments.get("photo")
         if not isinstance(number, int) or isinstance(number, bool):
             return NO_SUCH_SHARED_PHOTO
-        if not 1 <= number <= len(self._shared_photos):
+        if not 1 <= number <= len(shared_photos):
             return NO_SUCH_SHARED_PHOTO
-        self.picked = self._shared_photos[number - 1]
+        offer.picked = shared_photos[number - 1]
         return f"Photo {number} will be sent after your text. Now write your text."
+
+    listed = "\n".join(
+        photo_tool_line(number, photo.description)
+        for number, photo in enumerate(shared_photos, start=1)
+    )
+    offer.tools.append(
+        ChatTool(
+            name="send_photo",
+            description=f"{description}\n\n{listed}",
+            parameters=SEND_PHOTO_PARAMETERS,
+            run=pick,
+        )
+    )
+    return offer
 
 
 class SendPhotoTools:
@@ -622,28 +622,28 @@ class SendPhotoTools:
         """
         self._repositories = repositories
 
-    def offer(self, user_id: UUID, shared_photo_ids: Iterable[UUID]) -> SendPhotoChoice:
-        """Start the send_photo choice for one reply to a User.
+    def offer(self, snapshot: UserSnapshot, context: ReplyContext) -> ReplyOffer:
+        """Offer the send_photo tool for one reply to a User.
 
         Each Shared Photo is looked up by the User's own ID, so another
         User's photo can never be offered or sent.
 
         Args:
-            user_id: The User being replied to.
-            shared_photo_ids: The Shared Photos that matter for the message,
-                as memory retrieval picked them.
+            snapshot: The User being replied to.
+            context: What the reply is answering, with the Shared Photos that
+                matter for the message, as memory retrieval picked them.
 
         Returns:
-            The choice, offering those of the User's Shared Photos that
-            still exist; none when there are none.
+            The offer, listing those of the User's Shared Photos that still
+            exist; no tool when there are none.
         """
         user_memory = self._repositories.user_memory
         found = (
-            user_memory.get_shared_photo(user_id, photo_id)
-            for photo_id in shared_photo_ids
+            user_memory.get_shared_photo(snapshot.user.id, photo_id)
+            for photo_id in context.shared_photo_ids
         )
         shared_photos = [photo for photo in found if photo is not None]
-        return SendPhotoChoice(
+        return send_photo_offer(
             shared_photos,
             self._repositories.platform_settings.get("send_photo_tool_description"),
         )

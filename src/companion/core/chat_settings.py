@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from datetime import time
 from typing import Any
 from uuid import UUID
@@ -17,6 +16,7 @@ from companion.core.models import (
     UserSnapshot,
 )
 from companion.core.ports import ChatTool, Repositories
+from companion.core.reply_tools import ReplyContext, ReplyOffer
 from companion.core.user_data import ChatDataDeletion
 from companion.core.user_memory import MemoryNotFoundError, UserMemoryService
 from companion.core.users import InvalidProfileError, UserService
@@ -92,19 +92,6 @@ TIME_ZONE_PARAMETERS: dict[str, Any] = {
     },
     "required": ["time_zone"],
 }
-
-
-@dataclass(frozen=True)
-class SettingsOffer:
-    """The settings tools a reply may use, and how the model should use them.
-
-    Attributes:
-        tools: The tools.
-        instructions: The reply instructions about changing settings.
-    """
-
-    tools: list[ChatTool]
-    instructions: str
 
 
 def parse_time(text: Any) -> time | None:
@@ -524,7 +511,7 @@ class SettingsTools:
         self._user_memory = user_memory
         self._data_deletion = data_deletion
 
-    def offer(self, snapshot: UserSnapshot) -> SettingsOffer:
+    def offer(self, snapshot: UserSnapshot, context: ReplyContext) -> ReplyOffer:
         """Pick the settings tools for a reply to a User.
 
         Deleting the account, changing country and disconnecting Telegram
@@ -532,6 +519,7 @@ class SettingsTools:
 
         Args:
             snapshot: The User being replied to.
+            context: What the reply is answering; not needed here.
 
         Returns:
             The tools and their reply instructions; only the tool to delete
@@ -554,7 +542,7 @@ class SettingsTools:
                 tool for tool in reply_tools.tools if tool.name == DELETE_DATA_TOOL
             ]
             instructions_key = DELETE_DATA_INSTRUCTIONS_SETTING
-        return SettingsOffer(
+        return ReplyOffer(
             tools=tools,
             instructions=self._repositories.platform_settings.get(instructions_key),
         )

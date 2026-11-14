@@ -214,21 +214,23 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 repositories=dependencies.repositories,
                 chat_model=chat_model,
                 features=feature_service,
-                web_search_tools=WebSearchTools(
-                    repositories=dependencies.repositories,
-                    web_search=dependencies.web_search,
-                ),
-                settings_tools=SettingsTools(
-                    repositories=dependencies.repositories,
-                    users=user_service,
-                    check_ins=check_in_service,
-                    user_memory=user_memory_service,
-                    data_deletion=chat_data_deletion,
-                ),
-                sticker_tools=StickerTools(dependencies.repositories),
-                sticker_adding=sticker_adding,
-                photo_tools=PhotoTools(dependencies.repositories, photo_service),
-                send_photo_tools=SendPhotoTools(dependencies.repositories),
+                tool_providers=[
+                    WebSearchTools(
+                        repositories=dependencies.repositories,
+                        web_search=dependencies.web_search,
+                    ),
+                    SettingsTools(
+                        repositories=dependencies.repositories,
+                        users=user_service,
+                        check_ins=check_in_service,
+                        user_memory=user_memory_service,
+                        data_deletion=chat_data_deletion,
+                    ),
+                    StickerTools(dependencies.repositories),
+                    sticker_adding,
+                    PhotoTools(dependencies.repositories, photo_service),
+                    SendPhotoTools(dependencies.repositories),
+                ],
             ),
         )
     )
