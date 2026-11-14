@@ -1304,6 +1304,15 @@ class KnowledgeDocument:
     created_at: datetime
     when_it_helps: str
 
+    @property
+    def title_with_source(self) -> str:
+        """Write the document's title with who wrote it and its tradition.
+
+        Returns:
+            E.g. "“On the breath” (Owner's notes, Mindfulness)".
+        """
+        return f"“{self.title}” ({self.source}, {self.tradition})"
+
 
 @dataclass(frozen=True)
 class KnowledgeDocumentWithText:

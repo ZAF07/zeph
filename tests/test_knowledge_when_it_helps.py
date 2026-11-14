@@ -1,5 +1,6 @@
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 
 from tests.fakes import (
@@ -239,6 +240,44 @@ def test_passages_come_only_from_the_chosen_documents(
     )
     assert BREATH_TEXT not in instructions
     assert TAX_TEXT not in instructions
+
+
+@pytest.mark.parametrize(
+    "named_as",
+    [
+        "“On grief” (Owner’s notes, Mindfulness)",
+        f"“On grief” (Owner’s notes, Mindfulness): {DEFAULT_WHEN_IT_HELPS}",
+        f"- “On grief” (Owner’s notes, Mindfulness): {DEFAULT_WHEN_IT_HELPS}",
+        "“On grief”",
+        '"On grief" (Owner\'s notes, Mindfulness)',
+        "  “On grief”   (Owner’s notes,\nMindfulness):",
+    ],
+)
+def test_a_document_named_by_part_or_all_of_its_listed_line_is_found(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    seeded_settings: dict[str, Any],
+    named_as: str,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    upload_ready(client, admin, "On grief", GRIEF_TEXT)
+    connect_telegram(client, auth_verifier, chat_channel)
+    set_settings(client, admin, {"knowledge_closeness_percent": 0})
+
+    instructions = reply_instructions(
+        client,
+        chat_model,
+        "it keeps coming in waves",
+        understanding_answer(
+            knowledge_documents=[named_as], knowledge_search=BREATH_SEARCH
+        ),
+    )
+
+    assert f"From “On grief” (Owner’s notes, Mindfulness):\n{GRIEF_TEXT}" in (
+        instructions
+    )
 
 
 def test_a_weak_match_in_a_chosen_document_adds_nothing(

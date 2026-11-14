@@ -1,6 +1,6 @@
 import time
 from dataclasses import asdict
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,6 +9,7 @@ from companion.adapters.knowledge_seed import read_knowledge_seed
 from evals.cases import CASES_DIR, KnowledgeCase, load_knowledge_cases
 from evals.judge import VersionVerdict, judge_version
 from evals.report import EvalReport, KnowledgeStepResult
+from evals.running_clock import RunningClock
 from evals.token_counting_chat_model import TokenCountingChatModel
 from tests.conftest import KNOWLEDGE_SEED_FILE
 from tests.fakes import FakeAuthVerifier, FakeChatChannel, FakeClock
@@ -24,6 +25,16 @@ pytestmark = pytest.mark.eval
 
 KNOWLEDGE_CASES = load_knowledge_cases(CASES_DIR / "knowledge.yaml")
 READY_TIMEOUT_SECONDS = 120
+
+
+@pytest.fixture
+def clock() -> FakeClock:
+    """A clock that moves with real time, so documents have their own upload times.
+
+    Newer documents then list first, as they do for real Users. It replaces
+    the evals' frozen clock for this eval only.
+    """
+    return RunningClock(datetime.now(UTC))
 
 
 def upload_starter_library(client: TestClient, admin: dict[str, str]) -> None:
