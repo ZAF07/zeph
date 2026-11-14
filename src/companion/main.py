@@ -24,7 +24,6 @@ from companion.adapters.telegram.chat_channel import TelegramChatChannel
 from companion.adapters.timer import ThreadTimer
 from companion.app import AppDependencies, create_app
 from companion.config import Settings, load_settings
-from companion.core.conversations import ConversationServices
 from companion.core.ports import (
     AuthAccounts,
     AuthVerifier,
@@ -40,6 +39,7 @@ from companion.core.ports import (
     Scheduler,
     WebSearch,
 )
+from companion.core.reply_gate import ConversationServices
 
 SEED_DIR = Path(__file__).parent / "seed"
 SEED_FILE = SEED_DIR / "platform_settings.yaml"

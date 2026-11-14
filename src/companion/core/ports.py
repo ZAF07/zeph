@@ -17,7 +17,6 @@ from companion.core.models import (
     Conversation,
     ConversationMessage,
     ConversationSummary,
-    ConversationTurn,
     DailyUsage,
     EmbeddedChunk,
     Feature,
@@ -37,6 +36,7 @@ from companion.core.models import (
     MemoryCategoryOverview,
     MemoryChanges,
     MemoryItem,
+    MessageToAnswer,
     ModelAnswer,
     PersonalSticker,
     PhotoImage,
@@ -382,15 +382,15 @@ class KnowledgeVectorStore(Protocol):
 class ConversationEngine(Protocol):
     """Runs the steps of answering a connected User's message."""
 
-    def handle(self, turn: ConversationTurn) -> None:
-        """Answer one message: save it, check it with the Safeguard, then reply.
+    def handle(self, message: MessageToAnswer) -> None:
+        """Answer one message: apply the house rules, then reply if needed.
 
-        On a crisis the Crisis Reply is sent and no reply is composed;
+        When the ReplyGate stops the reply nothing is composed;
         otherwise the reply is given the User Memory that matters and the
         Knowledge that may fit.
 
         Args:
-            turn: The message to answer.
+            message: The message to answer.
         """
         ...
 

@@ -29,7 +29,7 @@ from companion.adapters.postgres.tables import metadata
 from companion.adapters.pypdf.text_extractor import PypdfTextExtractor
 from companion.app import AppDependencies, create_app
 from companion.config import MissingSettingsError, Settings, load_settings
-from companion.core.conversations import ConversationServices
+from companion.core.reply_gate import ConversationServices
 from evals.current_settings import (
     app_database_url,
     read_current_platform_settings,

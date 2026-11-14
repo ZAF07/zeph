@@ -13,7 +13,7 @@ from companion.core.models import (
     AccountIdentity,
     ChannelSticker,
     ChatLine,
-    ConversationTurn,
+    MessageToAnswer,
     ModelAnswer,
     PhotoImage,
     StickerImage,
@@ -284,11 +284,11 @@ class FakeConversationEngine:
         """Start having forgotten no one."""
         self.forgotten: list[UUID] = []
 
-    def handle(self, turn: ConversationTurn) -> None:
-        """Ignore the turn, as tests using this engine send no messages.
+    def handle(self, message: MessageToAnswer) -> None:
+        """Ignore the message, as tests using this engine send no messages.
 
         Args:
-            turn: The incoming turn.
+            message: The message to answer.
         """
 
     def forget_user(self, user_id: UUID) -> None:
