@@ -73,3 +73,4 @@ Kept on purpose:
 - `TypingKeeper` passes most calls straight through (Middle Man). It is a decorator over the `ChatChannel` port, and that is why every sender stops typing on its own.
 - Every service gets the wrapped channel, so no sender (e.g. an Admin's sticker-adding notice) can leave typing showing after its message. A side effect: a notice sent mid-reply also ends that reply's typing repeats. That is fine, because something did arrive.
 - `IncomingMessageHandler` gets the same object as `chat_channel` and `typing_keeper`. The two roles stay readable at each call site.
+- Archived in `dec2c0c` ("Messages issue 02 done: archive issue with test, run, review evidence and commits").
