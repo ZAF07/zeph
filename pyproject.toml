@@ -33,6 +33,7 @@ build-backend = "uv_build"
 dev = [
     "mypy>=2.4.1",
     "pytest>=9.2.0",
+    "pytest-xdist>=3.8.0",
     "ruff>=0.17.4",
     "testcontainers[postgres]>=4.15.0",
     "types-pyyaml>=6.0.12.20261103",
@@ -41,7 +42,7 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "-m 'not contract and not eval'"
+addopts = "-m 'not contract and not eval' -n auto"
 markers = [
     "contract: needs a real external service and keys; run with `make contract`",
     "eval: measures the Companion with the real LLM; run with `make eval`",

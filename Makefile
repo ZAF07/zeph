@@ -25,11 +25,11 @@ check-web:
 
 ## Adapter contract tests against real services; needs keys in .env.
 contract:
-	set -a && . ./.env && set +a && uv run pytest -m contract
+	set -a && . ./.env && set +a && uv run pytest -n 0 -m contract
 
 ## Real-LLM evals: Safeguard, Persona, Knowledge and Settings; needs keys in .env. See evals/README.md.
 eval:
-	set -a && . ./.env && set +a && uv run pytest evals -m eval
+	set -a && . ./.env && set +a && uv run pytest -n 0 evals -m eval
 
 ## Start everything.
 up:
