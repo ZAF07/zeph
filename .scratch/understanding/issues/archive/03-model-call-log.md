@@ -52,4 +52,5 @@ None - can start immediately.
 ## Completion
 
 - Completed: 2026-11-14
-- Commit: <to be filled in after merge>
+- Commits: `ecd9452` (Model Call Log), `5811810` (review fixes: one trace per Message after rebase, single call outcome), `5f91e0c` (issue archived, CONTEXT.md)
+- Merged into main: `32dfa91` (branch `understanding-03-model-call-log`, pushed to origin)
