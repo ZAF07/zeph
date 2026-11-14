@@ -76,3 +76,29 @@ Notes:
 - The 4 Understanding failures are real model behaviour, not harness errors: a failed case prints what the Understanding was given and what it answered, and the input was right (e.g. the Mei Thread was shown, but the model picked "Just chatting" and brought nothing up). Tuning the Understanding prompt and Needs is follow-up `17-tune-understanding-with-the-eval.md`.
 - Persona `struggling-with-shared-photos` and Settings `forget-why-here` also fail on plain `main` (checked by setting this branch's changes aside: Persona failed 2 of 2, Settings 1 of 2). They are not caused by this change and were left alone.
 - First run with the real-time clock in every eval broke the Knowledge eval 3 of 3 times (vs 3 of 3 passes with the frozen clock). Cause: a real defect in shipped code, filed as `16-knowledge-dropped-when-document-named-by-its-whole-line.md`.
+
+### 2026-11-14 — `/code-review` fixes, Understanding eval rerun
+
+Review (Standards: no hard violations; Spec: two partial, four shaky). Fixed:
+
+- Knowledge check now also needs passages to reach the reply (read from the reply call's instructions in the Model Call Log), not only that the Understanding chose a document.
+- The loader refuses a Life Thread title written anywhere else in the case (Portrait, items, Summaries, Curiosities, Knowledge, earlier messages, Messages), so "found" only passes when the Companion was reminded.
+- A Message logging more than one Understanding call uses the last one instead of crashing.
+- The long eval test is split (`send_and_collect_lines`, `check_message`, `latest_understanding`, `calls_in_new_traces`). Keyword arguments for `list_traces`. One helper replaces three repeated Thread-check loops. Reactions and sensitivity are kept as enums. The day and minute offsets in `made_up_memory.py` are named.
+- The existing Persona and Settings failures are filed as `18-persona-and-settings-evals-fail-on-main.md`.
+
+Left as is: importing `wait_until_ready` from the Knowledge eval (the repo already does this between test modules). For "no repeat" and "brushed off", the "not raised" check is mostly guaranteed by the hold-back code, so the Judge rules are what test the reply there. For the Curiosity case, the second Message passes because the raised Curiosity is no longer due, not because of the per-Conversation limit.
+
+Understanding eval rerun after the fixes (`-k understanding`):
+
+```
+Understanding: 9 of 13 messages passed (28 of 32 checks, 9 of 9 rules)
+  Understanding calls: 13, 1352 ms on average (slowest 1674 ms), 1492 tokens in and 126 out on average
+      FAIL need: picked Think it through, expected Advice
+      FAIL need: picked Be heard, expected Accountability
+      FAIL asked why: didn't ask why
+      FAIL knowledge: chose “The Second Arrow” (Owner's notes, Buddhism), but no passage reached the reply   ← bug 16
+Tokens used (app and judge): 58389 in, 2700 out
+```
+
+`reminded-of-sister` passed this run (it failed in the two before), so results vary from run to run.

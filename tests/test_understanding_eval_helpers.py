@@ -32,11 +32,12 @@ cases:
 
 NOTHING_RAISED = ObservedUnderstanding(
     need="Be heard",
-    shown="Life Threads this reminds you of:\n[1] Falling-out with Mei",
+    understanding_input="Life Threads this reminds you of:\n[1] Falling-out with Mei",
     raised_threads=[],
     raised_curiosities=0,
     asked_why=False,
     knowledge_documents=[],
+    knowledge_in_reply=[],
 )
 
 
@@ -203,6 +204,7 @@ def test_every_expectation_met_passes_each_check() -> None:
             raised_curiosities=1,
             asked_why=True,
             knowledge_documents=["On the breath"],
+            knowledge_in_reply=["On the breath"],
         ),
     )
 
@@ -212,7 +214,11 @@ def test_every_expectation_met_passes_each_check() -> None:
         CheckResult("raised", True, "brought up Falling-out with Mei"),
         CheckResult("curiosity", True, "brought up 1 Curiosity"),
         CheckResult("asked why", True, "asked why"),
-        CheckResult("knowledge", True, "chose On the breath"),
+        CheckResult(
+            "knowledge",
+            True,
+            "chose On the breath; passages from On the breath reached the reply",
+        ),
     ]
 
 
@@ -322,3 +328,41 @@ def test_a_message_with_no_understanding_call_fails_and_says_so() -> None:
     assert not result.passed
     assert "    hi (no Understanding call was logged)" in text
     assert "Understanding calls: 0" in text
+
+
+def test_knowledge_chosen_but_not_reaching_the_reply_fails() -> None:
+    expect = UnderstandingExpectations(knowledge=True)
+    named_by_its_line = "“On the breath” (Owner's notes, Mindfulness)"
+
+    [check] = check_understanding(
+        expect, replace(NOTHING_RAISED, knowledge_documents=[named_by_its_line])
+    )
+
+    assert check == CheckResult(
+        "knowledge",
+        False,
+        f"chose {named_by_its_line}, but no passage reached the reply",
+    )
+
+
+@pytest.mark.parametrize(
+    "memory",
+    [
+        "      portrait: Maya has a Falling-out with Mei.\n",
+        "      summaries: [{days_ago: 2, summary: Falling-out with Mei again.}]\n",
+    ],
+)
+def test_a_thread_title_written_elsewhere_in_the_case_is_refused(
+    tmp_path: Path, memory: str
+) -> None:
+    cases_file = tmp_path / "understanding.yaml"
+    cases_file.write_text(
+        CASE_FILE_START + "  - id: hi\n"
+        "    memory:\n"
+        + memory
+        + "      threads: [{title: Falling-out with Mei, story: S}]\n"
+        "    messages: [{text: hi, expect: {found: [Falling-out with Mei]}}]\n"
+    )
+
+    with pytest.raises(InvalidEvalCasesError, match="Falling-out with Mei"):
+        load_understanding_cases(cases_file)

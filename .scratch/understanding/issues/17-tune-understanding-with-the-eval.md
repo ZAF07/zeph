@@ -15,7 +15,7 @@ The PRD says being reminded is the heart of the feature and to tune the closenes
 
 ## Acceptance criteria
 
-- [ ] `uv run pytest -n 0 evals -m eval -k understanding` passes, or each remaining failure is explained
+- [ ] `uv run pytest -n 0 evals -m eval -k understanding` passes (apart from failures caused by bug 16), or each remaining failure is explained
 - [ ] The other Evals don't get worse
 - [ ] `make check-python` passes
 

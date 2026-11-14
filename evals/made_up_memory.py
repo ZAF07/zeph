@@ -9,7 +9,6 @@ from companion.core.models import (
     ConversationSummary,
     Curiosity,
     CuriosityChanges,
-    CuriositySensitivity,
     CuriosityState,
     LifeThread,
     LifeThreadToSave,
@@ -18,13 +17,15 @@ from companion.core.models import (
     MemorySource,
     MessageDirection,
     MessageKind,
-    ThreadReaction,
     UserPortrait,
 )
 from companion.core.ports import Embedder, Repositories
 from evals.cases import EarlierLine, EvalCuriosity, EvalMemory, EvalThread
 
 MEMORY_ITEMS_DAYS_AGO = 30
+PORTRAIT_DAYS_AGO = 1
+CURIOSITIES_DAYS_AGO = 3
+RAISED_IN_THIS_CONVERSATION_MINUTES_AGO = 2
 
 
 def open_conversation_with(
@@ -109,7 +110,7 @@ def give_made_up_memory(
             UserPortrait(
                 user_id=user_id,
                 text=memory.portrait,
-                written_at=now - timedelta(days=1),
+                written_at=now - timedelta(days=PORTRAIT_DAYS_AGO),
             )
         )
     save_memory_items(repositories, user_id, memory.items, now)
@@ -250,7 +251,9 @@ def to_thread_to_save(
     last_raised_at = None
     last_raised_conversation_id = None
     if thread.raised_in_this_conversation:
-        last_raised_at = now - timedelta(minutes=2)
+        last_raised_at = now - timedelta(
+            minutes=RAISED_IN_THIS_CONVERSATION_MINUTES_AGO
+        )
         last_raised_conversation_id = open_conversation_id
     elif thread.raised_days_ago is not None:
         last_raised_at = now - timedelta(days=thread.raised_days_ago)
@@ -267,7 +270,7 @@ def to_thread_to_save(
             updated_at=updated_at,
             last_raised_at=last_raised_at,
             last_raised_conversation_id=last_raised_conversation_id,
-            last_reaction=ThreadReaction(thread.reaction) if thread.reaction else None,
+            last_reaction=thread.reaction,
         ),
         name_keys=name_keys(thread.people),
         embedding=embedding,
@@ -283,7 +286,7 @@ def to_curiosity(user_id: UUID, curiosity: EvalCuriosity, now: datetime) -> Curi
         now: When the case's first Message is sent.
 
     Returns:
-        The Curiosity, written three days before `now`.
+        The Curiosity, written `CURIOSITIES_DAYS_AGO` days before `now`.
     """
     not_before = (
         None
@@ -296,7 +299,7 @@ def to_curiosity(user_id: UUID, curiosity: EvalCuriosity, now: datetime) -> Curi
         question=curiosity.question,
         why=curiosity.why,
         not_before=not_before,
-        sensitivity=CuriositySensitivity(curiosity.sensitivity),
+        sensitivity=curiosity.sensitivity,
         state=CuriosityState.WAITING,
-        created_at=now - timedelta(days=3),
+        created_at=now - timedelta(days=CURIOSITIES_DAYS_AGO),
     )

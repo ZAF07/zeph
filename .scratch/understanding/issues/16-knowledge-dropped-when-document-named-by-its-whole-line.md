@@ -40,3 +40,7 @@ Deterministic in 3 of 3 runs (and passes 3 of 3 with the frozen clock):
 - [ ] A test covers it at the webhook seam (scripted Understanding answer naming the document that way → passages reach the reply)
 - [ ] The Knowledge eval uses the real-time `RunningClock`, and passes
 - [ ] `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy`, `uv run pytest` pass
+
+## Comments
+
+- 2026-11-14: Also shows in the Understanding Eval (issue 14), with only one document and the normal clock setup: `FAIL knowledge: chose “The Second Arrow” (Owner's notes, Buddhism), but no passage reached the reply` (`uv run pytest -n 0 evals -m eval -k knowledge-for-a-reflective-question`). Not every run, so the model does it some of the time, not only when the order changes.

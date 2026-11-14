@@ -1,5 +1,6 @@
 import re
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -13,9 +14,9 @@ from companion.core.models import ModelCall, ModelStep, Understanding
 from companion.core.ports import Repositories
 from evals.cases import (
     CASES_DIR,
-    EarlierLine,
     EvalKnowledgeDocument,
     UnderstandingCase,
+    UnderstandingMessage,
     load_understanding_cases,
 )
 from evals.judge import judge_persona_rules
@@ -47,6 +48,7 @@ pytestmark = pytest.mark.eval
 
 UNDERSTANDING_CASES = load_understanding_cases(CASES_DIR / "understanding.yaml")
 TRACES_READ_AT_MOST = 200
+KNOWLEDGE_PASSAGE_SOURCE = re.compile(r"^From “(.+?)” \(", re.MULTILINE)
 
 
 @pytest.fixture
@@ -96,7 +98,7 @@ def upload_knowledge_documents(
         assert response.status_code == 200, response.text
 
 
-def calls_since(
+def calls_in_new_traces(
     repositories: Repositories, user_id: UUID, seen_trace_ids: set[UUID]
 ) -> list[ModelCall]:
     """Read the User's model calls in traces not seen before, and mark them seen.
@@ -110,7 +112,11 @@ def calls_since(
         The calls in the new traces.
     """
     overviews = repositories.model_calls.list_traces(
-        user_id, None, None, False, TRACES_READ_AT_MOST
+        user_id=user_id,
+        since=None,
+        step=None,
+        errors_only=False,
+        limit=TRACES_READ_AT_MOST,
     )
     calls: list[ModelCall] = []
     for overview in overviews:
@@ -123,24 +129,45 @@ def calls_since(
     return calls
 
 
-def observe(understanding: Understanding, shown: str) -> ObservedUnderstanding:
-    """Describe what a saved Understanding did, for the checks.
+def knowledge_in_reply(calls: Sequence[ModelCall]) -> list[str]:
+    """List the Knowledge documents whose passages reached the reply.
+
+    Args:
+        calls: The Message's model calls.
+
+    Returns:
+        The titles, each once, as the reply's instructions name them.
+    """
+    instructions = "\n".join(
+        call.content.instructions
+        for call in calls
+        if call.step == ModelStep.REPLY and call.content
+    )
+    return list(dict.fromkeys(KNOWLEDGE_PASSAGE_SOURCE.findall(instructions)))
+
+
+def describe_what_was_done(
+    understanding: Understanding, understanding_input: str, calls: Sequence[ModelCall]
+) -> ObservedUnderstanding:
+    """Describe what a saved Understanding and the reply after it did.
 
     Args:
         understanding: The Message's saved Understanding.
-        shown: What the Understanding model was given.
+        understanding_input: What the Understanding model was given.
+        calls: The Message's model calls.
 
     Returns:
-        What it did.
+        What they did.
     """
     form = understanding.form
     return ObservedUnderstanding(
         need=understanding.need,
-        shown=shown,
+        understanding_input=understanding_input,
         raised_threads=[item.title for item in form.bring_up],
         raised_curiosities=len(form.curiosities),
         asked_why=understanding.asked_why,
         knowledge_documents=list(form.knowledge.documents) if form.knowledge else [],
+        knowledge_in_reply=knowledge_in_reply(calls),
     )
 
 
@@ -161,18 +188,139 @@ def full_content_check(calls: Sequence[ModelCall]) -> CheckResult:
     return CheckResult("full content", True, f"kept for all {len(calls)} model calls")
 
 
-def transcript_lines_for(earlier: Sequence[EarlierLine]) -> list[str]:
-    """Write the earlier messages as lines of the Judge's transcript.
+def transcript_line(from_person: bool, text: str) -> str:
+    """Write one message as a line of the Judge's transcript.
 
     Args:
-        earlier: The messages already in the Conversation.
+        from_person: True if the person sent it; False if Zeph did.
+        text: What it says.
 
     Returns:
-        One "Person:" or "Zeph:" line each.
+        E.g. "Person: hey".
     """
+    return f"{'Person' if from_person else 'Zeph'}: {text}"
+
+
+def send_and_collect_lines(
+    client: TestClient, chat_channel: FakeChatChannel, text: str
+) -> list[str]:
+    """Send one Message through the webhook and write it and Zeph's replies.
+
+    Args:
+        client: The backend's test client.
+        chat_channel: Records what Zeph sends.
+        text: What the person sends.
+
+    Returns:
+        The Message's transcript line, then one per reply text.
+    """
+    already_sent = len(chat_channel.sent)
+    assert send_to_webhook(client, telegram_text_update(text)) == 200
     return [
-        f"{'Person' if line.from_person else 'Zeph'}: {line.text}" for line in earlier
+        transcript_line(True, text),
+        *(
+            transcript_line(False, sent.text)
+            for sent in chat_channel.sent[already_sent:]
+        ),
     ]
+
+
+@dataclass(frozen=True)
+class CheckedMessage:
+    """One Message's result, and what to print if it failed.
+
+    Attributes:
+        result: The result for the report.
+        failure_details: What the Understanding was given and answered;
+            empty when the Message passed.
+    """
+
+    result: UnderstandingMessageResult
+    failure_details: list[str]
+
+
+def check_message(
+    case_id: str,
+    message: UnderstandingMessage,
+    calls: Sequence[ModelCall],
+    understanding: Understanding | None,
+    transcript: str,
+    chat_model: TokenCountingChatModel,
+) -> CheckedMessage:
+    """Check one Message's Understanding and reply, and judge the reply.
+
+    Args:
+        case_id: The case's ID.
+        message: The Message and what it should do.
+        calls: Its model calls, from the Model Call Log.
+        understanding: Its saved Understanding; None if none was saved.
+        transcript: The Conversation so far, for the Judge.
+        chat_model: The model that judges.
+
+    Returns:
+        Its result; a Message with no logged Understanding call fails.
+    """
+    understanding_calls = [
+        call for call in calls if call.step == ModelStep.UNDERSTANDING
+    ]
+    if not understanding_calls or understanding is None:
+        return CheckedMessage(
+            UnderstandingMessageResult(case_id, message.text, [], [], None), []
+        )
+    understanding_call = understanding_calls[-1]
+    content = understanding_call.content
+    understanding_input = (
+        "\n".join(line.text for line in content.history) if content else ""
+    )
+    checks = check_understanding(
+        message.expect,
+        describe_what_was_done(understanding, understanding_input, calls),
+    )
+    checks.append(full_content_check(calls))
+    rules = {rule: UNDERSTANDING_CASES.rules[rule] for rule in message.expect.rules}
+    verdicts = judge_persona_rules(chat_model, transcript, rules) if rules else []
+    result = UnderstandingMessageResult(
+        case_id,
+        message.text,
+        checks,
+        verdicts,
+        UnderstandingCallStats(
+            understanding_call.duration_ms,
+            understanding_call.tokens_in,
+            understanding_call.tokens_out,
+        ),
+    )
+    if result.passed:
+        return CheckedMessage(result, [])
+    return CheckedMessage(
+        result,
+        [
+            f"The Understanding of “{message.text}” was given:",
+            understanding_input,
+            "It answered:",
+            content.response if content else "(no content kept)",
+            "",
+        ],
+    )
+
+
+def latest_understanding(
+    repositories: Repositories, user_id: UUID
+) -> Understanding | None:
+    """Read the newest Understanding in the User's latest Conversation.
+
+    Args:
+        repositories: Where Conversations and Understandings are stored.
+        user_id: The User's ID.
+
+    Returns:
+        The Understanding; None if there is none.
+    """
+    conversation = repositories.conversations.get_latest_for_user(user_id)
+    if conversation is None:
+        return None
+    understandings = repositories.understandings.list_for_conversation(conversation.id)
+    return understandings[-1] if understandings else None
 
 
 @pytest.mark.parametrize(
@@ -204,71 +352,32 @@ def test_the_understanding_reads_the_user_and_the_reply_follows_it(
         repositories, embedder, user_id, case.memory, clock.now(), open_conversation_id
     )
     seen_trace_ids: set[UUID] = set()
-    calls_since(repositories, user_id, seen_trace_ids)
-    transcript_lines = transcript_lines_for(case.earlier)
+    calls_in_new_traces(repositories, user_id, seen_trace_ids)
+    transcript_lines = [
+        transcript_line(line.from_person, line.text) for line in case.earlier
+    ]
 
-    results = []
-    understanding_lines = []
+    checked_messages = []
     for message in case.messages:
-        already_sent = len(chat_channel.sent)
-        assert send_to_webhook(client, telegram_text_update(message.text)) == 200
-        transcript_lines.append(f"Person: {message.text}")
-        transcript_lines += [
-            f"Zeph: {sent.text}" for sent in chat_channel.sent[already_sent:]
-        ]
-        calls = calls_since(repositories, user_id, seen_trace_ids)
-        understanding_calls = [
-            call for call in calls if call.step == ModelStep.UNDERSTANDING
-        ]
-        conversation = repositories.conversations.get_latest_for_user(user_id)
-        assert conversation is not None
-        understandings = repositories.understandings.list_for_conversation(
-            conversation.id
-        )
-        if not understanding_calls or not understandings:
-            results.append(
-                UnderstandingMessageResult(case.id, message.text, [], [], None)
+        transcript_lines += send_and_collect_lines(client, chat_channel, message.text)
+        checked_messages.append(
+            check_message(
+                case.id,
+                message,
+                calls_in_new_traces(repositories, user_id, seen_trace_ids),
+                latest_understanding(repositories, user_id),
+                "\n".join(transcript_lines),
+                chat_model,
             )
-            continue
-        [understanding_call] = understanding_calls
-        content = understanding_call.content
-        shown = "\n".join(line.text for line in content.history) if content else ""
-        checks = check_understanding(message.expect, observe(understandings[-1], shown))
-        checks.append(full_content_check(calls))
-        rules = {rule: UNDERSTANDING_CASES.rules[rule] for rule in message.expect.rules}
-        verdicts = (
-            judge_persona_rules(chat_model, "\n".join(transcript_lines), rules)
-            if rules
-            else []
         )
-        result = UnderstandingMessageResult(
-            case.id,
-            message.text,
-            checks,
-            verdicts,
-            UnderstandingCallStats(
-                understanding_call.duration_ms,
-                understanding_call.tokens_in,
-                understanding_call.tokens_out,
-            ),
-        )
-        results.append(result)
-        if not result.passed:
-            understanding_lines += [
-                f"The Understanding of “{message.text}” was given:",
-                shown,
-                "It answered:",
-                content.response if content else "(no content kept)",
-                "",
-            ]
 
-    eval_report.understanding += results
-    failed = [result for result in results if not result.passed]
+    eval_report.understanding += [checked.result for checked in checked_messages]
+    failed = [checked for checked in checked_messages if not checked.result.passed]
     assert not failed, "\n".join(
         [
-            *understanding_lines,
+            *(line for checked in failed for line in checked.failure_details),
             *transcript_lines,
             "",
-            *[line for result in failed for line in result.describe()],
+            *(line for checked in failed for line in checked.result.describe()),
         ]
     )

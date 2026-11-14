@@ -240,8 +240,7 @@ class EvalThread:
             updated.
         raised_days_ago: How many days before the case's time Zeph last
             brought it up; None if it never did.
-        reaction: How the person took it then: "engaged", "brushed_off" or
-            "asked_to_drop"; None if not known.
+        reaction: How the person took it then; None if not known.
         raised_in_this_conversation: Whether Zeph already brought it up in
             the case's open Conversation.
     """
@@ -252,7 +251,7 @@ class EvalThread:
     is_open: bool = True
     updated_days_ago: int = 0
     raised_days_ago: int | None = None
-    reaction: str | None = None
+    reaction: ThreadReaction | None = None
     raised_in_this_conversation: bool = False
 
 
@@ -266,13 +265,13 @@ class EvalCuriosity:
         not_before_days_ago: How many days before the case's time its day
             came (0 for today, below 0 for a day still to come); None for
             any time.
-        sensitivity: "low", "medium" or "high".
+        sensitivity: How carefully it must be asked.
     """
 
     question: str
     why: str
     not_before_days_ago: int | None = 0
-    sensitivity: str = "low"
+    sensitivity: CuriositySensitivity = CuriositySensitivity.LOW
 
 
 @dataclass(frozen=True)
@@ -676,7 +675,7 @@ def to_eval_thread(entry: dict[str, Any]) -> EvalThread:
         is_open=entry.get("open", True),
         updated_days_ago=entry.get("updated_days_ago", 0),
         raised_days_ago=entry.get("raised_days_ago"),
-        reaction=ThreadReaction(reaction).value if reaction else None,
+        reaction=ThreadReaction(reaction) if reaction else None,
         raised_in_this_conversation=entry.get("raised_in_this_conversation", False),
     )
 
@@ -712,9 +711,7 @@ def to_eval_memory(entry: dict[str, Any]) -> EvalMemory:
                 question=curiosity["question"],
                 why=curiosity["why"],
                 not_before_days_ago=curiosity.get("not_before_days_ago", 0),
-                sensitivity=CuriositySensitivity(
-                    curiosity.get("sensitivity", "low")
-                ).value,
+                sensitivity=CuriositySensitivity(curiosity.get("sensitivity", "low")),
             )
             for curiosity in entry.get("curiosities", [])
         ],
@@ -770,10 +767,38 @@ def to_understanding_message(entry: dict[str, Any]) -> UnderstandingMessage:
     )
 
 
-def require_known_names(
+def texts_besides_threads(case: UnderstandingCase) -> list[str]:
+    """List every text in a case the Understanding may see, except its Threads.
+
+    Args:
+        case: The case.
+
+    Returns:
+        The Portrait, Memory Items, Summaries, Curiosities, Knowledge
+        Documents, earlier messages and Messages.
+    """
+    memory = case.memory
+    return [
+        memory.portrait,
+        *(content for contents in memory.items.values() for content in contents),
+        *(summary.summary for summary in memory.summaries),
+        *(f"{item.question} {item.why}" for item in memory.curiosities),
+        *(
+            f"{document.title} {document.when_it_helps}"
+            for document in memory.knowledge_documents
+        ),
+        *(line.text for line in case.earlier),
+        *(message.text for message in case.messages),
+    ]
+
+
+def require_checkable_names(
     case: UnderstandingCase, rules: dict[str, str], cases_file: Path
 ) -> None:
-    """Check a case names only rules and Life Threads that exist.
+    """Check a case names only rules and Life Threads it can be checked by.
+
+    A Thread's title may appear only in the Thread itself, so "found"
+    passes only when the Companion was reminded of it.
 
     Args:
         case: The case.
@@ -781,8 +806,9 @@ def require_known_names(
         cases_file: The file it came from, for the error message.
 
     Raises:
-        InvalidEvalCasesError: If it names an unknown rule or Thread, or
-            has a Thread raised in its Conversation but no earlier lines.
+        InvalidEvalCasesError: If it names an unknown rule or Thread, writes
+            a Thread's title elsewhere, or has a Thread raised in its
+            Conversation but no earlier lines.
     """
     titles = {thread.title for thread in case.memory.threads}
     for message in case.messages:
@@ -795,6 +821,15 @@ def require_known_names(
                 f"{cases_file.name}: {case.id} names unknown rules or Threads: "
                 + ", ".join(unknown_rules + unknown_threads)
             )
+    other_texts = texts_besides_threads(case)
+    written_elsewhere = [
+        title for title in titles if any(title in text for text in other_texts)
+    ]
+    if written_elsewhere:
+        raise InvalidEvalCasesError(
+            f"{cases_file.name}: {case.id} writes Thread titles outside the "
+            "Threads: " + ", ".join(written_elsewhere)
+        )
     raised_here = any(
         thread.raised_in_this_conversation for thread in case.memory.threads
     )
@@ -818,8 +853,9 @@ def load_understanding_cases(cases_file: Path) -> UnderstandingCases:
 
     Raises:
         InvalidEvalCasesError: If a case names an unknown rule or Life
-            Thread, has a Thread raised in its Conversation but no earlier
-            lines, or two cases share an ID.
+            Thread, writes a Thread's title outside it, has a Thread raised
+            in its Conversation but no earlier lines, or two cases share an
+            ID.
     """
     content: dict[str, Any] = yaml.safe_load(cases_file.read_text())
     rules: dict[str, str] = content["rules"]
@@ -836,6 +872,6 @@ def load_understanding_cases(cases_file: Path) -> UnderstandingCases:
         for entry in content["cases"]
     ]
     for case in cases:
-        require_known_names(case, rules, cases_file)
+        require_checkable_names(case, rules, cases_file)
     require_unique_ids([case.id for case in cases], cases_file)
     return UnderstandingCases(rules=rules, cases=cases)
