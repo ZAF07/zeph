@@ -6,6 +6,7 @@ import { Memories } from "@/components/Memories";
 import type {
   ApiClient,
   ConversationSummary,
+  LifeThread,
   MemoryGroup,
   SharedPhoto,
 } from "@/lib/api-client";
@@ -23,6 +24,8 @@ const apiClient = {
   listSharedPhotos: vi.fn<ApiClient["listSharedPhotos"]>(),
   getSharedPhotoImage: vi.fn<ApiClient["getSharedPhotoImage"]>(),
   deleteSharedPhoto: vi.fn<ApiClient["deleteSharedPhoto"]>(),
+  listLifeThreads: vi.fn<ApiClient["listLifeThreads"]>(),
+  deleteLifeThread: vi.fn<ApiClient["deleteLifeThread"]>(),
 };
 
 vi.mock("@/lib/use-api-client", () => ({
@@ -80,6 +83,23 @@ const summaries: ConversationSummary[] = [
   },
 ];
 
+const lifeThreads: LifeThread[] = [
+  {
+    id: "thread-1",
+    title: "Falling-out with Mei",
+    story: "Fell out with their sister Mei in February over money.",
+    is_open: true,
+    updated_at: "2026-11-12T09:00:00Z",
+  },
+  {
+    id: "thread-2",
+    title: "Moving flat",
+    story: "Moved into the new flat in March.",
+    is_open: false,
+    updated_at: "2026-10-03T09:00:00Z",
+  },
+];
+
 const sharedPhotos: SharedPhoto[] = [
   {
     id: "photo-1",
@@ -111,6 +131,8 @@ describe("Memories", () => {
       new Blob(["jpeg"], { type: "image/jpeg" }),
     );
     apiClient.deleteSharedPhoto.mockResolvedValue(undefined);
+    apiClient.listLifeThreads.mockResolvedValue(lifeThreads);
+    apiClient.deleteLifeThread.mockResolvedValue(undefined);
     URL.createObjectURL = vi.fn(() => "blob:photo");
     URL.revokeObjectURL = vi.fn();
   });
@@ -259,6 +281,94 @@ describe("Memories", () => {
     );
 
     expect(screen.getByText("No Conversation Summaries yet")).toBeVisible();
+  });
+
+  it("shows each Life Thread's story, whether it is open, and when it was updated", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<Memories />);
+
+    await user.click(
+      await screen.findByRole("tab", { name: "What’s going on" }),
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "What’s going on in your life" }),
+    ).toBeVisible();
+    const [open, settled] = screen.getAllByRole("listitem");
+    expect(within(open).getByText("Falling-out with Mei")).toBeVisible();
+    expect(
+      within(open).getByText(
+        "Fell out with their sister Mei in February over money.",
+      ),
+    ).toBeVisible();
+    expect(within(open).getByText("Open")).toBeVisible();
+    expect(within(open).getByText("Updated 12 Nov")).toBeVisible();
+    expect(within(settled).getByText("Moving flat")).toBeVisible();
+    expect(within(settled).getByText("Settled")).toBeVisible();
+    expect(within(settled).getByText("Updated 3 Oct")).toBeVisible();
+  });
+
+  it("deletes a Life Thread", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<Memories />);
+    await user.click(
+      await screen.findByRole("tab", { name: "What’s going on" }),
+    );
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Delete story: Falling-out with Mei",
+      }),
+    );
+
+    expect(apiClient.deleteLifeThread).toHaveBeenCalledWith("thread-1");
+    expect(screen.queryByText("Falling-out with Mei")).not.toBeInTheDocument();
+    expect(screen.getByText("Moving flat")).toBeVisible();
+  });
+
+  it("keeps a Life Thread and explains when deleting it fails", async () => {
+    apiClient.deleteLifeThread.mockRejectedValue(new Error("down"));
+    const user = userEvent.setup();
+    renderWithQueries(<Memories />);
+    await user.click(
+      await screen.findByRole("tab", { name: "What’s going on" }),
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Delete story: Moving flat" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn’t delete that. Please try again.",
+    );
+    expect(screen.getByText("Moving flat")).toBeVisible();
+  });
+
+  it("explains when there are no Life Threads yet", async () => {
+    apiClient.listLifeThreads.mockResolvedValue([]);
+    const user = userEvent.setup();
+    renderWithQueries(<Memories />);
+
+    await user.click(
+      await screen.findByRole("tab", { name: "What’s going on" }),
+    );
+
+    expect(screen.getByText("Nothing here yet")).toBeVisible();
+  });
+
+  it("still shows and deletes Life Threads when User Memory is off", async () => {
+    apiClient.getMe.mockResolvedValue({ ...maya, user_memory_enabled: false });
+    const user = userEvent.setup();
+    renderWithQueries(<Memories />);
+    await user.click(
+      await screen.findByRole("tab", { name: "What’s going on" }),
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Delete story: Moving flat" }),
+    );
+
+    expect(apiClient.deleteLifeThread).toHaveBeenCalledWith("thread-2");
   });
 
   it("shows each Shared Photo with its photo, description, note and date", async () => {

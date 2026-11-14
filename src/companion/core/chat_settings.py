@@ -9,6 +9,7 @@ from companion.core.models import (
     CheckInChanges,
     CheckInFrequency,
     Feature,
+    LifeThread,
     MemoryItem,
     PauseLength,
     PlatformSettings,
@@ -112,6 +113,20 @@ def parse_time(text: Any) -> time | None:
         return None
 
 
+def describe_listed_memory(memory: MemoryItem | LifeThread) -> str:
+    """Write one line of what list_memories shows the model.
+
+    Args:
+        memory: A Memory Item or a Life Thread.
+
+    Returns:
+        The Memory Item's content, or the Life Thread's title and story.
+    """
+    if isinstance(memory, LifeThread):
+        return f"A story in their life: {memory.title}. {memory.story}"
+    return memory.content
+
+
 class ReplySettingsTools:
     """The settings tools for one reply to one User.
 
@@ -137,7 +152,7 @@ class ReplySettingsTools:
             repositories: Where Users are stored.
             users: Changes User Memory, Photo Viewing and the time zone.
             check_ins: Changes Check-in settings.
-            user_memory: Lists and forgets Memory Items.
+            user_memory: Lists and forgets Memory Items and Life Threads.
             data_deletion: Asks to delete the User's data.
             settings: The platform settings, read once for the reply.
         """
@@ -148,7 +163,7 @@ class ReplySettingsTools:
         self._check_ins = check_ins
         self._user_memory = user_memory
         self._data_deletion = data_deletion
-        self._listed_memories: list[MemoryItem] = []
+        self._listed_memories: list[MemoryItem | LifeThread] = []
 
     @property
     def tools(self) -> list[ChatTool]:
@@ -206,8 +221,9 @@ class ReplySettingsTools:
             ChatTool(
                 name="list_memories",
                 description=(
-                    "List what you remember about the person, by number, to "
-                    "find the one they want you to forget."
+                    "List what you remember about the person and the stories "
+                    "in their life you follow, by number, to find the one "
+                    "they want you to forget."
                 ),
                 parameters=NO_ARGUMENTS,
                 run=self._list_memories,
@@ -215,8 +231,8 @@ class ReplySettingsTools:
             ChatTool(
                 name="forget_memory",
                 description=(
-                    "Forget one memory the person named, by its number from "
-                    "list_memories. Only the one they clearly meant."
+                    "Forget one memory or story the person named, by its "
+                    "number from list_memories. Only the one they clearly meant."
                 ),
                 parameters=FORGET_PARAMETERS,
                 run=self._forget_memory,
@@ -405,25 +421,27 @@ class ReplySettingsTools:
         )
 
     def _list_memories(self, arguments: dict[str, Any]) -> str:
-        """List the User's Memory Items by number.
+        """List the User's Memory Items, then their Life Threads, by number.
 
         Args:
             arguments: The model's arguments; none are needed.
 
         Returns:
-            The numbered Memory Items, or that there are none.
+            The numbered Memory Items and Life Threads, or that there are none.
         """
         groups = self._user_memory.list_groups(self._user_id)
-        self._listed_memories = [item for group in groups for item in group.items]
+        items = [item for group in groups for item in group.items]
+        threads = self._user_memory.list_threads(self._user_id)
+        self._listed_memories = [*items, *threads]
         if not self._listed_memories:
             return "You remember nothing about them."
         return "\n".join(
-            f"{number}. {item.content}"
-            for number, item in enumerate(self._listed_memories, start=1)
+            f"{number}. {describe_listed_memory(memory)}"
+            for number, memory in enumerate(self._listed_memories, start=1)
         )
 
     def _forget_memory(self, arguments: dict[str, Any]) -> str:
-        """Forget one of the listed Memory Items.
+        """Forget one of the listed Memory Items or Life Threads.
 
         Args:
             arguments: The model's arguments, with the memory's "number".
@@ -439,12 +457,17 @@ class ReplySettingsTools:
             number = 0
         if not 1 <= number <= len(self._listed_memories):
             return f"There is no memory with that number. {NOTHING_CHANGED}"
-        item = self._listed_memories[number - 1]
+        memory = self._listed_memories[number - 1]
         try:
-            self._user_memory.delete_item(self._user_id, item.id)
+            if isinstance(memory, LifeThread):
+                self._user_memory.delete_thread(self._user_id, memory.id)
+                forgotten = memory.title
+            else:
+                self._user_memory.delete_item(self._user_id, memory.id)
+                forgotten = memory.content
         except MemoryNotFoundError:
             return f"That memory is already gone. {NOTHING_CHANGED}"
-        return f'You forgot "{item.content}". {TELL_THEM}'
+        return f'You forgot "{forgotten}". {TELL_THEM}'
 
     def _change_time_zone(self, arguments: dict[str, Any]) -> str:
         """Change the User's time zone.
@@ -508,7 +531,7 @@ class SettingsTools:
             repositories: Where Users and settings are stored.
             users: Changes User Memory, Photo Viewing and the time zone.
             check_ins: Changes Check-in settings.
-            user_memory: Lists and forgets Memory Items.
+            user_memory: Lists and forgets Memory Items and Life Threads.
             data_deletion: Asks to delete the User's data.
         """
         self._repositories = repositories

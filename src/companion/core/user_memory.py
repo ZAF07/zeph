@@ -6,6 +6,7 @@ from companion.core.features import FeatureService
 from companion.core.models import (
     ConversationSummary,
     Feature,
+    LifeThread,
     MemoryCategory,
     MemoryGroup,
     MemoryItem,
@@ -34,6 +35,12 @@ class ConversationSummaryNotFoundError(MemoryNotFoundError):
     """Raised when a User has no Conversation Summary with that ID."""
 
     shown_message = "Conversation Summary not found"
+
+
+class LifeThreadNotFoundError(MemoryNotFoundError):
+    """Raised when a User has no Life Thread with that ID."""
+
+    shown_message = "Life Thread not found"
 
 
 class UserMemoryService:
@@ -148,6 +155,30 @@ class UserMemoryService:
         """
         if not self._repositories.user_memory.delete_summary(user_id, summary_id):
             raise ConversationSummaryNotFoundError
+
+    def list_threads(self, user_id: UUID) -> list[LifeThread]:
+        """List a User's Life Threads, open first, then the latest updated.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Life Threads.
+        """
+        return self._repositories.life_threads.list_for_user(user_id)
+
+    def delete_thread(self, user_id: UUID, thread_id: UUID) -> None:
+        """Delete one of a User's Life Threads, so it is never brought up again.
+
+        Args:
+            user_id: The User's ID.
+            thread_id: The Life Thread's ID.
+
+        Raises:
+            LifeThreadNotFoundError: If the User has no such Life Thread.
+        """
+        if not self._repositories.life_threads.delete(user_id, thread_id):
+            raise LifeThreadNotFoundError
 
     def remember_onboarding(self, user: User) -> None:
         """Save the User's onboarding answers as Memory Items.

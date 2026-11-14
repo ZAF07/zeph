@@ -960,13 +960,19 @@ class LifeThreadRepository(Protocol):
         """
         ...
 
-    def save_many(self, threads: Sequence[LifeThreadToSave]) -> None:
+    def save_many(
+        self,
+        added: Sequence[LifeThreadToSave],
+        changed: Sequence[LifeThreadToSave],
+    ) -> None:
         """Add new Threads and save changed ones, in one step.
 
-        A changed Thread saved with no embedding keeps the one it had.
+        A changed Thread saved with no embedding keeps the one it had. A
+        changed Thread that was deleted meanwhile stays deleted.
 
         Args:
-            threads: The new and changed Threads.
+            added: The new Threads.
+            changed: The changed Threads.
         """
         ...
 
@@ -983,6 +989,29 @@ class LifeThreadRepository(Protocol):
             thread_ids: The Threads' IDs.
             conversation_id: The Conversation they were brought up in.
             raised_at: When the reply that brought them up was sent.
+        """
+        ...
+
+    def list_for_user(self, user_id: UUID) -> list[LifeThread]:
+        """List a User's Threads, open first, then the latest updated.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Threads.
+        """
+        ...
+
+    def delete(self, user_id: UUID, thread_id: UUID) -> bool:
+        """Delete one of a User's Threads.
+
+        Args:
+            user_id: The User's ID.
+            thread_id: The Thread's ID.
+
+        Returns:
+            True if it was deleted; False if the User has no such Thread.
         """
         ...
 

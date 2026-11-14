@@ -653,7 +653,18 @@ class LifeThreadKeeper:
             logger.warning("Life Thread keeping gave no readable answer")
             return
         planned = plan_thread_changes(entries, known, raised_ids, snapshot.user.id, now)
-        threads.save_many([self._to_save(thread) for thread in planned])
+        threads.save_many(
+            added=[
+                self._to_save(thread)
+                for thread in planned
+                if thread.id not in known_threads
+            ],
+            changed=[
+                self._to_save(thread)
+                for thread in planned
+                if thread.id in known_threads
+            ],
+        )
 
     def _to_save(self, thread: LifeThread) -> LifeThreadToSave:
         """Add a Thread's name keys and embedding, so it can be found.

@@ -19,6 +19,7 @@ from companion.core.models import (
     ConnectionToken,
     ConnectionTokenStatus,
     ConversationSummary,
+    LifeThread,
     MemoryGroup,
     MemoryItem,
     MemorySource,
@@ -251,6 +252,22 @@ class ConversationSummariesResponse(BaseModel):
     summaries: list[ConversationSummaryResponse]
 
 
+class LifeThreadResponse(BaseModel):
+    """A Life Thread's story, whether it is open, and when it last changed."""
+
+    id: str
+    title: str
+    story: str
+    is_open: bool
+    updated_at: datetime
+
+
+class LifeThreadsResponse(BaseModel):
+    """A User's Life Threads, open first, then the latest updated."""
+
+    threads: list[LifeThreadResponse]
+
+
 class SharedPhotoResponse(BaseModel):
     """A Shared Photo, without the chat channel's IDs."""
 
@@ -298,6 +315,24 @@ def to_memory_item_response(item: MemoryItem) -> MemoryItemResponse:
         source=item.source,
         created_at=item.created_at,
         updated_at=item.updated_at,
+    )
+
+
+def to_life_thread_response(thread: LifeThread) -> LifeThreadResponse:
+    """Describe a Life Thread for the Dashboard.
+
+    Args:
+        thread: The Life Thread.
+
+    Returns:
+        Its title, story, whether it is open and when it last changed.
+    """
+    return LifeThreadResponse(
+        id=str(thread.id),
+        title=thread.title,
+        story=thread.story,
+        is_open=thread.is_open,
+        updated_at=thread.updated_at,
     )
 
 
@@ -927,6 +962,44 @@ def build_dashboard_api_router(
             CoreError: 404 if the User has no such Conversation Summary.
         """
         user_memory_service.delete_summary(user.id, summary_id)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @router.get("/life-threads")
+    def list_life_threads(
+        user: Annotated[User, Depends(current_user)],
+    ) -> LifeThreadsResponse:
+        """Return the User's Life Threads, open first, then the latest updated.
+
+        Args:
+            user: The signed-in User.
+
+        Returns:
+            The Life Threads.
+        """
+        return LifeThreadsResponse(
+            threads=[
+                to_life_thread_response(thread)
+                for thread in user_memory_service.list_threads(user.id)
+            ]
+        )
+
+    @router.delete("/life-threads/{thread_id}", status_code=status.HTTP_204_NO_CONTENT)
+    def delete_life_thread(
+        user: Annotated[User, Depends(current_user)], thread_id: UUID
+    ) -> Response:
+        """Delete one of the User's Life Threads.
+
+        Args:
+            user: The signed-in User.
+            thread_id: The Life Thread's ID.
+
+        Returns:
+            An empty response.
+
+        Raises:
+            CoreError: 404 if the User has no such Life Thread.
+        """
+        user_memory_service.delete_thread(user.id, thread_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @router.get("/shared-photos")
