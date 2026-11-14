@@ -561,7 +561,7 @@ def downgrade_to_before_wondering(database_url: str) -> None:
     config = Config()
     config.set_main_option("script_location", str(MIGRATIONS_DIR))
     config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
-    command.downgrade(config, "0033")
+    command.downgrade(config, "0034")
 
 
 def test_an_existing_install_gets_the_wondering_kind_last(
