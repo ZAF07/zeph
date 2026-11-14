@@ -207,7 +207,7 @@ class MemoryRetrieval:
         self._repositories = repositories
         self._chat_model = chat_model
 
-    def recall(self, user: UserSnapshot, conversation_id: UUID) -> RecalledMemory:
+    def recall(self, snapshot: UserSnapshot, conversation_id: UUID) -> RecalledMemory:
         """Find what the Companion remembers that matters for the newest message.
 
         Memory Items from every "always include" category go in, plus those
@@ -221,20 +221,20 @@ class MemoryRetrieval:
         Shared Photo is used when Photo Viewing doesn't work.
 
         Args:
-            user: The User being answered.
+            snapshot: The User being answered.
             conversation_id: The Conversation the message is in.
 
         Returns:
             The memory section for the reply instructions and the Shared
             Photos that matter.
         """
-        user_id = user.user.id
+        user_id = snapshot.user.id
         settings = self._repositories.platform_settings
         user_memory = self._repositories.user_memory
         items = user_memory.list_items(user_id)
         shared_photos = (
             user_memory.list_shared_photos(user_id)
-            if user.works(Feature.PHOTO_VIEWING)
+            if snapshot.works(Feature.PHOTO_VIEWING)
             else []
         )
         filled_category_ids = {item.category_id for item in items}
@@ -253,7 +253,7 @@ class MemoryRetrieval:
         )
         if shared_photos:
             pickable.append(photos_group)
-        picked = self._pick(pickable, user, conversation_id)
+        picked = self._pick(pickable, snapshot, conversation_id)
         picked_ids = {category.id for category in picked}
         relevant_photos = shared_photos if photos_group in picked else []
         chosen = [
@@ -269,7 +269,7 @@ class MemoryRetrieval:
                 chosen,
                 items,
                 summaries,
-                user.user.time_zone,
+                snapshot.user.time_zone,
                 settings.get("reply_memory_intro"),
                 relevant_photos,
             ),
@@ -279,14 +279,14 @@ class MemoryRetrieval:
     def _pick(
         self,
         categories: list[MemoryCategory],
-        user: UserSnapshot,
+        snapshot: UserSnapshot,
         conversation_id: UUID,
     ) -> list[MemoryCategory]:
         """Ask the model which categories matter for the newest message.
 
         Args:
             categories: The categories it may pick from.
-            user: The User being answered.
+            snapshot: The User being answered.
             conversation_id: The Conversation the message is in.
 
         Returns:
@@ -299,7 +299,7 @@ class MemoryRetrieval:
         messages = self._repositories.conversations.list_messages(conversation_id)
         try:
             answer = self._chat_model.generate(
-                user=user,
+                snapshot=snapshot,
                 model=settings.get("memory_retrieval_model"),
                 instructions=settings.get("memory_retrieval_prompt"),
                 history=[

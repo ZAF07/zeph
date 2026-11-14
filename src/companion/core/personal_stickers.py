@@ -235,7 +235,7 @@ class PersonalStickerKeeper:
         self._clock = clock
 
     def keep_from(
-        self, user: UserSnapshot, messages: list[ConversationMessage]
+        self, snapshot: UserSnapshot, messages: list[ConversationMessage]
     ) -> None:
         """Keep the stickers that fit from an ended Conversation.
 
@@ -246,12 +246,12 @@ class PersonalStickerKeeper:
         ago first.
 
         Args:
-            user: The User whose Conversation it was.
+            snapshot: The User whose Conversation it was.
             messages: The Conversation's messages, oldest first.
         """
-        if not user.works(Feature.PERSONAL_STICKERS):
+        if not snapshot.works(Feature.PERSONAL_STICKERS):
             return
-        user_id = user.user.id
+        user_id = snapshot.user.id
         stickers_by_number = dict(enumerate(list_sent_stickers(messages), start=1))
         if not stickers_by_number:
             return
@@ -262,7 +262,7 @@ class PersonalStickerKeeper:
         }
         settings = self._repositories.platform_settings
         answer = self._chat_model.generate(
-            user=user,
+            snapshot=snapshot,
             model=settings.get("personal_sticker_keeping_model"),
             instructions=settings.get("personal_sticker_keeping_prompt"),
             history=[

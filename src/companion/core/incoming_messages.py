@@ -259,12 +259,12 @@ class IncomingMessageHandler:
                 )
 
     def _message_to_answer(
-        self, user: UserSnapshot, message: IncomingMessage
+        self, snapshot: UserSnapshot, message: IncomingMessage
     ) -> MessageToAnswer:
         """Turn a connected User's message into the message the Companion answers.
 
         Args:
-            user: The User who sent it.
+            snapshot: The User who sent it.
             message: The incoming message.
 
         Returns:
@@ -272,19 +272,19 @@ class IncomingMessageHandler:
         """
         if message.photo is None:
             return MessageToAnswer(
-                user_id=user.user.id,
+                user_id=snapshot.user.id,
                 chat_id=message.chat_id,
                 text=readable_text(message),
                 kind=message.kind,
                 sticker=message.sticker,
             )
         return self._photo_message_to_answer(
-            user, message.chat_id, [message.photo], message.text
+            snapshot, message.chat_id, [message.photo], message.text
         )
 
     def _photo_message_to_answer(
         self,
-        user: UserSnapshot,
+        snapshot: UserSnapshot,
         chat_id: int,
         photos: Sequence[ChannelPhoto],
         caption: str,
@@ -292,7 +292,7 @@ class IncomingMessageHandler:
         """Describe a User's photos and turn them into the message to answer.
 
         Args:
-            user: The User who sent them.
+            snapshot: The User who sent them.
             chat_id: The chat to reply in.
             photos: The photo, or an album's photos.
             caption: The caption; "" if none.
@@ -301,9 +301,9 @@ class IncomingMessageHandler:
             The message to answer, whose text holds each photo's description, or, with
             Photo Viewing off, whose Safeguard text does.
         """
-        photo_message = self._photo_service.read_message(user, photos, caption)
+        photo_message = self._photo_service.read_message(snapshot, photos, caption)
         return MessageToAnswer(
-            user_id=user.user.id,
+            user_id=snapshot.user.id,
             chat_id=chat_id,
             text=photo_message.text,
             kind=MessageKind.PHOTO,

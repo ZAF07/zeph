@@ -269,7 +269,7 @@ class PhotoService:
         self._clock = clock
 
     def read_message(
-        self, user: UserSnapshot, photos: Sequence[ChannelPhoto], caption: str
+        self, snapshot: UserSnapshot, photos: Sequence[ChannelPhoto], caption: str
     ) -> PhotoMessage:
         """Describe a User's photos and write their message as the Companion reads it.
 
@@ -280,7 +280,7 @@ class PhotoService:
         "Photo Viewing off" note, and no photo is marked as viewed.
 
         Args:
-            user: The User who sent them.
+            snapshot: The User who sent them.
             photos: The photo, or an album's photos in the order sent.
             caption: The caption; "" if none.
 
@@ -291,14 +291,14 @@ class PhotoService:
         """
         settings = self._repositories.platform_settings
         looked_at = photos[: settings.get("photo_album_max_photos")]
-        descriptions = [self.describe(user, photo) for photo in looked_at]
+        descriptions = [self.describe(snapshot, photo) for photo in looked_at]
         described_text = photo_message_text(
             caption,
             descriptions,
             settings.get("photo_not_viewed_note"),
             photos_not_looked_at=len(photos) - len(looked_at),
         )
-        if not user.works(Feature.PHOTO_VIEWING):
+        if not snapshot.works(Feature.PHOTO_VIEWING):
             return PhotoMessage(
                 text=photo_message_text(
                     caption,
@@ -324,7 +324,7 @@ class PhotoService:
             ),
         )
 
-    def describe(self, user: UserSnapshot, photo: ChannelPhoto) -> str | None:
+    def describe(self, snapshot: UserSnapshot, photo: ChannelPhoto) -> str | None:
         """Download a photo and write a detailed description of it.
 
         A failed download or look is tried again up to `photo_retry_count`
@@ -332,7 +332,7 @@ class PhotoService:
         User's usage.
 
         Args:
-            user: The User who sent it.
+            snapshot: The User who sent it.
             photo: The photo.
 
         Returns:
@@ -344,19 +344,21 @@ class PhotoService:
             return None
         settings = self._repositories.platform_settings
         return self._look(
-            user,
+            snapshot,
             photo,
             settings.get("photo_description_prompt"),
             log_action="view a photo",
         )
 
-    def ask(self, user: UserSnapshot, photo: ChannelPhoto, question: str) -> str | None:
+    def ask(
+        self, snapshot: UserSnapshot, photo: ChannelPhoto, question: str
+    ) -> str | None:
         """Look at a User's photo again to answer a question about it.
 
         Retries and usage work as for `describe`.
 
         Args:
-            user: The User who sent it.
+            snapshot: The User who sent it.
             photo: The photo.
             question: What to look for.
 
@@ -366,7 +368,7 @@ class PhotoService:
         """
         settings = self._repositories.platform_settings
         return self._look(
-            user,
+            snapshot,
             photo,
             photo_question_instructions(
                 settings.get("photo_description_prompt"), question
@@ -423,7 +425,7 @@ class PhotoService:
 
     def _look(
         self,
-        user: UserSnapshot,
+        snapshot: UserSnapshot,
         photo: ChannelPhoto,
         instructions: str,
         log_action: str,
@@ -431,7 +433,7 @@ class PhotoService:
         """Download a photo and look at it, trying again when that fails.
 
         Args:
-            user: The User whose usage the tokens go into.
+            snapshot: The User whose usage the tokens go into.
             photo: The photo.
             instructions: What to write about the photo.
             log_action: What is being done, for the error log, e.g.
@@ -456,7 +458,7 @@ class PhotoService:
                 )
             else:
                 self._usage_limiter.record_tokens(
-                    user, answer.tokens_in, answer.tokens_out
+                    snapshot, answer.tokens_in, answer.tokens_out
                 )
                 if answer.text.strip():
                     return answer.text.strip()
@@ -484,7 +486,7 @@ class PhotoTools:
         self._repositories = repositories
         self._photo_service = photo_service
 
-    def offer(self, user: UserSnapshot, conversation_id: UUID) -> list[ChatTool]:
+    def offer(self, snapshot: UserSnapshot, conversation_id: UUID) -> list[ChatTool]:
         """Pick the photo tools for a reply in a Conversation.
 
         The ask_about_photo tool lists the photos in the Conversation that
@@ -493,14 +495,14 @@ class PhotoTools:
         listed with its message's text.
 
         Args:
-            user: The User being replied to.
+            snapshot: The User being replied to.
             conversation_id: The Conversation being replied in.
 
         Returns:
             The ask_about_photo tool, or none when no photo in the
             Conversation was viewed or Photo Viewing doesn't work for the User.
         """
-        if not user.works(Feature.PHOTO_VIEWING):
+        if not snapshot.works(Feature.PHOTO_VIEWING):
             return []
         messages = self._repositories.conversations.list_messages(conversation_id)
         viewed = [
@@ -532,7 +534,7 @@ class PhotoTools:
             if not question:
                 return MISSING_QUESTION
             photo, _ = viewed[number - 1]
-            answer = self._photo_service.ask(user, photo, question)
+            answer = self._photo_service.ask(snapshot, photo, question)
             if answer is None:
                 return LOOK_AGAIN_FAILED
             return f"Looking again at photo {number}: {answer}"

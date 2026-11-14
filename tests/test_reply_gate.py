@@ -68,14 +68,14 @@ class FakeSafeguard:
     def assess(
         self,
         conversation_id: UUID,
-        user: UserSnapshot,
+        snapshot: UserSnapshot,
         newest_text: str | None = None,
     ) -> RiskType:
         """Report the set risk.
 
         Args:
             conversation_id: The Conversation.
-            user: The User.
+            snapshot: The User.
             newest_text: The message as the Safeguard reads it, if different.
 
         Returns:
@@ -84,11 +84,11 @@ class FakeSafeguard:
         self.calls.append("assess")
         return self.risk_type
 
-    def respond_to_crisis(self, user: UserSnapshot, risk_type: RiskType) -> str:
+    def respond_to_crisis(self, snapshot: UserSnapshot, risk_type: RiskType) -> str:
         """Write the Crisis Reply.
 
         Args:
-            user: The User in crisis.
+            snapshot: The User in crisis.
             risk_type: The risk seen.
 
         Returns:
@@ -111,11 +111,13 @@ class FakeDataDeletion:
         self.calls = calls
         self.answer = answer
 
-    def settle(self, user: UserSnapshot, chat_id: int, text: str) -> DataDeletionAnswer:
+    def settle(
+        self, snapshot: UserSnapshot, chat_id: int, text: str
+    ) -> DataDeletionAnswer:
         """Settle a pending Delete My Data.
 
         Args:
-            user: The User.
+            snapshot: The User.
             chat_id: The chat to reply in.
             text: The message.
 
@@ -125,11 +127,11 @@ class FakeDataDeletion:
         self.calls.append("settle")
         return self.answer
 
-    def cancel(self, user: UserSnapshot) -> DataDeletionAnswer:
+    def cancel(self, snapshot: UserSnapshot) -> DataDeletionAnswer:
         """Cancel a pending Delete My Data.
 
         Args:
-            user: The User.
+            snapshot: The User.
 
         Returns:
             That a request was cancelled.
@@ -151,11 +153,11 @@ class FakeUsageLimiter:
         self.calls = calls
         self.within_limit = within_limit
 
-    def claim_message(self, user: UserSnapshot) -> bool:
+    def claim_message(self, snapshot: UserSnapshot) -> bool:
         """Count the message.
 
         Args:
-            user: The User who sent it.
+            snapshot: The User who sent it.
 
         Returns:
             Whether it is within the limit.

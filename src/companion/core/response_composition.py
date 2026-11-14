@@ -124,7 +124,7 @@ class ResponseComposer:
     def compose(
         self,
         conversation_id: UUID,
-        user: UserSnapshot,
+        snapshot: UserSnapshot,
         memory: str = "",
         knowledge: str = "",
         data_deletion_cancelled: bool = False,
@@ -147,7 +147,7 @@ class ResponseComposer:
 
         Args:
             conversation_id: The Conversation to reply in.
-            user: The User being replied to, as read when the reply started.
+            snapshot: The User being replied to, as read when the reply started.
             memory: The User Memory that matters for this message; "" if none.
             knowledge: The Knowledge passages that may fit; "" if none.
             data_deletion_cancelled: True if this message cancelled the
@@ -164,11 +164,13 @@ class ResponseComposer:
         """
         settings = self._repositories.platform_settings
         instructions = f"{settings.get('persona')}\n\n{settings.get('response_prompt')}"
-        web_search = self._web_search_tools.offer(user)
-        settings_tools = self._settings_tools.offer(user)
-        sticker_choice = self._sticker_tools.offer(user)
-        photo_tools = self._photo_tools.offer(user, conversation_id)
-        send_photo_choice = self._send_photo_tools.offer(user.user.id, shared_photo_ids)
+        web_search = self._web_search_tools.offer(snapshot)
+        settings_tools = self._settings_tools.offer(snapshot)
+        sticker_choice = self._sticker_tools.offer(snapshot)
+        photo_tools = self._photo_tools.offer(snapshot, conversation_id)
+        send_photo_choice = self._send_photo_tools.offer(
+            snapshot.user.id, shared_photo_ids
+        )
         cancelled_note = (
             settings.get(DELETION_CANCELLED_NOTE_SETTING)
             if data_deletion_cancelled
@@ -179,7 +181,7 @@ class ResponseComposer:
             knowledge,
             web_search.instructions,
             settings_tools.instructions,
-            self._features.unavailable_note(user.unavailable_features),
+            self._features.unavailable_note(snapshot.unavailable_features),
             cancelled_note,
         )
         for section in sections:
@@ -189,7 +191,7 @@ class ResponseComposer:
             self._repositories.conversations.list_messages(conversation_id)
         )
         reply = self._chat_model.generate(
-            user=user,
+            snapshot=snapshot,
             model=settings.get("response_model"),
             instructions=instructions,
             history=history,
@@ -197,7 +199,7 @@ class ResponseComposer:
                 *web_search.tools,
                 *settings_tools.tools,
                 *sticker_choice.tools,
-                *self._sticker_adding.tools(user.user),
+                *self._sticker_adding.tools(snapshot.user),
                 *photo_tools,
                 *send_photo_choice.tools,
             ],

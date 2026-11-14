@@ -68,7 +68,7 @@ class KnowledgeRetrieval:
         self._embedder = embedder
         self._vector_store = vector_store
 
-    def recall(self, user: UserSnapshot, conversation_id: UUID) -> str:
+    def recall(self, snapshot: UserSnapshot, conversation_id: UUID) -> str:
         """Write the Knowledge passages closest to the newest message.
 
         The newest message is embedded and the top few chunks, as many as the
@@ -77,13 +77,13 @@ class KnowledgeRetrieval:
         User. If the search fails the reply goes ahead without them.
 
         Args:
-            user: The User being replied to.
+            snapshot: The User being replied to.
             conversation_id: The Conversation the message is in.
 
         Returns:
             The Knowledge section for the reply instructions; "" if none.
         """
-        if not user.works(Feature.KNOWLEDGE):
+        if not snapshot.works(Feature.KNOWLEDGE):
             return ""
         settings = self._repositories.platform_settings
         limit = settings.get("knowledge_chunks_per_reply")

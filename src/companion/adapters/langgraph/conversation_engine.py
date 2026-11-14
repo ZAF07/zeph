@@ -243,7 +243,7 @@ class LangGraphConversationEngine:
         graph.add_edge("deliver_reply", END)
         self._graph = graph.compile(checkpointer=checkpointer)
 
-    def handle(self, message: MessageToAnswer, user: UserSnapshot) -> None:
+    def handle(self, message: MessageToAnswer, snapshot: UserSnapshot) -> None:
         """Answer one message: apply the house rules, then reply if needed.
 
         The ReplyGate saves the message and applies the house rules. When it
@@ -253,7 +253,7 @@ class LangGraphConversationEngine:
 
         Args:
             message: The message to answer.
-            user: The User who sent it, read once as the reply starts.
+            snapshot: The User who sent it, read once as the reply starts.
         """
         final_state = self._graph.invoke(
             {
@@ -266,7 +266,7 @@ class LangGraphConversationEngine:
                 "safeguard_text": message.safeguard_text or "",
             },
             config={"configurable": {"thread_id": str(message.user_id)}},
-            context=user,
+            context=snapshot,
         )
         if final_state["stop_reason"] == StopReason.DATA_DELETED:
             self.forget_user(message.user_id)

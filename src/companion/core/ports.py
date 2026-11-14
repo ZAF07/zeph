@@ -383,7 +383,7 @@ class KnowledgeVectorStore(Protocol):
 class ConversationEngine(Protocol):
     """Runs the steps of answering a connected User's message."""
 
-    def handle(self, message: MessageToAnswer, user: UserSnapshot) -> None:
+    def handle(self, message: MessageToAnswer, snapshot: UserSnapshot) -> None:
         """Answer one message: apply the house rules, then reply if needed.
 
         When the ReplyGate stops the reply nothing is composed;
@@ -392,7 +392,7 @@ class ConversationEngine(Protocol):
 
         Args:
             message: The message to answer.
-            user: The User who sent it, read once as the reply starts.
+            snapshot: The User who sent it, read once as the reply starts.
         """
         ...
 

@@ -919,19 +919,19 @@ class CheckInService:
             MEMORY_INTRO,
         )
 
-    def _shared_photos(self, user: UserSnapshot) -> list[SharedPhoto]:
+    def _shared_photos(self, snapshot: UserSnapshot) -> list[SharedPhoto]:
         """List the User's Shared Photos a Check-in may send.
 
         Args:
-            user: The User, as read for this tick.
+            snapshot: The User, as read for this tick.
 
         Returns:
             Their Shared Photos, newest first; none if Photo Viewing doesn't
             work for the User.
         """
-        if not user.works(Feature.PHOTO_VIEWING):
+        if not snapshot.works(Feature.PHOTO_VIEWING):
             return []
-        return self._repositories.user_memory.list_shared_photos(user.user.id)
+        return self._repositories.user_memory.list_shared_photos(snapshot.user.id)
 
     def _decide(
         self,
@@ -966,7 +966,7 @@ class CheckInService:
             describe_shared_photos(kinds, shared_photos, user.time_zone),
         )
         answer = self._chat_model.generate(
-            user=snapshot,
+            snapshot=snapshot,
             model=settings.get("check_in_model"),
             instructions=f"{settings.get('persona')}\n\n{settings.get('check_in_prompt')}",
             history=[ChatLine(role=ChatRole.USER, text=description)],

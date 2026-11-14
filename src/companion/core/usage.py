@@ -39,11 +39,11 @@ class UsageLimiter:
         self._repositories = repositories
         self._clock = clock
 
-    def claim_message(self, user: UserSnapshot) -> bool:
+    def claim_message(self, snapshot: UserSnapshot) -> bool:
         """Count one message toward the User's daily message limit.
 
         Args:
-            user: The User who sent it, as read when the reply started.
+            snapshot: The User who sent it, as read when the reply started.
 
         Returns:
             True if it was counted and may be answered; False if the User has
@@ -51,17 +51,17 @@ class UsageLimiter:
         """
         daily_limit = self._repositories.platform_settings.get("daily_message_limit")
         return self._repositories.usage.claim_message(
-            user.user.id, user.today, daily_limit
+            snapshot.user.id, snapshot.today, daily_limit
         )
 
-    def has_used_up_daily_message_limit(self, user: UserSnapshot) -> bool:
+    def has_used_up_daily_message_limit(self, snapshot: UserSnapshot) -> bool:
         """Tell whether the User has used up today's daily message limit.
 
         It is used up once their message count for their day has reached the
         limit, even if no message was turned away yet.
 
         Args:
-            user: The User, as read when the tick started.
+            snapshot: The User, as read when the tick started.
 
         Returns:
             True if their next message today would get the limit reply.
@@ -69,7 +69,9 @@ class UsageLimiter:
         daily_limit: int = self._repositories.platform_settings.get(
             "daily_message_limit"
         )
-        count = self._repositories.usage.count_messages(user.user.id, user.today)
+        count = self._repositories.usage.count_messages(
+            snapshot.user.id, snapshot.today
+        )
         return count >= daily_limit
 
     def limit_reply(self) -> str:
@@ -82,17 +84,17 @@ class UsageLimiter:
         return reply
 
     def record_tokens(
-        self, user: UserSnapshot, tokens_in: int, tokens_out: int
+        self, snapshot: UserSnapshot, tokens_in: int, tokens_out: int
     ) -> None:
         """Add chat model tokens to the User's day.
 
         Args:
-            user: The User the model call was for.
+            snapshot: The User the model call was for.
             tokens_in: Tokens the model read.
             tokens_out: Tokens the model wrote.
         """
         self._repositories.usage.add_tokens(
-            user.user.id, user.today, tokens_in, tokens_out
+            snapshot.user.id, snapshot.today, tokens_in, tokens_out
         )
 
     def report(self, days: int) -> UsageReport:
@@ -136,7 +138,7 @@ class UsageRecordingChatModel:
 
     def generate(
         self,
-        user: UserSnapshot,
+        snapshot: UserSnapshot,
         model: str,
         instructions: str,
         history: list[ChatLine],
@@ -145,7 +147,7 @@ class UsageRecordingChatModel:
         """Generate an answer for a User and record the tokens it took.
 
         Args:
-            user: The User the answer is for.
+            snapshot: The User the answer is for.
             model: The model to use, e.g. "deepseek-chat".
             instructions: What the model should be and do.
             history: The Conversation so far, oldest first.
@@ -157,5 +159,5 @@ class UsageRecordingChatModel:
         answer = self._chat_model.generate(
             model=model, instructions=instructions, history=history, tools=tools
         )
-        self._usage_limiter.record_tokens(user, answer.tokens_in, answer.tokens_out)
+        self._usage_limiter.record_tokens(snapshot, answer.tokens_in, answer.tokens_out)
         return answer.text

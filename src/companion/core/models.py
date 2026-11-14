@@ -1283,17 +1283,6 @@ class UserSnapshot:
         """
         return self._status(feature).works
 
-    def available(self, feature: Feature) -> bool:
-        """Say whether the Admin side allows a Feature for the User.
-
-        Args:
-            feature: The Feature.
-
-        Returns:
-            True if the Admin side allows it, whatever the User's own switch.
-        """
-        return self._status(feature).available
-
     @property
     def unavailable_features(self) -> list[Feature]:
         """List the Features the Admin side has off for the User.

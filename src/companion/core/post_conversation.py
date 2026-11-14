@@ -380,26 +380,25 @@ class PostConversationProcessor:
                 unprocessed so the next tick tries again.
         """
         user_memory = self._repositories.user_memory
-        found = self._user_snapshots.load_many([conversation.user_id])
-        user = found[0] if found else None
+        snapshot = self._user_snapshots.find(conversation.user_id)
         messages = self._repositories.conversations.list_messages(conversation.id)
-        if user is not None:
-            self._keep_personal_stickers(user, messages)
-        if user is None or not user.works(Feature.USER_MEMORY) or not messages:
+        if snapshot is not None:
+            self._keep_personal_stickers(snapshot, messages)
+        if snapshot is None or not snapshot.works(Feature.USER_MEMORY) or not messages:
             user_memory.save_processed_conversation(
                 conversation.id, self._clock.now(), None, NO_CHANGES
             )
             return
         categories = self._repositories.memory_categories.list_all()
-        user_id = user.user.id
+        user_id = snapshot.user.id
         items_by_number = dict(enumerate(user_memory.list_items(user_id), start=1))
         photos_by_number = (
             dict(enumerate(list_sent_photos(messages), start=1))
-            if user.works(Feature.PHOTO_VIEWING)
+            if snapshot.works(Feature.PHOTO_VIEWING)
             else {}
         )
         answer = self._ask(
-            user,
+            snapshot,
             describe_conversation(
                 messages, categories, items_by_number, photos_by_number
             ),
@@ -442,24 +441,24 @@ class PostConversationProcessor:
         user_memory.save_processed_conversation(conversation.id, now, summary, changes)
 
     def _keep_personal_stickers(
-        self, user: UserSnapshot, messages: list[ConversationMessage]
+        self, snapshot: UserSnapshot, messages: list[ConversationMessage]
     ) -> None:
         """Keep the User's Personal Stickers, logging a failure instead of raising.
 
         Args:
-            user: The User whose Conversation it was.
+            snapshot: The User whose Conversation it was.
             messages: The Conversation's messages, oldest first.
         """
         try:
-            self._personal_sticker_keeper.keep_from(user, messages)
+            self._personal_sticker_keeper.keep_from(snapshot, messages)
         except Exception:
             logger.exception("Could not keep Personal Stickers")
 
-    def _ask(self, user: UserSnapshot, description: str) -> ProcessingAnswer | None:
+    def _ask(self, snapshot: UserSnapshot, description: str) -> ProcessingAnswer | None:
         """Ask the model about the Conversation, once more if it can't be read.
 
         Args:
-            user: The User whose Conversation it was.
+            snapshot: The User whose Conversation it was.
             description: The categories, current memory and Conversation.
 
         Returns:
@@ -468,7 +467,7 @@ class PostConversationProcessor:
         settings = self._repositories.platform_settings
         for _ in range(2):
             answer = self._chat_model.generate(
-                user=user,
+                snapshot=snapshot,
                 model=settings.get("memory_processing_model"),
                 instructions=settings.get("memory_processing_prompt"),
                 history=[ChatLine(role=ChatRole.USER, text=description)],

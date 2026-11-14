@@ -524,14 +524,14 @@ class SettingsTools:
         self._user_memory = user_memory
         self._data_deletion = data_deletion
 
-    def offer(self, user: UserSnapshot) -> SettingsOffer:
+    def offer(self, snapshot: UserSnapshot) -> SettingsOffer:
         """Pick the settings tools for a reply to a User.
 
         Deleting the account, changing country and disconnecting Telegram
         have no tool: they are only on the Dashboard.
 
         Args:
-            user: The User being replied to.
+            snapshot: The User being replied to.
 
         Returns:
             The tools and their reply instructions; only the tool to delete
@@ -539,14 +539,14 @@ class SettingsTools:
             doesn't work for them.
         """
         reply_tools = ReplySettingsTools(
-            user.user.id,
+            snapshot.user.id,
             self._repositories,
             self._users,
             self._check_ins,
             self._user_memory,
             self._data_deletion,
         )
-        if user.works(Feature.SETTINGS_IN_CHAT):
+        if snapshot.works(Feature.SETTINGS_IN_CHAT):
             tools = reply_tools.tools
             instructions_key = INSTRUCTIONS_SETTING
         else:

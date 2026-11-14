@@ -70,7 +70,7 @@ class ReplyGate:
         self._usage_limiter = usage_limiter
 
     def check(
-        self, message: MessageToAnswer, user: UserSnapshot
+        self, message: MessageToAnswer, snapshot: UserSnapshot
     ) -> Stopped | ReplyNeeded:
         """Save the message, then decide whether it needs a composed reply.
 
@@ -82,7 +82,7 @@ class ReplyGate:
 
         Args:
             message: The message to answer.
-            user: The User who sent it, as read when the reply started.
+            snapshot: The User who sent it, as read when the reply started.
 
         Returns:
             `Stopped` with the reason no reply is composed, or `ReplyNeeded`.
@@ -96,21 +96,21 @@ class ReplyGate:
             message.sticker,
         )
         risk_type = self._safeguard.assess(
-            conversation_id, user, message.safeguard_text
+            conversation_id, snapshot, message.safeguard_text
         )
         if risk_type != RiskType.NONE:
-            crisis_reply = self._safeguard.respond_to_crisis(user, risk_type)
+            crisis_reply = self._safeguard.respond_to_crisis(snapshot, risk_type)
             self._conversations.deliver_at_once(
                 conversation_id, message.chat_id, crisis_reply
             )
-            self._data_deletion.cancel(user)
+            self._data_deletion.cancel(snapshot)
             return Stopped(StopReason.CRISIS)
         data_deletion_answer = self._data_deletion.settle(
-            user, message.chat_id, message.text
+            snapshot, message.chat_id, message.text
         )
         if data_deletion_answer == DataDeletionAnswer.CONFIRMED:
             return Stopped(StopReason.DATA_DELETED)
-        if not self._usage_limiter.claim_message(user):
+        if not self._usage_limiter.claim_message(snapshot):
             self._conversations.deliver_at_once(
                 conversation_id, message.chat_id, self._usage_limiter.limit_reply()
             )

@@ -81,7 +81,7 @@ class WebSearchTools:
         self._repositories = repositories
         self._web_search = web_search
 
-    def offer(self, user: UserSnapshot) -> WebSearchOffer:
+    def offer(self, snapshot: UserSnapshot) -> WebSearchOffer:
         """Pick the web tools for a reply to a User.
 
         None are offered when Web Search doesn't work for the User, or once
@@ -91,18 +91,18 @@ class WebSearchTools:
         can't check instead of claiming it searched.
 
         Args:
-            user: The User being replied to.
+            snapshot: The User being replied to.
 
         Returns:
             The tools and their reply instructions.
         """
-        if not user.works(Feature.WEB_SEARCH):
+        if not snapshot.works(Feature.WEB_SEARCH):
             return WebSearchOffer(tools=[], instructions="")
         settings = self._repositories.platform_settings
         usage = self._repositories.usage
         daily_limit = settings.get("web_search_daily_limit")
-        user_id = user.user.id
-        today = user.today
+        user_id = snapshot.user.id
+        today = snapshot.today
         source_reminder = settings.get("web_result_source_reminder")
         used_today = usage.count_web_searches(user_id, today)
         if used_today >= daily_limit:

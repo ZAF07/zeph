@@ -37,10 +37,22 @@ class UserSnapshotLoader:
         Raises:
             UserNotFoundError: If there is no such User.
         """
-        snapshots = self.load_many([user_id])
-        if not snapshots:
+        snapshot = self.find(user_id)
+        if snapshot is None:
             raise UserNotFoundError(user_id)
-        return snapshots[0]
+        return snapshot
+
+    def find(self, user_id: UUID) -> UserSnapshot | None:
+        """Read one User's snapshot, if they still exist.
+
+        Args:
+            user_id: The User.
+
+        Returns:
+            Their snapshot, or None if there is no such User.
+        """
+        snapshots = self.load_many([user_id])
+        return snapshots[0] if snapshots else None
 
     def load_many(self, user_ids: Sequence[UUID]) -> list[UserSnapshot]:
         """Read many Users' snapshots in three queries.
@@ -68,7 +80,7 @@ class UserSnapshotLoader:
         return [
             UserSnapshot(
                 user=user,
-                local_now=local_now(now, user.time_zone),
+                local_now=local_now(user.time_zone, now),
                 today=users_today(user.time_zone, now),
                 features=tuple(
                     feature_statuses(

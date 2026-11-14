@@ -300,11 +300,11 @@ class StickerTools:
         """
         self._repositories = repositories
 
-    def offer(self, user: UserSnapshot) -> StickerChoice:
+    def offer(self, snapshot: UserSnapshot) -> StickerChoice:
         """Start the sticker choice for one reply to a User.
 
         Args:
-            user: The User being replied to.
+            snapshot: The User being replied to.
 
         Returns:
             The choice, offering the User's Personal Stickers first, when
@@ -312,11 +312,11 @@ class StickerTools:
             sticker that has a note and isn't one of theirs; none when
             Stickers doesn't work for the User.
         """
-        if not user.works(Feature.STICKERS):
+        if not snapshot.works(Feature.STICKERS):
             return StickerChoice([], "")
         theirs = (
-            self._repositories.personal_stickers.list_for_user(user.user.id)
-            if user.works(Feature.PERSONAL_STICKERS)
+            self._repositories.personal_stickers.list_for_user(snapshot.user.id)
+            if snapshot.works(Feature.PERSONAL_STICKERS)
             else []
         )
         their_unique_ids = {sticker.file_unique_id for sticker in theirs}

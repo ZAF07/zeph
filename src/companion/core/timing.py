@@ -59,12 +59,12 @@ def users_today(time_zone: str | None, now: datetime) -> date:
     return (now.astimezone(ZoneInfo(time_zone)) if time_zone else now).date()
 
 
-def local_now(now: datetime, time_zone: str | None) -> datetime:
+def local_now(time_zone: str | None, now: datetime) -> datetime:
     """Turn a time into the User's local time.
 
     Args:
-        now: The time, timezone-aware.
         time_zone: The User's IANA time zone; UTC if they have none.
+        now: The time, timezone-aware.
 
     Returns:
         The same moment in the User's time zone.
