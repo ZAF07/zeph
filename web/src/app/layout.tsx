@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import "@/app/globals.css";
 import { AuthProvider } from "@/lib/auth/AuthProvider";
+import { QueryProvider } from "@/lib/QueryProvider";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({
@@ -17,7 +18,8 @@ export const metadata: Metadata = {
 };
 
 /**
- * The root layout: fonts, global styles and sign-in.
+ * The root layout: fonts, global styles, sign-in and the shared cache of
+ * backend data.
  *
  * @param props - `children` is the page.
  * @returns The HTML document.
@@ -27,7 +29,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <AuthProvider>
       <html lang="en">
         <body className={`${geistSans.variable} ${geistMono.variable}`}>
-          {children}
+          <QueryProvider>{children}</QueryProvider>
         </body>
       </html>
     </AuthProvider>

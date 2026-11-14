@@ -1,9 +1,10 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OnboardingFlow } from "@/components/OnboardingFlow";
 import type { ApiClient, Me, PlatformContent } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   getMe: vi.fn<ApiClient["getMe"]>(),
@@ -63,7 +64,7 @@ function setBrowserLanguages(languages: string[]) {
 }
 
 async function renderAtHelloStep() {
-  render(<OnboardingFlow />);
+  renderWithQueries(<OnboardingFlow />);
   await screen.findByRole("heading", { name: "Hello. I’m Zeph." });
 }
 
@@ -331,7 +332,7 @@ describe("OnboardingFlow", () => {
       newUser({ onboarding_completed_at: "2026-11-11T09:00:00Z" }),
     );
 
-    render(<OnboardingFlow />);
+    renderWithQueries(<OnboardingFlow />);
 
     await vi.waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
   });

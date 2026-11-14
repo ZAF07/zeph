@@ -1,45 +1,53 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { LoadFailed } from "@/components/LoadFailed";
 import { Switch } from "@/components/Switch";
-import type { Feature, FeatureSwitch } from "@/lib/api-client";
+import type { FeatureSwitch } from "@/lib/api-client";
 import { lastChangeNote } from "@/lib/features";
+import { queryKeys, reloadUserPages } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
-
-type LoadState =
-  | { kind: "loading" }
-  | { kind: "failed" }
-  | { kind: "loaded"; features: FeatureSwitch[] };
 
 /**
  * The admin Features page's body: one row per Feature with what it does, its
  * switch for everyone and its last change. A switch saves as soon as it is
- * flipped.
+ * flipped, and the signed-in Admin's own pages load again, since the
+ * Feature may have changed for them too.
  *
  * @returns The list, or a loading block or error with Try again.
  */
 export function AdminFeatures() {
   const apiClient = useApiClient();
-  const [state, setState] = useState<LoadState>({ kind: "loading" });
-  const [saving, setSaving] = useState<Feature | null>(null);
-  const [failure, setFailure] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const featuresQuery = useQuery({
+    queryKey: queryKeys.features,
+    queryFn: () => apiClient.listFeatures(),
+  });
+  const switchForEveryone = useMutation({
+    mutationFn: ({ feature, on }: { feature: FeatureSwitch; on: boolean }) =>
+      apiClient.setFeatureForEveryone(feature.feature, on),
+    onSuccess: (changed) => {
+      queryClient.setQueryData<FeatureSwitch[]>(queryKeys.features, (current) =>
+        current?.map((feature) =>
+          feature.feature === changed.feature ? changed : feature,
+        ),
+      );
+      reloadUserPages(queryClient);
+    },
+  });
+  const features = featuresQuery.data;
 
-  const load = useCallback(async () => {
-    setState({ kind: "loading" });
-    try {
-      setState({ kind: "loaded", features: await apiClient.listFeatures() });
-    } catch {
-      setState({ kind: "failed" });
+  if (!features) {
+    if (featuresQuery.isError) {
+      return (
+        <LoadFailed
+          title="Couldn’t load Features"
+          body="Every Feature keeps its last saved switch."
+          onRetry={() => void featuresQuery.refetch()}
+        />
+      );
     }
-  }, [apiClient]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  if (state.kind === "loading") {
     return (
       <div
         aria-busy="true"
@@ -49,49 +57,19 @@ export function AdminFeatures() {
     );
   }
 
-  if (state.kind === "failed") {
-    return (
-      <LoadFailed
-        title="Couldn’t load Features"
-        body="Every Feature keeps its last saved switch."
-        onRetry={() => void load()}
-      />
-    );
-  }
-
-  const features = state.features;
-
-  async function switchForEveryone(feature: FeatureSwitch, on: boolean) {
-    setSaving(feature.feature);
-    setFailure(null);
-    try {
-      const changed = await apiClient.setFeatureForEveryone(
-        feature.feature,
-        on,
-      );
-      setState({
-        kind: "loaded",
-        features: features.map((current) =>
-          current.feature === changed.feature ? changed : current,
-        ),
-      });
-    } catch {
-      setFailure(
-        `Couldn’t change ${feature.name}. It is still ${feature.on ? "on" : "off"}.`,
-      );
-    } finally {
-      setSaving(null);
-    }
-  }
+  const failedFeature = switchForEveryone.isError
+    ? switchForEveryone.variables.feature
+    : null;
 
   return (
     <div className="flex flex-col gap-4">
-      {failure ? (
+      {failedFeature ? (
         <p
           role="alert"
           className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3.5 text-sm text-danger-deep"
         >
-          {failure}
+          Couldn’t change {failedFeature.name}. It is still{" "}
+          {failedFeature.on ? "on" : "off"}.
         </p>
       ) : null}
       <ul className="m-0 flex list-none flex-col rounded-card border border-line bg-white p-0">
@@ -118,8 +96,8 @@ export function AdminFeatures() {
               <Switch
                 label={`${feature.name} for everyone`}
                 checked={feature.on}
-                disabled={saving !== null}
-                onChange={(on) => void switchForEveryone(feature, on)}
+                disabled={switchForEveryone.isPending}
+                onChange={(on) => switchForEveryone.mutate({ feature, on })}
               />
             </span>
           </li>

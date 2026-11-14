@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useState, type FormEvent } from "react";
 
 import { primaryButton } from "@/components/button-styles";
 import { fieldCaption, fieldLabel, inputField } from "@/components/form-styles";
 import { ApiError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 type AddMethod = "set" | "telegram";
@@ -43,43 +45,38 @@ export function StickerAddPanel({ onAdded }: { onAdded: () => void }) {
   const apiClient = useApiClient();
   const [method, setMethod] = useState<AddMethod>("set");
   const [setName, setSetName] = useState("");
-  const [isImporting, setIsImporting] = useState(false);
   const [flash, setFlash] = useState<Flash | null>(null);
-  const [hasTelegram, setHasTelegram] = useState<boolean | undefined>(
-    undefined,
-  );
 
-  useEffect(() => {
-    if (method !== "telegram" || hasTelegram !== undefined) {
-      return;
-    }
-    apiClient
-      .getTelegramConnection()
-      .then((status) => setHasTelegram(status.connection !== null))
-      .catch(() => setHasTelegram(false));
-  }, [apiClient, method, hasTelegram]);
+  const telegramQuery = useQuery({
+    queryKey: queryKeys.telegramConnection,
+    queryFn: () => apiClient.getTelegramConnection(),
+    enabled: method === "telegram",
+  });
+  const hasTelegram = telegramQuery.isError
+    ? false
+    : telegramQuery.data && telegramQuery.data.connection !== null;
 
-  async function importSet(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const name = setName.trim();
-    setIsImporting(true);
-    setFlash(null);
-    try {
-      const count = await apiClient.importStickerSet(name);
+  const importStickerSet = useMutation({
+    mutationFn: (name: string) => apiClient.importStickerSet(name),
+    onMutate: () => setFlash(null),
+    onSuccess: (count, name) => {
       setFlash({ text: importedMessage(count, name), isError: false });
       setSetName("");
       onAdded();
-    } catch (error) {
+    },
+    onError: (error) =>
       setFlash({
         text:
           error instanceof ApiError && error.detail
             ? error.detail
             : "Couldn’t import that set. Please try again.",
         isError: true,
-      });
-    } finally {
-      setIsImporting(false);
-    }
+      }),
+  });
+
+  function importSet(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    importStickerSet.mutate(setName.trim());
   }
 
   return (
@@ -117,7 +114,7 @@ export function StickerAddPanel({ onAdded }: { onAdded: () => void }) {
 
       {method === "set" ? (
         <form
-          onSubmit={(event) => void importSet(event)}
+          onSubmit={importSet}
           className="flex flex-wrap items-end gap-2.5 px-5 pb-5 pt-4"
         >
           <label className={`${fieldLabel} flex-[1_1_280px]`}>
@@ -133,9 +130,9 @@ export function StickerAddPanel({ onAdded }: { onAdded: () => void }) {
           <button
             type="submit"
             className={primaryButton}
-            disabled={isImporting || setName.trim() === ""}
+            disabled={importStickerSet.isPending || setName.trim() === ""}
           >
-            {isImporting ? "Importing…" : "Import set"}
+            {importStickerSet.isPending ? "Importing…" : "Import set"}
           </button>
           <p className={`${fieldCaption} basis-full`}>
             The part after t.me/addstickers/. Every sticker in the set is added

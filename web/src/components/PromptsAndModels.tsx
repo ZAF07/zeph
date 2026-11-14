@@ -1,18 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { CoreServiceCard } from "@/components/CoreServiceCard";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LockIcon } from "@/components/LockIcon";
-import type { CoreServices } from "@/lib/api-client";
+import { queryKeys } from "@/lib/queries";
 import { useAdminSettings } from "@/lib/use-admin-settings";
 import { useApiClient } from "@/lib/use-api-client";
-
-type ServicesState =
-  | { kind: "loading" }
-  | { kind: "failed" }
-  | { kind: "loaded"; coreServices: CoreServices };
 
 /**
  * The admin Prompts & models page: one card per core service, each with its
@@ -22,45 +17,27 @@ type ServicesState =
  */
 export function PromptsAndModels() {
   const apiClient = useApiClient();
-  const {
-    state: settingsState,
-    reload: reloadSettings,
-    save,
-  } = useAdminSettings();
-  const [servicesState, setServicesState] = useState<ServicesState>({
-    kind: "loading",
+  const settingsQuery = useAdminSettings();
+  const servicesQuery = useQuery({
+    queryKey: queryKeys.coreServices,
+    queryFn: () => apiClient.getCoreServices(),
   });
+  const settings = settingsQuery.data;
+  const coreServices = servicesQuery.data;
 
-  const loadServices = useCallback(async () => {
-    setServicesState({ kind: "loading" });
-    try {
-      setServicesState({
-        kind: "loaded",
-        coreServices: await apiClient.getCoreServices(),
-      });
-    } catch {
-      setServicesState({ kind: "failed" });
+  if (!settings || !coreServices) {
+    if (settingsQuery.isError || servicesQuery.isError) {
+      return (
+        <LoadFailed
+          title="Couldn’t load prompts"
+          body="Every service keeps running on its last saved prompt and model."
+          onRetry={() => {
+            void servicesQuery.refetch();
+            void settingsQuery.refetch();
+          }}
+        />
+      );
     }
-  }, [apiClient]);
-
-  useEffect(() => {
-    void loadServices();
-  }, [loadServices]);
-
-  if (servicesState.kind === "failed" || settingsState.kind === "failed") {
-    return (
-      <LoadFailed
-        title="Couldn’t load prompts"
-        body="Every service keeps running on its last saved prompt and model."
-        onRetry={() => {
-          void loadServices();
-          reloadSettings();
-        }}
-      />
-    );
-  }
-
-  if (servicesState.kind === "loading" || settingsState.kind === "loading") {
     return (
       <div
         aria-busy="true"
@@ -70,7 +47,7 @@ export function PromptsAndModels() {
     );
   }
 
-  const { services, model_choices: modelChoices } = servicesState.coreServices;
+  const { services, model_choices: modelChoices } = coreServices;
   if (services.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
@@ -92,8 +69,7 @@ export function PromptsAndModels() {
             key={service.name}
             service={service}
             modelChoices={modelChoices}
-            settings={settingsState.settings}
-            onSave={save}
+            settings={settings}
           />
         ))}
       </div>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { AdminPageHeader } from "@/components/AdminPageHeader";
 import {
@@ -19,15 +19,8 @@ import {
   type KnowledgeDetailsChange,
   type KnowledgeDocumentWithText,
 } from "@/lib/api-client";
+import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
-
-type LoadState =
-  | { kind: "loading" }
-  | { kind: "not-found" }
-  | { kind: "failed" }
-  | { kind: "loaded"; document: KnowledgeDocumentWithText };
-
-type Flash = { text: string; isError: boolean };
 
 const pendingCheckMilliseconds = 3000;
 
@@ -45,103 +38,84 @@ const libraryPath = "/admin/knowledge";
 export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
   const apiClient = useApiClient();
   const router = useRouter();
-  const [state, setState] = useState<LoadState>({ kind: "loading" });
-  const [flash, setFlash] = useState<Flash | null>(null);
-  const [isBusy, setIsBusy] = useState(false);
+  const queryClient = useQueryClient();
+  const documentKey = queryKeys.knowledgeDocument(documentId);
 
-  const load = useCallback(async () => {
-    try {
-      setState({
-        kind: "loaded",
-        document: await apiClient.getKnowledgeDocument(documentId),
-      });
-    } catch (error) {
-      setState({
-        kind:
-          error instanceof ApiError && error.status === 404
-            ? "not-found"
-            : "failed",
-      });
-    }
-  }, [apiClient, documentId]);
+  const documentQuery = useQuery({
+    queryKey: documentKey,
+    queryFn: () => apiClient.getKnowledgeDocument(documentId),
+    refetchInterval: (query) =>
+      query.state.data?.status === "pending" ? pendingCheckMilliseconds : false,
+  });
+  const isNotFound =
+    documentQuery.error instanceof ApiError &&
+    documentQuery.error.status === 404;
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const isPending =
-    state.kind === "loaded" && state.document.status === "pending";
-
-  useEffect(() => {
-    if (!isPending) {
-      return;
-    }
-    const timer = setTimeout(() => void load(), pendingCheckMilliseconds);
-    return () => clearTimeout(timer);
-  }, [isPending, load, state]);
+  function showSaved(saved: KnowledgeDocumentWithText) {
+    queryClient.setQueryData(documentKey, saved);
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.knowledgeDocuments,
+    });
+    return saved;
+  }
 
   async function saveDetails(
     knowledgeDocument: KnowledgeDocumentWithText,
     change: KnowledgeDetailsChange,
   ) {
-    const saved = await apiClient.updateKnowledgeDocumentDetails(
-      knowledgeDocument.id,
-      change,
+    return showSaved(
+      await apiClient.updateKnowledgeDocumentDetails(
+        knowledgeDocument.id,
+        change,
+      ),
     );
-    setState({ kind: "loaded", document: saved });
-    return saved;
   }
 
   async function saveText(text: string) {
-    const saved = await apiClient.saveKnowledgeDocumentText(documentId, text);
-    setState({ kind: "loaded", document: saved });
-    return saved;
+    return showSaved(
+      await apiClient.saveKnowledgeDocumentText(documentId, text),
+    );
   }
 
   async function replaceFile(file: File) {
-    const replaced = await apiClient.replaceKnowledgeDocumentFile(
-      documentId,
-      file,
+    return showSaved(
+      await apiClient.replaceKnowledgeDocumentFile(documentId, file),
     );
-    setState({ kind: "loaded", document: replaced });
-    return replaced;
   }
 
-  async function retry(knowledgeDocument: KnowledgeDocumentWithText) {
-    setIsBusy(true);
-    setFlash(null);
-    try {
-      await apiClient.retryKnowledgeDocument(knowledgeDocument.id);
-      await load();
-    } catch {
-      setFlash({
-        text: `Couldn’t retry ${knowledgeDocument.title}. Please try again.`,
-        isError: true,
+  const retryDocument = useMutation({
+    mutationFn: async () => {
+      await apiClient.retryKnowledgeDocument(documentId);
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.knowledgeDocuments,
       });
-    } finally {
-      setIsBusy(false);
-    }
-  }
+      await queryClient.invalidateQueries({ queryKey: documentKey });
+    },
+  });
 
-  async function remove(knowledgeDocument: KnowledgeDocumentWithText) {
+  const deleteDocument = useMutation({
+    mutationFn: () => apiClient.deleteKnowledgeDocument(documentId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.knowledgeDocuments,
+      });
+      router.push(libraryPath);
+    },
+  });
+
+  const isBusy =
+    retryDocument.isPending ||
+    deleteDocument.isPending ||
+    deleteDocument.isSuccess;
+
+  function remove(knowledgeDocument: KnowledgeDocumentWithText) {
     if (
-      !window.confirm(
+      window.confirm(
         `Delete ${knowledgeDocument.title}? Zeph will stop drawing on it.`,
       )
     ) {
-      return;
-    }
-    setIsBusy(true);
-    setFlash(null);
-    try {
-      await apiClient.deleteKnowledgeDocument(knowledgeDocument.id);
-      router.push(libraryPath);
-    } catch {
-      setFlash({
-        text: `Couldn’t delete ${knowledgeDocument.title}. Please try again.`,
-        isError: true,
-      });
-      setIsBusy(false);
+      retryDocument.reset();
+      deleteDocument.mutate();
     }
   }
 
@@ -151,7 +125,7 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
     </Link>
   );
 
-  if (state.kind === "loading") {
+  if (documentQuery.isPending) {
     return (
       <div className="flex flex-col gap-9">
         {backLink}
@@ -164,7 +138,7 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
     );
   }
 
-  if (state.kind === "not-found") {
+  if (!documentQuery.data && isNotFound) {
     return (
       <div className="flex flex-col gap-9">
         {backLink}
@@ -183,20 +157,20 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
     );
   }
 
-  if (state.kind === "failed") {
+  if (!documentQuery.data) {
     return (
       <div className="flex flex-col gap-9">
         {backLink}
         <LoadFailed
           title="Couldn’t load the document"
           body="Zeph keeps using documents that are already Ready."
-          onRetry={() => void load()}
+          onRetry={() => void documentQuery.refetch()}
         />
       </div>
     );
   }
 
-  const knowledgeDocument = state.document;
+  const knowledgeDocument = documentQuery.data;
 
   return (
     <div className="flex flex-col gap-9">
@@ -216,16 +190,13 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
         </div>
       </div>
 
-      {flash ? (
+      {retryDocument.isError || deleteDocument.isError ? (
         <p
           role="status"
-          className={`m-0 rounded-xl px-4 py-3.5 text-sm ${
-            flash.isError
-              ? "border border-danger-line bg-danger-tint text-danger-deep"
-              : "bg-blue-tint text-blue-deep"
-          }`}
+          className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3.5 text-sm text-danger-deep"
         >
-          {flash.text}
+          Couldn’t {retryDocument.isError ? "retry" : "delete"}{" "}
+          {knowledgeDocument.title}. Please try again.
         </p>
       ) : null}
 
@@ -239,7 +210,10 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
             type="button"
             className={`${compactSecondaryButton} bg-white`}
             disabled={isBusy}
-            onClick={() => void retry(knowledgeDocument)}
+            onClick={() => {
+              deleteDocument.reset();
+              retryDocument.mutate();
+            }}
           >
             Retry
           </button>
@@ -266,7 +240,7 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
           type="button"
           className={dangerButton}
           disabled={isBusy}
-          onClick={() => void remove(knowledgeDocument)}
+          onClick={() => remove(knowledgeDocument)}
         >
           Delete document
         </button>

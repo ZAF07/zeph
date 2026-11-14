@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 import {
   compactSecondaryButton,
@@ -14,12 +15,8 @@ import {
   type MemoryCategoryInput,
   type MemoryCategoryOverview,
 } from "@/lib/api-client";
+import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
-
-type LoadState =
-  | { kind: "loading" }
-  | { kind: "failed" }
-  | { kind: "loaded"; categories: MemoryCategoryOverview[] };
 
 type Editing =
   { kind: "add" } | { kind: "edit"; category: MemoryCategoryOverview };
@@ -51,50 +48,58 @@ function itemCountLabel(count: number): string {
  */
 export function MemoryCategoriesManager() {
   const apiClient = useApiClient();
-  const [state, setState] = useState<LoadState>({ kind: "loading" });
+  const queryClient = useQueryClient();
   const [editing, setEditing] = useState<Editing | null>(null);
   const [flash, setFlash] = useState<Flash | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      setState({
-        kind: "loaded",
-        categories: await apiClient.listMemoryCategories(),
-      });
-    } catch {
-      setState({ kind: "failed" });
-    }
-  }, [apiClient]);
+  const categoriesQuery = useQuery({
+    queryKey: queryKeys.memoryCategories,
+    queryFn: () => apiClient.listMemoryCategories(),
+  });
+  const categories = categoriesQuery.data;
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  async function reloadCategories() {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.memoryGroups });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.home });
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.memoryCategories,
+    });
+  }
 
-  async function runRowAction(
-    category: MemoryCategoryOverview,
-    action: () => Promise<unknown>,
-    successText: string | null,
-  ) {
-    setBusyId(category.id);
-    setFlash(null);
-    try {
+  const rowAction = useMutation({
+    mutationFn: async ({
+      action,
+    }: {
+      target: MemoryCategoryOverview;
+      action: () => Promise<unknown>;
+      successText: string | null;
+    }) => {
       await action();
+      await reloadCategories();
+    },
+    onMutate: () => setFlash(null),
+    onSuccess: (_, { successText }) => {
       if (successText) {
         setFlash({ text: successText, isError: false });
       }
-      await load();
-    } catch (error) {
+    },
+    onError: (error, { target }) =>
       setFlash({
         text:
           error instanceof ApiError && error.status === 409 && error.detail
             ? error.detail
-            : `Couldn’t change ${category.name}. Please try again.`,
+            : `Couldn’t change ${target.name}. Please try again.`,
         isError: true,
-      });
-    } finally {
-      setBusyId(null);
-    }
+      }),
+  });
+  const busyId = rowAction.isPending ? rowAction.variables.target.id : null;
+
+  function runRowAction(
+    target: MemoryCategoryOverview,
+    action: () => Promise<unknown>,
+    successText: string | null,
+  ) {
+    rowAction.mutate({ target, action, successText });
   }
 
   function startEditing(next: Editing) {
@@ -111,7 +116,7 @@ export function MemoryCategoriesManager() {
       setFlash({ text: `Added ${input.name.trim()}.`, isError: false });
     }
     setEditing(null);
-    await load();
+    await reloadCategories();
   }
 
   const header = (
@@ -163,36 +168,31 @@ export function MemoryCategoriesManager() {
     </>
   );
 
-  if (state.kind === "loading") {
+  if (!categories) {
     return (
       <div className="flex flex-col gap-[30px]">
         {header}
-        <div
-          aria-busy="true"
-          aria-label="Loading categories"
-          className="h-[320px] rounded-card border border-line bg-subtle"
-        />
+        {categoriesQuery.isError ? (
+          <LoadFailed
+            title="Couldn’t load Memory Categories"
+            body="Zeph keeps using the last saved set."
+            onRetry={() => void categoriesQuery.refetch()}
+          />
+        ) : (
+          <div
+            aria-busy="true"
+            aria-label="Loading categories"
+            className="h-[320px] rounded-card border border-line bg-subtle"
+          />
+        )}
       </div>
     );
   }
 
-  if (state.kind === "failed") {
-    return (
-      <div className="flex flex-col gap-[30px]">
-        {header}
-        <LoadFailed
-          title="Couldn’t load Memory Categories"
-          body="Zeph keeps using the last saved set."
-          onRetry={() => void load()}
-        />
-      </div>
-    );
-  }
+  const active = categories.filter((category) => !category.archived);
+  const archived = categories.filter((category) => category.archived);
 
-  const active = state.categories.filter((category) => !category.archived);
-  const archived = state.categories.filter((category) => category.archived);
-
-  if (state.categories.length === 0) {
+  if (categories.length === 0) {
     return (
       <div className="flex flex-col gap-[30px]">
         {header}
@@ -252,7 +252,7 @@ export function MemoryCategoriesManager() {
                       checked={category.always_include}
                       disabled={isBusy}
                       onChange={(checked) =>
-                        void runRowAction(
+                        runRowAction(
                           category,
                           () =>
                             apiClient.updateMemoryCategory(category.id, {
@@ -278,7 +278,7 @@ export function MemoryCategoriesManager() {
                     className={compactSecondaryButton}
                     disabled={isBusy}
                     onClick={() =>
-                      void runRowAction(
+                      runRowAction(
                         category,
                         () => apiClient.archiveMemoryCategory(category.id),
                         `Archived ${category.name}. Its memories are kept.`,
@@ -340,7 +340,7 @@ export function MemoryCategoriesManager() {
                   className={compactSecondaryButton}
                   disabled={busyId === category.id}
                   onClick={() =>
-                    void runRowAction(
+                    runRowAction(
                       category,
                       () => apiClient.restoreMemoryCategory(category.id),
                       `Restored ${category.name}.`,

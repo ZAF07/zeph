@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -9,6 +9,7 @@ import type {
   UserFeatures,
   UserFeatureStatus,
 } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   listUserFeatures: vi.fn<ApiClient["listUserFeatures"]>(),
@@ -64,7 +65,7 @@ describe("UserFeaturesPanel", () => {
 
   it("shows only how many Personal Stickers the User has", async () => {
     apiClient.listUserFeatures.mockResolvedValue(userFeatures([webSearch], 3));
-    render(<UserFeaturesPanel user={ren} onClose={() => {}} />);
+    renderWithQueries(<UserFeaturesPanel user={ren} onClose={() => {}} />);
 
     expect(
       await screen.findByText("Personal Stickers kept for Ren Okafor: 3"),
@@ -83,7 +84,7 @@ describe("UserFeaturesPanel", () => {
         },
       ]),
     );
-    render(<UserFeaturesPanel user={ren} onClose={() => {}} />);
+    renderWithQueries(<UserFeaturesPanel user={ren} onClose={() => {}} />);
 
     await screen.findByText("Personal Stickers");
     expect(
@@ -94,13 +95,14 @@ describe("UserFeaturesPanel", () => {
   });
 
   it("shows each Feature's switch for the User and whether it works", async () => {
-    render(<UserFeaturesPanel user={ren} onClose={() => {}} />);
+    renderWithQueries(<UserFeaturesPanel user={ren} onClose={() => {}} />);
 
     const dialog = await screen.findByRole("dialog", {
       name: "Features for Ren Okafor",
     });
     expect(apiClient.listUserFeatures).toHaveBeenCalledWith("ren");
     expect(within(dialog).getByText("ren@example.com")).toBeVisible();
+    await screen.findByText("Web Search");
     const row = within(rowFor("Web Search"));
     expect(row.getByRole("button", { name: "Default" })).toHaveAttribute(
       "aria-pressed",
@@ -130,7 +132,7 @@ describe("UserFeaturesPanel", () => {
         },
       ]),
     );
-    render(<UserFeaturesPanel user={ren} onClose={() => {}} />);
+    renderWithQueries(<UserFeaturesPanel user={ren} onClose={() => {}} />);
 
     expect(await screen.findByText(text)).toBeVisible();
   });
@@ -148,7 +150,7 @@ describe("UserFeaturesPanel", () => {
         },
       ]),
     );
-    render(<UserFeaturesPanel user={ren} onClose={() => {}} />);
+    renderWithQueries(<UserFeaturesPanel user={ren} onClose={() => {}} />);
 
     expect(
       await screen.findByText(/^Changed 13 Nov, .+ by maya@example.com$/),
@@ -165,7 +167,7 @@ describe("UserFeaturesPanel", () => {
       changed_at: "2026-11-13T09:00:00Z",
     });
     const user = userEvent.setup();
-    render(<UserFeaturesPanel user={ren} onClose={() => {}} />);
+    renderWithQueries(<UserFeaturesPanel user={ren} onClose={() => {}} />);
 
     await screen.findByText("Web Search");
     await user.click(
@@ -219,7 +221,7 @@ describe("UserFeaturesPanel", () => {
       changed_at: "2026-11-13T10:00:00Z",
     });
     const user = userEvent.setup();
-    render(<UserFeaturesPanel user={ren} onClose={() => {}} />);
+    renderWithQueries(<UserFeaturesPanel user={ren} onClose={() => {}} />);
 
     await screen.findByText("Stickers");
     const stickers = within(rowFor("Stickers"));
@@ -265,7 +267,7 @@ describe("UserFeaturesPanel", () => {
       changed_at: "2026-11-13T10:00:00Z",
     });
     const user = userEvent.setup();
-    render(<UserFeaturesPanel user={ren} onClose={() => {}} />);
+    renderWithQueries(<UserFeaturesPanel user={ren} onClose={() => {}} />);
 
     await screen.findByText("Settings in Chat");
     const settings = within(rowFor("Settings in Chat"));
@@ -289,7 +291,7 @@ describe("UserFeaturesPanel", () => {
   it("keeps the switch as it was when a change fails", async () => {
     apiClient.setFeatureForUser.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    render(<UserFeaturesPanel user={ren} onClose={() => {}} />);
+    renderWithQueries(<UserFeaturesPanel user={ren} onClose={() => {}} />);
 
     await screen.findByText("Web Search");
     await user.click(
@@ -309,7 +311,7 @@ describe("UserFeaturesPanel", () => {
       .mockRejectedValueOnce(new Error("down"))
       .mockResolvedValueOnce(userFeatures([webSearch]));
     const user = userEvent.setup();
-    render(<UserFeaturesPanel user={ren} onClose={() => {}} />);
+    renderWithQueries(<UserFeaturesPanel user={ren} onClose={() => {}} />);
 
     await user.click(await screen.findByRole("button", { name: "Try again" }));
 
@@ -319,7 +321,7 @@ describe("UserFeaturesPanel", () => {
   it("closes with Close or Escape", async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
-    render(<UserFeaturesPanel user={ren} onClose={onClose} />);
+    renderWithQueries(<UserFeaturesPanel user={ren} onClose={onClose} />);
 
     await screen.findByText("Web Search");
     await user.click(screen.getByRole("button", { name: "Close" }));

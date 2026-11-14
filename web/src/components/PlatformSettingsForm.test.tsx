@@ -1,9 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PlatformSettingsForm } from "@/components/PlatformSettingsForm";
 import { ApiError, type AdminSettings, type ApiClient } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   getAdminSettings: vi.fn<ApiClient["getAdminSettings"]>(),
@@ -57,7 +58,7 @@ describe("PlatformSettingsForm", () => {
   });
 
   it("shows the quiet gap and the shared wording", async () => {
-    render(<PlatformSettingsForm />);
+    renderWithQueries(<PlatformSettingsForm />);
 
     expect(await screen.findByLabelText("Conversation quiet gap")).toHaveValue(
       60,
@@ -80,7 +81,7 @@ describe("PlatformSettingsForm", () => {
 
   it("saves only the settings that changed", async () => {
     const user = userEvent.setup();
-    render(<PlatformSettingsForm />);
+    renderWithQueries(<PlatformSettingsForm />);
     const gap = await screen.findByLabelText("Conversation quiet gap");
 
     await user.clear(gap);
@@ -96,7 +97,7 @@ describe("PlatformSettingsForm", () => {
 
   it("shows and saves the sticker adding quiet gap", async () => {
     const user = userEvent.setup();
-    render(<PlatformSettingsForm />);
+    renderWithQueries(<PlatformSettingsForm />);
     const gap = await screen.findByLabelText("Sticker adding quiet gap");
     expect(gap).toHaveValue(5);
 
@@ -111,7 +112,7 @@ describe("PlatformSettingsForm", () => {
 
   it("shows and saves the Check-in ignore threshold and fewer message", async () => {
     const user = userEvent.setup();
-    render(<PlatformSettingsForm />);
+    renderWithQueries(<PlatformSettingsForm />);
     const threshold = await screen.findByLabelText("Ignore threshold");
     expect(threshold).toHaveValue(3);
     const message = screen.getByLabelText(/Would you like fewer\?” message/);
@@ -131,7 +132,7 @@ describe("PlatformSettingsForm", () => {
 
   it("shows and saves the daily message limit and limit-reached reply", async () => {
     const user = userEvent.setup();
-    render(<PlatformSettingsForm />);
+    renderWithQueries(<PlatformSettingsForm />);
     const limit = await screen.findByLabelText("Daily message limit");
     expect(limit).toHaveValue(200);
     expect(
@@ -154,7 +155,7 @@ describe("PlatformSettingsForm", () => {
 
   it("shows and saves the finish-onboarding-first reply", async () => {
     const user = userEvent.setup();
-    render(<PlatformSettingsForm />);
+    renderWithQueries(<PlatformSettingsForm />);
     const reply = await screen.findByLabelText(
       /“Finish onboarding first” reply/,
     );
@@ -171,7 +172,7 @@ describe("PlatformSettingsForm", () => {
 
   it("shows and saves the photo retries and the didn't-come-through note", async () => {
     const user = userEvent.setup();
-    render(<PlatformSettingsForm />);
+    renderWithQueries(<PlatformSettingsForm />);
     const retries = await screen.findByLabelText("Photo retries");
     expect(retries).toHaveValue(2);
     expect(screen.getByRole("region", { name: "Photos" })).toContainElement(
@@ -194,7 +195,7 @@ describe("PlatformSettingsForm", () => {
 
   it("shows and saves the album wait and most photos per album", async () => {
     const user = userEvent.setup();
-    render(<PlatformSettingsForm />);
+    renderWithQueries(<PlatformSettingsForm />);
     const wait = await screen.findByLabelText("Album wait");
     const most = screen.getByLabelText("Most photos per album");
     expect(wait).toHaveValue(2);
@@ -217,7 +218,7 @@ describe("PlatformSettingsForm", () => {
 
   it("shows and saves the message retention in its Data section", async () => {
     const user = userEvent.setup();
-    render(<PlatformSettingsForm />);
+    renderWithQueries(<PlatformSettingsForm />);
     const retention = await screen.findByLabelText("Message retention");
     expect(retention).toHaveValue(30);
     expect(screen.getByRole("region", { name: "Data" })).toContainElement(
@@ -237,7 +238,7 @@ describe("PlatformSettingsForm", () => {
   });
 
   it("shows the web search daily limit but no Web Search switch", async () => {
-    render(<PlatformSettingsForm />);
+    renderWithQueries(<PlatformSettingsForm />);
 
     expect(
       await screen.findByLabelText("Per-user daily web search limit"),
@@ -247,7 +248,7 @@ describe("PlatformSettingsForm", () => {
 
   it("saves a new daily web search limit as a number", async () => {
     const user = userEvent.setup();
-    render(<PlatformSettingsForm />);
+    renderWithQueries(<PlatformSettingsForm />);
     const limit = await screen.findByLabelText(
       "Per-user daily web search limit",
     );
@@ -263,7 +264,7 @@ describe("PlatformSettingsForm", () => {
 
   it("won't save a quiet gap that is not a whole number", async () => {
     const user = userEvent.setup();
-    render(<PlatformSettingsForm />);
+    renderWithQueries(<PlatformSettingsForm />);
     const gap = await screen.findByLabelText("Conversation quiet gap");
 
     await user.clear(gap);
@@ -282,7 +283,7 @@ describe("PlatformSettingsForm", () => {
       ),
     );
     const user = userEvent.setup();
-    render(<PlatformSettingsForm />);
+    renderWithQueries(<PlatformSettingsForm />);
     const gap = await screen.findByLabelText("Conversation quiet gap");
 
     await user.clear(gap);
@@ -298,7 +299,7 @@ describe("PlatformSettingsForm", () => {
 
   it("discards unsaved changes", async () => {
     const user = userEvent.setup();
-    render(<PlatformSettingsForm />);
+    renderWithQueries(<PlatformSettingsForm />);
     const notice = await screen.findByLabelText(/^AI notice/);
 
     await user.type(notice, " Extra.");
@@ -310,7 +311,7 @@ describe("PlatformSettingsForm", () => {
   it("says so when saving fails", async () => {
     apiClient.updateAdminSettings.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    render(<PlatformSettingsForm />);
+    renderWithQueries(<PlatformSettingsForm />);
 
     await user.type(await screen.findByLabelText(/^AI notice/), " Extra.");
     await user.click(screen.getByRole("button", { name: "Save settings" }));
@@ -327,7 +328,7 @@ describe("PlatformSettingsForm", () => {
       .mockRejectedValueOnce(new Error("down"))
       .mockResolvedValue(settings);
     const user = userEvent.setup();
-    render(<PlatformSettingsForm />);
+    renderWithQueries(<PlatformSettingsForm />);
 
     await user.click(await screen.findByRole("button", { name: "Try again" }));
 
@@ -338,7 +339,7 @@ describe("PlatformSettingsForm", () => {
 
   it("shows and saves the Photo Viewing off note and explanation", async () => {
     const user = userEvent.setup();
-    render(<PlatformSettingsForm />);
+    renderWithQueries(<PlatformSettingsForm />);
     const note = await screen.findByLabelText(/Photo Viewing off” note/);
     const explanation = screen.getByLabelText(/Photo Viewing explanation/);
     expect(note).toHaveValue("Say you didn't look at the photo.");

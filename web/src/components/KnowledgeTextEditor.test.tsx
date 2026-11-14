@@ -1,8 +1,9 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { KnowledgeTextEditor } from "@/components/KnowledgeTextEditor";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const text = [
   "# Mindful breathing",
@@ -14,7 +15,9 @@ const text = [
 
 describe("KnowledgeTextEditor, read-only", () => {
   it("shows the text in a labelled, read-only editor with its length", () => {
-    render(<KnowledgeTextEditor value={text} readOnly label="Document text" />);
+    renderWithQueries(
+      <KnowledgeTextEditor value={text} readOnly label="Document text" />,
+    );
 
     const editor = screen.getByRole("textbox", { name: "Document text" });
     expect(editor).toHaveAttribute("aria-readonly", "true");
@@ -23,7 +26,9 @@ describe("KnowledgeTextEditor, read-only", () => {
   });
 
   it("previews the Markdown without running raw HTML", async () => {
-    render(<KnowledgeTextEditor value={text} readOnly label="Document text" />);
+    renderWithQueries(
+      <KnowledgeTextEditor value={text} readOnly label="Document text" />,
+    );
 
     await userEvent.click(screen.getByRole("button", { name: "Preview" }));
 
@@ -40,7 +45,9 @@ describe("KnowledgeTextEditor, read-only", () => {
   });
 
   it("offers find but no editing controls", () => {
-    render(<KnowledgeTextEditor value={text} readOnly label="Document text" />);
+    renderWithQueries(
+      <KnowledgeTextEditor value={text} readOnly label="Document text" />,
+    );
 
     const tools = within(screen.getByRole("toolbar", { name: "Text tools" }));
     expect(

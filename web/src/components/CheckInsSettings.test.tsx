@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CheckInsSettings } from "@/components/CheckInsSettings";
 import type { ApiClient, CheckIns } from "@/lib/api-client";
 import { userWithRole } from "@/test/fixtures";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   getMe: vi.fn<ApiClient["getMe"]>(),
@@ -43,7 +44,7 @@ function checkInsWith(overrides: Partial<CheckIns> = {}): CheckIns {
 }
 
 async function renderLoaded() {
-  render(<CheckInsSettings />);
+  renderWithQueries(<CheckInsSettings />);
   await screen.findByRole("heading", { name: "Settings" });
 }
 
@@ -145,9 +146,11 @@ describe("CheckInsSettings", () => {
     fireEvent.change(screen.getByLabelText("Until"), {
       target: { value: "08:15" },
     });
-    expect(apiClient.updateCheckIns).toHaveBeenCalledWith({
-      quiet_hours_end: "08:15",
-    });
+    await vi.waitFor(() =>
+      expect(apiClient.updateCheckIns).toHaveBeenCalledWith({
+        quiet_hours_end: "08:15",
+      }),
+    );
     expect(await screen.findByDisplayValue("08:15")).toBeInTheDocument();
 
     await user.selectOptions(screen.getByLabelText("Time zone"), [
@@ -351,7 +354,7 @@ describe("CheckInsSettings", () => {
   it("shows an error with Try again when loading fails", async () => {
     apiClient.getCheckIns.mockRejectedValueOnce(new Error("down"));
     const user = userEvent.setup();
-    render(<CheckInsSettings />);
+    renderWithQueries(<CheckInsSettings />);
 
     expect(
       await screen.findByText("We couldn’t load your Check-in settings"),

@@ -1,17 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { primaryButton } from "@/components/button-styles";
 import { CheckInKindCard } from "@/components/CheckInKindCard";
 import { LoadFailed } from "@/components/LoadFailed";
 import type { CheckInKindInput, CheckInKindOverview } from "@/lib/api-client";
+import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
-
-type LoadState =
-  | { kind: "loading" }
-  | { kind: "failed" }
-  | { kind: "loaded"; kinds: CheckInKindOverview[] };
 
 const emptyKind: CheckInKindInput = { name: "", description: "" };
 
@@ -23,39 +20,37 @@ const emptyKind: CheckInKindInput = { name: "", description: "" };
  */
 export function CheckInKindsManager() {
   const apiClient = useApiClient();
-  const [state, setState] = useState<LoadState>({ kind: "loading" });
+  const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
+  const kindsQuery = useQuery({
+    queryKey: queryKeys.checkInKinds,
+    queryFn: () => apiClient.listCheckInKinds(),
+  });
+  const kinds = kindsQuery.data;
 
-  const load = useCallback(async () => {
-    try {
-      setState({ kind: "loaded", kinds: await apiClient.listCheckInKinds() });
-    } catch {
-      setState({ kind: "failed" });
-    }
-  }, [apiClient]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  async function reloadKinds() {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.checkIns });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.checkInKinds });
+  }
 
   async function add(input: CheckInKindInput) {
     await apiClient.addCheckInKind(input);
     setIsAdding(false);
     setFlash(`Added ${input.name.trim()}.`);
-    await load();
+    await reloadKinds();
   }
 
   async function save(kind: CheckInKindOverview, input: CheckInKindInput) {
     await apiClient.updateCheckInKind(kind.id, input);
     setFlash(`Saved ${input.name.trim()}.`);
-    await load();
+    await reloadKinds();
   }
 
   async function remove(kind: CheckInKindOverview) {
     await apiClient.removeCheckInKind(kind.id);
     setFlash(`Removed ${kind.name}.`);
-    await load();
+    await reloadKinds();
   }
 
   const addButton = (
@@ -72,7 +67,16 @@ export function CheckInKindsManager() {
     </button>
   );
 
-  if (state.kind === "loading") {
+  if (!kinds) {
+    if (kindsQuery.isError) {
+      return (
+        <LoadFailed
+          title="Couldn’t load Check-in Kinds"
+          body="Check-ins keep running with the last saved set."
+          onRetry={() => void kindsQuery.refetch()}
+        />
+      );
+    }
     return (
       <div
         aria-busy="true"
@@ -82,16 +86,6 @@ export function CheckInKindsManager() {
         <span className="block h-[220px] rounded-card bg-subtle" />
         <span className="block h-[220px] rounded-card bg-subtle" />
       </div>
-    );
-  }
-
-  if (state.kind === "failed") {
-    return (
-      <LoadFailed
-        title="Couldn’t load Check-in Kinds"
-        body="Check-ins keep running with the last saved set."
-        onRetry={() => void load()}
-      />
     );
   }
 
@@ -108,7 +102,7 @@ export function CheckInKindsManager() {
         </p>
       ) : null}
 
-      {state.kinds.length === 0 && !isAdding ? (
+      {kinds.length === 0 && !isAdding ? (
         <div className="flex flex-col items-center gap-1 rounded-card border border-dashed border-line-strong px-6 py-8 text-center">
           <span className="text-h3">No Check-in Kinds</span>
           <p className="m-0 max-w-[34em] text-caption text-ink-muted">
@@ -118,7 +112,7 @@ export function CheckInKindsManager() {
         </div>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(420px,100%),1fr))] gap-4">
-          {state.kinds.map((kind) => (
+          {kinds.map((kind) => (
             <CheckInKindCard
               key={kind.id}
               initial={kind}

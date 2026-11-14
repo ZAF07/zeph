@@ -1,25 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 
 import { compactSecondaryButton } from "@/components/button-styles";
 import { LoadFailed } from "@/components/LoadFailed";
 import type {
   AdminUser,
+  UserFeatures,
   UserFeatureStatus,
   UserFeatureSwitch,
 } from "@/lib/api-client";
 import { lastChangeNote, reasonText } from "@/lib/features";
+import { queryKeys, reloadUserPages } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
-
-type LoadState =
-  | { kind: "loading" }
-  | { kind: "failed" }
-  | {
-      kind: "loaded";
-      features: UserFeatureStatus[];
-      personalStickerCount: number;
-    };
 
 const switchOptions: { id: UserFeatureSwitch; label: string }[] = [
   { id: "default", label: "Default" },
@@ -47,28 +41,40 @@ export function UserFeaturesPanel({
 }) {
   const apiClient = useApiClient();
   const closeRef = useRef<HTMLButtonElement>(null);
-  const [state, setState] = useState<LoadState>({ kind: "loading" });
-  const [isSaving, setIsSaving] = useState(false);
-  const [failure, setFailure] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const displayName = user.name ?? user.email ?? "This User";
+  const userFeaturesKey = queryKeys.userFeatures(user.id);
 
-  const load = useCallback(async () => {
-    setState({ kind: "loading" });
-    try {
-      const userFeatures = await apiClient.listUserFeatures(user.id);
-      setState({
-        kind: "loaded",
-        features: userFeatures.features,
-        personalStickerCount: userFeatures.personal_sticker_count,
-      });
-    } catch {
-      setState({ kind: "failed" });
-    }
-  }, [apiClient, user.id]);
+  const featuresQuery = useQuery({
+    queryKey: userFeaturesKey,
+    queryFn: () => apiClient.listUserFeatures(user.id),
+  });
+  const userFeatures = featuresQuery.data;
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const setSwitch = useMutation({
+    mutationFn: ({
+      feature,
+      featureSwitch,
+    }: {
+      feature: UserFeatureStatus;
+      featureSwitch: UserFeatureSwitch;
+    }) => apiClient.setFeatureForUser(user.id, feature.feature, featureSwitch),
+    onSuccess: (changed) => {
+      queryClient.setQueryData<UserFeatures>(userFeaturesKey, (current) =>
+        current
+          ? {
+              ...current,
+              features: current.features.map((status) =>
+                status.feature === changed.feature ? changed : status,
+              ),
+            }
+          : current,
+      );
+      reloadUserPages(queryClient);
+    },
+  });
+  const isSaving = setSwitch.isPending;
+  const failedFeature = setSwitch.isError ? setSwitch.variables.feature : null;
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -84,37 +90,12 @@ export function UserFeaturesPanel({
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [isSaving, onClose]);
 
-  async function setSwitch(
+  function changeSwitch(
     feature: UserFeatureStatus,
     featureSwitch: UserFeatureSwitch,
   ) {
-    if (feature.switch === featureSwitch) {
-      return;
-    }
-    setIsSaving(true);
-    setFailure(null);
-    try {
-      const changed = await apiClient.setFeatureForUser(
-        user.id,
-        feature.feature,
-        featureSwitch,
-      );
-      setState((current) =>
-        current.kind === "loaded"
-          ? {
-              ...current,
-              features: current.features.map((status) =>
-                status.feature === changed.feature ? changed : status,
-              ),
-            }
-          : current,
-      );
-    } catch {
-      setFailure(
-        `Couldn’t change ${feature.name} for ${displayName}. It is still ${feature.switch}.`,
-      );
-    } finally {
-      setIsSaving(false);
+    if (feature.switch !== featureSwitch) {
+      setSwitch.mutate({ feature, featureSwitch });
     }
   }
 
@@ -155,7 +136,7 @@ export function UserFeaturesPanel({
           User only.
         </p>
 
-        {state.kind === "loading" ? (
+        {featuresQuery.isPending ? (
           <div
             aria-busy="true"
             aria-label="Loading Features"
@@ -163,26 +144,27 @@ export function UserFeaturesPanel({
           />
         ) : null}
 
-        {state.kind === "failed" ? (
+        {!userFeatures && featuresQuery.isError ? (
           <LoadFailed
             title="Couldn’t load Features"
             body="This User’s switches are unchanged."
-            onRetry={() => void load()}
+            onRetry={() => void featuresQuery.refetch()}
           />
         ) : null}
 
-        {failure ? (
+        {failedFeature ? (
           <p
             role="alert"
             className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3.5 text-sm text-danger-deep"
           >
-            {failure}
+            Couldn’t change {failedFeature.name} for {displayName}. It is still{" "}
+            {failedFeature.switch}.
           </p>
         ) : null}
 
-        {state.kind === "loaded" ? (
+        {userFeatures ? (
           <ul className="m-0 flex list-none flex-col rounded-card border border-line p-0">
-            {state.features.map((feature, index) => (
+            {userFeatures.features.map((feature, index) => (
               <li
                 key={feature.feature}
                 className={`flex flex-wrap items-center justify-between gap-x-5 gap-y-3 px-5 py-4 ${
@@ -215,7 +197,7 @@ export function UserFeaturesPanel({
                       type="button"
                       aria-pressed={feature.switch === option.id}
                       disabled={isSaving}
-                      onClick={() => void setSwitch(feature, option.id)}
+                      onClick={() => changeSwitch(feature, option.id)}
                       className={`min-h-10 cursor-pointer rounded-full border px-3.5 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 ${
                         feature.switch === option.id
                           ? "border-ink bg-ink text-white"
@@ -231,10 +213,10 @@ export function UserFeaturesPanel({
           </ul>
         ) : null}
 
-        {state.kind === "loaded" ? (
+        {userFeatures ? (
           <p className="m-0 text-caption text-ink-muted">
             Personal Stickers kept for {displayName}:{" "}
-            {state.personalStickerCount}
+            {userFeatures.personal_sticker_count}
           </p>
         ) : null}
       </div>

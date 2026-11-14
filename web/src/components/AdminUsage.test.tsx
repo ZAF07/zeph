@@ -1,9 +1,10 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AdminUsage } from "@/components/AdminUsage";
 import type { ApiClient, UsageReport } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   getUsage: vi.fn<ApiClient["getUsage"]>(),
@@ -72,7 +73,7 @@ describe("AdminUsage", () => {
   });
 
   it("shows today's totals and usage per User per day, never message content", async () => {
-    render(<AdminUsage />);
+    renderWithQueries(<AdminUsage />);
 
     expect(
       await screen.findByText(
@@ -105,7 +106,7 @@ describe("AdminUsage", () => {
 
   it("loads a longer period when picked", async () => {
     const user = userEvent.setup();
-    render(<AdminUsage />);
+    renderWithQueries(<AdminUsage />);
     await screen.findByRole("table");
 
     await user.selectOptions(screen.getByLabelText("Period"), "Last 7 days");
@@ -124,7 +125,7 @@ describe("AdminUsage", () => {
     const click = vi
       .spyOn(HTMLAnchorElement.prototype, "click")
       .mockImplementation(() => {});
-    render(<AdminUsage />);
+    renderWithQueries(<AdminUsage />);
     await screen.findByRole("table");
 
     await user.click(screen.getByRole("button", { name: "Download CSV" }));
@@ -141,7 +142,7 @@ describe("AdminUsage", () => {
 
   it("says when there is no usage yet", async () => {
     apiClient.getUsage.mockResolvedValue({ ...report, rows: [] });
-    render(<AdminUsage />);
+    renderWithQueries(<AdminUsage />);
 
     expect(await screen.findByText("No usage yet")).toBeVisible();
     expect(screen.getByRole("button", { name: "Download CSV" })).toBeDisabled();
@@ -150,7 +151,7 @@ describe("AdminUsage", () => {
   it("offers to try again when usage can't be loaded", async () => {
     const user = userEvent.setup();
     apiClient.getUsage.mockRejectedValueOnce(new Error("down"));
-    render(<AdminUsage />);
+    renderWithQueries(<AdminUsage />);
 
     await user.click(await screen.findByRole("button", { name: "Try again" }));
 

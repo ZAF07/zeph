@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   primaryButton,
@@ -16,17 +16,17 @@ import { OnboardingProgress } from "@/components/OnboardingProgress";
 import { QuietHoursFields } from "@/components/QuietHoursFields";
 import { Switch } from "@/components/Switch";
 import { TelegramConnectionCard } from "@/components/TelegramConnectionCard";
-import type {
-  CheckInFrequency,
-  CheckIns,
-  Me,
-  PlatformContent,
-} from "@/lib/api-client";
+import type { CheckInFrequency, CheckIns, Me } from "@/lib/api-client";
 import { toTimeFieldValue } from "@/lib/check-ins";
 import { countryFromBrowser } from "@/lib/countries";
 import { paragraphs } from "@/lib/paragraphs";
+import {
+  useCheckIns,
+  useCompleteOnboarding,
+  useMe,
+  usePlatformContent,
+} from "@/lib/queries";
 import { timeZoneFromBrowser, timeZoneLabel } from "@/lib/time-zones";
-import { useApiClient } from "@/lib/use-api-client";
 
 const STEP_LABELS = [
   "Hello",
@@ -61,11 +61,6 @@ type Answers = {
   quietHoursEnd: string;
 };
 
-type LoadState =
-  | { kind: "loading" }
-  | { kind: "failed" }
-  | { kind: "loaded"; content: PlatformContent };
-
 /**
  * Starts the answers from what the User saved before, or from the browser.
  *
@@ -99,41 +94,37 @@ function startingAnswers(me: Me, checkIns: CheckIns): Answers {
  * @returns The onboarding flow.
  */
 export function OnboardingFlow() {
-  const apiClient = useApiClient();
   const router = useRouter();
-  const [loadState, setLoadState] = useState<LoadState>({ kind: "loading" });
+  const meQuery = useMe();
+  const contentQuery = usePlatformContent();
+  const checkInsQuery = useCheckIns();
+  const completeOnboarding = useCompleteOnboarding();
   const [answers, setAnswers] = useState<Answers | null>(null);
   const [step, setStep] = useState(HELLO_STEP);
   const [countryFromBrowserUsed, setCountryFromBrowserUsed] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveFailed, setSaveFailed] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoadState({ kind: "loading" });
-    try {
-      const [me, content, checkIns] = await Promise.all([
-        apiClient.getMe(),
-        apiClient.getPlatformContent(),
-        apiClient.getCheckIns(),
-      ]);
-      if (me.onboarding_completed_at) {
-        router.replace("/");
-        return;
-      }
-      const starting = startingAnswers(me, checkIns);
-      setAnswers(starting);
-      setCountryFromBrowserUsed(!me.country && starting.country !== "");
-      setLoadState({ kind: "loaded", content });
-    } catch {
-      setLoadState({ kind: "failed" });
-    }
-  }, [apiClient, router]);
+  const me = meQuery.data;
+  const checkIns = checkInsQuery.data;
+  const content = contentQuery.data;
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (answers || !me || !checkIns) {
+      return;
+    }
+    if (me.onboarding_completed_at) {
+      router.replace("/");
+      return;
+    }
+    const starting = startingAnswers(me, checkIns);
+    setAnswers(starting);
+    setCountryFromBrowserUsed(!me.country && starting.country !== "");
+  }, [answers, me, checkIns, router]);
 
-  if (loadState.kind === "failed") {
+  const loadFailed =
+    (!answers && (meQuery.isError || checkInsQuery.isError)) ||
+    (!content && contentQuery.isError);
+
+  if (loadFailed) {
     return (
       <div
         role="alert"
@@ -148,7 +139,11 @@ export function OnboardingFlow() {
         <button
           type="button"
           className={`${secondaryButton} self-start`}
-          onClick={() => void load()}
+          onClick={() => {
+            void meQuery.refetch();
+            void contentQuery.refetch();
+            void checkInsQuery.refetch();
+          }}
         >
           Try again
         </button>
@@ -156,7 +151,7 @@ export function OnboardingFlow() {
     );
   }
 
-  if (loadState.kind === "loading" || !answers) {
+  if (!answers || !content) {
     return (
       <div
         aria-busy="true"
@@ -164,8 +159,6 @@ export function OnboardingFlow() {
       />
     );
   }
-
-  const { content } = loadState;
 
   function change(changes: Partial<Answers>) {
     setAnswers((current) => (current ? { ...current, ...changes } : current));
@@ -181,14 +174,12 @@ export function OnboardingFlow() {
     change({ reasons });
   }
 
-  async function saveAndContinue() {
+  function saveAndContinue() {
     if (!answers) {
       return;
     }
-    setIsSaving(true);
-    setSaveFailed(false);
-    try {
-      await apiClient.completeOnboarding({
+    completeOnboarding.mutate(
+      {
         name: answers.name.trim(),
         ai_notice_acknowledged: answers.aiNoticeAcknowledged,
         onboarding_reasons: answers.reasons,
@@ -200,13 +191,9 @@ export function OnboardingFlow() {
         check_in_frequency: answers.checkInFrequency,
         quiet_hours_start: answers.quietHoursStart,
         quiet_hours_end: answers.quietHoursEnd,
-      });
-      setStep(TELEGRAM_STEP);
-    } catch {
-      setSaveFailed(true);
-    } finally {
-      setIsSaving(false);
-    }
+      },
+      { onSuccess: () => setStep(TELEGRAM_STEP) },
+    );
   }
 
   const needsName = step === HELLO_STEP && !answers.name.trim();
@@ -215,14 +202,17 @@ export function OnboardingFlow() {
   const needsLocation =
     step === LOCATION_STEP && (!answers.country || !answers.timeZone);
   const canContinue =
-    !needsName && !needsAcknowledgement && !needsLocation && !isSaving;
+    !needsName &&
+    !needsAcknowledgement &&
+    !needsLocation &&
+    !completeOnboarding.isPending;
 
   function next() {
     if (!canContinue) {
       return;
     }
     if (step === MEMORY_STEP) {
-      void saveAndContinue();
+      saveAndContinue();
       return;
     }
     setStep(step + 1);
@@ -426,7 +416,7 @@ export function OnboardingFlow() {
               onChange={(userMemoryEnabled) => change({ userMemoryEnabled })}
             />
           </div>
-          {saveFailed ? (
+          {completeOnboarding.isError ? (
             <p
               role="alert"
               className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3 text-sm text-danger-deep"
@@ -468,7 +458,7 @@ export function OnboardingFlow() {
             disabled={!canContinue}
             onClick={next}
           >
-            {isSaving ? "Saving…" : "Continue"}
+            {completeOnboarding.isPending ? "Saving…" : "Continue"}
           </button>
         ) : (
           <Link href="/" className={quietButton}>

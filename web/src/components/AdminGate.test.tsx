@@ -1,10 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AdminGate } from "@/components/AdminGate";
 import type { ApiClient } from "@/lib/api-client";
 import { userWithRole } from "@/test/fixtures";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   getMe: vi.fn<ApiClient["getMe"]>(),
@@ -26,7 +27,7 @@ describe("AdminGate", () => {
   it("shows the admin page to an Admin", async () => {
     apiClient.getMe.mockResolvedValue(userWithRole("admin"));
 
-    render(<AdminGate>Admin page</AdminGate>);
+    renderWithQueries(<AdminGate>Admin page</AdminGate>);
 
     expect(await screen.findByText("Admin page")).toBeInTheDocument();
     expect(router.replace).not.toHaveBeenCalled();
@@ -35,7 +36,7 @@ describe("AdminGate", () => {
   it("sends a User who is not an Admin home without showing the page", async () => {
     apiClient.getMe.mockResolvedValue(userWithRole("user"));
 
-    render(<AdminGate>Admin page</AdminGate>);
+    renderWithQueries(<AdminGate>Admin page</AdminGate>);
 
     await vi.waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
     expect(screen.queryByText("Admin page")).not.toBeInTheDocument();
@@ -46,7 +47,7 @@ describe("AdminGate", () => {
       .mockRejectedValueOnce(new Error("down"))
       .mockResolvedValue(userWithRole("admin"));
     const user = userEvent.setup();
-    render(<AdminGate>Admin page</AdminGate>);
+    renderWithQueries(<AdminGate>Admin page</AdminGate>);
 
     await user.click(await screen.findByRole("button", { name: "Try again" }));
 

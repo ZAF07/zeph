@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { secondaryButton } from "@/components/button-styles";
 import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
@@ -12,21 +12,17 @@ import { QuietHoursFields } from "@/components/QuietHoursFields";
 import { RecentCheckInsList } from "@/components/RecentCheckInsList";
 import { SettingLabel } from "@/components/SettingLabel";
 import { Switch } from "@/components/Switch";
-import type {
-  CheckInChanges,
-  CheckIns,
-  Me,
-  PauseLength,
-} from "@/lib/api-client";
+import type { CheckInChanges, CheckIns, PauseLength } from "@/lib/api-client";
 import { pausedText, toTimeFieldValue } from "@/lib/check-ins";
 import { notAvailableText } from "@/lib/features";
+import {
+  useCheckIns,
+  useMe,
+  useSaveCheckIns,
+  useUpdatePreferences,
+} from "@/lib/queries";
 import { timeZoneOptions } from "@/lib/time-zones";
 import { useApiClient } from "@/lib/use-api-client";
-
-type LoadState =
-  | { kind: "loading" }
-  | { kind: "failed" }
-  | { kind: "loaded"; me: Me; checkIns: CheckIns };
 
 const pauseChoices: { length: PauseLength; label: string }[] = [
   { length: "day", label: "For a day" },
@@ -46,72 +42,43 @@ const settingsRow =
  */
 export function CheckInsSettings() {
   const apiClient = useApiClient();
-  const [state, setState] = useState<LoadState>({ kind: "loading" });
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveFailed, setSaveFailed] = useState(false);
+  const meQuery = useMe();
+  const checkInsQuery = useCheckIns();
+  const saveCheckIns = useSaveCheckIns();
+  const updatePreferences = useUpdatePreferences();
 
-  const load = useCallback(async () => {
-    setState({ kind: "loading" });
-    try {
-      const [me, checkIns] = await Promise.all([
-        apiClient.getMe(),
-        apiClient.getCheckIns(),
-      ]);
-      setState({ kind: "loaded", me, checkIns });
-    } catch {
-      setState({ kind: "failed" });
-    }
-  }, [apiClient]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const timeZone = state.kind === "loaded" ? state.me.time_zone : null;
+  const me = meQuery.data;
+  const timeZone = me?.time_zone ?? null;
   const timeZones = useMemo(() => timeZoneOptions(timeZone), [timeZone]);
+  const isLoaded = me !== undefined && checkInsQuery.data !== undefined;
+  const checkIns = isLoaded ? checkInsQuery.data : null;
+  const loadFailed = !isLoaded && (meQuery.isError || checkInsQuery.isError);
+  const changedInChat = me?.changed_in_chat ?? {};
+  const isSaving = saveCheckIns.isPending || updatePreferences.isPending;
+  const saveFailed = saveCheckIns.isError || updatePreferences.isError;
 
-  async function save(
-    change: () => Promise<{ me: Me } | { me: Me; checkIns: CheckIns }>,
-  ) {
-    setIsSaving(true);
-    setSaveFailed(false);
-    try {
-      const saved = await change();
-      setState((current) =>
-        current.kind === "loaded" ? { ...current, ...saved } : current,
-      );
-    } catch {
-      setSaveFailed(true);
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  async function withMe(checkIns: Promise<CheckIns>) {
-    const savedCheckIns = await checkIns;
-    return { checkIns: savedCheckIns, me: await apiClient.getMe() };
+  function save(sendChange: () => Promise<CheckIns>) {
+    updatePreferences.reset();
+    saveCheckIns.mutate(sendChange);
   }
 
   function changeSettings(changes: CheckInChanges) {
-    void save(() => withMe(apiClient.updateCheckIns(changes)));
+    save(() => apiClient.updateCheckIns(changes));
   }
 
   function pause(length: PauseLength) {
-    void save(() => withMe(apiClient.pauseCheckIns(length)));
+    save(() => apiClient.pauseCheckIns(length));
   }
 
   function resume() {
-    void save(() => withMe(apiClient.resumeCheckIns()));
+    save(() => apiClient.resumeCheckIns());
   }
 
   function changeTimeZone(timeZone: string) {
-    void save(async () => ({
-      me: await apiClient.updatePreferences({ time_zone: timeZone }),
-    }));
+    saveCheckIns.reset();
+    updatePreferences.mutate({ time_zone: timeZone });
   }
 
-  const checkIns = state.kind === "loaded" ? state.checkIns : null;
-  const changedInChat = state.kind === "loaded" ? state.me.changed_in_chat : {};
   function chatCaption(changedAt: string | undefined) {
     return (
       <ChangedInChatCaption
@@ -153,7 +120,7 @@ export function CheckInsSettings() {
         ) : null}
       </header>
 
-      {state.kind === "loading" ? (
+      {!isLoaded && !loadFailed ? (
         <div
           aria-busy="true"
           aria-label="Loading Check-ins"
@@ -164,11 +131,14 @@ export function CheckInsSettings() {
         </div>
       ) : null}
 
-      {state.kind === "failed" ? (
+      {loadFailed ? (
         <LoadFailed
           title="We couldn’t load your Check-in settings"
           body="Your settings haven’t changed. Try again in a moment."
-          onRetry={() => void load()}
+          onRetry={() => {
+            void meQuery.refetch();
+            void checkInsQuery.refetch();
+          }}
         />
       ) : null}
 

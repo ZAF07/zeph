@@ -1,8 +1,8 @@
-import { render } from "@testing-library/react";
 import { useLayoutEffect } from "react";
 import { describe, expect, it } from "vitest";
 
 import { CodeMirrorEditor } from "@/components/CodeMirrorEditor";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 /**
  * Records, while the page is being put on screen, whether the editor's
@@ -26,7 +26,7 @@ describe("CodeMirrorEditor", () => {
   it("is in the page as soon as it is rendered, not a moment later", () => {
     let isEditorThere = false;
 
-    render(
+    renderWithQueries(
       <>
         <CodeMirrorEditor value="# Mindful breathing" label="Document text" />
         <EditorPresenceCheck

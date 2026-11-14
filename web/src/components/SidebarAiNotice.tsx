@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-import { useApiClient } from "@/lib/use-api-client";
+import { usePlatformContent } from "@/lib/queries";
 
 /**
  * The short AI notice at the foot of the sidebar, worded by Admins.
@@ -10,15 +8,7 @@ import { useApiClient } from "@/lib/use-api-client";
  * @returns The notice, or nothing until the wording has loaded.
  */
 export function SidebarAiNotice() {
-  const apiClient = useApiClient();
-  const [notice, setNotice] = useState<string | null>(null);
-
-  useEffect(() => {
-    apiClient
-      .getPlatformContent()
-      .then((content) => setNotice(content.ai_notice_short))
-      .catch(() => setNotice(null));
-  }, [apiClient]);
+  const notice = usePlatformContent().data?.ai_notice_short;
 
   if (!notice) {
     return null;

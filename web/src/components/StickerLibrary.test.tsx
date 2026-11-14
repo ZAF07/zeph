@@ -1,9 +1,10 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StickerLibrary } from "@/components/StickerLibrary";
 import { ApiError, type ApiClient, type Sticker } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   listStickers: vi.fn<ApiClient["listStickers"]>(),
@@ -54,7 +55,7 @@ describe("StickerLibrary", () => {
   });
 
   it("lists stickers with their notes and marks the ones that need a note", async () => {
-    render(<StickerLibrary />);
+    renderWithQueries(<StickerLibrary />);
 
     expect(await screen.findByText("2 stickers")).toBeInTheDocument();
     expect(
@@ -67,7 +68,7 @@ describe("StickerLibrary", () => {
   it("shows the empty state when there are no stickers", async () => {
     apiClient.listStickers.mockResolvedValue([]);
 
-    render(<StickerLibrary />);
+    renderWithQueries(<StickerLibrary />);
 
     expect(await screen.findByText("No stickers yet")).toBeInTheDocument();
     expect(
@@ -78,7 +79,7 @@ describe("StickerLibrary", () => {
   it("shows an error with Try again when the stickers can't load", async () => {
     apiClient.listStickers.mockRejectedValueOnce(new Error("down"));
 
-    render(<StickerLibrary />);
+    renderWithQueries(<StickerLibrary />);
 
     const alert = await screen.findByRole("alert");
     expect(
@@ -92,7 +93,7 @@ describe("StickerLibrary", () => {
 
   it("imports a sticker set by name and shows how many were added", async () => {
     apiClient.importStickerSet.mockResolvedValue(2);
-    render(<StickerLibrary />);
+    renderWithQueries(<StickerLibrary />);
     await screen.findByText("2 stickers");
 
     await userEvent.type(
@@ -118,7 +119,7 @@ describe("StickerLibrary", () => {
         "There is no sticker set called “Nope”.",
       ),
     );
-    render(<StickerLibrary />);
+    renderWithQueries(<StickerLibrary />);
     await screen.findByText("2 stickers");
 
     await userEvent.type(
@@ -133,7 +134,7 @@ describe("StickerLibrary", () => {
   });
 
   it("explains both ways to add stickers in the Telegram chat", async () => {
-    render(<StickerLibrary />);
+    renderWithQueries(<StickerLibrary />);
     await screen.findByText("2 stickers");
 
     await userEvent.click(
@@ -154,7 +155,7 @@ describe("StickerLibrary", () => {
       connection: null,
       latest_token: null,
     });
-    render(<StickerLibrary />);
+    renderWithQueries(<StickerLibrary />);
     await screen.findByText("2 stickers");
 
     await userEvent.click(
@@ -171,7 +172,7 @@ describe("StickerLibrary", () => {
       ...leaf,
       note: "A calm moment",
     });
-    render(<StickerLibrary />);
+    renderWithQueries(<StickerLibrary />);
     await screen.findByText("2 stickers");
 
     const note = cardFor("🍃").getByRole("textbox", { name: "When to use" });
@@ -187,7 +188,7 @@ describe("StickerLibrary", () => {
   });
 
   it("does not save a note that was not changed", async () => {
-    render(<StickerLibrary />);
+    renderWithQueries(<StickerLibrary />);
     await screen.findByText("2 stickers");
 
     await userEvent.click(
@@ -200,7 +201,7 @@ describe("StickerLibrary", () => {
 
   it("shows when a note couldn't be saved", async () => {
     apiClient.saveStickerNote.mockRejectedValue(new Error("down"));
-    render(<StickerLibrary />);
+    renderWithQueries(<StickerLibrary />);
     await screen.findByText("2 stickers");
 
     await userEvent.type(
@@ -216,7 +217,7 @@ describe("StickerLibrary", () => {
 
   it("removes a sticker", async () => {
     apiClient.removeSticker.mockResolvedValue();
-    render(<StickerLibrary />);
+    renderWithQueries(<StickerLibrary />);
     await screen.findByText("2 stickers");
     apiClient.listStickers.mockResolvedValue([seedling]);
 
@@ -239,7 +240,7 @@ describe("StickerLibrary", () => {
     URL.createObjectURL = vi.fn(() => "blob:seedling");
     URL.revokeObjectURL = vi.fn();
 
-    render(<StickerLibrary />);
+    renderWithQueries(<StickerLibrary />);
 
     expect(await screen.findByAltText("Sticker: 🌱")).toHaveAttribute(
       "src",

@@ -1,9 +1,10 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AdminUsers } from "@/components/AdminUsers";
 import { ApiError, type AdminUser, type ApiClient } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   listAdminUsers: vi.fn<ApiClient["listAdminUsers"]>(),
@@ -53,7 +54,7 @@ describe("AdminUsers", () => {
   });
 
   it("lists each User with sign-up date, Telegram status and counts", async () => {
-    render(<AdminUsers />);
+    renderWithQueries(<AdminUsers />);
 
     await screen.findByText("Maya Lin");
     const mayaRow = within(rowFor("Maya Lin"));
@@ -74,7 +75,7 @@ describe("AdminUsers", () => {
   it("makes a User an Admin", async () => {
     apiClient.changeUserRole.mockResolvedValue({ id: "ren", role: "admin" });
     const user = userEvent.setup();
-    render(<AdminUsers />);
+    renderWithQueries(<AdminUsers />);
 
     await user.click(
       within(rowFor(await textOf("Ren Okafor"))).getByRole("button", {
@@ -109,7 +110,7 @@ describe("AdminUsers", () => {
       personal_sticker_count: 0,
     });
     const user = userEvent.setup();
-    render(<AdminUsers />);
+    renderWithQueries(<AdminUsers />);
 
     await user.click(
       within(rowFor(await textOf("Ren Okafor"))).getByRole("button", {
@@ -131,7 +132,7 @@ describe("AdminUsers", () => {
       new ApiError(409, "/api/admin/users/maya/role"),
     );
     const user = userEvent.setup();
-    render(<AdminUsers />);
+    renderWithQueries(<AdminUsers />);
 
     await user.click(
       within(rowFor(await textOf("Maya Lin"))).getByRole("button", {
@@ -149,7 +150,7 @@ describe("AdminUsers", () => {
 
   it("finds Users by name or email and filters by Admins or Telegram", async () => {
     const user = userEvent.setup();
-    render(<AdminUsers />);
+    renderWithQueries(<AdminUsers />);
     await screen.findByText("Maya Lin");
 
     await user.type(screen.getByLabelText("Search users"), "ren@");
@@ -171,7 +172,7 @@ describe("AdminUsers", () => {
   it("shows an empty state before anyone signs up", async () => {
     apiClient.listAdminUsers.mockResolvedValue([]);
 
-    render(<AdminUsers />);
+    renderWithQueries(<AdminUsers />);
 
     expect(await screen.findByText("No users yet")).toBeVisible();
   });
@@ -181,7 +182,7 @@ describe("AdminUsers", () => {
       .mockRejectedValueOnce(new Error("down"))
       .mockResolvedValue([maya]);
     const user = userEvent.setup();
-    render(<AdminUsers />);
+    renderWithQueries(<AdminUsers />);
 
     await user.click(await screen.findByRole("button", { name: "Try again" }));
 

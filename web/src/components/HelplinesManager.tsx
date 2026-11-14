@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { compactSecondaryButton } from "@/components/button-styles";
 import { inputField } from "@/components/form-styles";
@@ -10,16 +11,11 @@ import type {
   ApiClient,
   Helpline,
   HelplineInput,
-  Helplines,
   MoveDirection,
 } from "@/lib/api-client";
 import { countryName } from "@/lib/countries";
+import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
-
-type LoadState =
-  | { kind: "loading" }
-  | { kind: "failed" }
-  | { kind: "loaded"; helplines: Helplines };
 
 type Editing =
   { kind: "add" } | { kind: "edit"; helpline: Helpline } | { kind: "fallback" };
@@ -151,49 +147,55 @@ function formSetup(
  */
 export function HelplinesManager() {
   const apiClient = useApiClient();
-  const [state, setState] = useState<LoadState>({ kind: "loading" });
+  const queryClient = useQueryClient();
   const [countryFilter, setCountryFilter] = useState("all");
   const [editing, setEditing] = useState<Editing | null>(null);
   const [flash, setFlash] = useState<Flash | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      setState({ kind: "loaded", helplines: await apiClient.listHelplines() });
-    } catch {
-      setState({ kind: "failed" });
-    }
-  }, [apiClient]);
+  const helplinesQuery = useQuery({
+    queryKey: queryKeys.helplines,
+    queryFn: () => apiClient.listHelplines(),
+  });
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  async function reloadHelplines() {
+    await queryClient.invalidateQueries({ queryKey: queryKeys.helplines });
+  }
 
-  async function runRowAction(
-    helpline: Helpline,
-    action: () => Promise<unknown>,
-    successText: string | null,
-  ) {
-    setBusyId(helpline.id);
-    setFlash(null);
-    try {
+  const rowAction = useMutation({
+    mutationFn: async ({
+      action,
+    }: {
+      target: Helpline;
+      action: () => Promise<unknown>;
+      successText: string | null;
+    }) => {
       await action();
+      await reloadHelplines();
+    },
+    onMutate: () => setFlash(null),
+    onSuccess: (_, { successText }) => {
       if (successText) {
         setFlash({ text: successText, isError: false });
       }
-      await load();
-    } catch {
+    },
+    onError: (_, { target }) =>
       setFlash({
-        text: `Couldn’t change ${helpline.name}. Please try again.`,
+        text: `Couldn’t change ${target.name}. Please try again.`,
         isError: true,
-      });
-    } finally {
-      setBusyId(null);
-    }
+      }),
+  });
+  const busyId = rowAction.isPending ? rowAction.variables.target.id : null;
+
+  function runRowAction(
+    target: Helpline,
+    action: () => Promise<unknown>,
+    successText: string | null,
+  ) {
+    rowAction.mutate({ target, action, successText });
   }
 
   function move(helpline: Helpline, direction: MoveDirection) {
-    void runRowAction(
+    runRowAction(
       helpline,
       () => apiClient.moveHelpline(helpline.id, direction),
       null,
@@ -204,14 +206,23 @@ export function HelplinesManager() {
     if (!window.confirm(`Remove ${helpline.name}?`)) {
       return;
     }
-    void runRowAction(
+    runRowAction(
       helpline,
       () => apiClient.deleteHelpline(helpline.id),
       `Removed ${helpline.name}.`,
     );
   }
 
-  if (state.kind === "loading") {
+  if (!helplinesQuery.data) {
+    if (helplinesQuery.isError) {
+      return (
+        <LoadFailed
+          title="Couldn’t load Helplines"
+          body="Zeph keeps using the last saved Helplines."
+          onRetry={() => void helplinesQuery.refetch()}
+        />
+      );
+    }
     return (
       <div
         aria-busy="true"
@@ -221,17 +232,7 @@ export function HelplinesManager() {
     );
   }
 
-  if (state.kind === "failed") {
-    return (
-      <LoadFailed
-        title="Couldn’t load Helplines"
-        body="Zeph keeps using the last saved Helplines."
-        onRetry={() => void load()}
-      />
-    );
-  }
-
-  const { helplines, international_fallback: fallback } = state.helplines;
+  const { helplines, international_fallback: fallback } = helplinesQuery.data;
   const countriesWithHelplines = [
     ...new Set(helplines.map((helpline) => helpline.country ?? "")),
   ];
@@ -305,7 +306,7 @@ export function HelplinesManager() {
             const message = await form.save(input);
             setFlash({ text: message, isError: false });
             setEditing(null);
-            await load();
+            await reloadHelplines();
           }}
           onCancel={() => setEditing(null)}
         />

@@ -1,17 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { LoadFailed } from "@/components/LoadFailed";
 import { StickerAddPanel } from "@/components/StickerAddPanel";
 import { StickerCard } from "@/components/StickerCard";
 import type { Sticker } from "@/lib/api-client";
+import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
-
-type LoadState =
-  | { kind: "loading" }
-  | { kind: "failed" }
-  | { kind: "loaded"; stickers: Sticker[] };
 
 /**
  * Writes a sticker count like "6 stickers".
@@ -31,30 +27,27 @@ function stickerCountLabel(count: number): string {
  */
 export function StickerLibrary() {
   const apiClient = useApiClient();
-  const [state, setState] = useState<LoadState>({ kind: "loading" });
+  const queryClient = useQueryClient();
+  const stickersQuery = useQuery({
+    queryKey: queryKeys.stickers,
+    queryFn: () => apiClient.listStickers(),
+  });
+  const stickers = stickersQuery.data;
 
-  const load = useCallback(async () => {
-    try {
-      setState({ kind: "loaded", stickers: await apiClient.listStickers() });
-    } catch {
-      setState({ kind: "failed" });
-    }
-  }, [apiClient]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  async function reloadStickers() {
+    await queryClient.invalidateQueries({ queryKey: queryKeys.stickers });
+  }
 
   async function remove(sticker: Sticker) {
     await apiClient.removeSticker(sticker.id);
-    await load();
+    await reloadStickers();
   }
 
   return (
     <div className="flex flex-col gap-[30px]">
-      <StickerAddPanel onAdded={() => void load()} />
+      <StickerAddPanel onAdded={() => void reloadStickers()} />
 
-      {state.kind === "loading" ? (
+      {stickersQuery.isPending ? (
         <div
           aria-busy="true"
           aria-label="Loading stickers"
@@ -69,15 +62,15 @@ export function StickerLibrary() {
         </div>
       ) : null}
 
-      {state.kind === "failed" ? (
+      {!stickers && stickersQuery.isError ? (
         <LoadFailed
           title="Couldn’t load stickers"
           body="Zeph keeps sending stickers from the last saved library."
-          onRetry={() => void load()}
+          onRetry={() => void stickersQuery.refetch()}
         />
       ) : null}
 
-      {state.kind === "loaded" && state.stickers.length === 0 ? (
+      {stickers && stickers.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
           <span className="text-[22px] font-medium tracking-[-0.02em]">
             No stickers yet
@@ -88,13 +81,13 @@ export function StickerLibrary() {
         </div>
       ) : null}
 
-      {state.kind === "loaded" && state.stickers.length > 0 ? (
+      {stickers && stickers.length > 0 ? (
         <>
           <p className="m-0 text-caption text-ink-muted">
-            {stickerCountLabel(state.stickers.length)}
+            {stickerCountLabel(stickers.length)}
           </p>
           <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(min(200px,100%),1fr))] gap-3 p-0">
-            {state.stickers.map((sticker) => (
+            {stickers.map((sticker) => (
               <StickerCard
                 key={sticker.id}
                 sticker={sticker}

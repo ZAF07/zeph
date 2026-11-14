@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -9,6 +9,7 @@ import {
   type Me,
   type PlatformContent,
 } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   getMe: vi.fn<ApiClient["getMe"]>(),
@@ -79,7 +80,7 @@ describe("AccountSettings", () => {
       ...onboardedUser,
       personal_stickers_available: false,
     });
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
 
     const section = await screen.findByRole("region", {
       name: "Your stickers",
@@ -90,7 +91,7 @@ describe("AccountSettings", () => {
   });
 
   it("says Delete my data can be asked for in chat", async () => {
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
 
     expect(
       await screen.findByText(/You can also tell Zeph “delete my data”/),
@@ -105,7 +106,7 @@ describe("AccountSettings", () => {
         user_memory: "2026-11-05T09:00:00Z",
       },
     });
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
 
     expect(
       await screen.findByText("Changed in chat · 3 Nov"),
@@ -119,7 +120,7 @@ describe("AccountSettings", () => {
       changed_in_chat: { time_zone: "2026-11-03T09:00:00Z" },
     });
     const user = userEvent.setup();
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
     await screen.findByText("Changed in chat · 3 Nov");
 
     await user.click(screen.getByRole("button", { name: "Save changes" }));
@@ -129,7 +130,7 @@ describe("AccountSettings", () => {
   });
 
   it("shows the saved profile", async () => {
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
 
     expect(await screen.findByLabelText("What Zeph calls you")).toHaveValue(
       "Maya",
@@ -141,7 +142,7 @@ describe("AccountSettings", () => {
 
   it("saves a changed name, country and time zone", async () => {
     const user = userEvent.setup();
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
     const nameField = await screen.findByLabelText("What Zeph calls you");
 
     await user.clear(nameField);
@@ -162,7 +163,7 @@ describe("AccountSettings", () => {
 
   it("does not save an empty name", async () => {
     const user = userEvent.setup();
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
 
     await user.clear(await screen.findByLabelText("What Zeph calls you"));
 
@@ -172,7 +173,7 @@ describe("AccountSettings", () => {
   it("tells the User when saving the profile fails", async () => {
     apiClient.updatePreferences.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
 
     await user.click(
       await screen.findByRole("button", { name: "Save changes" }),
@@ -190,7 +191,7 @@ describe("AccountSettings", () => {
       memory_note: "**Memory is paused.** Zeph won’t learn anything new.",
     });
     const user = userEvent.setup();
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
     const memorySwitch = await screen.findByRole("switch", {
       name: "Remember meaningful details",
     });
@@ -217,7 +218,7 @@ describe("AccountSettings", () => {
       user_memory_available: false,
     });
     const user = userEvent.setup();
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
     const memorySwitch = await screen.findByRole("switch", {
       name: "Remember meaningful details",
     });
@@ -232,7 +233,7 @@ describe("AccountSettings", () => {
   it("offers Try again when the account cannot be loaded", async () => {
     apiClient.getMe.mockRejectedValueOnce(new Error("down"));
     const user = userEvent.setup();
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
 
     await user.click(await screen.findByRole("button", { name: "Try again" }));
 
@@ -242,7 +243,7 @@ describe("AccountSettings", () => {
   });
 
   it("states the retention period from settings and that memories stay", async () => {
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
 
     expect(
       await screen.findByText(
@@ -253,7 +254,7 @@ describe("AccountSettings", () => {
 
   it("deletes the User's data only after DELETE is typed", async () => {
     const user = userEvent.setup();
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
     const yourData = within(
       await screen.findByRole("region", { name: "Your data" }),
     );
@@ -282,7 +283,7 @@ describe("AccountSettings", () => {
 
   it("cancelling Delete my data deletes nothing", async () => {
     const user = userEvent.setup();
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
     const yourData = within(
       await screen.findByRole("region", { name: "Your data" }),
     );
@@ -299,7 +300,7 @@ describe("AccountSettings", () => {
   it("tells the User when deleting their data fails", async () => {
     apiClient.deleteMyData.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
     const yourData = within(
       await screen.findByRole("region", { name: "Your data" }),
     );
@@ -318,7 +319,7 @@ describe("AccountSettings", () => {
 
   it("deletes the account after DELETE is typed, then signs out", async () => {
     const user = userEvent.setup();
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
     const deleteAccount = within(
       await screen.findByRole("region", { name: "Delete account" }),
     );
@@ -343,7 +344,7 @@ describe("AccountSettings", () => {
 
   it("keeps the account when the User chooses to", async () => {
     const user = userEvent.setup();
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
     const deleteAccount = within(
       await screen.findByRole("region", { name: "Delete account" }),
     );
@@ -366,7 +367,7 @@ describe("AccountSettings", () => {
       new ApiError(409, "/api/me", "You’re the only Admin."),
     );
     const user = userEvent.setup();
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
     const deleteAccount = within(
       await screen.findByRole("region", { name: "Delete account" }),
     );
@@ -390,7 +391,7 @@ describe("AccountSettings", () => {
 
   it("turns Photo Viewing off straight away, with the seeded explanation", async () => {
     const user = userEvent.setup();
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
     const photoSwitch = await screen.findByRole("switch", {
       name: "Look at my photos",
     });
@@ -421,7 +422,7 @@ describe("AccountSettings", () => {
       photo_viewing_available: false,
     });
     const user = userEvent.setup();
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
     const photoSwitch = await screen.findByRole("switch", {
       name: "Look at my photos",
     });
@@ -441,7 +442,7 @@ describe("AccountSettings", () => {
       ...onboardedUser,
       changed_in_chat: { photo_viewing: "2026-11-07T09:00:00Z" },
     });
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
 
     const section = await screen.findByRole("region", {
       name: "Look at my photos",
@@ -454,7 +455,7 @@ describe("AccountSettings", () => {
   it("tells the User when changing Photo Viewing fails", async () => {
     apiClient.updatePreferences.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    render(<AccountSettings />);
+    renderWithQueries(<AccountSettings />);
 
     await user.click(
       await screen.findByRole("switch", { name: "Look at my photos" }),

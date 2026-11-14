@@ -5,9 +5,10 @@ import { useState } from "react";
 import { primaryButton, secondaryButton } from "@/components/button-styles";
 import { LoadFailed } from "@/components/LoadFailed";
 import { lastSavedNote, textSetting } from "@/lib/settings";
-import { useAdminSettings } from "@/lib/use-admin-settings";
-
-type SaveState = "idle" | "saving" | "saved" | "failed";
+import {
+  useAdminSettings,
+  useSaveAdminSettings,
+} from "@/lib/use-admin-settings";
 
 /**
  * The admin Persona page's editor: the honesty-rules reminder, the Persona
@@ -16,9 +17,10 @@ type SaveState = "idle" | "saving" | "saved" | "failed";
  * @returns The editor, or a loading block or error with Try again.
  */
 export function PersonaEditor() {
-  const { state, reload, save } = useAdminSettings();
+  const settingsQuery = useAdminSettings();
+  const saveSettings = useSaveAdminSettings();
   const [draft, setDraft] = useState<string | null>(null);
-  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const settings = settingsQuery.data;
 
   const honestyNote = (
     <div
@@ -35,46 +37,34 @@ export function PersonaEditor() {
     </div>
   );
 
-  if (state.kind === "loading") {
+  if (!settings) {
     return (
       <>
         {honestyNote}
-        <div
-          aria-busy="true"
-          aria-label="Loading persona"
-          className="h-[560px] rounded-card border border-line bg-subtle"
-        />
+        {settingsQuery.isError ? (
+          <LoadFailed
+            title="Couldn’t load the Persona"
+            body="Zeph keeps using the last saved version."
+            onRetry={() => void settingsQuery.refetch()}
+          />
+        ) : (
+          <div
+            aria-busy="true"
+            aria-label="Loading persona"
+            className="h-[560px] rounded-card border border-line bg-subtle"
+          />
+        )}
       </>
     );
   }
 
-  if (state.kind === "failed") {
-    return (
-      <>
-        {honestyNote}
-        <LoadFailed
-          title="Couldn’t load the Persona"
-          body="Zeph keeps using the last saved version."
-          onRetry={reload}
-        />
-      </>
-    );
-  }
-
-  const savedPersona = textSetting(state.settings, "persona");
+  const savedPersona = textSetting(settings, "persona");
   const text = draft ?? savedPersona;
   const isDirty = text !== savedPersona;
-  const canSave = isDirty && text.trim() !== "" && saveState !== "saving";
+  const canSave = isDirty && text.trim() !== "" && !saveSettings.isPending;
 
-  async function savePersona() {
-    setSaveState("saving");
-    try {
-      await save({ persona: text });
-      setDraft(null);
-      setSaveState("saved");
-    } catch {
-      setSaveState("failed");
-    }
+  function savePersona() {
+    saveSettings.mutate({ persona: text }, { onSuccess: () => setDraft(null) });
   }
 
   return (
@@ -83,7 +73,7 @@ export function PersonaEditor() {
       <section className="flex flex-col rounded-card border border-line bg-white">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3.5">
           <span className="text-caption text-ink-muted">
-            {lastSavedNote(state.settings, ["persona"])}
+            {lastSavedNote(settings, ["persona"])}
           </span>
           <span className="font-mono text-caption text-ink-muted">
             {text.length} characters
@@ -96,7 +86,7 @@ export function PersonaEditor() {
             value={text}
             onChange={(event) => {
               setDraft(event.target.value);
-              setSaveState("idle");
+              saveSettings.reset();
             }}
             className="block min-h-[560px] w-full resize-y border-0 p-5 font-mono text-[13.5px] leading-relaxed text-ink"
           />
@@ -118,7 +108,7 @@ export function PersonaEditor() {
               disabled={!isDirty}
               onClick={() => {
                 setDraft(null);
-                setSaveState("idle");
+                saveSettings.reset();
               }}
             >
               Discard
@@ -127,14 +117,14 @@ export function PersonaEditor() {
               type="button"
               className={primaryButton}
               disabled={!canSave}
-              onClick={() => void savePersona()}
+              onClick={savePersona}
             >
-              {saveState === "saving" ? "Saving…" : "Save Persona"}
+              {saveSettings.isPending ? "Saving…" : "Save Persona"}
             </button>
           </div>
         </div>
       </section>
-      {saveState === "saved" ? (
+      {saveSettings.isSuccess ? (
         <p
           role="status"
           className="m-0 rounded-xl bg-blue-tint px-4 py-3.5 text-sm text-blue-deep"
@@ -142,7 +132,7 @@ export function PersonaEditor() {
           Saved. Zeph uses it from the next message.
         </p>
       ) : null}
-      {saveState === "failed" ? (
+      {saveSettings.isError ? (
         <p
           role="alert"
           className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3.5 text-sm text-danger-deep"

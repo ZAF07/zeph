@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { deleteIconButton } from "@/components/button-styles";
 import { DeleteIcon } from "@/components/DeleteIcon";
@@ -8,12 +8,8 @@ import { LoadFailed } from "@/components/LoadFailed";
 import { PersonalStickerPicture } from "@/components/PersonalStickerPicture";
 import type { PersonalSticker } from "@/lib/api-client";
 import { notAvailableText } from "@/lib/features";
+import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
-
-type LoadState =
-  | { kind: "loading" }
-  | { kind: "failed" }
-  | { kind: "loaded"; stickers: PersonalSticker[] };
 
 /**
  * The Your stickers section: each sticker Zeph kept from the User, with its
@@ -27,47 +23,22 @@ type LoadState =
  */
 export function PersonalStickersSection({ available }: { available: boolean }) {
   const apiClient = useApiClient();
-  const [state, setState] = useState<LoadState>({ kind: "loading" });
-  const [isRemoving, setIsRemoving] = useState(false);
-  const [removeFailed, setRemoveFailed] = useState(false);
+  const queryClient = useQueryClient();
+  const stickersQuery = useQuery({
+    queryKey: queryKeys.personalStickers,
+    queryFn: () => apiClient.listPersonalStickers(),
+  });
+  const stickers = stickersQuery.data;
 
-  const load = useCallback(async () => {
-    setState({ kind: "loading" });
-    try {
-      setState({
-        kind: "loaded",
-        stickers: await apiClient.listPersonalStickers(),
-      });
-    } catch {
-      setState({ kind: "failed" });
-    }
-  }, [apiClient]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  async function removeSticker(stickerId: string) {
-    setIsRemoving(true);
-    setRemoveFailed(false);
-    try {
-      await apiClient.deletePersonalSticker(stickerId);
-      setState((current) =>
-        current.kind === "loaded"
-          ? {
-              kind: "loaded",
-              stickers: current.stickers.filter(
-                (sticker) => sticker.id !== stickerId,
-              ),
-            }
-          : current,
-      );
-    } catch {
-      setRemoveFailed(true);
-    } finally {
-      setIsRemoving(false);
-    }
-  }
+  const removeSticker = useMutation({
+    mutationFn: (stickerId: string) =>
+      apiClient.deletePersonalSticker(stickerId),
+    onSuccess: (_, stickerId) =>
+      queryClient.setQueryData<PersonalSticker[]>(
+        queryKeys.personalStickers,
+        (current) => current?.filter((sticker) => sticker.id !== stickerId),
+      ),
+  });
 
   return (
     <section
@@ -91,13 +62,13 @@ export function PersonalStickersSection({ available }: { available: boolean }) {
         use.
       </p>
 
-      {removeFailed ? (
+      {removeSticker.isError ? (
         <p role="alert" className="m-0 text-sm text-danger-deep">
           We couldn’t remove that. Please try again.
         </p>
       ) : null}
 
-      {state.kind === "loading" ? (
+      {stickersQuery.isPending ? (
         <span
           aria-busy="true"
           aria-label="Loading your stickers"
@@ -105,17 +76,17 @@ export function PersonalStickersSection({ available }: { available: boolean }) {
         />
       ) : null}
 
-      {state.kind === "failed" ? (
+      {!stickers && stickersQuery.isError ? (
         <LoadFailed
           title="We couldn’t load your stickers"
           body="Nothing has been removed."
-          onRetry={() => void load()}
+          onRetry={() => void stickersQuery.refetch()}
         />
       ) : null}
 
-      {state.kind === "loaded" && state.stickers.length > 0 ? (
+      {stickers && stickers.length > 0 ? (
         <ul className="m-0 flex list-none flex-col gap-3 p-0">
-          {state.stickers.map((sticker) => {
+          {stickers.map((sticker) => {
             const name = sticker.emoji ?? "with no emoji";
             return (
               <li
@@ -130,8 +101,8 @@ export function PersonalStickersSection({ available }: { available: boolean }) {
                   type="button"
                   aria-label={`Remove sticker ${name}`}
                   className={deleteIconButton}
-                  disabled={isRemoving}
-                  onClick={() => void removeSticker(sticker.id)}
+                  disabled={removeSticker.isPending}
+                  onClick={() => removeSticker.mutate(sticker.id)}
                 >
                   <DeleteIcon />
                 </button>
@@ -141,7 +112,7 @@ export function PersonalStickersSection({ available }: { available: boolean }) {
         </ul>
       ) : null}
 
-      {state.kind === "loaded" && state.stickers.length === 0 ? (
+      {stickers && stickers.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-10 text-center">
           <span className="text-[17px] font-medium">No stickers kept yet</span>
           <p className="m-0 text-caption text-ink-muted">

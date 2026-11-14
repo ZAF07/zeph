@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { secondaryButton } from "@/components/button-styles";
 import { inputField } from "@/components/form-styles";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LockIcon } from "@/components/LockIcon";
-import type { DailyUsage, UsageReport } from "@/lib/api-client";
+import type { DailyUsage } from "@/lib/api-client";
 import { formatShortDay } from "@/lib/dates";
 import {
   formatFullCount,
@@ -15,12 +16,8 @@ import {
   summarizeUsage,
   usageCsv,
 } from "@/lib/usage";
+import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
-
-type LoadState =
-  | { kind: "loading" }
-  | { kind: "failed" }
-  | { kind: "loaded"; report: UsageReport };
 
 const periods = [
   { days: 1, label: "Today" },
@@ -68,23 +65,14 @@ function downloadCsv(rows: DailyUsage[], days: number) {
  */
 export function AdminUsage() {
   const apiClient = useApiClient();
-  const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [days, setDays] = useState(1);
+  const usageQuery = useQuery({
+    queryKey: queryKeys.usage(days),
+    queryFn: () => apiClient.getUsage(days),
+  });
+  const report = usageQuery.data;
 
-  const load = useCallback(async () => {
-    setState({ kind: "loading" });
-    try {
-      setState({ kind: "loaded", report: await apiClient.getUsage(days) });
-    } catch {
-      setState({ kind: "failed" });
-    }
-  }, [apiClient, days]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const rows = state.kind === "loaded" ? state.report.rows : [];
+  const rows = report?.rows ?? [];
   const periodLabel = (
     periods.find((option) => option.days === days)?.label ?? ""
   ).toLowerCase();
@@ -123,7 +111,7 @@ export function AdminUsage() {
         </button>
       </div>
 
-      {state.kind === "loading" ? (
+      {usageQuery.isPending ? (
         <div
           aria-busy="true"
           aria-label="Loading usage"
@@ -131,15 +119,15 @@ export function AdminUsage() {
         />
       ) : null}
 
-      {state.kind === "failed" ? (
+      {!report && usageQuery.isError ? (
         <LoadFailed
           title="Couldn’t load usage"
           body="Usage is still being recorded as normal."
-          onRetry={() => void load()}
+          onRetry={() => void usageQuery.refetch()}
         />
       ) : null}
 
-      {state.kind === "loaded" ? (
+      {report ? (
         <dl className="m-0 grid grid-cols-[repeat(auto-fit,minmax(min(180px,100%),1fr))] gap-3">
           {totals.map((total) => (
             <div
@@ -157,7 +145,7 @@ export function AdminUsage() {
         </dl>
       ) : null}
 
-      {state.kind === "loaded" && rows.length === 0 ? (
+      {report && rows.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
           <span className="text-[22px] font-medium tracking-[-0.02em]">
             No usage yet
@@ -169,15 +157,16 @@ export function AdminUsage() {
         </div>
       ) : null}
 
-      {state.kind === "loaded" && rows.length > 0 ? (
+      {report && rows.length > 0 ? (
         <div className="overflow-x-auto rounded-xl border border-line bg-white">
           <table className="w-full min-w-[820px] border-collapse text-sm">
             <caption className="border-b border-line px-4 py-2.5 text-left">
               <span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted">
                 <LockIcon />
-                No message content · daily limit{" "}
-                {state.report.daily_message_limit} messages,{" "}
-                {state.report.web_search_daily_limit} web searches
+                No message content · daily limit {
+                  report.daily_message_limit
+                }{" "}
+                messages, {report.web_search_daily_limit} web searches
               </span>
             </caption>
             <thead>

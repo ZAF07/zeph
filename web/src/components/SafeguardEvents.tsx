@@ -1,21 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { inputField } from "@/components/form-styles";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LockIcon } from "@/components/LockIcon";
-import type { RiskType, SafeguardEvent } from "@/lib/api-client";
+import type { RiskType, SafeguardEventFilter } from "@/lib/api-client";
 import { countryName } from "@/lib/countries";
 import { formatSavedAt } from "@/lib/dates";
+import { queryKeys } from "@/lib/queries";
 import { riskTypeLabel, riskTypes } from "@/lib/risk-types";
 import { useApiClient } from "@/lib/use-api-client";
-
-type LoadState =
-  | { kind: "loading" }
-  | { kind: "failed" }
-  | { kind: "loaded"; events: SafeguardEvent[] };
 
 const periods: { value: string; label: string; phrase: string }[] = [
   { value: "30", label: "Last 30 days", phrase: "in the last 30 days" },
@@ -39,28 +36,20 @@ const headings = [
  */
 export function SafeguardEvents() {
   const apiClient = useApiClient();
-  const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [riskType, setRiskType] = useState<RiskType | null>(null);
   const [period, setPeriod] = useState("30");
   const periodPhrase =
     periods.find((option) => option.value === period)?.phrase ?? "";
 
-  const load = useCallback(async () => {
-    setState({ kind: "loading" });
-    try {
-      const events = await apiClient.listSafeguardEvents({
-        riskType: riskType ?? undefined,
-        days: period === "all" ? undefined : Number(period),
-      });
-      setState({ kind: "loaded", events });
-    } catch {
-      setState({ kind: "failed" });
-    }
-  }, [apiClient, riskType, period]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const filter: SafeguardEventFilter = {
+    riskType: riskType ?? undefined,
+    days: period === "all" ? undefined : Number(period),
+  };
+  const eventsQuery = useQuery({
+    queryKey: queryKeys.safeguardEvents(filter),
+    queryFn: () => apiClient.listSafeguardEvents(filter),
+  });
+  const events = eventsQuery.data;
 
   const riskFilters: { id: RiskType | null; label: string }[] = [
     { id: null, label: "All" },
@@ -108,7 +97,7 @@ export function SafeguardEvents() {
         </div>
       </div>
 
-      {state.kind === "loading" ? (
+      {eventsQuery.isPending ? (
         <div
           aria-busy="true"
           aria-label="Loading events"
@@ -116,15 +105,15 @@ export function SafeguardEvents() {
         />
       ) : null}
 
-      {state.kind === "failed" ? (
+      {!events && eventsQuery.isError ? (
         <LoadFailed
           title="Couldn’t load Safeguard Events"
           body="Safeguard itself is unaffected and still screening messages."
-          onRetry={() => void load()}
+          onRetry={() => void eventsQuery.refetch()}
         />
       ) : null}
 
-      {state.kind === "loaded" && state.events.length === 0 ? (
+      {events && events.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
           <span className="text-[22px] font-medium tracking-[-0.02em]">
             No Safeguard Events in this period
@@ -137,16 +126,15 @@ export function SafeguardEvents() {
         </div>
       ) : null}
 
-      {state.kind === "loaded" && state.events.length > 0 ? (
+      {events && events.length > 0 ? (
         <>
           <div className="overflow-x-auto rounded-xl border border-line bg-white">
             <table className="w-full min-w-[760px] border-collapse text-sm">
               <caption className="border-b border-line px-4 py-2.5 text-left">
                 <span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted">
                   <LockIcon />
-                  No message content · {state.events.length}{" "}
-                  {state.events.length === 1 ? "event" : "events"}{" "}
-                  {periodPhrase}
+                  No message content · {events.length}{" "}
+                  {events.length === 1 ? "event" : "events"} {periodPhrase}
                 </span>
               </caption>
               <thead>
@@ -163,7 +151,7 @@ export function SafeguardEvents() {
                 </tr>
               </thead>
               <tbody>
-                {state.events.map((event) => (
+                {events.map((event) => (
                   <tr
                     key={event.id}
                     className="border-b border-line last:border-b-0"

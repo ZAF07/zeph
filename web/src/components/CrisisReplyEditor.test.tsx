@@ -1,9 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CrisisReplyEditor } from "@/components/CrisisReplyEditor";
 import { ApiError, type AdminSettings, type ApiClient } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   getAdminSettings: vi.fn<ApiClient["getAdminSettings"]>(),
@@ -36,7 +37,7 @@ describe("CrisisReplyEditor", () => {
   });
 
   it("shows the saved Crisis Reply wording", async () => {
-    render(<CrisisReplyEditor />);
+    renderWithQueries(<CrisisReplyEditor />);
 
     expect(await screen.findByLabelText("Crisis Reply wording")).toHaveValue(
       "I’m an AI. Please reach out:\n{helplines}",
@@ -49,7 +50,7 @@ describe("CrisisReplyEditor", () => {
 
   it("saves new wording", async () => {
     const user = userEvent.setup();
-    render(<CrisisReplyEditor />);
+    renderWithQueries(<CrisisReplyEditor />);
     const wording = await screen.findByLabelText("Crisis Reply wording");
 
     await user.type(wording, " I’m still here.");
@@ -71,7 +72,7 @@ describe("CrisisReplyEditor", () => {
       ),
     );
     const user = userEvent.setup();
-    render(<CrisisReplyEditor />);
+    renderWithQueries(<CrisisReplyEditor />);
     const wording = await screen.findByLabelText("Crisis Reply wording");
 
     await user.clear(wording);
@@ -85,7 +86,7 @@ describe("CrisisReplyEditor", () => {
 
   it("won't save blank wording", async () => {
     const user = userEvent.setup();
-    render(<CrisisReplyEditor />);
+    renderWithQueries(<CrisisReplyEditor />);
 
     await user.clear(await screen.findByLabelText("Crisis Reply wording"));
 
@@ -99,7 +100,7 @@ describe("CrisisReplyEditor", () => {
       .mockRejectedValueOnce(new Error("down"))
       .mockResolvedValue(settings);
     const user = userEvent.setup();
-    render(<CrisisReplyEditor />);
+    renderWithQueries(<CrisisReplyEditor />);
 
     expect(
       await screen.findByText("Couldn’t load the Crisis Reply"),

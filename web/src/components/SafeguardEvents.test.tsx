@@ -1,9 +1,10 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SafeguardEvents } from "@/components/SafeguardEvents";
 import type { ApiClient, SafeguardEvent } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   listSafeguardEvents: vi.fn<ApiClient["listSafeguardEvents"]>(),
@@ -40,7 +41,7 @@ describe("SafeguardEvents", () => {
   });
 
   it("lists who, when and what kind of risk, never message content", async () => {
-    render(<SafeguardEvents />);
+    renderWithQueries(<SafeguardEvents />);
 
     const tomRow = within((await screen.findByText("Tom Hale")).closest("tr")!);
     expect(tomRow.getByText("Suicide / self-harm")).toBeInTheDocument();
@@ -60,7 +61,7 @@ describe("SafeguardEvents", () => {
 
   it("filters by risk type and period", async () => {
     const user = userEvent.setup();
-    render(<SafeguardEvents />);
+    renderWithQueries(<SafeguardEvents />);
     await screen.findByText("Tom Hale");
 
     await user.click(screen.getByRole("button", { name: "Abuse" }));
@@ -78,7 +79,7 @@ describe("SafeguardEvents", () => {
 
   it("explains an empty period", async () => {
     apiClient.listSafeguardEvents.mockResolvedValue([]);
-    render(<SafeguardEvents />);
+    renderWithQueries(<SafeguardEvents />);
 
     expect(
       await screen.findByText("No Safeguard Events in this period"),
@@ -90,7 +91,7 @@ describe("SafeguardEvents", () => {
       .mockRejectedValueOnce(new Error("down"))
       .mockResolvedValue([tom]);
     const user = userEvent.setup();
-    render(<SafeguardEvents />);
+    renderWithQueries(<SafeguardEvents />);
 
     expect(
       await screen.findByText(

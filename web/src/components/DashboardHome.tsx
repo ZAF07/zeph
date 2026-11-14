@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { primaryButton } from "@/components/button-styles";
 import { ConnectTelegramBanner } from "@/components/ConnectTelegramBanner";
@@ -10,12 +10,9 @@ import { HomeTelegramCard } from "@/components/HomeTelegramCard";
 import { LoadFailed } from "@/components/LoadFailed";
 import { MemoryNote } from "@/components/MemoryNote";
 import { RecentlyRemembered } from "@/components/RecentlyRemembered";
-import type { Home } from "@/lib/api-client";
 import { greeting, todayHeading } from "@/lib/home";
+import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
-
-type LoadState =
-  { kind: "loading" } | { kind: "failed" } | { kind: "loaded"; home: Home };
 
 const twoColumns =
   "grid grid-cols-[repeat(auto-fit,minmax(min(320px,100%),1fr))] gap-6";
@@ -28,23 +25,13 @@ const twoColumns =
  */
 export function DashboardHome() {
   const apiClient = useApiClient();
-  const [state, setState] = useState<LoadState>({ kind: "loading" });
-
-  const load = useCallback(async () => {
-    setState({ kind: "loading" });
-    try {
-      setState({ kind: "loaded", home: await apiClient.getHome() });
-    } catch {
-      setState({ kind: "failed" });
-    }
-  }, [apiClient]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const homeQuery = useQuery({
+    queryKey: queryKeys.home,
+    queryFn: () => apiClient.getHome(),
+  });
 
   const now = new Date();
-  const home = state.kind === "loaded" ? state.home : null;
+  const home = homeQuery.data;
   const timeZone = home?.time_zone ?? undefined;
 
   return (
@@ -65,7 +52,7 @@ export function DashboardHome() {
         ) : null}
       </header>
 
-      {state.kind === "loading" ? (
+      {homeQuery.isPending ? (
         <div
           aria-busy="true"
           aria-label="Loading your Dashboard"
@@ -80,11 +67,11 @@ export function DashboardHome() {
         </div>
       ) : null}
 
-      {state.kind === "failed" ? (
+      {!home && homeQuery.isError ? (
         <LoadFailed
           title="We couldn’t load your Dashboard"
           body="Something went wrong on our side. Zeph is still reachable in Telegram, and nothing you’ve shared is lost."
-          onRetry={() => void load()}
+          onRetry={() => void homeQuery.refetch()}
         />
       ) : null}
 

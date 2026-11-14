@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -8,6 +8,7 @@ import {
   type ApiClient,
   type MemoryCategoryOverview,
 } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   listMemoryCategories: vi.fn<ApiClient["listMemoryCategories"]>(),
@@ -65,7 +66,7 @@ describe("MemoryCategoriesManager", () => {
   });
 
   it("lists active and archived categories with their item counts", async () => {
-    render(<MemoryCategoriesManager />);
+    renderWithQueries(<MemoryCategoriesManager />);
 
     await screen.findByText("Goals");
     const active = section(/Active/);
@@ -89,7 +90,7 @@ describe("MemoryCategoriesManager", () => {
   it("says when nothing is archived", async () => {
     apiClient.listMemoryCategories.mockResolvedValue([goals]);
 
-    render(<MemoryCategoriesManager />);
+    renderWithQueries(<MemoryCategoriesManager />);
 
     expect(await screen.findByText("Nothing archived.")).toBeInTheDocument();
   });
@@ -101,7 +102,7 @@ describe("MemoryCategoriesManager", () => {
       item_count: 0,
     });
     apiClient.addMemoryCategory.mockResolvedValue(work);
-    render(<MemoryCategoriesManager />);
+    renderWithQueries(<MemoryCategoriesManager />);
     await screen.findByText("Goals");
     apiClient.listMemoryCategories.mockResolvedValue([goals, values, work]);
 
@@ -130,7 +131,7 @@ describe("MemoryCategoriesManager", () => {
         "There is already a category called Goals.",
       ),
     );
-    render(<MemoryCategoriesManager />);
+    renderWithQueries(<MemoryCategoriesManager />);
     await screen.findByText("Goals");
 
     await user.click(screen.getByRole("button", { name: "Add category" }));
@@ -150,7 +151,7 @@ describe("MemoryCategoriesManager", () => {
       ...goals,
       name: "Aims",
     });
-    render(<MemoryCategoriesManager />);
+    renderWithQueries(<MemoryCategoriesManager />);
     await screen.findByText("Goals");
 
     await user.click(rowFor("Goals").getByRole("button", { name: "Edit" }));
@@ -178,7 +179,7 @@ describe("MemoryCategoriesManager", () => {
       ...goals,
       always_include: true,
     });
-    render(<MemoryCategoriesManager />);
+    renderWithQueries(<MemoryCategoriesManager />);
     await screen.findByText("Goals");
 
     await user.click(
@@ -205,7 +206,7 @@ describe("MemoryCategoriesManager", () => {
       ...habits,
       archived: false,
     });
-    render(<MemoryCategoriesManager />);
+    renderWithQueries(<MemoryCategoriesManager />);
     await screen.findByText("Goals");
 
     await user.click(rowFor("Goals").getByRole("button", { name: "Archive" }));
@@ -226,7 +227,7 @@ describe("MemoryCategoriesManager", () => {
   it("says when a change fails", async () => {
     const user = userEvent.setup();
     apiClient.archiveMemoryCategory.mockRejectedValue(new Error("offline"));
-    render(<MemoryCategoriesManager />);
+    renderWithQueries(<MemoryCategoriesManager />);
     await screen.findByText("Goals");
 
     await user.click(rowFor("Goals").getByRole("button", { name: "Archive" }));
@@ -243,7 +244,7 @@ describe("MemoryCategoriesManager", () => {
     apiClient.archiveMemoryCategory.mockRejectedValue(
       new ApiError(409, "/api/admin/memory-categories/goals/archive", reason),
     );
-    render(<MemoryCategoriesManager />);
+    renderWithQueries(<MemoryCategoriesManager />);
     await screen.findByText("Goals");
 
     await user.click(rowFor("Goals").getByRole("button", { name: "Archive" }));
@@ -254,7 +255,7 @@ describe("MemoryCategoriesManager", () => {
   it("shows the empty state when there are no categories", async () => {
     apiClient.listMemoryCategories.mockResolvedValue([]);
 
-    render(<MemoryCategoriesManager />);
+    renderWithQueries(<MemoryCategoriesManager />);
 
     expect(await screen.findByText("No categories yet")).toBeInTheDocument();
   });
@@ -262,7 +263,7 @@ describe("MemoryCategoriesManager", () => {
   it("offers to try again when the categories can't be loaded", async () => {
     const user = userEvent.setup();
     apiClient.listMemoryCategories.mockRejectedValueOnce(new Error("offline"));
-    render(<MemoryCategoriesManager />);
+    renderWithQueries(<MemoryCategoriesManager />);
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Couldn’t load Memory Categories");

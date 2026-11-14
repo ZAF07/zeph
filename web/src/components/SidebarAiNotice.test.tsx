@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { SidebarAiNotice } from "@/components/SidebarAiNotice";
 import type { ApiClient } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   getPlatformContent: vi.fn<ApiClient["getPlatformContent"]>(),
@@ -23,7 +24,7 @@ describe("SidebarAiNotice", () => {
       message_retention_days: 30,
     });
 
-    render(<SidebarAiNotice />);
+    renderWithQueries(<SidebarAiNotice />);
 
     expect(
       await screen.findByText("Seeded: Zeph is an AI."),

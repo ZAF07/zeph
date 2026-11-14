@@ -1,12 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import { LoadFailed } from "@/components/LoadFailed";
-import { useApiClient } from "@/lib/use-api-client";
-
-type GateState = "checking" | "admin" | "failed";
+import { useMe } from "@/lib/queries";
 
 /**
  * Shows admin pages only to Admins; anyone else is sent home. The backend
@@ -16,38 +14,26 @@ type GateState = "checking" | "admin" | "failed";
  * @returns The page, a loading block, or an error with Try again.
  */
 export function AdminGate({ children }: { children: ReactNode }) {
-  const apiClient = useApiClient();
+  const me = useMe();
   const router = useRouter();
-  const [state, setState] = useState<GateState>("checking");
-
-  const check = useCallback(async () => {
-    setState("checking");
-    try {
-      const me = await apiClient.getMe();
-      if (me.role === "admin") {
-        setState("admin");
-      } else {
-        router.replace("/");
-      }
-    } catch {
-      setState("failed");
-    }
-  }, [apiClient, router]);
+  const isNotAdmin = me.data !== undefined && me.data.role !== "admin";
 
   useEffect(() => {
-    void check();
-  }, [check]);
+    if (isNotAdmin) {
+      router.replace("/");
+    }
+  }, [isNotAdmin, router]);
 
-  if (state === "admin") {
+  if (me.data?.role === "admin") {
     return <>{children}</>;
   }
 
-  if (state === "failed") {
+  if (me.isError) {
     return (
       <LoadFailed
         title="Couldn’t open the admin area"
         body="Nothing has changed. Try again in a moment."
-        onRetry={() => void check()}
+        onRetry={() => void me.refetch()}
       />
     );
   }

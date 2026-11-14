@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -9,6 +9,7 @@ import {
   type ApiClient,
   type CoreServices,
 } from "@/lib/api-client";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   getAdminSettings: vi.fn<ApiClient["getAdminSettings"]>(),
@@ -68,7 +69,7 @@ describe("PromptsAndModels", () => {
   });
 
   it("shows a card per core service with its model and prompt", async () => {
-    render(<PromptsAndModels />);
+    renderWithQueries(<PromptsAndModels />);
 
     const card = within(
       await screen.findByRole("region", { name: "Response composition" }),
@@ -87,7 +88,7 @@ describe("PromptsAndModels", () => {
 
   it("saves a service's changed model and prompt together", async () => {
     const user = userEvent.setup();
-    render(<PromptsAndModels />);
+    renderWithQueries(<PromptsAndModels />);
     const card = within(
       await screen.findByRole("region", { name: "Response composition" }),
     );
@@ -108,7 +109,7 @@ describe("PromptsAndModels", () => {
   it("says so when saving a service fails", async () => {
     apiClient.updateAdminSettings.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    render(<PromptsAndModels />);
+    renderWithQueries(<PromptsAndModels />);
     const card = within(
       await screen.findByRole("region", { name: "Response composition" }),
     );
@@ -163,7 +164,7 @@ describe("PromptsAndModels", () => {
     });
     apiClient.updateAdminSettings.mockResolvedValue({});
     const user = userEvent.setup();
-    render(<PromptsAndModels />);
+    renderWithQueries(<PromptsAndModels />);
     const card = within(
       await screen.findByRole("region", { name: "Photo viewing" }),
     );
@@ -192,7 +193,7 @@ describe("PromptsAndModels", () => {
       ),
     );
     const user = userEvent.setup();
-    render(<PromptsAndModels />);
+    renderWithQueries(<PromptsAndModels />);
     const card = within(
       await screen.findByRole("region", { name: "Response composition" }),
     );
@@ -267,7 +268,7 @@ describe("PromptsAndModels", () => {
 
     it("folds each group shut until it is clicked", async () => {
       const user = userEvent.setup();
-      render(<PromptsAndModels />);
+      renderWithQueries(<PromptsAndModels />);
       const card = within(
         await screen.findByRole("region", { name: "Response composition" }),
       );
@@ -285,7 +286,7 @@ describe("PromptsAndModels", () => {
 
     it("shows a hint under the labels that have one", async () => {
       const user = userEvent.setup();
-      render(<PromptsAndModels />);
+      renderWithQueries(<PromptsAndModels />);
       const card = within(
         await screen.findByRole("region", { name: "Response composition" }),
       );
@@ -302,7 +303,7 @@ describe("PromptsAndModels", () => {
 
     it("saves the grouped notes with the prompt and model", async () => {
       const user = userEvent.setup();
-      render(<PromptsAndModels />);
+      renderWithQueries(<PromptsAndModels />);
       const card = within(
         await screen.findByRole("region", { name: "Response composition" }),
       );
@@ -327,7 +328,7 @@ describe("PromptsAndModels", () => {
       model_choices: [],
     });
 
-    render(<PromptsAndModels />);
+    renderWithQueries(<PromptsAndModels />);
 
     expect(await screen.findByText("No services configured")).toBeVisible();
   });
@@ -337,7 +338,7 @@ describe("PromptsAndModels", () => {
       .mockRejectedValueOnce(new Error("down"))
       .mockResolvedValue(coreServices);
     const user = userEvent.setup();
-    render(<PromptsAndModels />);
+    renderWithQueries(<PromptsAndModels />);
 
     await user.click(await screen.findByRole("button", { name: "Try again" }));
 

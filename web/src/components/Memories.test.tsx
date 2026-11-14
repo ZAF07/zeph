@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,6 +10,7 @@ import type {
   SharedPhoto,
 } from "@/lib/api-client";
 import { userWithRole } from "@/test/fixtures";
+import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   getMe: vi.fn<ApiClient["getMe"]>(),
@@ -119,7 +120,7 @@ describe("Memories", () => {
       ...maya,
       changed_in_chat: { user_memory: "2026-11-03T09:00:00Z" },
     });
-    render(<Memories />);
+    renderWithQueries(<Memories />);
 
     expect(
       await screen.findByText("Changed in chat · 3 Nov"),
@@ -127,7 +128,7 @@ describe("Memories", () => {
   });
 
   it("shows Memory Items grouped by Memory Category with where they came from", async () => {
-    render(<Memories />);
+    renderWithQueries(<Memories />);
 
     const lifeDetails = within(
       await screen.findByRole("region", { name: "Life details" }),
@@ -145,7 +146,7 @@ describe("Memories", () => {
 
   it("deletes a single Memory Item", async () => {
     const user = userEvent.setup();
-    render(<Memories />);
+    renderWithQueries(<Memories />);
 
     await user.click(
       await screen.findByRole("button", {
@@ -166,7 +167,7 @@ describe("Memories", () => {
   it("keeps a Memory Item and explains when deleting it fails", async () => {
     apiClient.deleteMemoryItem.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    render(<Memories />);
+    renderWithQueries(<Memories />);
 
     await user.click(
       await screen.findByRole("button", {
@@ -182,7 +183,7 @@ describe("Memories", () => {
 
   it("deletes all Memory Items only after confirming", async () => {
     const user = userEvent.setup();
-    render(<Memories />);
+    renderWithQueries(<Memories />);
 
     await user.click(
       await screen.findByRole("button", { name: "Delete all memories" }),
@@ -207,7 +208,7 @@ describe("Memories", () => {
 
   it("lists Conversation Summaries by date with how the User seemed", async () => {
     const user = userEvent.setup();
-    render(<Memories />);
+    renderWithQueries(<Memories />);
 
     await user.click(
       await screen.findByRole("tab", { name: "Conversation Summaries" }),
@@ -231,7 +232,7 @@ describe("Memories", () => {
 
   it("deletes a Conversation Summary", async () => {
     const user = userEvent.setup();
-    render(<Memories />);
+    renderWithQueries(<Memories />);
     await user.click(
       await screen.findByRole("tab", { name: "Conversation Summaries" }),
     );
@@ -251,7 +252,7 @@ describe("Memories", () => {
   it("explains when there are no Conversation Summaries yet", async () => {
     apiClient.listConversationSummaries.mockResolvedValue([]);
     const user = userEvent.setup();
-    render(<Memories />);
+    renderWithQueries(<Memories />);
 
     await user.click(
       await screen.findByRole("tab", { name: "Conversation Summaries" }),
@@ -262,7 +263,7 @@ describe("Memories", () => {
 
   it("shows each Shared Photo with its photo, description, note and date", async () => {
     const user = userEvent.setup();
-    render(<Memories />);
+    renderWithQueries(<Memories />);
 
     await user.click(await screen.findByRole("tab", { name: "Photos" }));
 
@@ -286,7 +287,7 @@ describe("Memories", () => {
   it("says so when a Shared Photo's image can't be loaded", async () => {
     apiClient.getSharedPhotoImage.mockRejectedValue(new Error("gone"));
     const user = userEvent.setup();
-    render(<Memories />);
+    renderWithQueries(<Memories />);
 
     await user.click(await screen.findByRole("tab", { name: "Photos" }));
 
@@ -300,7 +301,7 @@ describe("Memories", () => {
 
   it("deletes a Shared Photo", async () => {
     const user = userEvent.setup();
-    render(<Memories />);
+    renderWithQueries(<Memories />);
     await user.click(await screen.findByRole("tab", { name: "Photos" }));
 
     await user.click(
@@ -319,7 +320,7 @@ describe("Memories", () => {
   it("keeps a Shared Photo and explains when deleting it fails", async () => {
     apiClient.deleteSharedPhoto.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    render(<Memories />);
+    renderWithQueries(<Memories />);
     await user.click(await screen.findByRole("tab", { name: "Photos" }));
 
     await user.click(
@@ -337,7 +338,7 @@ describe("Memories", () => {
   it("explains when there are no Shared Photos yet", async () => {
     apiClient.listSharedPhotos.mockResolvedValue([]);
     const user = userEvent.setup();
-    render(<Memories />);
+    renderWithQueries(<Memories />);
 
     await user.click(await screen.findByRole("tab", { name: "Photos" }));
 
@@ -352,7 +353,7 @@ describe("Memories", () => {
         "**Memory is paused.** Zeph won’t learn anything new, but still uses what it already knows about you.",
     });
     const user = userEvent.setup();
-    render(<Memories />);
+    renderWithQueries(<Memories />);
 
     const memorySwitch = await screen.findByRole("switch", { name: "Memory" });
     expect(memorySwitch).toHaveAttribute("aria-checked", "true");
@@ -376,7 +377,7 @@ describe("Memories", () => {
       memory_note:
         "**Memory is paused.** Zeph won’t learn anything new, but still uses what it already knows about you.",
     });
-    render(<Memories />);
+    renderWithQueries(<Memories />);
 
     expect(await screen.findByRole("status")).toHaveTextContent(
       "Memory is paused.",
@@ -391,7 +392,7 @@ describe("Memories", () => {
         "**Memory isn’t available on your account.** Zeph won’t learn anything new.",
     });
     const user = userEvent.setup();
-    render(<Memories />);
+    renderWithQueries(<Memories />);
 
     const memorySwitch = await screen.findByRole("switch", { name: "Memory" });
     expect(memorySwitch).toBeDisabled();
@@ -411,7 +412,7 @@ describe("Memories", () => {
 
   it("explains when nothing has been remembered yet", async () => {
     apiClient.listMemoryGroups.mockResolvedValue([]);
-    render(<Memories />);
+    renderWithQueries(<Memories />);
 
     expect(
       await screen.findByText("Zeph hasn’t remembered anything yet"),
@@ -423,7 +424,7 @@ describe("Memories", () => {
       .mockRejectedValueOnce(new Error("down"))
       .mockResolvedValue(groups);
     const user = userEvent.setup();
-    render(<Memories />);
+    renderWithQueries(<Memories />);
 
     expect(
       await screen.findByText("We couldn’t load your memories"),
