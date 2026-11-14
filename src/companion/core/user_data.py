@@ -19,6 +19,10 @@ from companion.core.ports import (
 
 logger = logging.getLogger(__name__)
 
+LAST_ADMIN_ACCOUNT_DELETION = (
+    "You’re the only Admin. Make someone else an Admin before deleting your account."
+)
+
 
 def delete_user_data(repositories: Repositories, user_id: UUID) -> None:
     """Delete a User's data in one transaction, keeping their account.
@@ -115,7 +119,7 @@ class UserDataService:
         """
         self._conversation_engine.forget_user(user.id)
         with self._repositories.transaction() as transaction:
-            refuse_if_last_admin(transaction, user.id)
+            refuse_if_last_admin(transaction, user.id, LAST_ADMIN_ACCOUNT_DELETION)
             if _delete_user(transaction.repositories, user.id):
                 transaction.repositories.pending_auth_account_deletions.add(
                     user.auth_id, self._clock.now()

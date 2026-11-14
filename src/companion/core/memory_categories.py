@@ -1,6 +1,7 @@
 from dataclasses import replace
 from uuid import UUID
 
+from companion.core.errors import ConflictError, InvalidError, NotFoundError
 from companion.core.models import (
     MemoryCategory,
     MemoryCategoryDetails,
@@ -21,15 +22,17 @@ PLACE_USING_CATEGORY_SETTING = {
 }
 
 
-class MemoryCategoryNotFoundError(LookupError):
+class MemoryCategoryNotFoundError(NotFoundError):
     """Raised when no Memory Category has the given ID."""
 
+    shown_message = "No such Memory Category"
 
-class InvalidMemoryCategoryError(ValueError):
+
+class InvalidMemoryCategoryError(InvalidError):
     """Raised when a Memory Category's details are not valid."""
 
 
-class RequiredMemoryCategoryError(ValueError):
+class RequiredMemoryCategoryError(ConflictError):
     """Raised when archiving a Memory Category that a setting names."""
 
 

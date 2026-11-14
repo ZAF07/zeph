@@ -3,6 +3,7 @@ from dataclasses import dataclass, replace
 from uuid import UUID
 
 from companion.core.admin_users import UserNotFoundError
+from companion.core.errors import NotAllowedError
 from companion.core.models import (
     Feature,
     FeatureReason,
@@ -134,8 +135,10 @@ FEATURES: tuple[FeatureDetails, ...] = (
 )
 
 
-class FeatureNotAvailableError(Exception):
+class FeatureNotAvailableError(NotAllowedError):
     """Raised when a User changes their own switch while the Admin side has it off."""
+
+    shown_message = "Not available on your account"
 
     def __init__(self, feature: Feature) -> None:
         """Remember which Feature it was.

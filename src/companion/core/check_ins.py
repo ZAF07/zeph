@@ -99,6 +99,25 @@ class RecentCheckIn:
 
 
 @dataclass(frozen=True)
+class CheckInsPage:
+    """What the Dashboard's Check-ins page shows a User. Never a next time.
+
+    Attributes:
+        settings: Their Check-in settings.
+        available: Whether the Admin side allows Check-ins for them.
+        paused: Whether their Check-ins are paused right now.
+        recent: Their newest Check-in decisions, newest first.
+        kinds: The Check-in Kinds that may be sent to them.
+    """
+
+    settings: CheckInSettings
+    available: bool
+    paused: bool
+    recent: list[RecentCheckIn]
+    kinds: list[CheckInKind]
+
+
+@dataclass(frozen=True)
 class LoggedCheckIn:
     """A Check-in decision for the Admins' Check-in log. Never the message.
 
@@ -637,6 +656,24 @@ class CheckInService:
                 if entry.check_in.outcome != CheckInOutcome.SKIPPED
             ),
             None,
+        )
+
+    def page(self, user: User) -> CheckInsPage:
+        """Gather what the Dashboard's Check-ins page shows a User.
+
+        Args:
+            user: The User.
+
+        Returns:
+            Their settings, whether Check-ins are available and paused right
+            now, their recent Check-ins and the Check-in Kinds.
+        """
+        return CheckInsPage(
+            settings=user.check_ins,
+            available=self._features.available_for(user.id, Feature.CHECK_INS),
+            paused=self.is_paused(user),
+            recent=self.list_recent(user),
+            kinds=self.list_kinds(),
         )
 
     def list_kinds(self) -> list[CheckInKind]:

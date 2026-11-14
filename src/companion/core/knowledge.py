@@ -5,6 +5,7 @@ from dataclasses import replace
 from pathlib import PurePath
 from uuid import UUID
 
+from companion.core.errors import ConflictError, InvalidError, NotFoundError
 from companion.core.models import (
     EmbeddedChunk,
     KnowledgeDetailsChange,
@@ -48,20 +49,26 @@ BLANK_LINE = re.compile(r"\n\s*\n")
 SENTENCE_END = re.compile(r"(?<=[.!?…])\s+")
 
 
-class KnowledgeDocumentNotFoundError(LookupError):
+class KnowledgeDocumentNotFoundError(NotFoundError):
     """Raised when no Knowledge document has the given ID."""
 
+    shown_message = "No such Knowledge document"
 
-class InvalidKnowledgeDocumentError(ValueError):
+
+class InvalidKnowledgeDocumentError(InvalidError):
     """Raised when an uploaded Knowledge document is not valid."""
 
 
-class KnowledgeFileStillBeingReadError(ValueError):
+class KnowledgeFileStillBeingReadError(ConflictError):
     """Raised when a document's text or file changes while its file is read."""
 
+    shown_message = "The file is still being read. Try again when it’s done."
 
-class KnowledgeNotRetryableError(ValueError):
+
+class KnowledgeNotRetryableError(ConflictError):
     """Raised when asked to retry a Knowledge document that has not failed."""
+
+    shown_message = "Only a failed document can be retried."
 
 
 def knowledge_file_type(file_name: str) -> KnowledgeFileType:

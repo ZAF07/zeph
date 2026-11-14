@@ -1,6 +1,7 @@
 import logging
 from uuid import UUID, uuid4
 
+from companion.core.errors import NotFoundError
 from companion.core.features import FeatureService
 from companion.core.models import (
     ConversationSummary,
@@ -23,8 +24,16 @@ from companion.core.ports import Clock, Repositories
 logger = logging.getLogger(__name__)
 
 
-class MemoryNotFoundError(LookupError):
-    """Raised when a User has no Memory Item or Conversation Summary with that ID."""
+class MemoryNotFoundError(NotFoundError):
+    """Raised when a User has no Memory Item with that ID."""
+
+    shown_message = "Memory not found"
+
+
+class ConversationSummaryNotFoundError(MemoryNotFoundError):
+    """Raised when a User has no Conversation Summary with that ID."""
+
+    shown_message = "Conversation Summary not found"
 
 
 class UserMemoryService:
@@ -134,10 +143,11 @@ class UserMemoryService:
             summary_id: The Conversation Summary's ID.
 
         Raises:
-            MemoryNotFoundError: If the User has no such Conversation Summary.
+            ConversationSummaryNotFoundError: If the User has no such
+                Conversation Summary.
         """
         if not self._repositories.user_memory.delete_summary(user_id, summary_id):
-            raise MemoryNotFoundError
+            raise ConversationSummaryNotFoundError
 
     def remember_onboarding(self, user: User) -> None:
         """Save the User's onboarding answers as Memory Items.

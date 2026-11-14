@@ -6,10 +6,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
-from companion.core.admin_users import LastAdminError
-from companion.core.check_ins import CheckInService, RecentCheckIn
-from companion.core.features import FeatureNotAvailableError, FeatureService
+from companion.core.check_ins import CheckInService, CheckInsPage, RecentCheckIn
 from companion.core.home import Home, HomeService
+from companion.core.me import Me, MeService
 from companion.core.models import (
     ChatSetting,
     CheckInChanges,
@@ -20,40 +19,24 @@ from companion.core.models import (
     ConnectionToken,
     ConnectionTokenStatus,
     ConversationSummary,
-    Feature,
     MemoryGroup,
     MemoryItem,
     MemorySource,
     OnboardingAnswers,
     PauseLength,
     PersonalSticker,
-    PlatformSettings,
     PreferenceChanges,
     SharedPhoto,
     User,
     UserRole,
 )
-from companion.core.personal_stickers import (
-    PersonalStickerNotFoundError,
-    PersonalStickerService,
-)
-from companion.core.photos import PhotoService, SharedPhotoNotFoundError
-from companion.core.platform_settings import (
-    AI_NOTICE,
-    AI_NOTICE_SHORT,
-    MESSAGE_RETENTION_DAYS,
-    ONBOARDING_REASON_CHOICES,
-    PHOTO_VIEWING_EXPLANATION,
-    USER_MEMORY_EXPLANATION,
-)
-from companion.core.ports import PlatformSettingsRepository
-from companion.core.telegram_connection import (
-    OnboardingNotFinishedError,
-    TelegramConnectionService,
-)
+from companion.core.personal_stickers import PersonalStickerService
+from companion.core.photos import PhotoService
+from companion.core.platform_settings import PlatformSettingsService
+from companion.core.telegram_connection import TelegramConnectionService
 from companion.core.user_data import UserDataService
-from companion.core.user_memory import MemoryNotFoundError, UserMemoryService
-from companion.core.users import InvalidProfileError, UserService
+from companion.core.user_memory import UserMemoryService
+from companion.core.users import UserService
 
 
 class MeResponse(BaseModel):
@@ -79,7 +62,6 @@ class MeResponse(BaseModel):
 
 
 DEFAULT_CHECK_INS = CheckInSettings()
-NOT_AVAILABLE = "Not available on your account"
 
 
 class OnboardingRequest(BaseModel):
@@ -411,29 +393,16 @@ def to_recent_check_in_response(recent: RecentCheckIn) -> RecentCheckInResponse:
     )
 
 
-def to_me_response(
-    user: User,
-    user_memory_available: bool,
-    memory_note: str,
-    photo_viewing_available: bool,
-    personal_stickers_available: bool,
-) -> MeResponse:
+def to_me_response(me: Me) -> MeResponse:
     """Describe a User for the Dashboard.
 
     Args:
-        user: The User.
-        user_memory_available: Whether the Admin side allows User Memory
-            for them.
-        memory_note: The Admin-managed note saying User Memory is off and
-            why; "" when it works.
-        photo_viewing_available: Whether the Admin side allows Photo Viewing
-            for them.
-        personal_stickers_available: Whether Personal Stickers works for
-            them; they have no switch of their own.
+        me: The User, with which of their Features are available.
 
     Returns:
         The response body.
     """
+    user = me.user
     return MeResponse(
         id=str(user.id),
         email=user.email,
@@ -444,14 +413,40 @@ def to_me_response(
         time_zone=user.time_zone,
         ai_notice_acknowledged_at=user.ai_notice_acknowledged_at,
         user_memory_enabled=user.user_memory_enabled,
-        user_memory_available=user_memory_available,
-        memory_note=memory_note,
+        user_memory_available=me.user_memory_available,
+        memory_note=me.memory_note,
         photo_viewing_enabled=user.photo_viewing_enabled,
-        photo_viewing_available=photo_viewing_available,
-        personal_stickers_available=personal_stickers_available,
+        photo_viewing_available=me.photo_viewing_available,
+        personal_stickers_available=me.personal_stickers_available,
         onboarding_completed_at=user.onboarding_completed_at,
         role=user.role,
         changed_in_chat=user.settings_changed_in_chat,
+    )
+
+
+def to_check_ins_response(page: CheckInsPage) -> CheckInsResponse:
+    """Describe a User's Check-ins page for the Dashboard.
+
+    Args:
+        page: Their Check-in settings, recent Check-ins and Check-in Kinds.
+
+    Returns:
+        The response body, with the pause as it stands right now.
+    """
+    settings = page.settings
+    return CheckInsResponse(
+        enabled=settings.enabled,
+        available=page.available,
+        frequency=settings.frequency,
+        quiet_hours_start=settings.quiet_hours_start,
+        quiet_hours_end=settings.quiet_hours_end,
+        paused=page.paused,
+        paused_until=settings.paused_until if page.paused else None,
+        recent=[to_recent_check_in_response(recent) for recent in page.recent],
+        kinds=[
+            CheckInKindSummaryResponse(name=kind.name, description=kind.description)
+            for kind in page.kinds
+        ],
     )
 
 
@@ -463,10 +458,10 @@ def build_dashboard_api_router(
     telegram_connection_service: TelegramConnectionService,
     user_data_service: UserDataService,
     home_service: HomeService,
-    feature_service: FeatureService,
+    me_service: MeService,
     photo_service: PhotoService,
     personal_sticker_service: PersonalStickerService,
-    platform_settings: PlatformSettingsRepository,
+    platform_settings_service: PlatformSettingsService,
     telegram_bot_username: str,
 ) -> APIRouter:
     """Build the Dashboard API routes.
@@ -482,13 +477,12 @@ def build_dashboard_api_router(
         telegram_connection_service: Issues tokens and reports connection status.
         user_data_service: Deletes the User's data or account.
         home_service: Gathers what the Dashboard home shows.
-        feature_service: Says whether the Admin side allows User Memory,
-            Check-ins and Photo Viewing for the User, and whether Personal
-            Stickers works for them.
+        me_service: Describes the User with which of their Features work.
         photo_service: Lists, downloads and deletes the User's Shared Photos.
         personal_sticker_service: Lists, downloads and removes the User's
             Personal Stickers.
-        platform_settings: Admin-managed wording shown on the Dashboard.
+        platform_settings_service: Reads the Admin-managed wording shown on
+            the Dashboard.
         telegram_bot_username: The Companion's Telegram @username, for deep links.
 
     Returns:
@@ -506,43 +500,18 @@ def build_dashboard_api_router(
         Returns:
             The response body.
         """
-        return to_me_response(
-            user,
-            feature_service.available_for(user.id, Feature.USER_MEMORY),
-            user_memory_service.memory_note(user, platform_settings.load()),
-            feature_service.available_for(user.id, Feature.PHOTO_VIEWING),
-            feature_service.works_for(user.id, Feature.PERSONAL_STICKERS),
-        )
+        return to_me_response(me_service.describe(user))
 
-    def to_check_ins_response(user: User) -> CheckInsResponse:
-        """Describe a User's Check-in settings and recent Check-ins.
+    def check_ins_response(user: User) -> CheckInsResponse:
+        """Describe a User's Check-ins page.
 
         Args:
             user: The User.
 
         Returns:
-            The response body, with the pause as it stands right now and the
-            Check-in Kinds that may be sent to them.
+            The response body.
         """
-        settings = user.check_ins
-        is_paused = check_in_service.is_paused(user)
-        return CheckInsResponse(
-            enabled=settings.enabled,
-            available=feature_service.available_for(user.id, Feature.CHECK_INS),
-            frequency=settings.frequency,
-            quiet_hours_start=settings.quiet_hours_start,
-            quiet_hours_end=settings.quiet_hours_end,
-            paused=is_paused,
-            paused_until=settings.paused_until if is_paused else None,
-            recent=[
-                to_recent_check_in_response(recent)
-                for recent in check_in_service.list_recent(user)
-            ],
-            kinds=[
-                CheckInKindSummaryResponse(name=kind.name, description=kind.description)
-                for kind in check_in_service.list_kinds()
-            ],
-        )
+        return to_check_ins_response(check_in_service.page(user))
 
     def to_token_response(
         token: ConnectionToken, token_status: ConnectionTokenStatus
@@ -564,15 +533,12 @@ def build_dashboard_api_router(
             status=token_status,
         )
 
-    def to_home_response(
-        user: User, home: Home, current_settings: PlatformSettings
-    ) -> HomeResponse:
+    def to_home_response(user: User, home: Home) -> HomeResponse:
         """Describe a User's Dashboard home.
 
         Args:
             user: The User.
             home: What their home shows.
-            current_settings: The platform settings, read once for the request.
 
         Returns:
             The response body, with the pause as it stands right now.
@@ -594,7 +560,7 @@ def build_dashboard_api_router(
             last_conversation_at=home.last_conversation_at,
             check_ins=HomeCheckInsResponse(
                 enabled=settings.enabled,
-                available=feature_service.available_for(user.id, Feature.CHECK_INS),
+                available=home.check_ins_available,
                 frequency=settings.frequency,
                 quiet_hours_start=settings.quiet_hours_start,
                 quiet_hours_end=settings.quiet_hours_end,
@@ -609,7 +575,7 @@ def build_dashboard_api_router(
                     else None
                 ),
             ),
-            memory_note=user_memory_service.memory_note(user, current_settings),
+            memory_note=home.memory_note,
             goals=[to_memory_item_response(item) for item in home.goals],
             recently_remembered=[
                 RememberedItemResponse(
@@ -618,7 +584,7 @@ def build_dashboard_api_router(
                 )
                 for remembered in home.recently_remembered
             ],
-            ai_notice=current_settings.get(AI_NOTICE_SHORT),
+            ai_notice=home.ai_notice,
         )
 
     @router.get("/me")
@@ -647,9 +613,8 @@ def build_dashboard_api_router(
             The updated User.
 
         Raises:
-            HTTPException: 422 if a new value is not acceptable; 403 if it
-                changes User Memory or Photo Viewing while the Admin side has
-                it off.
+            CoreError: 422 if a new value is not acceptable; 403 if it changes
+                User Memory or Photo Viewing while the Admin side has it off.
         """
         changes = PreferenceChanges(
             name=request.name,
@@ -658,14 +623,7 @@ def build_dashboard_api_router(
             country=request.country,
             time_zone=request.time_zone,
         )
-        try:
-            return me_response(user_service.update_preferences(user, changes))
-        except InvalidProfileError as error:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
-            ) from error
-        except FeatureNotAvailableError as error:
-            raise HTTPException(status.HTTP_403_FORBIDDEN, NOT_AVAILABLE) from error
+        return me_response(user_service.update_preferences(user, changes))
 
     @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
     def delete_account(user: Annotated[User, Depends(current_user)]) -> Response:
@@ -678,16 +636,9 @@ def build_dashboard_api_router(
             An empty response.
 
         Raises:
-            HTTPException: 409 if they are the only Admin.
+            CoreError: 409 if they are the only Admin.
         """
-        try:
-            user_data_service.delete_account(user)
-        except LastAdminError as error:
-            raise HTTPException(
-                status.HTTP_409_CONFLICT,
-                "You’re the only Admin. Make someone else an Admin before "
-                "deleting your account.",
-            ) from error
+        user_data_service.delete_account(user)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @router.delete("/me/data", status_code=status.HTTP_204_NO_CONTENT)
@@ -717,8 +668,8 @@ def build_dashboard_api_router(
             The updated User.
 
         Raises:
-            HTTPException: 422 if the AI notice was not acknowledged or an
-                answer is not acceptable.
+            CoreError: 422 if the AI notice was not acknowledged or an answer
+                is not acceptable.
         """
         answers = OnboardingAnswers(
             name=request.name,
@@ -735,12 +686,7 @@ def build_dashboard_api_router(
                 quiet_hours_end=request.quiet_hours_end,
             ),
         )
-        try:
-            return me_response(user_service.complete_onboarding(user, answers))
-        except InvalidProfileError as error:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)
-            ) from error
+        return me_response(user_service.complete_onboarding(user, answers))
 
     @router.get("/home")
     def get_home(user: Annotated[User, Depends(current_user)]) -> HomeResponse:
@@ -753,8 +699,7 @@ def build_dashboard_api_router(
             Their Telegram Connection, Check-in status, Goals, newest Memory
             Items and the AI notice.
         """
-        settings = platform_settings.load()
-        return to_home_response(user, home_service.get(user, settings), settings)
+        return to_home_response(user, home_service.get(user))
 
     @router.get("/check-ins")
     def get_check_ins(user: Annotated[User, Depends(current_user)]) -> CheckInsResponse:
@@ -766,7 +711,7 @@ def build_dashboard_api_router(
         Returns:
             The settings and recent Check-ins.
         """
-        return to_check_ins_response(user)
+        return check_ins_response(user)
 
     @router.patch("/check-ins")
     def update_check_ins(
@@ -782,7 +727,7 @@ def build_dashboard_api_router(
             The updated settings and recent Check-ins.
 
         Raises:
-            HTTPException: 403 if it turns Check-ins on or off while the Admin
+            CoreError: 403 if it turns Check-ins on or off while the Admin
                 side has them off.
         """
         changes = CheckInChanges(
@@ -791,11 +736,7 @@ def build_dashboard_api_router(
             quiet_hours_start=request.quiet_hours_start,
             quiet_hours_end=request.quiet_hours_end,
         )
-        try:
-            saved = check_in_service.change_settings(user, changes)
-        except FeatureNotAvailableError as error:
-            raise HTTPException(status.HTTP_403_FORBIDDEN, NOT_AVAILABLE) from error
-        return to_check_ins_response(saved)
+        return check_ins_response(check_in_service.change_settings(user, changes))
 
     @router.put("/check-ins/pause")
     def pause_check_ins(
@@ -810,7 +751,7 @@ def build_dashboard_api_router(
         Returns:
             The updated settings and recent Check-ins.
         """
-        return to_check_ins_response(check_in_service.pause(user, request.length))
+        return check_ins_response(check_in_service.pause(user, request.length))
 
     @router.delete("/check-ins/pause")
     def resume_check_ins(
@@ -824,7 +765,7 @@ def build_dashboard_api_router(
         Returns:
             The updated settings and recent Check-ins.
         """
-        return to_check_ins_response(check_in_service.resume(user))
+        return check_ins_response(check_in_service.resume(user))
 
     @router.get("/platform-content")
     def get_platform_content(
@@ -839,14 +780,14 @@ def build_dashboard_api_router(
             The AI notice, User Memory explanation, onboarding choices and how
             long messages are kept.
         """
-        settings = platform_settings.load()
+        content = platform_settings_service.dashboard_content()
         return PlatformContentResponse(
-            ai_notice=settings.get(AI_NOTICE),
-            ai_notice_short=settings.get(AI_NOTICE_SHORT),
-            user_memory_explanation=settings.get(USER_MEMORY_EXPLANATION),
-            photo_viewing_explanation=settings.get(PHOTO_VIEWING_EXPLANATION),
-            onboarding_reason_choices=settings.get(ONBOARDING_REASON_CHOICES),
-            message_retention_days=settings.get(MESSAGE_RETENTION_DAYS),
+            ai_notice=content.ai_notice,
+            ai_notice_short=content.ai_notice_short,
+            user_memory_explanation=content.user_memory_explanation,
+            photo_viewing_explanation=content.photo_viewing_explanation,
+            onboarding_reason_choices=content.onboarding_reason_choices,
+            message_retention_days=content.message_retention_days,
         )
 
     @router.get("/telegram-connection")
@@ -894,12 +835,9 @@ def build_dashboard_api_router(
             The new token and its Telegram deep link.
 
         Raises:
-            HTTPException: 409 if the User hasn't finished onboarding.
+            CoreError: 409 if the User hasn't finished onboarding.
         """
-        try:
-            token = telegram_connection_service.create_token(user)
-        except OnboardingNotFinishedError as error:
-            raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
+        token = telegram_connection_service.create_token(user)
         return to_token_response(token, ConnectionTokenStatus.ACTIVE)
 
     @router.get("/memory-items")
@@ -945,14 +883,9 @@ def build_dashboard_api_router(
             An empty response.
 
         Raises:
-            HTTPException: 404 if the User has no such Memory Item.
+            CoreError: 404 if the User has no such Memory Item.
         """
-        try:
-            user_memory_service.delete_item(user.id, item_id)
-        except MemoryNotFoundError as error:
-            raise HTTPException(
-                status.HTTP_404_NOT_FOUND, "Memory not found"
-            ) from error
+        user_memory_service.delete_item(user.id, item_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @router.get("/conversation-summaries")
@@ -991,14 +924,9 @@ def build_dashboard_api_router(
             An empty response.
 
         Raises:
-            HTTPException: 404 if the User has no such Conversation Summary.
+            CoreError: 404 if the User has no such Conversation Summary.
         """
-        try:
-            user_memory_service.delete_summary(user.id, summary_id)
-        except MemoryNotFoundError as error:
-            raise HTTPException(
-                status.HTTP_404_NOT_FOUND, "Conversation Summary not found"
-            ) from error
+        user_memory_service.delete_summary(user.id, summary_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @router.get("/shared-photos")
@@ -1036,15 +964,10 @@ def build_dashboard_api_router(
             The image.
 
         Raises:
-            HTTPException: 404 if the User has no such Shared Photo or it
-                couldn't be downloaded.
+            CoreError: 404 if the User has no such Shared Photo.
+            HTTPException: 404 if it couldn't be downloaded.
         """
-        try:
-            image = photo_service.shared_photo_image(user.id, photo_id)
-        except SharedPhotoNotFoundError as error:
-            raise HTTPException(
-                status.HTTP_404_NOT_FOUND, "Shared Photo not found"
-            ) from error
+        image = photo_service.shared_photo_image(user.id, photo_id)
         if image is None:
             raise HTTPException(
                 status.HTTP_404_NOT_FOUND, "This photo couldn't be downloaded"
@@ -1069,14 +992,9 @@ def build_dashboard_api_router(
             An empty response.
 
         Raises:
-            HTTPException: 404 if the User has no such Shared Photo.
+            CoreError: 404 if the User has no such Shared Photo.
         """
-        try:
-            photo_service.delete_shared(user.id, photo_id)
-        except SharedPhotoNotFoundError as error:
-            raise HTTPException(
-                status.HTTP_404_NOT_FOUND, "Shared Photo not found"
-            ) from error
+        photo_service.delete_shared(user.id, photo_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @router.get("/personal-stickers")
@@ -1114,15 +1032,11 @@ def build_dashboard_api_router(
             The image.
 
         Raises:
-            HTTPException: 404 if the User has no such sticker, or it has no
-                image or it couldn't be downloaded.
+            CoreError: 404 if the User has no such sticker.
+            HTTPException: 404 if it has no image or it couldn't be
+                downloaded.
         """
-        try:
-            image = personal_sticker_service.get_image(user.id, sticker_id)
-        except PersonalStickerNotFoundError as error:
-            raise HTTPException(
-                status.HTTP_404_NOT_FOUND, "Personal Sticker not found"
-            ) from error
+        image = personal_sticker_service.get_image(user.id, sticker_id)
         if image is None:
             raise HTTPException(
                 status.HTTP_404_NOT_FOUND, "This sticker has no image to show"
@@ -1149,14 +1063,9 @@ def build_dashboard_api_router(
             An empty response.
 
         Raises:
-            HTTPException: 404 if the User has no such sticker.
+            CoreError: 404 if the User has no such sticker.
         """
-        try:
-            personal_sticker_service.remove(user.id, sticker_id)
-        except PersonalStickerNotFoundError as error:
-            raise HTTPException(
-                status.HTTP_404_NOT_FOUND, "Personal Sticker not found"
-            ) from error
+        personal_sticker_service.remove(user.id, sticker_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     return router

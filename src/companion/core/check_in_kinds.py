@@ -2,6 +2,7 @@ from dataclasses import replace
 from datetime import timedelta
 from uuid import UUID
 
+from companion.core.errors import InvalidError, NotFoundError
 from companion.core.models import CheckInKind, CheckInKindDetails, CheckInKindOverview
 from companion.core.ports import Clock, Repositories
 
@@ -10,11 +11,13 @@ MAX_DESCRIPTION_LENGTH = 500
 SENDS_COUNTED_OVER = timedelta(days=30)
 
 
-class CheckInKindNotFoundError(LookupError):
+class CheckInKindNotFoundError(NotFoundError):
     """Raised when no Check-in Kind has the given ID."""
 
+    shown_message = "No such Check-in Kind"
 
-class InvalidCheckInKindError(ValueError):
+
+class InvalidCheckInKindError(InvalidError):
     """Raised when a Check-in Kind's details are not valid."""
 
 

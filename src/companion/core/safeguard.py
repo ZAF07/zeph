@@ -4,6 +4,7 @@ from dataclasses import replace
 from datetime import timedelta
 from uuid import UUID, uuid4
 
+from companion.core.errors import InvalidError
 from companion.core.helplines import HelplineService
 from companion.core.models import (
     ChatLine,
@@ -37,7 +38,7 @@ CRISIS_LABELS = frozenset(
 )
 
 
-class InvalidEventFilterError(ValueError):
+class InvalidEventFilterError(InvalidError):
     """Raised when Safeguard Events are filtered by something that isn't a crisis."""
 
 

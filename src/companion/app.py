@@ -11,6 +11,7 @@ from companion.adapters.http.auth import (
     build_current_user_dependency,
 )
 from companion.adapters.http.dashboard_api import build_dashboard_api_router
+from companion.adapters.http.errors import add_core_error_handlers
 from companion.adapters.telegram.webhook import build_telegram_webhook_router
 from companion.core.admin_users import AdminUserService
 from companion.core.chat_settings import SettingsTools
@@ -24,6 +25,7 @@ from companion.core.home import HomeService
 from companion.core.incoming_messages import IncomingMessageHandler
 from companion.core.knowledge import KnowledgeService
 from companion.core.knowledge_retrieval import KnowledgeRetrieval
+from companion.core.me import MeService
 from companion.core.memory_categories import MemoryCategoryService
 from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.message_retention import MessageRetention
@@ -290,11 +292,15 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         dependencies.scheduler.stop()
 
     app = FastAPI(title="Companion backend", lifespan=run_scheduler)
+    add_core_error_handlers(app)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=dependencies.cors_origins,
         allow_methods=["*"],
         allow_headers=["*"],
+    )
+    platform_settings_service = PlatformSettingsService(
+        dependencies.repositories.platform_settings, dependencies.clock
     )
     current_user = build_current_user_dependency(
         dependencies.auth_verifier, user_service
@@ -310,11 +316,17 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             home_service=HomeService(
                 repositories=dependencies.repositories,
                 check_in_service=check_in_service,
+                features=feature_service,
+                user_memory_service=user_memory_service,
             ),
-            feature_service=feature_service,
+            me_service=MeService(
+                repositories=dependencies.repositories,
+                features=feature_service,
+                user_memory_service=user_memory_service,
+            ),
             photo_service=photo_service,
             personal_sticker_service=personal_sticker_service,
-            platform_settings=dependencies.repositories.platform_settings,
+            platform_settings_service=platform_settings_service,
             telegram_bot_username=dependencies.telegram_bot_username,
         )
     )
@@ -323,9 +335,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             current_admin=build_current_admin_dependency(current_user),
             admin_user_service=AdminUserService(dependencies.repositories),
             feature_service=feature_service,
-            platform_settings_service=PlatformSettingsService(
-                dependencies.repositories.platform_settings, dependencies.clock
-            ),
+            platform_settings_service=platform_settings_service,
             helpline_service=helpline_service,
             safeguard=safeguard,
             memory_category_service=MemoryCategoryService(

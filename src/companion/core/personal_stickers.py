@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from companion.core.errors import NotFoundError
 from companion.core.models import (
     ChannelSticker,
     ChatLine,
@@ -28,8 +29,10 @@ from companion.core.usage import UsageRecordingChatModel
 logger = logging.getLogger(__name__)
 
 
-class PersonalStickerNotFoundError(LookupError):
+class PersonalStickerNotFoundError(NotFoundError):
     """Raised when a User has no Personal Sticker with the given ID."""
+
+    shown_message = "Personal Sticker not found"
 
 
 @dataclass(frozen=True)
