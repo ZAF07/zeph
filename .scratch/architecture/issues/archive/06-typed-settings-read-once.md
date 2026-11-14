@@ -72,4 +72,8 @@ None. Fits well with issue 03 (loaded at the same points as the `UserSnapshot`).
   - mypy catches a wrong key or type: see the mypy check in Comments.
   - `pytest` 704 passed (9 deselected evals), `ruff check` and `ruff format --check` clean, `mypy` no issues in 103 files.
   - `/run`: Admin edited the Persona on the Dashboard; the next reply followed it (see Comments).
-- Commits: <to be filled in after merge>
+- Commits:
+  - 8b8e584 "Read typed platform settings once per reply, tick and request"
+  - 2c5f2e9 "Review fixes: drop stray settings arg from _save docstring, use the dashboard_url placeholder"
+  - 24588f7 "Architecture issue 06 done: archive issue with test, run and review evidence"
+  - 0b6ec07 "Glossary: Platform Settings"
