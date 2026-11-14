@@ -1,6 +1,6 @@
 # 02 — Backend tests take about 12 minutes because they run one at a time
 
-Status: in-progress
+Status: completed
 
 ## Symptom
 
@@ -29,10 +29,10 @@ Run `uv run pytest --durations=20` first to see whether a few slow tests are mos
 
 ## Acceptance criteria
 
-- [ ] The full backend suite runs much faster (say under 4 minutes on a normal machine), with the time before and after recorded here
-- [ ] Every test still passes, run in parallel and run on its own
-- [ ] `make check` (or whatever runs the full suite) uses the faster way
-- [ ] Quality gates pass: `uv run pytest`, `uv run ruff check`, `uv run ruff format --check`, `uv run mypy src`
+- [x] The full backend suite runs much faster (say under 4 minutes on a normal machine), with the time before and after recorded here
+- [x] Every test still passes, run in parallel and run on its own
+- [x] `make check` (or whatever runs the full suite) uses the faster way
+- [x] Quality gates pass: `uv run pytest`, `uv run ruff check`, `uv run ruff format --check`, `uv run mypy src`
 
 ## Comments
 
@@ -48,3 +48,15 @@ Diagnosis, 14 Nov 2026 (worktree `ai-chat-companion-dev-env-02`, 10 cores):
 - **After, in parallel:** 836 passed in 72.5s, 92.5s and 77.9s on three runs (load 6 to 10). No test containers left afterwards.
 - **One at a time (`-n 0`):** 836 passed in 573s (load 10 to 12).
 - A small run pays about 3s for starting workers (2 files: 3.1s with `-n 0`, 6.0s with `-n auto`). Use `-n 0` for quick single-file runs.
+
+Final checks on the rebased branch, 14 Nov 2026 (load 9 to 13):
+
+- `make check`: ruff and format clean, mypy clean, **846 passed in 85s** (parallel), web lint, format and typecheck clean, 363 vitest passed.
+- One at a time (`uv run pytest -n 0`): **846 passed in 288s**.
+- Code review (Standards and Spec): no hard violations. Fixed: Postgres started on every run even with no database tests (now only when needed), unclear names, fixture docstring, a test that only re-checked an f-string. Left as is: `evals/conftest.py` still starts its own Postgres (evals run with `-n 0`).
+- Confirmed hypothesis: the suite was slow because tests ran one at a time, and much slower when other agents loaded the machine. No slow outliers. Parallel runs needed one shared Postgres; one container per worker raced on Ryuk start-up and left containers behind.
+
+## Completion
+
+- Completed: 2026-11-14
+- Commit: d9cc583 "Run backend tests in parallel with one shared Postgres", review fixes 5b94312 "Start the test Postgres only when a test needs it", archive c02c45a "Dev env issue 02 done: archive issue with test, timing and review evidence" (moved the file only; the ticked criteria, final checks and this section landed with the commit-record commit) (merged from `dev-env-02-parallel-tests` in d705dc2 "Merge dev-env issue 02: backend tests run in parallel…"; `make check` green on main after the merge: Python 864 passed in 95s, web 368 passed)
