@@ -156,6 +156,7 @@ class DataDeletionAnswer(StrEnum):
     NOTHING_ASKED = "nothing_asked"
     CONFIRMED = "confirmed"
     CANCELLED = "cancelled"
+    CANCELLED_WORD_NOT_ALONE = "cancelled_word_not_alone"
 
 
 class ChatDataDeletion:
@@ -206,25 +207,28 @@ class ChatDataDeletion:
     ) -> DataDeletionAnswer:
         """Delete the User's data if they confirmed, or else cancel the request.
 
-        The confirmation must be the whole message; case and the spaces
-        around it don't matter. Once the data is gone a fixed reply is sent,
-        and not saved, so nothing of theirs is left behind.
+        The confirmation must be the whole Message, sent on its own; case and
+        the spaces around it don't matter. A Message that has the word as one
+        of several texts cancels too, and says so, so the reply can tell them
+        why. Once the data is gone a fixed reply is sent, and not saved, so
+        nothing of theirs is left behind.
 
         Args:
             snapshot: The User who sent the message, as read when the reply
                 started.
             chat_id: The chat to reply in.
-            text: Their message.
+            text: Their Message, its texts one per line.
 
         Returns:
             Whether there was a request, and if so whether it was confirmed.
         """
         if not self._clear_request(snapshot):
             return DataDeletionAnswer.NOTHING_ASKED
-        if (
-            text.strip().casefold()
-            != self.confirmation_word(snapshot.settings).casefold()
-        ):
+        word = self.confirmation_word(snapshot.settings).casefold()
+        if text.strip().casefold() != word:
+            texts = [line.strip().casefold() for line in text.splitlines()]
+            if word in texts:
+                return DataDeletionAnswer.CANCELLED_WORD_NOT_ALONE
             return DataDeletionAnswer.CANCELLED
         delete_user_data(self._repositories, snapshot.user.id)
         self._chat_channel.send_text(chat_id, snapshot.settings.get(DATA_DELETED_REPLY))

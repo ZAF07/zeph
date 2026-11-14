@@ -10,11 +10,13 @@ from tests.fakes import (
     FakeChatChannel,
     FakeClock,
     FakeScheduler,
+    FakeTimer,
     ScriptedChatModel,
     ToolCall,
 )
 from tests.telegram_helpers import (
     TELEGRAM_CHAT_ID,
+    post_to_webhook,
     send_to_webhook,
     telegram_text_update,
 )
@@ -388,6 +390,7 @@ def test_delete_my_data_in_chat_only_deletes_after_the_confirmation_word(
         f"Reply {word} to confirm.",
     )
     assert f'"{word}"' in call.tool_results[0]
+    assert "on its own, with nothing after it" in call.tool_results[0]
     data_tables = user_data_tables(engine)
     assert all(
         count > 0 for count in rows_per_table(engine, user_id, data_tables).values()
@@ -446,8 +449,51 @@ def test_any_other_reply_cancels_delete_my_data(
         rows_per_table(engine, user_id, tables_a_reply_leaves_alone(engine)) == before
     )
     cancel_note = seeded_settings["reply_data_deletion_cancelled_note"]
+    word_not_alone_note = seeded_settings["reply_data_deletion_word_not_alone_note"]
     assert cancel_note in cancelled.instructions
+    assert word_not_alone_note not in cancelled.instructions
     assert cancel_note not in later.instructions
+
+
+def test_the_word_with_another_text_in_one_message_cancels_and_says_why(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    timer: FakeTimer,
+    seeded_settings: dict[str, Any],
+) -> None:
+    _, user_id = set_up_user_with_every_kind_of_data(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+    )
+    word = seeded_settings["data_deletion_confirmation_word"]
+    reply_call(
+        client,
+        chat_model,
+        "delete my data",
+        ToolCall("start_deleting_my_data", {}),
+        f"Reply {word} to confirm.",
+    )
+    before = rows_per_table(engine, user_id, user_data_tables(engine))
+    chat_model.script("Nothing was deleted.")
+
+    for text in (word, "bye for good"):
+        assert post_to_webhook(client, telegram_text_update(text)) == 200
+    timer.end_message_waits()
+
+    assert rows_per_table(engine, user_id, user_data_tables(engine)) == before
+    instructions = chat_model.calls[-1].instructions
+    assert seeded_settings["reply_data_deletion_word_not_alone_note"] in instructions
+    assert seeded_settings["reply_data_deletion_cancelled_note"] not in instructions
 
 
 def test_a_crisis_message_never_runs_a_settings_tool(

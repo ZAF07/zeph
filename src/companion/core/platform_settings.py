@@ -196,6 +196,9 @@ DATA_DELETED_REPLY = Setting("data_deleted_reply", read_text)
 REPLY_DATA_DELETION_CANCELLED_NOTE = Setting(
     "reply_data_deletion_cancelled_note", read_text
 )
+REPLY_DATA_DELETION_WORD_NOT_ALONE_NOTE = Setting(
+    "reply_data_deletion_word_not_alone_note", read_text
+)
 ONBOARDING_NAME_MEMORY_CATEGORY = Setting("onboarding_name_memory_category", read_text)
 ONBOARDING_REASONS_MEMORY_CATEGORY = Setting(
     "onboarding_reasons_memory_category", read_text
@@ -387,6 +390,16 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         hint=(
             "Added when the User’s message cancelled their request to delete "
             "their data."
+        ),
+    ),
+    EditableSetting(
+        REPLY_DATA_DELETION_WORD_NOT_ALONE_NOTE.key,
+        "Data deletion word-not-alone note",
+        SettingKind.TEXT,
+        max_length=2_000,
+        hint=(
+            "Added instead when the User sent the confirmation word together "
+            "with other texts in one Message, so it didn’t count."
         ),
     ),
     EditableSetting(
@@ -640,6 +653,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
                     REPLY_SETTINGS_INSTRUCTIONS.key,
                     REPLY_DELETE_DATA_INSTRUCTIONS.key,
                     REPLY_DATA_DELETION_CANCELLED_NOTE.key,
+                    REPLY_DATA_DELETION_WORD_NOT_ALONE_NOTE.key,
                 ),
             ),
             ExtraPromptGroup(

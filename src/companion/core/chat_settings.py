@@ -482,8 +482,8 @@ class ReplySettingsTools:
             "Nothing is deleted yet. Tell them this deletes their messages, what "
             "you remember about them, their Check-ins and this Telegram "
             "connection, and can't be undone; their account and settings stay. "
-            f'Ask them to reply with exactly "{word}" to confirm. Any other reply '
-            "cancels it."
+            f'Ask them to reply with exactly "{word}" to confirm, on its own, with '
+            "nothing after it. Any other reply cancels it."
         )
 
 

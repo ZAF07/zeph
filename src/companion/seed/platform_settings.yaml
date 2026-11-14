@@ -484,8 +484,9 @@ reply_features_unavailable_note: >-
   If it's a setting they can't change in chat, say they can change their
   settings on the Dashboard: {dashboard_url}
 
-# The word a User must reply with, as their whole message, to confirm
-# deleting their data in chat. Any other reply cancels it. Case doesn't matter.
+# The word a User must reply with, on its own as their whole Message, to
+# confirm deleting their data in chat. Any other reply cancels it. Case
+# doesn't matter.
 data_deletion_confirmation_word: DELETE
 
 # Sent once a User's data is deleted in chat. It is not saved, and their
@@ -501,6 +502,16 @@ reply_data_deletion_cancelled_note: >-
   The person asked to delete their data, but this message isn't the
   confirmation word, so nothing was deleted and the request is cancelled.
   Tell them briefly, then answer their message.
+
+# Put after the reply instructions instead, when the User sent the
+# confirmation word but with other texts in the same Message, so it didn't
+# count.
+reply_data_deletion_word_not_alone_note: >-
+  The person asked to delete their data and sent the confirmation word, but
+  together with other texts in the same message, so it didn't count: nothing
+  was deleted and the request is cancelled. Tell them briefly that the word
+  only counts when sent on its own, and that they can ask again if they still
+  want their data deleted. Then answer the rest of their message.
 
 # The Memory Categories that onboarding answers are saved in, when the User
 # has User Memory on: their name, and what brings them here.

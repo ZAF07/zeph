@@ -17,7 +17,6 @@ from companion.core.models import (
 )
 from companion.core.platform_settings import (
     PERSONA,
-    REPLY_DATA_DELETION_CANCELLED_NOTE,
     RESPONSE_MODEL,
     RESPONSE_PROMPT,
 )
@@ -119,7 +118,7 @@ class ResponseComposer:
         snapshot: UserSnapshot,
         memory: str = "",
         knowledge: str = "",
-        data_deletion_cancelled: bool = False,
+        data_deletion_note: str = "",
         shared_photo_ids: Sequence[UUID] = (),
     ) -> ComposedReply:
         """Compose a reply to the Conversation's newest message.
@@ -137,8 +136,8 @@ class ResponseComposer:
             snapshot: The User being replied to, as read when the reply started.
             memory: The User Memory that matters for this message; "" if none.
             knowledge: The Knowledge passages that may fit; "" if none.
-            data_deletion_cancelled: True if this message cancelled the
-                User's request to delete their data, so the reply says so.
+            data_deletion_note: Tells the reply this Message cancelled the
+                User's request to delete their data, and why; "" if it didn't.
             shared_photo_ids: The User's Shared Photos that matter for the
                 message, which the reply may send one of; empty if none.
 
@@ -156,18 +155,13 @@ class ResponseComposer:
         offers = [
             provider.offer(snapshot, context) for provider in self._tool_providers
         ]
-        cancelled_note = (
-            settings.get(REPLY_DATA_DELETION_CANCELLED_NOTE)
-            if data_deletion_cancelled
-            else ""
-        )
         instructions = f"{settings.get(PERSONA)}\n\n{settings.get(RESPONSE_PROMPT)}"
         sections = (
             memory,
             knowledge,
             *(offer.instructions for offer in offers),
             self._features.unavailable_note(snapshot.unavailable_features, settings),
-            cancelled_note,
+            data_deletion_note,
         )
         for section in sections:
             if section:

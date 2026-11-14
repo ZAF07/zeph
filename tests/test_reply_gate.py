@@ -24,6 +24,8 @@ CHAT_ID = 42
 CONVERSATION_ID = uuid4()
 CRISIS_REPLY = "Please reach out to a helpline."
 LIMIT_REPLY = "I'm wiped for today, talk tomorrow?"
+CANCELLED_NOTE = "Nothing was deleted."
+WORD_NOT_ALONE_NOTE = "The word only counts on its own."
 
 
 class FakeConversations:
@@ -223,7 +225,12 @@ def build_gate(
         local_now=now,
         today=now.date(),
         features=(),
-        settings=PlatformSettings({}),
+        settings=PlatformSettings(
+            {
+                "reply_data_deletion_cancelled_note": CANCELLED_NOTE,
+                "reply_data_deletion_word_not_alone_note": WORD_NOT_ALONE_NOTE,
+            }
+        ),
         trace=ModelCallTrace(id=uuid4(), kind=TraceKind.MESSAGE),
     )
     return gate, snapshot, calls, conversations.sent
@@ -310,7 +317,15 @@ def test_a_confirmed_deletion_stops_the_reply() -> None:
 def test_a_message_with_a_pending_deletion_cancels_it_and_needs_a_reply() -> None:
     result, _, _ = check_message(data_deletion_answer=DataDeletionAnswer.CANCELLED)
 
-    assert result == ReplyNeeded(data_deletion_cancelled=True)
+    assert result == ReplyNeeded(data_deletion_note=CANCELLED_NOTE)
+
+
+def test_the_word_sent_with_other_texts_gets_the_note_that_says_why() -> None:
+    result, _, _ = check_message(
+        data_deletion_answer=DataDeletionAnswer.CANCELLED_WORD_NOT_ALONE
+    )
+
+    assert result == ReplyNeeded(data_deletion_note=WORD_NOT_ALONE_NOTE)
 
 
 def test_a_message_over_the_limit_sends_the_limit_reply() -> None:
@@ -324,6 +339,6 @@ def test_a_message_over_the_limit_sends_the_limit_reply() -> None:
 def test_a_normal_message_counts_once_and_needs_a_reply() -> None:
     result, calls, sent = check_message()
 
-    assert result == ReplyNeeded(data_deletion_cancelled=False)
+    assert result == ReplyNeeded(data_deletion_note="")
     assert sent == []
     assert calls == ["settle", "claim_message"]
