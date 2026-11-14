@@ -161,7 +161,7 @@ A Memory Category the product itself relies on: Onboarding answers are saved in 
 _Avoid_: Constant category, built-in category, core category
 
 **Conversation Summary**:
-A short account of what one Conversation covered, how the User seemed (its mood), and what the Companion offered and how it landed (e.g. "suggested a walk; they said it helped"), written once, when the Conversation ends. The newest few go into every reply; older ones are found by meaning when the Companion looks for something from the past.
+A short account of what one Conversation covered, how the User seemed (its mood), and what the Companion offered and how it landed (e.g. "suggested a walk; they said it helped"), written once, when the Conversation ends. The newest few go into every reply; older ones are found by meaning when the Understanding asks to look up the past, however old they are: only the User's own, only those close enough (an Admin-set bar), up to an Admin-set number, each with its date.
 _Avoid_: Recap, transcript, log
 
 **Life Thread**:
