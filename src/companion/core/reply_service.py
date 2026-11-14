@@ -59,7 +59,7 @@ class ReplyService:
             snapshot,
             memory.text,
             knowledge,
-            data_deletion_cancelled=gate_result.data_deletion_cancelled,
+            data_deletion_note=gate_result.data_deletion_note,
             shared_photo_ids=memory.shared_photo_ids,
         )
         self._conversations.deliver_reply(

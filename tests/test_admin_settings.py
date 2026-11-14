@@ -392,6 +392,7 @@ RESPONSE_COMPOSITION_NOTE_GROUPS = {
         "reply_settings_instructions",
         "reply_delete_data_instructions",
         "reply_data_deletion_cancelled_note",
+        "reply_data_deletion_word_not_alone_note",
     ],
     "Memory and Knowledge": ["reply_memory_intro", "reply_knowledge_intro"],
     "Features": ["reply_features_unavailable_note"],

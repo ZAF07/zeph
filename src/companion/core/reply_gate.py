@@ -5,9 +5,14 @@ from uuid import UUID
 from companion.core.conversations import ConversationService
 from companion.core.models import (
     MessageToAnswer,
+    PlatformSettings,
     RiskType,
     TextToScreen,
     UserSnapshot,
+)
+from companion.core.platform_settings import (
+    REPLY_DATA_DELETION_CANCELLED_NOTE,
+    REPLY_DATA_DELETION_WORD_NOT_ALONE_NOTE,
 )
 from companion.core.safeguard import Safeguard
 from companion.core.usage import UsageLimiter
@@ -49,11 +54,30 @@ class ReplyNeeded:
     """The Message passed the house rules and needs a composed reply.
 
     Attributes:
-        data_deletion_cancelled: Whether the Message cancelled a pending
-            Delete My Data, so the reply can mention it.
+        data_deletion_note: What the reply is told when the Message cancelled
+            a pending Delete My Data, so it can say so and why; "" if it
+            didn't.
     """
 
-    data_deletion_cancelled: bool
+    data_deletion_note: str
+
+
+def data_deletion_note(answer: DataDeletionAnswer, settings: PlatformSettings) -> str:
+    """Pick the note that tells the reply a Delete My Data was cancelled.
+
+    Args:
+        answer: What the Message did to a pending Delete My Data.
+        settings: The platform settings, which hold the notes.
+
+    Returns:
+        The note for a cancelled request, or the one for the word sent with
+        other texts; "" when nothing was cancelled.
+    """
+    if answer == DataDeletionAnswer.CANCELLED_WORD_NOT_ALONE:
+        return settings.get(REPLY_DATA_DELETION_WORD_NOT_ALONE_NOTE)
+    if answer == DataDeletionAnswer.CANCELLED:
+        return settings.get(REPLY_DATA_DELETION_CANCELLED_NOTE)
+    return ""
 
 
 class ReplyGate:
@@ -147,5 +171,4 @@ class ReplyGate:
                 self._usage_limiter.limit_reply(snapshot.settings),
             )
             return Stopped(StopReason.OVER_LIMIT)
-        data_deletion_cancelled = data_deletion_answer == DataDeletionAnswer.CANCELLED
-        return ReplyNeeded(data_deletion_cancelled)
+        return ReplyNeeded(data_deletion_note(data_deletion_answer, snapshot.settings))
