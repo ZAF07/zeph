@@ -15,6 +15,7 @@ from tests.telegram_helpers import (
     owner_headers,
     post_to_webhook,
     send_to_webhook,
+    telegram_photo_update,
     telegram_text_update,
 )
 from tests.test_safeguard import use_simple_crisis_reply
@@ -202,4 +203,74 @@ def test_typing_stops_when_the_reply_fails(
         "typing",
         f"text: {seeded_settings['reply_failed_message']}",
     ]
+    assert_no_typing_after_the_last_message(chat_channel, timer)
+
+
+def test_one_failed_typing_call_does_not_end_the_typing_repeats(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    timer: FakeTimer,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_channel.events.clear()
+    chat_model.script("hi")
+
+    def one_typing_call_fails_then_the_next_works() -> None:
+        chat_channel.typing_failure = RuntimeError("telegram timed out")
+        timer.end_typing_waits()
+        chat_channel.typing_failure = None
+        timer.end_typing_waits()
+
+    chat_model.before_next_reply = one_typing_call_fails_then_the_next_works
+    send_to_webhook(client, telegram_text_update("hey"))
+
+    assert chat_channel.events == ["typing", "typing", "typing", "text: hi"]
+    assert_no_typing_after_the_last_message(chat_channel, timer)
+
+
+def test_typing_stops_when_a_text_fails_to_be_checked(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    timer: FakeTimer,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_channel.events.clear()
+    chat_model.script_safeguard(RuntimeError("model down"))
+    chat_model.before_next_safeguard = timer.end_typing_waits
+
+    post_to_webhook(client, telegram_text_update("hey"))
+
+    assert chat_channel.events == [
+        "typing",
+        "typing",
+        f"text: {seeded_settings['reply_failed_message']}",
+    ]
+    assert_no_typing_after_the_last_message(chat_channel, timer)
+
+
+def test_typing_shows_again_while_an_album_is_answered(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    timer: FakeTimer,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_channel.events.clear()
+    chat_model.script("what a view")
+    chat_model.before_next_reply = timer.end_typing_waits
+
+    for number in (1, 2):
+        update = telegram_photo_update(
+            file_unique_id=f"photo-{number}", album_id="album-1", message_id=10 + number
+        )
+        assert post_to_webhook(client, update) == 200
+    timer.end_message_waits()
+
+    assert chat_channel.events == ["typing", "typing", "typing", "text: what a view"]
     assert_no_typing_after_the_last_message(chat_channel, timer)

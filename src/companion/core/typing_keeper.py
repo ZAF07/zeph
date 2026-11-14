@@ -1,8 +1,11 @@
+import logging
 import threading
 from collections import defaultdict
 
 from companion.core.models import ChannelSticker, PhotoImage, StickerImage
 from companion.core.ports import ChatChannel, Timer
+
+logger = logging.getLogger(__name__)
 
 TYPING_WAIT_PREFIX = "typing:"
 
@@ -164,6 +167,9 @@ class TypingKeeper:
     def _show_again(self, chat_id: int, every_seconds: float) -> None:
         """Show typing again, then wait to show it once more, unless it was stopped.
 
+        If showing typing fails, the error is logged and the next try still
+        comes, so one failed call doesn't end it.
+
         Args:
             chat_id: The chat.
             every_seconds: How long to wait before the next time.
@@ -171,7 +177,10 @@ class TypingKeeper:
         with self._lock_for(chat_id):
             if chat_id not in self._chats_kept_typing:
                 return
-            self._chat_channel.show_typing(chat_id)
+            try:
+                self._chat_channel.show_typing(chat_id)
+            except Exception:
+                logger.exception("Could not show typing again")
         self._wait_to_show_again(chat_id, every_seconds)
 
     def _lock_for(self, chat_id: int) -> threading.Lock:

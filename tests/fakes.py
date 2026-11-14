@@ -68,7 +68,8 @@ class FakeChatChannel:
     `events` lists texts, stickers, photos, reactions and typing in the
     order they happened. Queue exceptions in `text_send_failures` to make
     the next text sends raise them. Set `photo_send_failure` to make sending
-    a photo raise it, and `reaction_failure` to make reacting raise it.
+    a photo raise it, `reaction_failure` to make reacting raise it, and
+    `typing_failure` to make showing typing raise it.
     Sticker sets and sticker images it knows are set by tests; set
     `sticker_lookup_failure` to make looking them up raise it. Photos are
     served from `photos`, or `FAKE_PHOTO` for any other file ID; queue
@@ -82,6 +83,7 @@ class FakeChatChannel:
         self.reactions: list[SentReaction] = []
         self.reaction_failure: Exception | None = None
         self.typing_shown_in: list[int] = []
+        self.typing_failure: Exception | None = None
         self.events: list[str] = []
         self.sticker_sets: dict[str, list[ChannelSticker]] = {}
         self.sticker_images: dict[str, StickerImage] = {}
@@ -204,7 +206,12 @@ class FakeChatChannel:
 
         Args:
             chat_id: The chat it was shown in.
+
+        Raises:
+            Exception: `typing_failure`, if set; typing is then not recorded.
         """
+        if self.typing_failure is not None:
+            raise self.typing_failure
         self.typing_shown_in.append(chat_id)
         self.events.append("typing")
 
@@ -402,13 +409,19 @@ class FakeTimer:
 
     def end_message_waits(self) -> None:
         """Run the waiting Message work now, as if each User had paused."""
-        keys = [key for key in self._waiting if key.startswith(MESSAGE_WAIT_PREFIX)]
-        for key in keys:
-            self._waiting.pop(key)()
+        self._end_waits(MESSAGE_WAIT_PREFIX)
 
     def end_typing_waits(self) -> None:
         """Run the waiting typing work now, as if each typing wait had ended."""
-        keys = [key for key in self._waiting if key.startswith(TYPING_WAIT_PREFIX)]
+        self._end_waits(TYPING_WAIT_PREFIX)
+
+    def _end_waits(self, key_prefix: str) -> None:
+        """Run the waiting work whose keys start with a prefix, as if its waits ended.
+
+        Args:
+            key_prefix: The start of the keys to run.
+        """
+        keys = [key for key in self._waiting if key.startswith(key_prefix)]
         for key in keys:
             self._waiting.pop(key)()
 
