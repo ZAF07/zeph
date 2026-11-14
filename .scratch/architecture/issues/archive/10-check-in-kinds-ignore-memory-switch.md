@@ -56,3 +56,4 @@ None. Touches `core/check_ins.py`, as issue 04 does. Doing this first leaves iss
 ## Completion
 
 - Completed: 2026-11-14
+- Commit: 7d643a1 "Check-in Kinds ignore the User Memory switch", review fixes 5a31216 "Review fixes: list_kinds needs no User, one place for a Feature's reply note name", archive 56aec66 "Architecture issue 10 done: archive issue with test, run and review evidence" (merged from `arch-10-check-in-kinds-ignore-memory` in b6f9fec "Merge architecture issue 10: Check-in Kinds ignore the User Memory switch; every Kind can be sent whichever switch is off (the User's or the Admin's), photo Kinds depend only on Shared Photos and Photo Viewing; "allowed without User Memory" removed from the Kind, the database (migration 0023), the admin API and page, and the seed data; the reply note names User Memory as learning new things so replies don't claim they can't remember")
