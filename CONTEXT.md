@@ -133,7 +133,7 @@ _Avoid_: Alert, incident, flag
 ### User Memory
 
 **User Memory**:
-Everything the Companion has retained about a specific User, made up of Memory Items, Conversation Summaries and Shared Photos. The User can turn it off: then nothing new is kept and the Companion doesn't use what it has, but nothing is deleted until the User deletes it. It is also a Feature: an Admin turning it off for a User has exactly the same effect, keeps the User's own choice for when it is back on, and still lets the User see and delete their memories.
+Everything the Companion has retained about a specific User, made up of Memory Items, Conversation Summaries and Shared Photos. The User can turn it off: then the Companion stops learning (nothing new is kept) but still uses what it already has, and nothing is deleted until the User deletes it. It is also a Feature, and the Admin's switch has the final say: an Admin turning it off for a User has exactly the same effect and keeps the User's own choice for when it is back on. Whichever switch is off, the User can always see and delete their memories on the Dashboard.
 _Avoid_: Memory, profile, history, context
 
 **Memory Item**:
