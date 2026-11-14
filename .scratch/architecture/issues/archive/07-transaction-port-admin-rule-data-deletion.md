@@ -63,8 +63,10 @@ None.
   - Each repository deletes only its own rows; the three combined methods are gone: `grep` finds none of `delete_data` (repository), `demote_unless_last_admin`, `delete_unless_last_admin`; 9 `delete_for_user` in port and adapter; the users and pending repositories delete only from their own tables.
   - Coverage test: `test_delete_my_data_removes_every_kind_of_data_but_keeps_the_account` reads every table with a `user_id` column from `information_schema`, fails if one has no test data, and checks each is cleared unless in `TABLES_KEPT_BY_DELETE_MY_DATA` (`daily_usage`, `safeguard_events`, `user_feature_switches`), which must stay unchanged. Account deletion checks every such table is empty.
   - Concurrency test: `test_two_admins_demoting_each_other_at_the_same_moment_leave_one_admin` holds the Admin lock, waits until the other demotion is blocked on it (`pg_stat_activity`), then demotes; the other gets `LastAdminError` and one Admin is left. It fails with `FOR UPDATE` removed.
-  - Checks: `pytest` 689 passed (9 evals deselected); `ruff check`, `ruff format --check` clean; `mypy src` no issues in 102 files.
+  - Checks (after rebase on issue 06): `pytest` 706 passed (9 evals deselected); `ruff check`, `ruff format --check` clean; `mypy src` no issues in 102 files.
   - `/run`: see Comments.
 - Commits:
-  - 4febb5b "Architecture issue 07: transaction port; last-Admin rule and Delete My Data in core"
-  - 06b4e0b "Review fixes: every per-User repository deletes its own rows; tighter lock wait"
+  - e61f74c "Architecture issue 07: transaction port; last-Admin rule and Delete My Data in core"
+  - 6c713f3 "Review fixes: every per-User repository deletes its own rows; tighter lock wait"
+  - 47103e4 "Architecture issue 07 done: archive issue with test, run and review evidence; ADR 0008 says which deletes Delete My Data skips"
+  - 2c3eb04 "Merge architecture issue 07: transaction port; last-Admin rule and Delete My Data in core" (merged into main)
