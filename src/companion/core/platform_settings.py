@@ -204,6 +204,9 @@ LIFE_THREAD_BRUSHED_OFF_WAIT = Setting("life_thread_brushed_off_wait_days", read
 LIFE_THREAD_KEEPING_MODEL = Setting("life_thread_keeping_model", read_text)
 LIFE_THREAD_KEEPING_PROMPT = Setting("life_thread_keeping_prompt", read_text)
 KNOWLEDGE_CHUNKS_PER_REPLY = Setting("knowledge_chunks_per_reply", read_whole_number)
+KNOWLEDGE_CLOSENESS_PERCENT = Setting("knowledge_closeness_percent", read_whole_number)
+KNOWLEDGE_WHEN_IT_HELPS_MODEL = Setting("knowledge_when_it_helps_model", read_text)
+KNOWLEDGE_WHEN_IT_HELPS_PROMPT = Setting("knowledge_when_it_helps_prompt", read_text)
 REPLY_KNOWLEDGE_INTRO = Setting("reply_knowledge_intro", read_text)
 DAILY_MESSAGE_LIMIT = Setting("daily_message_limit", read_whole_number)
 DAILY_LIMIT_REPLY = Setting("daily_limit_reply", read_text)
@@ -549,6 +552,16 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.MODEL,
     ),
     EditableSetting(
+        KNOWLEDGE_WHEN_IT_HELPS_PROMPT.key,
+        "Knowledge “when it helps” prompt",
+        SettingKind.TEXT,
+    ),
+    EditableSetting(
+        KNOWLEDGE_WHEN_IT_HELPS_MODEL.key,
+        "Knowledge “when it helps” model",
+        SettingKind.MODEL,
+    ),
+    EditableSetting(
         PERSONAL_STICKERS_LIMIT.key,
         "Most Personal Stickers per User",
         SettingKind.WHOLE_NUMBER,
@@ -611,6 +624,13 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=365,
+    ),
+    EditableSetting(
+        KNOWLEDGE_CLOSENESS_PERCENT.key,
+        "Knowledge closeness bar",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=100,
     ),
     EditableSetting(
         CONVERSATION_QUIET_GAP.key,
@@ -812,6 +832,18 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         ),
         prompt_key=PERSONAL_STICKER_KEEPING_PROMPT.key,
         model_key=PERSONAL_STICKER_KEEPING_MODEL.key,
+    ),
+    CoreService(
+        name="Knowledge “when it helps”",
+        runs_when="When a Knowledge document is made ready without one",
+        description=(
+            "Drafts a Knowledge document’s “when it helps” description from "
+            "its details and text. The Understanding reads these to decide "
+            "whether any document fits. Admins can rewrite it on the "
+            "document’s page."
+        ),
+        prompt_key=KNOWLEDGE_WHEN_IT_HELPS_PROMPT.key,
+        model_key=KNOWLEDGE_WHEN_IT_HELPS_MODEL.key,
     ),
     CoreService(
         name="Check-ins",

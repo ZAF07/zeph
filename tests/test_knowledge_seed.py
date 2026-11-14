@@ -11,17 +11,24 @@ from companion.adapters.postgres.tables import knowledge_chunks, knowledge_docum
 from companion.adapters.pypdf.text_extractor import PypdfTextExtractor
 from companion.core.knowledge import KnowledgeService
 from companion.core.models import KnowledgeFileType, KnowledgeStatus, KnowledgeUpload
+from companion.core.platform_settings import KNOWLEDGE_WHEN_IT_HELPS_PROMPT
 from tests.conftest import KNOWLEDGE_SEED_FILE
-from tests.fakes import FakeEmbedder
+from tests.fakes import DEFAULT_WHEN_IT_HELPS, FakeEmbedder, ScriptedChatModel
 from tests.knowledge_helpers import blank_pdf
 
 
 def knowledge_service(engine: Engine) -> KnowledgeService:
+    repositories = build_postgres_repositories(engine)
     return KnowledgeService(
-        repositories=build_postgres_repositories(engine),
+        repositories=repositories,
         text_extractor=PypdfTextExtractor(),
         embedder=FakeEmbedder(),
         vector_store=PgvectorKnowledgeVectorStore(engine),
+        chat_model=ScriptedChatModel(
+            knowledge_when_it_helps_prompt=repositories.platform_settings.load().get(
+                KNOWLEDGE_WHEN_IT_HELPS_PROMPT
+            )
+        ),
         clock=SystemClock(),
     )
 
@@ -48,6 +55,7 @@ def test_the_starter_mindfulness_set_is_seeded_ready_from_the_data_files(
         ("Tao Te Ching (selections)", "Taoism"),
     ]
     assert {document.status for document in documents} == {KnowledgeStatus.READY}
+    assert {document.when_it_helps for document in documents} == {DEFAULT_WHEN_IT_HELPS}
 
 
 def test_the_starter_set_is_seeded_only_on_first_run(engine: Engine) -> None:

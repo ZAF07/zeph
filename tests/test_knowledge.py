@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from datetime import timedelta
 from typing import Any
 from uuid import UUID
@@ -7,17 +8,20 @@ from sqlalchemy import Engine, func, select, update
 
 from companion.adapters.postgres.tables import knowledge_chunks, knowledge_documents
 from tests.fakes import (
+    DEFAULT_WHEN_IT_HELPS,
     FakeAuthVerifier,
     FakeChatChannel,
     FakeClock,
     FakeEmbedder,
     ScriptedChatModel,
+    understanding_answer,
 )
 from tests.knowledge_helpers import (
     blank_pdf,
     document_text,
     list_documents,
     pdf_with_text,
+    set_knowledge_closeness,
     upload_document,
 )
 from tests.telegram_helpers import (
@@ -50,10 +54,20 @@ def chunk_count(engine: Engine) -> int:
 
 
 def reply_instructions(
-    client: TestClient, chat_model: ScriptedChatModel, text: str
+    client: TestClient,
+    chat_model: ScriptedChatModel,
+    text: str,
+    documents: Sequence[str] = ("Dhammapada",),
 ) -> str:
-    """Send a Telegram message and return the instructions its reply was given."""
+    """Send a Telegram message and return the instructions its reply was given.
+
+    The Understanding chooses the given Knowledge documents and searches them
+    with the message.
+    """
     chat_model.calls.clear()
+    chat_model.script_understanding(
+        understanding_answer(knowledge_documents=documents, knowledge_search=text)
+    )
     chat_model.script("mm, yes")
     assert send_to_webhook(client, telegram_text_update(text)) == 200
     [reply_call] = chat_model.calls
@@ -88,6 +102,7 @@ def test_an_uploaded_text_document_starts_pending_and_becomes_ready(
         "failure_reason": None,
         "text_edited": False,
         "created_at": clock.now().isoformat().replace("+00:00", "Z"),
+        "when_it_helps": DEFAULT_WHEN_IT_HELPS,
     }
 
 
@@ -115,6 +130,7 @@ def test_a_document_shows_the_text_read_from_its_file(
         "failure_reason": None,
         "text_edited": False,
         "created_at": clock.now().isoformat().replace("+00:00", "Z"),
+        "when_it_helps": DEFAULT_WHEN_IT_HELPS,
         "text": "Mind is the forerunner.",
     }
 
@@ -379,7 +395,9 @@ def test_the_next_reply_cites_a_documents_new_details(
         json={"title": "On the breath", "source": "Owner’s summary"},
         headers=admin,
     )
-    instructions = reply_instructions(client, chat_model, "notice the breath")
+    instructions = reply_instructions(
+        client, chat_model, "notice the breath", documents=["On the breath"]
+    )
 
     assert (
         f"From “On the breath” (Owner’s summary, Buddhism):\n{BREATH_PASSAGES[0]}"
@@ -414,6 +432,7 @@ def test_editing_a_documents_text_reindexes_it_from_the_new_wording(
     uploaded = upload_document(client, admin, "breath.txt", BREATH_PASSAGES[0].encode())
     document_id = uploaded.json()["id"]
     connect_telegram(client, auth_verifier, chat_channel)
+    set_knowledge_closeness(client, admin, 0)
 
     response = save_text(client, admin, document_id, f"\n  {RIVER_PASSAGE}  \n")
 
@@ -490,6 +509,7 @@ def test_retrying_a_failed_reindex_keeps_the_edited_text(
     uploaded = upload_document(client, admin, "breath.txt", BREATH_PASSAGES[0].encode())
     document_id = uploaded.json()["id"]
     connect_telegram(client, auth_verifier, chat_channel)
+    set_knowledge_closeness(client, admin, 0)
     embedder.failure = RuntimeError("model download failed")
 
     save_text(client, admin, document_id, RIVER_PASSAGE)
@@ -534,6 +554,7 @@ def test_replacing_a_file_keeps_the_document_and_uses_the_new_text(
     document_id = uploaded.json()["id"]
     save_text(client, admin, document_id, BREATH_PASSAGES[1])
     connect_telegram(client, auth_verifier, chat_channel)
+    set_knowledge_closeness(client, admin, 0)
     clock.advance(timedelta(days=3))
 
     response = replace_file(
@@ -674,9 +695,13 @@ def test_matching_knowledge_reaches_the_reply_with_where_it_is_from(
             tradition="Mindfulness",
         )
     connect_telegram(client, auth_verifier, chat_channel)
+    set_knowledge_closeness(client, admin, 10)
 
     instructions = reply_instructions(
-        client, chat_model, "my attention keeps drifting, the breath helps"
+        client,
+        chat_model,
+        "my attention keeps drifting, the breath helps",
+        documents=["Taxes", "On the breath 1", "On the breath 2", "On the breath 3"],
     )
 
     assert embedder.queries[-1] == "my attention keeps drifting, the breath helps"
@@ -702,8 +727,11 @@ def test_a_failed_document_never_reaches_the_reply(
     admin = owner_headers(client, auth_verifier)
     upload_document(client, admin, "scan.pdf", blank_pdf(), title="Scan")
     connect_telegram(client, auth_verifier, chat_channel)
+    set_knowledge_closeness(client, admin, 0)
 
-    instructions = reply_instructions(client, chat_model, "notice the breath")
+    instructions = reply_instructions(
+        client, chat_model, "notice the breath", documents=["Scan"]
+    )
 
     assert seeded_settings["reply_knowledge_intro"] not in instructions
     assert instructions.endswith(seeded_settings["reply_settings_instructions"])
@@ -721,7 +749,11 @@ def test_a_deleted_document_and_its_chunks_are_gone_from_replies(
     upload_document(client, admin, "tax.txt", TAX_PASSAGE.encode(), title="Taxes")
     [breath] = [d for d in list_documents(client, admin) if d["title"] != "Taxes"]
     connect_telegram(client, auth_verifier, chat_channel)
-    assert BREATH_PASSAGES[0] in reply_instructions(client, chat_model, "the breath")
+    set_knowledge_closeness(client, admin, 0)
+    chosen = ["Dhammapada", "Taxes"]
+    assert BREATH_PASSAGES[0] in reply_instructions(
+        client, chat_model, "the breath", chosen
+    )
 
     response = client.delete(
         f"/api/admin/knowledge-documents/{breath['id']}", headers=admin
@@ -731,7 +763,7 @@ def test_a_deleted_document_and_its_chunks_are_gone_from_replies(
     assert [d["title"] for d in list_documents(client, admin)] == ["Taxes"]
     assert chunk_count(engine) == 1
     assert BREATH_PASSAGES[0] not in reply_instructions(
-        client, chat_model, "the breath"
+        client, chat_model, "the breath", chosen
     )
     missing = client.delete(
         f"/api/admin/knowledge-documents/{MISSING_ID}", headers=admin

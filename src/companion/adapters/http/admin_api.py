@@ -534,6 +534,7 @@ class KnowledgeDocumentResponse(BaseModel):
     failure_reason: str | None
     text_edited: bool
     created_at: datetime
+    when_it_helps: str
 
 
 class KnowledgeDocumentWithTextResponse(KnowledgeDocumentResponse):
@@ -548,6 +549,7 @@ class KnowledgeDetailsRequest(BaseModel):
     title: str | None = None
     source: str | None = None
     tradition: str | None = None
+    when_it_helps: str | None = None
 
 
 class KnowledgeTextRequest(BaseModel):
@@ -638,6 +640,7 @@ def to_knowledge_document_response(
         failure_reason=document.failure_reason,
         text_edited=document.text_edited,
         created_at=document.created_at,
+        when_it_helps=document.when_it_helps,
     )
 
 
@@ -1872,7 +1875,7 @@ def build_admin_api_router(
     def update_knowledge_document_details(
         document_id: UUID, request: KnowledgeDetailsRequest
     ) -> KnowledgeDocumentWithTextResponse:
-        """Change a Knowledge document's title, source or tradition.
+        """Change a Knowledge document's title, source, tradition or "when it helps".
 
         Takes effect straight away, with no re-indexing.
 
@@ -1893,6 +1896,7 @@ def build_admin_api_router(
                 title=request.title,
                 source=request.source,
                 tradition=request.tradition,
+                when_it_helps=request.when_it_helps,
             ),
         )
         return to_knowledge_document_with_text_response(document_with_text)

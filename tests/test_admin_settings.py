@@ -220,6 +220,7 @@ def test_core_services_list_their_prompt_and_model_settings(
         "Photo viewing",
         "Life Thread keeping",
         "Personal Sticker keeping",
+        "Knowledge “when it helps”",
         "Check-ins",
     ]
     service = response["services"][1]

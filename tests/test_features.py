@@ -17,6 +17,7 @@ from tests.fakes import (
     FakeScheduler,
     ScriptedChatModel,
     ToolCall,
+    understanding_answer,
 )
 from tests.knowledge_helpers import upload_document
 from tests.telegram_helpers import (
@@ -606,6 +607,16 @@ def test_with_stickers_off_admins_still_add_stickers_in_chat(
     assert sticker["emoji"] == "🌊"
 
 
+def choose_breath_passage(chat_model: ScriptedChatModel) -> None:
+    """Have the next Understanding choose the breath document."""
+    chat_model.script_understanding(
+        understanding_answer(
+            knowledge_documents=["On the breath"],
+            knowledge_search="notice the breath entering",
+        )
+    )
+
+
 def upload_breath_passage(client: TestClient, admin: dict[str, str]) -> None:
     """Upload one Knowledge document about the breath."""
     response = upload_document(
@@ -634,14 +645,17 @@ def test_with_knowledge_off_no_passages_go_into_the_reply(
     intro = seeded_settings["reply_knowledge_intro"]
     note = unavailable_note(seeded_settings, "Knowledge")
 
+    choose_breath_passage(chat_model)
     on = reply_call(client, chat_model, "the breath helps me")
     switch_for_everyone(client, admin, "knowledge", on=False)
     searches_before = len(embedder.queries)
+    choose_breath_passage(chat_model)
     off = reply_call(client, chat_model, "the breath helps me")
     knowledge_searches_while_off = embedder.queries[searches_before:].count(
         "the breath helps me"
     )
     switch_for_everyone(client, admin, "knowledge", on=True)
+    choose_breath_passage(chat_model)
     back_on = reply_call(client, chat_model, "the breath helps me")
 
     assert BREATH_PASSAGES[0] in on.instructions
@@ -666,7 +680,9 @@ def test_with_knowledge_off_for_one_user_others_still_get_passages(
     user_id = maya_id(client, auth_verifier)
 
     status = switch_for_user(client, admin, user_id, "knowledge", "off")
+    choose_breath_passage(chat_model)
     maya_call = reply_call(client, chat_model, "the breath helps me")
+    choose_breath_passage(chat_model)
     owner_call = owner_reply_call(client, chat_model, "the breath helps me")
 
     assert status["works"] is False

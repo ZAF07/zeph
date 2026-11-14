@@ -17,6 +17,10 @@ from companion.core.models import (
     ChatLine,
     ChatRole,
     ConversationMessage,
+    Feature,
+    KnowledgeDocument,
+    KnowledgeLookup,
+    KnowledgeStatus,
     MessageDirection,
     ModelStep,
     MoodIntensity,
@@ -39,7 +43,7 @@ from companion.core.usage import UsageRecordingChatModel
 
 logger = logging.getLogger(__name__)
 
-LIST_FIELDS = ("memory_categories", "look_up_past", "knowledge")
+LIST_FIELDS = ("memory_categories", "look_up_past")
 
 
 @dataclass(frozen=True)
@@ -90,6 +94,20 @@ def format_earlier_understanding(understanding: Understanding) -> str:
     return f"{line} {form.nuance}" if form.nuance else line
 
 
+def format_knowledge_document(document: KnowledgeDocument) -> str:
+    """Write one Knowledge document as the Understanding reads it.
+
+    Args:
+        document: The document.
+
+    Returns:
+        E.g. "- “On the breath” (Owner's notes, Mindfulness): When their
+        attention keeps drifting."
+    """
+    line = f"- “{document.title}” ({document.source}, {document.tradition})"
+    return f"{line}: {document.when_it_helps}" if document.when_it_helps else line
+
+
 def describe_message_for_understanding(
     snapshot: UserSnapshot,
     needs: Sequence[Need],
@@ -97,6 +115,7 @@ def describe_message_for_understanding(
     earlier: Sequence[Understanding],
     messages: list[ConversationMessage],
     reminded: Sequence[RemindedThread],
+    knowledge_documents: Sequence[KnowledgeDocument],
 ) -> str:
     """Write what the Understanding model is given about the Message.
 
@@ -108,11 +127,12 @@ def describe_message_for_understanding(
         messages: The Conversation so far, oldest first; the User's messages
             at the end are the Message being answered.
         reminded: The Life Threads the Message reminds the Companion of.
+        knowledge_documents: The Knowledge documents it may choose from.
 
     Returns:
         The time, Needs, Goals, Memory Categories, recent Conversations,
-        reminded Life Threads, earlier Understandings, earlier Conversation
-        and latest message.
+        reminded Life Threads, Knowledge documents, earlier Understandings,
+        earlier Conversation and latest message.
     """
     fallback = fallback_need(needs)
     need_lines = "\n".join(f"- {need.name}: {need.when_it_fits}" for need in needs)
@@ -129,6 +149,9 @@ def describe_message_for_understanding(
     earlier_lines = "\n".join(
         format_earlier_understanding(understanding) for understanding in earlier
     )
+    knowledge_lines = "\n".join(
+        format_knowledge_document(document) for document in knowledge_documents
+    )
     earlier_messages, latest_text = split_off_latest_message(messages)
     return (
         f"Time where they are: {format_local_time(snapshot.local_now)}\n\n"
@@ -139,6 +162,8 @@ def describe_message_for_understanding(
         f"\n\nRecent Conversations, newest first:\n{summary_lines or 'None yet.'}"
         f"\n\nLife Threads this reminds you of, open ones first:\n"
         f"{describe_reminded_threads(reminded, snapshot.user.time_zone)}"
+        f"\n\nKnowledge documents, with when each helps:\n"
+        f"{knowledge_lines or 'None.'}"
         f"\n\nEarlier Understandings in this Conversation, oldest first:\n"
         f"{earlier_lines or 'None yet.'}\n\n"
         f"Earlier in the Conversation:\n"
@@ -297,6 +322,26 @@ def keep_held_back_threads_alone(
     )
 
 
+def read_knowledge_lookup(value: Any) -> KnowledgeLookup | None:
+    """Read the form's `knowledge` field: documents to search and a phrase.
+
+    Args:
+        value: The field's value, e.g. {"documents": ["On grief"], "search":
+            "letting sorrow pass"}.
+
+    Returns:
+        The lookup; None if it names no document or gives no phrase, so no
+        Knowledge is searched.
+    """
+    if not isinstance(value, dict):
+        return None
+    documents = read_text_list(value.get("documents"))
+    search = value.get("search")
+    if not documents or not isinstance(search, str) or not search.strip():
+        return None
+    return KnowledgeLookup(documents=documents, search=search.strip())
+
+
 def read_understanding_form(
     answer: str, reminded: Sequence[RemindedThread]
 ) -> UnderstandingForm | None:
@@ -345,6 +390,7 @@ def read_understanding_form(
         bring_up=read_bring_up(parsed.get("bring_up"), by_number),
         left_alone=read_left_alone(parsed.get("left_alone"), by_number),
         threads_touched=read_threads_touched(parsed.get("threads_touched"), by_number),
+        knowledge=read_knowledge_lookup(parsed.get("knowledge")),
         **lists,
     )
     return keep_held_back_threads_alone(form, reminded)
@@ -520,7 +566,13 @@ class UnderstandingService:
         model_form = self._ask(
             snapshot,
             describe_message_for_understanding(
-                snapshot, needs, saved, earlier, messages, reminded
+                snapshot,
+                needs,
+                saved,
+                earlier,
+                messages,
+                reminded,
+                self._knowledge_documents(snapshot),
             ),
             reminded,
         )
@@ -552,6 +604,23 @@ class UnderstandingService:
                 format_threads_for_reply(reminded, model_form, snapshot.user.time_zone),
             ),
         )
+
+    def _knowledge_documents(self, snapshot: UserSnapshot) -> list[KnowledgeDocument]:
+        """List the Knowledge documents the Understanding may choose from.
+
+        Args:
+            snapshot: The User being answered.
+
+        Returns:
+            Every Ready document; none when Knowledge doesn't work for them.
+        """
+        if not snapshot.works(Feature.KNOWLEDGE):
+            return []
+        return [
+            document
+            for document in self._repositories.knowledge_documents.list_all()
+            if document.status == KnowledgeStatus.READY
+        ]
 
     def _ask(
         self,

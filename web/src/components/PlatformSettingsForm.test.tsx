@@ -37,6 +37,7 @@ const settings: AdminSettings = {
   life_threads_per_reply: seeded(3),
   life_threads_closeness_percent: seeded(68),
   life_thread_brushed_off_wait_days: seeded(14),
+  knowledge_closeness_percent: seeded(60),
   photo_retry_count: seeded(2),
   photo_album_max_photos: seeded(5),
   personal_stickers_limit: seeded(30),
@@ -203,6 +204,21 @@ describe("PlatformSettingsForm", () => {
       life_threads_per_reply: 2,
       life_threads_closeness_percent: 70,
       life_thread_brushed_off_wait_days: 21,
+    });
+  });
+
+  it("shows and saves the Knowledge closeness bar", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const bar = await screen.findByLabelText("Knowledge closeness bar");
+    expect(bar).toHaveValue(60);
+
+    await user.clear(bar);
+    await user.type(bar, "70");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      knowledge_closeness_percent: 70,
     });
   });
 

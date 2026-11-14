@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 
 import { primaryButton } from "@/components/button-styles";
-import { fieldLabel, inputField } from "@/components/form-styles";
+import { fieldCaption, fieldLabel, inputField } from "@/components/form-styles";
 import {
   ApiError,
   type KnowledgeDetailsChange,
@@ -18,10 +18,10 @@ import {
 type Flash = { text: string; isError: boolean };
 
 /**
- * A Knowledge document's Details card: its title, source / author and
- * tradition as a form with Save, and its type and added day. Saving takes
- * effect straight away, without re-indexing. Shows the backend's reason if
- * it refuses.
+ * A Knowledge document's Details card: its title, source / author,
+ * tradition and "when it helps" as a form with Save, and its type and added
+ * day. Saving takes effect straight away, without re-indexing. Shows the
+ * backend's reason if it refuses.
  *
  * @param props - `knowledgeDocument` is the document; `onSave` sends the
  *   changed details and resolves with the saved document.
@@ -39,10 +39,14 @@ export function KnowledgeDetailsForm({
   const [title, setTitle] = useState(knowledgeDocument.title);
   const [source, setSource] = useState(knowledgeDocument.source);
   const [tradition, setTradition] = useState(knowledgeDocument.tradition);
+  const [whenItHelps, setWhenItHelps] = useState(
+    knowledgeDocument.when_it_helps,
+  );
   const [saved, setSaved] = useState({
     title: knowledgeDocument.title,
     source: knowledgeDocument.source,
     tradition: knowledgeDocument.tradition,
+    whenItHelps: knowledgeDocument.when_it_helps,
   });
   const [flash, setFlash] = useState<Flash | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -53,7 +57,8 @@ export function KnowledgeDetailsForm({
   const hasChanges =
     title !== saved.title ||
     source !== saved.source ||
-    tradition !== saved.tradition;
+    tradition !== saved.tradition ||
+    whenItHelps !== saved.whenItHelps;
   const fixedDetails = [
     {
       term: "Type",
@@ -71,14 +76,21 @@ export function KnowledgeDetailsForm({
     setIsSaving(true);
     setFlash(null);
     try {
-      const savedDocument = await onSave({ title, source, tradition });
+      const savedDocument = await onSave({
+        title,
+        source,
+        tradition,
+        when_it_helps: whenItHelps,
+      });
       setTitle(savedDocument.title);
       setSource(savedDocument.source);
       setTradition(savedDocument.tradition);
+      setWhenItHelps(savedDocument.when_it_helps);
       setSaved({
         title: savedDocument.title,
         source: savedDocument.source,
         tradition: savedDocument.tradition,
+        whenItHelps: savedDocument.when_it_helps,
       });
       setFlash({
         text: "Details saved. Replies use them straight away.",
@@ -140,6 +152,23 @@ export function KnowledgeDetailsForm({
             ))}
           </select>
         </label>
+      </div>
+      <div className="flex flex-col gap-2">
+        <label className={fieldLabel}>
+          When it helps
+          <textarea
+            className={`${inputField} min-h-24 resize-y`}
+            rows={3}
+            value={whenItHelps}
+            aria-describedby="when-it-helps-caption"
+            onChange={(event) => setWhenItHelps(event.target.value)}
+          />
+        </label>
+        <p id="when-it-helps-caption" className={fieldCaption}>
+          {saved.whenItHelps === ""
+            ? "Not drafted yet. Until you write it, Zeph only has the title to go on."
+            : "Zeph reads this to decide whether the document fits what someone needs."}
+        </p>
       </div>
       <dl className="m-0 grid grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))] gap-x-3 gap-y-4">
         {fixedDetails.map((detail) => (

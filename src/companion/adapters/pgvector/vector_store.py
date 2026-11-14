@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from uuid import UUID, uuid4
 
 from sqlalchemy import Engine, delete, insert, select
@@ -61,20 +62,37 @@ class PgvectorKnowledgeVectorStore:
                 )
             )
 
-    def search(self, embedding: list[float], limit: int) -> list[KnowledgeChunkMatch]:
-        """Find the chunks closest to an embedding.
+    def search(
+        self,
+        embedding: list[float],
+        document_ids: Sequence[UUID],
+        min_closeness: float,
+        limit: int,
+    ) -> list[KnowledgeChunkMatch]:
+        """Find the chunks of some documents closest to an embedding.
+
+        Closeness is cosine similarity.
 
         Args:
             embedding: What to search with.
+            document_ids: The documents to search; only their chunks count.
+            min_closeness: How close a chunk must be, from 0 to 1.
             limit: The most chunks to return.
 
         Returns:
             The closest chunks, best match first.
         """
+        if not document_ids or limit < 1:
+            return []
+        distance = knowledge_chunks.c.embedding.cosine_distance(embedding)
         with self._engine.connect() as connection:
             rows = connection.execute(
                 select(knowledge_chunks.c.document_id, knowledge_chunks.c.text)
-                .order_by(knowledge_chunks.c.embedding.cosine_distance(embedding))
+                .where(
+                    knowledge_chunks.c.document_id.in_(document_ids),
+                    distance <= 1 - min_closeness,
+                )
+                .order_by(distance)
                 .limit(limit)
             ).all()
         return [

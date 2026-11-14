@@ -349,6 +349,7 @@ knowledge_documents = Table(
     Column("status", Text, nullable=False),
     Column("failure_reason", Text),
     Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("when_it_helps", Text, nullable=False, server_default=""),
 )
 
 knowledge_chunks = Table(

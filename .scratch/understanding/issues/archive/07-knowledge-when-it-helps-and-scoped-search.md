@@ -1,6 +1,6 @@
 # 07 — Knowledge "when it helps", chosen by the Understanding
 
-Status: ready-for-agent
+Status: in-progress
 
 ## Parent
 
@@ -24,3 +24,13 @@ Knowledge comes in only when it genuinely fits. Each Knowledge Document gets a "
 ## Blocked by
 
 - `.scratch/understanding/issues/04-understanding-call-with-seeded-needs.md`
+
+## Comments
+
+- Branch `understanding-07-knowledge-when-it-helps`, worktree `ai-chat-companion-understanding-07`.
+- Plan:
+  - `knowledge_documents.when_it_helps` (text, default ""), migration 0030; it also reloads the Understanding prompt, which now explains `knowledge`.
+  - Drafting: when a document is indexed and its "when it helps" is blank, one model call (Admin-set prompt and model, on Prompts and Models) drafts it from the title, source, tradition and the start of the text, before the document is marked Ready. A failed draft is logged and the document is still Ready. Text edits and file replacements keep the description (CONTEXT.md: replacing a file keeps its details).
+  - Admins edit it with the other details (PATCH `/api/admin/knowledge-documents/{id}`), in the Details card. Blank is allowed.
+  - The Understanding sees every Ready document (title, source, tradition, when it helps) while Knowledge works for the User, and answers `knowledge` as `{"documents": ["<title>"], "search": "<phrase>"}` or `null`.
+  - Search: only when documents and a phrase were given; embeddings search only inside the chosen Ready documents, at or above `knowledge_closeness_percent`, at most `knowledge_chunks_per_reply`. The old latest-text search goes.

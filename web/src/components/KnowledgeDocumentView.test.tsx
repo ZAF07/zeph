@@ -41,6 +41,7 @@ const breathing: KnowledgeDocumentWithText = {
   failure_reason: null,
   text_edited: false,
   created_at: "2026-10-02T09:00:00Z",
+  when_it_helps: "When someone wants to settle a scattered mind.",
   text: "# Mindful breathing\n\nNotice the **breath** entering.",
 };
 
@@ -146,6 +147,7 @@ describe("KnowledgeDocumentView", () => {
         title: "  On the breath ",
         source: "Owner’s summary",
         tradition: "Buddhism",
+        when_it_helps: "When someone wants to settle a scattered mind.",
       },
     );
     expect(
@@ -160,6 +162,63 @@ describe("KnowledgeDocumentView", () => {
     expect(
       details.getByRole("button", { name: "Save details" }),
     ).toBeDisabled();
+  });
+
+  it("edits when the document helps, and replies use it straight away", async () => {
+    apiClient.updateKnowledgeDocumentDetails.mockResolvedValue({
+      ...breathing,
+      when_it_helps: "When they can’t sleep for worry.",
+    });
+    renderWithQueries(<KnowledgeDocumentView documentId="breathing" />);
+    const details = within(
+      await screen.findByRole("form", { name: "Details" }),
+    );
+    const whenItHelps = details.getByLabelText("When it helps");
+    expect(whenItHelps).toHaveValue(
+      "When someone wants to settle a scattered mind.",
+    );
+
+    await userEvent.clear(whenItHelps);
+    await userEvent.type(whenItHelps, "When they can’t sleep for worry.");
+    await userEvent.click(
+      details.getByRole("button", { name: "Save details" }),
+    );
+
+    expect(apiClient.updateKnowledgeDocumentDetails).toHaveBeenCalledWith(
+      "breathing",
+      expect.objectContaining({
+        when_it_helps: "When they can’t sleep for worry.",
+      }),
+    );
+    expect(
+      await details.findByText(
+        "Details saved. Replies use them straight away.",
+      ),
+    ).toBeInTheDocument();
+    expect(details.getByLabelText("When it helps")).toHaveValue(
+      "When they can’t sleep for worry.",
+    );
+    expect(
+      details.getByRole("button", { name: "Save details" }),
+    ).toBeDisabled();
+  });
+
+  it("asks for when it helps when the draft is missing", async () => {
+    apiClient.getKnowledgeDocument.mockResolvedValue({
+      ...breathing,
+      when_it_helps: "",
+    });
+    renderWithQueries(<KnowledgeDocumentView documentId="breathing" />);
+    const details = within(
+      await screen.findByRole("form", { name: "Details" }),
+    );
+
+    expect(details.getByLabelText("When it helps")).toHaveValue("");
+    expect(
+      details.getByText(
+        "Not drafted yet. Until you write it, Zeph only has the title to go on.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("won't save a blank title and shows the backend's reason when refused", async () => {

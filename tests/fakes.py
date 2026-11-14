@@ -438,6 +438,8 @@ def understanding_answer(
     bring_up: Sequence[dict[str, Any]] = (),
     left_alone: Sequence[dict[str, Any]] = (),
     threads_touched: Sequence[int] = (),
+    knowledge_documents: Sequence[str] = (),
+    knowledge_search: str = "",
 ) -> str:
     """Build the form the Understanding model answers with.
 
@@ -454,10 +456,18 @@ def understanding_answer(
         left_alone: The Life Threads to leave alone, e.g. {"thread": 1,
             "reason": "..."}.
         threads_touched: The numbers of the Life Threads the message touches.
+        knowledge_documents: The titles of the Knowledge documents to search;
+            none means no Knowledge.
+        knowledge_search: The phrase to search them with.
 
     Returns:
         The form as JSON.
     """
+    knowledge = (
+        {"documents": list(knowledge_documents), "search": knowledge_search}
+        if knowledge_documents
+        else None
+    )
     return json.dumps(
         {
             "need": need,
@@ -469,20 +479,24 @@ def understanding_answer(
             "bring_up": list(bring_up),
             "left_alone": list(left_alone),
             "look_up_past": list(look_up_past),
-            "knowledge": [],
+            "knowledge": knowledge,
             "threads_touched": list(threads_touched),
         }
     )
 
 
+DEFAULT_WHEN_IT_HELPS = "When someone wants a calm, steady practice."
+
+
 class ScriptedChatModel:
     """Chat model that returns pre-written replies and records each call.
 
-    Safeguard, memory processing, Understanding, Life Thread keeping and
-    Personal Sticker keeping calls are told apart by their instructions and
-    kept apart from reply calls, each with its own script. The Safeguard
-    defaults to "none", the Understanding to `understanding_answer()` and
-    Life Thread keeping to no Threads, so tests about replies don't have to
+    Safeguard, memory processing, Understanding, Life Thread keeping,
+    Personal Sticker keeping and Knowledge "when it helps" drafting calls are
+    told apart by their instructions and kept apart from reply calls, each
+    with its own script. The Safeguard defaults to "none", the Understanding
+    to `understanding_answer()`, Life Thread keeping to no Threads and
+    drafting to `DEFAULT_WHEN_IT_HELPS`, so tests about replies don't have to
     script them too. Set
     `before_next_reply` to run something once while the next reply is being
     "written", like a User acting during a slow model call, and
@@ -497,6 +511,7 @@ class ScriptedChatModel:
         understanding_prompt: str = "",
         sticker_keeping_prompt: str = "",
         thread_keeping_prompt: str = "",
+        knowledge_when_it_helps_prompt: str = "",
     ) -> None:
         """Start with no replies scripted, no calls and no delay.
 
@@ -510,6 +525,8 @@ class ScriptedChatModel:
                 Sticker keeping call.
             thread_keeping_prompt: The instructions that mark a Life Thread
                 keeping call.
+            knowledge_when_it_helps_prompt: The instructions that mark a
+                Knowledge "when it helps" drafting call.
         """
         self._replies: list[str | Exception | ToolCall] = []
         self._safeguard_answers: list[str | Exception] = []
@@ -517,17 +534,20 @@ class ScriptedChatModel:
         self._understanding_answers: list[str | Exception] = []
         self._sticker_keeping_answers: list[str | Exception] = []
         self._thread_keeping_answers: list[str | Exception] = []
+        self._when_it_helps_answers: list[str | Exception] = []
         self.safeguard_prompt = safeguard_prompt
         self.memory_processing_prompt = memory_processing_prompt
         self.understanding_prompt = understanding_prompt
         self.sticker_keeping_prompt = sticker_keeping_prompt
         self.thread_keeping_prompt = thread_keeping_prompt
+        self.knowledge_when_it_helps_prompt = knowledge_when_it_helps_prompt
         self.calls: list[ChatModelCall] = []
         self.safeguard_calls: list[ChatModelCall] = []
         self.processing_calls: list[ChatModelCall] = []
         self.understanding_calls: list[ChatModelCall] = []
         self.sticker_keeping_calls: list[ChatModelCall] = []
         self.thread_keeping_calls: list[ChatModelCall] = []
+        self.when_it_helps_calls: list[ChatModelCall] = []
         self.call_order: list[str] = []
         self.delay_seconds = 0.0
         self.before_next_reply: Callable[[], None] | None = None
@@ -589,6 +609,15 @@ class ScriptedChatModel:
                 returned, to act like a failing model.
         """
         self._sticker_keeping_answers.extend(answers)
+
+    def script_when_it_helps(self, *answers: str | Exception) -> None:
+        """Queue Knowledge "when it helps" drafts, one per drafting call.
+
+        Args:
+            answers: The drafts; an exception is raised instead of returned,
+                to act like a failing model.
+        """
+        self._when_it_helps_answers.extend(answers)
 
     def generate(
         self,
@@ -658,6 +687,17 @@ class ScriptedChatModel:
             self.sticker_keeping_calls.append(call)
             self.call_order.append("sticker_keeping")
             answer = self._sticker_keeping_answers.pop(0)
+        elif (
+            self.knowledge_when_it_helps_prompt
+            and instructions == self.knowledge_when_it_helps_prompt
+        ):
+            self.when_it_helps_calls.append(call)
+            self.call_order.append("when_it_helps")
+            answer = (
+                self._when_it_helps_answers.pop(0)
+                if self._when_it_helps_answers
+                else DEFAULT_WHEN_IT_HELPS
+            )
         else:
             self.calls.append(call)
             self.call_order.append("reply")

@@ -369,8 +369,9 @@ understanding_prompt: |-
   are given the time where they are, the Needs Zeph can meet, their Goals,
   the Memory Categories Zeph has saved something in, their recent
   Conversations, the Life Threads (ongoing stories in their life) this
-  message reminds Zeph of, what you understood earlier in this Conversation,
-  and the Conversation so far, ending with their latest message.
+  message reminds Zeph of, the Knowledge documents Zeph can draw on with when
+  each helps, what you understood earlier in this Conversation, and the
+  Conversation so far, ending with their latest message.
 
   Work out what they want from Zeph right now, fresh for this message:
   - need: the one Need that fits best, its name exactly as written. If it
@@ -398,6 +399,16 @@ understanding_prompt: |-
   - left_alone: the Life Threads the message touches that Zeph should not
     raise, each with a short reason (e.g. "they're struggling with something
     else", "too painful right now").
+  - knowledge: the Knowledge documents worth searching, titles exactly as
+    written, and one search phrase about what would help, from the whole
+    Conversation, not only their last words. Write the phrase in the words a
+    helpful passage would use, the topic or practice, not their question
+    (e.g. "being kind to yourself after a mistake", not "how do I stop
+    beating myself up?"). Choose a document only when its "when it helps"
+    genuinely fits what they need right now, e.g. a reflective question or
+    wanting a way to cope, or when they ask about a practice or teaching a
+    document covers. Most of the time nothing fits:
+    when they are venting, chatting, or want practical help, use null.
   Notice how their mood is moving across the Conversation, and the time and
   day: 2am on a Sunday reads differently from lunchtime on a Tuesday.
 
@@ -412,7 +423,7 @@ understanding_prompt: |-
     "bring_up": [{"thread": <number>, "how": "lead" | "weave"}],
     "left_alone": [{"thread": <number>, "reason": "..."}],
     "look_up_past": ["<search phrase>"],
-    "knowledge": [],
+    "knowledge": {"documents": ["<document title>"], "search": "<search phrase>"} | null,
     "threads_touched": [<number>]
   }
 
@@ -468,9 +479,31 @@ life_threads_closeness_percent: 62
 # brought up again unless they raise it.
 life_thread_brushed_off_wait_days: 14
 
-# Knowledge. Before each reply the message is matched against the Knowledge
-# library, and this many of the closest passages go into the reply.
+# Knowledge. When the Understanding chooses Knowledge documents, its search
+# phrase is matched against those documents only, and at most this many of the
+# closest passages go into the reply.
 knowledge_chunks_per_reply: 3
+
+# How close in meaning (cosine similarity, as a percent) a passage must be to
+# the Understanding's search phrase to go into the reply. The Understanding has
+# already chosen the documents; with the bge-small embedder, fitting passages
+# score about 65 to 75 and unrelated ones about 50.
+knowledge_closeness_percent: 60
+
+# Drafts a Knowledge document's "when it helps" description when it is made
+# ready without one. Admins can rewrite it on the document's page.
+knowledge_when_it_helps_model: deepseek-chat
+knowledge_when_it_helps_prompt: |-
+  You help Zeph, an AI companion, decide when a document from its Knowledge
+  library would help a person it is talking with. You are given the
+  document's title, source, tradition and the start of its text.
+
+  In one or two plain sentences, say when this document would help someone:
+  what they might be going through or asking about, and what it offers them,
+  naming any practice or teaching it covers by its name (e.g. "When someone
+  can't stop worrying at night and wants a simple breathing practice to
+  settle, such as the 4-7-8 breath."). Don't summarise the whole text.
+  Answer with the description only.
 
 # Put before the Knowledge passages given to each reply.
 reply_knowledge_intro: >-
