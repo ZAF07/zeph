@@ -787,7 +787,7 @@ class MoodIntensity(StrEnum):
 
 
 class ThreadReaction(StrEnum):
-    """How the User took it when the Companion brought up a Life Thread."""
+    """How the User took it when the Companion brought up a Life Thread or Curiosity."""
 
     ENGAGED = "engaged"
     BRUSHED_OFF = "brushed_off"
@@ -881,6 +881,96 @@ class ThreadLeftAlone:
     reason: str
 
 
+class CuriositySensitivity(StrEnum):
+    """How sensitive a Curiosity is, so a sensitive one waits for the right moment."""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class CuriosityState(StrEnum):
+    """Where a Curiosity stands."""
+
+    WAITING = "waiting"
+    RAISED = "raised"
+    CLOSED = "closed"
+
+
+@dataclass(frozen=True)
+class Curiosity:
+    """Something the Companion wants to ask a User later. Internal: never shown.
+
+    Attributes:
+        id: Our ID for it.
+        user_id: The User it is about.
+        question: What to ask, e.g. "How did the presentation go?".
+        why: Why the Companion wonders.
+        not_before: The first day, in the User's time zone, it may be asked;
+            None for any day.
+        sensitivity: How sensitive it is.
+        state: Waiting, raised or closed (no longer relevant).
+        created_at: When it was made.
+        source_memory_item_id: The Memory Item it came from, if any; deleting
+            that item deletes it.
+        source_life_thread_id: The Life Thread it came from, if any; deleting
+            that Thread deletes it.
+        raised_at: When the Companion asked it; None if not yet.
+        raised_conversation_id: The Conversation it was asked in; None if
+            not yet, or if that Conversation is gone.
+        reaction: How the User took it; None until the Conversation it was
+            asked in ends, or if that isn't known.
+    """
+
+    id: UUID
+    user_id: UUID
+    question: str
+    why: str
+    not_before: date | None
+    sensitivity: CuriositySensitivity
+    state: CuriosityState
+    created_at: datetime
+    source_memory_item_id: UUID | None = None
+    source_life_thread_id: UUID | None = None
+    raised_at: datetime | None = None
+    raised_conversation_id: UUID | None = None
+    reaction: ThreadReaction | None = None
+
+
+@dataclass(frozen=True)
+class CuriosityChanges:
+    """What a Conversation's end changes in a User's Curiosities.
+
+    Attributes:
+        added: The new Curiosities.
+        updated: Waiting Curiosities with new details, or now closed; one
+            raised meanwhile is left as it is.
+        reactions: How the User took Curiosities raised in the Conversation,
+            by Curiosity ID.
+    """
+
+    added: list[Curiosity]
+    updated: list[Curiosity]
+    reactions: dict[UUID, ThreadReaction]
+
+
+@dataclass(frozen=True)
+class CuriosityToRaise:
+    """A Curiosity the Understanding chose to bring up, and how.
+
+    Attributes:
+        curiosity_id: The Curiosity's ID.
+        question: What to ask, when it was chosen.
+        why: Why the Companion wonders, when it was chosen.
+        how: Lead with it, or weave it in.
+    """
+
+    curiosity_id: UUID
+    question: str
+    why: str
+    how: BringUpWay
+
+
 @dataclass(frozen=True)
 class KnowledgeLookup:
     """The Knowledge the Understanding chose to search for a reply.
@@ -910,6 +1000,7 @@ class UnderstandingForm:
         look_up_past: Phrases to search older Summaries with.
         knowledge: The Knowledge to search; None when no Knowledge fits.
         threads_touched: The titles of the Life Threads the Message touches.
+        curiosities: The Curiosities to bring up, and how.
     """
 
     need: str
@@ -923,6 +1014,7 @@ class UnderstandingForm:
     look_up_past: tuple[str, ...] = ()
     knowledge: KnowledgeLookup | None = None
     threads_touched: tuple[str, ...] = ()
+    curiosities: tuple[CuriosityToRaise, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -1486,6 +1578,7 @@ class Feature(StrEnum):
     SETTINGS_IN_CHAT = "settings_in_chat"
     PHOTO_VIEWING = "photo_viewing"
     PERSONAL_STICKERS = "personal_stickers"
+    CURIOSITIES = "curiosities"
 
 
 @dataclass(frozen=True)
@@ -1616,6 +1709,7 @@ class ModelStep(StrEnum):
     CHECK_IN = "check_in"
     CONVERSATION_END = "conversation_end"
     LIFE_THREADS = "life_threads"
+    CURIOSITIES = "curiosities"
     PORTRAIT = "portrait"
     PERSONAL_STICKERS = "personal_stickers"
 

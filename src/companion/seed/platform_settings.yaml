@@ -377,9 +377,11 @@ understanding_prompt: |-
   Portrait (a short picture of who they are, what helps them and what
   doesn't), their Goals, the Memory Categories Zeph has saved something in,
   their recent Conversations, the Life Threads (ongoing stories in their
-  life) this message reminds Zeph of, the Knowledge documents Zeph can draw
-  on with when each helps, what you understood earlier in this Conversation,
-  and the Conversation so far, ending with their latest message.
+  life) this message reminds Zeph of, the things Zeph has been wondering
+  about them (Curiosities) whose time has come, the Knowledge documents Zeph
+  can draw on with when each helps, what you understood earlier in this
+  Conversation, and the Conversation so far, ending with their latest
+  message.
 
   Work out what they want from Zeph right now, fresh for this message:
   - need: the one Need that fits best, its name exactly as written. If it
@@ -404,6 +406,13 @@ understanding_prompt: |-
     to lead with it, or "weave" to weave it in if the moment allows. Only
     when it fits: an open Thread the message connects to, when they have
     room for it. Usually at most one. Never one marked "don't bring it up".
+    Curiosities go here too, as {"curiosity": <number>, "how": ...}, only
+    when Zeph should ask it in this very reply: "lead" to open with it,
+    usually at the start of a Conversation when they're just saying hi, or
+    "weave" to ask it after answering what they said, when it connects.
+    Otherwise leave it out for a better moment: when they're upset, busy
+    with something else, or it's sensitive and the moment isn't right.
+    Never more than the Conversation has left.
   - left_alone: the Life Threads the message touches that Zeph should not
     raise, each with a short reason (e.g. "they're struggling with something
     else", "too painful right now").
@@ -428,7 +437,8 @@ understanding_prompt: |-
     "intensity": "low" | "medium" | "high",
     "cause_known": true | false,
     "memory_categories": ["<category name>"],
-    "bring_up": [{"thread": <number>, "how": "lead" | "weave"}],
+    "bring_up": [{"thread": <number>, "how": "lead" | "weave"},
+                 {"curiosity": <number>, "how": "lead" | "weave"}],
     "left_alone": [{"thread": <number>, "reason": "..."}],
     "look_up_past": ["<search phrase>"],
     "knowledge": {"documents": ["<document title>"], "search": "<search phrase>"} | null,
@@ -486,6 +496,16 @@ life_threads_closeness_percent: 62
 # many days before bringing it up again. A Thread they asked to drop is never
 # brought up again unless they raise it.
 life_thread_brushed_off_wait_days: 14
+
+# Curiosities: things Zeph wants to ask a User later, written when a
+# Conversation ends. The Understanding sees the waiting ones whose "not before"
+# day has come and may bring one up; at most this many are raised in one
+# Conversation.
+curiosities_per_conversation: 1
+
+# How many of a User's Curiosities can wait at once. When a Conversation's end
+# makes more, the oldest waiting ones are closed.
+curiosities_waiting_limit: 10
 
 # Knowledge. When the Understanding chooses Knowledge documents, its search
 # phrase is matched against those documents only, and at most this many of the
@@ -733,6 +753,54 @@ portrait_prompt: |-
   Use only what you are given. Don't guess, diagnose or judge. Leave out
   anything they would not want said back to them. At most about 250 words.
   Answer with the Portrait only, no heading.
+
+# When a Conversation ends and User Memory and Curiosities work for the User,
+# this call writes things Zeph wants to ask them later, records how they took
+# the ones Zeph asked, and closes ones no longer relevant.
+curiosity_keeping_model: deepseek-chat
+
+curiosity_keeping_prompt: |-
+  You keep the Curiosities of a person who talks with Zeph, an AI companion.
+  A Curiosity is something Zeph wants to ask them later, the way a friend
+  who thinks about them between chats would: "how did the presentation
+  go?", "did you and Mei talk in the end?", "you've seemed low on Sunday
+  nights, wonder why". You are given today's date, what Zeph remembers about
+  them (Memory Items), the Life Threads this Conversation touches, the
+  Curiosities waiting or brought up in this Conversation, ones already asked
+  recently, and the Conversation.
+
+  - Write a new Curiosity for something worth asking about later: an event
+    coming up, a decision they're weighing, something left unfinished, a
+    pattern you notice. Give what to ask (a short question in Zeph's voice),
+    why Zeph wonders, the first day it makes sense to ask ("not_before", as
+    YYYY-MM-DD, e.g. the day after their presentation; null for any day),
+    how sensitive it is ("low", "medium" or "high"), and the number of the
+    Memory Item ("memory_item") or Life Thread ("thread") it comes from, if
+    one. Usually none or one per Conversation; never one about something
+    already asked recently or already waiting.
+  - For a waiting Curiosity that has changed (e.g. the presentation moved),
+    give its number with the new details. If it's no longer relevant (they
+    already told Zeph, or it no longer applies), give its number with
+    "close": true.
+  - For each Curiosity marked "brought up in this Conversation", say how
+    they took it: "engaged" if they talked about it, "brushed_off" if they
+    changed the subject or gave a short answer, "asked_to_drop" if they
+    asked Zeph not to ask.
+
+  Answer with JSON only, in exactly this shape, leaving out Curiosities with
+  nothing new:
+  {
+    "curiosities": [
+      {"ask": "...", "why": "...", "not_before": "YYYY-MM-DD" | null,
+       "sensitivity": "low" | "medium" | "high",
+       "memory_item": <number> | null, "thread": <number> | null},
+      {"curiosity": <number>, "ask": "...", "why": "...",
+       "not_before": "YYYY-MM-DD" | null, "sensitivity": "..."},
+      {"curiosity": <number>, "close": true},
+      {"curiosity": <number>,
+       "reaction": "engaged" | "brushed_off" | "asked_to_drop"}
+    ]
+  }
 
 # Personal Stickers. When a Conversation ends and the person sent stickers in
 # it, this model picks the ones whose meaning was clear and writes when to use

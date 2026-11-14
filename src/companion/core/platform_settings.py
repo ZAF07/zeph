@@ -203,6 +203,12 @@ LIFE_THREADS_CLOSENESS_PERCENT = Setting(
 LIFE_THREAD_BRUSHED_OFF_WAIT = Setting("life_thread_brushed_off_wait_days", read_days)
 LIFE_THREAD_KEEPING_MODEL = Setting("life_thread_keeping_model", read_text)
 LIFE_THREAD_KEEPING_PROMPT = Setting("life_thread_keeping_prompt", read_text)
+CURIOSITIES_PER_CONVERSATION = Setting(
+    "curiosities_per_conversation", read_whole_number
+)
+CURIOSITIES_WAITING_LIMIT = Setting("curiosities_waiting_limit", read_whole_number)
+CURIOSITY_KEEPING_MODEL = Setting("curiosity_keeping_model", read_text)
+CURIOSITY_KEEPING_PROMPT = Setting("curiosity_keeping_prompt", read_text)
 PORTRAIT_MODEL = Setting("portrait_model", read_text)
 PORTRAIT_PROMPT = Setting("portrait_prompt", read_text)
 KNOWLEDGE_CHUNKS_PER_REPLY = Setting("knowledge_chunks_per_reply", read_whole_number)
@@ -554,6 +560,16 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.MODEL,
     ),
     EditableSetting(
+        CURIOSITY_KEEPING_PROMPT.key,
+        "Curiosity keeping prompt",
+        SettingKind.TEXT,
+    ),
+    EditableSetting(
+        CURIOSITY_KEEPING_MODEL.key,
+        "Curiosity keeping model",
+        SettingKind.MODEL,
+    ),
+    EditableSetting(
         PERSONAL_STICKER_KEEPING_PROMPT.key,
         "Personal Sticker keeping prompt",
         SettingKind.TEXT,
@@ -636,6 +652,20 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=365,
+    ),
+    EditableSetting(
+        CURIOSITIES_PER_CONVERSATION.key,
+        "Most Curiosities raised per Conversation",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=5,
+    ),
+    EditableSetting(
+        CURIOSITIES_WAITING_LIMIT.key,
+        "Most Curiosities waiting at once",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
     ),
     EditableSetting(
         KNOWLEDGE_CLOSENESS_PERCENT.key,
@@ -797,7 +827,8 @@ CORE_SERVICES: tuple[CoreService, ...] = (
             "Reads what the User just said and picks the Need that fits, how "
             "they seem and whether Zeph knows why, and the Memory Categories "
             "that matter. It sees the Life Threads the message reminds Zeph "
-            "of and picks which to bring up or leave alone. The reply follows "
+            "of and picks which to bring up or leave alone, and may bring up "
+            "one of the Curiosities whose day has come. The reply follows "
             "the Need’s “how to reply” and gets only those memories plus the "
             "always-included ones."
         ),
@@ -833,6 +864,18 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         ),
         prompt_key=LIFE_THREAD_KEEPING_PROMPT.key,
         model_key=LIFE_THREAD_KEEPING_MODEL.key,
+    ),
+    CoreService(
+        name="Curiosity keeping",
+        runs_when="After quiet gap, while User Memory and Curiosities work",
+        description=(
+            "Writes the things Zeph wants to ask the User later, each with why, "
+            "a “not before” day and how sensitive it is. Records how the User "
+            "took the ones Zeph asked, closes ones no longer relevant, and "
+            "closes the oldest waiting ones over the limit."
+        ),
+        prompt_key=CURIOSITY_KEEPING_PROMPT.key,
+        model_key=CURIOSITY_KEEPING_MODEL.key,
     ),
     CoreService(
         name="User Portrait",

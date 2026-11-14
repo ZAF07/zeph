@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from companion.core.curiosities import CuriosityKeeper
 from companion.core.life_threads import LifeThreadKeeper
 from companion.core.memory_retrieval import format_time
 from companion.core.model_call_log import start_trace
@@ -371,9 +372,9 @@ class PostConversationProcessor:
     """Sums up each ended Conversation and updates the User's User Memory.
 
     It changes their Memory Items, keeps the photos that matter to them as
-    Shared Photos, updates their Life Threads and then rewrites their User
-    Portrait. Each Summary records how their mood moved and what the
-    Companion offered and how it landed, and is embedded,
+    Shared Photos, updates their Life Threads, keeps their Curiosities and
+    then rewrites their User Portrait. Each Summary records how their mood
+    moved and what the Companion offered and how it landed, and is embedded,
     so it can be found by meaning however old it is. Separately from User
     Memory, it keeps the User's Personal Stickers.
     """
@@ -385,6 +386,7 @@ class PostConversationProcessor:
         chat_model: UsageRecordingChatModel,
         personal_sticker_keeper: PersonalStickerKeeper,
         life_thread_keeper: LifeThreadKeeper,
+        curiosity_keeper: CuriosityKeeper,
         portrait_writer: PortraitWriter,
         embedder: Embedder,
         clock: Clock,
@@ -401,6 +403,8 @@ class PostConversationProcessor:
             personal_sticker_keeper: Keeps the stickers the User sent whose
                 meaning was clear.
             life_thread_keeper: Starts and adds to the User's Life Threads.
+            curiosity_keeper: Writes, updates and closes the User's
+                Curiosities.
             portrait_writer: Rewrites the User's Portrait.
             embedder: Embeds each Summary, so it can be found by meaning.
             clock: Tells the current time.
@@ -410,6 +414,7 @@ class PostConversationProcessor:
         self._chat_model = chat_model
         self._personal_sticker_keeper = personal_sticker_keeper
         self._life_thread_keeper = life_thread_keeper
+        self._curiosity_keeper = curiosity_keeper
         self._portrait_writer = portrait_writer
         self._embedder = embedder
         self._clock = clock
@@ -424,9 +429,10 @@ class PostConversationProcessor:
         summary, the operations and the photos to keep as Shared Photos; an
         unreadable answer is asked again once, and if it is still unreadable
         nothing is saved, so a bad answer is never retried forever. Once the
-        Conversation is marked processed, its Life Threads are kept and then
-        the User Portrait is rewritten; if either fails, the failure is
-        logged and not tried again, so no Thread is ever added twice.
+        Conversation is marked processed, its Life Threads are kept, then its
+        Curiosities while the Curiosities Feature works, and then the User
+        Portrait is rewritten; if any of them fails, the failure is logged
+        and not tried again, so nothing is ever added twice.
 
         Args:
             conversation: The ended Conversation.
@@ -481,6 +487,8 @@ class PostConversationProcessor:
                 photos_by_number,
             )
         self._keep_life_threads(snapshot, conversation.id, messages)
+        if snapshot.works(Feature.CURIOSITIES):
+            self._keep_curiosities(snapshot, conversation.id, messages)
         self._write_portrait(snapshot)
 
     def _save_memory(
@@ -565,6 +573,24 @@ class PostConversationProcessor:
             self._portrait_writer.write(snapshot)
         except Exception:
             logger.exception("Could not write the User Portrait")
+
+    def _keep_curiosities(
+        self,
+        snapshot: UserSnapshot,
+        conversation_id: UUID,
+        messages: list[ConversationMessage],
+    ) -> None:
+        """Keep the User's Curiosities, logging a failure instead of raising.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            conversation_id: The ended Conversation.
+            messages: Its messages, oldest first.
+        """
+        try:
+            self._curiosity_keeper.keep_from(snapshot, conversation_id, messages)
+        except Exception:
+            logger.exception("Could not keep Curiosities")
 
     def _embed(self, summary: ConversationSummary) -> list[float] | None:
         """Embed a Summary, logging a failure instead of raising.

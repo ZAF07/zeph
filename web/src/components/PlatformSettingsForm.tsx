@@ -104,6 +104,25 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
     ],
   },
   {
+    heading: "Curiosities",
+    fields: [
+      {
+        key: "curiosities_per_conversation",
+        label: "Most Curiosities raised per Conversation",
+        caption:
+          "How many of the things Zeph has been wondering about it may bring up in one Conversation. 0 means none.",
+        unit: "per chat",
+      },
+      {
+        key: "curiosities_waiting_limit",
+        label: "Most Curiosities waiting at once",
+        caption:
+          "When a Conversation’s end makes more, Zeph closes the oldest waiting ones.",
+        unit: "waiting",
+      },
+    ],
+  },
+  {
     heading: "Knowledge",
     fields: [
       {

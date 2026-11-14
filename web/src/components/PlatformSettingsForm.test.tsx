@@ -37,6 +37,8 @@ const settings: AdminSettings = {
   life_threads_per_reply: seeded(3),
   life_threads_closeness_percent: seeded(68),
   life_thread_brushed_off_wait_days: seeded(14),
+  curiosities_per_conversation: seeded(1),
+  curiosities_waiting_limit: seeded(10),
   knowledge_closeness_percent: seeded(60),
   photo_retry_count: seeded(2),
   photo_album_max_photos: seeded(5),
@@ -204,6 +206,28 @@ describe("PlatformSettingsForm", () => {
       life_threads_per_reply: 2,
       life_threads_closeness_percent: 70,
       life_thread_brushed_off_wait_days: 21,
+    });
+  });
+
+  it("shows and saves the Curiosity limits", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const raised = await screen.findByLabelText(
+      "Most Curiosities raised per Conversation",
+    );
+    const waiting = screen.getByLabelText("Most Curiosities waiting at once");
+    expect(raised).toHaveValue(1);
+    expect(waiting).toHaveValue(10);
+
+    await user.clear(raised);
+    await user.type(raised, "2");
+    await user.clear(waiting);
+    await user.type(waiting, "20");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      curiosities_per_conversation: 2,
+      curiosities_waiting_limit: 20,
     });
   });
 
