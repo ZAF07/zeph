@@ -5,17 +5,12 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from langgraph.checkpoint.postgres import PostgresSaver
 from sqlalchemy import Engine, create_engine, text
 from testcontainers.community.postgres import PostgresContainer
 
 from companion.adapters.deepseek.chat_model import DeepSeekChatModel
 from companion.adapters.deepseek.photo_viewer import DeepSeekPhotoViewer
 from companion.adapters.fastembed.embedder import FastEmbedEmbedder
-from companion.adapters.langgraph.conversation_engine import (
-    LangGraphConversationEngine,
-    build_postgres_checkpointer,
-)
 from companion.adapters.pgvector.vector_store import PgvectorKnowledgeVectorStore
 from companion.adapters.postgres.database import (
     migrate,
@@ -29,7 +24,6 @@ from companion.adapters.postgres.tables import metadata
 from companion.adapters.pypdf.text_extractor import PypdfTextExtractor
 from companion.app import AppDependencies, create_app
 from companion.config import MissingSettingsError, Settings, load_settings
-from companion.core.conversation_services import ConversationServices
 from evals.current_settings import (
     app_database_url,
     read_current_platform_settings,
@@ -130,12 +124,6 @@ def database_url() -> Iterator[str]:
 
 
 @pytest.fixture(scope="session")
-def checkpointer(database_url: str) -> PostgresSaver:
-    """The LangGraph Postgres checkpointer on the eval database."""
-    return build_postgres_checkpointer(database_url)
-
-
-@pytest.fixture(scope="session")
 def chat_model(
     app_settings: Settings, eval_report: EvalReport
 ) -> TokenCountingChatModel:
@@ -201,7 +189,6 @@ def auth_verifier() -> FakeAuthVerifier:
 @pytest.fixture
 def client(
     engine: Engine,
-    checkpointer: PostgresSaver,
     clock: FakeClock,
     chat_channel: FakeChatChannel,
     chat_model: TokenCountingChatModel,
@@ -216,26 +203,11 @@ def client(
     don't wait), auth, the scheduler and web search (so no Tavily credits are
     spent).
     """
-
-    def build_conversation_engine(
-        services: ConversationServices,
-    ) -> LangGraphConversationEngine:
-        """Build the real LangGraph engine on the eval database.
-
-        Args:
-            services: The core services the engine runs.
-
-        Returns:
-            The engine.
-        """
-        return LangGraphConversationEngine(services, checkpointer)
-
     dependencies = AppDependencies(
         repositories=build_postgres_repositories(engine),
         chat_channel=chat_channel,
         chat_model=chat_model,
         photo_viewer=photo_viewer,
-        build_conversation_engine=build_conversation_engine,
         auth_verifier=auth_verifier,
         auth_accounts=auth_verifier,
         text_extractor=PypdfTextExtractor(),

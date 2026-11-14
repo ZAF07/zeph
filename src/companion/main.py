@@ -1,5 +1,4 @@
 import logging
-from collections.abc import Callable
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -11,10 +10,6 @@ from companion.adapters.clock import SystemClock
 from companion.adapters.deepseek.chat_model import DeepSeekChatModel
 from companion.adapters.deepseek.photo_viewer import DeepSeekPhotoViewer
 from companion.adapters.fastembed.embedder import FastEmbedEmbedder
-from companion.adapters.langgraph.conversation_engine import (
-    LangGraphConversationEngine,
-    build_postgres_checkpointer,
-)
 from companion.adapters.pgvector.vector_store import PgvectorKnowledgeVectorStore
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.adapters.pypdf.text_extractor import PypdfTextExtractor
@@ -24,14 +19,12 @@ from companion.adapters.telegram.chat_channel import TelegramChatChannel
 from companion.adapters.timer import ThreadTimer
 from companion.app import AppDependencies, create_app
 from companion.config import Settings, load_settings
-from companion.core.conversation_services import ConversationServices
 from companion.core.ports import (
     AuthAccounts,
     AuthVerifier,
     ChatChannel,
     ChatModel,
     Clock,
-    ConversationEngine,
     DocumentTextExtractor,
     Embedder,
     KnowledgeVectorStore,
@@ -284,42 +277,6 @@ def build_photo_viewer(settings: Settings) -> PhotoViewer:
     raise UnknownAdapterError("CHAT_MODEL_ADAPTER", settings.chat_model_adapter)
 
 
-def build_conversation_engine_factory(
-    settings: Settings,
-) -> Callable[[ConversationServices], ConversationEngine]:
-    """Pick how to build the conversation engine chosen in `.env`.
-
-    Args:
-        settings: The loaded settings.
-
-    Returns:
-        A function that builds the engine around the core services.
-
-    Raises:
-        UnknownAdapterError: If the chosen adapter does not exist.
-    """
-    if settings.conversation_engine_adapter == "langgraph":
-        checkpointer = build_postgres_checkpointer(settings.database_url)
-
-        def build_langgraph_engine(
-            services: ConversationServices,
-        ) -> ConversationEngine:
-            """Build the LangGraph engine with the Postgres checkpointer.
-
-            Args:
-                services: The core services the engine runs.
-
-            Returns:
-                The engine.
-            """
-            return LangGraphConversationEngine(services, checkpointer)
-
-        return build_langgraph_engine
-    raise UnknownAdapterError(
-        "CONVERSATION_ENGINE_ADAPTER", settings.conversation_engine_adapter
-    )
-
-
 def quiet_http_client_logs() -> None:
     """Keep the HTTP client libraries from logging each request.
 
@@ -346,7 +303,6 @@ def build_production_app() -> FastAPI:
         chat_channel=build_chat_channel(settings),
         chat_model=build_chat_model(settings),
         photo_viewer=build_photo_viewer(settings),
-        build_conversation_engine=build_conversation_engine_factory(settings),
         auth_verifier=build_auth_verifier(settings),
         auth_accounts=build_auth_accounts(settings),
         text_extractor=build_text_extractor(settings),
