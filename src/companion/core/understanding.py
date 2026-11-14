@@ -574,6 +574,7 @@ def describe_understanding_shape(
         Threads and past look-ups there were; never any words.
     """
     ways = [item.how for item in form.bring_up]
+    held_back = [item for item in reminded if item.hold_back]
     return UnderstandingShape(
         need=need.name,
         intensity=form.intensity,
@@ -582,7 +583,7 @@ def describe_understanding_shape(
         threads_led_with=ways.count(BringUpWay.LEAD),
         threads_woven_in=ways.count(BringUpWay.WEAVE),
         threads_left_alone=len(form.left_alone),
-        threads_held_back=sum(1 for item in reminded if item.hold_back),
+        threads_held_back=len(held_back),
         past_look_ups=len(form.look_up_past),
     )
 

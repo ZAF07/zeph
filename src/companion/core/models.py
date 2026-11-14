@@ -1773,6 +1773,9 @@ class ModelCallContent:
 class UnderstandingShape:
     """The shape of an Understanding, kept for every User. Never any words.
 
+    When the Understanding call failed or couldn't be read, it is the
+    fallback the reply followed: the fallback Need, low, cause known.
+
     Attributes:
         need: The Need the reply followed, by name.
         intensity: How strongly the User seemed to feel their mood.
@@ -1780,9 +1783,11 @@ class UnderstandingShape:
         threads_reminded: How many Life Threads the Message reminded it of.
         threads_led_with: How many Threads the reply was to lead with.
         threads_woven_in: How many Threads the reply was to weave in.
-        threads_left_alone: How many Threads were left alone, held-back ones
-            included.
-        threads_held_back: How many reminded Threads were held back.
+        threads_left_alone: How many Threads the reply was told to leave
+            alone; a held-back Thread counts here only when the model chose
+            to bring it up or to leave it alone.
+        threads_held_back: How many reminded Threads were held back, whatever
+            the model chose.
         past_look_ups: How many phrases older Summaries were searched with.
     """
 
@@ -1832,7 +1837,7 @@ class ModelCall:
     error: str | None
     tools_called: tuple[str, ...]
     content: ModelCallContent | None
-    understanding_shape: UnderstandingShape | None = None
+    understanding_shape: UnderstandingShape | None
 
 
 @dataclass(frozen=True)

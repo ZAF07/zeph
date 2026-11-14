@@ -205,7 +205,7 @@ def test_a_plain_users_understanding_shows_its_shape_and_never_its_words(
         assert not any(words in row for row in stored_model_calls(engine))
 
 
-def test_a_held_back_thread_shows_as_held_back_and_left_alone(
+def test_a_held_back_thread_shows_as_held_back_and_left_alone_when_chosen(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -218,20 +218,23 @@ def test_a_held_back_thread_shows_as_held_back_and_left_alone(
     start_mei_thread(client, chat_model, clock, scheduler, seeded_settings)
     clock.advance(timedelta(days=30))
     bring_up_mei = understanding_answer(bring_up=[{"thread": 1, "how": "weave"}])
-    chat_model.script_understanding(bring_up_mei, bring_up_mei)
-    chat_model.script("mm", "mm")
+    chat_model.script_understanding(bring_up_mei, bring_up_mei, understanding_answer())
+    chat_model.script("mm", "mm", "mm")
 
     send_to_webhook(client, telegram_text_update("Mei's wedding is next week"))
     admin = owner_headers(client, auth_verifier)
     first = newest_understanding_call(client, admin)["understanding_shape"]
     send_to_webhook(client, telegram_text_update("Mei wants me there"))
     second = newest_understanding_call(client, admin)["understanding_shape"]
+    send_to_webhook(client, telegram_text_update("Mei is getting married"))
+    third = newest_understanding_call(client, admin)["understanding_shape"]
 
     assert (first["threads_woven_in"], first["threads_held_back"]) == (1, 0)
     assert second["threads_reminded"] == 1
     assert second["threads_held_back"] == 1
     assert second["threads_left_alone"] == 1
     assert second["threads_woven_in"] + second["threads_led_with"] == 0
+    assert (third["threads_held_back"], third["threads_left_alone"]) == (1, 0)
 
 
 def test_an_admins_own_understanding_shows_its_shape_with_its_content(
@@ -274,7 +277,12 @@ def test_a_failed_understanding_shows_the_fallback_need_it_used(
     admin = owner_headers(client, auth_verifier)
     understanding = newest_understanding_call(client, admin)
     assert understanding["error"] == "RuntimeError"
-    assert understanding["understanding_shape"]["need"] == "Ask more"
+    shape = understanding["understanding_shape"]
+    assert (shape["need"], shape["intensity"], shape["cause_known"]) == (
+        "Ask more",
+        "low",
+        True,
+    )
 
 
 def test_texts_sent_in_a_row_make_one_trace_for_their_message(

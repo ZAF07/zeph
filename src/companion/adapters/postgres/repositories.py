@@ -4499,7 +4499,15 @@ def _to_understanding_shape(values: dict[str, Any]) -> UnderstandingShape:
         The shape.
     """
     return UnderstandingShape(
-        **{**values, "intensity": MoodIntensity(values["intensity"])}
+        need=values["need"],
+        intensity=MoodIntensity(values["intensity"]),
+        cause_known=values["cause_known"],
+        threads_reminded=values["threads_reminded"],
+        threads_led_with=values["threads_led_with"],
+        threads_woven_in=values["threads_woven_in"],
+        threads_left_alone=values["threads_left_alone"],
+        threads_held_back=values["threads_held_back"],
+        past_look_ups=values["past_look_ups"],
     )
 
 

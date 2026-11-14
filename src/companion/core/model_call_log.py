@@ -140,6 +140,7 @@ class ModelCallLog:
             error=None if answer else type(outcome).__name__,
             tools_called=tuple(tool_call.name for tool_call in tool_calls),
             content=content if self._keeps_content(snapshot) else None,
+            understanding_shape=None,
         )
         if self._developer_logs:
             logger.info(
@@ -158,7 +159,9 @@ class ModelCallLog:
     ) -> None:
         """Record the shape of the Understanding its trace's call just made.
 
-        Saving never raises: a failure is logged and the reply goes on.
+        The shape lands on the trace's newest Understanding call, so it must
+        come after that call is recorded. Saving never raises: a failure is
+        logged and the reply goes on.
 
         Args:
             snapshot: The User the Understanding was for, with its trace.
