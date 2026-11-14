@@ -76,3 +76,4 @@ The Companion has things it's been meaning to ask (`CONTEXT.md` "Curiosity").
 
 - Completed: 2026-11-14
 - Commits: `c9b9bff` (Curiosities, with review fix and CONTEXT.md), `a8d968c` (issue archived with evidence), `f92382a` (a chosen Curiosity is asked in this reply, also when woven in; migration renumbered to 0033)
+- Merged into main: `26430ae` (branch `understanding-11-curiosities`, pushed to origin)
