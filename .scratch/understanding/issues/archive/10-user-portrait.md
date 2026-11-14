@@ -78,4 +78,5 @@ The Companion has a sense of who the User is as a whole (`CONTEXT.md` "User Port
 ## Completion
 
 - Completed: 2026-11-14
-- Commits: <filled in after merge>
+- Commits: `2c622f0` (User Portrait: writer, mood arc and offered in Summaries, rewrite on delete, clear, Dashboard API, "About you" tab, Admin flag, migration 0032), `815a0fd` (review fixes: rewrite time taken first, failed rewrite clears, shared category helper, exact-list tests), `a81d2c7` (issue archived with evidence; CONTEXT.md)
+- Merged into main: `9efdfc6` (branch `understanding-10-user-portrait`, pushed to origin)
