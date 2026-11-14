@@ -10,7 +10,7 @@ import { LockIcon } from "@/components/LockIcon";
 import { UserFeaturesPanel } from "@/components/UserFeaturesPanel";
 import { ApiError, type AdminUser, type UserRole } from "@/lib/api-client";
 import { formatDay } from "@/lib/dates";
-import { queryKeys } from "@/lib/queries";
+import { queryKeys, reloadUserPages } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 type Filter = "all" | "admins" | "telegram_not_connected";
@@ -91,7 +91,7 @@ export function AdminUsers() {
           user.id === change.id ? { ...user, role: change.role } : user,
         ),
       );
-      void queryClient.invalidateQueries({ queryKey: queryKeys.me });
+      reloadUserPages(queryClient);
       const displayName = target.name ?? target.email ?? "This User";
       setFlash({
         text:

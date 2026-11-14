@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { compactSecondaryButton } from "@/components/button-styles";
@@ -151,7 +151,6 @@ export function HelplinesManager() {
   const [countryFilter, setCountryFilter] = useState("all");
   const [editing, setEditing] = useState<Editing | null>(null);
   const [flash, setFlash] = useState<Flash | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
 
   const helplinesQuery = useQuery({
     queryKey: queryKeys.helplines,
@@ -162,31 +161,41 @@ export function HelplinesManager() {
     await queryClient.invalidateQueries({ queryKey: queryKeys.helplines });
   }
 
-  async function runRowAction(
-    helpline: Helpline,
-    action: () => Promise<unknown>,
-    successText: string | null,
-  ) {
-    setBusyId(helpline.id);
-    setFlash(null);
-    try {
+  const rowAction = useMutation({
+    mutationFn: async ({
+      action,
+    }: {
+      target: Helpline;
+      action: () => Promise<unknown>;
+      successText: string | null;
+    }) => {
       await action();
+      await reloadHelplines();
+    },
+    onMutate: () => setFlash(null),
+    onSuccess: (_, { successText }) => {
       if (successText) {
         setFlash({ text: successText, isError: false });
       }
-      await reloadHelplines();
-    } catch {
+    },
+    onError: (_, { target }) =>
       setFlash({
-        text: `Couldn’t change ${helpline.name}. Please try again.`,
+        text: `Couldn’t change ${target.name}. Please try again.`,
         isError: true,
-      });
-    } finally {
-      setBusyId(null);
-    }
+      }),
+  });
+  const busyId = rowAction.isPending ? rowAction.variables.target.id : null;
+
+  function runRowAction(
+    target: Helpline,
+    action: () => Promise<unknown>,
+    successText: string | null,
+  ) {
+    rowAction.mutate({ target, action, successText });
   }
 
   function move(helpline: Helpline, direction: MoveDirection) {
-    void runRowAction(
+    runRowAction(
       helpline,
       () => apiClient.moveHelpline(helpline.id, direction),
       null,
@@ -197,7 +206,7 @@ export function HelplinesManager() {
     if (!window.confirm(`Remove ${helpline.name}?`)) {
       return;
     }
-    void runRowAction(
+    runRowAction(
       helpline,
       () => apiClient.deleteHelpline(helpline.id),
       `Removed ${helpline.name}.`,

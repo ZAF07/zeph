@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import {
@@ -72,7 +72,6 @@ export function KnowledgeLibrary() {
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
   const [flash, setFlash] = useState<Flash | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
 
   const documentsQuery = useQuery({
     queryKey: queryKeys.knowledgeDocuments,
@@ -102,27 +101,37 @@ export function KnowledgeLibrary() {
     await reloadDocuments();
   }
 
-  async function runRowAction(
-    knowledgeDocument: KnowledgeDocument,
-    action: () => Promise<unknown>,
-    successText: string | null,
-  ) {
-    setBusyId(knowledgeDocument.id);
-    setFlash(null);
-    try {
+  const rowAction = useMutation({
+    mutationFn: async ({
+      action,
+    }: {
+      target: KnowledgeDocument;
+      action: () => Promise<unknown>;
+      successText: string | null;
+    }) => {
       await action();
+      await reloadDocuments();
+    },
+    onMutate: () => setFlash(null),
+    onSuccess: (_, { successText }) => {
       if (successText) {
         setFlash({ text: successText, isError: false });
       }
-      await reloadDocuments();
-    } catch {
+    },
+    onError: (_, { target }) =>
       setFlash({
-        text: `Couldn’t change ${knowledgeDocument.title}. Please try again.`,
+        text: `Couldn’t change ${target.title}. Please try again.`,
         isError: true,
-      });
-    } finally {
-      setBusyId(null);
-    }
+      }),
+  });
+  const busyId = rowAction.isPending ? rowAction.variables.target.id : null;
+
+  function runRowAction(
+    target: KnowledgeDocument,
+    action: () => Promise<unknown>,
+    successText: string | null,
+  ) {
+    rowAction.mutate({ target, action, successText });
   }
 
   function remove(knowledgeDocument: KnowledgeDocument) {
@@ -133,7 +142,7 @@ export function KnowledgeLibrary() {
     ) {
       return;
     }
-    void runRowAction(
+    runRowAction(
       knowledgeDocument,
       () => apiClient.deleteKnowledgeDocument(knowledgeDocument.id),
       `Deleted ${knowledgeDocument.title}.`,
@@ -256,7 +265,7 @@ export function KnowledgeLibrary() {
                           className={compactSecondaryButton}
                           disabled={isBusy}
                           onClick={() =>
-                            void runRowAction(
+                            runRowAction(
                               knowledgeDocument,
                               () =>
                                 apiClient.retryKnowledgeDocument(

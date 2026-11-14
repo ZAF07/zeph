@@ -4,6 +4,7 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
+  type QueryClient,
   type UseMutationResult,
   type UseQueryResult,
 } from "@tanstack/react-query";
@@ -53,6 +54,19 @@ export const queryKeys = {
   ],
   stickerImage: (stickerId: string) => ["sticker-image", stickerId],
 } as const;
+
+/**
+ * Loads again what the signed-in User's own pages show: the User, Home and
+ * the platform content. Admin changes that can reach the Admin's own pages
+ * call this, such as a Feature switch, a role change or new wording.
+ *
+ * @param queryClient - The cache of backend data.
+ */
+export function reloadUserPages(queryClient: QueryClient): void {
+  void queryClient.invalidateQueries({ queryKey: queryKeys.me });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.home });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.platformContent });
+}
 
 /**
  * The signed-in User, loaded once and shared by every component that shows

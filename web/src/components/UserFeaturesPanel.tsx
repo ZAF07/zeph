@@ -12,7 +12,7 @@ import type {
   UserFeatureSwitch,
 } from "@/lib/api-client";
 import { lastChangeNote, reasonText } from "@/lib/features";
-import { queryKeys } from "@/lib/queries";
+import { queryKeys, reloadUserPages } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 const switchOptions: { id: UserFeatureSwitch; label: string }[] = [
@@ -70,7 +70,7 @@ export function UserFeaturesPanel({
             }
           : current,
       );
-      void queryClient.invalidateQueries({ queryKey: queryKeys.me });
+      reloadUserPages(queryClient);
     },
   });
   const isSaving = setSwitch.isPending;

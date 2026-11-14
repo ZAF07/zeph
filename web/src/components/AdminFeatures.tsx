@@ -6,7 +6,7 @@ import { LoadFailed } from "@/components/LoadFailed";
 import { Switch } from "@/components/Switch";
 import type { FeatureSwitch } from "@/lib/api-client";
 import { lastChangeNote } from "@/lib/features";
-import { queryKeys } from "@/lib/queries";
+import { queryKeys, reloadUserPages } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 /**
@@ -33,8 +33,7 @@ export function AdminFeatures() {
           feature.feature === changed.feature ? changed : feature,
         ),
       );
-      void queryClient.invalidateQueries({ queryKey: queryKeys.me });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.home });
+      reloadUserPages(queryClient);
     },
   });
   const features = featuresQuery.data;

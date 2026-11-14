@@ -9,7 +9,7 @@ import {
 } from "@tanstack/react-query";
 
 import type { AdminSettings, SettingValue } from "@/lib/api-client";
-import { queryKeys } from "@/lib/queries";
+import { queryKeys, reloadUserPages } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 /**
@@ -28,8 +28,9 @@ export function useAdminSettings(): UseQueryResult<AdminSettings> {
 
 /**
  * Saves new values for platform settings. Every admin page then shows the
- * saved settings. It fails with the backend's `ApiError` if the backend
- * refuses them.
+ * saved settings, and the User pages load again, since settings such as the
+ * AI notice and memory notes show there too. It fails with the backend's
+ * `ApiError` if the backend refuses them.
  *
  * @returns The mutation; pass it the new values by setting key.
  */
@@ -43,7 +44,9 @@ export function useSaveAdminSettings(): UseMutationResult<
   return useMutation({
     mutationFn: (values: Record<string, SettingValue>) =>
       apiClient.updateAdminSettings(values),
-    onSuccess: (settings) =>
-      queryClient.setQueryData(queryKeys.adminSettings, settings),
+    onSuccess: (settings) => {
+      queryClient.setQueryData(queryKeys.adminSettings, settings);
+      reloadUserPages(queryClient);
+    },
   });
 }
