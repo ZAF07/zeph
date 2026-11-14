@@ -28,6 +28,7 @@ export const queryKeys = {
   memoryGroups: ["memory-groups"],
   conversationSummaries: ["conversation-summaries"],
   lifeThreads: ["life-threads"],
+  userPortrait: ["user-portrait"],
   sharedPhotos: ["shared-photos"],
   checkIns: ["check-ins"],
   personalStickers: ["personal-stickers"],

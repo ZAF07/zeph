@@ -66,6 +66,7 @@ from companion.core.understanding import UnderstandingService
 from companion.core.usage import UsageLimiter, UsageRecordingChatModel
 from companion.core.user_data import ChatDataDeletion, UserDataService
 from companion.core.user_memory import UserMemoryService
+from companion.core.user_portrait import PortraitWriter
 from companion.core.user_snapshot import UserSnapshotLoader
 from companion.core.users import UserService
 from companion.core.web_search import WebSearchTools
@@ -283,6 +284,12 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         auth_accounts=dependencies.auth_accounts,
         clock=dependencies.clock,
     )
+    portrait_writer = PortraitWriter(
+        repositories=dependencies.repositories,
+        user_snapshots=user_snapshots,
+        chat_model=chat_model,
+        clock=dependencies.clock,
+    )
     scheduled_work = ScheduledWork(
         repositories=dependencies.repositories,
         post_conversation=PostConversationProcessor(
@@ -300,9 +307,11 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 embedder=dependencies.embedder,
                 clock=dependencies.clock,
             ),
+            portrait_writer=portrait_writer,
             embedder=dependencies.embedder,
             clock=dependencies.clock,
         ),
+        portrait_writer=portrait_writer,
         check_ins=check_in_service,
         message_retention=MessageRetention(
             repositories=dependencies.repositories,

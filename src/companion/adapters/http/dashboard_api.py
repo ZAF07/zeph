@@ -238,11 +238,12 @@ class MemoryItemsResponse(BaseModel):
 
 
 class ConversationSummaryResponse(BaseModel):
-    """A Conversation Summary and how the User seemed."""
+    """A Conversation Summary, how the User seemed and what Zeph offered."""
 
     id: str
     summary: str
     mood: str
+    offered: str
     created_at: datetime
 
 
@@ -266,6 +267,19 @@ class LifeThreadsResponse(BaseModel):
     """A User's Life Threads, open first, then the latest updated."""
 
     threads: list[LifeThreadResponse]
+
+
+class UserPortraitResponse(BaseModel):
+    """A User's User Portrait and when it was last written."""
+
+    text: str
+    updated_at: datetime
+
+
+class UserPortraitBody(BaseModel):
+    """A User's User Portrait, or null if they have none."""
+
+    portrait: UserPortraitResponse | None
 
 
 class SharedPhotoResponse(BaseModel):
@@ -369,6 +383,7 @@ def to_summary_response(summary: ConversationSummary) -> ConversationSummaryResp
         id=str(summary.id),
         summary=summary.summary,
         mood=summary.mood,
+        offered=summary.offered,
         created_at=summary.created_at,
     )
 
@@ -1000,6 +1015,45 @@ def build_dashboard_api_router(
             CoreError: 404 if the User has no such Life Thread.
         """
         user_memory_service.delete_thread(user.id, thread_id)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @router.get("/user-portrait")
+    def get_user_portrait(
+        user: Annotated[User, Depends(current_user)],
+    ) -> UserPortraitBody:
+        """Return the User's User Portrait.
+
+        Args:
+            user: The signed-in User.
+
+        Returns:
+            The Portrait, or null if they have none.
+        """
+        portrait = user_memory_service.find_portrait(user.id)
+        return UserPortraitBody(
+            portrait=(
+                UserPortraitResponse(text=portrait.text, updated_at=portrait.written_at)
+                if portrait
+                else None
+            )
+        )
+
+    @router.delete("/user-portrait", status_code=status.HTTP_204_NO_CONTENT)
+    def delete_user_portrait(
+        user: Annotated[User, Depends(current_user)],
+    ) -> Response:
+        """Clear the User's User Portrait.
+
+        Args:
+            user: The signed-in User.
+
+        Returns:
+            An empty response.
+
+        Raises:
+            CoreError: 404 if the User has no Portrait.
+        """
+        user_memory_service.delete_portrait(user.id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @router.get("/shared-photos")

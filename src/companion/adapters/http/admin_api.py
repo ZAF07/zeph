@@ -90,6 +90,7 @@ class AdminUserResponse(BaseModel):
     conversation_count: int
     messages_sent: int
     life_thread_count: int
+    has_portrait: bool
 
 
 class RoleRequest(BaseModel):
@@ -1006,6 +1007,7 @@ def to_admin_user_response(overview: UserOverview) -> AdminUserResponse:
         conversation_count=overview.conversation_count,
         messages_sent=overview.messages_sent,
         life_thread_count=overview.life_thread_count,
+        has_portrait=overview.has_portrait,
     )
 
 

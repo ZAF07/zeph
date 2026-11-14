@@ -153,6 +153,7 @@ def chat_model(seeded_settings: dict[str, Any]) -> ScriptedChatModel:
         knowledge_when_it_helps_prompt=seeded_settings[
             "knowledge_when_it_helps_prompt"
         ],
+        portrait_prompt=seeded_settings["portrait_prompt"],
     )
 
 

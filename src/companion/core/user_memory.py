@@ -13,6 +13,7 @@ from companion.core.models import (
     MemorySource,
     PlatformSettings,
     User,
+    UserPortrait,
 )
 from companion.core.platform_settings import (
     MEMORY_NOT_AVAILABLE_NOTE,
@@ -43,11 +44,19 @@ class LifeThreadNotFoundError(MemoryNotFoundError):
     shown_message = "Life Thread not found"
 
 
+class UserPortraitNotFoundError(MemoryNotFoundError):
+    """Raised when a User has no User Portrait."""
+
+    shown_message = "User Portrait not found"
+
+
 class UserMemoryService:
     """Lets a User see and delete their User Memory, and seeds it at onboarding.
 
     While User Memory is off the Companion stops learning but keeps using what
-    it has, so only saving is stopped here.
+    it has, so only saving is stopped here. Deleting a Memory Item, Life
+    Thread or Conversation Summary asks for the User Portrait to be written
+    again without it, whatever User Memory says, since that only forgets.
     """
 
     def __init__(
@@ -122,6 +131,7 @@ class UserMemoryService:
         """
         if not self._repositories.user_memory.delete_item(user_id, item_id):
             raise MemoryNotFoundError
+        self._rewrite_portrait(user_id)
 
     def delete_all_items(self, user_id: UUID) -> None:
         """Delete every one of a User's Memory Items; Summaries stay.
@@ -130,6 +140,7 @@ class UserMemoryService:
             user_id: The User's ID.
         """
         self._repositories.user_memory.delete_all_items(user_id)
+        self._rewrite_portrait(user_id)
 
     def list_summaries(self, user_id: UUID) -> list[ConversationSummary]:
         """List a User's Conversation Summaries, newest first.
@@ -155,6 +166,7 @@ class UserMemoryService:
         """
         if not self._repositories.user_memory.delete_summary(user_id, summary_id):
             raise ConversationSummaryNotFoundError
+        self._rewrite_portrait(user_id)
 
     def list_threads(self, user_id: UUID) -> list[LifeThread]:
         """List a User's Life Threads, open first, then the latest updated.
@@ -179,6 +191,43 @@ class UserMemoryService:
         """
         if not self._repositories.life_threads.delete(user_id, thread_id):
             raise LifeThreadNotFoundError
+        self._rewrite_portrait(user_id)
+
+    def find_portrait(self, user_id: UUID) -> UserPortrait | None:
+        """Find a User's User Portrait.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Portrait; None if they have none.
+        """
+        return self._repositories.user_portraits.find(user_id)
+
+    def delete_portrait(self, user_id: UUID) -> None:
+        """Clear a User's User Portrait.
+
+        It is written again only at a later Conversation end while User
+        Memory works; a Portrait being written as it is cleared never lands.
+
+        Args:
+            user_id: The User's ID.
+
+        Raises:
+            UserPortraitNotFoundError: If the User has no Portrait.
+        """
+        if not self._repositories.user_portraits.clear(user_id, self._clock.now()):
+            raise UserPortraitNotFoundError
+
+    def _rewrite_portrait(self, user_id: UUID) -> None:
+        """Ask for the User's Portrait to be written again, after a deletion.
+
+        The scheduler's next tick writes it, if they have one.
+
+        Args:
+            user_id: The User's ID.
+        """
+        self._repositories.user_portraits.request_rewrite(user_id, self._clock.now())
 
     def remember_onboarding(self, user: User) -> None:
         """Save the User's onboarding answers as Memory Items.

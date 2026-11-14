@@ -11,7 +11,7 @@ from companion.core.life_threads import (
     describe_reminded_threads,
     format_threads_for_reply,
 )
-from companion.core.memory_retrieval import SavedMemory, format_day
+from companion.core.memory_retrieval import SavedMemory, format_day, summary_line
 from companion.core.models import (
     BringUpWay,
     ChatLine,
@@ -130,9 +130,9 @@ def describe_message_for_understanding(
         knowledge_documents: The Knowledge documents it may choose from.
 
     Returns:
-        The time, Needs, Goals, Memory Categories, recent Conversations,
-        reminded Life Threads, Knowledge documents, earlier Understandings,
-        earlier Conversation and latest message.
+        The time, Needs, User Portrait, Goals, Memory Categories, recent
+        Conversations, reminded Life Threads, Knowledge documents, earlier
+        Understandings, earlier Conversation and latest message.
     """
     fallback = fallback_need(needs)
     need_lines = "\n".join(f"- {need.name}: {need.when_it_fits}" for need in needs)
@@ -142,9 +142,7 @@ def describe_message_for_understanding(
         f"- {category.name}: {category.description}" for category in saved.pickable
     )
     summary_lines = "\n".join(
-        f"- {format_day(summary.created_at, snapshot.user.time_zone)}: "
-        f"{summary.summary} They seemed {summary.mood}."
-        for summary in saved.summaries
+        summary_line(summary, snapshot.user.time_zone) for summary in saved.summaries
     )
     earlier_lines = "\n".join(
         format_earlier_understanding(understanding) for understanding in earlier
@@ -157,6 +155,7 @@ def describe_message_for_understanding(
         f"Time where they are: {format_local_time(snapshot.local_now)}\n\n"
         f"Needs:\n{need_lines}\n"
         f"Fallback Need: {fallback.name}\n\n"
+        f"Their User Portrait:\n{saved.portrait or 'Not written yet.'}\n\n"
         f"Their Goals:\n{goal_lines or 'None saved.'}\n\n"
         f"Memory Categories with something saved:\n{category_lines or 'None yet.'}"
         f"\n\nRecent Conversations, newest first:\n{summary_lines or 'None yet.'}"

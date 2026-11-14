@@ -203,6 +203,8 @@ LIFE_THREADS_CLOSENESS_PERCENT = Setting(
 LIFE_THREAD_BRUSHED_OFF_WAIT = Setting("life_thread_brushed_off_wait_days", read_days)
 LIFE_THREAD_KEEPING_MODEL = Setting("life_thread_keeping_model", read_text)
 LIFE_THREAD_KEEPING_PROMPT = Setting("life_thread_keeping_prompt", read_text)
+PORTRAIT_MODEL = Setting("portrait_model", read_text)
+PORTRAIT_PROMPT = Setting("portrait_prompt", read_text)
 KNOWLEDGE_CHUNKS_PER_REPLY = Setting("knowledge_chunks_per_reply", read_whole_number)
 KNOWLEDGE_CLOSENESS_PERCENT = Setting("knowledge_closeness_percent", read_whole_number)
 KNOWLEDGE_WHEN_IT_HELPS_MODEL = Setting("knowledge_when_it_helps_model", read_text)
@@ -542,6 +544,16 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.MODEL,
     ),
     EditableSetting(
+        PORTRAIT_PROMPT.key,
+        "User Portrait prompt",
+        SettingKind.TEXT,
+    ),
+    EditableSetting(
+        PORTRAIT_MODEL.key,
+        "User Portrait model",
+        SettingKind.MODEL,
+    ),
+    EditableSetting(
         PERSONAL_STICKER_KEEPING_PROMPT.key,
         "Personal Sticker keeping prompt",
         SettingKind.TEXT,
@@ -821,6 +833,20 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         ),
         prompt_key=LIFE_THREAD_KEEPING_PROMPT.key,
         model_key=LIFE_THREAD_KEEPING_MODEL.key,
+    ),
+    CoreService(
+        name="User Portrait",
+        runs_when="After quiet gap while User Memory works, and after a deletion",
+        description=(
+            "Writes a short picture of the User from their Memory Items, Life "
+            "Threads and newest Conversation Summaries: who they are, what’s "
+            "going on now, recurring themes, what helps and what doesn’t, and "
+            "where they stand on their Goals. Every Understanding and reply "
+            "sees it. When the User deletes a Memory Item, Life Thread or "
+            "Summary, it is written again without it."
+        ),
+        prompt_key=PORTRAIT_PROMPT.key,
+        model_key=PORTRAIT_MODEL.key,
     ),
     CoreService(
         name="Personal Sticker keeping",

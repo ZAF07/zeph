@@ -9,6 +9,7 @@ import type {
   LifeThread,
   MemoryGroup,
   SharedPhoto,
+  UserPortrait,
 } from "@/lib/api-client";
 import { userWithRole } from "@/test/fixtures";
 import { renderWithQueries } from "@/test/render-with-queries";
@@ -26,6 +27,8 @@ const apiClient = {
   deleteSharedPhoto: vi.fn<ApiClient["deleteSharedPhoto"]>(),
   listLifeThreads: vi.fn<ApiClient["listLifeThreads"]>(),
   deleteLifeThread: vi.fn<ApiClient["deleteLifeThread"]>(),
+  getUserPortrait: vi.fn<ApiClient["getUserPortrait"]>(),
+  deleteUserPortrait: vi.fn<ApiClient["deleteUserPortrait"]>(),
 };
 
 vi.mock("@/lib/use-api-client", () => ({
@@ -73,12 +76,14 @@ const summaries: ConversationSummary[] = [
     id: "summary-1",
     summary: "Talked through whether to accept the new role.",
     mood: "unsettled at first, then calmer",
+    offered: "Suggested a walk; they said it helped.",
     created_at: "2026-11-11T09:00:00Z",
   },
   {
     id: "summary-2",
     summary: "A short Conversation after a morning swim.",
     mood: "light and content",
+    offered: "",
     created_at: "2026-11-09T09:00:00Z",
   },
 ];
@@ -99,6 +104,11 @@ const lifeThreads: LifeThread[] = [
     updated_at: "2026-10-03T09:00:00Z",
   },
 ];
+
+const portrait: UserPortrait = {
+  text: "Maya is a designer weighing a new role. Walks help; pep talks don’t.",
+  updated_at: "2026-11-13T09:00:00Z",
+};
 
 const sharedPhotos: SharedPhoto[] = [
   {
@@ -133,6 +143,8 @@ describe("Memories", () => {
     apiClient.deleteSharedPhoto.mockResolvedValue(undefined);
     apiClient.listLifeThreads.mockResolvedValue(lifeThreads);
     apiClient.deleteLifeThread.mockResolvedValue(undefined);
+    apiClient.getUserPortrait.mockResolvedValue(portrait);
+    apiClient.deleteUserPortrait.mockResolvedValue(undefined);
     URL.createObjectURL = vi.fn(() => "blob:photo");
     URL.revokeObjectURL = vi.fn();
   });
@@ -249,6 +261,9 @@ describe("Memories", () => {
     expect(
       within(newest).getByText("You seemed unsettled at first, then calmer"),
     ).toBeVisible();
+    expect(
+      within(newest).getByText("Suggested a walk; they said it helped."),
+    ).toBeVisible();
     expect(within(older).getByText("Mon 9 Nov")).toBeVisible();
   });
 
@@ -281,6 +296,73 @@ describe("Memories", () => {
     );
 
     expect(screen.getByText("No Conversation Summaries yet")).toBeVisible();
+  });
+
+  it("shows what Zeph knows about the User and when it was updated", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<Memories />);
+
+    await user.click(await screen.findByRole("tab", { name: "About you" }));
+
+    expect(
+      screen.getByRole("heading", { name: "What I know about you" }),
+    ).toBeVisible();
+    expect(screen.getByText(portrait.text)).toBeVisible();
+    expect(screen.getByText("Updated 13 Nov")).toBeVisible();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  it("deletes what Zeph knows about the User", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<Memories />);
+    await user.click(await screen.findByRole("tab", { name: "About you" }));
+
+    await user.click(
+      screen.getByRole("button", { name: "Delete what Zeph knows about you" }),
+    );
+
+    expect(apiClient.deleteUserPortrait).toHaveBeenCalled();
+    expect(screen.queryByText(portrait.text)).not.toBeInTheDocument();
+    expect(screen.getByText("Nothing here yet")).toBeVisible();
+  });
+
+  it("keeps the Portrait and explains when deleting it fails", async () => {
+    apiClient.deleteUserPortrait.mockRejectedValue(new Error("down"));
+    const user = userEvent.setup();
+    renderWithQueries(<Memories />);
+    await user.click(await screen.findByRole("tab", { name: "About you" }));
+
+    await user.click(
+      screen.getByRole("button", { name: "Delete what Zeph knows about you" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn’t delete that. Please try again.",
+    );
+    expect(screen.getByText(portrait.text)).toBeVisible();
+  });
+
+  it("explains when there is no Portrait yet", async () => {
+    apiClient.getUserPortrait.mockResolvedValue(null);
+    const user = userEvent.setup();
+    renderWithQueries(<Memories />);
+
+    await user.click(await screen.findByRole("tab", { name: "About you" }));
+
+    expect(screen.getByText("Nothing here yet")).toBeVisible();
+  });
+
+  it("still shows and deletes the Portrait when User Memory is off", async () => {
+    apiClient.getMe.mockResolvedValue({ ...maya, user_memory_enabled: false });
+    const user = userEvent.setup();
+    renderWithQueries(<Memories />);
+    await user.click(await screen.findByRole("tab", { name: "About you" }));
+
+    await user.click(
+      screen.getByRole("button", { name: "Delete what Zeph knows about you" }),
+    );
+
+    expect(apiClient.deleteUserPortrait).toHaveBeenCalled();
   });
 
   it("shows each Life Thread's story, whether it is open, and when it was updated", async () => {

@@ -492,16 +492,18 @@ class ScriptedChatModel:
     """Chat model that returns pre-written replies and records each call.
 
     Safeguard, memory processing, Understanding, Life Thread keeping,
-    Personal Sticker keeping and Knowledge "when it helps" drafting calls are
-    told apart by their instructions and kept apart from reply calls, each
-    with its own script. The Safeguard defaults to "none", the Understanding
-    to `understanding_answer()`, Life Thread keeping to no Threads and
-    drafting to `DEFAULT_WHEN_IT_HELPS`, so tests about replies don't have to
-    script them too. Set
+    Portrait writing, Personal Sticker keeping and Knowledge "when it helps"
+    drafting calls are told apart by their instructions and kept apart from
+    reply calls, each with its own script. The Safeguard defaults to "none",
+    the Understanding to `understanding_answer()`, Life Thread keeping to no
+    Threads, Portrait writing to an empty answer (no Portrait) and drafting
+    to `DEFAULT_WHEN_IT_HELPS`, so tests about replies don't have to script
+    them too. Set
     `before_next_reply` to run something once while the next reply is being
     "written", like a User acting during a slow model call, and
     `before_next_safeguard` likewise while the next text is being checked,
-    and `before_next_thread_keeping` while the next Life Threads are kept.
+    `before_next_thread_keeping` while the next Life Threads are kept and
+    `before_next_portrait` while the next Portrait is written.
     """
 
     def __init__(
@@ -512,6 +514,7 @@ class ScriptedChatModel:
         sticker_keeping_prompt: str = "",
         thread_keeping_prompt: str = "",
         knowledge_when_it_helps_prompt: str = "",
+        portrait_prompt: str = "",
     ) -> None:
         """Start with no replies scripted, no calls and no delay.
 
@@ -527,6 +530,8 @@ class ScriptedChatModel:
                 keeping call.
             knowledge_when_it_helps_prompt: The instructions that mark a
                 Knowledge "when it helps" drafting call.
+            portrait_prompt: The instructions that mark a Portrait writing
+                call.
         """
         self._replies: list[str | Exception | ToolCall] = []
         self._safeguard_answers: list[str | Exception] = []
@@ -535,12 +540,14 @@ class ScriptedChatModel:
         self._sticker_keeping_answers: list[str | Exception] = []
         self._thread_keeping_answers: list[str | Exception] = []
         self._when_it_helps_answers: list[str | Exception] = []
+        self._portrait_answers: list[str | Exception] = []
         self.safeguard_prompt = safeguard_prompt
         self.memory_processing_prompt = memory_processing_prompt
         self.understanding_prompt = understanding_prompt
         self.sticker_keeping_prompt = sticker_keeping_prompt
         self.thread_keeping_prompt = thread_keeping_prompt
         self.knowledge_when_it_helps_prompt = knowledge_when_it_helps_prompt
+        self.portrait_prompt = portrait_prompt
         self.calls: list[ChatModelCall] = []
         self.safeguard_calls: list[ChatModelCall] = []
         self.processing_calls: list[ChatModelCall] = []
@@ -548,11 +555,13 @@ class ScriptedChatModel:
         self.sticker_keeping_calls: list[ChatModelCall] = []
         self.thread_keeping_calls: list[ChatModelCall] = []
         self.when_it_helps_calls: list[ChatModelCall] = []
+        self.portrait_calls: list[ChatModelCall] = []
         self.call_order: list[str] = []
         self.delay_seconds = 0.0
         self.before_next_reply: Callable[[], None] | None = None
         self.before_next_safeguard: Callable[[], None] | None = None
         self.before_next_thread_keeping: Callable[[], None] | None = None
+        self.before_next_portrait: Callable[[], None] | None = None
 
     def script(self, *replies: str | Exception | ToolCall) -> None:
         """Queue replies to return, one per call, in order.
@@ -600,6 +609,15 @@ class ScriptedChatModel:
                 returned, to act like a failing model.
         """
         self._thread_keeping_answers.extend(answers)
+
+    def script_portrait(self, *answers: str | Exception) -> None:
+        """Queue Portrait writing answers, one per call.
+
+        Args:
+            answers: The Portraits; an exception is raised instead of
+                returned, to act like a failing model.
+        """
+        self._portrait_answers.extend(answers)
 
     def script_sticker_keeping(self, *answers: str | Exception) -> None:
         """Queue Personal Sticker keeping answers, one per call.
@@ -681,6 +699,14 @@ class ScriptedChatModel:
                 if self._thread_keeping_answers
                 else json.dumps({"threads": []})
             )
+        elif self.portrait_prompt and instructions == self.portrait_prompt:
+            self.portrait_calls.append(call)
+            self.call_order.append("portrait")
+            if self.before_next_portrait is not None:
+                before_next_portrait = self.before_next_portrait
+                self.before_next_portrait = None
+                before_next_portrait()
+            answer = self._portrait_answers.pop(0) if self._portrait_answers else ""
         elif (
             self.sticker_keeping_prompt and instructions == self.sticker_keeping_prompt
         ):

@@ -60,6 +60,7 @@ from companion.core.models import (
     Understanding,
     User,
     UserOverview,
+    UserPortrait,
     WebSearchResult,
 )
 
@@ -1027,6 +1028,74 @@ class LifeThreadRepository(Protocol):
 
     def delete_for_user(self, user_id: UUID) -> None:
         """Delete every one of a User's Life Threads.
+
+        Args:
+            user_id: The User's ID.
+        """
+        ...
+
+
+class UserPortraitRepository(Protocol):
+    """Stores each User's User Portrait, and whether it must be written again.
+
+    A save only lands when what it was written from was read after the last
+    save or clear, so a deleted Portrait, or one written before a deletion,
+    never comes back.
+    """
+
+    def find(self, user_id: UUID) -> UserPortrait | None:
+        """Find a User's Portrait.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Portrait; None if they have none, or it was cleared.
+        """
+        ...
+
+    def save(self, portrait: UserPortrait) -> None:
+        """Save a User's Portrait, unless a newer one or a clear came first.
+
+        A rewrite asked for before its `written_at` is done by this save.
+
+        Args:
+            portrait: The Portrait; `written_at` is when what it was written
+                from was read.
+        """
+        ...
+
+    def clear(self, user_id: UUID, cleared_at: datetime) -> bool:
+        """Clear a User's Portrait, so no Portrait written before now lands.
+
+        Args:
+            user_id: The User's ID.
+            cleared_at: When it is being cleared.
+
+        Returns:
+            True if they had a Portrait.
+        """
+        ...
+
+    def request_rewrite(self, user_id: UUID, requested_at: datetime) -> None:
+        """Ask for a User's Portrait to be written again, after a deletion.
+
+        Args:
+            user_id: The User's ID.
+            requested_at: When the deletion happened.
+        """
+        ...
+
+    def list_rewrite_requests(self) -> list[UUID]:
+        """List the Users whose Portrait must be written again.
+
+        Returns:
+            Their IDs, the longest waiting first.
+        """
+        ...
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's Portrait and any rewrite asked for.
 
         Args:
             user_id: The User's ID.
@@ -2129,6 +2198,7 @@ class Repositories:
     understandings: UnderstandingRepository
     user_memory: UserMemoryRepository
     life_threads: LifeThreadRepository
+    user_portraits: UserPortraitRepository
     knowledge_documents: KnowledgeDocumentRepository
     usage: UsageRepository
     stickers: StickerRepository

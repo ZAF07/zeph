@@ -71,6 +71,11 @@ export function ConversationSummariesList({
                     />
                     You seemed {summary.mood}
                   </span>
+                  {summary.offered ? (
+                    <span className="text-caption text-ink-soft">
+                      {summary.offered}
+                    </span>
+                  ) : null}
                 </span>
                 <button
                   type="button"

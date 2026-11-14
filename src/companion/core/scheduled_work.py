@@ -6,6 +6,7 @@ from companion.core.platform_settings import CONVERSATION_QUIET_GAP
 from companion.core.ports import Clock, Repositories
 from companion.core.post_conversation import PostConversationProcessor
 from companion.core.user_data import UserDataService
+from companion.core.user_portrait import PortraitWriter
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,7 @@ class ScheduledWork:
         self,
         repositories: Repositories,
         post_conversation: PostConversationProcessor,
+        portrait_writer: PortraitWriter,
         check_ins: CheckInService,
         message_retention: MessageRetention,
         user_data: UserDataService,
@@ -27,6 +29,8 @@ class ScheduledWork:
         Args:
             repositories: Where Conversations and settings are stored.
             post_conversation: Processes each ended Conversation.
+            portrait_writer: Rewrites the User Portraits a deletion asked
+                for.
             check_ins: Sends the Check-ins that are due.
             message_retention: Deletes messages older than the retention
                 period.
@@ -35,13 +39,14 @@ class ScheduledWork:
         """
         self._repositories = repositories
         self._post_conversation = post_conversation
+        self._portrait_writer = portrait_writer
         self._check_ins = check_ins
         self._message_retention = message_retention
         self._user_data = user_data
         self._clock = clock
 
     def tick(self) -> None:
-        """Process quiet Conversations, send Check-ins, delete old data.
+        """Process quiet Conversations, rewrite Portraits, send Check-ins, tidy up.
 
         Old data is messages past the retention period and auth accounts still
         to delete. A Conversation whose processing fails, or an auth account
@@ -60,6 +65,7 @@ class ScheduledWork:
                 self._post_conversation.process(conversation, settings)
             except Exception:
                 logger.exception("Could not process an ended Conversation")
+        self._portrait_writer.rewrite_requested(settings)
         self._check_ins.send_due(settings)
         self._message_retention.delete_expired(settings)
         self._user_data.delete_pending_auth_accounts()

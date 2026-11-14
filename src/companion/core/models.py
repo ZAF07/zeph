@@ -191,6 +191,7 @@ class UserOverview:
         messages_sent: How many messages they have sent the Companion.
         life_thread_count: How many Life Threads the Companion follows for
             them.
+        has_portrait: Whether they have a User Portrait.
     """
 
     user: User
@@ -198,6 +199,7 @@ class UserOverview:
     conversation_count: int
     messages_sent: int
     life_thread_count: int
+    has_portrait: bool
 
 
 @dataclass(frozen=True)
@@ -1076,8 +1078,11 @@ class ConversationSummary:
         conversation_id: The Conversation it sums up.
         user_id: The User who took part.
         summary: What was talked about.
-        mood: How the User seemed, e.g. "unsettled at first, then calmer".
+        mood: How the User seemed, as an arc when it moved, e.g. "unsettled
+            at first, then calmer".
         created_at: When it was written.
+        offered: What the Companion offered and how it landed, e.g.
+            "Suggested a walk; they said it helped."; "" if nothing.
     """
 
     id: UUID
@@ -1086,6 +1091,24 @@ class ConversationSummary:
     summary: str
     mood: str
     created_at: datetime
+    offered: str = ""
+
+
+@dataclass(frozen=True)
+class UserPortrait:
+    """A short, living picture of a User, written from their User Memory.
+
+    Attributes:
+        user_id: The User it is about.
+        text: The Portrait: who they are, what's going on now, recurring
+            themes, what helps and what doesn't, where they stand on their
+            Goals.
+        written_at: When the User Memory it was written from was read.
+    """
+
+    user_id: UUID
+    text: str
+    written_at: datetime
 
 
 class KnowledgeFileType(StrEnum):
@@ -1580,6 +1603,7 @@ class TraceKind(StrEnum):
     MESSAGE = "message"
     CHECK_IN = "check_in"
     CONVERSATION_END = "conversation_end"
+    PORTRAIT_REWRITE = "portrait_rewrite"
 
 
 class ModelStep(StrEnum):
@@ -1592,6 +1616,7 @@ class ModelStep(StrEnum):
     CHECK_IN = "check_in"
     CONVERSATION_END = "conversation_end"
     LIFE_THREADS = "life_threads"
+    PORTRAIT = "portrait"
     PERSONAL_STICKERS = "personal_stickers"
 
 

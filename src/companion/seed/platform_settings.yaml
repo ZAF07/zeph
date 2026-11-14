@@ -316,12 +316,18 @@ memory_processing_prompt: |-
   You look after the memory of Zeph, an AI companion people talk to on
   Telegram. You are given a Conversation that has just ended, the Memory
   Categories, what Zeph already remembers about the person, each item with a
-  number, and a description of each photo the person sent, each with a number.
+  number, a description of each photo the person sent, each with a number,
+  and how Zeph read their mood at each message.
 
   Write a short summary of the Conversation: what was talked about, in one to
   three plain sentences, about "they". Don't say how they seemed in the
-  summary. Separately, say in a few words how the person seemed (for example
-  "tired but hopeful" or "light and content").
+  summary. Separately, say in a few words how the person seemed, as an arc
+  when their mood moved (for example "anxious at first, calmer by the end" or
+  "light and content"). You are given how Zeph read their mood at each
+  message; use it, and the Conversation itself, for the arc. Then, in one
+  short sentence, say what Zeph offered and how it landed (for example
+  "Suggested a walk; they said it helped." or "Offered advice; they wanted to
+  vent, so it fell flat."); leave it empty if Zeph only chatted.
 
   Then decide what Zeph should remember. Keep only meaningful, lasting facts
   the person shared about themselves: not small talk, not what the Companion
@@ -348,6 +354,7 @@ memory_processing_prompt: |-
   {
     "summary": "...",
     "mood": "...",
+    "offered": "...",
     "memory_operations": [
       {"action": "add", "category": "<category name>", "content": "..."},
       {"action": "update", "item": <number>, "content": "...", "category": "<category name>"},
@@ -366,12 +373,13 @@ understanding_model: deepseek-chat
 
 understanding_prompt: |-
   You help Zeph, an AI companion, understand a person before it replies. You
-  are given the time where they are, the Needs Zeph can meet, their Goals,
-  the Memory Categories Zeph has saved something in, their recent
-  Conversations, the Life Threads (ongoing stories in their life) this
-  message reminds Zeph of, the Knowledge documents Zeph can draw on with when
-  each helps, what you understood earlier in this Conversation, and the
-  Conversation so far, ending with their latest message.
+  are given the time where they are, the Needs Zeph can meet, their User
+  Portrait (a short picture of who they are, what helps them and what
+  doesn't), their Goals, the Memory Categories Zeph has saved something in,
+  their recent Conversations, the Life Threads (ongoing stories in their
+  life) this message reminds Zeph of, the Knowledge documents Zeph can draw
+  on with when each helps, what you understood earlier in this Conversation,
+  and the Conversation so far, ending with their latest message.
 
   Work out what they want from Zeph right now, fresh for this message:
   - need: the one Need that fits best, its name exactly as written. If it
@@ -697,6 +705,34 @@ life_thread_keeping_prompt: |-
       {"title": "...", "story": "...", "people": ["..."], "open": true}
     ]
   }
+
+# When a Conversation ends and User Memory works for the User, this call
+# rewrites their User Portrait from their Memory Items, Life Threads and
+# newest Conversation Summaries. It also runs when the User deletes a Memory
+# Item, Life Thread or Summary, so the Portrait no longer holds it. It is
+# never shown the old Portrait.
+portrait_model: deepseek-chat
+
+portrait_prompt: |-
+  You write the User Portrait of a person who talks with Zeph, an AI
+  companion: a short, living picture of them that Zeph reads before every
+  reply, so it talks to them like a friend who knows them well. You are
+  given today's date, what Zeph remembers about them (by Memory Category),
+  the Life Threads (ongoing stories in their life) and their most recent
+  Conversations, newest first.
+
+  Write about "they", in plain warm sentences, in a few short paragraphs:
+  - Who they are: their life, work, people who matter, what they care about.
+  - What's going on in their life now.
+  - Themes they keep coming back to, and patterns (e.g. "low on Sunday
+    nights").
+  - What has helped them and what hasn't (e.g. "walks help; pep talks
+    annoy them").
+  - Where they stand on their Goals.
+  - Open questions Zeph is still curious about.
+  Use only what you are given. Don't guess, diagnose or judge. Leave out
+  anything they would not want said back to them. At most about 250 words.
+  Answer with the Portrait only, no heading.
 
 # Personal Stickers. When a Conversation ends and the person sent stickers in
 # it, this model picks the ones whose meaning was clear and writes when to use

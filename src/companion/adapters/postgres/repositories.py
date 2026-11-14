@@ -13,6 +13,7 @@ from sqlalchemy import (
     Select,
     and_,
     bindparam,
+    case,
     delete,
     func,
     or_,
@@ -47,6 +48,7 @@ from companion.adapters.postgres.tables import (
     telegram_connections,
     understandings,
     user_feature_switches,
+    user_portraits,
     users,
 )
 from companion.core.features import feature_details
@@ -119,6 +121,7 @@ from companion.core.models import (
     UnderstandingForm,
     User,
     UserOverview,
+    UserPortrait,
     UserRole,
 )
 from companion.core.ports import Repositories, Transaction
@@ -425,6 +428,7 @@ def _to_summary(row: Row[Any]) -> ConversationSummary:
         summary=row.summary,
         mood=row.mood,
         created_at=row.created_at,
+        offered=row.offered,
     )
 
 
@@ -641,6 +645,14 @@ class PostgresUserRepository:
             .where(life_threads.c.user_id == users.c.id)
             .scalar_subquery()
         )
+        has_portrait = (
+            select(user_portraits.c.user_id)
+            .where(
+                user_portraits.c.user_id == users.c.id,
+                user_portraits.c.text.is_not(None),
+            )
+            .exists()
+        )
         telegram_connected = (
             select(telegram_connections.c.user_id)
             .where(telegram_connections.c.user_id == users.c.id)
@@ -652,6 +664,7 @@ class PostgresUserRepository:
             conversation_count.label("conversation_count"),
             messages_sent.label("messages_sent"),
             life_thread_count.label("life_thread_count"),
+            has_portrait.label("has_portrait"),
         ).order_by(users.c.created_at.desc())
         with self._database.connect() as connection:
             rows = connection.execute(statement).all()
@@ -662,6 +675,7 @@ class PostgresUserRepository:
                 conversation_count=row.conversation_count,
                 messages_sent=row.messages_sent,
                 life_thread_count=row.life_thread_count,
+                has_portrait=row.has_portrait,
             )
             for row in rows
         ]
@@ -2127,6 +2141,149 @@ class PostgresLifeThreadRepository:
             )
 
 
+class PostgresUserPortraitRepository:
+    """Stores User Portraits in Postgres, one row per User.
+
+    A cleared Portrait keeps its row, with no text, so the time it was
+    cleared still stops older saves.
+    """
+
+    def __init__(self, database: Database) -> None:
+        """Set up the repository.
+
+        Args:
+            database: Where to run queries: the engine, or one transaction.
+        """
+        self._database = database
+
+    def find(self, user_id: UUID) -> UserPortrait | None:
+        """Find a User's Portrait.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Portrait; None if they have none, or it was cleared.
+        """
+        with self._database.connect() as connection:
+            row = connection.execute(
+                select(user_portraits).where(
+                    user_portraits.c.user_id == user_id,
+                    user_portraits.c.text.is_not(None),
+                )
+            ).one_or_none()
+        if row is None:
+            return None
+        return UserPortrait(
+            user_id=row.user_id, text=row.text, written_at=row.written_at
+        )
+
+    def save(self, portrait: UserPortrait) -> None:
+        """Save a User's Portrait, unless a newer one or a clear came first.
+
+        A rewrite asked for before its `written_at` is done by this save.
+
+        Args:
+            portrait: The Portrait; `written_at` is when what it was written
+                from was read.
+        """
+        statement = insert(user_portraits).values(
+            user_id=portrait.user_id,
+            text=portrait.text,
+            written_at=portrait.written_at,
+        )
+        stored = user_portraits.c
+        with self._database.begin() as connection:
+            connection.execute(
+                statement.on_conflict_do_update(
+                    index_elements=[stored.user_id],
+                    set_={
+                        "text": statement.excluded.text,
+                        "written_at": statement.excluded.written_at,
+                        "rewrite_requested_at": case(
+                            (
+                                stored.rewrite_requested_at
+                                <= statement.excluded.written_at,
+                                None,
+                            ),
+                            else_=stored.rewrite_requested_at,
+                        ),
+                    },
+                    where=or_(
+                        stored.written_at.is_(None),
+                        stored.written_at <= statement.excluded.written_at,
+                    ),
+                )
+            )
+
+    def clear(self, user_id: UUID, cleared_at: datetime) -> bool:
+        """Clear a User's Portrait, so no Portrait written before now lands.
+
+        Args:
+            user_id: The User's ID.
+            cleared_at: When it is being cleared.
+
+        Returns:
+            True if they had a Portrait.
+        """
+        with self._database.begin() as connection:
+            had_text = connection.execute(
+                select(user_portraits.c.text.is_not(None))
+                .where(user_portraits.c.user_id == user_id)
+                .with_for_update()
+            ).scalar_one_or_none()
+            connection.execute(
+                update(user_portraits)
+                .where(user_portraits.c.user_id == user_id)
+                .values(text=None, written_at=cleared_at, rewrite_requested_at=None)
+            )
+        return bool(had_text)
+
+    def request_rewrite(self, user_id: UUID, requested_at: datetime) -> None:
+        """Ask for a User's Portrait to be written again, after a deletion.
+
+        Args:
+            user_id: The User's ID.
+            requested_at: When the deletion happened.
+        """
+        statement = insert(user_portraits).values(
+            user_id=user_id, rewrite_requested_at=requested_at
+        )
+        with self._database.begin() as connection:
+            connection.execute(
+                statement.on_conflict_do_update(
+                    index_elements=[user_portraits.c.user_id],
+                    set_={"rewrite_requested_at": requested_at},
+                )
+            )
+
+    def list_rewrite_requests(self) -> list[UUID]:
+        """List the Users whose Portrait must be written again.
+
+        Returns:
+            Their IDs, the longest waiting first.
+        """
+        with self._database.connect() as connection:
+            return list(
+                connection.execute(
+                    select(user_portraits.c.user_id)
+                    .where(user_portraits.c.rewrite_requested_at.is_not(None))
+                    .order_by(user_portraits.c.rewrite_requested_at)
+                ).scalars()
+            )
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's Portrait and any rewrite asked for.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(user_portraits).where(user_portraits.c.user_id == user_id)
+            )
+
+
 class PostgresUserMemoryRepository:
     """Stores Memory Items, Conversation Summaries and Shared Photos in Postgres."""
 
@@ -2328,6 +2485,7 @@ class PostgresUserMemoryRepository:
                         mood=summary.mood,
                         created_at=summary.created_at,
                         embedding=summary_embedding,
+                        offered=summary.offered,
                     )
                 )
             if changes.added:
@@ -4225,6 +4383,7 @@ def _build_repositories(
         understandings=PostgresUnderstandingRepository(database),
         user_memory=PostgresUserMemoryRepository(database),
         life_threads=PostgresLifeThreadRepository(database),
+        user_portraits=PostgresUserPortraitRepository(database),
         knowledge_documents=PostgresKnowledgeDocumentRepository(database),
         usage=PostgresUsageRepository(database),
         stickers=PostgresStickerRepository(database),
