@@ -1,7 +1,18 @@
-from concurrent.futures import ThreadPoolExecutor
+import time
+from concurrent.futures import Future, ThreadPoolExecutor
+from uuid import UUID
 
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import Engine, text
 
+from companion.adapters.postgres.repositories import build_postgres_repositories
+from companion.core.admin_users import (
+    AdminUserService,
+    LastAdminError,
+    refuse_if_last_admin,
+)
+from companion.core.models import User, UserRole
 from tests.conftest import INITIAL_ADMIN_EMAIL
 from tests.fakes import FakeAuthVerifier, FakeChatChannel, ScriptedChatModel
 from tests.telegram_helpers import (
@@ -198,3 +209,70 @@ def test_two_admins_demoting_each_other_at_once_leave_one_admin(
         ).json()["users"]
     ]
     assert roles.count("admin") == 1
+
+
+def wait_until_a_query_waits_on_a_lock(engine: Engine) -> None:
+    """Wait until another database session is blocked on a row lock."""
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        with engine.connect() as connection:
+            waiting = connection.execute(
+                text(
+                    "SELECT count(*) FROM pg_stat_activity "
+                    "WHERE wait_event_type = 'Lock'"
+                )
+            ).scalar_one()
+        if waiting:
+            return
+        time.sleep(0.01)
+    raise AssertionError("No query started waiting on the Admin lock")
+
+
+def two_admins(client: TestClient, auth_verifier: FakeAuthVerifier) -> list[UUID]:
+    """Make the owner and Maya Admins, and return their User IDs."""
+    owner = owner_headers(client, auth_verifier)
+    maya_id = user_id_for(client, auth_headers(auth_verifier, "user_maya"))
+    client.put(
+        f"/api/admin/users/{maya_id}/role", json={"role": "admin"}, headers=owner
+    )
+    return [UUID(user_id_for(client, owner)), UUID(maya_id)]
+
+
+def test_two_admins_demoting_each_other_at_the_same_moment_leave_one_admin(
+    client: TestClient, engine: Engine, auth_verifier: FakeAuthVerifier
+) -> None:
+    owner_id, maya_id = two_admins(client, auth_verifier)
+    repositories = build_postgres_repositories(engine)
+    admin_users = AdminUserService(repositories)
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with repositories.transaction() as transaction:
+            refuse_if_last_admin(transaction, maya_id)
+            demoting_the_owner: Future[User] = pool.submit(
+                admin_users.change_role, owner_id, UserRole.USER
+            )
+            wait_until_a_query_waits_on_a_lock(engine)
+            transaction.repositories.users.demote_to_user(maya_id)
+
+        with pytest.raises(LastAdminError):
+            demoting_the_owner.result()
+
+    roles = {
+        user.id: user.role for user in repositories.users.get_many([owner_id, maya_id])
+    }
+    assert roles == {owner_id: UserRole.ADMIN, maya_id: UserRole.USER}
+
+
+def test_a_failed_transaction_changes_nothing(
+    client: TestClient, engine: Engine, auth_verifier: FakeAuthVerifier
+) -> None:
+    _, maya_id = two_admins(client, auth_verifier)
+    repositories = build_postgres_repositories(engine)
+
+    with pytest.raises(RuntimeError), repositories.transaction() as transaction:
+        transaction.repositories.users.demote_to_user(maya_id)
+        raise RuntimeError
+
+    maya = repositories.users.get(maya_id)
+    assert maya is not None
+    assert maya.role == UserRole.ADMIN

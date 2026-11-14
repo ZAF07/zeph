@@ -321,7 +321,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     app.include_router(
         build_admin_api_router(
             current_admin=build_current_admin_dependency(current_user),
-            admin_user_service=AdminUserService(dependencies.repositories.users),
+            admin_user_service=AdminUserService(dependencies.repositories),
             feature_service=feature_service,
             platform_settings_service=PlatformSettingsService(
                 dependencies.repositories.platform_settings, dependencies.clock

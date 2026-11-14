@@ -1,6 +1,5 @@
 import json
 import logging
-from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -43,15 +42,10 @@ from tests.test_post_conversation import (
     processing_answer,
 )
 
-USER_DATA_TABLES = (
-    "conversations",
-    "conversation_summaries",
-    "memory_items",
-    "shared_photos",
-    "personal_stickers",
-    "check_ins",
-    "connection_tokens",
-    "telegram_connections",
+TABLES_KEPT_BY_DELETE_MY_DATA = (
+    "daily_usage",
+    "safeguard_events",
+    "user_feature_switches",
 )
 
 
@@ -106,15 +100,38 @@ def set_up_user_with_every_kind_of_data(
     return headers, user_id
 
 
-def rows_per_table(engine: Engine, user_id: str) -> dict[str, int]:
-    """Count a User's rows in each table that holds their data."""
+def tables_with_a_user_id_column(engine: Engine) -> list[str]:
+    """List every table with a `user_id` column, so a new one is never missed."""
+    with engine.connect() as connection:
+        return list(
+            connection.execute(
+                text(
+                    "SELECT table_name FROM information_schema.columns "
+                    "WHERE table_schema = 'public' AND column_name = 'user_id' "
+                    "ORDER BY table_name"
+                )
+            ).scalars()
+        )
+
+
+def user_data_tables(engine: Engine) -> list[str]:
+    """List the tables Delete My Data must clear: every per-User table not kept."""
+    return [
+        table
+        for table in tables_with_a_user_id_column(engine)
+        if table not in TABLES_KEPT_BY_DELETE_MY_DATA
+    ]
+
+
+def rows_per_table(engine: Engine, user_id: str, tables: list[str]) -> dict[str, int]:
+    """Count a User's rows in each of the given tables."""
     with engine.connect() as connection:
         return {
             table: connection.execute(
                 text(f"SELECT count(*) FROM {table} WHERE user_id = :user_id"),  # noqa: S608
                 {"user_id": user_id},
             ).scalar_one()
-            for table in USER_DATA_TABLES
+            for table in tables
         }
 
 
@@ -166,13 +183,21 @@ def test_delete_my_data_removes_every_kind_of_data_but_keeps_the_account(
         scheduler,
         seeded_settings,
     )
-    assert all(count > 0 for count in rows_per_table(engine, user_id).values())
+    data_tables = user_data_tables(engine)
+    before = rows_per_table(engine, user_id, data_tables)
+    tables_without_test_data = [table for table, count in before.items() if count == 0]
+    assert tables_without_test_data == []
+    kept_before = rows_per_table(engine, user_id, list(TABLES_KEPT_BY_DELETE_MY_DATA))
     assert has_checkpoints(checkpointer, user_id)
 
     response = client.delete("/api/me/data", headers=headers)
 
     assert response.status_code == 204
-    assert rows_per_table(engine, user_id) == dict.fromkeys(USER_DATA_TABLES, 0)
+    assert rows_per_table(engine, user_id, data_tables) == dict.fromkeys(data_tables, 0)
+    assert (
+        rows_per_table(engine, user_id, list(TABLES_KEPT_BY_DELETE_MY_DATA))
+        == kept_before
+    )
     assert message_count(engine) == 0
     assert not has_checkpoints(checkpointer, user_id)
     assert memory_contents(client, headers) == {}
@@ -213,14 +238,15 @@ def test_delete_my_data_leaves_other_users_alone(
         scheduler,
         seeded_settings,
     )
-    before = rows_per_table(engine, user_id)
+    every_table = tables_with_a_user_id_column(engine)
+    before = rows_per_table(engine, user_id, every_table)
 
     response = client.delete(
         "/api/me/data", headers=owner_headers(client, auth_verifier)
     )
 
     assert response.status_code == 204
-    assert rows_per_table(engine, user_id) == before
+    assert rows_per_table(engine, user_id, every_table) == before
 
 
 def test_delete_account_removes_the_user_and_their_auth_account(
@@ -254,7 +280,8 @@ def test_delete_account_removes_the_user_and_their_auth_account(
             {"user_id": user_id},
         ).scalar_one()
     assert users_left == 0
-    assert rows_per_table(engine, user_id) == dict.fromkeys(USER_DATA_TABLES, 0)
+    every_table = tables_with_a_user_id_column(engine)
+    assert rows_per_table(engine, user_id, every_table) == dict.fromkeys(every_table, 0)
     assert message_count(engine) == 0
     assert not has_checkpoints(checkpointer, user_id)
     assert client.get("/api/me", headers=headers).status_code == 401
@@ -450,18 +477,25 @@ def test_an_account_already_gone_from_clerk_on_retry_counts_as_deleted(
     assert pending_auth_account_deletions(engine) == []
 
 
-def test_deleting_an_account_twice_at_once_is_harmless(
-    client: TestClient, engine: Engine, auth_verifier: FakeAuthVerifier
+def test_deleting_an_account_twice_is_harmless(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    clock: FakeClock,
 ) -> None:
     client.get("/api/me", headers=auth_headers(auth_verifier, "user_maya"))
-    users = build_postgres_repositories(engine).users
-    user = users.get_by_auth_id("user_maya")
+    auth_verifier.failing_deletes.add("user_maya")
+    repositories = build_postgres_repositories(engine)
+    user_data = UserDataService(
+        repositories, FakeConversationEngine(), auth_verifier, clock
+    )
+    user = repositories.users.get_by_auth_id("user_maya")
     assert user is not None
 
-    first = users.delete_unless_last_admin(user.id, datetime(2026, 11, 11, tzinfo=UTC))
-    second = users.delete_unless_last_admin(user.id, datetime(2026, 11, 11, tzinfo=UTC))
+    user_data.delete_account(user)
+    user_data.delete_account(user)
 
-    assert (first, second) == (True, True)
+    assert count_users_with_auth_id(engine, "user_maya") == 0
     assert len(pending_auth_account_deletions(engine)) == 1
 
 

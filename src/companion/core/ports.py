@@ -1,4 +1,5 @@
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any, Protocol
@@ -522,50 +523,45 @@ class UserRepository(Protocol):
         """
         ...
 
-    def demote_unless_last_admin(self, user_id: UUID) -> User | None:
-        """Make an Admin a plain User, in one step, unless they are the only one.
-
-        Two Admins demoting each other at the same time can never leave the
-        platform without an Admin.
+    def demote_to_user(self, user_id: UUID) -> User:
+        """Make an Admin a plain User.
 
         Args:
             user_id: The Admin's ID.
 
         Returns:
-            The saved User, or None if they are the last Admin.
+            The saved User.
         """
         ...
 
-    def delete_data(self, user_id: UUID) -> None:
-        """Delete a User's data in one step, keeping their account.
+    def delete(self, user_id: UUID) -> bool:
+        """Delete a User and what stays with their account.
 
-        Their Conversations and messages, Conversation Summaries, Memory Items,
-        Check-in history, connection tokens and Telegram Connection go. Their
-        profile, settings, Usage and Safeguard Events stay.
-
-        Args:
-            user_id: The User's ID.
-        """
-        ...
-
-    def delete_unless_last_admin(self, user_id: UUID, deleted_at: datetime) -> bool:
-        """Delete a User and everything of theirs, unless they are the only Admin.
-
-        In the same step, their auth provider account is added to the pending
-        auth account deletions, so it is never lost track of.
+        Their profile, settings, Usage, Safeguard Events and Feature Switches
+        go with them.
 
         Args:
             user_id: The User's ID.
-            deleted_at: When they were deleted.
 
         Returns:
-            True if they were deleted; False if they are the last Admin.
+            True if they were deleted; False if there was no such User.
         """
         ...
 
 
 class PendingAuthAccountDeletionRepository(Protocol):
     """Stores the auth provider accounts still to delete, by auth ID only."""
+
+    def add(self, auth_id: str, added_at: datetime) -> None:
+        """Note an auth provider account as still to delete.
+
+        Adding one already on the list changes nothing.
+
+        Args:
+            auth_id: The auth provider's account ID.
+            added_at: When it was added.
+        """
+        ...
 
     def list_auth_ids(self) -> list[str]:
         """List the auth IDs of the accounts still to delete, oldest first.
@@ -576,10 +572,7 @@ class PendingAuthAccountDeletionRepository(Protocol):
         ...
 
     def complete(self, auth_id: str) -> None:
-        """Mark an account deleted at the auth provider, in one step.
-
-        Any User made with that auth ID since, by signing in again before the
-        account was deleted, is deleted with everything of theirs.
+        """Take an account off the list, once it is deleted at the auth provider.
 
         Args:
             auth_id: The auth provider's account ID.
@@ -630,6 +623,14 @@ class TelegramConnectionRepository(Protocol):
 
         Args:
             connection: The connection to save.
+        """
+        ...
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's Telegram Connection.
+
+        Args:
+            user_id: The User's ID.
         """
         ...
 
@@ -686,6 +687,14 @@ class ConnectionTokenRepository(Protocol):
         Args:
             token: The code.
             rejected_at: When it was refused.
+        """
+        ...
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete every connection token of a User's.
+
+        Args:
+            user_id: The User's ID.
         """
         ...
 
@@ -794,6 +803,14 @@ class ConversationRepository(Protocol):
 
         Args:
             cutoff: Messages sent before this are deleted.
+        """
+        ...
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's Conversations and their messages.
+
+        Args:
+            user_id: The User's ID.
         """
         ...
 
@@ -984,6 +1001,14 @@ class UserMemoryRepository(Protocol):
 
         Returns:
             True if it was deleted; False if the User has no such photo.
+        """
+        ...
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's Memory Items, Conversation Summaries and Shared Photos.
+
+        Args:
+            user_id: The User's ID.
         """
         ...
 
@@ -1487,6 +1512,14 @@ class PersonalStickerRepository(Protocol):
         """
         ...
 
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's Personal Stickers.
+
+        Args:
+            user_id: The User's ID.
+        """
+        ...
+
 
 class CheckInRepository(Protocol):
     """Stores Check-in Kinds and the Check-in decisions made for Users."""
@@ -1694,6 +1727,14 @@ class CheckInRepository(Protocol):
         """
         ...
 
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's Check-in history.
+
+        Args:
+            user_id: The User's ID.
+        """
+        ...
+
 
 class FeatureSwitchRepository(Protocol):
     """Stores each Feature's switches, for everyone and per User."""
@@ -1777,7 +1818,12 @@ class FeatureSwitchRepository(Protocol):
 
 @dataclass(frozen=True)
 class Repositories:
-    """Every repository the core needs, so adapters can be swapped as one."""
+    """Every repository the core needs, so adapters can be swapped as one.
+
+    `with repositories.transaction() as transaction:` runs changes across
+    them in one transaction: all of it is saved, or none. Starting one inside
+    another joins the outer one.
+    """
 
     users: UserRepository
     telegram_connections: TelegramConnectionRepository
@@ -1795,3 +1841,24 @@ class Repositories:
     check_ins: CheckInRepository
     feature_switches: FeatureSwitchRepository
     pending_auth_account_deletions: PendingAuthAccountDeletionRepository
+    transaction: Callable[[], AbstractContextManager["Transaction"]]
+
+
+class Transaction(Protocol):
+    """One transaction across the repositories, with locks for rules that need them."""
+
+    @property
+    def repositories(self) -> Repositories:
+        """The repositories, each working inside this transaction."""
+        ...
+
+    def lock_admins(self) -> list[UUID]:
+        """Lock the Admins until the transaction ends, and list them.
+
+        Another transaction locking them waits for this one, then sees its
+        changes.
+
+        Returns:
+            The IDs of the Users who are Admins.
+        """
+        ...
