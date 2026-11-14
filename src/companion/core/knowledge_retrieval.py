@@ -14,7 +14,6 @@ from companion.core.platform_settings import (
     REPLY_KNOWLEDGE_INTRO,
 )
 from companion.core.ports import Embedder, KnowledgeVectorStore, Repositories
-from companion.core.understanding import format_knowledge_document
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +42,7 @@ def format_knowledge(
         if document.status == KnowledgeStatus.READY
     }
     passages = [
-        f"From “{document.title}” ({document.source}, {document.tradition}):\n"
-        f"{match.text}"
+        f"From {document.title_with_source}:\n{match.text}"
         for match in matches
         if (document := ready_documents.get(match.document_id)) is not None
     ]
@@ -53,23 +51,42 @@ def format_knowledge(
     return intro + "\n\n" + "\n\n".join(passages)
 
 
-def names_for_document(document: KnowledgeDocument) -> set[str]:
-    """List the ways the Understanding may name a document, in lower case.
+def comparable_name(name: str) -> str:
+    """Even out a document name, so how it was copied doesn't matter.
 
-    The Understanding sees each document as a listed line and sometimes
-    copies part or all of that line instead of just the title.
+    Args:
+        name: A document name, as the Understanding gave it or as listed.
+
+    Returns:
+        The name in lower case, with straight quotes, single spaces, and no
+        leading "- " or trailing ":".
+    """
+    straight_quotes = name.translate(str.maketrans("“”‘’", "\"\"''"))
+    single_spaced = " ".join(straight_quotes.split())
+    return single_spaced.removeprefix("- ").removesuffix(":").strip().casefold()
+
+
+def comparable_names_for(document: KnowledgeDocument) -> set[str]:
+    """List the ways the Understanding may name a document, made comparable.
+
+    The Understanding sees each document as a listed line, like
+    "- “Title” (source, tradition): when it helps", and sometimes copies
+    part or all of that line instead of just the title.
 
     Args:
         document: The document.
 
     Returns:
-        Its title, and its listed line (without the "- ") with and without
-        the "when it helps" part.
+        Its title, quoted title, title with source and tradition, and whole
+        listed line, each passed through `comparable_name`.
     """
-    listed_line = format_knowledge_document(document).removeprefix("- ")
-    quoted_with_source = f"“{document.title}” ({document.source}, {document.tradition})"
-    names = {document.title, listed_line, quoted_with_source}
-    return {name.casefold() for name in names}
+    names = {
+        document.title,
+        f"“{document.title}”",
+        document.title_with_source,
+        f"{document.title_with_source}: {document.when_it_helps}",
+    }
+    return {comparable_name(name) for name in names}
 
 
 def chosen_documents(
@@ -82,16 +99,16 @@ def chosen_documents(
         lookup: What the Understanding chose.
 
     Returns:
-        The Ready documents it named by title or by their listed line, in
-        any case and with or without the line's "- "; a name that matches
-        none is ignored.
+        The Ready documents it named by title or by part or all of their
+        listed line, ignoring case, quote style and spacing; a name that
+        matches none is ignored.
     """
-    named = {name.strip().removeprefix("- ").casefold() for name in lookup.documents}
+    names_given = {comparable_name(name) for name in lookup.documents}
     return [
         document
         for document in documents
         if document.status == KnowledgeStatus.READY
-        and not named.isdisjoint(names_for_document(document))
+        and not names_given.isdisjoint(comparable_names_for(document))
     ]
 
 

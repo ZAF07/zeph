@@ -248,9 +248,12 @@ def test_passages_come_only_from_the_chosen_documents(
         "“On grief” (Owner’s notes, Mindfulness)",
         f"“On grief” (Owner’s notes, Mindfulness): {DEFAULT_WHEN_IT_HELPS}",
         f"- “On grief” (Owner’s notes, Mindfulness): {DEFAULT_WHEN_IT_HELPS}",
+        "“On grief”",
+        '"On grief" (Owner\'s notes, Mindfulness)',
+        "  “On grief”   (Owner’s notes,\nMindfulness):",
     ],
 )
-def test_a_document_named_by_its_whole_listed_line_is_still_found(
+def test_a_document_named_by_part_or_all_of_its_listed_line_is_found(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,

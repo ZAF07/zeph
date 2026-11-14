@@ -114,7 +114,7 @@ def format_knowledge_document(document: KnowledgeDocument) -> str:
         E.g. "- “On the breath” (Owner's notes, Mindfulness): When their
         attention keeps drifting."
     """
-    line = f"- “{document.title}” ({document.source}, {document.tradition})"
+    line = f"- {document.title_with_source}"
     return f"{line}: {document.when_it_helps}" if document.when_it_helps else line
 
 
