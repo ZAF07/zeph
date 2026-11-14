@@ -103,6 +103,10 @@ onboarding_reason_choices:
 # A message after this many quiet minutes starts a new Conversation.
 conversation_quiet_gap_minutes: 60
 
+# How many seconds the Companion waits after a User's last text, photo or
+# album photo before answering everything they sent as one Message.
+message_wait_seconds: 4
+
 # Raw messages older than this many days are deleted on the next scheduler
 # tick. Conversation Summaries and Memory Items stay until the User deletes
 # them.
@@ -248,10 +252,6 @@ photo_viewing_off_note: >-
 # How many more times a photo is tried when downloading or looking at it
 # fails, with a short pause between tries.
 photo_retry_count: 2
-
-# How many seconds to wait after an album's last photo arrives before
-# answering all its photos as one message.
-photo_album_wait_seconds: 2
 
 # The most photos looked at in one album; the Companion is told how many
 # more there were.

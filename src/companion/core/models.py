@@ -464,13 +464,16 @@ class ConversationMessage:
 
 
 @dataclass(frozen=True)
-class MessageToAnswer:
-    """A connected User's message that the Companion should answer.
+class TextToScreen:
+    """One text of a connected User's Message, ready for the Safeguard.
+
+    A text here is any one piece of a Message: a text, a sticker, a photo
+    or a whole Album.
 
     Attributes:
         user_id: The User who sent it.
         chat_id: The chat to reply in.
-        text: The message as the Companion reads it, e.g. "[sticker: 😂]"
+        text: The text as the Companion reads it, e.g. "[sticker: 😂]"
             for a sticker, or "[photo: …] caption" for a photo.
         kind: What kind of message it is.
         photos: The photos it came with.
@@ -487,6 +490,23 @@ class MessageToAnswer:
     photos: tuple[ChannelPhoto, ...] = ()
     safeguard_text: str | None = None
     sticker: ChannelSticker | None = None
+
+
+@dataclass(frozen=True)
+class MessageToAnswer:
+    """A connected User's Message whose texts all passed the Safeguard.
+
+    Attributes:
+        user_id: The User who sent it.
+        chat_id: The chat to reply in.
+        conversation_id: The Conversation its texts were saved into.
+        text: Its texts as the Companion reads them, one per line.
+    """
+
+    user_id: UUID
+    chat_id: int
+    conversation_id: UUID
+    text: str
 
 
 class ChatRole(StrEnum):

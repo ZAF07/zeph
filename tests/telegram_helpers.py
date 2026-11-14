@@ -163,7 +163,21 @@ def telegram_reply_to_sticker_update(
 
 
 def send_to_webhook(client: TestClient, update: dict[str, Any]) -> int:
-    """Post an update to the webhook with the right secret and return the status."""
+    """Post an update, then end the Message wait as if the User paused.
+
+    Returns the status of the post.
+    """
+    status_code = post_to_webhook(client, update)
+    assert isinstance(client, CompanionTestClient)
+    client.timer.end_message_waits()
+    return status_code
+
+
+def post_to_webhook(client: TestClient, update: dict[str, Any]) -> int:
+    """Post an update to the webhook with the right secret and return the status.
+
+    The Message wait is left running, so later texts join the same Message.
+    """
     response = client.post(
         "/telegram/webhook",
         json=update,

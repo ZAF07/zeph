@@ -123,7 +123,7 @@ def add_due_users(engine: Engine, clock: FakeClock, how_many: int) -> list[User]
     return added
 
 
-def test_a_reply_reads_the_user_and_their_switches_once(
+def test_a_text_and_its_reply_each_read_the_user_and_their_switches_once(
     client: TestClient,
     engine: Engine,
     auth_verifier: FakeAuthVerifier,
@@ -139,7 +139,7 @@ def test_a_reply_reads_the_user_and_their_switches_once(
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID)[-1] == (
         "hey, good to hear from you"
     )
-    assert reads == {"users": 1, "feature_switches": 1, "user_feature_switches": 1}
+    assert reads == {"users": 2, "feature_switches": 2, "user_feature_switches": 2}
 
 
 def test_a_check_in_tick_reads_users_and_switches_the_same_for_many_due_users(

@@ -145,6 +145,7 @@ MEMORY_PAUSED_NOTE = Setting("memory_paused_note", read_text)
 MEMORY_NOT_AVAILABLE_NOTE = Setting("memory_not_available_note", read_text)
 ONBOARDING_REASON_CHOICES = Setting("onboarding_reason_choices", read_text_list)
 CONVERSATION_QUIET_GAP = Setting("conversation_quiet_gap_minutes", read_minutes)
+MESSAGE_WAIT_SECONDS = Setting("message_wait_seconds", read_whole_number)
 MESSAGE_RETENTION_DAYS = Setting("message_retention_days", read_whole_number)
 TYPING_SECONDS_PER_CHARACTER = Setting("typing_seconds_per_character", read_number)
 MIN_TYPING_SECONDS = Setting("min_typing_seconds", read_number)
@@ -162,7 +163,6 @@ SEND_PHOTO_TOOL_DESCRIPTION = Setting("send_photo_tool_description", read_text)
 PHOTO_NOT_VIEWED_NOTE = Setting("photo_not_viewed_note", read_text)
 PHOTO_VIEWING_OFF_NOTE = Setting("photo_viewing_off_note", read_text)
 PHOTO_RETRY_COUNT = Setting("photo_retry_count", read_whole_number)
-PHOTO_ALBUM_WAIT_SECONDS = Setting("photo_album_wait_seconds", read_whole_number)
 PHOTO_ALBUM_MAX_PHOTOS = Setting("photo_album_max_photos", read_whole_number)
 SAFEGUARD_MODEL = Setting("safeguard_model", read_text)
 SAFEGUARD_PROMPT = Setting("safeguard_prompt", read_text)
@@ -478,13 +478,6 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         maximum=5,
     ),
     EditableSetting(
-        PHOTO_ALBUM_WAIT_SECONDS.key,
-        "Album wait",
-        SettingKind.WHOLE_NUMBER,
-        minimum=1,
-        maximum=30,
-    ),
-    EditableSetting(
         PHOTO_ALBUM_MAX_PHOTOS.key,
         "Most photos per album",
         SettingKind.WHOLE_NUMBER,
@@ -536,6 +529,13 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=5,
         maximum=1440,
+    ),
+    EditableSetting(
+        MESSAGE_WAIT_SECONDS.key,
+        "Message wait",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=30,
     ),
     EditableSetting(
         DAILY_MESSAGE_LIMIT.key,

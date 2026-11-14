@@ -21,6 +21,7 @@ function seeded(value: string | number) {
 
 const settings: AdminSettings = {
   conversation_quiet_gap_minutes: seeded(60),
+  message_wait_seconds: seeded(4),
   web_search_daily_limit: seeded(10),
   ai_notice: seeded("I'm an AI."),
   ai_notice_short: seeded("Zeph is an AI."),
@@ -31,7 +32,6 @@ const settings: AdminSettings = {
   daily_limit_reply: seeded("I'm wiped for today, talk tomorrow?"),
   message_retention_days: seeded(30),
   photo_retry_count: seeded(2),
-  photo_album_wait_seconds: seeded(2),
   photo_album_max_photos: seeded(5),
   personal_stickers_limit: seeded(30),
   sticker_adding_quiet_gap_minutes: seeded(5),
@@ -193,25 +193,39 @@ describe("PlatformSettingsForm", () => {
     });
   });
 
-  it("shows and saves the album wait and most photos per album", async () => {
+  it("shows and saves the message wait in its Conversations section", async () => {
     const user = userEvent.setup();
     renderWithQueries(<PlatformSettingsForm />);
-    const wait = await screen.findByLabelText("Album wait");
-    const most = screen.getByLabelText("Most photos per album");
-    expect(wait).toHaveValue(2);
-    expect(most).toHaveValue(5);
-    const photos = screen.getByRole("region", { name: "Photos" });
-    expect(photos).toContainElement(wait);
-    expect(photos).toContainElement(most);
+    const wait = await screen.findByLabelText("Message wait");
+    expect(wait).toHaveValue(4);
+    expect(
+      screen.getByRole("region", { name: "Conversations" }),
+    ).toContainElement(wait);
+    expect(screen.queryByLabelText("Album wait")).not.toBeInTheDocument();
 
     await user.clear(wait);
-    await user.type(wait, "4");
+    await user.type(wait, "6");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      message_wait_seconds: 6,
+    });
+  });
+
+  it("shows and saves the most photos per album", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const most = await screen.findByLabelText("Most photos per album");
+    expect(most).toHaveValue(5);
+    expect(screen.getByRole("region", { name: "Photos" })).toContainElement(
+      most,
+    );
+
     await user.clear(most);
     await user.type(most, "8");
     await user.click(screen.getByRole("button", { name: "Save settings" }));
 
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
-      photo_album_wait_seconds: 4,
       photo_album_max_photos: 8,
     });
   });

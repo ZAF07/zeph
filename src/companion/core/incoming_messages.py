@@ -1,7 +1,8 @@
 import logging
 import threading
 from collections import defaultdict
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
+from dataclasses import dataclass, field
 from uuid import UUID
 
 from companion.core.models import (
@@ -9,17 +10,20 @@ from companion.core.models import (
     IncomingMessage,
     MessageKind,
     MessageToAnswer,
+    PlatformSettings,
+    TextToScreen,
     UserSnapshot,
 )
 from companion.core.photos import PhotoService
 from companion.core.platform_settings import (
     DASHBOARD_URL_PLACEHOLDER,
-    PHOTO_ALBUM_WAIT_SECONDS,
+    MESSAGE_WAIT_SECONDS,
     REPLY_FAILED_MESSAGE,
     UNKNOWN_TELEGRAM_USER_REPLY,
     UNSUPPORTED_MESSAGE_REPLY,
 )
 from companion.core.ports import ChatChannel, Repositories, Timer
+from companion.core.reply_gate import ReplyGate, Stopped
 from companion.core.reply_service import ReplyService
 from companion.core.sticker_adding import StickerAdding
 from companion.core.stickers import sticker_message_text
@@ -27,6 +31,8 @@ from companion.core.telegram_connection import TelegramConnectionService
 from companion.core.user_snapshot import UserSnapshotLoader
 
 logger = logging.getLogger(__name__)
+
+MESSAGE_WAIT_PREFIX = "message:"
 
 
 def readable_text(message: IncomingMessage) -> str:
@@ -67,18 +73,70 @@ def album_caption(messages: Sequence[IncomingMessage]) -> str:
     return " ".join([*markers, caption]).strip()
 
 
+def group_albums(
+    album_items: Sequence[IncomingMessage],
+) -> list[list[IncomingMessage]]:
+    """Group Album photos and files by the Album they came in.
+
+    Args:
+        album_items: The items, in the order they arrived.
+
+    Returns:
+        One list per Album, in the order the Albums arrived, each in the
+        order its items were sent.
+    """
+    albums: dict[str | None, list[IncomingMessage]] = {}
+    for item in album_items:
+        albums.setdefault(item.album_id, []).append(item)
+    return [
+        sorted(items, key=lambda item: item.message_id) for items in albums.values()
+    ]
+
+
+@dataclass
+class PendingMessage:
+    """What a User has sent in a Message they haven't paused after yet.
+
+    Attributes:
+        chat_id: The chat to reply in.
+        conversation_id: The Conversation its latest screened text was saved
+            into; None until a text is screened.
+        texts: Its screened texts as the Companion reads them, in order.
+        album_items: Its Album photos and files, screened together once the
+            User pauses.
+    """
+
+    chat_id: int
+    conversation_id: UUID | None = None
+    texts: list[str] = field(default_factory=list)
+    album_items: list[IncomingMessage] = field(default_factory=list)
+
+    def add_screened(self, conversation_id: UUID, text: str) -> None:
+        """Add a text that passed the Safeguard.
+
+        Args:
+            conversation_id: The Conversation it was saved into.
+            text: The text as the Companion reads it.
+        """
+        self.conversation_id = conversation_id
+        self.texts.append(text)
+
+
 class IncomingMessageHandler:
     """Decides what to do with each message people send the Companion.
 
-    A User's messages are answered one at a time, so a reply always sees
-    every earlier message, even when several arrive at once. Photos sent
-    together as an album are collected and answered as one message.
+    A connected User's texts are gathered into one Message until they pause
+    for `message_wait_seconds`, then answered together with one reply. Each
+    text is saved and checked by the Safeguard as it arrives, so a crisis
+    is never held back by the wait. A User's turns run one at a time, so a
+    text that arrives while a reply is being written starts a new Message.
     """
 
     def __init__(
         self,
         telegram_connections: TelegramConnectionService,
         repositories: Repositories,
+        reply_gate: ReplyGate,
         reply_service: ReplyService,
         chat_channel: ChatChannel,
         sticker_adding: StickerAdding,
@@ -93,13 +151,14 @@ class IncomingMessageHandler:
             telegram_connections: Handles `/start <token>` messages.
             repositories: Where Users, Telegram Connections and settings are
                 stored.
-            reply_service: Answers connected Users' messages.
+            reply_gate: Saves each text and checks it for crisis.
+            reply_service: Answers connected Users' Messages.
             chat_channel: Sends replies that need no Conversation.
             sticker_adding: Adds the stickers Admins send in adding mode or
                 reply "add this" to.
             photo_service: Describes the photos Users send.
-            user_snapshots: Reads the User once at the start of each reply.
-            timer: Waits for the rest of an album to arrive.
+            user_snapshots: Reads the User once at the start of each turn.
+            timer: Waits for the User to pause before answering their Message.
             dashboard_url: The Dashboard's address, put into some replies.
         """
         self._telegram_connections = telegram_connections
@@ -108,6 +167,7 @@ class IncomingMessageHandler:
         self._user_snapshots = user_snapshots
         self._timer = timer
         self._repositories = repositories
+        self._reply_gate = reply_gate
         self._reply_service = reply_service
         self._chat_channel = chat_channel
         self._dashboard_url = dashboard_url
@@ -115,8 +175,8 @@ class IncomingMessageHandler:
             threading.Lock
         )
         self._turn_locks_guard = threading.Lock()
-        self._albums: dict[str, list[IncomingMessage]] = {}
-        self._albums_guard = threading.Lock()
+        self._pending_messages: dict[UUID, PendingMessage] = {}
+        self._pending_messages_guard = threading.Lock()
 
     def handle(self, message: IncomingMessage) -> None:
         """Handle one incoming message.
@@ -126,15 +186,13 @@ class IncomingMessageHandler:
         from an Admin in adding mode goes into the Sticker Library; any other
         message ends adding mode, with a summary of what was added, and is
         then handled as normal. An Admin's "add this" reply to a sticker adds
-        it. A photo is described
-        first, so the Safeguard and the reply read what it shows; an album's
-        photos wait until `photo_album_wait_seconds` pass after the last one
-        arrives, then are answered together as one message. A voice
-        note, video or other message the Companion can't read gets the
-        unsupported reply, unless it has a caption, which is answered
-        instead. Any other message from a connected User is answered by the
-        Companion; if that fails, they get a short fallback reply instead of
-        silence.
+        it. A voice note, video or other message the Companion can't read
+        gets the unsupported reply, unless it has a caption, which is
+        answered instead. Anything else from a connected User joins their
+        Message: a photo is described first, so the Safeguard and the reply
+        read what it shows; an Album's photos are described and checked
+        together once the User pauses. If saving or checking a text fails,
+        the User gets a short fallback reply instead of silence.
 
         Args:
             message: The incoming message.
@@ -164,7 +222,7 @@ class IncomingMessageHandler:
         if self._sticker_adding.add_if_asked(connection.user_id, message):
             return
         if message.album_id is not None:
-            self._collect_album_item(connection.user_id, message)
+            self._hold_album_item(connection.user_id, message)
             return
         if message.kind == MessageKind.UNSUPPORTED and not message.text.strip():
             self._chat_channel.send_text(
@@ -174,148 +232,196 @@ class IncomingMessageHandler:
                 ),
             )
             return
-        self._answer(
-            connection.user_id,
-            message.chat_id,
-            lambda user: self._message_to_answer(user, message),
-        )
+        self._screen_text(connection.user_id, message)
 
-    def _collect_album_item(self, user_id: UUID, message: IncomingMessage) -> None:
-        """Keep an album's photo or file and restart the wait for the rest of it.
+    def _hold_album_item(self, user_id: UUID, message: IncomingMessage) -> None:
+        """Add an Album's photo or file to the User's Message and restart the wait.
 
         Args:
             user_id: The User who sent it.
-            message: The photo or file message, with its album ID.
+            message: The photo or file message, with its Album ID.
         """
-        album_key = f"{message.sender_id}:{message.album_id}"
-        with self._albums_guard:
-            self._albums.setdefault(album_key, []).append(message)
-        self._timer.start(
-            album_key,
-            self._repositories.platform_settings.load().get(PHOTO_ALBUM_WAIT_SECONDS),
-            lambda: self._answer_album(user_id, album_key),
-        )
+        with self._pending_messages_guard:
+            pending = self._pending_messages.setdefault(
+                user_id, PendingMessage(chat_id=message.chat_id)
+            )
+            pending.album_items.append(message)
+        self._restart_wait(user_id, self._repositories.platform_settings.load())
 
-    def _answer_album(self, user_id: UUID, album_key: str) -> None:
-        """Answer an album's collected items as one message, in the order sent.
+    def _screen_text(self, user_id: UUID, message: IncomingMessage) -> None:
+        """Save a text and check it for crisis now, then restart the wait.
 
-        Files the Companion can't open, like a video, are marked in the text
-        ("[video] caption"). An album with no photos and no caption gets the
-        unsupported reply once.
+        A crisis gets the Crisis Reply straight away and drops the rest of
+        the User's Message, so it isn't answered normally.
 
         Args:
             user_id: The User who sent it.
-            album_key: Names the collected album.
-        """
-        with self._albums_guard:
-            messages = self._albums.pop(album_key, [])
-        if not messages:
-            return
-        messages.sort(key=lambda message: message.message_id)
-        chat_id = messages[0].chat_id
-        photos = [message.photo for message in messages if message.photo]
-        caption = album_caption(messages)
-        if photos:
-            self._answer(
-                user_id,
-                chat_id,
-                lambda user: self._photo_message_to_answer(
-                    user, chat_id, photos, caption
-                ),
-            )
-            return
-        if not any(message.text.strip() for message in messages):
-            self._chat_channel.send_text(
-                chat_id,
-                self._repositories.platform_settings.load().get(
-                    UNSUPPORTED_MESSAGE_REPLY
-                ),
-            )
-            return
-        self._answer(
-            user_id,
-            chat_id,
-            lambda user: MessageToAnswer(
-                user_id=user_id,
-                chat_id=chat_id,
-                text=caption,
-                kind=MessageKind.UNSUPPORTED,
-            ),
-        )
-
-    def _answer(
-        self,
-        user_id: UUID,
-        chat_id: int,
-        build_message: Callable[[UserSnapshot], MessageToAnswer],
-    ) -> None:
-        """Answer a User's message after their earlier ones, with a fallback on failure.
-
-        The platform settings and the User are read once, inside their turn,
-        and that snapshot is used for the whole reply.
-
-        Args:
-            user_id: The User who sent it.
-            chat_id: The chat to reply in.
-            build_message: Builds the message the Companion answers from the
-                User snapshot.
+            message: The incoming message.
         """
         with self._turn_lock_for(user_id):
             settings = self._repositories.platform_settings.load()
             try:
                 snapshot = self._user_snapshots.load(user_id, settings)
-                self._reply_service.handle(build_message(snapshot), snapshot)
+                text = self._text_to_screen(snapshot, message)
+                result = self._reply_gate.screen(text, snapshot)
             except Exception:
-                logger.exception("Could not answer a message from a User")
+                logger.exception("Could not check a text from a User")
                 self._chat_channel.send_text(
-                    chat_id, settings.get(REPLY_FAILED_MESSAGE)
+                    message.chat_id, settings.get(REPLY_FAILED_MESSAGE)
+                )
+                return
+            with self._pending_messages_guard:
+                if isinstance(result, Stopped):
+                    self._pending_messages.pop(user_id, None)
+                    return
+                pending = self._pending_messages.setdefault(
+                    user_id, PendingMessage(chat_id=message.chat_id)
+                )
+                pending.add_screened(result.conversation_id, text.text)
+        self._restart_wait(user_id, settings)
+
+    def _restart_wait(self, user_id: UUID, settings: PlatformSettings) -> None:
+        """Start the wait for the User to pause, restarting any wait under way.
+
+        Args:
+            user_id: The User.
+            settings: The platform settings, which say how long to wait.
+        """
+        self._timer.start(
+            f"{MESSAGE_WAIT_PREFIX}{user_id}",
+            settings.get(MESSAGE_WAIT_SECONDS),
+            lambda: self._answer_message(user_id),
+        )
+
+    def _answer_message(self, user_id: UUID) -> None:
+        """Answer everything the User sent before pausing with one reply.
+
+        Any Albums are described and checked for crisis first; a crisis gets
+        the Crisis Reply and the Message isn't answered normally. An Album
+        with no photos and no caption gets the unsupported reply. The
+        platform settings and the User are read once, inside their turn, and
+        that snapshot is used for the whole reply. If the reply fails the
+        User gets a short fallback reply instead of silence.
+
+        Args:
+            user_id: The User who paused.
+        """
+        with self._turn_lock_for(user_id):
+            with self._pending_messages_guard:
+                pending = self._pending_messages.pop(user_id, None)
+            if pending is None:
+                return
+            settings = self._repositories.platform_settings.load()
+            try:
+                snapshot = self._user_snapshots.load(user_id, settings)
+                for album_items in group_albums(pending.album_items):
+                    album_text = self._album_text_to_screen(
+                        snapshot, pending.chat_id, album_items
+                    )
+                    if album_text is None:
+                        continue
+                    result = self._reply_gate.screen(album_text, snapshot)
+                    if isinstance(result, Stopped):
+                        return
+                    pending.add_screened(result.conversation_id, album_text.text)
+                if pending.conversation_id is None:
+                    return
+                self._reply_service.handle(
+                    MessageToAnswer(
+                        user_id=user_id,
+                        chat_id=pending.chat_id,
+                        conversation_id=pending.conversation_id,
+                        text="\n".join(pending.texts),
+                    ),
+                    snapshot,
+                )
+            except Exception:
+                logger.exception("Could not answer a Message from a User")
+                self._chat_channel.send_text(
+                    pending.chat_id, settings.get(REPLY_FAILED_MESSAGE)
                 )
 
-    def _message_to_answer(
+    def _album_text_to_screen(
+        self,
+        snapshot: UserSnapshot,
+        chat_id: int,
+        album_items: Sequence[IncomingMessage],
+    ) -> TextToScreen | None:
+        """Turn an Album's items into one text of the Message.
+
+        Files the Companion can't open, like a video, are marked in the text
+        ("[video] caption"). An Album with no photos and no caption gets the
+        unsupported reply instead.
+
+        Args:
+            snapshot: The User who sent it.
+            chat_id: The chat it came from.
+            album_items: The Album's items, in the order sent.
+
+        Returns:
+            The text to screen, or None when the Album has nothing to answer.
+        """
+        photos = [item.photo for item in album_items if item.photo]
+        caption = album_caption(album_items)
+        if photos:
+            return self._photo_text_to_screen(snapshot, chat_id, photos, caption)
+        if not any(item.text.strip() for item in album_items):
+            self._chat_channel.send_text(
+                chat_id, snapshot.settings.get(UNSUPPORTED_MESSAGE_REPLY)
+            )
+            return None
+        return TextToScreen(
+            user_id=snapshot.user.id,
+            chat_id=chat_id,
+            text=caption,
+            kind=MessageKind.UNSUPPORTED,
+        )
+
+    def _text_to_screen(
         self, snapshot: UserSnapshot, message: IncomingMessage
-    ) -> MessageToAnswer:
-        """Turn a connected User's message into the message the Companion answers.
+    ) -> TextToScreen:
+        """Turn a connected User's message into one text of their Message.
 
         Args:
             snapshot: The User who sent it.
             message: The incoming message.
 
         Returns:
-            The message to answer; a photo's text holds its description.
+            The text to screen; a photo's text holds its description.
         """
         if message.photo is None:
-            return MessageToAnswer(
+            return TextToScreen(
                 user_id=snapshot.user.id,
                 chat_id=message.chat_id,
                 text=readable_text(message),
                 kind=message.kind,
                 sticker=message.sticker,
             )
-        return self._photo_message_to_answer(
+        return self._photo_text_to_screen(
             snapshot, message.chat_id, [message.photo], message.text
         )
 
-    def _photo_message_to_answer(
+    def _photo_text_to_screen(
         self,
         snapshot: UserSnapshot,
         chat_id: int,
         photos: Sequence[ChannelPhoto],
         caption: str,
-    ) -> MessageToAnswer:
-        """Describe a User's photos and turn them into the message to answer.
+    ) -> TextToScreen:
+        """Describe a User's photos and turn them into one text of their Message.
 
         Args:
             snapshot: The User who sent them.
             chat_id: The chat to reply in.
-            photos: The photo, or an album's photos.
+            photos: The photo, or an Album's photos.
             caption: The caption; "" if none.
 
         Returns:
-            The message to answer, whose text holds each photo's description, or, with
-            Photo Viewing off, whose Safeguard text does.
+            The text to screen, which holds each photo's description, or,
+            with Photo Viewing off, whose Safeguard text does.
         """
         photo_message = self._photo_service.read_message(snapshot, photos, caption)
-        return MessageToAnswer(
+        return TextToScreen(
             user_id=snapshot.user.id,
             chat_id=chat_id,
             text=photo_message.text,

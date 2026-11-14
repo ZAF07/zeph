@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from companion.adapters.postgres.tables import EMBEDDING_SIZE
+from companion.core.incoming_messages import MESSAGE_WAIT_PREFIX
 from companion.core.models import (
     AccountIdentity,
     ChannelSticker,
@@ -396,6 +397,12 @@ class FakeTimer:
         self._waiting.clear()
         for work in waiting:
             work()
+
+    def end_message_waits(self) -> None:
+        """Run the waiting Message work now, as if each User had paused."""
+        keys = [key for key in self._waiting if key.startswith(MESSAGE_WAIT_PREFIX)]
+        for key in keys:
+            self._waiting.pop(key)()
 
 
 class ScriptedChatModel:

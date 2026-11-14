@@ -24,7 +24,7 @@ from companion.core.platform_settings import (
     SHARED_PHOTOS_MEMORY_DESCRIPTION,
 )
 from companion.core.ports import Repositories
-from companion.core.transcripts import to_transcript_lines
+from companion.core.transcripts import split_off_latest_message, to_transcript_lines
 from companion.core.usage import UsageRecordingChatModel
 
 logger = logging.getLogger(__name__)
@@ -95,8 +95,8 @@ def describe_message_for_picking(
 
     Args:
         categories: The Memory Categories it may pick from.
-        messages: The Conversation so far, oldest first; the last one is the
-            message being answered.
+        messages: The Conversation so far, oldest first; the User's messages
+            at the end are the Message being answered.
 
     Returns:
         The categories, the earlier Conversation and the latest message.
@@ -104,12 +104,12 @@ def describe_message_for_picking(
     category_lines = "\n".join(
         f"- {category.name}: {category.description}" for category in categories
     )
-    *earlier, latest = messages
+    earlier, latest_text = split_off_latest_message(messages)
     return (
         f"Memory Categories:\n{category_lines}\n\n"
         f"Earlier in the Conversation:\n"
         f"{to_transcript_lines(earlier) or 'Nothing yet.'}\n\n"
-        f"Latest message:\nPerson: {latest.content}"
+        f"Latest message:\nPerson: {latest_text}"
     )
 
 

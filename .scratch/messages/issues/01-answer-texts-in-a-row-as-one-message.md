@@ -1,6 +1,6 @@
 # 01 — Answer texts sent in a row as one Message
 
-Status: ready-for-agent
+Status: in-progress
 
 ## Parent
 
@@ -29,3 +29,14 @@ People often send 2–3 short texts in a row. Today each text gets its own reply
 ## Blocked by
 
 None - can start immediately.
+
+## Comments
+
+### Plan (14 Nov 2026, branch `messages-01-group-texts`)
+
+- Split the ReplyGate in two: `screen` runs per text as it arrives (save it, Safeguard, Crisis Reply), `check` runs once per Message (Delete My Data, Daily Message Limit).
+- `IncomingMessageHandler` keeps one pending Message per User. Each text (or single photo, sticker, captioned file) is screened at once under the User's turn lock, then the per-User wait restarts. Album items join the pending Message unscreened and are described and screened together when the wait ends, as today.
+- When the wait ends: pop the pending Message under the turn lock, screen any Albums, then run the reply (Delete My Data, limit, compose, deliver) once. A crisis drops the pending Message.
+- The reply call and the memory/Knowledge lookups read the trailing run of the User's texts as one latest Message (consecutive incoming messages are merged into one line).
+- One setting `message_wait_seconds` ("Message wait", Conversations section, default 4) replaces `photo_album_wait_seconds`; migration 0025 removes the old row.
+- Tests: `send_to_webhook` posts and then ends the wait (a User who pauses); a new `post_to_webhook` posts without ending it, for grouping tests.

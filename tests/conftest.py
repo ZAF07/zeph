@@ -50,10 +50,11 @@ KNOWLEDGE_SEED_FILE = SEED_DIR / "knowledge" / "knowledge.yaml"
 class CompanionTestClient(TestClient):
     """A test client that can also reach the test database for setup."""
 
-    def __init__(self, app: Any, engine: Engine) -> None:
-        """Wrap the app and remember the test database."""
+    def __init__(self, app: Any, engine: Engine, timer: FakeTimer) -> None:
+        """Wrap the app and remember the test database and timer."""
         super().__init__(app)
         self.engine = engine
+        self.timer = timer
 
 
 @pytest.fixture(scope="session")
@@ -187,7 +188,7 @@ def client(
         dashboard_url=DASHBOARD_URL,
         initial_admin_emails=frozenset({INITIAL_ADMIN_EMAIL}),
     )
-    with CompanionTestClient(create_app(dependencies), engine) as test_client:
+    with CompanionTestClient(create_app(dependencies), engine, timer) as test_client:
         yield test_client
 
 

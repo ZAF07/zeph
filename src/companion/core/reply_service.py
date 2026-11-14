@@ -7,12 +7,12 @@ from companion.core.response_composition import ResponseComposer
 
 
 class ReplyService:
-    """Answers a connected User's message, one step after another (ADR-0009).
+    """Answers a connected User's Message, one step after another (ADR-0009).
 
-    The steps run in this order: the ReplyGate saves the message and applies
-    the house rules, then the User Memory that matters and the Knowledge that
-    may fit are recalled, then the reply is composed and delivered. Every step
-    reads the User from the same snapshot.
+    The steps run in this order: the ReplyGate applies the house rules left
+    once the Message's texts are saved and checked, then the User Memory that
+    matters and the Knowledge that may fit are recalled, then the reply is
+    composed and delivered. Every step reads the User from the same snapshot.
     """
 
     def __init__(
@@ -26,7 +26,7 @@ class ReplyService:
         """Set up the service.
 
         Args:
-            reply_gate: Saves each message and applies the house rules.
+            reply_gate: Applies the house rules to each Message.
             conversations: Sends composed replies.
             memory_retrieval: Finds the User Memory that matters for a message.
             knowledge_retrieval: Finds the Knowledge that may fit a message.
@@ -39,24 +39,23 @@ class ReplyService:
         self._response_composer = response_composer
 
     def handle(self, message: MessageToAnswer, snapshot: UserSnapshot) -> None:
-        """Answer one message: apply the house rules, then reply if needed.
+        """Answer one screened Message: apply the house rules, then reply if needed.
 
         When the ReplyGate stops the reply nothing is composed. A failing
         step raises, so the caller can send its fallback message.
 
         Args:
-            message: The message to answer.
+            message: The Message to answer, its texts already saved and
+                checked by the Safeguard.
             snapshot: The User who sent it, read once as the reply starts.
         """
         gate_result = self._reply_gate.check(message, snapshot)
         if isinstance(gate_result, Stopped):
             return
-        memory = self._memory_retrieval.recall(snapshot, gate_result.conversation_id)
-        knowledge = self._knowledge_retrieval.recall(
-            snapshot, gate_result.conversation_id
-        )
+        memory = self._memory_retrieval.recall(snapshot, message.conversation_id)
+        knowledge = self._knowledge_retrieval.recall(snapshot, message.conversation_id)
         reply = self._response_composer.compose(
-            gate_result.conversation_id,
+            message.conversation_id,
             snapshot,
             memory.text,
             knowledge,
@@ -65,7 +64,7 @@ class ReplyService:
         )
         self._conversations.deliver_reply(
             message.user_id,
-            gate_result.conversation_id,
+            message.conversation_id,
             message.chat_id,
             reply.parts,
             snapshot.settings,
