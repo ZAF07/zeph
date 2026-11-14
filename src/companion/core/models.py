@@ -1040,13 +1040,10 @@ class CheckInKindDetails:
     Attributes:
         name: Its name, e.g. "A casual hello".
         description: What it is, as the Check-in model and Users are told.
-        allowed_without_user_memory: Whether it may be sent to a User with
-            User Memory off.
     """
 
     name: str
     description: str
-    allowed_without_user_memory: bool
 
 
 @dataclass(frozen=True)
@@ -1057,8 +1054,6 @@ class CheckInKind:
         id: Our ID for the Check-in Kind.
         name: Its name, e.g. "A casual hello".
         description: What it is, as the Check-in model and Users are told.
-        allowed_without_user_memory: Whether it may be sent to a User with
-            User Memory off.
         sort_order: Where it comes in the list.
         sends_shared_photo: Whether one of the User's Shared Photos is sent
             with its message. Fixed when the Kind is made; Admins can't
@@ -1068,7 +1063,6 @@ class CheckInKind:
     id: UUID
     name: str
     description: str
-    allowed_without_user_memory: bool
     sort_order: int
     sends_shared_photo: bool = False
 

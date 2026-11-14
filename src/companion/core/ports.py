@@ -1467,8 +1467,7 @@ class CheckInRepository(Protocol):
         """Add a Check-in Kind last in the list.
 
         Args:
-            details: Its name, description and whether it is allowed without
-                User Memory.
+            details: Its name and description.
 
         Returns:
             The saved Check-in Kind.

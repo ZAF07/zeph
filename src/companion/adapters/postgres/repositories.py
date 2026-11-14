@@ -144,7 +144,6 @@ def _to_check_in_kind(row: Row[Any]) -> CheckInKind:
         id=row.id,
         name=row.name,
         description=row.description,
-        allowed_without_user_memory=row.allowed_without_user_memory,
         sort_order=row.sort_order,
         sends_shared_photo=row.sends_shared_photo,
     )
@@ -2546,8 +2545,7 @@ class PostgresCheckInRepository:
         """Add a Check-in Kind last in the list.
 
         Args:
-            details: Its name, description and whether it is allowed without
-                User Memory.
+            details: Its name and description.
 
         Returns:
             The saved Check-in Kind.
@@ -2562,7 +2560,6 @@ class PostgresCheckInRepository:
                     id=uuid4(),
                     name=details.name,
                     description=details.description,
-                    allowed_without_user_memory=details.allowed_without_user_memory,
                     sort_order=0 if highest is None else int(highest) + 1,
                     sends_shared_photo=False,
                 )
@@ -2571,7 +2568,7 @@ class PostgresCheckInRepository:
         return _to_check_in_kind(row)
 
     def update_kind(self, kind: CheckInKind) -> CheckInKind:
-        """Save a Check-in Kind's name, description and User Memory flag.
+        """Save a Check-in Kind's name and description.
 
         Args:
             kind: The Check-in Kind with its new values.
@@ -2583,11 +2580,7 @@ class PostgresCheckInRepository:
             row = connection.execute(
                 update(check_in_kinds)
                 .where(check_in_kinds.c.id == kind.id)
-                .values(
-                    name=kind.name,
-                    description=kind.description,
-                    allowed_without_user_memory=kind.allowed_without_user_memory,
-                )
+                .values(name=kind.name, description=kind.description)
                 .returning(check_in_kinds)
             ).one()
         return _to_check_in_kind(row)

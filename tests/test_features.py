@@ -71,6 +71,12 @@ def web_tool_names(call: ChatModelCall) -> list[str]:
     return [tool.name for tool in call.tools if tool.name in WEB_TOOLS]
 
 
+USER_MEMORY_IN_REPLY_NOTE = (
+    "learning new things about them (you still remember and use everything "
+    "you already know about them)"
+)
+
+
 def unavailable_note(seeded_settings: dict[str, Any], names: str) -> str:
     """Write the seeded not-available note for the given Features' names."""
     note: str = seeded_settings["reply_features_unavailable_note"]
@@ -725,7 +731,7 @@ def test_with_user_memory_off_by_an_admin_memory_is_still_used_and_the_choice_is
     user_id = maya_id(client, auth_verifier)
     maya = auth_headers(auth_verifier, "user_maya")
     remember_some_things(client, chat_model, clock, scheduler, seeded_settings)
-    note = unavailable_note(seeded_settings, "User Memory")
+    note = unavailable_note(seeded_settings, USER_MEMORY_IN_REPLY_NOTE)
 
     switch_for_user(client, admin, user_id, "user_memory", "off")
     chat_model.retrieval_calls.clear()
@@ -739,6 +745,7 @@ def test_with_user_memory_off_by_an_admin_memory_is_still_used_and_the_choice_is
     assert len(retrievals_while_off) == 1
     assert "Talked about work and family." in off.instructions
     assert note in off.instructions
+    assert unavailable_note(seeded_settings, "User Memory") not in off.instructions
     assert me_while_off["user_memory_enabled"] is True
     assert me_while_off["user_memory_available"] is False
     assert "Sister Jo" in memories_while_off["Relationships"]
@@ -900,7 +907,7 @@ def test_with_user_memory_off_by_an_admin_check_ins_still_use_existing_memory(
 
     [line] = chat_model.calls[-1].history
     assert "A casual hello" in line.text
-    assert "A follow-up" not in line.text
+    assert "A follow-up" in line.text
     assert "New job, running on autopilot." in line.text
     assert "User Memory is off" not in line.text
 

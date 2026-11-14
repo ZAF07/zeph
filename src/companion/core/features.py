@@ -30,6 +30,8 @@ class FeatureDetails:
         needs_stickers: Whether it works only while Stickers works too.
         in_reply_note: Whether replies are told when it isn't available,
             so they can say so if the User asks for it.
+        reply_note_name: What replies are told it is called when it isn't
+            available; "" to use its name.
     """
 
     feature: Feature
@@ -38,6 +40,7 @@ class FeatureDetails:
     on_by_default: bool = True
     needs_stickers: bool = False
     in_reply_note: bool = True
+    reply_note_name: str = ""
 
 
 FEATURES: tuple[FeatureDetails, ...] = (
@@ -80,6 +83,10 @@ FEATURES: tuple[FeatureDetails, ...] = (
             "Zeph learns what matters about a User. It works only while the "
             "User has User Memory on too. Turning it off stops learning, but "
             "Zeph still uses what it already knows and deletes nothing."
+        ),
+        reply_note_name=(
+            "learning new things about them (you still remember and use "
+            "everything you already know about them)"
         ),
     ),
     FeatureDetails(
@@ -218,7 +225,9 @@ class FeatureService:
     def unavailable_note(self, user_id: UUID) -> str:
         """Write the reply note naming the Features a User doesn't have.
 
-        Features that aren't named in the reply note are left out.
+        Features that aren't named in the reply note are left out. User
+        Memory is named as learning new things, so replies don't claim they
+        can't remember what is already saved.
 
         Args:
             user_id: The User being replied to.
@@ -235,7 +244,10 @@ class FeatureService:
         ]
         if not unavailable:
             return ""
-        names = ", ".join(feature_details(feature).name for feature in unavailable)
+        names = ", ".join(
+            feature_details(feature).reply_note_name or feature_details(feature).name
+            for feature in unavailable
+        )
         note: str = self._repositories.platform_settings.get(UNAVAILABLE_NOTE_SETTING)
         return note.replace(FEATURES_PLACEHOLDER, names).replace(
             DASHBOARD_URL_PLACEHOLDER, self._dashboard_url

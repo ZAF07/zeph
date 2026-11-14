@@ -13,16 +13,11 @@ type LoadState =
   | { kind: "failed" }
   | { kind: "loaded"; kinds: CheckInKindOverview[] };
 
-const emptyKind: CheckInKindInput = {
-  name: "",
-  description: "",
-  allowed_without_user_memory: false,
-};
+const emptyKind: CheckInKindInput = { name: "", description: "" };
 
 /**
- * The admin Check-in Kinds manager: a card per Kind to edit its name,
- * description and "allowed when memory is off", or remove it, and a card to
- * add a new one.
+ * The admin Check-in Kinds manager: a card per Kind to edit its name and
+ * description, or remove it, and a card to add a new one.
  *
  * @returns The cards, or a loading, empty or error state.
  */

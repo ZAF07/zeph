@@ -354,7 +354,6 @@ check_in_kinds = Table(
     Column("id", Uuid, primary_key=True),
     Column("name", Text, nullable=False, unique=True),
     Column("description", Text, nullable=False),
-    Column("allowed_without_user_memory", Boolean, nullable=False),
     Column("sort_order", Integer, nullable=False),
     Column("sends_shared_photo", Boolean, nullable=False),
 )

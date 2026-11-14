@@ -8,12 +8,12 @@ from tests.conftest import CHECK_IN_KINDS_SEED_FILE
 def test_starting_check_in_kinds_come_from_the_seed_file(engine: Engine) -> None:
     kinds = build_postgres_repositories(engine).check_ins.list_kinds()
 
-    assert [(kind.name, kind.allowed_without_user_memory) for kind in kinds] == [
-        ("A casual hello", True),
-        ("A follow-up", False),
-        ("A present-moment pause", True),
-        ("A thought to reflect on", False),
-        ("A look back at a photo", False),
+    assert [kind.name for kind in kinds] == [
+        "A casual hello",
+        "A follow-up",
+        "A present-moment pause",
+        "A thought to reflect on",
+        "A look back at a photo",
     ]
     assert [kind.sends_shared_photo for kind in kinds] == [
         False,

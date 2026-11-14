@@ -411,11 +411,10 @@ export type PersonalSticker = {
   kept_at: string;
 };
 
-/** A Check-in Kind's name, description and "allowed when memory is off". */
+/** A Check-in Kind's name and description. */
 export type CheckInKindInput = {
   name: string;
   description: string;
-  allowed_without_user_memory: boolean;
 };
 
 /**

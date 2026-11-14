@@ -8,14 +8,12 @@ import {
   secondaryButton,
 } from "@/components/button-styles";
 import { fieldLabel, inputField } from "@/components/form-styles";
-import { Switch } from "@/components/Switch";
 import { ApiError, type CheckInKindInput } from "@/lib/api-client";
 
 /**
- * One Check-in Kind as an editable card: name, description, whether it is
- * allowed when User Memory is off, how often it was sent, Save and Remove.
- * A new Kind's card has Add and Cancel instead. A Kind that sends a Shared
- * Photo always needs memories, so it says so instead of offering the switch.
+ * One Check-in Kind as an editable card: name, description, how often it
+ * was sent, Save and Remove. A new Kind's card has Add and Cancel instead.
+ * A Kind that sends a Shared Photo says so, and who it goes to.
  *
  * @param props - `initial` fills the card; `isNew` marks a Kind not saved
  *   yet; `sentLast30Days` is the send count; `sendsSharedPhoto` marks a
@@ -44,9 +42,6 @@ export function CheckInKindCard({
   const fieldId = useId();
   const [name, setName] = useState(initial.name);
   const [description, setDescription] = useState(initial.description);
-  const [allowedWithoutMemory, setAllowedWithoutMemory] = useState(
-    initial.allowed_without_user_memory,
-  );
   const [isBusy, setIsBusy] = useState(false);
   const [isConfirmingRemove, setIsConfirmingRemove] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,9 +49,7 @@ export function CheckInKindCard({
   const title = isNew ? "New Check-in Kind" : initial.name;
   const isComplete = name.trim() !== "" && description.trim() !== "";
   const isChanged =
-    name !== initial.name ||
-    description !== initial.description ||
-    allowedWithoutMemory !== initial.allowed_without_user_memory;
+    name !== initial.name || description !== initial.description;
 
   async function run(action: () => Promise<void>, failureText: string) {
     setIsBusy(true);
@@ -76,12 +69,7 @@ export function CheckInKindCard({
 
   function save() {
     void run(
-      () =>
-        onSave({
-          name,
-          description,
-          allowed_without_user_memory: allowedWithoutMemory,
-        }),
+      () => onSave({ name, description }),
       "Couldn’t save the Check-in Kind. Please try again.",
     );
   }
@@ -128,27 +116,10 @@ export function CheckInKindCard({
         <div className="flex min-w-0 flex-col border-t border-line px-5 py-3">
           <span className="font-medium">Sends a Shared Photo</span>
           <span className="text-caption text-ink-muted">
-            Needs memories — only for Users with memory on and a Shared Photo
+            Only for Users with Photo Viewing on and a Shared Photo
           </span>
         </div>
-      ) : (
-        <div className="flex items-center justify-between gap-4 border-t border-line px-5 py-3">
-          <span className="flex min-w-0 flex-col">
-            <span className="font-medium">Allowed when memory is off</span>
-            <span className="text-caption text-ink-muted">
-              {allowedWithoutMemory
-                ? "Works without memories or summaries"
-                : "Needs memories — skipped for Users with memory off"}
-            </span>
-          </span>
-          <Switch
-            label={`Allowed when memory is off: ${title}`}
-            checked={allowedWithoutMemory}
-            disabled={isBusy}
-            onChange={setAllowedWithoutMemory}
-          />
-        </div>
-      )}
+      ) : null}
       {error ? (
         <p
           role="alert"
