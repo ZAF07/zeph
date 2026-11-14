@@ -1,9 +1,8 @@
 from datetime import date, datetime, timedelta
-from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from companion.core.models import Conversation
-from companion.core.ports import PlatformSettingsRepository, UserRepository
+from companion.core.ports import PlatformSettingsRepository
 
 
 def quiet_gap(settings: PlatformSettingsRepository) -> timedelta:
@@ -60,16 +59,14 @@ def users_today(time_zone: str | None, now: datetime) -> date:
     return (now.astimezone(ZoneInfo(time_zone)) if time_zone else now).date()
 
 
-def user_today(users: UserRepository, user_id: UUID, now: datetime) -> date:
-    """Work out today's date where a stored User lives.
+def local_now(time_zone: str | None, now: datetime) -> datetime:
+    """Turn a time into the User's local time.
 
     Args:
-        users: Where Users are stored.
-        user_id: The User.
-        now: The current time.
+        time_zone: The User's IANA time zone; UTC if they have none.
+        now: The time, timezone-aware.
 
     Returns:
-        Today's date in their time zone, or in UTC if they have none.
+        The same moment in the User's time zone.
     """
-    user = users.get(user_id)
-    return users_today(user.time_zone if user else None, now)
+    return now.astimezone(ZoneInfo(time_zone or "UTC"))

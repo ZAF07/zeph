@@ -3,7 +3,7 @@ from enum import StrEnum
 from uuid import UUID
 
 from companion.core.conversations import ConversationService
-from companion.core.models import MessageToAnswer, RiskType
+from companion.core.models import MessageToAnswer, RiskType, UserSnapshot
 from companion.core.safeguard import Safeguard
 from companion.core.usage import UsageLimiter
 from companion.core.user_data import ChatDataDeletion, DataDeletionAnswer
@@ -69,7 +69,9 @@ class ReplyGate:
         self._data_deletion = data_deletion
         self._usage_limiter = usage_limiter
 
-    def check(self, message: MessageToAnswer) -> Stopped | ReplyNeeded:
+    def check(
+        self, message: MessageToAnswer, snapshot: UserSnapshot
+    ) -> Stopped | ReplyNeeded:
         """Save the message, then decide whether it needs a composed reply.
 
         On a crisis the Crisis Reply is sent, then any pending Delete My Data
@@ -80,6 +82,7 @@ class ReplyGate:
 
         Args:
             message: The message to answer.
+            snapshot: The User who sent it, as read when the reply started.
 
         Returns:
             `Stopped` with the reason no reply is composed, or `ReplyNeeded`.
@@ -93,21 +96,21 @@ class ReplyGate:
             message.sticker,
         )
         risk_type = self._safeguard.assess(
-            conversation_id, message.user_id, message.safeguard_text
+            conversation_id, snapshot, message.safeguard_text
         )
         if risk_type != RiskType.NONE:
-            crisis_reply = self._safeguard.respond_to_crisis(message.user_id, risk_type)
+            crisis_reply = self._safeguard.respond_to_crisis(snapshot, risk_type)
             self._conversations.deliver_at_once(
                 conversation_id, message.chat_id, crisis_reply
             )
-            self._data_deletion.cancel(message.user_id)
+            self._data_deletion.cancel(snapshot)
             return Stopped(StopReason.CRISIS)
         data_deletion_answer = self._data_deletion.settle(
-            message.user_id, message.chat_id, message.text
+            snapshot, message.chat_id, message.text
         )
         if data_deletion_answer == DataDeletionAnswer.CONFIRMED:
             return Stopped(StopReason.DATA_DELETED)
-        if not self._usage_limiter.claim_message(message.user_id):
+        if not self._usage_limiter.claim_message(snapshot):
             self._conversations.deliver_at_once(
                 conversation_id, message.chat_id, self._usage_limiter.limit_reply()
             )

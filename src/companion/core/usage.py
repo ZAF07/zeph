@@ -1,11 +1,10 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import timedelta
-from uuid import UUID
 
-from companion.core.models import ChatLine, DailyUsage
+from companion.core.models import ChatLine, DailyUsage, UserSnapshot
 from companion.core.ports import ChatModel, ChatTool, Clock, Repositories
-from companion.core.timing import user_today, users_today
+from companion.core.timing import users_today
 
 
 @dataclass(frozen=True)
@@ -40,11 +39,11 @@ class UsageLimiter:
         self._repositories = repositories
         self._clock = clock
 
-    def claim_message(self, user_id: UUID) -> bool:
+    def claim_message(self, snapshot: UserSnapshot) -> bool:
         """Count one message toward the User's daily message limit.
 
         Args:
-            user_id: The User who sent it.
+            snapshot: The User who sent it, as read when the reply started.
 
         Returns:
             True if it was counted and may be answered; False if the User has
@@ -52,19 +51,17 @@ class UsageLimiter:
         """
         daily_limit = self._repositories.platform_settings.get("daily_message_limit")
         return self._repositories.usage.claim_message(
-            user_id,
-            user_today(self._repositories.users, user_id, self._clock.now()),
-            daily_limit,
+            snapshot.user.id, snapshot.today, daily_limit
         )
 
-    def has_used_up_daily_message_limit(self, user_id: UUID) -> bool:
+    def has_used_up_daily_message_limit(self, snapshot: UserSnapshot) -> bool:
         """Tell whether the User has used up today's daily message limit.
 
         It is used up once their message count for their day has reached the
         limit, even if no message was turned away yet.
 
         Args:
-            user_id: The User.
+            snapshot: The User, as read when the tick started.
 
         Returns:
             True if their next message today would get the limit reply.
@@ -72,8 +69,10 @@ class UsageLimiter:
         daily_limit: int = self._repositories.platform_settings.get(
             "daily_message_limit"
         )
-        today = user_today(self._repositories.users, user_id, self._clock.now())
-        return self._repositories.usage.count_messages(user_id, today) >= daily_limit
+        count = self._repositories.usage.count_messages(
+            snapshot.user.id, snapshot.today
+        )
+        return count >= daily_limit
 
     def limit_reply(self) -> str:
         """Read the in-character reply sent once the daily limit is reached.
@@ -84,19 +83,18 @@ class UsageLimiter:
         reply: str = self._repositories.platform_settings.get("daily_limit_reply")
         return reply
 
-    def record_tokens(self, user_id: UUID, tokens_in: int, tokens_out: int) -> None:
+    def record_tokens(
+        self, snapshot: UserSnapshot, tokens_in: int, tokens_out: int
+    ) -> None:
         """Add chat model tokens to the User's day.
 
         Args:
-            user_id: The User the model call was for.
+            snapshot: The User the model call was for.
             tokens_in: Tokens the model read.
             tokens_out: Tokens the model wrote.
         """
         self._repositories.usage.add_tokens(
-            user_id,
-            user_today(self._repositories.users, user_id, self._clock.now()),
-            tokens_in,
-            tokens_out,
+            snapshot.user.id, snapshot.today, tokens_in, tokens_out
         )
 
     def report(self, days: int) -> UsageReport:
@@ -140,7 +138,7 @@ class UsageRecordingChatModel:
 
     def generate(
         self,
-        user_id: UUID,
+        snapshot: UserSnapshot,
         model: str,
         instructions: str,
         history: list[ChatLine],
@@ -149,7 +147,7 @@ class UsageRecordingChatModel:
         """Generate an answer for a User and record the tokens it took.
 
         Args:
-            user_id: The User the answer is for.
+            snapshot: The User the answer is for.
             model: The model to use, e.g. "deepseek-chat".
             instructions: What the model should be and do.
             history: The Conversation so far, oldest first.
@@ -161,5 +159,5 @@ class UsageRecordingChatModel:
         answer = self._chat_model.generate(
             model=model, instructions=instructions, history=history, tools=tools
         )
-        self._usage_limiter.record_tokens(user_id, answer.tokens_in, answer.tokens_out)
+        self._usage_limiter.record_tokens(snapshot, answer.tokens_in, answer.tokens_out)
         return answer.text

@@ -1,6 +1,7 @@
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from companion.core.models import MessageToAnswer, RiskType
+from companion.core.models import MessageToAnswer, RiskType, User, UserSnapshot
 from companion.core.reply_gate import ReplyGate, ReplyNeeded, Stopped, StopReason
 from companion.core.user_data import DataDeletionAnswer
 
@@ -65,13 +66,16 @@ class FakeSafeguard:
         self.risk_type = risk_type
 
     def assess(
-        self, conversation_id: UUID, user_id: UUID, newest_text: str | None = None
+        self,
+        conversation_id: UUID,
+        snapshot: UserSnapshot,
+        newest_text: str | None = None,
     ) -> RiskType:
         """Report the set risk.
 
         Args:
             conversation_id: The Conversation.
-            user_id: The User.
+            snapshot: The User.
             newest_text: The message as the Safeguard reads it, if different.
 
         Returns:
@@ -80,11 +84,11 @@ class FakeSafeguard:
         self.calls.append("assess")
         return self.risk_type
 
-    def respond_to_crisis(self, user_id: UUID, risk_type: RiskType) -> str:
+    def respond_to_crisis(self, snapshot: UserSnapshot, risk_type: RiskType) -> str:
         """Write the Crisis Reply.
 
         Args:
-            user_id: The User in crisis.
+            snapshot: The User in crisis.
             risk_type: The risk seen.
 
         Returns:
@@ -107,11 +111,13 @@ class FakeDataDeletion:
         self.calls = calls
         self.answer = answer
 
-    def settle(self, user_id: UUID, chat_id: int, text: str) -> DataDeletionAnswer:
+    def settle(
+        self, snapshot: UserSnapshot, chat_id: int, text: str
+    ) -> DataDeletionAnswer:
         """Settle a pending Delete My Data.
 
         Args:
-            user_id: The User.
+            snapshot: The User.
             chat_id: The chat to reply in.
             text: The message.
 
@@ -121,11 +127,11 @@ class FakeDataDeletion:
         self.calls.append("settle")
         return self.answer
 
-    def cancel(self, user_id: UUID) -> DataDeletionAnswer:
+    def cancel(self, snapshot: UserSnapshot) -> DataDeletionAnswer:
         """Cancel a pending Delete My Data.
 
         Args:
-            user_id: The User.
+            snapshot: The User.
 
         Returns:
             That a request was cancelled.
@@ -147,11 +153,11 @@ class FakeUsageLimiter:
         self.calls = calls
         self.within_limit = within_limit
 
-    def claim_message(self, user_id: UUID) -> bool:
+    def claim_message(self, snapshot: UserSnapshot) -> bool:
         """Count the message.
 
         Args:
-            user_id: The User who sent it.
+            snapshot: The User who sent it.
 
         Returns:
             Whether it is within the limit.
@@ -191,7 +197,12 @@ def check_message(
         data_deletion=FakeDataDeletion(calls, data_deletion_answer),
         usage_limiter=FakeUsageLimiter(calls, within_limit),
     )
-    result = gate.check(MessageToAnswer(user_id=uuid4(), chat_id=CHAT_ID, text="hi"))
+    now = datetime(2026, 11, 14, 9, 0, tzinfo=UTC)
+    user = User(id=uuid4(), auth_id="user_maya", email=None, created_at=now)
+    snapshot = UserSnapshot(user=user, local_now=now, today=now.date(), features=())
+    result = gate.check(
+        MessageToAnswer(user_id=user.id, chat_id=CHAT_ID, text="hi"), snapshot
+    )
     return result, calls, conversations.sent
 
 

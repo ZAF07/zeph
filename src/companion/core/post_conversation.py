@@ -5,7 +5,6 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from companion.core.features import FeatureService
 from companion.core.models import (
     ChannelPhoto,
     ChatLine,
@@ -20,11 +19,13 @@ from companion.core.models import (
     MemorySource,
     MessageDirection,
     SharedPhoto,
+    UserSnapshot,
 )
 from companion.core.personal_stickers import PersonalStickerKeeper
 from companion.core.ports import Clock, Repositories
 from companion.core.transcripts import to_transcript_lines
 from companion.core.usage import UsageRecordingChatModel
+from companion.core.user_snapshot import UserSnapshotLoader
 
 logger = logging.getLogger(__name__)
 
@@ -336,7 +337,7 @@ class PostConversationProcessor:
     def __init__(
         self,
         repositories: Repositories,
-        features: FeatureService,
+        user_snapshots: UserSnapshotLoader,
         chat_model: UsageRecordingChatModel,
         personal_sticker_keeper: PersonalStickerKeeper,
         clock: Clock,
@@ -344,10 +345,10 @@ class PostConversationProcessor:
         """Set up the processor.
 
         Args:
-            repositories: Where Users, Conversations, User Memory and
-                settings are stored.
-            features: Says whether User Memory and Photo Viewing work for the
-                User.
+            repositories: Where Conversations, User Memory and settings are
+                stored.
+            user_snapshots: Reads the User and their Features once per
+                Conversation.
             chat_model: Writes the summary and the Memory Item operations,
                 and records the tokens used.
             personal_sticker_keeper: Keeps the stickers the User sent whose
@@ -355,7 +356,7 @@ class PostConversationProcessor:
             clock: Tells the current time.
         """
         self._repositories = repositories
-        self._features = features
+        self._user_snapshots = user_snapshots
         self._chat_model = chat_model
         self._personal_sticker_keeper = personal_sticker_keeper
         self._clock = clock
@@ -379,28 +380,25 @@ class PostConversationProcessor:
                 unprocessed so the next tick tries again.
         """
         user_memory = self._repositories.user_memory
-        user = self._repositories.users.get(conversation.user_id)
+        snapshot = self._user_snapshots.find(conversation.user_id)
         messages = self._repositories.conversations.list_messages(conversation.id)
-        if user is not None:
-            self._keep_personal_stickers(user.id, messages)
-        if (
-            user is None
-            or not self._features.works_for(user.id, Feature.USER_MEMORY)
-            or not messages
-        ):
+        if snapshot is not None:
+            self._keep_personal_stickers(snapshot, messages)
+        if snapshot is None or not snapshot.works(Feature.USER_MEMORY) or not messages:
             user_memory.save_processed_conversation(
                 conversation.id, self._clock.now(), None, NO_CHANGES
             )
             return
         categories = self._repositories.memory_categories.list_all()
-        items_by_number = dict(enumerate(user_memory.list_items(user.id), start=1))
+        user_id = snapshot.user.id
+        items_by_number = dict(enumerate(user_memory.list_items(user_id), start=1))
         photos_by_number = (
             dict(enumerate(list_sent_photos(messages), start=1))
-            if self._features.works_for(user.id, Feature.PHOTO_VIEWING)
+            if snapshot.works(Feature.PHOTO_VIEWING)
             else {}
         )
         answer = self._ask(
-            user.id,
+            snapshot,
             describe_conversation(
                 messages, categories, items_by_number, photos_by_number
             ),
@@ -415,7 +413,7 @@ class PostConversationProcessor:
         changes = plan_memory_changes(
             answer.operations,
             MemoryChangeContext(
-                user_id=user.id,
+                user_id=user_id,
                 conversation_id=conversation.id,
                 now=now,
                 items_by_number=items_by_number,
@@ -429,13 +427,13 @@ class PostConversationProcessor:
         changes = replace(
             changes,
             new_shared_photos=plan_new_shared_photos(
-                answer.photos_to_keep, photos_by_number, user.id, conversation.id
+                answer.photos_to_keep, photos_by_number, user_id, conversation.id
             ),
         )
         summary = ConversationSummary(
             id=uuid4(),
             conversation_id=conversation.id,
-            user_id=user.id,
+            user_id=user_id,
             summary=answer.summary,
             mood=answer.mood,
             created_at=now,
@@ -443,24 +441,24 @@ class PostConversationProcessor:
         user_memory.save_processed_conversation(conversation.id, now, summary, changes)
 
     def _keep_personal_stickers(
-        self, user_id: UUID, messages: list[ConversationMessage]
+        self, snapshot: UserSnapshot, messages: list[ConversationMessage]
     ) -> None:
         """Keep the User's Personal Stickers, logging a failure instead of raising.
 
         Args:
-            user_id: The User whose Conversation it was.
+            snapshot: The User whose Conversation it was.
             messages: The Conversation's messages, oldest first.
         """
         try:
-            self._personal_sticker_keeper.keep_from(user_id, messages)
+            self._personal_sticker_keeper.keep_from(snapshot, messages)
         except Exception:
             logger.exception("Could not keep Personal Stickers")
 
-    def _ask(self, user_id: UUID, description: str) -> ProcessingAnswer | None:
+    def _ask(self, snapshot: UserSnapshot, description: str) -> ProcessingAnswer | None:
         """Ask the model about the Conversation, once more if it can't be read.
 
         Args:
-            user_id: The User whose Conversation it was.
+            snapshot: The User whose Conversation it was.
             description: The categories, current memory and Conversation.
 
         Returns:
@@ -469,7 +467,7 @@ class PostConversationProcessor:
         settings = self._repositories.platform_settings
         for _ in range(2):
             answer = self._chat_model.generate(
-                user_id=user_id,
+                snapshot=snapshot,
                 model=settings.get("memory_processing_model"),
                 instructions=settings.get("memory_processing_prompt"),
                 history=[ChatLine(role=ChatRole.USER, text=description)],

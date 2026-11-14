@@ -435,6 +435,22 @@ class PostgresUserRepository:
             row = connection.execute(select(users).where(users.c.id == user_id)).first()
         return _to_user(row) if row else None
 
+    def get_many(self, user_ids: Sequence[UUID]) -> list[User]:
+        """Find many Users by our IDs, in one query.
+
+        Args:
+            user_ids: The Users' IDs.
+
+        Returns:
+            The Users found, in the order of the IDs given.
+        """
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                select(users).where(users.c.id.in_(user_ids))
+            ).all()
+        found = {row.id: _to_user(row) for row in rows}
+        return [found[user_id] for user_id in user_ids if user_id in found]
+
     def get_by_auth_id(self, auth_id: str) -> User | None:
         """Find a User by the auth provider's account ID.
 
@@ -2900,8 +2916,23 @@ class PostgresFeatureSwitchRepository:
         Returns:
             The User's switches, in no set order.
         """
+        return self.list_for_users([user_id]).get(user_id, [])
+
+    def list_for_users(
+        self, user_ids: Sequence[UUID]
+    ) -> dict[UUID, list[FeatureSwitch]]:
+        """List the switches stored for many Users, in one query.
+
+        Args:
+            user_ids: The Users.
+
+        Returns:
+            Each User's switches, in no set order; a User with none is left
+            out.
+        """
         statement = (
             select(
+                user_feature_switches.c.user_id,
                 user_feature_switches.c.feature,
                 user_feature_switches.c.is_on,
                 user_feature_switches.c.changed_at,
@@ -2912,20 +2943,22 @@ class PostgresFeatureSwitchRepository:
                     users, users.c.id == user_feature_switches.c.changed_by
                 )
             )
-            .where(user_feature_switches.c.user_id == user_id)
+            .where(user_feature_switches.c.user_id.in_(user_ids))
         )
         with self._engine.connect() as connection:
             rows = connection.execute(statement).all()
-        return [
-            FeatureSwitch(
-                feature=Feature(row.feature),
-                on=row.is_on,
-                changed_by_email=row.email,
-                changed_at=row.changed_at,
-            )
-            for row in rows
-            if row.feature in Feature
-        ]
+        switches_by_user: dict[UUID, list[FeatureSwitch]] = {}
+        for row in rows:
+            if row.feature in Feature:
+                switches_by_user.setdefault(row.user_id, []).append(
+                    FeatureSwitch(
+                        feature=Feature(row.feature),
+                        on=row.is_on,
+                        changed_by_email=row.email,
+                        changed_at=row.changed_at,
+                    )
+                )
+        return switches_by_user
 
     def save_for_user(
         self,

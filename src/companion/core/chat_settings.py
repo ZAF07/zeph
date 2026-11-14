@@ -4,7 +4,7 @@ from typing import Any
 from uuid import UUID
 
 from companion.core.check_ins import CheckInService
-from companion.core.features import FeatureNotAvailableError, FeatureService
+from companion.core.features import FeatureNotAvailableError
 from companion.core.memory_retrieval import format_day
 from companion.core.models import (
     CheckInChanges,
@@ -14,6 +14,7 @@ from companion.core.models import (
     PauseLength,
     PreferenceChanges,
     User,
+    UserSnapshot,
 )
 from companion.core.ports import ChatTool, Repositories
 from companion.core.user_data import ChatDataDeletion
@@ -503,7 +504,6 @@ class SettingsTools:
     def __init__(
         self,
         repositories: Repositories,
-        features: FeatureService,
         users: UserService,
         check_ins: CheckInService,
         user_memory: UserMemoryService,
@@ -513,27 +513,25 @@ class SettingsTools:
 
         Args:
             repositories: Where Users and settings are stored.
-            features: Says whether Settings in Chat works for the User.
             users: Changes User Memory, Photo Viewing and the time zone.
             check_ins: Changes Check-in settings.
             user_memory: Lists and forgets Memory Items.
             data_deletion: Asks to delete the User's data.
         """
         self._repositories = repositories
-        self._features = features
         self._users = users
         self._check_ins = check_ins
         self._user_memory = user_memory
         self._data_deletion = data_deletion
 
-    def offer(self, user_id: UUID) -> SettingsOffer:
+    def offer(self, snapshot: UserSnapshot) -> SettingsOffer:
         """Pick the settings tools for a reply to a User.
 
         Deleting the account, changing country and disconnecting Telegram
         have no tool: they are only on the Dashboard.
 
         Args:
-            user_id: The User being replied to.
+            snapshot: The User being replied to.
 
         Returns:
             The tools and their reply instructions; only the tool to delete
@@ -541,14 +539,14 @@ class SettingsTools:
             doesn't work for them.
         """
         reply_tools = ReplySettingsTools(
-            user_id,
+            snapshot.user.id,
             self._repositories,
             self._users,
             self._check_ins,
             self._user_memory,
             self._data_deletion,
         )
-        if self._features.works_for(user_id, Feature.SETTINGS_IN_CHAT):
+        if snapshot.works(Feature.SETTINGS_IN_CHAT):
             tools = reply_tools.tools
             instructions_key = INSTRUCTIONS_SETTING
         else:

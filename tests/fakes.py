@@ -17,6 +17,7 @@ from companion.core.models import (
     ModelAnswer,
     PhotoImage,
     StickerImage,
+    UserSnapshot,
     WebSearchResult,
 )
 from companion.core.ports import ChatTool
@@ -284,11 +285,12 @@ class FakeConversationEngine:
         """Start having forgotten no one."""
         self.forgotten: list[UUID] = []
 
-    def handle(self, message: MessageToAnswer) -> None:
+    def handle(self, message: MessageToAnswer, user: UserSnapshot) -> None:
         """Ignore the message, as tests using this engine send no messages.
 
         Args:
             message: The message to answer.
+            user: The User who sent it.
         """
 
     def forget_user(self, user_id: UUID) -> None:

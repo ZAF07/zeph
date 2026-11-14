@@ -1,9 +1,8 @@
 import logging
 from dataclasses import replace
 from enum import StrEnum
-from uuid import UUID
 
-from companion.core.models import User
+from companion.core.models import User, UserSnapshot
 from companion.core.ports import (
     AuthAccounts,
     ChatChannel,
@@ -161,7 +160,9 @@ class ChatDataDeletion:
             replace(user, data_deletion_requested_at=self._clock.now())
         )
 
-    def settle(self, user_id: UUID, chat_id: int, text: str) -> DataDeletionAnswer:
+    def settle(
+        self, snapshot: UserSnapshot, chat_id: int, text: str
+    ) -> DataDeletionAnswer:
         """Delete the User's data if they confirmed, or else cancel the request.
 
         The confirmation must be the whole message; case and the spaces
@@ -169,47 +170,55 @@ class ChatDataDeletion:
         and not saved, so nothing of theirs is left behind.
 
         Args:
-            user_id: The User who sent the message.
+            snapshot: The User who sent the message, as read when the reply
+                started.
             chat_id: The chat to reply in.
             text: Their message.
 
         Returns:
             Whether there was a request, and if so whether it was confirmed.
         """
-        if not self._clear_request(user_id):
+        if not self._clear_request(snapshot):
             return DataDeletionAnswer.NOTHING_ASKED
         if text.strip().casefold() != self.confirmation_word().casefold():
             return DataDeletionAnswer.CANCELLED
-        self._repositories.users.delete_data(user_id)
+        self._repositories.users.delete_data(snapshot.user.id)
         self._chat_channel.send_text(
             chat_id, self._repositories.platform_settings.get(DELETED_REPLY_SETTING)
         )
         return DataDeletionAnswer.CONFIRMED
 
-    def cancel(self, user_id: UUID) -> DataDeletionAnswer:
+    def cancel(self, snapshot: UserSnapshot) -> DataDeletionAnswer:
         """Cancel the User's pending request, if they have one.
 
         Args:
-            user_id: The User.
+            snapshot: The User, as read when the reply started.
 
         Returns:
             Whether there was a request to cancel.
         """
-        if not self._clear_request(user_id):
+        if not self._clear_request(snapshot):
             return DataDeletionAnswer.NOTHING_ASKED
         return DataDeletionAnswer.CANCELLED
 
-    def _clear_request(self, user_id: UUID) -> bool:
+    def _clear_request(self, snapshot: UserSnapshot) -> bool:
         """Clear the User's pending request to delete their data.
 
+        The snapshot says whether there is one; only then is the User read
+        again, right before the change is saved.
+
         Args:
-            user_id: The User.
+            snapshot: The User, as read when the reply started.
 
         Returns:
             True if they had a pending request.
         """
-        user = self._repositories.users.get(user_id)
-        if user is None or user.data_deletion_requested_at is None:
+        if snapshot.user.data_deletion_requested_at is None:
             return False
-        self._repositories.users.update(replace(user, data_deletion_requested_at=None))
+        stored = self._repositories.users.get(snapshot.user.id)
+        if stored is None or stored.data_deletion_requested_at is None:
+            return False
+        self._repositories.users.update(
+            replace(stored, data_deletion_requested_at=None)
+        )
         return True

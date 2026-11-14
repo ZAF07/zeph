@@ -5,7 +5,6 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from companion.core.features import FeatureService
 from companion.core.models import (
     ChannelSticker,
     ChatLine,
@@ -15,6 +14,7 @@ from companion.core.models import (
     MessageDirection,
     PersonalSticker,
     StickerImage,
+    UserSnapshot,
 )
 from companion.core.ports import ChatChannel, Clock, Repositories
 from companion.core.transcripts import to_transcript_lines
@@ -219,7 +219,6 @@ class PersonalStickerKeeper:
     def __init__(
         self,
         repositories: Repositories,
-        features: FeatureService,
         chat_model: UsageRecordingChatModel,
         clock: Clock,
     ) -> None:
@@ -227,17 +226,17 @@ class PersonalStickerKeeper:
 
         Args:
             repositories: Where Personal Stickers and settings are stored.
-            features: Says whether Personal Stickers works for the User.
             chat_model: Picks the stickers to keep and writes their notes,
                 and records the tokens used.
             clock: Tells the current time.
         """
         self._repositories = repositories
-        self._features = features
         self._chat_model = chat_model
         self._clock = clock
 
-    def keep_from(self, user_id: UUID, messages: list[ConversationMessage]) -> None:
+    def keep_from(
+        self, snapshot: UserSnapshot, messages: list[ConversationMessage]
+    ) -> None:
         """Keep the stickers that fit from an ended Conversation.
 
         Nothing happens when Personal Stickers doesn't work for the User or
@@ -247,11 +246,12 @@ class PersonalStickerKeeper:
         ago first.
 
         Args:
-            user_id: The User whose Conversation it was.
+            snapshot: The User whose Conversation it was.
             messages: The Conversation's messages, oldest first.
         """
-        if not self._features.works_for(user_id, Feature.PERSONAL_STICKERS):
+        if not snapshot.works(Feature.PERSONAL_STICKERS):
             return
+        user_id = snapshot.user.id
         stickers_by_number = dict(enumerate(list_sent_stickers(messages), start=1))
         if not stickers_by_number:
             return
@@ -262,7 +262,7 @@ class PersonalStickerKeeper:
         }
         settings = self._repositories.platform_settings
         answer = self._chat_model.generate(
-            user_id=user_id,
+            snapshot=snapshot,
             model=settings.get("personal_sticker_keeping_model"),
             instructions=settings.get("personal_sticker_keeping_prompt"),
             history=[

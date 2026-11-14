@@ -4,13 +4,13 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
-from companion.core.features import FeatureService
 from companion.core.models import (
     ChannelSticker,
     Feature,
     LibrarySticker,
     PersonalSticker,
     StickerImage,
+    UserSnapshot,
 )
 from companion.core.ports import ChatChannel, ChatTool, Clock, Repositories
 
@@ -292,22 +292,19 @@ class StickerChoice:
 class StickerTools:
     """Offers the User's Personal Stickers and the Sticker Library to replies."""
 
-    def __init__(self, repositories: Repositories, features: FeatureService) -> None:
+    def __init__(self, repositories: Repositories) -> None:
         """Set up the sticker tools.
 
         Args:
             repositories: Where the stickers and settings are stored.
-            features: Says whether Stickers and Personal Stickers work for
-                the User.
         """
         self._repositories = repositories
-        self._features = features
 
-    def offer(self, user_id: UUID) -> StickerChoice:
+    def offer(self, snapshot: UserSnapshot) -> StickerChoice:
         """Start the sticker choice for one reply to a User.
 
         Args:
-            user_id: The User being replied to.
+            snapshot: The User being replied to.
 
         Returns:
             The choice, offering the User's Personal Stickers first, when
@@ -315,11 +312,11 @@ class StickerTools:
             sticker that has a note and isn't one of theirs; none when
             Stickers doesn't work for the User.
         """
-        if not self._features.works_for(user_id, Feature.STICKERS):
+        if not snapshot.works(Feature.STICKERS):
             return StickerChoice([], "")
         theirs = (
-            self._repositories.personal_stickers.list_for_user(user_id)
-            if self._features.works_for(user_id, Feature.PERSONAL_STICKERS)
+            self._repositories.personal_stickers.list_for_user(snapshot.user.id)
+            if snapshot.works(Feature.PERSONAL_STICKERS)
             else []
         )
         their_unique_ids = {sticker.file_unique_id for sticker in theirs}

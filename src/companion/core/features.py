@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from uuid import UUID
 
@@ -159,9 +160,11 @@ def feature_details(feature: Feature) -> FeatureDetails:
 class FeatureService:
     """Answers whether a Feature works for a User, and keeps its switches.
 
-    Other core services ask this instead of reading switches themselves. A
-    Feature with no saved switch follows its default for everyone. A User's
-    own switch, when "on" or "off", overrides the one for everyone.
+    Replies and Check-in ticks read each Feature's status from a
+    `UserSnapshot`, worked out with the same rules; other core services ask
+    this instead of reading switches themselves. A Feature with no saved
+    switch follows its default for everyone. A User's own switch, when "on"
+    or "off", overrides the one for everyone.
     """
 
     def __init__(
@@ -216,22 +219,7 @@ class FeatureService:
         if not self.available_for(user_id, feature):
             raise FeatureNotAvailableError(feature)
 
-    def unavailable_for(self, user_id: UUID) -> list[Feature]:
-        """List the Features the Admin side has off for a User.
-
-        Features the User turned off themselves aren't listed.
-
-        Args:
-            user_id: The User.
-
-        Returns:
-            The Features, in the order of `FEATURES`.
-        """
-        return [
-            status.feature for status in self._statuses(user_id) if not status.available
-        ]
-
-    def unavailable_note(self, user_id: UUID) -> str:
+    def unavailable_note(self, unavailable: Sequence[Feature]) -> str:
         """Write the reply note naming the Features a User doesn't have.
 
         Features that aren't named in the reply note are left out. User
@@ -239,22 +227,21 @@ class FeatureService:
         can't remember what is already saved.
 
         Args:
-            user_id: The User being replied to.
+            unavailable: The Features the Admin side has off for the User
+                being replied to.
 
         Returns:
             The Admin-managed note with the Features' names and the
             Dashboard's address filled in; "" when every Feature named in it
             works.
         """
-        unavailable = [
-            feature
-            for feature in self.unavailable_for(user_id)
-            if feature_details(feature).in_reply_note
+        named = [
+            feature for feature in unavailable if feature_details(feature).in_reply_note
         ]
-        if not unavailable:
+        if not named:
             return ""
         names = ", ".join(
-            feature_details(feature).name_in_reply_note for feature in unavailable
+            feature_details(feature).name_in_reply_note for feature in named
         )
         note: str = self._repositories.platform_settings.get(UNAVAILABLE_NOTE_SETTING)
         return note.replace(FEATURES_PLACEHOLDER, names).replace(
@@ -267,22 +254,9 @@ class FeatureService:
         Returns:
             One switch per Feature, in the order of `FEATURES`.
         """
-        saved = {
-            switch.feature: switch
-            for switch in self._repositories.feature_switches.list_for_everyone()
-        }
-        return [
-            saved.get(
-                details.feature,
-                FeatureSwitch(
-                    feature=details.feature,
-                    on=details.on_by_default,
-                    changed_by_email=None,
-                    changed_at=None,
-                ),
-            )
-            for details in FEATURES
-        ]
+        return switches_for_everyone(
+            self._repositories.feature_switches.list_for_everyone()
+        )
 
     def set_for_everyone(
         self, feature: Feature, on: bool, admin: User
@@ -382,34 +356,77 @@ class FeatureService:
     def _statuses(self, user_id: UUID) -> list[FeatureStatus]:
         """Work out each Feature's status for a User, without checking they exist.
 
-        A Feature that needs Stickers doesn't work while Stickers doesn't.
-
         Args:
             user_id: The User.
 
         Returns:
             One status per Feature, in the order of `FEATURES`.
         """
-        user = self._repositories.users.get(user_id)
-        user_switches = {
-            switch.feature: switch
-            for switch in self._repositories.feature_switches.list_for_user(user_id)
-        }
-        statuses = {
-            everyone_switch.feature: status_for(
-                everyone_switch,
-                user_switches.get(everyone_switch.feature),
-                own_switch_on(user, everyone_switch.feature),
-            )
-            for everyone_switch in self.list_for_everyone()
-        }
-        stickers_work = statuses[Feature.STICKERS].works
-        return [
-            stickers_off_applied(statuses[details.feature])
-            if details.needs_stickers and not stickers_work
-            else statuses[details.feature]
-            for details in FEATURES
-        ]
+        return feature_statuses(
+            self._repositories.users.get(user_id),
+            self.list_for_everyone(),
+            self._repositories.feature_switches.list_for_user(user_id),
+        )
+
+
+def switches_for_everyone(saved: list[FeatureSwitch]) -> list[FeatureSwitch]:
+    """Fill in each Feature's default where no switch for everyone is saved.
+
+    Args:
+        saved: The saved switches for everyone, in any order.
+
+    Returns:
+        One switch per Feature, in the order of `FEATURES`.
+    """
+    saved_by_feature = {switch.feature: switch for switch in saved}
+    return [
+        saved_by_feature.get(
+            details.feature,
+            FeatureSwitch(
+                feature=details.feature,
+                on=details.on_by_default,
+                changed_by_email=None,
+                changed_at=None,
+            ),
+        )
+        for details in FEATURES
+    ]
+
+
+def feature_statuses(
+    user: User | None,
+    everyone_switches: list[FeatureSwitch],
+    user_switches: list[FeatureSwitch],
+) -> list[FeatureStatus]:
+    """Work out each Feature's status for a User from their switches.
+
+    A Feature that needs Stickers doesn't work while Stickers doesn't.
+
+    Args:
+        user: The User, for their own switches; None if there is no such User.
+        everyone_switches: One switch for everyone per Feature, defaults
+            filled in.
+        user_switches: The switches saved for this User, in any order.
+
+    Returns:
+        One status per Feature, in the order of `FEATURES`.
+    """
+    user_switches_by_feature = {switch.feature: switch for switch in user_switches}
+    statuses = {
+        everyone_switch.feature: status_for(
+            everyone_switch,
+            user_switches_by_feature.get(everyone_switch.feature),
+            own_switch_on(user, everyone_switch.feature),
+        )
+        for everyone_switch in everyone_switches
+    }
+    stickers_work = statuses[Feature.STICKERS].works
+    return [
+        stickers_off_applied(statuses[details.feature])
+        if details.needs_stickers and not stickers_work
+        else statuses[details.feature]
+        for details in FEATURES
+    ]
 
 
 def own_switch_on(user: User | None, feature: Feature) -> bool | None:
