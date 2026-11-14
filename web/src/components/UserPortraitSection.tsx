@@ -10,7 +10,7 @@ import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 /**
- * The "What I know about you" tab: Zeph's User Portrait of the User and when
+ * The "About you" tab, headed "What I know about you": Zeph's User Portrait of the User and when
  * it was last written. It can be deleted, but not edited.
  *
  * @param props - `portrait` is the User's Portrait, or null if they have

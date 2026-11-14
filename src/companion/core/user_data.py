@@ -23,9 +23,9 @@ def delete_user_data(repositories: Repositories, user_id: UUID) -> None:
 
     Their Conversations and messages, Model Call Log entries, Memory Items,
     Conversation Summaries, Shared Photos, Life Threads, User Portrait,
-    Personal Stickers,
-    Check-in history, connection tokens and Telegram Connection go. Their profile,
-    settings, Usage, Safeguard Events and Feature Switches stay.
+    Personal Stickers, Check-in history, connection tokens and Telegram
+    Connection go. Their profile, settings, Usage, Safeguard Events and
+    Feature Switches stay.
 
     Args:
         repositories: Where the User's data is stored.

@@ -129,6 +129,29 @@ def summary_line(summary: ConversationSummary, time_zone: str | None) -> str:
     return f"{line} {summary.offered}" if summary.offered else line
 
 
+def format_items_by_category(
+    categories: Sequence[MemoryCategory], items: Sequence[MemoryItem]
+) -> list[str]:
+    """Write a User's Memory Items under their Memory Category names.
+
+    Args:
+        categories: The Memory Categories to write, in order.
+        items: The User's Memory Items.
+
+    Returns:
+        One section per category with items: its name, then a "- " line
+        per item; categories with no items are left out.
+    """
+    sections = []
+    for category in categories:
+        lines = [
+            f"- {item.content}" for item in items if item.category_id == category.id
+        ]
+        if lines:
+            sections.append(f"{category.name}:\n" + "\n".join(lines))
+    return sections
+
+
 def format_memory(
     categories: list[MemoryCategory],
     items: list[MemoryItem],
@@ -157,12 +180,7 @@ def format_memory(
         nothing to tell.
     """
     sections = [f"Who they are:\n{portrait}"] if portrait else []
-    for category in categories:
-        lines = [
-            f"- {item.content}" for item in items if item.category_id == category.id
-        ]
-        if lines:
-            sections.append(f"{category.name}:\n" + "\n".join(lines))
+    sections.extend(format_items_by_category(categories, items))
     if summaries:
         summary_lines = [summary_line(summary, time_zone) for summary in summaries]
         sections.append(
@@ -239,10 +257,9 @@ class MemoryRetrieval:
     def read(self, snapshot: UserSnapshot) -> SavedMemory:
         """Read what the Companion has saved about the User, once per reply.
 
-        Archived categories are left out. The User Portrait is read too.
-        What is saved is used even while
-        User Memory is off, since off only stops learning; no Shared Photo
-        is used when Photo Viewing doesn't work.
+        Archived categories are left out. The User Portrait is read too. What
+        is saved is used even while User Memory is off, since off only stops
+        learning; no Shared Photo is used when Photo Viewing doesn't work.
 
         Args:
             snapshot: The User being answered.
@@ -295,13 +312,12 @@ class MemoryRetrieval:
     ) -> RecalledMemory:
         """Pick out what the Companion remembers that matters for the message.
 
-        The User Portrait goes first. Memory Items from every "always
-        include" category go in, plus those
-        from the categories the Understanding picked, plus the newest
-        Conversation Summaries, plus older Summaries found by meaning. All
-        the User's Shared Photos go in when the Understanding picked "Shared
-        Photos". A picked name that isn't one of the pickable categories is
-        ignored.
+        The User Portrait goes first. Memory Items from every "always include"
+        category go in, plus those from the categories the Understanding
+        picked, plus the newest Conversation Summaries, plus older Summaries
+        found by meaning. All the User's Shared Photos go in when the
+        Understanding picked "Shared Photos". A picked name that isn't one of
+        the pickable categories is ignored.
 
         Args:
             snapshot: The User being answered.

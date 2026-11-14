@@ -3,7 +3,11 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from companion.core.life_threads import describe_thread
-from companion.core.memory_retrieval import format_day, summary_line
+from companion.core.memory_retrieval import (
+    format_day,
+    format_items_by_category,
+    summary_line,
+)
 from companion.core.model_call_log import start_trace
 from companion.core.models import (
     ChatLine,
@@ -50,13 +54,7 @@ def describe_user_memory(
         Today's date, the Memory Items by category, the Life Threads and the
         recent Conversations.
     """
-    item_sections = []
-    for category in categories:
-        lines = [
-            f"- {item.content}" for item in items if item.category_id == category.id
-        ]
-        if lines:
-            item_sections.append(f"{category.name}:\n" + "\n".join(lines))
+    item_sections = format_items_by_category(categories, items)
     thread_lines = "\n".join(
         f"- {describe_thread(thread, time_zone)}" for thread in threads
     )
@@ -108,8 +106,59 @@ class PortraitWriter:
         Args:
             snapshot: The User.
         """
-        user_id = snapshot.user.id
         read_at = self._clock.now()
+        text = self._ask(snapshot, read_at)
+        if not text:
+            logger.warning("The User Portrait model gave an empty answer")
+            return
+        self._repositories.user_portraits.save(
+            UserPortrait(user_id=snapshot.user.id, text=text, written_at=read_at)
+        )
+
+    def rewrite_requested(self, settings: PlatformSettings) -> None:
+        """Write again the Portraits a deletion asked for, without what was deleted.
+
+        This runs whatever User Memory says, since it only forgets. A User
+        with no Portrait gets none. When a rewrite fails or the answer is
+        empty, the Portrait is cleared instead, so the deleted thing is never
+        used again. Clearing also stops any Portrait written from older User
+        Memory from landing later.
+
+        Args:
+            settings: The platform settings, read once for the tick.
+        """
+        portraits = self._repositories.user_portraits
+        for user_id in portraits.list_rewrite_requests():
+            snapshot = self._user_snapshots.find(
+                user_id, settings, start_trace(TraceKind.PORTRAIT_REWRITE)
+            )
+            if snapshot is None:
+                continue
+            read_at = self._clock.now()
+            text = ""
+            if portraits.find(user_id) is not None:
+                try:
+                    text = self._ask(snapshot, read_at)
+                except Exception:
+                    logger.exception("Could not rewrite a User Portrait; clearing it")
+            if text:
+                portraits.save(
+                    UserPortrait(user_id=user_id, text=text, written_at=read_at)
+                )
+            else:
+                portraits.clear(user_id, read_at)
+
+    def _ask(self, snapshot: UserSnapshot, read_at: datetime) -> str:
+        """Ask the model for the Portrait, from the User Memory saved now.
+
+        Args:
+            snapshot: The User.
+            read_at: When their User Memory is being read.
+
+        Returns:
+            The Portrait; "" if the answer was empty.
+        """
+        user_id = snapshot.user.id
         description = describe_user_memory(
             self._repositories.memory_categories.list_all(),
             self._repositories.user_memory.list_items(user_id),
@@ -121,41 +170,10 @@ class PortraitWriter:
             snapshot.user.time_zone,
         )
         settings = snapshot.settings
-        answer = self._chat_model.generate(
+        return self._chat_model.generate(
             snapshot=snapshot,
             step=ModelStep.PORTRAIT,
             model=settings.get(PORTRAIT_MODEL),
             instructions=settings.get(PORTRAIT_PROMPT),
             history=[ChatLine(role=ChatRole.USER, text=description)],
         ).strip()
-        if not answer:
-            logger.warning("The User Portrait model gave an empty answer")
-            return
-        self._repositories.user_portraits.save(
-            UserPortrait(user_id=user_id, text=answer, written_at=read_at)
-        )
-
-    def rewrite_requested(self, settings: PlatformSettings) -> None:
-        """Write again the Portraits a deletion asked for, without what was deleted.
-
-        This runs whatever User Memory says, since it only forgets. A User
-        with no Portrait gets none: the request is just dropped. A rewrite
-        that fails is logged and tried again on the next tick.
-
-        Args:
-            settings: The platform settings, read once for the tick.
-        """
-        portraits = self._repositories.user_portraits
-        for user_id in portraits.list_rewrite_requests():
-            try:
-                snapshot = self._user_snapshots.find(
-                    user_id, settings, start_trace(TraceKind.PORTRAIT_REWRITE)
-                )
-                if snapshot is None:
-                    continue
-                if portraits.find(user_id) is None:
-                    portraits.clear(user_id, self._clock.now())
-                    continue
-                self.write(snapshot)
-            except Exception:
-                logger.exception("Could not rewrite a User Portrait")

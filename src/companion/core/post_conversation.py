@@ -326,7 +326,7 @@ def describe_conversation(
     categories: list[MemoryCategory],
     items_by_number: dict[int, MemoryItem],
     photos_by_number: dict[int, SentPhoto],
-    moods: str = "",
+    moods: str,
 ) -> str:
     """Write what the post-conversation processing model is given.
 

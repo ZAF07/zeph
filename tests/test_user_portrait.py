@@ -435,13 +435,12 @@ def test_a_memory_item_deleted_while_the_portrait_is_written_is_rewritten_out(
         clock.advance(timedelta(seconds=5))
         item_id = memory_item_id(client, headers, TEACHER_FACT)
         client.delete(f"/api/memory-items/{item_id}", headers=headers)
+        chat_model.script_portrait(REWRITTEN)
 
     chat_model.before_next_portrait = delete_teacher_fact
     end_conversation_with_portrait(
         client, chat_model, clock, scheduler, seeded_settings
     )
-    chat_model.script_portrait(REWRITTEN)
-    scheduler.tick()
 
     assert TEACHER_FACT not in chat_model.portrait_calls[-1].history[0].text
     assert portrait_shown(client, headers)["text"] == REWRITTEN
@@ -556,4 +555,29 @@ def test_forgetting_in_chat_rewrites_the_portrait_without_it(
     scheduler.tick()
 
     assert TEACHER_FACT not in chat_model.portrait_calls[-1].history[0].text
+    assert len(chat_model.portrait_calls) == 2
+
+
+def test_a_failed_rewrite_after_a_deletion_clears_the_portrait(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    headers = auth_headers(auth_verifier, "user_maya")
+    end_conversation_with_portrait(
+        client, chat_model, clock, scheduler, seeded_settings
+    )
+
+    item_id = memory_item_id(client, headers, TEACHER_FACT)
+    client.delete(f"/api/memory-items/{item_id}", headers=headers)
+    chat_model.script_portrait(RuntimeError("model down"))
+    scheduler.tick()
+    scheduler.tick()
+
+    assert portrait_shown(client, headers) is None
     assert len(chat_model.portrait_calls) == 2
