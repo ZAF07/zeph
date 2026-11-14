@@ -67,4 +67,8 @@ Evals (real DeepSeek and fastembed):
 ## Completion
 
 - Completed: 2026-11-14
-- Commit: <to be filled in after merge>
+- Commits:
+  - `cf98b3d` Understanding issue 16: find a Knowledge document named by its whole listed line
+  - `23d03b0` Understanding issue 16 review fixes: even out quotes and spaces, one place for the title line
+  - `b02deef` Understanding issue 16 done: archive issue with eval, run and review evidence; note reply-side Knowledge misses on issue 17
+  - `f4654ab` Merge understanding issue 16: a Knowledge document is found when named by part or all of its listed line (into `main`)
