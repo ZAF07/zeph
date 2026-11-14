@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { AdminPageHeader } from "@/components/AdminPageHeader";
 import {
@@ -23,8 +22,6 @@ import {
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
-type Flash = { text: string; isError: boolean };
-
 const pendingCheckMilliseconds = 3000;
 
 const libraryPath = "/admin/knowledge";
@@ -42,8 +39,6 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
   const apiClient = useApiClient();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [flash, setFlash] = useState<Flash | null>(null);
-  const [isBusy, setIsBusy] = useState(false);
   const documentKey = queryKeys.knowledgeDocument(documentId);
 
   const documentQuery = useQuery({
@@ -88,47 +83,39 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
     );
   }
 
-  async function retry(knowledgeDocument: KnowledgeDocumentWithText) {
-    setIsBusy(true);
-    setFlash(null);
-    try {
-      await apiClient.retryKnowledgeDocument(knowledgeDocument.id);
+  const retryDocument = useMutation({
+    mutationFn: async () => {
+      await apiClient.retryKnowledgeDocument(documentId);
       void queryClient.invalidateQueries({
         queryKey: queryKeys.knowledgeDocuments,
       });
       await queryClient.invalidateQueries({ queryKey: documentKey });
-    } catch {
-      setFlash({
-        text: `Couldn’t retry ${knowledgeDocument.title}. Please try again.`,
-        isError: true,
-      });
-    } finally {
-      setIsBusy(false);
-    }
-  }
+    },
+  });
 
-  async function remove(knowledgeDocument: KnowledgeDocumentWithText) {
-    if (
-      !window.confirm(
-        `Delete ${knowledgeDocument.title}? Zeph will stop drawing on it.`,
-      )
-    ) {
-      return;
-    }
-    setIsBusy(true);
-    setFlash(null);
-    try {
-      await apiClient.deleteKnowledgeDocument(knowledgeDocument.id);
+  const deleteDocument = useMutation({
+    mutationFn: () => apiClient.deleteKnowledgeDocument(documentId),
+    onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.knowledgeDocuments,
       });
       router.push(libraryPath);
-    } catch {
-      setFlash({
-        text: `Couldn’t delete ${knowledgeDocument.title}. Please try again.`,
-        isError: true,
-      });
-      setIsBusy(false);
+    },
+  });
+
+  const isBusy =
+    retryDocument.isPending ||
+    deleteDocument.isPending ||
+    deleteDocument.isSuccess;
+
+  function remove(knowledgeDocument: KnowledgeDocumentWithText) {
+    if (
+      window.confirm(
+        `Delete ${knowledgeDocument.title}? Zeph will stop drawing on it.`,
+      )
+    ) {
+      retryDocument.reset();
+      deleteDocument.mutate();
     }
   }
 
@@ -203,16 +190,13 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
         </div>
       </div>
 
-      {flash ? (
+      {retryDocument.isError || deleteDocument.isError ? (
         <p
           role="status"
-          className={`m-0 rounded-xl px-4 py-3.5 text-sm ${
-            flash.isError
-              ? "border border-danger-line bg-danger-tint text-danger-deep"
-              : "bg-blue-tint text-blue-deep"
-          }`}
+          className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3.5 text-sm text-danger-deep"
         >
-          {flash.text}
+          Couldn’t {retryDocument.isError ? "retry" : "delete"}{" "}
+          {knowledgeDocument.title}. Please try again.
         </p>
       ) : null}
 
@@ -226,7 +210,10 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
             type="button"
             className={`${compactSecondaryButton} bg-white`}
             disabled={isBusy}
-            onClick={() => void retry(knowledgeDocument)}
+            onClick={() => {
+              deleteDocument.reset();
+              retryDocument.mutate();
+            }}
           >
             Retry
           </button>
@@ -253,7 +240,7 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
           type="button"
           className={dangerButton}
           disabled={isBusy}
-          onClick={() => void remove(knowledgeDocument)}
+          onClick={() => remove(knowledgeDocument)}
         >
           Delete document
         </button>
