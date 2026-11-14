@@ -38,6 +38,10 @@ from companion.core.models import (
     MemoryChanges,
     MemoryItem,
     ModelAnswer,
+    ModelCall,
+    ModelCallTraceDetails,
+    ModelCallTraceOverview,
+    ModelStep,
     NextDueTimeChange,
     PersonalSticker,
     PhotoImage,
@@ -1123,6 +1127,67 @@ class SafeguardEventRepository(Protocol):
         ...
 
 
+class ModelCallRepository(Protocol):
+    """Stores the Model Call Log."""
+
+    def add(self, call: ModelCall) -> None:
+        """Save one model call.
+
+        Args:
+            call: The call to save.
+        """
+        ...
+
+    def list_traces(
+        self,
+        user_id: UUID | None,
+        since: datetime | None,
+        step: ModelStep | None,
+        errors_only: bool,
+        limit: int,
+    ) -> list[ModelCallTraceOverview]:
+        """List traces with who they were for, newest first.
+
+        Args:
+            user_id: Only this User's traces; None for every User.
+            since: Only traces started at or after this time; None for all time.
+            step: Only traces with a call for this step; None for every step.
+            errors_only: Only traces with a failed call.
+            limit: The most traces to list.
+
+        Returns:
+            The traces.
+        """
+        ...
+
+    def get_trace(self, trace_id: UUID) -> ModelCallTraceDetails | None:
+        """Read one trace with every call in it.
+
+        Args:
+            trace_id: The trace's ID.
+
+        Returns:
+            The trace, or None if there is no such trace.
+        """
+        ...
+
+    def delete_started_before(self, cutoff: datetime) -> None:
+        """Delete every call that started before a time.
+
+        Args:
+            cutoff: Calls that started before this are deleted.
+        """
+        ...
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete a User's calls.
+
+        Args:
+            user_id: The User's ID.
+        """
+        ...
+
+
 class KnowledgeDocumentRepository(Protocol):
     """Stores Knowledge documents and their uploaded files."""
 
@@ -1821,6 +1886,7 @@ class Repositories:
     check_ins: CheckInRepository
     feature_switches: FeatureSwitchRepository
     pending_auth_account_deletions: PendingAuthAccountDeletionRepository
+    model_calls: ModelCallRepository
     transaction: Callable[[], AbstractContextManager["Transaction"]]
 
 

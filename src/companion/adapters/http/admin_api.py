@@ -30,6 +30,7 @@ from companion.core.knowledge import (
     knowledge_file_type,
 )
 from companion.core.memory_categories import MemoryCategoryService
+from companion.core.model_call_log import ModelCallLog
 from companion.core.models import (
     CheckInKind,
     CheckInKindDetails,
@@ -51,9 +52,14 @@ from companion.core.models import (
     LibrarySticker,
     MemoryCategory,
     MemoryCategoryDetails,
+    ModelCallContent,
+    ModelCallTraceDetails,
+    ModelCallTraceOverview,
+    ModelStep,
     RiskType,
     SafeguardEventOverview,
     StoredSetting,
+    TraceKind,
     User,
     UserFeatureSwitch,
     UserOverview,
@@ -356,6 +362,84 @@ class UsageResponse(BaseModel):
     web_search_daily_limit: int
 
 
+class ChatLineResponse(BaseModel):
+    """One line a model call was given."""
+
+    role: str
+    text: str
+
+
+class OfferedToolResponse(BaseModel):
+    """A tool a model call was offered."""
+
+    name: str
+    description: str
+    parameters: dict[str, Any]
+
+
+class ToolCallResponse(BaseModel):
+    """A tool call a model made, with what it was told back."""
+
+    name: str
+    arguments: dict[str, Any]
+    result: str
+
+
+class ModelCallContentResponse(BaseModel):
+    """What a model call was given and answered. Only ever kept for Admins and Evals."""
+
+    instructions: str
+    history: list[ChatLineResponse]
+    tools_offered: list[OfferedToolResponse]
+    tool_calls: list[ToolCallResponse]
+    response: str
+    reasoning: str | None
+
+
+class ModelCallResponse(BaseModel):
+    """One model call in a trace; `content` is null unless full content was kept."""
+
+    id: str
+    step: ModelStep
+    model: str
+    started_at: datetime
+    duration_ms: int
+    tokens_in: int
+    tokens_out: int
+    error: str | None
+    tools_called: list[str]
+    content: ModelCallContentResponse | None
+
+
+class ModelCallTraceResponse(BaseModel):
+    """A Model Call Log trace: who and when, with totals of its calls."""
+
+    trace_id: str
+    kind: TraceKind
+    user_id: str
+    user_name: str | None
+    user_email: str | None
+    started_at: datetime
+    steps: list[ModelStep]
+    tokens_in: int
+    tokens_out: int
+    duration_ms: int
+    error_count: int
+    has_content: bool
+
+
+class ModelCallTracesResponse(BaseModel):
+    """Model Call Log traces, newest first."""
+
+    traces: list[ModelCallTraceResponse]
+
+
+class ModelCallTraceDetailsResponse(ModelCallTraceResponse):
+    """One Model Call Log trace with every call in it, in order."""
+
+    calls: list[ModelCallResponse]
+
+
 class MemoryCategoryResponse(BaseModel):
     """A Memory Category as Admins see it."""
 
@@ -654,6 +738,102 @@ def to_safeguard_event_response(
     )
 
 
+def to_model_call_trace_response(
+    overview: ModelCallTraceOverview,
+) -> ModelCallTraceResponse:
+    """Describe a Model Call Log trace for the admin area.
+
+    Args:
+        overview: The trace and who it was for.
+
+    Returns:
+        The response body.
+    """
+    return ModelCallTraceResponse(
+        trace_id=str(overview.trace.id),
+        kind=overview.trace.kind,
+        user_id=str(overview.user_id),
+        user_name=overview.user_name,
+        user_email=overview.user_email,
+        started_at=overview.started_at,
+        steps=list(overview.steps),
+        tokens_in=overview.tokens_in,
+        tokens_out=overview.tokens_out,
+        duration_ms=overview.duration_ms,
+        error_count=overview.error_count,
+        has_content=overview.has_content,
+    )
+
+
+def to_model_call_content_response(
+    content: ModelCallContent,
+) -> ModelCallContentResponse:
+    """Describe what a model call was given and answered.
+
+    Args:
+        content: The call's content.
+
+    Returns:
+        The response body.
+    """
+    return ModelCallContentResponse(
+        instructions=content.instructions,
+        history=[
+            ChatLineResponse(role=line.role.value, text=line.text)
+            for line in content.history
+        ],
+        tools_offered=[
+            OfferedToolResponse(
+                name=tool.name, description=tool.description, parameters=tool.parameters
+            )
+            for tool in content.tools_offered
+        ],
+        tool_calls=[
+            ToolCallResponse(
+                name=call.name, arguments=call.arguments, result=call.result
+            )
+            for call in content.tool_calls
+        ],
+        response=content.response,
+        reasoning=content.reasoning,
+    )
+
+
+def to_model_call_trace_details_response(
+    details: ModelCallTraceDetails,
+) -> ModelCallTraceDetailsResponse:
+    """Describe one Model Call Log trace with its calls for the admin area.
+
+    Args:
+        details: The trace and its calls.
+
+    Returns:
+        The response body.
+    """
+    return ModelCallTraceDetailsResponse(
+        **to_model_call_trace_response(details.overview).model_dump(),
+        calls=[
+            ModelCallResponse(
+                id=str(call.id),
+                step=call.step,
+                model=call.model,
+                started_at=call.started_at,
+                duration_ms=call.duration_ms,
+                tokens_in=call.tokens_in,
+                tokens_out=call.tokens_out,
+                error=call.error,
+                tools_called=list(call.tools_called),
+                content=(
+                    to_model_call_content_response(call.content)
+                    if call.content
+                    else None
+                ),
+            )
+            for call in details.calls
+        ],
+    )
+
+
 def to_settings_response(settings: list[StoredSetting]) -> SettingsResponse:
     """Describe settings for the admin area.
 
@@ -763,6 +943,7 @@ def build_admin_api_router(
     check_in_kind_service: CheckInKindService,
     check_in_service: CheckInService,
     usage_limiter: UsageLimiter,
+    model_call_log: ModelCallLog,
 ) -> APIRouter:
     """Build the admin API routes.
 
@@ -783,6 +964,7 @@ def build_admin_api_router(
         check_in_kind_service: Manages Check-in Kinds.
         check_in_service: Lists Check-in decisions.
         usage_limiter: Reports usage per User per day.
+        model_call_log: Lists and opens Model Call Log traces.
 
     Returns:
         The router.
@@ -1328,6 +1510,49 @@ def build_admin_api_router(
             daily_message_limit=report.daily_message_limit,
             web_search_daily_limit=report.web_search_daily_limit,
         )
+
+    @router.get("/model-calls")
+    def list_model_call_traces(
+        user_id: UUID | None = None,
+        days: Annotated[int | None, Query(ge=1)] = None,
+        step: ModelStep | None = None,
+        errors_only: bool = False,
+    ) -> ModelCallTracesResponse:
+        """List the newest Model Call Log traces. Never includes content.
+
+        Args:
+            user_id: Only this User's traces; every User's if left out.
+            days: Only traces from the last this many days; all time if left
+                out.
+            step: Only traces with a call for this step; every step if left
+                out.
+            errors_only: Only traces with a failed call.
+
+        Returns:
+            The traces with who each was for.
+        """
+        overviews = model_call_log.list_traces(user_id, days, step, errors_only)
+        return ModelCallTracesResponse(
+            traces=[to_model_call_trace_response(overview) for overview in overviews]
+        )
+
+    @router.get("/model-calls/{trace_id}")
+    def open_model_call_trace(trace_id: UUID) -> ModelCallTraceDetailsResponse:
+        """Open one Model Call Log trace with every call in it.
+
+        Content is there only for calls that kept it: an Admin's own chats
+        and Eval runs.
+
+        Args:
+            trace_id: The trace.
+
+        Returns:
+            The trace and its calls, in order.
+
+        Raises:
+            CoreError: 404 if there is no such trace.
+        """
+        return to_model_call_trace_details_response(model_call_log.open_trace(trace_id))
 
     @router.get("/stickers")
     def list_stickers() -> StickersResponse:

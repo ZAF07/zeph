@@ -27,7 +27,9 @@ from companion.core.models import (
     Conversation,
     Feature,
     FeatureSwitch,
+    ModelCallTrace,
     PlatformSettings,
+    TraceKind,
     User,
     UserSnapshot,
 )
@@ -110,6 +112,7 @@ def facts(
         today=users_today(user.time_zone, now),
         features=tuple(feature_statuses(user, everyone, [])),
         settings=PlatformSettings({}),
+        trace=ModelCallTrace(id=uuid4(), kind=TraceKind.MESSAGE),
     )
     defaults: dict[str, Any] = {
         "telegram_chat_id": CHAT_ID,

@@ -442,6 +442,78 @@ export type CheckInLogEntry = {
   status: CheckInStatus;
 };
 
+/** What a Model Call Log trace was for. */
+export type TraceKind = "message" | "check_in" | "conversation_end";
+
+/** Which step of the Companion's work a model call was for. */
+export type ModelStep =
+  | "safeguard"
+  | "memory_picking"
+  | "reply"
+  | "photo"
+  | "check_in"
+  | "conversation_end"
+  | "personal_stickers";
+
+/** A Model Call Log trace in a list: who, when and totals. Never content. */
+export type ModelCallTrace = {
+  trace_id: string;
+  kind: TraceKind;
+  user_id: string;
+  user_name: string | null;
+  user_email: string | null;
+  started_at: string;
+  steps: ModelStep[];
+  tokens_in: number;
+  tokens_out: number;
+  duration_ms: number;
+  error_count: number;
+  has_content: boolean;
+};
+
+/** What a model call was given and answered; kept only for Admins and Evals. */
+export type ModelCallContent = {
+  instructions: string;
+  history: { role: string; text: string }[];
+  tools_offered: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  }[];
+  tool_calls: {
+    name: string;
+    arguments: Record<string, unknown>;
+    result: string;
+  }[];
+  response: string;
+  reasoning: string | null;
+};
+
+/** One model call in a trace; `content` is null unless it was kept. */
+export type ModelCall = {
+  id: string;
+  step: ModelStep;
+  model: string;
+  started_at: string;
+  duration_ms: number;
+  tokens_in: number;
+  tokens_out: number;
+  error: string | null;
+  tools_called: string[];
+  content: ModelCallContent | null;
+};
+
+/** One Model Call Log trace with every call in it, in order. */
+export type ModelCallTraceDetails = ModelCallTrace & { calls: ModelCall[] };
+
+/** Which traces to list; a field left out means no limit. */
+export type ModelCallTraceFilter = {
+  userId?: string;
+  days?: number;
+  step?: ModelStep;
+  errorsOnly?: boolean;
+};
+
 /** What one User used on one of their days. Counts only, never content. */
 export type DailyUsage = {
   day: string;
@@ -593,6 +665,10 @@ export type ApiClient = {
   ) => Promise<CheckInKind>;
   removeCheckInKind: (id: string) => Promise<void>;
   listCheckInLog: (days: number) => Promise<CheckInLogEntry[]>;
+  listModelCallTraces: (
+    filter: ModelCallTraceFilter,
+  ) => Promise<ModelCallTrace[]>;
+  getModelCallTrace: (traceId: string) => Promise<ModelCallTraceDetails>;
   getUsage: (days: number) => Promise<UsageReport>;
   listMemoryCategories: () => Promise<MemoryCategoryOverview[]>;
   addMemoryCategory: (category: MemoryCategoryInput) => Promise<MemoryCategory>;
@@ -847,6 +923,29 @@ export function createApiClient(
           `/api/admin/check-ins?days=${days}`,
         )
       ).entries,
+    listModelCallTraces: async (filter) => {
+      const query = new URLSearchParams();
+      if (filter.userId) {
+        query.set("user_id", filter.userId);
+      }
+      if (filter.days) {
+        query.set("days", String(filter.days));
+      }
+      if (filter.step) {
+        query.set("step", filter.step);
+      }
+      if (filter.errorsOnly) {
+        query.set("errors_only", "true");
+      }
+      const search = query.size > 0 ? `?${query.toString()}` : "";
+      return (
+        await request<{ traces: ModelCallTrace[] }>(
+          `/api/admin/model-calls${search}`,
+        )
+      ).traces;
+    },
+    getModelCallTrace: (traceId) =>
+      request<ModelCallTraceDetails>(`/api/admin/model-calls/${traceId}`),
     getUsage: (days) => request<UsageReport>(`/api/admin/usage?days=${days}`),
     listMemoryCategories: async () =>
       (

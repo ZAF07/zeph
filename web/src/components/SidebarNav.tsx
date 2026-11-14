@@ -28,6 +28,7 @@ const adminItems = [
   { label: "Features", href: "/admin/features" },
   { label: "Platform settings", href: "/admin/settings" },
   { label: "Usage", href: "/admin/usage" },
+  { label: "Model call log", href: "/admin/model-calls" },
 ];
 
 /**

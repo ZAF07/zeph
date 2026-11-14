@@ -201,7 +201,8 @@ def client(
     Everything on the reply path is real except the chat channel (which
     records and serves test images as photos), the clock (so typing pauses
     don't wait), auth, the scheduler and web search (so no Tavily credits are
-    spent).
+    spent). The Model Call Log keeps full content for every call, as Eval
+    runs do (ADR-0010).
     """
     dependencies = AppDependencies(
         repositories=build_postgres_repositories(engine),
@@ -221,6 +222,7 @@ def client(
         telegram_bot_username=BOT_USERNAME,
         dashboard_url=DASHBOARD_URL,
         initial_admin_emails=frozenset({INITIAL_ADMIN_EMAIL}),
+        model_call_content_for_everyone=True,
     )
     with CompanionTestClient(create_app(dependencies), engine) as test_client:
         yield test_client

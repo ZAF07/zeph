@@ -21,10 +21,10 @@ LAST_ADMIN_ACCOUNT_DELETION = (
 def delete_user_data(repositories: Repositories, user_id: UUID) -> None:
     """Delete a User's data in one transaction, keeping their account.
 
-    Their Conversations and messages, Memory Items, Conversation Summaries,
-    Shared Photos, Personal Stickers, Check-in history, connection tokens and
-    Telegram Connection go. Their profile, settings, Usage, Safeguard Events
-    and Feature Switches stay.
+    Their Conversations and messages, Model Call Log entries, Memory Items,
+    Conversation Summaries, Shared Photos, Personal Stickers, Check-in
+    history, connection tokens and Telegram Connection go. Their profile,
+    settings, Usage, Safeguard Events and Feature Switches stay.
 
     Args:
         repositories: Where the User's data is stored.
@@ -33,6 +33,7 @@ def delete_user_data(repositories: Repositories, user_id: UUID) -> None:
     with repositories.transaction() as transaction:
         in_transaction = transaction.repositories
         in_transaction.conversations.delete_for_user(user_id)
+        in_transaction.model_calls.delete_for_user(user_id)
         in_transaction.user_memory.delete_for_user(user_id)
         in_transaction.personal_stickers.delete_for_user(user_id)
         in_transaction.check_ins.delete_for_user(user_id)

@@ -410,3 +410,28 @@ pending_auth_account_deletions = Table(
     Column("auth_id", Text, primary_key=True),
     Column("added_at", DateTime(timezone=True), nullable=False),
 )
+
+model_calls = Table(
+    "model_calls",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("position", BigInteger, Identity(), nullable=False, unique=True),
+    Column("trace_id", Uuid, nullable=False, index=True),
+    Column("trace_kind", Text, nullable=False),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("step", Text, nullable=False),
+    Column("model", Text, nullable=False),
+    Column("started_at", DateTime(timezone=True), nullable=False, index=True),
+    Column("duration_ms", Integer, nullable=False),
+    Column("tokens_in", Integer, nullable=False),
+    Column("tokens_out", Integer, nullable=False),
+    Column("error", Text),
+    Column("tools_called", JSONB, nullable=False, server_default="[]"),
+    Column("content", JSONB(none_as_null=True)),
+)

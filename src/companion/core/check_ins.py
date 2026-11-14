@@ -37,10 +37,12 @@ from companion.core.models import (
     CheckInSettings,
     CheckInStatus,
     Feature,
+    ModelStep,
     NextDueTimeChange,
     PauseLength,
     PlatformSettings,
     SharedPhoto,
+    TraceKind,
     User,
     UserSnapshot,
 )
@@ -725,7 +727,7 @@ class CheckInService:
         if not due_users:
             return
         snapshots = self._user_snapshots.load_many(
-            [user.id for user in due_users], platform_settings
+            [user.id for user in due_users], platform_settings, TraceKind.CHECK_IN
         )
         rules = self._rules(platform_settings)
         plans = [
@@ -1138,6 +1140,7 @@ class CheckInService:
         )
         answer = self._chat_model.generate(
             snapshot=snapshot,
+            step=ModelStep.CHECK_IN,
             model=settings.get(CHECK_IN_MODEL),
             instructions=f"{settings.get(PERSONA)}\n\n{settings.get(CHECK_IN_PROMPT)}",
             history=[ChatLine(role=ChatRole.USER, text=description)],

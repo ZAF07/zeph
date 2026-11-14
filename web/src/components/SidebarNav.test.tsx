@@ -48,6 +48,7 @@ describe("SidebarNav", () => {
       "Features",
       "Platform settings",
       "Usage",
+      "Model call log",
     ]);
     expect(
       within(adminGroup).getByRole("link", { name: "Persona" }),

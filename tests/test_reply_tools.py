@@ -14,6 +14,7 @@ from companion.core.chat_settings import (
 )
 from companion.core.check_ins import CheckInService
 from companion.core.features import FeatureService
+from companion.core.model_call_log import ModelCallLog
 from companion.core.models import (
     ChannelPhoto,
     ChannelSticker,
@@ -25,9 +26,11 @@ from companion.core.models import (
     LibrarySticker,
     MessageDirection,
     MessageKind,
+    ModelCallTrace,
     PersonalSticker,
     PlatformSettings,
     SharedPhoto,
+    TraceKind,
     User,
     UserFeatureSwitch,
     UserRole,
@@ -102,6 +105,7 @@ def snapshot_for(user: User, *working: Feature) -> UserSnapshot:
         today=NOW.date(),
         features=statuses,
         settings=PlatformSettings(yaml.safe_load(SEED_FILE.read_text())),
+        trace=ModelCallTrace(id=uuid4(), kind=TraceKind.MESSAGE),
     )
 
 
@@ -147,6 +151,23 @@ def plain_tool(name: str) -> ChatTool:
     return ChatTool(name=name, description="", parameters={}, run=lambda _: "")
 
 
+def recording_chat_model(
+    repositories: Repositories,
+    clock: FakeClock,
+    chat_model: ScriptedChatModel | None = None,
+) -> UsageRecordingChatModel:
+    """Wrap a scripted chat model and a fake photo viewer, as the app does."""
+    return UsageRecordingChatModel(
+        chat_model or ScriptedChatModel(),
+        FakePhotoViewer(),
+        UsageLimiter(repositories, clock),
+        ModelCallLog(
+            repositories, clock, content_for_everyone=False, developer_logs=False
+        ),
+        clock,
+    )
+
+
 def build_composer(
     repositories: Repositories,
     chat_model: ScriptedChatModel,
@@ -154,10 +175,9 @@ def build_composer(
 ) -> ResponseComposer:
     """Build a composer with the scripted chat model and the given providers."""
     clock = FakeClock(NOW)
-    usage_limiter = UsageLimiter(repositories, clock)
     return ResponseComposer(
         repositories=repositories,
-        chat_model=UsageRecordingChatModel(chat_model, usage_limiter),
+        chat_model=recording_chat_model(repositories, clock, chat_model),
         features=FeatureService(repositories, clock, DASHBOARD_URL),
         tool_providers=providers,
     )
@@ -312,7 +332,7 @@ def build_settings_tools(repositories: Repositories) -> SettingsTools:
         repositories=repositories,
         features=features,
         user_snapshots=UserSnapshotLoader(repositories, clock),
-        chat_model=UsageRecordingChatModel(ScriptedChatModel(), usage_limiter),
+        chat_model=recording_chat_model(repositories, clock),
         usage_limiter=usage_limiter,
         chat_channel=chat_channel,
         clock=clock,
@@ -421,8 +441,7 @@ def test_photo_viewing_offers_a_look_again_at_viewed_photos_only(
         PhotoService(
             repositories=repositories,
             chat_channel=FakeChatChannel(),
-            photo_viewer=FakePhotoViewer(),
-            usage_limiter=UsageLimiter(repositories, clock),
+            chat_model=recording_chat_model(repositories, clock),
             clock=clock,
         ),
     )

@@ -28,6 +28,7 @@ from companion.core.me import MeService
 from companion.core.memory_categories import MemoryCategoryService
 from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.message_retention import MessageRetention
+from companion.core.model_call_log import ModelCallLog
 from companion.core.personal_stickers import (
     PersonalStickerKeeper,
     PersonalStickerService,
@@ -91,6 +92,11 @@ class AppDependencies:
         cors_origins: Browser origins allowed to call the Dashboard API.
         initial_admin_emails: Emails, in lower case, whose accounts become
             Admins on first sign-in.
+        model_call_content_for_everyone: Whether the Model Call Log keeps
+            full content for every User, as in an Eval run; otherwise only
+            for Admins.
+        model_call_developer_logs: Whether every model call's full content
+            is written to the developer logs, as in local and worktree runs.
     """
 
     repositories: Repositories
@@ -111,6 +117,8 @@ class AppDependencies:
     dashboard_url: str
     cors_origins: list[str] = field(default_factory=list)
     initial_admin_emails: frozenset[str] = frozenset()
+    model_call_content_for_everyone: bool = False
+    model_call_developer_logs: bool = False
 
 
 def create_app(dependencies: AppDependencies) -> FastAPI:
@@ -129,7 +137,19 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         dependencies.repositories, feature_service, dependencies.clock
     )
     usage_limiter = UsageLimiter(dependencies.repositories, dependencies.clock)
-    chat_model = UsageRecordingChatModel(dependencies.chat_model, usage_limiter)
+    model_call_log = ModelCallLog(
+        dependencies.repositories,
+        dependencies.clock,
+        content_for_everyone=dependencies.model_call_content_for_everyone,
+        developer_logs=dependencies.model_call_developer_logs,
+    )
+    chat_model = UsageRecordingChatModel(
+        dependencies.chat_model,
+        dependencies.photo_viewer,
+        usage_limiter,
+        model_call_log,
+        dependencies.clock,
+    )
     user_snapshots = UserSnapshotLoader(dependencies.repositories, dependencies.clock)
     check_in_service = CheckInService(
         repositories=dependencies.repositories,
@@ -186,8 +206,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     photo_service = PhotoService(
         repositories=dependencies.repositories,
         chat_channel=dependencies.chat_channel,
-        photo_viewer=dependencies.photo_viewer,
-        usage_limiter=usage_limiter,
+        chat_model=chat_model,
         clock=dependencies.clock,
     )
     reply_gate = ReplyGate(
@@ -349,6 +368,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             ),
             check_in_service=check_in_service,
             usage_limiter=usage_limiter,
+            model_call_log=model_call_log,
         )
     )
     app.include_router(

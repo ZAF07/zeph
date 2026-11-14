@@ -8,8 +8,8 @@ from companion.core.ports import Clock, Repositories
 class MessageRetention:
     """Deletes raw messages once they are older than the Admin-set retention period.
 
-    Conversation Summaries and Memory Items are kept until the User deletes
-    them.
+    Model Call Log entries go with them. Conversation Summaries and Memory
+    Items are kept until the User deletes them.
     """
 
     def __init__(
@@ -27,7 +27,7 @@ class MessageRetention:
         self._clock = clock
 
     def delete_expired(self, settings: PlatformSettings) -> None:
-        """Delete messages older than the retention period.
+        """Delete messages and Model Call Log entries older than the retention period.
 
         Args:
             settings: Holds the retention period, read once for the tick.
@@ -35,3 +35,4 @@ class MessageRetention:
         retention = timedelta(days=settings.get(MESSAGE_RETENTION_DAYS))
         cutoff = self._clock.now() - retention
         self._repositories.conversations.delete_messages_sent_before(cutoff)
+        self._repositories.model_calls.delete_started_before(cutoff)

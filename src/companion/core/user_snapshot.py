@@ -1,9 +1,16 @@
 from collections.abc import Sequence
+from dataclasses import replace
 from uuid import UUID
 
 from companion.core.admin_users import UserNotFoundError
 from companion.core.features import feature_statuses, switches_for_everyone
-from companion.core.models import PlatformSettings, UserSnapshot
+from companion.core.model_call_log import start_trace
+from companion.core.models import (
+    ModelCallTrace,
+    PlatformSettings,
+    TraceKind,
+    UserSnapshot,
+)
 from companion.core.ports import Clock, Repositories
 from companion.core.timing import local_now, users_today
 
@@ -25,12 +32,15 @@ class UserSnapshotLoader:
         self._repositories = repositories
         self._clock = clock
 
-    def load(self, user_id: UUID, settings: PlatformSettings) -> UserSnapshot:
+    def load(
+        self, user_id: UUID, settings: PlatformSettings, trace: ModelCallTrace
+    ) -> UserSnapshot:
         """Read one User's snapshot.
 
         Args:
             user_id: The User.
             settings: The platform settings, read once for the reply or tick.
+            trace: The Model Call Log trace the snapshot's model calls go in.
 
         Returns:
             Their snapshot.
@@ -38,36 +48,44 @@ class UserSnapshotLoader:
         Raises:
             UserNotFoundError: If there is no such User.
         """
-        snapshot = self.find(user_id, settings)
+        snapshot = self.find(user_id, settings, trace)
         if snapshot is None:
             raise UserNotFoundError(user_id)
         return snapshot
 
-    def find(self, user_id: UUID, settings: PlatformSettings) -> UserSnapshot | None:
+    def find(
+        self, user_id: UUID, settings: PlatformSettings, trace: ModelCallTrace
+    ) -> UserSnapshot | None:
         """Read one User's snapshot, if they still exist.
 
         Args:
             user_id: The User.
             settings: The platform settings, read once for the reply or tick.
+            trace: The Model Call Log trace the snapshot's model calls go in.
 
         Returns:
             Their snapshot, or None if there is no such User.
         """
-        snapshots = self.load_many([user_id], settings)
-        return snapshots[0] if snapshots else None
+        snapshots = self.load_many([user_id], settings, trace.kind)
+        return replace(snapshots[0], trace=trace) if snapshots else None
 
     def load_many(
-        self, user_ids: Sequence[UUID], settings: PlatformSettings
+        self,
+        user_ids: Sequence[UUID],
+        settings: PlatformSettings,
+        trace_kind: TraceKind,
     ) -> list[UserSnapshot]:
         """Read many Users' snapshots in three queries.
 
         The switches for everyone are read once and every User's own
         switches in one more query. The platform settings are read by the
         caller, once for the whole reply or tick, and shared by every snapshot.
+        Each snapshot starts its own Model Call Log trace.
 
         Args:
             user_ids: The Users.
             settings: The platform settings, read once for the reply or tick.
+            trace_kind: What each snapshot's Model Call Log trace is for.
 
         Returns:
             One snapshot per User found, in the order given; Users that don't
@@ -94,6 +112,7 @@ class UserSnapshotLoader:
                     )
                 ),
                 settings=settings,
+                trace=start_trace(trace_kind),
             )
             for user in found
         ]

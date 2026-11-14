@@ -1,6 +1,6 @@
 # 03 — Model Call Log
 
-Status: ready-for-agent
+Status: in-progress
 
 ## Parent
 
@@ -28,3 +28,8 @@ Admins can see every model call the Companion makes, grouped into one trace per 
 ## Blocked by
 
 None - can start immediately.
+
+## Comments
+
+- Branch `understanding-03-model-call-log`, worktree `ai-chat-companion-understanding-03` (ports 3180/8180/5612).
+- Plan: one `model_calls` table (migration 0026), one row per model call, grouped by a trace ID. Each `UserSnapshot` carries the trace (Message, Check-in or Conversation end), so no globals. `UsageRecordingChatModel` times each call, catches errors, records tool names and saves the entry; each call site names its step. Photos move onto the wrapper. Content is stored only for Admins and Eval runs (`AppDependencies.model_call_content_for_everyone`). `MODEL_CALL_DEVELOPER_LOGS=true` writes full content to developer logs.

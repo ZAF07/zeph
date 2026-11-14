@@ -13,6 +13,7 @@ from companion.core.models import (
     ConversationMessage,
     Feature,
     MessageDirection,
+    ModelStep,
     PersonalSticker,
     StickerImage,
     UserSnapshot,
@@ -271,6 +272,7 @@ class PersonalStickerKeeper:
         settings = snapshot.settings
         answer = self._chat_model.generate(
             snapshot=snapshot,
+            step=ModelStep.PERSONAL_STICKERS,
             model=settings.get(PERSONAL_STICKER_KEEPING_MODEL),
             instructions=settings.get(PERSONAL_STICKER_KEEPING_PROMPT),
             history=[

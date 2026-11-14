@@ -67,6 +67,14 @@ def me(client: TestClient, headers: dict[str, str]) -> dict[str, Any]:
     return body
 
 
+def tables_a_reply_leaves_alone(engine: Engine) -> list[str]:
+    """List the per-User tables a cancelled Delete My Data must not change.
+
+    The Model Call Log is left out: every reply adds to it.
+    """
+    return [table for table in user_data_tables(engine) if table != "model_calls"]
+
+
 def test_settings_tools_are_offered_with_their_instructions(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
@@ -427,14 +435,16 @@ def test_any_other_reply_cancels_delete_my_data(
         ToolCall("start_deleting_my_data", {}),
         f"Reply {word} to confirm.",
     )
-    before = rows_per_table(engine, user_id, user_data_tables(engine))
+    before = rows_per_table(engine, user_id, tables_a_reply_leaves_alone(engine))
 
     cancelled = reply_call(
         client, chat_model, f"hmm, {word.lower()} everything? no wait", "Okay."
     )
     later = reply_call(client, chat_model, word, "Hm?")
 
-    assert rows_per_table(engine, user_id, user_data_tables(engine)) == before
+    assert (
+        rows_per_table(engine, user_id, tables_a_reply_leaves_alone(engine)) == before
+    )
     cancel_note = seeded_settings["reply_data_deletion_cancelled_note"]
     assert cancel_note in cancelled.instructions
     assert cancel_note not in later.instructions
@@ -489,11 +499,13 @@ def test_a_crisis_message_cancels_a_pending_delete_my_data(
     )
     chat_model.script_safeguard("suicide_or_self_harm")
     send_to_webhook(client, telegram_text_update("I want to end it all"))
-    before = rows_per_table(engine, user_id, user_data_tables(engine))
+    before = rows_per_table(engine, user_id, tables_a_reply_leaves_alone(engine))
 
     reply_call(client, chat_model, word, "Hm?")
 
-    assert rows_per_table(engine, user_id, user_data_tables(engine)) == before
+    assert (
+        rows_per_table(engine, user_id, tables_a_reply_leaves_alone(engine)) == before
+    )
 
 
 def test_saving_the_profile_without_changing_the_time_zone_keeps_its_mark(
