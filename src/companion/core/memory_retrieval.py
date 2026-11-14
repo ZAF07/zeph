@@ -5,7 +5,6 @@ from datetime import datetime
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
-from companion.core.features import FeatureService
 from companion.core.models import (
     ChatLine,
     ChatRole,
@@ -15,6 +14,7 @@ from companion.core.models import (
     MemoryCategory,
     MemoryItem,
     SharedPhoto,
+    UserSnapshot,
 )
 from companion.core.ports import Repositories
 from companion.core.transcripts import to_transcript_lines
@@ -194,24 +194,20 @@ class MemoryRetrieval:
     def __init__(
         self,
         repositories: Repositories,
-        features: FeatureService,
         chat_model: UsageRecordingChatModel,
     ) -> None:
         """Set up memory retrieval.
 
         Args:
-            repositories: Where Users, Conversations, User Memory and
-                settings are stored.
-            features: Says whether User Memory and Photo Viewing work for the
-                User.
+            repositories: Where Conversations, User Memory and settings are
+                stored.
             chat_model: Picks the Memory Categories that matter and records
                 the tokens used.
         """
         self._repositories = repositories
-        self._features = features
         self._chat_model = chat_model
 
-    def recall(self, user_id: UUID, conversation_id: UUID) -> RecalledMemory:
+    def recall(self, user: UserSnapshot, conversation_id: UUID) -> RecalledMemory:
         """Find what the Companion remembers that matters for the newest message.
 
         Memory Items from every "always include" category go in, plus those
@@ -225,22 +221,20 @@ class MemoryRetrieval:
         Shared Photo is used when Photo Viewing doesn't work.
 
         Args:
-            user_id: The User being answered.
+            user: The User being answered.
             conversation_id: The Conversation the message is in.
 
         Returns:
             The memory section for the reply instructions and the Shared
             Photos that matter.
         """
-        user = self._repositories.users.get(user_id)
-        if user is None:
-            return RecalledMemory(text="")
+        user_id = user.user.id
         settings = self._repositories.platform_settings
         user_memory = self._repositories.user_memory
         items = user_memory.list_items(user_id)
         shared_photos = (
             user_memory.list_shared_photos(user_id)
-            if self._features.works_for(user_id, Feature.PHOTO_VIEWING)
+            if user.works(Feature.PHOTO_VIEWING)
             else []
         )
         filled_category_ids = {item.category_id for item in items}
@@ -259,7 +253,7 @@ class MemoryRetrieval:
         )
         if shared_photos:
             pickable.append(photos_group)
-        picked = self._pick(pickable, user_id, conversation_id)
+        picked = self._pick(pickable, user, conversation_id)
         picked_ids = {category.id for category in picked}
         relevant_photos = shared_photos if photos_group in picked else []
         chosen = [
@@ -275,7 +269,7 @@ class MemoryRetrieval:
                 chosen,
                 items,
                 summaries,
-                user.time_zone,
+                user.user.time_zone,
                 settings.get("reply_memory_intro"),
                 relevant_photos,
             ),
@@ -285,14 +279,14 @@ class MemoryRetrieval:
     def _pick(
         self,
         categories: list[MemoryCategory],
-        user_id: UUID,
+        user: UserSnapshot,
         conversation_id: UUID,
     ) -> list[MemoryCategory]:
         """Ask the model which categories matter for the newest message.
 
         Args:
             categories: The categories it may pick from.
-            user_id: The User being answered.
+            user: The User being answered.
             conversation_id: The Conversation the message is in.
 
         Returns:
@@ -305,7 +299,7 @@ class MemoryRetrieval:
         messages = self._repositories.conversations.list_messages(conversation_id)
         try:
             answer = self._chat_model.generate(
-                user_id=user_id,
+                user=user,
                 model=settings.get("memory_retrieval_model"),
                 instructions=settings.get("memory_retrieval_prompt"),
                 history=[

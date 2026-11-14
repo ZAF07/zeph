@@ -1250,3 +1250,66 @@ class FeatureStatus:
     switch: UserFeatureSwitch
     changed_by_email: str | None
     changed_at: datetime | None
+
+
+@dataclass(frozen=True)
+class UserSnapshot:
+    """A User as they were when a reply or Check-in tick started.
+
+    Read once and passed to every step, so no step reads the User or the
+    Feature switches again, and a switch changed halfway through doesn't
+    change what the rest of the reply or tick does.
+
+    Attributes:
+        user: The User.
+        local_now: The time where they live when it was read.
+        today: Their day when it was read.
+        features: Each Feature's status for them, in the order of `FEATURES`.
+    """
+
+    user: User
+    local_now: datetime
+    today: date
+    features: tuple[FeatureStatus, ...]
+
+    def works(self, feature: Feature) -> bool:
+        """Say whether a Feature works for the User.
+
+        Args:
+            feature: The Feature.
+
+        Returns:
+            True if it works for them.
+        """
+        return self._status(feature).works
+
+    def available(self, feature: Feature) -> bool:
+        """Say whether the Admin side allows a Feature for the User.
+
+        Args:
+            feature: The Feature.
+
+        Returns:
+            True if the Admin side allows it, whatever the User's own switch.
+        """
+        return self._status(feature).available
+
+    @property
+    def unavailable_features(self) -> list[Feature]:
+        """List the Features the Admin side has off for the User.
+
+        Returns:
+            The Features, in the order of `FEATURES`.
+        """
+        return [status.feature for status in self.features if not status.available]
+
+    def _status(self, feature: Feature) -> FeatureStatus:
+        """Find one Feature's status.
+
+        Args:
+            feature: The Feature.
+
+        Returns:
+            Its status.
+        """
+        return next(status for status in self.features if status.feature == feature)

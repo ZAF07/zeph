@@ -12,6 +12,7 @@ from companion.core.models import (
     RiskType,
     SafeguardEvent,
     SafeguardEventOverview,
+    UserSnapshot,
 )
 from companion.core.ports import Clock, Repositories
 from companion.core.response_composition import to_chat_history
@@ -134,7 +135,10 @@ class Safeguard:
         self._clock = clock
 
     def assess(
-        self, conversation_id: UUID, user_id: UUID, newest_text: str | None = None
+        self,
+        conversation_id: UUID,
+        user: UserSnapshot,
+        newest_text: str | None = None,
     ) -> RiskType:
         """Classify the risk in the Conversation's newest message.
 
@@ -145,7 +149,7 @@ class Safeguard:
 
         Args:
             conversation_id: The Conversation the message was added to.
-            user_id: The User who sent it.
+            user: The User who sent it.
             newest_text: The newest message as the Safeguard reads it, when
                 that differs from the saved one, e.g. a photo's description
                 with Photo Viewing off; None to read the saved one.
@@ -162,7 +166,7 @@ class Safeguard:
         transcript = [ChatLine(role=ChatRole.USER, text=to_transcript(history))]
         for _ in range(2):
             answer = self._chat_model.generate(
-                user_id=user_id,
+                user=user,
                 model=settings.get("safeguard_model"),
                 instructions=settings.get("safeguard_prompt"),
                 history=transcript,
@@ -173,7 +177,7 @@ class Safeguard:
         logger.warning("The Safeguard model gave no label twice; treating as crisis")
         return RiskType.UNCLEAR
 
-    def respond_to_crisis(self, user_id: UUID, risk_type: RiskType) -> str:
+    def respond_to_crisis(self, user: UserSnapshot, risk_type: RiskType) -> str:
         """Write the Crisis Reply and record a Safeguard Event.
 
         The Crisis Reply is the Admin-edited wording with `{helplines}`
@@ -182,18 +186,17 @@ class Safeguard:
         text.
 
         Args:
-            user_id: The User in crisis.
+            user: The User in crisis.
             risk_type: What kind of crisis the Safeguard saw.
 
         Returns:
             The Crisis Reply.
         """
-        user = self._repositories.users.get(user_id)
-        to_share = self._helplines.to_share_with(user.country if user else None)
+        to_share = self._helplines.to_share_with(user.user.country)
         self._repositories.safeguard_events.add(
             SafeguardEvent(
                 id=uuid4(),
-                user_id=user_id,
+                user_id=user.user.id,
                 risk_type=risk_type,
                 created_at=self._clock.now(),
                 helplines_country=to_share.country,

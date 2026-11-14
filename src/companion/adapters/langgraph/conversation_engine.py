@@ -4,6 +4,7 @@ from uuid import UUID
 
 from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.runtime import Runtime
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
@@ -13,6 +14,7 @@ from companion.core.models import (
     ChannelSticker,
     MessageKind,
     MessageToAnswer,
+    UserSnapshot,
 )
 from companion.core.reply_gate import Stopped, StopReason
 
@@ -71,7 +73,9 @@ class LangGraphConversationEngine:
 
     The first step asks the core ReplyGate whether a reply is needed; the
     rest recall memory and Knowledge, compose the reply and deliver it. Each
-    step is a thin call into a core service (ADR-0003). Every User has
+    step is a thin call into a core service (ADR-0003). The User snapshot is
+    the run's context, so every step reads the same User and is never saved
+    in a checkpoint. Every User has
     one checkpoint thread, keyed by their User ID. Every value a step reads is
     set earlier in the same turn, so a thread carries nothing from one message
     to the next and can be deleted between messages.
@@ -88,11 +92,12 @@ class LangGraphConversationEngine:
         """
         self._checkpointer = checkpointer
 
-        def check(state: ReplyState) -> ReplyState:
+        def check(state: ReplyState, runtime: Runtime[UserSnapshot]) -> ReplyState:
             """Save the User's message and apply the house rules.
 
             Args:
                 state: The graph's state so far.
+                runtime: Holds the User snapshot.
 
             Returns:
                 Why no reply is composed, or "" with the Conversation's ID and
@@ -108,7 +113,8 @@ class LangGraphConversationEngine:
                     photos=tuple(ChannelPhoto(**photo) for photo in state["photos"]),
                     safeguard_text=state["safeguard_text"] or None,
                     sticker=ChannelSticker(**sticker) if sticker else None,
-                )
+                ),
+                runtime.context,
             )
             if isinstance(result, Stopped):
                 return {"stop_reason": result.reason.value}
@@ -131,18 +137,21 @@ class LangGraphConversationEngine:
                 return END
             return "recall_memory"
 
-        def recall_memory(state: ReplyState) -> ReplyState:
+        def recall_memory(
+            state: ReplyState, runtime: Runtime[UserSnapshot]
+        ) -> ReplyState:
             """Find the User Memory that matters for the message.
 
             Args:
                 state: The graph's state so far.
+                runtime: Holds the User snapshot.
 
             Returns:
                 The memory to give the reply, and the IDs of the Shared
                 Photos that matter.
             """
             recalled = services.memory_retrieval.recall(
-                UUID(state["user_id"]), UUID(state["conversation_id"])
+                runtime.context, UUID(state["conversation_id"])
             )
             return {
                 "memory": recalled.text,
@@ -151,25 +160,31 @@ class LangGraphConversationEngine:
                 ],
             }
 
-        def recall_knowledge(state: ReplyState) -> ReplyState:
+        def recall_knowledge(
+            state: ReplyState, runtime: Runtime[UserSnapshot]
+        ) -> ReplyState:
             """Find the Knowledge that may fit the message.
 
             Args:
                 state: The graph's state so far.
+                runtime: Holds the User snapshot.
 
             Returns:
                 The Knowledge to give the reply.
             """
             knowledge = services.knowledge_retrieval.recall(
-                UUID(state["user_id"]), UUID(state["conversation_id"])
+                runtime.context, UUID(state["conversation_id"])
             )
             return {"knowledge": knowledge}
 
-        def compose_reply(state: ReplyState) -> ReplyState:
+        def compose_reply(
+            state: ReplyState, runtime: Runtime[UserSnapshot]
+        ) -> ReplyState:
             """Write the Companion's reply.
 
             Args:
                 state: The graph's state so far.
+                runtime: Holds the User snapshot.
 
             Returns:
                 The reply as short messages, and its sticker's and Shared
@@ -177,7 +192,7 @@ class LangGraphConversationEngine:
             """
             reply = services.response_composer.compose(
                 UUID(state["conversation_id"]),
-                UUID(state["user_id"]),
+                runtime.context,
                 state["memory"],
                 state["knowledge"],
                 data_deletion_cancelled=state["data_deletion_cancelled"],
@@ -214,7 +229,7 @@ class LangGraphConversationEngine:
             )
             return {}
 
-        graph = StateGraph(ReplyState)
+        graph = StateGraph(ReplyState, context_schema=UserSnapshot)
         graph.add_node("check", check)
         graph.add_node("recall_memory", recall_memory)
         graph.add_node("recall_knowledge", recall_knowledge)
@@ -228,7 +243,7 @@ class LangGraphConversationEngine:
         graph.add_edge("deliver_reply", END)
         self._graph = graph.compile(checkpointer=checkpointer)
 
-    def handle(self, message: MessageToAnswer) -> None:
+    def handle(self, message: MessageToAnswer, user: UserSnapshot) -> None:
         """Answer one message: apply the house rules, then reply if needed.
 
         The ReplyGate saves the message and applies the house rules. When it
@@ -238,6 +253,7 @@ class LangGraphConversationEngine:
 
         Args:
             message: The message to answer.
+            user: The User who sent it, read once as the reply starts.
         """
         final_state = self._graph.invoke(
             {
@@ -250,6 +266,7 @@ class LangGraphConversationEngine:
                 "safeguard_text": message.safeguard_text or "",
             },
             config={"configurable": {"thread_id": str(message.user_id)}},
+            context=user,
         )
         if final_state["stop_reason"] == StopReason.DATA_DELETED:
             self.forget_user(message.user_id)

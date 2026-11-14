@@ -13,6 +13,7 @@ from companion.core.models import (
     MessageDirection,
     PersonalSticker,
     SharedPhoto,
+    UserSnapshot,
 )
 from companion.core.photos import PhotoTools, SendPhotoTools
 from companion.core.ports import Repositories
@@ -123,7 +124,7 @@ class ResponseComposer:
     def compose(
         self,
         conversation_id: UUID,
-        user_id: UUID,
+        user: UserSnapshot,
         memory: str = "",
         knowledge: str = "",
         data_deletion_cancelled: bool = False,
@@ -146,7 +147,7 @@ class ResponseComposer:
 
         Args:
             conversation_id: The Conversation to reply in.
-            user_id: The User being replied to.
+            user: The User being replied to, as read when the reply started.
             memory: The User Memory that matters for this message; "" if none.
             knowledge: The Knowledge passages that may fit; "" if none.
             data_deletion_cancelled: True if this message cancelled the
@@ -163,11 +164,11 @@ class ResponseComposer:
         """
         settings = self._repositories.platform_settings
         instructions = f"{settings.get('persona')}\n\n{settings.get('response_prompt')}"
-        web_search = self._web_search_tools.offer(user_id)
-        settings_tools = self._settings_tools.offer(user_id)
-        sticker_choice = self._sticker_tools.offer(user_id)
-        photo_tools = self._photo_tools.offer(user_id, conversation_id)
-        send_photo_choice = self._send_photo_tools.offer(user_id, shared_photo_ids)
+        web_search = self._web_search_tools.offer(user)
+        settings_tools = self._settings_tools.offer(user)
+        sticker_choice = self._sticker_tools.offer(user)
+        photo_tools = self._photo_tools.offer(user, conversation_id)
+        send_photo_choice = self._send_photo_tools.offer(user.user.id, shared_photo_ids)
         cancelled_note = (
             settings.get(DELETION_CANCELLED_NOTE_SETTING)
             if data_deletion_cancelled
@@ -178,7 +179,7 @@ class ResponseComposer:
             knowledge,
             web_search.instructions,
             settings_tools.instructions,
-            self._features.unavailable_note(user_id),
+            self._features.unavailable_note(user.unavailable_features),
             cancelled_note,
         )
         for section in sections:
@@ -188,7 +189,7 @@ class ResponseComposer:
             self._repositories.conversations.list_messages(conversation_id)
         )
         reply = self._chat_model.generate(
-            user_id=user_id,
+            user=user,
             model=settings.get("response_model"),
             instructions=instructions,
             history=history,
@@ -196,7 +197,7 @@ class ResponseComposer:
                 *web_search.tools,
                 *settings_tools.tools,
                 *sticker_choice.tools,
-                *self._sticker_adding.tools(user_id),
+                *self._sticker_adding.tools(user.user),
                 *photo_tools,
                 *send_photo_choice.tools,
             ],

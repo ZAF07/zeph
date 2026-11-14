@@ -7,7 +7,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
-from companion.core.models import ChannelSticker, IncomingMessage, UserRole
+from companion.core.models import ChannelSticker, IncomingMessage, User, UserRole
 from companion.core.ports import ChatChannel, ChatTool, Repositories, Timer
 from companion.core.stickers import (
     StickerLibraryService,
@@ -168,16 +168,16 @@ class StickerAdding:
         self._modes: dict[UUID, AddingMode] = {}
         self._guard = threading.Lock()
 
-    def tools(self, user_id: UUID) -> list[ChatTool]:
+    def tools(self, user: User) -> list[ChatTool]:
         """Offer the tool that starts adding mode, to Admins only.
 
         Args:
-            user_id: The User being replied to.
+            user: The User being replied to.
 
         Returns:
             The tool for an Admin; none for anyone else.
         """
-        if not self._is_admin(user_id):
+        if user.role != UserRole.ADMIN:
             return []
         return [
             ChatTool(
@@ -193,7 +193,7 @@ class StickerAdding:
                     "if it isn't clear."
                 ),
                 parameters=ADDING_PARAMETERS,
-                run=lambda arguments: self._start(user_id, arguments),
+                run=lambda arguments: self._start(user.id, arguments),
             )
         ]
 

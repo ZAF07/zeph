@@ -1,12 +1,12 @@
 import logging
 from uuid import UUID
 
-from companion.core.features import FeatureService
 from companion.core.models import (
     Feature,
     KnowledgeChunkMatch,
     KnowledgeDocument,
     KnowledgeStatus,
+    UserSnapshot,
 )
 from companion.core.ports import Embedder, KnowledgeVectorStore, Repositories
 
@@ -53,7 +53,6 @@ class KnowledgeRetrieval:
     def __init__(
         self,
         repositories: Repositories,
-        features: FeatureService,
         embedder: Embedder,
         vector_store: KnowledgeVectorStore,
     ) -> None:
@@ -62,16 +61,14 @@ class KnowledgeRetrieval:
         Args:
             repositories: Where Conversations, Knowledge documents and
                 settings are stored.
-            features: Says whether Knowledge works for the User.
             embedder: Embeds the message to search with.
             vector_store: Finds the closest Knowledge chunks.
         """
         self._repositories = repositories
-        self._features = features
         self._embedder = embedder
         self._vector_store = vector_store
 
-    def recall(self, user_id: UUID, conversation_id: UUID) -> str:
+    def recall(self, user: UserSnapshot, conversation_id: UUID) -> str:
         """Write the Knowledge passages closest to the newest message.
 
         The newest message is embedded and the top few chunks, as many as the
@@ -80,13 +77,13 @@ class KnowledgeRetrieval:
         User. If the search fails the reply goes ahead without them.
 
         Args:
-            user_id: The User being replied to.
+            user: The User being replied to.
             conversation_id: The Conversation the message is in.
 
         Returns:
             The Knowledge section for the reply instructions; "" if none.
         """
-        if not self._features.works_for(user_id, Feature.KNOWLEDGE):
+        if not user.works(Feature.KNOWLEDGE):
             return ""
         settings = self._repositories.platform_settings
         limit = settings.get("knowledge_chunks_per_reply")

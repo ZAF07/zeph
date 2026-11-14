@@ -1,6 +1,6 @@
 # 03 — Load a User snapshot once per reply and per Check-in tick
 
-Status: ready-for-agent
+Status: in-progress
 
 ## Parent
 
@@ -38,3 +38,15 @@ A `UserSnapshot` value: the User, their local time, their day, and every Feature
 ## Blocked by
 
 - `.scratch/architecture/issues/01-reply-gate.md`
+
+## Comments
+
+### 14 Nov 2026 — plan (branch `arch-03-user-snapshot`)
+
+- `core/user_snapshot.py`: `UserSnapshot` (User, local time, day, Feature statuses; `works`/`available`) and `UserSnapshotLoader.load` / `load_many`.
+- `features.py` keeps the rules as a pure `feature_statuses(...)`; `FeatureService` and the loader both use it.
+- New repo reads: `users.get_many`, `feature_switches.list_for_users` (one `IN (...)` query each).
+- Reply: `IncomingMessageHandler._answer` loads the snapshot inside the User's turn lock and passes it to the engine (LangGraph run `context`, never checkpointed). ReplyGate, Safeguard, data deletion check, usage, memory/Knowledge recall, composer and its tools read it. `UsageRecordingChatModel.generate` takes the snapshot so token days use it.
+- Check-in tick: `send_due` does one `load_many` for all due Users.
+- Post-conversation does one `load` per Conversation (it uses the chat model, which now needs a snapshot).
+- Left as is on purpose: settings tools and data deletion re-read the User right before they write, so two changes in one reply build on each other.

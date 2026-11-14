@@ -9,12 +9,14 @@ from companion.core.models import (
     IncomingMessage,
     MessageKind,
     MessageToAnswer,
+    UserSnapshot,
 )
 from companion.core.photos import PhotoService
 from companion.core.ports import ChatChannel, ConversationEngine, Repositories, Timer
 from companion.core.sticker_adding import StickerAdding
 from companion.core.stickers import sticker_message_text
 from companion.core.telegram_connection import TelegramConnectionService
+from companion.core.user_snapshot import UserSnapshotLoader
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +75,7 @@ class IncomingMessageHandler:
         chat_channel: ChatChannel,
         sticker_adding: StickerAdding,
         photo_service: PhotoService,
+        user_snapshots: UserSnapshotLoader,
         timer: Timer,
         dashboard_url: str,
     ) -> None:
@@ -87,12 +90,14 @@ class IncomingMessageHandler:
             sticker_adding: Adds the stickers Admins send in adding mode or
                 reply "add this" to.
             photo_service: Describes the photos Users send.
+            user_snapshots: Reads the User once at the start of each reply.
             timer: Waits for the rest of an album to arrive.
             dashboard_url: The Dashboard's address, put into some replies.
         """
         self._telegram_connections = telegram_connections
         self._sticker_adding = sticker_adding
         self._photo_service = photo_service
+        self._user_snapshots = user_snapshots
         self._timer = timer
         self._repositories = repositories
         self._conversation_engine = conversation_engine
@@ -161,7 +166,7 @@ class IncomingMessageHandler:
         self._answer(
             connection.user_id,
             message.chat_id,
-            lambda: self._message_to_answer(connection.user_id, message),
+            lambda user: self._message_to_answer(user, message),
         )
 
     def _collect_album_item(self, user_id: UUID, message: IncomingMessage) -> None:
@@ -203,8 +208,8 @@ class IncomingMessageHandler:
             self._answer(
                 user_id,
                 chat_id,
-                lambda: self._photo_message_to_answer(
-                    user_id, chat_id, photos, caption
+                lambda user: self._photo_message_to_answer(
+                    user, chat_id, photos, caption
                 ),
             )
             return
@@ -217,7 +222,7 @@ class IncomingMessageHandler:
         self._answer(
             user_id,
             chat_id,
-            lambda: MessageToAnswer(
+            lambda user: MessageToAnswer(
                 user_id=user_id,
                 chat_id=chat_id,
                 text=caption,
@@ -229,18 +234,23 @@ class IncomingMessageHandler:
         self,
         user_id: UUID,
         chat_id: int,
-        build_message: Callable[[], MessageToAnswer],
+        build_message: Callable[[UserSnapshot], MessageToAnswer],
     ) -> None:
         """Answer a User's message after their earlier ones, with a fallback on failure.
+
+        The User is read once, inside their turn, and that snapshot is used
+        for the whole reply.
 
         Args:
             user_id: The User who sent it.
             chat_id: The chat to reply in.
-            build_message: Builds the message the Companion answers.
+            build_message: Builds the message the Companion answers from the
+                User snapshot.
         """
         with self._turn_lock_for(user_id):
             try:
-                self._conversation_engine.handle(build_message())
+                user = self._user_snapshots.load(user_id)
+                self._conversation_engine.handle(build_message(user), user)
             except Exception:
                 logger.exception("Could not answer a message from a User")
                 self._chat_channel.send_text(
@@ -249,12 +259,12 @@ class IncomingMessageHandler:
                 )
 
     def _message_to_answer(
-        self, user_id: UUID, message: IncomingMessage
+        self, user: UserSnapshot, message: IncomingMessage
     ) -> MessageToAnswer:
         """Turn a connected User's message into the message the Companion answers.
 
         Args:
-            user_id: The User who sent it.
+            user: The User who sent it.
             message: The incoming message.
 
         Returns:
@@ -262,19 +272,19 @@ class IncomingMessageHandler:
         """
         if message.photo is None:
             return MessageToAnswer(
-                user_id=user_id,
+                user_id=user.user.id,
                 chat_id=message.chat_id,
                 text=readable_text(message),
                 kind=message.kind,
                 sticker=message.sticker,
             )
         return self._photo_message_to_answer(
-            user_id, message.chat_id, [message.photo], message.text
+            user, message.chat_id, [message.photo], message.text
         )
 
     def _photo_message_to_answer(
         self,
-        user_id: UUID,
+        user: UserSnapshot,
         chat_id: int,
         photos: Sequence[ChannelPhoto],
         caption: str,
@@ -282,7 +292,7 @@ class IncomingMessageHandler:
         """Describe a User's photos and turn them into the message to answer.
 
         Args:
-            user_id: The User who sent them.
+            user: The User who sent them.
             chat_id: The chat to reply in.
             photos: The photo, or an album's photos.
             caption: The caption; "" if none.
@@ -291,9 +301,9 @@ class IncomingMessageHandler:
             The message to answer, whose text holds each photo's description, or, with
             Photo Viewing off, whose Safeguard text does.
         """
-        photo_message = self._photo_service.read_message(user_id, photos, caption)
+        photo_message = self._photo_service.read_message(user, photos, caption)
         return MessageToAnswer(
-            user_id=user_id,
+            user_id=user.user.id,
             chat_id=chat_id,
             text=photo_message.text,
             kind=MessageKind.PHOTO,

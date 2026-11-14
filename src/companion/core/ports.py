@@ -49,6 +49,7 @@ from companion.core.models import (
     TelegramConnection,
     User,
     UserOverview,
+    UserSnapshot,
     WebSearchResult,
 )
 
@@ -382,15 +383,16 @@ class KnowledgeVectorStore(Protocol):
 class ConversationEngine(Protocol):
     """Runs the steps of answering a connected User's message."""
 
-    def handle(self, message: MessageToAnswer) -> None:
+    def handle(self, message: MessageToAnswer, user: UserSnapshot) -> None:
         """Answer one message: apply the house rules, then reply if needed.
 
         When the ReplyGate stops the reply nothing is composed;
         otherwise the reply is given the User Memory that matters and the
-        Knowledge that may fit.
+        Knowledge that may fit. Every step reads the User from the snapshot.
 
         Args:
             message: The message to answer.
+            user: The User who sent it, read once as the reply starts.
         """
         ...
 
@@ -444,6 +446,17 @@ class UserRepository(Protocol):
 
         Returns:
             The User, or None if there is none.
+        """
+        ...
+
+    def get_many(self, user_ids: Sequence[UUID]) -> list[User]:
+        """Find many Users by our IDs, in one query.
+
+        Args:
+            user_ids: The Users' IDs.
+
+        Returns:
+            The Users found, in the order of the IDs given.
         """
         ...
 
@@ -1630,6 +1643,20 @@ class FeatureSwitchRepository(Protocol):
 
         Returns:
             The User's switches, in no set order.
+        """
+        ...
+
+    def list_for_users(
+        self, user_ids: Sequence[UUID]
+    ) -> dict[UUID, list[FeatureSwitch]]:
+        """List the switches stored for many Users, in one query.
+
+        Args:
+            user_ids: The Users.
+
+        Returns:
+            Each User's switches, in no set order; a User with none is left
+            out.
         """
         ...
 

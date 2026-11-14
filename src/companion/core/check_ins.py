@@ -3,7 +3,6 @@ import logging
 from dataclasses import dataclass, replace
 from datetime import datetime, time, timedelta
 from uuid import UUID, uuid4
-from zoneinfo import ZoneInfo
 
 from companion.core.features import FeatureService
 from companion.core.memory_retrieval import (
@@ -28,6 +27,7 @@ from companion.core.models import (
     PauseLength,
     SharedPhoto,
     User,
+    UserSnapshot,
 )
 from companion.core.ports import (
     ChatBlockedError,
@@ -44,6 +44,7 @@ from companion.core.timing import (
     users_today,
 )
 from companion.core.usage import UsageLimiter, UsageRecordingChatModel
+from companion.core.user_snapshot import UserSnapshotLoader
 
 logger = logging.getLogger(__name__)
 
@@ -129,19 +130,6 @@ def is_in_quiet_hours(settings: CheckInSettings, local_time: time) -> bool:
     if start > end:
         return local_time >= start or local_time < end
     return False
-
-
-def local_now(now: datetime, time_zone: str | None) -> datetime:
-    """Turn a time into the User's local time.
-
-    Args:
-        now: The time, timezone-aware.
-        time_zone: The User's IANA time zone; UTC if they have none.
-
-    Returns:
-        The same moment in the User's time zone.
-    """
-    return now.astimezone(ZoneInfo(time_zone or "UTC"))
 
 
 def check_in_status(
@@ -395,6 +383,7 @@ class CheckInService:
         self,
         repositories: Repositories,
         features: FeatureService,
+        user_snapshots: UserSnapshotLoader,
         chat_model: UsageRecordingChatModel,
         usage_limiter: UsageLimiter,
         chat_channel: ChatChannel,
@@ -405,7 +394,10 @@ class CheckInService:
         Args:
             repositories: Where Users, Check-ins, Conversations and settings
                 are stored.
-            features: Says whether Check-ins and User Memory work for a User.
+            features: Says whether the Admin side allows Check-ins when a
+                User changes them.
+            user_snapshots: Reads every due User and their Features at once
+                on each tick.
             chat_model: Writes each Check-in and records the tokens used.
             usage_limiter: Says whether a User has used up today's daily
                 message limit.
@@ -415,6 +407,7 @@ class CheckInService:
         """
         self._repositories = repositories
         self._features = features
+        self._user_snapshots = user_snapshots
         self._chat_model = chat_model
         self._usage_limiter = usage_limiter
         self._chat_channel = chat_channel
@@ -616,18 +609,21 @@ class CheckInService:
 
         A User is due when Check-ins work for them, the frequency gap has passed,
         they are not paused, it is outside their quiet hours, they have a
-        Telegram Connection and no open Conversation. A decision that fails
-        before it is saved is logged and tried again on the next tick; the
-        others still go ahead.
+        Telegram Connection and no open Conversation. Every due User and their
+        Features are read once, together, at the start of the tick. A decision
+        that fails before it is saved is logged and tried again on the next
+        tick; the others still go ahead.
         """
         now = self._clock.now()
-        for user in self._repositories.check_ins.list_due_users(now):
+        due_users = self._repositories.check_ins.list_due_users(now)
+        snapshots = self._user_snapshots.load_many([user.id for user in due_users])
+        for snapshot in snapshots:
             try:
-                self._check_in_if_due(user, now)
+                self._check_in_if_due(snapshot, now)
             except Exception:
                 logger.exception("Could not decide on a Check-in")
 
-    def _check_in_if_due(self, user: User, now: datetime) -> None:
+    def _check_in_if_due(self, snapshot: UserSnapshot, now: datetime) -> None:
         """Send, skip, or ask about fewer Check-ins, if nothing holds it back.
 
         A User who has used up today's daily message limit gets a limit skip
@@ -640,29 +636,30 @@ class CheckInService:
         unless the chat channel refuses the message.
 
         Args:
-            user: A User whose next Check-in is due.
+            snapshot: A User whose next Check-in is due, as read for this tick.
             now: The current time.
 
         Raises:
             InvalidCheckInAnswerError: If the model's answer can't be used.
         """
-        if not self._features.works_for(user.id, Feature.CHECK_INS):
+        if not snapshot.works(Feature.CHECK_INS):
             return
+        user = snapshot.user
         settings = user.check_ins
-        local_time = local_now(now, user.time_zone)
+        local_time = snapshot.local_now
         if settings.is_paused_at(now) or is_in_quiet_hours(settings, local_time.time()):
             return
         connection = self._repositories.telegram_connections.get_by_user(user.id)
         if connection is None or self._has_open_conversation(user, now):
             return
-        if self._usage_limiter.has_used_up_daily_message_limit(user.id):
+        if self._usage_limiter.has_used_up_daily_message_limit(snapshot):
             self._skip_for_daily_limit(user, now)
             return
         next_due_at = now + self._gap(settings.frequency)
         if self._has_ignored_too_many(user):
             self._ask_about_fewer(user, connection.telegram_chat_id, now, next_due_at)
             return
-        shared_photos = self._shared_photos(user)
+        shared_photos = self._shared_photos(snapshot)
         kinds = [
             kind
             for kind in self.list_kinds()
@@ -671,7 +668,7 @@ class CheckInService:
         if not kinds:
             logger.warning("No Check-in Kind may be sent to this User")
             return
-        decision = self._decide(user, kinds, shared_photos, local_time)
+        decision = self._decide(snapshot, kinds, shared_photos)
         if decision.kind is None:
             skipped = CheckIn(
                 id=uuid4(),
@@ -922,34 +919,33 @@ class CheckInService:
             MEMORY_INTRO,
         )
 
-    def _shared_photos(self, user: User) -> list[SharedPhoto]:
+    def _shared_photos(self, user: UserSnapshot) -> list[SharedPhoto]:
         """List the User's Shared Photos a Check-in may send.
 
         Args:
-            user: The User.
+            user: The User, as read for this tick.
 
         Returns:
             Their Shared Photos, newest first; none if Photo Viewing doesn't
             work for the User.
         """
-        if not self._features.works_for(user.id, Feature.PHOTO_VIEWING):
+        if not user.works(Feature.PHOTO_VIEWING):
             return []
-        return self._repositories.user_memory.list_shared_photos(user.id)
+        return self._repositories.user_memory.list_shared_photos(user.user.id)
 
     def _decide(
         self,
-        user: User,
+        snapshot: UserSnapshot,
         kinds: list[CheckInKind],
         shared_photos: list[SharedPhoto],
-        local_time: datetime,
     ) -> CheckInDecision:
         """Ask the Check-in model to choose a Kind and write the message, or skip.
 
         Args:
-            user: The User it is for.
+            snapshot: The User it is for, with their local time, as read for
+                this tick.
             kinds: The Check-in Kinds it may choose from.
             shared_photos: The User's Shared Photos it may send.
-            local_time: The User's local time now.
 
         Returns:
             The decision.
@@ -958,10 +954,11 @@ class CheckInService:
             InvalidCheckInAnswerError: If the answer can't be used.
         """
         settings = self._repositories.platform_settings
+        user = snapshot.user
         description = describe_check_in(
             user,
             kinds,
-            local_time,
+            snapshot.local_now,
             describe_recent_check_ins(
                 self._recent(user, CHECK_INS_TOLD_TO_MODEL), user.time_zone
             ),
@@ -969,7 +966,7 @@ class CheckInService:
             describe_shared_photos(kinds, shared_photos, user.time_zone),
         )
         answer = self._chat_model.generate(
-            user_id=user.id,
+            user=snapshot,
             model=settings.get("check_in_model"),
             instructions=f"{settings.get('persona')}\n\n{settings.get('check_in_prompt')}",
             history=[ChatLine(role=ChatRole.USER, text=description)],
