@@ -25,7 +25,7 @@ The Companion's voice and character — human in style, honest that it is an AI.
 _Avoid_: System prompt, personality, character
 
 **Platform Settings**:
-Everything Admins set that shapes how the Companion behaves for all Users: the Persona, each core service's prompt and model, wording such as the Crisis Reply and the Limit Reply, and limits such as the Daily Message Limit or the Conversation quiet gap. A change an Admin saves applies from the next reply or Check-in; one already under way finishes with the Platform Settings it started with.
+Everything Admins set that shapes how the Companion behaves for all Users: the Persona, each core service's prompt, model and whether the model thinks first, wording such as the Crisis Reply and the Limit Reply, and limits such as the Daily Message Limit or the Conversation quiet gap. A change an Admin saves applies from the next reply or Check-in; one already under way finishes with the Platform Settings it started with.
 _Avoid_: Config, system settings, admin config
 
 **Sticker Library**:
@@ -239,7 +239,7 @@ A User's choice, made only on the Dashboard, to remove everything Delete My Data
 _Avoid_: Close account, deactivate, unsubscribe
 
 **Model Call Log**:
-The Admins' record of every model call the Companion makes, grouped by what it was for: a Message, a Check-in, or the work done when a Conversation ends. For every User it holds no content: which steps ran, the model, tokens, time taken, errors and the shape of each decision, never its words: for an Understanding, the Need picked, the mood's intensity and whether its cause was known, and how many Life Threads it was reminded of, brought up (led with or woven in), left alone and held back, and how many past look-ups it asked for; when the Understanding couldn't be made, the fallback it used. Full content (what the model was given, what it answered, its tool calls and its reasoning) is kept only for Admins' own chats and Evals. Removed with the User's messages.
+The Admins' record of every model call the Companion makes, grouped by what it was for: a Message, a Check-in, or the work done when a Conversation ends. For every User it holds no content: which steps ran, the model and whether it thought first, tokens, time taken, errors and the shape of each decision, never its words: for an Understanding, the Need picked, the mood's intensity and whether its cause was known, and how many Life Threads it was reminded of, brought up (led with or woven in), left alone and held back, and how many past look-ups it asked for; when the Understanding couldn't be made, the fallback it used. Full content (what the model was given, what it answered, its tool calls and its reasoning) is kept only for Admins' own chats and Evals. Removed with the User's messages.
 _Avoid_: Trace, debug log, LLM log
 
 ### Quality
