@@ -178,11 +178,12 @@ def test_the_settings_cases_check_stop_looking_at_my_photos() -> None:
     assert photos_off.tools == ["turn_photo_viewing_on_or_off"]
 
 
-def test_the_persona_cases_include_a_struggling_user_with_shared_photos() -> None:
+def test_the_persona_cases_include_struggling_users_with_shared_photos() -> None:
     cases = load_persona_cases(CASES_DIR / "persona.yaml")
 
-    [struggling] = [c for c in cases.conversations if c.shared_photos]
-    assert "no_photo_when_struggling" in struggling.rules
+    with_photos = {c.id: c.rules for c in cases.conversations if c.shared_photos}
+    assert "no_photo_when_struggling" in with_photos["struggling-with-shared-photos"]
+    assert "photo_sent_when_asked" in with_photos["struggling-asks-for-photo"]
 
 
 def test_a_case_naming_an_image_that_is_not_there_is_refused(tmp_path: Path) -> None:
@@ -348,6 +349,51 @@ def test_a_settings_result_passes_only_with_exactly_the_expected_changes() -> No
         "FAIL account: delete my account → expected no tool, "
         "called start_deleting_my_data"
     )
+
+
+def test_a_settings_result_passes_only_when_the_right_memory_item_is_forgotten() -> (
+    None
+):
+    case = SettingsCase(
+        id="forget-why",
+        message="forget why I came",
+        tools=["forget_memory"],
+        memories={"Challenges": ["Work stress"], "Preferences": ["Sunday walks"]},
+        forgotten=["Work stress"],
+    )
+    called = ["list_memories", "forget_memory"]
+
+    assert SettingsResult(case, called, ["Sunday walks", "Goes by Maya"]).passed
+    kept = SettingsResult(case, called, ["Work stress", "Sunday walks"])
+    assert not kept.passed
+    assert kept.describe().endswith("; still remembers: Work stress")
+    everything_forgotten = SettingsResult(case, called, ["Goes by Maya"])
+    assert not everything_forgotten.passed
+    assert everything_forgotten.describe().endswith("; wrongly forgot: Sunday walks")
+
+
+def test_a_settings_case_forgetting_a_memory_item_it_lacks_is_refused(
+    tmp_path: Path,
+) -> None:
+    cases_file = tmp_path / "settings.yaml"
+    cases_file.write_text(
+        "- id: forget\n"
+        "  message: forget that\n"
+        "  tools: [forget_memory]\n"
+        "  memories: {Challenges: [Work stress]}\n"
+        "  forgotten: [Sunday walks]\n"
+    )
+
+    with pytest.raises(InvalidEvalCasesError, match="Sunday walks"):
+        load_settings_cases(cases_file)
+
+
+def test_the_forget_why_here_case_gives_the_user_memory_items_to_forget() -> None:
+    cases = load_settings_cases(CASES_DIR / "settings.yaml")
+
+    [forget] = [case for case in cases if case.id == "forget-why-here"]
+    assert len(forget.forgotten) == 1
+    assert len(forget.memory_item_contents) == 2
 
 
 def test_the_report_counts_settings_results() -> None:

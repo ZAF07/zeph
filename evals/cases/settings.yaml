@@ -4,6 +4,11 @@
 # fails the case. `list_memories` only reads, so it is always allowed. An
 # empty list means no setting may change: Dashboard-only requests, unclear
 # requests and everyday chat.
+#
+# A case may give the User some Memory Items first, by Memory Category name
+# (`memories`), and list which of them must be gone afterwards (`forgotten`);
+# every other one must stay. Such a User skips "What brings you here?" in
+# onboarding, so only the case's own Memory Items say why they came.
 
 - id: week-off
   message: can you give me a week off from check-ins?
@@ -27,6 +32,13 @@
 
 - id: forget-why-here
   message: forget what I told you about why I came here
+  memories:
+    Challenges:
+      - Came here because work stress is wearing them down
+    Preferences:
+      - Likes a long walk by the river on Sunday mornings
+  forgotten:
+    - Came here because work stress is wearing them down
   tools: [forget_memory]
 
 - id: moved-to-london

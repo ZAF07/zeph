@@ -1014,6 +1014,10 @@ class UnderstandingForm:
         knowledge: The Knowledge to search; None when no Knowledge fits.
         threads_touched: The titles of the Life Threads the Message touches.
         curiosities: The Curiosities to bring up, and how.
+        struggling: Whether the User is struggling: upset, scared, grieving
+            or hurting.
+        asked_for_photo: Whether they asked to see one of their Shared
+            Photos.
     """
 
     need: str
@@ -1028,6 +1032,8 @@ class UnderstandingForm:
     knowledge: KnowledgeLookup | None = None
     threads_touched: tuple[str, ...] = ()
     curiosities: tuple[CuriosityToRaise, ...] = ()
+    struggling: bool = False
+    asked_for_photo: bool = False
 
 
 @dataclass(frozen=True)

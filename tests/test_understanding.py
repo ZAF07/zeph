@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 from typing import Any
 
@@ -63,6 +64,7 @@ def test_seeded_needs_have_ask_more_as_the_only_fallback() -> None:
         "Think it through",
         "Advice",
         "Accountability",
+        "Get it done",
         "Ask more",
         "Just chatting",
     ]
@@ -353,6 +355,35 @@ def test_each_understanding_is_saved_with_its_message_and_the_need_by_name(
             {"id": saved["message_id"]},
         ).scalar_one()
     assert message == "what should I do?"
+
+
+def test_struggling_and_asked_for_photo_are_saved_and_odd_values_read_as_false(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    engine: Engine,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    odd = json.loads(understanding_answer())
+    odd.update(struggling="yes", asked_for_photo=1)
+    chat_model.script_understanding(
+        understanding_answer(struggling=True, asked_for_photo=True), json.dumps(odd)
+    )
+    chat_model.script("I'm here", "ok")
+
+    send_to_webhook(client, telegram_text_update("I'm scared, send me mum's photo"))
+    send_to_webhook(client, telegram_text_update("hmm"))
+
+    [first, second] = saved_understandings(engine)
+    assert (first["form"]["struggling"], first["form"]["asked_for_photo"]) == (
+        True,
+        True,
+    )
+    assert (second["form"]["struggling"], second["form"]["asked_for_photo"]) == (
+        False,
+        False,
+    )
 
 
 def test_message_retention_removes_understandings_with_their_messages(

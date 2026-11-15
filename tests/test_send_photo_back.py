@@ -155,6 +155,57 @@ def test_shared_photos_not_picked_for_the_message_are_not_shown_or_offered(
     assert send_photo_tools(call) == []
 
 
+def test_a_struggling_user_who_did_not_ask_is_not_offered_their_photo(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    connect_maya_with_a_shared_cat(client, auth_verifier, chat_channel)
+    chat_model.script_understanding(
+        understanding_answer(memory_categories=["Shared Photos"], struggling=True)
+    )
+
+    call = reply_call(
+        client,
+        chat_model,
+        telegram_text_update("Miso is at the vet, they think it's serious"),
+        "oh no, I'm here",
+    )
+
+    assert CAT in call.instructions
+    assert send_photo_tools(call) == []
+    assert chat_channel.sent_photos == []
+
+
+def test_a_struggling_user_who_asks_for_their_photo_is_offered_it(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    connect_maya_with_a_shared_cat(client, auth_verifier, chat_channel)
+    chat_model.script_understanding(
+        understanding_answer(
+            memory_categories=["Shared Photos"], struggling=True, asked_for_photo=True
+        )
+    )
+
+    call = reply_call(
+        client,
+        chat_model,
+        telegram_text_update("Miso is at the vet. can you send me that photo of him?"),
+        ToolCall("send_photo", {"photo": 1}),
+        "here he is",
+    )
+
+    [tool] = send_photo_tools(call)
+    assert f"1. {CAT}" in tool.description
+    assert chat_channel.sent_photos == [
+        SentPhoto(chat_id=TELEGRAM_CHAT_ID, file_id="file-cat")
+    ]
+
+
 def test_a_reply_sends_at_most_one_shared_photo_after_the_text_and_before_a_sticker(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,

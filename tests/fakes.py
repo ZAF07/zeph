@@ -440,6 +440,8 @@ def understanding_answer(
     threads_touched: Sequence[int] = (),
     knowledge_documents: Sequence[object] = (),
     knowledge_search: str = "",
+    struggling: bool = False,
+    asked_for_photo: bool = False,
 ) -> str:
     """Build the form the Understanding model answers with.
 
@@ -460,6 +462,8 @@ def understanding_answer(
             to search, or anything else a model might write there; none
             means no Knowledge.
         knowledge_search: The phrase to search them with.
+        struggling: Whether the User is struggling.
+        asked_for_photo: Whether they asked to see one of their photos.
 
     Returns:
         The form as JSON.
@@ -482,6 +486,8 @@ def understanding_answer(
             "look_up_past": list(look_up_past),
             "knowledge": knowledge,
             "threads_touched": list(threads_touched),
+            "struggling": struggling,
+            "asked_for_photo": asked_for_photo,
         }
     )
 

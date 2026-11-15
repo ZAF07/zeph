@@ -460,7 +460,8 @@ def read_understanding_form(
 
     Text around the JSON object, such as a code fence, is ignored. A missing
     or odd mood, intensity or cause reads as an unclear, low mood whose
-    cause is known, so it never makes the reply ask why. Life Threads are
+    cause is known, so it never makes the reply ask why. A missing or odd
+    "struggling" or "asked_for_photo" reads as false. Life Threads are
     named by their numbers in the reminded list; no held-back Thread is
     ever brought up. Curiosities are named by their numbers in the due list,
     and no more are brought up than the Conversation may still raise.
@@ -508,9 +509,26 @@ def read_understanding_form(
         threads_touched=read_threads_touched(parsed.get("threads_touched"), by_number),
         knowledge=read_knowledge_lookup(parsed.get("knowledge"), knowledge_documents),
         curiosities=read_curiosities_to_raise(parsed.get("bring_up"), due),
+        struggling=parsed.get("struggling") is True,
+        asked_for_photo=parsed.get("asked_for_photo") is True,
         **lists,
     )
     return keep_held_back_threads_alone(form, reminded)
+
+
+def may_send_photo(form: UnderstandingForm) -> bool:
+    """Decide whether the reply may send the User one of their Shared Photos.
+
+    A struggling User is never sent a photo back unless they asked for one:
+    a photo can sting, or read as "cheer up" instead of listening.
+
+    Args:
+        form: What the Understanding model decided.
+
+    Returns:
+        True unless the User is struggling and didn't ask for a photo.
+    """
+    return not form.struggling or form.asked_for_photo
 
 
 def fallback_form(fallback: Need) -> UnderstandingForm:

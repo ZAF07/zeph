@@ -1787,6 +1787,9 @@ def _to_knowledge_lookup(stored: dict[str, Any] | None) -> KnowledgeLookup | Non
 def _to_understanding_form(stored: dict[str, Any]) -> UnderstandingForm:
     """Turn a saved form back into an Understanding form.
 
+    Forms saved before "struggling" and "asked_for_photo" were asked for
+    read them as false.
+
     Args:
         stored: The form as saved.
 
@@ -1828,6 +1831,8 @@ def _to_understanding_form(stored: dict[str, Any]) -> UnderstandingForm:
             )
             for item in stored.get("curiosities", [])
         ),
+        struggling=stored.get("struggling", False),
+        asked_for_photo=stored.get("asked_for_photo", False),
     )
 
 

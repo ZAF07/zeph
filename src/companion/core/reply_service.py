@@ -6,7 +6,7 @@ from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.models import MessageToAnswer, UserSnapshot
 from companion.core.reply_gate import ReplyGate, Stopped
 from companion.core.response_composition import ResponseComposer
-from companion.core.understanding import UnderstandingService
+from companion.core.understanding import UnderstandingService, may_send_photo
 
 
 class ReplyService:
@@ -21,7 +21,8 @@ class ReplyService:
     older Conversations it asked to look up and passages from the Knowledge
     documents it chose are recalled, then the reply is composed and
     delivered, and the Threads and Curiosities it brought up are marked
-    raised. Every step reads the User from the same snapshot.
+    raised. A struggling User is offered none of their Shared Photos back
+    unless they asked for one. Every step reads the User from the same snapshot.
     """
 
     def __init__(
@@ -92,7 +93,7 @@ class ReplyService:
             knowledge,
             reply_guidance=understood.reply_guidance,
             data_deletion_note=gate_result.data_deletion_note,
-            shared_photo_ids=memory.shared_photo_ids,
+            shared_photo_ids=memory.shared_photo_ids if may_send_photo(form) else (),
         )
         self._conversations.deliver_reply(
             message.user_id,

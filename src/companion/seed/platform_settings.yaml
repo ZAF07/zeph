@@ -438,6 +438,10 @@ understanding_prompt: |-
     wanting a way to cope, or when they ask about a practice or teaching a
     document covers. Most of the time nothing fits:
     when they are venting, chatting, or want practical help, use null.
+  - struggling: true if they are struggling right now: upset, scared,
+    grieving, hurting or overwhelmed; false if not.
+  - asked_for_photo: true only if they asked Zeph to send or show them one
+    of their own photos; false if not.
   Notice how their mood is moving across the Conversation, and the time and
   day: 2am on a Sunday reads differently from lunchtime on a Tuesday.
 
@@ -454,7 +458,9 @@ understanding_prompt: |-
     "left_alone": [{"thread": <number>, "reason": "..."}],
     "look_up_past": ["<search phrase>"],
     "knowledge": {"documents": [<number>], "search": "<search phrase>"} | null,
-    "threads_touched": [<number>]
+    "threads_touched": [<number>],
+    "struggling": true | false,
+    "asked_for_photo": true | false
   }
 
 # Added to the reply's instructions when the person's mood stands out (high

@@ -205,11 +205,26 @@ class SettingsCase:
         message: What the User sends.
         tools: The settings tools the reply must call; empty when no setting
             may change.
+        memories: The Memory Items the User has before the message, by
+            Memory Category name, beyond those onboarding saves.
+        forgotten: Which of those Memory Items must be gone afterwards;
+            every other one must stay.
     """
 
     id: str
     message: str
     tools: list[str]
+    memories: dict[str, list[str]] = field(default_factory=dict)
+    forgotten: list[str] = field(default_factory=list)
+
+    @property
+    def memory_item_contents(self) -> list[str]:
+        """List the contents of the case's Memory Items, whatever their category.
+
+        Returns:
+            The contents, in the order the case lists them.
+        """
+        return [content for items in self.memories.values() for content in items]
 
 
 @dataclass(frozen=True)
@@ -621,20 +636,40 @@ def load_settings_cases(cases_file: Path) -> list[SettingsCase]:
     """Read the settings requests and the tools each must call.
 
     Args:
-        cases_file: YAML list of cases with `id`, `message` and `tools`.
+        cases_file: YAML list of cases with `id`, `message` and `tools`, and
+            optional `memories` (Memory Item contents by Memory Category
+            name) and `forgotten` (which of them must be gone afterwards).
 
     Returns:
         The cases, in the order listed.
 
     Raises:
-        InvalidEvalCasesError: If two cases share an ID.
+        InvalidEvalCasesError: If two cases share an ID, or a case's
+            `forgotten` names a Memory Item it doesn't have.
     """
     entries: list[dict[str, Any]] = yaml.safe_load(cases_file.read_text())
     cases = [
-        SettingsCase(id=entry["id"], message=entry["message"], tools=entry["tools"])
+        SettingsCase(
+            id=entry["id"],
+            message=entry["message"],
+            tools=entry["tools"],
+            memories=entry.get("memories", {}),
+            forgotten=entry.get("forgotten", []),
+        )
         for entry in entries
     ]
     require_unique_ids([case.id for case in cases], cases_file)
+    for case in cases:
+        unknown = [
+            content
+            for content in case.forgotten
+            if content not in case.memory_item_contents
+        ]
+        if unknown:
+            raise InvalidEvalCasesError(
+                f"{cases_file.name}: {case.id} forgets Memory Items it doesn't "
+                "have: " + ", ".join(unknown)
+            )
     return cases
 
 
