@@ -239,4 +239,4 @@ An Eval area in the Dashboard's admin section.
 - Prices from DeepSeek's pricing page (checked 15 Nov 2026), at peak, cache miss, at 1 USD ≈ 1.28 SGD (10 Nov 2026): `deepseek-flash` USD 0.30 / 1.20, `deepseek-v4-pro` USD 1.32 / 3.96 per 1M tokens in / out. DeepSeek may change them; Admins update the setting.
 - Cases are already data files (`evals/cases/*.yaml`), so they become the seed without a rewrite.
 - The platform isn't live yet, so no backfill of old terminal runs is needed.
-- Grilling decisions: `.scratch/eval-dashboard/issues/01-run-evals-from-the-dashboard.md`.
+- Grilling decisions: `.scratch/eval-dashboard/issues/archive/01-run-evals-from-the-dashboard.md`.

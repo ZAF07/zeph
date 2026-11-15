@@ -1,6 +1,6 @@
 # 01 — Eval dashboard: Admins run and tune Evals from the Dashboard
 
-Status: ready-for-human
+Status: completed
 
 ## Idea (from the User, during the Understanding grilling, 14 Nov 2026)
 
@@ -83,3 +83,4 @@ Terms are in `CONTEXT.md` (Eval Run, Eval Case, Variant, Setting Override, Make 
 ## Comments
 
 - 2026-11-15: PRD written at `.scratch/eval-dashboard/PRD.md` (test seams agreed: backend HTTP API, "work the next Queued run", Dashboard components). Next: `/to-issues`.
+- 2026-11-15: archived. Grilling done; decisions carried into `.scratch/eval-dashboard/PRD.md` and issues 02-05.
