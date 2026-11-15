@@ -8,7 +8,9 @@ from pydantic import BaseModel
 
 from companion.adapters.http.admin_api import ModelCallResponse, to_model_call_response
 from companion.core.evals.costs import EvalCosts, EvalCostsService, PriceRow
+from companion.core.evals.make_live import MakeLiveService
 from companion.core.evals.models import (
+    FIRST_TRY,
     CaseOutcome,
     CaseResult,
     Cost,
@@ -18,9 +20,18 @@ from companion.core.evals.models import (
     EvalRunState,
     ModelTokens,
     StartedFrom,
+    Variant,
+    VariantTotals,
 )
 from companion.core.evals.runs import EvalRunService
+from companion.core.evals.setting_overrides import need_override_key, need_values
 from companion.core.models import User
+from companion.core.needs import NeedService
+from companion.core.platform_settings import (
+    EDITABLE_SETTINGS,
+    PlatformSettingsService,
+    SettingKind,
+)
 
 
 class EvalResponse(BaseModel):
@@ -37,10 +48,27 @@ class EvalsResponse(BaseModel):
 
 
 class StartEvalRunRequest(BaseModel):
-    """The whole Evals and single cases a new run runs."""
+    """The whole Evals and single cases a new run runs, its Variants and Repeats.
+
+    Each Variant is its Setting Overrides, by setting key or `need:<id>`;
+    they are lettered A, B, C in order. One empty Variant runs the live
+    settings.
+    """
 
     evals: list[EvalName] = []
     case_keys: list[str] = []
+    variants: list[dict[str, Any]] = [{}]
+    repeats: int = FIRST_TRY
+
+
+class VariantEstimateResponse(BaseModel):
+    """What one Variant would use, counting every Repeat."""
+
+    letter: str
+    tokens_in: int
+    tokens_out: int
+    cost_sgd: float
+    unpriced_models: list[str]
 
 
 class ModelTokensResponse(BaseModel):
@@ -64,6 +92,16 @@ class EstimateResponse(BaseModel):
     models: list[ModelTokensResponse]
     cost_sgd: float
     unpriced_models: list[str]
+    variants: list[VariantEstimateResponse]
+
+
+class MadeLiveResponse(BaseModel):
+    """Who made a Variant live, when, and what was applied or left out."""
+
+    by_name: str | None
+    at: datetime
+    applied_keys: list[str]
+    left_out_keys: list[str]
 
 
 class VariantResponse(BaseModel):
@@ -71,6 +109,21 @@ class VariantResponse(BaseModel):
 
     letter: str
     setting_overrides: dict[str, Any]
+    made_live: MadeLiveResponse | None
+
+
+class VariantTotalsResponse(BaseModel):
+    """How one Variant's finished cases went, added up."""
+
+    letter: str
+    passed: int
+    failed: int
+    errored: int
+    tokens_in: int
+    tokens_out: int
+    duration_ms: int
+    cost_sgd: float
+    unpriced_models: list[str]
 
 
 class EvalRunResponse(BaseModel):
@@ -137,6 +190,60 @@ class EvalRunDetailsResponse(EvalRunResponse):
     """An Eval Run with its Case Results so far, in the order they finished."""
 
     results: list[CaseResultResponse]
+    variant_totals: list[VariantTotalsResponse]
+
+
+class OverridableSettingResponse(BaseModel):
+    """A Platform Setting a Variant can override, with its rule and live value."""
+
+    key: str
+    label: str
+    kind: SettingKind
+    minimum: int
+    maximum: int
+    max_length: int
+    hint: str | None
+    value: Any
+
+
+class OverridableNeedResponse(BaseModel):
+    """A Need a Variant can override, keyed `need:<id>`, with its live details."""
+
+    key: str
+    name: str
+    value: dict[str, str]
+
+
+class OverrideChoicesResponse(BaseModel):
+    """What a Variant can override, as on the settings pages."""
+
+    settings: list[OverridableSettingResponse]
+    needs: list[OverridableNeedResponse]
+    models: list[str]
+
+
+class LiveChangeResponse(BaseModel):
+    """An overridden setting whose live value changed since the run started.
+
+    `now` is null for a Need deleted since.
+    """
+
+    key: str
+    then: Any
+    now: Any
+    override: Any
+
+
+class LiveChangesResponse(BaseModel):
+    """The settings to confirm or leave out before making a Variant live."""
+
+    changes: list[LiveChangeResponse]
+
+
+class MakeLiveRequest(BaseModel):
+    """The changed settings the Admin chose to apply as well."""
+
+    confirmed_keys: list[str] = []
 
 
 class CaseResultTraceResponse(BaseModel):
@@ -156,12 +263,21 @@ class EvalCaseResponse(BaseModel):
     archived: bool
 
 
+class SnapshotNeedResponse(BaseModel):
+    """A live Need when a run started, keyed as its override would be."""
+
+    key: str
+    name: str
+    value: dict[str, str]
+
+
 class EvalRunSnapshotResponse(BaseModel):
     """What a run used; every field is null while it is Queued."""
 
     settings: dict[str, Any] | None
     judge: dict[str, Any] | None
     cases: list[EvalCaseResponse] | None
+    needs: list[SnapshotNeedResponse] | None
 
 
 class CaseHistoryEntryResponse(BaseModel):
@@ -280,12 +396,7 @@ def to_eval_run_response(overview: EvalRunOverview) -> EvalRunResponse:
         started_by_name=run.started_by_name,
         evals=run.evals,
         repeats=run.repeats,
-        variants=[
-            VariantResponse(
-                letter=variant.letter, setting_overrides=variant.setting_overrides
-            )
-            for variant in run.variants
-        ],
+        variants=[to_variant_response(variant) for variant in run.variants],
         queued_at=run.queued_at,
         started_at=run.started_at,
         finished_at=run.finished_at,
@@ -300,6 +411,53 @@ def to_eval_run_response(overview: EvalRunOverview) -> EvalRunResponse:
         tokens_in=totals.tokens_in,
         tokens_out=totals.tokens_out,
         **cost_fields(overview.cost),
+    )
+
+
+def to_variant_response(variant: Variant) -> VariantResponse:
+    """Turn a Variant into its API shape.
+
+    Args:
+        variant: The Variant.
+
+    Returns:
+        The response.
+    """
+    made_live = variant.made_live
+    return VariantResponse(
+        letter=variant.letter,
+        setting_overrides=variant.setting_overrides,
+        made_live=(
+            MadeLiveResponse(
+                by_name=made_live.by_name,
+                at=made_live.at,
+                applied_keys=made_live.applied_keys,
+                left_out_keys=made_live.left_out_keys,
+            )
+            if made_live
+            else None
+        ),
+    )
+
+
+def to_variant_totals_response(totals: VariantTotals) -> VariantTotalsResponse:
+    """Turn a Variant's totals into their API shape.
+
+    Args:
+        totals: The Variant's totals.
+
+    Returns:
+        The response.
+    """
+    return VariantTotalsResponse(
+        letter=totals.letter,
+        passed=totals.totals.passed,
+        failed=totals.totals.failed,
+        errored=totals.totals.errored,
+        tokens_in=totals.totals.tokens_in,
+        tokens_out=totals.totals.tokens_out,
+        duration_ms=totals.duration_ms,
+        **cost_fields(totals.cost),
     )
 
 
@@ -341,6 +499,9 @@ def build_eval_api_router(
     current_admin: Callable[..., User],
     eval_run_service: EvalRunService,
     eval_costs_service: EvalCostsService,
+    make_live_service: MakeLiveService,
+    platform_settings_service: PlatformSettingsService,
+    need_service: NeedService,
 ) -> APIRouter:
     """Build the admin routes for Evals, Eval Runs and their costs.
 
@@ -350,6 +511,9 @@ def build_eval_api_router(
         current_admin: The dependency that lets only Admins through.
         eval_run_service: Starts Eval Runs and shows how they went.
         eval_costs_service: Reads and saves Model Prices and the token limit.
+        make_live_service: Makes a Variant's Setting Overrides live.
+        platform_settings_service: Lists the settings a Variant can override.
+        need_service: Lists the Needs a Variant can override.
 
     Returns:
         The router.
@@ -402,11 +566,18 @@ def build_eval_api_router(
             The run.
 
         Raises:
-            CoreError: 422 if nothing is picked, a case key is unknown or
-                the Evals have no cases.
+            CoreError: 422 if nothing is picked, a case key is unknown, the
+                Evals have no cases, the Variants or Repeats are out of
+                range or a Setting Override is refused; 404 if an override
+                names no live Need.
         """
         overview = eval_run_service.start_run(
-            admin.id, StartedFrom.DASHBOARD, request.evals, request.case_keys
+            admin.id,
+            StartedFrom.DASHBOARD,
+            request.evals,
+            request.case_keys,
+            request.variants,
+            request.repeats,
         )
         return to_eval_run_response(overview)
 
@@ -423,7 +594,9 @@ def build_eval_api_router(
         Raises:
             CoreError: 422 as for starting the run.
         """
-        estimate = eval_run_service.estimate(request.evals, request.case_keys)
+        estimate = eval_run_service.estimate(
+            request.evals, request.case_keys, request.variants, request.repeats
+        )
         return EstimateResponse(
             case_count=estimate.case_count,
             rough_case_count=estimate.rough_case_count,
@@ -431,7 +604,113 @@ def build_eval_api_router(
             tokens_out=sum(count.tokens_out for count in estimate.tokens.values()),
             models=to_model_tokens_responses(estimate.tokens),
             **cost_fields(estimate.cost),
+            variants=[
+                VariantEstimateResponse(
+                    letter=variant.letter,
+                    tokens_in=sum(c.tokens_in for c in variant.tokens.values()),
+                    tokens_out=sum(c.tokens_out for c in variant.tokens.values()),
+                    **cost_fields(variant.cost),
+                )
+                for variant in estimate.variants
+            ],
         )
+
+    @router.get("/setting-override-choices")
+    def list_setting_override_choices() -> OverrideChoicesResponse:
+        """List what a Variant can override, with each one's live value.
+
+        Returns:
+            The settings Admins can edit with their rules, the Needs, and
+            the models a model setting can pick.
+        """
+        stored = {
+            setting.key: setting.value
+            for setting in platform_settings_service.list_editable()
+        }
+        return OverrideChoicesResponse(
+            settings=[
+                OverridableSettingResponse(
+                    key=setting.key,
+                    label=setting.label,
+                    kind=setting.kind,
+                    minimum=setting.minimum,
+                    maximum=setting.maximum,
+                    max_length=setting.max_length,
+                    hint=setting.hint,
+                    value=stored.get(setting.key),
+                )
+                for setting in EDITABLE_SETTINGS
+            ],
+            needs=[
+                OverridableNeedResponse(
+                    key=need_override_key(need.id),
+                    name=need.name,
+                    value=need_values(need),
+                )
+                for need in need_service.list_all()
+            ],
+            models=platform_settings_service.model_choices(),
+        )
+
+    @router.get("/eval-runs/{run_id}/variants/{letter}/live-changes")
+    def list_live_changes(run_id: UUID, letter: str) -> LiveChangesResponse:
+        """List a Variant's overridden settings changed live since its run.
+
+        Args:
+            run_id: The run's ID.
+            letter: The Variant's letter.
+
+        Returns:
+            Each with its value then, now and the override; empty when
+            Make Live needs no confirming.
+
+        Raises:
+            CoreError: 404 if there is no such run or Variant; 409 if the
+                run didn't finish or the Variant was made live already; 422
+                if it has no overrides.
+        """
+        return LiveChangesResponse(
+            changes=[
+                LiveChangeResponse(
+                    key=change.key,
+                    then=change.then,
+                    now=change.now,
+                    override=change.override,
+                )
+                for change in make_live_service.changes_since_run(run_id, letter)
+            ]
+        )
+
+    @router.post("/eval-runs/{run_id}/variants/{letter}/make-live")
+    def make_variant_live(
+        run_id: UUID,
+        letter: str,
+        request: MakeLiveRequest,
+        admin: Annotated[User, Depends(current_admin)],
+    ) -> VariantResponse:
+        """Apply a Variant's Setting Overrides to the live settings.
+
+        Overrides unchanged live since the run are applied, with the changed
+        ones the Admin confirmed; other changed ones are left out.
+
+        Args:
+            run_id: The run's ID.
+            letter: The Variant's letter.
+            request: The changed settings to apply as well.
+            admin: The Admin making it live.
+
+        Returns:
+            The Variant, with who made it live, when and what.
+
+        Raises:
+            CoreError: 404 if there is no such run, Variant or Need; 409 if
+                the run didn't finish or the Variant was made live already;
+                422 if it has no overrides or the settings save refuses one.
+        """
+        variant = make_live_service.make_live(
+            run_id, letter, admin, set(request.confirmed_keys)
+        )
+        return to_variant_response(variant)
 
     @router.post("/eval-runs/{run_id}/cancel")
     def cancel_eval_run(run_id: UUID) -> EvalRunResponse:
@@ -494,18 +773,29 @@ def build_eval_api_router(
             run_id: The run's ID.
 
         Returns:
-            The snapshot; all null while the run is Queued.
+            The snapshot, with the live Needs keyed as their overrides
+            would be; all null while the run is Queued.
 
         Raises:
             CoreError: 404 if there is no such run.
         """
         snapshot = eval_run_service.get_snapshot(run_id)
         if snapshot is None:
-            return EvalRunSnapshotResponse(settings=None, judge=None, cases=None)
+            return EvalRunSnapshotResponse(
+                settings=None, judge=None, cases=None, needs=None
+            )
         return EvalRunSnapshotResponse(
             settings=snapshot.settings,
             judge=snapshot.judge,
             cases=[to_eval_case_response(case) for case in snapshot.cases],
+            needs=[
+                SnapshotNeedResponse(
+                    key=need_override_key(need.id),
+                    name=need.name,
+                    value=need_values(need),
+                )
+                for need in snapshot.needs
+            ],
         )
 
     @router.get("/eval-runs/{run_id}/results/{result_id}")
@@ -615,6 +905,9 @@ def build_eval_api_router(
         return EvalRunDetailsResponse(
             **to_eval_run_response(details.overview).model_dump(),
             results=[to_case_result_response(result) for result in details.results],
+            variant_totals=[
+                to_variant_totals_response(totals) for totals in details.variant_totals
+            ],
         )
 
     return router

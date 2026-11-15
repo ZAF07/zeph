@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from typing import Any
 from uuid import UUID, uuid4
@@ -12,6 +12,9 @@ from companion.core.evals.costs import (
 )
 from companion.core.evals.models import (
     ENDED_STATES,
+    FIRST_TRY,
+    MAX_REPEATS,
+    VARIANT_LETTERS,
     CaseHistory,
     CaseHistoryEntry,
     CaseHistoryRow,
@@ -24,16 +27,23 @@ from companion.core.evals.models import (
     EvalRunDetails,
     EvalRunOverview,
     EvalRunState,
+    ModelTokens,
     RunSnapshot,
+    RunTotals,
     StartedFrom,
+    Variant,
+    VariantEstimate,
+    VariantTotals,
     add_tokens_by_model,
 )
 from companion.core.evals.ports import EvalCaseRepository, EvalRunRepository
+from companion.core.evals.setting_overrides import SettingOverrides
 from companion.core.models import ModelCall
 from companion.core.platform_settings import (
     EVAL_RUN_TOKEN_LIMIT,
     MODEL_PRICES,
     RESPONSE_MODEL,
+    ModelPrice,
 )
 from companion.core.ports import Clock, PlatformSettingsRepository
 
@@ -78,6 +88,18 @@ class EvalRunEndedError(ConflictError):
 
 class EvalRunStillGoingError(ConflictError):
     """Raised when re-running or deleting a run that hasn't ended."""
+
+
+class InvalidVariantsError(InvalidError):
+    """Raised when a run has no Variants or more than it may have."""
+
+    shown_message = f"A run has 1 to {len(VARIANT_LETTERS)} Variants."
+
+
+class InvalidRepeatsError(InvalidError):
+    """Raised when a run's Repeats are out of range."""
+
+    shown_message = f"Repeats must be a whole number from {FIRST_TRY} to {MAX_REPEATS}."
 
 
 class NothingFailedError(InvalidError):
@@ -151,6 +173,38 @@ def mark_changes(rows: Sequence[CaseHistoryRow]) -> list[CaseHistoryEntry]:
     return entries
 
 
+def variant_totals(
+    letter: str, results: Sequence[CaseResult], prices: Mapping[str, ModelPrice]
+) -> VariantTotals:
+    """Add up one Variant's Case Results.
+
+    Args:
+        letter: The Variant's letter.
+        results: Its Case Results.
+        prices: The Model Prices the run started with.
+
+    Returns:
+        Its passes, fails, errors, tokens, time and cost.
+    """
+    outcomes = [result.result.outcome for result in results]
+    tokens_by_model: dict[str, ModelTokens] = add_tokens_by_model(
+        *(result.tokens_by_model for result in results)
+    )
+    return VariantTotals(
+        letter=letter,
+        totals=RunTotals(
+            passed=outcomes.count(CaseOutcome.PASS),
+            failed=outcomes.count(CaseOutcome.FAIL),
+            errored=outcomes.count(CaseOutcome.ERROR),
+            tokens_in=sum(result.tokens_in for result in results),
+            tokens_out=sum(result.tokens_out for result in results),
+            tokens_by_model=tokens_by_model,
+        ),
+        duration_ms=sum(result.duration_ms for result in results),
+        cost=price_tokens(tokens_by_model, prices),
+    )
+
+
 class EvalRunService:
     """Starts, estimates, cancels, re-runs and deletes Eval Runs, and shows them.
 
@@ -162,6 +216,7 @@ class EvalRunService:
         runs: EvalRunRepository,
         cases: EvalCaseRepository,
         settings: PlatformSettingsRepository,
+        overrides: SettingOverrides,
         clock: Clock,
     ) -> None:
         """Set up the service.
@@ -170,11 +225,13 @@ class EvalRunService:
             runs: Where Eval Runs and Case Results are stored.
             cases: Where Eval Cases are stored.
             settings: The live Platform Settings, for estimates.
+            overrides: Checks Variants' Setting Overrides.
             clock: Tells the time.
         """
         self._runs = runs
         self._cases = cases
         self._settings = settings
+        self._overrides = overrides
         self._clock = clock
 
     def list_evals(self) -> list[EvalOverview]:
@@ -198,14 +255,22 @@ class EvalRunService:
         started_from: StartedFrom,
         evals: Sequence[EvalName],
         case_keys: Sequence[str] = (),
+        variant_overrides: Sequence[Mapping[str, Any]] = ({},),
+        repeats: int = FIRST_TRY,
     ) -> EvalRunOverview:
         """Save a new run of whole Evals and single cases as Queued.
+
+        Each Variant's Setting Overrides are held to the same checks as a
+        save on the settings pages; the live settings are never touched.
 
         Args:
             started_by: The Admin starting it; None from the terminal.
             started_from: Where it is started.
             evals: The Evals whose every case it runs.
             case_keys: Single cases it runs as well, by key.
+            variant_overrides: Each Variant's Setting Overrides, lettered
+                A, B, C in order; an empty one runs the live settings.
+            repeats: How many times each case runs per Variant.
 
         Returns:
             The run.
@@ -214,21 +279,43 @@ class EvalRunService:
             NoEvalsChosenError: If no Eval or case is given.
             UnknownEvalCaseError: If a key isn't a case that can run.
             NoEvalCasesError: If the Evals have no cases.
+            InvalidVariantsError: If there are no Variants or too many.
+            InvalidRepeatsError: If Repeats are out of range.
+            InvalidError: If a Setting Override is refused.
+            NotFoundError: If a Setting Override names no live Need.
         """
         cases = self._pick_cases(evals, case_keys)
-        return self._queue(started_by, started_from, cases, None)
+        if not FIRST_TRY <= repeats <= MAX_REPEATS:
+            raise InvalidRepeatsError()
+        if not 1 <= len(variant_overrides) <= len(VARIANT_LETTERS):
+            raise InvalidVariantsError()
+        variants = [
+            Variant(letter, self._overrides.checked(overrides))
+            for letter, overrides in zip(
+                VARIANT_LETTERS, variant_overrides, strict=False
+            )
+        ]
+        return self._queue(started_by, started_from, cases, variants, repeats, None)
 
     def estimate(
-        self, evals: Sequence[EvalName], case_keys: Sequence[str] = ()
+        self,
+        evals: Sequence[EvalName],
+        case_keys: Sequence[str] = (),
+        variant_overrides: Sequence[Mapping[str, Any]] = ({},),
+        repeats: int = FIRST_TRY,
     ) -> Estimate:
         """Estimate what a run of whole Evals and single cases would use.
 
         Each case counts the tokens of its newest Case Result; a case never
-        run counts a rough figure for its Eval, on the live reply model.
+        run counts a rough figure for its Eval, on the Variant's reply
+        model. Every Variant counts every case once per Repeat. Overrides
+        aren't checked here, so an estimate shows while they are typed.
 
         Args:
             evals: The Evals whose every case it would run.
             case_keys: Single cases it would run as well, by key.
+            variant_overrides: Each Variant's Setting Overrides.
+            repeats: How many times each case would run per Variant.
 
         Returns:
             The estimate, priced at the live Model Prices.
@@ -237,22 +324,41 @@ class EvalRunService:
             NoEvalsChosenError: If no Eval or case is given.
             UnknownEvalCaseError: If a key isn't a case that can run.
             NoEvalCasesError: If the Evals have no cases.
+            InvalidVariantsError: If there are no Variants or too many.
+            InvalidRepeatsError: If Repeats are out of range.
         """
         cases = self._pick_cases(evals, case_keys)
+        if not FIRST_TRY <= repeats <= MAX_REPEATS:
+            raise InvalidRepeatsError()
+        if not 1 <= len(variant_overrides) <= len(VARIANT_LETTERS):
+            raise InvalidVariantsError()
         newest = self._runs.newest_tokens_by_case([case.key for case in cases])
         settings = self._settings.load()
-        rough_model = settings.get(RESPONSE_MODEL)
-        tokens = add_tokens_by_model(
-            *(
-                newest.get(case.key, {rough_model: ROUGH_TOKENS_PER_CASE[case.eval]})
-                for case in cases
+        prices = stored_prices(settings.values)
+        variants = []
+        for letter, overrides in zip(VARIANT_LETTERS, variant_overrides, strict=False):
+            rough_model = overrides.get(RESPONSE_MODEL.key)
+            if not isinstance(rough_model, str):
+                rough_model = settings.get(RESPONSE_MODEL)
+            per_case = add_tokens_by_model(
+                *(
+                    newest.get(
+                        case.key, {rough_model: ROUGH_TOKENS_PER_CASE[case.eval]}
+                    )
+                    for case in cases
+                )
             )
-        )
+            tokens = {model: count.times(repeats) for model, count in per_case.items()}
+            variants.append(
+                VariantEstimate(letter, tokens, price_tokens(tokens, prices))
+            )
+        tokens = add_tokens_by_model(*(variant.tokens for variant in variants))
         return Estimate(
             tokens=tokens,
-            cost=price_tokens(tokens, stored_prices(settings.values)),
-            case_count=len(cases),
+            cost=price_tokens(tokens, prices),
+            case_count=len(cases) * len(variants) * repeats,
             rough_case_count=sum(1 for case in cases if case.key not in newest),
+            variants=variants,
         )
 
     def rerun_failed(
@@ -260,7 +366,9 @@ class EvalRunService:
     ) -> EvalRunOverview:
         """Start a new run of an ended run's Fail and Error cases.
 
-        Cases archived since are left out.
+        A case is run again if any of its tries on any Variant failed or
+        errored. The new run has the same Variants and Repeats, so its
+        results compare fairly. Cases archived since are left out.
 
         Args:
             run_id: The run whose failed cases to run again.
@@ -289,7 +397,13 @@ class EvalRunService:
         cases = self._cases.list_for_keys(failed_keys) if failed_keys else []
         if not cases:
             raise NothingFailedError()
-        return self._queue(started_by, started_from, cases, run_id)
+        variants = [
+            Variant(variant.letter, variant.setting_overrides)
+            for variant in run.variants
+        ]
+        return self._queue(
+            started_by, started_from, cases, variants, run.repeats, run_id
+        )
 
     def cancel_run(self, run_id: UUID) -> EvalRunOverview:
         """Cancel a run: a Queued one at once, a Running one after its case.
@@ -363,14 +477,26 @@ class EvalRunService:
             run_id: The run's ID.
 
         Returns:
-            The run and its results.
+            The run, its results and each Variant's totals.
 
         Raises:
             EvalRunNotFoundError: If there is no such run.
         """
+        overview = self.get_overview(run_id)
+        results = self._runs.list_results(run_id)
+        snapshot = overview.run.snapshot
+        prices = stored_prices(snapshot.settings) if snapshot else {}
         return EvalRunDetails(
-            overview=self.get_overview(run_id),
-            results=self._runs.list_results(run_id),
+            overview=overview,
+            results=results,
+            variant_totals=[
+                variant_totals(
+                    variant.letter,
+                    [result for result in results if result.variant == variant.letter],
+                    prices,
+                )
+                for variant in overview.run.variants
+            ],
         )
 
     def get_snapshot(self, run_id: UUID) -> RunSnapshot | None:
@@ -465,6 +591,8 @@ class EvalRunService:
         started_by: UUID | None,
         started_from: StartedFrom,
         cases: Sequence[EvalCase],
+        variants: Sequence[Variant],
+        repeats: int,
         rerun_of: UUID | None,
     ) -> EvalRunOverview:
         """Save a run of some cases as Queued.
@@ -473,6 +601,8 @@ class EvalRunService:
             started_by: The Admin starting it; None from the terminal.
             started_from: Where it is started.
             cases: The cases it runs, in order.
+            variants: Its Variants.
+            repeats: How many times each case runs per Variant.
             rerun_of: The run whose failed cases it runs again, if any.
 
         Returns:
@@ -486,6 +616,8 @@ class EvalRunService:
             list(dict.fromkeys(case.eval for case in cases)),
             [case.key for case in cases],
             self._clock.now(),
+            variants,
+            repeats,
             rerun_of,
         )
         return self.get_overview(run_id)

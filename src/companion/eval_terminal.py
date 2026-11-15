@@ -3,16 +3,22 @@ import sys
 import time
 from collections.abc import Callable
 
+from sqlalchemy import Engine
+
 from companion.adapters.evals.terminal_report import progress_line, report_lines
 from companion.adapters.postgres.eval_repositories import (
     PostgresEvalCaseRepository,
     PostgresEvalRunRepository,
 )
-from companion.adapters.postgres.repositories import PostgresPlatformSettingsRepository
+from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.config import load_settings
 from companion.core.errors import InvalidError
 from companion.core.evals.models import EvalName, EvalRunState, StartedFrom
 from companion.core.evals.runs import EvalRunService
+from companion.core.evals.setting_overrides import SettingOverrides
+from companion.core.needs import NeedService
+from companion.core.platform_settings import PlatformSettingsService
+from companion.core.ports import Clock
 from companion.main import build_clock, build_database_engine
 
 POLL_SECONDS = 2
@@ -95,6 +101,29 @@ def start_and_watch_run(
     )
 
 
+def build_eval_run_service(engine: Engine, clock: Clock) -> EvalRunService:
+    """Build the Eval Runs service on the app database, as the backend does.
+
+    Args:
+        engine: The app database.
+        clock: Tells the time.
+
+    Returns:
+        The service.
+    """
+    repositories = build_postgres_repositories(engine)
+    return EvalRunService(
+        runs=PostgresEvalRunRepository(engine),
+        cases=PostgresEvalCaseRepository(engine),
+        settings=repositories.platform_settings,
+        overrides=SettingOverrides(
+            PlatformSettingsService(repositories.platform_settings, clock),
+            NeedService(repositories),
+        ),
+        clock=clock,
+    )
+
+
 def main() -> None:
     """Run `make eval`: queue a terminal run on this stack and watch it.
 
@@ -120,12 +149,7 @@ def main() -> None:
     evals = arguments.evals or ([] if arguments.cases else list(EvalName))
     settings = load_settings()
     engine = build_database_engine(settings)
-    service = EvalRunService(
-        runs=PostgresEvalRunRepository(engine),
-        cases=PostgresEvalCaseRepository(engine),
-        settings=PostgresPlatformSettingsRepository(engine),
-        clock=build_clock(settings),
-    )
+    service = build_eval_run_service(engine, build_clock(settings))
     try:
         passed = start_and_watch_run(
             service,

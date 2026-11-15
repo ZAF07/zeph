@@ -52,12 +52,24 @@ def add_cases(engine: Engine, *cases: EvalCase) -> None:
 
 
 def start_run(
-    client: TestClient, admin: dict[str, str], *evals: EvalName
+    client: TestClient,
+    admin: dict[str, str],
+    *evals: EvalName,
+    variants: list[dict[str, Any]] | None = None,
+    repeats: int = 1,
 ) -> dict[str, Any]:
-    """Start an Eval Run from the Dashboard API and return it."""
+    """Start an Eval Run from the Dashboard API and return it.
+
+    `variants` are each Variant's Setting Overrides; one live Variant if
+    None.
+    """
     response = client.post(
         "/api/admin/eval-runs",
-        json={"evals": [name.value for name in evals]},
+        json={
+            "evals": [name.value for name in evals],
+            "variants": variants if variants is not None else [{}],
+            "repeats": repeats,
+        },
         headers=admin,
     )
     assert response.status_code == 201, response.text
@@ -71,3 +83,12 @@ def open_run(client: TestClient, admin: dict[str, str], run_id: str) -> dict[str
     assert response.status_code == 200, response.text
     run: dict[str, Any] = response.json()
     return run
+
+
+def need_key(client: TestClient, admin: dict[str, str], name: str) -> str:
+    """Find the override key of a live Need by its name."""
+    response = client.get("/api/admin/setting-override-choices", headers=admin)
+    assert response.status_code == 200, response.text
+    return next(
+        need["key"] for need in response.json()["needs"] if need["name"] == name
+    )

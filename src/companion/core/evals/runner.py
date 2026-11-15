@@ -1,7 +1,6 @@
 import logging
 import time
 from itertools import product
-from typing import Any
 from uuid import UUID, uuid4
 
 from companion.core.evals.case_shapes import CASE_SHAPES, image_names
@@ -27,9 +26,10 @@ from companion.core.evals.ports import (
     EvalRunRepository,
     JudgeSettingsRepository,
 )
+from companion.core.evals.setting_overrides import variant_needs, variant_settings
 from companion.core.models import ModelCall
 from companion.core.platform_settings import EVAL_RUN_TOKEN_LIMIT
-from companion.core.ports import Clock, PlatformSettingsRepository
+from companion.core.ports import Clock, NeedRepository, PlatformSettingsRepository
 
 TRACES_PER_CASE_AT_MOST = 500
 STOP_REASONS = {
@@ -50,6 +50,7 @@ class EvalRunner:
         images: EvalImageRepository,
         judge_settings: JudgeSettingsRepository,
         live_settings: PlatformSettingsRepository,
+        live_needs: NeedRepository,
         environment: EvalEnvironment,
         clock: Clock,
     ) -> None:
@@ -61,6 +62,7 @@ class EvalRunner:
             images: The app database's test images for the cases.
             judge_settings: The app database's Judge settings, read only.
             live_settings: The app database's Platform Settings, read only.
+            live_needs: The app database's Needs, read only.
             environment: Prepares the Eval database and builds the app on it.
             clock: Tells the time.
         """
@@ -69,6 +71,7 @@ class EvalRunner:
         self._images = images
         self._judge_settings = judge_settings
         self._live_settings = live_settings
+        self._live_needs = live_needs
         self._environment = environment
         self._clock = clock
 
@@ -87,8 +90,12 @@ class EvalRunner:
         """Take the oldest Queued run, if any, and run its cases.
 
         The cases and the Judge's settings are read as they are now, so an
-        Admin's edits apply from the next run. Each case gets fresh made-up
-        data. A case that raises becomes an Error and the run carries on.
+        Admin's edits apply from the next run. It goes case by case: each
+        try of a case runs on every Variant before the next try, and every
+        try of a case before the next case, so a run that stops early still
+        compares its Variants fairly. Each try gets fresh made-up data with
+        its Variant's settings, and every Variant is marked by the same
+        Judge. A case that raises becomes an Error and the run carries on.
         After each case, and between the Messages of an Understanding case,
         the run ends Cancelled if an Admin cancelled it, or Stopped over
         limit once its tokens are over the Eval run token limit.
@@ -104,19 +111,21 @@ class EvalRunner:
             settings=dict(live.values),
             judge=self._judge_settings.load(),
             cases=self._cases.list_for_keys(run.case_keys),
+            needs=self._live_needs.list_all(),
         )
         token_limit = live.get(EVAL_RUN_TOKEN_LIMIT)
         self._runs.save_snapshot(run.id, snapshot, token_limit)
         self._environment.start_run()
         tokens_used = 0
         ended_as = EvalRunState.FINISHED
-        for case, variant in product(snapshot.cases, run.variants):
+        tries = range(FIRST_TRY, FIRST_TRY + run.repeats)
+        for case, try_number, variant in product(snapshot.cases, tries, run.variants):
             result = self._run_and_save_case(
                 run,
                 variant,
+                try_number,
                 case,
-                snapshot.settings,
-                snapshot.judge,
+                snapshot,
                 tokens_used,
                 token_limit,
             )
@@ -151,9 +160,9 @@ class EvalRunner:
         self,
         run: EvalRun,
         variant: Variant,
+        try_number: int,
         case: EvalCase,
-        live_settings: dict[str, Any],
-        judge_values: dict[str, Any],
+        snapshot: RunSnapshot,
         tokens_before: int,
         token_limit: int,
     ) -> CaseResult:
@@ -162,10 +171,10 @@ class EvalRunner:
         Args:
             run: The run.
             variant: The Variant.
+            try_number: Which try of the case this is, from 1.
             case: The case.
-            live_settings: The live Platform Settings when the run started.
-            judge_values: The Judge's settings for the run; one missing makes
-                the case an Error.
+            snapshot: The live settings, Needs and Judge settings when the
+                run started; a Judge setting missing makes the case an Error.
             tokens_before: The run's tokens before this case.
             token_limit: The most tokens the run may use.
 
@@ -187,12 +196,14 @@ class EvalRunner:
             return STOP_REASONS.get(stop_state) if stop_state else None
 
         try:
-            judge = JudgeSettings.from_values(judge_values)
+            judge = JudgeSettings.from_values(snapshot.judge)
             images = self._images.get_many(
                 image_names(CASE_SHAPES[case.eval], case.content)
             )
             companion = self._environment.fresh_companion(
-                {**live_settings, **variant.setting_overrides}, images
+                variant_settings(snapshot.settings, variant.setting_overrides),
+                variant_needs(snapshot.needs, variant.setting_overrides),
+                images,
             )
             result = check_case(case, companion, judge, should_stop)
         except CaseStoppedError as stopped:
@@ -210,7 +221,7 @@ class EvalRunner:
             id=uuid4(),
             run_id=run.id,
             variant=variant.letter,
-            try_number=FIRST_TRY,
+            try_number=try_number,
             case_key=case.key,
             eval=case.eval,
             case_content=case.content,

@@ -24,6 +24,7 @@ from companion.core.curiosities import CuriosityKeeper, CuriosityRaiser
 from companion.core.evals.case_editing import EvalCaseService
 from companion.core.evals.costs import EvalCostsService
 from companion.core.evals.judge_settings import JudgeSettingsService
+from companion.core.evals.make_live import MakeLiveService
 from companion.core.evals.ports import (
     EvalCaseRepository,
     EvalImageRepository,
@@ -31,6 +32,7 @@ from companion.core.evals.ports import (
     JudgeSettingsRepository,
 )
 from companion.core.evals.runs import EvalRunService
+from companion.core.evals.setting_overrides import SettingOverrides
 from companion.core.features import FeatureService
 from companion.core.helplines import HelplineService
 from companion.core.home import HomeService
@@ -435,6 +437,9 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             need_service=NeedService(dependencies.repositories),
         )
     )
+    setting_overrides = SettingOverrides(
+        platform_settings_service, NeedService(dependencies.repositories)
+    )
     app.include_router(
         build_eval_api_router(
             current_admin=build_current_admin_dependency(current_user),
@@ -442,8 +447,18 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 dependencies.eval_runs,
                 dependencies.eval_cases,
                 dependencies.repositories.platform_settings,
+                setting_overrides,
                 dependencies.clock,
             ),
+            make_live_service=MakeLiveService(
+                dependencies.eval_runs,
+                setting_overrides,
+                dependencies.repositories.platform_settings,
+                dependencies.repositories.needs,
+                dependencies.clock,
+            ),
+            platform_settings_service=platform_settings_service,
+            need_service=NeedService(dependencies.repositories),
             eval_costs_service=EvalCostsService(
                 dependencies.repositories.platform_settings, dependencies.clock
             ),

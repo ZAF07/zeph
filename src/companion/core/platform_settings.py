@@ -1194,14 +1194,14 @@ class PlatformSettingsService:
                 valid; nothing is saved.
         """
         validated_values = {
-            key: self._validated_value(key, value) for key, value in values.items()
+            key: self.checked_value(key, value) for key, value in values.items()
         }
         if validated_values:
             self._settings.save_many(validated_values, self._clock.now(), admin.id)
         return self.list_editable()
 
-    def _validated_value(self, key: str, value: Any) -> Any:
-        """Check one new value against its setting's rule.
+    def checked_value(self, key: str, value: Any) -> Any:
+        """Check one new value against its setting's rule, without saving it.
 
         Args:
             key: The setting's key.

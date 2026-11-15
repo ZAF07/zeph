@@ -634,6 +634,7 @@ eval_runs = Table(
     Column("cancel_requested", Boolean, nullable=False, server_default="false"),
     Column("token_limit", Integer),
     Column("rerun_of", Uuid, ForeignKey("eval_runs.id", ondelete="SET NULL")),
+    Column("needs_snapshot", JSONB, nullable=False, server_default="[]"),
 )
 
 eval_variants = Table(
@@ -647,6 +648,10 @@ eval_variants = Table(
     ),
     Column("letter", Text, primary_key=True),
     Column("setting_overrides", JSONB, nullable=False, server_default="{}"),
+    Column("made_live_by", Uuid, ForeignKey("users.id", ondelete="SET NULL")),
+    Column("made_live_at", DateTime(timezone=True)),
+    Column("applied_keys", JSONB, nullable=False, server_default="[]"),
+    Column("left_out_keys", JSONB, nullable=False, server_default="[]"),
 )
 
 eval_case_results = Table(

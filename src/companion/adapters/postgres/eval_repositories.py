@@ -32,7 +32,6 @@ from companion.adapters.postgres.tables import (
     users,
 )
 from companion.core.evals.models import (
-    FIRST_VARIANT,
     CaseCheckResult,
     CaseHistoryRow,
     CaseOutcome,
@@ -44,6 +43,7 @@ from companion.core.evals.models import (
     EvalRun,
     EvalRunOverview,
     EvalRunState,
+    MadeLive,
     ModelTokens,
     RunSnapshot,
     RunTotals,
@@ -51,7 +51,7 @@ from companion.core.evals.models import (
     StoredEvalCase,
     Variant,
 )
-from companion.core.models import ModelCall
+from companion.core.models import ModelCall, Need
 
 TAKE_RUN_LOCK = 7_301_013
 RUNNER_LOCK = 7_301_014
@@ -516,7 +516,68 @@ def _to_snapshot(row: Row[Any]) -> RunSnapshot | None:
         settings=row.settings_snapshot,
         judge=row.judge_snapshot,
         cases=[_to_eval_case(case) for case in row.cases_snapshot],
+        needs=[_to_need(need) for need in row.needs_snapshot],
     )
+
+
+def _need_values(need: Need) -> dict[str, Any]:
+    """Write a Need as JSON for a run's snapshot.
+
+    Args:
+        need: The Need.
+
+    Returns:
+        Its fields, the ID as text.
+    """
+    return {
+        "id": str(need.id),
+        "name": need.name,
+        "when_it_fits": need.when_it_fits,
+        "how_to_reply": need.how_to_reply,
+        "sort_order": need.sort_order,
+        "is_fallback": need.is_fallback,
+    }
+
+
+def _to_need(values: dict[str, Any]) -> Need:
+    """Read a Need from a run's snapshot.
+
+    Args:
+        values: Its fields, as `_need_values` wrote them.
+
+    Returns:
+        The Need.
+    """
+    return Need(
+        id=UUID(values["id"]),
+        name=values["name"],
+        when_it_fits=values["when_it_fits"],
+        how_to_reply=values["how_to_reply"],
+        sort_order=values["sort_order"],
+        is_fallback=values["is_fallback"],
+    )
+
+
+def _to_variant(row: Row[Any]) -> Variant:
+    """Turn an `eval_variants` row, with its Admin's name, into a Variant.
+
+    Args:
+        row: The database row.
+
+    Returns:
+        The Variant.
+    """
+    made_live = (
+        MadeLive(
+            by_name=row.made_live_by_name,
+            at=row.made_live_at,
+            applied_keys=row.applied_keys,
+            left_out_keys=row.left_out_keys,
+        )
+        if row.made_live_at is not None
+        else None
+    )
+    return Variant(row.letter, row.setting_overrides, made_live)
 
 
 def _to_eval_run(row: Row[Any], variants: list[Variant]) -> EvalRun:
@@ -618,9 +679,11 @@ class PostgresEvalRunRepository:
         evals: Sequence[EvalName],
         case_keys: Sequence[str],
         queued_at: datetime,
+        variants: Sequence[Variant],
+        repeats: int,
         rerun_of: UUID | None = None,
     ) -> None:
-        """Save a new run as Queued, with one Variant (A) and one try.
+        """Save a new run as Queued.
 
         Args:
             run_id: Its ID.
@@ -629,6 +692,8 @@ class PostgresEvalRunRepository:
             evals: The Evals of the cases it runs.
             case_keys: The keys of the cases it runs, in order.
             queued_at: When it is started.
+            variants: Its Variants, each with its Setting Overrides.
+            repeats: How many times each case runs per Variant.
             rerun_of: The run whose failed cases it runs again, if any.
         """
         with self._engine.begin() as connection:
@@ -641,11 +706,20 @@ class PostgresEvalRunRepository:
                     evals=[name.value for name in evals],
                     case_keys=list(case_keys),
                     queued_at=queued_at,
+                    repeats=repeats,
                     rerun_of=rerun_of,
                 )
             )
             connection.execute(
-                insert(eval_variants).values(run_id=run_id, letter=FIRST_VARIANT)
+                insert(eval_variants),
+                [
+                    {
+                        "run_id": run_id,
+                        "letter": variant.letter,
+                        "setting_overrides": variant.setting_overrides,
+                    }
+                    for variant in variants
+                ],
             )
 
     def get(self, run_id: UUID) -> EvalRun | None:
@@ -866,7 +940,7 @@ class PostgresEvalRunRepository:
 
         Args:
             run_id: The run.
-            snapshot: The settings, Judge settings and cases.
+            snapshot: The settings, Judge settings, cases and Needs.
             token_limit: The Eval run token limit when it started.
         """
         with self._engine.begin() as connection:
@@ -877,6 +951,7 @@ class PostgresEvalRunRepository:
                     settings_snapshot=snapshot.settings,
                     judge_snapshot=snapshot.judge,
                     cases_snapshot=[_eval_case_values(case) for case in snapshot.cases],
+                    needs_snapshot=[_need_values(need) for need in snapshot.needs],
                     token_limit=token_limit,
                 )
             )
@@ -979,6 +1054,40 @@ class PostgresEvalRunRepository:
                 .values(state=state.value, finished_at=now)
             )
 
+    def mark_made_live(
+        self,
+        run_id: UUID,
+        letter: str,
+        admin_id: UUID,
+        now: datetime,
+        applied_keys: Sequence[str],
+        left_out_keys: Sequence[str],
+    ) -> None:
+        """Record that an Admin made a Variant's Setting Overrides live.
+
+        Args:
+            run_id: The run.
+            letter: The Variant's letter.
+            admin_id: The Admin.
+            now: When.
+            applied_keys: The overrides applied.
+            left_out_keys: The overrides left out.
+        """
+        with self._engine.begin() as connection:
+            connection.execute(
+                update(eval_variants)
+                .where(
+                    eval_variants.c.run_id == run_id,
+                    eval_variants.c.letter == letter,
+                )
+                .values(
+                    made_live_by=admin_id,
+                    made_live_at=now,
+                    applied_keys=list(applied_keys),
+                    left_out_keys=list(left_out_keys),
+                )
+            )
+
     def delete(self, run_id: UUID) -> None:
         """Delete a run with its Variants, Case Results and traces.
 
@@ -1019,7 +1128,17 @@ class PostgresEvalRunRepository:
             rows = connection.execute(statement).all()
             run_ids = [row.id for row in rows]
             variant_rows = connection.execute(
-                select(eval_variants)
+                select(
+                    eval_variants,
+                    func.coalesce(users.c.name, users.c.email).label(
+                        "made_live_by_name"
+                    ),
+                )
+                .select_from(
+                    eval_variants.outerjoin(
+                        users, users.c.id == eval_variants.c.made_live_by
+                    )
+                )
                 .where(eval_variants.c.run_id.in_(run_ids))
                 .order_by(eval_variants.c.letter)
             ).all()
@@ -1035,9 +1154,7 @@ class PostgresEvalRunRepository:
             )
         variants: dict[UUID, list[Variant]] = {}
         for variant in variant_rows:
-            variants.setdefault(variant.run_id, []).append(
-                Variant(variant.letter, variant.setting_overrides)
-            )
+            variants.setdefault(variant.run_id, []).append(_to_variant(variant))
         return [
             EvalRunOverview(
                 run=_to_eval_run(row, variants.get(row.id, [])),
