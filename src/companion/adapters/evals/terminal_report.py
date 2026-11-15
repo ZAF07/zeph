@@ -5,6 +5,7 @@ from companion.core.evals.models import (
     CaseOutcome,
     CaseResult,
     Check,
+    Cost,
     EvalName,
     EvalRunOverview,
 )
@@ -262,6 +263,27 @@ def eval_lines(name: EvalName, results: Sequence[CaseResult]) -> list[str]:
     return [*lines, *errors_lines(results)]
 
 
+def cost_line(cost: Cost) -> str:
+    """Write what a run's tokens cost, as the Dashboard shows it.
+
+    Args:
+        cost: The run's cost, at the Model Prices it started with.
+
+    Returns:
+        E.g. "Cost: S$0.2130, at the prices the run started with", naming
+        any model with no price set.
+    """
+    line = f"Cost: S${cost.sgd:.4f}, at the prices the run started with"
+    if cost.unpriced_models:
+        models = ", ".join(cost.unpriced_models)
+        one = len(cost.unpriced_models) == 1
+        line += (
+            f"; {models} {'has' if one else 'have'} no price set, "
+            f"so {'its' if one else 'their'} tokens aren't counted"
+        )
+    return line
+
+
 def report_lines(overview: EvalRunOverview, results: Sequence[CaseResult]) -> list[str]:
     """Write the whole report printed when a run ends.
 
@@ -278,6 +300,7 @@ def report_lines(overview: EvalRunOverview, results: Sequence[CaseResult]) -> li
         f"Cases: {totals.passed} passed, {totals.failed} failed, "
         f"{totals.errored} errors",
         f"Tokens used (app and judge): {totals.tokens_in} in, {totals.tokens_out} out",
+        cost_line(overview.cost),
     ]
     for name in overview.run.evals:
         eval_results = [r for r in results if r.eval == name]

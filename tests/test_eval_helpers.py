@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -10,7 +10,11 @@ from companion.adapters.eval_case_seed import (
     read_eval_case_file,
     read_eval_case_seed,
 )
-from companion.adapters.evals.terminal_report import eval_lines, progress_line
+from companion.adapters.evals.terminal_report import (
+    eval_lines,
+    progress_line,
+    report_lines,
+)
 from companion.core.evals.cases import (
     EvalPhoto,
     EvalSharedPhoto,
@@ -37,7 +41,13 @@ from companion.core.evals.models import (
     CaseOutcome,
     CaseResult,
     Check,
+    Cost,
     EvalName,
+    EvalRun,
+    EvalRunOverview,
+    EvalRunState,
+    RunTotals,
+    StartedFrom,
 )
 from companion.core.evals.safeguard_eval import describe_safeguard_case
 from companion.core.evals.settings_eval import SETTINGS_TOOLS, SettingsResult
@@ -498,3 +508,33 @@ def test_the_report_counts_settings_and_photo_description_cases() -> None:
     photo_text = "\n".join(eval_lines(EvalName.PHOTO_DESCRIPTIONS, photos))
     assert "Photo descriptions: 0 of 1 right" in photo_text
     assert "  card\n    FAIL left out: leaked 4929" in photo_text
+
+
+def finished_overview(cost: Cost) -> EvalRunOverview:
+    """A finished terminal run of no Evals, with some totals and a cost."""
+    run = EvalRun(
+        id=UUID("6f1c2d3e-0000-4000-8000-000000000001"),
+        started_by_id=None,
+        started_by_name=None,
+        started_from=StartedFrom.TERMINAL,
+        state=EvalRunState.FINISHED,
+        evals=[],
+        repeats=1,
+        variants=[],
+        queued_at=datetime(2026, 11, 15, tzinfo=UTC),
+    )
+    totals = RunTotals(passed=1, tokens_in=374_494, tokens_out=45_924)
+    return EvalRunOverview(run=run, case_count=1, totals=totals, cost=cost)
+
+
+def test_the_report_prints_the_runs_cost_and_models_with_no_price() -> None:
+    priced = report_lines(finished_overview(Cost(sgd=0.2130)), [])
+    unpriced = report_lines(
+        finished_overview(Cost(sgd=0.05, unpriced_models=["deepseek-x"])), []
+    )
+
+    assert "Cost: S$0.2130, at the prices the run started with" in priced
+    assert (
+        "Cost: S$0.0500, at the prices the run started with; "
+        "deepseek-x has no price set, so its tokens aren't counted"
+    ) in unpriced

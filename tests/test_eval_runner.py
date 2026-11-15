@@ -19,7 +19,7 @@ from companion.adapters.postgres.repositories import (
     PostgresNeedRepository,
     PostgresPlatformSettingsRepository,
 )
-from companion.core.evals.models import EvalCase, EvalName
+from companion.core.evals.models import EvalCase, EvalName, EvalRunState
 from companion.core.evals.runner import EvalRunner
 from companion.eval_terminal import build_eval_run_service, start_and_watch_run
 from companion.main import SEED_DIR
@@ -1363,3 +1363,21 @@ def test_the_token_limit_counts_every_variant_and_repeat(
     assert [
         (result["try_number"], result["variant"]) for result in stopped["results"]
     ] == [(1, "A"), (1, "B"), (2, "A")]
+
+
+def test_a_cancel_asked_for_after_the_last_case_still_ends_the_run_cancelled(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    clock: FakeClock,
+) -> None:
+    add_cases(engine, CRISIS_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.SAFEGUARD)
+    runs = PostgresEvalRunRepository(engine)
+    runs.take_next_queued(clock.now())
+    runs.request_cancel(UUID(run["id"]), clock.now())
+
+    runs.end(UUID(run["id"]), EvalRunState.FINISHED, clock.now())
+
+    assert open_run(client, admin, run["id"])["state"] == "cancelled"

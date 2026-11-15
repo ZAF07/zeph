@@ -1039,11 +1039,21 @@ class PostgresEvalRunRepository:
     def end(self, run_id: UUID, state: EvalRunState, now: datetime) -> None:
         """End a Running run as Finished, Cancelled or Stopped over limit.
 
+        A run an Admin asked to cancel ends Cancelled rather than Finished,
+        decided in the same statement, so a cancel pressed after the last
+        case is never lost.
+
         Args:
             run_id: The run.
             state: How it ended.
             now: When it ended.
         """
+        ended_as: Any = state.value
+        if state == EvalRunState.FINISHED:
+            ended_as = case_when(
+                (eval_runs.c.cancel_requested, EvalRunState.CANCELLED.value),
+                else_=state.value,
+            )
         with self._engine.begin() as connection:
             connection.execute(
                 update(eval_runs)
@@ -1051,7 +1061,7 @@ class PostgresEvalRunRepository:
                     eval_runs.c.id == run_id,
                     eval_runs.c.state == EvalRunState.RUNNING.value,
                 )
-                .values(state=state.value, finished_at=now)
+                .values(state=ended_as, finished_at=now)
             )
 
     def mark_made_live(
