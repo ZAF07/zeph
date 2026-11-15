@@ -52,7 +52,7 @@ export function ShapeFieldInput(props: ShapeFieldProps) {
     <div className="flex min-w-0 flex-col gap-1.5">
       <label htmlFor={inputId} className="text-sm font-medium">
         {field.label}
-        {field.required ? null : (
+        {field.required || field.kind === "on_off" ? null : (
           <span className="font-normal text-ink-muted"> · optional</span>
         )}
       </label>
