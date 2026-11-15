@@ -67,3 +67,5 @@ Lane A (run pages). Runs in parallel with 04.
   - `7b4e499` Eval dashboard issue 03: cost under tokens in the runs list so it fits
   - `7f73e18` Eval dashboard issue 03: review fixes (price rule in core, history ignores prices and limit, CASES test, clearer names)
   - `9fb87ea` Eval dashboard issue 03: CONTEXT.md on Cancel and limit stops, traces and run pricing
+- Archive commit: `9f06e9d` Eval dashboard issue 03 done: archive issue with run, eval, review and rebase evidence
+- Merge commit: `b0dedbf` Merge eval dashboard issue 03 into main
