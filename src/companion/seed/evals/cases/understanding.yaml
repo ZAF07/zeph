@@ -102,7 +102,7 @@ cases:
         expect:
           need: [Advice]
 
-  - id: small-talk
+  - id: dog-in-rain-boots
     memory: *maya
     messages:
       - text: haha just saw a dog wearing tiny yellow rain boots outside the café

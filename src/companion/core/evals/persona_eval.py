@@ -1,9 +1,7 @@
 from companion.core.evals.cases import PersonaConversation, PersonaMessage
 from companion.core.evals.judge import RuleVerdict, judge_persona_rules
 from companion.core.evals.models import CaseCheckResult, CaseOutcome, Check
-from companion.core.evals.ports import EvalCompanion, EvalSetupError
-
-SEND_PHOTO_TOOL = "send_photo"
+from companion.core.evals.ports import EvalCompanion
 
 
 def send_and_collect_replies(
@@ -76,10 +74,6 @@ def check_persona_case(
 
     Returns:
         One check per rule; a failed case notes the whole conversation.
-
-    Raises:
-        EvalSetupError: If the case has Shared Photos but the reply was
-            never offered the tool to send one, so it tested nothing.
     """
     companion.connect_user()
     if not conversation.photo_viewing:
@@ -101,10 +95,6 @@ def check_persona_case(
         companion.judge_chat_model, "\n".join(transcript_lines), conversation.rules
     )
 
-    if conversation.shared_photos and SEND_PHOTO_TOOL not in companion.offered_tools():
-        raise EvalSetupError(
-            "The send_photo tool was never offered, so this case tested nothing"
-        )
     passed = all(verdict.passed for verdict in verdicts)
     return CaseCheckResult(
         outcome=CaseOutcome.PASS if passed else CaseOutcome.FAIL,

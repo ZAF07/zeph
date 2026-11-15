@@ -188,11 +188,26 @@ class SettingsCase:
         message: What the User sends.
         tools: The settings tools the reply must call; empty when no setting
             may change.
+        memories: The Memory Items the User has before the message, by
+            Memory Category name, beyond those onboarding saves.
+        forgotten: Which of those Memory Items must be gone afterwards;
+            every other one must stay.
     """
 
     id: str
     message: str
     tools: list[str]
+    memories: dict[str, list[str]] = field(default_factory=dict)
+    forgotten: list[str] = field(default_factory=list)
+
+    @property
+    def memory_item_contents(self) -> list[str]:
+        """List the contents of the case's Memory Items, whatever their category.
+
+        Returns:
+            The contents, in the order the case lists them.
+        """
+        return [content for items in self.memories.values() for content in items]
 
 
 @dataclass(frozen=True)
@@ -501,12 +516,30 @@ def read_settings_case(key: str, content: dict[str, Any]) -> SettingsCase:
 
     Args:
         key: The case's key.
-        content: `message` and `tools`.
+        content: `message` and `tools`, and optional `memories` (Memory Item
+            contents by Memory Category name) and `forgotten` (which of them
+            must be gone afterwards).
 
     Returns:
         The case.
+
+    Raises:
+        InvalidEvalCaseError: If `forgotten` names a Memory Item the case
+            doesn't have.
     """
-    return SettingsCase(id=key, message=content["message"], tools=content["tools"])
+    case = SettingsCase(
+        id=key,
+        message=content["message"],
+        tools=content["tools"],
+        memories=content.get("memories", {}),
+        forgotten=content.get("forgotten", []),
+    )
+    unknown = [item for item in case.forgotten if item not in case.memory_item_contents]
+    if unknown:
+        raise InvalidEvalCaseError(
+            f"{key} forgets Memory Items it doesn't have: " + ", ".join(unknown)
+        )
+    return case
 
 
 def to_utc(value: Any) -> datetime:

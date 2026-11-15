@@ -4,7 +4,7 @@ from typing import Any
 
 import yaml
 
-from companion.core.evals.cases import InvalidEvalCaseError
+from companion.core.evals.cases import InvalidEvalCaseError, require_unique_keys
 from companion.core.evals.models import EvalCase, EvalName
 
 CASE_FILES = {
@@ -125,32 +125,34 @@ def images_named(case: EvalCase) -> list[str]:
     return []
 
 
-def read_eval_case_seed(cases_dir: Path, images_dir: Path) -> list[EvalCase]:
-    """Read the Eval Cases from the seed files.
+def read_eval_case_file(
+    name: EvalName, cases_file: Path, images_dir: Path
+) -> list[EvalCase]:
+    """Read one Eval's seed file into Eval Cases.
 
     Args:
-        cases_dir: The folder of case files, one per Eval.
+        name: The Eval.
+        cases_file: Its case file.
         images_dir: The folder of test images the cases send.
 
     Returns:
-        Every case, by Eval, in the order written.
+        Its cases, in the order written.
 
     Raises:
-        InvalidEvalCaseError: If a case names a rule its file doesn't define
-            or an image that isn't there.
+        InvalidEvalCaseError: If two cases share a key, or a case names a
+            rule its file doesn't define or an image that isn't there.
     """
-    cases: list[EvalCase] = []
-    for name, file_name in CASE_FILES.items():
-        content = yaml.safe_load((cases_dir / file_name).read_text())
-        if name == EvalName.PERSONA:
-            cases += persona_cases(content)
-        elif name == EvalName.UNDERSTANDING:
-            cases += understanding_cases(content)
-        else:
-            cases += [
-                EvalCase(key=entry["id"], eval=name, content=without_id(entry))
-                for entry in content
-            ]
+    content = yaml.safe_load(cases_file.read_text())
+    if name == EvalName.PERSONA:
+        cases = persona_cases(content)
+    elif name == EvalName.UNDERSTANDING:
+        cases = understanding_cases(content)
+    else:
+        cases = [
+            EvalCase(key=entry["id"], eval=name, content=without_id(entry))
+            for entry in content
+        ]
+    require_unique_keys([case.key for case in cases])
     for case in cases:
         missing = [
             image for image in images_named(case) if not (images_dir / image).is_file()
@@ -160,3 +162,20 @@ def read_eval_case_seed(cases_dir: Path, images_dir: Path) -> list[EvalCase]:
                 f"{case.key} sends images that aren't there: {', '.join(missing)}"
             )
     return cases
+
+
+def read_eval_case_seed(cases_dir: Path, images_dir: Path) -> list[EvalCase]:
+    """Read the Eval Cases from the seed files, one file per Eval.
+
+    Args:
+        cases_dir: The folder of case files.
+        images_dir: The folder of test images the cases send.
+
+    Returns:
+        Every case, by Eval, in the order written.
+    """
+    return [
+        case
+        for name, file_name in CASE_FILES.items()
+        for case in read_eval_case_file(name, cases_dir / file_name, images_dir)
+    ]

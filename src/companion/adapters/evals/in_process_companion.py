@@ -1,11 +1,10 @@
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
-from httpx import Response
 from sqlalchemy import Engine, text
 
 from companion.adapters.evals.stand_ins import (
@@ -113,7 +112,30 @@ def telegram_photo_content(file_unique_id: str, caption: str) -> dict[str, Any]:
     return content
 
 
-def require_status(response: Response, expected: int, step: str) -> Any:
+class AppResponse(Protocol):
+    """A response from the app, as its in-process client gives it."""
+
+    @property
+    def status_code(self) -> int:
+        """The HTTP status code."""
+        ...
+
+    @property
+    def text(self) -> str:
+        """The body as text."""
+        ...
+
+    @property
+    def content(self) -> bytes:
+        """The body."""
+        ...
+
+    def json(self) -> Any:
+        """Read the body as JSON."""
+        ...
+
+
+def require_status(response: AppResponse, expected: int, step: str) -> Any:
     """Check the app agreed to a setup step and read its answer.
 
     Args:
@@ -230,14 +252,6 @@ class InProcessCompanion:
         """
         return list(self._chat_model.called_tools)
 
-    def offered_tools(self) -> list[str]:
-        """List the tools the reply model was offered since the case started.
-
-        Returns:
-            Their names, in order, with repeats.
-        """
-        return list(self._chat_model.offered_tools)
-
     def clear_called_tools(self) -> None:
         """Forget the tools called so far."""
         self._chat_model.called_tools.clear()
@@ -258,7 +272,9 @@ class InProcessCompanion:
         """
         self._clock.move(by)
 
-    def connect_user(self, check_ins: bool = False) -> UUID:
+    def connect_user(
+        self, check_ins: bool = False, onboarding_reasons: bool = True
+    ) -> UUID:
         """Sign up the made-up User, onboard them and connect their Telegram.
 
         Only the onboarding times are set, so the User has no name, answers
@@ -267,6 +283,8 @@ class InProcessCompanion:
         Args:
             check_ins: Whether they answer onboarding with Check-ins on
                 "most days" in Singapore.
+            onboarding_reasons: Whether that onboarding says what brings
+                them here, which saves Memory Items.
 
         Returns:
             The User's ID.
@@ -293,7 +311,17 @@ class InProcessCompanion:
         if check_ins:
             require_status(
                 self._client.put(
-                    "/api/onboarding", json=ONBOARDING_WITH_CHECK_INS, headers=headers
+                    "/api/onboarding",
+                    json=(
+                        ONBOARDING_WITH_CHECK_INS
+                        if onboarding_reasons
+                        else {
+                            **ONBOARDING_WITH_CHECK_INS,
+                            "onboarding_reasons": [],
+                            "onboarding_note": None,
+                        }
+                    ),
+                    headers=headers,
                 ),
                 200,
                 "Onboarding with Check-ins",
@@ -328,6 +356,19 @@ class InProcessCompanion:
         )
         content = telegram_photo_content(image_file.stem, caption)
         return self._send(telegram_message_update(content))
+
+    def memory_item_contents(self) -> list[str]:
+        """List the contents of the User's Memory Items, as the Dashboard does.
+
+        Returns:
+            The contents, whatever their category.
+        """
+        groups = require_status(
+            self._client.get("/api/memory-items", headers=self._user_headers()),
+            200,
+            "Listing Memory Items",
+        )["groups"]
+        return [str(item["content"]) for group in groups for item in group["items"]]
 
     def turn_photo_viewing_off(self) -> None:
         """Turn Photo Viewing off for the User."""

@@ -63,14 +63,6 @@ class EvalCompanion(Protocol):
         """
         ...
 
-    def offered_tools(self) -> list[str]:
-        """List the tools the reply model was offered since the case started.
-
-        Returns:
-            Their names, in order, with repeats.
-        """
-        ...
-
     def clear_called_tools(self) -> None:
         """Forget the tools called so far."""
         ...
@@ -91,12 +83,16 @@ class EvalCompanion(Protocol):
         """
         ...
 
-    def connect_user(self, check_ins: bool = False) -> UUID:
+    def connect_user(
+        self, check_ins: bool = False, onboarding_reasons: bool = True
+    ) -> UUID:
         """Sign up the made-up User, onboard them and connect their Telegram.
 
         Args:
             check_ins: Whether they answer onboarding with Check-ins on
                 "most days" in Singapore.
+            onboarding_reasons: Whether that onboarding says what brings
+                them here, which saves Memory Items.
 
         Returns:
             The User's ID.
@@ -123,6 +119,14 @@ class EvalCompanion(Protocol):
 
         Returns:
             What the Companion sent back.
+        """
+        ...
+
+    def memory_item_contents(self) -> list[str]:
+        """List the contents of the User's Memory Items, as the Dashboard does.
+
+        Returns:
+            The contents, whatever their category.
         """
         ...
 

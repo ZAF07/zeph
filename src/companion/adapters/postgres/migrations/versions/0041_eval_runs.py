@@ -2,8 +2,8 @@
 
 These tables hold no made-up data; that stays in the Eval database.
 
-Revision ID: 0039
-Revises: 0038
+Revision ID: 0041
+Revises: 0040
 Create Date: 2026-11-15
 """
 
@@ -13,8 +13,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0039"
-down_revision: str | None = "0038"
+revision: str = "0041"
+down_revision: str | None = "0040"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -281,7 +281,7 @@ class TokenCounter:
 
 
 class CountingChatModel:
-    """Chat model that counts tokens and notes the tools offered and called."""
+    """Chat model that counts tokens and notes the tools the model called."""
 
     def __init__(self, chat_model: ChatModel, counter: TokenCounter) -> None:
         """Wrap a chat model.
@@ -293,7 +293,6 @@ class CountingChatModel:
         self._chat_model = chat_model
         self._counter = counter
         self.called_tools: list[str] = []
-        self.offered_tools: list[str] = []
 
     def generate(
         self,
@@ -313,7 +312,6 @@ class CountingChatModel:
         Returns:
             The real chat model's answer.
         """
-        self.offered_tools += [tool.name for tool in tools]
         recorded_tools = [self._recording(tool) for tool in tools]
         answer = self._chat_model.generate(model, instructions, history, recorded_tools)
         self._counter.add(answer)
