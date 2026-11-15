@@ -22,3 +22,11 @@ uv run pytest -n 0 evals -m eval -k "struggling-with-shared-photos or forget-why
 
 - [ ] Both cases pass in 3 runs in a row
 - [ ] `make check-python` passes
+
+## Blocked by
+
+- `.scratch/understanding/issues/21-reasoning-calls-default-to-reasoner.md`
+
+## Comments
+
+- 2026-11-15 (grilling, paused): rerun both cases on reasoner once issue 21 is done. Open question: a code guard where the Understanding says the User is struggling and the reply then isn't offered `send_photo` (recommended; the rule today is only tool-description wording). `forget-why-here` not discussed yet.
