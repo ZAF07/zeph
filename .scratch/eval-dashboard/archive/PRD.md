@@ -252,3 +252,5 @@ An Eval area in the Dashboard's admin section.
   - 05 Variants, Repeats, Setting Overrides and Make Live: archive 65b1a07, merge abb4d5c
 - Checks on close-out (issue 05 branch, main at 207b532): ruff, ruff format, mypy pass; pytest 1087 passed; pnpm lint, format:check, typecheck pass; Vitest 424 passed
 
+- Archive commit: `d0fbe9a` Eval dashboard PRD done: mark completed, archive it, and point the issues at its new path
+- Merge commit: `d7db002` Merge eval dashboard PRD archive
