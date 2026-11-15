@@ -9,6 +9,7 @@ import { CaseResultCard } from "@/components/CaseResultCard";
 import type { EvalRunDetails } from "@/lib/api-client";
 import { formatSavedAt } from "@/lib/dates";
 import {
+  countOf,
   describeEvals,
   describeTotals,
   isRunGoing,
@@ -33,10 +34,9 @@ function progressText(run: EvalRunDetails): string {
     return "Waiting for the runner. It starts once any run before it ends.";
   }
   if (run.case_count === null) {
-    return done === 1 ? "1 case done" : `${done} cases done`;
+    return `${countOf(done, "case")} done`;
   }
-  const cases = run.case_count === 1 ? "case" : "cases";
-  return `${done} of ${run.case_count} ${cases} done`;
+  return `${done} of ${countOf(run.case_count, "case")} done`;
 }
 
 /**
@@ -54,7 +54,7 @@ export function EvalRunView({ runId }: { runId: string }) {
     queryFn: () => apiClient.getEvalRun(runId),
     refetchInterval: (query) => {
       const state = query.state.data?.state;
-      return state === undefined || isRunGoing(state)
+      return state !== undefined && isRunGoing(state)
         ? runCheckMilliseconds
         : false;
     },

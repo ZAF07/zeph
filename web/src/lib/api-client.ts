@@ -662,7 +662,6 @@ export type Sticker = {
   added_at: string;
 };
 
-/** Every call the Dashboard makes to the backend. */
 /** One of the six Evals. */
 export type EvalName =
   | "safeguard"
@@ -735,6 +734,7 @@ export type CaseResult = {
 /** An Eval Run with its Case Results so far, in the order they finished. */
 export type EvalRunDetails = EvalRun & { results: CaseResult[] };
 
+/** Every call the Dashboard makes to the backend. */
 export type ApiClient = {
   getMe: () => Promise<Me>;
   updatePreferences: (changes: PreferenceChanges) => Promise<Me>;

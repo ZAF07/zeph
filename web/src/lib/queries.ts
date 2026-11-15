@@ -51,6 +51,7 @@ export const queryKeys = {
   ],
   modelCallTrace: (traceId: string) => ["model-call-trace", traceId],
   evals: ["evals"],
+  allEvalRuns: ["eval-runs"],
   evalRuns: (includeTerminal: boolean) => ["eval-runs", includeTerminal],
   evalRun: (runId: string) => ["eval-run", runId],
   usage: (days: number) => ["usage", days],

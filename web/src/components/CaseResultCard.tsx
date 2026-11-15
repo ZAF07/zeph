@@ -1,6 +1,6 @@
 import { EvalPill } from "@/components/EvalPill";
 import type { CaseResult } from "@/lib/api-client";
-import { evalDetails, groupChecks, outcomeLabels } from "@/lib/evals";
+import { countOf, evalDetails, groupChecks, outcomeLabels } from "@/lib/evals";
 import { formatDuration, formatTokens } from "@/lib/model-calls";
 
 /**
@@ -34,9 +34,7 @@ export function CaseResultCard({ result }: { result: CaseResult }) {
       {result.checks.length > 0 ? (
         <details open={result.outcome !== "pass"}>
           <summary className="cursor-pointer text-caption text-ink-soft">
-            {result.checks.length === 1
-              ? "1 check"
-              : `${result.checks.length} checks`}
+            {countOf(result.checks.length, "check")}
             {failedChecks > 0 ? `, ${failedChecks} failed` : ""}
           </summary>
           <div className="mt-2 flex flex-col gap-2">

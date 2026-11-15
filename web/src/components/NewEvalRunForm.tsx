@@ -1,13 +1,13 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { primaryButton } from "@/components/button-styles";
 import { LoadFailed } from "@/components/LoadFailed";
 import type { EvalName } from "@/lib/api-client";
-import { evalDetails, evalOrder } from "@/lib/evals";
+import { countOf, evalDetails, evalOrder } from "@/lib/evals";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
@@ -23,13 +23,18 @@ export function NewEvalRunForm() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const [chosen, setChosen] = useState<EvalName[]>([]);
-  const [starting, setStarting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const evalsQuery = useQuery({
     queryKey: queryKeys.evals,
     queryFn: () => apiClient.listEvals(),
   });
   const evals = evalsQuery.data;
+  const startMutation = useMutation({
+    mutationFn: (names: EvalName[]) => apiClient.startEvalRun(names),
+    onSuccess: (run) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.allEvalRuns });
+      router.push(`/admin/evals/runs/${run.id}`);
+    },
+  });
 
   function toggle(name: EvalName) {
     setChosen(
@@ -39,20 +44,9 @@ export function NewEvalRunForm() {
     );
   }
 
-  async function start(event: FormEvent<HTMLFormElement>) {
+  function start(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setStarting(true);
-    setError(null);
-    try {
-      const run = await apiClient.startEvalRun(
-        evalOrder.filter((name) => chosen.includes(name)),
-      );
-      void queryClient.invalidateQueries({ queryKey: ["eval-runs"] });
-      router.push(`/admin/evals/runs/${run.id}`);
-    } catch {
-      setError("Couldn’t start the run. Try again.");
-      setStarting(false);
-    }
+    startMutation.mutate(evalOrder.filter((name) => chosen.includes(name)));
   }
 
   if (evals === undefined) {
@@ -76,10 +70,7 @@ export function NewEvalRunForm() {
     .reduce((count, summary) => count + summary.case_keys.length, 0);
 
   return (
-    <form
-      onSubmit={(event) => void start(event)}
-      className="flex flex-col gap-5"
-    >
+    <form onSubmit={start} className="flex flex-col gap-5">
       <fieldset className="m-0 flex flex-col gap-2.5 border-0 p-0">
         <legend className="mb-2.5 text-body font-medium">Evals to run</legend>
         {evals.map((summary) => {
@@ -102,7 +93,7 @@ export function NewEvalRunForm() {
                   <span className="font-medium">
                     {details.label}{" "}
                     <span className="font-normal text-ink-muted">
-                      · {count === 1 ? "1 case" : `${count} cases`}
+                      · {countOf(count, "case")}
                     </span>
                   </span>
                   <span className="text-caption text-ink-soft">
@@ -126,20 +117,24 @@ export function NewEvalRunForm() {
         Each case calls DeepSeek, so a run costs money. Cases are read-only for
         now.
       </p>
-      {error ? (
+      {startMutation.isError ? (
         <p role="alert" className="m-0 text-caption text-danger">
-          {error}
+          Couldn’t start the run. Try again.
         </p>
       ) : null}
       <div>
         <button
           type="submit"
           className={primaryButton}
-          disabled={chosen.length === 0 || starting}
+          disabled={
+            chosen.length === 0 ||
+            startMutation.isPending ||
+            startMutation.isSuccess
+          }
         >
           {chosen.length === 0
             ? "Start run"
-            : `Start run · ${caseCount === 1 ? "1 case" : `${caseCount} cases`}`}
+            : `Start run · ${countOf(caseCount, "case")}`}
         </button>
       </div>
     </form>

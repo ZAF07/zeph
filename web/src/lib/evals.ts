@@ -37,14 +37,7 @@ export const evalDetails: Record<EvalName, { label: string; checks: string }> =
   };
 
 /** Every Eval, in the order shown. */
-export const evalOrder: EvalName[] = [
-  "safeguard",
-  "persona",
-  "knowledge",
-  "settings",
-  "photo_descriptions",
-  "understanding",
-];
+export const evalOrder = Object.keys(evalDetails) as EvalName[];
 
 /** Each run state's label and pill colours. */
 export const runStateLabels: Record<
@@ -69,6 +62,17 @@ export const outcomeLabels: Record<
   fail: { label: "Fail", pill: "bg-danger-tint text-danger-deep" },
   error: { label: "Error", pill: "bg-yellow-tint text-yellow-deep" },
 };
+
+/**
+ * Writes a count with its noun, singular for one.
+ *
+ * @param count - How many.
+ * @param noun - The noun for one, e.g. "case".
+ * @returns E.g. "1 case" or "3 cases".
+ */
+export function countOf(count: number, noun: string): string {
+  return `${count} ${count === 1 ? noun : `${noun}s`}`;
+}
 
 /**
  * Says whether a run may still change, so its page keeps checking.
@@ -104,7 +108,7 @@ export function describeTotals(totals: {
 }): string {
   const parts = [`${totals.passed} passed`, `${totals.failed} failed`];
   if (totals.errored > 0) {
-    parts.push(totals.errored === 1 ? "1 error" : `${totals.errored} errors`);
+    parts.push(countOf(totals.errored, "error"));
   }
   return parts.join(" · ");
 }

@@ -39,7 +39,7 @@ def read_evals(names: str) -> list[EvalName]:
         raise argparse.ArgumentTypeError(f"{error}; the Evals are {known}") from error
 
 
-def watch_run(
+def start_and_watch_run(
     service: EvalRunService,
     evals: list[EvalName],
     write: Callable[[str], None],
@@ -100,7 +100,7 @@ def main() -> None:
         clock=build_clock(settings),
     )
     try:
-        passed = watch_run(
+        passed = start_and_watch_run(
             service, arguments.evals, lambda line: print(line, flush=True), time.sleep
         )
     except InvalidError as error:
