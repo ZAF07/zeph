@@ -229,7 +229,7 @@ export type UserFeatures = {
 };
 
 /** The value of a platform setting Admins can edit. */
-export type SettingValue = string | number;
+export type SettingValue = string | number | boolean;
 
 /** A platform setting's value and when, and by whom, it was last saved. */
 export type AdminSetting = {
@@ -257,13 +257,17 @@ export type ExtraPromptGroup = {
   prompts: ExtraPrompt[];
 };
 
-/** A core service whose prompt and model Admins can change. */
+/**
+ * A core service whose prompt, model and thinking Admins can change.
+ * `thinking_key` is the on/off setting for whether its model thinks first.
+ */
 export type CoreService = {
   name: string;
   runs_when: string;
   description: string;
   prompt_key: string;
   model_key: string;
+  thinking_key: string;
   extra_prompts: ExtraPrompt[];
   extra_prompt_groups: ExtraPromptGroup[];
 };
@@ -548,6 +552,7 @@ export type ModelCall = {
   id: string;
   step: ModelStep;
   model: string;
+  thinking: boolean;
   started_at: string;
   duration_ms: number;
   tokens_in: number;

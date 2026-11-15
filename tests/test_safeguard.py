@@ -317,7 +317,8 @@ def test_safeguard_prompt_and_model_changes_apply_to_the_next_message(
         json={
             "values": {
                 "safeguard_prompt": "Classify the risk. Edited by an Admin.",
-                "safeguard_model": "deepseek-reasoner",
+                "safeguard_model": "deepseek-flash",
+                "safeguard_thinking": False,
             }
         },
         headers=admin,
@@ -328,7 +329,8 @@ def test_safeguard_prompt_and_model_changes_apply_to_the_next_message(
     send_to_webhook(client, telegram_text_update("hi"))
 
     [call] = chat_model.safeguard_calls
-    assert call.model == "deepseek-reasoner"
+    assert call.model == "deepseek-flash"
+    assert call.thinking is False
 
 
 def test_a_failing_safeguard_never_lets_a_normal_reply_through(

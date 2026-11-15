@@ -57,6 +57,7 @@ from companion.core.platform_settings import (
     CHECK_IN_MODEL,
     CHECK_IN_PROMPT,
     CHECK_IN_REPLY_WINDOW,
+    CHECK_IN_THINKING,
     CONVERSATION_QUIET_GAP,
     CURIOSITY_CHECK_INS_PER_WEEK,
     PERSONA,
@@ -1249,6 +1250,7 @@ class CheckInService:
             snapshot=snapshot,
             step=ModelStep.CHECK_IN,
             model=settings.get(CHECK_IN_MODEL),
+            thinking=settings.get(CHECK_IN_THINKING),
             instructions=f"{settings.get(PERSONA)}\n\n{settings.get(CHECK_IN_PROMPT)}",
             history=[ChatLine(role=ChatRole.USER, text=description)],
         )

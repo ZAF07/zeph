@@ -570,6 +570,7 @@ model_calls = Table(
     ),
     Column("step", Text, nullable=False),
     Column("model", Text, nullable=False),
+    Column("thinking", Boolean, nullable=False, server_default="false"),
     Column("started_at", DateTime(timezone=True), nullable=False, index=True),
     Column("duration_ms", Integer, nullable=False),
     Column("tokens_in", Integer, nullable=False),

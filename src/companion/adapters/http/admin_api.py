@@ -208,6 +208,7 @@ class CoreServiceResponse(BaseModel):
     description: str
     prompt_key: str
     model_key: str
+    thinking_key: str
     extra_prompts: list[ExtraPromptResponse]
     extra_prompt_groups: list[ExtraPromptGroupResponse]
 
@@ -463,6 +464,7 @@ class ModelCallResponse(BaseModel):
     id: str
     step: ModelStep
     model: str
+    thinking: bool
     started_at: datetime
     duration_ms: int
     tokens_in: int
@@ -932,6 +934,7 @@ def to_model_call_response(call: ModelCall) -> ModelCallResponse:
         id=str(call.id),
         step=call.step,
         model=call.model,
+        thinking=call.thinking,
         started_at=call.started_at,
         duration_ms=call.duration_ms,
         tokens_in=call.tokens_in,
@@ -1267,6 +1270,7 @@ def build_admin_api_router(
                     description=service.description,
                     prompt_key=service.prompt_key,
                     model_key=service.model_key,
+                    thinking_key=service.thinking_key,
                     extra_prompts=[
                         to_extra_prompt_response(key)
                         for key in service.extra_prompt_keys

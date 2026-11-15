@@ -14,6 +14,17 @@ export function textSetting(settings: AdminSettings, key: string): string {
 }
 
 /**
+ * Reads an on/off setting.
+ *
+ * @param settings - The settings, by key.
+ * @param key - The setting to read.
+ * @returns True if it is on; false if it is off or missing.
+ */
+export function onOffSetting(settings: AdminSettings, key: string): boolean {
+  return settings[key]?.value === true;
+}
+
+/**
  * Says when some settings were last saved by an Admin, and by whom.
  *
  * @param settings - The settings, by key.

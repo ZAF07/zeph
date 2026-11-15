@@ -37,6 +37,7 @@ from companion.core.platform_settings import (
     CURIOSITIES_WAITING_LIMIT,
     CURIOSITY_KEEPING_MODEL,
     CURIOSITY_KEEPING_PROMPT,
+    CURIOSITY_KEEPING_THINKING,
 )
 from companion.core.ports import Clock, Embedder, Repositories
 from companion.core.transcripts import to_transcript_lines
@@ -661,6 +662,7 @@ class CuriosityKeeper:
                 snapshot=snapshot,
                 step=ModelStep.CURIOSITIES,
                 model=settings.get(CURIOSITY_KEEPING_MODEL),
+                thinking=settings.get(CURIOSITY_KEEPING_THINKING),
                 instructions=settings.get(CURIOSITY_KEEPING_PROMPT),
                 history=[ChatLine(role=ChatRole.USER, text=description)],
             )

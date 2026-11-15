@@ -297,6 +297,7 @@ class CountingChatModel:
     def generate(
         self,
         model: str,
+        thinking: bool,
         instructions: str,
         history: list[ChatLine],
         tools: Sequence[ChatTool] = (),
@@ -305,6 +306,7 @@ class CountingChatModel:
 
         Args:
             model: The model to use.
+            thinking: Whether the model should think before it answers.
             instructions: What the model should be and do.
             history: The conversation so far, oldest first.
             tools: The tools the model may call.
@@ -313,7 +315,9 @@ class CountingChatModel:
             The real chat model's answer.
         """
         recorded_tools = [self._recording(tool) for tool in tools]
-        answer = self._chat_model.generate(model, instructions, history, recorded_tools)
+        answer = self._chat_model.generate(
+            model, thinking, instructions, history, recorded_tools
+        )
         self._counter.add(answer)
         return answer
 
@@ -355,17 +359,20 @@ class CountingPhotoViewer:
         self._photo_viewer = photo_viewer
         self._counter = counter
 
-    def look(self, model: str, instructions: str, photo: PhotoImage) -> ModelAnswer:
+    def look(
+        self, model: str, thinking: bool, instructions: str, photo: PhotoImage
+    ) -> ModelAnswer:
         """Look at a photo with the real photo viewer and count its tokens.
 
         Args:
             model: The model to use.
+            thinking: Whether the model should think before it answers.
             instructions: What to write about the photo.
             photo: The photo's image.
 
         Returns:
             The real photo viewer's answer.
         """
-        answer = self._photo_viewer.look(model, instructions, photo)
+        answer = self._photo_viewer.look(model, thinking, instructions, photo)
         self._counter.add(answer)
         return answer

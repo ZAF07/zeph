@@ -79,6 +79,7 @@ class EditingDuringDraftChatModel(ScriptedChatModel):
     def generate(
         self,
         model: str,
+        thinking: bool,
         instructions: str,
         history: list[ChatLine],
         tools: Sequence[ChatTool] = (),

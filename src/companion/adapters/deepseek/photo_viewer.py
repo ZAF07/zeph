@@ -1,10 +1,8 @@
 import base64
 
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
-from langchain_deepseek import ChatDeepSeek
-from pydantic import SecretStr
 
-from companion.adapters.deepseek.chat_model import to_model_answer
+from companion.adapters.deepseek.chat_model import build_client, to_model_answer
 from companion.core.models import ModelAnswer, PhotoImage
 
 
@@ -39,19 +37,22 @@ class DeepSeekPhotoViewer:
         Args:
             api_key: The DeepSeek API key.
         """
-        self._api_key = SecretStr(api_key)
+        self._api_key = api_key
 
-    def look(self, model: str, instructions: str, photo: PhotoImage) -> ModelAnswer:
+    def look(
+        self, model: str, thinking: bool, instructions: str, photo: PhotoImage
+    ) -> ModelAnswer:
         """Look at a photo and write what the instructions ask for.
 
         Args:
-            model: The DeepSeek model to use, e.g. "deepseek-chat".
+            model: The DeepSeek model to use, e.g. "deepseek-flash".
+            thinking: Whether the model should think before it answers.
             instructions: What to write about the photo.
             photo: The photo's image.
 
         Returns:
             The text and the tokens it took.
         """
-        client = ChatDeepSeek(model_name=model, api_key=self._api_key, timeout=60)
+        client = build_client(self._api_key, model, thinking)
         response = client.invoke(to_photo_messages(instructions, photo))
         return to_model_answer(response.text, [response])

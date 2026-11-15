@@ -34,7 +34,8 @@ class ModelCallRequest:
 
     Attributes:
         step: Which step it is for.
-        model: The model asked, e.g. "deepseek-chat".
+        model: The model asked, e.g. "deepseek-flash".
+        thinking: Whether the model was asked to think before it answers.
         instructions: What the model is told to be and do.
         history: The lines it is given, oldest first.
         tools: The tools it is offered.
@@ -42,6 +43,7 @@ class ModelCallRequest:
 
     step: ModelStep
     model: str
+    thinking: bool
     instructions: str
     history: tuple[ChatLine, ...]
     tools: Sequence[ChatTool]
@@ -133,6 +135,7 @@ class ModelCallLog:
             user_id=snapshot.user.id,
             step=request.step,
             model=request.model,
+            thinking=request.thinking,
             started_at=started_at,
             duration_ms=(self._clock.now() - started_at) // timedelta(milliseconds=1),
             tokens_in=answer.tokens_in if answer else 0,

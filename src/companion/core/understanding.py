@@ -46,6 +46,7 @@ from companion.core.platform_settings import (
     REPLY_ASK_WHY_NOTE,
     UNDERSTANDING_MODEL,
     UNDERSTANDING_PROMPT,
+    UNDERSTANDING_THINKING,
 )
 from companion.core.ports import Clock, Repositories
 from companion.core.transcripts import split_off_latest_message, to_transcript_lines
@@ -837,6 +838,7 @@ class UnderstandingService:
                 snapshot=snapshot,
                 step=ModelStep.UNDERSTANDING,
                 model=settings.get(UNDERSTANDING_MODEL),
+                thinking=settings.get(UNDERSTANDING_THINKING),
                 instructions=settings.get(UNDERSTANDING_PROMPT),
                 history=[ChatLine(role=ChatRole.USER, text=description)],
             )

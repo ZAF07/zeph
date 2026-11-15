@@ -408,7 +408,7 @@ def test_message_retention_removes_understandings_with_their_messages(
     assert saved_understandings(engine) == []
 
 
-def test_a_changed_understanding_prompt_and_model_are_used_for_the_next_message(
+def test_a_changed_understanding_prompt_and_thinking_are_used_for_the_next_message(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -416,17 +416,13 @@ def test_a_changed_understanding_prompt_and_model_are_used_for_the_next_message(
     seeded_settings: dict[str, Any],
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
-    other_model = next(
-        model
-        for model in seeded_settings["available_models"]
-        if model != seeded_settings["understanding_model"]
-    )
+    other_thinking = not seeded_settings["understanding_thinking"]
     response = client.patch(
         "/api/admin/settings",
         json={
             "values": {
                 "understanding_prompt": "Read the person closely.",
-                "understanding_model": other_model,
+                "understanding_thinking": other_thinking,
             }
         },
         headers=owner_headers(client, auth_verifier),
@@ -439,4 +435,5 @@ def test_a_changed_understanding_prompt_and_model_are_used_for_the_next_message(
 
     [understanding_call] = chat_model.understanding_calls
     assert understanding_call.instructions == "Read the person closely."
-    assert understanding_call.model == other_model
+    assert understanding_call.model == seeded_settings["understanding_model"]
+    assert understanding_call.thinking is other_thinking

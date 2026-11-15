@@ -22,6 +22,7 @@ export function ModelCallCard({ call }: { call: ModelCall }) {
   const headingId = useId();
   const facts = [
     { label: "Model", value: call.model },
+    { label: "Thinking", value: call.thinking ? "On" : "Off" },
     {
       label: "Tokens",
       value: formatTokens(call.tokens_in, call.tokens_out),

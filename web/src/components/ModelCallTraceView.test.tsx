@@ -34,7 +34,8 @@ const plainUsersTrace: ModelCallTraceDetails = {
     {
       id: "c1",
       step: "safeguard",
-      model: "deepseek-chat",
+      model: "deepseek-flash",
+      thinking: false,
       started_at: "2026-11-14T10:30:00Z",
       duration_ms: 400,
       tokens_in: 300,
@@ -47,7 +48,8 @@ const plainUsersTrace: ModelCallTraceDetails = {
     {
       id: "c4",
       step: "understanding",
-      model: "deepseek-chat",
+      model: "deepseek-flash",
+      thinking: true,
       started_at: "2026-11-14T10:30:00Z",
       duration_ms: 600,
       tokens_in: 800,
@@ -70,7 +72,8 @@ const plainUsersTrace: ModelCallTraceDetails = {
     {
       id: "c2",
       step: "reply",
-      model: "deepseek-chat",
+      model: "deepseek-flash",
+      thinking: false,
       started_at: "2026-11-14T10:30:01Z",
       duration_ms: 2000,
       tokens_in: 900,
@@ -92,7 +95,8 @@ const adminsTrace: ModelCallTraceDetails = {
     {
       id: "c3",
       step: "reply",
-      model: "deepseek-reasoner",
+      model: "deepseek-flash",
+      thinking: true,
       started_at: "2026-11-14T10:30:01Z",
       duration_ms: 2000,
       tokens_in: 900,
@@ -136,7 +140,13 @@ describe("ModelCallTraceView", () => {
 
     const reply = await screen.findByRole("article", { name: "Reply" });
     expect(apiClient.getModelCallTrace).toHaveBeenCalledWith("t1");
-    expect(within(reply).getByText("deepseek-chat")).toBeInTheDocument();
+    expect(within(reply).getByText("deepseek-flash")).toBeInTheDocument();
+    expect(within(reply).getByText("Thinking")).toBeInTheDocument();
+    expect(within(reply).getByText("Off")).toBeInTheDocument();
+    const understanding = screen.getByRole("article", {
+      name: "Understanding",
+    });
+    expect(within(understanding).getByText("On")).toBeInTheDocument();
     expect(within(reply).getByText("900 in / 78 out")).toBeInTheDocument();
     expect(within(reply).getByText("2.0 s")).toBeInTheDocument();
     expect(within(reply).getByText("web_search")).toBeInTheDocument();

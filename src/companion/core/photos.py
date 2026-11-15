@@ -19,6 +19,7 @@ from companion.core.platform_settings import (
     PHOTO_MODEL,
     PHOTO_NOT_VIEWED_NOTE,
     PHOTO_RETRY_COUNT,
+    PHOTO_THINKING,
     PHOTO_VIEWING_OFF_NOTE,
     SEND_PHOTO_TOOL_DESCRIPTION,
 )
@@ -461,6 +462,7 @@ class PhotoService:
                 answer = self._chat_model.look(
                     snapshot=snapshot,
                     model=settings.get(PHOTO_MODEL),
+                    thinking=settings.get(PHOTO_THINKING),
                     instructions=instructions,
                     photo=image,
                 )

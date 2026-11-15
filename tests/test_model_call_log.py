@@ -102,6 +102,7 @@ def test_a_plain_users_message_makes_a_trace_with_no_content(
     opened = open_trace(client, admin, trace["trace_id"])
     steps = [call["step"] for call in opened["calls"]]
     assert steps == ["safeguard", "understanding", "reply"]
+    assert [call["thinking"] for call in opened["calls"]] == [True, True, False]
     reply = opened["calls"][-1]
     assert reply["model"]
     assert reply["tokens_in"] > 0
@@ -461,7 +462,8 @@ def record_one_call(
         snapshot,
         ModelCallRequest(
             step=ModelStep.REPLY,
-            model="deepseek-chat",
+            model="deepseek-flash",
+            thinking=True,
             instructions="Be kind.",
             history=(ChatLine(ChatRole.USER, SECRET_WORDS),),
             tools=(),

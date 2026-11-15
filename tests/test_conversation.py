@@ -62,14 +62,16 @@ def test_persona_is_read_from_platform_settings(
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
     set_platform_setting(engine, "persona", "You are Zeph, edited by an Admin.")
-    set_platform_setting(engine, "response_model", "deepseek-reasoner")
+    set_platform_setting(engine, "response_model", "deepseek-v4-pro")
+    set_platform_setting(engine, "response_thinking", True)
     chat_model.script("ok")
 
     send_to_webhook(client, telegram_text_update("hello"))
 
     [call] = chat_model.calls
     assert "You are Zeph, edited by an Admin." in call.instructions
-    assert call.model == "deepseek-reasoner"
+    assert call.model == "deepseek-v4-pro"
+    assert call.thinking is True
 
 
 def test_reply_with_blank_lines_is_sent_as_several_short_messages(

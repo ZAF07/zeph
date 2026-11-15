@@ -22,7 +22,11 @@ from companion.core.models import (
     UserPortrait,
     UserSnapshot,
 )
-from companion.core.platform_settings import PORTRAIT_MODEL, PORTRAIT_PROMPT
+from companion.core.platform_settings import (
+    PORTRAIT_MODEL,
+    PORTRAIT_PROMPT,
+    PORTRAIT_THINKING,
+)
 from companion.core.ports import Clock, Repositories
 from companion.core.usage import UsageRecordingChatModel
 from companion.core.user_snapshot import UserSnapshotLoader
@@ -174,6 +178,7 @@ class PortraitWriter:
             snapshot=snapshot,
             step=ModelStep.PORTRAIT,
             model=settings.get(PORTRAIT_MODEL),
+            thinking=settings.get(PORTRAIT_THINKING),
             instructions=settings.get(PORTRAIT_PROMPT),
             history=[ChatLine(role=ChatRole.USER, text=description)],
         ).strip()

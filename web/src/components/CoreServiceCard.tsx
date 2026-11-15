@@ -5,20 +5,22 @@ import { useState } from "react";
 import { secondaryButton } from "@/components/button-styles";
 import { ExtraPromptField } from "@/components/ExtraPromptField";
 import { fieldLabel, inputField } from "@/components/form-styles";
+import { Switch } from "@/components/Switch";
 import {
   ApiError,
   type AdminSettings,
   type CoreService,
   type ExtraPrompt,
 } from "@/lib/api-client";
-import { lastSavedNote, textSetting } from "@/lib/settings";
+import { lastSavedNote, onOffSetting, textSetting } from "@/lib/settings";
 import { useSaveAdminSettings } from "@/lib/use-admin-settings";
 
 const SAVE_FAILED_MESSAGE =
   "Couldn’t save. The last saved prompt and model stay in use.";
 
 /**
- * One core service's card: which model it uses, its prompt and any extra
+ * One core service's card: which model it uses and whether that model
+ * thinks first, its prompt and any extra
  * prompts (like a tool description), saved together. Grouped extra prompts
  * sit in groups that are folded shut until clicked. The prompt is combined
  * with the Persona when the service runs. When the backend refuses a save,
@@ -39,8 +41,10 @@ export function CoreServiceCard({
 }) {
   const saveSettings = useSaveAdminSettings();
   const savedModel = textSetting(settings, service.model_key);
+  const savedThinking = onOffSetting(settings, service.thinking_key);
   const savedPrompt = textSetting(settings, service.prompt_key);
   const [model, setModel] = useState(savedModel);
+  const [thinking, setThinking] = useState(savedThinking);
   const [prompt, setPrompt] = useState(savedPrompt);
   const allExtraPrompts = [
     ...service.extra_prompts,
@@ -55,6 +59,7 @@ export function CoreServiceCard({
 
   const isDirty =
     model !== savedModel ||
+    thinking !== savedThinking ||
     prompt !== savedPrompt ||
     extraKeys.some((key) => extraPrompts[key] !== savedExtraPrompts[key]);
   const allFilled = [
@@ -74,6 +79,7 @@ export function CoreServiceCard({
       {
         [service.prompt_key]: prompt,
         [service.model_key]: model,
+        [service.thinking_key]: thinking,
         ...extraPrompts,
       },
       {
@@ -123,23 +129,38 @@ export function CoreServiceCard({
         <p className="m-0 text-sm text-ink-soft">{service.description}</p>
       </div>
       <div className="flex flex-col gap-3 px-5 pb-4">
-        <label className={fieldLabel}>
-          Model
-          <select
-            className={inputField}
-            value={model}
-            onChange={(event) => {
-              setModel(event.target.value);
-              saveSettings.reset();
-            }}
-          >
-            {modelChoices.map((choice) => (
-              <option key={choice} value={choice}>
-                {choice}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="flex flex-wrap items-end gap-4">
+          <label className={`${fieldLabel} min-w-0 flex-1`}>
+            Model
+            <select
+              className={inputField}
+              value={model}
+              onChange={(event) => {
+                setModel(event.target.value);
+                saveSettings.reset();
+              }}
+            >
+              {modelChoices.map((choice) => (
+                <option key={choice} value={choice}>
+                  {choice}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex items-center gap-2.5 pb-1">
+            <span aria-hidden="true" className="text-sm font-semibold">
+              Thinking
+            </span>
+            <Switch
+              label="Thinking"
+              checked={thinking}
+              onChange={(isOn) => {
+                setThinking(isOn);
+                saveSettings.reset();
+              }}
+            />
+          </div>
+        </div>
         <label className={fieldLabel}>
           Prompt
           <textarea
@@ -183,6 +204,7 @@ export function CoreServiceCard({
           {lastSavedNote(settings, [
             service.prompt_key,
             service.model_key,
+            service.thinking_key,
             ...extraKeys,
           ])}
         </span>

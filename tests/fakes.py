@@ -330,6 +330,7 @@ class ChatModelCall:
 
     Attributes:
         model: The model name asked for.
+        thinking: Whether the model was asked to think first.
         instructions: The instructions given.
         history: The Conversation so far.
         tools: The tools the model was offered.
@@ -337,6 +338,7 @@ class ChatModelCall:
     """
 
     model: str
+    thinking: bool
     instructions: str
     history: list[ChatLine]
     tools: list[ChatTool] = field(default_factory=list)
@@ -663,6 +665,7 @@ class ScriptedChatModel:
     def generate(
         self,
         model: str,
+        thinking: bool,
         instructions: str,
         history: list[ChatLine],
         tools: Sequence[ChatTool] = (),
@@ -671,6 +674,7 @@ class ScriptedChatModel:
 
         Args:
             model: The model name asked for.
+            thinking: Whether the model was asked to think first.
             instructions: The instructions given.
             history: The Conversation so far.
             tools: The tools the model may call.
@@ -680,7 +684,11 @@ class ScriptedChatModel:
             with the same token counts for every call.
         """
         call = ChatModelCall(
-            model=model, instructions=instructions, history=history, tools=list(tools)
+            model=model,
+            thinking=thinking,
+            instructions=instructions,
+            history=history,
+            tools=list(tools),
         )
         tool_calls: list[ToolCallRecord] = []
         if self.safeguard_prompt and instructions == self.safeguard_prompt:
@@ -788,11 +796,13 @@ class PhotoViewerCall:
 
     Attributes:
         model: The model name asked for.
+        thinking: Whether the model was asked to think first.
         instructions: The instructions given.
         photo: The photo it was shown.
     """
 
     model: str
+    thinking: bool
     instructions: str
     photo: PhotoImage
 
@@ -819,11 +829,14 @@ class FakePhotoViewer:
         """
         self._answers.extend(answers)
 
-    def look(self, model: str, instructions: str, photo: PhotoImage) -> ModelAnswer:
+    def look(
+        self, model: str, thinking: bool, instructions: str, photo: PhotoImage
+    ) -> ModelAnswer:
         """Record the look and return the next scripted description.
 
         Args:
             model: The model name asked for.
+            thinking: Whether the model was asked to think first.
             instructions: The instructions given.
             photo: The photo to look at.
 
@@ -833,7 +846,7 @@ class FakePhotoViewer:
         Raises:
             Exception: The next scripted exception, if that is what's queued.
         """
-        self.calls.append(PhotoViewerCall(model, instructions, photo))
+        self.calls.append(PhotoViewerCall(model, thinking, instructions, photo))
         answer = self._answers.pop(0) if self._answers else self.DEFAULT_DESCRIPTION
         if isinstance(answer, Exception):
             raise answer

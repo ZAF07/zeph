@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -14,9 +15,45 @@ from pydantic import SecretStr
 from companion.core.models import ChatLine, ChatRole, ModelAnswer, ToolCallRecord
 from companion.core.ports import ChatTool
 
+logger = logging.getLogger(__name__)
+
 MAX_TOOL_ROUNDS = 4
+CURRENT_MODEL = "deepseek-flash"
+OLD_CHAT_MODEL = "deepseek-chat"
+OLD_REASONER_MODEL = "deepseek-reasoner"
 
 AskModel = Callable[[list[BaseMessage]], AIMessage]
+
+
+def build_client(api_key: str, model: str, thinking: bool) -> ChatDeepSeek:
+    """Set up a DeepSeek client for one call, with thinking on or off.
+
+    The old names still work: "deepseek-chat" is sent as the current model
+    with thinking as asked, and "deepseek-reasoner" as the current model
+    with thinking always on, warning when it was asked to think less.
+
+    Args:
+        api_key: The DeepSeek API key.
+        model: The DeepSeek model to use, e.g. "deepseek-flash".
+        thinking: Whether the model should think before it answers.
+
+    Returns:
+        The client.
+    """
+    if model == OLD_REASONER_MODEL and not thinking:
+        logger.warning(
+            "deepseek-reasoner always thinks; thinking stays on for this call"
+        )
+    if model == OLD_REASONER_MODEL:
+        thinking = True
+    if model in (OLD_CHAT_MODEL, OLD_REASONER_MODEL):
+        model = CURRENT_MODEL
+    return ChatDeepSeek(
+        model_name=model,
+        api_key=SecretStr(api_key),
+        timeout=60,
+        extra_body={"thinking": {"type": "enabled" if thinking else "disabled"}},
+    )
 
 
 def to_langchain_messages(
@@ -156,11 +193,12 @@ class DeepSeekChatModel:
         Args:
             api_key: The DeepSeek API key.
         """
-        self._api_key = SecretStr(api_key)
+        self._api_key = api_key
 
     def generate(
         self,
         model: str,
+        thinking: bool,
         instructions: str,
         history: list[ChatLine],
         tools: Sequence[ChatTool] = (),
@@ -168,7 +206,8 @@ class DeepSeekChatModel:
         """Generate the next reply, calling tools first if the model wants to.
 
         Args:
-            model: The DeepSeek model to use, e.g. "deepseek-chat".
+            model: The DeepSeek model to use, e.g. "deepseek-flash".
+            thinking: Whether the model should think before it answers.
             instructions: What the model should be and do (Persona and prompt).
             history: The Conversation so far, oldest first.
             tools: The tools the model may call; none by default.
@@ -176,7 +215,7 @@ class DeepSeekChatModel:
         Returns:
             The reply text and the tokens it took.
         """
-        client = ChatDeepSeek(model_name=model, api_key=self._api_key, timeout=60)
+        client = build_client(self._api_key, model, thinking)
         messages = to_langchain_messages(instructions, history)
         if not tools:
             response = client.invoke(messages)
