@@ -250,7 +250,7 @@ Under the hood, replies move out of LangGraph into plain core code (ADR-0009).
 
 - **Message grouping** (several texts in a row answered as one Message). Its own issue, built *before* this PRD so Understandings are made per Message from the start. The term is already in `CONTEXT.md`.
 - **Keeping typing visible on slow replies** (sending "typing" every ~4 seconds). Its own small issue.
-- **Eval dashboard** (run and tune Evals from the Dashboard, draft settings, side-by-side model comparisons). Its own PRD: `.scratch/eval-dashboard/issues/01-run-evals-from-the-dashboard.md`.
+- **Eval dashboard** (run and tune Evals from the Dashboard, draft settings, side-by-side model comparisons). Its own PRD: `.scratch/eval-dashboard/issues/archive/01-run-evals-from-the-dashboard.md`.
 - **Trying a stronger reply model.** No code: `deepseek-reasoner` is already selectable; compare with Evals (and later the Eval dashboard).
 - **Lookup tools for the reply model** (the hybrid). Kept possible, not built.
 - **Searching Memory Items by meaning.** They stay picked by category.
