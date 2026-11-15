@@ -245,8 +245,36 @@ _Avoid_: Trace, debug log, LLM log
 ### Quality
 
 **Eval**:
-A measurement of how the Companion behaves with the real LLM, run on demand (`make eval`) and never in the normal checks, because it costs money and its results vary. There are Safeguard, Persona, Knowledge, Settings, Photo description and Understanding Evals; a Settings Eval checks that plain-words requests make exactly the right Chat Setting Change, or none, and an Understanding Eval gives a made-up User a User Memory and checks each Message's Understanding (the Need picked, Life Threads found, brought up or left alone, Curiosities, asking why, Knowledge) and its time and tokens. Each one goes through the real reply path and uses the Platform Settings Admins have set. Its cases are data files, not code.
+A measurement of how the Companion behaves with the real LLM, run on demand in an Eval Run and never in the normal checks, because it costs money and its results vary. There are Safeguard, Persona, Knowledge, Settings, Photo description and Understanding Evals; a Settings Eval checks that plain-words requests make exactly the right Chat Setting Change, or none, and an Understanding Eval gives a made-up User a User Memory and checks each Message's Understanding (the Need picked, Life Threads found, brought up or left alone, Curiosities, asking why, Knowledge) and its time and tokens. Each one goes through the real reply path with the Platform Settings Admins have set, changed only by a Variant's Setting Overrides. Its made-up Users, messages and documents are kept fully apart from real Users and their data; an Eval never messages a real chat or searches the web.
 _Avoid_: Test, benchmark
+
+**Eval Case**:
+One situation an Eval checks, such as one labelled message for the Safeguard Eval or one made-up User and their Messages for the Understanding Eval, with what is expected to happen. Admins add, edit, duplicate and archive Eval Cases on the Dashboard; the starting ones come from seed files, and a seed never overwrites an edited case or brings back an archived one. Archived cases are kept so past Eval Runs still show them.
+_Avoid_: Test case, fixture, scenario
+
+**Eval Run**:
+One go at some Eval Cases (whole Evals or single cases), started by an Admin on the Dashboard or from the terminal. Before it starts, Admins see an estimate of its tokens and cost. It is Queued until it can start (one runs at a time), then Running, and ends Finished, Cancelled, Interrupted (it stopped unexpectedly; it is never retried by itself) or Stopped over limit (it crossed the Eval run token limit). Each Eval Case gets a Case Result as soon as it is done, so Admins watch them come in. A run keeps what it used (the Platform Settings, the Judge's settings and each case as it was), so later changes never alter its results. Runs started from the terminal are hidden from the run list unless an Admin chooses to see them. Runs are kept until an Admin deletes one.
+_Avoid_: Eval job, test run, batch
+
+**Variant**:
+One set of Platform Settings an Eval Run tries: the live ones, or the live ones changed by its own Setting Overrides. A run has one to three Variants; each runs every chosen case the same number of times (its Repeats), so they can be compared side by side. The Judge is the same for every Variant in a run.
+_Avoid_: Arm, configuration, experiment
+
+**Setting Override**:
+A change to one Platform Setting (a prompt, a Need, a model, thinking on or off, a limit) that applies only inside one Variant of an Eval Run. It never changes what real Users get, unless an Admin makes it live.
+_Avoid_: Draft setting, temp setting
+
+**Make Live**:
+An Admin's choice to apply a Variant's Setting Overrides to the live Platform Settings, only on a Finished Eval Run and once per Variant. If a setting's live value changed since the run started, the Admin sees the value then, the value now and the override, and confirms or leaves out each such setting. The run shows who made it live, when, and what was applied.
+_Avoid_: Promote, deploy, publish
+
+**Case Result**:
+How one Eval Case went in one Variant on one try: Pass, Fail (the Companion behaved wrongly) or Error (it couldn't be checked, for example the model didn't answer), with the Judge's reason for each rule, the tokens, the time and every model call's full content. Errors don't count as fails. Re-running a run's failed cases includes its Errors.
+_Avoid_: Test result, score
+
+**Model Price**:
+What a model costs in Singapore dollars per million tokens in and out, set by Admins and used for Eval Run cost estimates. A model with no price shows tokens only. The estimate uses the highest price DeepSeek charges, so real costs are lower.
+_Avoid_: Rate, tariff
 
 **Missed Crisis**:
 A real crisis that the Safeguard lets through as "none". Any Missed Crisis fails the Safeguard Eval.
@@ -257,5 +285,5 @@ An everyday message that the Safeguard treats as a crisis, such as "this traffic
 _Avoid_: False positive
 
 **Judge**:
-The LLM that marks a Persona, Knowledge or Understanding Eval: for each rule it says whether the replies keep it, and for a Knowledge Eval it says which version of a document a reply used. It always gives a reason. It can be wrong.
+The LLM that marks a Persona, Knowledge or Understanding Eval: for each rule it says whether the replies keep it, and for a Knowledge Eval it says which version of a document a reply used. It always gives a reason. It can be wrong. Admins set its model, thinking and prompts; a Variant's Setting Overrides never change it.
 _Avoid_: Grader, evaluator
