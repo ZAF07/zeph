@@ -30,10 +30,15 @@ from companion.core.evals.models import (
 )
 from companion.core.evals.ports import EvalCaseRepository, EvalRunRepository
 from companion.core.models import ModelCall
-from companion.core.platform_settings import RESPONSE_MODEL
+from companion.core.platform_settings import (
+    EVAL_RUN_TOKEN_LIMIT,
+    MODEL_PRICES,
+    RESPONSE_MODEL,
+)
 from companion.core.ports import Clock, PlatformSettingsRepository
 
 CASE_HISTORY_LENGTH = 20
+COST_SETTING_KEYS = frozenset({MODEL_PRICES.key, EVAL_RUN_TOKEN_LIMIT.key})
 FAILED_OUTCOMES = (CaseOutcome.FAIL, CaseOutcome.ERROR)
 
 
@@ -96,6 +101,29 @@ def changed_keys(older: dict[str, Any], newer: dict[str, Any]) -> list[str]:
     )
 
 
+def changed_setting_names(older: CaseHistoryRow, newer: CaseHistoryRow) -> list[str]:
+    """Name the settings that differ between two runs of a case.
+
+    Model Prices and the token limit are left out, since they never change
+    a result.
+
+    Args:
+        older: The older result's run.
+        newer: The newer result's run.
+
+    Returns:
+        The Platform Settings' keys, then the Judge settings' as
+        `judge.<name>`.
+    """
+    platform = [
+        key
+        for key in changed_keys(older.settings, newer.settings)
+        if key not in COST_SETTING_KEYS
+    ]
+    judge = [f"judge.{key}" for key in changed_keys(older.judge, newer.judge)]
+    return platform + judge
+
+
 def mark_changes(rows: Sequence[CaseHistoryRow]) -> list[CaseHistoryEntry]:
     """Mark each result with what changed since the older result after it.
 
@@ -116,15 +144,7 @@ def mark_changes(rows: Sequence[CaseHistoryRow]) -> list[CaseHistoryEntry]:
                     and older.result.case_content != row.result.case_content
                 ),
                 changed_settings=(
-                    [
-                        *changed_keys(older.settings, row.settings),
-                        *(
-                            f"judge.{key}"
-                            for key in changed_keys(older.judge, row.judge)
-                        ),
-                    ]
-                    if older is not None
-                    else []
+                    changed_setting_names(older, row) if older is not None else []
                 ),
             )
         )

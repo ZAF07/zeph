@@ -73,6 +73,21 @@ def price_tokens(
 
 
 @dataclass(frozen=True)
+class PriceRow:
+    """One model's row on the Model Prices page.
+
+    Attributes:
+        model: The model's name.
+        sgd_in: SGD per 1,000,000 tokens it reads; None for no price.
+        sgd_out: SGD per 1,000,000 tokens it writes; None for no price.
+    """
+
+    model: str
+    sgd_in: float | None
+    sgd_out: float | None
+
+
+@dataclass(frozen=True)
 class EvalCosts:
     """What keeps Eval Runs' cost in check.
 
@@ -82,7 +97,7 @@ class EvalCosts:
         token_limit: The most tokens one Eval Run may use.
     """
 
-    prices: list[tuple[str, ModelPrice | None]]
+    prices: list[PriceRow]
     token_limit: int
 
 
@@ -118,20 +133,28 @@ class EvalCostsService:
         prices = settings.get(MODEL_PRICES)
         models = list(dict.fromkeys([*settings.get(AVAILABLE_MODELS), *prices]))
         return EvalCosts(
-            prices=[(model, prices.get(model)) for model in models],
+            prices=[
+                PriceRow(
+                    model,
+                    prices[model].sgd_in if model in prices else None,
+                    prices[model].sgd_out if model in prices else None,
+                )
+                for model in models
+            ],
             token_limit=settings.get(EVAL_RUN_TOKEN_LIMIT),
         )
 
     def update(
-        self, admin: User, prices: Sequence[ModelPrice], token_limit: int
+        self, admin: User, prices: Sequence[PriceRow], token_limit: int
     ) -> EvalCosts:
         """Check and save the Model Prices and the token limit together.
 
-        Models left out of `prices` have no price afterwards.
+        A row with neither price, and a model left out, have no price
+        afterwards.
 
         Args:
             admin: The Admin saving them.
-            prices: Every model's price.
+            prices: Every model's row.
             token_limit: The most tokens one Eval Run may use.
 
         Returns:
@@ -139,7 +162,8 @@ class EvalCostsService:
 
         Raises:
             InvalidEvalCostsError: If a price or the limit is out of range,
-                or a model is named twice; nothing is saved.
+                a row has only one of its two prices, or a model is named
+                twice; nothing is saved.
         """
         if not LOWEST_TOKEN_LIMIT <= token_limit <= HIGHEST_TOKEN_LIMIT:
             raise InvalidEvalCostsError(
@@ -147,12 +171,19 @@ class EvalCostsService:
                 f"to {HIGHEST_TOKEN_LIMIT:,}."
             )
         stored: dict[str, dict[str, float]] = {}
-        for price in prices:
-            model = price.model.strip()
+        for row in prices:
+            model = row.model.strip()
             if not model:
                 raise InvalidEvalCostsError("Every price needs a model name.")
             if model in stored:
                 raise InvalidEvalCostsError(f"{model} has two prices.")
+            if row.sgd_in is None and row.sgd_out is None:
+                continue
+            if row.sgd_in is None or row.sgd_out is None:
+                raise InvalidEvalCostsError(
+                    f"Give {model} a price for tokens in and out, or neither."
+                )
+            price = ModelPrice(model, row.sgd_in, row.sgd_out)
             for amount in (price.sgd_in, price.sgd_out):
                 if not 0 <= amount <= HIGHEST_PRICE_SGD:
                     raise InvalidEvalCostsError(

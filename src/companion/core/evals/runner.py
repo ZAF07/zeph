@@ -111,7 +111,7 @@ class EvalRunner:
         tokens_used = 0
         ended_as = EvalRunState.FINISHED
         for case, variant in product(snapshot.cases, run.variants):
-            result = self._run_case(
+            result = self._run_and_save_case(
                 run,
                 variant,
                 case,
@@ -147,7 +147,7 @@ class EvalRunner:
             return EvalRunState.STOPPED_OVER_LIMIT
         return None
 
-    def _run_case(
+    def _run_and_save_case(
         self,
         run: EvalRun,
         variant: Variant,
@@ -157,7 +157,7 @@ class EvalRunner:
         tokens_before: int,
         token_limit: int,
     ) -> CaseResult:
-        """Run one case on fresh data with a Variant's settings.
+        """Run one case on fresh data with a Variant's settings, then save it.
 
         Args:
             run: The run.
@@ -247,6 +247,11 @@ def read_case_model_calls(companion: EvalCompanion) -> list[ModelCall]:
             errors_only=False,
             limit=TRACES_PER_CASE_AT_MOST,
         )
+        if len(overviews) == TRACES_PER_CASE_AT_MOST:
+            logger.warning(
+                "An Eval case made %d traces or more; only the newest are kept",
+                TRACES_PER_CASE_AT_MOST,
+            )
         calls: list[ModelCall] = []
         for overview in reversed(overviews):
             details = model_calls.get_trace(overview.trace.id)

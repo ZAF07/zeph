@@ -7,15 +7,12 @@ from fastapi import APIRouter, Depends, Response, status
 from pydantic import BaseModel
 
 from companion.adapters.http.admin_api import ModelCallResponse, to_model_call_response
-from companion.core.evals.costs import (
-    EvalCosts,
-    EvalCostsService,
-    InvalidEvalCostsError,
-)
+from companion.core.evals.costs import EvalCosts, EvalCostsService, PriceRow
 from companion.core.evals.models import (
     CaseOutcome,
     CaseResult,
     Cost,
+    EvalCase,
     EvalName,
     EvalRunOverview,
     EvalRunState,
@@ -24,7 +21,6 @@ from companion.core.evals.models import (
 )
 from companion.core.evals.runs import EvalRunService
 from companion.core.models import User
-from companion.core.platform_settings import ModelPrice
 
 
 class EvalResponse(BaseModel):
@@ -233,14 +229,24 @@ def to_eval_costs_body(costs: EvalCosts) -> EvalCostsBody:
     """
     return EvalCostsBody(
         prices=[
-            ModelPriceBody(
-                model=model,
-                sgd_in=price.sgd_in if price else None,
-                sgd_out=price.sgd_out if price else None,
-            )
-            for model, price in costs.prices
+            ModelPriceBody(model=row.model, sgd_in=row.sgd_in, sgd_out=row.sgd_out)
+            for row in costs.prices
         ],
         token_limit=costs.token_limit,
+    )
+
+
+def to_eval_case_response(case: EvalCase) -> EvalCaseResponse:
+    """Turn an Eval Case into its API shape.
+
+    Args:
+        case: The case.
+
+    Returns:
+        The response.
+    """
+    return EvalCaseResponse(
+        key=case.key, eval=case.eval, content=case.content, archived=case.archived
     )
 
 
@@ -499,15 +505,7 @@ def build_eval_api_router(
         return EvalRunSnapshotResponse(
             settings=snapshot.settings,
             judge=snapshot.judge,
-            cases=[
-                EvalCaseResponse(
-                    key=case.key,
-                    eval=case.eval,
-                    content=case.content,
-                    archived=case.archived,
-                )
-                for case in snapshot.cases
-            ],
+            cases=[to_eval_case_response(case) for case in snapshot.cases],
         )
 
     @router.get("/eval-runs/{run_id}/results/{result_id}")
@@ -548,14 +546,8 @@ def build_eval_api_router(
             CoreError: 404 if there is no such case.
         """
         history = eval_run_service.case_history(case_key)
-        case = history.case
         return CaseHistoryResponse(
-            case=EvalCaseResponse(
-                key=case.key,
-                eval=case.eval,
-                content=case.content,
-                archived=case.archived,
-            ),
+            case=to_eval_case_response(history.case),
             entries=[
                 CaseHistoryEntryResponse(
                     run_id=str(entry.result.run_id),
@@ -599,15 +591,9 @@ def build_eval_api_router(
             CoreError: 422 if a price or the limit is out of range, or only
                 one of a model's two prices is given.
         """
-        prices = []
-        for price in body.prices:
-            if price.sgd_in is None and price.sgd_out is None:
-                continue
-            if price.sgd_in is None or price.sgd_out is None:
-                raise InvalidEvalCostsError(
-                    f"Give {price.model} a price for tokens in and out, or neither."
-                )
-            prices.append(ModelPrice(price.model, price.sgd_in, price.sgd_out))
+        prices = [
+            PriceRow(price.model, price.sgd_in, price.sgd_out) for price in body.prices
+        ]
         return to_eval_costs_body(
             eval_costs_service.update(admin, prices, body.token_limit)
         )

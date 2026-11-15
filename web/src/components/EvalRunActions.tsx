@@ -29,6 +29,7 @@ export function EvalRunActions({ run }: { run: EvalRun }) {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const failedCount = run.failed + run.errored;
   const isGoing = isRunGoing(run.state);
+  const canDelete = run.state !== "running";
 
   const cancelMutation = useMutation({
     mutationFn: () => apiClient.cancelEvalRun(run.id),
@@ -79,7 +80,7 @@ export function EvalRunActions({ run }: { run: EvalRun }) {
             Re-run failed · {countOf(failedCount, "case")}
           </button>
         ) : null}
-        {run.state !== "running" && !isConfirmingDelete ? (
+        {canDelete && !isConfirmingDelete ? (
           <button
             type="button"
             className={dangerButton}
@@ -89,7 +90,7 @@ export function EvalRunActions({ run }: { run: EvalRun }) {
           </button>
         ) : null}
       </div>
-      {isConfirmingDelete && run.state !== "running" ? (
+      {canDelete && isConfirmingDelete ? (
         <div className="flex flex-col gap-3 rounded-card bg-danger-tint p-5">
           <p className="m-0 text-caption">
             This deletes the run with its Case Results and traces. It can’t be

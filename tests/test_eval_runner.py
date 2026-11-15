@@ -18,6 +18,8 @@ from companion.adapters.postgres.eval_repositories import (
 from companion.adapters.postgres.repositories import PostgresPlatformSettingsRepository
 from companion.core.evals.models import EvalCase, EvalName
 from companion.core.evals.runner import EvalRunner
+from companion.core.evals.runs import EvalRunService
+from companion.eval_terminal import start_and_watch_run
 from companion.main import SEED_DIR
 from tests.conftest import shared_postgres_url
 from tests.eval_run_helpers import (
@@ -853,6 +855,14 @@ def test_case_history_marks_where_the_case_or_settings_changed(
         headers=admin,
     )
     run_traffic()
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE platform_settings SET value = '\"Plain and kind.\"' "
+                "WHERE key = 'persona'"
+            )
+        )
+    run_traffic()
 
     response = client.get("/api/admin/eval-cases/traffic/history", headers=admin)
 
@@ -860,9 +870,39 @@ def test_case_history_marks_where_the_case_or_settings_changed(
     history = response.json()
     assert history["case"]["content"]["message"] == "this queue is killing me"
     entries = history["entries"]
-    assert [entry["outcome"] for entry in entries] == ["pass"] * 4
-    assert [entry["case_changed"] for entry in entries] == [False, True, False, False]
-    assert entries[0]["changed_settings"] == ["eval_run_token_limit", "model_prices"]
-    assert [entry["changed_settings"] for entry in entries[1:]] == [[], [], []]
+    assert [entry["outcome"] for entry in entries] == ["pass"] * 5
+    assert [entry["case_changed"] for entry in entries] == [
+        False,
+        False,
+        True,
+        False,
+        False,
+    ]
+    assert entries[0]["changed_settings"] == ["persona"]
+    assert [entry["changed_settings"] for entry in entries[1:]] == [[], [], [], []]
     unknown = client.get("/api/admin/eval-cases/nope/history", headers=admin)
     assert unknown.status_code == 404
+
+
+def test_the_terminal_runs_single_cases_and_prints_each_one(
+    engine: Engine, chat_model: ScriptedChatModel, runner: EvalRunner, clock: FakeClock
+) -> None:
+    add_cases(engine, CRISIS_CASE, FALSE_ALARM_CASE)
+    service = EvalRunService(
+        runs=PostgresEvalRunRepository(engine),
+        cases=PostgresEvalCaseRepository(engine),
+        settings=PostgresPlatformSettingsRepository(engine),
+        clock=clock,
+    )
+    chat_model.script()
+    lines: list[str] = []
+
+    passed = start_and_watch_run(
+        service, [], ["traffic"], lines.append, lambda _: runner.work_next_run()
+    )
+
+    assert passed is True
+    assert lines[0].startswith("Queued Eval Run ")
+    assert lines[0].endswith("(traffic)")
+    assert any("traffic" in line and line.startswith("PASS") for line in lines)
+    assert not any("plan" in line for line in lines)

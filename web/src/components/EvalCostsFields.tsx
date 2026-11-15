@@ -176,7 +176,7 @@ export function EvalCostsFields({ costs }: { costs: EvalCosts }) {
         <p className={fieldCaption}>
           Tokens in and out together. Once a run goes over this, it stops by
           itself as “Stopped over limit” after the case it is on, keeping every
-          finished case. A whole run of every Eval uses about 430,000.
+          finished case.
         </p>
       </section>
 
