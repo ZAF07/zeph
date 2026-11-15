@@ -1,6 +1,6 @@
 # 17 — Tune the Understanding with the Understanding Eval
 
-Status: ready-for-agent
+Status: completed
 
 ## What
 
@@ -29,10 +29,10 @@ The PRD says being reminded is the heart of the feature and to tune the closenes
 
 ## Acceptance criteria
 
-- [ ] Every Understanding eval case passes in 3 runs in a row (`uv run pytest -n 0 evals -m eval -k understanding`), or each remaining failure is written up with its pass rate
-- [ ] The other Evals don't get worse than the baseline run (a new failure is rerun 3 times to tell a regression from a fluke)
-- [ ] `make check-python` passes
-- [ ] The local main database has the new Understanding prompt and Needs
+- [x] Every Understanding eval case passes in 3 runs in a row (`uv run pytest -n 0 evals -m eval -k understanding`), or each remaining failure is written up with its pass rate: final 3 runs 12/12, 12/12, 12/12. `reminded-of-sister`'s reply rule then failed in the full eval and 1 of 3 reruns (8 of 10 since the last rewording, the Understanding's own checks passed every run): written up below and in issue 25
+- [x] The other Evals don't get worse than the baseline run (a new failure is rerun 3 times to tell a regression from a fluke): final `make eval` 68/70; `reminded-of-sister` (above) and Persona `asks-for-tips` `no_lists` (2 of 4, a reply-side flake already seen failing 2 of 3 in issue 18, not caused by the Understanding) were rerun 3 times; baseline's `delete-account` failure passed
+- [x] `make check-python` passes: ruff, ruff format, mypy clean; 957 passed
+- [x] The local main database has the new Understanding prompt and Needs: one-off reset run on 2026-11-15 (see Comments); also brought it from migration 0038 to 0040, so it now has issue 18's prompt fields and the "Get it done" Need
 
 ## Blocked by
 
@@ -41,4 +41,18 @@ The PRD says being reminded is the heart of the feature and to tune the closenes
 
 ## Comments
 
+- 2026-11-15 (implemented; evidence). All runs on the deepseek-reasoner defaults, stack down so evals used the seed files:
+  - **Baseline** (before any change): `make eval` 69/70 (only `delete-account`, issue 18/24's case). Understanding 3 runs: 12/12, 12/12, 11/12. On the reasoner 3 of the 4 cases in "What" already passed 3/3 (Advice, Accountability, Mei raised); only `strong-mood-unknown-cause` failed (1 of 3, `asked_why`).
+  - **All four fixes** (seed files only: `needs.yaml` Advice, Think it through, Accountability, Be heard; `platform_settings.yaml` intensity, cause_known, bring_up), 3 Understanding runs: 12/12, 10/12, 10/12. Every Understanding check passed; the Judge failed `reminded-of-sister` `raises_sister_naturally` twice (the Understanding picked `weave` for Mei, because "weave after a light message" fit "my sister's wedding is next week", and the reply skipped Mei) and `no-knowledge-for-a-vent` `no_teaching` twice (a silver lining in the reply).
+  - **Tuned bring_up alone:** "lead when the message is about the Thread or someone in it, weave when it is only a side link". Both cases rerun 3 times: 2/2 each time (the vent failures were noise).
+  - **Final:** Understanding 12/12, 12/12, 12/12 (3 in a row). `make eval` 68/70: `reminded-of-sister` (Understanding picked `lead`, reply asked "how are you feeling about it?" without Mei) and Persona `asks-for-tips` `no_lists`. Each rerun 3 times: `reminded-of-sister` 2/3, `asks-for-tips` 2/3. Both are the reply, not the Understanding; filed as `25-reply-skips-thread-it-was-told-to-lead.md`. `strong-mood-unknown-cause` passed every run after the fix (8/8).
+  - **Running app:** the Understanding eval drives the real backend through the Telegram webhook with real DeepSeek and fastembed, so these runs are the app check for a seed-wording change; no separate /run.
+  - **Local main DB reset** (shown, then run): started only the main Postgres container, ran the project's `migrate()` (it was at 0038, so issue 18's 0039 and 0040 hadn't run), deleted `understanding_prompt` and re-ran `seed_platform_settings` from the new seed, set each Need's `when_it_fits` from `needs.yaml` by name (7 of 7 updated), checked the prompt has both the issue 18 fields and the new bring_up wording, stopped the container.
+  - **Review:** Spec found nothing blocking (lead/weave rewording within the decision). Standards found no hard issues; kept as tested: one short line in bring_up, the "and" clauses in Be heard / Think it through, and "Good moods count too" placement in cause_known. Rewording now would ship text the evals didn't test.
+
 - 2026-11-14 (issue 16 done): the Knowledge eval's reply sometimes skips a passage it was given. That is the reply prompt, not the Understanding: filed as `20-reply-skips-knowledge-passage-it-was-given.md`.
+
+## Completion
+
+- Completed: 2026-11-15
+- Commits: `6a9378b` (Understanding prompt and Needs wording), `3284e0d` (follow-up issue 25)
