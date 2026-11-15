@@ -33,7 +33,12 @@ def test_settings_requests_call_the_right_tool(
     clock: FakeClock,
     eval_report: EvalReport,
 ) -> None:
-    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    no_onboarding_memory = (
+        {"onboarding_reasons": [], "onboarding_note": None} if case.memories else {}
+    )
+    headers = set_up_user_with_check_ins(
+        client, auth_verifier, chat_channel, **no_onboarding_memory
+    )
     user_id = UUID(client.get("/api/me", headers=headers).json()["id"])
     save_memory_items(
         build_postgres_repositories(engine), user_id, case.memories, clock.now()

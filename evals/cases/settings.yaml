@@ -7,7 +7,8 @@
 #
 # A case may give the User some Memory Items first, by Memory Category name
 # (`memories`), and list which of them must be gone afterwards (`forgotten`);
-# every other one must stay.
+# every other one must stay. Such a User skips "What brings you here?" in
+# onboarding, so only the case's own Memory Items say why they came.
 
 - id: week-off
   message: can you give me a week off from check-ins?
