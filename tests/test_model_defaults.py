@@ -27,7 +27,7 @@ REASONING_CALLS: list[Setting[str]] = [
     CHECK_IN_MODEL,
 ]
 
-WRITING_CALLS: list[Setting[str]] = [
+CHAT_MODEL_CALLS: list[Setting[str]] = [
     RESPONSE_MODEL,
     KNOWLEDGE_WHEN_IT_HELPS_MODEL,
     PERSONAL_STICKER_KEEPING_MODEL,
@@ -35,14 +35,14 @@ WRITING_CALLS: list[Setting[str]] = [
 ]
 
 
-@pytest.mark.parametrize("setting", REASONING_CALLS, ids=lambda s: s.key)
+@pytest.mark.parametrize("setting", REASONING_CALLS, ids=lambda setting: setting.key)
 def test_calls_that_make_judgments_default_to_the_reasoner(
     setting: Setting[str], seeded_settings: dict[str, Any]
 ) -> None:
     assert seeded_settings[setting.key] == "deepseek-reasoner"
 
 
-@pytest.mark.parametrize("setting", WRITING_CALLS, ids=lambda s: s.key)
+@pytest.mark.parametrize("setting", CHAT_MODEL_CALLS, ids=lambda setting: setting.key)
 def test_other_calls_stay_on_the_chat_model(
     setting: Setting[str], seeded_settings: dict[str, Any]
 ) -> None:
