@@ -1,4 +1,4 @@
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import asdict
 from datetime import datetime
@@ -11,6 +11,8 @@ from sqlalchemy.dialects.postgresql import insert
 from companion.adapters.postgres.tables import (
     eval_case_results,
     eval_cases,
+    eval_images,
+    eval_judge_settings,
     eval_runs,
     eval_variants,
     users,
@@ -22,6 +24,7 @@ from companion.core.evals.models import (
     CaseResult,
     Check,
     EvalCase,
+    EvalImage,
     EvalName,
     EvalRun,
     EvalRunOverview,
@@ -29,6 +32,7 @@ from companion.core.evals.models import (
     RunSnapshot,
     RunTotals,
     StartedFrom,
+    StoredEvalCase,
     Variant,
 )
 
@@ -129,6 +133,247 @@ class PostgresEvalCaseRepository:
                 .returning(eval_cases.c.key)
             ).scalars()
             return list(added)
+
+    def list_stored(self, eval_name: EvalName) -> list[StoredEvalCase]:
+        """List every case of one Eval, archived ones too.
+
+        Args:
+            eval_name: The Eval.
+
+        Returns:
+            The cases, in the order added.
+        """
+        statement = (
+            self._stored_cases()
+            .where(eval_cases.c.eval == eval_name.value)
+            .order_by(eval_cases.c.position)
+        )
+        with self._engine.connect() as connection:
+            return [_to_stored_case(row) for row in connection.execute(statement)]
+
+    def get(self, key: str) -> StoredEvalCase | None:
+        """Read one case, archived or not.
+
+        Args:
+            key: Its key.
+
+        Returns:
+            The case; None if no case has the key.
+        """
+        statement = self._stored_cases().where(eval_cases.c.key == key)
+        with self._engine.connect() as connection:
+            row = connection.execute(statement).first()
+        return _to_stored_case(row) if row is not None else None
+
+    def add(self, case: EvalCase, now: datetime, admin_id: UUID) -> bool:
+        """Add a case an Admin wrote.
+
+        Args:
+            case: The case.
+            now: When it is added.
+            admin_id: The Admin adding it.
+
+        Returns:
+            True if added; False if its key is taken.
+        """
+        row = {
+            **_eval_case_values(case),
+            "edited": True,
+            "created_at": now,
+            "created_by": admin_id,
+            "updated_at": now,
+            "updated_by": admin_id,
+        }
+        with self._engine.begin() as connection:
+            added = connection.execute(
+                insert(eval_cases)
+                .values(row)
+                .on_conflict_do_nothing()
+                .returning(eval_cases.c.key)
+            ).first()
+        return added is not None
+
+    def update(
+        self,
+        key: str,
+        content: dict[str, Any],
+        archived: bool,
+        now: datetime,
+        admin_id: UUID,
+    ) -> None:
+        """Change a case and mark it edited, so the seed leaves it alone.
+
+        Args:
+            key: Its key.
+            content: Its new content.
+            archived: Whether it is archived.
+            now: When it changed.
+            admin_id: The Admin changing it.
+        """
+        with self._engine.begin() as connection:
+            connection.execute(
+                update(eval_cases)
+                .where(eval_cases.c.key == key)
+                .values(
+                    content=content,
+                    archived=archived,
+                    edited=True,
+                    updated_at=now,
+                    updated_by=admin_id,
+                )
+            )
+
+    @staticmethod
+    def _stored_cases() -> Select[Any]:
+        """Select cases with who last changed them.
+
+        Returns:
+            The query.
+        """
+        return select(
+            eval_cases,
+            func.coalesce(users.c.name, users.c.email).label("updated_by_name"),
+        ).select_from(
+            eval_cases.outerjoin(users, users.c.id == eval_cases.c.updated_by)
+        )
+
+
+def _to_stored_case(row: Row[Any]) -> StoredEvalCase:
+    """Turn a case row, joined with its last editor, into a stored case.
+
+    Args:
+        row: The database row.
+
+    Returns:
+        The stored case.
+    """
+    values = row._asdict()
+    return StoredEvalCase(
+        case=_to_eval_case(values),
+        edited=values["edited"],
+        updated_at=values["updated_at"],
+        updated_by_name=values["updated_by_name"],
+    )
+
+
+class PostgresEvalImageRepository:
+    """Stores the test images cases send, in the app database."""
+
+    def __init__(self, engine: Engine) -> None:
+        """Set up the repository.
+
+        Args:
+            engine: The app database.
+        """
+        self._engine = engine
+
+    def add_missing(self, images: Sequence[EvalImage], now: datetime) -> None:
+        """Add the images whose name isn't stored yet; never change one.
+
+        Args:
+            images: The images.
+            now: When they are added.
+        """
+        if not images:
+            return
+        rows = [
+            {
+                "name": image.name,
+                "content": image.content,
+                "media_type": image.media_type,
+                "created_at": now,
+            }
+            for image in images
+        ]
+        with self._engine.begin() as connection:
+            connection.execute(
+                insert(eval_images).values(rows).on_conflict_do_nothing()
+            )
+
+    def get_many(self, names: Sequence[str]) -> list[EvalImage]:
+        """Read some images.
+
+        Args:
+            names: Their names.
+
+        Returns:
+            The ones stored, in no particular order.
+        """
+        if not names:
+            return []
+        statement = select(eval_images).where(eval_images.c.name.in_(list(names)))
+        with self._engine.connect() as connection:
+            return [
+                EvalImage(name=row.name, content=row.content, media_type=row.media_type)
+                for row in connection.execute(statement)
+            ]
+
+
+class PostgresJudgeSettingsRepository:
+    """Stores the Judge's settings in the app database."""
+
+    def __init__(self, engine: Engine) -> None:
+        """Set up the repository.
+
+        Args:
+            engine: The app database.
+        """
+        self._engine = engine
+
+    def load(self) -> dict[str, Any]:
+        """Read every Judge setting.
+
+        Returns:
+            Each setting's value by name.
+        """
+        with self._engine.connect() as connection:
+            rows = connection.execute(select(eval_judge_settings))
+            return {row.key: row.value for row in rows}
+
+    def add_missing(self, values: Mapping[str, Any], now: datetime) -> None:
+        """Add the settings not stored yet; never change one.
+
+        Args:
+            values: Each setting's starting value by name.
+            now: When they are added.
+        """
+        rows = [
+            {"key": key, "value": value, "updated_at": now}
+            for key, value in values.items()
+        ]
+        if not rows:
+            return
+        with self._engine.begin() as connection:
+            connection.execute(
+                insert(eval_judge_settings).values(rows).on_conflict_do_nothing()
+            )
+
+    def save(self, values: Mapping[str, Any], now: datetime, admin_id: UUID) -> None:
+        """Save new values for some settings.
+
+        Args:
+            values: Each setting's new value by name.
+            now: When they changed.
+            admin_id: The Admin changing them.
+        """
+        rows = [
+            {"key": key, "value": value, "updated_at": now, "updated_by": admin_id}
+            for key, value in values.items()
+        ]
+        if not rows:
+            return
+        statement = insert(eval_judge_settings).values(rows)
+        with self._engine.begin() as connection:
+            connection.execute(
+                statement.on_conflict_do_update(
+                    index_elements=[eval_judge_settings.c.key],
+                    set_={
+                        "value": statement.excluded.value,
+                        "updated_at": statement.excluded.updated_at,
+                        "updated_by": statement.excluded.updated_by,
+                    },
+                )
+            )
 
 
 def _check_values(result: CaseCheckResult) -> dict[str, Any]:

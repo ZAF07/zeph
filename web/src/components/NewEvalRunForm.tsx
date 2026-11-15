@@ -114,8 +114,8 @@ export function NewEvalRunForm() {
         })}
       </fieldset>
       <p className="m-0 text-caption text-ink-muted">
-        Each case calls DeepSeek, so a run costs money. Cases are read-only for
-        now.
+        Each case calls DeepSeek, so a run costs money. Cases are run as they
+        are now; edit them under Cases.
       </p>
       {startMutation.isError ? (
         <p role="alert" className="m-0 text-caption text-danger">

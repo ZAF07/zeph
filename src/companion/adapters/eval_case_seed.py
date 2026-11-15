@@ -4,8 +4,9 @@ from typing import Any
 
 import yaml
 
+from companion.core.evals.case_shapes import CASE_SHAPES, image_names
 from companion.core.evals.cases import InvalidEvalCaseError, require_unique_keys
-from companion.core.evals.models import EvalCase, EvalName
+from companion.core.evals.models import EvalCase, EvalImage, EvalName
 
 CASE_FILES = {
     EvalName.SAFEGUARD: "safeguard.yaml",
@@ -29,7 +30,9 @@ def without_id(entry: dict[str, Any]) -> dict[str, Any]:
     return {name: value for name, value in entry.items() if name != "id"}
 
 
-def rules_named(rules: dict[str, str], names: list[str], key: str) -> dict[str, str]:
+def rules_named(
+    rules: dict[str, str], names: list[str], key: str
+) -> list[dict[str, str]]:
     """Pick the rules a case names from its file's rules.
 
     Args:
@@ -38,7 +41,7 @@ def rules_named(rules: dict[str, str], names: list[str], key: str) -> dict[str, 
         key: The case's key, for the error message.
 
     Returns:
-        The rules it names, by ID.
+        The rules it names, each `{id, check}`.
 
     Raises:
         InvalidEvalCaseError: If it names a rule the file doesn't define.
@@ -46,7 +49,54 @@ def rules_named(rules: dict[str, str], names: list[str], key: str) -> dict[str, 
     unknown = [name for name in names if name not in rules]
     if unknown:
         raise InvalidEvalCaseError(f"{key} names unknown rules: {', '.join(unknown)}")
-    return {name: rules[name] for name in names}
+    return [{"id": name, "check": rules[name]} for name in names]
+
+
+def memory_item_list(items: dict[str, list[str]] | None) -> list[dict[str, Any]]:
+    """Write Memory Items given by category as a list of `{category, contents}`.
+
+    Args:
+        items: Memory Items' contents by Memory Category name; None for none.
+
+    Returns:
+        One entry per category, in the order written.
+    """
+    return [
+        {"category": category, "contents": contents}
+        for category, contents in (items or {}).items()
+    ]
+
+
+def persona_message(entry: str | dict[str, str]) -> dict[str, Any]:
+    """Write a scripted message as `{text, photo, shows}`.
+
+    Args:
+        entry: Plain text, or `{photo, shows, caption}` as the file has it.
+
+    Returns:
+        The message.
+    """
+    if isinstance(entry, str):
+        return {"text": entry, "photo": None, "shows": ""}
+    return {
+        "text": entry.get("caption", ""),
+        "photo": entry["photo"],
+        "shows": entry["shows"],
+    }
+
+
+def earlier_line(entry: dict[str, str]) -> dict[str, str]:
+    """Write a message already in the Conversation as `{who, text}`.
+
+    Args:
+        entry: `{person: <text>}` or `{zeph: <text>}` as the file has it.
+
+    Returns:
+        The message.
+    """
+    if "person" in entry:
+        return {"who": "person", "text": entry["person"]}
+    return {"who": "zeph", "text": entry["zeph"]}
 
 
 def persona_cases(content: dict[str, Any]) -> list[EvalCase]:
@@ -56,7 +106,8 @@ def persona_cases(content: dict[str, Any]) -> list[EvalCase]:
         content: `rules` and `conversations`.
 
     Returns:
-        One case per conversation.
+        One case per conversation, each message written as
+        `{text, photo, shows}`.
     """
     return [
         EvalCase(
@@ -64,6 +115,7 @@ def persona_cases(content: dict[str, Any]) -> list[EvalCase]:
             eval=EvalName.PERSONA,
             content={
                 **without_id(entry),
+                "messages": [persona_message(message) for message in entry["messages"]],
                 "rules": rules_named(content["rules"], entry["rules"], entry["id"]),
             },
         )
@@ -78,7 +130,8 @@ def understanding_cases(content: dict[str, Any]) -> list[EvalCase]:
         content: `now`, `rules` and `cases`.
 
     Returns:
-        One case per entry, its `now` written as ISO text.
+        One case per entry, its `now` written as ISO text, its Memory Items
+        and earlier lines as lists.
     """
     cases = []
     for entry in content["cases"]:
@@ -88,12 +141,20 @@ def understanding_cases(content: dict[str, Any]) -> list[EvalCase]:
             for rule in message.get("expect", {}).get("rules", [])
         ]
         now = entry.get("now", content["now"])
+        memory = entry.get("memory", {})
         cases.append(
             EvalCase(
                 key=entry["id"],
                 eval=EvalName.UNDERSTANDING,
                 content={
                     **without_id(entry),
+                    "memory": {
+                        **memory,
+                        "items": memory_item_list(memory.get("items")),
+                    },
+                    "earlier": [
+                        earlier_line(line) for line in entry.get("earlier", [])
+                    ],
                     "now": now.isoformat() if isinstance(now, datetime) else now,
                     "rules": rules_named(
                         content["rules"], list(dict.fromkeys(named)), entry["id"]
@@ -102,27 +163,6 @@ def understanding_cases(content: dict[str, Any]) -> list[EvalCase]:
             )
         )
     return cases
-
-
-def images_named(case: EvalCase) -> list[str]:
-    """List the test images a case sends.
-
-    Args:
-        case: The case.
-
-    Returns:
-        The images' file names.
-    """
-    content = case.content
-    if case.eval in (EvalName.SAFEGUARD, EvalName.PHOTO_DESCRIPTIONS):
-        return [content["photo"]] if "photo" in content else []
-    if case.eval == EvalName.PERSONA:
-        return [
-            message["photo"]
-            for message in content["messages"]
-            if isinstance(message, dict)
-        ]
-    return []
 
 
 def read_eval_case_file(
@@ -147,6 +187,18 @@ def read_eval_case_file(
         cases = persona_cases(content)
     elif name == EvalName.UNDERSTANDING:
         cases = understanding_cases(content)
+    elif name == EvalName.SETTINGS:
+        cases = [
+            EvalCase(
+                key=entry["id"],
+                eval=name,
+                content={
+                    **without_id(entry),
+                    "memories": memory_item_list(entry.get("memories")),
+                },
+            )
+            for entry in content
+        ]
     else:
         cases = [
             EvalCase(key=entry["id"], eval=name, content=without_id(entry))
@@ -155,7 +207,9 @@ def read_eval_case_file(
     require_unique_keys([case.key for case in cases])
     for case in cases:
         missing = [
-            image for image in images_named(case) if not (images_dir / image).is_file()
+            image
+            for image in image_names(CASE_SHAPES[case.eval], case.content)
+            if not (images_dir / image).is_file()
         ]
         if missing:
             raise InvalidEvalCaseError(
@@ -178,4 +232,37 @@ def read_eval_case_seed(cases_dir: Path, images_dir: Path) -> list[EvalCase]:
         case
         for name, file_name in CASE_FILES.items()
         for case in read_eval_case_file(name, cases_dir / file_name, images_dir)
+    ]
+
+
+MEDIA_TYPES = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+}
+
+
+def read_eval_image_seed(cases: list[EvalCase], images_dir: Path) -> list[EvalImage]:
+    """Read the test images the seed cases send, to keep with the cases.
+
+    Args:
+        cases: The seed cases.
+        images_dir: The folder of test images.
+
+    Returns:
+        Each image the cases name, once.
+    """
+    names = dict.fromkeys(
+        name
+        for case in cases
+        for name in image_names(CASE_SHAPES[case.eval], case.content)
+    )
+    return [
+        EvalImage(
+            name=name,
+            content=(images_dir / name).read_bytes(),
+            media_type=MEDIA_TYPES[(images_dir / name).suffix.lower()],
+        )
+        for name in names
     ]

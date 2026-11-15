@@ -27,7 +27,8 @@ def add_core_error_handlers(app: FastAPI) -> None:
     """Answer every core error with the status code of its kind.
 
     The body is `{"detail": <message>}`, the same shape as FastAPI's own
-    errors, so routes never catch core errors themselves.
+    errors, so routes never catch core errors themselves. An error about a
+    form's fields adds `fields`: a message per field path.
 
     Args:
         app: The app to add the handlers to.
@@ -56,7 +57,11 @@ def core_error_handler(status_code: int) -> CoreErrorHandler:
         Returns:
             The error response.
         """
-        message = error.message() if isinstance(error, CoreError) else str(error)
-        return JSONResponse(status_code=status_code, content={"detail": message})
+        if not isinstance(error, CoreError):
+            return JSONResponse(status_code=status_code, content={"detail": str(error)})
+        content: dict[str, object] = {"detail": error.message()}
+        if error.field_errors():
+            content["fields"] = error.field_errors()
+        return JSONResponse(status_code=status_code, content=content)
 
     return handle

@@ -4,7 +4,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
-from companion.adapters.postgres.eval_repositories import PostgresEvalCaseRepository
+from companion.adapters.postgres.eval_repositories import (
+    PostgresEvalCaseRepository,
+    PostgresEvalImageRepository,
+)
 from companion.core.evals.case_seed import add_seed_cases
 from companion.core.evals.cases import InvalidEvalCaseError
 from companion.core.evals.models import EvalCase, EvalName
@@ -137,7 +140,8 @@ def test_the_seed_adds_only_new_keys_and_never_overwrites_or_restores(
     engine: Engine, clock: FakeClock
 ) -> None:
     cases = PostgresEvalCaseRepository(engine)
-    add_seed_cases(cases, [CRISIS_CASE, FALSE_ALARM_CASE], clock)
+    images = PostgresEvalImageRepository(engine)
+    add_seed_cases(cases, images, [CRISIS_CASE, FALSE_ALARM_CASE], [], clock)
     with engine.begin() as connection:
         connection.execute(
             text(
@@ -149,7 +153,9 @@ def test_the_seed_adds_only_new_keys_and_never_overwrites_or_restores(
             text("UPDATE eval_cases SET archived = true WHERE key = 'traffic'")
         )
 
-    added = add_seed_cases(cases, [CRISIS_CASE, FALSE_ALARM_CASE, SETTINGS_CASE], clock)
+    added = add_seed_cases(
+        cases, images, [CRISIS_CASE, FALSE_ALARM_CASE, SETTINGS_CASE], [], clock
+    )
 
     assert added == ["just-chatting"]
     stored = cases.list_for_evals([EvalName.SAFEGUARD, EvalName.SETTINGS])
@@ -162,7 +168,13 @@ def test_the_seed_adds_only_new_keys_and_never_overwrites_or_restores(
 def test_a_seed_case_that_does_not_fit_its_eval_is_refused(
     engine: Engine, clock: FakeClock
 ) -> None:
-    broken = EvalCase(key="broken", eval=EvalName.SETTINGS, content={"message": "hi"})
+    broken = EvalCase(key="broken", eval=EvalName.SETTINGS, content={"tools": []})
 
     with pytest.raises(InvalidEvalCaseError, match="broken"):
-        add_seed_cases(PostgresEvalCaseRepository(engine), [broken], clock)
+        add_seed_cases(
+            PostgresEvalCaseRepository(engine),
+            PostgresEvalImageRepository(engine),
+            [broken],
+            [],
+            clock,
+        )

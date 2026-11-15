@@ -4,8 +4,14 @@ from typing import Any
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
-from companion.adapters.postgres.eval_repositories import PostgresEvalCaseRepository
-from companion.core.evals.models import EvalCase, EvalName
+from companion.adapters.eval_case_seed import MEDIA_TYPES
+from companion.adapters.postgres.eval_repositories import (
+    PostgresEvalCaseRepository,
+    PostgresEvalImageRepository,
+)
+from companion.core.evals.case_shapes import CASE_SHAPES, image_names
+from companion.core.evals.models import EvalCase, EvalImage, EvalName
+from companion.main import EVAL_IMAGES_DIR
 
 CRISIS_CASE = EvalCase(
     key="plan",
@@ -25,10 +31,24 @@ SETTINGS_CASE = EvalCase(
 
 
 def add_cases(engine: Engine, *cases: EvalCase) -> None:
-    """Store Eval Cases in the app database, as the seed would."""
-    PostgresEvalCaseRepository(engine).add_missing(
-        list(cases), datetime(2026, 11, 15, tzinfo=UTC)
-    )
+    """Store Eval Cases and the seed images they send, as the seed would."""
+    now = datetime(2026, 11, 15, tzinfo=UTC)
+    names = {
+        name
+        for case in cases
+        for name in image_names(CASE_SHAPES[case.eval], case.content)
+        if (EVAL_IMAGES_DIR / name).is_file()
+    }
+    images = [
+        EvalImage(
+            name=name,
+            content=(EVAL_IMAGES_DIR / name).read_bytes(),
+            media_type=MEDIA_TYPES[(EVAL_IMAGES_DIR / name).suffix],
+        )
+        for name in names
+    ]
+    PostgresEvalImageRepository(engine).add_missing(images, now)
+    PostgresEvalCaseRepository(engine).add_missing(list(cases), now)
 
 
 def start_run(

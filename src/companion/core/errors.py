@@ -22,6 +22,14 @@ class CoreError(Exception):
         """
         return self.shown_message or str(self)
 
+    def field_errors(self) -> dict[str, str]:
+        """Give what is wrong per field of a form, when the error is about one.
+
+        Returns:
+            A message for each field, by its path; empty by default.
+        """
+        return {}
+
 
 class NotFoundError(CoreError, LookupError):
     """Raised when the thing asked for does not exist, or isn't theirs."""

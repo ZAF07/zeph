@@ -739,6 +739,67 @@ export type CaseResult = {
 /** An Eval Run with its Case Results so far, in the order they finished. */
 export type EvalRunDetails = EvalRun & { results: CaseResult[] };
 
+/** What kind of value a field of a case or Judge form holds. */
+export type FieldKind =
+  | "text"
+  | "long_text"
+  | "whole_number"
+  | "on_off"
+  | "choice"
+  | "date_time"
+  | "image"
+  | "text_list"
+  | "group"
+  | "group_list";
+
+/** One value a choice field can hold. */
+export type ChoiceOption = { value: string | boolean; label: string };
+
+/**
+ * One field of a form, as the backend describes it: what it holds, what it
+ * means and, for a group or list of groups, its own fields.
+ */
+export type ShapeField = {
+  name: string;
+  label: string;
+  description: string;
+  kind: FieldKind;
+  required: boolean;
+  options: ChoiceOption[];
+  fields: ShapeField[];
+  unique_by: string;
+  item_label: string;
+  minimum: number | null;
+  default: unknown;
+};
+
+/** A part of a form, such as the made-up User Memory. */
+export type ShapeSection = {
+  title: string;
+  description: string;
+  fields: ShapeField[];
+};
+
+/** The fields a case, or the Judge's settings, is made of, in sections. */
+export type FormShape = { sections: ShapeSection[] };
+
+/** A form's values, by field name. */
+export type FormValues = Record<string, unknown>;
+
+/** An Eval Case as Admins see it. */
+export type EvalCase = {
+  key: string;
+  eval: EvalName;
+  content: FormValues;
+  archived: boolean;
+  edited: boolean;
+  updated_at: string;
+  updated_by_name: string | null;
+};
+
+/** The Judge's settings and the form that edits them. */
+export type JudgeSettings = { shape: FormShape; values: FormValues };
+
 /** Every call the Dashboard makes to the backend. */
 export type ApiClient = {
   getMe: () => Promise<Me>;
@@ -817,6 +878,21 @@ export type ApiClient = {
   listEvalRuns: (includeTerminal: boolean) => Promise<EvalRun[]>;
   startEvalRun: (evals: EvalName[]) => Promise<EvalRun>;
   getEvalRun: (runId: string) => Promise<EvalRunDetails>;
+  listEvalCaseShapes: () => Promise<Record<EvalName, FormShape>>;
+  listEvalCases: (evalName: EvalName) => Promise<EvalCase[]>;
+  getEvalCase: (key: string) => Promise<EvalCase>;
+  addEvalCase: (
+    key: string,
+    evalName: EvalName,
+    content: FormValues,
+  ) => Promise<EvalCase>;
+  editEvalCase: (key: string, content: FormValues) => Promise<EvalCase>;
+  duplicateEvalCase: (key: string, newKey: string) => Promise<EvalCase>;
+  archiveEvalCase: (key: string) => Promise<EvalCase>;
+  uploadEvalImage: (file: File) => Promise<{ name: string }>;
+  getEvalImage: (name: string) => Promise<Blob>;
+  getJudgeSettings: () => Promise<JudgeSettings>;
+  saveJudgeSettings: (values: FormValues) => Promise<JudgeSettings>;
   getUsage: (days: number) => Promise<UsageReport>;
   listMemoryCategories: () => Promise<MemoryCategoryOverview[]>;
   addMemoryCategory: (category: MemoryCategoryInput) => Promise<MemoryCategory>;
@@ -858,37 +934,58 @@ export class ApiError extends Error {
    * @param status - The HTTP status code.
    * @param path - The API path that failed.
    * @param detail - The backend's explanation, when it gave one.
+   * @param fields - What is wrong per form field, by the field's path
+   *   (e.g. `messages.0.text`), when a form save was refused.
    */
   constructor(
     readonly status: number,
     path: string,
     readonly detail: string | null = null,
+    readonly fields: Record<string, string> = {},
   ) {
     super(`API request to ${path} failed with status ${status}`);
   }
 }
 
 /**
- * Reads the backend's explanation from an error response, if it has one.
+ * Reads the per-field messages from a refused form save's body.
+ *
+ * @param body - The parsed error body.
+ * @returns Each field's message by its path; empty when there are none.
+ */
+function fieldErrors(body: object): Record<string, string> {
+  if (!("fields" in body) || typeof body.fields !== "object" || !body.fields) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(body.fields).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+  );
+}
+
+/**
+ * Turns an error response into an `ApiError` with the backend's
+ * explanation and per-field messages, if it gave them.
  *
  * @param response - The error response.
- * @returns The `detail` text, or null.
+ * @param path - The API path that failed.
+ * @returns The error.
  */
-async function errorDetail(response: Response): Promise<string | null> {
+async function toApiError(response: Response, path: string): Promise<ApiError> {
   try {
     const body: unknown = await response.json();
-    if (
-      typeof body === "object" &&
-      body !== null &&
-      "detail" in body &&
-      typeof body.detail === "string"
-    ) {
-      return body.detail;
+    if (typeof body === "object" && body !== null) {
+      const detail =
+        "detail" in body && typeof body.detail === "string"
+          ? body.detail
+          : null;
+      return new ApiError(response.status, path, detail, fieldErrors(body));
     }
   } catch {
-    return null;
+    return new ApiError(response.status, path);
   }
-  return null;
+  return new ApiError(response.status, path);
 }
 
 /**
@@ -912,7 +1009,7 @@ export function createApiClient(
       headers: await authHeaders(),
     });
     if (!response.ok) {
-      throw new ApiError(response.status, path, await errorDetail(response));
+      throw await toApiError(response, path);
     }
     return response.blob();
   }
@@ -936,7 +1033,7 @@ export function createApiClient(
       body: requestBody,
     });
     if (!response.ok) {
-      throw new ApiError(response.status, path, await errorDetail(response));
+      throw await toApiError(response, path);
     }
     if (response.status === 204) {
       return undefined as T;
@@ -1128,6 +1225,53 @@ export function createApiClient(
       request<EvalRun>("/api/admin/eval-runs", "POST", { evals }),
     getEvalRun: (runId) =>
       request<EvalRunDetails>(`/api/admin/eval-runs/${runId}`),
+    listEvalCaseShapes: async () =>
+      (
+        await request<{ shapes: Record<EvalName, FormShape> }>(
+          "/api/admin/eval-case-shapes",
+        )
+      ).shapes,
+    listEvalCases: async (evalName) =>
+      (
+        await request<{ cases: EvalCase[] }>(
+          `/api/admin/eval-cases?eval=${evalName}`,
+        )
+      ).cases,
+    getEvalCase: (key) =>
+      request<EvalCase>(`/api/admin/eval-cases/${encodeURIComponent(key)}`),
+    addEvalCase: (key, evalName, content) =>
+      request<EvalCase>("/api/admin/eval-cases", "POST", {
+        key,
+        eval: evalName,
+        content,
+      }),
+    editEvalCase: (key, content) =>
+      request<EvalCase>(
+        `/api/admin/eval-cases/${encodeURIComponent(key)}`,
+        "PUT",
+        { content },
+      ),
+    duplicateEvalCase: (key, newKey) =>
+      request<EvalCase>(
+        `/api/admin/eval-cases/${encodeURIComponent(key)}/duplicate`,
+        "POST",
+        { key: newKey },
+      ),
+    archiveEvalCase: (key) =>
+      request<EvalCase>(
+        `/api/admin/eval-cases/${encodeURIComponent(key)}/archive`,
+        "POST",
+      ),
+    uploadEvalImage: (file) => {
+      const form = new FormData();
+      form.append("file", file);
+      return request<{ name: string }>("/api/admin/eval-images", "POST", form);
+    },
+    getEvalImage: (name) =>
+      requestBlob(`/api/admin/eval-images/${encodeURIComponent(name)}`),
+    getJudgeSettings: () => request<JudgeSettings>("/api/admin/eval-judge"),
+    saveJudgeSettings: (values) =>
+      request<JudgeSettings>("/api/admin/eval-judge", "PUT", { values }),
     getUsage: (days) => request<UsageReport>(`/api/admin/usage?days=${days}`),
     listMemoryCategories: async () =>
       (

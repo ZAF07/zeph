@@ -589,8 +589,29 @@ eval_cases = Table(
     Column("eval", Text, nullable=False, index=True),
     Column("content", JSONB, nullable=False),
     Column("archived", Boolean, nullable=False, server_default="false"),
+    Column("edited", Boolean, nullable=False, server_default="false"),
     Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("created_by", Uuid, ForeignKey("users.id", ondelete="SET NULL")),
     Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("updated_by", Uuid, ForeignKey("users.id", ondelete="SET NULL")),
+)
+
+eval_images = Table(
+    "eval_images",
+    metadata,
+    Column("name", Text, primary_key=True),
+    Column("content", LargeBinary, nullable=False),
+    Column("media_type", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
+
+eval_judge_settings = Table(
+    "eval_judge_settings",
+    metadata,
+    Column("key", Text, primary_key=True),
+    Column("value", JSONB, nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("updated_by", Uuid, ForeignKey("users.id", ondelete="SET NULL")),
 )
 
 eval_runs = Table(

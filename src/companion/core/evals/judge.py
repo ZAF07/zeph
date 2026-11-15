@@ -4,46 +4,115 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from companion.core.evals.case_shapes import (
+    ChoiceOption,
+    FieldKind,
+    FormShape,
+    ShapeField,
+    ShapeSection,
+    long_text_field,
+)
 from companion.core.models import ChatLine, ChatRole
 from companion.core.ports import ChatModel
 
-JUDGE_MODEL = "deepseek-flash"
-JUDGE_THINKING = False
 NO_VERSION = "none"
 CODE_FENCE = re.compile(r"^```(?:json)?\s*|\s*```$")
 
-PERSONA_JUDGE_INSTRUCTIONS = """\
-You judge replies written by Zeph, an AI companion people talk to on Telegram.
-You are given a conversation and some rules. For each rule, decide whether
-Zeph's replies in the whole conversation keep it. Judge only what Zeph wrote,
-not the person. Be strict: one reply that breaks a rule fails that rule.
 
-Answer with JSON only, in exactly this shape, one verdict per rule:
-{"verdicts": [{"rule": "<rule id>", "passed": true, "reason": "<one sentence>"}]}"""
+@dataclass(frozen=True)
+class JudgeSettings:
+    """The Judge's model, thinking and prompts, set by Admins (ADR-0004).
 
-VERSION_JUDGE_INSTRUCTIONS = """\
-You check which version of a document an AI companion's reply draws on. You
-are given the person's question, the reply and several versions of the
-document, each with a name. The versions differ in their details (numbers,
-colours, names, steps). Decide which one version the reply's details come
-from. If the reply draws on none of them, or you can't tell, answer "none".
+    Attributes:
+        model: The model that judges.
+        thinking: Whether it thinks before it answers.
+        persona_instructions: Its prompt for checking replies against rules.
+        version_instructions: Its prompt for telling which version of a
+            Knowledge Document a reply draws on.
+    """
 
-Answer with JSON only, in exactly this shape:
-{"version": "<version name or none>", "reason": "<one sentence naming the details>"}"""
+    model: str
+    thinking: bool
+    persona_instructions: str
+    version_instructions: str
+
+    @classmethod
+    def from_values(cls, values: Mapping[str, Any]) -> "JudgeSettings":
+        """Read the settings from their stored values.
+
+        Args:
+            values: Each setting's value by name.
+
+        Returns:
+            The settings.
+        """
+        return cls(
+            model=values["model"],
+            thinking=values["thinking"],
+            persona_instructions=values["persona_instructions"],
+            version_instructions=values["version_instructions"],
+        )
 
 
-def judge_settings() -> dict[str, str]:
-    """List the Judge's model, thinking and prompts, for an Eval Run's snapshot.
+def judge_shape(model_choices: Sequence[str]) -> FormShape:
+    """Describe the Judge's settings as a form, the way case forms are.
+
+    Args:
+        model_choices: The models Admins can pick.
 
     Returns:
-        Each setting's value by name.
+        The shape, which checks a save and draws the form.
     """
-    return {
-        "model": JUDGE_MODEL,
-        "thinking": "on" if JUDGE_THINKING else "off",
-        "persona_instructions": PERSONA_JUDGE_INSTRUCTIONS,
-        "version_instructions": VERSION_JUDGE_INSTRUCTIONS,
-    }
+    return FormShape(
+        [
+            ShapeSection(
+                "Model",
+                "The model that marks Persona, Knowledge and Understanding "
+                "cases. Every Variant in a run is marked by the same Judge.",
+                [
+                    ShapeField(
+                        "model",
+                        "Model",
+                        "The model the Judge asks. A stronger model marks more "
+                        "reliably but costs more per case.",
+                        FieldKind.CHOICE,
+                        required=True,
+                        options=[ChoiceOption(name, name) for name in model_choices],
+                    ),
+                    ShapeField(
+                        "thinking",
+                        "Thinking",
+                        "Whether the Judge thinks before it answers. On is "
+                        "slower and uses more tokens.",
+                        FieldKind.ON_OFF,
+                        default=False,
+                    ),
+                ],
+            ),
+            ShapeSection(
+                "Prompts",
+                "What the Judge is told. A change applies from the next run; "
+                "runs already done keep the Judge they used.",
+                [
+                    long_text_field(
+                        "persona_instructions",
+                        "Rules prompt",
+                        "How the Judge checks replies against a case's rules "
+                        "(Persona and Understanding). It must ask for JSON "
+                        'like {"verdicts": [{"rule", "passed", "reason"}]}, or '
+                        "every rule fails as unreadable.",
+                    ),
+                    long_text_field(
+                        "version_instructions",
+                        "Versions prompt",
+                        "How the Judge tells which version of a Knowledge "
+                        "Document a reply draws on (Knowledge). It must ask "
+                        'for JSON like {"version", "reason"}.',
+                    ),
+                ],
+            ),
+        ]
+    )
 
 
 @dataclass(frozen=True)
@@ -147,12 +216,16 @@ def read_version_verdict(answer: str, versions: Sequence[str]) -> VersionVerdict
 
 
 def judge_persona_rules(
-    chat_model: ChatModel, transcript: str, rules: Mapping[str, str]
+    chat_model: ChatModel,
+    judge: JudgeSettings,
+    transcript: str,
+    rules: Mapping[str, str],
 ) -> list[RuleVerdict]:
     """Ask the judge whether a conversation's replies keep each rule.
 
     Args:
         chat_model: The model that judges.
+        judge: The Judge's model, thinking and prompts.
         transcript: The conversation, one "Person:" or "Zeph:" line each.
         rules: Each rule's ID and what it checks.
 
@@ -162,21 +235,26 @@ def judge_persona_rules(
     rule_lines = "\n".join(f"- {rule}: {check}" for rule, check in rules.items())
     question = f"Rules:\n{rule_lines}\n\nConversation:\n{transcript}"
     answer = chat_model.generate(
-        model=JUDGE_MODEL,
-        thinking=JUDGE_THINKING,
-        instructions=PERSONA_JUDGE_INSTRUCTIONS,
+        model=judge.model,
+        thinking=judge.thinking,
+        instructions=judge.persona_instructions,
         history=[ChatLine(role=ChatRole.USER, text=question)],
     )
     return read_rule_verdicts(answer.text, list(rules))
 
 
 def judge_version(
-    chat_model: ChatModel, question: str, reply: str, versions: Mapping[str, str]
+    chat_model: ChatModel,
+    judge: JudgeSettings,
+    question: str,
+    reply: str,
+    versions: Mapping[str, str],
 ) -> VersionVerdict:
     """Ask the judge which version of a document a reply draws on.
 
     Args:
         chat_model: The model that judges.
+        judge: The Judge's model, thinking and prompts.
         question: What the person asked.
         reply: The Companion's reply.
         versions: Each version's name and content.
@@ -189,9 +267,9 @@ def judge_version(
     )
     prompt = f"Question:\n{question}\n\nReply:\n{reply}\n\n{version_parts}"
     answer = chat_model.generate(
-        model=JUDGE_MODEL,
-        thinking=JUDGE_THINKING,
-        instructions=VERSION_JUDGE_INSTRUCTIONS,
+        model=judge.model,
+        thinking=judge.thinking,
+        instructions=judge.version_instructions,
         history=[ChatLine(role=ChatRole.USER, text=prompt)],
     )
     return read_version_verdict(answer.text, list(versions))

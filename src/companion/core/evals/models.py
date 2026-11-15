@@ -66,6 +66,42 @@ class EvalCase:
 
 
 @dataclass(frozen=True)
+class StoredEvalCase:
+    """An Eval Case as Admins see it in the case list.
+
+    Attributes:
+        case: The case.
+        edited: Whether an Admin changed it after it was added.
+        updated_at: When it last changed.
+        updated_by_name: The name or email of the Admin who last changed
+            it; None if the seed added it and nobody changed it since.
+    """
+
+    case: EvalCase
+    edited: bool
+    updated_at: datetime
+    updated_by_name: str | None
+
+
+@dataclass(frozen=True)
+class EvalImage:
+    """A test image a case sends as a photo, kept with the cases.
+
+    A stored image never changes, so an old run's cases still show the
+    image they used.
+
+    Attributes:
+        name: Its name, which cases refer to it by.
+        content: The image file.
+        media_type: Its type, e.g. image/png.
+    """
+
+    name: str
+    content: bytes
+    media_type: str
+
+
+@dataclass(frozen=True)
 class Check:
     """One thing checked in a case, such as a Judge rule.
 

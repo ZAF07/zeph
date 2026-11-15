@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,7 @@ from companion.adapters.postgres.database import (
     seed_platform_settings,
 )
 from companion.adapters.postgres.tables import metadata, platform_settings
+from companion.core.evals.models import EvalImage
 from companion.core.ports import ChatModel, Embedder, PhotoViewer
 
 
@@ -58,8 +60,7 @@ class PostgresEvalEnvironment:
             chat_model: The real chat model.
             photo_viewer: The real photo viewer.
             embedder: The real embedder, loaded once.
-            seed_dir: The app's seed folder, with the Eval test images in
-                `evals/images`.
+            seed_dir: The app's seed folder.
         """
         self._database_url = database_url
         self._engine: Engine = create_engine(database_url)
@@ -75,12 +76,15 @@ class PostgresEvalEnvironment:
             connection.execute(text("CREATE SCHEMA public"))
         migrate(self._database_url)
 
-    def fresh_companion(self, platform_settings: dict[str, Any]) -> InProcessCompanion:
+    def fresh_companion(
+        self, platform_settings: dict[str, Any], images: Sequence[EvalImage]
+    ) -> InProcessCompanion:
         """Empty the Eval database, seed it and build the app on it.
 
         Args:
             platform_settings: The Platform Settings to write into it, by
                 key; settings missing here come from the seed.
+            images: The test images the case sends, by name.
 
         Returns:
             The app, ready for one case.
@@ -97,7 +101,7 @@ class PostgresEvalEnvironment:
             chat_model=self._chat_model,
             photo_viewer=self._photo_viewer,
             embedder=self._embedder,
-            images_dir=self._seed_dir / "evals" / "images",
+            images=images,
             knowledge_seed_file=self._seed_dir / "knowledge" / "knowledge.yaml",
         )
 

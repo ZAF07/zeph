@@ -36,3 +36,12 @@ Lane B (case and Judge pages). Runs in parallel with 03.
 - `02-eval-runs-from-the-dashboard.md`
 
 ## Comments
+
+- 2026-11-15 (implementing, branch `eval-dashboard-04-edit-cases-judge`): plan.
+  - **Case shapes in core** (`core/evals/case_shapes.py`): each Eval's case shape is a list of sections of described fields (text, long text, whole number, on/off, choice, date and time, image, list of text, group, list of groups). The same shape checks a save (a message per field path, e.g. `messages.0.text`) and is sent to the Dashboard to draw the form, so the form has no rules of its own. The Eval's own cross checks (Thread titles, forgotten Memory Items) run after it.
+  - **Regular content:** content becomes plain fields the form can write: Persona messages always `{text, photo, shows}`, rules and Memory Items lists of `{id, check}` / `{category, contents}`, earlier lines `{who, text}`. The seed reader writes this shape; the migration rewrites stored cases once (run snapshots are left as they were).
+  - **Images** live in a new `eval_images` table (name, bytes, type). The seed adds its images there; uploads get a fresh name so a stored image never changes and old runs still point at what they used. The runner hands each case its images; nothing reads the images folder at run time.
+  - **Judge settings:** a new `eval_judge_settings` table seeded from `seed/evals/judge.yaml` (add missing keys only), not Platform Settings, so Setting Overrides can never change the Judge. The runner reads them at run start, snapshots them and passes them to the Persona, Knowledge and Understanding checks. Model must be one of the Available models.
+  - **API:** new `eval_case_api.py` (keeps clear of 03's `eval_api.py`): shapes, list/get/add/edit/duplicate/archive cases, image upload/download, Judge get/save. A case save that doesn't fit answers 422 with `fields` (path → message) beside `detail`.
+  - **Dashboard:** Runs / Cases / Judge tabs in the Eval area; cases list per Eval; one shape-driven case form; Judge form in the same style.
+  - Migration 0043 (03 also adds one; whoever rebases second renumbers).
