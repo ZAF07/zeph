@@ -28,7 +28,7 @@ services:
         condition: service_healthy
     ports:
       - "${BACKEND_PORT:-8000}:8000"
-    environment:
+    environment: &backend-environment
       POSTGRES_USER: ${POSTGRES_USER:-}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
       POSTGRES_DB: ${POSTGRES_DB:-}
@@ -54,6 +54,28 @@ services:
       WEB_SEARCH_ADAPTER: ${WEB_SEARCH_ADAPTER:-}
       SCHEDULER_ADAPTER: ${SCHEDULER_ADAPTER:-}
       MODEL_CALL_DEVELOPER_LOGS: ${MODEL_CALL_DEVELOPER_LOGS:-}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8000/health')
+      interval: 5s
+      timeout: 5s
+      start_period: 180s
+      retries: 30
+
+  # Works Eval Runs one at a time against its own Eval database (ADR-0013).
+  # It always uses a recording chat channel and no web search, whatever the
+  # adapter settings say, and runs no Check-ins.
+  eval-runner:
+    build: .
+    command: ["python", "-m", "companion.eval_runner"]
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment: *backend-environment
 
   web:
     build: ./web
