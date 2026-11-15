@@ -1330,3 +1330,36 @@ def test_a_variant_is_marked_made_live_only_once(
 
     assert (first, second) == (True, False)
     assert make_live(client, admin, run["id"], "B").status_code == 409
+
+
+def test_the_token_limit_counts_every_variant_and_repeat(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, FALSE_ALARM_CASE)
+    admin = owner_headers(client, auth_verifier)
+    measured = start_run(client, admin, EvalName.SAFEGUARD)
+    chat_model.script("")
+    runner.work_next_run()
+    [one_try] = open_run(client, admin, measured["id"])["results"]
+    tokens_per_try = one_try["tokens_in"] + one_try["tokens_out"]
+    set_token_limit(engine, 2 * tokens_per_try + 1)
+    run = start_run(
+        client,
+        admin,
+        EvalName.SAFEGUARD,
+        variants=[{}, {"safeguard_thinking": False}],
+        repeats=2,
+    )
+    chat_model.script(*[""] * 4)
+
+    runner.work_next_run()
+
+    stopped = open_run(client, admin, run["id"])
+    assert stopped["state"] == "stopped_over_limit"
+    assert [
+        (result["try_number"], result["variant"]) for result in stopped["results"]
+    ] == [(1, "A"), (1, "B"), (2, "A")]
