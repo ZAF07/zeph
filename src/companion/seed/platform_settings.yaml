@@ -428,9 +428,9 @@ understanding_prompt: |-
   - left_alone: the Life Threads the message touches that Zeph should not
     raise, each with a short reason (e.g. "they're struggling with something
     else", "too painful right now").
-  - knowledge: the Knowledge documents worth searching, titles exactly as
-    written, and one search phrase about what would help, from the whole
-    Conversation, not only their last words. Write the phrase in the words a
+  - knowledge: the numbers of the Knowledge documents worth searching, and
+    one search phrase about what would help, from the whole Conversation,
+    not only their last words. Write the phrase in the words a
     helpful passage would use, the topic or practice, not their question
     (e.g. "being kind to yourself after a mistake", not "how do I stop
     beating myself up?"). Choose a document only when its "when it helps"
@@ -453,7 +453,7 @@ understanding_prompt: |-
                  {"curiosity": <number>, "how": "lead" | "weave"}],
     "left_alone": [{"thread": <number>, "reason": "..."}],
     "look_up_past": ["<search phrase>"],
-    "knowledge": {"documents": ["<document title>"], "search": "<search phrase>"} | null,
+    "knowledge": {"documents": [<number>], "search": "<search phrase>"} | null,
     "threads_touched": [<number>]
   }
 

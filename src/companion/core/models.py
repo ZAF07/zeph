@@ -972,15 +972,28 @@ class CuriosityToRaise:
 
 
 @dataclass(frozen=True)
+class ChosenKnowledgeDocument:
+    """A Knowledge document the Understanding chose to search.
+
+    Attributes:
+        document_id: The document's ID.
+        title: Its title, when it was chosen.
+    """
+
+    document_id: UUID
+    title: str
+
+
+@dataclass(frozen=True)
 class KnowledgeLookup:
     """The Knowledge the Understanding chose to search for a reply.
 
     Attributes:
-        documents: The titles of the Knowledge documents to search.
+        documents: The Knowledge documents to search.
         search: The phrase to search them with.
     """
 
-    documents: tuple[str, ...]
+    documents: tuple[ChosenKnowledgeDocument, ...]
     search: str
 
 

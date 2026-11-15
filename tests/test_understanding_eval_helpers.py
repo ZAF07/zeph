@@ -332,16 +332,13 @@ def test_a_message_with_no_understanding_call_fails_and_says_so() -> None:
 
 def test_knowledge_chosen_but_not_reaching_the_reply_fails() -> None:
     expect = UnderstandingExpectations(knowledge=True)
-    named_by_its_line = "“On the breath” (Owner's notes, Mindfulness)"
 
     [check] = check_understanding(
-        expect, replace(NOTHING_RAISED, knowledge_documents=[named_by_its_line])
+        expect, replace(NOTHING_RAISED, knowledge_documents=["On the breath"])
     )
 
     assert check == CheckResult(
-        "knowledge",
-        False,
-        f"chose {named_by_its_line}, but no passage reached the reply",
+        "knowledge", False, "chose On the breath, but no passage reached the reply"
     )
 
 
