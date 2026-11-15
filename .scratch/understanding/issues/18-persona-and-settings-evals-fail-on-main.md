@@ -1,6 +1,6 @@
 # 18 — Persona and Settings Evals fail on main
 
-Status: needs-triage
+Status: ready-for-agent
 
 ## What
 
@@ -18,9 +18,20 @@ set -a && . ./.env && set +a
 uv run pytest -n 0 evals -m eval -k "struggling-with-shared-photos or forget-why-here"
 ```
 
+## Decisions (grilling, 2026-11-15)
+
+- **Rule:** never send a Shared Photo back when the User is struggling, unless they ask for one. The reply still sees the photo descriptions, so it may mention the memory in words. Why: a photo can sting (beach photo with mum while mum is in hospital), can read as "cheer up" instead of listening, and the model can't reliably tell an encouraging photo from a painful one.
+- **Code guard:** add `struggling: bool` and `asked_for_photo: bool` to `UnderstandingForm`. The reply is offered `send_photo` only when `not struggling or asked_for_photo`. Update the seeded Understanding prompt to fill both (needs a migration that reloads it, like 0037).
+- **`forget-why-here` is an eval bug:** the eval User has no memories, so `list_memories` returns nothing and not calling `forget_memory` is correct. Fix the case: give that User two Memory Items, one about why they came (e.g. "came here because work stress is wearing them down") and one unrelated. Pass only if that item is deleted and the other stays.
+- The guard and the eval fix don't need issue 21; only the final "3 runs in a row" check runs after it.
+
 ## Acceptance criteria
 
-- [ ] Both cases pass in 3 runs in a row
+- [ ] A struggling User who didn't ask is never offered `send_photo` (unit test on the guard)
+- [ ] A struggling User who asks for a photo is offered `send_photo` (unit test)
+- [ ] Persona eval: a struggling User who asks for a photo can get one back (new case)
+- [ ] `forget-why-here` seeds two Memory Items; passes only when the right one is deleted and the other stays
+- [ ] Both cases pass in 3 runs in a row (after issue 21)
 - [ ] `make check-python` passes
 
 ## Blocked by
@@ -29,4 +40,5 @@ uv run pytest -n 0 evals -m eval -k "struggling-with-shared-photos or forget-why
 
 ## Comments
 
+- 2026-11-15 (grilling, done): decisions above. Ready for `/implement`; final 3-run check waits on issue 21.
 - 2026-11-15 (grilling, paused): rerun both cases on reasoner once issue 21 is done. Open question: a code guard where the Understanding says the User is struggling and the reply then isn't offered `send_photo` (recommended; the rule today is only tool-description wording). `forget-why-here` not discussed yet.
