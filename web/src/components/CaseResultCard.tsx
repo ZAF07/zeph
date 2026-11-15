@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { EvalPill } from "@/components/EvalPill";
 import type { CaseResult } from "@/lib/api-client";
 import { countOf, evalDetails, groupChecks, outcomeLabels } from "@/lib/evals";
@@ -5,12 +7,20 @@ import { formatDuration, formatTokens } from "@/lib/model-calls";
 
 /**
  * One Case Result: its outcome, tokens and time, then each check with its
- * reason, any error and, for a failed case, the notes that help read it.
+ * reason, any error and, for a failed case, the notes that help read it. It
+ * links to the result's full trace and to the case's history.
  *
- * @param props - `result` is the Case Result.
+ * @param props - `runId` is the run it belongs to; `result` is the Case
+ *   Result.
  * @returns The result's card.
  */
-export function CaseResultCard({ result }: { result: CaseResult }) {
+export function CaseResultCard({
+  runId,
+  result,
+}: {
+  runId: string;
+  result: CaseResult;
+}) {
   const failedChecks = result.checks.filter((check) => !check.passed).length;
   return (
     <li
@@ -19,11 +29,20 @@ export function CaseResultCard({ result }: { result: CaseResult }) {
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <EvalPill {...outcomeLabels[result.outcome]} />
-        <span className="font-medium">{result.case_key}</span>
+        <Link
+          href={`/admin/evals/history/${encodeURIComponent(result.case_key)}`}
+          className="font-medium"
+          title="This case in recent runs"
+        >
+          {result.case_key}
+        </Link>
         <span className="text-ink-muted">{evalDetails[result.eval].label}</span>
         <span className="ml-auto whitespace-nowrap text-caption text-ink-muted">
           {formatTokens(result.tokens_in, result.tokens_out)} ·{" "}
-          {formatDuration(result.duration_ms)}
+          {formatDuration(result.duration_ms)} ·{" "}
+          <Link href={`/admin/evals/runs/${runId}/results/${result.id}`}>
+            Full trace
+          </Link>
         </span>
       </div>
       {result.error ? (

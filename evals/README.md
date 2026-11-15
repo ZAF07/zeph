@@ -63,10 +63,19 @@ Runs go one at a time; a run started while another runs waits as Queued. If
 the runner stops mid-run, the run ends Interrupted and keeps the cases it
 finished; it is never started again by itself.
 
+After each case the runner copies the case's model calls (full content) into
+the app database's Eval tables, so every Case Result opens its full trace on
+the Dashboard. They never show in the Model Call Log.
+
 ## How to run
 
-From the Dashboard: Admin → Evals → New run, tick the Evals, Start run. The
-run's page fills in as each case finishes.
+From the Dashboard: Admin → Evals → New run, tick whole Evals or open an
+Eval and tick single cases, check the estimate, Start run. The run's page
+fills in as each case finishes, with running totals of passes, tokens and
+SGD. It can be cancelled (it stops after the case it is on and keeps what
+finished), its Fail and Error cases re-run once it ends, or deleted with its
+results and traces. Each case's page shows its pass or fail in recent runs,
+marked where the case or the settings changed.
 
 From the terminal, with the stack running (`make up`, or `make restart` in a
 worktree, which runs its own stack and Eval database):
@@ -75,6 +84,8 @@ worktree, which runs its own stack and Eval database):
 make eval                                # all six Evals
 make eval EVALS=safeguard                # one Eval
 make eval EVALS=persona,understanding    # several
+make eval CASES=reminded-of-sister       # single cases, by key
+make eval EVALS=safeguard CASES=small-talk  # both
 ```
 
 It queues a run marked as started from the terminal, prints each case as it
@@ -83,6 +94,14 @@ The Dashboard's runs list hides terminal runs unless "Show terminal runs" is
 on. A full run takes about 10 minutes.
 
 ## Cost
+
+Model Prices (SGD per 1M tokens in and out, per model) and the Eval run
+token limit (1,000,000 to start) are Platform Settings, on Admin → Evals →
+Model Prices. A model with no price shows its tokens marked "no price set".
+New run shows an estimate first: each case's tokens from its last run, or a
+rough figure for its Eval if it never ran. A run that goes over the limit
+stops by itself as Stopped over limit, after the case it is on (or between
+the Messages of an Understanding case, which then ends as an Error).
 
 One full run (2026-11-12) used about 71,000 tokens in and 3,000 out on
 DeepSeek (then `deepseek-chat`), the app's calls and the judge's together. At

@@ -22,11 +22,16 @@ const tabs = [
     href: "/admin/evals/judge",
     isActive: (pathname: string) => pathname.startsWith("/admin/evals/judge"),
   },
+  {
+    label: "Model Prices",
+    href: "/admin/evals/costs",
+    isActive: (pathname: string) => pathname.startsWith("/admin/evals/costs"),
+  },
 ];
 
 /**
- * The Eval area's parts: its runs, its cases and the Judge, highlighting
- * the part being viewed.
+ * The Eval area's parts: its runs, its cases, the Judge and the Model
+ * Prices, highlighting the part being viewed.
  *
  * @returns The links.
  */

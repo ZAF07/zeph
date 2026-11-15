@@ -60,6 +60,18 @@ export const queryKeys = {
   evalCase: (key: string) => ["eval-case", key],
   evalImage: (name: string) => ["eval-image", name],
   judgeSettings: ["judge-settings"],
+  evalRunEstimate: (pick: { evals: string[]; case_keys: string[] }) => [
+    "eval-run-estimate",
+    pick,
+  ],
+  evalRunSnapshot: (runId: string) => ["eval-run-snapshot", runId],
+  caseResultTrace: (runId: string, resultId: string) => [
+    "case-result-trace",
+    runId,
+    resultId,
+  ],
+  caseHistory: (caseKey: string) => ["case-history", caseKey],
+  evalCosts: ["eval-costs"],
   usage: (days: number) => ["usage", days],
   memoryCategories: ["memory-categories"],
   knowledgeDocuments: ["knowledge-documents"],

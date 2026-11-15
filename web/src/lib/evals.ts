@@ -47,6 +47,11 @@ export const runStateLabels: Record<
   queued: { label: "Queued", pill: "bg-subtle text-ink-body" },
   running: { label: "Running", pill: "bg-yellow-tint text-yellow-deep" },
   finished: { label: "Finished", pill: "bg-blue-tint text-blue-deep" },
+  cancelled: { label: "Cancelled", pill: "bg-subtle text-ink-body" },
+  stopped_over_limit: {
+    label: "Stopped over limit",
+    pill: "bg-danger-tint text-danger-deep",
+  },
   interrupted: {
     label: "Interrupted",
     pill: "bg-danger-tint text-danger-deep",
@@ -143,4 +148,34 @@ export function groupChecks(
  */
 export function toEvalName(value: string): EvalName | null {
   return evalOrder.find((name) => name === value) ?? null;
+}
+
+/**
+ * Writes an amount in SGD, with more decimals for amounts under a dollar so
+ * a small run doesn't read as free.
+ *
+ * @param sgd - The amount.
+ * @returns E.g. "S$1.24" or "S$0.0043".
+ */
+export function formatSgd(sgd: number): string {
+  return `S$${sgd.toFixed(sgd >= 1 || sgd === 0 ? 2 : 4)}`;
+}
+
+/**
+ * Writes what some tokens cost, naming the models with no Model Price.
+ *
+ * @param cost - `cost_sgd` and `unpriced_models`.
+ * @returns E.g. "S$0.42", or "S$0.42 + deepseek-x (no price set)".
+ */
+export function describeCost(cost: {
+  cost_sgd: number;
+  unpriced_models: string[];
+}): string {
+  if (cost.unpriced_models.length === 0) {
+    return formatSgd(cost.cost_sgd);
+  }
+  const unpriced = `${cost.unpriced_models.join(", ")} (no price set)`;
+  return cost.cost_sgd > 0
+    ? `${formatSgd(cost.cost_sgd)} + ${unpriced}`
+    : unpriced;
 }
