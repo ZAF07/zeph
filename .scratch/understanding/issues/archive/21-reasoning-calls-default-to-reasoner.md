@@ -67,4 +67,4 @@ Every model setting in `src/companion/seed/platform_settings.yaml` defaults to `
 ## Completion
 
 - Completed: 2026-11-15
-- Commit: <to be filled in after merge>
+- Commits: `426d7ed` (reasoner defaults, test, issues 18 and 22, eval README), `ab58665` (review fixes and evidence), `277fa7f` (archive); merged to main in `db2b03b`
