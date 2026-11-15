@@ -29,4 +29,6 @@ None
 
 - Completed: 2026-11-15
 - Commits (branch `eval-dashboard-06-cancel-and-terminal-cost`):
-  - `851e619` Eval dashboard issue 06: a cancel asked for after the last case ends the run Cancelled; make eval prints the run's SGD
+  - `2920bf1` Eval dashboard issue 06: a cancel asked for after the last case ends the run Cancelled; make eval prints the run's SGD
+- Archive commit: `1f59f03` Eval dashboard issue 06 done: archive issue with test and run evidence
+- Merge commit: `86aa793` Merge eval dashboard issue 06 into main
