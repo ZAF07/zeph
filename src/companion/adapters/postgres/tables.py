@@ -579,3 +579,74 @@ model_calls = Table(
     Column("content", JSONB(none_as_null=True)),
     Column("understanding_shape", JSONB(none_as_null=True)),
 )
+
+eval_cases = Table(
+    "eval_cases",
+    metadata,
+    Column("key", Text, primary_key=True),
+    Column("position", BigInteger, Identity(), nullable=False, unique=True),
+    Column("eval", Text, nullable=False, index=True),
+    Column("content", JSONB, nullable=False),
+    Column("archived", Boolean, nullable=False, server_default="false"),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+)
+
+eval_runs = Table(
+    "eval_runs",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("position", BigInteger, Identity(), nullable=False, unique=True),
+    Column("started_by", Uuid, ForeignKey("users.id", ondelete="SET NULL")),
+    Column("started_from", Text, nullable=False),
+    Column("state", Text, nullable=False, index=True),
+    Column("evals", JSONB, nullable=False),
+    Column("repeats", Integer, nullable=False, server_default="1"),
+    Column("queued_at", DateTime(timezone=True), nullable=False),
+    Column("started_at", DateTime(timezone=True)),
+    Column("finished_at", DateTime(timezone=True)),
+    Column("settings_snapshot", JSONB(none_as_null=True)),
+    Column("judge_snapshot", JSONB(none_as_null=True)),
+    Column("cases_snapshot", JSONB(none_as_null=True)),
+)
+
+eval_variants = Table(
+    "eval_variants",
+    metadata,
+    Column(
+        "run_id",
+        Uuid,
+        ForeignKey("eval_runs.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("letter", Text, primary_key=True),
+    Column("setting_overrides", JSONB, nullable=False, server_default="{}"),
+)
+
+eval_case_results = Table(
+    "eval_case_results",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("position", BigInteger, Identity(), nullable=False, unique=True),
+    Column(
+        "run_id",
+        Uuid,
+        ForeignKey("eval_runs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("variant", Text, nullable=False),
+    Column("try_number", Integer, nullable=False),
+    Column("case_key", Text, nullable=False),
+    Column("eval", Text, nullable=False),
+    Column("case_content", JSONB, nullable=False),
+    Column("outcome", Text, nullable=False),
+    Column("checks", JSONB, nullable=False),
+    Column("facts", JSONB, nullable=False),
+    Column("notes", JSONB, nullable=False),
+    Column("error", Text, nullable=False, server_default=""),
+    Column("tokens_in", Integer, nullable=False),
+    Column("tokens_out", Integer, nullable=False),
+    Column("duration_ms", Integer, nullable=False),
+    Column("finished_at", DateTime(timezone=True), nullable=False),
+)

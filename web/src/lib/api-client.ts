@@ -662,6 +662,78 @@ export type Sticker = {
   added_at: string;
 };
 
+/** One of the six Evals. */
+export type EvalName =
+  | "safeguard"
+  | "persona"
+  | "knowledge"
+  | "settings"
+  | "photo_descriptions"
+  | "understanding";
+
+/** An Eval and the cases a new run of it would run. */
+export type EvalSummary = { eval: EvalName; case_keys: string[] };
+
+/** Where an Eval Run stands. */
+export type EvalRunState = "queued" | "running" | "finished" | "interrupted";
+
+/** How one Eval Case went; an Error couldn't be checked and isn't a Fail. */
+export type CaseOutcome = "pass" | "fail" | "error";
+
+/**
+ * An Eval Run with its totals so far. `case_count` is null until the runner
+ * takes it; `started_by_name` is null for a run started from the terminal.
+ */
+export type EvalRun = {
+  id: string;
+  state: EvalRunState;
+  started_from: "dashboard" | "terminal";
+  started_by_name: string | null;
+  evals: EvalName[];
+  repeats: number;
+  variants: { letter: string; setting_overrides: Record<string, unknown> }[];
+  queued_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  case_count: number | null;
+  passed: number;
+  failed: number;
+  errored: number;
+  tokens_in: number;
+  tokens_out: number;
+};
+
+/**
+ * One thing checked in a case, such as a Judge rule and its reason. `group`
+ * names the Message it checks in an Understanding case; "" otherwise.
+ */
+export type CaseCheck = {
+  name: string;
+  passed: boolean;
+  detail: string;
+  group: string;
+};
+
+/** One case's result in an Eval Run. */
+export type CaseResult = {
+  id: string;
+  variant: string;
+  try_number: number;
+  case_key: string;
+  eval: EvalName;
+  outcome: CaseOutcome;
+  checks: CaseCheck[];
+  notes: string[];
+  error: string;
+  tokens_in: number;
+  tokens_out: number;
+  duration_ms: number;
+  finished_at: string;
+};
+
+/** An Eval Run with its Case Results so far, in the order they finished. */
+export type EvalRunDetails = EvalRun & { results: CaseResult[] };
+
 /** Every call the Dashboard makes to the backend. */
 export type ApiClient = {
   getMe: () => Promise<Me>;
@@ -736,6 +808,10 @@ export type ApiClient = {
     filter: ModelCallTraceFilter,
   ) => Promise<ModelCallTrace[]>;
   getModelCallTrace: (traceId: string) => Promise<ModelCallTraceDetails>;
+  listEvals: () => Promise<EvalSummary[]>;
+  listEvalRuns: (includeTerminal: boolean) => Promise<EvalRun[]>;
+  startEvalRun: (evals: EvalName[]) => Promise<EvalRun>;
+  getEvalRun: (runId: string) => Promise<EvalRunDetails>;
   getUsage: (days: number) => Promise<UsageReport>;
   listMemoryCategories: () => Promise<MemoryCategoryOverview[]>;
   addMemoryCategory: (category: MemoryCategoryInput) => Promise<MemoryCategory>;
@@ -1035,6 +1111,18 @@ export function createApiClient(
     },
     getModelCallTrace: (traceId) =>
       request<ModelCallTraceDetails>(`/api/admin/model-calls/${traceId}`),
+    listEvals: async () =>
+      (await request<{ evals: EvalSummary[] }>("/api/admin/evals")).evals,
+    listEvalRuns: async (includeTerminal) =>
+      (
+        await request<{ runs: EvalRun[] }>(
+          `/api/admin/eval-runs?include_terminal=${includeTerminal}`,
+        )
+      ).runs,
+    startEvalRun: (evals) =>
+      request<EvalRun>("/api/admin/eval-runs", "POST", { evals }),
+    getEvalRun: (runId) =>
+      request<EvalRunDetails>(`/api/admin/eval-runs/${runId}`),
     getUsage: (days) => request<UsageReport>(`/api/admin/usage?days=${days}`),
     listMemoryCategories: async () =>
       (

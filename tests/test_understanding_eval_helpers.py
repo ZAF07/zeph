@@ -1,26 +1,23 @@
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from evals.cases import (
-    CASES_DIR,
-    InvalidEvalCasesError,
+from companion.adapters.evals.terminal_report import eval_lines
+from companion.core.evals.cases import (
+    InvalidEvalCaseError,
+    UnderstandingCase,
     UnderstandingExpectations,
-    load_understanding_cases,
 )
-from evals.judge import RuleVerdict
-from evals.report import (
-    EvalReport,
-    UnderstandingCallStats,
-    UnderstandingMessageResult,
-)
-from evals.understanding_checks import (
+from companion.core.evals.models import CaseOutcome, Check, EvalName
+from companion.core.evals.understanding_checks import (
     CheckResult,
     ObservedUnderstanding,
     check_understanding,
 )
+from tests.test_eval_helpers import case_result, from_file, seeded
 
 CASE_FILE_START = """\
 now: 2026-11-13T18:30:00
@@ -28,6 +25,11 @@ rules:
   no_fixing: Zeph's last reply gives no advice.
 cases:
 """
+
+
+def read_cases(tmp_path: Path, text: str) -> list[UnderstandingCase]:
+    """Read Understanding cases from a case file's text."""
+    return from_file(tmp_path, EvalName.UNDERSTANDING, text)
 
 
 NOTHING_RAISED = ObservedUnderstanding(
@@ -42,9 +44,9 @@ NOTHING_RAISED = ObservedUnderstanding(
 
 
 def test_the_understanding_cases_cover_every_check_the_issue_asks_for() -> None:
-    cases = load_understanding_cases(CASES_DIR / "understanding.yaml")
+    cases: list[UnderstandingCase] = seeded(EvalName.UNDERSTANDING)
 
-    expectations = [message.expect for case in cases.cases for message in case.messages]
+    expectations = [message.expect for case in cases for message in case.messages]
     needs = {need for expect in expectations for need in expect.need}
     assert {"Be heard", "Advice", "Just chatting", "Accountability"} <= needs
     assert any(expect.raised for expect in expectations)
@@ -55,7 +57,7 @@ def test_the_understanding_cases_cover_every_check_the_issue_asks_for() -> None:
     assert any(expect.knowledge is True for expect in expectations)
     assert any(expect.knowledge is False for expect in expectations)
     assert any(expect.rules for expect in expectations)
-    threads = [thread for case in cases.cases for thread in case.memory.threads]
+    threads = [thread for case in cases for thread in case.memory.threads]
     assert any(thread.raised_in_this_conversation for thread in threads)
     assert any(thread.reaction == "brushed_off" for thread in threads)
 
@@ -63,8 +65,8 @@ def test_the_understanding_cases_cover_every_check_the_issue_asks_for() -> None:
 def test_a_case_is_read_with_its_memory_earlier_lines_and_messages(
     tmp_path: Path,
 ) -> None:
-    cases_file = tmp_path / "understanding.yaml"
-    cases_file.write_text(
+    [case] = read_cases(
+        tmp_path,
         CASE_FILE_START
         + """\
   - id: wedding
@@ -102,10 +104,8 @@ def test_a_case_is_read_with_its_memory_earlier_lines_and_messages(
           curiosity_raised: false
           knowledge: false
           rules: [no_fixing]
-"""
+""",
     )
-
-    [case] = load_understanding_cases(cases_file).cases
 
     assert case.now == datetime(2026, 11, 12, 9, tzinfo=UTC)
     assert case.memory.portrait == "Maya, 34, a nurse."
@@ -136,10 +136,9 @@ def test_a_case_is_read_with_its_memory_earlier_lines_and_messages(
 
 
 def test_a_case_without_its_own_time_uses_the_files(tmp_path: Path) -> None:
-    cases_file = tmp_path / "understanding.yaml"
-    cases_file.write_text(CASE_FILE_START + "  - id: hi\n    messages: [{text: hi}]\n")
-
-    [case] = load_understanding_cases(cases_file).cases
+    [case] = read_cases(
+        tmp_path, CASE_FILE_START + "  - id: hi\n    messages: [{text: hi}]\n"
+    )
 
     assert case.now == datetime(2026, 11, 13, 18, 30, tzinfo=UTC)
     assert case.messages[0].expect == UnderstandingExpectations()
@@ -155,35 +154,32 @@ def test_a_case_without_its_own_time_uses_the_files(tmp_path: Path) -> None:
 def test_a_case_naming_an_unknown_rule_or_thread_is_refused(
     tmp_path: Path, message: str, refused: str
 ) -> None:
-    cases_file = tmp_path / "understanding.yaml"
-    cases_file.write_text(CASE_FILE_START + f"  - id: hi\n    messages: [{message}]\n")
-
-    with pytest.raises(InvalidEvalCasesError, match=refused):
-        load_understanding_cases(cases_file)
+    with pytest.raises(InvalidEvalCaseError, match=refused):
+        read_cases(
+            tmp_path, CASE_FILE_START + f"  - id: hi\n    messages: [{message}]\n"
+        )
 
 
 def test_a_thread_raised_in_this_conversation_needs_earlier_lines(
     tmp_path: Path,
 ) -> None:
-    cases_file = tmp_path / "understanding.yaml"
-    cases_file.write_text(
-        CASE_FILE_START + "  - id: hi\n"
-        "    memory:\n"
-        "      threads: [{title: T, story: S, raised_in_this_conversation: true}]\n"
-        "    messages: [{text: hi}]\n"
-    )
-
-    with pytest.raises(InvalidEvalCasesError, match="earlier"):
-        load_understanding_cases(cases_file)
+    with pytest.raises(InvalidEvalCaseError, match="earlier"):
+        read_cases(
+            tmp_path,
+            CASE_FILE_START + "  - id: hi\n"
+            "    memory:\n"
+            "      threads: [{title: T, story: S, raised_in_this_conversation: true}]\n"
+            "    messages: [{text: hi}]\n",
+        )
 
 
 def test_understanding_cases_with_the_same_id_are_refused(tmp_path: Path) -> None:
-    cases_file = tmp_path / "understanding.yaml"
     message = "    messages: [{text: hi}]\n"
-    cases_file.write_text(CASE_FILE_START + f"  - id: a\n{message}  - id: a\n{message}")
 
-    with pytest.raises(InvalidEvalCasesError, match="a"):
-        load_understanding_cases(cases_file)
+    with pytest.raises(InvalidEvalCaseError, match="a"):
+        read_cases(
+            tmp_path, CASE_FILE_START + f"  - id: a\n{message}  - id: a\n{message}"
+        )
 
 
 def test_every_expectation_met_passes_each_check() -> None:
@@ -276,33 +272,46 @@ def test_a_thread_left_alone_passes_and_a_missing_curiosity_fails() -> None:
     ]
 
 
+def understanding_result(
+    key: str, messages: list[dict[str, Any]], checks: list[Check]
+) -> Any:
+    passed = all(message["passed"] for message in messages)
+    return case_result(
+        EvalName.UNDERSTANDING,
+        key,
+        CaseOutcome.PASS if passed else CaseOutcome.FAIL,
+        checks,
+        {"messages": messages},
+    )
+
+
 def test_the_report_shows_each_message_with_its_checks_reasons_time_and_tokens() -> (
     None
 ):
-    report = EvalReport(
-        understanding=[
-            UnderstandingMessageResult(
-                case_id="rant",
-                message="ugh my landlord",
-                checks=[CheckResult("need", True, "picked Be heard")],
-                verdicts=[RuleVerdict("no_fixing", False, "Suggests a lawyer.")],
-                call=UnderstandingCallStats(1200, 2000, 150),
-            ),
-            UnderstandingMessageResult(
-                case_id="rant",
-                message="anyway",
-                checks=[CheckResult("need", False, "picked Advice, expected Be heard")],
-                verdicts=[],
-                call=UnderstandingCallStats(1800, 2400, 250),
-            ),
-        ]
+    result = understanding_result(
+        "rant",
+        [
+            {
+                "text": "ugh my landlord",
+                "passed": False,
+                "call": {"duration_ms": 1200, "tokens_in": 2000, "tokens_out": 150},
+            },
+            {
+                "text": "anyway",
+                "passed": False,
+                "call": {"duration_ms": 1800, "tokens_in": 2400, "tokens_out": 250},
+            },
+        ],
+        [
+            Check("need", True, "picked Be heard", group="ugh my landlord"),
+            Check("no_fixing", False, "Suggests a lawyer.", group="ugh my landlord"),
+            Check("need", False, "picked Advice, expected Be heard", group="anyway"),
+        ],
     )
 
-    text = "\n".join(report.lines())
+    text = "\n".join(eval_lines(EvalName.UNDERSTANDING, [result]))
 
-    assert "Understanding: 0 of 2 messages passed (1 of 2 checks, 0 of 1 rules)" in (
-        text
-    )
+    assert "Understanding: 1 of 3 checks and rules passed" in text
     assert (
         "  Understanding calls: 2, 1500 ms on average (slowest 1800 ms), "
         "2200 tokens in and 200 out on average"
@@ -317,16 +326,14 @@ def test_the_report_shows_each_message_with_its_checks_reasons_time_and_tokens()
     ) in text
 
 
-def test_a_message_with_no_understanding_call_fails_and_says_so() -> None:
-    result = UnderstandingMessageResult(
-        case_id="hi", message="hi", checks=[], verdicts=[], call=None
+def test_a_message_with_no_understanding_call_shows_no_calls() -> None:
+    result = understanding_result(
+        "hi", [{"text": "hi", "passed": False, "call": None}], []
     )
-    report = EvalReport(understanding=[result])
 
-    text = "\n".join(report.lines())
+    text = "\n".join(eval_lines(EvalName.UNDERSTANDING, [result]))
 
-    assert not result.passed
-    assert "    hi (no Understanding call was logged)" in text
+    assert result.result.outcome == CaseOutcome.FAIL
     assert "Understanding calls: 0" in text
 
 
@@ -352,14 +359,12 @@ def test_knowledge_chosen_but_not_reaching_the_reply_fails() -> None:
 def test_a_thread_title_written_elsewhere_in_the_case_is_refused(
     tmp_path: Path, memory: str
 ) -> None:
-    cases_file = tmp_path / "understanding.yaml"
-    cases_file.write_text(
-        CASE_FILE_START + "  - id: hi\n"
-        "    memory:\n"
-        + memory
-        + "      threads: [{title: Falling-out with Mei, story: S}]\n"
-        "    messages: [{text: hi, expect: {found: [Falling-out with Mei]}}]\n"
-    )
-
-    with pytest.raises(InvalidEvalCasesError, match="Falling-out with Mei"):
-        load_understanding_cases(cases_file)
+    with pytest.raises(InvalidEvalCaseError, match="Falling-out with Mei"):
+        read_cases(
+            tmp_path,
+            CASE_FILE_START + "  - id: hi\n"
+            "    memory:\n"
+            + memory
+            + "      threads: [{title: Falling-out with Mei, story: S}]\n"
+            "    messages: [{text: hi, expect: {found: [Falling-out with Mei]}}]\n",
+        )
