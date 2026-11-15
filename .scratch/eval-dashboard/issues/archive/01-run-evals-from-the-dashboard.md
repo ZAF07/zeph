@@ -84,3 +84,13 @@ Terms are in `CONTEXT.md` (Eval Run, Eval Case, Variant, Setting Override, Make 
 
 - 2026-11-15: PRD written at `.scratch/eval-dashboard/PRD.md` (test seams agreed: backend HTTP API, "work the next Queued run", Dashboard components). Next: `/to-issues`.
 - 2026-11-15: archived. Grilling done; decisions carried into `.scratch/eval-dashboard/PRD.md` and issues 02-05.
+
+## Completion
+
+- Completed: 2026-11-15 (grilling issue; its decisions live in the PRD and issues 02-05, which hold the code)
+- Commits:
+  - `599cd9d` Eval dashboard issue 01 grilling: decisions, CONTEXT.md terms, ADR-0013
+  - `bf47648` Eval dashboard issue 01: archive the grilling issue; links updated
+- Merge commits:
+  - `c73949d` Merge eval dashboard issue 01 grilling
+  - `dee4951` Merge eval dashboard issue 01 archive
