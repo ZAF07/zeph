@@ -30,7 +30,7 @@ export function PromptsAndModels() {
       return (
         <LoadFailed
           title="Couldn’t load prompts"
-          body="Every service keeps running on its last saved prompt and model."
+          body="Every service keeps running on its last saved prompt, model and thinking."
           onRetry={() => {
             void servicesQuery.refetch();
             void settingsQuery.refetch();

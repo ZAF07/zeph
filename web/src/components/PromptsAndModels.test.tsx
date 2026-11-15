@@ -153,7 +153,7 @@ describe("PromptsAndModels", () => {
 
     expect(
       await card.findByText(
-        "Couldn’t save. The last saved prompt and model stay in use.",
+        "Couldn’t save. The last saved prompt, model and thinking stay in use.",
       ),
     ).toBeVisible();
   });

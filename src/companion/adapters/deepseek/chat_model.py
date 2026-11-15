@@ -40,11 +40,11 @@ def build_client(api_key: str, model: str, thinking: bool) -> ChatDeepSeek:
     Returns:
         The client.
     """
-    if model == OLD_REASONER_MODEL and not thinking:
-        logger.warning(
-            "deepseek-reasoner always thinks; thinking stays on for this call"
-        )
     if model == OLD_REASONER_MODEL:
+        if not thinking:
+            logger.warning(
+                "deepseek-reasoner always thinks; thinking stays on for this call"
+            )
         thinking = True
     if model in (OLD_CHAT_MODEL, OLD_REASONER_MODEL):
         model = CURRENT_MODEL

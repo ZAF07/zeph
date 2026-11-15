@@ -16,7 +16,7 @@ import { lastSavedNote, onOffSetting, textSetting } from "@/lib/settings";
 import { useSaveAdminSettings } from "@/lib/use-admin-settings";
 
 const SAVE_FAILED_MESSAGE =
-  "Couldn’t save. The last saved prompt and model stay in use.";
+  "Couldn’t save. The last saved prompt, model and thinking stay in use.";
 
 /**
  * One core service's card: which model it uses and whether that model
