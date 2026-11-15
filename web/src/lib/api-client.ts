@@ -704,7 +704,7 @@ export type EvalRun = {
   started_by_name: string | null;
   evals: EvalName[];
   repeats: number;
-  variants: { letter: string; setting_overrides: Record<string, unknown> }[];
+  variants: EvalVariant[];
   queued_at: string;
   started_at: string | null;
   finished_at: string | null;
@@ -726,6 +726,86 @@ export type EvalRun = {
 export type EvalRunPick = { evals: EvalName[]; case_keys: string[] };
 
 /**
+ * A Variant's Setting Overrides, by setting key, or `need:<id>` for a Need
+ * (its name, when it fits and how to reply).
+ */
+export type SettingOverrides = Record<string, unknown>;
+
+/**
+ * Who made a Variant live, when, and which overrides were applied or left
+ * out. `by_name` is null if the Admin has since gone.
+ */
+export type MadeLive = {
+  by_name: string | null;
+  at: string;
+  applied_keys: string[];
+  left_out_keys: string[];
+};
+
+/** One set of settings a run runs its cases with; null `made_live` if never. */
+export type EvalVariant = {
+  letter: string;
+  setting_overrides: SettingOverrides;
+  made_live: MadeLive | null;
+};
+
+/**
+ * A new run: its cases, each Variant's Setting Overrides (lettered A, B, C;
+ * an empty one runs the live settings) and how many times each case runs.
+ */
+export type EvalRunRequest = EvalRunPick & {
+  variants: SettingOverrides[];
+  repeats: number;
+};
+
+/** What kind of value a Platform Setting holds. */
+export type SettingKind = "text" | "whole_number" | "model" | "on_off";
+
+/** A Platform Setting a Variant can override, with its rule and live value. */
+export type OverridableSetting = {
+  key: string;
+  label: string;
+  kind: SettingKind;
+  minimum: number;
+  maximum: number;
+  max_length: number;
+  hint: string | null;
+  value: unknown;
+};
+
+/** A Need as an override's value. */
+export type NeedOverride = {
+  name: string;
+  when_it_fits: string;
+  how_to_reply: string;
+};
+
+/** A Need a Variant can override, keyed `need:<id>`, with its live details. */
+export type OverridableNeed = {
+  key: string;
+  name: string;
+  value: NeedOverride;
+};
+
+/** What a Variant can override, and the models a model setting can pick. */
+export type OverrideChoices = {
+  settings: OverridableSetting[];
+  needs: OverridableNeed[];
+  models: string[];
+};
+
+/**
+ * An overridden setting whose live value changed since the run started;
+ * `now` is null for a Need deleted since.
+ */
+export type LiveChange = {
+  key: string;
+  then: unknown;
+  now: unknown;
+  override: unknown;
+};
+
+/**
  * What a run would use, before it starts; only an estimate. `cost_sgd`
  * leaves out the tokens of `unpriced_models`. `rough_case_count` cases have
  * never run, so use a rough figure for their Eval.
@@ -738,6 +818,13 @@ export type EvalRunEstimate = {
   models: { model: string; tokens_in: number; tokens_out: number }[];
   cost_sgd: number;
   unpriced_models: string[];
+  variants: {
+    letter: string;
+    tokens_in: number;
+    tokens_out: number;
+    cost_sgd: number;
+    unpriced_models: string[];
+  }[];
 };
 
 /**
@@ -768,8 +855,27 @@ export type CaseResult = {
   finished_at: string;
 };
 
-/** An Eval Run with its Case Results so far, in the order they finished. */
-export type EvalRunDetails = EvalRun & { results: CaseResult[] };
+/** How one Variant's finished cases went, added up. */
+export type VariantTotals = {
+  letter: string;
+  passed: number;
+  failed: number;
+  errored: number;
+  tokens_in: number;
+  tokens_out: number;
+  duration_ms: number;
+  cost_sgd: number;
+  unpriced_models: string[];
+};
+
+/**
+ * An Eval Run with its Case Results so far, in the order they finished, and
+ * each Variant's totals.
+ */
+export type EvalRunDetails = EvalRun & {
+  results: CaseResult[];
+  variant_totals: VariantTotals[];
+};
 
 /** What kind of value a field of a case or Judge form holds. */
 export type FieldKind =
@@ -846,11 +952,15 @@ export type EvalCaseContent = {
   archived: boolean;
 };
 
-/** What a run used; every field is null while it is Queued. */
+/**
+ * What a run used; every field is null while it is Queued. `needs` are the
+ * live Needs, keyed as their overrides would be.
+ */
 export type EvalRunSnapshot = {
   settings: Record<string, unknown> | null;
   judge: Record<string, unknown> | null;
   cases: EvalCaseContent[] | null;
+  needs: OverridableNeed[] | null;
 };
 
 /**
@@ -961,8 +1071,15 @@ export type ApiClient = {
   getModelCallTrace: (traceId: string) => Promise<ModelCallTraceDetails>;
   listEvals: () => Promise<EvalSummary[]>;
   listEvalRuns: (includeTerminal: boolean) => Promise<EvalRun[]>;
-  startEvalRun: (pick: EvalRunPick) => Promise<EvalRun>;
-  estimateEvalRun: (pick: EvalRunPick) => Promise<EvalRunEstimate>;
+  startEvalRun: (request: EvalRunRequest) => Promise<EvalRun>;
+  estimateEvalRun: (request: EvalRunRequest) => Promise<EvalRunEstimate>;
+  listSettingOverrideChoices: () => Promise<OverrideChoices>;
+  listLiveChanges: (runId: string, letter: string) => Promise<LiveChange[]>;
+  makeVariantLive: (
+    runId: string,
+    letter: string,
+    confirmedKeys: string[],
+  ) => Promise<EvalVariant>;
   getEvalRun: (runId: string) => Promise<EvalRunDetails>;
   listEvalCaseShapes: () => Promise<Record<EvalName, FormShape>>;
   listEvalCases: (evalName: EvalName) => Promise<EvalCase[]>;
@@ -1318,10 +1435,28 @@ export function createApiClient(
           `/api/admin/eval-runs?include_terminal=${includeTerminal}`,
         )
       ).runs,
-    startEvalRun: (pick) =>
-      request<EvalRun>("/api/admin/eval-runs", "POST", pick),
-    estimateEvalRun: (pick) =>
-      request<EvalRunEstimate>("/api/admin/eval-runs/estimate", "POST", pick),
+    startEvalRun: (runRequest) =>
+      request<EvalRun>("/api/admin/eval-runs", "POST", runRequest),
+    estimateEvalRun: (runRequest) =>
+      request<EvalRunEstimate>(
+        "/api/admin/eval-runs/estimate",
+        "POST",
+        runRequest,
+      ),
+    listSettingOverrideChoices: () =>
+      request<OverrideChoices>("/api/admin/setting-override-choices"),
+    listLiveChanges: async (runId, letter) =>
+      (
+        await request<{ changes: LiveChange[] }>(
+          `/api/admin/eval-runs/${runId}/variants/${letter}/live-changes`,
+        )
+      ).changes,
+    makeVariantLive: (runId, letter, confirmedKeys) =>
+      request<EvalVariant>(
+        `/api/admin/eval-runs/${runId}/variants/${letter}/make-live`,
+        "POST",
+        { confirmed_keys: confirmedKeys },
+      ),
     getEvalRun: (runId) =>
       request<EvalRunDetails>(`/api/admin/eval-runs/${runId}`),
     listEvalCaseShapes: async () =>

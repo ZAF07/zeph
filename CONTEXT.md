@@ -245,7 +245,7 @@ _Avoid_: Trace, debug log, LLM log
 ### Quality
 
 **Eval**:
-A measurement of how the Companion behaves with the real LLM, run on demand in an Eval Run and never in the normal checks, because it costs money and its results vary. There are Safeguard, Persona, Knowledge, Settings, Photo description and Understanding Evals; a Settings Eval checks that plain-words requests make exactly the right Chat Setting Change, or none, and an Understanding Eval gives a made-up User a User Memory and checks each Message's Understanding (the Need picked, Life Threads found, brought up or left alone, Curiosities, asking why, Knowledge) and its time and tokens. Each one goes through the real reply path with the Platform Settings Admins have set, changed only by a Variant's Setting Overrides. Its made-up Users, messages and documents are kept fully apart from real Users and their data; an Eval never messages a real chat or searches the web.
+A measurement of how the Companion behaves with the real LLM, run on demand in an Eval Run and never in the normal checks, because it costs money and its results vary. There are Safeguard, Persona, Knowledge, Settings, Photo description and Understanding Evals; a Settings Eval checks that plain-words requests make exactly the right Chat Setting Change, or none, and an Understanding Eval gives a made-up User a User Memory and checks each Message's Understanding (the Need picked, Life Threads found, brought up or left alone, Curiosities, asking why, Knowledge) and its time and tokens. Each one goes through the real reply path with the Platform Settings and Needs Admins have set, changed only by a Variant's Setting Overrides. Its made-up Users, messages and documents are kept fully apart from real Users and their data; an Eval never messages a real chat or searches the web.
 _Avoid_: Test, benchmark
 
 **Eval Case**:
@@ -253,19 +253,19 @@ One situation an Eval checks, such as one labelled message for the Safeguard Eva
 _Avoid_: Test case, fixture, scenario
 
 **Eval Run**:
-One go at some Eval Cases (whole Evals or single cases), started by an Admin on the Dashboard or from the terminal. Before it starts, Admins see an estimate of its tokens and cost. It is Queued until it can start (one runs at a time), then Running, and ends Finished, Cancelled, Interrupted (it stopped unexpectedly; it is never retried by itself) or Stopped over limit (it crossed the Eval run token limit). Cancelled and Stopped over limit take effect after the case under way (or between the Messages of an Understanding case, which then ends as an Error) and keep every finished Case Result. Each Eval Case gets a Case Result as soon as it is done, so Admins watch them come in. A run keeps what it used (the Platform Settings, the Judge's settings and each case as it was), so later changes never alter its results. Runs started from the terminal are hidden from the run list unless an Admin chooses to see them. Runs are kept until an Admin deletes one.
+One go at some Eval Cases (whole Evals or single cases), started by an Admin on the Dashboard or from the terminal. Before it starts, Admins see an estimate of its tokens and cost. It is Queued until it can start (one runs at a time), then Running, and ends Finished, Cancelled, Interrupted (it stopped unexpectedly; it is never retried by itself) or Stopped over limit (it crossed the Eval run token limit). Cancelled and Stopped over limit take effect after the case under way (or between the Messages of an Understanding case, which then ends as an Error) and keep every finished Case Result. Each Eval Case gets a Case Result as soon as it is done, so Admins watch them come in. A run keeps what it used (the Platform Settings, the Needs, the Judge's settings and each case as it was), so later changes never alter its results. Runs started from the terminal are hidden from the run list unless an Admin chooses to see them. Runs are kept until an Admin deletes one.
 _Avoid_: Eval job, test run, batch
 
 **Variant**:
-One set of Platform Settings an Eval Run tries: the live ones, or the live ones changed by its own Setting Overrides. A run has one to three Variants; each runs every chosen case the same number of times (its Repeats), so they can be compared side by side. The Judge is the same for every Variant in a run.
+One set of Platform Settings an Eval Run tries: the live ones, or the live ones changed by its own Setting Overrides. A run has one to three Variants; each runs every chosen case the same number of times (its Repeats), so they can be compared side by side. A run goes case by case: each try of a case runs on every Variant before the next try, and every try before the next case, so a run that stops early still compares fairly. Every try starts from fresh made-up data. The Judge is the same for every Variant in a run. Re-running a run's failed cases keeps its Variants and Repeats.
 _Avoid_: Arm, configuration, experiment
 
 **Setting Override**:
-A change to one Platform Setting (a prompt, a Need, a model, thinking on or off, a limit) that applies only inside one Variant of an Eval Run. It never changes what real Users get, unless an Admin makes it live.
+A change to one Platform Setting (a prompt, a Need, a model, thinking on or off, a limit) that applies only inside one Variant of an Eval Run. It is held to the same checks as a save on the settings pages, and a Need can be changed but not added or removed. It never changes what real Users get, unless an Admin makes it live. A Variant changing a Need deleted before its run starts ends its cases as Errors.
 _Avoid_: Draft setting, temp setting
 
 **Make Live**:
-An Admin's choice to apply a Variant's Setting Overrides to the live Platform Settings, only on a Finished Eval Run and once per Variant. If a setting's live value changed since the run started, the Admin sees the value then, the value now and the override, and confirms or leaves out each such setting. The run shows who made it live, when, and what was applied.
+An Admin's choice to apply a Variant's Setting Overrides to the live Platform Settings, only on a Finished Eval Run and once per Variant. If a setting's live value changed since the run started, the Admin sees the value then, the value now and the override, and confirms or leaves out each such setting; the others apply straight away, through the same saves as the settings pages. The run shows who made it live, when, and what was applied or left out.
 _Avoid_: Promote, deploy, publish
 
 **Case Result**:

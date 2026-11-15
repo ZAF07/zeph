@@ -12,7 +12,10 @@ from companion.adapters.postgres.eval_repositories import (
     PostgresJudgeSettingsRepository,
     hold_runner_lock,
 )
-from companion.adapters.postgres.repositories import PostgresPlatformSettingsRepository
+from companion.adapters.postgres.repositories import (
+    PostgresNeedRepository,
+    PostgresPlatformSettingsRepository,
+)
 from companion.config import load_settings
 from companion.core.evals.runner import EvalRunner
 from companion.main import (
@@ -50,6 +53,7 @@ def run_forever() -> None:
         images=PostgresEvalImageRepository(engine),
         judge_settings=PostgresJudgeSettingsRepository(engine),
         live_settings=PostgresPlatformSettingsRepository(engine),
+        live_needs=PostgresNeedRepository(engine),
         environment=PostgresEvalEnvironment(
             database_url=settings.eval_database_url,
             chat_model=build_chat_model(settings),

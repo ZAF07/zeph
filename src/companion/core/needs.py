@@ -79,9 +79,25 @@ class NeedService:
             InvalidNeedError: If a field is blank or too long, or another Need
                 already has the name.
         """
+        return self._repositories.needs.update(need_id, self.checked(need_id, details))
+
+    def checked(self, need_id: UUID, details: NeedDetails) -> NeedDetails:
+        """Check new details for a Need, without saving them.
+
+        Args:
+            need_id: The Need's ID.
+            details: Its new values.
+
+        Returns:
+            The details with surrounding spaces removed.
+
+        Raises:
+            NeedNotFoundError: If there is no such Need.
+            InvalidNeedError: If a field is blank or too long, or another Need
+                already has the name.
+        """
         self._get(need_id)
-        checked = self._checked_details(details, need_id)
-        return self._repositories.needs.update(need_id, checked)
+        return self._checked_details(details, need_id)
 
     def delete(self, need_id: UUID) -> None:
         """Remove a Need.

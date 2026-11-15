@@ -5,6 +5,8 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
+from companion.core.models import Need
+
 
 class EvalName(StrEnum):
     """One of the six Evals."""
@@ -58,7 +60,9 @@ class CaseOutcome(StrEnum):
 
 
 FIRST_VARIANT = "A"
+VARIANT_LETTERS = "ABC"
 FIRST_TRY = 1
+MAX_REPEATS = 5
 
 
 @dataclass(frozen=True)
@@ -85,6 +89,17 @@ class ModelTokens:
         return ModelTokens(
             self.tokens_in + other.tokens_in, self.tokens_out + other.tokens_out
         )
+
+    def times(self, count: int) -> "ModelTokens":
+        """Count these tokens a number of times over.
+
+        Args:
+            count: How many times.
+
+        Returns:
+            The tokens times `count`.
+        """
+        return ModelTokens(self.tokens_in * count, self.tokens_out * count)
 
 
 def add_tokens_by_model(
@@ -242,17 +257,37 @@ class CaseResult:
 
 
 @dataclass(frozen=True)
+class MadeLive:
+    """When an Admin made a Variant's Setting Overrides live, and what went live.
+
+    Attributes:
+        by_name: The Admin's name or email; None if they have since gone.
+        at: When.
+        applied_keys: The overrides applied, by key.
+        left_out_keys: The overrides left out because their live value had
+            changed since the run started, by key.
+    """
+
+    by_name: str | None
+    at: datetime
+    applied_keys: list[str]
+    left_out_keys: list[str]
+
+
+@dataclass(frozen=True)
 class Variant:
     """One set of settings an Eval Run runs its cases with.
 
     Attributes:
         letter: Its letter, e.g. "A".
-        setting_overrides: Platform Settings changed for it, by key; empty
-            for the live settings.
+        setting_overrides: Platform Settings changed for it, by key, and
+            Needs as `need:<id>`; empty for the live settings.
+        made_live: When its overrides were made live; None if never.
     """
 
     letter: str
     setting_overrides: dict[str, Any] = field(default_factory=dict)
+    made_live: MadeLive | None = None
 
 
 @dataclass(frozen=True)
@@ -263,11 +298,13 @@ class RunSnapshot:
         settings: The live Platform Settings when it started, by key.
         judge: The Judge's settings, by name.
         cases: Each case as it was when it started.
+        needs: The live Needs when it started, in order.
     """
 
     settings: dict[str, Any]
     judge: dict[str, Any]
     cases: list[EvalCase]
+    needs: list[Need] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -366,16 +403,52 @@ class EvalRunOverview:
 
 
 @dataclass(frozen=True)
+class VariantTotals:
+    """How one Variant's finished cases went, added up.
+
+    Attributes:
+        letter: The Variant's letter.
+        totals: Its passes, fails, errors and tokens.
+        duration_ms: The time its cases took, added up.
+        cost: What its tokens cost.
+    """
+
+    letter: str
+    totals: RunTotals
+    duration_ms: int
+    cost: Cost
+
+
+@dataclass(frozen=True)
 class EvalRunDetails:
     """An Eval Run with its Case Results so far.
 
     Attributes:
         overview: The run and its totals.
         results: Its Case Results, in the order they finished.
+        variant_totals: Each Variant's totals, in letter order.
     """
 
     overview: EvalRunOverview
     results: list[CaseResult]
+    variant_totals: list[VariantTotals] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class LiveChange:
+    """An overridden setting whose live value changed since the run started.
+
+    Attributes:
+        key: The setting's key, or `need:<id>` for a Need.
+        then: Its live value when the run started.
+        now: Its live value now; None for a Need deleted since.
+        override: The Variant's value.
+    """
+
+    key: str
+    then: Any
+    now: Any
+    override: Any
 
 
 @dataclass(frozen=True)
@@ -455,18 +528,37 @@ class CaseHistory:
 
 
 @dataclass(frozen=True)
+class VariantEstimate:
+    """What one Variant of a run would use, before it starts.
+
+    Attributes:
+        letter: The Variant's letter.
+        tokens: The tokens it would use, by model, counting every Repeat.
+        cost: What those tokens would cost.
+    """
+
+    letter: str
+    tokens: dict[str, ModelTokens]
+    cost: Cost
+
+
+@dataclass(frozen=True)
 class Estimate:
     """What a run would use, before it starts. It is only an estimate.
 
     Attributes:
-        tokens: The tokens it would use, by model.
+        tokens: The tokens it would use, by model, counting every Variant
+            and Repeat.
         cost: What those tokens would cost.
-        case_count: How many cases it would run.
-        rough_case_count: How many of them have never run, so use a rough
-            figure for their Eval.
+        case_count: How many cases it would run, counting every Variant
+            and Repeat.
+        rough_case_count: How many of the cases picked have never run, so
+            use a rough figure for their Eval.
+        variants: What each Variant would use.
     """
 
     tokens: dict[str, ModelTokens]
     cost: Cost
     case_count: int
     rough_case_count: int
+    variants: list[VariantEstimate] = field(default_factory=list)

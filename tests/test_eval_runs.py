@@ -1,3 +1,4 @@
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -54,7 +55,9 @@ def test_a_started_run_waits_queued_with_one_variant_and_no_results(
     assert run["started_by_name"] == "owner@example.com"
     assert run["evals"] == ["safeguard"]
     assert run["repeats"] == 1
-    assert run["variants"] == [{"letter": "A", "setting_overrides": {}}]
+    assert run["variants"] == [
+        {"letter": "A", "setting_overrides": {}, "made_live": None}
+    ]
     assert run["case_count"] == 1
     assert run["case_keys"] == ["plan"]
     assert run["cancel_requested"] is False
@@ -304,7 +307,12 @@ def test_a_queued_run_has_no_snapshot_yet(
 
     response = client.get(f"/api/admin/eval-runs/{run['id']}/snapshot", headers=admin)
 
-    assert response.json() == {"settings": None, "judge": None, "cases": None}
+    assert response.json() == {
+        "settings": None,
+        "judge": None,
+        "cases": None,
+        "needs": None,
+    }
 
 
 def test_model_prices_are_seeded_and_admins_change_them_with_the_limit(
@@ -367,3 +375,102 @@ def test_a_price_or_limit_out_of_range_is_refused_and_nothing_saved(
     assert response.status_code == 422
     after = client.get("/api/admin/eval-costs", headers=admin).json()
     assert after["token_limit"] == 1_000_000
+
+
+def test_the_estimate_counts_every_variant_and_repeat(
+    client: TestClient, engine: Engine, auth_verifier: FakeAuthVerifier
+) -> None:
+    add_cases(engine, CRISIS_CASE)
+    admin = owner_headers(client, auth_verifier)
+
+    response = client.post(
+        "/api/admin/eval-runs/estimate",
+        json={
+            "evals": ["safeguard"],
+            "variants": [{}, {"response_thinking": True}],
+            "repeats": 3,
+        },
+        headers=admin,
+    )
+
+    assert response.status_code == 200, response.text
+    estimate = response.json()
+    assert estimate["case_count"] == 6
+    assert estimate["rough_case_count"] == 1
+    assert [
+        (variant["letter"], variant["tokens_in"]) for variant in estimate["variants"]
+    ] == [("A", 12_000), ("B", 12_000)]
+    assert estimate["tokens_in"] == 24_000
+
+
+@pytest.mark.parametrize(
+    ("change", "status"),
+    [
+        ({"repeats": 0}, 422),
+        ({"repeats": 6}, 422),
+        ({"variants": []}, 422),
+        ({"variants": [{}, {}, {}, {}]}, 422),
+        ({"variants": [{"no_such_setting": 1}]}, 422),
+        ({"variants": [{"daily_message_limit": -1}]}, 422),
+        ({"variants": [{"model_prices": {}}]}, 422),
+        ({"variants": [{"need:not-an-id": {}}]}, 422),
+        ({"variants": [{f"need:{uuid4()}": {"name": "x"}}]}, 422),
+        (
+            {
+                "variants": [
+                    {
+                        f"need:{uuid4()}": {
+                            "name": "x",
+                            "when_it_fits": "y",
+                            "how_to_reply": "z",
+                        }
+                    }
+                ]
+            },
+            404,
+        ),
+    ],
+)
+def test_variants_repeats_and_overrides_out_of_range_are_refused(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    change: dict[str, Any],
+    status: int,
+) -> None:
+    add_cases(engine, CRISIS_CASE)
+    admin = owner_headers(client, auth_verifier)
+
+    response = client.post(
+        "/api/admin/eval-runs",
+        json={"evals": ["safeguard"], **change},
+        headers=admin,
+    )
+
+    assert response.status_code == status, response.text
+    runs = client.get("/api/admin/eval-runs", headers=admin).json()["runs"]
+    assert runs == []
+
+
+def test_override_choices_list_the_editable_settings_needs_and_models(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+
+    response = client.get("/api/admin/setting-override-choices", headers=admin)
+
+    assert response.status_code == 200
+    choices = response.json()
+    thinking = next(
+        setting
+        for setting in choices["settings"]
+        if setting["key"] == "understanding_thinking"
+    )
+    assert (thinking["kind"], thinking["value"]) == ("on_off", True)
+    keys = {setting["key"] for setting in choices["settings"]}
+    assert "model_prices" not in keys
+    assert "eval_run_token_limit" not in keys
+    fallback = next(need for need in choices["needs"] if need["name"] == "Ask more")
+    assert fallback["key"].startswith("need:")
+    assert set(fallback["value"]) == {"name", "when_it_fits", "how_to_reply"}
+    assert choices["models"] == ["deepseek-flash"]

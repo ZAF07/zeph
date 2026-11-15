@@ -15,7 +15,9 @@ from companion.adapters.postgres.database import (
     seed_platform_settings,
 )
 from companion.adapters.postgres.tables import metadata, platform_settings
+from companion.adapters.postgres.tables import needs as needs_table
 from companion.core.evals.models import EvalImage
+from companion.core.models import Need
 from companion.core.ports import ChatModel, Embedder, PhotoViewer
 
 
@@ -77,13 +79,17 @@ class PostgresEvalEnvironment:
         migrate(self._database_url)
 
     def fresh_companion(
-        self, platform_settings: dict[str, Any], images: Sequence[EvalImage]
+        self,
+        platform_settings: dict[str, Any],
+        needs: Sequence[Need],
+        images: Sequence[EvalImage],
     ) -> InProcessCompanion:
         """Empty the Eval database, seed it and build the app on it.
 
         Args:
             platform_settings: The Platform Settings to write into it, by
                 key; settings missing here come from the seed.
+            needs: The Needs to write into it; the seed's when empty.
             images: The test images the case sends, by name.
 
         Returns:
@@ -91,6 +97,7 @@ class PostgresEvalEnvironment:
         """
         self._empty()
         self._store_platform_settings(platform_settings)
+        self._store_needs(needs)
         seed_platform_settings(self._engine, self._seed_dir / "platform_settings.yaml")
         seed_helplines(self._engine, self._seed_dir / "helplines.yaml")
         seed_memory_categories(self._engine, self._seed_dir / "memory_categories.yaml")
@@ -128,3 +135,27 @@ class PostgresEvalEnvironment:
         ]
         with self._engine.begin() as connection:
             connection.execute(insert(platform_settings).values(rows))
+
+    def _store_needs(self, needs: Sequence[Need]) -> None:
+        """Write Needs into the empty Eval database.
+
+        Seeding afterwards adds Needs only when there are none, so these win.
+
+        Args:
+            needs: The Needs, with their IDs and order.
+        """
+        if not needs:
+            return
+        rows = [
+            {
+                "id": need.id,
+                "name": need.name,
+                "when_it_fits": need.when_it_fits,
+                "how_to_reply": need.how_to_reply,
+                "sort_order": need.sort_order,
+                "is_fallback": need.is_fallback,
+            }
+            for need in needs
+        ]
+        with self._engine.begin() as connection:
+            connection.execute(insert(needs_table).values(rows))

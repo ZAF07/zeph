@@ -17,8 +17,9 @@ from companion.core.evals.models import (
     RunSnapshot,
     StartedFrom,
     StoredEvalCase,
+    Variant,
 )
-from companion.core.models import ModelCall
+from companion.core.models import ModelCall, Need
 from companion.core.ports import ChatModel, Embedder, Repositories
 
 
@@ -244,13 +245,17 @@ class EvalEnvironment(Protocol):
         ...
 
     def fresh_companion(
-        self, platform_settings: dict[str, Any], images: Sequence[EvalImage]
+        self,
+        platform_settings: dict[str, Any],
+        needs: Sequence[Need],
+        images: Sequence[EvalImage],
     ) -> EvalCompanion:
         """Empty the Eval database, seed it and build the app on it.
 
         Args:
             platform_settings: The Platform Settings to write into it, by
                 key; settings missing here come from the seed.
+            needs: The Needs to write into it; the seed's when empty.
             images: The test images the case sends, by name.
 
         Returns:
@@ -418,9 +423,11 @@ class EvalRunRepository(Protocol):
         evals: Sequence[EvalName],
         case_keys: Sequence[str],
         queued_at: datetime,
+        variants: Sequence[Variant],
+        repeats: int,
         rerun_of: UUID | None = None,
     ) -> None:
-        """Save a new run as Queued, with one Variant (A) and one try.
+        """Save a new run as Queued.
 
         Args:
             run_id: Its ID.
@@ -429,6 +436,8 @@ class EvalRunRepository(Protocol):
             evals: The Evals of the cases it runs.
             case_keys: The keys of the cases it runs, in order.
             queued_at: When it is started.
+            variants: Its Variants, each with its Setting Overrides.
+            repeats: How many times each case runs per Variant.
             rerun_of: The run whose failed cases it runs again, if any.
         """
         ...
@@ -544,7 +553,7 @@ class EvalRunRepository(Protocol):
 
         Args:
             run_id: The run.
-            snapshot: The settings, Judge settings and cases.
+            snapshot: The settings, Judge settings, cases and Needs.
             token_limit: The Eval run token limit when it started.
         """
         ...
@@ -587,6 +596,41 @@ class EvalRunRepository(Protocol):
             run_id: The run.
             state: How it ended.
             now: When it ended.
+        """
+        ...
+
+    def mark_made_live(
+        self,
+        run_id: UUID,
+        letter: str,
+        admin_id: UUID,
+        now: datetime,
+        applied_keys: Sequence[str],
+        left_out_keys: Sequence[str],
+    ) -> bool:
+        """Record that an Admin made a Variant's Setting Overrides live.
+
+        Only a Variant not made live yet is marked, in one step.
+
+        Args:
+            run_id: The run.
+            letter: The Variant's letter.
+            admin_id: The Admin.
+            now: When.
+            applied_keys: The overrides applied.
+            left_out_keys: The overrides left out.
+
+        Returns:
+            True if it was marked; False if it was made live already.
+        """
+        ...
+
+    def unmark_made_live(self, run_id: UUID, letter: str) -> None:
+        """Take off a Variant's made-live mark, when its save was refused.
+
+        Args:
+            run_id: The run.
+            letter: The Variant's letter.
         """
         ...
 

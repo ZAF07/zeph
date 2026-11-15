@@ -11,15 +11,17 @@ import { formatDuration, formatTokens } from "@/lib/model-calls";
  * links to the result's full trace and to the case's history.
  *
  * @param props - `runId` is the run it belongs to; `result` is the Case
- *   Result.
+ *   Result; `tryLabel`, when given, says which try it is, e.g. "Try 2 of 3".
  * @returns The result's card.
  */
 export function CaseResultCard({
   runId,
   result,
+  tryLabel,
 }: {
   runId: string;
   result: CaseResult;
+  tryLabel?: string;
 }) {
   const failedChecks = result.checks.filter((check) => !check.passed).length;
   return (
@@ -37,6 +39,7 @@ export function CaseResultCard({
           {result.case_key}
         </Link>
         <span className="text-ink-muted">{evalDetails[result.eval].label}</span>
+        {tryLabel ? <span className="text-ink-muted">· {tryLabel}</span> : null}
         <span className="ml-auto whitespace-nowrap text-caption text-ink-muted">
           {formatTokens(result.tokens_in, result.tokens_out)} ·{" "}
           {formatDuration(result.duration_ms)} ·{" "}

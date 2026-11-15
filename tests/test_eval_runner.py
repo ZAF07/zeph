@@ -15,11 +15,13 @@ from companion.adapters.postgres.eval_repositories import (
     PostgresEvalRunRepository,
     PostgresJudgeSettingsRepository,
 )
-from companion.adapters.postgres.repositories import PostgresPlatformSettingsRepository
+from companion.adapters.postgres.repositories import (
+    PostgresNeedRepository,
+    PostgresPlatformSettingsRepository,
+)
 from companion.core.evals.models import EvalCase, EvalName
 from companion.core.evals.runner import EvalRunner
-from companion.core.evals.runs import EvalRunService
-from companion.eval_terminal import start_and_watch_run
+from companion.eval_terminal import build_eval_run_service, start_and_watch_run
 from companion.main import SEED_DIR
 from tests.conftest import shared_postgres_url
 from tests.eval_run_helpers import (
@@ -27,6 +29,7 @@ from tests.eval_run_helpers import (
     FALSE_ALARM_CASE,
     SETTINGS_CASE,
     add_cases,
+    need_key,
     open_run,
     start_run,
 )
@@ -123,6 +126,7 @@ def runner(
         images=PostgresEvalImageRepository(engine),
         judge_settings=PostgresJudgeSettingsRepository(engine),
         live_settings=PostgresPlatformSettingsRepository(engine),
+        live_needs=PostgresNeedRepository(engine),
         environment=PostgresEvalEnvironment(
             database_url=eval_database_url,
             chat_model=chat_model,
@@ -290,6 +294,7 @@ def test_a_run_keeps_its_snapshot_of_settings_judge_and_cases(
     assert run.snapshot.settings == dict(live)
     assert run.snapshot.judge == PostgresJudgeSettingsRepository(engine).load()
     assert run.snapshot.cases == [CRISIS_CASE]
+    assert run.snapshot.needs == PostgresNeedRepository(engine).list_all()
 
 
 def test_a_run_left_running_is_interrupted_at_start_up_and_never_retried(
@@ -822,6 +827,9 @@ def test_a_finished_run_shows_its_snapshot(
             "archived": False,
         }
     ]
+    assert [need["name"] for need in snapshot["needs"]] == [
+        need.name for need in PostgresNeedRepository(engine).list_all()
+    ]
 
 
 def test_case_history_marks_where_the_case_or_settings_changed(
@@ -888,12 +896,7 @@ def test_the_terminal_runs_single_cases_and_prints_each_one(
     engine: Engine, chat_model: ScriptedChatModel, runner: EvalRunner, clock: FakeClock
 ) -> None:
     add_cases(engine, CRISIS_CASE, FALSE_ALARM_CASE)
-    service = EvalRunService(
-        runs=PostgresEvalRunRepository(engine),
-        cases=PostgresEvalCaseRepository(engine),
-        settings=PostgresPlatformSettingsRepository(engine),
-        clock=clock,
-    )
+    service = build_eval_run_service(engine, clock)
     chat_model.script()
     lines: list[str] = []
 
@@ -906,3 +909,457 @@ def test_the_terminal_runs_single_cases_and_prints_each_one(
     assert lines[0].endswith("(traffic)")
     assert any("traffic" in line and line.startswith("PASS") for line in lines)
     assert not any("plan" in line for line in lines)
+
+
+PERSONA_VERDICT = (
+    '{"verdicts": [{"rule": "no_lists", "passed": true, "reason": "Plain."}]}'
+)
+
+
+def test_an_override_changes_only_its_variant_and_every_variant_has_the_same_judge(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, PERSONA_CASE)
+    admin = owner_headers(client, auth_verifier)
+    live_before = PostgresPlatformSettingsRepository(engine).load().values
+    run = start_run(
+        client, admin, EvalName.PERSONA, variants=[{}, {"response_thinking": True}]
+    )
+    chat_model.script("Pretty good!", PERSONA_VERDICT, "Pretty good!", PERSONA_VERDICT)
+
+    runner.work_next_run()
+
+    reply_a, judge_a, reply_b, judge_b = chat_model.calls
+    assert (reply_a.thinking, reply_b.thinking) == (False, True)
+    assert (judge_a.model, judge_a.thinking, judge_a.instructions) == (
+        judge_b.model,
+        judge_b.thinking,
+        judge_b.instructions,
+    )
+    assert PostgresPlatformSettingsRepository(engine).load().values == live_before
+    finished = open_run(client, admin, run["id"])
+    assert finished["variants"][1]["setting_overrides"] == {"response_thinking": True}
+    assert [result["variant"] for result in finished["results"]] == ["A", "B"]
+
+
+def test_three_variants_with_three_repeats_run_case_by_case_across_variants(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, CRISIS_CASE, FALSE_ALARM_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(
+        client,
+        admin,
+        EvalName.SAFEGUARD,
+        variants=[
+            {},
+            {"safeguard_thinking": False},
+            {"crisis_reply": "Stay safe. {helplines}"},
+        ],
+        repeats=3,
+    )
+    chat_model.script(*["I'm here."] * 9)
+
+    runner.work_next_run()
+
+    finished = open_run(client, admin, run["id"])
+    assert finished["case_count"] == 18
+    assert [
+        (result["case_key"], result["try_number"], result["variant"])
+        for result in finished["results"]
+    ] == [
+        (key, try_number, letter)
+        for key in ("plan", "traffic")
+        for try_number in (1, 2, 3)
+        for letter in "ABC"
+    ]
+    assert [
+        (totals["letter"], totals["passed"], totals["failed"])
+        for totals in finished["variant_totals"]
+    ] == [("A", 3, 3), ("B", 3, 3), ("C", 3, 3)]
+    assert all(totals["duration_ms"] >= 0 for totals in finished["variant_totals"])
+
+
+def test_every_variant_and_try_starts_from_fresh_made_up_data(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, PERSONA_CASE)
+    admin = owner_headers(client, auth_verifier)
+    start_run(
+        client,
+        admin,
+        EvalName.PERSONA,
+        variants=[{}, {"response_thinking": True}],
+        repeats=2,
+    )
+    chat_model.script(*["Pretty good!", PERSONA_VERDICT] * 4)
+
+    runner.work_next_run()
+
+    with engine.connect() as connection:
+        users_per_result = connection.execute(
+            text(
+                "SELECT case_result_id, array_agg(DISTINCT made_up_user_id) "
+                "FROM eval_model_calls GROUP BY case_result_id"
+            )
+        ).all()
+    assert len(users_per_result) == 4
+    made_up_users = [users for _, users in users_per_result]
+    assert all(len(users) == 1 for users in made_up_users)
+    assert len({users[0] for users in made_up_users}) == 4
+
+
+def test_a_need_override_reaches_only_its_variant_and_live_needs_stay(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, UNDERSTANDING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    key = need_key(client, admin, "Just chatting")
+    live_needs = PostgresNeedRepository(engine).list_all()
+    override = {
+        "name": "Just chatting",
+        "when_it_fits": "Only when they say the word pineapple.",
+        "how_to_reply": "Chat back lightly.",
+    }
+    start_run(client, admin, EvalName.UNDERSTANDING, variants=[{}, {key: override}])
+    chat_model.script("Hi!", "Hi!")
+
+    runner.work_next_run()
+
+    understanding_a, understanding_b = chat_model.understanding_calls
+    assert "pineapple" not in str(understanding_a)
+    assert "Just chatting: Only when they say the word pineapple." in str(
+        understanding_b
+    )
+    assert PostgresNeedRepository(engine).list_all() == live_needs
+
+
+def test_re_run_failed_keeps_the_variants_and_repeats(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, CRISIS_CASE, FALSE_ALARM_CASE)
+    admin = owner_headers(client, auth_verifier)
+    variants = [{}, {"safeguard_thinking": False}]
+    run = start_run(client, admin, EvalName.SAFEGUARD, variants=variants, repeats=2)
+    chat_model.script(*["I'm here."] * 4)
+    runner.work_next_run()
+
+    response = client.post(
+        f"/api/admin/eval-runs/{run['id']}/rerun-failed", headers=admin
+    )
+
+    rerun = response.json()
+    assert rerun["case_keys"] == ["plan"]
+    assert rerun["repeats"] == 2
+    assert [variant["setting_overrides"] for variant in rerun["variants"]] == variants
+    assert rerun["case_count"] == 4
+
+
+def finish_run_with_overrides(
+    client: TestClient,
+    admin: dict[str, str],
+    engine: Engine,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+    overrides: dict[str, Any],
+) -> dict[str, Any]:
+    add_cases(engine, FALSE_ALARM_CASE)
+    run = start_run(client, admin, EvalName.SAFEGUARD, variants=[{}, overrides])
+    chat_model.script()
+    runner.work_next_run()
+    return run
+
+
+def make_live(
+    client: TestClient,
+    admin: dict[str, str],
+    run_id: str,
+    letter: str,
+    confirmed_keys: list[str] | None = None,
+) -> Any:
+    return client.post(
+        f"/api/admin/eval-runs/{run_id}/variants/{letter}/make-live",
+        json={"confirmed_keys": confirmed_keys or []},
+        headers=admin,
+    )
+
+
+def live_changes(
+    client: TestClient, admin: dict[str, str], run_id: str, letter: str
+) -> Any:
+    return client.get(
+        f"/api/admin/eval-runs/{run_id}/variants/{letter}/live-changes",
+        headers=admin,
+    )
+
+
+def test_make_live_applies_the_overrides_once_and_the_run_shows_who_when_and_what(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    key = need_key(client, admin, "Just chatting")
+    need_change = {
+        "name": "Just chatting",
+        "when_it_fits": "They want light, easy chat.",
+        "how_to_reply": "Keep it light.",
+    }
+    run = finish_run_with_overrides(
+        client,
+        admin,
+        engine,
+        chat_model,
+        runner,
+        {"response_thinking": True, "daily_message_limit": 80, key: need_change},
+    )
+    assert live_changes(client, admin, run["id"], "B").json() == {"changes": []}
+
+    response = make_live(client, admin, run["id"], "B")
+
+    assert response.status_code == 200, response.text
+    made_live = response.json()["made_live"]
+    assert made_live["by_name"] == "owner@example.com"
+    assert sorted(made_live["applied_keys"]) == sorted(
+        ["response_thinking", "daily_message_limit", key]
+    )
+    assert made_live["left_out_keys"] == []
+    live = client.get("/api/admin/settings", headers=admin).json()["settings"]
+    assert live["response_thinking"]["value"] is True
+    assert live["daily_message_limit"]["value"] == 80
+    [need] = [
+        need
+        for need in PostgresNeedRepository(engine).list_all()
+        if need.name == "Just chatting"
+    ]
+    assert need.when_it_fits == "They want light, easy chat."
+    variant_b = open_run(client, admin, run["id"])["variants"][1]
+    assert variant_b["made_live"] == made_live
+    again = make_live(client, admin, run["id"], "B")
+    assert again.status_code == 409
+
+
+def test_a_setting_changed_live_since_the_run_is_applied_only_if_confirmed(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    run = finish_run_with_overrides(
+        client,
+        admin,
+        engine,
+        chat_model,
+        runner,
+        {
+            "response_thinking": True,
+            "daily_message_limit": 80,
+            "message_wait_seconds": 9,
+        },
+    )
+    client.patch(
+        "/api/admin/settings",
+        json={"values": {"daily_message_limit": 60, "message_wait_seconds": 7}},
+        headers=admin,
+    )
+    then = open_run(client, admin, run["id"])
+    snapshot = client.get(
+        f"/api/admin/eval-runs/{then['id']}/snapshot", headers=admin
+    ).json()["settings"]
+
+    changes = live_changes(client, admin, run["id"], "B").json()["changes"]
+
+    assert sorted(changes, key=lambda change: change["key"]) == [
+        {
+            "key": "daily_message_limit",
+            "then": snapshot["daily_message_limit"],
+            "now": 60,
+            "override": 80,
+        },
+        {
+            "key": "message_wait_seconds",
+            "then": snapshot["message_wait_seconds"],
+            "now": 7,
+            "override": 9,
+        },
+    ]
+    made_live = make_live(
+        client, admin, run["id"], "B", ["message_wait_seconds"]
+    ).json()["made_live"]
+    assert sorted(made_live["applied_keys"]) == [
+        "message_wait_seconds",
+        "response_thinking",
+    ]
+    assert made_live["left_out_keys"] == ["daily_message_limit"]
+    live = client.get("/api/admin/settings", headers=admin).json()["settings"]
+    assert live["daily_message_limit"]["value"] == 60
+    assert live["message_wait_seconds"]["value"] == 9
+    assert live["response_thinking"]["value"] is True
+
+
+def test_make_live_needs_a_finished_run_and_a_variant_with_overrides(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    finished = finish_run_with_overrides(
+        client, admin, engine, chat_model, runner, {"response_thinking": True}
+    )
+    queued = start_run(
+        client, admin, EvalName.SAFEGUARD, variants=[{"response_thinking": True}]
+    )
+    client.post(f"/api/admin/eval-runs/{queued['id']}/cancel", headers=admin)
+
+    assert make_live(client, admin, queued["id"], "A").status_code == 409
+    assert live_changes(client, admin, queued["id"], "A").status_code == 409
+    assert make_live(client, admin, finished["id"], "A").status_code == 422
+    assert make_live(client, admin, finished["id"], "C").status_code == 404
+    assert make_live(client, admin, str(uuid4()), "A").status_code == 404
+    live = client.get("/api/admin/settings", headers=admin).json()["settings"]
+    assert live["response_thinking"]["value"] is False
+
+
+def test_a_need_deleted_before_the_run_starts_makes_its_variant_an_error(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, FALSE_ALARM_CASE)
+    admin = owner_headers(client, auth_verifier)
+    key = need_key(client, admin, "Just chatting")
+    change = {"name": "Just chatting", "when_it_fits": "x", "how_to_reply": "y"}
+    run = start_run(client, admin, EvalName.SAFEGUARD, variants=[{}, {key: change}])
+    deleted = client.delete(
+        f"/api/admin/needs/{key.removeprefix('need:')}", headers=admin
+    )
+    assert deleted.status_code == 204
+    chat_model.script()
+
+    runner.work_next_run()
+
+    variant_a, variant_b = open_run(client, admin, run["id"])["results"]
+    assert variant_a["outcome"] == "pass"
+    assert variant_b["outcome"] == "error"
+    assert "Need deleted before the run started" in variant_b["error"]
+
+
+def test_a_refused_make_live_changes_nothing_and_can_be_tried_again(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    key = need_key(client, admin, "Just chatting")
+    change = {"name": "Just chatting", "when_it_fits": "x", "how_to_reply": "y"}
+    run = finish_run_with_overrides(
+        client,
+        admin,
+        engine,
+        chat_model,
+        runner,
+        {"daily_message_limit": 80, key: change},
+    )
+    client.delete(f"/api/admin/needs/{key.removeprefix('need:')}", headers=admin)
+    [gone] = live_changes(client, admin, run["id"], "B").json()["changes"]
+    assert (gone["key"], gone["now"]) == (key, None)
+
+    refused = make_live(client, admin, run["id"], "B", [key])
+
+    assert refused.status_code == 404
+    live = client.get("/api/admin/settings", headers=admin).json()["settings"]
+    assert live["daily_message_limit"]["value"] != 80
+    assert open_run(client, admin, run["id"])["variants"][1]["made_live"] is None
+    made_live = make_live(client, admin, run["id"], "B").json()["made_live"]
+    assert made_live["applied_keys"] == ["daily_message_limit"]
+    assert made_live["left_out_keys"] == [key]
+
+
+def test_a_variant_is_marked_made_live_only_once(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+    clock: FakeClock,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    run = finish_run_with_overrides(
+        client, admin, engine, chat_model, runner, {"response_thinking": True}
+    )
+    runs = PostgresEvalRunRepository(engine)
+    with engine.begin() as connection:
+        admin_id = connection.execute(text("SELECT id FROM users LIMIT 1")).scalar()
+
+    first = runs.mark_made_live(
+        UUID(run["id"]), "B", admin_id, clock.now(), ["response_thinking"], []
+    )
+    second = runs.mark_made_live(
+        UUID(run["id"]), "B", admin_id, clock.now(), ["response_thinking"], []
+    )
+
+    assert (first, second) == (True, False)
+    assert make_live(client, admin, run["id"], "B").status_code == 409
+
+
+def test_the_token_limit_counts_every_variant_and_repeat(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, FALSE_ALARM_CASE)
+    admin = owner_headers(client, auth_verifier)
+    measured = start_run(client, admin, EvalName.SAFEGUARD)
+    chat_model.script("")
+    runner.work_next_run()
+    [one_try] = open_run(client, admin, measured["id"])["results"]
+    tokens_per_try = one_try["tokens_in"] + one_try["tokens_out"]
+    set_token_limit(engine, 2 * tokens_per_try + 1)
+    run = start_run(
+        client,
+        admin,
+        EvalName.SAFEGUARD,
+        variants=[{}, {"safeguard_thinking": False}],
+        repeats=2,
+    )
+    chat_model.script(*[""] * 4)
+
+    runner.work_next_run()
+
+    stopped = open_run(client, admin, run["id"])
+    assert stopped["state"] == "stopped_over_limit"
+    assert [
+        (result["try_number"], result["variant"]) for result in stopped["results"]
+    ] == [(1, "A"), (1, "B"), (2, "A")]

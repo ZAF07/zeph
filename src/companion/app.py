@@ -24,6 +24,7 @@ from companion.core.curiosities import CuriosityKeeper, CuriosityRaiser
 from companion.core.evals.case_editing import EvalCaseService
 from companion.core.evals.costs import EvalCostsService
 from companion.core.evals.judge_settings import JudgeSettingsService
+from companion.core.evals.make_live import MakeLiveService
 from companion.core.evals.ports import (
     EvalCaseRepository,
     EvalImageRepository,
@@ -31,6 +32,7 @@ from companion.core.evals.ports import (
     JudgeSettingsRepository,
 )
 from companion.core.evals.runs import EvalRunService
+from companion.core.evals.setting_overrides import SettingOverrideService
 from companion.core.features import FeatureService
 from companion.core.helplines import HelplineService
 from companion.core.home import HomeService
@@ -377,6 +379,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     platform_settings_service = PlatformSettingsService(
         dependencies.repositories.platform_settings, dependencies.clock
     )
+    need_service = NeedService(dependencies.repositories)
     current_user = build_current_user_dependency(
         dependencies.auth_verifier, user_service
     )
@@ -432,9 +435,10 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             check_in_service=check_in_service,
             usage_limiter=usage_limiter,
             model_call_log=model_call_log,
-            need_service=NeedService(dependencies.repositories),
+            need_service=need_service,
         )
     )
+    setting_overrides = SettingOverrideService(platform_settings_service, need_service)
     app.include_router(
         build_eval_api_router(
             current_admin=build_current_admin_dependency(current_user),
@@ -442,8 +446,17 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 dependencies.eval_runs,
                 dependencies.eval_cases,
                 dependencies.repositories.platform_settings,
+                setting_overrides,
                 dependencies.clock,
             ),
+            make_live_service=MakeLiveService(
+                dependencies.eval_runs,
+                setting_overrides,
+                dependencies.repositories.platform_settings,
+                dependencies.repositories.needs,
+                dependencies.clock,
+            ),
+            setting_override_service=setting_overrides,
             eval_costs_service=EvalCostsService(
                 dependencies.repositories.platform_settings, dependencies.clock
             ),
