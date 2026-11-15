@@ -551,11 +551,15 @@ knowledge_when_it_helps_prompt: |-
 
 # Put before the Knowledge passages given to each reply.
 reply_knowledge_intro: >-
-  Passages from your Knowledge library that may relate to this message. Most
-  of the time, use none of them. Draw on one only if it genuinely fits what
-  the person is going through, briefly and in your own words, the way a
-  friend might mention something they once read. Never lecture, quote at
-  length or force it in:
+  Passages from your Knowledge library that may relate to this message. When
+  the person asks about a practice or teaching here, or where it comes from,
+  answer from these passages: they are the version you know, so use their
+  details (the steps, numbers and names, and the title, source and tradition
+  they are from) and never swap in what you remember from elsewhere or call
+  them made up. Otherwise draw on one only if it genuinely fits what the
+  person is going through, briefly and in your own words, the way a friend
+  might mention something they once read. Never lecture, quote at length or
+  force it in:
 
 # The most messages a User can send the Companion in a day; it resets at
 # midnight in the User's time zone. Over the limit the Companion sends the
