@@ -42,3 +42,20 @@ uv run pytest -n 0 evals -m eval -k "struggling-with-shared-photos or forget-why
 
 - 2026-11-15 (grilling, done): decisions above. Ready for `/implement`; final 3-run check waits on issue 21.
 - 2026-11-15 (grilling, paused): rerun both cases on reasoner once issue 21 is done. Open question: a code guard where the Understanding says the User is struggling and the reply then isn't offered `send_photo` (recommended; the rule today is only tool-description wording). `forget-why-here` not discussed yet.
+- 2026-11-15 (found while doing issue 21, root cause for the Settings cases): **no Need fits "do something for me"** (change a setting, forget something, delete my data), so the Understanding picks the fallback **Ask more**, whose how-to-reply says "Don't guess… ask one simple question… before going deeper". The reply then asks or offers instead of calling the tool. Seen with a probe that sends one message to a fresh User in the real app (worktree DB, real DeepSeek) and reads the Model Call Log:
+  - "please delete all my data", 8 runs each: Understanding picked Ask more 15 of 16 times, nuance like "clarify what they want deleted and confirm before anything irreversible". Reply called `start_deleting_my_data` 5/8 on deepseek-chat, **1/8 on deepseek-reasoner** (reasoner follows the "confirm first" advice more faithfully). Over 8 eval runs each: delete-my-data 6/8 chat, 4/8 reasoner; forget-why-here 3/8 chat, 4/8 reasoner; quiet-after-nine 5/8 chat, 6/8 reasoner.
+  - **Trial fix** (worktree only, then removed): a Need placed before Ask more:
+    ```yaml
+    - name: Get it done
+      when_it_fits: >-
+        They ask Zeph to do something it can do for them: change a setting, turn
+        something on or off, forget something, or delete their data.
+      how_to_reply: >-
+        Do it now with the right tool, then say plainly what you did. Don't ask
+        them to confirm or explain first: a tool that needs confirming asks for it
+        itself. Ask only if you truly can't tell what they want changed.
+    ```
+    Probe on reasoner, 6 runs each: delete-my-data 5/6, forget-why-here 6/6 (`list_memories` then `forget_memory`), quiet-after-nine 6/6. Full `make eval` 3×: Settings 12/14, 14/14, 14/14; total failures 6, 2, 1 (vs 4, 5, 4 on reasoner without it).
+  - **Needs a wording fix before use:** with it, "delete my account please" (must call no tool) called `start_deleting_my_data` in 1 of 3 eval runs and 1 of 5 probes: the reply said it can't delete accounts, then offered and started data deletion. Something like "Only do what they asked; if Zeph can't do it, say where they can, and don't do something else in its place." Re-measure delete-account, memory-off and advice-is-asked-for (each failed once in the 3 runs) after.
+  - Not caused by the trial Need: Persona `asks-for-tips` failed `no_lists` in 2 of 3 runs with it, but the Understanding picked Advice in 5 of 5 probes; the Advice reply sometimes writes tips as separate lines.
+  - A new Need is an Admin-managed row (ADR-0004): the seed file only loads when there are no Needs, so the local main DB needs it added by hand.

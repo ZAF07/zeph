@@ -275,7 +275,7 @@ photo_retry_count: 2
 photo_album_max_photos: 5
 
 # The model the Safeguard uses to check each incoming message for crisis.
-safeguard_model: deepseek-chat
+safeguard_model: deepseek-reasoner
 
 # How the Safeguard classifies each incoming message. The answer must be
 # exactly one of the labels below.
@@ -322,7 +322,7 @@ crisis_reply: |-
 # User Memory. When a Conversation ends, post-conversation processing writes a
 # Conversation Summary, changes the User's Memory Items and picks the photos to
 # keep as Shared Photos in one call.
-memory_processing_model: deepseek-chat
+memory_processing_model: deepseek-reasoner
 
 memory_processing_prompt: |-
   You look after the memory of Zeph, an AI companion people talk to on
@@ -381,7 +381,7 @@ memory_processing_prompt: |-
 # and fills in a form: which Need fits, how they seem, whether the Companion
 # knows why, and which Memory Categories matter. The reply follows the
 # picked Need's "how to reply".
-understanding_model: deepseek-chat
+understanding_model: deepseek-reasoner
 
 understanding_prompt: |-
   You help Zeph, an AI companion, understand a person before it replies. You
@@ -725,7 +725,7 @@ sticker_tool_description: >-
 # When a Conversation ends and User Memory works for the User, this call
 # starts and adds to their Life Threads, and records how they took each
 # Thread the Companion brought up.
-life_thread_keeping_model: deepseek-chat
+life_thread_keeping_model: deepseek-reasoner
 
 life_thread_keeping_prompt: |-
   You keep the Life Threads of a person who talks with Zeph, an AI
@@ -769,7 +769,7 @@ life_thread_keeping_prompt: |-
 # newest Conversation Summaries. It also runs when the User deletes a Memory
 # Item, Life Thread or Summary, so the Portrait no longer holds it. It is
 # never shown the old Portrait.
-portrait_model: deepseek-chat
+portrait_model: deepseek-reasoner
 
 portrait_prompt: |-
   You write the User Portrait of a person who talks with Zeph, an AI
@@ -795,7 +795,7 @@ portrait_prompt: |-
 # When a Conversation ends and User Memory and Curiosities work for the User,
 # this call writes things Zeph wants to ask them later, records how they took
 # the ones Zeph asked, and closes ones no longer relevant.
-curiosity_keeping_model: deepseek-chat
+curiosity_keeping_model: deepseek-reasoner
 
 curiosity_keeping_prompt: |-
   You keep the Curiosities of a person who talks with Zeph, an AI companion.
@@ -876,7 +876,7 @@ personal_stickers_limit: 30
 # Check-ins. On each scheduler tick, this model decides for each User who is
 # due: a Check-in Kind and message, or to skip. It gets the Persona and this
 # prompt.
-check_in_model: deepseek-chat
+check_in_model: deepseek-reasoner
 
 check_in_prompt: |-
   Now you are deciding whether to reach out first with a Check-in: a short,

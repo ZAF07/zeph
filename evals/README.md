@@ -65,7 +65,7 @@ looking at photos) and the real fastembed embedder. Only the chat channel is
 fake: it records what Zeph sends and serves the test images in
 `evals/images/` when a photo is downloaded, so no real Telegram chat is
 needed. Web search is also fake, so no Tavily credits
-are used. A full run takes about 6 minutes.
+are used. A full run takes about 10 minutes.
 
 To run one part or one case, pass pytest options through `uv run`:
 
@@ -92,6 +92,12 @@ The Understanding eval alone (2026-11-14, 12 cases, 13 Messages) used about
 Understanding and reply calls plus the judge. Each Understanding call took
 about 1.4 seconds and 1,500 tokens in, 130 out. A whole `make eval` run that
 day used about 343,000 in and 15,500 out and took about 6 minutes.
+
+Since 2026-11-15 the Safeguard, Understanding and the calls after a
+Conversation default to `deepseek-reasoner` (the reply stays on
+`deepseek-chat`). A whole run then uses about 339,000 tokens in and 42,000
+out (the reasoning counts as output) and takes about 10 minutes. Each
+Understanding call takes about 3.6 seconds and 1,500 tokens in, 520 out.
 
 ## Reading the results
 
