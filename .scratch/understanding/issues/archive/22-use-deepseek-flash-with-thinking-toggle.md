@@ -51,4 +51,4 @@ Checked in issue 21: both legacy names come back from the API as `model: deepsee
 ## Completion
 
 - Completed: 2026-11-15
-- Commits: `dcdb024` (deepseek-flash, Thinking switch, log, Judge, tests), `bb0fac5` (review fixes, eval notes); merged to main in `92e60da`
+- Commits: `dcdb024` (deepseek-flash, Thinking switch, log, Judge, tests), `bb0fac5` (review fixes, eval notes), `557f3f8` (archive); merged to main in `92e60da`
