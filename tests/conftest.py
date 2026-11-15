@@ -21,7 +21,9 @@ from companion.adapters.postgres.database import (
 )
 from companion.adapters.postgres.eval_repositories import (
     PostgresEvalCaseRepository,
+    PostgresEvalImageRepository,
     PostgresEvalRunRepository,
+    PostgresJudgeSettingsRepository,
 )
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.adapters.pypdf.text_extractor import PypdfTextExtractor
@@ -51,6 +53,7 @@ HELPLINES_SEED_FILE = SEED_DIR / "helplines.yaml"
 MEMORY_CATEGORIES_SEED_FILE = SEED_DIR / "memory_categories.yaml"
 CHECK_IN_KINDS_SEED_FILE = SEED_DIR / "check_in_kinds.yaml"
 NEEDS_SEED_FILE = SEED_DIR / "needs.yaml"
+JUDGE_SEED_FILE = SEED_DIR / "evals" / "judge.yaml"
 KNOWLEDGE_SEED_FILE = SEED_DIR / "knowledge" / "knowledge.yaml"
 
 
@@ -165,7 +168,7 @@ def engine(database_url: str) -> Iterator[Engine]:
                 "daily_usage, stickers, check_in_kinds, check_ins, "
                 "feature_switches, user_feature_switches, shared_photos, "
                 "personal_stickers, pending_auth_account_deletions, needs, "
-                "eval_cases, eval_runs CASCADE"
+                "eval_cases, eval_runs, eval_images, eval_judge_settings CASCADE"
             )
         )
     seed_platform_settings(engine, SEED_FILE)
@@ -173,6 +176,9 @@ def engine(database_url: str) -> Iterator[Engine]:
     seed_memory_categories(engine, MEMORY_CATEGORIES_SEED_FILE)
     seed_check_in_kinds(engine, CHECK_IN_KINDS_SEED_FILE)
     seed_needs(engine, NEEDS_SEED_FILE)
+    PostgresJudgeSettingsRepository(engine).add_missing(
+        yaml.safe_load(JUDGE_SEED_FILE.read_text()), datetime.now(UTC)
+    )
     yield engine
     engine.dispose()
 
@@ -266,6 +272,8 @@ def client(
         repositories=build_postgres_repositories(engine),
         eval_runs=PostgresEvalRunRepository(engine),
         eval_cases=PostgresEvalCaseRepository(engine),
+        eval_images=PostgresEvalImageRepository(engine),
+        judge_settings=PostgresJudgeSettingsRepository(engine),
         chat_channel=chat_channel,
         chat_model=chat_model,
         photo_viewer=photo_viewer,

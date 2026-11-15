@@ -3,8 +3,9 @@ import time
 from typing import Any
 from uuid import UUID, uuid4
 
+from companion.core.evals.case_shapes import CASE_SHAPES, image_names
 from companion.core.evals.eval_checks import check_case
-from companion.core.evals.judge import judge_settings
+from companion.core.evals.judge import JudgeSettings
 from companion.core.evals.models import (
     FIRST_TRY,
     CaseCheckResult,
@@ -19,7 +20,9 @@ from companion.core.evals.ports import (
     EvalCaseRepository,
     EvalCompanion,
     EvalEnvironment,
+    EvalImageRepository,
     EvalRunRepository,
+    JudgeSettingsRepository,
 )
 from companion.core.ports import Clock, PlatformSettingsRepository
 
@@ -33,6 +36,8 @@ class EvalRunner:
         self,
         runs: EvalRunRepository,
         cases: EvalCaseRepository,
+        images: EvalImageRepository,
+        judge_settings: JudgeSettingsRepository,
         live_settings: PlatformSettingsRepository,
         environment: EvalEnvironment,
         clock: Clock,
@@ -42,12 +47,16 @@ class EvalRunner:
         Args:
             runs: The app database's Eval Runs and Case Results.
             cases: The app database's Eval Cases.
+            images: The app database's test images for the cases.
+            judge_settings: The app database's Judge settings, read only.
             live_settings: The app database's Platform Settings, read only.
             environment: Prepares the Eval database and builds the app on it.
             clock: Tells the time.
         """
         self._runs = runs
         self._cases = cases
+        self._images = images
+        self._judge_settings = judge_settings
         self._live_settings = live_settings
         self._environment = environment
         self._clock = clock
@@ -66,8 +75,9 @@ class EvalRunner:
     def work_next_run(self) -> bool:
         """Take the oldest Queued run, if any, and run all its cases.
 
-        Each case gets fresh made-up data. A case that raises becomes an
-        Error and the run carries on.
+        The cases and the Judge's settings are read as they are now, so an
+        Admin's edits apply from the next run. Each case gets fresh made-up
+        data. A case that raises becomes an Error and the run carries on.
 
         Returns:
             True if a run was worked; False if none was waiting.
@@ -77,7 +87,7 @@ class EvalRunner:
             return False
         snapshot = RunSnapshot(
             settings=dict(self._live_settings.load().values),
-            judge=judge_settings(),
+            judge=self._judge_settings.load(),
             cases=self._cases.list_for_evals(run.evals),
         )
         self._runs.save_snapshot(run.id, snapshot)
@@ -85,7 +95,9 @@ class EvalRunner:
         for case in snapshot.cases:
             for variant in run.variants:
                 self._runs.add_result(
-                    self._run_case(run, variant, case, snapshot.settings)
+                    self._run_case(
+                        run, variant, case, snapshot.settings, snapshot.judge
+                    )
                 )
         self._runs.finish(run.id, self._clock.now())
         return True
@@ -96,6 +108,7 @@ class EvalRunner:
         variant: Variant,
         case: EvalCase,
         live_settings: dict[str, Any],
+        judge_values: dict[str, Any],
     ) -> CaseResult:
         """Run one case on fresh data with a Variant's settings.
 
@@ -104,6 +117,8 @@ class EvalRunner:
             variant: The Variant.
             case: The case.
             live_settings: The live Platform Settings when the run started.
+            judge_values: The Judge's settings for the run; one missing makes
+                the case an Error.
 
         Returns:
             The Case Result.
@@ -111,10 +126,14 @@ class EvalRunner:
         started = time.monotonic()
         companion: EvalCompanion | None = None
         try:
-            companion = self._environment.fresh_companion(
-                {**live_settings, **variant.setting_overrides}
+            judge = JudgeSettings.from_values(judge_values)
+            images = self._images.get_many(
+                image_names(CASE_SHAPES[case.eval], case.content)
             )
-            result = check_case(case, companion)
+            companion = self._environment.fresh_companion(
+                {**live_settings, **variant.setting_overrides}, images
+            )
+            result = check_case(case, companion, judge)
         except Exception as error:
             logger.exception("Eval case %s errored", case.key)
             result = CaseCheckResult(

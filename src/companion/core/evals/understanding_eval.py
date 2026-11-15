@@ -9,7 +9,7 @@ from companion.core.evals.cases import (
     UnderstandingCase,
     UnderstandingMessage,
 )
-from companion.core.evals.judge import judge_persona_rules
+from companion.core.evals.judge import JudgeSettings, judge_persona_rules
 from companion.core.evals.made_up_memory import (
     give_made_up_memory,
     open_conversation_with,
@@ -212,6 +212,7 @@ def check_message(
     understanding: Understanding | None,
     transcript: str,
     judge_chat_model: ChatModel,
+    judge: JudgeSettings,
 ) -> CheckedMessage:
     """Check one Message's Understanding and reply, and judge the reply.
 
@@ -222,6 +223,7 @@ def check_message(
         understanding: Its saved Understanding; None if none was saved.
         transcript: The Conversation so far, for the Judge.
         judge_chat_model: The model that judges.
+        judge: The Judge's model, thinking and prompts.
 
     Returns:
         Its checks; a Message with no logged Understanding call fails.
@@ -242,7 +244,9 @@ def check_message(
     )
     results.append(full_content_check(calls))
     rules = {rule: case.rules[rule] for rule in message.expect.rules}
-    verdicts = judge_persona_rules(judge_chat_model, transcript, rules) if rules else []
+    verdicts = (
+        judge_persona_rules(judge_chat_model, judge, transcript, rules) if rules else []
+    )
     checks = [
         *(
             Check(result.name, result.passed, result.detail, group=message.text)
@@ -308,13 +312,14 @@ def message_facts(checked: CheckedMessage) -> dict[str, Any]:
 
 
 def check_understanding_case(
-    case: UnderstandingCase, companion: EvalCompanion
+    case: UnderstandingCase, companion: EvalCompanion, judge: JudgeSettings
 ) -> CaseCheckResult:
     """Give a made-up User a memory, send Messages and check each Understanding.
 
     Args:
         case: The made-up memory, Conversation and Messages.
         companion: The app on the Eval database.
+        judge: The Judge's model, thinking and prompts.
 
     Returns:
         Every Message's checks, grouped by Message; its facts hold each
@@ -353,6 +358,7 @@ def check_understanding_case(
                 latest_understanding(repositories, user_id),
                 "\n".join(transcript_lines),
                 companion.judge_chat_model,
+                judge,
             )
         )
 

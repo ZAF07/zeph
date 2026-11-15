@@ -11,10 +11,11 @@ from companion.adapters.evals.environment import (
 )
 from companion.adapters.postgres.eval_repositories import (
     PostgresEvalCaseRepository,
+    PostgresEvalImageRepository,
     PostgresEvalRunRepository,
+    PostgresJudgeSettingsRepository,
 )
 from companion.adapters.postgres.repositories import PostgresPlatformSettingsRepository
-from companion.core.evals.judge import judge_settings
 from companion.core.evals.models import EvalCase, EvalName
 from companion.core.evals.runner import EvalRunner
 from companion.main import SEED_DIR
@@ -42,8 +43,8 @@ PERSONA_CASE = EvalCase(
     key="small-talk",
     eval=EvalName.PERSONA,
     content={
-        "messages": ["hey, how's it going?"],
-        "rules": {"no_lists": "No reply uses lists."},
+        "messages": [{"text": "hey, how's it going?", "photo": None, "shows": ""}],
+        "rules": [{"id": "no_lists", "check": "No reply uses lists."}],
     },
 )
 PHOTO_CASE = EvalCase(
@@ -57,7 +58,7 @@ UNDERSTANDING_CASE = EvalCase(
     content={
         "now": "2026-11-13T18:30:00",
         "messages": [{"text": "hi there", "expect": {"need": ["Just chatting"]}}],
-        "rules": {},
+        "rules": [],
     },
 )
 KNOWLEDGE_CASE = EvalCase(
@@ -117,6 +118,8 @@ def runner(
     return EvalRunner(
         runs=PostgresEvalRunRepository(engine),
         cases=PostgresEvalCaseRepository(engine),
+        images=PostgresEvalImageRepository(engine),
+        judge_settings=PostgresJudgeSettingsRepository(engine),
         live_settings=PostgresPlatformSettingsRepository(engine),
         environment=PostgresEvalEnvironment(
             database_url=eval_database_url,
@@ -283,7 +286,7 @@ def test_a_run_keeps_its_snapshot_of_settings_judge_and_cases(
     assert run is not None and run.snapshot is not None
     live = PostgresPlatformSettingsRepository(engine).load().values
     assert run.snapshot.settings == dict(live)
-    assert run.snapshot.judge == judge_settings()
+    assert run.snapshot.judge == PostgresJudgeSettingsRepository(engine).load()
     assert run.snapshot.cases == [CRISIS_CASE]
 
 
@@ -399,3 +402,108 @@ def test_a_knowledge_case_judges_the_version_used_after_each_change(
     assert result["checks"][1]["detail"] == (
         "uses an old version (original), expected edited. Still seven counts."
     )
+
+
+def test_an_edited_case_and_judge_are_used_by_the_next_run_and_old_runs_keep_theirs(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, PERSONA_CASE)
+    admin = owner_headers(client, auth_verifier)
+    verdict = '{"verdicts": [{"rule": "no_lists", "passed": true, "reason": "Fine."}]}'
+    first_run = start_run(client, admin, EvalName.PERSONA)
+    chat_model.script("Pretty good!", verdict)
+    runner.work_next_run()
+    first_judge = PostgresJudgeSettingsRepository(engine).load()
+    edited_case = {
+        **PERSONA_CASE.content,
+        "messages": [{"text": "what did you do today?", "photo": None, "shows": ""}],
+    }
+    client.put(
+        "/api/admin/eval-cases/small-talk",
+        json={"content": edited_case},
+        headers=admin,
+    )
+    edited_judge = {**first_judge, "thinking": True, "persona_instructions": "Be fair."}
+    client.put("/api/admin/eval-judge", json={"values": edited_judge}, headers=admin)
+    calls_before = len(chat_model.calls)
+
+    second_run = start_run(client, admin, EvalName.PERSONA)
+    chat_model.script("Not much, you?", verdict)
+    runner.work_next_run()
+
+    reply_call, judge_call = chat_model.calls[calls_before:]
+    assert reply_call.history[-1].text == "what did you do today?"
+    assert (judge_call.thinking, judge_call.instructions) == (True, "Be fair.")
+    assert "Person: what did you do today?" in judge_call.history[-1].text
+    runs = PostgresEvalRunRepository(engine)
+    old = runs.get(UUID(first_run["id"]))
+    new = runs.get(UUID(second_run["id"]))
+    assert old is not None and old.snapshot is not None
+    assert new is not None and new.snapshot is not None
+    assert old.snapshot.judge == first_judge
+    assert old.snapshot.cases[0].content == PERSONA_CASE.content
+    assert new.snapshot.judge == edited_judge
+    assert new.snapshot.cases[0].content == edited_case
+    [old_result] = open_run(client, admin, first_run["id"])["results"]
+    assert old_result["outcome"] == "pass"
+    [old_stored] = runs.list_results(UUID(first_run["id"]))
+    assert old_stored.case_content == PERSONA_CASE.content
+
+
+def test_a_photo_case_sends_the_image_uploaded_for_it(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    photo_viewer: FakePhotoViewer,
+    runner: EvalRunner,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    image = (SEED_DIR / "evals" / "images" / "house-drawing.png").read_bytes()
+    uploaded = client.post(
+        "/api/admin/eval-images",
+        files={"file": ("drawing.png", image, "image/png")},
+        headers=admin,
+    ).json()["name"]
+    client.post(
+        "/api/admin/eval-cases",
+        json={
+            "key": "uploaded-photo",
+            "eval": "photo_descriptions",
+            "content": {"photo": uploaded, "must_leave_out": ["hunter2"]},
+        },
+        headers=admin,
+    )
+    run = start_run(client, admin, EvalName.PHOTO_DESCRIPTIONS)
+    photo_viewer.script("A child's drawing of a house.")
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "pass", result
+    assert photo_viewer.calls[-1].photo.content == image
+    assert photo_viewer.calls[-1].photo.media_type == "image/png"
+
+
+def test_a_missing_judge_setting_makes_each_case_an_error_and_the_run_finishes(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, CRISIS_CASE)
+    with engine.begin() as connection:
+        connection.execute(text("DELETE FROM eval_judge_settings WHERE key = 'model'"))
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.SAFEGUARD)
+
+    runner.work_next_run()
+
+    finished = open_run(client, admin, run["id"])
+    assert finished["state"] == "finished"
+    [result] = finished["results"]
+    assert result["outcome"] == "error"
+    assert "model" in result["error"]

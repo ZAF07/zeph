@@ -1,5 +1,5 @@
 from companion.core.evals.cases import PersonaConversation, PersonaMessage
-from companion.core.evals.judge import RuleVerdict, judge_persona_rules
+from companion.core.evals.judge import JudgeSettings, RuleVerdict, judge_persona_rules
 from companion.core.evals.models import CaseCheckResult, CaseOutcome, Check
 from companion.core.evals.ports import EvalCompanion
 
@@ -64,13 +64,14 @@ def verdict_check(verdict: RuleVerdict, group: str = "") -> Check:
 
 
 def check_persona_case(
-    conversation: PersonaConversation, companion: EvalCompanion
+    conversation: PersonaConversation, companion: EvalCompanion, judge: JudgeSettings
 ) -> CaseCheckResult:
     """Send a scripted conversation and have the Judge check its rules.
 
     Args:
         conversation: The scripted conversation and its rules.
         companion: The app on the Eval database.
+        judge: The Judge's model, thinking and prompts.
 
     Returns:
         One check per rule; a failed case notes the whole conversation.
@@ -92,7 +93,10 @@ def check_persona_case(
         transcript_lines += [f"Zeph: {reply}" for reply in replies]
 
     verdicts = judge_persona_rules(
-        companion.judge_chat_model, "\n".join(transcript_lines), conversation.rules
+        companion.judge_chat_model,
+        judge,
+        "\n".join(transcript_lines),
+        conversation.rules,
     )
 
     passed = all(verdict.passed for verdict in verdicts)

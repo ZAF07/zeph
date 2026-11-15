@@ -134,3 +134,13 @@ export function groupChecks(
   }
   return groups;
 }
+
+/**
+ * Reads an Eval's name from a page address.
+ *
+ * @param value - The address part, e.g. "persona".
+ * @returns The Eval, or null if no Eval has that name.
+ */
+export function toEvalName(value: string): EvalName | null {
+  return evalOrder.find((name) => name === value) ?? null;
+}

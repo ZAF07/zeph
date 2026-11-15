@@ -1,6 +1,7 @@
 import time
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 from uuid import UUID, uuid4
 
@@ -22,12 +23,14 @@ from companion.adapters.knowledge_seed import read_knowledge_seed
 from companion.adapters.pgvector.vector_store import PgvectorKnowledgeVectorStore
 from companion.adapters.postgres.eval_repositories import (
     PostgresEvalCaseRepository,
+    PostgresEvalImageRepository,
     PostgresEvalRunRepository,
+    PostgresJudgeSettingsRepository,
 )
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.adapters.pypdf.text_extractor import PypdfTextExtractor
 from companion.app import AppDependencies, create_app
-from companion.core.evals.models import Replies
+from companion.core.evals.models import EvalImage, Replies
 from companion.core.evals.ports import EvalSetupError
 from companion.core.models import PhotoImage
 from companion.core.ports import ChatModel, Embedder, PhotoViewer, Repositories
@@ -42,7 +45,6 @@ USER_EMAIL = "user_maya@example.com"
 TELEGRAM_USER_ID = 5551001
 TELEGRAM_USERNAME = "maya_l"
 READY_TIMEOUT_SECONDS = 120
-MEDIA_TYPES = {".jpg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
 ONBOARDING_WITH_CHECK_INS = {
     "name": "Maya",
     "ai_notice_acknowledged": True,
@@ -170,7 +172,7 @@ class InProcessCompanion:
         chat_model: ChatModel,
         photo_viewer: PhotoViewer,
         embedder: Embedder,
-        images_dir: Path,
+        images: Sequence[EvalImage],
         knowledge_seed_file: Path,
     ) -> None:
         """Build and start the app on the Eval database.
@@ -180,12 +182,12 @@ class InProcessCompanion:
             chat_model: The real chat model.
             photo_viewer: The real photo viewer.
             embedder: The real embedder.
-            images_dir: Where the test images are.
+            images: The test images the case sends.
             knowledge_seed_file: The starter Knowledge library's seed file.
         """
         self._engine = engine
         self._embedder = embedder
-        self._images_dir = images_dir
+        self._images = {image.name: image for image in images}
         self._knowledge_seed_file = knowledge_seed_file
         self._counter = TokenCounter()
         self._chat_model = CountingChatModel(chat_model, self._counter)
@@ -200,6 +202,8 @@ class InProcessCompanion:
             repositories=self._repositories,
             eval_runs=PostgresEvalRunRepository(engine),
             eval_cases=PostgresEvalCaseRepository(engine),
+            eval_images=PostgresEvalImageRepository(engine),
+            judge_settings=PostgresJudgeSettingsRepository(engine),
             chat_channel=self._chat_channel,
             chat_model=self._chat_model,
             photo_viewer=CountingPhotoViewer(photo_viewer, self._counter),
@@ -341,20 +345,26 @@ class InProcessCompanion:
         return self._send(telegram_message_update({"text": text}))
 
     def send_photo(self, image_name: str, caption: str) -> Replies:
-        """Send a test image from the User as a photo and wait for the reply.
+        """Send one of the case's test images from the User as a photo.
 
         Args:
-            image_name: The test image's file name.
+            image_name: The test image's name.
             caption: The photo's caption; "" for none.
 
         Returns:
             What the Companion sent back.
+
+        Raises:
+            EvalSetupError: If the case has no image by that name.
         """
-        image_file = self._images_dir / image_name
-        self._chat_channel.photos[f"file-{image_file.stem}"] = PhotoImage(
-            content=image_file.read_bytes(), media_type=MEDIA_TYPES[image_file.suffix]
+        image = self._images.get(image_name)
+        if image is None:
+            raise EvalSetupError(f"The image {image_name} isn't stored")
+        stem = PurePosixPath(image_name).stem
+        self._chat_channel.photos[f"file-{stem}"] = PhotoImage(
+            content=image.content, media_type=image.media_type
         )
-        content = telegram_photo_content(image_file.stem, caption)
+        content = telegram_photo_content(stem, caption)
         return self._send(telegram_message_update(content))
 
     def memory_item_contents(self) -> list[str]:

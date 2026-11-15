@@ -181,12 +181,20 @@ Run it after changing any of these:
 
 ## Adding cases
 
-The cases are seed files in `src/companion/seed/evals/cases/`, with the test
-images in `src/companion/seed/evals/images/`. On start-up the backend adds
-every case whose key (its `id`) isn't in the database yet. It never changes
-a case already there, so editing a seed file doesn't change an existing case,
-and keys must be unique across all six files. Each file explains its own
-format at the top. Cases are read-only on the Dashboard for now.
+Admins add, edit, duplicate and archive cases on the Dashboard (Admin →
+Evals → Cases), in a form per Eval that explains every field; photo cases
+upload their images there. A save that doesn't fit the Eval's case shape is
+refused with a message beside each field. Edits stay in the database and
+never go back to the seed files. The Judge's model, thinking and prompts are
+on the Judge tab, seeded from `src/companion/seed/evals/judge.yaml`.
+
+The starting cases are seed files in `src/companion/seed/evals/cases/`, with
+the test images in `src/companion/seed/evals/images/`. On start-up the
+backend adds every case whose key (its `id`) isn't in the database yet, with
+its images. It never changes a case already there, edited or archived, so
+editing a seed file doesn't change an existing case, and keys must be unique
+across all six files. Each file explains its own format at the top; the
+backend rewrites it into the form's shape when it reads it.
 
 - `safeguard.yaml`: add an `id`, a `kind` (`clear_crisis`, `subtle_crisis` or
   `false_alarm`), the `message` and, if the message needs context, `earlier`

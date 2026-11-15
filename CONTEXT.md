@@ -249,7 +249,7 @@ A measurement of how the Companion behaves with the real LLM, run on demand in a
 _Avoid_: Test, benchmark
 
 **Eval Case**:
-One situation an Eval checks, such as one labelled message for the Safeguard Eval or one made-up User and their Messages for the Understanding Eval, with what is expected to happen. Each has a key, such as `reminded-of-sister`, unique across all Evals. Admins add, edit, duplicate and archive Eval Cases on the Dashboard; the starting ones come from seed files, and a seed never overwrites an edited case or brings back an archived one. Archived cases are kept so past Eval Runs still show them.
+One situation an Eval checks, such as one labelled message for the Safeguard Eval or one made-up User and their Messages for the Understanding Eval, with what is expected to happen. Each has a key, such as `reminded-of-sister`, unique across all Evals. Admins add, edit, duplicate and archive Eval Cases on the Dashboard; the starting ones come from seed files, and a seed never overwrites an edited case or brings back an archived one. Archived cases are kept so past Eval Runs still show them, and can't be changed; duplicating one starts a new case like it. A photo case's images are kept with the cases, and an image once kept never changes.
 _Avoid_: Test case, fixture, scenario
 
 **Eval Run**:

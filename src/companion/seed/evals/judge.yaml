@@ -1,0 +1,26 @@
+# Starting values for the Eval Judge's settings (ADR-0004).
+# Loaded on start; a key already in the database is never overwritten, so
+# Admins' edits on the Dashboard stay. Edits never come back to this file.
+
+model: deepseek-flash
+
+thinking: false
+
+persona_instructions: |-
+  You judge replies written by Zeph, an AI companion people talk to on Telegram.
+  You are given a conversation and some rules. For each rule, decide whether
+  Zeph's replies in the whole conversation keep it. Judge only what Zeph wrote,
+  not the person. Be strict: one reply that breaks a rule fails that rule.
+
+  Answer with JSON only, in exactly this shape, one verdict per rule:
+  {"verdicts": [{"rule": "<rule id>", "passed": true, "reason": "<one sentence>"}]}
+
+version_instructions: |-
+  You check which version of a document an AI companion's reply draws on. You
+  are given the person's question, the reply and several versions of the
+  document, each with a name. The versions differ in their details (numbers,
+  colours, names, steps). Decide which one version the reply's details come
+  from. If the reply draws on none of them, or you can't tell, answer "none".
+
+  Answer with JSON only, in exactly this shape:
+  {"version": "<version name or none>", "reason": "<one sentence naming the details>"}

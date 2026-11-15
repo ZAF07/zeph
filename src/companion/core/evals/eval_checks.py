@@ -9,6 +9,7 @@ from companion.core.evals.cases import (
     read_settings_case,
     read_understanding_case,
 )
+from companion.core.evals.judge import JudgeSettings
 from companion.core.evals.knowledge_eval import check_knowledge_case
 from companion.core.evals.models import CaseCheckResult, EvalCase, EvalName
 from companion.core.evals.persona_eval import check_persona_case
@@ -18,14 +19,14 @@ from companion.core.evals.safeguard_eval import check_safeguard_case
 from companion.core.evals.settings_eval import check_settings_case
 from companion.core.evals.understanding_eval import check_understanding_case
 
-type CaseChecker = Callable[[EvalCase, EvalCompanion], CaseCheckResult]
+type CaseChecker = Callable[[EvalCase, EvalCompanion, JudgeSettings], CaseCheckResult]
 
 
 def checker[CaseShape](
     read: Callable[[str, dict[str, Any]], CaseShape],
     check: Callable[[CaseShape, EvalCompanion], CaseCheckResult],
 ) -> CaseChecker:
-    """Join an Eval's case reader and its check into one step.
+    """Join the case reader and check of an Eval without a Judge into one step.
 
     Args:
         read: Reads a case into the Eval's case shape.
@@ -34,18 +35,40 @@ def checker[CaseShape](
     Returns:
         A step that reads and checks an Eval Case.
     """
-    return lambda case, companion: check(read(case.key, case.content), companion)
+    return lambda case, companion, _judge: check(
+        read(case.key, case.content), companion
+    )
+
+
+def judged_checker[CaseShape](
+    read: Callable[[str, dict[str, Any]], CaseShape],
+    check: Callable[[CaseShape, EvalCompanion, JudgeSettings], CaseCheckResult],
+) -> CaseChecker:
+    """Join the case reader and check of an Eval the Judge marks into one step.
+
+    Args:
+        read: Reads a case into the Eval's case shape.
+        check: Checks a case of that shape with the Judge.
+
+    Returns:
+        A step that reads and checks an Eval Case.
+    """
+    return lambda case, companion, judge: check(
+        read(case.key, case.content), companion, judge
+    )
 
 
 CHECKERS: dict[EvalName, CaseChecker] = {
     EvalName.SAFEGUARD: checker(read_safeguard_case, check_safeguard_case),
-    EvalName.PERSONA: checker(read_persona_case, check_persona_case),
-    EvalName.KNOWLEDGE: checker(read_knowledge_case, check_knowledge_case),
+    EvalName.PERSONA: judged_checker(read_persona_case, check_persona_case),
+    EvalName.KNOWLEDGE: judged_checker(read_knowledge_case, check_knowledge_case),
     EvalName.SETTINGS: checker(read_settings_case, check_settings_case),
     EvalName.PHOTO_DESCRIPTIONS: checker(
         read_photo_description_case, check_photo_description_case
     ),
-    EvalName.UNDERSTANDING: checker(read_understanding_case, check_understanding_case),
+    EvalName.UNDERSTANDING: judged_checker(
+        read_understanding_case, check_understanding_case
+    ),
 }
 
 READERS: dict[EvalName, Callable[[str, dict[str, Any]], object]] = {
@@ -58,17 +81,20 @@ READERS: dict[EvalName, Callable[[str, dict[str, Any]], object]] = {
 }
 
 
-def check_case(case: EvalCase, companion: EvalCompanion) -> CaseCheckResult:
+def check_case(
+    case: EvalCase, companion: EvalCompanion, judge: JudgeSettings
+) -> CaseCheckResult:
     """Run one Eval Case with its Eval's check.
 
     Args:
         case: The case.
         companion: The app on the Eval database, fresh for this case.
+        judge: The Judge's settings for the run.
 
     Returns:
         What checking it found.
     """
-    return CHECKERS[case.eval](case, companion)
+    return CHECKERS[case.eval](case, companion, judge)
 
 
 def read_case(case: EvalCase) -> object:

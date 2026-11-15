@@ -54,6 +54,12 @@ export const queryKeys = {
   allEvalRuns: ["eval-runs"],
   evalRuns: (includeTerminal: boolean) => ["eval-runs", includeTerminal],
   evalRun: (runId: string) => ["eval-run", runId],
+  evalCaseShapes: ["eval-case-shapes"],
+  allEvalCases: ["eval-cases"],
+  evalCases: (evalName: string) => ["eval-cases", evalName],
+  evalCase: (key: string) => ["eval-case", key],
+  evalImage: (name: string) => ["eval-image", name],
+  judgeSettings: ["judge-settings"],
   usage: (days: number) => ["usage", days],
   memoryCategories: ["memory-categories"],
   knowledgeDocuments: ["knowledge-documents"],
@@ -186,4 +192,15 @@ export function useSaveCheckIns(): UseMutationResult<
       void queryClient.invalidateQueries({ queryKey: queryKeys.home });
     },
   });
+}
+
+/**
+ * Marks every list of Eval Cases, and the Evals a new run can pick, as out
+ * of date after a case was added, changed, copied or archived.
+ *
+ * @param queryClient - The cache of backend data.
+ */
+export function refreshEvalCases(queryClient: QueryClient): void {
+  void queryClient.invalidateQueries({ queryKey: queryKeys.allEvalCases });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.evals });
 }

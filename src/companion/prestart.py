@@ -2,7 +2,9 @@ import sys
 from collections.abc import Callable
 from functools import partial
 
-from companion.adapters.eval_case_seed import read_eval_case_seed
+import yaml
+
+from companion.adapters.eval_case_seed import read_eval_case_seed, read_eval_image_seed
 from companion.adapters.knowledge_seed import read_knowledge_seed
 from companion.adapters.postgres.database import (
     migrate,
@@ -12,16 +14,21 @@ from companion.adapters.postgres.database import (
     seed_needs,
     seed_platform_settings,
 )
-from companion.adapters.postgres.eval_repositories import PostgresEvalCaseRepository
+from companion.adapters.postgres.eval_repositories import (
+    PostgresEvalCaseRepository,
+    PostgresEvalImageRepository,
+    PostgresJudgeSettingsRepository,
+)
 from companion.adapters.telegram.chat_channel import TelegramChatChannel
 from companion.config import MissingSettingsError, Settings, load_settings
-from companion.core.evals.case_seed import add_seed_cases
+from companion.core.evals.case_seed import add_seed_cases, add_seed_judge_settings
 from companion.core.knowledge import KnowledgeService
 from companion.main import (
     CHECK_IN_KINDS_SEED_FILE,
     EVAL_CASES_DIR,
     EVAL_IMAGES_DIR,
     HELPLINES_SEED_FILE,
+    JUDGE_SEED_FILE,
     KNOWLEDGE_SEED_FILE,
     MEMORY_CATEGORIES_SEED_FILE,
     NEEDS_SEED_FILE,
@@ -60,8 +67,8 @@ def prepare() -> None:
     """Get everything ready before the backend starts serving.
 
     Checks settings, migrates the database, loads seed data (adding new Eval
-    Cases by key, embedding the
-    starter Knowledge and drafting when each document helps on first run,
+    Cases by key with their images, and Judge settings not stored yet,
+    embedding the starter Knowledge and drafting when each document helps on first run,
     finishing any upload a restart interrupted and saving the text of
     documents uploaded before text was saved) and registers the Telegram
     webhook unless turned off.
@@ -74,9 +81,17 @@ def prepare() -> None:
     seed_memory_categories(engine, MEMORY_CATEGORIES_SEED_FILE)
     seed_check_in_kinds(engine, CHECK_IN_KINDS_SEED_FILE)
     seed_needs(engine, NEEDS_SEED_FILE)
+    seed_cases = read_eval_case_seed(EVAL_CASES_DIR, EVAL_IMAGES_DIR)
     add_seed_cases(
         PostgresEvalCaseRepository(engine),
-        read_eval_case_seed(EVAL_CASES_DIR, EVAL_IMAGES_DIR),
+        PostgresEvalImageRepository(engine),
+        seed_cases,
+        read_eval_image_seed(seed_cases, EVAL_IMAGES_DIR),
+        build_clock(settings),
+    )
+    add_seed_judge_settings(
+        PostgresJudgeSettingsRepository(engine),
+        yaml.safe_load(JUDGE_SEED_FILE.read_text()),
         build_clock(settings),
     )
     knowledge_service = KnowledgeService(

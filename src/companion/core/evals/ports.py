@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta
 from typing import Any, Protocol
 from uuid import UUID
@@ -6,12 +6,14 @@ from uuid import UUID
 from companion.core.evals.models import (
     CaseResult,
     EvalCase,
+    EvalImage,
     EvalName,
     EvalRun,
     EvalRunOverview,
     Replies,
     RunSnapshot,
     StartedFrom,
+    StoredEvalCase,
 )
 from companion.core.ports import ChatModel, Embedder, Repositories
 
@@ -111,14 +113,17 @@ class EvalCompanion(Protocol):
         ...
 
     def send_photo(self, image_name: str, caption: str) -> Replies:
-        """Send a test image from the User as a photo and wait for the reply.
+        """Send one of the case's test images from the User as a photo.
 
         Args:
-            image_name: The test image's file name.
+            image_name: The test image's name.
             caption: The photo's caption; "" for none.
 
         Returns:
             What the Companion sent back.
+
+        Raises:
+            EvalSetupError: If the case has no image by that name.
         """
         ...
 
@@ -226,12 +231,15 @@ class EvalEnvironment(Protocol):
         """Wipe the Eval database and bring its schema up to date."""
         ...
 
-    def fresh_companion(self, platform_settings: dict[str, Any]) -> EvalCompanion:
+    def fresh_companion(
+        self, platform_settings: dict[str, Any], images: Sequence[EvalImage]
+    ) -> EvalCompanion:
         """Empty the Eval database, seed it and build the app on it.
 
         Args:
             platform_settings: The Platform Settings to write into it, by
                 key; settings missing here come from the seed.
+            images: The test images the case sends, by name.
 
         Returns:
             The app, ready for one case.
@@ -262,6 +270,116 @@ class EvalCaseRepository(Protocol):
 
         Returns:
             The keys added.
+        """
+        ...
+
+    def list_stored(self, eval_name: EvalName) -> list[StoredEvalCase]:
+        """List every case of one Eval, archived ones too.
+
+        Args:
+            eval_name: The Eval.
+
+        Returns:
+            The cases, in the order added.
+        """
+        ...
+
+    def get(self, key: str) -> StoredEvalCase | None:
+        """Read one case, archived or not.
+
+        Args:
+            key: Its key.
+
+        Returns:
+            The case; None if no case has the key.
+        """
+        ...
+
+    def add(self, case: EvalCase, now: datetime, admin_id: UUID) -> bool:
+        """Add a case an Admin wrote.
+
+        Args:
+            case: The case.
+            now: When it is added.
+            admin_id: The Admin adding it.
+
+        Returns:
+            True if added; False if its key is taken.
+        """
+        ...
+
+    def update(
+        self,
+        key: str,
+        content: dict[str, Any],
+        *,
+        archived: bool,
+        now: datetime,
+        admin_id: UUID,
+    ) -> None:
+        """Change a case and mark it edited, so the seed leaves it alone.
+
+        Args:
+            key: Its key.
+            content: Its new content.
+            archived: Whether it is archived.
+            now: When it changed.
+            admin_id: The Admin changing it.
+        """
+        ...
+
+
+class EvalImageRepository(Protocol):
+    """Stores the test images cases send, kept with the cases."""
+
+    def add_missing(self, images: Sequence[EvalImage], now: datetime) -> None:
+        """Add the images whose name isn't stored yet; never change one.
+
+        Args:
+            images: The images.
+            now: When they are added.
+        """
+        ...
+
+    def get_many(self, names: Sequence[str]) -> list[EvalImage]:
+        """Read some images.
+
+        Args:
+            names: Their names.
+
+        Returns:
+            The ones stored, in no particular order.
+        """
+        ...
+
+
+class JudgeSettingsRepository(Protocol):
+    """Stores the Judge's settings, set by Admins."""
+
+    def load(self) -> dict[str, Any]:
+        """Read every Judge setting.
+
+        Returns:
+            Each setting's value by name.
+        """
+        ...
+
+    def add_missing(self, values: Mapping[str, Any], now: datetime) -> None:
+        """Add the settings not stored yet; never change one.
+
+        Args:
+            values: Each setting's starting value by name.
+            now: When they are added.
+        """
+        ...
+
+    def save(self, values: Mapping[str, Any], now: datetime, admin_id: UUID) -> None:
+        """Save new values for some settings.
+
+        Args:
+            values: Each setting's new value by name.
+            now: When they changed.
+            admin_id: The Admin changing them.
         """
         ...
 

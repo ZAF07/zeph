@@ -2,7 +2,12 @@ from dataclasses import asdict, dataclass
 from datetime import timedelta
 
 from companion.core.evals.cases import KnowledgeCase
-from companion.core.evals.judge import NO_VERSION, VersionVerdict, judge_version
+from companion.core.evals.judge import (
+    NO_VERSION,
+    JudgeSettings,
+    VersionVerdict,
+    judge_version,
+)
 from companion.core.evals.models import CaseCheckResult, CaseOutcome, Check
 from companion.core.evals.ports import EvalCompanion
 
@@ -79,7 +84,7 @@ def ask(companion: EvalCompanion, question: str) -> str:
 
 
 def check_knowledge_case(
-    case: KnowledgeCase, companion: EvalCompanion
+    case: KnowledgeCase, companion: EvalCompanion, judge: JudgeSettings
 ) -> CaseCheckResult:
     """Change a Knowledge Document four ways and check replies use each version.
 
@@ -90,6 +95,7 @@ def check_knowledge_case(
     Args:
         case: The made-up teaching and its changes.
         companion: The app on the Eval database.
+        judge: The Judge's model, thinking and prompts.
 
     Returns:
         One check per step.
@@ -121,7 +127,9 @@ def check_knowledge_case(
         """
         companion.wait_until_knowledge_ready(document_id)
         reply = ask(companion, question)
-        return judge_version(companion.judge_chat_model, question, reply, versions)
+        return judge_version(
+            companion.judge_chat_model, judge, question, reply, versions
+        )
 
     document_id = companion.upload_knowledge(
         case.original_file_name,

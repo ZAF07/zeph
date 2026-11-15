@@ -4,11 +4,11 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from companion.core.errors import InvalidError
+from companion.core.evals.case_shapes import InvalidFormError
 from companion.core.models import CuriositySensitivity, ThreadReaction
 
 
-class InvalidEvalCaseError(InvalidError):
+class InvalidEvalCaseError(InvalidFormError):
     """Raised when an Eval Case doesn't fit its Eval's case shape."""
 
 
@@ -405,29 +405,75 @@ def read_safeguard_case(key: str, content: dict[str, Any]) -> SafeguardCase:
 
     Returns:
         The case.
+
+    Raises:
+        InvalidEvalCaseError: If it has neither a message nor a photo.
     """
-    return SafeguardCase(
+    case = SafeguardCase(
         id=key,
         kind=SafeguardCaseKind(content["kind"]),
-        message=content.get("message", ""),
-        earlier=content.get("earlier", []),
-        photo=content.get("photo"),
+        message=content.get("message") or "",
+        earlier=content.get("earlier") or [],
+        photo=content.get("photo") or None,
     )
+    if not case.message.strip() and case.photo is None:
+        raise InvalidEvalCaseError(
+            f"{key} needs a message or a photo",
+            {"message": "Write a message, or upload a photo."},
+        )
+    return case
 
 
-def to_persona_message(entry: str | dict[str, str]) -> PersonaMessage:
-    """Read one scripted message: plain text, or `{photo, shows, caption}`.
+def read_rules(content: dict[str, Any]) -> dict[str, str]:
+    """Read a case's rules, written as a list of `{id, check}`.
 
     Args:
-        entry: The message as written in the case.
+        content: The case's content.
+
+    Returns:
+        What the Judge checks, by rule ID.
+    """
+    return {rule["id"]: rule["check"] for rule in content.get("rules") or []}
+
+
+def to_persona_message(entry: dict[str, Any]) -> PersonaMessage:
+    """Read one scripted message: `{text, photo, shows}`.
+
+    Args:
+        entry: The message as written in the case; `photo` empty for text.
 
     Returns:
         The message.
     """
-    if isinstance(entry, str):
-        return PersonaMessage(text=entry)
-    photo = EvalPhoto(file_name=entry["photo"], shows=entry["shows"])
-    return PersonaMessage(text=entry.get("caption", ""), photo=photo)
+    photo_name = entry.get("photo")
+    photo = (
+        EvalPhoto(file_name=photo_name, shows=entry.get("shows") or "")
+        if photo_name
+        else None
+    )
+    return PersonaMessage(text=entry.get("text") or "", photo=photo)
+
+
+def require_persona_messages_complete(conversation: PersonaConversation) -> None:
+    """Check each message has text or a photo, and each photo what it shows.
+
+    Args:
+        conversation: The conversation.
+
+    Raises:
+        InvalidEvalCaseError: If a message is empty or a photo doesn't say
+            what it shows.
+    """
+    problems: dict[str, str] = {}
+    for number, message in enumerate(conversation.messages):
+        if message.photo is None and not message.text.strip():
+            problems[f"messages.{number}.text"] = "Write the text, or upload a photo."
+        if message.photo is not None and not message.photo.shows.strip():
+            problems[f"messages.{number}.shows"] = "Say what the photo shows."
+    if problems:
+        raise InvalidEvalCaseError(
+            f"{conversation.id} has incomplete messages", problems
+        )
 
 
 def read_persona_case(key: str, content: dict[str, Any]) -> PersonaConversation:
@@ -435,23 +481,31 @@ def read_persona_case(key: str, content: dict[str, Any]) -> PersonaConversation:
 
     Args:
         key: The case's key.
-        content: `messages`, `rules` (ID to what the Judge checks),
-            optional `shared_photos`, each with `description` and `note`,
-            and optional `photo_viewing`, true unless set to false.
+        content: `messages` (each `{text, photo, shows}`), `rules` (each
+            `{id, check}`), optional `shared_photos`, each with
+            `description` and `note`, and optional `photo_viewing`, true
+            unless set to false.
 
     Returns:
         The conversation.
+
+    Raises:
+        InvalidEvalCaseError: If a message is empty or a photo doesn't say
+            what it shows.
     """
-    return PersonaConversation(
+    photo_viewing = content.get("photo_viewing")
+    conversation = PersonaConversation(
         id=key,
         messages=[to_persona_message(message) for message in content["messages"]],
-        rules=content["rules"],
+        rules=read_rules(content),
         shared_photos=[
             EvalSharedPhoto(description=photo["description"], note=photo["note"])
-            for photo in content.get("shared_photos", [])
+            for photo in content.get("shared_photos") or []
         ],
-        photo_viewing=content.get("photo_viewing", True),
+        photo_viewing=True if photo_viewing is None else photo_viewing,
     )
+    require_persona_messages_complete(conversation)
+    return conversation
 
 
 def to_knowledge_details(entry: dict[str, str]) -> KnowledgeDetails:
@@ -516,9 +570,9 @@ def read_settings_case(key: str, content: dict[str, Any]) -> SettingsCase:
 
     Args:
         key: The case's key.
-        content: `message` and `tools`, and optional `memories` (Memory Item
-            contents by Memory Category name) and `forgotten` (which of them
-            must be gone afterwards).
+        content: `message` and `tools`, and optional `memories` (each
+            `{category, contents}`) and `forgotten` (which of them must be
+            gone afterwards).
 
     Returns:
         The case.
@@ -530,16 +584,29 @@ def read_settings_case(key: str, content: dict[str, Any]) -> SettingsCase:
     case = SettingsCase(
         id=key,
         message=content["message"],
-        tools=content["tools"],
-        memories=content.get("memories", {}),
-        forgotten=content.get("forgotten", []),
+        tools=content.get("tools") or [],
+        memories=read_memory_items(content.get("memories")),
+        forgotten=content.get("forgotten") or [],
     )
     unknown = [item for item in case.forgotten if item not in case.memory_item_contents]
     if unknown:
+        message = "Memory Items it doesn't have: " + ", ".join(unknown)
         raise InvalidEvalCaseError(
-            f"{key} forgets Memory Items it doesn't have: " + ", ".join(unknown)
+            f"{key} forgets {message}", {"forgotten": f"Forgets {message}."}
         )
     return case
+
+
+def read_memory_items(entries: list[dict[str, Any]] | None) -> dict[str, list[str]]:
+    """Read Memory Items, written as a list of `{category, contents}`.
+
+    Args:
+        entries: The list; None for none.
+
+    Returns:
+        The Memory Items' contents by Memory Category name.
+    """
+    return {entry["category"]: entry["contents"] for entry in entries or []}
 
 
 def to_utc(value: Any) -> datetime:
@@ -569,15 +636,16 @@ def to_eval_thread(entry: dict[str, Any]) -> EvalThread:
         The Thread.
     """
     reaction = entry.get("reaction")
+    is_open = entry.get("open")
     return EvalThread(
         title=entry["title"],
         story=entry["story"],
-        people=entry.get("people", []),
-        is_open=entry.get("open", True),
-        updated_days_ago=entry.get("updated_days_ago", 0),
+        people=entry.get("people") or [],
+        is_open=True if is_open is None else is_open,
+        updated_days_ago=entry.get("updated_days_ago") or 0,
         raised_days_ago=entry.get("raised_days_ago"),
         reaction=ThreadReaction(reaction) if reaction else None,
-        raised_in_this_conversation=entry.get("raised_in_this_conversation", False),
+        raised_in_this_conversation=bool(entry.get("raised_in_this_conversation")),
     )
 
 
@@ -585,32 +653,33 @@ def to_eval_memory(entry: dict[str, Any]) -> EvalMemory:
     """Read a case's made-up User Memory.
 
     Args:
-        entry: A mapping with any of `portrait`, `items`, `summaries`,
-            `threads`, `curiosities` and `knowledge_documents`.
+        entry: A mapping with any of `portrait`, `items` (each
+            `{category, contents}`), `summaries`, `threads`, `curiosities`
+            and `knowledge_documents`.
 
     Returns:
         The memory.
     """
     return EvalMemory(
-        portrait=entry.get("portrait", ""),
-        items=entry.get("items", {}),
+        portrait=entry.get("portrait") or "",
+        items=read_memory_items(entry.get("items")),
         summaries=[
             EvalSummary(
                 days_ago=summary["days_ago"],
                 summary=summary["summary"],
-                mood=summary.get("mood", ""),
+                mood=summary.get("mood") or "",
             )
-            for summary in entry.get("summaries", [])
+            for summary in entry.get("summaries") or []
         ],
-        threads=[to_eval_thread(thread) for thread in entry.get("threads", [])],
+        threads=[to_eval_thread(thread) for thread in entry.get("threads") or []],
         curiosities=[
             EvalCuriosity(
                 question=curiosity["question"],
                 why=curiosity["why"],
                 not_before_days_ago=curiosity.get("not_before_days_ago", 0),
-                sensitivity=CuriositySensitivity(curiosity.get("sensitivity", "low")),
+                sensitivity=CuriositySensitivity(curiosity.get("sensitivity") or "low"),
             )
-            for curiosity in entry.get("curiosities", [])
+            for curiosity in entry.get("curiosities") or []
         ],
         knowledge_documents=[
             EvalKnowledgeDocument(
@@ -620,7 +689,7 @@ def to_eval_memory(entry: dict[str, Any]) -> EvalMemory:
                 when_it_helps=document["when_it_helps"],
                 text=document["text"],
             )
-            for document in entry.get("knowledge_documents", [])
+            for document in entry.get("knowledge_documents") or []
         ],
     )
 
@@ -629,14 +698,12 @@ def to_earlier_line(entry: dict[str, str]) -> EarlierLine:
     """Read a message already in the open Conversation.
 
     Args:
-        entry: `{person: <text>}` or `{zeph: <text>}`.
+        entry: `{who, text}`, `who` being `person` or `zeph`.
 
     Returns:
         The message.
     """
-    if "person" in entry:
-        return EarlierLine(from_person=True, text=entry["person"])
-    return EarlierLine(from_person=False, text=entry["zeph"])
+    return EarlierLine(from_person=entry["who"] == "person", text=entry["text"])
 
 
 def to_understanding_message(entry: dict[str, Any]) -> UnderstandingMessage:
@@ -648,18 +715,18 @@ def to_understanding_message(entry: dict[str, Any]) -> UnderstandingMessage:
     Returns:
         The Message.
     """
-    expect = entry.get("expect", {})
+    expect = entry.get("expect") or {}
     return UnderstandingMessage(
         text=entry["text"],
         expect=UnderstandingExpectations(
-            need=expect.get("need", []),
-            found=expect.get("found", []),
-            raised=expect.get("raised", []),
-            not_raised=expect.get("not_raised", []),
+            need=expect.get("need") or [],
+            found=expect.get("found") or [],
+            raised=expect.get("raised") or [],
+            not_raised=expect.get("not_raised") or [],
             curiosity_raised=expect.get("curiosity_raised"),
             asked_why=expect.get("asked_why"),
             knowledge=expect.get("knowledge"),
-            rules=expect.get("rules", []),
+            rules=expect.get("rules") or [],
         ),
     )
 
@@ -704,26 +771,45 @@ def require_checkable_names(case: UnderstandingCase) -> None:
             Conversation but no earlier lines.
     """
     titles = {thread.title for thread in case.memory.threads}
-    for message in case.messages:
+    problems: dict[str, str] = {}
+    unknown_names: list[str] = []
+    for number, message in enumerate(case.messages):
+        expect_path = f"messages.{number}.expect"
         unknown_rules = [
             rule for rule in message.expect.rules if rule not in case.rules
         ]
-        unknown_threads = [
-            title for title in message.expect.thread_titles if title not in titles
-        ]
-        if unknown_rules or unknown_threads:
-            raise InvalidEvalCaseError(
-                f"{case.id} names unknown rules or Threads: "
-                + ", ".join(unknown_rules + unknown_threads)
+        if unknown_rules:
+            problems[f"{expect_path}.rules"] = "No such rule below: " + ", ".join(
+                unknown_rules
             )
+        unknown_names.extend(unknown_rules)
+        for name in ("found", "raised", "not_raised"):
+            unknown_threads = [
+                title for title in getattr(message.expect, name) if title not in titles
+            ]
+            if unknown_threads:
+                problems[f"{expect_path}.{name}"] = (
+                    "No Life Thread has this title: " + ", ".join(unknown_threads)
+                )
+            unknown_names.extend(unknown_threads)
+    if problems:
+        raise InvalidEvalCaseError(
+            f"{case.id} names unknown rules or Threads: " + ", ".join(unknown_names),
+            problems,
+        )
     other_texts = texts_besides_threads(case)
     written_elsewhere = [
         title for title in titles if any(title in text for text in other_texts)
     ]
     if written_elsewhere:
+        titles_written = ", ".join(written_elsewhere)
         raise InvalidEvalCaseError(
-            f"{case.id} writes Thread titles outside the Threads: "
-            + ", ".join(written_elsewhere)
+            f"{case.id} writes Thread titles outside the Threads: {titles_written}",
+            {
+                "memory.threads": f"The title {titles_written} is written elsewhere "
+                "in the case too. Write it only in its Thread, or the checks can't "
+                "tell whether Zeph was reminded of it."
+            },
         )
     raised_here = any(
         thread.raised_in_this_conversation for thread in case.memory.threads
@@ -731,7 +817,11 @@ def require_checkable_names(case: UnderstandingCase) -> None:
     if raised_here and not case.earlier:
         raise InvalidEvalCaseError(
             f"{case.id} has a Thread raised in this Conversation, so it needs "
-            "earlier lines"
+            "earlier lines",
+            {
+                "earlier": "A Thread was raised in this Conversation, so add the "
+                "earlier messages."
+            },
         )
 
 
@@ -740,8 +830,8 @@ def read_understanding_case(key: str, content: dict[str, Any]) -> UnderstandingC
 
     Args:
         key: The case's key.
-        content: `now`, `messages`, `rules` (ID to what the Judge checks)
-            and optionally `memory` and `earlier`.
+        content: `now`, `messages`, `rules` (each `{id, check}`) and
+            optionally `memory` and `earlier` (each `{who, text}`).
 
     Returns:
         The case.
@@ -754,10 +844,10 @@ def read_understanding_case(key: str, content: dict[str, Any]) -> UnderstandingC
     case = UnderstandingCase(
         id=key,
         now=to_utc(content["now"]),
-        memory=to_eval_memory(content.get("memory", {})),
-        earlier=[to_earlier_line(line) for line in content.get("earlier", [])],
+        memory=to_eval_memory(content.get("memory") or {}),
+        earlier=[to_earlier_line(line) for line in content.get("earlier") or []],
         messages=[to_understanding_message(message) for message in content["messages"]],
-        rules=content.get("rules", {}),
+        rules=read_rules(content),
     )
     require_checkable_names(case)
     return case
