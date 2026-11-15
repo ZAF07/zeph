@@ -22,6 +22,7 @@ from companion.core.check_ins import CheckInService
 from companion.core.conversations import ConversationService
 from companion.core.curiosities import CuriosityKeeper, CuriosityRaiser
 from companion.core.evals.case_editing import EvalCaseService
+from companion.core.evals.costs import EvalCostsService
 from companion.core.evals.judge_settings import JudgeSettingsService
 from companion.core.evals.ports import (
     EvalCaseRepository,
@@ -438,7 +439,13 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         build_eval_api_router(
             current_admin=build_current_admin_dependency(current_user),
             eval_run_service=EvalRunService(
-                dependencies.eval_runs, dependencies.eval_cases, dependencies.clock
+                dependencies.eval_runs,
+                dependencies.eval_cases,
+                dependencies.repositories.platform_settings,
+                dependencies.clock,
+            ),
+            eval_costs_service=EvalCostsService(
+                dependencies.repositories.platform_settings, dependencies.clock
             ),
         )
     )

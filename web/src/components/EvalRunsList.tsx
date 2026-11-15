@@ -8,12 +8,24 @@ import { primaryButton } from "@/components/button-styles";
 import { EvalPill } from "@/components/EvalPill";
 import { LoadFailed } from "@/components/LoadFailed";
 import { formatSavedAt } from "@/lib/dates";
-import { describeEvals, describeTotals, runStateLabels } from "@/lib/evals";
+import {
+  describeCost,
+  describeEvals,
+  describeTotals,
+  runStateLabels,
+} from "@/lib/evals";
 import { formatTokens } from "@/lib/model-calls";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
-const headings = ["When", "Started by", "Evals", "State", "Results", "Tokens"];
+const headings = [
+  "When",
+  "Started by",
+  "Evals",
+  "State",
+  "Results",
+  "Tokens and cost",
+];
 
 const cell = "px-[18px] py-3.5";
 
@@ -125,6 +137,9 @@ export function EvalRunsList() {
                   </td>
                   <td className={`${cell} whitespace-nowrap`}>
                     {formatTokens(run.tokens_in, run.tokens_out)}
+                    <span className="block text-caption text-ink-muted">
+                      {describeCost(run)}
+                    </span>
                   </td>
                 </tr>
               ))}

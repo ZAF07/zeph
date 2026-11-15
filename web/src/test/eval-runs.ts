@@ -13,11 +13,17 @@ export const finishedRun: EvalRunDetails = {
   started_at: "2026-11-15T09:00:05Z",
   finished_at: "2026-11-15T09:03:00Z",
   case_count: 2,
+  case_keys: ["plan", "traffic"],
+  cancel_requested: false,
+  token_limit: 1_000_000,
+  rerun_of: null,
   passed: 0,
   failed: 0,
   errored: 0,
   tokens_in: 0,
   tokens_out: 0,
+  cost_sgd: 0,
+  unpriced_models: [],
   results: [],
 };
 

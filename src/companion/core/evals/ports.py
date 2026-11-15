@@ -4,17 +4,21 @@ from typing import Any, Protocol
 from uuid import UUID
 
 from companion.core.evals.models import (
+    CaseHistoryRow,
     CaseResult,
     EvalCase,
     EvalImage,
     EvalName,
     EvalRun,
     EvalRunOverview,
+    EvalRunState,
+    ModelTokens,
     Replies,
     RunSnapshot,
     StartedFrom,
     StoredEvalCase,
 )
+from companion.core.models import ModelCall
 from companion.core.ports import ChatModel, Embedder, Repositories
 
 
@@ -54,6 +58,14 @@ class EvalCompanion(Protocol):
 
         Returns:
             Tokens in and tokens out, the app's and the Judge's.
+        """
+        ...
+
+    def tokens_by_model(self) -> dict[str, ModelTokens]:
+        """Add up the same tokens by the model that used them.
+
+        Returns:
+            Each model's tokens, the app's and the Judge's.
         """
         ...
 
@@ -261,6 +273,17 @@ class EvalCaseRepository(Protocol):
         """
         ...
 
+    def list_for_keys(self, keys: Sequence[str]) -> list[EvalCase]:
+        """List the cases with some keys that aren't archived.
+
+        Args:
+            keys: The keys.
+
+        Returns:
+            The cases found, in the order of `keys`.
+        """
+        ...
+
     def add_missing(self, cases: Sequence[EvalCase], now: datetime) -> list[str]:
         """Add the cases whose key isn't stored yet, archived or not.
 
@@ -393,7 +416,9 @@ class EvalRunRepository(Protocol):
         started_by: UUID | None,
         started_from: StartedFrom,
         evals: Sequence[EvalName],
+        case_keys: Sequence[str],
         queued_at: datetime,
+        rerun_of: UUID | None = None,
     ) -> None:
         """Save a new run as Queued, with one Variant (A) and one try.
 
@@ -401,8 +426,10 @@ class EvalRunRepository(Protocol):
             run_id: Its ID.
             started_by: The Admin starting it; None from the terminal.
             started_from: Where it is started.
-            evals: The Evals whose cases it runs.
+            evals: The Evals of the cases it runs.
+            case_keys: The keys of the cases it runs, in order.
             queued_at: When it is started.
+            rerun_of: The run whose failed cases it runs again, if any.
         """
         ...
 
@@ -450,6 +477,55 @@ class EvalRunRepository(Protocol):
         """
         ...
 
+    def get_result(self, run_id: UUID, result_id: UUID) -> CaseResult | None:
+        """Read one Case Result of a run.
+
+        Args:
+            run_id: The run.
+            result_id: The result.
+
+        Returns:
+            The result; None if the run has no such result.
+        """
+        ...
+
+    def list_result_calls(self, result_id: UUID) -> list[ModelCall]:
+        """List a Case Result's model calls, its full trace.
+
+        Args:
+            result_id: The result.
+
+        Returns:
+            The calls, in the order they were made.
+        """
+        ...
+
+    def newest_tokens_by_case(
+        self, case_keys: Sequence[str]
+    ) -> dict[str, dict[str, ModelTokens]]:
+        """Read each case's tokens by model from its newest Case Result.
+
+        Args:
+            case_keys: The cases.
+
+        Returns:
+            Tokens by model for each case that has a result; cases never
+            run are left out.
+        """
+        ...
+
+    def list_case_history(self, case_key: str, limit: int) -> list[CaseHistoryRow]:
+        """List a case's newest Case Results with what their runs used.
+
+        Args:
+            case_key: The case.
+            limit: The most results to list.
+
+        Returns:
+            The results, newest first.
+        """
+        ...
+
     def take_next_queued(self, now: datetime) -> EvalRun | None:
         """Mark the oldest Queued run Running, if no run is Running.
 
@@ -461,29 +537,64 @@ class EvalRunRepository(Protocol):
         """
         ...
 
-    def save_snapshot(self, run_id: UUID, snapshot: RunSnapshot) -> None:
-        """Save what a run uses.
+    def save_snapshot(
+        self, run_id: UUID, snapshot: RunSnapshot, token_limit: int
+    ) -> None:
+        """Save what a run uses and the most tokens it may use.
 
         Args:
             run_id: The run.
             snapshot: The settings, Judge settings and cases.
+            token_limit: The Eval run token limit when it started.
         """
         ...
 
-    def add_result(self, result: CaseResult) -> None:
-        """Save one Case Result.
+    def add_result(self, result: CaseResult, calls: Sequence[ModelCall]) -> None:
+        """Save one Case Result with its full trace.
 
         Args:
             result: The result.
+            calls: The model calls the case made.
         """
         ...
 
-    def finish(self, run_id: UUID, now: datetime) -> None:
-        """Mark a Running run Finished.
+    def is_cancel_requested(self, run_id: UUID) -> bool:
+        """Say whether an Admin asked to cancel a run.
 
         Args:
             run_id: The run.
-            now: When it finished.
+
+        Returns:
+            True if they did.
+        """
+        ...
+
+    def request_cancel(self, run_id: UUID, now: datetime) -> None:
+        """Cancel a Queued run now, or ask the runner to cancel a Running one.
+
+        Does nothing to a run that has ended.
+
+        Args:
+            run_id: The run.
+            now: When it is cancelled.
+        """
+        ...
+
+    def end(self, run_id: UUID, state: EvalRunState, now: datetime) -> None:
+        """End a Running run as Finished, Cancelled or Stopped over limit.
+
+        Args:
+            run_id: The run.
+            state: How it ended.
+            now: When it ended.
+        """
+        ...
+
+    def delete(self, run_id: UUID) -> None:
+        """Delete a run with its Variants, Case Results and traces.
+
+        Args:
+            run_id: The run.
         """
         ...
 

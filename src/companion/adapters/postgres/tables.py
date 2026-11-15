@@ -630,6 +630,10 @@ eval_runs = Table(
     Column("settings_snapshot", JSONB(none_as_null=True)),
     Column("judge_snapshot", JSONB(none_as_null=True)),
     Column("cases_snapshot", JSONB(none_as_null=True)),
+    Column("case_keys", JSONB, nullable=False, server_default="[]"),
+    Column("cancel_requested", Boolean, nullable=False, server_default="false"),
+    Column("token_limit", Integer),
+    Column("rerun_of", Uuid, ForeignKey("eval_runs.id", ondelete="SET NULL")),
 )
 
 eval_variants = Table(
@@ -659,7 +663,7 @@ eval_case_results = Table(
     ),
     Column("variant", Text, nullable=False),
     Column("try_number", Integer, nullable=False),
-    Column("case_key", Text, nullable=False),
+    Column("case_key", Text, nullable=False, index=True),
     Column("eval", Text, nullable=False),
     Column("case_content", JSONB, nullable=False),
     Column("outcome", Text, nullable=False),
@@ -671,4 +675,33 @@ eval_case_results = Table(
     Column("tokens_out", Integer, nullable=False),
     Column("duration_ms", Integer, nullable=False),
     Column("finished_at", DateTime(timezone=True), nullable=False),
+    Column("tokens_by_model", JSONB, nullable=False, server_default="{}"),
+)
+
+eval_model_calls = Table(
+    "eval_model_calls",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("position", BigInteger, Identity(), nullable=False, unique=True),
+    Column(
+        "case_result_id",
+        Uuid,
+        ForeignKey("eval_case_results.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("made_up_user_id", Uuid, nullable=False),
+    Column("trace_id", Uuid, nullable=False),
+    Column("trace_kind", Text, nullable=False),
+    Column("step", Text, nullable=False),
+    Column("model", Text, nullable=False),
+    Column("thinking", Boolean, nullable=False),
+    Column("started_at", DateTime(timezone=True), nullable=False),
+    Column("duration_ms", Integer, nullable=False),
+    Column("tokens_in", Integer, nullable=False),
+    Column("tokens_out", Integer, nullable=False),
+    Column("error", Text),
+    Column("tools_called", JSONB, nullable=False),
+    Column("content", JSONB(none_as_null=True)),
+    Column("understanding_shape", JSONB(none_as_null=True)),
 )

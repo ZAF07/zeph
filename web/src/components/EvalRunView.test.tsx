@@ -1,4 +1,5 @@
 import { act, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EvalRunView, runCheckMilliseconds } from "@/components/EvalRunView";
@@ -8,10 +9,18 @@ import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   getEvalRun: vi.fn<ApiClient["getEvalRun"]>(),
+  cancelEvalRun: vi.fn<ApiClient["cancelEvalRun"]>(),
+  rerunFailedCases: vi.fn<ApiClient["rerunFailedCases"]>(),
+  deleteEvalRun: vi.fn<ApiClient["deleteEvalRun"]>(),
+  getEvalRunSnapshot: vi.fn<ApiClient["getEvalRunSnapshot"]>(),
 };
+const router = { push: vi.fn() };
 
 vi.mock("@/lib/use-api-client", () => ({
   useApiClient: () => apiClient,
+}));
+vi.mock("next/navigation", () => ({
+  useRouter: () => router,
 }));
 
 const failedResult: CaseResult = {
@@ -130,7 +139,6 @@ describe("EvalRunView", () => {
     apiClient.getEvalRun.mockResolvedValue({
       ...finishedRun,
       state: "queued",
-      case_count: null,
     });
     renderWithQueries(<EvalRunView runId="run-1" />);
 
@@ -140,5 +148,123 @@ describe("EvalRunView", () => {
     expect(
       screen.getByText("Case Results appear here as each case finishes."),
     ).toBeInTheDocument();
+  });
+
+  it("shows the running cost and cancels a running run after its case", async () => {
+    const withCost = { ...running, cost_sgd: 0.0123 };
+    apiClient.getEvalRun.mockResolvedValue(withCost);
+    apiClient.cancelEvalRun.mockResolvedValue({
+      ...withCost,
+      cancel_requested: true,
+    });
+    renderWithQueries(<EvalRunView runId="run-1" />);
+
+    expect(await screen.findByText("S$0.0123")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Re-run failed/ }),
+    ).not.toBeInTheDocument();
+    apiClient.getEvalRun.mockResolvedValue({
+      ...withCost,
+      cancel_requested: true,
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Cancel run" }));
+
+    expect(apiClient.cancelEvalRun).toHaveBeenCalledWith("run-1");
+    expect(
+      await screen.findByRole("button", { name: "Cancelling…" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText(/stops after the case it is on/),
+    ).toBeInTheDocument();
+  });
+
+  it("marks models with no price and says why a run stopped over its limit", async () => {
+    apiClient.getEvalRun.mockResolvedValue({
+      ...finished,
+      state: "stopped_over_limit",
+      cost_sgd: 0,
+      unpriced_models: ["deepseek-x"],
+    });
+    renderWithQueries(<EvalRunView runId="run-1" />);
+
+    expect(
+      await screen.findByText("deepseek-x (no price set)"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Stopped over limit")).toBeInTheDocument();
+    expect(
+      screen.getByText(/went over its token limit of 1,000,000/),
+    ).toBeInTheDocument();
+  });
+
+  it("re-runs the failed cases of an ended run and opens the new run", async () => {
+    apiClient.getEvalRun.mockResolvedValue(finished);
+    apiClient.rerunFailedCases.mockResolvedValue({
+      ...finishedRun,
+      id: "run-2",
+      state: "queued",
+    });
+    renderWithQueries(<EvalRunView runId="run-1" />);
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Re-run failed · 2 cases" }),
+    );
+
+    expect(apiClient.rerunFailedCases).toHaveBeenCalledWith("run-1");
+    expect(router.push).toHaveBeenCalledWith("/admin/evals/runs/run-2");
+  });
+
+  it("deletes a run only after the confirm step", async () => {
+    apiClient.getEvalRun.mockResolvedValue(finished);
+    apiClient.deleteEvalRun.mockResolvedValue();
+    renderWithQueries(<EvalRunView runId="run-1" />);
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Delete run" }),
+    );
+    expect(apiClient.deleteEvalRun).not.toHaveBeenCalled();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Delete for good" }),
+    );
+
+    expect(apiClient.deleteEvalRun).toHaveBeenCalledWith("run-1");
+    expect(router.push).toHaveBeenCalledWith("/admin/evals");
+  });
+
+  it("links each Case Result to its full trace and its case history", async () => {
+    apiClient.getEvalRun.mockResolvedValue(finished);
+    renderWithQueries(<EvalRunView runId="run-1" />);
+
+    const card = await screen.findByRole("listitem", { name: "plan" });
+
+    expect(
+      within(card).getByRole("link", { name: "Full trace" }),
+    ).toHaveAttribute("href", "/admin/evals/runs/run-1/results/result-1");
+    expect(within(card).getByRole("link", { name: "plan" })).toHaveAttribute(
+      "href",
+      "/admin/evals/history/plan",
+    );
+  });
+
+  it("shows what the run used once opened", async () => {
+    apiClient.getEvalRun.mockResolvedValue(finished);
+    apiClient.getEvalRunSnapshot.mockResolvedValue({
+      settings: { persona: "Warm and plain." },
+      judge: { model: "deepseek-flash" },
+      cases: [
+        {
+          key: "plan",
+          eval: "safeguard",
+          content: { kind: "clear_crisis" },
+          archived: false,
+        },
+      ],
+    });
+    renderWithQueries(<EvalRunView runId="run-1" />);
+
+    await userEvent.click(await screen.findByText("What this run used"));
+
+    expect(await screen.findByText("Warm and plain.")).toBeInTheDocument();
+    expect(screen.getByText("Cases (1)")).toBeInTheDocument();
+    expect(apiClient.getEvalRunSnapshot).toHaveBeenCalledWith("run-1");
   });
 });

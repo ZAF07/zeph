@@ -1,5 +1,5 @@
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,6 +18,8 @@ from companion.adapters.postgres.eval_repositories import (
 from companion.adapters.postgres.repositories import PostgresPlatformSettingsRepository
 from companion.core.evals.models import EvalCase, EvalName
 from companion.core.evals.runner import EvalRunner
+from companion.core.evals.runs import EvalRunService
+from companion.eval_terminal import start_and_watch_run
 from companion.main import SEED_DIR
 from tests.conftest import shared_postgres_url
 from tests.eval_run_helpers import (
@@ -507,3 +509,400 @@ def test_a_missing_judge_setting_makes_each_case_an_error_and_the_run_finishes(
     [result] = finished["results"]
     assert result["outcome"] == "error"
     assert "model" in result["error"]
+
+
+TWO_MESSAGE_UNDERSTANDING_CASE = EvalCase(
+    key="hi-twice",
+    eval=EvalName.UNDERSTANDING,
+    content={
+        "now": "2026-11-13T18:30:00",
+        "messages": [
+            {"text": "hi there", "expect": {"need": ["Just chatting"]}},
+            {"text": "hi again", "expect": {"need": ["Just chatting"]}},
+        ],
+        "rules": {},
+    },
+)
+
+
+def set_token_limit(engine: Engine, limit: int) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE platform_settings SET value = to_jsonb(:limit) "
+                "WHERE key = 'eval_run_token_limit'"
+            ),
+            {"limit": limit},
+        )
+
+
+def test_a_run_over_its_token_limit_stops_after_the_case_that_crossed_it(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, CRISIS_CASE, FALSE_ALARM_CASE)
+    set_token_limit(engine, 1)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.SAFEGUARD)
+    chat_model.script_safeguard("suicide_or_self_harm")
+    chat_model.script()
+
+    runner.work_next_run()
+
+    stopped = open_run(client, admin, run["id"])
+    assert stopped["state"] == "stopped_over_limit"
+    assert stopped["token_limit"] == 1
+    assert [result["case_key"] for result in stopped["results"]] == ["plan"]
+    assert stopped["finished_at"] is not None
+
+
+def test_an_understanding_case_stops_between_messages_once_over_the_limit(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, TWO_MESSAGE_UNDERSTANDING_CASE)
+    set_token_limit(engine, 1)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.UNDERSTANDING)
+    chat_model.script("Hi! Good to hear from you.", "Hi again!")
+
+    runner.work_next_run()
+
+    stopped = open_run(client, admin, run["id"])
+    assert stopped["state"] == "stopped_over_limit"
+    [result] = stopped["results"]
+    assert result["outcome"] == "error"
+    assert result["error"] == (
+        "Stopped after 1 of 2 Messages: the run went over its token limit."
+    )
+    assert result["tokens_in"] > 0
+    assert stopped["errored"] == 1
+
+
+def test_cancel_stops_a_running_run_after_its_case_and_keeps_finished_results(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, PERSONA_CASE, SETTINGS_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.PERSONA, EvalName.SETTINGS)
+
+    def cancel() -> None:
+        response = client.post(
+            f"/api/admin/eval-runs/{run['id']}/cancel", headers=admin
+        )
+        assert response.json()["cancel_requested"] is True
+
+    chat_model.before_next_reply = cancel
+    chat_model.script(
+        "Pretty good!",
+        '{"verdicts": [{"rule": "no_lists", "passed": true, "reason": "Plain."}]}',
+    )
+
+    runner.work_next_run()
+
+    cancelled = open_run(client, admin, run["id"])
+    assert cancelled["state"] == "cancelled"
+    [result] = cancelled["results"]
+    assert (result["case_key"], result["outcome"]) == ("small-talk", "pass")
+    assert runner.work_next_run() is False
+
+
+def test_every_case_result_opens_its_full_trace_kept_out_of_the_model_call_log(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, PERSONA_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.PERSONA)
+    chat_model.script(
+        "Pretty good!",
+        '{"verdicts": [{"rule": "no_lists", "passed": true, "reason": "Plain."}]}',
+    )
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    response = client.get(
+        f"/api/admin/eval-runs/{run['id']}/results/{result['id']}", headers=admin
+    )
+    assert response.status_code == 200
+    trace = response.json()
+    assert trace["result"]["case_key"] == "small-talk"
+    steps = [call["step"] for call in trace["calls"]]
+    assert "reply" in steps
+    reply_call = trace["calls"][steps.index("reply")]
+    assert reply_call["content"]["response"] == "Pretty good!"
+    log = client.get("/api/admin/model-calls", headers=admin).json()
+    assert log["traces"] == []
+
+    other_run = client.get(
+        f"/api/admin/eval-runs/{uuid4()}/results/{result['id']}", headers=admin
+    )
+    assert other_run.status_code == 404
+
+
+def test_a_deleted_run_takes_its_results_and_traces_with_it(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, PERSONA_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.PERSONA)
+    chat_model.script(
+        "Pretty good!",
+        '{"verdicts": [{"rule": "no_lists", "passed": true, "reason": "Plain."}]}',
+    )
+    runner.work_next_run()
+
+    def count(table: str) -> int:
+        with engine.connect() as connection:
+            return int(
+                connection.execute(text(f"SELECT count(*) FROM {table}")).scalar_one()
+            )
+
+    assert count("eval_model_calls") > 0
+
+    client.delete(f"/api/admin/eval-runs/{run['id']}", headers=admin)
+
+    assert count("eval_case_results") == 0
+    assert count("eval_model_calls") == 0
+
+
+def test_a_run_is_priced_per_model_and_a_model_without_a_price_is_named(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, CRISIS_CASE)
+    admin = owner_headers(client, auth_verifier)
+    priced_run = start_run(client, admin, EvalName.SAFEGUARD)
+    chat_model.script_safeguard("suicide_or_self_harm", "suicide_or_self_harm")
+    chat_model.script()
+    runner.work_next_run()
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE platform_settings SET value = '{}' WHERE key = 'model_prices'")
+        )
+    unpriced_run = start_run(client, admin, EvalName.SAFEGUARD)
+    runner.work_next_run()
+
+    priced = open_run(client, admin, priced_run["id"])
+    unpriced = open_run(client, admin, unpriced_run["id"])
+    expected = (priced["tokens_in"] * 0.38 + priced["tokens_out"] * 1.54) / 1e6
+    assert priced["tokens_in"] > 0
+    assert priced["cost_sgd"] == pytest.approx(expected)
+    assert priced["unpriced_models"] == []
+    assert unpriced["state"] == "finished"
+    assert unpriced["cost_sgd"] == 0
+    assert unpriced["unpriced_models"] == ["deepseek-flash"]
+
+
+def test_the_estimate_uses_each_cases_tokens_from_its_last_run(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, CRISIS_CASE, FALSE_ALARM_CASE)
+    admin = owner_headers(client, auth_verifier)
+    client.post("/api/admin/eval-runs", json={"case_keys": ["plan"]}, headers=admin)
+    chat_model.script_safeguard("suicide_or_self_harm")
+    chat_model.script()
+    runner.work_next_run()
+
+    estimate = client.post(
+        "/api/admin/eval-runs/estimate", json={"evals": ["safeguard"]}, headers=admin
+    ).json()
+
+    [plan] = open_run(
+        client,
+        admin,
+        client.get("/api/admin/eval-runs", headers=admin).json()["runs"][0]["id"],
+    )["results"]
+    assert estimate["rough_case_count"] == 1
+    assert estimate["tokens_in"] == plan["tokens_in"] + 4_000
+    assert estimate["tokens_out"] == plan["tokens_out"] + 400
+
+
+def test_re_run_failed_runs_only_the_fail_and_error_cases(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, MISSING_PHOTO_CASE, CRISIS_CASE, FALSE_ALARM_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.SAFEGUARD)
+    chat_model.script("I'm here with you.")
+    runner.work_next_run()
+    results = results_by_key(open_run(client, admin, run["id"]))
+    assert [
+        results[key]["outcome"] for key in ("missing-photo", "plan", "traffic")
+    ] == [
+        "error",
+        "fail",
+        "pass",
+    ]
+
+    response = client.post(
+        f"/api/admin/eval-runs/{run['id']}/rerun-failed", headers=admin
+    )
+
+    assert response.status_code == 201
+    rerun = response.json()
+    assert rerun["case_keys"] == ["missing-photo", "plan"]
+    assert rerun["rerun_of"] == run["id"]
+    assert rerun["state"] == "queued"
+
+
+def test_re_run_failed_is_refused_when_nothing_failed(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, FALSE_ALARM_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.SAFEGUARD)
+    chat_model.script()
+    runner.work_next_run()
+
+    response = client.post(
+        f"/api/admin/eval-runs/{run['id']}/rerun-failed", headers=admin
+    )
+
+    assert response.status_code == 422
+
+
+def test_a_finished_run_shows_its_snapshot(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, FALSE_ALARM_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.SAFEGUARD)
+    chat_model.script()
+    runner.work_next_run()
+
+    snapshot = client.get(
+        f"/api/admin/eval-runs/{run['id']}/snapshot", headers=admin
+    ).json()
+
+    assert snapshot["settings"]["eval_run_token_limit"] == 1_000_000
+    assert snapshot["judge"] == PostgresJudgeSettingsRepository(engine).load()
+    assert snapshot["cases"] == [
+        {
+            "key": "traffic",
+            "eval": "safeguard",
+            "content": FALSE_ALARM_CASE.content,
+            "archived": False,
+        }
+    ]
+
+
+def test_case_history_marks_where_the_case_or_settings_changed(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, FALSE_ALARM_CASE)
+    admin = owner_headers(client, auth_verifier)
+
+    def run_traffic() -> None:
+        start_run(client, admin, EvalName.SAFEGUARD)
+        chat_model.script()
+        runner.work_next_run()
+
+    run_traffic()
+    run_traffic()
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE eval_cases SET content = content || "
+                "'{\"message\": \"this queue is killing me\"}' WHERE key = 'traffic'"
+            )
+        )
+    run_traffic()
+    client.put(
+        "/api/admin/eval-costs",
+        json={"prices": [], "token_limit": 500_000},
+        headers=admin,
+    )
+    run_traffic()
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE platform_settings SET value = '\"Plain and kind.\"' "
+                "WHERE key = 'persona'"
+            )
+        )
+    run_traffic()
+
+    response = client.get("/api/admin/eval-cases/traffic/history", headers=admin)
+
+    assert response.status_code == 200
+    history = response.json()
+    assert history["case"]["content"]["message"] == "this queue is killing me"
+    entries = history["entries"]
+    assert [entry["outcome"] for entry in entries] == ["pass"] * 5
+    assert [entry["case_changed"] for entry in entries] == [
+        False,
+        False,
+        True,
+        False,
+        False,
+    ]
+    assert entries[0]["changed_settings"] == ["persona"]
+    assert [entry["changed_settings"] for entry in entries[1:]] == [[], [], [], []]
+    unknown = client.get("/api/admin/eval-cases/nope/history", headers=admin)
+    assert unknown.status_code == 404
+
+
+def test_the_terminal_runs_single_cases_and_prints_each_one(
+    engine: Engine, chat_model: ScriptedChatModel, runner: EvalRunner, clock: FakeClock
+) -> None:
+    add_cases(engine, CRISIS_CASE, FALSE_ALARM_CASE)
+    service = EvalRunService(
+        runs=PostgresEvalRunRepository(engine),
+        cases=PostgresEvalCaseRepository(engine),
+        settings=PostgresPlatformSettingsRepository(engine),
+        clock=clock,
+    )
+    chat_model.script()
+    lines: list[str] = []
+
+    passed = start_and_watch_run(
+        service, [], ["traffic"], lines.append, lambda _: runner.work_next_run()
+    )
+
+    assert passed is True
+    assert lines[0].startswith("Queued Eval Run ")
+    assert lines[0].endswith("(traffic)")
+    assert any("traffic" in line and line.startswith("PASS") for line in lines)
+    assert not any("plan" in line for line in lines)

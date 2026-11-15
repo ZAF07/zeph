@@ -23,6 +23,7 @@ const dashboardRun: EvalRun = {
   errored: 1,
   tokens_in: 40000,
   tokens_out: 2000,
+  cost_sgd: 0.0183,
 };
 const terminalRun: EvalRun = {
   ...finishedRun,
@@ -42,7 +43,7 @@ describe("EvalRunsList", () => {
     );
   });
 
-  it("lists Dashboard runs with who started them, their Evals and results", async () => {
+  it("lists Dashboard runs with who started them, their Evals, results and cost", async () => {
     renderWithQueries(<EvalRunsList />);
 
     const table = await screen.findByRole("table");
@@ -53,7 +54,7 @@ describe("EvalRunsList", () => {
       "Safeguard, Persona",
       "Finished",
       "29 passed · 1 failed · 1 error",
-      "40,000 in / 2,000 out",
+      "40,000 in / 2,000 outS$0.0183",
     ]);
     expect(within(cells[0]).getByRole("link")).toHaveAttribute(
       "href",

@@ -30,7 +30,7 @@ from companion.adapters.postgres.eval_repositories import (
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.adapters.pypdf.text_extractor import PypdfTextExtractor
 from companion.app import AppDependencies, create_app
-from companion.core.evals.models import EvalImage, Replies
+from companion.core.evals.models import EvalImage, ModelTokens, Replies
 from companion.core.evals.ports import EvalSetupError
 from companion.core.models import PhotoImage
 from companion.core.ports import ChatModel, Embedder, PhotoViewer, Repositories
@@ -247,6 +247,14 @@ class InProcessCompanion:
             Tokens in and tokens out, the app's and the Judge's.
         """
         return self._counter.tokens_in, self._counter.tokens_out
+
+    def tokens_by_model(self) -> dict[str, ModelTokens]:
+        """Add up the same tokens by the model that used them.
+
+        Returns:
+            Each model's tokens, the app's and the Judge's.
+        """
+        return dict(self._counter.by_model)
 
     def called_tools(self) -> list[str]:
         """List the tools the reply model called since the case started.

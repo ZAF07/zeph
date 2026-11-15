@@ -4549,7 +4549,7 @@ def _to_understanding_shape(values: dict[str, Any]) -> UnderstandingShape:
     )
 
 
-def _to_model_call(row: Row[Any]) -> ModelCall:
+def to_model_call(row: Row[Any]) -> ModelCall:
     """Turn a `model_calls` row into a model call.
 
     Args:
@@ -4707,7 +4707,7 @@ class PostgresModelCallRepository:
             ).all()
         return ModelCallTraceDetails(
             overview=self._to_trace_overview(overview_row),
-            calls=tuple(_to_model_call(row) for row in call_rows),
+            calls=tuple(to_model_call(row) for row in call_rows),
         )
 
     def delete_started_before(self, cutoff: datetime) -> None:

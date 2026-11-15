@@ -8,6 +8,7 @@ from companion.adapters.postgres.eval_repositories import (
     PostgresEvalCaseRepository,
     PostgresEvalRunRepository,
 )
+from companion.adapters.postgres.repositories import PostgresPlatformSettingsRepository
 from companion.config import load_settings
 from companion.core.errors import InvalidError
 from companion.core.evals.models import EvalName, EvalRunState, StartedFrom
@@ -39,9 +40,22 @@ def read_evals(names: str) -> list[EvalName]:
         raise argparse.ArgumentTypeError(f"{error}; the Evals are {known}") from error
 
 
+def read_case_keys(keys: str) -> list[str]:
+    """Read the case keys asked for on the command line.
+
+    Args:
+        keys: Comma-separated case keys; "" for none.
+
+    Returns:
+        The keys.
+    """
+    return [key.strip() for key in keys.split(",") if key.strip()]
+
+
 def start_and_watch_run(
     service: EvalRunService,
     evals: list[EvalName],
+    case_keys: list[str],
     write: Callable[[str], None],
     sleep: Callable[[float], None],
 ) -> bool:
@@ -49,15 +63,18 @@ def start_and_watch_run(
 
     Args:
         service: Starts and reads Eval Runs.
-        evals: The Evals to run.
+        evals: The Evals whose every case to run.
+        case_keys: Single cases to run as well.
         write: Prints one line.
         sleep: Waits between looks.
 
     Returns:
         True if the run finished with no Fail or Error.
     """
-    run_id = service.start_run(None, StartedFrom.TERMINAL, evals).run.id
-    write(f"Queued Eval Run {run_id} ({', '.join(name.value for name in evals)})")
+    run = service.start_run(None, StartedFrom.TERMINAL, evals, case_keys).run
+    picked = [name.value for name in evals] + case_keys
+    write(f"Queued Eval Run {run.id} ({', '.join(picked)})")
+    run_id = run.id
     printed = 0
     while True:
         details = service.get_details(run_id)
@@ -81,6 +98,8 @@ def start_and_watch_run(
 def main() -> None:
     """Run `make eval`: queue a terminal run on this stack and watch it.
 
+    Runs every Eval unless `--evals` or `--cases` picks some.
+
     Exits 0 when every case passed, 1 on any Fail or Error or when the run
     didn't finish, and 2 when the run can't be started.
     """
@@ -88,20 +107,32 @@ def main() -> None:
     parser.add_argument(
         "--evals",
         type=read_evals,
-        default=list(EvalName),
-        help="comma-separated Evals, e.g. safeguard,understanding; all if left out",
+        default=[],
+        help="comma-separated Evals, e.g. safeguard,understanding",
+    )
+    parser.add_argument(
+        "--cases",
+        type=read_case_keys,
+        default=[],
+        help="comma-separated case keys, e.g. reminded-of-sister",
     )
     arguments = parser.parse_args()
+    evals = arguments.evals or ([] if arguments.cases else list(EvalName))
     settings = load_settings()
     engine = build_database_engine(settings)
     service = EvalRunService(
         runs=PostgresEvalRunRepository(engine),
         cases=PostgresEvalCaseRepository(engine),
+        settings=PostgresPlatformSettingsRepository(engine),
         clock=build_clock(settings),
     )
     try:
         passed = start_and_watch_run(
-            service, arguments.evals, lambda line: print(line, flush=True), time.sleep
+            service,
+            evals,
+            arguments.cases,
+            lambda line: print(line, flush=True),
+            time.sleep,
         )
     except InvalidError as error:
         print(error.message(), file=sys.stderr)

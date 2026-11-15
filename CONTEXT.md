@@ -253,7 +253,7 @@ One situation an Eval checks, such as one labelled message for the Safeguard Eva
 _Avoid_: Test case, fixture, scenario
 
 **Eval Run**:
-One go at some Eval Cases (whole Evals or single cases), started by an Admin on the Dashboard or from the terminal. Before it starts, Admins see an estimate of its tokens and cost. It is Queued until it can start (one runs at a time), then Running, and ends Finished, Cancelled, Interrupted (it stopped unexpectedly; it is never retried by itself) or Stopped over limit (it crossed the Eval run token limit). Each Eval Case gets a Case Result as soon as it is done, so Admins watch them come in. A run keeps what it used (the Platform Settings, the Judge's settings and each case as it was), so later changes never alter its results. Runs started from the terminal are hidden from the run list unless an Admin chooses to see them. Runs are kept until an Admin deletes one.
+One go at some Eval Cases (whole Evals or single cases), started by an Admin on the Dashboard or from the terminal. Before it starts, Admins see an estimate of its tokens and cost. It is Queued until it can start (one runs at a time), then Running, and ends Finished, Cancelled, Interrupted (it stopped unexpectedly; it is never retried by itself) or Stopped over limit (it crossed the Eval run token limit). Cancelled and Stopped over limit take effect after the case under way (or between the Messages of an Understanding case, which then ends as an Error) and keep every finished Case Result. Each Eval Case gets a Case Result as soon as it is done, so Admins watch them come in. A run keeps what it used (the Platform Settings, the Judge's settings and each case as it was), so later changes never alter its results. Runs started from the terminal are hidden from the run list unless an Admin chooses to see them. Runs are kept until an Admin deletes one.
 _Avoid_: Eval job, test run, batch
 
 **Variant**:
@@ -269,11 +269,11 @@ An Admin's choice to apply a Variant's Setting Overrides to the live Platform Se
 _Avoid_: Promote, deploy, publish
 
 **Case Result**:
-How one Eval Case went in one Variant on one try: Pass, Fail (the Companion behaved wrongly) or Error (it couldn't be checked, for example the model didn't answer), with the Judge's reason for each rule, the tokens, the time and every model call's full content. Errors don't count as fails. Re-running a run's failed cases includes its Errors.
+How one Eval Case went in one Variant on one try: Pass, Fail (the Companion behaved wrongly) or Error (it couldn't be checked, for example the model didn't answer), with the Judge's reason for each rule, the tokens, the time and every model call's full content (its trace; the Judge's own calls aren't in it). Traces are Eval-only and never show in the Model Call Log. Errors don't count as fails. Re-running a run's failed cases includes its Errors.
 _Avoid_: Test result, score
 
 **Model Price**:
-What a model costs in Singapore dollars per million tokens in and out, set by Admins and used for Eval Run cost estimates. A model with no price shows tokens only. The estimate uses the highest price DeepSeek charges, so real costs are lower.
+What a model costs in Singapore dollars per million tokens in and out, set by Admins and used for Eval Run cost estimates and totals. A run is priced at the Model Prices it started with. A model with no price shows tokens only, marked "no price set", and never blocks a run. The estimate uses the highest price DeepSeek charges, so real costs are lower.
 _Avoid_: Rate, tariff
 
 **Missed Crisis**:

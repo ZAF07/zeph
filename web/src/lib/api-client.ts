@@ -680,14 +680,22 @@ export type EvalName =
 export type EvalSummary = { eval: EvalName; case_keys: string[] };
 
 /** Where an Eval Run stands. */
-export type EvalRunState = "queued" | "running" | "finished" | "interrupted";
+export type EvalRunState =
+  | "queued"
+  | "running"
+  | "finished"
+  | "cancelled"
+  | "stopped_over_limit"
+  | "interrupted";
 
 /** How one Eval Case went; an Error couldn't be checked and isn't a Fail. */
 export type CaseOutcome = "pass" | "fail" | "error";
 
 /**
- * An Eval Run with its totals so far. `case_count` is null until the runner
- * takes it; `started_by_name` is null for a run started from the terminal.
+ * An Eval Run with its totals so far. `started_by_name` is null for a run
+ * started from the terminal. `cost_sgd` leaves out the tokens of
+ * `unpriced_models`, which have no Model Price. `token_limit` is null until
+ * the runner takes the run.
  */
 export type EvalRun = {
   id: string;
@@ -700,12 +708,36 @@ export type EvalRun = {
   queued_at: string;
   started_at: string | null;
   finished_at: string | null;
-  case_count: number | null;
+  case_count: number;
+  case_keys: string[];
+  cancel_requested: boolean;
+  token_limit: number | null;
+  rerun_of: string | null;
   passed: number;
   failed: number;
   errored: number;
   tokens_in: number;
   tokens_out: number;
+  cost_sgd: number;
+  unpriced_models: string[];
+};
+
+/** The whole Evals and single cases a run runs. */
+export type EvalRunPick = { evals: EvalName[]; case_keys: string[] };
+
+/**
+ * What a run would use, before it starts; only an estimate. `cost_sgd`
+ * leaves out the tokens of `unpriced_models`. `rough_case_count` cases have
+ * never run, so use a rough figure for their Eval.
+ */
+export type EvalRunEstimate = {
+  case_count: number;
+  rough_case_count: number;
+  tokens_in: number;
+  tokens_out: number;
+  models: { model: string; tokens_in: number; tokens_out: number }[];
+  cost_sgd: number;
+  unpriced_models: string[];
 };
 
 /**
@@ -799,6 +831,59 @@ export type EvalCase = {
 
 /** The Judge's settings and the form that edits them. */
 export type JudgeSettings = { shape: FormShape; values: FormValues };
+/** A Case Result with its full trace: every model call its case made. */
+export type CaseResultTrace = {
+  run_id: string;
+  result: CaseResult;
+  calls: ModelCall[];
+};
+
+/** An Eval Case, as it is or as it was when a run started. */
+export type EvalCaseContent = {
+  key: string;
+  eval: EvalName;
+  content: Record<string, unknown>;
+  archived: boolean;
+};
+
+/** What a run used; every field is null while it is Queued. */
+export type EvalRunSnapshot = {
+  settings: Record<string, unknown> | null;
+  judge: Record<string, unknown> | null;
+  cases: EvalCaseContent[] | null;
+};
+
+/**
+ * A case's result in one run. `case_changed` and `changed_settings` say what
+ * was different from the older result after it in the list; Judge settings
+ * show as `judge.<name>`.
+ */
+export type CaseHistoryEntry = {
+  run_id: string;
+  run_queued_at: string;
+  result_id: string;
+  variant: string;
+  try_number: number;
+  outcome: CaseOutcome;
+  case_changed: boolean;
+  changed_settings: string[];
+};
+
+/** A case and its results in recent runs, newest first. */
+export type CaseHistory = {
+  case: EvalCaseContent;
+  entries: CaseHistoryEntry[];
+};
+
+/** One model's price in SGD per 1M tokens; null for no price set. */
+export type ModelPrice = {
+  model: string;
+  sgd_in: number | null;
+  sgd_out: number | null;
+};
+
+/** The Model Prices and the Eval run token limit. */
+export type EvalCosts = { prices: ModelPrice[]; token_limit: number };
 
 /** Every call the Dashboard makes to the backend. */
 export type ApiClient = {
@@ -876,7 +961,8 @@ export type ApiClient = {
   getModelCallTrace: (traceId: string) => Promise<ModelCallTraceDetails>;
   listEvals: () => Promise<EvalSummary[]>;
   listEvalRuns: (includeTerminal: boolean) => Promise<EvalRun[]>;
-  startEvalRun: (evals: EvalName[]) => Promise<EvalRun>;
+  startEvalRun: (pick: EvalRunPick) => Promise<EvalRun>;
+  estimateEvalRun: (pick: EvalRunPick) => Promise<EvalRunEstimate>;
   getEvalRun: (runId: string) => Promise<EvalRunDetails>;
   listEvalCaseShapes: () => Promise<Record<EvalName, FormShape>>;
   listEvalCases: (evalName: EvalName) => Promise<EvalCase[]>;
@@ -893,6 +979,17 @@ export type ApiClient = {
   getEvalImage: (name: string) => Promise<Blob>;
   getJudgeSettings: () => Promise<JudgeSettings>;
   saveJudgeSettings: (values: FormValues) => Promise<JudgeSettings>;
+  cancelEvalRun: (runId: string) => Promise<EvalRun>;
+  rerunFailedCases: (runId: string) => Promise<EvalRun>;
+  deleteEvalRun: (runId: string) => Promise<void>;
+  getEvalRunSnapshot: (runId: string) => Promise<EvalRunSnapshot>;
+  getCaseResultTrace: (
+    runId: string,
+    resultId: string,
+  ) => Promise<CaseResultTrace>;
+  getCaseHistory: (caseKey: string) => Promise<CaseHistory>;
+  getEvalCosts: () => Promise<EvalCosts>;
+  saveEvalCosts: (costs: EvalCosts) => Promise<EvalCosts>;
   getUsage: (days: number) => Promise<UsageReport>;
   listMemoryCategories: () => Promise<MemoryCategoryOverview[]>;
   addMemoryCategory: (category: MemoryCategoryInput) => Promise<MemoryCategory>;
@@ -1221,8 +1318,10 @@ export function createApiClient(
           `/api/admin/eval-runs?include_terminal=${includeTerminal}`,
         )
       ).runs,
-    startEvalRun: (evals) =>
-      request<EvalRun>("/api/admin/eval-runs", "POST", { evals }),
+    startEvalRun: (pick) =>
+      request<EvalRun>("/api/admin/eval-runs", "POST", pick),
+    estimateEvalRun: (pick) =>
+      request<EvalRunEstimate>("/api/admin/eval-runs/estimate", "POST", pick),
     getEvalRun: (runId) =>
       request<EvalRunDetails>(`/api/admin/eval-runs/${runId}`),
     listEvalCaseShapes: async () =>
@@ -1272,6 +1371,25 @@ export function createApiClient(
     getJudgeSettings: () => request<JudgeSettings>("/api/admin/eval-judge"),
     saveJudgeSettings: (values) =>
       request<JudgeSettings>("/api/admin/eval-judge", "PUT", { values }),
+    cancelEvalRun: (runId) =>
+      request<EvalRun>(`/api/admin/eval-runs/${runId}/cancel`, "POST"),
+    rerunFailedCases: (runId) =>
+      request<EvalRun>(`/api/admin/eval-runs/${runId}/rerun-failed`, "POST"),
+    deleteEvalRun: (runId) =>
+      request<void>(`/api/admin/eval-runs/${runId}`, "DELETE"),
+    getEvalRunSnapshot: (runId) =>
+      request<EvalRunSnapshot>(`/api/admin/eval-runs/${runId}/snapshot`),
+    getCaseResultTrace: (runId, resultId) =>
+      request<CaseResultTrace>(
+        `/api/admin/eval-runs/${runId}/results/${resultId}`,
+      ),
+    getCaseHistory: (caseKey) =>
+      request<CaseHistory>(
+        `/api/admin/eval-cases/${encodeURIComponent(caseKey)}/history`,
+      ),
+    getEvalCosts: () => request<EvalCosts>("/api/admin/eval-costs"),
+    saveEvalCosts: (costs) =>
+      request<EvalCosts>("/api/admin/eval-costs", "PUT", costs),
     getUsage: (days) => request<UsageReport>(`/api/admin/usage?days=${days}`),
     listMemoryCategories: async () =>
       (

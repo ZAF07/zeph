@@ -14,7 +14,13 @@ from companion.core.evals.made_up_memory import (
     give_made_up_memory,
     open_conversation_with,
 )
-from companion.core.evals.models import CaseCheckResult, CaseOutcome, Check
+from companion.core.evals.models import (
+    CaseCheckResult,
+    CaseOutcome,
+    CaseStoppedError,
+    Check,
+    StopCheck,
+)
 from companion.core.evals.persona_eval import verdict_check
 from companion.core.evals.ports import EvalCompanion
 from companion.core.evals.understanding_checks import (
@@ -312,7 +318,10 @@ def message_facts(checked: CheckedMessage) -> dict[str, Any]:
 
 
 def check_understanding_case(
-    case: UnderstandingCase, companion: EvalCompanion, judge: JudgeSettings
+    case: UnderstandingCase,
+    companion: EvalCompanion,
+    judge: JudgeSettings,
+    should_stop: StopCheck,
 ) -> CaseCheckResult:
     """Give a made-up User a memory, send Messages and check each Understanding.
 
@@ -320,11 +329,16 @@ def check_understanding_case(
         case: The made-up memory, Conversation and Messages.
         companion: The app on the Eval database.
         judge: The Judge's model, thinking and prompts.
+        should_stop: Says why the run is to stop, or None to carry on;
+            asked before each Message after the first.
 
     Returns:
         Every Message's checks, grouped by Message; its facts hold each
         Message's outcome and Understanding call. A failed case notes what
         the Understanding was given and answered, and the conversation.
+
+    Raises:
+        CaseStoppedError: If the run is to stop before the last Message.
     """
     upload_knowledge_documents(companion, case.memory.knowledge_documents)
     companion.move_clock(case.now - companion.now())
@@ -347,8 +361,14 @@ def check_understanding_case(
         transcript_line(line.from_person, line.text) for line in case.earlier
     ]
 
-    checked_messages = []
+    checked_messages: list[CheckedMessage] = []
     for message in case.messages:
+        stop_reason = should_stop() if checked_messages else None
+        if stop_reason is not None:
+            raise CaseStoppedError(
+                f"Stopped after {len(checked_messages)} of "
+                f"{len(case.messages)} Messages: {stop_reason}."
+            )
         transcript_lines += send_and_collect_lines(companion, message.text)
         checked_messages.append(
             check_message(

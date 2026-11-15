@@ -4,6 +4,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import Any
 
+from companion.core.evals.models import ModelTokens
 from companion.core.incoming_messages import MESSAGE_WAIT_PREFIX
 from companion.core.models import (
     AccountIdentity,
@@ -263,21 +264,26 @@ class RunningClock:
 
 
 class TokenCounter:
-    """Adds up the tokens of every model answer in one Eval case."""
+    """Adds up the tokens of every model answer in one Eval case, by model."""
 
     def __init__(self) -> None:
         """Start at zero."""
         self.tokens_in = 0
         self.tokens_out = 0
+        self.by_model: dict[str, ModelTokens] = {}
 
-    def add(self, answer: ModelAnswer) -> None:
+    def add(self, model: str, answer: ModelAnswer) -> None:
         """Add an answer's tokens.
 
         Args:
+            model: The model that gave it.
             answer: The model's answer.
         """
         self.tokens_in += answer.tokens_in
         self.tokens_out += answer.tokens_out
+        self.by_model[model] = self.by_model.get(model, ModelTokens()).plus(
+            ModelTokens(answer.tokens_in, answer.tokens_out)
+        )
 
 
 class CountingChatModel:
@@ -318,7 +324,7 @@ class CountingChatModel:
         answer = self._chat_model.generate(
             model, thinking, instructions, history, recorded_tools
         )
-        self._counter.add(answer)
+        self._counter.add(model, answer)
         return answer
 
     def _recording(self, tool: ChatTool) -> ChatTool:
@@ -374,5 +380,5 @@ class CountingPhotoViewer:
             The real photo viewer's answer.
         """
         answer = self._photo_viewer.look(model, thinking, instructions, photo)
-        self._counter.add(answer)
+        self._counter.add(model, answer)
         return answer
