@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 from alembic import command
@@ -10,31 +11,12 @@ from companion.adapters.postgres.database import (
     seed_platform_settings,
 )
 from tests.conftest import SEED_FILE
+from tests.test_photo_viewing import stored_setting
 
 OLD_KNOWLEDGE_INTRO = (
     "Passages from your Knowledge library that may relate to this message. "
     "Most of the time, use none of them."
 )
-
-
-def saved_knowledge_intro(engine: Engine) -> str:
-    """Read the saved Knowledge intro.
-
-    Args:
-        engine: The database engine.
-
-    Returns:
-        The intro's saved value.
-    """
-    with engine.begin() as connection:
-        return str(
-            connection.execute(
-                text(
-                    "SELECT value #>> '{}' FROM platform_settings "
-                    "WHERE key = 'reply_knowledge_intro'"
-                )
-            ).scalar_one()
-        )
 
 
 def test_an_existing_install_gets_the_new_knowledge_intro(
@@ -48,14 +30,16 @@ def test_an_existing_install_gets_the_new_knowledge_intro(
         with engine.begin() as connection:
             connection.execute(
                 text(
-                    "UPDATE platform_settings "
-                    "SET value = to_jsonb(CAST(:intro AS text)) "
+                    "UPDATE platform_settings SET value = :old "
                     "WHERE key = 'reply_knowledge_intro'"
                 ),
-                {"intro": OLD_KNOWLEDGE_INTRO},
+                {"old": json.dumps(OLD_KNOWLEDGE_INTRO)},
             )
     finally:
         migrate(database_url)
     seed_platform_settings(engine, SEED_FILE)
 
-    assert saved_knowledge_intro(engine) == seeded_settings["reply_knowledge_intro"]
+    assert (
+        stored_setting(engine, "reply_knowledge_intro")
+        == seeded_settings["reply_knowledge_intro"]
+    )
