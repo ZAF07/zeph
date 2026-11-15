@@ -16,3 +16,5 @@ Also seen in the same runs, also reply-side and older than issue 17: Persona `as
 - [ ] `asks-for-tips` passes in 3 runs in a row, or is split into its own issue
 
 ## Comments
+
+- 2026-11-15, from issue 22's evals (reply on `deepseek-flash`, thinking off): two more reply-side flakes where the Understanding's checks passed. `strong-mood-unknown-cause` asked two questions at once (`gentle_probe`, 1 of 2 runs), and `brushed-off-not-raised-too-soon` asked how dad was though the Understanding left that Thread alone (`leaves_dad_alone`, 1 of 3 runs).
