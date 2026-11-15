@@ -60,4 +60,5 @@ None - can start immediately. (Best after understanding issue 22, so the Judge m
   - `b1844c8` Eval dashboard issue 02: review fixes (start a run through a mutation, query key in one place, TSDoc, stop polling on load error, make eval checks backend too)
   - `9ab61b7` Eval dashboard issue 02: status note
   - `8faa0f7` Eval dashboard issue 02: CONTEXT.md says case keys are unique across Evals
-- Merge commit: <recorded after merge>
+- Archive commit: `98ea017` Eval dashboard issue 02 done: archive issue with run, eval and review evidence
+- Merge commit: `d9aaf05` Merge eval dashboard issue 02 into main
