@@ -54,8 +54,7 @@ describe("EvalRunsList", () => {
       "Safeguard, Persona",
       "Finished",
       "29 passed · 1 failed · 1 error",
-      "40,000 in / 2,000 out",
-      "S$0.0183",
+      "40,000 in / 2,000 outS$0.0183",
     ]);
     expect(within(cells[0]).getByRole("link")).toHaveAttribute(
       "href",

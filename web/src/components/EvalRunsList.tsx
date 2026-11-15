@@ -24,8 +24,7 @@ const headings = [
   "Evals",
   "State",
   "Results",
-  "Tokens",
-  "Cost",
+  "Tokens and cost",
 ];
 
 const cell = "px-[18px] py-3.5";
@@ -96,7 +95,7 @@ export function EvalRunsList() {
 
       {runs !== undefined && runs.length > 0 ? (
         <div className="overflow-x-auto rounded-xl border border-line bg-white">
-          <table className="w-full min-w-[920px] border-collapse text-sm">
+          <table className="w-full min-w-[820px] border-collapse text-sm">
             <thead>
               <tr>
                 {headings.map((heading) => (
@@ -138,9 +137,9 @@ export function EvalRunsList() {
                   </td>
                   <td className={`${cell} whitespace-nowrap`}>
                     {formatTokens(run.tokens_in, run.tokens_out)}
-                  </td>
-                  <td className={`${cell} whitespace-nowrap`}>
-                    {describeCost(run)}
+                    <span className="block text-caption text-ink-muted">
+                      {describeCost(run)}
+                    </span>
                   </td>
                 </tr>
               ))}
