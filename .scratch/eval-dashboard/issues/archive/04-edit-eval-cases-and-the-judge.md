@@ -59,3 +59,6 @@ Lane B (case and Judge pages). Runs in parallel with 03.
   - `700c8b8` Eval dashboard issue 04: Admins edit Eval Cases and the Judge
   - `c939582` Eval dashboard issue 04: on/off fields don't say optional
   - `1d63a1f` Eval dashboard issue 04: review fixes
+  - `0a96749` Eval dashboard issue 04: CONTEXT.md and ADRs 0014-0015 for case shapes and the Judge's own settings
+  - `9cb852c` Eval dashboard issue 04: evals README on editing cases and the Judge
+- Archive commit: `b96e525` Eval dashboard issue 04 done: archive issue with run, review and check evidence
