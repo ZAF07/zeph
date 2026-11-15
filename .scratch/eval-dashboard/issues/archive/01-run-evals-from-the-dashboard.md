@@ -82,8 +82,8 @@ Terms are in `CONTEXT.md` (Eval Run, Eval Case, Variant, Setting Override, Make 
 
 ## Comments
 
-- 2026-11-15: PRD written at `.scratch/eval-dashboard/PRD.md` (test seams agreed: backend HTTP API, "work the next Queued run", Dashboard components). Next: `/to-issues`.
-- 2026-11-15: archived. Grilling done; decisions carried into `.scratch/eval-dashboard/PRD.md` and issues 02-05.
+- 2026-11-15: PRD written at `.scratch/eval-dashboard/archive/PRD.md` (test seams agreed: backend HTTP API, "work the next Queued run", Dashboard components). Next: `/to-issues`.
+- 2026-11-15: archived. Grilling done; decisions carried into `.scratch/eval-dashboard/archive/PRD.md` and issues 02-05.
 
 ## Completion
 

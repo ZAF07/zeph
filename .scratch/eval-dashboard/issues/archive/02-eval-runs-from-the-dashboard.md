@@ -4,7 +4,7 @@ Status: completed
 
 ## Parent
 
-`.scratch/eval-dashboard/PRD.md` (decisions in `archive/01-run-evals-from-the-dashboard.md`, ADR-0013)
+`.scratch/eval-dashboard/archive/PRD.md` (decisions in `archive/01-run-evals-from-the-dashboard.md`, ADR-0013)
 
 ## What to build
 

@@ -4,7 +4,7 @@ Status: completed
 
 ## Parent
 
-`.scratch/eval-dashboard/PRD.md`
+`.scratch/eval-dashboard/archive/PRD.md`
 
 ## What to build
 

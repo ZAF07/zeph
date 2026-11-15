@@ -1,6 +1,6 @@
 # PRD: Eval dashboard — Admins run, tune and compare Evals from the Dashboard
 
-Status: ready-for-agent
+Status: completed
 
 ## Problem Statement
 
@@ -240,3 +240,15 @@ An Eval area in the Dashboard's admin section.
 - Cases are already data files (`evals/cases/*.yaml`), so they become the seed without a rewrite.
 - The platform isn't live yet, so no backfill of old terminal runs is needed.
 - Grilling decisions: `.scratch/eval-dashboard/issues/archive/01-run-evals-from-the-dashboard.md`.
+
+## Completion
+
+- Completed: 2026-11-15
+- Delivered by issues 01–05 (all archived in `.scratch/eval-dashboard/issues/archive/`, each listing its commits):
+  - 01 Grilling (decisions, CONTEXT.md terms, ADR-0013): 599cd9d, archive bf47648, merges c73949d and dee4951
+  - 02 Eval Runs from the Dashboard: archive 98ea017, merge d9aaf05
+  - 03 Cost control, traces, single cases, Re-run failed and history: archive 9f06e9d, merge b0dedbf
+  - 04 Edit Eval Cases and the Judge: archive b96e525, merge 959a487
+  - 05 Variants, Repeats, Setting Overrides and Make Live: archive 65b1a07, merge abb4d5c
+- Checks on close-out (issue 05 branch, main at 207b532): ruff, ruff format, mypy pass; pytest 1087 passed; pnpm lint, format:check, typecheck pass; Vitest 424 passed
+
