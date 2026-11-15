@@ -23,6 +23,7 @@ from companion.core.models import (
     BringUpWay,
     ChatLine,
     ChatRole,
+    ChosenKnowledgeDocument,
     ConversationMessage,
     CuriosityToRaise,
     Feature,
@@ -104,17 +105,35 @@ def format_earlier_understanding(understanding: Understanding) -> str:
     return f"{line} {form.nuance}" if form.nuance else line
 
 
-def format_knowledge_document(document: KnowledgeDocument) -> str:
+def number_knowledge_documents(
+    documents: Sequence[KnowledgeDocument],
+) -> dict[int, KnowledgeDocument]:
+    """Number the Knowledge documents the Understanding may choose from.
+
+    The numbers hold for one Understanding call only, since the documents
+    can change between calls.
+
+    Args:
+        documents: The documents, in the order they are listed.
+
+    Returns:
+        The documents by number, from 1.
+    """
+    return dict(enumerate(documents, start=1))
+
+
+def format_knowledge_document(number: int, document: KnowledgeDocument) -> str:
     """Write one Knowledge document as the Understanding reads it.
 
     Args:
+        number: The number the Understanding chooses it by.
         document: The document.
 
     Returns:
-        E.g. "- “On the breath” (Owner's notes, Mindfulness): When their
+        E.g. "[1] “On the breath” (Owner's notes, Mindfulness): When their
         attention keeps drifting."
     """
-    line = f"- {document.title_with_source}"
+    line = f"[{number}] {document.title_with_source}"
     return f"{line}: {document.when_it_helps}" if document.when_it_helps else line
 
 
@@ -126,7 +145,7 @@ def describe_message_for_understanding(
     messages: list[ConversationMessage],
     reminded: Sequence[RemindedThread],
     due: DueCuriosities,
-    knowledge_documents: Sequence[KnowledgeDocument],
+    knowledge_documents: dict[int, KnowledgeDocument],
 ) -> str:
     """Write what the Understanding model is given about the Message.
 
@@ -139,7 +158,8 @@ def describe_message_for_understanding(
             at the end are the Message being answered.
         reminded: The Life Threads the Message reminds the Companion of.
         due: The Curiosities it may bring up.
-        knowledge_documents: The Knowledge documents it may choose from.
+        knowledge_documents: The Knowledge documents it may choose from, by
+            number.
 
     Returns:
         The time, Needs, User Portrait, Goals, Memory Categories, recent
@@ -161,7 +181,8 @@ def describe_message_for_understanding(
         format_earlier_understanding(understanding) for understanding in earlier
     )
     knowledge_lines = "\n".join(
-        format_knowledge_document(document) for document in knowledge_documents
+        format_knowledge_document(number, document)
+        for number, document in knowledge_documents.items()
     )
     earlier_messages, latest_text = split_off_latest_message(messages)
     return (
@@ -202,6 +223,21 @@ def read_text_list(value: Any) -> tuple[str, ...]:
     )
 
 
+def read_number(value: Any) -> int | None:
+    """Read a number the form uses to name something from a numbered list.
+
+    Args:
+        value: The number, as the model wrote it.
+
+    Returns:
+        The number; None if the value isn't a whole number, e.g. a title,
+        a number written as text, or true/false.
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
 def read_thread(
     value: Any, by_number: dict[int, RemindedThread]
 ) -> RemindedThread | None:
@@ -214,9 +250,8 @@ def read_thread(
     Returns:
         The Thread; None if the value isn't one of their numbers.
     """
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return by_number.get(value)
+    number = read_number(value)
+    return None if number is None else by_number.get(number)
 
 
 def read_threads_touched(
@@ -327,8 +362,8 @@ def read_curiosities_to_raise(
     for entry in value:
         if not isinstance(entry, dict):
             continue
-        number = entry.get("curiosity")
-        if isinstance(number, bool) or not isinstance(number, int):
+        number = read_number(entry.get("curiosity"))
+        if number is None:
             continue
         item = by_number.get(number)
         if item is None or item.curiosity.id in chosen:
@@ -381,28 +416,45 @@ def keep_held_back_threads_alone(
     )
 
 
-def read_knowledge_lookup(value: Any) -> KnowledgeLookup | None:
+def read_knowledge_lookup(
+    value: Any, by_number: dict[int, KnowledgeDocument]
+) -> KnowledgeLookup | None:
     """Read the form's `knowledge` field: documents to search and a phrase.
 
     Args:
-        value: The field's value, e.g. {"documents": ["On grief"], "search":
+        value: The field's value, e.g. {"documents": [1], "search":
             "letting sorrow pass"}.
+        by_number: The Knowledge documents the model was shown, by number.
 
     Returns:
-        The lookup; None if it names no document or gives no phrase, so no
-        Knowledge is searched.
+        The lookup, each document once; None if it names no listed number
+        or gives no phrase, so no Knowledge is searched.
     """
     if not isinstance(value, dict):
         return None
-    documents = read_text_list(value.get("documents"))
+    numbers = value.get("documents")
     search = value.get("search")
-    if not documents or not isinstance(search, str) or not search.strip():
+    if not isinstance(numbers, list) or not isinstance(search, str):
         return None
-    return KnowledgeLookup(documents=documents, search=search.strip())
+    documents: dict[UUID, ChosenKnowledgeDocument] = {}
+    for value in numbers:
+        number = read_number(value)
+        document = None if number is None else by_number.get(number)
+        if document is None:
+            continue
+        documents[document.id] = ChosenKnowledgeDocument(
+            document_id=document.id, title=document.title
+        )
+    if not documents or not search.strip():
+        return None
+    return KnowledgeLookup(documents=tuple(documents.values()), search=search.strip())
 
 
 def read_understanding_form(
-    answer: str, reminded: Sequence[RemindedThread], due: DueCuriosities
+    answer: str,
+    reminded: Sequence[RemindedThread],
+    due: DueCuriosities,
+    knowledge_documents: dict[int, KnowledgeDocument],
 ) -> UnderstandingForm | None:
     """Read the Understanding model's JSON form.
 
@@ -412,11 +464,14 @@ def read_understanding_form(
     named by their numbers in the reminded list; no held-back Thread is
     ever brought up. Curiosities are named by their numbers in the due list,
     and no more are brought up than the Conversation may still raise.
+    Knowledge documents are named by their numbers in the Knowledge list.
 
     Args:
         answer: The model's answer.
         reminded: The Life Threads the model was shown, numbered.
         due: The Curiosities the model was shown, numbered.
+        knowledge_documents: The Knowledge documents the model was shown,
+            by number.
 
     Returns:
         The form, or None if it has no JSON object naming a Need.
@@ -451,7 +506,7 @@ def read_understanding_form(
         bring_up=read_bring_up(parsed.get("bring_up"), by_number),
         left_alone=read_left_alone(parsed.get("left_alone"), by_number),
         threads_touched=read_threads_touched(parsed.get("threads_touched"), by_number),
-        knowledge=read_knowledge_lookup(parsed.get("knowledge")),
+        knowledge=read_knowledge_lookup(parsed.get("knowledge"), knowledge_documents),
         curiosities=read_curiosities_to_raise(parsed.get("bring_up"), due),
         **lists,
     )
@@ -668,6 +723,9 @@ class UnderstandingService:
         earlier = self._repositories.understandings.list_for_conversation(
             conversation_id
         )
+        knowledge_documents = number_knowledge_documents(
+            self._knowledge_documents(snapshot)
+        )
         model_form = self._ask(
             snapshot,
             describe_message_for_understanding(
@@ -678,10 +736,11 @@ class UnderstandingService:
                 messages,
                 reminded,
                 due,
-                self._knowledge_documents(snapshot),
+                knowledge_documents,
             ),
             reminded,
             due,
+            knowledge_documents,
         )
         if model_form is None:
             need = fallback_need(needs)
@@ -739,6 +798,7 @@ class UnderstandingService:
         description: str,
         reminded: Sequence[RemindedThread],
         due: DueCuriosities,
+        knowledge_documents: dict[int, KnowledgeDocument],
     ) -> UnderstandingForm | None:
         """Ask the model to fill in the form.
 
@@ -747,6 +807,8 @@ class UnderstandingService:
             description: What the model is given about the Message.
             reminded: The Life Threads it was shown, numbered.
             due: The Curiosities it was shown, numbered.
+            knowledge_documents: The Knowledge documents it was shown, by
+                number.
 
         Returns:
             The form; None if the call failed or the answer can't be read.
@@ -763,7 +825,7 @@ class UnderstandingService:
         except Exception:
             logger.exception("The Understanding call failed; using the fallback Need")
             return None
-        form = read_understanding_form(answer, reminded, due)
+        form = read_understanding_form(answer, reminded, due, knowledge_documents)
         if form is None:
             logger.warning(
                 "The Understanding form couldn't be read; using the fallback Need"

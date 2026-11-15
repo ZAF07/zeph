@@ -166,7 +166,11 @@ def describe_what_was_done(
         raised_threads=[item.title for item in form.bring_up],
         raised_curiosities=len(form.curiosities),
         asked_why=understanding.asked_why,
-        knowledge_documents=list(form.knowledge.documents) if form.knowledge else [],
+        knowledge_documents=(
+            [chosen.title for chosen in form.knowledge.documents]
+            if form.knowledge
+            else []
+        ),
         knowledge_in_reply=knowledge_in_reply(calls),
     )
 

@@ -613,7 +613,7 @@ def choose_breath_passage(chat_model: ScriptedChatModel) -> None:
     """Have the next Understanding choose the breath document."""
     chat_model.script_understanding(
         understanding_answer(
-            knowledge_documents=["On the breath"],
+            knowledge_documents=[1],
             knowledge_search="notice the breath entering",
         )
     )

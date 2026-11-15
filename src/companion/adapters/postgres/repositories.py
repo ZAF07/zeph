@@ -68,6 +68,7 @@ from companion.core.models import (
     CheckInLogEntry,
     CheckInOutcome,
     CheckInSettings,
+    ChosenKnowledgeDocument,
     ConnectionToken,
     Conversation,
     ConversationMessage,
@@ -86,6 +87,7 @@ from companion.core.models import (
     KnowledgeDocument,
     KnowledgeFile,
     KnowledgeFileType,
+    KnowledgeLookup,
     KnowledgeStatus,
     KnowledgeUpload,
     LibrarySticker,
@@ -132,7 +134,6 @@ from companion.core.models import (
     UserRole,
 )
 from companion.core.ports import Repositories, Transaction
-from companion.core.understanding import read_knowledge_lookup
 
 
 class Database(Protocol):
@@ -1737,7 +1738,8 @@ def _understanding_form_values(form: UnderstandingForm) -> dict[str, Any]:
         form: The form.
 
     Returns:
-        The form, with each Thread's and Curiosity's ID as text.
+        The form, with each Thread's, Curiosity's and Knowledge document's ID
+        as text.
     """
     values = asdict(form)
     for field_name in ("bring_up", "left_alone"):
@@ -1748,7 +1750,38 @@ def _understanding_form_values(form: UnderstandingForm) -> dict[str, Any]:
         {**item, "curiosity_id": str(item["curiosity_id"])}
         for item in values["curiosities"]
     ]
+    if values["knowledge"] is not None:
+        values["knowledge"]["documents"] = [
+            {**item, "document_id": str(item["document_id"])}
+            for item in values["knowledge"]["documents"]
+        ]
     return values
+
+
+def _to_knowledge_lookup(stored: dict[str, Any] | None) -> KnowledgeLookup | None:
+    """Turn a saved Knowledge lookup back into one.
+
+    Lookups saved before documents were chosen by number named them by
+    title only; those names are skipped.
+
+    Args:
+        stored: The lookup as saved; None if no Knowledge was chosen.
+
+    Returns:
+        The lookup; None if none was saved or it has no document left.
+    """
+    if stored is None:
+        return None
+    documents = tuple(
+        ChosenKnowledgeDocument(
+            document_id=UUID(item["document_id"]), title=item["title"]
+        )
+        for item in stored["documents"]
+        if isinstance(item, dict)
+    )
+    if not documents:
+        return None
+    return KnowledgeLookup(documents=documents, search=stored["search"])
 
 
 def _to_understanding_form(stored: dict[str, Any]) -> UnderstandingForm:
@@ -1784,7 +1817,7 @@ def _to_understanding_form(stored: dict[str, Any]) -> UnderstandingForm:
             for item in stored["left_alone"]
         ),
         look_up_past=tuple(stored["look_up_past"]),
-        knowledge=read_knowledge_lookup(stored["knowledge"]),
+        knowledge=_to_knowledge_lookup(stored["knowledge"]),
         threads_touched=tuple(stored["threads_touched"]),
         curiosities=tuple(
             CuriosityToRaise(

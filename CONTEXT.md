@@ -189,7 +189,7 @@ _Avoid_: Probe, question bank, prompt, talking point
 ### Knowledge
 
 **Knowledge**:
-The curated library of philosophy, psychology and mindfulness material the Companion draws on, made of Knowledge Documents. Shared by all Users; never about any one User. The Companion brings it in only when it genuinely fits the message, lightly and in its own words, never as a lecture. The Understanding decides whether any Knowledge Document fits, from each one's "when it helps", and if so names the documents and a search phrase; only passages from those documents that are close enough to the phrase (an Admin-set bar) go into the reply. Most messages, such as a vent or small talk, get none. It is a Feature: when it doesn't work for a User, no Knowledge goes into their replies and none is offered to the Understanding.
+The curated library of philosophy, psychology and mindfulness material the Companion draws on, made of Knowledge Documents. Shared by all Users; never about any one User. The Companion brings it in only when it genuinely fits the message, lightly and in its own words, never as a lecture. The Understanding decides whether any Knowledge Document fits, from each one's "when it helps", and if so picks the documents from the Ready ones it is shown, plus a search phrase; only passages from those documents that are close enough to the phrase (an Admin-set bar) go into the reply. Most messages, such as a vent or small talk, get none. It is a Feature: when it doesn't work for a User, no Knowledge goes into their replies and none is offered to the Understanding.
 _Avoid_: Wisdom base, corpus, content
 
 **Knowledge Document**:

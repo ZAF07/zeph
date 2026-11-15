@@ -1,8 +1,19 @@
+import json
+import re
 from typing import Any
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from fastapi.testclient import TestClient
+from sqlalchemy import Engine, text
 
+from companion.adapters.postgres.database import (
+    MIGRATIONS_DIR,
+    migrate,
+    seed_platform_settings,
+)
+from tests.conftest import SEED_FILE
 from tests.fakes import (
     DEFAULT_WHEN_IT_HELPS,
     FakeAuthVerifier,
@@ -19,6 +30,7 @@ from tests.telegram_helpers import (
     send_to_webhook,
     telegram_text_update,
 )
+from tests.test_understanding import saved_understandings
 
 BREATH_TEXT = (
     "Breathing in, notice the breath entering. Breathing out, notice the breath "
@@ -62,6 +74,14 @@ def reply_instructions(
     assert send_to_webhook(client, telegram_text_update(text)) == 200
     [reply_call] = chat_model.calls
     return reply_call.instructions
+
+
+def listed_number(chat_model: ScriptedChatModel, title: str) -> int:
+    """Find the number the last Understanding call listed a document under."""
+    [asked] = chat_model.understanding_calls[-1].history
+    found = re.search(rf"^\[(\d+)\] “{re.escape(title)}”", asked.text, re.MULTILINE)
+    assert found, asked.text
+    return int(found.group(1))
 
 
 def set_settings(
@@ -154,7 +174,7 @@ def test_an_admin_edits_when_it_helps_and_the_next_understanding_sees_it(
     [understanding_call] = chat_model.understanding_calls
     [asked] = understanding_call.history
     assert (
-        "- “On the breath” (Owner’s notes, Mindfulness): "
+        "[1] “On the breath” (Owner’s notes, Mindfulness): "
         "When they can't sleep for worry."
     ) in asked.text
 
@@ -221,6 +241,7 @@ def test_passages_come_only_from_the_chosen_documents(
     upload_ready(client, admin, "Taxes", TAX_TEXT)
     connect_telegram(client, auth_verifier, chat_channel)
     set_settings(client, admin, {"knowledge_closeness_percent": 0})
+    reply_instructions(client, chat_model, "hello", understanding_answer())
 
     instructions = reply_instructions(
         client,
@@ -228,7 +249,7 @@ def test_passages_come_only_from_the_chosen_documents(
         "yeah, exactly",
         understanding_answer(
             need="Think it through",
-            knowledge_documents=["on GRIEF"],
+            knowledge_documents=[listed_number(chat_model, "On grief")],
             knowledge_search=BREATH_SEARCH,
         ),
     )
@@ -242,24 +263,87 @@ def test_passages_come_only_from_the_chosen_documents(
     assert TAX_TEXT not in instructions
 
 
-@pytest.mark.parametrize(
-    "named_as",
-    [
-        "“On grief” (Owner’s notes, Mindfulness)",
-        f"“On grief” (Owner’s notes, Mindfulness): {DEFAULT_WHEN_IT_HELPS}",
-        f"- “On grief” (Owner’s notes, Mindfulness): {DEFAULT_WHEN_IT_HELPS}",
-        "“On grief”",
-        '"On grief" (Owner\'s notes, Mindfulness)',
-        "  “On grief”   (Owner’s notes,\nMindfulness):",
-    ],
-)
-def test_a_document_named_by_part_or_all_of_its_listed_line_is_found(
+def test_the_understanding_picks_documents_by_their_listed_number(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
     chat_model: ScriptedChatModel,
+    engine: Engine,
     seeded_settings: dict[str, Any],
-    named_as: str,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    upload_ready(client, admin, "On the breath", BREATH_TEXT)
+    grief = upload_ready(client, admin, "On grief", GRIEF_TEXT)
+    upload_ready(client, admin, "Taxes", TAX_TEXT)
+    connect_telegram(client, auth_verifier, chat_channel)
+    set_settings(client, admin, {"knowledge_closeness_percent": 0})
+    reply_instructions(client, chat_model, "hello", understanding_answer())
+    grief_number = listed_number(chat_model, "On grief")
+
+    instructions = reply_instructions(
+        client,
+        chat_model,
+        "it keeps coming in waves",
+        understanding_answer(
+            knowledge_documents=[grief_number], knowledge_search=BREATH_SEARCH
+        ),
+    )
+
+    assert f"From “On grief” (Owner’s notes, Mindfulness):\n{GRIEF_TEXT}" in (
+        instructions
+    )
+    assert BREATH_TEXT not in instructions
+    assert TAX_TEXT not in instructions
+    chosen = saved_understandings(engine)[-1]["form"]["knowledge"]
+    assert chosen == {
+        "documents": [{"document_id": grief["id"], "title": "On grief"}],
+        "search": BREATH_SEARCH,
+    }
+
+
+def test_a_chosen_document_is_kept_when_the_next_message_is_understood(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    upload_ready(client, admin, "On grief", GRIEF_TEXT)
+    connect_telegram(client, auth_verifier, chat_channel)
+    set_settings(client, admin, {"knowledge_closeness_percent": 0})
+    chosen = understanding_answer(
+        knowledge_documents=[1], knowledge_search=BREATH_SEARCH
+    )
+
+    first = reply_instructions(client, chat_model, "it comes in waves", chosen)
+    second = reply_instructions(client, chat_model, "still waves", chosen)
+
+    assert GRIEF_TEXT in first
+    assert GRIEF_TEXT in second
+
+
+@pytest.mark.parametrize(
+    "picked",
+    [
+        2,
+        0,
+        -1,
+        True,
+        "1",
+        "On grief",
+        "“On grief” (Owner’s notes, Mindfulness)",
+        {"document": 1},
+    ],
+)
+def test_a_number_not_in_the_list_or_a_title_picks_nothing(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    embedder: FakeEmbedder,
+    engine: Engine,
+    seeded_settings: dict[str, Any],
+    picked: Any,
 ) -> None:
     admin = owner_headers(client, auth_verifier)
     upload_ready(client, admin, "On grief", GRIEF_TEXT)
@@ -271,13 +355,15 @@ def test_a_document_named_by_part_or_all_of_its_listed_line_is_found(
         chat_model,
         "it keeps coming in waves",
         understanding_answer(
-            knowledge_documents=[named_as], knowledge_search=BREATH_SEARCH
+            knowledge_documents=[picked], knowledge_search=BREATH_SEARCH
         ),
     )
 
-    assert f"From “On grief” (Owner’s notes, Mindfulness):\n{GRIEF_TEXT}" in (
-        instructions
-    )
+    assert seeded_settings["reply_knowledge_intro"] not in instructions
+    assert GRIEF_TEXT not in instructions
+    assert BREATH_SEARCH not in embedder.queries
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["mm, yes"]
+    assert saved_understandings(engine)[-1]["form"]["knowledge"] is None
 
 
 def test_a_weak_match_in_a_chosen_document_adds_nothing(
@@ -295,9 +381,7 @@ def test_a_weak_match_in_a_chosen_document_adds_nothing(
         client,
         chat_model,
         "the breath helps",
-        understanding_answer(
-            knowledge_documents=["Taxes"], knowledge_search=BREATH_SEARCH
-        ),
+        understanding_answer(knowledge_documents=[1], knowledge_search=BREATH_SEARCH),
     )
 
     assert seeded_settings["reply_knowledge_intro"] not in instructions
@@ -315,7 +399,7 @@ def test_the_admin_sets_the_knowledge_closeness_bar(
     upload_ready(client, admin, "On grief", GRIEF_TEXT)
     connect_telegram(client, auth_verifier, chat_channel)
     chosen = understanding_answer(
-        knowledge_documents=["On grief"], knowledge_search=BREATH_SEARCH
+        knowledge_documents=[1], knowledge_search=BREATH_SEARCH
     )
 
     set_settings(client, admin, {"knowledge_closeness_percent": 99})
@@ -327,7 +411,7 @@ def test_the_admin_sets_the_knowledge_closeness_bar(
     assert GRIEF_TEXT in loose
 
 
-def test_an_unknown_document_title_or_a_missing_phrase_searches_nothing(
+def test_an_unknown_document_number_or_a_missing_phrase_searches_nothing(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -344,17 +428,46 @@ def test_an_unknown_document_title_or_a_missing_phrase_searches_nothing(
         client,
         chat_model,
         "the breath",
-        understanding_answer(
-            knowledge_documents=["Seneca"], knowledge_search=BREATH_SEARCH
-        ),
+        understanding_answer(knowledge_documents=[2], knowledge_search=BREATH_SEARCH),
     )
     no_phrase = reply_instructions(
         client,
         chat_model,
         "the breath",
-        understanding_answer(knowledge_documents=["On the breath"]),
+        understanding_answer(knowledge_documents=[1]),
     )
 
     assert seeded_settings["reply_knowledge_intro"] not in unknown
     assert seeded_settings["reply_knowledge_intro"] not in no_phrase
     assert BREATH_SEARCH not in embedder.queries[searches_before:]
+
+
+def test_an_existing_install_gets_the_prompt_that_picks_knowledge_by_number(
+    engine: Engine, database_url: str, seeded_settings: dict[str, Any]
+) -> None:
+    config = Config()
+    config.set_main_option("script_location", str(MIGRATIONS_DIR))
+    config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
+    command.downgrade(config, "0036")
+    try:
+        seed_platform_settings(engine, SEED_FILE)
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "UPDATE platform_settings SET value = :old "
+                    "WHERE key = 'understanding_prompt'"
+                ),
+                {"old": json.dumps("Name documents by title exactly as written.")},
+            )
+    finally:
+        migrate(database_url)
+    seed_platform_settings(engine, SEED_FILE)
+
+    with engine.connect() as connection:
+        prompt = connection.execute(
+            text(
+                "SELECT value FROM platform_settings WHERE key = 'understanding_prompt'"
+            )
+        ).scalar_one()
+    assert prompt == seeded_settings["understanding_prompt"]
+    assert '"knowledge": {"documents": [<number>]' in prompt

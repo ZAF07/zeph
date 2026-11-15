@@ -438,7 +438,7 @@ def understanding_answer(
     bring_up: Sequence[dict[str, Any]] = (),
     left_alone: Sequence[dict[str, Any]] = (),
     threads_touched: Sequence[int] = (),
-    knowledge_documents: Sequence[str] = (),
+    knowledge_documents: Sequence[object] = (),
     knowledge_search: str = "",
 ) -> str:
     """Build the form the Understanding model answers with.
@@ -456,8 +456,9 @@ def understanding_answer(
         left_alone: The Life Threads to leave alone, e.g. {"thread": 1,
             "reason": "..."}.
         threads_touched: The numbers of the Life Threads the message touches.
-        knowledge_documents: The titles of the Knowledge documents to search;
-            none means no Knowledge.
+        knowledge_documents: The listed numbers of the Knowledge documents
+            to search, or anything else a model might write there; none
+            means no Knowledge.
         knowledge_search: The phrase to search them with.
 
     Returns:

@@ -57,12 +57,12 @@ def reply_instructions(
     client: TestClient,
     chat_model: ScriptedChatModel,
     text: str,
-    documents: Sequence[str] = ("Dhammapada",),
+    documents: Sequence[int] = (1,),
 ) -> str:
     """Send a Telegram message and return the instructions its reply was given.
 
-    The Understanding chooses the given Knowledge documents and searches them
-    with the message.
+    The Understanding chooses the Knowledge documents listed under the given
+    numbers and searches them with the message.
     """
     chat_model.calls.clear()
     chat_model.script_understanding(
@@ -396,7 +396,7 @@ def test_the_next_reply_cites_a_documents_new_details(
         headers=admin,
     )
     instructions = reply_instructions(
-        client, chat_model, "notice the breath", documents=["On the breath"]
+        client, chat_model, "notice the breath", documents=[1]
     )
 
     assert (
@@ -701,7 +701,7 @@ def test_matching_knowledge_reaches_the_reply_with_where_it_is_from(
         client,
         chat_model,
         "my attention keeps drifting, the breath helps",
-        documents=["Taxes", "On the breath 1", "On the breath 2", "On the breath 3"],
+        documents=[1, 2, 3, 4],
     )
 
     assert embedder.queries[-1] == "my attention keeps drifting, the breath helps"
@@ -730,7 +730,7 @@ def test_a_failed_document_never_reaches_the_reply(
     set_knowledge_closeness(client, admin, 0)
 
     instructions = reply_instructions(
-        client, chat_model, "notice the breath", documents=["Scan"]
+        client, chat_model, "notice the breath", documents=[1]
     )
 
     assert seeded_settings["reply_knowledge_intro"] not in instructions
@@ -750,7 +750,7 @@ def test_a_deleted_document_and_its_chunks_are_gone_from_replies(
     [breath] = [d for d in list_documents(client, admin) if d["title"] != "Taxes"]
     connect_telegram(client, auth_verifier, chat_channel)
     set_knowledge_closeness(client, admin, 0)
-    chosen = ["Dhammapada", "Taxes"]
+    chosen = [1, 2]
     assert BREATH_PASSAGES[0] in reply_instructions(
         client, chat_model, "the breath", chosen
     )
