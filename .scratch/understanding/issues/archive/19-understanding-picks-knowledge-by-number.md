@@ -69,3 +69,7 @@ A number that's not in the list is ignored. The numbers only hold for one Unders
 
 - Completed: 2026-11-15
 - Commits:
+  - `dc1f5e1` Understanding issue 19: pick Knowledge documents by number
+  - `422d977` Understanding issue 19 review fixes: one number reader for Threads, Curiosities and Knowledge
+  - `fc74f0b` Understanding issue 19 done: archive issue with eval, run and review evidence
+  - `8200f14` Merge understanding issue 19: the Understanding picks Knowledge documents by their number in a numbered list (into `main`)
