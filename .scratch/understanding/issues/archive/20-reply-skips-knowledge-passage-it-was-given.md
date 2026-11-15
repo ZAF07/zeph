@@ -48,3 +48,14 @@ Not blocked: this can run while `19-understanding-picks-knowledge-by-number.md` 
 - 2026-11-15 review: the spec review said the first wording told every reply to recite the title, source and tradition, and to "never call them made up". Reworded: steps when they ask how it goes, title, source and tradition when they ask where it comes from, and use the passages' details rather than what the model remembers from elsewhere. Evals above are on this wording. `tests/test_knowledge_intro_migration.py` checks migration 0038 swaps an old saved intro for the seed one (red without the migration).
 - 2026-11-15 `/run` (worktree stack, `make db-copy` from main at 0036 with the old intro and 6 Knowledge documents): on start the database went to 0038 and `reply_knowledge_intro` held the new wording. Sent two messages through the whole webhook path (`create_app` with the real repositories, DeepSeek, fastembed and pgvector) inside a backend container for the owner; only Telegram (recording channel), the timer and the scheduler were swapped, because a worktree's fake Telegram chat stops before the reply. Both reply calls had the new intro and `From “Mindful breathing” (Owner’s summary, Mindfulness):` passages. "how exactly does the mindful breathing practice go, step by step?" got the passage's steps (notice the breath at the nostrils or belly, count out-breaths to ten, come back without telling yourself off).
 - Caveat: "where does that mindful breathing practice come from?" got the real history (the Buddha's instructions, Thich Nhat Hanh, Jon Kabat-Zinn's MBSR) rather than naming "Owner's summary, Mindfulness". Fair for a real-world practice whose library source is only a summary, but it is not what the intro asks for. Worth watching if Admins add sourced teachings; the eval's made-up teachings are named every time.
+
+## Completion
+
+- Completed: 2026-11-15
+- Commits:
+  - `a1fabd6` Understanding issue 20: Knowledge intro has the reply answer from passages when asked about them
+  - `04f9d8f` Understanding issue 20: migration 0038 reloads the Knowledge intro; record the diagnosis
+  - `b9ef409` Understanding issue 20 review fixes: steps when asked how, source when asked where; test reuses stored_setting
+  - `3f17477` Understanding issue 20 done: archive issue with eval, run and review evidence
+  - `295fede` Understanding issue 20: CONTEXT.md says replies answer from Knowledge passages they are asked about
+  - `9393de8` Merge understanding issue 20 into main
