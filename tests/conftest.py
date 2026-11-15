@@ -19,6 +19,10 @@ from companion.adapters.postgres.database import (
     seed_needs,
     seed_platform_settings,
 )
+from companion.adapters.postgres.eval_repositories import (
+    PostgresEvalCaseRepository,
+    PostgresEvalRunRepository,
+)
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.adapters.pypdf.text_extractor import PypdfTextExtractor
 from companion.app import AppDependencies, create_app
@@ -160,7 +164,8 @@ def engine(database_url: str) -> Iterator[Engine]:
                 "conversation_summaries, knowledge_documents, knowledge_chunks, "
                 "daily_usage, stickers, check_in_kinds, check_ins, "
                 "feature_switches, user_feature_switches, shared_photos, "
-                "personal_stickers, pending_auth_account_deletions, needs CASCADE"
+                "personal_stickers, pending_auth_account_deletions, needs, "
+                "eval_cases, eval_runs CASCADE"
             )
         )
     seed_platform_settings(engine, SEED_FILE)
@@ -259,6 +264,8 @@ def client(
 
     dependencies = AppDependencies(
         repositories=build_postgres_repositories(engine),
+        eval_runs=PostgresEvalRunRepository(engine),
+        eval_cases=PostgresEvalCaseRepository(engine),
         chat_channel=chat_channel,
         chat_model=chat_model,
         photo_viewer=photo_viewer,

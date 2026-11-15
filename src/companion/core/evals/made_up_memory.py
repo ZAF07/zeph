@@ -2,6 +2,12 @@ from collections.abc import Sequence
 from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 
+from companion.core.evals.cases import (
+    EarlierLine,
+    EvalCuriosity,
+    EvalMemory,
+    EvalThread,
+)
 from companion.core.life_threads import name_keys
 from companion.core.models import (
     Conversation,
@@ -20,7 +26,6 @@ from companion.core.models import (
     UserPortrait,
 )
 from companion.core.ports import Embedder, Repositories
-from evals.cases import EarlierLine, EvalCuriosity, EvalMemory, EvalThread
 
 MEMORY_ITEMS_DAYS_AGO = 30
 PORTRAIT_DAYS_AGO = 1

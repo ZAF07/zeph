@@ -1,4 +1,4 @@
-# Photo description eval. Each test image in evals/images/ is sent as a photo
+# Photo description eval. Each test image in the images folder next to this one is sent as a photo
 # with no caption, and its description (what the Safeguard, the reply and
 # memory read) must leave out every text listed under `must_leave_out`, like
 # card numbers and passwords that are readable in the image.

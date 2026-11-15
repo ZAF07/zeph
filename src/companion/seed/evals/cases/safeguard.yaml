@@ -2,7 +2,7 @@
 # Telegram webhook by a fresh User; "earlier" messages (optional) are sent
 # first, so the last message is classified with them as context.
 #
-# A case can carry a `photo`: a test image in evals/images/, sent as a photo
+# A case can carry a `photo`: a test image in the images folder next to this one, sent as a photo
 # with `message` (optional) as its caption. The real photo viewer describes it
 # first, and the Safeguard reads that description.
 #

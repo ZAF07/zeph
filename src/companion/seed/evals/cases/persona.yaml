@@ -2,7 +2,7 @@
 # Telegram webhook, then an LLM judge checks Zeph's replies against the rules
 # the conversation lists.
 #
-# A message is plain text, or a photo of a test image in evals/images/:
+# A message is plain text, or a photo of a test image in the images folder next to this one:
 #   - photo: weekend-list.jpg      # the image, served by the fake chat channel
 #     caption: wish me luck        # optional
 #     shows: A handwritten list…   # what is really in it, as the judge is told

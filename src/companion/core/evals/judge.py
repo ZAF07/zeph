@@ -31,6 +31,19 @@ Answer with JSON only, in exactly this shape:
 {"version": "<version name or none>", "reason": "<one sentence naming the details>"}"""
 
 
+def judge_settings() -> dict[str, str]:
+    """List the Judge's model and prompts, for an Eval Run's snapshot.
+
+    Returns:
+        Each setting's value by name.
+    """
+    return {
+        "model": JUDGE_MODEL,
+        "persona_instructions": PERSONA_JUDGE_INSTRUCTIONS,
+        "version_instructions": VERSION_JUDGE_INSTRUCTIONS,
+    }
+
+
 @dataclass(frozen=True)
 class RuleVerdict:
     """The judge's verdict on one Persona rule for one conversation.

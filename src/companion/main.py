@@ -11,6 +11,10 @@ from companion.adapters.deepseek.chat_model import DeepSeekChatModel
 from companion.adapters.deepseek.photo_viewer import DeepSeekPhotoViewer
 from companion.adapters.fastembed.embedder import FastEmbedEmbedder
 from companion.adapters.pgvector.vector_store import PgvectorKnowledgeVectorStore
+from companion.adapters.postgres.eval_repositories import (
+    PostgresEvalCaseRepository,
+    PostgresEvalRunRepository,
+)
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.adapters.pypdf.text_extractor import PypdfTextExtractor
 from companion.adapters.scheduler import InProcessScheduler
@@ -42,6 +46,8 @@ MEMORY_CATEGORIES_SEED_FILE = SEED_DIR / "memory_categories.yaml"
 CHECK_IN_KINDS_SEED_FILE = SEED_DIR / "check_in_kinds.yaml"
 NEEDS_SEED_FILE = SEED_DIR / "needs.yaml"
 KNOWLEDGE_SEED_FILE = SEED_DIR / "knowledge" / "knowledge.yaml"
+EVAL_CASES_DIR = SEED_DIR / "evals" / "cases"
+EVAL_IMAGES_DIR = SEED_DIR / "evals" / "images"
 SCHEDULER_INTERVAL_SECONDS = 60
 HTTP_CLIENT_LOGGER_NAMES = ("httpx", "httpcore")
 
@@ -319,6 +325,8 @@ def build_production_app() -> FastAPI:
     engine = build_database_engine(settings)
     dependencies = AppDependencies(
         repositories=build_repositories(settings, engine),
+        eval_runs=PostgresEvalRunRepository(engine),
+        eval_cases=PostgresEvalCaseRepository(engine),
         chat_channel=build_chat_channel(settings),
         chat_model=build_chat_model(settings),
         photo_viewer=build_photo_viewer(settings),

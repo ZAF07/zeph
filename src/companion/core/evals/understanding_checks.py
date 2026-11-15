@@ -1,7 +1,7 @@
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from evals.cases import UnderstandingExpectations
+from companion.core.evals.cases import UnderstandingExpectations
 
 
 @dataclass(frozen=True)

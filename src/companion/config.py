@@ -86,6 +86,21 @@ class Settings(BaseSettings):
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
 
+    @property
+    def eval_database_url(self) -> str:
+        """Build the SQLAlchemy URL of the Eval database, beside the app's.
+
+        It is on the same Postgres server, named after the app's database
+        with `_eval` added, so each worktree gets its own (ADR-0013).
+
+        Returns:
+            The Eval database's URL.
+        """
+        return (
+            f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}_eval"
+        )
+
 
 def load_settings(environment: Mapping[str, str] | None = None) -> Settings:
     """Read settings, failing with the names of any missing required keys.

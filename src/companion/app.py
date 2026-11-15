@@ -12,6 +12,7 @@ from companion.adapters.http.auth import (
 )
 from companion.adapters.http.dashboard_api import build_dashboard_api_router
 from companion.adapters.http.errors import add_core_error_handlers
+from companion.adapters.http.eval_api import build_eval_api_router
 from companion.adapters.telegram.webhook import build_telegram_webhook_router
 from companion.core.admin_users import AdminUserService
 from companion.core.chat_settings import SettingsTools
@@ -19,6 +20,8 @@ from companion.core.check_in_kinds import CheckInKindService
 from companion.core.check_ins import CheckInService
 from companion.core.conversations import ConversationService
 from companion.core.curiosities import CuriosityKeeper, CuriosityRaiser
+from companion.core.evals.ports import EvalCaseRepository, EvalRunRepository
+from companion.core.evals.runs import EvalRunService
 from companion.core.features import FeatureService
 from companion.core.helplines import HelplineService
 from companion.core.home import HomeService
@@ -79,6 +82,8 @@ class AppDependencies:
 
     Attributes:
         repositories: Where data is stored.
+        eval_runs: Where Eval Runs and Case Results are stored.
+        eval_cases: Where Eval Cases are stored.
         chat_channel: Sends messages to people.
         chat_model: Generates the Companion's words.
         photo_viewer: Looks at the photos Users send.
@@ -106,6 +111,8 @@ class AppDependencies:
     """
 
     repositories: Repositories
+    eval_runs: EvalRunRepository
+    eval_cases: EvalCaseRepository
     chat_channel: ChatChannel
     chat_model: ChatModel
     photo_viewer: PhotoViewer
@@ -413,6 +420,14 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             usage_limiter=usage_limiter,
             model_call_log=model_call_log,
             need_service=NeedService(dependencies.repositories),
+        )
+    )
+    app.include_router(
+        build_eval_api_router(
+            current_admin=build_current_admin_dependency(current_user),
+            eval_run_service=EvalRunService(
+                dependencies.eval_runs, dependencies.eval_cases, dependencies.clock
+            ),
         )
     )
     app.include_router(
