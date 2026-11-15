@@ -11,7 +11,12 @@ from companion.core.evals.cases import (
 )
 from companion.core.evals.judge import JudgeSettings
 from companion.core.evals.knowledge_eval import check_knowledge_case
-from companion.core.evals.models import CaseCheckResult, EvalCase, EvalName
+from companion.core.evals.models import (
+    CaseCheckResult,
+    EvalCase,
+    EvalName,
+    StopCheck,
+)
 from companion.core.evals.persona_eval import check_persona_case
 from companion.core.evals.photo_description_eval import check_photo_description_case
 from companion.core.evals.ports import EvalCompanion
@@ -19,7 +24,9 @@ from companion.core.evals.safeguard_eval import check_safeguard_case
 from companion.core.evals.settings_eval import check_settings_case
 from companion.core.evals.understanding_eval import check_understanding_case
 
-type CaseChecker = Callable[[EvalCase, EvalCompanion, JudgeSettings], CaseCheckResult]
+type CaseChecker = Callable[
+    [EvalCase, EvalCompanion, JudgeSettings, StopCheck], CaseCheckResult
+]
 
 
 def checker[CaseShape](
@@ -33,9 +40,10 @@ def checker[CaseShape](
         check: Checks a case of that shape.
 
     Returns:
-        A step that reads and checks an Eval Case.
+        A step that reads and checks an Eval Case. It doesn't stop
+        part-way, since these Evals' cases are short.
     """
-    return lambda case, companion, _judge: check(
+    return lambda case, companion, _judge, _should_stop: check(
         read(case.key, case.content), companion
     )
 
@@ -51,10 +59,36 @@ def judged_checker[CaseShape](
         check: Checks a case of that shape with the Judge.
 
     Returns:
-        A step that reads and checks an Eval Case.
+        A step that reads and checks an Eval Case. It doesn't stop
+        part-way.
     """
-    return lambda case, companion, judge: check(
+    return lambda case, companion, judge, _should_stop: check(
         read(case.key, case.content), companion, judge
+    )
+
+
+def check_understanding(
+    case: EvalCase,
+    companion: EvalCompanion,
+    judge: JudgeSettings,
+    should_stop: StopCheck,
+) -> CaseCheckResult:
+    """Read and check an Understanding case, which may stop between Messages.
+
+    Args:
+        case: The case.
+        companion: The app on the Eval database.
+        judge: The Judge's settings for the run.
+        should_stop: Says why the run is to stop, or None to carry on.
+
+    Returns:
+        What checking it found.
+    """
+    return check_understanding_case(
+        read_understanding_case(case.key, case.content),
+        companion,
+        judge,
+        should_stop,
     )
 
 
@@ -66,9 +100,7 @@ CHECKERS: dict[EvalName, CaseChecker] = {
     EvalName.PHOTO_DESCRIPTIONS: checker(
         read_photo_description_case, check_photo_description_case
     ),
-    EvalName.UNDERSTANDING: judged_checker(
-        read_understanding_case, check_understanding_case
-    ),
+    EvalName.UNDERSTANDING: check_understanding,
 }
 
 READERS: dict[EvalName, Callable[[str, dict[str, Any]], object]] = {
@@ -82,7 +114,10 @@ READERS: dict[EvalName, Callable[[str, dict[str, Any]], object]] = {
 
 
 def check_case(
-    case: EvalCase, companion: EvalCompanion, judge: JudgeSettings
+    case: EvalCase,
+    companion: EvalCompanion,
+    judge: JudgeSettings,
+    should_stop: StopCheck,
 ) -> CaseCheckResult:
     """Run one Eval Case with its Eval's check.
 
@@ -90,11 +125,16 @@ def check_case(
         case: The case.
         companion: The app on the Eval database, fresh for this case.
         judge: The Judge's settings for the run.
+        should_stop: Says why the run is to stop, or None to carry on;
+            asked between the steps of a long case.
 
     Returns:
         What checking it found.
+
+    Raises:
+        CaseStoppedError: If the run is to stop before the case ends.
     """
-    return CHECKERS[case.eval](case, companion, judge)
+    return CHECKERS[case.eval](case, companion, judge, should_stop)
 
 
 def read_case(case: EvalCase) -> object:

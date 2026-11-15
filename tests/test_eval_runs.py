@@ -22,6 +22,8 @@ from tests.eval_run_helpers import (
 from tests.fakes import FakeAuthVerifier, FakeClock
 from tests.telegram_helpers import auth_headers, owner_headers
 
+SOME_RUN = "/api/admin/eval-runs/6f1c2d3e-0000-4000-8000-000000000001"
+
 
 def test_an_admin_sees_every_eval_with_the_cases_a_run_would_run(
     client: TestClient, engine: Engine, auth_verifier: FakeAuthVerifier
@@ -53,7 +55,10 @@ def test_a_started_run_waits_queued_with_one_variant_and_no_results(
     assert run["evals"] == ["safeguard"]
     assert run["repeats"] == 1
     assert run["variants"] == [{"letter": "A", "setting_overrides": {}}]
-    assert run["case_count"] is None
+    assert run["case_count"] == 1
+    assert run["case_keys"] == ["plan"]
+    assert run["cancel_requested"] is False
+    assert (run["cost_sgd"], run["unpriced_models"]) == (0, [])
     assert open_run(client, admin, run["id"])["results"] == []
     listed = client.get("/api/admin/eval-runs", headers=admin).json()["runs"]
     assert [listed_run["id"] for listed_run in listed] == [run["id"]]
@@ -124,6 +129,15 @@ def test_an_unknown_eval_or_run_is_refused(
         ("GET", "/api/admin/eval-runs"),
         ("POST", "/api/admin/eval-runs"),
         ("GET", "/api/admin/eval-runs/6f1c2d3e-0000-4000-8000-000000000001"),
+        ("POST", "/api/admin/eval-runs/estimate"),
+        ("POST", f"{SOME_RUN}/cancel"),
+        ("POST", f"{SOME_RUN}/rerun-failed"),
+        ("DELETE", SOME_RUN),
+        ("GET", f"{SOME_RUN}/snapshot"),
+        ("GET", f"{SOME_RUN}/results/6f1c2d3e-0000-4000-8000-000000000002"),
+        ("GET", "/api/admin/eval-cases/plan/history"),
+        ("GET", "/api/admin/eval-costs"),
+        ("PUT", "/api/admin/eval-costs"),
     ],
 )
 def test_only_admins_reach_the_eval_routes(
@@ -178,3 +192,178 @@ def test_a_seed_case_that_does_not_fit_its_eval_is_refused(
             [],
             clock,
         )
+
+
+def test_a_run_of_single_cases_runs_only_those_and_unknown_keys_are_refused(
+    client: TestClient, engine: Engine, auth_verifier: FakeAuthVerifier
+) -> None:
+    add_cases(engine, CRISIS_CASE, FALSE_ALARM_CASE, SETTINGS_CASE)
+    admin = owner_headers(client, auth_verifier)
+
+    run = client.post(
+        "/api/admin/eval-runs",
+        json={"evals": ["settings"], "case_keys": ["traffic"]},
+        headers=admin,
+    ).json()
+    unknown = client.post(
+        "/api/admin/eval-runs", json={"case_keys": ["no-such-case"]}, headers=admin
+    )
+
+    assert run["case_keys"] == ["traffic", "just-chatting"]
+    assert run["evals"] == ["safeguard", "settings"]
+    assert run["case_count"] == 2
+    assert unknown.status_code == 422
+    assert "no-such-case" in unknown.json()["detail"]
+
+
+def test_a_case_never_run_is_estimated_with_its_evals_rough_figure(
+    client: TestClient, engine: Engine, auth_verifier: FakeAuthVerifier
+) -> None:
+    add_cases(engine, CRISIS_CASE, FALSE_ALARM_CASE)
+    admin = owner_headers(client, auth_verifier)
+
+    response = client.post(
+        "/api/admin/eval-runs/estimate", json={"evals": ["safeguard"]}, headers=admin
+    )
+
+    assert response.status_code == 200
+    estimate = response.json()
+    assert (estimate["case_count"], estimate["rough_case_count"]) == (2, 2)
+    assert (estimate["tokens_in"], estimate["tokens_out"]) == (8_000, 800)
+    assert estimate["models"] == [
+        {"model": "deepseek-flash", "tokens_in": 8_000, "tokens_out": 800}
+    ]
+    assert estimate["cost_sgd"] == pytest.approx((8_000 * 0.38 + 800 * 1.54) / 1e6)
+    assert estimate["unpriced_models"] == []
+
+
+def test_a_queued_run_is_cancelled_at_once_and_an_ended_run_cannot_be(
+    client: TestClient, engine: Engine, auth_verifier: FakeAuthVerifier
+) -> None:
+    add_cases(engine, CRISIS_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.SAFEGUARD)
+
+    cancelled = client.post(f"/api/admin/eval-runs/{run['id']}/cancel", headers=admin)
+    again = client.post(f"/api/admin/eval-runs/{run['id']}/cancel", headers=admin)
+
+    assert cancelled.status_code == 200
+    assert cancelled.json()["state"] == "cancelled"
+    assert cancelled.json()["finished_at"] is not None
+    assert again.status_code == 409
+
+
+def test_a_running_run_is_only_marked_for_cancelling_and_cannot_be_deleted(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    clock: FakeClock,
+) -> None:
+    add_cases(engine, CRISIS_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.SAFEGUARD)
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE eval_runs SET state = 'running' WHERE id = :id"),
+            {"id": run["id"]},
+        )
+
+    cancelled = client.post(f"/api/admin/eval-runs/{run['id']}/cancel", headers=admin)
+    deleted = client.delete(f"/api/admin/eval-runs/{run['id']}", headers=admin)
+    rerun = client.post(f"/api/admin/eval-runs/{run['id']}/rerun-failed", headers=admin)
+
+    assert cancelled.json()["state"] == "running"
+    assert cancelled.json()["cancel_requested"] is True
+    assert deleted.status_code == 409
+    assert rerun.status_code == 409
+
+
+def test_a_deleted_run_is_gone(
+    client: TestClient, engine: Engine, auth_verifier: FakeAuthVerifier
+) -> None:
+    add_cases(engine, CRISIS_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.SAFEGUARD)
+
+    deleted = client.delete(f"/api/admin/eval-runs/{run['id']}", headers=admin)
+
+    assert deleted.status_code == 204
+    assert (
+        client.get(f"/api/admin/eval-runs/{run['id']}", headers=admin).status_code
+        == 404
+    )
+    assert client.get("/api/admin/eval-runs", headers=admin).json()["runs"] == []
+
+
+def test_a_queued_run_has_no_snapshot_yet(
+    client: TestClient, engine: Engine, auth_verifier: FakeAuthVerifier
+) -> None:
+    add_cases(engine, CRISIS_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.SAFEGUARD)
+
+    response = client.get(f"/api/admin/eval-runs/{run['id']}/snapshot", headers=admin)
+
+    assert response.json() == {"settings": None, "judge": None, "cases": None}
+
+
+def test_model_prices_are_seeded_and_admins_change_them_with_the_limit(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+
+    seeded = client.get("/api/admin/eval-costs", headers=admin).json()
+    saved = client.put(
+        "/api/admin/eval-costs",
+        json={
+            "prices": [
+                {"model": "deepseek-flash", "sgd_in": 0.5, "sgd_out": 2},
+                {"model": "deepseek-v4-pro", "sgd_in": None, "sgd_out": None},
+            ],
+            "token_limit": 250_000,
+        },
+        headers=admin,
+    )
+
+    assert seeded == {
+        "prices": [
+            {"model": "deepseek-flash", "sgd_in": 0.38, "sgd_out": 1.54},
+            {"model": "deepseek-v4-pro", "sgd_in": 1.69, "sgd_out": 5.07},
+        ],
+        "token_limit": 1_000_000,
+    }
+    assert saved.status_code == 200
+    assert saved.json() == {
+        "prices": [{"model": "deepseek-flash", "sgd_in": 0.5, "sgd_out": 2.0}],
+        "token_limit": 250_000,
+    }
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"prices": [], "token_limit": 5},
+        {"prices": [{"model": "x", "sgd_in": -1, "sgd_out": 1}], "token_limit": 50_000},
+        {
+            "prices": [{"model": "x", "sgd_in": 1, "sgd_out": None}],
+            "token_limit": 50_000,
+        },
+        {
+            "prices": [
+                {"model": "x", "sgd_in": 1, "sgd_out": 1},
+                {"model": "x", "sgd_in": 2, "sgd_out": 2},
+            ],
+            "token_limit": 50_000,
+        },
+    ],
+)
+def test_a_price_or_limit_out_of_range_is_refused_and_nothing_saved(
+    client: TestClient, auth_verifier: FakeAuthVerifier, body: dict[str, object]
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+
+    response = client.put("/api/admin/eval-costs", json=body, headers=admin)
+
+    assert response.status_code == 422
+    after = client.get("/api/admin/eval-costs", headers=admin).json()
+    assert after["token_limit"] == 1_000_000

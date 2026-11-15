@@ -941,3 +941,17 @@ check_in_hours_between:
 # A User's first message within this many hours of a Check-in is its reply:
 # that Conversation starts with the Check-in. Later, the Check-in had no reply.
 check_in_reply_window_hours: 24
+
+# Eval Runs. Model Prices are SGD per 1,000,000 tokens read ("in") and
+# written ("out"): DeepSeek's peak, cache-miss prices on 15 Nov 2026 at
+# 1 USD ≈ 1.28 SGD. A model with no price shows tokens only. A run that uses
+# more tokens than the limit ends Stopped over limit.
+model_prices:
+  deepseek-flash:
+    in: 0.38
+    out: 1.54
+  deepseek-v4-pro:
+    in: 1.69
+    out: 5.07
+
+eval_run_token_limit: 1000000

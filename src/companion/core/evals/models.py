@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
@@ -22,7 +23,19 @@ class EvalRunState(StrEnum):
     QUEUED = "queued"
     RUNNING = "running"
     FINISHED = "finished"
+    CANCELLED = "cancelled"
+    STOPPED_OVER_LIMIT = "stopped_over_limit"
     INTERRUPTED = "interrupted"
+
+
+ENDED_STATES = frozenset(
+    {
+        EvalRunState.FINISHED,
+        EvalRunState.CANCELLED,
+        EvalRunState.STOPPED_OVER_LIMIT,
+        EvalRunState.INTERRUPTED,
+    }
+)
 
 
 class StartedFrom(StrEnum):
@@ -46,6 +59,60 @@ class CaseOutcome(StrEnum):
 
 FIRST_VARIANT = "A"
 FIRST_TRY = 1
+
+
+@dataclass(frozen=True)
+class ModelTokens:
+    """The tokens one model read and wrote.
+
+    Attributes:
+        tokens_in: Tokens it read.
+        tokens_out: Tokens it wrote.
+    """
+
+    tokens_in: int = 0
+    tokens_out: int = 0
+
+    def plus(self, other: "ModelTokens") -> "ModelTokens":
+        """Add another count to this one.
+
+        Args:
+            other: The other count.
+
+        Returns:
+            Both added up.
+        """
+        return ModelTokens(
+            self.tokens_in + other.tokens_in, self.tokens_out + other.tokens_out
+        )
+
+
+def add_tokens_by_model(
+    *counts: dict[str, ModelTokens],
+) -> dict[str, ModelTokens]:
+    """Add up tokens by model.
+
+    Args:
+        counts: Tokens by model name, any number of them.
+
+    Returns:
+        Each model's tokens across all of them.
+    """
+    total: dict[str, ModelTokens] = {}
+    for count in counts:
+        for model, tokens in count.items():
+            total[model] = total.get(model, ModelTokens()).plus(tokens)
+    return total
+
+
+class CaseStoppedError(Exception):
+    """Raised inside a case when its run is to stop before the case ends.
+
+    The case then ends as an Error with this message.
+    """
+
+
+type StopCheck = Callable[[], str | None]
 
 
 @dataclass(frozen=True)
@@ -156,6 +223,7 @@ class CaseResult:
         tokens_out: Tokens the LLM wrote, the app's and the Judge's.
         duration_ms: How long the case took.
         finished_at: When it finished.
+        tokens_by_model: The same tokens, by the model that used them.
     """
 
     id: UUID
@@ -170,6 +238,7 @@ class CaseResult:
     tokens_out: int
     duration_ms: int
     finished_at: datetime
+    tokens_by_model: dict[str, ModelTokens] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -218,6 +287,11 @@ class EvalRun:
         started_at: When the runner took it; None while Queued.
         finished_at: When it ended; None until then.
         snapshot: What it used; None until the runner takes it.
+        case_keys: The keys of the cases it runs, in order.
+        cancel_requested: Whether an Admin asked to cancel it while it ran.
+        token_limit: The most tokens it may use; None until the runner
+            takes it.
+        rerun_of: The run whose failed cases it runs again; None otherwise.
     """
 
     id: UUID
@@ -232,6 +306,10 @@ class EvalRun:
     started_at: datetime | None = None
     finished_at: datetime | None = None
     snapshot: RunSnapshot | None = None
+    case_keys: list[str] = field(default_factory=list)
+    cancel_requested: bool = False
+    token_limit: int | None = None
+    rerun_of: UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -244,6 +322,7 @@ class RunTotals:
         errored: Cases that couldn't be checked.
         tokens_in: Tokens the LLM read.
         tokens_out: Tokens the LLM wrote.
+        tokens_by_model: The same tokens, by the model that used them.
     """
 
     passed: int = 0
@@ -251,6 +330,21 @@ class RunTotals:
     errored: int = 0
     tokens_in: int = 0
     tokens_out: int = 0
+    tokens_by_model: dict[str, ModelTokens] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class Cost:
+    """What some tokens cost in SGD.
+
+    Attributes:
+        sgd: The cost of the tokens of models with a price.
+        unpriced_models: Models that used tokens but have no price set, so
+            their tokens aren't in `sgd`.
+    """
+
+    sgd: float = 0.0
+    unpriced_models: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -259,13 +353,16 @@ class EvalRunOverview:
 
     Attributes:
         run: The run.
-        case_count: How many cases it runs in all; None while Queued.
+        case_count: How many cases it runs in all, counting each Variant
+            and Repeat.
         totals: Its finished cases added up.
+        cost: What its tokens so far cost; empty until it is priced.
     """
 
     run: EvalRun
-    case_count: int | None
+    case_count: int
     totals: RunTotals
+    cost: Cost = field(default_factory=Cost)
 
 
 @dataclass(frozen=True)
@@ -305,3 +402,71 @@ class Replies:
 
     texts: list[str]
     photo_file_ids: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class CaseHistoryRow:
+    """A case's result in one run, with what that run used.
+
+    Attributes:
+        result: The Case Result, with the case as it was.
+        run_queued_at: When its run was started.
+        settings: The Platform Settings its Variant ran with: the run's
+            snapshot with the Variant's Setting Overrides.
+        judge: The Judge's settings in the run's snapshot.
+    """
+
+    result: CaseResult
+    run_queued_at: datetime
+    settings: dict[str, Any]
+    judge: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class CaseHistoryEntry:
+    """A case's result in one run, marked with what changed since the run before.
+
+    Attributes:
+        result: The Case Result.
+        run_queued_at: When its run was started.
+        case_changed: Whether the case was different from the older result.
+        changed_settings: The Platform Settings, and Judge settings as
+            `judge.<name>`, that were different from the older result's run.
+    """
+
+    result: CaseResult
+    run_queued_at: datetime
+    case_changed: bool
+    changed_settings: list[str]
+
+
+@dataclass(frozen=True)
+class CaseHistory:
+    """A case and its pass or fail in recent runs.
+
+    Attributes:
+        case: The case as it is now.
+        entries: Its newest results first, each marked with what changed
+            since the result after it in the list.
+    """
+
+    case: EvalCase
+    entries: list[CaseHistoryEntry]
+
+
+@dataclass(frozen=True)
+class Estimate:
+    """What a run would use, before it starts. It is only an estimate.
+
+    Attributes:
+        tokens: The tokens it would use, by model.
+        cost: What those tokens would cost.
+        case_count: How many cases it would run.
+        rough_case_count: How many of them have never run, so use a rough
+            figure for their Eval.
+    """
+
+    tokens: dict[str, ModelTokens]
+    cost: Cost
+    case_count: int
+    rough_case_count: int

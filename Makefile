@@ -28,11 +28,11 @@ contract:
 	set -a && . ./.env && set +a && uv run pytest -n 0 -m contract
 
 ## Real-LLM evals: queue an Eval Run on this stack's eval-runner, print each case, then the report.
-## Needs the stack running (make up, or this worktree's own). EVALS=safeguard,understanding picks Evals. See evals/README.md.
+## Needs the stack running (make up, or this worktree's own). EVALS=safeguard,understanding picks Evals, CASES=reminded-of-sister single cases. See evals/README.md.
 eval:
 	@running="$$($(COMPOSE) ps --status running --services 2>/dev/null)"; \
 	echo "$$running" | grep -qx backend && echo "$$running" | grep -qx eval-runner || { echo "The stack isn't running here (backend and eval-runner must be up). Start it with make up or make restart, then run make eval again."; exit 1; }
-	$(COMPOSE) exec -T backend python -m companion.eval_terminal $(if $(EVALS),--evals $(EVALS))
+	$(COMPOSE) exec -T backend python -m companion.eval_terminal $(if $(EVALS),--evals $(EVALS)) $(if $(CASES),--cases $(CASES))
 
 ## Start everything.
 up:

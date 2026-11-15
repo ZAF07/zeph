@@ -291,6 +291,46 @@ CHECK_IN_GAPS = Setting("check_in_hours_between", read_check_in_gaps)
 CHECK_IN_REPLY_WINDOW = Setting("check_in_reply_window_hours", read_hours)
 
 
+@dataclass(frozen=True)
+class ModelPrice:
+    """What one model costs in SGD per 1,000,000 tokens.
+
+    Attributes:
+        model: The model's name, e.g. "deepseek-flash".
+        sgd_in: SGD per 1,000,000 tokens it reads.
+        sgd_out: SGD per 1,000,000 tokens it writes.
+    """
+
+    model: str
+    sgd_in: float
+    sgd_out: float
+
+
+def read_model_prices(value: Any) -> dict[str, ModelPrice]:
+    """Read the stored Model Prices.
+
+    Args:
+        value: The stored value: SGD in and out by model, e.g.
+            {"deepseek-flash": {"in": 0.38, "out": 1.54}}.
+
+    Returns:
+        Each priced model's price, by name.
+
+    Raises:
+        TypeError: If the value is not prices by model.
+    """
+    if not isinstance(value, dict):
+        raise TypeError(f"Expected prices by model, got {value!r}.")
+    return {
+        model: ModelPrice(model, read_number(price["in"]), read_number(price["out"]))
+        for model, price in value.items()
+    }
+
+
+MODEL_PRICES = Setting("model_prices", read_model_prices)
+EVAL_RUN_TOKEN_LIMIT = Setting("eval_run_token_limit", read_whole_number)
+
+
 class SettingKind(StrEnum):
     """What kind of value a setting holds, which decides how it is checked."""
 

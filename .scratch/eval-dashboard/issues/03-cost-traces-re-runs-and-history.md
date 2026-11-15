@@ -1,6 +1,6 @@
 # 03 — Runs lane: cost control, full traces, single cases, Re-run failed and history
 
-Status: ready-for-agent
+Status: in-progress
 
 ## Parent
 
@@ -43,3 +43,12 @@ Lane A (run pages). Runs in parallel with 04.
 - `.scratch/understanding/issues/22-use-deepseek-flash-with-thinking-toggle.md` (so model names match the seeded prices)
 
 ## Comments
+
+- 2026-11-15 (implementing, branch `eval-dashboard-03-cost-traces-history`): plan.
+  - Schema (one migration): `eval_runs` gets `case_keys` (the cases picked, resolved when the run starts), `cancel_requested`, `token_limit`, `rerun_of`; `eval_case_results` gets `tokens_by_model`; new `eval_model_calls` (a Model Call Log row tied to a Case Result, no User; cascades with the run).
+  - Model Prices (`model_prices`) and the Eval run token limit (`eval_run_token_limit`, 1,000,000) are Platform Settings, seeded; edited on one "Eval costs" page. SGD is priced from the run's settings snapshot, so later price changes don't rewrite old runs.
+  - Tokens are counted per model (app and Judge), so each model is priced on its own.
+  - Estimate: each case's tokens from its newest Case Result; a rough per-Eval figure on the live reply model for cases never run.
+  - Cancel: a Queued run is Cancelled at once; a Running one is marked and the runner ends it Cancelled after the case it is on. Token limit and Cancel are checked after each case and between Messages of an Understanding case; a case stopped half-way is saved as an Error, so its tokens still count.
+  - Re-run failed: on a run that has ended, a new run of its Fail and Error case keys.
+  - History: snapshot read on demand on the Run page; case history at `/admin/evals/history/<key>` (not `/admin/evals/cases/...`, which issue 04 may use).

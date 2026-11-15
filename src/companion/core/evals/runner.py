@@ -1,5 +1,6 @@
 import logging
 import time
+from itertools import product
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -11,8 +12,10 @@ from companion.core.evals.models import (
     CaseCheckResult,
     CaseOutcome,
     CaseResult,
+    CaseStoppedError,
     EvalCase,
     EvalRun,
+    EvalRunState,
     RunSnapshot,
     Variant,
 )
@@ -24,7 +27,15 @@ from companion.core.evals.ports import (
     EvalRunRepository,
     JudgeSettingsRepository,
 )
+from companion.core.models import ModelCall
+from companion.core.platform_settings import EVAL_RUN_TOKEN_LIMIT
 from companion.core.ports import Clock, PlatformSettingsRepository
+
+TRACES_PER_CASE_AT_MOST = 500
+STOP_REASONS = {
+    EvalRunState.CANCELLED: "the run was cancelled",
+    EvalRunState.STOPPED_OVER_LIMIT: "the run went over its token limit",
+}
 
 logger = logging.getLogger(__name__)
 
@@ -73,11 +84,14 @@ class EvalRunner:
         return self._runs.interrupt_running(self._clock.now())
 
     def work_next_run(self) -> bool:
-        """Take the oldest Queued run, if any, and run all its cases.
+        """Take the oldest Queued run, if any, and run its cases.
 
         The cases and the Judge's settings are read as they are now, so an
         Admin's edits apply from the next run. Each case gets fresh made-up
         data. A case that raises becomes an Error and the run carries on.
+        After each case, and between the Messages of an Understanding case,
+        the run ends Cancelled if an Admin cancelled it, or Stopped over
+        limit once its tokens are over the Eval run token limit.
 
         Returns:
             True if a run was worked; False if none was waiting.
@@ -85,22 +99,53 @@ class EvalRunner:
         run = self._runs.take_next_queued(self._clock.now())
         if run is None:
             return False
+        live = self._live_settings.load()
         snapshot = RunSnapshot(
-            settings=dict(self._live_settings.load().values),
+            settings=dict(live.values),
             judge=self._judge_settings.load(),
-            cases=self._cases.list_for_evals(run.evals),
+            cases=self._cases.list_for_keys(run.case_keys),
         )
-        self._runs.save_snapshot(run.id, snapshot)
+        token_limit = live.get(EVAL_RUN_TOKEN_LIMIT)
+        self._runs.save_snapshot(run.id, snapshot, token_limit)
         self._environment.start_run()
-        for case in snapshot.cases:
-            for variant in run.variants:
-                self._runs.add_result(
-                    self._run_case(
-                        run, variant, case, snapshot.settings, snapshot.judge
-                    )
-                )
-        self._runs.finish(run.id, self._clock.now())
+        tokens_used = 0
+        ended_as = EvalRunState.FINISHED
+        for case, variant in product(snapshot.cases, run.variants):
+            result = self._run_case(
+                run,
+                variant,
+                case,
+                snapshot.settings,
+                snapshot.judge,
+                tokens_used,
+                token_limit,
+            )
+            tokens_used += result.tokens_in + result.tokens_out
+            stop_state = self._stop_state(run.id, tokens_used, token_limit)
+            if stop_state is not None:
+                ended_as = stop_state
+                break
+        self._runs.end(run.id, ended_as, self._clock.now())
         return True
+
+    def _stop_state(
+        self, run_id: UUID, tokens_used: int, token_limit: int
+    ) -> EvalRunState | None:
+        """Say how a run is to end now, if it is to stop early.
+
+        Args:
+            run_id: The run.
+            tokens_used: Its tokens so far.
+            token_limit: The most tokens it may use.
+
+        Returns:
+            Cancelled or Stopped over limit; None to carry on.
+        """
+        if self._runs.is_cancel_requested(run_id):
+            return EvalRunState.CANCELLED
+        if tokens_used > token_limit:
+            return EvalRunState.STOPPED_OVER_LIMIT
+        return None
 
     def _run_case(
         self,
@@ -109,6 +154,8 @@ class EvalRunner:
         case: EvalCase,
         live_settings: dict[str, Any],
         judge_values: dict[str, Any],
+        tokens_before: int,
+        token_limit: int,
     ) -> CaseResult:
         """Run one case on fresh data with a Variant's settings.
 
@@ -119,12 +166,26 @@ class EvalRunner:
             live_settings: The live Platform Settings when the run started.
             judge_values: The Judge's settings for the run; one missing makes
                 the case an Error.
+            tokens_before: The run's tokens before this case.
+            token_limit: The most tokens the run may use.
 
         Returns:
-            The Case Result.
+            The Case Result, with the model calls it made.
         """
         started = time.monotonic()
         companion: EvalCompanion | None = None
+        calls: list[ModelCall] = []
+
+        def should_stop() -> str | None:
+            """Say why the run is to stop part-way through this case.
+
+            Returns:
+                Why; None to carry on.
+            """
+            used = sum(companion.tokens_used()) if companion else 0
+            stop_state = self._stop_state(run.id, tokens_before + used, token_limit)
+            return STOP_REASONS.get(stop_state) if stop_state else None
+
         try:
             judge = JudgeSettings.from_values(judge_values)
             images = self._images.get_many(
@@ -133,7 +194,9 @@ class EvalRunner:
             companion = self._environment.fresh_companion(
                 {**live_settings, **variant.setting_overrides}, images
             )
-            result = check_case(case, companion, judge)
+            result = check_case(case, companion, judge, should_stop)
+        except CaseStoppedError as stopped:
+            result = CaseCheckResult(outcome=CaseOutcome.ERROR, error=str(stopped))
         except Exception as error:
             logger.exception("Eval case %s errored", case.key)
             result = CaseCheckResult(
@@ -141,8 +204,9 @@ class EvalRunner:
             )
         tokens_in, tokens_out = companion.tokens_used() if companion else (0, 0)
         if companion is not None:
+            calls = read_case_model_calls(companion)
             close_quietly(companion)
-        return CaseResult(
+        case_result = CaseResult(
             id=uuid4(),
             run_id=run.id,
             variant=variant.letter,
@@ -155,7 +219,43 @@ class EvalRunner:
             tokens_out=tokens_out,
             duration_ms=round((time.monotonic() - started) * 1000),
             finished_at=self._clock.now(),
+            tokens_by_model=companion.tokens_by_model() if companion else {},
         )
+        self._runs.add_result(case_result, calls)
+        return case_result
+
+
+def read_case_model_calls(companion: EvalCompanion) -> list[ModelCall]:
+    """Read every model call a case made, its full trace.
+
+    The Eval database is emptied before each case, so every call in it is
+    this case's. Reading them never fails the case: a failure is logged and
+    the trace left empty.
+
+    Args:
+        companion: The case's app.
+
+    Returns:
+        The calls, oldest trace first, each trace's calls in order.
+    """
+    model_calls = companion.repositories.model_calls
+    try:
+        overviews = model_calls.list_traces(
+            user_id=None,
+            since=None,
+            step=None,
+            errors_only=False,
+            limit=TRACES_PER_CASE_AT_MOST,
+        )
+        calls: list[ModelCall] = []
+        for overview in reversed(overviews):
+            details = model_calls.get_trace(overview.trace.id)
+            if details is not None:
+                calls += details.calls
+        return calls
+    except Exception:
+        logger.exception("Reading an Eval case's model calls failed")
+        return []
 
 
 def close_quietly(companion: EvalCompanion) -> None:
