@@ -1,39 +1,15 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from companion.core.errors import InvalidError
+from companion.core.evals.case_shapes import InvalidFormError
 from companion.core.models import CuriositySensitivity, ThreadReaction
 
 
-class InvalidEvalCaseError(InvalidError):
-    """Raised when an Eval Case doesn't fit its Eval's case shape.
-
-    Attributes:
-        problems: What is wrong, by the path of the field it is in, e.g.
-            `messages.0.text`; "" for the case as a whole.
-    """
-
-    def __init__(self, message: str, problems: Mapping[str, str] | None = None):
-        """Set up the error.
-
-        Args:
-            message: What is wrong, in one line.
-            problems: What is wrong per field; when None, the message is the
-                case's one problem.
-        """
-        super().__init__(message)
-        self.problems = dict(problems) if problems is not None else {"": message}
-
-    def field_errors(self) -> dict[str, str]:
-        """Give what is wrong per field, to show beside each field.
-
-        Returns:
-            The message for each field's path.
-        """
-        return self.problems
+class InvalidEvalCaseError(InvalidFormError):
+    """Raised when an Eval Case doesn't fit its Eval's case shape."""
 
 
 class SafeguardCaseKind(StrEnum):

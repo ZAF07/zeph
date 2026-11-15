@@ -486,3 +486,24 @@ def test_a_photo_case_sends_the_image_uploaded_for_it(
     assert result["outcome"] == "pass", result
     assert photo_viewer.calls[-1].photo.content == image
     assert photo_viewer.calls[-1].photo.media_type == "image/png"
+
+
+def test_a_missing_judge_setting_makes_each_case_an_error_and_the_run_finishes(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, CRISIS_CASE)
+    with engine.begin() as connection:
+        connection.execute(text("DELETE FROM eval_judge_settings WHERE key = 'model'"))
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.SAFEGUARD)
+
+    runner.work_next_run()
+
+    finished = open_run(client, admin, run["id"])
+    assert finished["state"] == "finished"
+    [result] = finished["results"]
+    assert result["outcome"] == "error"
+    assert "model" in result["error"]

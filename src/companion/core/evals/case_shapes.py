@@ -4,7 +4,36 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
+from companion.core.errors import InvalidError
 from companion.core.evals.models import EvalName
+
+
+class InvalidFormError(InvalidError):
+    """Raised when what was saved doesn't fit its form.
+
+    Attributes:
+        problems: What is wrong, by the path of the field it is in, e.g.
+            `messages.0.text`; "" for the form as a whole.
+    """
+
+    def __init__(self, message: str, problems: Mapping[str, str] | None = None):
+        """Set up the error.
+
+        Args:
+            message: What is wrong, in one line.
+            problems: What is wrong per field; when None, the message is the
+                form's one problem.
+        """
+        super().__init__(message)
+        self.problems = dict(problems) if problems is not None else {"": message}
+
+    def field_errors(self) -> dict[str, str]:
+        """Give what is wrong per field, to show beside each field.
+
+        Returns:
+            The message for each field's path.
+        """
+        return self.problems
 
 
 class FieldKind(StrEnum):

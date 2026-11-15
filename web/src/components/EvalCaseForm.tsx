@@ -14,7 +14,7 @@ import type {
   FormValues,
 } from "@/lib/api-client";
 import { emptyForm, savingErrors } from "@/lib/eval-forms";
-import { queryKeys } from "@/lib/queries";
+import { queryKeys, refreshEvalCases } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 /**
@@ -49,8 +49,7 @@ export function EvalCaseForm({
         ? apiClient.editEvalCase(existing.key, values)
         : apiClient.addEvalCase(caseKey.trim(), evalName, values),
     onSuccess: (saved) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.allEvalCases });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.evals });
+      refreshEvalCases(queryClient);
       queryClient.setQueryData(queryKeys.evalCase(saved.key), saved);
       if (!existing) {
         router.push(`/admin/evals/cases/${evalName}`);

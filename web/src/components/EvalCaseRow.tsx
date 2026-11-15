@@ -12,9 +12,10 @@ import {
 } from "@/components/button-styles";
 import { EvalPill } from "@/components/EvalPill";
 import { fieldLabel, inputField } from "@/components/form-styles";
-import { ApiError, type EvalCase } from "@/lib/api-client";
+import type { EvalCase } from "@/lib/api-client";
 import { formatSavedAt } from "@/lib/dates";
-import { queryKeys } from "@/lib/queries";
+import { savingErrors } from "@/lib/eval-forms";
+import { refreshEvalCases } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 /**
@@ -33,32 +34,23 @@ export function EvalCaseRow({ evalCase }: { evalCase: EvalCase }) {
   const [copyKey, setCopyKey] = useState(`${evalCase.key}-copy`);
   const editHref = `/admin/evals/cases/${evalCase.eval}/edit/${evalCase.key}`;
 
-  function refresh() {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.allEvalCases });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.evals });
-  }
-
   const duplicateMutation = useMutation({
     mutationFn: (newKey: string) =>
       apiClient.duplicateEvalCase(evalCase.key, newKey),
     onSuccess: (copy) => {
-      refresh();
+      refreshEvalCases(queryClient);
       router.push(`/admin/evals/cases/${copy.eval}/edit/${copy.key}`);
     },
   });
   const archiveMutation = useMutation({
     mutationFn: () => apiClient.archiveEvalCase(evalCase.key),
     onSuccess: () => {
-      refresh();
+      refreshEvalCases(queryClient);
       setStep("idle");
     },
   });
-  const duplicateError =
-    duplicateMutation.error instanceof ApiError
-      ? (duplicateMutation.error.fields.key ?? duplicateMutation.error.detail)
-      : duplicateMutation.isError
-        ? "Couldn’t duplicate the case. Try again."
-        : null;
+  const duplicateErrors = savingErrors(duplicateMutation.error);
+  const duplicateError = duplicateErrors.fields.key ?? duplicateErrors.summary;
 
   function duplicate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

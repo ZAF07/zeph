@@ -1,8 +1,7 @@
 from collections.abc import Mapping
 from typing import Any
 
-from companion.core.evals.case_shapes import FormShape, find_problems
-from companion.core.evals.cases import InvalidEvalCaseError
+from companion.core.evals.case_shapes import FormShape, InvalidFormError, find_problems
 from companion.core.evals.judge import judge_shape
 from companion.core.evals.ports import JudgeSettingsRepository
 from companion.core.models import User
@@ -10,7 +9,7 @@ from companion.core.platform_settings import AVAILABLE_MODELS
 from companion.core.ports import Clock, PlatformSettingsRepository
 
 
-class InvalidJudgeSettingsError(InvalidEvalCaseError):
+class InvalidJudgeSettingsError(InvalidFormError):
     """Raised when the Judge's settings don't fit their form."""
 
 

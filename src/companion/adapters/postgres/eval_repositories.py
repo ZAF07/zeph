@@ -197,6 +197,7 @@ class PostgresEvalCaseRepository:
         self,
         key: str,
         content: dict[str, Any],
+        *,
         archived: bool,
         now: datetime,
         admin_id: UUID,

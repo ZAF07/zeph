@@ -46,6 +46,33 @@ class InvalidEvalImageError(InvalidError):
     shown_message = "Upload a PNG, JPEG or WebP image of at most 5 MB."
 
 
+def require_no_problems(problems: dict[str, str]) -> None:
+    """Refuse a case save when any field has a problem.
+
+    Args:
+        problems: A message per field path.
+
+    Raises:
+        InvalidEvalCaseError: If there is any problem.
+    """
+    if problems:
+        raise InvalidEvalCaseError("The case has problems; see each field.", problems)
+
+
+def image_name_stem(file_name: str) -> str:
+    """Turn an uploaded file's name into the start of a stored image's name.
+
+    Args:
+        file_name: The uploaded file's name, e.g. "My Drawing.PNG".
+
+    Returns:
+        Lowercase letters and numbers joined by hyphens, e.g. "my-drawing";
+        "image" when nothing is left.
+    """
+    words = re.findall(r"[a-z0-9]+", file_name.rsplit(".", 1)[0].lower())
+    return "-".join(words) or "image"
+
+
 class EvalCaseService:
     """Lets Admins add, edit, duplicate and archive Eval Cases (ADR-0004).
 
@@ -123,11 +150,7 @@ class EvalCaseService:
                 message per field.
         """
         case = EvalCase(key=key, eval=eval_name, content=content)
-        problems = {**self._key_problems(key), **self._content_problems(case)}
-        if problems:
-            raise InvalidEvalCaseError(
-                "The case has problems; see each field.", problems
-            )
+        require_no_problems({**self._key_problems(key), **self._content_problems(case)})
         if not self._cases.add(case, self._clock.now(), admin.id):
             raise InvalidEvalCaseError(
                 "The case key is taken.", {"key": "Another case has this key."}
@@ -157,12 +180,10 @@ class EvalCaseService:
         if stored.case.archived:
             raise ArchivedEvalCaseError()
         case = EvalCase(key=key, eval=stored.case.eval, content=content)
-        problems = self._content_problems(case)
-        if problems:
-            raise InvalidEvalCaseError(
-                "The case has problems; see each field.", problems
-            )
-        self._cases.update(key, content, False, self._clock.now(), admin.id)
+        require_no_problems(self._content_problems(case))
+        self._cases.update(
+            key, content, archived=False, now=self._clock.now(), admin_id=admin.id
+        )
         return self.get_case(key)
 
     def duplicate_case(self, admin: User, key: str, new_key: str) -> StoredEvalCase:
@@ -199,7 +220,11 @@ class EvalCaseService:
         stored = self.get_case(key)
         if not stored.case.archived:
             self._cases.update(
-                key, stored.case.content, True, self._clock.now(), admin.id
+                key,
+                stored.case.content,
+                archived=True,
+                now=self._clock.now(),
+                admin_id=admin.id,
             )
         return self.get_case(key)
 
@@ -224,11 +249,8 @@ class EvalCaseService:
         suffix = IMAGE_MEDIA_TYPES.get(media_type)
         if suffix is None or not content or len(content) > IMAGE_MAX_BYTES:
             raise InvalidEvalImageError()
-        stem = re.sub(r"[^a-z0-9]+", "-", file_name.rsplit(".", 1)[0].lower()).strip(
-            "-"
-        )
         image = EvalImage(
-            name=f"{stem or 'image'}-{uuid4().hex[:8]}{suffix}",
+            name=f"{image_name_stem(file_name)}-{uuid4().hex[:8]}{suffix}",
             content=content,
             media_type=media_type,
         )

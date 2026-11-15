@@ -193,3 +193,14 @@ export function useSaveCheckIns(): UseMutationResult<
     },
   });
 }
+
+/**
+ * Marks every list of Eval Cases, and the Evals a new run can pick, as out
+ * of date after a case was added, changed, copied or archived.
+ *
+ * @param queryClient - The cache of backend data.
+ */
+export function refreshEvalCases(queryClient: QueryClient): void {
+  void queryClient.invalidateQueries({ queryKey: queryKeys.allEvalCases });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.evals });
+}

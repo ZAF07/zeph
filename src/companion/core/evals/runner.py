@@ -91,12 +91,13 @@ class EvalRunner:
             cases=self._cases.list_for_evals(run.evals),
         )
         self._runs.save_snapshot(run.id, snapshot)
-        judge = JudgeSettings.from_values(snapshot.judge)
         self._environment.start_run()
         for case in snapshot.cases:
             for variant in run.variants:
                 self._runs.add_result(
-                    self._run_case(run, variant, case, snapshot.settings, judge)
+                    self._run_case(
+                        run, variant, case, snapshot.settings, snapshot.judge
+                    )
                 )
         self._runs.finish(run.id, self._clock.now())
         return True
@@ -107,7 +108,7 @@ class EvalRunner:
         variant: Variant,
         case: EvalCase,
         live_settings: dict[str, Any],
-        judge: JudgeSettings,
+        judge_values: dict[str, Any],
     ) -> CaseResult:
         """Run one case on fresh data with a Variant's settings.
 
@@ -116,7 +117,8 @@ class EvalRunner:
             variant: The Variant.
             case: The case.
             live_settings: The live Platform Settings when the run started.
-            judge: The Judge's settings for the run.
+            judge_values: The Judge's settings for the run; one missing makes
+                the case an Error.
 
         Returns:
             The Case Result.
@@ -124,6 +126,7 @@ class EvalRunner:
         started = time.monotonic()
         companion: EvalCompanion | None = None
         try:
+            judge = JudgeSettings.from_values(judge_values)
             images = self._images.get_many(
                 image_names(CASE_SHAPES[case.eval], case.content)
             )
