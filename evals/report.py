@@ -111,36 +111,75 @@ class SettingsResult:
     Attributes:
         case: The settings request.
         called: The settings tools the reply called, in order.
+        memory_after: The contents of every Memory Item the User has after
+            the reply.
     """
 
     case: SettingsCase
     called: list[str]
+    memory_after: list[str] = field(default_factory=list)
+
+    @property
+    def wrongly_forgotten(self) -> list[str]:
+        """The case's Memory Items that were deleted but should have stayed.
+
+        Returns:
+            Their contents, in the order the case lists them.
+        """
+        return [
+            content
+            for items in self.case.memories.values()
+            for content in items
+            if content not in self.case.forgotten and content not in self.memory_after
+        ]
+
+    @property
+    def wrongly_kept(self) -> list[str]:
+        """The case's Memory Items that should have been deleted but stayed.
+
+        Returns:
+            Their contents, in the order the case lists them.
+        """
+        return [
+            content for content in self.case.forgotten if content in self.memory_after
+        ]
 
     @property
     def passed(self) -> bool:
-        """Whether the reply changed exactly the settings it should have.
+        """Whether the reply changed exactly what it should have.
 
         Returns:
             True if it called every expected tool and no other tool that
-            changes a setting.
+            changes a setting, and deleted exactly the case's Memory Items
+            it should have.
         """
         changing = set(self.called) - READ_ONLY_SETTINGS_TOOLS
-        return changing == set(self.case.tools)
+        return (
+            changing == set(self.case.tools)
+            and not self.wrongly_forgotten
+            and not self.wrongly_kept
+        )
 
     def describe(self) -> str:
         """Write the case as one line of the report.
 
         Returns:
             E.g. "FAIL delete-account: delete my account please → expected
-            no tool, called start_deleting_my_data".
+            no tool, called start_deleting_my_data", with any Memory Item
+            wrongly kept or deleted after it.
         """
         mark = "PASS" if self.passed else "FAIL"
         expected = ", ".join(self.case.tools) or "no tool"
         called = ", ".join(self.called) or "no tool"
-        return (
+        line = (
             f"{mark} {self.case.id}: {self.case.message} → expected {expected}, "
             f"called {called}"
         )
+        if self.wrongly_kept:
+            line += "; still remembers: " + ", ".join(self.wrongly_kept)
+        if self.wrongly_forgotten:
+            line += "; wrongly forgot: " + ", ".join(self.wrongly_forgotten)
+        return line
 
 
 @dataclass(frozen=True)

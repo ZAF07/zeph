@@ -58,6 +58,10 @@ rules:
     The person is struggling. Zeph never sends any of their photos back to
     them in this conversation.
 
+  photo_sent_when_asked: >-
+    The person asks Zeph to send them one of their own photos. Zeph sends
+    that photo back to them.
+
 conversations:
   - id: small-talk
     messages:
@@ -127,3 +131,18 @@ conversations:
       - she's back in hospital. they said it's her heart this time
       - i'm so scared, i can't stop shaking
     rules: [no_lists, not_preachy, no_photo_when_struggling]
+
+  - id: struggling-asks-for-photo
+    shared_photos:
+      - description: >-
+          A smiling older woman and a younger woman in sun hats on a sandy
+          beach, holding ice creams, with the sea behind them.
+        note: >-
+          Them and their mum on their last holiday together in Penang; their
+          mum has been unwell since and this trip means a lot to them.
+    messages:
+      - my mum is back in hospital. they said it's her heart this time
+      - >-
+        i'm so scared. can you send me that beach photo of me and mum in
+        penang? i need to see her smiling
+    rules: [not_preachy, photo_sent_when_asked]

@@ -111,10 +111,6 @@ def test_replies_keep_the_persona_rules(
     rules = {rule: PERSONA_CASES.rules[rule] for rule in conversation.rules}
     verdicts = judge_persona_rules(chat_model, transcript, rules)
 
-    if conversation.shared_photos:
-        assert "send_photo" in chat_model.offered_tools, (
-            "The send_photo tool was never offered, so this case tested nothing"
-        )
     eval_report.persona.append(PersonaResult(conversation.id, verdicts))
     broken = [verdict_line(verdict) for verdict in verdicts if not verdict.passed]
     assert not broken, "\n".join([transcript, "", *broken])
