@@ -11,6 +11,7 @@ import {
 
 import type {
   CheckIns,
+  EvalRunRequest,
   Me,
   ModelCallTraceFilter,
   OnboardingAnswers,
@@ -60,10 +61,11 @@ export const queryKeys = {
   evalCase: (key: string) => ["eval-case", key],
   evalImage: (name: string) => ["eval-image", name],
   judgeSettings: ["judge-settings"],
-  evalRunEstimate: (pick: { evals: string[]; case_keys: string[] }) => [
+  evalRunEstimate: (runRequest: EvalRunRequest) => [
     "eval-run-estimate",
-    pick,
+    runRequest,
   ],
+  settingOverrideChoices: ["setting-override-choices"],
   evalRunSnapshot: (runId: string) => ["eval-run-snapshot", runId],
   caseResultTrace: (runId: string, resultId: string) => [
     "case-result-trace",

@@ -11,7 +11,7 @@ export default function AdminNewEvalRunPage() {
     <div className="flex flex-col gap-[22px]">
       <AdminPageHeader
         title="New Eval Run"
-        lead="Pick the Evals to run with the live Platform Settings. Results appear on the run’s page as each case finishes."
+        lead="Pick the Evals to run, with the live Platform Settings or Variants that change some of them for this run only. Results appear on the run’s page as each case finishes."
       />
       <NewEvalRunForm />
     </div>

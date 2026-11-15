@@ -13,6 +13,9 @@ const apiClient = {
   rerunFailedCases: vi.fn<ApiClient["rerunFailedCases"]>(),
   deleteEvalRun: vi.fn<ApiClient["deleteEvalRun"]>(),
   getEvalRunSnapshot: vi.fn<ApiClient["getEvalRunSnapshot"]>(),
+  listSettingOverrideChoices: vi.fn<ApiClient["listSettingOverrideChoices"]>(),
+  listLiveChanges: vi.fn<ApiClient["listLiveChanges"]>(),
+  makeVariantLive: vi.fn<ApiClient["makeVariantLive"]>(),
 };
 const router = { push: vi.fn() };
 
@@ -66,6 +69,7 @@ const running: EvalRunDetails = {
 };
 const finished: EvalRunDetails = {
   ...finishedRun,
+  case_keys: ["plan", "reminded-of-sister", "traffic"],
   case_count: 3,
   passed: 1,
   failed: 1,
@@ -117,16 +121,24 @@ describe("EvalRunView", () => {
     apiClient.getEvalRun.mockResolvedValue(finished);
     renderWithQueries(<EvalRunView runId="run-1" />);
 
-    const failedCard = await screen.findByRole("listitem", {
+    await userEvent.click(
+      await screen.findByRole("button", {
+        name: "reminded-of-sister on Variant A",
+      }),
+    );
+    const failedCard = screen.getByRole("listitem", {
       name: "reminded-of-sister",
     });
-    const erroredCard = screen.getByRole("listitem", { name: "traffic" });
+    expect(within(failedCard).getByText("Fail")).toBeInTheDocument();
     expect(
       screen.getByText("“my sister's wedding is next week”"),
     ).toBeVisible();
     expect(screen.getByText(/Suggests a lawyer\./)).toBeInTheDocument();
     expect(screen.getByText("2 checks, 1 failed")).toBeInTheDocument();
-    expect(within(failedCard).getByText("Fail")).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "traffic on Variant A" }),
+    );
+    const erroredCard = screen.getByRole("listitem", { name: "traffic" });
     expect(
       within(erroredCard).getByText(
         "Couldn’t be checked: The model didn't answer",
@@ -234,7 +246,10 @@ describe("EvalRunView", () => {
     apiClient.getEvalRun.mockResolvedValue(finished);
     renderWithQueries(<EvalRunView runId="run-1" />);
 
-    const card = await screen.findByRole("listitem", { name: "plan" });
+    await userEvent.click(
+      await screen.findByRole("button", { name: "plan on Variant A" }),
+    );
+    const card = screen.getByRole("listitem", { name: "plan" });
 
     expect(
       within(card).getByRole("link", { name: "Full trace" }),
@@ -258,6 +273,7 @@ describe("EvalRunView", () => {
           archived: false,
         },
       ],
+      needs: [],
     });
     renderWithQueries(<EvalRunView runId="run-1" />);
 
@@ -266,5 +282,265 @@ describe("EvalRunView", () => {
     expect(await screen.findByText("Warm and plain.")).toBeInTheDocument();
     expect(screen.getByText("Cases (1)")).toBeInTheDocument();
     expect(apiClient.getEvalRunSnapshot).toHaveBeenCalledWith("run-1");
+  });
+
+  describe("comparing Variants", () => {
+    const tryOf = (
+      id: string,
+      variant: string,
+      tryNumber: number,
+      outcome: CaseResult["outcome"],
+    ): CaseResult => ({
+      ...passedResult,
+      id,
+      variant,
+      try_number: tryNumber,
+      outcome,
+    });
+    const comparison: EvalRunDetails = {
+      ...finishedRun,
+      case_keys: ["plan"],
+      repeats: 2,
+      case_count: 4,
+      variants: [
+        { letter: "A", setting_overrides: {}, made_live: null },
+        {
+          letter: "B",
+          setting_overrides: { understanding_thinking: false },
+          made_live: null,
+        },
+      ],
+      results: [
+        tryOf("a-1", "A", 1, "pass"),
+        tryOf("b-1", "B", 1, "fail"),
+        tryOf("a-2", "A", 2, "pass"),
+        tryOf("b-2", "B", 2, "pass"),
+      ],
+      variant_totals: [
+        {
+          letter: "A",
+          passed: 2,
+          failed: 0,
+          errored: 0,
+          tokens_in: 1800,
+          tokens_out: 80,
+          duration_ms: 4800,
+          cost_sgd: 0.0021,
+          unpriced_models: [],
+        },
+        {
+          letter: "B",
+          passed: 1,
+          failed: 1,
+          errored: 0,
+          tokens_in: 1000,
+          tokens_out: 60,
+          duration_ms: 2000,
+          cost_sgd: 0.0011,
+          unpriced_models: [],
+        },
+      ],
+    };
+
+    beforeEach(() => {
+      apiClient.listSettingOverrideChoices.mockResolvedValue({
+        settings: [
+          {
+            key: "understanding_thinking",
+            label: "Understanding thinking",
+            kind: "on_off",
+            minimum: 0,
+            maximum: 0,
+            max_length: 20000,
+            hint: null,
+            value: true,
+          },
+        ],
+        needs: [],
+        models: ["deepseek-flash"],
+      });
+      apiClient.getEvalRunSnapshot.mockResolvedValue({
+        settings: { understanding_thinking: true },
+        judge: {},
+        cases: [],
+        needs: [],
+      });
+    });
+
+    it("shows a column per Variant with each cell's tries and totals", async () => {
+      apiClient.getEvalRun.mockResolvedValue(comparison);
+      renderWithQueries(<EvalRunView runId="run-1" />);
+
+      const cellB = await screen.findByRole("button", {
+        name: "plan on Variant B",
+      });
+      expect(within(cellB).getByText("1 of 2 passed")).toBeInTheDocument();
+      expect(
+        within(
+          screen.getByRole("button", { name: "plan on Variant A" }),
+        ).getByText("2 of 2 passed"),
+      ).toBeInTheDocument();
+      const totalsB = screen.getByRole("cell", { name: "Variant B totals" });
+      expect(
+        within(totalsB).getByText("1 passed · 1 failed"),
+      ).toBeInTheDocument();
+      expect(within(totalsB).getByText("2.0 s · S$0.0011")).toBeInTheDocument();
+
+      await userEvent.click(cellB);
+
+      const tries = screen.getAllByRole("listitem", { name: "plan" });
+      expect(tries).toHaveLength(2);
+      expect(within(tries[0]).getByText("· Try 1 of 2")).toBeInTheDocument();
+      expect(within(tries[0]).getByText("Fail")).toBeInTheDocument();
+      expect(
+        within(tries[1]).getByRole("link", { name: "Full trace" }),
+      ).toHaveAttribute("href", "/admin/evals/runs/run-1/results/b-2");
+    });
+
+    it("shows each override as a difference from live when the run started", async () => {
+      apiClient.getEvalRun.mockResolvedValue(comparison);
+      renderWithQueries(<EvalRunView runId="run-1" />);
+
+      const variantB = await screen.findByRole("region", { name: "Variant B" });
+      expect(
+        await within(variantB).findByText("Understanding thinking"),
+      ).toBeInTheDocument();
+      expect(
+        within(variantB).getByText("Live when it started:").parentElement,
+      ).toHaveTextContent("Live when it started: On");
+      expect(
+        within(variantB).getByText("Variant B:").parentElement,
+      ).toHaveTextContent("Variant B: Off");
+      const variantA = screen.getByRole("region", { name: "Variant A" });
+      expect(within(variantA).getByText(/live settings/)).toBeInTheDocument();
+      expect(
+        within(variantA).queryByRole("button", { name: /live$/ }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("makes a Variant live in one click when nothing changed since", async () => {
+      apiClient.getEvalRun.mockResolvedValue(comparison);
+      apiClient.listLiveChanges.mockResolvedValue([]);
+      apiClient.makeVariantLive.mockResolvedValue({
+        ...comparison.variants[1],
+        made_live: {
+          by_name: "Owner",
+          at: "2026-11-15T10:00:00Z",
+          applied_keys: ["understanding_thinking"],
+          left_out_keys: [],
+        },
+      });
+      renderWithQueries(<EvalRunView runId="run-1" />);
+
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Make Variant B live" }),
+      );
+
+      expect(apiClient.listLiveChanges).toHaveBeenCalledWith("run-1", "B");
+      expect(apiClient.makeVariantLive).toHaveBeenCalledWith("run-1", "B", []);
+    });
+
+    it("asks to confirm or leave out a setting changed live since the run", async () => {
+      const twoChanges = {
+        ...comparison,
+        variants: [
+          comparison.variants[0],
+          {
+            letter: "B",
+            setting_overrides: {
+              understanding_thinking: false,
+              daily_message_limit: 80,
+            },
+            made_live: null,
+          },
+        ],
+      };
+      apiClient.getEvalRun.mockResolvedValue(twoChanges);
+      apiClient.listLiveChanges.mockResolvedValue([
+        {
+          key: "understanding_thinking",
+          then: true,
+          now: false,
+          override: false,
+        },
+        { key: "daily_message_limit", then: 50, now: 60, override: 80 },
+      ]);
+      apiClient.makeVariantLive.mockResolvedValue({
+        ...twoChanges.variants[1],
+        made_live: null,
+      });
+      renderWithQueries(<EvalRunView runId="run-1" />);
+
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Make Variant B live" }),
+      );
+
+      const confirm = await screen.findByRole("region", {
+        name: "Confirm making Variant B live",
+      });
+      expect(apiClient.makeVariantLive).not.toHaveBeenCalled();
+      const limitChange = within(confirm).getByRole("checkbox", {
+        name: /daily_message_limit/,
+      });
+      expect(limitChange.closest("label")).toHaveTextContent(
+        "When the run started: 50Live now: 60Variant B: 80",
+      );
+      await userEvent.click(limitChange);
+      await userEvent.click(
+        within(confirm).getByRole("button", { name: "Make live" }),
+      );
+
+      expect(apiClient.makeVariantLive).toHaveBeenCalledWith("run-1", "B", [
+        "daily_message_limit",
+      ]);
+    });
+
+    it("shows who made a Variant live, when, and what was applied or left out", async () => {
+      apiClient.getEvalRun.mockResolvedValue({
+        ...comparison,
+        variants: [
+          comparison.variants[0],
+          {
+            ...comparison.variants[1],
+            made_live: {
+              by_name: "Maya Lin",
+              at: "2026-11-15T10:00:00Z",
+              applied_keys: ["understanding_thinking"],
+              left_out_keys: ["daily_message_limit"],
+            },
+          },
+        ],
+      });
+      renderWithQueries(<EvalRunView runId="run-1" />);
+
+      const variantB = await screen.findByRole("region", { name: "Variant B" });
+      expect(
+        await within(variantB).findByText("Applied: Understanding thinking."),
+      ).toBeInTheDocument();
+      expect(
+        within(variantB).getByText(/Made live by Maya Lin/),
+      ).toBeInTheDocument();
+      expect(
+        within(variantB).getByText(/Left out.*daily_message_limit/),
+      ).toBeInTheDocument();
+      expect(
+        within(variantB).queryByRole("button", { name: "Make Variant B live" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("offers Make Live only once the run has finished", async () => {
+      apiClient.getEvalRun.mockResolvedValue({
+        ...comparison,
+        state: "cancelled",
+      });
+      renderWithQueries(<EvalRunView runId="run-1" />);
+
+      expect(
+        await screen.findByRole("region", { name: "Variant B" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Make Variant B live" }),
+      ).not.toBeInTheDocument();
+    });
   });
 });

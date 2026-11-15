@@ -2,7 +2,7 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
-import type { EvalRunPick } from "@/lib/api-client";
+import type { EvalRunRequest } from "@/lib/api-client";
 import { countOf, describeCost } from "@/lib/evals";
 import { formatTokens } from "@/lib/model-calls";
 import { queryKeys } from "@/lib/queries";
@@ -10,17 +10,22 @@ import { useApiClient } from "@/lib/use-api-client";
 
 /**
  * The estimate of a run's tokens and SGD before it starts, from each case's
- * last run, or a rough figure for cases that have never run. It never blocks
- * starting the run.
+ * last run, or a rough figure for cases that have never run, counting every
+ * Variant and Repeat. With more than one Variant it shows each one too. It
+ * never blocks starting the run.
  *
- * @param props - `pick` is the whole Evals and single cases the run would run.
+ * @param props - `runRequest` is the run as it would start.
  * @returns The estimate, or a line saying it couldn't be worked out.
  */
-export function EvalRunEstimateNote({ pick }: { pick: EvalRunPick }) {
+export function EvalRunEstimateNote({
+  runRequest,
+}: {
+  runRequest: EvalRunRequest;
+}) {
   const apiClient = useApiClient();
   const estimateQuery = useQuery({
-    queryKey: queryKeys.evalRunEstimate(pick),
-    queryFn: () => apiClient.estimateEvalRun(pick),
+    queryKey: queryKeys.evalRunEstimate(runRequest),
+    queryFn: () => apiClient.estimateEvalRun(runRequest),
     placeholderData: keepPreviousData,
   });
   const estimate = estimateQuery.data;
@@ -40,6 +45,17 @@ export function EvalRunEstimateNote({ pick }: { pick: EvalRunPick }) {
             About {formatTokens(estimate.tokens_in, estimate.tokens_out)} tokens
             · {describeCost(estimate)}
           </p>
+          {estimate.variants.length > 1 ? (
+            <ul className="m-0 flex list-none flex-col gap-0.5 p-0 text-caption text-ink-soft">
+              {estimate.variants.map((variant) => (
+                <li key={variant.letter}>
+                  Variant {variant.letter}: about{" "}
+                  {formatTokens(variant.tokens_in, variant.tokens_out)} tokens ·{" "}
+                  {describeCost(variant)}
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <p className="m-0 text-caption text-ink-muted">
             From each case’s last run, at DeepSeek’s peak price, so the real
             cost is usually the same or lower.

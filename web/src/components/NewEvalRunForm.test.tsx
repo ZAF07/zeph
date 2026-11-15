@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { NewEvalRunForm } from "@/components/NewEvalRunForm";
-import type { ApiClient } from "@/lib/api-client";
+import { ApiError, type ApiClient } from "@/lib/api-client";
 import { finishedRun } from "@/test/eval-runs";
 import { renderWithQueries } from "@/test/render-with-queries";
 
@@ -11,6 +11,7 @@ const apiClient = {
   listEvals: vi.fn<ApiClient["listEvals"]>(),
   startEvalRun: vi.fn<ApiClient["startEvalRun"]>(),
   estimateEvalRun: vi.fn<ApiClient["estimateEvalRun"]>(),
+  listSettingOverrideChoices: vi.fn<ApiClient["listSettingOverrideChoices"]>(),
 };
 const router = { push: vi.fn() };
 
@@ -44,6 +45,51 @@ describe("NewEvalRunForm", () => {
       ],
       cost_sgd: 0.045,
       unpriced_models: [],
+      variants: [
+        {
+          letter: "A",
+          tokens_in: 82_000,
+          tokens_out: 9_000,
+          cost_sgd: 0.045,
+          unpriced_models: [],
+        },
+      ],
+    });
+    apiClient.listSettingOverrideChoices.mockResolvedValue({
+      settings: [
+        {
+          key: "understanding_thinking",
+          label: "Understanding thinking",
+          kind: "on_off",
+          minimum: 0,
+          maximum: 0,
+          max_length: 20000,
+          hint: null,
+          value: true,
+        },
+        {
+          key: "crisis_reply",
+          label: "Crisis Reply",
+          kind: "text",
+          minimum: 0,
+          maximum: 0,
+          max_length: 20000,
+          hint: null,
+          value: "Please reach out. {helplines}",
+        },
+      ],
+      needs: [
+        {
+          key: "need:n-1",
+          name: "Be heard",
+          value: {
+            name: "Be heard",
+            when_it_fits: "They are venting.",
+            how_to_reply: "Listen first.",
+          },
+        },
+      ],
+      models: ["deepseek-flash"],
     });
   });
 
@@ -61,6 +107,8 @@ describe("NewEvalRunForm", () => {
     expect(apiClient.startEvalRun).toHaveBeenCalledWith({
       evals: ["safeguard", "persona"],
       case_keys: [],
+      variants: [{}],
+      repeats: 1,
     });
     expect(router.push).toHaveBeenCalledWith("/admin/evals/runs/run-9");
   });
@@ -107,6 +155,8 @@ describe("NewEvalRunForm", () => {
     expect(apiClient.startEvalRun).toHaveBeenCalledWith({
       evals: [],
       case_keys: ["traffic"],
+      variants: [{}],
+      repeats: 1,
     });
   });
 
@@ -127,6 +177,8 @@ describe("NewEvalRunForm", () => {
     expect(apiClient.estimateEvalRun).toHaveBeenLastCalledWith({
       evals: ["safeguard"],
       case_keys: [],
+      variants: [{}],
+      repeats: 1,
     });
   });
 
@@ -144,5 +196,146 @@ describe("NewEvalRunForm", () => {
     expect(
       screen.getByRole("button", { name: "Start run · 2 cases" }),
     ).toBeEnabled();
+  });
+
+  it("compares Variants with their own overrides and Repeats", async () => {
+    renderWithQueries(<NewEvalRunForm />);
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: /Safeguard/ }),
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Add Variant B" }),
+    );
+    const variantB = screen.getByRole("region", { name: "Variant B" });
+    await userEvent.selectOptions(
+      within(variantB).getByRole("combobox", {
+        name: "Change a setting in Variant B",
+      }),
+      "understanding_thinking",
+    );
+    expect(within(variantB).getByText("Live: On")).toBeInTheDocument();
+    await userEvent.click(
+      within(variantB).getByRole("switch", { name: "Understanding thinking" }),
+    );
+    await userEvent.selectOptions(
+      screen.getByRole("combobox", { name: /Repeats/ }),
+      "3",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Start run · 12 cases" }),
+    );
+
+    expect(apiClient.startEvalRun).toHaveBeenCalledWith({
+      evals: ["safeguard"],
+      case_keys: [],
+      variants: [{}, { understanding_thinking: false }],
+      repeats: 3,
+    });
+  });
+
+  it("changes a Need for one Variant, starting from its live details", async () => {
+    renderWithQueries(<NewEvalRunForm />);
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: /Safeguard/ }),
+    );
+    await userEvent.selectOptions(
+      await screen.findByRole("combobox", {
+        name: "Change a setting in Variant A",
+      }),
+      "need:n-1",
+    );
+    const whenItFits = screen.getByRole("textbox", {
+      name: "Need: Be heard when it fits",
+    });
+    expect(whenItFits).toHaveValue("They are venting.");
+    await userEvent.clear(whenItFits);
+    await userEvent.type(whenItFits, "Only when venting.");
+    await userEvent.click(screen.getByRole("button", { name: /Start run/ }));
+
+    expect(apiClient.startEvalRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variants: [
+          {
+            "need:n-1": {
+              name: "Be heard",
+              when_it_fits: "Only when venting.",
+              how_to_reply: "Listen first.",
+            },
+          },
+        ],
+      }),
+    );
+  });
+
+  it("shows why an override was refused, as the settings page would", async () => {
+    apiClient.startEvalRun.mockRejectedValue(
+      new ApiError(
+        422,
+        "/api/admin/eval-runs",
+        "The Crisis Reply must include {helplines}, where the Helplines go.",
+      ),
+    );
+    renderWithQueries(<NewEvalRunForm />);
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: /Safeguard/ }),
+    );
+    await userEvent.selectOptions(
+      await screen.findByRole("combobox", {
+        name: "Change a setting in Variant A",
+      }),
+      "crisis_reply",
+    );
+    await userEvent.clear(
+      screen.getByRole("textbox", { name: "Crisis Reply" }),
+    );
+    await userEvent.type(
+      screen.getByRole("textbox", { name: "Crisis Reply" }),
+      "Stay safe.",
+    );
+    await userEvent.click(screen.getByRole("button", { name: /Start run/ }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Couldn’t start the run: The Crisis Reply must include {helplines}",
+    );
+  });
+
+  it("shows each Variant's estimate when comparing", async () => {
+    apiClient.estimateEvalRun.mockResolvedValue({
+      case_count: 4,
+      rough_case_count: 0,
+      tokens_in: 20_000,
+      tokens_out: 2_000,
+      models: [],
+      cost_sgd: 0.01,
+      unpriced_models: [],
+      variants: ["A", "B"].map((letter) => ({
+        letter,
+        tokens_in: 10_000,
+        tokens_out: 1_000,
+        cost_sgd: 0.005,
+        unpriced_models: [],
+      })),
+    });
+    renderWithQueries(<NewEvalRunForm />);
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: /Safeguard/ }),
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Add Variant B" }),
+    );
+
+    const estimate = await screen.findByRole("region", { name: "Estimate" });
+    expect(
+      await within(estimate).findByText(
+        "Variant B: about 10,000 in / 1,000 out tokens · S$0.0050",
+      ),
+    ).toBeInTheDocument();
+    expect(apiClient.estimateEvalRun).toHaveBeenLastCalledWith(
+      expect.objectContaining({ variants: [{}, {}] }),
+    );
   });
 });

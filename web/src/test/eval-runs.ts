@@ -8,7 +8,7 @@ export const finishedRun: EvalRunDetails = {
   started_by_name: "Owner",
   evals: ["safeguard"],
   repeats: 1,
-  variants: [{ letter: "A", setting_overrides: {} }],
+  variants: [{ letter: "A", setting_overrides: {}, made_live: null }],
   queued_at: "2026-11-15T09:00:00Z",
   started_at: "2026-11-15T09:00:05Z",
   finished_at: "2026-11-15T09:03:00Z",
@@ -25,6 +25,7 @@ export const finishedRun: EvalRunDetails = {
   cost_sgd: 0,
   unpriced_models: [],
   results: [],
+  variant_totals: [],
 };
 
 /** A passed Safeguard Case Result, for Dashboard tests. */

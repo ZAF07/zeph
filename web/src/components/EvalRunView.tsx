@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
-import { CaseResultCard } from "@/components/CaseResultCard";
 import { EvalPill } from "@/components/EvalPill";
 import { EvalRunActions } from "@/components/EvalRunActions";
+import { EvalRunGrid } from "@/components/EvalRunGrid";
 import { EvalRunSnapshotDetails } from "@/components/EvalRunSnapshotDetails";
+import { EvalVariantsPanel } from "@/components/EvalVariantsPanel";
 import { LoadFailed } from "@/components/LoadFailed";
 import type { EvalRunDetails } from "@/lib/api-client";
 import { formatSavedAt } from "@/lib/dates";
@@ -41,9 +42,10 @@ function progressText(run: EvalRunDetails): string {
 
 /**
  * The page of one Eval Run: its state, who started it, its running totals
- * (passes, tokens and SGD), what an Admin can do with it, what it used, then
- * each Case Result as it finishes. It checks again every two seconds while
- * the run is Queued or Running, and stops once the run has ended.
+ * (passes, tokens and SGD), what an Admin can do with it, its Variants with
+ * Make Live, what it used, then the grid of Case Results as they finish, a
+ * row per case and a column per Variant. It checks again every two seconds
+ * while the run is Queued or Running, and stops once the run has ended.
  *
  * @param props - `runId` is the run's ID.
  * @returns The run, or a loading or error state.
@@ -157,14 +159,12 @@ export function EvalRunView({ runId }: { runId: string }) {
         </p>
       ) : null}
 
+      <EvalVariantsPanel run={run} />
+
       <EvalRunSnapshotDetails runId={run.id} />
 
       {run.results.length > 0 ? (
-        <ol className="m-0 flex list-none flex-col gap-2.5 p-0">
-          {run.results.map((result) => (
-            <CaseResultCard key={result.id} runId={run.id} result={result} />
-          ))}
-        </ol>
+        <EvalRunGrid run={run} />
       ) : (
         <div className="rounded-card border border-dashed border-line-strong px-6 py-12 text-center text-caption text-ink-muted">
           Case Results appear here as each case finishes.
