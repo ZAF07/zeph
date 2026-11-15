@@ -48,7 +48,8 @@ def check_photo_description_case(
         companion: The app on the Eval database.
 
     Returns:
-        One check; its facts hold the description.
+        One check; its facts hold the description, which a failed case
+        also notes.
     """
     user_id = companion.connect_user()
 
@@ -69,4 +70,5 @@ def check_photo_description_case(
         outcome=CaseOutcome.PASS if check.passed else CaseOutcome.FAIL,
         checks=[check],
         facts={"description": description},
+        notes=[] if check.passed else [f"Description: {description}"],
     )

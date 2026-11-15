@@ -33,9 +33,10 @@ function progressText(run: EvalRunDetails): string {
     return "Waiting for the runner. It starts once any run before it ends.";
   }
   if (run.case_count === null) {
-    return `${done} cases done`;
+    return done === 1 ? "1 case done" : `${done} cases done`;
   }
-  return `${done} of ${run.case_count} cases done`;
+  const cases = run.case_count === 1 ? "case" : "cases";
+  return `${done} of ${run.case_count} ${cases} done`;
 }
 
 /**

@@ -60,10 +60,10 @@ services:
         - python
         - -c
         - import urllib.request; urllib.request.urlopen('http://localhost:8000/health')
-      interval: 5s
+      interval: 10s
       timeout: 5s
       start_period: 180s
-      retries: 30
+      retries: 6
 
   # Works Eval Runs one at a time against its own Eval database (ADR-0013).
   # It always uses a recording chat channel and no web search, whatever the
