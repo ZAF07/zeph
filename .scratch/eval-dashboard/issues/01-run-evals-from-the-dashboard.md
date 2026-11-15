@@ -81,3 +81,5 @@ Terms are in `CONTEXT.md` (Eval Run, Eval Case, Variant, Setting Override, Make 
 `/to-prd`, then `/to-issues`. Evals cost money: the User is reminded before any eval run is planned or made.
 
 ## Comments
+
+- 2026-11-15: PRD written at `.scratch/eval-dashboard/PRD.md` (test seams agreed: backend HTTP API, "work the next Queued run", Dashboard components). Next: `/to-issues`.
