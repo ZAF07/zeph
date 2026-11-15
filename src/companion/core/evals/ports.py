@@ -592,6 +592,9 @@ class EvalRunRepository(Protocol):
     def end(self, run_id: UUID, state: EvalRunState, now: datetime) -> None:
         """End a Running run as Finished, Cancelled or Stopped over limit.
 
+        A run an Admin asked to cancel ends Cancelled rather than Finished,
+        even if the cancel came after its last case.
+
         Args:
             run_id: The run.
             state: How it ended.
