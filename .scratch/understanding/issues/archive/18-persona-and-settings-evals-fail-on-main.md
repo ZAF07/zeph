@@ -73,4 +73,4 @@ uv run pytest -n 0 evals -m eval -k "struggling-with-shared-photos or forget-why
 ## Completion
 
 - Completed: 2026-11-15
-- Commits: to be filled in after merge
+- Commits: `0389b4e` (photo guard, Understanding prompt and migration 0039, Get it done Need and migration 0040, eval cases), `5579b85` (review fixes, guard unit test, CONTEXT.md), `b511515` (forget-why-here User skips onboarding reasons), `86925e5` (archive with evidence); merged to main in `cd5a050`
