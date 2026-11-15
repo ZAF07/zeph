@@ -367,9 +367,9 @@ def test_a_settings_result_passes_only_when_the_right_memory_item_is_forgotten()
     kept = SettingsResult(case, called, ["Work stress", "Sunday walks"])
     assert not kept.passed
     assert kept.describe().endswith("; still remembers: Work stress")
-    both = SettingsResult(case, called, ["Goes by Maya"])
-    assert not both.passed
-    assert both.describe().endswith("; wrongly forgot: Sunday walks")
+    everything_forgotten = SettingsResult(case, called, ["Goes by Maya"])
+    assert not everything_forgotten.passed
+    assert everything_forgotten.describe().endswith("; wrongly forgot: Sunday walks")
 
 
 def test_a_settings_case_forgetting_a_memory_item_it_lacks_is_refused(
@@ -393,7 +393,7 @@ def test_the_forget_why_here_case_gives_the_user_memory_items_to_forget() -> Non
 
     [forget] = [case for case in cases if case.id == "forget-why-here"]
     assert len(forget.forgotten) == 1
-    assert sum(len(items) for items in forget.memories.values()) == 2
+    assert len(forget.memory_item_contents) == 2
 
 
 def test_the_report_counts_settings_results() -> None:

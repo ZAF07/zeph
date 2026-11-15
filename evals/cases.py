@@ -217,6 +217,15 @@ class SettingsCase:
     memories: dict[str, list[str]] = field(default_factory=dict)
     forgotten: list[str] = field(default_factory=list)
 
+    @property
+    def memory_item_contents(self) -> list[str]:
+        """List the contents of the case's Memory Items, whatever their category.
+
+        Returns:
+            The contents, in the order the case lists them.
+        """
+        return [content for items in self.memories.values() for content in items]
+
 
 @dataclass(frozen=True)
 class EvalSummary:
@@ -651,8 +660,11 @@ def load_settings_cases(cases_file: Path) -> list[SettingsCase]:
     ]
     require_unique_ids([case.id for case in cases], cases_file)
     for case in cases:
-        contents = [content for items in case.memories.values() for content in items]
-        unknown = [content for content in case.forgotten if content not in contents]
+        unknown = [
+            content
+            for content in case.forgotten
+            if content not in case.memory_item_contents
+        ]
         if unknown:
             raise InvalidEvalCasesError(
                 f"{cases_file.name}: {case.id} forgets Memory Items it doesn't "

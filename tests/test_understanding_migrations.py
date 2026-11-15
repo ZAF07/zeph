@@ -65,17 +65,17 @@ def test_an_existing_install_gets_the_new_understanding_prompt(
 def test_an_existing_install_gets_get_it_done_just_before_the_fallback(
     engine: Engine, database_url: str
 ) -> None:
-    seeded = stored_needs(engine)
+    needs_before = stored_needs(engine)
     downgrade_to(database_url, "0039")
     try:
         assert "Get it done" not in [need["name"] for need in stored_needs(engine)]
     finally:
         migrate(database_url)
 
-    assert stored_needs(engine) == seeded
-    seed: list[dict[str, Any]] = yaml.safe_load(NEEDS_SEED_FILE.read_text())
-    [get_it_done] = [need for need in seed if need["name"] == "Get it done"]
-    [stored] = [need for need in seeded if need["name"] == "Get it done"]
+    assert stored_needs(engine) == needs_before
+    seed_needs: list[dict[str, Any]] = yaml.safe_load(NEEDS_SEED_FILE.read_text())
+    [get_it_done] = [need for need in seed_needs if need["name"] == "Get it done"]
+    [stored] = [need for need in needs_before if need["name"] == "Get it done"]
     assert stored["when_it_fits"] == get_it_done["when_it_fits"]
     assert stored["how_to_reply"] == get_it_done["how_to_reply"]
 

@@ -128,8 +128,7 @@ class SettingsResult:
         """
         return [
             content
-            for items in self.case.memories.values()
-            for content in items
+            for content in self.case.memory_item_contents
             if content not in self.case.forgotten and content not in self.memory_after
         ]
 
