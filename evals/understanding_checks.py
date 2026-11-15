@@ -16,8 +16,8 @@ class ObservedUnderstanding:
         raised_threads: The titles of the Life Threads it brought up.
         raised_curiosities: How many Curiosities it brought up.
         asked_why: Whether the reply was asked to gently ask why.
-        knowledge_documents: The Knowledge documents it chose to search, as
-            it named them; empty when none.
+        knowledge_documents: The titles of the Knowledge documents it chose
+            to search; empty when none.
         knowledge_in_reply: The Knowledge documents whose passages reached
             the reply's instructions.
     """
@@ -132,7 +132,7 @@ def check_knowledge(
 
     Args:
         expected: Whether Knowledge must be chosen and reach the reply.
-        chosen: The documents the Understanding chose, as it named them.
+        chosen: The titles of the documents the Understanding chose.
         in_reply: The documents whose passages reached the reply.
 
     Returns:

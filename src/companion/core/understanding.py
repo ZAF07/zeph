@@ -223,6 +223,21 @@ def read_text_list(value: Any) -> tuple[str, ...]:
     )
 
 
+def read_number(value: Any) -> int | None:
+    """Read a number the form uses to name something from a numbered list.
+
+    Args:
+        value: The number, as the model wrote it.
+
+    Returns:
+        The number; None if the value isn't a whole number, e.g. a title,
+        a number written as text, or true/false.
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
 def read_thread(
     value: Any, by_number: dict[int, RemindedThread]
 ) -> RemindedThread | None:
@@ -235,9 +250,8 @@ def read_thread(
     Returns:
         The Thread; None if the value isn't one of their numbers.
     """
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return by_number.get(value)
+    number = read_number(value)
+    return None if number is None else by_number.get(number)
 
 
 def read_threads_touched(
@@ -348,8 +362,8 @@ def read_curiosities_to_raise(
     for entry in value:
         if not isinstance(entry, dict):
             continue
-        number = entry.get("curiosity")
-        if isinstance(number, bool) or not isinstance(number, int):
+        number = read_number(entry.get("curiosity"))
+        if number is None:
             continue
         item = by_number.get(number)
         if item is None or item.curiosity.id in chosen:
@@ -422,13 +436,15 @@ def read_knowledge_lookup(
     search = value.get("search")
     if not isinstance(numbers, list) or not isinstance(search, str):
         return None
-    documents = {
-        document.id: ChosenKnowledgeDocument(document.id, document.title)
-        for number in numbers
-        if not isinstance(number, bool)
-        and isinstance(number, int)
-        and (document := by_number.get(number)) is not None
-    }
+    documents: dict[UUID, ChosenKnowledgeDocument] = {}
+    for value in numbers:
+        number = read_number(value)
+        document = None if number is None else by_number.get(number)
+        if document is None:
+            continue
+        documents[document.id] = ChosenKnowledgeDocument(
+            document_id=document.id, title=document.title
+        )
     if not documents or not search.strip():
         return None
     return KnowledgeLookup(documents=tuple(documents.values()), search=search.strip())
