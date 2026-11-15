@@ -32,7 +32,7 @@ from companion.core.evals.ports import (
     JudgeSettingsRepository,
 )
 from companion.core.evals.runs import EvalRunService
-from companion.core.evals.setting_overrides import SettingOverrides
+from companion.core.evals.setting_overrides import SettingOverrideService
 from companion.core.features import FeatureService
 from companion.core.helplines import HelplineService
 from companion.core.home import HomeService
@@ -379,6 +379,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     platform_settings_service = PlatformSettingsService(
         dependencies.repositories.platform_settings, dependencies.clock
     )
+    need_service = NeedService(dependencies.repositories)
     current_user = build_current_user_dependency(
         dependencies.auth_verifier, user_service
     )
@@ -434,12 +435,10 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             check_in_service=check_in_service,
             usage_limiter=usage_limiter,
             model_call_log=model_call_log,
-            need_service=NeedService(dependencies.repositories),
+            need_service=need_service,
         )
     )
-    setting_overrides = SettingOverrides(
-        platform_settings_service, NeedService(dependencies.repositories)
-    )
+    setting_overrides = SettingOverrideService(platform_settings_service, need_service)
     app.include_router(
         build_eval_api_router(
             current_admin=build_current_admin_dependency(current_user),
@@ -457,8 +456,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 dependencies.repositories.needs,
                 dependencies.clock,
             ),
-            platform_settings_service=platform_settings_service,
-            need_service=NeedService(dependencies.repositories),
+            setting_override_service=setting_overrides,
             eval_costs_service=EvalCostsService(
                 dependencies.repositories.platform_settings, dependencies.clock
             ),

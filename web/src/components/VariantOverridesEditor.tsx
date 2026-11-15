@@ -2,7 +2,10 @@ import { compactSecondaryButton } from "@/components/button-styles";
 import { inputField } from "@/components/form-styles";
 import { SettingOverrideField } from "@/components/SettingOverrideField";
 import type { OverrideChoices, SettingOverrides } from "@/lib/api-client";
-import { overrideLabel } from "@/lib/setting-overrides";
+import {
+  describeVariantSettings,
+  overrideLabel,
+} from "@/lib/setting-overrides";
 
 /**
  * One Variant of a new run: the live settings, plus any Setting Overrides
@@ -59,10 +62,7 @@ export function VariantOverridesEditor({
         <h3 className="m-0 text-body font-semibold">
           Variant {letter}{" "}
           <span className="font-normal text-ink-muted">
-            ·{" "}
-            {keys.length === 0
-              ? "live settings"
-              : `live settings with ${keys.length} changed`}
+            · {describeVariantSettings(keys.length)}
           </span>
         </h3>
         {onRemove ? (

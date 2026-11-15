@@ -9,3 +9,6 @@ export const fieldLabel = "flex min-w-0 flex-col gap-2 text-sm font-medium";
 
 /** A small grey line under a field. */
 export const fieldCaption = "m-0 text-caption font-normal text-ink-muted";
+
+/** A tall text box for prompts and other long text, in a code font. */
+export const codeTextArea = `${inputField} resize-y font-mono text-[13.5px] leading-relaxed`;

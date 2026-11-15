@@ -10,7 +10,7 @@ from companion.core.evals.models import (
 )
 from companion.core.evals.ports import EvalRunRepository
 from companion.core.evals.runs import EvalRunNotFoundError
-from companion.core.evals.setting_overrides import SettingOverrides, live_value
+from companion.core.evals.setting_overrides import SettingOverrideService, live_value
 from companion.core.models import User
 from companion.core.ports import Clock, NeedRepository, PlatformSettingsRepository
 
@@ -71,7 +71,7 @@ class MakeLiveService:
     def __init__(
         self,
         runs: EvalRunRepository,
-        overrides: SettingOverrides,
+        overrides: SettingOverrideService,
         live_settings: PlatformSettingsRepository,
         live_needs: NeedRepository,
         clock: Clock,
@@ -119,8 +119,10 @@ class MakeLiveService:
 
         Overrides whose live value is as it was when the run started are
         applied straight away; changed ones only if confirmed, and are left
-        out otherwise. The Variant records who, when, and what was applied
-        or left out, and can't be made live again.
+        out otherwise. The Variant is marked made live first, in one step,
+        so two Admins at once can't both apply it; if the save is refused the
+        mark is taken off again. It records who, when, and what was applied
+        or left out.
 
         Args:
             run_id: The run.
@@ -152,10 +154,16 @@ class MakeLiveService:
             for key, value in variant.setting_overrides.items()
             if key not in left_out
         }
-        self._overrides.save_live(admin, applied)
-        self._runs.mark_made_live(
+        claimed = self._runs.mark_made_live(
             run_id, letter, admin.id, self._clock.now(), list(applied), left_out
         )
+        if not claimed:
+            raise AlreadyMadeLiveError()
+        try:
+            self._overrides.save_live(admin, applied)
+        except Exception:
+            self._runs.unmark_made_live(run_id, letter)
+            raise
         return variant_of(self._runs.get(run_id), letter)
 
     def _variant_to_make_live(

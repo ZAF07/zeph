@@ -37,7 +37,7 @@ from companion.core.evals.models import (
     add_tokens_by_model,
 )
 from companion.core.evals.ports import EvalCaseRepository, EvalRunRepository
-from companion.core.evals.setting_overrides import SettingOverrides
+from companion.core.evals.setting_overrides import SettingOverrideService
 from companion.core.models import ModelCall
 from companion.core.platform_settings import (
     EVAL_RUN_TOKEN_LIMIT,
@@ -173,6 +173,25 @@ def mark_changes(rows: Sequence[CaseHistoryRow]) -> list[CaseHistoryEntry]:
     return entries
 
 
+def check_variants_and_repeats(
+    variant_overrides: Sequence[Mapping[str, Any]], repeats: int
+) -> None:
+    """Check a run has 1 to 3 Variants and Repeats in range.
+
+    Args:
+        variant_overrides: Each Variant's Setting Overrides.
+        repeats: How many times each case runs per Variant.
+
+    Raises:
+        InvalidVariantsError: If there are no Variants or too many.
+        InvalidRepeatsError: If Repeats are out of range.
+    """
+    if not FIRST_TRY <= repeats <= MAX_REPEATS:
+        raise InvalidRepeatsError()
+    if not 1 <= len(variant_overrides) <= len(VARIANT_LETTERS):
+        raise InvalidVariantsError()
+
+
 def variant_totals(
     letter: str, results: Sequence[CaseResult], prices: Mapping[str, ModelPrice]
 ) -> VariantTotals:
@@ -216,7 +235,7 @@ class EvalRunService:
         runs: EvalRunRepository,
         cases: EvalCaseRepository,
         settings: PlatformSettingsRepository,
-        overrides: SettingOverrides,
+        overrides: SettingOverrideService,
         clock: Clock,
     ) -> None:
         """Set up the service.
@@ -285,10 +304,7 @@ class EvalRunService:
             NotFoundError: If a Setting Override names no live Need.
         """
         cases = self._pick_cases(evals, case_keys)
-        if not FIRST_TRY <= repeats <= MAX_REPEATS:
-            raise InvalidRepeatsError()
-        if not 1 <= len(variant_overrides) <= len(VARIANT_LETTERS):
-            raise InvalidVariantsError()
+        check_variants_and_repeats(variant_overrides, repeats)
         variants = [
             Variant(letter, self._overrides.checked(overrides))
             for letter, overrides in zip(
@@ -328,10 +344,7 @@ class EvalRunService:
             InvalidRepeatsError: If Repeats are out of range.
         """
         cases = self._pick_cases(evals, case_keys)
-        if not FIRST_TRY <= repeats <= MAX_REPEATS:
-            raise InvalidRepeatsError()
-        if not 1 <= len(variant_overrides) <= len(VARIANT_LETTERS):
-            raise InvalidVariantsError()
+        check_variants_and_repeats(variant_overrides, repeats)
         newest = self._runs.newest_tokens_by_case([case.key for case in cases])
         settings = self._settings.load()
         prices = stored_prices(settings.values)
@@ -368,7 +381,8 @@ class EvalRunService:
 
         A case is run again if any of its tries on any Variant failed or
         errored. The new run has the same Variants and Repeats, so its
-        results compare fairly. Cases archived since are left out.
+        results compare fairly; their overrides are checked again, as
+        settings may have changed since. Cases archived since are left out.
 
         Args:
             run_id: The run whose failed cases to run again.
@@ -383,6 +397,8 @@ class EvalRunService:
             EvalRunStillGoingError: If the run hasn't ended.
             NothingFailedError: If none of its cases failed or errored, or
                 those that did are archived.
+            InvalidError: If a Setting Override is refused now.
+            NotFoundError: If a Setting Override names a Need deleted since.
         """
         run = self.get_overview(run_id).run
         if run.state not in ENDED_STATES:
@@ -398,7 +414,7 @@ class EvalRunService:
         if not cases:
             raise NothingFailedError()
         variants = [
-            Variant(variant.letter, variant.setting_overrides)
+            Variant(variant.letter, self._overrides.checked(variant.setting_overrides))
             for variant in run.variants
         ]
         return self._queue(

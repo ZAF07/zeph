@@ -15,7 +15,7 @@ from companion.config import load_settings
 from companion.core.errors import InvalidError
 from companion.core.evals.models import EvalName, EvalRunState, StartedFrom
 from companion.core.evals.runs import EvalRunService
-from companion.core.evals.setting_overrides import SettingOverrides
+from companion.core.evals.setting_overrides import SettingOverrideService
 from companion.core.needs import NeedService
 from companion.core.platform_settings import PlatformSettingsService
 from companion.core.ports import Clock
@@ -116,7 +116,7 @@ def build_eval_run_service(engine: Engine, clock: Clock) -> EvalRunService:
         runs=PostgresEvalRunRepository(engine),
         cases=PostgresEvalCaseRepository(engine),
         settings=repositories.platform_settings,
-        overrides=SettingOverrides(
+        overrides=SettingOverrideService(
             PlatformSettingsService(repositories.platform_settings, clock),
             NeedService(repositories),
         ),

@@ -2,7 +2,10 @@ import { MakeLiveControl } from "@/components/MakeLiveControl";
 import { SettingValueLine } from "@/components/SettingValueLine";
 import type { EvalRunState, EvalVariant } from "@/lib/api-client";
 import { formatSavedAt } from "@/lib/dates";
-import { describeSettingValue } from "@/lib/setting-overrides";
+import {
+  describeSettingValue,
+  describeVariantSettings,
+} from "@/lib/setting-overrides";
 
 /** Values this long, or with line breaks, open on a click. */
 const shortValueLength = 80;
@@ -53,10 +56,7 @@ export function EvalVariantCard({
       <h2 className="m-0 text-body font-semibold">
         Variant {variant.letter}{" "}
         <span className="font-normal text-ink-muted">
-          ·{" "}
-          {keys.length === 0
-            ? "live settings"
-            : `live settings with ${keys.length} changed`}
+          · {describeVariantSettings(keys.length)}
         </span>
       </h2>
       {keys.length > 0 ? (

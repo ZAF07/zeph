@@ -1,7 +1,5 @@
-import { fieldLabel, inputField } from "@/components/form-styles";
+import { codeTextArea, fieldLabel, inputField } from "@/components/form-styles";
 import type { NeedOverride } from "@/lib/api-client";
-
-const textArea = `${inputField} resize-y font-mono text-[13.5px] leading-relaxed`;
 
 /**
  * The three fields of a Need override.
@@ -37,7 +35,7 @@ export function NeedOverrideFields({
         When it fits
         <textarea
           aria-label={`${label} when it fits`}
-          className={textArea}
+          className={codeTextArea}
           rows={3}
           value={details.when_it_fits}
           onChange={(event) =>
@@ -49,7 +47,7 @@ export function NeedOverrideFields({
         How to reply
         <textarea
           aria-label={`${label} how to reply`}
-          className={textArea}
+          className={codeTextArea}
           rows={3}
           value={details.how_to_reply}
           onChange={(event) =>

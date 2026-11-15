@@ -24,14 +24,13 @@ from companion.core.evals.models import (
     VariantTotals,
 )
 from companion.core.evals.runs import EvalRunService
-from companion.core.evals.setting_overrides import need_override_key, need_values
-from companion.core.models import User
-from companion.core.needs import NeedService
-from companion.core.platform_settings import (
-    EDITABLE_SETTINGS,
-    PlatformSettingsService,
-    SettingKind,
+from companion.core.evals.setting_overrides import (
+    SettingOverrideService,
+    need_override_key,
+    need_values,
 )
+from companion.core.models import Need, User
+from companion.core.platform_settings import SettingKind
 
 
 class EvalResponse(BaseModel):
@@ -206,8 +205,8 @@ class OverridableSettingResponse(BaseModel):
     value: Any
 
 
-class OverridableNeedResponse(BaseModel):
-    """A Need a Variant can override, keyed `need:<id>`, with its live details."""
+class NeedResponse(BaseModel):
+    """A Need keyed as its override would be, `need:<id>`, with its details."""
 
     key: str
     name: str
@@ -218,7 +217,7 @@ class OverrideChoicesResponse(BaseModel):
     """What a Variant can override, as on the settings pages."""
 
     settings: list[OverridableSettingResponse]
-    needs: list[OverridableNeedResponse]
+    needs: list[NeedResponse]
     models: list[str]
 
 
@@ -263,21 +262,13 @@ class EvalCaseResponse(BaseModel):
     archived: bool
 
 
-class SnapshotNeedResponse(BaseModel):
-    """A live Need when a run started, keyed as its override would be."""
-
-    key: str
-    name: str
-    value: dict[str, str]
-
-
 class EvalRunSnapshotResponse(BaseModel):
     """What a run used; every field is null while it is Queued."""
 
     settings: dict[str, Any] | None
     judge: dict[str, Any] | None
     cases: list[EvalCaseResponse] | None
-    needs: list[SnapshotNeedResponse] | None
+    needs: list[NeedResponse] | None
 
 
 class CaseHistoryEntryResponse(BaseModel):
@@ -414,6 +405,20 @@ def to_eval_run_response(overview: EvalRunOverview) -> EvalRunResponse:
     )
 
 
+def to_need_response(need: Need) -> NeedResponse:
+    """Turn a Need into its API shape, keyed as its override would be.
+
+    Args:
+        need: The Need.
+
+    Returns:
+        The response.
+    """
+    return NeedResponse(
+        key=need_override_key(need.id), name=need.name, value=need_values(need)
+    )
+
+
 def to_variant_response(variant: Variant) -> VariantResponse:
     """Turn a Variant into its API shape.
 
@@ -500,8 +505,7 @@ def build_eval_api_router(
     eval_run_service: EvalRunService,
     eval_costs_service: EvalCostsService,
     make_live_service: MakeLiveService,
-    platform_settings_service: PlatformSettingsService,
-    need_service: NeedService,
+    setting_override_service: SettingOverrideService,
 ) -> APIRouter:
     """Build the admin routes for Evals, Eval Runs and their costs.
 
@@ -512,8 +516,7 @@ def build_eval_api_router(
         eval_run_service: Starts Eval Runs and shows how they went.
         eval_costs_service: Reads and saves Model Prices and the token limit.
         make_live_service: Makes a Variant's Setting Overrides live.
-        platform_settings_service: Lists the settings a Variant can override.
-        need_service: Lists the Needs a Variant can override.
+        setting_override_service: Lists what a Variant can override.
 
     Returns:
         The router.
@@ -607,8 +610,10 @@ def build_eval_api_router(
             variants=[
                 VariantEstimateResponse(
                     letter=variant.letter,
-                    tokens_in=sum(c.tokens_in for c in variant.tokens.values()),
-                    tokens_out=sum(c.tokens_out for c in variant.tokens.values()),
+                    tokens_in=sum(count.tokens_in for count in variant.tokens.values()),
+                    tokens_out=sum(
+                        count.tokens_out for count in variant.tokens.values()
+                    ),
                     **cost_fields(variant.cost),
                 )
                 for variant in estimate.variants
@@ -623,33 +628,23 @@ def build_eval_api_router(
             The settings Admins can edit with their rules, the Needs, and
             the models a model setting can pick.
         """
-        stored = {
-            setting.key: setting.value
-            for setting in platform_settings_service.list_editable()
-        }
+        choices = setting_override_service.choices()
         return OverrideChoicesResponse(
             settings=[
                 OverridableSettingResponse(
-                    key=setting.key,
-                    label=setting.label,
-                    kind=setting.kind,
-                    minimum=setting.minimum,
-                    maximum=setting.maximum,
-                    max_length=setting.max_length,
-                    hint=setting.hint,
-                    value=stored.get(setting.key),
+                    key=choice.setting.key,
+                    label=choice.setting.label,
+                    kind=choice.setting.kind,
+                    minimum=choice.setting.minimum,
+                    maximum=choice.setting.maximum,
+                    max_length=choice.setting.max_length,
+                    hint=choice.setting.hint,
+                    value=choice.value,
                 )
-                for setting in EDITABLE_SETTINGS
+                for choice in choices.settings
             ],
-            needs=[
-                OverridableNeedResponse(
-                    key=need_override_key(need.id),
-                    name=need.name,
-                    value=need_values(need),
-                )
-                for need in need_service.list_all()
-            ],
-            models=platform_settings_service.model_choices(),
+            needs=[to_need_response(need) for need in choices.needs],
+            models=choices.models,
         )
 
     @router.get("/eval-runs/{run_id}/variants/{letter}/live-changes")
@@ -788,14 +783,7 @@ def build_eval_api_router(
             settings=snapshot.settings,
             judge=snapshot.judge,
             cases=[to_eval_case_response(case) for case in snapshot.cases],
-            needs=[
-                SnapshotNeedResponse(
-                    key=need_override_key(need.id),
-                    name=need.name,
-                    value=need_values(need),
-                )
-                for need in snapshot.needs
-            ],
+            needs=[to_need_response(need) for need in snapshot.needs],
         )
 
     @router.get("/eval-runs/{run_id}/results/{result_id}")

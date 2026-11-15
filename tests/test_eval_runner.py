@@ -1244,3 +1244,89 @@ def test_make_live_needs_a_finished_run_and_a_variant_with_overrides(
     assert make_live(client, admin, str(uuid4()), "A").status_code == 404
     live = client.get("/api/admin/settings", headers=admin).json()["settings"]
     assert live["response_thinking"]["value"] is False
+
+
+def test_a_need_deleted_before_the_run_starts_makes_its_variant_an_error(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, FALSE_ALARM_CASE)
+    admin = owner_headers(client, auth_verifier)
+    key = need_key(client, admin, "Just chatting")
+    change = {"name": "Just chatting", "when_it_fits": "x", "how_to_reply": "y"}
+    run = start_run(client, admin, EvalName.SAFEGUARD, variants=[{}, {key: change}])
+    deleted = client.delete(
+        f"/api/admin/needs/{key.removeprefix('need:')}", headers=admin
+    )
+    assert deleted.status_code == 204
+    chat_model.script()
+
+    runner.work_next_run()
+
+    variant_a, variant_b = open_run(client, admin, run["id"])["results"]
+    assert variant_a["outcome"] == "pass"
+    assert variant_b["outcome"] == "error"
+    assert "Need deleted before the run started" in variant_b["error"]
+
+
+def test_a_refused_make_live_changes_nothing_and_can_be_tried_again(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    key = need_key(client, admin, "Just chatting")
+    change = {"name": "Just chatting", "when_it_fits": "x", "how_to_reply": "y"}
+    run = finish_run_with_overrides(
+        client,
+        admin,
+        engine,
+        chat_model,
+        runner,
+        {"daily_message_limit": 80, key: change},
+    )
+    client.delete(f"/api/admin/needs/{key.removeprefix('need:')}", headers=admin)
+    [gone] = live_changes(client, admin, run["id"], "B").json()["changes"]
+    assert (gone["key"], gone["now"]) == (key, None)
+
+    refused = make_live(client, admin, run["id"], "B", [key])
+
+    assert refused.status_code == 404
+    live = client.get("/api/admin/settings", headers=admin).json()["settings"]
+    assert live["daily_message_limit"]["value"] != 80
+    assert open_run(client, admin, run["id"])["variants"][1]["made_live"] is None
+    made_live = make_live(client, admin, run["id"], "B").json()["made_live"]
+    assert made_live["applied_keys"] == ["daily_message_limit"]
+    assert made_live["left_out_keys"] == [key]
+
+
+def test_a_variant_is_marked_made_live_only_once(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+    clock: FakeClock,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    run = finish_run_with_overrides(
+        client, admin, engine, chat_model, runner, {"response_thinking": True}
+    )
+    runs = PostgresEvalRunRepository(engine)
+    with engine.begin() as connection:
+        admin_id = connection.execute(text("SELECT id FROM users LIMIT 1")).scalar()
+
+    first = runs.mark_made_live(
+        UUID(run["id"]), "B", admin_id, clock.now(), ["response_thinking"], []
+    )
+    second = runs.mark_made_live(
+        UUID(run["id"]), "B", admin_id, clock.now(), ["response_thinking"], []
+    )
+
+    assert (first, second) == (True, False)
+    assert make_live(client, admin, run["id"], "B").status_code == 409

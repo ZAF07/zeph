@@ -1,12 +1,16 @@
 from collections.abc import Mapping, Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import Any
 from uuid import UUID
 
 from companion.core.errors import InvalidError
 from companion.core.models import Need, NeedDetails, User
 from companion.core.needs import NeedService
-from companion.core.platform_settings import PlatformSettingsService
+from companion.core.platform_settings import (
+    EDITABLE_SETTINGS,
+    EditableSetting,
+    PlatformSettingsService,
+)
 
 NEED_OVERRIDE_PREFIX = "need:"
 NEED_FIELDS = ("name", "when_it_fits", "how_to_reply")
@@ -14,6 +18,42 @@ NEED_FIELDS = ("name", "when_it_fits", "how_to_reply")
 
 class InvalidOverrideError(InvalidError):
     """Raised when a Setting Override names no setting or Need, or is malformed."""
+
+
+class OverriddenNeedGoneError(Exception):
+    """Raised when a Variant changes a Need deleted before its run started.
+
+    The case then ends as an Error with this message, so the Variant never
+    quietly runs without its change.
+    """
+
+
+@dataclass(frozen=True)
+class OverridableSetting:
+    """A Platform Setting a Variant can override, with its live value.
+
+    Attributes:
+        setting: The setting and the rule its value must meet.
+        value: Its live value.
+    """
+
+    setting: EditableSetting
+    value: Any
+
+
+@dataclass(frozen=True)
+class OverrideChoices:
+    """What a Variant can override, as the settings pages can change it.
+
+    Attributes:
+        settings: The Platform Settings Admins can edit, with live values.
+        needs: The live Needs.
+        models: The models a model setting can pick.
+    """
+
+    settings: list[OverridableSetting]
+    needs: list[Need]
+    models: list[str]
 
 
 def need_override_key(need_id: UUID) -> str:
@@ -28,11 +68,11 @@ def need_override_key(need_id: UUID) -> str:
     return f"{NEED_OVERRIDE_PREFIX}{need_id}"
 
 
-def need_values(need: Need) -> dict[str, str]:
+def need_values(need: Need | NeedDetails) -> dict[str, str]:
     """Write a Need's details as an override's value.
 
     Args:
-        need: The Need.
+        need: The Need, or its details.
 
     Returns:
         Its name, when it fits and how to reply.
@@ -96,7 +136,21 @@ def variant_needs(
 
     Returns:
         The live Needs, each with the Variant's changes to it.
+
+    Raises:
+        OverriddenNeedGoneError: If the Variant changes a Need that isn't
+            among them.
     """
+    live_keys = {need_override_key(need.id) for need in live_needs}
+    gone = [
+        key
+        for key in overrides
+        if key.startswith(NEED_OVERRIDE_PREFIX) and key not in live_keys
+    ]
+    if gone:
+        raise OverriddenNeedGoneError(
+            "This Variant changes a Need deleted before the run started."
+        )
     return [
         replace(need, **overrides[need_override_key(need.id)])
         if need_override_key(need.id) in overrides
@@ -149,7 +203,7 @@ def need_details(key: str, value: Any) -> NeedDetails:
     )
 
 
-class SettingOverrides:
+class SettingOverrideService:
     """Checks Setting Overrides, and saves them live, as the settings pages do.
 
     Platform Settings go through the Platform Settings save and Needs
@@ -160,7 +214,7 @@ class SettingOverrides:
     def __init__(
         self, settings_service: PlatformSettingsService, need_service: NeedService
     ) -> None:
-        """Set up the checks.
+        """Set up the service.
 
         Args:
             settings_service: The Platform Settings save.
@@ -191,13 +245,29 @@ class SettingOverrides:
             if need_id is None:
                 checked[key] = self._settings_service.checked_value(key, value)
             else:
-                details = self._need_service.checked(need_id, need_details(key, value))
-                checked[key] = {
-                    "name": details.name,
-                    "when_it_fits": details.when_it_fits,
-                    "how_to_reply": details.how_to_reply,
-                }
+                checked[key] = need_values(
+                    self._need_service.checked(need_id, need_details(key, value))
+                )
         return checked
+
+    def choices(self) -> OverrideChoices:
+        """List what a Variant can override, with each one's live value.
+
+        Returns:
+            The editable Platform Settings, the live Needs and the models.
+        """
+        live = {
+            stored.key: stored.value
+            for stored in self._settings_service.list_editable()
+        }
+        return OverrideChoices(
+            settings=[
+                OverridableSetting(setting, live.get(setting.key))
+                for setting in EDITABLE_SETTINGS
+            ],
+            needs=self._need_service.list_all(),
+            models=self._settings_service.model_choices(),
+        )
 
     def save_live(self, admin: User, overrides: Mapping[str, Any]) -> None:
         """Save Setting Overrides as the live Platform Settings and Needs.

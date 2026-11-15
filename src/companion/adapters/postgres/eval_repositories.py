@@ -1062,8 +1062,10 @@ class PostgresEvalRunRepository:
         now: datetime,
         applied_keys: Sequence[str],
         left_out_keys: Sequence[str],
-    ) -> None:
+    ) -> bool:
         """Record that an Admin made a Variant's Setting Overrides live.
+
+        Only a Variant not made live yet is marked, in one step.
 
         Args:
             run_id: The run.
@@ -1072,6 +1074,33 @@ class PostgresEvalRunRepository:
             now: When.
             applied_keys: The overrides applied.
             left_out_keys: The overrides left out.
+
+        Returns:
+            True if it was marked; False if it was made live already.
+        """
+        with self._engine.begin() as connection:
+            marked = connection.execute(
+                update(eval_variants)
+                .where(
+                    eval_variants.c.run_id == run_id,
+                    eval_variants.c.letter == letter,
+                    eval_variants.c.made_live_at.is_(None),
+                )
+                .values(
+                    made_live_by=admin_id,
+                    made_live_at=now,
+                    applied_keys=list(applied_keys),
+                    left_out_keys=list(left_out_keys),
+                )
+            )
+            return marked.rowcount == 1
+
+    def unmark_made_live(self, run_id: UUID, letter: str) -> None:
+        """Take off a Variant's made-live mark, when its save was refused.
+
+        Args:
+            run_id: The run.
+            letter: The Variant's letter.
         """
         with self._engine.begin() as connection:
             connection.execute(
@@ -1081,10 +1110,10 @@ class PostgresEvalRunRepository:
                     eval_variants.c.letter == letter,
                 )
                 .values(
-                    made_live_by=admin_id,
-                    made_live_at=now,
-                    applied_keys=list(applied_keys),
-                    left_out_keys=list(left_out_keys),
+                    made_live_by=None,
+                    made_live_at=None,
+                    applied_keys=[],
+                    left_out_keys=[],
                 )
             )
 

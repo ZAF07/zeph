@@ -13,7 +13,7 @@ import {
   describeTriesUsage,
   resultsByCell,
   triesPill,
-} from "@/lib/setting-overrides";
+} from "@/lib/eval-run-grid";
 
 /**
  * A run's Case Results side by side: a row per case and a column per

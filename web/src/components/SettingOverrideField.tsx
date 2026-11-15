@@ -1,4 +1,8 @@
-import { fieldCaption, inputField } from "@/components/form-styles";
+import {
+  codeTextArea,
+  fieldCaption,
+  inputField,
+} from "@/components/form-styles";
 import { NeedOverrideFields } from "@/components/NeedOverrideFields";
 import { Switch } from "@/components/Switch";
 import type { OverridableSetting } from "@/lib/api-client";
@@ -95,7 +99,7 @@ export function SettingOverrideField({
       ) : (
         <textarea
           aria-label={label}
-          className={`${inputField} resize-y font-mono text-[13.5px] leading-relaxed`}
+          className={codeTextArea}
           rows={6}
           maxLength={setting.max_length}
           value={typeof value === "string" ? value : ""}
