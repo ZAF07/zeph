@@ -182,6 +182,19 @@ time, the Judge's reason for each rule, and for a failed case what happened.
 The judge is an LLM too, so it can be wrong. Read the reason before acting on
 a failure, and run again if one result looks off.
 
+## Trying a change first
+
+On the Dashboard's New run page, add up to three Variants. Variant A runs
+the live settings; in B or C, pick any setting on the settings pages, or a
+Need, and change it for that run only. Repeats (1 to 5) run each case more
+than once, to tell a steady result from luck. The estimate counts every
+Variant and Repeat. The run page shows a row per case and a column per
+Variant, with totals per Variant; pick a cell to see each try's reasons and
+trace. When a Variant of a Finished run is better, Make Live applies its
+changes to the live settings. If someone changed one of those settings
+since the run started, you choose whether to replace it. `make eval` always
+runs the live settings, once.
+
 ## When to run
 
 Run it after changing any of these:
