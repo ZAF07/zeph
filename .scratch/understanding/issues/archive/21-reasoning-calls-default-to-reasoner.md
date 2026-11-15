@@ -1,6 +1,6 @@
 # 21 — Calls that need reasoning default to deepseek-reasoner
 
-Status: ready-for-agent
+Status: completed
 
 ## What
 
@@ -17,12 +17,12 @@ Every model setting in `src/companion/seed/platform_settings.yaml` defaults to `
 
 ## Acceptance criteria
 
-- [ ] The 7 settings above default to `deepseek-reasoner` in the seed file
-- [ ] Each of those calls works on reasoner in the running app (`/run`)
-- [ ] No eval case passes less often than before; flaky cases mostly become steady (before/after table in Comments)
-- [ ] Reply-path time and cost change reported
-- [ ] `make check-python` passes
-- [ ] The local main database has the new defaults
+- [x] The 7 settings above default to `deepseek-reasoner` in the seed file (`tests/test_model_defaults.py`)
+- [x] Each of those calls works on reasoner in the running app (`/run`: all 7 ran, saved reasoning and data)
+- [x] No eval case passes less often than before; flaky cases mostly become steady (before/after table in Comments) — **waived by the user for delete-my-data** (6/8 → 4/8, caused by this change; fix moved to issue 18); flaky cases partly steadier
+- [x] Reply-path time and cost change reported (3.5 s → 6.2 s, ×1.8; about +20% cost per Message)
+- [x] `make check-python` passes (after rebase on `e4505b9`: ruff, format, mypy, 947 passed)
+- [x] The local main database has the new defaults (`UPDATE 7`, shown to and approved by the user first)
 
 ## Comments
 
@@ -63,3 +63,8 @@ Every model setting in `src/companion/seed/platform_settings.yaml` defaults to `
   - **Waiver:** the "no eval case passes less often" box is not met for delete-my-data (6/8 → 4/8, caused by this change). The user chose to ship and fix it in issue 18. "Flaky cases mostly become steady" is partly met: are-you-human and memory-off became steady and the two cases that always failed (advice-is-asked-for, goal-slip) now always pass; strong-mood, vent, struggling and forget-why-here stay flaky.
   - **Reply on reasoner with tools** (the local main DB's Admin set `response_model` to reasoner): checked in the worktree, "please don't message me after 9pm" called `change_quiet_hours`, the tool result went back and the reply came, no error, 2 of 2.
   - `make check-python` passed before review: ruff, ruff format (230 files), mypy (123 source files), pytest 946 passed. Rerun after rebase below.
+
+## Completion
+
+- Completed: 2026-11-15
+- Commit: <to be filled in after merge>

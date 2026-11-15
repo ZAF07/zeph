@@ -37,7 +37,7 @@ The PRD says being reminded is the heart of the feature and to tune the closenes
 ## Blocked by
 
 - `.scratch/understanding/issues/14-understanding-eval.md`
-- `.scratch/understanding/issues/21-reasoning-calls-default-to-reasoner.md` (tune on the reasoner, not on chat)
+- `.scratch/understanding/issues/archive/21-reasoning-calls-default-to-reasoner.md` (completed 2026-11-15) (tune on the reasoner, not on chat)
 
 ## Comments
 
