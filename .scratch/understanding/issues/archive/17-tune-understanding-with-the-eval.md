@@ -55,4 +55,4 @@ The PRD says being reminded is the heart of the feature and to tune the closenes
 ## Completion
 
 - Completed: 2026-11-15
-- Commits: `6a9378b` (Understanding prompt and Needs wording), `3284e0d` (follow-up issue 25)
+- Commits: `6a9378b` (Understanding prompt and Needs wording), `3284e0d` (follow-up issue 25), `9a8e001` (archive with evidence); merged to main in `5f6f9cc`
