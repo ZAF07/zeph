@@ -66,7 +66,7 @@ def test_saved_settings_record_when_and_by_whom(
     assert reloaded["settings"]["persona"] == persona
 
 
-def test_persona_prompt_and_model_changes_apply_to_the_next_reply(
+def test_persona_prompt_model_and_thinking_changes_apply_to_the_next_reply(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -80,7 +80,8 @@ def test_persona_prompt_and_model_changes_apply_to_the_next_reply(
             "values": {
                 "persona": "You are Zeph, retuned by an Admin.",
                 "response_prompt": "Reply in one short line.",
-                "response_model": "deepseek-reasoner",
+                "response_model": "deepseek-flash",
+                "response_thinking": True,
             }
         },
         headers=headers,
@@ -90,7 +91,8 @@ def test_persona_prompt_and_model_changes_apply_to_the_next_reply(
     send_to_webhook(client, telegram_text_update("hi"))
 
     [call] = chat_model.calls
-    assert call.model == "deepseek-reasoner"
+    assert call.model == "deepseek-flash"
+    assert call.thinking is True
     assert "You are Zeph, retuned by an Admin." in call.instructions
     assert "Reply in one short line." in call.instructions
 
@@ -205,6 +207,21 @@ def test_one_invalid_value_means_nothing_is_saved(
     assert settings["persona"]["value"] == seeded_settings["persona"]
 
 
+def test_a_thinking_setting_must_be_on_or_off(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+
+    response = client.patch(
+        "/api/admin/settings",
+        json={"values": {"understanding_thinking": "yes"}},
+        headers=headers,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "The Understanding thinking must be on or off."
+
+
 def test_core_services_list_their_prompt_and_model_settings(
     client: TestClient, auth_verifier: FakeAuthVerifier
 ) -> None:
@@ -228,7 +245,8 @@ def test_core_services_list_their_prompt_and_model_settings(
     service = response["services"][1]
     assert service["prompt_key"] == "response_prompt"
     assert service["model_key"] == "response_model"
-    assert response["model_choices"] == ["deepseek-chat", "deepseek-reasoner"]
+    assert service["thinking_key"] == "response_thinking"
+    assert response["model_choices"] == ["deepseek-flash"]
 
 
 def test_the_photo_settings_are_editable_with_their_seeded_values(
@@ -240,7 +258,8 @@ def test_the_photo_settings_are_editable_with_their_seeded_values(
 
     settings = client.get("/api/admin/settings", headers=headers).json()["settings"]
 
-    assert settings["photo_model"]["value"] == "deepseek-chat"
+    assert settings["photo_model"]["value"] == "deepseek-flash"
+    assert settings["photo_thinking"]["value"] is False
     assert settings["photo_retry_count"]["value"] == 2
     assert settings["photo_album_max_photos"]["value"] == 5
     for key in (

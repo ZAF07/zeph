@@ -63,7 +63,8 @@ def test_deepseek_generates_a_reply() -> None:
     chat_model = DeepSeekChatModel(required_env("DEEPSEEK_API_KEY"))
 
     reply = chat_model.generate(
-        model="deepseek-chat",
+        model="deepseek-flash",
+        thinking=False,
         instructions="Reply with one short friendly sentence.",
         history=[ChatLine(role=ChatRole.USER, text="hi there")],
     )
@@ -73,12 +74,29 @@ def test_deepseek_generates_a_reply() -> None:
     assert reply.tokens_out > 0
 
 
+@pytest.mark.parametrize("model", ["deepseek-flash", "deepseek-chat"])
+def test_deepseek_thinks_only_when_asked(model: str) -> None:
+    chat_model = DeepSeekChatModel(required_env("DEEPSEEK_API_KEY"))
+
+    def answer(thinking: bool) -> str | None:
+        return chat_model.generate(
+            model=model,
+            thinking=thinking,
+            instructions="Answer with one number.",
+            history=[ChatLine(role=ChatRole.USER, text="What is 17 times 23?")],
+        ).reasoning
+
+    assert answer(thinking=True)
+    assert answer(thinking=False) is None
+
+
 def test_deepseek_describes_a_photo() -> None:
     photo_viewer = DeepSeekPhotoViewer(required_env("DEEPSEEK_API_KEY"))
     image_file = Path(__file__).parents[2] / "evals/images/weekend-list.jpg"
 
     answer = photo_viewer.look(
-        model="deepseek-chat",
+        model="deepseek-flash",
+        thinking=False,
         instructions="Write out the handwritten list in the photo.",
         photo=PhotoImage(content=image_file.read_bytes(), media_type="image/jpeg"),
     )
@@ -96,7 +114,8 @@ def test_deepseek_calls_an_offered_tool_and_uses_its_result() -> None:
         return "Result: the secret word of the day is 'lantern'."
 
     reply = chat_model.generate(
-        model="deepseek-chat",
+        model="deepseek-flash",
+        thinking=True,
         instructions=(
             "Always use the web_search tool before answering. "
             "Then answer in one short sentence."

@@ -4,46 +4,72 @@ import pytest
 
 from companion.core.models import Setting
 from companion.core.platform_settings import (
-    CHECK_IN_MODEL,
-    CURIOSITY_KEEPING_MODEL,
-    KNOWLEDGE_WHEN_IT_HELPS_MODEL,
-    LIFE_THREAD_KEEPING_MODEL,
-    MEMORY_PROCESSING_MODEL,
-    PERSONAL_STICKER_KEEPING_MODEL,
-    PHOTO_MODEL,
-    PORTRAIT_MODEL,
-    RESPONSE_MODEL,
-    SAFEGUARD_MODEL,
-    UNDERSTANDING_MODEL,
+    AVAILABLE_MODELS,
+    CHECK_IN_THINKING,
+    CORE_SERVICES,
+    CURIOSITY_KEEPING_THINKING,
+    KNOWLEDGE_WHEN_IT_HELPS_THINKING,
+    LIFE_THREAD_KEEPING_THINKING,
+    MEMORY_PROCESSING_THINKING,
+    PERSONAL_STICKER_KEEPING_THINKING,
+    PHOTO_THINKING,
+    PORTRAIT_THINKING,
+    RESPONSE_THINKING,
+    SAFEGUARD_THINKING,
+    UNDERSTANDING_THINKING,
 )
 
-REASONING_CALLS: list[Setting[str]] = [
-    UNDERSTANDING_MODEL,
-    SAFEGUARD_MODEL,
-    MEMORY_PROCESSING_MODEL,
-    LIFE_THREAD_KEEPING_MODEL,
-    PORTRAIT_MODEL,
-    CURIOSITY_KEEPING_MODEL,
-    CHECK_IN_MODEL,
+CURRENT_MODEL = "deepseek-flash"
+
+THINKING_CALLS: list[Setting[bool]] = [
+    UNDERSTANDING_THINKING,
+    SAFEGUARD_THINKING,
+    MEMORY_PROCESSING_THINKING,
+    LIFE_THREAD_KEEPING_THINKING,
+    PORTRAIT_THINKING,
+    CURIOSITY_KEEPING_THINKING,
+    CHECK_IN_THINKING,
 ]
 
-CHAT_MODEL_CALLS: list[Setting[str]] = [
-    RESPONSE_MODEL,
-    KNOWLEDGE_WHEN_IT_HELPS_MODEL,
-    PERSONAL_STICKER_KEEPING_MODEL,
-    PHOTO_MODEL,
+NOT_THINKING_CALLS: list[Setting[bool]] = [
+    RESPONSE_THINKING,
+    KNOWLEDGE_WHEN_IT_HELPS_THINKING,
+    PERSONAL_STICKER_KEEPING_THINKING,
+    PHOTO_THINKING,
 ]
 
 
-@pytest.mark.parametrize("setting", REASONING_CALLS, ids=lambda setting: setting.key)
-def test_calls_that_make_judgments_default_to_the_reasoner(
-    setting: Setting[str], seeded_settings: dict[str, Any]
+def test_the_current_model_is_the_only_one_to_pick(
+    seeded_settings: dict[str, Any],
 ) -> None:
-    assert seeded_settings[setting.key] == "deepseek-reasoner"
+    assert seeded_settings[AVAILABLE_MODELS.key] == [CURRENT_MODEL]
 
 
-@pytest.mark.parametrize("setting", CHAT_MODEL_CALLS, ids=lambda setting: setting.key)
-def test_other_calls_stay_on_the_chat_model(
-    setting: Setting[str], seeded_settings: dict[str, Any]
+@pytest.mark.parametrize(
+    "service", CORE_SERVICES, ids=lambda service: service.model_key
+)
+def test_every_call_starts_on_the_current_model(
+    service: Any, seeded_settings: dict[str, Any]
 ) -> None:
-    assert seeded_settings[setting.key] == "deepseek-chat"
+    assert seeded_settings[service.model_key] == CURRENT_MODEL
+
+
+@pytest.mark.parametrize("setting", THINKING_CALLS, ids=lambda setting: setting.key)
+def test_calls_that_make_judgments_start_with_thinking_on(
+    setting: Setting[bool], seeded_settings: dict[str, Any]
+) -> None:
+    assert seeded_settings[setting.key] is True
+
+
+@pytest.mark.parametrize("setting", NOT_THINKING_CALLS, ids=lambda setting: setting.key)
+def test_other_calls_start_with_thinking_off(
+    setting: Setting[bool], seeded_settings: dict[str, Any]
+) -> None:
+    assert seeded_settings[setting.key] is False
+
+
+def test_every_core_service_has_a_thinking_setting() -> None:
+    assert len(THINKING_CALLS + NOT_THINKING_CALLS) == len(CORE_SERVICES)
+    assert {setting.key for setting in THINKING_CALLS + NOT_THINKING_CALLS} == {
+        service.thinking_key for service in CORE_SERVICES
+    }

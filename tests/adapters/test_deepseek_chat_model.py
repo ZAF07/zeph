@@ -1,3 +1,6 @@
+import logging
+
+import pytest
 from langchain_core.messages import (
     AIMessage,
     BaseMessage,
@@ -9,6 +12,7 @@ from langchain_core.messages import (
 from companion.adapters.deepseek.chat_model import (
     MAX_TOOL_ROUNDS,
     answer_with_tools,
+    build_client,
     to_langchain_messages,
     to_model_answer,
 )
@@ -205,3 +209,50 @@ def test_the_models_reasoning_is_kept_when_it_gives_one() -> None:
         "They asked about Seneca."
     )
     assert to_model_answer("hi", [AIMessage("hi")]).reasoning is None
+
+
+def thinking_sent(model: str, thinking: bool) -> tuple[str, object]:
+    client = build_client("key", model, thinking)
+    return client.model_name, client.extra_body
+
+
+def test_thinking_is_switched_on_or_off_in_the_request() -> None:
+    assert thinking_sent("deepseek-flash", True) == (
+        "deepseek-flash",
+        {"thinking": {"type": "enabled"}},
+    )
+    assert thinking_sent("deepseek-flash", False) == (
+        "deepseek-flash",
+        {"thinking": {"type": "disabled"}},
+    )
+
+
+def test_the_old_chat_name_is_sent_as_flash_with_thinking_as_asked() -> None:
+    assert thinking_sent("deepseek-chat", False) == (
+        "deepseek-flash",
+        {"thinking": {"type": "disabled"}},
+    )
+    assert thinking_sent("deepseek-chat", True) == (
+        "deepseek-flash",
+        {"thinking": {"type": "enabled"}},
+    )
+
+
+def test_the_old_reasoner_name_is_sent_as_flash_and_always_thinks(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.WARNING):
+        sent = thinking_sent("deepseek-reasoner", False)
+
+    assert sent == ("deepseek-flash", {"thinking": {"type": "enabled"}})
+    assert "deepseek-reasoner always thinks" in caplog.text
+
+
+def test_the_old_reasoner_name_asked_to_think_logs_no_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.WARNING):
+        sent = thinking_sent("deepseek-reasoner", True)
+
+    assert sent == ("deepseek-flash", {"thinking": {"type": "enabled"}})
+    assert not caplog.text

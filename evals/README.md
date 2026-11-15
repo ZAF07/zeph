@@ -85,7 +85,7 @@ on. A full run takes about 10 minutes.
 ## Cost
 
 One full run (2026-11-12) used about 71,000 tokens in and 3,000 out on
-DeepSeek (`deepseek-chat`), the app's calls and the judge's together. At
+DeepSeek (then `deepseek-chat`), the app's calls and the judge's together. At
 DeepSeek's prices that is about 2–3 US cents. The report prints the exact
 token count for each run. Adding cases adds to it: roughly 1,000 tokens per
 Safeguard case and 10,000 per Knowledge case.
@@ -96,11 +96,11 @@ Understanding and reply calls plus the judge. Each Understanding call took
 about 1.4 seconds and 1,500 tokens in, 130 out. A whole `make eval` run that
 day used about 343,000 in and 15,500 out and took about 6 minutes.
 
-Since 2026-11-15 the Safeguard, Understanding and the calls after a
-Conversation default to `deepseek-reasoner` (the reply stays on
-`deepseek-chat`). A whole run then uses about 339,000 tokens in and 42,000
-out (the reasoning counts as output) and takes about 10 minutes. Each
-Understanding call takes about 3.6 seconds and 1,500 tokens in, 520 out.
+Since 2026-11-15 every call uses `deepseek-flash`, with Thinking on for the
+Safeguard, Understanding and the calls after a Conversation (off for the
+reply and the judge). A whole run (2026-11-15) used about 382,000 tokens in
+and 44,000 out (the reasoning counts as output) and took about 9 minutes.
+Each Understanding call took about 3.3 seconds and 1,800 tokens in, 480 out.
 
 ## Reading the results
 

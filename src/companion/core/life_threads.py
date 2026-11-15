@@ -26,6 +26,7 @@ from companion.core.platform_settings import (
     LIFE_THREAD_BRUSHED_OFF_WAIT,
     LIFE_THREAD_KEEPING_MODEL,
     LIFE_THREAD_KEEPING_PROMPT,
+    LIFE_THREAD_KEEPING_THINKING,
     LIFE_THREADS_CLOSENESS_PERCENT,
     LIFE_THREADS_PER_REPLY,
 )
@@ -704,6 +705,7 @@ class LifeThreadKeeper:
                 snapshot=snapshot,
                 step=ModelStep.LIFE_THREADS,
                 model=settings.get(LIFE_THREAD_KEEPING_MODEL),
+                thinking=settings.get(LIFE_THREAD_KEEPING_THINKING),
                 instructions=settings.get(LIFE_THREAD_KEEPING_PROMPT),
                 history=[ChatLine(role=ChatRole.USER, text=description)],
             )

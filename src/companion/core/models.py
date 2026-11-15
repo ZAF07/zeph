@@ -1839,7 +1839,8 @@ class ModelCall:
         trace: The trace it belongs to.
         user_id: The User it was for.
         step: Which step it was for.
-        model: The model asked, e.g. "deepseek-chat".
+        model: The model asked, e.g. "deepseek-flash".
+        thinking: Whether the model was asked to think before it answers.
         started_at: When the call started.
         duration_ms: How long it took, in milliseconds.
         tokens_in: Tokens the model read.
@@ -1858,6 +1859,7 @@ class ModelCall:
     user_id: UUID
     step: ModelStep
     model: str
+    thinking: bool
     started_at: datetime
     duration_ms: int
     tokens_in: int

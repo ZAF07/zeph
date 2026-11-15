@@ -118,6 +118,23 @@ def read_text_list(value: Any) -> list[str]:
     return [read_text(item) for item in value]
 
 
+def read_on_off(value: Any) -> bool:
+    """Read a stored on/off setting.
+
+    Args:
+        value: The stored value.
+
+    Returns:
+        True if it is on.
+
+    Raises:
+        TypeError: If the value is not true or false.
+    """
+    if not isinstance(value, bool):
+        raise TypeError(f"Expected true or false, got {value!r}.")
+    return value
+
+
 def read_check_in_gaps(value: Any) -> dict[CheckInFrequency, timedelta]:
     """Read the fewest hours between two Check-ins, for each frequency.
 
@@ -167,9 +184,11 @@ MIN_TYPING_SECONDS = Setting("min_typing_seconds", read_number)
 MAX_TYPING_SECONDS = Setting("max_typing_seconds", read_number)
 AVAILABLE_MODELS = Setting("available_models", read_text_list)
 RESPONSE_MODEL = Setting("response_model", read_text)
+RESPONSE_THINKING = Setting("response_thinking", read_on_off)
 PERSONA = Setting("persona", read_text)
 RESPONSE_PROMPT = Setting("response_prompt", read_text)
 PHOTO_MODEL = Setting("photo_model", read_text)
+PHOTO_THINKING = Setting("photo_thinking", read_on_off)
 PHOTO_DESCRIPTION_PROMPT = Setting("photo_description_prompt", read_text)
 ASK_ABOUT_PHOTO_TOOL_DESCRIPTION = Setting(
     "ask_about_photo_tool_description", read_text
@@ -180,11 +199,14 @@ PHOTO_VIEWING_OFF_NOTE = Setting("photo_viewing_off_note", read_text)
 PHOTO_RETRY_COUNT = Setting("photo_retry_count", read_whole_number)
 PHOTO_ALBUM_MAX_PHOTOS = Setting("photo_album_max_photos", read_whole_number)
 SAFEGUARD_MODEL = Setting("safeguard_model", read_text)
+SAFEGUARD_THINKING = Setting("safeguard_thinking", read_on_off)
 SAFEGUARD_PROMPT = Setting("safeguard_prompt", read_text)
 CRISIS_REPLY = Setting("crisis_reply", read_text)
 MEMORY_PROCESSING_MODEL = Setting("memory_processing_model", read_text)
+MEMORY_PROCESSING_THINKING = Setting("memory_processing_thinking", read_on_off)
 MEMORY_PROCESSING_PROMPT = Setting("memory_processing_prompt", read_text)
 UNDERSTANDING_MODEL = Setting("understanding_model", read_text)
+UNDERSTANDING_THINKING = Setting("understanding_thinking", read_on_off)
 UNDERSTANDING_PROMPT = Setting("understanding_prompt", read_text)
 REPLY_ASK_WHY_NOTE = Setting("reply_ask_why_note", read_text)
 SHARED_PHOTOS_MEMORY_DESCRIPTION = Setting(
@@ -204,6 +226,7 @@ LIFE_THREADS_CLOSENESS_PERCENT = Setting(
 )
 LIFE_THREAD_BRUSHED_OFF_WAIT = Setting("life_thread_brushed_off_wait_days", read_days)
 LIFE_THREAD_KEEPING_MODEL = Setting("life_thread_keeping_model", read_text)
+LIFE_THREAD_KEEPING_THINKING = Setting("life_thread_keeping_thinking", read_on_off)
 LIFE_THREAD_KEEPING_PROMPT = Setting("life_thread_keeping_prompt", read_text)
 CURIOSITIES_PER_CONVERSATION = Setting(
     "curiosities_per_conversation", read_whole_number
@@ -213,12 +236,17 @@ CURIOSITY_CHECK_INS_PER_WEEK = Setting(
     "curiosity_check_ins_per_week", read_whole_number
 )
 CURIOSITY_KEEPING_MODEL = Setting("curiosity_keeping_model", read_text)
+CURIOSITY_KEEPING_THINKING = Setting("curiosity_keeping_thinking", read_on_off)
 CURIOSITY_KEEPING_PROMPT = Setting("curiosity_keeping_prompt", read_text)
 PORTRAIT_MODEL = Setting("portrait_model", read_text)
+PORTRAIT_THINKING = Setting("portrait_thinking", read_on_off)
 PORTRAIT_PROMPT = Setting("portrait_prompt", read_text)
 KNOWLEDGE_CHUNKS_PER_REPLY = Setting("knowledge_chunks_per_reply", read_whole_number)
 KNOWLEDGE_CLOSENESS_PERCENT = Setting("knowledge_closeness_percent", read_whole_number)
 KNOWLEDGE_WHEN_IT_HELPS_MODEL = Setting("knowledge_when_it_helps_model", read_text)
+KNOWLEDGE_WHEN_IT_HELPS_THINKING = Setting(
+    "knowledge_when_it_helps_thinking", read_on_off
+)
 KNOWLEDGE_WHEN_IT_HELPS_PROMPT = Setting("knowledge_when_it_helps_prompt", read_text)
 REPLY_KNOWLEDGE_INTRO = Setting("reply_knowledge_intro", read_text)
 DAILY_MESSAGE_LIMIT = Setting("daily_message_limit", read_whole_number)
@@ -249,9 +277,13 @@ ONBOARDING_REASONS_MEMORY_CATEGORY = Setting(
 HOME_GOALS_MEMORY_CATEGORY = Setting("home_goals_memory_category", read_text)
 STICKER_TOOL_DESCRIPTION = Setting("sticker_tool_description", read_text)
 PERSONAL_STICKER_KEEPING_MODEL = Setting("personal_sticker_keeping_model", read_text)
+PERSONAL_STICKER_KEEPING_THINKING = Setting(
+    "personal_sticker_keeping_thinking", read_on_off
+)
 PERSONAL_STICKER_KEEPING_PROMPT = Setting("personal_sticker_keeping_prompt", read_text)
 PERSONAL_STICKERS_LIMIT = Setting("personal_stickers_limit", read_whole_number)
 CHECK_IN_MODEL = Setting("check_in_model", read_text)
+CHECK_IN_THINKING = Setting("check_in_thinking", read_on_off)
 CHECK_IN_PROMPT = Setting("check_in_prompt", read_text)
 CHECK_IN_IGNORE_THRESHOLD = Setting("check_in_ignore_threshold", read_whole_number)
 CHECK_IN_FEWER_MESSAGE = Setting("check_in_fewer_message", read_text)
@@ -265,6 +297,7 @@ class SettingKind(StrEnum):
     TEXT = "text"
     WHOLE_NUMBER = "whole_number"
     MODEL = "model"
+    ON_OFF = "on_off"
 
 
 @dataclass(frozen=True)
@@ -329,6 +362,7 @@ class CoreService:
         description: What the service does.
         prompt_key: The setting holding its prompt.
         model_key: The setting holding the model it uses.
+        thinking_key: The setting holding whether that model thinks first.
         extra_prompt_keys: Other text settings shown with its prompt, e.g.
             a tool description it uses.
         extra_prompt_groups: Other text settings shown with its prompt in
@@ -340,6 +374,7 @@ class CoreService:
     description: str
     prompt_key: str
     model_key: str
+    thinking_key: str
     extra_prompt_keys: tuple[str, ...] = ()
     extra_prompt_groups: tuple[ExtraPromptGroup, ...] = ()
 
@@ -348,6 +383,7 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     EditableSetting(PERSONA.key, "Persona", SettingKind.TEXT),
     EditableSetting(SAFEGUARD_PROMPT.key, "Safeguard prompt", SettingKind.TEXT),
     EditableSetting(SAFEGUARD_MODEL.key, "Safeguard model", SettingKind.MODEL),
+    EditableSetting(SAFEGUARD_THINKING.key, "Safeguard thinking", SettingKind.ON_OFF),
     EditableSetting(
         CRISIS_REPLY.key,
         "Crisis Reply",
@@ -362,6 +398,9 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     ),
     EditableSetting(
         RESPONSE_MODEL.key, "Response composition model", SettingKind.MODEL
+    ),
+    EditableSetting(
+        RESPONSE_THINKING.key, "Response composition thinking", SettingKind.ON_OFF
     ),
     EditableSetting(
         STICKER_TOOL_DESCRIPTION.key,
@@ -499,8 +538,16 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         "Post-conversation processing model",
         SettingKind.MODEL,
     ),
+    EditableSetting(
+        MEMORY_PROCESSING_THINKING.key,
+        "Post-conversation processing thinking",
+        SettingKind.ON_OFF,
+    ),
     EditableSetting(UNDERSTANDING_PROMPT.key, "Understanding prompt", SettingKind.TEXT),
     EditableSetting(UNDERSTANDING_MODEL.key, "Understanding model", SettingKind.MODEL),
+    EditableSetting(
+        UNDERSTANDING_THINKING.key, "Understanding thinking", SettingKind.ON_OFF
+    ),
     EditableSetting(
         REPLY_ASK_WHY_NOTE.key,
         "“Gently ask why” note",
@@ -521,6 +568,7 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         PHOTO_DESCRIPTION_PROMPT.key, "Photo description prompt", SettingKind.TEXT
     ),
     EditableSetting(PHOTO_MODEL.key, "Photo viewing model", SettingKind.MODEL),
+    EditableSetting(PHOTO_THINKING.key, "Photo viewing thinking", SettingKind.ON_OFF),
     EditableSetting(
         ASK_ABOUT_PHOTO_TOOL_DESCRIPTION.key,
         "ask_about_photo tool description",
@@ -570,6 +618,11 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.MODEL,
     ),
     EditableSetting(
+        LIFE_THREAD_KEEPING_THINKING.key,
+        "Life Thread keeping thinking",
+        SettingKind.ON_OFF,
+    ),
+    EditableSetting(
         PORTRAIT_PROMPT.key,
         "User Portrait prompt",
         SettingKind.TEXT,
@@ -578,6 +631,9 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         PORTRAIT_MODEL.key,
         "User Portrait model",
         SettingKind.MODEL,
+    ),
+    EditableSetting(
+        PORTRAIT_THINKING.key, "User Portrait thinking", SettingKind.ON_OFF
     ),
     EditableSetting(
         CURIOSITY_KEEPING_PROMPT.key,
@@ -590,6 +646,9 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.MODEL,
     ),
     EditableSetting(
+        CURIOSITY_KEEPING_THINKING.key, "Curiosity keeping thinking", SettingKind.ON_OFF
+    ),
+    EditableSetting(
         PERSONAL_STICKER_KEEPING_PROMPT.key,
         "Personal Sticker keeping prompt",
         SettingKind.TEXT,
@@ -600,6 +659,11 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.MODEL,
     ),
     EditableSetting(
+        PERSONAL_STICKER_KEEPING_THINKING.key,
+        "Personal Sticker keeping thinking",
+        SettingKind.ON_OFF,
+    ),
+    EditableSetting(
         KNOWLEDGE_WHEN_IT_HELPS_PROMPT.key,
         "Knowledge “when it helps” prompt",
         SettingKind.TEXT,
@@ -608,6 +672,11 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         KNOWLEDGE_WHEN_IT_HELPS_MODEL.key,
         "Knowledge “when it helps” model",
         SettingKind.MODEL,
+    ),
+    EditableSetting(
+        KNOWLEDGE_WHEN_IT_HELPS_THINKING.key,
+        "Knowledge “when it helps” thinking",
+        SettingKind.ON_OFF,
     ),
     EditableSetting(
         PERSONAL_STICKERS_LIMIT.key,
@@ -625,6 +694,7 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     ),
     EditableSetting(CHECK_IN_PROMPT.key, "Check-in prompt", SettingKind.TEXT),
     EditableSetting(CHECK_IN_MODEL.key, "Check-in model", SettingKind.MODEL),
+    EditableSetting(CHECK_IN_THINKING.key, "Check-in thinking", SettingKind.ON_OFF),
     EditableSetting(
         CHECK_IN_IGNORE_THRESHOLD.key,
         "Ignore threshold",
@@ -816,6 +886,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         ),
         prompt_key=SAFEGUARD_PROMPT.key,
         model_key=SAFEGUARD_MODEL.key,
+        thinking_key=SAFEGUARD_THINKING.key,
     ),
     CoreService(
         name="Response composition",
@@ -826,6 +897,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         ),
         prompt_key=RESPONSE_PROMPT.key,
         model_key=RESPONSE_MODEL.key,
+        thinking_key=RESPONSE_THINKING.key,
         extra_prompt_groups=(
             ExtraPromptGroup(
                 "Web search",
@@ -865,6 +937,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         ),
         prompt_key=MEMORY_PROCESSING_PROMPT.key,
         model_key=MEMORY_PROCESSING_MODEL.key,
+        thinking_key=MEMORY_PROCESSING_THINKING.key,
     ),
     CoreService(
         name="Understanding",
@@ -880,6 +953,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         ),
         prompt_key=UNDERSTANDING_PROMPT.key,
         model_key=UNDERSTANDING_MODEL.key,
+        thinking_key=UNDERSTANDING_THINKING.key,
         extra_prompt_keys=(SHARED_PHOTOS_MEMORY_DESCRIPTION.key,),
     ),
     CoreService(
@@ -893,6 +967,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         ),
         prompt_key=PHOTO_DESCRIPTION_PROMPT.key,
         model_key=PHOTO_MODEL.key,
+        thinking_key=PHOTO_THINKING.key,
         extra_prompt_keys=(
             ASK_ABOUT_PHOTO_TOOL_DESCRIPTION.key,
             SEND_PHOTO_TOOL_DESCRIPTION.key,
@@ -910,6 +985,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         ),
         prompt_key=LIFE_THREAD_KEEPING_PROMPT.key,
         model_key=LIFE_THREAD_KEEPING_MODEL.key,
+        thinking_key=LIFE_THREAD_KEEPING_THINKING.key,
     ),
     CoreService(
         name="Curiosity keeping",
@@ -922,6 +998,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         ),
         prompt_key=CURIOSITY_KEEPING_PROMPT.key,
         model_key=CURIOSITY_KEEPING_MODEL.key,
+        thinking_key=CURIOSITY_KEEPING_THINKING.key,
     ),
     CoreService(
         name="User Portrait",
@@ -936,6 +1013,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         ),
         prompt_key=PORTRAIT_PROMPT.key,
         model_key=PORTRAIT_MODEL.key,
+        thinking_key=PORTRAIT_THINKING.key,
     ),
     CoreService(
         name="Personal Sticker keeping",
@@ -947,6 +1025,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         ),
         prompt_key=PERSONAL_STICKER_KEEPING_PROMPT.key,
         model_key=PERSONAL_STICKER_KEEPING_MODEL.key,
+        thinking_key=PERSONAL_STICKER_KEEPING_THINKING.key,
     ),
     CoreService(
         name="Knowledge “when it helps”",
@@ -959,6 +1038,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         ),
         prompt_key=KNOWLEDGE_WHEN_IT_HELPS_PROMPT.key,
         model_key=KNOWLEDGE_WHEN_IT_HELPS_MODEL.key,
+        thinking_key=KNOWLEDGE_WHEN_IT_HELPS_THINKING.key,
     ),
     CoreService(
         name="Check-ins",
@@ -970,6 +1050,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         ),
         prompt_key=CHECK_IN_PROMPT.key,
         model_key=CHECK_IN_MODEL.key,
+        thinking_key=CHECK_IN_THINKING.key,
     ),
 )
 
@@ -1118,6 +1199,10 @@ class PlatformSettingsService:
                     f"The {setting.label} must be a whole number from "
                     f"{setting.minimum} to {setting.maximum}."
                 )
+            return value
+        if setting.kind == SettingKind.ON_OFF:
+            if not isinstance(value, bool):
+                raise InvalidSettingError(f"The {setting.label} must be on or off.")
             return value
         if value not in self.model_choices():
             raise InvalidSettingError(

@@ -19,6 +19,7 @@ from companion.core.platform_settings import (
     PERSONA,
     RESPONSE_MODEL,
     RESPONSE_PROMPT,
+    RESPONSE_THINKING,
 )
 from companion.core.ports import Repositories
 from companion.core.reply_tools import ReplyContext, ReplyToolProvider
@@ -179,6 +180,7 @@ class ResponseComposer:
             snapshot=snapshot,
             step=ModelStep.REPLY,
             model=settings.get(RESPONSE_MODEL),
+            thinking=settings.get(RESPONSE_THINKING),
             instructions=instructions,
             history=history,
             tools=[tool for offer in offers for tool in offer.tools],

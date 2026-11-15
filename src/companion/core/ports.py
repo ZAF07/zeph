@@ -245,14 +245,19 @@ class ChatModel(Protocol):
     def generate(
         self,
         model: str,
+        thinking: bool,
         instructions: str,
         history: list[ChatLine],
         tools: Sequence[ChatTool] = (),
     ) -> ModelAnswer:
         """Generate the next reply, calling tools first if the model wants to.
 
+        A model that can't do the thinking asked for does the closest it can
+        and logs a warning; it never fails for it.
+
         Args:
-            model: The model to use, e.g. "deepseek-chat".
+            model: The model to use, e.g. "deepseek-flash".
+            thinking: Whether the model should think before it answers.
             instructions: What the model should be and do (Persona and prompt).
             history: The Conversation so far, oldest first.
             tools: The tools the model may call; none by default.
@@ -266,11 +271,17 @@ class ChatModel(Protocol):
 class PhotoViewer(Protocol):
     """Looks at a photo with a model that can see images."""
 
-    def look(self, model: str, instructions: str, photo: PhotoImage) -> ModelAnswer:
+    def look(
+        self, model: str, thinking: bool, instructions: str, photo: PhotoImage
+    ) -> ModelAnswer:
         """Look at a photo and write what the instructions ask for.
 
+        A model that can't do the thinking asked for does the closest it can
+        and logs a warning; it never fails for it.
+
         Args:
-            model: The model to use, e.g. "deepseek-chat".
+            model: The model to use, e.g. "deepseek-flash".
+            thinking: Whether the model should think before it answers.
             instructions: What to write about the photo.
             photo: The photo's image.
 

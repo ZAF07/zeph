@@ -184,6 +184,7 @@ class UsageRecordingChatModel:
         snapshot: UserSnapshot,
         step: ModelStep,
         model: str,
+        thinking: bool,
         instructions: str,
         history: list[ChatLine],
         tools: Sequence[ChatTool] = (),
@@ -193,7 +194,8 @@ class UsageRecordingChatModel:
         Args:
             snapshot: The User the answer is for.
             step: Which step the answer is for.
-            model: The model to use, e.g. "deepseek-chat".
+            model: The model to use, e.g. "deepseek-flash".
+            thinking: Whether the model should think before it answers.
             instructions: What the model should be and do.
             history: The Conversation so far, oldest first.
             tools: The tools the model may call; none by default.
@@ -204,17 +206,28 @@ class UsageRecordingChatModel:
         Raises:
             Exception: Whatever the chat model raises, once it is recorded.
         """
-        request = ModelCallRequest(step, model, instructions, tuple(history), tools)
+        request = ModelCallRequest(
+            step, model, thinking, instructions, tuple(history), tools
+        )
         return self._ask_and_record(
             snapshot,
             request,
             lambda: self._chat_model.generate(
-                model=model, instructions=instructions, history=history, tools=tools
+                model=model,
+                thinking=thinking,
+                instructions=instructions,
+                history=history,
+                tools=tools,
             ),
         )
 
     def look(
-        self, snapshot: UserSnapshot, model: str, instructions: str, photo: PhotoImage
+        self,
+        snapshot: UserSnapshot,
+        model: str,
+        thinking: bool,
+        instructions: str,
+        photo: PhotoImage,
     ) -> str:
         """Look at a photo for a User and record the call.
 
@@ -223,7 +236,8 @@ class UsageRecordingChatModel:
 
         Args:
             snapshot: The User who sent the photo.
-            model: The model to use, e.g. "deepseek-chat".
+            model: The model to use, e.g. "deepseek-flash".
+            thinking: Whether the model should think before it answers.
             instructions: What to write about the photo.
             photo: The photo's image.
 
@@ -236,6 +250,7 @@ class UsageRecordingChatModel:
         request = ModelCallRequest(
             step=ModelStep.PHOTO,
             model=model,
+            thinking=thinking,
             instructions=instructions,
             history=(ChatLine(role=ChatRole.USER, text="[photo]"),),
             tools=(),
@@ -244,7 +259,7 @@ class UsageRecordingChatModel:
             snapshot,
             request,
             lambda: self._photo_viewer.look(
-                model=model, instructions=instructions, photo=photo
+                model=model, thinking=thinking, instructions=instructions, photo=photo
             ),
         )
 

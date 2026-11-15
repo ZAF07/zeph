@@ -29,11 +29,12 @@ const coreServices: CoreServices = {
       description: "Writes Zeph’s reply.",
       prompt_key: "response_prompt",
       model_key: "response_model",
+      thinking_key: "response_thinking",
       extra_prompts: [],
       extra_prompt_groups: [],
     },
   ],
-  model_choices: ["deepseek-chat", "deepseek-reasoner"],
+  model_choices: ["deepseek-flash", "deepseek-v4-pro"],
 };
 
 const settings: AdminSettings = {
@@ -43,7 +44,12 @@ const settings: AdminSettings = {
     updated_by: null,
   },
   response_model: {
-    value: "deepseek-chat",
+    value: "deepseek-flash",
+    updated_at: "2026-11-01T00:00:00Z",
+    updated_by: null,
+  },
+  response_thinking: {
+    value: false,
     updated_at: "2026-11-01T00:00:00Z",
     updated_by: null,
   },
@@ -65,10 +71,15 @@ describe("PromptsAndModels", () => {
         updated_at: "2026-11-11T09:00:00Z",
         updated_by: "Maya Lin",
       },
+      response_thinking: {
+        value: values.response_thinking === true,
+        updated_at: "2026-11-11T09:00:00Z",
+        updated_by: "Maya Lin",
+      },
     }));
   });
 
-  it("shows a card per core service with its model and prompt", async () => {
+  it("shows a card per core service with its model, thinking and prompt", async () => {
     renderWithQueries(<PromptsAndModels />);
 
     const card = within(
@@ -76,12 +87,13 @@ describe("PromptsAndModels", () => {
     );
     expect(card.getByText("Every reply")).toBeVisible();
     expect(card.getByText("Writes Zeph’s reply.")).toBeVisible();
-    expect(card.getByLabelText("Model")).toHaveValue("deepseek-chat");
+    expect(card.getByLabelText("Model")).toHaveValue("deepseek-flash");
     expect(
       within(card.getByLabelText("Model"))
         .getAllByRole("option")
         .map((option) => option.textContent),
-    ).toEqual(["deepseek-chat", "deepseek-reasoner"]);
+    ).toEqual(["deepseek-flash", "deepseek-v4-pro"]);
+    expect(card.getByRole("switch", { name: "Thinking" })).not.toBeChecked();
     expect(card.getByLabelText("Prompt")).toHaveValue("Reply briefly.");
     expect(card.getByText("Using the starting values")).toBeVisible();
   });
@@ -94,15 +106,37 @@ describe("PromptsAndModels", () => {
     );
     expect(card.getByRole("button", { name: "Save" })).toBeDisabled();
 
-    await user.selectOptions(card.getByLabelText("Model"), "deepseek-reasoner");
+    await user.selectOptions(card.getByLabelText("Model"), "deepseek-v4-pro");
     await user.type(card.getByLabelText("Prompt"), " Be warm.");
     await user.click(card.getByRole("button", { name: "Save" }));
 
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       response_prompt: "Reply briefly. Be warm.",
-      response_model: "deepseek-reasoner",
+      response_model: "deepseek-v4-pro",
+      response_thinking: false,
     });
     expect(await card.findByText(/Last saved .* by Maya Lin/)).toBeVisible();
+    expect(card.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
+
+  it("saves thinking switched on for a service", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PromptsAndModels />);
+    const card = within(
+      await screen.findByRole("region", { name: "Response composition" }),
+    );
+
+    await user.click(card.getByRole("switch", { name: "Thinking" }));
+    expect(card.getByRole("switch", { name: "Thinking" })).toBeChecked();
+    await user.click(card.getByRole("button", { name: "Save" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      response_prompt: "Reply briefly.",
+      response_model: "deepseek-flash",
+      response_thinking: true,
+    });
+    expect(await card.findByText(/Last saved .* by Maya Lin/)).toBeVisible();
+    expect(card.getByRole("switch", { name: "Thinking" })).toBeChecked();
     expect(card.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
@@ -119,7 +153,7 @@ describe("PromptsAndModels", () => {
 
     expect(
       await card.findByText(
-        "Couldn’t save. The last saved prompt and model stay in use.",
+        "Couldn’t save. The last saved prompt, model and thinking stay in use.",
       ),
     ).toBeVisible();
   });
@@ -133,6 +167,7 @@ describe("PromptsAndModels", () => {
           description: "Looks at each photo.",
           prompt_key: "photo_description_prompt",
           model_key: "photo_model",
+          thinking_key: "photo_thinking",
           extra_prompts: [
             {
               key: "ask_about_photo_tool_description",
@@ -143,7 +178,7 @@ describe("PromptsAndModels", () => {
           extra_prompt_groups: [],
         },
       ],
-      model_choices: ["deepseek-chat"],
+      model_choices: ["deepseek-flash"],
     });
     apiClient.getAdminSettings.mockResolvedValue({
       photo_description_prompt: {
@@ -152,7 +187,7 @@ describe("PromptsAndModels", () => {
         updated_by: null,
       },
       photo_model: {
-        value: "deepseek-chat",
+        value: "deepseek-flash",
         updated_at: "2026-11-01T00:00:00Z",
         updated_by: null,
       },
@@ -178,7 +213,8 @@ describe("PromptsAndModels", () => {
 
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       photo_description_prompt: "Describe the photo.",
-      photo_model: "deepseek-chat",
+      photo_model: "deepseek-flash",
+      photo_thinking: false,
       ask_about_photo_tool_description:
         "Look again only when needed. Ask one question.",
     });
@@ -243,7 +279,7 @@ describe("PromptsAndModels", () => {
             ],
           },
         ],
-        model_choices: ["deepseek-chat"],
+        model_choices: ["deepseek-flash"],
       });
       apiClient.getAdminSettings.mockResolvedValue({
         ...settings,
@@ -314,7 +350,8 @@ describe("PromptsAndModels", () => {
 
       expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
         response_prompt: "Reply briefly.",
-        response_model: "deepseek-chat",
+        response_model: "deepseek-flash",
+        response_thinking: false,
         web_search_tool_description: "Search the web.",
         reply_web_search_instructions: "Say where it came from.",
         reply_memory_intro: "What you remember: Edited",

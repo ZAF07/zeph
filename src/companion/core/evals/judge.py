@@ -7,7 +7,8 @@ from typing import Any
 from companion.core.models import ChatLine, ChatRole
 from companion.core.ports import ChatModel
 
-JUDGE_MODEL = "deepseek-chat"
+JUDGE_MODEL = "deepseek-flash"
+JUDGE_THINKING = False
 NO_VERSION = "none"
 CODE_FENCE = re.compile(r"^```(?:json)?\s*|\s*```$")
 
@@ -32,13 +33,14 @@ Answer with JSON only, in exactly this shape:
 
 
 def judge_settings() -> dict[str, str]:
-    """List the Judge's model and prompts, for an Eval Run's snapshot.
+    """List the Judge's model, thinking and prompts, for an Eval Run's snapshot.
 
     Returns:
         Each setting's value by name.
     """
     return {
         "model": JUDGE_MODEL,
+        "thinking": "on" if JUDGE_THINKING else "off",
         "persona_instructions": PERSONA_JUDGE_INSTRUCTIONS,
         "version_instructions": VERSION_JUDGE_INSTRUCTIONS,
     }
@@ -161,6 +163,7 @@ def judge_persona_rules(
     question = f"Rules:\n{rule_lines}\n\nConversation:\n{transcript}"
     answer = chat_model.generate(
         model=JUDGE_MODEL,
+        thinking=JUDGE_THINKING,
         instructions=PERSONA_JUDGE_INSTRUCTIONS,
         history=[ChatLine(role=ChatRole.USER, text=question)],
     )
@@ -187,6 +190,7 @@ def judge_version(
     prompt = f"Question:\n{question}\n\nReply:\n{reply}\n\n{version_parts}"
     answer = chat_model.generate(
         model=JUDGE_MODEL,
+        thinking=JUDGE_THINKING,
         instructions=VERSION_JUDGE_INSTRUCTIONS,
         history=[ChatLine(role=ChatRole.USER, text=prompt)],
     )

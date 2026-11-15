@@ -33,6 +33,7 @@ from companion.core.personal_stickers import PersonalStickerKeeper
 from companion.core.platform_settings import (
     MEMORY_PROCESSING_MODEL,
     MEMORY_PROCESSING_PROMPT,
+    MEMORY_PROCESSING_THINKING,
 )
 from companion.core.ports import Clock, Embedder, Repositories
 from companion.core.transcripts import to_transcript_lines
@@ -639,6 +640,7 @@ class PostConversationProcessor:
                 snapshot=snapshot,
                 step=ModelStep.CONVERSATION_END,
                 model=settings.get(MEMORY_PROCESSING_MODEL),
+                thinking=settings.get(MEMORY_PROCESSING_THINKING),
                 instructions=settings.get(MEMORY_PROCESSING_PROMPT),
                 history=[ChatLine(role=ChatRole.USER, text=description)],
             )
