@@ -61,6 +61,6 @@ Lane B (case and Judge pages). Runs in parallel with 03.
   - `1d63a1f` Eval dashboard issue 04: review fixes
   - `0a96749` Eval dashboard issue 04: CONTEXT.md and ADRs 0014-0015 for case shapes and the Judge's own settings
   - `9cb852c` Eval dashboard issue 04: evals README on editing cases and the Judge
-- Archive commit: `b96e525` Eval dashboard issue 04 done: archive issue with run, review and check evidence
   - `a9112c5` Eval dashboard issue 04: list the docs commits in the archived issue
+- Archive commit: `b96e525` Eval dashboard issue 04 done: archive issue with run, review and check evidence
 - Merge commit: `959a487` Merge eval dashboard issue 04 into main
