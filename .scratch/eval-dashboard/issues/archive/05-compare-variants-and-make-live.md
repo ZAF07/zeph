@@ -60,6 +60,6 @@ Lane A, after 03. An Admin tries changes before real Users get them, compares th
   - `0fe0daa` Eval dashboard issue 05: review fixes (Make Live marks once in one step, deleted Need is an Error, re-run re-checks overrides, choices in core, less duplication)
   - `cd0de9f` Eval dashboard issue 05: CONTEXT.md and evals README on Variants, Repeats, Need overrides and Make Live
   - `9e693a5` Eval dashboard issue 05: test that the token limit counts every Variant and Repeat
-- Archive commit: <recorded after merge>
-- Merge commit: <recorded after merge>
+- Archive commit: `65b1a07` Eval dashboard issue 05 done: archive issue with run, eval, review and check evidence
+- Merge commit: `abb4d5c` Merge eval dashboard issue 05: Variants side by side, Repeats, Setting Overrides and Make Live
 
