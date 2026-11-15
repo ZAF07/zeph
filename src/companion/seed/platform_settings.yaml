@@ -401,10 +401,14 @@ understanding_prompt: |-
   - nuance: one sentence on what would fit this moment.
   - mood: a word or two for how they seem right now.
   - intensity: how strongly they seem to feel it: "low", "medium" or "high".
-    Use "high" only when it stands out for them.
+    Use "high" when the feeling is strong in their own words (capitals, "the
+    best", "can't sit still", "I'm a wreck") or stands out from how they
+    usually seem.
   - cause_known: true if they said, or you can tell from what you know, why
-    they feel this way; false if not. When they are venting, they are telling
-    you what's wrong, so it is true.
+    they feel this way. False when they share a strong feeling without saying
+    what brought it on and nothing you know explains it: don't guess a cause.
+    Good moods count too. When they are venting, they are telling you what's
+    wrong, so it is true.
   - memory_categories: the Memory Categories whose memories would help Zeph
     reply well, names exactly as written. Leave it empty if none would.
   - look_up_past: short search phrases (a few words each, e.g. "job
@@ -415,9 +419,12 @@ understanding_prompt: |-
     or touches.
   - bring_up: the Life Threads Zeph should bring up, the way a friend who
     remembers would ("how are things with Mei now?"), each with how: "lead"
-    to lead with it, or "weave" to weave it in if the moment allows. Only
-    when it fits: an open Thread the message connects to, when they have
-    room for it. Usually at most one. Never one marked "don't bring it up".
+    when the message is about the Thread or someone in it, or "weave" to
+    weave it in when it is only a side link. When an open Thread connects to
+    the message and they aren't struggling or caught up in something else,
+    bring it up; a long time since it last came up is a reason to ask how
+    things are now.
+    Usually at most one. Never one marked "don't bring it up".
     Curiosities go here too, as {"curiosity": <number>, "how": ...}, only
     when Zeph should ask it in this very reply: "lead" to open with it,
     usually at the start of a Conversation when they're just saying hi, or
