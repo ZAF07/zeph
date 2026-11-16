@@ -29,6 +29,10 @@ from companion.core.timing import is_open
 logger = logging.getLogger(__name__)
 
 
+class ReplyPartlySentError(Exception):
+    """Raised when sending a reply failed after part of it was sent."""
+
+
 def typing_pause_seconds(text: str, settings: PlatformSettings) -> float:
     """Work out how long to show typing before sending a message.
 
@@ -151,11 +155,20 @@ class ConversationService:
             sticker_id: The sticker to send after them, from the Sticker
                 Library or the User's Personal Stickers.
             shared_photo_id: The User's Shared Photo to send back after them.
+
+        Raises:
+            ReplyPartlySentError: If a later message failed after the first
+                was sent; any other error means none of the reply was sent.
         """
-        for part in reply_parts:
+        for number, part in enumerate(reply_parts):
             self._chat_channel.show_typing(chat_id)
             self._clock.sleep(typing_pause_seconds(part, settings))
-            self._chat_channel.send_text(chat_id, part)
+            try:
+                self._chat_channel.send_text(chat_id, part)
+            except Exception as error:
+                if number > 0:
+                    raise ReplyPartlySentError from error
+                raise
             self._save(conversation_id, MessageDirection.OUTGOING, part)
         if shared_photo_id is not None:
             self._send_shared_photo(user_id, conversation_id, chat_id, shared_photo_id)

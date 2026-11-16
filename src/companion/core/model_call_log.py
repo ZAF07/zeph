@@ -73,10 +73,9 @@ class ModelCallLog:
 
     Every call keeps its step, model, tokens, time taken, error and the tools
     it called, and an Understanding or woven-in Check-in call the shape of
-    its decision. What the
-    model was given and answered is kept only when the User is an Admin, or
-    when every call keeps it (an Eval run). Developer logs, when on, get the
-    full content of every call instead.
+    its decision. What the model was given and answered is kept only when
+    the User is an Admin, or when every call keeps it (an Eval run).
+    Developer logs, when on, get the full content of every call instead.
     """
 
     def __init__(

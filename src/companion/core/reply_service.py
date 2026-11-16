@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 
-from companion.core.conversations import ConversationService
+from companion.core.conversations import ConversationService, ReplyPartlySentError
 from companion.core.curiosities import CuriosityRaiser
 from companion.core.knowledge_retrieval import KnowledgeRetrieval
 from companion.core.life_threads import ThreadReminder
@@ -76,7 +76,9 @@ class ReplyService:
 
         When the ReplyGate stops the reply nothing is composed. A failing
         step raises, so the caller can send its fallback message. A Check-in
-        woven into a reply that fails is taken back, so it stays due.
+        woven into a reply that fails before any of it is sent is taken
+        back, so it stays due; once part of the reply is sent, it counts as
+        sent and is never woven in again.
 
         Args:
             message: The Message to answer, its texts already saved and
@@ -134,9 +136,11 @@ class ReplyService:
                 reply.sticker.id if reply.sticker else None,
                 reply.shared_photo.id if reply.shared_photo else None,
             )
+        except ReplyPartlySentError:
+            raise
         except Exception:
-            if woven is not None and woven_check_in is not None:
-                self._woven_check_ins.take_back(snapshot, woven, woven_check_in)
+            if woven_check_in is not None:
+                self._woven_check_ins.take_back(snapshot, woven_check_in)
             raise
         self._thread_reminder.mark_raised(message.conversation_id, form.bring_up)
         self._curiosity_raiser.mark_raised(message.conversation_id, form.curiosities)

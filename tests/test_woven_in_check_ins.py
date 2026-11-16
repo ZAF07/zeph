@@ -427,6 +427,40 @@ def test_a_reply_that_fails_to_send_logs_no_check_in_and_it_stays_due(
     assert next_due_at(engine, maya_id(client, headers)) == due_at
 
 
+def test_a_reply_that_fails_after_its_first_part_keeps_the_woven_in_check_in(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    due_at = next_due_at(engine, maya_id(client, headers))
+    open_a_conversation_until_due(client, chat_model, chat_channel, clock)
+    chat_model.script_woven_check_in(weave_answer())
+    chat_model.script("how did the board presentation go?\n\nand how's the salad?")
+    send_text = chat_channel.send_text
+
+    def fail_the_second_part(chat_id: int, text: str) -> None:
+        if text == "and how's the salad?":
+            raise ConnectionError("telegram is down")
+        send_text(chat_id, text)
+
+    monkeypatch.setattr(chat_channel, "send_text", fail_the_second_part)
+
+    send_to_webhook(client, telegram_text_update("now making a big salad"))
+
+    assert "how did the board presentation go?" in chat_channel.texts_sent_to(
+        TELEGRAM_CHAT_ID
+    )
+    [recent] = recent_check_ins(client, headers)
+    assert recent["kind"] == "A follow-up"
+    assert due_at is not None
+    assert next_due_at(engine, maya_id(client, headers)) == due_at + ONE_DAY
+
+
 def test_a_woven_in_check_in_whose_save_fails_is_not_woven_in(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,

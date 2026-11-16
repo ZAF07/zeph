@@ -169,14 +169,10 @@ def check_woven_in(expected: bool, woven_in: bool) -> CheckResult:
     Returns:
         The check's outcome.
     """
-    if woven_in:
-        detail = "wove in the due Check-in"
-        return CheckResult(
-            "woven in", expected, detail if expected else f"{detail}, expected not now"
-        )
-    if expected:
-        return CheckResult("woven in", False, "said not now, expected it woven in")
-    return CheckResult("woven in", True, "said not now")
+    detail = "wove in the due Check-in" if woven_in else "said not now"
+    if woven_in != expected:
+        detail += ", expected not now" if woven_in else ", expected it woven in"
+    return CheckResult("woven in", woven_in == expected, detail)
 
 
 def check_understanding(

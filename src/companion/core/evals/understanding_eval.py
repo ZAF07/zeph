@@ -154,6 +154,9 @@ def make_check_in_due(repositories: Repositories, user_id: UUID, now: datetime) 
         repositories: Where Users are stored.
         user_id: The User's ID.
         now: The case's time.
+
+    Raises:
+        ValueError: If the made-up User isn't there.
     """
     user = repositories.users.get(user_id)
     if user is None:

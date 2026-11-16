@@ -110,7 +110,7 @@ def kinds_to_weave_in(kinds: Sequence[CheckInKind]) -> list[CheckInKind]:
     ]
 
 
-def describe_conversation(messages: Sequence[ConversationMessage]) -> str:
+def describe_conversation_for_check_in(messages: Sequence[ConversationMessage]) -> str:
     """Write the current Conversation for the Check-in model.
 
     Args:
@@ -376,9 +376,7 @@ class WovenCheckIns:
             return None
         return check_in if saved else None
 
-    def take_back(
-        self, snapshot: UserSnapshot, woven: WovenCheckIn, check_in: CheckIn
-    ) -> None:
+    def take_back(self, snapshot: UserSnapshot, check_in: CheckIn) -> None:
         """Take back a saved Woven-in Check-in whose reply was never sent.
 
         The User stays due at the Due Time read for the reply. It never
@@ -386,17 +384,20 @@ class WovenCheckIns:
         twice.
 
         Args:
-            snapshot: The User being answered, as read for the reply.
-            woven: The Check-in that was to be woven in.
+            snapshot: The User being answered, as read for the reply, whose
+                Due Time was due.
             check_in: The saved Check-in.
         """
+        settings = snapshot.user.check_ins
+        if settings.next_due_at is None:
+            return
         try:
             self._repositories.check_ins.undo_add(
                 check_in,
-                woven.due_at,
+                settings.next_due_at,
                 end_pause=False,
                 skipped=None,
-                held_back_due_at=snapshot.user.check_ins.held_back_due_at,
+                held_back_due_at=settings.held_back_due_at,
             )
         except Exception:
             logger.exception("Could not take back a Woven-in Check-in; it is missed")
@@ -448,7 +449,7 @@ class WovenCheckIns:
                 MEMORY_INTRO,
                 portrait=saved.portrait,
             ),
-            describe_conversation(
+            describe_conversation_for_check_in(
                 self._repositories.conversations.list_messages(conversation_id)
             ),
             describe_understanding_for_check_in(form, reminded),
