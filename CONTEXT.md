@@ -105,7 +105,7 @@ A due Check-in that arrives inside the Companion's reply while a Conversation is
 _Avoid_: Mid-conversation check-in, injected check-in
 
 **Held-back Check-in**:
-A due Check-in that waits because something stops it for now: the User paused, it is their Quiet Hours, or they have no Telegram Connection. Nothing is sent or logged; it is decided again once that ends, when the pause ends or Quiet Hours end, or when the User resumes or connects Telegram. If the User changes the setting that held it back, it is decided again straight away. Admins can see which Users have one held back right now and why; once it is no longer held back, nothing of it is kept.
+A due Check-in that waits because something stops it for now: the User paused, it is their Quiet Hours, they have no Telegram Connection, they have used up today's Daily Message Limit (after that day's Skipped Check-in), or no Check-in Kind may be sent to them. Nothing is sent or logged; it is decided again once that ends, when the pause ends or Quiet Hours end, or when the User resumes or connects Telegram. If the User, or an Admin through an Admin Setting Change, changes the setting that held it back, it is decided again straight away. Admins can see which Users have one held back right now and why; once it is no longer held back, nothing of it is kept.
 _Avoid_: Skipped (a skip is a decision and is logged)
 
 **Skipped Check-in**:
