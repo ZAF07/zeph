@@ -226,7 +226,7 @@ def test_quiet_hours_show_as_held_back_until_they_end_then_clear_once_sent(
     }
     entry = only_entry(client, admin)
     assert entry["held_back"] is None
-    assert entry["next_due_at"] == as_json_time(clock.now() + ONE_DAY)
+    assert entry["next_due_at"] == as_json_time(clock.now() + ONE_DAY / 2)
 
 
 def test_no_telegram_connection_shows_as_held_back_with_no_end(

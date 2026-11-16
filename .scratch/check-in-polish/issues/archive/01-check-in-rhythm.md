@@ -50,13 +50,13 @@ Track B also changes the Check-in decision and tick code and adds migrations. Wh
 
 **2026-11-16 — done.**
 
-How the rhythm is kept: hold-backs move `check_in_next_due_at` (so a held-back User isn't re-read every tick) and save the Due Time the Check-in was first due at in a new column, `users.check_in_held_back_due_at` (migration 0046). A decision counts the next Due Time from it (`CheckInSettings.rhythm_due_at`), then clears it. A refused send that is retried, and a daily-limit skip, keep it too. Turning Check-ins off or on, or changing the frequency, clears it, since the rhythm starts again.
+How the rhythm is kept: hold-backs move `check_in_next_due_at` (so a held-back User isn't re-read every tick) and save the Due Time the Check-in was first due at in a new column, `users.check_in_held_back_due_at` (migration 0047). A decision counts the next Due Time from it (`CheckInSettings.rhythm_due_at`), then clears it. A refused send that is retried, and a daily-limit skip, keep it too. Turning Check-ins off or on, or changing the frequency, clears it, since the rhythm starts again.
 
 Decisions made without asking:
 - After an "until I resume" pause, the rhythm continues from the Due Time before the pause (the issue expected a fresh one). Either way the User gets one Check-in and then their normal rhythm.
 - None of the frequency gaps was on the admin Platform Settings page, so all four are now editable there (new `hours_by_frequency` setting kind, 1–720 hours each).
 
-Notes for track B: migration 0046 is taken. `HoldBack` keeps its shape. `AskModel` now has `next_due_if_sent` and `next_due_if_skipped`. `SkipForDailyLimit` has `stays_due_at`.
+Notes for track B: track B merged first with 0046, so this is 0047. `HoldBack` keeps its shape. `AskModel` now has `next_due_if_sent` and `next_due_if_skipped`. `SkipForDailyLimit` has `stays_due_at`.
 
 ## Evidence
 
@@ -85,7 +85,7 @@ Notes for track B: migration 0046 is taken. `HoldBack` keeps its shape. `AskMode
 - Quiet gap seed of 15: `tests/test_admin_settings.py::test_admin_sees_each_editable_setting_with_its_seeded_value`, `tests/test_setting_keys.py`.
 - Checks: backend 1117 passed, with ruff, ruff format --check and mypy clean. Web: lint, format:check and typecheck clean, 426 tests passed.
 - `/run` on the worktree stack (ports 3020/8020):
-  - `make db-copy` from the main stack (at 0045), then a restart migrated it to 0046. Gaps became `{"weekly": 168, "most_days": 24, "few_times_a_week": 56, "a_few_times_a_day": 6}`, and the stored quiet gap stayed 15.
+  - `make db-copy` from the main stack (at 0045), then a restart migrated it to 0046 (now numbered 0047, after track B took 0046). Gaps became `{"weekly": 168, "most_days": 24, "few_times_a_week": 56, "a_few_times_a_day": 6}`, and the stored quiet gap stayed 15.
   - Signed in as Admin, `/admin/settings` showed all four gaps (168/56/24/6). Changing "A few times a day" to 5 saved to the database, then it was set back to 6.
   - On `/check-ins`, "A few times a day" was picked and still showed after a reload. The next Due Time became now + 6 h.
   - The real `CheckInService` ran in a backend container on the worktree database, with the live backend stopped and only the chat channel and model stubbed (the worktree has no real Telegram chat). Times moved by shifting DB rows. Due Time D = 13:06:37, Quiet Hours covering now:
@@ -93,7 +93,13 @@ Notes for track B: migration 0046 is taken. `HoldBack` keeps its shape. `AskMode
     - after Quiet Hours were shifted off and the Check-in was sent, the next Due Time was 2026-11-17 13:06:37 (D + 24 h), not 13:16:37 (the old rule)
     - the model input included the User Portrait
 
+- After rebasing onto track B (issue 03, which took migration 0046), this issue's migration became 0047.
+  - The real-data copy, reset to its 0045 state, migrated 0045 → 0046 → 0047. The users table gained `check_in_held_back_reason`, `check_in_held_back_until`, `settings_changed_by_admin` and `check_in_held_back_due_at`, and the 6 h gap was added.
+  - The in-container Check-in run was repeated on the merged code with the same result: next Due Time D + 24 h (13:26:26 tomorrow), not 13:36:26. Track B's held-back reason showed `quiet_hours` while held back and was cleared once sent.
+  - Track B's `test_quiet_hours_show_as_held_back_until_they_end_then_clear_once_sent` expected the old rule. It now expects send time + 12 h: the next Due Time (09:00Z) fell 9.5 h after the send, so the half-gap rule pushed it to send time + 12 h.
+  - Checks after the rebase: backend 1137 passed with ruff, ruff format --check and mypy clean. Web: lint, format:check and typecheck clean, 448 tests passed.
+
 ## Completion
 
 - Completed: 2026-11-16
-- Commits: 9c26a87 (implementation), 9b4f15d (review fixes)
+- Commits: 04686bc (implementation), 9e87408 (review fixes), f7e713d (archive), plus the rebase-onto-issue-03 commit and the merge commit recorded below
