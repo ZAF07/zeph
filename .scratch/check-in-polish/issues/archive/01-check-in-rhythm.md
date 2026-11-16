@@ -102,4 +102,5 @@ Notes for track B: track B merged first with 0046, so this is 0047. `HoldBack` k
 ## Completion
 
 - Completed: 2026-11-16
-- Commits: 04686bc (implementation), 9e87408 (review fixes), f7e713d (archive), plus the rebase-onto-issue-03 commit and the merge commit recorded below
+- Commits: c9a891d (implementation), cfb077d (review fixes), 4cc5c49 (archive), 59d7d47 (rebase onto issue 03, migration 0047)
+- Merge: bef50a8
