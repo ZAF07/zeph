@@ -398,6 +398,7 @@ class WovenCheckIns:
                 end_pause=False,
                 skipped=None,
                 held_back_due_at=settings.held_back_due_at,
+                check_in_now=None,
             )
         except Exception:
             logger.exception("Could not take back a Woven-in Check-in; it is missed")

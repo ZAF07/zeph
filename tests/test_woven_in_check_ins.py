@@ -23,6 +23,7 @@ from tests.telegram_helpers import (
     telegram_text_update,
 )
 from tests.test_check_in_hold_back import maya_id, next_due_at
+from tests.test_check_in_now import check_in_now
 from tests.test_check_in_rhythm import change_check_ins, pause_check_ins
 from tests.test_check_in_schedule import as_json_time, only_entry
 from tests.test_check_in_sending import (
@@ -543,3 +544,25 @@ def test_the_woven_in_check_in_prompt_is_editable_by_admins(
 
     [woven_call] = chat_model.woven_check_in_calls
     assert woven_call.instructions.endswith("Weave it in, maybe.")
+
+
+def test_a_waiting_check_in_now_is_not_woven_in_and_is_left_to_the_tick(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+) -> None:
+    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    admin = owner_headers(client, auth_verifier)
+    clock.advance(timedelta(hours=1))
+    chat_model.script("oh nice!")
+    send_to_webhook(client, telegram_text_update("just got back from a run"))
+    check_in_now(client, admin, [maya_id(client, headers)])
+    chat_model.script_woven_check_in(weave_answer())
+    chat_model.script("sounds tasty!")
+
+    send_to_webhook(client, telegram_text_update("now making a big salad"))
+
+    assert chat_model.woven_check_in_calls == []
+    assert only_entry(client, admin)["check_in_now_waiting"] is True
