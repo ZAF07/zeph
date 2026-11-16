@@ -1,7 +1,6 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta
-from enum import StrEnum
 
 from companion.core.models import (
     CheckInFrequency,
@@ -9,23 +8,12 @@ from companion.core.models import (
     CheckInSettings,
     Conversation,
     Feature,
+    HoldBackReason,
     UserSnapshot,
 )
 from companion.core.timing import is_open, local_now
 
 REFUSED_CHECK_IN_RETRY_GAP = timedelta(minutes=15)
-
-
-class HoldBackReason(StrEnum):
-    """Why a due User's Check-in is held back."""
-
-    CHECK_INS_OFF = "check_ins_off"
-    PAUSED = "paused"
-    QUIET_HOURS = "quiet_hours"
-    NO_TELEGRAM_CONNECTION = "no_telegram_connection"
-    IN_CONVERSATION = "in_conversation"
-    LIMIT_SKIP_DONE_TODAY = "limit_skip_done_today"
-    NO_KIND_TO_SEND = "no_kind_to_send"
 
 
 @dataclass(frozen=True)

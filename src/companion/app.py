@@ -18,6 +18,7 @@ from companion.adapters.telegram.webhook import build_telegram_webhook_router
 from companion.core.admin_users import AdminUserService
 from companion.core.chat_settings import SettingsTools
 from companion.core.check_in_kinds import CheckInKindService
+from companion.core.check_in_schedule import CheckInScheduleService
 from companion.core.check_ins import CheckInService
 from companion.core.conversations import ConversationService
 from companion.core.curiosities import CuriosityKeeper, CuriosityRaiser
@@ -433,6 +434,9 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 dependencies.repositories, dependencies.clock
             ),
             check_in_service=check_in_service,
+            check_in_schedule_service=CheckInScheduleService(
+                dependencies.repositories, check_in_service, dependencies.clock
+            ),
             usage_limiter=usage_limiter,
             model_call_log=model_call_log,
             need_service=need_service,

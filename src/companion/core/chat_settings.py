@@ -6,6 +6,7 @@ from companion.core.check_ins import CheckInService
 from companion.core.features import FeatureNotAvailableError
 from companion.core.memory_retrieval import format_day
 from companion.core.models import (
+    ChangedBy,
     CheckInChanges,
     CheckInFrequency,
     Feature,
@@ -296,7 +297,9 @@ class ReplySettingsTools:
             length = PauseLength(str(arguments.get("length")))
         except ValueError:
             return f"The length must be day, week or until_resumed. {NOTHING_CHANGED}"
-        settings = self._check_ins.pause(user, length, in_chat=True).check_ins
+        settings = self._check_ins.pause(
+            user, length, changed_by=ChangedBy.CHAT
+        ).check_ins
         if settings.paused_until is None:
             return f"Check-ins are paused until they ask to resume. {TELL_THEM}"
         until = format_day(settings.paused_until, user.time_zone)
@@ -314,7 +317,7 @@ class ReplySettingsTools:
         user = self._user()
         if not self._check_ins.is_paused(user):
             return f"Their Check-ins aren't paused. {NOTHING_CHANGED}"
-        self._check_ins.resume(user, in_chat=True)
+        self._check_ins.resume(user, changed_by=ChangedBy.CHAT)
         return f"Check-ins are resumed. {TELL_THEM}"
 
     def _change_frequency(self, arguments: dict[str, Any]) -> str:
@@ -334,7 +337,7 @@ class ReplySettingsTools:
                 f"{NOTHING_CHANGED}"
             )
         self._check_ins.change_settings(
-            self._user(), CheckInChanges(frequency=frequency), in_chat=True
+            self._user(), CheckInChanges(frequency=frequency), changed_by=ChangedBy.CHAT
         )
         return f"Check-ins are now {FREQUENCY_WORDS[frequency]}. {TELL_THEM}"
 
@@ -360,7 +363,7 @@ class ReplySettingsTools:
         settings = self._check_ins.change_settings(
             self._user(),
             CheckInChanges(quiet_hours_start=start, quiet_hours_end=end),
-            in_chat=True,
+            changed_by=ChangedBy.CHAT,
         ).check_ins
         return (
             f"Quiet hours are now {settings.quiet_hours_start:%H:%M} to "
@@ -387,7 +390,7 @@ class ReplySettingsTools:
             self._users.update_preferences(
                 self._user(),
                 PreferenceChanges(user_memory_enabled=turn_on),
-                in_chat=True,
+                changed_by=ChangedBy.CHAT,
             )
         except FeatureNotAvailableError:
             return (
@@ -421,7 +424,7 @@ class ReplySettingsTools:
             self._users.update_preferences(
                 self._user(),
                 PreferenceChanges(photo_viewing_enabled=turn_on),
-                in_chat=True,
+                changed_by=ChangedBy.CHAT,
             )
         except FeatureNotAvailableError:
             return (
@@ -497,7 +500,9 @@ class ReplySettingsTools:
         time_zone = str(arguments.get("time_zone", "")).strip()
         try:
             self._users.update_preferences(
-                self._user(), PreferenceChanges(time_zone=time_zone), in_chat=True
+                self._user(),
+                PreferenceChanges(time_zone=time_zone),
+                changed_by=ChangedBy.CHAT,
             )
         except InvalidProfileError:
             return (

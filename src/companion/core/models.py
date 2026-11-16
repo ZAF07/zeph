@@ -34,6 +34,31 @@ class CheckInFrequency(StrEnum):
     MOST_DAYS = "most_days"
 
 
+class HoldBackReason(StrEnum):
+    """Why a due User's Check-in is held back."""
+
+    CHECK_INS_OFF = "check_ins_off"
+    PAUSED = "paused"
+    QUIET_HOURS = "quiet_hours"
+    NO_TELEGRAM_CONNECTION = "no_telegram_connection"
+    IN_CONVERSATION = "in_conversation"
+    LIMIT_SKIP_DONE_TODAY = "limit_skip_done_today"
+    NO_KIND_TO_SEND = "no_kind_to_send"
+
+
+@dataclass(frozen=True)
+class HeldBack:
+    """Why a User's due Check-in is held back right now, as the last tick saw.
+
+    Attributes:
+        reason: Why it is held back.
+        until: When it is decided again; None when not known.
+    """
+
+    reason: HoldBackReason
+    until: datetime | None
+
+
 class PauseLength(StrEnum):
     """How long a User pauses their Check-ins for."""
 
@@ -57,6 +82,8 @@ class CheckInSettings:
             the User resumes.
         next_due_at: When the next Check-in may be sent; never shown to the
             User.
+        held_back: Why the last tick held their due Check-in back; None
+            once it is decided. Only ticks save it.
     """
 
     enabled: bool = False
@@ -66,6 +93,7 @@ class CheckInSettings:
     paused: bool = False
     paused_until: datetime | None = None
     next_due_at: datetime | None = None
+    held_back: HeldBack | None = None
 
     def is_paused_at(self, now: datetime) -> bool:
         """Tell whether Check-ins are paused at a given time.
@@ -90,11 +118,14 @@ class NextDueTimeChange:
         read_as: Their due time as it was read; the change is only saved
             if it is still this.
         becomes: The due time to save; None for none.
+        held_back: Why they are held back, saved with it; None for not
+            held back.
     """
 
     user_id: UUID
     read_as: datetime | None
     becomes: datetime | None
+    held_back: HeldBack | None = None
 
 
 @dataclass(frozen=True)
@@ -125,6 +156,14 @@ class ChatSetting(StrEnum):
     TIME_ZONE = "time_zone"
 
 
+class ChangedBy(StrEnum):
+    """Who changed a User's setting, and where."""
+
+    DASHBOARD = "dashboard"
+    CHAT = "chat"
+    ADMIN = "admin"
+
+
 @dataclass(frozen=True)
 class User:
     """A person with an account who converses with the Companion.
@@ -148,6 +187,8 @@ class User:
         check_ins: Their Check-in settings.
         settings_changed_in_chat: When each setting was last changed in chat;
             a setting is left out once it is changed on the Dashboard.
+        settings_changed_by_admin: When an Admin last changed each setting
+            for them; a setting is left out once the User changes it.
         data_deletion_requested_at: When they asked in chat to delete their
             data and are yet to reply with the confirmation word; None if not.
     """
@@ -168,6 +209,7 @@ class User:
     role: UserRole = UserRole.USER
     check_ins: CheckInSettings = field(default_factory=CheckInSettings)
     settings_changed_in_chat: dict[ChatSetting, datetime] = field(default_factory=dict)
+    settings_changed_by_admin: dict[ChatSetting, datetime] = field(default_factory=dict)
     data_deletion_requested_at: datetime | None = None
 
     @property
@@ -178,6 +220,67 @@ class User:
             True once onboarding is done.
         """
         return self.onboarding_completed_at is not None
+
+
+@dataclass(frozen=True)
+class UserPage:
+    """One page of Users, and how many there are on every page together.
+
+    Attributes:
+        users: The Users on this page.
+        total: How many Users match, on every page.
+    """
+
+    users: list[User]
+    total: int
+
+
+@dataclass(frozen=True)
+class CheckInScheduleEntry:
+    """One opted-in User on the Check-in Schedule. Never message content.
+
+    Attributes:
+        user: The User, with their Check-in settings, Due Time and why a
+            Check-in is held back right now.
+        paused: Whether their Check-ins are paused right now.
+        check_ins_work: Whether the Check-ins Feature works for them.
+    """
+
+    user: User
+    paused: bool
+    check_ins_work: bool
+
+
+@dataclass(frozen=True)
+class CheckInSchedulePage:
+    """One page of the Check-in Schedule.
+
+    Attributes:
+        entries: The opted-in Users on this page, soonest Due Time first.
+        total: How many opted-in Users match, on every page.
+        now: When it was read, so Due Times can be shown from then.
+    """
+
+    entries: list[CheckInScheduleEntry]
+    total: int
+    now: datetime
+
+
+@dataclass(frozen=True)
+class AdminCheckInChanges:
+    """Check-in settings an Admin changes for a User; None leaves one as it is.
+
+    Admins can't turn a User's Check-ins on or off, so there is no switch.
+
+    Attributes:
+        frequency: How often, at most, a Check-in may be sent.
+        quiet_hours_start: Local time when quiet hours begin.
+        quiet_hours_end: Local time when quiet hours end.
+    """
+
+    frequency: CheckInFrequency | None = None
+    quiet_hours_start: time | None = None
+    quiet_hours_end: time | None = None
 
 
 @dataclass(frozen=True)

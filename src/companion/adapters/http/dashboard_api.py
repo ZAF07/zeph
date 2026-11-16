@@ -131,7 +131,11 @@ class CheckInKindSummaryResponse(BaseModel):
 
 
 class CheckInsResponse(BaseModel):
-    """A User's Check-in settings and recent Check-ins; never a next time."""
+    """A User's Check-in settings and recent Check-ins; never a next time.
+
+    `changed_by_admin` says when an Admin last changed each setting, until
+    the User changes it themselves.
+    """
 
     enabled: bool
     available: bool
@@ -142,6 +146,7 @@ class CheckInsResponse(BaseModel):
     paused_until: datetime | None
     recent: list[RecentCheckInResponse]
     kinds: list[CheckInKindSummaryResponse]
+    changed_by_admin: dict[ChatSetting, datetime]
 
 
 class PlatformContentResponse(BaseModel):
@@ -498,6 +503,7 @@ def to_check_ins_response(page: CheckInsPage) -> CheckInsResponse:
             CheckInKindSummaryResponse(name=kind.name, description=kind.description)
             for kind in page.kinds
         ],
+        changed_by_admin=page.changed_by_admin,
     )
 
 

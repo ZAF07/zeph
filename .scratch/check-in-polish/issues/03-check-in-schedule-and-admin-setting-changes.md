@@ -53,3 +53,13 @@ None - can start immediately.
 Track A (issue 02) adds a "waiting to be woven in" held-back state. Leave room for more reasons. Track A also changes the Check-in decision and tick code and adds migrations. Whichever merges second rebases, and renumbers its migration if they clash.
 
 ## Comments
+
+### 2026-11-16 — plan (branch `check-in-polish-03-schedule`)
+
+- **Held back:** `HoldBackReason` moves to `models.py` (still importable from `check_in_decision`). `CheckInSettings` gains `held_back: HeldBack | None` (reason + until). The tick's bulk `save_next_due_times` writes it with the Due Time; "until" is the new Due Time unless the User stays due (then unknown). `check_ins.add` (any decision) clears it. `users.update` never writes it (the tick owns it).
+- **Marks:** `ChangedBy` (dashboard / chat / admin) replaces the `in_chat` bool in `record_where_changed`, `CheckInService.change_settings/pause/resume` and `UserService.update_preferences`. New JSONB column `settings_changed_by_admin`, next to the chat marks. Admin change sets the admin mark and drops the chat mark; chat sets chat and drops admin; Dashboard drops both.
+- **Core:** new `CheckInScheduleService` (`core/check_in_schedule.py`): list (search, page; opted-in only, soonest Due Time first, Feature status worked out in bulk), change frequency / Quiet Hours, pause, resume — all through `CheckInService` with `ChangedBy.ADMIN`. Refuses a User who hasn't opted in (409). Never touches `enabled`.
+- **API:** `GET /api/admin/check-in-schedule?search=&page=`, `PATCH /api/admin/check-in-schedule/{user_id}` (no `enabled` field; extra fields → 422), `PUT|DELETE /api/admin/check-in-schedule/{user_id}/pause`. `/api/check-ins` gains `changed_by_admin`.
+- **Migration** `0046`: three new `users` columns. Renumber if track A takes 0046 first.
+- **Web:** `CheckInSchedule` (search, table, paging), `UserCheckInSettingsPanel` (dialog like `UserFeaturesPanel`), `ChangedByAdminCaption` on the User's Check-ins page, nav item next to Check-in Kinds / Check-in log. Formatting in `lib/check-in-schedule.ts`.
+- Leaves room for issue 04 (Check in Now: row checkboxes) and issue 02 (new held-back reason).

@@ -8,6 +8,7 @@ from companion.core.errors import InvalidError
 from companion.core.features import FeatureService
 from companion.core.models import (
     AccountIdentity,
+    ChangedBy,
     ChatSetting,
     Feature,
     OnboardingAnswers,
@@ -198,7 +199,10 @@ class UserService:
         return saved
 
     def update_preferences(
-        self, user: User, changes: PreferenceChanges, in_chat: bool = False
+        self,
+        user: User,
+        changes: PreferenceChanges,
+        changed_by: ChangedBy = ChangedBy.DASHBOARD,
     ) -> User:
         """Change a User's name, own Feature switches, country or time zone.
 
@@ -209,8 +213,8 @@ class UserService:
         Args:
             user: The User making the change.
             changes: The preferences to change; None leaves one as it is.
-            in_chat: True if the User asked for it in chat, not on the
-                Dashboard.
+            changed_by: Who changed it: the User on the Dashboard or in
+                chat, or an Admin.
 
         Returns:
             The saved User.
@@ -232,7 +236,7 @@ class UserService:
             changed.append(ChatSetting.TIME_ZONE)
             check_ins = self._check_ins.settings_after_time_zone_change(user)
         updated = replace(
-            record_where_changed(user, changed, in_chat, self._clock.now()),
+            record_where_changed(user, changed, changed_by, self._clock.now()),
             name=clean_name(changes.name) if changes.name is not None else user.name,
             user_memory_enabled=(
                 changes.user_memory_enabled

@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -14,10 +14,11 @@ from fastapi import (
     UploadFile,
     status,
 )
-from pydantic import BaseModel, StrictBool
+from pydantic import BaseModel, ConfigDict, StrictBool
 
 from companion.core.admin_users import AdminUserService
 from companion.core.check_in_kinds import CheckInKindService
+from companion.core.check_in_schedule import CheckInScheduleService
 from companion.core.check_ins import CheckInService, LoggedCheckIn
 from companion.core.features import FeatureService, feature_details
 from companion.core.helplines import HelplineService
@@ -29,9 +30,13 @@ from companion.core.knowledge import (
 from companion.core.memory_categories import MemoryCategoryService
 from companion.core.model_call_log import ModelCallLog
 from companion.core.models import (
+    AdminCheckInChanges,
+    ChatSetting,
+    CheckInFrequency,
     CheckInKind,
     CheckInKindDetails,
     CheckInOutcome,
+    CheckInScheduleEntry,
     CheckInStatus,
     Feature,
     FeatureReason,
@@ -39,6 +44,7 @@ from companion.core.models import (
     FeatureSwitch,
     Helpline,
     HelplineDetails,
+    HoldBackReason,
     KnowledgeDetailsChange,
     KnowledgeDocument,
     KnowledgeDocumentWithText,
@@ -58,6 +64,7 @@ from companion.core.models import (
     MoveDirection,
     Need,
     NeedDetails,
+    PauseLength,
     RiskType,
     SafeguardEventOverview,
     StoredSetting,
@@ -93,6 +100,61 @@ class AdminUserResponse(BaseModel):
     messages_sent: int
     life_thread_count: int
     has_portrait: bool
+
+
+class HeldBackResponse(BaseModel):
+    """Why a User's due Check-in is held back right now, and until when if known."""
+
+    reason: HoldBackReason
+    until: datetime | None
+
+
+class CheckInScheduleEntryResponse(BaseModel):
+    """One opted-in User on the Check-in Schedule. Never message content."""
+
+    user_id: str
+    name: str | None
+    email: str | None
+    time_zone: str | None
+    next_due_at: datetime | None
+    frequency: CheckInFrequency
+    quiet_hours_start: time
+    quiet_hours_end: time
+    paused: bool
+    paused_until: datetime | None
+    check_ins_work: bool
+    held_back: HeldBackResponse | None
+    changed_by_admin: list[ChatSetting]
+
+
+class CheckInScheduleResponse(BaseModel):
+    """One page of the Check-in Schedule, and when it was read."""
+
+    entries: list[CheckInScheduleEntryResponse]
+    total: int
+    page: int
+    page_size: int
+    now: datetime
+
+
+class AdminCheckInSettingsRequest(BaseModel):
+    """Check-in settings an Admin changes for a User; a field left out stays.
+
+    There is no on/off switch: Admins can't opt a User in or out, so any
+    other field is refused.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    frequency: CheckInFrequency | None = None
+    quiet_hours_start: time | None = None
+    quiet_hours_end: time | None = None
+
+
+class AdminPauseRequest(BaseModel):
+    """How long an Admin pauses a User's Check-ins for."""
+
+    length: PauseLength
 
 
 class RoleRequest(BaseModel):
@@ -1066,6 +1128,41 @@ def to_admin_user_response(overview: UserOverview) -> AdminUserResponse:
     )
 
 
+def to_check_in_schedule_entry_response(
+    entry: CheckInScheduleEntry,
+) -> CheckInScheduleEntryResponse:
+    """Describe one User's row on the Check-in Schedule for the admin API.
+
+    Args:
+        entry: The User, whether paused now and whether Check-ins work.
+
+    Returns:
+        The response body; the pause only while it lasts.
+    """
+    user = entry.user
+    settings = user.check_ins
+    held_back = settings.held_back
+    return CheckInScheduleEntryResponse(
+        user_id=str(user.id),
+        name=user.name,
+        email=user.email,
+        time_zone=user.time_zone,
+        next_due_at=settings.next_due_at,
+        frequency=settings.frequency,
+        quiet_hours_start=settings.quiet_hours_start,
+        quiet_hours_end=settings.quiet_hours_end,
+        paused=entry.paused,
+        paused_until=settings.paused_until if entry.paused else None,
+        check_ins_work=entry.check_ins_work,
+        held_back=(
+            HeldBackResponse(reason=held_back.reason, until=held_back.until)
+            if held_back is not None
+            else None
+        ),
+        changed_by_admin=list(user.settings_changed_by_admin),
+    )
+
+
 def build_admin_api_router(
     current_admin: Callable[..., User],
     admin_user_service: AdminUserService,
@@ -1079,6 +1176,7 @@ def build_admin_api_router(
     personal_sticker_service: PersonalStickerService,
     check_in_kind_service: CheckInKindService,
     check_in_service: CheckInService,
+    check_in_schedule_service: CheckInScheduleService,
     usage_limiter: UsageLimiter,
     model_call_log: ModelCallLog,
     need_service: NeedService,
@@ -1101,6 +1199,8 @@ def build_admin_api_router(
         personal_sticker_service: Counts each User's Personal Stickers.
         check_in_kind_service: Manages Check-in Kinds.
         check_in_service: Lists Check-in decisions.
+        check_in_schedule_service: Lists opted-in Users' Check-ins and makes
+            Admin Setting Changes.
         usage_limiter: Reports usage per User per day.
         model_call_log: Lists and opens Model Call Log traces.
         need_service: Manages Needs.
@@ -1694,6 +1794,98 @@ def build_admin_api_router(
                 for logged in check_in_service.list_log(days)
             ]
         )
+
+    @router.get("/check-in-schedule")
+    def list_check_in_schedule(
+        search: str = "",
+        page: Annotated[int, Query(ge=1)] = 1,
+        page_size: Annotated[int, Query(ge=1, le=100)] = 25,
+    ) -> CheckInScheduleResponse:
+        """List one page of the Users who opted in to Check-ins. Never message text.
+
+        Args:
+            search: Only Users whose name or email holds this.
+            page: Which page, from 1.
+            page_size: The most Users on a page.
+
+        Returns:
+            The page, soonest Due Time first, with how many Users match and
+            when it was read.
+        """
+        found = check_in_schedule_service.list_page(search, page, page_size)
+        return CheckInScheduleResponse(
+            entries=[
+                to_check_in_schedule_entry_response(entry) for entry in found.entries
+            ],
+            total=found.total,
+            page=page,
+            page_size=page_size,
+            now=found.now,
+        )
+
+    @router.patch("/check-in-schedule/{user_id}")
+    def change_user_check_ins(
+        user_id: UUID, request: AdminCheckInSettingsRequest
+    ) -> CheckInScheduleEntryResponse:
+        """Change a User's Check-in Frequency or Quiet Hours for them.
+
+        Args:
+            user_id: The User.
+            request: The settings to change.
+
+        Returns:
+            The User's row on the Schedule after the change.
+
+        Raises:
+            CoreError: 404 if there is no such User; 409 if they haven't
+                opted in to Check-ins.
+        """
+        entry = check_in_schedule_service.change_settings(
+            user_id,
+            AdminCheckInChanges(
+                frequency=request.frequency,
+                quiet_hours_start=request.quiet_hours_start,
+                quiet_hours_end=request.quiet_hours_end,
+            ),
+        )
+        return to_check_in_schedule_entry_response(entry)
+
+    @router.put("/check-in-schedule/{user_id}/pause")
+    def pause_user_check_ins(
+        user_id: UUID, request: AdminPauseRequest
+    ) -> CheckInScheduleEntryResponse:
+        """Pause a User's Check-ins for a day, a week or until resumed.
+
+        Args:
+            user_id: The User.
+            request: How long to pause for.
+
+        Returns:
+            The User's row on the Schedule after the change.
+
+        Raises:
+            CoreError: 404 if there is no such User; 409 if they haven't
+                opted in to Check-ins.
+        """
+        entry = check_in_schedule_service.pause(user_id, request.length)
+        return to_check_in_schedule_entry_response(entry)
+
+    @router.delete("/check-in-schedule/{user_id}/pause")
+    def resume_user_check_ins(user_id: UUID) -> CheckInScheduleEntryResponse:
+        """End the pause on a User's Check-ins.
+
+        Args:
+            user_id: The User.
+
+        Returns:
+            The User's row on the Schedule after the change.
+
+        Raises:
+            CoreError: 404 if there is no such User; 409 if they haven't
+                opted in to Check-ins.
+        """
+        entry = check_in_schedule_service.resume(user_id)
+        return to_check_in_schedule_entry_response(entry)
 
     @router.get("/usage")
     def list_usage(days: Annotated[int, Query(ge=1, le=365)] = 7) -> UsageResponse:

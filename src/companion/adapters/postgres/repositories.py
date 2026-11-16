@@ -7,6 +7,7 @@ from typing import Any, Protocol
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    ColumnElement,
     Connection,
     Engine,
     Row,
@@ -81,8 +82,10 @@ from companion.core.models import (
     DailyUsage,
     Feature,
     FeatureSwitch,
+    HeldBack,
     Helpline,
     HelplineDetails,
+    HoldBackReason,
     KnowledgeDetailsChange,
     KnowledgeDocument,
     KnowledgeFile,
@@ -130,6 +133,7 @@ from companion.core.models import (
     UnderstandingShape,
     User,
     UserOverview,
+    UserPage,
     UserPortrait,
     UserRole,
 )
@@ -188,13 +192,48 @@ def _to_user(row: Row[Any]) -> User:
             paused=row.check_ins_paused,
             paused_until=row.check_ins_paused_until,
             next_due_at=row.check_in_next_due_at,
+            held_back=(
+                HeldBack(
+                    reason=HoldBackReason(row.check_in_held_back_reason),
+                    until=row.check_in_held_back_until,
+                )
+                if row.check_in_held_back_reason is not None
+                else None
+            ),
         ),
-        settings_changed_in_chat={
-            ChatSetting(setting): datetime.fromisoformat(changed_at)
-            for setting, changed_at in row.settings_changed_in_chat.items()
-        },
+        settings_changed_in_chat=_to_setting_stamps(row.settings_changed_in_chat),
+        settings_changed_by_admin=_to_setting_stamps(row.settings_changed_by_admin),
         data_deletion_requested_at=row.data_deletion_requested_at,
     )
+
+
+def _to_setting_stamps(saved: dict[str, str]) -> dict[ChatSetting, datetime]:
+    """Turn saved "when each setting was changed" stamps into datetimes.
+
+    Args:
+        saved: The JSONB column's value, by setting name.
+
+    Returns:
+        When each setting was changed.
+    """
+    return {
+        ChatSetting(setting): datetime.fromisoformat(changed_at)
+        for setting, changed_at in saved.items()
+    }
+
+
+def _from_setting_stamps(stamps: dict[ChatSetting, datetime]) -> dict[str, str]:
+    """Turn "when each setting was changed" stamps into a JSONB column's value.
+
+    Args:
+        stamps: When each setting was changed.
+
+    Returns:
+        The value to save, by setting name.
+    """
+    return {
+        setting.value: changed_at.isoformat() for setting, changed_at in stamps.items()
+    }
 
 
 def _to_need(row: Row[Any]) -> Need:
@@ -615,10 +654,12 @@ class PostgresUserRepository:
                 check_ins_paused=user.check_ins.paused,
                 check_ins_paused_until=user.check_ins.paused_until,
                 check_in_next_due_at=user.check_ins.next_due_at,
-                settings_changed_in_chat={
-                    setting.value: changed_at.isoformat()
-                    for setting, changed_at in user.settings_changed_in_chat.items()
-                },
+                settings_changed_in_chat=_from_setting_stamps(
+                    user.settings_changed_in_chat
+                ),
+                settings_changed_by_admin=_from_setting_stamps(
+                    user.settings_changed_by_admin
+                ),
                 data_deletion_requested_at=user.data_deletion_requested_at,
             )
             .returning(users)
@@ -3896,14 +3937,51 @@ class PostgresCheckInRepository:
             rows = connection.execute(statement).all()
         return [_to_user(row) for row in rows]
 
+    def list_opted_in_users(self, search: str, limit: int, offset: int) -> UserPage:
+        """List one page of the Users who opted in to Check-ins.
+
+        Args:
+            search: Only Users whose name or email holds this, in any case;
+                "" for every one.
+            limit: The most Users on the page.
+            offset: How many matching Users come before the page.
+
+        Returns:
+            The page, soonest Due Time first and Users with none last, and
+            how many Users match.
+        """
+        conditions: list[ColumnElement[bool]] = [users.c.check_ins_enabled.is_(True)]
+        if search:
+            pattern = f"%{search}%"
+            conditions.append(
+                or_(users.c.name.ilike(pattern), users.c.email.ilike(pattern))
+            )
+        with self._database.connect() as connection:
+            total = connection.execute(
+                select(func.count()).select_from(users).where(*conditions)
+            ).scalar_one()
+            rows = connection.execute(
+                select(users)
+                .where(*conditions)
+                .order_by(
+                    users.c.check_in_next_due_at.asc().nulls_last(),
+                    users.c.name,
+                    users.c.id,
+                )
+                .limit(limit)
+                .offset(offset)
+            ).all()
+        return UserPage(users=[_to_user(row) for row in rows], total=total)
+
     def save_next_due_times(self, changes: Sequence[NextDueTimeChange]) -> None:
-        """Save many Users' next due times, in one statement.
+        """Save many Users' next due times, and why each is held back, in one statement.
 
         A User whose due time changed since it was read is left as it is, so
         a settings change made meanwhile is kept.
 
         Args:
-            changes: Each User's due time as read and the one to save.
+            changes: Each User's due time as read, the one to save, and why
+                they are held back.
         """
         if not changes:
             return
@@ -3916,7 +3994,13 @@ class PostgresCheckInRepository:
                     bindparam("read_as", type_=due_type)
                 ),
             )
-            .values(check_in_next_due_at=bindparam("becomes", type_=due_type))
+            .values(
+                check_in_next_due_at=bindparam("becomes", type_=due_type),
+                check_in_held_back_reason=bindparam("held_back_reason"),
+                check_in_held_back_until=bindparam(
+                    "held_back_until", type_=users.c.check_in_held_back_until.type
+                ),
+            )
         )
         with self._database.begin() as connection:
             connection.execute(
@@ -3926,6 +4010,16 @@ class PostgresCheckInRepository:
                         "changed_user_id": change.user_id,
                         "read_as": change.read_as,
                         "becomes": change.becomes,
+                        "held_back_reason": (
+                            change.held_back.reason.value
+                            if change.held_back is not None
+                            else None
+                        ),
+                        "held_back_until": (
+                            change.held_back.until
+                            if change.held_back is not None
+                            else None
+                        ),
                     }
                     for change in changes
                 ],
@@ -3960,13 +4054,19 @@ class PostgresCheckInRepository:
     ) -> None:
         """Save a Check-in decision and the User's next due time, together.
 
+        A decision ends any hold back, so why it was held back is cleared.
+
         Args:
             check_in: The Check-in decision.
             next_due_at: When the User's next Check-in may be sent.
             pause_until_resumed: Whether to also pause the User's Check-ins
                 until they resume.
         """
-        user_changes: dict[str, Any] = {"check_in_next_due_at": next_due_at}
+        user_changes: dict[str, Any] = {
+            "check_in_next_due_at": next_due_at,
+            "check_in_held_back_reason": None,
+            "check_in_held_back_until": None,
+        }
         if pause_until_resumed:
             user_changes |= {"check_ins_paused": True, "check_ins_paused_until": None}
         with self._database.begin() as connection:
