@@ -98,7 +98,7 @@ Evidence per acceptance criterion:
 - Check-in Log / Model Call Log: `test_the_model_call_log_shows_the_woven_in_step_with_its_shape_only`, `tests/test_admin_check_ins.py`; `CheckInLog.test.tsx`, `ModelCallTraceView.test.tsx`; seen on `/admin/check-in-log` ("Sent · Woven in") and the trace page (Kinds offered 4, Decision Weave in, Kind chosen).
 - Held-back state: tick test above (`waiting_to_be_woven_in`, until = Conversation end, Due Time unchanged); seen on `/admin/check-in-schedule` ("Waiting to be woven in, until 14:37"). Migration 0049 renames stored `in_conversation`.
 - Tick reads flat: `tests/test_check_in_hold_back.py::test_reads_per_tick_stay_the_same_as_due_users_grow` passes.
-- Evals: 3 new Understanding cases (`check-in-woven-in-at-an-easy-pause`, `check-in-not-now-while-asking-for-help`, `check-in-not-now-mid-story`) with `check_in_due` and `woven_in`; editable on the case form (ADR-0014). Runner path tested in `tests/test_eval_runner.py::test_an_understanding_case_checks_whether_the_due_check_in_was_woven_in`. **Not run: waiting for the owner's OK on cost.**
+- Evals: 3 new Understanding cases (`check-in-woven-in-at-an-easy-pause`, `check-in-not-now-while-asking-for-help`, `check-in-not-now-mid-story`) with `check_in_due` and `woven_in`; editable on the case form (ADR-0014). Runner path tested in `tests/test_eval_runner.py::test_an_understanding_case_checks_whether_the_due_check_in_was_woven_in`. Run on 2026-11-16 with the owner's OK (see below).
 - Checks: backend 1162 passed, ruff, ruff format --check, mypy clean. Web: lint, format:check, typecheck clean, 449 passed.
 - `/run` (worktree stack, 3010/8010): real app in a backend container on the worktree DB, real DeepSeek model, only Telegram/scheduler/timer swapped. Message before the Due Time: no woven-in call. Due Time moved 30 min back + tick: held back `waiting_to_be_woven_in` until the Conversation could end, Due Time kept. Light message during Quiet Hours: model chose "A present-moment pause"; reply "take a sec to actually clock it…"; logged sent / woven in / no message text; Due Time +24 h; next message marked it replied. (A first run's model said "not now" twice, which the prompt allows.)
 
@@ -114,6 +114,14 @@ Caveats (from code review, left as is):
 - Issue 04's `decide_check_in_now` held a mid-Conversation Check in Now back as `in_conversation`; it now uses `waiting_to_be_woven_in` (same retry time). A reply doesn't weave in a Check-in while a Check in Now waits, so the tick still sends that one as the Admin's (no double send). Weaving a Check in Now in is issue 05. Test: `test_a_waiting_check_in_now_is_not_woven_in_and_is_left_to_the_tick`.
 - Checks after the rebase: backend 1179 passed, ruff, ruff format --check, mypy clean. Web: lint, format:check, typecheck clean, 455 passed.
 - `/run` repeated on the merged code (same in-container script, real DeepSeek): no call before the Due Time; tick held back `waiting_to_be_woven_in` until the Conversation could end with the Due Time kept; during Quiet Hours the model wove in "A casual hello" ("How was the rest of the week, beyond it just being long?"), logged sent / woven in, Due Time +24 h, next message marked it replied.
+
+### 2026-11-16 — eval run (owner OK'd the cost)
+
+Ran on a fresh worktree stack of merged main (7c72b0f), real DeepSeek. The command picked the whole Understanding eval, so all 15 cases ran: 14 passed.
+- `check-in-woven-in-at-an-easy-pause`: PASS (wove in the due Check-in).
+- `check-in-not-now-while-asking-for-help`: PASS (Need Advice; said not now).
+- `check-in-not-now-mid-story`: PASS (said not now).
+- `reminded-of-sister`: FAIL on the Judge rule `raises_sister_naturally` (the Understanding brought Mei up, the reply didn't). It has no Check-in due, so no woven-in call runs there. Reruns: merged main 2 of 3 passed, pre-merge main (4b20b7f) 1 of 1 passed. It's a flaky reply, not caused by this change.
 
 ## Completion
 
