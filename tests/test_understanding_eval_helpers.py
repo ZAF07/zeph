@@ -40,6 +40,7 @@ NOTHING_RAISED = ObservedUnderstanding(
     asked_why=False,
     knowledge_documents=[],
     knowledge_in_reply=[],
+    woven_in=False,
 )
 
 
@@ -57,6 +58,14 @@ def test_the_understanding_cases_cover_every_check_the_issue_asks_for() -> None:
     assert any(expect.knowledge is True for expect in expectations)
     assert any(expect.knowledge is False for expect in expectations)
     assert any(expect.rules for expect in expectations)
+    assert any(expect.woven_in is True for expect in expectations)
+    assert any(expect.woven_in is False for expect in expectations)
+    assert all(
+        case.check_in_due
+        for case in cases
+        for message in case.messages
+        if message.expect.woven_in is not None
+    )
     threads = [thread for case in cases for thread in case.memory.threads]
     assert any(thread.raised_in_this_conversation for thread in threads)
     assert any(thread.reaction == "brushed_off" for thread in threads)
@@ -71,6 +80,7 @@ def test_a_case_is_read_with_its_memory_earlier_lines_and_messages(
         + """\
   - id: wedding
     now: 2026-11-12T09:00:00
+    check_in_due: true
     memory:
       portrait: Maya, 34, a nurse.
       items: {Goals: [Run three times a week]}
@@ -103,11 +113,13 @@ def test_a_case_is_read_with_its_memory_earlier_lines_and_messages(
           raised: [Falling-out with Mei]
           curiosity_raised: false
           knowledge: false
+          woven_in: false
           rules: [no_fixing]
 """,
     )
 
     assert case.now == datetime(2026, 11, 12, 9, tzinfo=UTC)
+    assert case.check_in_due is True
     assert case.memory.portrait == "Maya, 34, a nurse."
     assert case.memory.items == {"Goals": ["Run three times a week"]}
     assert case.memory.summaries[0].days_ago == 3
@@ -131,6 +143,7 @@ def test_a_case_is_read_with_its_memory_earlier_lines_and_messages(
         curiosity_raised=False,
         asked_why=None,
         knowledge=False,
+        woven_in=False,
         rules=["no_fixing"],
     )
 
@@ -252,6 +265,29 @@ def test_each_missed_expectation_fails_its_check_and_says_what_happened() -> Non
 
 def test_expectations_left_out_are_not_checked() -> None:
     assert check_understanding(UnderstandingExpectations(), NOTHING_RAISED) == []
+
+
+def test_a_woven_in_check_in_is_checked_against_what_was_expected() -> None:
+    woven = replace(NOTHING_RAISED, woven_in=True)
+
+    assert check_understanding(UnderstandingExpectations(woven_in=True), woven) == [
+        CheckResult("woven in", True, "wove in the due Check-in")
+    ]
+    assert check_understanding(UnderstandingExpectations(woven_in=False), woven) == [
+        CheckResult("woven in", False, "wove in the due Check-in, expected not now")
+    ]
+    assert check_understanding(
+        UnderstandingExpectations(woven_in=True), NOTHING_RAISED
+    ) == [CheckResult("woven in", False, "said not now, expected it woven in")]
+
+
+def test_a_case_expecting_a_woven_in_check_in_needs_one_due(tmp_path: Path) -> None:
+    with pytest.raises(InvalidEvalCaseError, match="check_in_due"):
+        read_cases(
+            tmp_path,
+            CASE_FILE_START
+            + "  - id: hi\n    messages: [{text: hi, expect: {woven_in: true}}]\n",
+        )
 
 
 def test_a_thread_left_alone_passes_and_a_missing_curiosity_fails() -> None:

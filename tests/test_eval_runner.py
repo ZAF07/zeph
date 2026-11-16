@@ -1,3 +1,4 @@
+import json
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -267,6 +268,53 @@ def test_settings_photo_and_understanding_cases_are_checked(
         "detail": "picked Just chatting",
         "group": "hi there",
     }
+
+
+def test_an_understanding_case_checks_whether_the_due_check_in_was_woven_in(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    woven_in_case = EvalCase(
+        key="woven-in",
+        eval=EvalName.UNDERSTANDING,
+        content={
+            "now": "2026-11-13T18:30:00",
+            "check_in_due": True,
+            "messages": [
+                {
+                    "text": "just made pasta, feeling chill",
+                    "expect": {"woven_in": True},
+                },
+                {"text": "yeah it went well!", "expect": {"woven_in": False}},
+            ],
+            "rules": [],
+        },
+    )
+    add_cases(engine, woven_in_case)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.UNDERSTANDING)
+    chat_model.script_woven_check_in(
+        json.dumps(
+            {
+                "decision": "weave_in",
+                "kind": "A follow-up",
+                "note": "Ask how the presentation went.",
+            }
+        )
+    )
+    chat_model.script("sounds cosy! how did the presentation go?", "so glad!")
+
+    runner.work_next_run()
+
+    result = results_by_key(open_run(client, admin, run["id"]))["woven-in"]
+    assert result["outcome"] == "pass", result
+    assert [
+        check["detail"] for check in result["checks"] if check["name"] == "woven in"
+    ] == ["wove in the due Check-in", "said not now"]
+    assert len(chat_model.woven_check_in_calls) == 1
 
 
 def test_a_run_keeps_its_snapshot_of_settings_judge_and_cases(

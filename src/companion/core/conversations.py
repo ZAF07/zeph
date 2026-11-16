@@ -29,6 +29,10 @@ from companion.core.timing import is_open
 logger = logging.getLogger(__name__)
 
 
+class ReplyPartlySentError(Exception):
+    """Raised when sending a reply failed after part of it was sent."""
+
+
 def typing_pause_seconds(text: str, settings: PlatformSettings) -> float:
     """Work out how long to show typing before sending a message.
 
@@ -81,7 +85,8 @@ class ConversationService:
         the Conversation just before the message is saved, the message is
         refused and tried again; it then starts a new Conversation, which
         cannot already be ended. So the message is never left out of a
-        Conversation's processing.
+        Conversation's processing. Within the reply window, it is the reply
+        to a Woven-in Check-in that is the User's newest sent Check-in.
 
         Args:
             user_id: The User who sent it.
@@ -110,6 +115,13 @@ class ConversationService:
                     sticker=sticker,
                 )
             )
+        now = self._clock.now()
+        self._repositories.check_ins.claim_reply(
+            user_id,
+            replied_at=now,
+            sent_since=now - settings.get(CHECK_IN_REPLY_WINDOW),
+            woven_in_only=True,
+        )
         self._chat_channel.show_typing(chat_id)
         return conversation_id
 
@@ -143,11 +155,20 @@ class ConversationService:
             sticker_id: The sticker to send after them, from the Sticker
                 Library or the User's Personal Stickers.
             shared_photo_id: The User's Shared Photo to send back after them.
+
+        Raises:
+            ReplyPartlySentError: If a later message failed after the first
+                was sent; any other error means none of the reply was sent.
         """
-        for part in reply_parts:
+        for number, part in enumerate(reply_parts):
             self._chat_channel.show_typing(chat_id)
             self._clock.sleep(typing_pause_seconds(part, settings))
-            self._chat_channel.send_text(chat_id, part)
+            try:
+                self._chat_channel.send_text(chat_id, part)
+            except Exception as error:
+                if number > 0:
+                    raise ReplyPartlySentError from error
+                raise
             self._save(conversation_id, MessageDirection.OUTGOING, part)
         if shared_photo_id is not None:
             self._send_shared_photo(user_id, conversation_id, chat_id, shared_photo_id)

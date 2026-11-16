@@ -15,6 +15,7 @@ from companion.core.models import (
     CheckInKindOverview,
     CheckInLogEntry,
     CheckInNowRequest,
+    CheckInShape,
     ConnectionToken,
     Conversation,
     ConversationMessage,
@@ -1572,6 +1573,15 @@ class ModelCallRepository(Protocol):
         """
         ...
 
+    def set_check_in_shape(self, trace_id: UUID, shape: CheckInShape) -> None:
+        """Save a woven-in Check-in decision's shape on a trace's newest Check-in call.
+
+        Args:
+            trace_id: The trace's ID.
+            shape: The decision's shape.
+        """
+        ...
+
     def list_traces(
         self,
         user_id: UUID | None,
@@ -2167,6 +2177,26 @@ class CheckInRepository(Protocol):
         """
         ...
 
+    def add_woven_in(
+        self, check_in: CheckIn, due_at_read: datetime, next_due_at: datetime
+    ) -> bool:
+        """Save a Woven-in Check-in and the User's next due time, if still due.
+
+        Nothing is saved if their due time changed since it was read, e.g.
+        because a tick or another reply decided on this Check-in already. A
+        decision ends any hold back, so why it was held back and the Due
+        Time they were first held back at are cleared.
+
+        Args:
+            check_in: The Woven-in Check-in.
+            due_at_read: The User's due time as read for the reply.
+            next_due_at: When the User's next Check-in may be sent.
+
+        Returns:
+            True if it was saved.
+        """
+        ...
+
     def undo_add(
         self,
         check_in: CheckIn,
@@ -2256,7 +2286,11 @@ class CheckInRepository(Protocol):
         ...
 
     def claim_reply(
-        self, user_id: UUID, replied_at: datetime, sent_since: datetime
+        self,
+        user_id: UUID,
+        replied_at: datetime,
+        sent_since: datetime,
+        woven_in_only: bool = False,
     ) -> CheckIn | None:
         """Mark the User's newest sent Check-in replied, if it can still be.
 
@@ -2266,6 +2300,7 @@ class CheckInRepository(Protocol):
             user_id: The User's ID.
             replied_at: When they replied.
             sent_since: A Check-in sent at or before this can't get a reply.
+            woven_in_only: Whether only a Woven-in Check-in may be claimed.
 
         Returns:
             The Check-in they replied to, or None if their newest sent

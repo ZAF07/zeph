@@ -1,6 +1,7 @@
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -28,10 +29,16 @@ from companion.core.evals.understanding_checks import (
     ObservedUnderstanding,
     check_understanding,
 )
-from companion.core.models import ModelCall, ModelStep, Understanding
+from companion.core.models import (
+    CheckInFrequency,
+    ModelCall,
+    ModelStep,
+    Understanding,
+)
 from companion.core.ports import ChatModel, Repositories
 
 TRACES_READ_AT_MOST = 200
+CHECK_IN_DUE_FOR = timedelta(hours=1)
 KNOWLEDGE_PASSAGE_SOURCE = re.compile(r"^From “(.+?)” \(", re.MULTILINE)
 
 
@@ -133,6 +140,37 @@ def describe_what_was_done(
             else []
         ),
         knowledge_in_reply=knowledge_in_reply(calls),
+        woven_in=any(
+            call.check_in_shape is not None and call.check_in_shape.woven_in
+            for call in calls
+        ),
+    )
+
+
+def make_check_in_due(repositories: Repositories, user_id: UUID, now: datetime) -> None:
+    """Turn the made-up User's Check-ins on, with one due an hour ago.
+
+    Args:
+        repositories: Where Users are stored.
+        user_id: The User's ID.
+        now: The case's time.
+
+    Raises:
+        ValueError: If the made-up User isn't there.
+    """
+    user = repositories.users.get(user_id)
+    if user is None:
+        raise ValueError("The made-up User is missing")
+    repositories.users.update(
+        replace(
+            user,
+            check_ins=replace(
+                user.check_ins,
+                enabled=True,
+                frequency=CheckInFrequency.MOST_DAYS,
+                next_due_at=now - CHECK_IN_DUE_FOR,
+            ),
+        )
     )
 
 
@@ -344,6 +382,8 @@ def check_understanding_case(
     companion.move_clock(case.now - companion.now())
     user_id = companion.connect_user()
     repositories = companion.repositories
+    if case.check_in_due:
+        make_check_in_due(repositories, user_id, companion.now())
     open_conversation_id = open_conversation_with(
         repositories, user_id, case.earlier, companion.now()
     )

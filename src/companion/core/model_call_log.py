@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 from companion.core.errors import NotFoundError
 from companion.core.models import (
     ChatLine,
+    CheckInShape,
     ModelAnswer,
     ModelCall,
     ModelCallContent,
@@ -71,10 +72,10 @@ class ModelCallLog:
     """Records every model call in the Model Call Log, at the right level (ADR-0010).
 
     Every call keeps its step, model, tokens, time taken, error and the tools
-    it called, and an Understanding call the shape of its decision. What the
-    model was given and answered is kept only when the User is an Admin, or
-    when every call keeps it (an Eval run). Developer logs, when on, get the
-    full content of every call instead.
+    it called, and an Understanding or woven-in Check-in call the shape of
+    its decision. What the model was given and answered is kept only when
+    the User is an Admin, or when every call keeps it (an Eval run).
+    Developer logs, when on, get the full content of every call instead.
     """
 
     def __init__(
@@ -176,6 +177,24 @@ class ModelCallLog:
             )
         except Exception:
             logger.exception("Could not save an Understanding's shape")
+
+    def record_check_in_shape(
+        self, snapshot: UserSnapshot, shape: CheckInShape
+    ) -> None:
+        """Record the shape of the woven-in Check-in decision its call just made.
+
+        The shape lands on the trace's newest Check-in call, so it must come
+        after that call is recorded. Saving never raises: a failure is
+        logged and the reply goes on.
+
+        Args:
+            snapshot: The User the decision was for, with its trace.
+            shape: The decision's shape.
+        """
+        try:
+            self._repositories.model_calls.set_check_in_shape(snapshot.trace.id, shape)
+        except Exception:
+            logger.exception("Could not save a woven-in Check-in's shape")
 
     def list_traces(
         self,

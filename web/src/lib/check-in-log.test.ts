@@ -15,6 +15,7 @@ function entry(overrides: Partial<CheckInLogEntry>): CheckInLogEntry {
     skip_reason: null,
     status: "no_reply",
     requested_by: null,
+    woven_in: false,
     ...overrides,
   };
 }

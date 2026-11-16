@@ -86,6 +86,7 @@ from companion.core.user_portrait import PortraitWriter
 from companion.core.user_snapshot import UserSnapshotLoader
 from companion.core.users import UserService
 from companion.core.web_search import WebSearchTools
+from companion.core.woven_check_ins import WovenCheckIns
 
 
 @dataclass(frozen=True)
@@ -291,6 +292,12 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 PhotoTools(dependencies.repositories, photo_service),
                 SendPhotoTools(dependencies.repositories),
             ],
+        ),
+        woven_check_ins=WovenCheckIns(
+            repositories=dependencies.repositories,
+            chat_model=chat_model,
+            model_call_log=model_call_log,
+            clock=dependencies.clock,
         ),
     )
     incoming_message_handler = IncomingMessageHandler(

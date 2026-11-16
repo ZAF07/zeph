@@ -73,8 +73,9 @@ function reasonText(entry: CheckInLogEntry): string {
 
 /**
  * The admin Check-in log: every decision the Check-ins service made — sent,
- * skipped and why, or paused by the ignore rule — with totals, and which
- * Admin asked for one with Check in Now. Never the message text.
+ * woven into a reply or not, skipped and why, or paused by the ignore rule —
+ * with totals, and which Admin asked for one with Check in Now. Never the
+ * message text.
  *
  * @returns The filters, totals and table, or a loading, empty or error state.
  */
@@ -245,6 +246,11 @@ export function CheckInLog() {
                         {entry.requested_by ? (
                           <span className="text-caption text-ink-muted">
                             Asked for by {entry.requested_by}
+                          </span>
+                        ) : null}
+                        {entry.woven_in ? (
+                          <span className="text-caption text-ink-muted">
+                            Woven in
                           </span>
                         ) : null}
                       </span>

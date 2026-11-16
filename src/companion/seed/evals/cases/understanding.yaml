@@ -26,6 +26,9 @@
 #
 # earlier: [{person: ...}, {zeph: ...}]   already in the open Conversation
 #
+# check_in_due: true   the person has Check-ins on, with one due an hour
+#                      before the first Message, so a reply may weave it in
+#
 # messages: [{text, expect}]. Everything in expect is optional:
 #   need: [<Need>, ...]          the Needs that may be picked
 #   found: [<Thread title>]      the Companion is reminded of it
@@ -34,6 +37,8 @@
 #   curiosity_raised: true|false
 #   asked_why: true|false        the reply is told to gently ask why
 #   knowledge: true|false        Knowledge documents are chosen
+#   woven_in: true|false         the reply weaves in the due Check-in;
+#                                needs check_in_due: true
 #   rules: [<rule id>]           the Judge checks Zeph's reply against these
 
 now: 2026-11-13T18:30:00
@@ -272,3 +277,52 @@ cases:
           need: [Be heard]
           knowledge: false
           rules: [no_fixing, no_teaching]
+
+  - id: check-in-woven-in-at-an-easy-pause
+    check_in_due: true
+    memory: &maya-with-presentation
+      portrait: >-
+        Maya is 34, a nurse in Melbourne who grew up in Penang. She works
+        long shifts and is close to a few old friends. Walks by the river
+        help her think.
+      summaries:
+        - days_ago: 2
+          summary: >-
+            Maya was nervous about presenting the new night-shift rota to the
+            hospital board on Thursday.
+          mood: nervous
+    earlier:
+      - person: finally home, what a week
+      - zeph: oh you made it! Friday evening at last. what's the plan tonight?
+    messages:
+      - text: >-
+          nothing much, just made pasta and I'm on the couch with a cup of tea.
+          feeling pretty chill actually
+        expect:
+          woven_in: true
+
+  - id: check-in-not-now-while-asking-for-help
+    check_in_due: true
+    memory: *maya-with-presentation
+    messages:
+      - text: >-
+          can you help me word a message to my landlord? the heating's been
+          broken for three weeks and I want to be firm but polite. he replies
+          to nothing
+        expect:
+          need: [Advice]
+          woven_in: false
+
+  - id: check-in-not-now-mid-story
+    check_in_due: true
+    memory: *maya-with-presentation
+    earlier:
+      - person: ok you will not believe what happened at work today
+      - zeph: oh no, go on, I'm listening
+    messages:
+      - text: >-
+          so my charge nurse pulls me aside, and I think I'm in trouble, right?
+          and then she says she's leaving and wants to put my name forward for
+          her job. and that's only the first part
+        expect:
+          woven_in: false

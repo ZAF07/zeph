@@ -4,6 +4,7 @@ import { LockIcon } from "@/components/LockIcon";
 import { ModelCallContentDetails } from "@/components/ModelCallContentDetails";
 import type { ModelCall } from "@/lib/api-client";
 import {
+  checkInShapeFacts,
   formatDuration,
   formatTokens,
   modelStepLabel,
@@ -35,6 +36,7 @@ export function ModelCallCard({ call }: { call: ModelCall }) {
     ...(call.understanding_shape
       ? understandingShapeFacts(call.understanding_shape)
       : []),
+    ...(call.check_in_shape ? checkInShapeFacts(call.check_in_shape) : []),
   ];
   return (
     <article

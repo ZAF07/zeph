@@ -1032,6 +1032,12 @@ UNDERSTANDING_EXPECT_FIELD = ShapeField(
             "Searches Knowledge",
             "Whether it must choose Knowledge Documents to search.",
         ),
+        yes_no_unchecked_field(
+            "woven_in",
+            "Weaves in the Check-in",
+            "Whether the reply must weave in the due Check-in. Needs “A "
+            "Check-in is due” on.",
+        ),
         text_list_field(
             "rules",
             "Rules",
@@ -1054,6 +1060,14 @@ UNDERSTANDING_SHAPE = FormShape(
                     "day changes how Zeph replies.",
                     FieldKind.DATE_TIME,
                     required=True,
+                ),
+                ShapeField(
+                    "check_in_due",
+                    "A Check-in is due",
+                    "Whether the User has Check-ins on, with one due when the "
+                    "first Message is sent, so a reply may weave it in.",
+                    FieldKind.ON_OFF,
+                    default=False,
                 ),
             ],
         ),

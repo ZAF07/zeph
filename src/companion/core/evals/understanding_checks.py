@@ -20,6 +20,8 @@ class ObservedUnderstanding:
             to search; empty when none.
         knowledge_in_reply: The Knowledge documents whose passages reached
             the reply's instructions.
+        woven_in: Whether the Check-in model chose to weave the due Check-in
+            into the reply.
     """
 
     need: str
@@ -29,6 +31,7 @@ class ObservedUnderstanding:
     asked_why: bool
     knowledge_documents: list[str]
     knowledge_in_reply: list[str]
+    woven_in: bool
 
 
 @dataclass(frozen=True)
@@ -156,6 +159,22 @@ def check_knowledge(
     )
 
 
+def check_woven_in(expected: bool, woven_in: bool) -> CheckResult:
+    """Check the due Check-in was woven in, or left for later, as expected.
+
+    Args:
+        expected: Whether it must be woven in.
+        woven_in: Whether the Check-in model chose to weave it in.
+
+    Returns:
+        The check's outcome.
+    """
+    detail = "wove in the due Check-in" if woven_in else "said not now"
+    if woven_in != expected:
+        detail += ", expected not now" if woven_in else ", expected it woven in"
+    return CheckResult("woven in", woven_in == expected, detail)
+
+
 def check_understanding(
     expect: UnderstandingExpectations, observed: ObservedUnderstanding
 ) -> list[CheckResult]:
@@ -171,8 +190,8 @@ def check_understanding(
 
     Returns:
         One outcome per check, in a fixed order: the Need, each Thread to
-        be found, brought up and left alone, then the Curiosity, asking why
-        and Knowledge.
+        be found, brought up and left alone, then the Curiosity, asking why,
+        Knowledge and the woven-in Check-in.
     """
     checks = []
     if expect.need:
@@ -212,4 +231,6 @@ def check_understanding(
                 observed.knowledge_in_reply,
             )
         )
+    if expect.woven_in is not None:
+        checks.append(check_woven_in(expect.woven_in, observed.woven_in))
     return checks

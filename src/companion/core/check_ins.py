@@ -225,7 +225,8 @@ def ignored_in_a_row(
 
     The count stops at a Check-in they replied to, at the last "would you
     like fewer?" message, and at Check-ins sent before they last started a
-    Conversation. Skipped Check-ins are passed over.
+    Conversation. Skipped and Woven-in Check-ins are passed over, since a
+    woven-in one came while they were talking.
 
     Args:
         recent: The User's newest Check-ins, newest first.
@@ -237,7 +238,7 @@ def ignored_in_a_row(
     """
     count = 0
     for check_in in recent:
-        if not check_in.was_sent:
+        if not check_in.was_sent or check_in.woven_in:
             continue
         if check_in.outcome == CheckInOutcome.ASKED_ABOUT_FEWER:
             break
@@ -274,8 +275,9 @@ def is_limit_skip_on_their_today(
 def due_time_change(user: User, plan: HoldBack) -> NextDueTimeChange | None:
     """Work out the change to a held-back User's next due time and why it waits.
 
-    It is held back until its new due time; a User who stays due waits for
-    something with no known end, such as their next day.
+    It is held back until its new due time; a User who stays due waits until
+    the time the plan gives, or for something with no known end, such as
+    their next day.
 
     Args:
         user: The User, as read for this tick.
@@ -285,9 +287,8 @@ def due_time_change(user: User, plan: HoldBack) -> NextDueTimeChange | None:
         The change; None if their due time and why it waits stay as they are.
     """
     read_as = user.check_ins.next_due_at
-    held_back = HeldBack(
-        reason=plan.reason, until=None if plan.retry_at == read_as else plan.retry_at
-    )
+    until = plan.until or (None if plan.retry_at == read_as else plan.retry_at)
+    held_back = HeldBack(reason=plan.reason, until=until)
     if plan.retry_at == read_as and held_back == user.check_ins.held_back:
         return None
     return NextDueTimeChange(

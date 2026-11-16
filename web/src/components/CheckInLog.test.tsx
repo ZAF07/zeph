@@ -26,6 +26,7 @@ const entries: CheckInLogEntry[] = [
     skip_reason: "Asked for space this week",
     status: "skipped",
     requested_by: null,
+    woven_in: false,
   },
   {
     id: "c2",
@@ -38,6 +39,7 @@ const entries: CheckInLogEntry[] = [
     skip_reason: null,
     status: "replied",
     requested_by: "Sam Admin",
+    woven_in: true,
   },
   {
     id: "c1",
@@ -50,6 +52,7 @@ const entries: CheckInLogEntry[] = [
     skip_reason: null,
     status: "sent",
     requested_by: null,
+    woven_in: false,
   },
 ];
 
@@ -69,7 +72,7 @@ describe("CheckInLog", () => {
     apiClient.listCheckInLog.mockResolvedValue(entries);
   });
 
-  it("lists sends, skips with reasons and ignore-rule pauses, never message text", async () => {
+  it("lists sends, woven in or not, skips with reasons and ignore-rule pauses, never message text", async () => {
     renderWithQueries(<CheckInLog />);
 
     expect(await screen.findByText("No message content")).toBeInTheDocument();
@@ -78,7 +81,7 @@ describe("CheckInLog", () => {
       ["Maya Lin", "Skipped", "—", "Asked for space this week", "—"],
       [
         "Ren Okafor",
-        "SentAsked for by Sam Admin",
+        "SentAsked for by Sam AdminWoven in",
         "A present-moment pause",
         "—",
         "Replied",
