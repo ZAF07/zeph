@@ -3794,6 +3794,39 @@ class PostgresPersonalStickerRepository:
             )
 
 
+def _clear_check_in_now_if_decided(
+    check_in_now: CheckInNowRequest | None,
+) -> dict[str, Any]:
+    """Build the User changes that clear the Check in Now a decision was for.
+
+    A Check in Now asked for since, or one waiting during a scheduled
+    decision, is kept.
+
+    Args:
+        check_in_now: The Check in Now the decision was for; None for a
+            scheduled one.
+
+    Returns:
+        The column values to set on the User's row.
+    """
+    requested_at = check_in_now.requested_at if check_in_now is not None else None
+    is_decided = users.c.check_in_now_requested_at.is_not_distinct_from(
+        bindparam(
+            "decided_request_at",
+            requested_at,
+            type_=users.c.check_in_now_requested_at.type,
+        )
+    )
+    return {
+        "check_in_now_requested_by": case(
+            (is_decided, None), else_=users.c.check_in_now_requested_by
+        ),
+        "check_in_now_requested_at": case(
+            (is_decided, None), else_=users.c.check_in_now_requested_at
+        ),
+    }
+
+
 class PostgresCheckInRepository:
     """Stores Check-in Kinds and Check-in decisions in Postgres."""
 
@@ -4132,25 +4165,12 @@ class PostgresCheckInRepository:
             check_in_now: The Check in Now it was decided for; None for a
                 scheduled one.
         """
-        requested_at = check_in_now.requested_at if check_in_now is not None else None
-        is_done = users.c.check_in_now_requested_at.is_not_distinct_from(
-            bindparam(
-                "decided_request_at",
-                requested_at,
-                type_=users.c.check_in_now_requested_at.type,
-            )
-        )
         user_changes: dict[str, Any] = {
             "check_in_next_due_at": next_due_at,
             "check_in_held_back_reason": None,
             "check_in_held_back_until": None,
             "check_in_held_back_due_at": None,
-            "check_in_now_requested_by": case(
-                (is_done, None), else_=users.c.check_in_now_requested_by
-            ),
-            "check_in_now_requested_at": case(
-                (is_done, None), else_=users.c.check_in_now_requested_at
-            ),
+            **_clear_check_in_now_if_decided(check_in_now),
         }
         if pause_until_resumed:
             user_changes |= {"check_ins_paused": True, "check_ins_paused_until": None}
@@ -4163,19 +4183,26 @@ class PostgresCheckInRepository:
             )
 
     def add_woven_in(
-        self, check_in: CheckIn, due_at_read: datetime, next_due_at: datetime
+        self,
+        check_in: CheckIn,
+        due_at_read: datetime,
+        next_due_at: datetime,
+        check_in_now: CheckInNowRequest | None = None,
     ) -> bool:
         """Save a Woven-in Check-in and the User's next due time, if still due.
 
         Nothing is saved if their due time changed since it was read, e.g.
         because a tick or another reply decided on this Check-in already. A
         decision ends any hold back, so why it was held back and the Due
-        Time they were first held back at are cleared.
+        Time they were first held back at are cleared. The Check in Now it
+        was woven in for is cleared too; one asked for since is kept.
 
         Args:
             check_in: The Woven-in Check-in.
             due_at_read: The User's due time as read for the reply.
             next_due_at: When the User's next Check-in may be sent.
+            check_in_now: The Check in Now it was woven in for; None for a
+                scheduled one.
 
         Returns:
             True if it was saved.
@@ -4195,6 +4222,7 @@ class PostgresCheckInRepository:
                     check_in_held_back_reason=None,
                     check_in_held_back_until=None,
                     check_in_held_back_due_at=None,
+                    **_clear_check_in_now_if_decided(check_in_now),
                 )
                 .returning(users.c.id)
             ).first()

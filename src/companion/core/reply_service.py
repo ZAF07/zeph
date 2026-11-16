@@ -139,8 +139,8 @@ class ReplyService:
         except ReplyPartlySentError:
             raise
         except Exception:
-            if woven_check_in is not None:
-                self._woven_check_ins.take_back(snapshot, woven_check_in)
+            if woven is not None and woven_check_in is not None:
+                self._woven_check_ins.take_back(snapshot, woven, woven_check_in)
             raise
         self._thread_reminder.mark_raised(message.conversation_id, form.bring_up)
         self._curiosity_raiser.mark_raised(message.conversation_id, form.curiosities)

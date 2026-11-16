@@ -21,6 +21,7 @@ from companion.core.models import (
     ChatRole,
     CheckIn,
     CheckInKind,
+    CheckInNowRequest,
     CheckInOutcome,
     CheckInShape,
     ConversationMessage,
@@ -52,11 +53,14 @@ class WovenCheckIn:
         kind: The Check-in Kind to weave in.
         note: One line on what to bring up.
         due_at: The User's Due Time as read for the reply.
+        check_in_now: The Admin's Check in Now it is for; None for a
+            scheduled one.
     """
 
     kind: CheckInKind
     note: str
     due_at: datetime
+    check_in_now: CheckInNowRequest | None = None
 
 
 def may_weave_check_in(
@@ -64,11 +68,11 @@ def may_weave_check_in(
 ) -> bool:
     """Tell whether a reply may be offered the User's due Check-in.
 
-    This is a rule, not a model choice: their Check-in must be due, Check-ins
-    must work for them (opted in, onboarded and the Feature on), they must
-    not be paused and the Understanding must not find them struggling. Quiet
-    Hours don't matter, since they are already talking. A waiting Check in
-    Now is left to the tick, which sends it once the Conversation ends.
+    This is a rule, not a model choice: they must be opted in and onboarded
+    and the Understanding must not find them struggling. Then either an
+    Admin's Check in Now is waiting, which goes past the Feature switch and
+    the pause, or their Check-in must be due, with the Feature on and not
+    paused. Quiet Hours don't matter, since they are already talking.
 
     Args:
         snapshot: The User being answered, as read for the reply.
@@ -79,15 +83,19 @@ def may_weave_check_in(
         True if the woven-in Check-in call may be made.
     """
     settings = snapshot.user.check_ins
+    if (
+        not settings.enabled
+        or not snapshot.user.has_finished_onboarding
+        or form.struggling
+    ):
+        return False
+    if settings.check_in_now is not None:
+        return True
     return (
-        settings.enabled
-        and snapshot.user.has_finished_onboarding
-        and snapshot.works(Feature.CHECK_INS)
+        snapshot.works(Feature.CHECK_INS)
         and settings.next_due_at is not None
         and settings.next_due_at <= now
         and not settings.is_paused_at(now)
-        and settings.check_in_now is None
-        and not form.struggling
     )
 
 
@@ -196,7 +204,10 @@ def describe_woven_check_in(
 
 
 def read_woven_check_in_answer(
-    answer: str, kinds: Sequence[CheckInKind], due_at: datetime
+    answer: str,
+    kinds: Sequence[CheckInKind],
+    due_at: datetime,
+    check_in_now: CheckInNowRequest | None,
 ) -> WovenCheckIn | None:
     """Read the Check-in model's "weave in" or "not now" answer.
 
@@ -207,6 +218,7 @@ def read_woven_check_in_answer(
         answer: The model's answer.
         kinds: The Check-in Kinds it could choose from.
         due_at: The User's Due Time as read for the reply.
+        check_in_now: The Admin's Check in Now waiting; None for none.
 
     Returns:
         The Check-in to weave in; None for "not now", an unknown Kind, an
@@ -226,7 +238,9 @@ def read_woven_check_in_answer(
     kind = kinds_by_name.get(kind_name.strip().lower())
     if kind is None:
         return None
-    return WovenCheckIn(kind=kind, note=note.strip(), due_at=due_at)
+    return WovenCheckIn(
+        kind=kind, note=note.strip(), due_at=due_at, check_in_now=check_in_now
+    )
 
 
 def format_woven_check_in_for_reply(woven: WovenCheckIn) -> str:
@@ -329,7 +343,9 @@ class WovenCheckIns:
         except Exception:
             logger.exception("The woven-in Check-in call failed; not now")
             return None
-        woven = read_woven_check_in_answer(answer, kinds, due_at)
+        woven = read_woven_check_in_answer(
+            answer, kinds, due_at, snapshot.user.check_ins.check_in_now
+        )
         self._model_call_log.record_check_in_shape(
             snapshot,
             CheckInShape(
@@ -343,9 +359,11 @@ class WovenCheckIns:
     def save(self, snapshot: UserSnapshot, woven: WovenCheckIn) -> CheckIn | None:
         """Save the Woven-in Check-in and move the Due Time on, before the reply goes.
 
-        The next Due Time follows the same rules as a sent Check-in. Nothing
-        is saved if the User's Due Time changed since it was read. It never
-        raises: a failed save means the reply weaves nothing in.
+        The next Due Time follows the same rules as a sent Check-in: one
+        frequency gap from now for a Check in Now, which records the Admin
+        who asked and is cleared. Nothing is saved if the User's Due Time
+        changed since it was read. It never raises: a failed save means the
+        reply weaves nothing in.
 
         Args:
             snapshot: The User being answered, as read for the reply.
@@ -357,6 +375,12 @@ class WovenCheckIns:
         settings = snapshot.user.check_ins
         now = self._clock.now()
         gap = snapshot.settings.get(CHECK_IN_GAPS)[settings.frequency]
+        check_in_now = woven.check_in_now
+        next_due_at = (
+            now + gap
+            if check_in_now is not None
+            else next_due_after_decision(settings.rhythm_due_at, now, gap, now)
+        )
         check_in = CheckIn(
             id=uuid4(),
             user_id=snapshot.user.id,
@@ -364,28 +388,32 @@ class WovenCheckIns:
             decided_at=now,
             kind_id=woven.kind.id,
             woven_in=True,
+            requested_by=(
+                check_in_now.requested_by if check_in_now is not None else None
+            ),
         )
         try:
             saved = self._repositories.check_ins.add_woven_in(
-                check_in,
-                woven.due_at,
-                next_due_after_decision(settings.rhythm_due_at, now, gap, now),
+                check_in, woven.due_at, next_due_at, check_in_now
             )
         except Exception:
             logger.exception("Could not save a Woven-in Check-in; not woven in")
             return None
         return check_in if saved else None
 
-    def take_back(self, snapshot: UserSnapshot, check_in: CheckIn) -> None:
+    def take_back(
+        self, snapshot: UserSnapshot, woven: WovenCheckIn, check_in: CheckIn
+    ) -> None:
         """Take back a saved Woven-in Check-in whose reply was never sent.
 
-        The User stays due at the Due Time read for the reply. It never
-        raises: if taking it back fails, that Check-in is missed, not sent
-        twice.
+        The User stays due at the Due Time read for the reply, and a Check
+        in Now it was for waits again. It never raises: if taking it back
+        fails, that Check-in is missed, not sent twice.
 
         Args:
             snapshot: The User being answered, as read for the reply, whose
                 Due Time was due.
+            woven: The Check-in that was to be woven in.
             check_in: The saved Check-in.
         """
         settings = snapshot.user.check_ins
@@ -398,7 +426,7 @@ class WovenCheckIns:
                 end_pause=False,
                 skipped=None,
                 held_back_due_at=settings.held_back_due_at,
-                check_in_now=None,
+                check_in_now=woven.check_in_now,
             )
         except Exception:
             logger.exception("Could not take back a Woven-in Check-in; it is missed")
