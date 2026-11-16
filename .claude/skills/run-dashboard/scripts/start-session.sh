@@ -11,9 +11,12 @@ cd "$REPO"
 set -a; . ./.env; set +a
 WEB_URL="http://localhost:${WEB_PORT:-3000}"
 
-if [ ! -d "$PW/node_modules/playwright" ]; then
+playwright_loads() { (cd "$PW" && node -e 'import("playwright")' >/dev/null 2>&1); }
+if ! playwright_loads; then
   mkdir -p "$PW"
-  (cd "$PW" && npm init -y >/dev/null && npm i playwright@1.57.0 >/dev/null && npx playwright install chromium >/dev/null)
+  rm -rf "$PW/node_modules"
+  (cd "$PW" && { [ -f package.json ] || npm init -y >/dev/null; } && npm i playwright@1.57.0 >/dev/null && npx playwright install chromium >/dev/null)
+  playwright_loads || { echo "Playwright did not install in $PW" >&2; exit 1; }
 fi
 rm -rf "$SESSION"; mkdir -p "$SESSION"
 
@@ -26,7 +29,13 @@ echo "$USER_ID" > "$SESSION/clerk_user_id"
 echo "$EMAIL" > "$SESSION/email"
 
 cp "$HERE/sign-in.mjs" "$PW/"
-(cd "$PW" && node sign-in.mjs "$USER_ID" "$SESSION/profile" "$WEB_URL")
+if ! (cd "$PW" && node sign-in.mjs "$USER_ID" "$SESSION/profile" "$WEB_URL"); then
+  curl -s -X DELETE "https://api.clerk.com/v1/users/$USER_ID" \
+    -H "Authorization: Bearer $CLERK_SECRET_KEY" >/dev/null
+  rm -rf "$SESSION"
+  echo "Sign-in failed; removed the Clerk test user $EMAIL" >&2
+  exit 1
+fi
 
 psql_run() { docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "$1"; }
 for _ in $(seq 1 20); do
