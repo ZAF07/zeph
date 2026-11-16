@@ -91,4 +91,4 @@ Track A (issue 02) adds a "waiting to be woven in" held-back state. Leave room f
 ## Completion
 
 - Completed: 2026-11-16
-- Commits: to be recorded after merge
+- Commits: `1af1db0` (backend: held-back reason, Schedule API, Admin Setting Changes, migration 0046), `313f759` (Dashboard: Schedule page, settings panel, Changed by an Admin marks), `cac7af0` (review fixes), `b60e3fc` (archive, CONTEXT.md); merged to main in `69f10f2`
