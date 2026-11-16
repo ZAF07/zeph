@@ -174,6 +174,23 @@ describe("CheckInsSettings", () => {
     ).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("lets a User pick a few times a day", async () => {
+    apiClient.updateCheckIns.mockResolvedValue(
+      checkInsWith({ frequency: "a_few_times_a_day" }),
+    );
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    await user.click(screen.getByRole("button", { name: "A few times a day" }));
+
+    expect(apiClient.updateCheckIns).toHaveBeenCalledWith({
+      frequency: "a_few_times_a_day",
+    });
+    expect(
+      await screen.findByRole("button", { name: "A few times a day" }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("saves new quiet hours and a new time zone", async () => {
     apiClient.updateCheckIns.mockResolvedValue(
       checkInsWith({ quiet_hours_end: "08:15:00" }),

@@ -13,6 +13,7 @@ export const checkInFrequencyOptions: {
   { value: "weekly", label: "Once a week" },
   { value: "few_times_a_week", label: "A few times a week" },
   { value: "most_days", label: "Most days" },
+  { value: "a_few_times_a_day", label: "A few times a day" },
 ];
 
 /** What each Check-in status is called, and its pill's colours. */

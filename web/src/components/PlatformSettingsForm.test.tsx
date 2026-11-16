@@ -3,7 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PlatformSettingsForm } from "@/components/PlatformSettingsForm";
-import { ApiError, type AdminSettings, type ApiClient } from "@/lib/api-client";
+import {
+  ApiError,
+  type AdminSettings,
+  type ApiClient,
+  type SettingValue,
+} from "@/lib/api-client";
 import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
@@ -15,7 +20,7 @@ vi.mock("@/lib/use-api-client", () => ({
   useApiClient: () => apiClient,
 }));
 
-function seeded(value: string | number) {
+function seeded(value: SettingValue) {
   return { value, updated_at: "2026-11-01T00:00:00Z", updated_by: null };
 }
 
@@ -28,6 +33,12 @@ const settings: AdminSettings = {
   ai_notice_short: seeded("Zeph is an AI."),
   user_memory_explanation: seeded("I can keep details."),
   check_in_ignore_threshold: seeded(3),
+  check_in_hours_between: seeded({
+    weekly: 168,
+    few_times_a_week: 56,
+    most_days: 24,
+    a_few_times_a_day: 6,
+  }),
   check_in_fewer_message: seeded("Would you like fewer check-ins?"),
   daily_message_limit: seeded(200),
   daily_limit_reply: seeded("I'm wiped for today, talk tomorrow?"),
@@ -120,6 +131,33 @@ describe("PlatformSettingsForm", () => {
 
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       sticker_adding_quiet_gap_minutes: 10,
+    });
+  });
+
+  it("shows each frequency's Check-in gap and saves them together", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const fewTimesADay = await screen.findByLabelText(
+      "Gap for “A few times a day”",
+    );
+    expect(fewTimesADay).toHaveValue(6);
+    expect(screen.getByLabelText("Gap for “Once a week”")).toHaveValue(168);
+    expect(screen.getByLabelText("Gap for “A few times a week”")).toHaveValue(
+      56,
+    );
+    expect(screen.getByLabelText("Gap for “Most days”")).toHaveValue(24);
+
+    await user.clear(fewTimesADay);
+    await user.type(fewTimesADay, "4");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      check_in_hours_between: {
+        weekly: 168,
+        few_times_a_week: 56,
+        most_days: 24,
+        a_few_times_a_day: 4,
+      },
     });
   });
 

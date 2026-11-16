@@ -113,7 +113,7 @@ onboarding_reason_choices:
   - Living more deliberately
 
 # A message after this many quiet minutes starts a new Conversation.
-conversation_quiet_gap_minutes: 60
+conversation_quiet_gap_minutes: 15
 
 # How many seconds the Companion waits after a User's last text, photo or
 # album photo before answering everything they sent as one Message.
@@ -937,6 +937,7 @@ check_in_hours_between:
   weekly: 168
   few_times_a_week: 56
   most_days: 24
+  a_few_times_a_day: 6
 
 # A User's first message within this many hours of a Check-in is its reply:
 # that Conversation starts with the Check-in. Later, the Check-in had no reply.

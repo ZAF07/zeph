@@ -919,7 +919,7 @@ class CheckInService:
             user_ids, 1, sent_only=False
         )
         newest_sent = repositories.check_ins.list_recent_for_users(
-            user_ids, rules.ignore_threshold, sent_only=True
+            user_ids, max(rules.ignore_threshold, 1), sent_only=True
         )
         with_shared_photos = repositories.user_memory.list_users_with_shared_photos(
             user_ids
@@ -933,6 +933,7 @@ class CheckInService:
             user_id = snapshot.user.id
             connection = connections.get(user_id)
             conversation = conversations.get(user_id)
+            sent = newest_sent.get(user_id, [])
             all_facts.append(
                 CheckInFacts(
                     snapshot=snapshot,
@@ -945,7 +946,7 @@ class CheckInService:
                         next(iter(newest.get(user_id, [])), None), snapshot
                     ),
                     ignored_in_a_row=ignored_in_a_row(
-                        newest_sent.get(user_id, []),
+                        sent,
                         conversation.started_at if conversation is not None else None,
                     ),
                     has_shared_photos=user_id in with_shared_photos,
@@ -955,6 +956,7 @@ class CheckInService:
                         )
                     ),
                     curiosity_check_ins_this_week=curiosity_check_ins.get(user_id, 0),
+                    last_sent_at=sent[0].decided_at if sent else None,
                 )
             )
         return all_facts
@@ -978,7 +980,7 @@ class CheckInService:
             InvalidCheckInAnswerError: If the model's answer can't be used.
         """
         if isinstance(plan, SkipForDailyLimit):
-            self._skip_for_daily_limit(snapshot.user, now)
+            self._skip_for_daily_limit(snapshot.user, plan, now)
         elif isinstance(plan, AskAboutFewer):
             self._ask_about_fewer(snapshot.user, plan, fewer_message, now)
         elif isinstance(plan, AskModel):
@@ -992,12 +994,13 @@ class CheckInService:
         Kinds that send a Shared Photo come with the User's Shared Photos,
         and Kinds that ask a Curiosity with their due Curiosities. A
         Curiosity is marked raised once its message counts as sent. The next
-        attempt is one frequency gap later, unless the chat channel refuses
-        the message.
+        Due Time is the one for a send or a skip, unless the chat channel
+        refuses the message.
 
         Args:
             snapshot: The User, as read for this tick.
-            plan: The Kinds it may pick from, the chat, and the next due time.
+            plan: The Kinds it may pick from, the chat, and the next due
+                times.
             now: The current time.
 
         Raises:
@@ -1027,7 +1030,7 @@ class CheckInService:
                 skip_reason=decision.skip_reason,
             )
             self._repositories.check_ins.add(
-                skipped, plan.next_due_at, pause_until_resumed=False
+                skipped, plan.next_due_if_skipped, pause_until_resumed=False
             )
             return
         shared_photo = decision.shared_photo
@@ -1047,7 +1050,7 @@ class CheckInService:
             plan.telegram_chat_id,
             decision.message,
             check_in,
-            plan.next_due_at,
+            plan.next_due_if_sent,
             pause_until_resumed=False,
         )
         if was_sent and curiosity is not None:
@@ -1059,13 +1062,17 @@ class CheckInService:
         ):
             self._repositories.check_ins.remove_shared_photo(check_in.id)
 
-    def _skip_for_daily_limit(self, user: User, now: datetime) -> None:
+    def _skip_for_daily_limit(
+        self, user: User, plan: SkipForDailyLimit, now: datetime
+    ) -> None:
         """Record a Skipped Check-in for a User who used up today's daily message limit.
 
-        The User stays due, so a Check-in can come on their next day.
+        The User stays due at their Due Time, so a Check-in can come on their
+        next day and the rhythm stays.
 
         Args:
             user: A due User who has used up today's daily message limit.
+            plan: Their Due Time to keep.
             now: The current time.
         """
         skipped = CheckIn(
@@ -1075,7 +1082,9 @@ class CheckInService:
             decided_at=now,
             skip_reason=DAILY_LIMIT_SKIP_REASON,
         )
-        self._repositories.check_ins.add(skipped, now, pause_until_resumed=False)
+        self._repositories.check_ins.add(
+            skipped, plan.stays_due_at, pause_until_resumed=False
+        )
 
     def _save_then_send(
         self,
@@ -1090,7 +1099,8 @@ class CheckInService:
 
         Saving first means a failed save sends nothing, so a Check-in is
         never sent twice. If the chat channel clearly refuses the message,
-        the Check-in is taken back and tried again after the retry gap. If
+        the Check-in is taken back and tried again after the retry gap, still
+        counting the next Due Time from the one it was first due at. If
         the User blocked the Companion, a Skipped Check-in takes its place and
         the next attempt is one frequency gap later, with no pause. Any other
         failure, such as a timeout, may still have delivered it, so it counts
@@ -1120,14 +1130,23 @@ class CheckInService:
                 skip_reason=BLOCKED_SKIP_REASON,
             )
             self._repositories.check_ins.undo_add(
-                check_in, next_due_at, pause_until_resumed, skipped
+                check_in,
+                next_due_at,
+                pause_until_resumed,
+                skipped,
+                held_back_due_at=None,
             )
             return False
         except MessageRefusedError as error:
             logger.warning("The chat channel refused a Check-in: %s", error)
             retry_at = retry_after_refusal(check_in.decided_at)
+            settings = user.check_ins
             self._repositories.check_ins.undo_add(
-                check_in, retry_at, pause_until_resumed, skipped=None
+                check_in,
+                retry_at,
+                pause_until_resumed,
+                skipped=None,
+                held_back_due_at=settings.held_back_due_at or settings.next_due_at,
             )
             return False
         except Exception:
@@ -1214,11 +1233,12 @@ class CheckInService:
             platform_settings: Holds how many Conversation Summaries to give.
 
         Returns:
-            Their Memory Items by active Memory Category and their newest
-            Conversation Summaries, even while User Memory is off; "" if
-            nothing is remembered.
+            Their User Portrait, Memory Items by active Memory Category and
+            newest Conversation Summaries, even while User Memory is off; ""
+            if nothing is remembered.
         """
         user_memory = self._repositories.user_memory
+        portrait = self._repositories.user_portraits.find(user.id)
         categories = [
             category
             for category in self._repositories.memory_categories.list_all()
@@ -1232,6 +1252,7 @@ class CheckInService:
             ),
             user.time_zone,
             MEMORY_INTRO,
+            portrait=portrait.text if portrait is not None else "",
         )
 
     def _decide(
@@ -1290,12 +1311,24 @@ class CheckInService:
 
         Returns:
             The updated settings with no due time or pause when off,
-            otherwise with the due time from `next_due_after_change`.
+            otherwise with the due time from `next_due_after_change`. A
+            Held-back Check-in's first Due Time is dropped when off, just
+            turned on or the frequency changed, since the rhythm starts again.
         """
         if not updated.enabled:
-            return replace(updated, paused=False, paused_until=None, next_due_at=None)
+            return replace(
+                updated,
+                paused=False,
+                paused_until=None,
+                next_due_at=None,
+                held_back_due_at=None,
+            )
+        starts_new_rhythm = (
+            not current.enabled or current.frequency != updated.frequency
+        )
         return replace(
             updated,
+            held_back_due_at=None if starts_new_rhythm else updated.held_back_due_at,
             next_due_at=next_due_after_change(
                 current,
                 updated,

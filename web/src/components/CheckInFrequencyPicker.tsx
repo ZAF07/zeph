@@ -2,8 +2,8 @@ import type { CheckInFrequency } from "@/lib/api-client";
 import { checkInFrequencyOptions } from "@/lib/check-ins";
 
 /**
- * The "How often, at most" choice between once a week, a few times a week
- * and most days.
+ * The "How often, at most" choice between once a week, a few times a week,
+ * most days and a few times a day.
  *
  * @param props - `value` is the picked frequency, `disabled` stops changes
  *   and `onChange` gets the new one.

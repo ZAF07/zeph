@@ -35,7 +35,13 @@ def test_admin_sees_each_editable_setting_with_its_seeded_value(
 
     assert settings["persona"]["value"] == seeded_settings["persona"]
     assert settings["response_model"]["value"] == seeded_settings["response_model"]
-    assert settings["conversation_quiet_gap_minutes"]["value"] == 60
+    assert settings["conversation_quiet_gap_minutes"]["value"] == 15
+    assert settings["check_in_hours_between"]["value"] == {
+        "weekly": 168,
+        "few_times_a_week": 56,
+        "most_days": 24,
+        "a_few_times_a_day": 6,
+    }
     assert settings["web_search_daily_limit"]["value"] == 10
     assert settings["message_retention_days"]["value"] == 30
     assert settings["persona"]["updated_by"] is None
@@ -145,6 +151,33 @@ def test_a_shorter_quiet_gap_starts_a_new_conversation_sooner(
         {"photo_album_max_photos": 0},
         {"photo_album_max_photos": 11},
         {"photo_model": "not-a-model"},
+        {"check_in_hours_between": 6},
+        {"check_in_hours_between": {"weekly": 168, "most_days": 24}},
+        {
+            "check_in_hours_between": {
+                "weekly": 168,
+                "few_times_a_week": 56,
+                "most_days": 24,
+                "a_few_times_a_day": 0,
+            }
+        },
+        {
+            "check_in_hours_between": {
+                "weekly": 168,
+                "few_times_a_week": 56,
+                "most_days": "24",
+                "a_few_times_a_day": 6,
+            }
+        },
+        {
+            "check_in_hours_between": {
+                "weekly": 168,
+                "few_times_a_week": 56,
+                "most_days": 24,
+                "a_few_times_a_day": 6,
+                "hourly": 1,
+            }
+        },
     ],
 )
 def test_invalid_setting_changes_are_refused(
@@ -172,6 +205,35 @@ def test_a_refused_value_is_explained_in_plain_words(
 
     assert response.json()["detail"] == (
         "The Conversation quiet gap must be a whole number from 5 to 1440."
+    )
+
+
+def test_the_check_in_gaps_can_be_changed_and_are_explained_when_refused(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+    gaps = {
+        "weekly": 168,
+        "few_times_a_week": 56,
+        "most_days": 24,
+        "a_few_times_a_day": 4,
+    }
+
+    saved = client.patch(
+        "/api/admin/settings",
+        json={"values": {"check_in_hours_between": gaps}},
+        headers=headers,
+    )
+    refused = client.patch(
+        "/api/admin/settings",
+        json={"values": {"check_in_hours_between": gaps | {"weekly": 0}}},
+        headers=headers,
+    )
+
+    assert saved.json()["settings"]["check_in_hours_between"]["value"] == gaps
+    assert refused.json()["detail"] == (
+        "The Check-in gaps must give each frequency a whole number of hours "
+        "from 1 to 720."
     )
 
 

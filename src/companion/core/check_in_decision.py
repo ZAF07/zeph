@@ -58,6 +58,8 @@ class CheckInFacts:
             has come.
         curiosity_check_ins_this_week: How many Check-ins that ask a
             Curiosity were sent to them in the last 7 days.
+        last_sent_at: When their newest sent Check-in was decided; None if
+            none was sent.
     """
 
     snapshot: UserSnapshot
@@ -69,6 +71,7 @@ class CheckInFacts:
     has_shared_photos: bool
     has_due_curiosity: bool
     curiosity_check_ins_this_week: int
+    last_sent_at: datetime | None
 
 
 @dataclass(frozen=True)
@@ -88,7 +91,13 @@ class HoldBack:
 
 @dataclass(frozen=True)
 class SkipForDailyLimit:
-    """Record a Skipped Check-in for the Daily Message Limit; the User stays due."""
+    """Record a Skipped Check-in for the Daily Message Limit; the User stays due.
+
+    Attributes:
+        stays_due_at: Their Due Time, kept so the rhythm stays.
+    """
+
+    stays_due_at: datetime
 
 
 @dataclass(frozen=True)
@@ -111,12 +120,14 @@ class AskModel:
     Attributes:
         kinds: The Check-in Kinds it may pick from.
         telegram_chat_id: The User's Telegram chat.
-        next_due_at: Their next due time after this Check-in.
+        next_due_if_sent: Their next due time if this Check-in is sent.
+        next_due_if_skipped: Their next due time if it is skipped.
     """
 
     kinds: tuple[CheckInKind, ...]
     telegram_chat_id: int
-    next_due_at: datetime
+    next_due_if_sent: datetime
+    next_due_if_skipped: datetime
 
 
 CheckInPlan = HoldBack | SkipForDailyLimit | AskAboutFewer | AskModel
@@ -132,7 +143,8 @@ def decide_check_in(
     and whether any Kind may be sent. Photo Kinds are offered only with
     Shared Photos and Photo Viewing working. Kinds that ask a Curiosity are
     offered only with a Curiosity due, Curiosities working and the weekly
-    limit not reached.
+    limit not reached. The next Due Time counts from the one the Check-in
+    was first due at, before any hold-back moved it.
 
     Args:
         facts: What is known about the User.
@@ -146,6 +158,7 @@ def decide_check_in(
     snapshot = facts.snapshot
     settings = snapshot.user.check_ins
     current_due_at = settings.next_due_at
+    previous_due_at = settings.held_back_due_at or current_due_at
     if not snapshot.works(Feature.CHECK_INS):
         return HoldBack(HoldBackReason.CHECK_INS_OFF, retry_at=current_due_at)
     if settings.is_paused_at(now):
@@ -169,10 +182,11 @@ def decide_check_in(
             return HoldBack(
                 HoldBackReason.LIMIT_SKIP_DONE_TODAY, retry_at=current_due_at
             )
-        return SkipForDailyLimit()
-    next_due_at = next_due_after_check_in(settings.frequency, rules.frequency_gaps, now)
+        return SkipForDailyLimit(stays_due_at=previous_due_at or now)
+    gap = rules.frequency_gaps[settings.frequency]
+    next_due_if_sent = next_due_after_decision(previous_due_at, now, gap, now)
     if facts.ignored_in_a_row >= rules.ignore_threshold:
-        return AskAboutFewer(telegram_chat_id=chat_id, next_due_at=next_due_at)
+        return AskAboutFewer(telegram_chat_id=chat_id, next_due_at=next_due_if_sent)
     photos_may_be_sent = facts.has_shared_photos and snapshot.works(
         Feature.PHOTO_VIEWING
     )
@@ -189,7 +203,14 @@ def decide_check_in(
     )
     if not kinds:
         return HoldBack(HoldBackReason.NO_KIND_TO_SEND, retry_at=current_due_at)
-    return AskModel(kinds=kinds, telegram_chat_id=chat_id, next_due_at=next_due_at)
+    return AskModel(
+        kinds=kinds,
+        telegram_chat_id=chat_id,
+        next_due_if_sent=next_due_if_sent,
+        next_due_if_skipped=next_due_after_decision(
+            previous_due_at, facts.last_sent_at, gap, now
+        ),
+    )
 
 
 def is_in_quiet_hours(settings: CheckInSettings, local_time: time) -> bool:
@@ -252,6 +273,40 @@ def next_due_after_check_in(
         One frequency gap later.
     """
     return now + frequency_gaps[frequency]
+
+
+def next_due_after_decision(
+    previous_due_at: datetime | None,
+    last_sent_at: datetime | None,
+    gap: timedelta,
+    now: datetime,
+) -> datetime:
+    """Work out the next Due Time after a Check-in is sent or skipped.
+
+    It is the first of "previous Due Time + n × gap" still to come, so Due
+    Times missed while held back are not made up. It never falls within half
+    a gap of the last sent Check-in; one that would is moved to the end of
+    that half gap.
+
+    Args:
+        previous_due_at: The Due Time this Check-in was first due at; None
+            for none, which makes it one gap from now.
+        last_sent_at: When the newest sent Check-in was decided, now if this
+            one is sent; None if none was sent.
+        gap: The User's frequency gap.
+        now: When the Check-in was decided.
+
+    Returns:
+        The next Due Time.
+    """
+    if previous_due_at is None:
+        due_at = now + gap
+    else:
+        gaps_passed = max(0, (now - previous_due_at) // gap)
+        due_at = previous_due_at + (gaps_passed + 1) * gap
+    if last_sent_at is None:
+        return due_at
+    return max(due_at, last_sent_at + gap / 2)
 
 
 def retry_after_refusal(decided_at: datetime) -> datetime:

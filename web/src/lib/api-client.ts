@@ -66,7 +66,8 @@ export type Me = {
 };
 
 /** How often, at most, Zeph may send a Check-in. */
-export type CheckInFrequency = "weekly" | "few_times_a_week" | "most_days";
+export type CheckInFrequency =
+  "weekly" | "few_times_a_week" | "most_days" | "a_few_times_a_day";
 
 /** How long to pause Check-ins for. */
 export type PauseLength = "day" | "week" | "until_resumed";
@@ -231,8 +232,9 @@ export type UserFeatures = {
   personal_sticker_count: number;
 };
 
-/** The value of a platform setting Admins can edit. */
-export type SettingValue = string | number | boolean;
+/** The value of a platform setting Admins can edit; the Check-in gaps are hours by frequency. */
+export type SettingValue =
+  string | number | boolean | Partial<Record<CheckInFrequency, number>>;
 
 /** A platform setting's value and when, and by whom, it was last saved. */
 export type AdminSetting = {

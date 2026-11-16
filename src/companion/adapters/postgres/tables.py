@@ -55,6 +55,7 @@ users = Table(
     Column("check_in_next_due_at", DateTime(timezone=True)),
     Column("check_in_held_back_reason", Text),
     Column("check_in_held_back_until", DateTime(timezone=True)),
+    Column("check_in_held_back_due_at", DateTime(timezone=True)),
     Column("settings_changed_in_chat", JSONB, nullable=False, server_default="{}"),
     Column("settings_changed_by_admin", JSONB, nullable=False, server_default="{}"),
     Column("data_deletion_requested_at", DateTime(timezone=True)),

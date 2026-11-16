@@ -32,6 +32,7 @@ class CheckInFrequency(StrEnum):
     WEEKLY = "weekly"
     FEW_TIMES_A_WEEK = "few_times_a_week"
     MOST_DAYS = "most_days"
+    A_FEW_TIMES_A_DAY = "a_few_times_a_day"
 
 
 class HoldBackReason(StrEnum):
@@ -84,6 +85,9 @@ class CheckInSettings:
             User.
         held_back: Why the last tick held their due Check-in back; None
             once it is decided, or once a settings change moves the Due Time.
+        held_back_due_at: The Due Time a Held-back Check-in was first due
+            at, kept while hold-backs move `next_due_at`, so the next Due
+            Time keeps the rhythm; None when nothing is held back.
     """
 
     enabled: bool = False
@@ -94,6 +98,7 @@ class CheckInSettings:
     paused_until: datetime | None = None
     next_due_at: datetime | None = None
     held_back: HeldBack | None = None
+    held_back_due_at: datetime | None = None
 
     def is_paused_at(self, now: datetime) -> bool:
         """Tell whether Check-ins are paused at a given time.

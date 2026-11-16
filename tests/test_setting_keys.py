@@ -44,11 +44,12 @@ def test_every_editable_setting_has_a_typed_key() -> None:
 def test_typed_keys_read_values_into_their_types(engine: Engine) -> None:
     settings = build_postgres_repositories(engine).platform_settings.load()
 
-    assert settings.get(CONVERSATION_QUIET_GAP) == timedelta(minutes=60)
+    assert settings.get(CONVERSATION_QUIET_GAP) == timedelta(minutes=15)
     assert settings.get(CHECK_IN_GAPS) == {
         CheckInFrequency.WEEKLY: timedelta(hours=168),
         CheckInFrequency.FEW_TIMES_A_WEEK: timedelta(hours=56),
         CheckInFrequency.MOST_DAYS: timedelta(hours=24),
+        CheckInFrequency.A_FEW_TIMES_A_DAY: timedelta(hours=6),
     }
     assert isinstance(settings.get(PERSONA), str)
 
