@@ -27,6 +27,7 @@ export function scheduleEntry(
     check_ins_work: true,
     held_back: null,
     changed_by_admin: [],
+    check_in_now_waiting: false,
     ...overrides,
   };
 }

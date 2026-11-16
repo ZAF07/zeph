@@ -14,6 +14,7 @@ function entry(overrides: Partial<CheckInLogEntry>): CheckInLogEntry {
     kind: "A casual hello",
     skip_reason: null,
     status: "no_reply",
+    requested_by: null,
     ...overrides,
   };
 }

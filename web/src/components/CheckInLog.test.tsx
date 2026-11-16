@@ -25,6 +25,7 @@ const entries: CheckInLogEntry[] = [
     kind: null,
     skip_reason: "Asked for space this week",
     status: "skipped",
+    requested_by: null,
   },
   {
     id: "c2",
@@ -36,6 +37,7 @@ const entries: CheckInLogEntry[] = [
     kind: "A present-moment pause",
     skip_reason: null,
     status: "replied",
+    requested_by: "Sam Admin",
   },
   {
     id: "c1",
@@ -47,6 +49,7 @@ const entries: CheckInLogEntry[] = [
     kind: null,
     skip_reason: null,
     status: "sent",
+    requested_by: null,
   },
 ];
 
@@ -73,7 +76,13 @@ describe("CheckInLog", () => {
     expect(apiClient.listCheckInLog).toHaveBeenCalledWith(7);
     expect(rowTexts()).toEqual([
       ["Maya Lin", "Skipped", "—", "Asked for space this week", "—"],
-      ["Ren Okafor", "Sent", "A present-moment pause", "—", "Replied"],
+      [
+        "Ren Okafor",
+        "SentAsked for by Sam Admin",
+        "A present-moment pause",
+        "—",
+        "Replied",
+      ],
       [
         "aiko@example.com",
         "Paused",
@@ -82,6 +91,14 @@ describe("CheckInLog", () => {
         "Waiting",
       ],
     ]);
+  });
+
+  it("says which Admin asked for a Check in Now", async () => {
+    renderWithQueries(<CheckInLog />);
+
+    await screen.findByRole("table");
+    expect(screen.getByText("Asked for by Sam Admin")).toBeVisible();
+    expect(screen.getAllByText(/Asked for by/)).toHaveLength(1);
   });
 
   it("shows the totals for the period", async () => {

@@ -46,6 +46,7 @@ export const queryKeys = {
   ],
   checkInKinds: ["check-in-kinds"],
   needs: ["needs"],
+  allCheckInLog: ["check-in-log"],
   checkInLog: (days: number) => ["check-in-log", days],
   allCheckInSchedule: ["check-in-schedule"],
   checkInSchedule: (filter: CheckInScheduleFilter) => [

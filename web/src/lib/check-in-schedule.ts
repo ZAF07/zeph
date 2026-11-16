@@ -1,4 +1,8 @@
-import type { HeldBack, HoldBackReason } from "@/lib/api-client";
+import type {
+  CheckInNowResult,
+  HeldBack,
+  HoldBackReason,
+} from "@/lib/api-client";
 import { toTimeFieldValue } from "@/lib/check-ins";
 import { dateParts } from "@/lib/dates";
 
@@ -15,6 +19,13 @@ export const holdBackReasonLabels: Record<HoldBackReason, string> = {
   in_conversation: "In a Conversation",
   limit_skip_done_today: "Today’s message limit used up",
   no_kind_to_send: "No Kind to send",
+};
+
+/** What the Schedule says happened to a Check in Now for one User. */
+export const checkInNowResultLabels: Record<CheckInNowResult, string> = {
+  requested: "Requested — goes out on the next tick",
+  not_opted_in: "Refused — hasn’t turned Check-ins on",
+  no_telegram_connection: "Refused — no Telegram Connection",
 };
 
 /** Which parts of a moment to write: like "07:30", "Tue 13:00" or "Tue 24 Nov 10:00". */

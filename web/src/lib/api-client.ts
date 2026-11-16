@@ -475,7 +475,11 @@ export type Need = NeedInput & {
   is_fallback: boolean;
 };
 
-/** One Check-in decision in the admin log. Never the message text. */
+/**
+ * One Check-in decision in the admin log. Never the message text.
+ * `requested_by` names the Admin who asked for it with Check in Now; null
+ * for a scheduled one.
+ */
 export type CheckInLogEntry = {
   id: string;
   user_id: string;
@@ -486,6 +490,7 @@ export type CheckInLogEntry = {
   kind: string | null;
   skip_reason: string | null;
   status: CheckInStatus;
+  requested_by: string | null;
 };
 
 /** Why a User's due Check-in is held back right now. */
@@ -508,7 +513,8 @@ export type HeldBack = {
  * One opted-in User on the Check-in Schedule. Never message content.
  * `next_due_at` is their Due Time; `held_back` is null unless the last tick
  * held a due Check-in back; `changed_by_admin` lists the settings an Admin
- * changed that the User hasn't changed since.
+ * changed that the User hasn't changed since; `check_in_now_waiting` says an
+ * Admin's Check in Now is waiting for the next tick.
  */
 export type CheckInScheduleEntry = {
   user_id: string;
@@ -524,6 +530,17 @@ export type CheckInScheduleEntry = {
   check_ins_work: boolean;
   held_back: HeldBack | null;
   changed_by_admin: ChatSetting[];
+  check_in_now_waiting: boolean;
+};
+
+/** What happened to a Check in Now asked for one User. */
+export type CheckInNowResult =
+  "requested" | "not_opted_in" | "no_telegram_connection";
+
+/** One User's result from a Check in Now. */
+export type CheckInNowResultForUser = {
+  user_id: string;
+  result: CheckInNowResult;
 };
 
 /** One page of the Check-in Schedule, and when the backend read it. */
@@ -1142,6 +1159,7 @@ export type ApiClient = {
     length: PauseLength,
   ) => Promise<CheckInScheduleEntry>;
   resumeUserCheckIns: (userId: string) => Promise<CheckInScheduleEntry>;
+  checkInNow: (userIds: string[]) => Promise<CheckInNowResultForUser[]>;
   listModelCallTraces: (
     filter: ModelCallTraceFilter,
   ) => Promise<ModelCallTrace[]>;
@@ -1507,6 +1525,14 @@ export function createApiClient(
         `/api/admin/check-in-schedule/${userId}/pause`,
         "DELETE",
       ),
+    checkInNow: async (userIds) =>
+      (
+        await request<{ results: CheckInNowResultForUser[] }>(
+          "/api/admin/check-in-schedule/check-in-now",
+          "POST",
+          { user_ids: userIds },
+        )
+      ).results,
     listModelCallTraces: async (filter) => {
       const query = new URLSearchParams();
       if (filter.userId) {
