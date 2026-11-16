@@ -3794,7 +3794,7 @@ class PostgresPersonalStickerRepository:
             )
 
 
-def clear_check_in_now_if_decided(
+def _clear_check_in_now_if_decided(
     check_in_now: CheckInNowRequest | None,
 ) -> dict[str, Any]:
     """Build the User changes that clear the Check in Now a decision was for.
@@ -4170,7 +4170,7 @@ class PostgresCheckInRepository:
             "check_in_held_back_reason": None,
             "check_in_held_back_until": None,
             "check_in_held_back_due_at": None,
-            **clear_check_in_now_if_decided(check_in_now),
+            **_clear_check_in_now_if_decided(check_in_now),
         }
         if pause_until_resumed:
             user_changes |= {"check_ins_paused": True, "check_ins_paused_until": None}
@@ -4222,7 +4222,7 @@ class PostgresCheckInRepository:
                     check_in_held_back_reason=None,
                     check_in_held_back_until=None,
                     check_in_held_back_due_at=None,
-                    **clear_check_in_now_if_decided(check_in_now),
+                    **_clear_check_in_now_if_decided(check_in_now),
                 )
                 .returning(users.c.id)
             ).first()
