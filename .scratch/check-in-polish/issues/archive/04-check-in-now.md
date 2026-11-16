@@ -92,4 +92,4 @@ Changes the same Check-in decision and tick code as track A. Rebase on whatever 
 ## Completion
 
 - Completed: 2026-11-16
-- Commits: `0bc7d59` (backend: request, tick and decision, log and Schedule API, migration 0048), `0a7e8b6` (Dashboard: selection, Check in now, results, waiting pill, "Asked for by" in the log), `ba71d15` (review fixes), `7d02ff9` (test fake), plus the archive commit; merge to main recorded below
+- Commits: `0bc7d59` (backend: request, tick and decision, log and Schedule API, migration 0048), `0a7e8b6` (Dashboard: selection, Check in now, results, waiting pill, "Asked for by" in the log), `ba71d15` (review fixes), `7d02ff9` (test fake), `db772b7` (archive, CONTEXT.md); merged to main in `c9f0478`
