@@ -25,6 +25,7 @@ const adminItems = [
   { label: "Needs", href: "/admin/needs" },
   { label: "Check-in Kinds", href: "/admin/check-in-kinds" },
   { label: "Check-in log", href: "/admin/check-in-log" },
+  { label: "Check-in Schedule", href: "/admin/check-in-schedule" },
   { label: "Sticker Library", href: "/admin/stickers" },
   { label: "Features", href: "/admin/features" },
   { label: "Platform settings", href: "/admin/settings" },

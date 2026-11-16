@@ -39,6 +39,7 @@ function checkInsWith(overrides: Partial<CheckIns> = {}): CheckIns {
         description: "A brief invitation to notice where you are.",
       },
     ],
+    changed_by_admin: {},
     ...overrides,
   };
 }
@@ -92,6 +93,47 @@ describe("CheckInsSettings", () => {
     expect(screen.getByText("Changed in chat · 3 Nov")).toBeInTheDocument();
     expect(screen.getByText("Changed in chat · 11 Nov")).toBeInTheDocument();
     expect(screen.getAllByText(/Changed in chat/)).toHaveLength(2);
+  });
+
+  it("marks settings an Admin changed", async () => {
+    apiClient.getCheckIns.mockResolvedValue(
+      checkInsWith({
+        changed_by_admin: {
+          check_in_frequency: "2026-11-15T02:00:00Z",
+          check_in_pause: "2026-11-16T02:00:00Z",
+        },
+      }),
+    );
+    await renderLoaded();
+
+    expect(
+      screen.getByText("Changed by an Admin · 15 Nov"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Changed by an Admin · 16 Nov"),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/Changed by an Admin/)).toHaveLength(2);
+  });
+
+  it("drops the Admin mark once the User changes that setting", async () => {
+    apiClient.getCheckIns.mockResolvedValue(
+      checkInsWith({
+        changed_by_admin: { check_in_frequency: "2026-11-15T02:00:00Z" },
+      }),
+    );
+    apiClient.updateCheckIns.mockResolvedValue(
+      checkInsWith({ frequency: "weekly" }),
+    );
+    const user = userEvent.setup();
+    await renderLoaded();
+    expect(screen.getByText(/Changed by an Admin/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Once a week" }));
+
+    expect(
+      await screen.findByRole("button", { name: "Once a week" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText(/Changed by an Admin/)).not.toBeInTheDocument();
   });
 
   it("drops the caption once the setting is changed on the Dashboard", async () => {
