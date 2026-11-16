@@ -6,8 +6,6 @@ from alembic.config import Config
 from sqlalchemy import Engine, text
 
 from companion.adapters.postgres.database import MIGRATIONS_DIR, migrate
-from companion.adapters.postgres.repositories import build_postgres_repositories
-from companion.core.models import User
 
 
 def add_user_with_no_due_time(engine: Engine, check_ins_enabled: bool) -> UUID:
@@ -20,23 +18,22 @@ def add_user_with_no_due_time(engine: Engine, check_ins_enabled: bool) -> UUID:
     Returns:
         The User's ID.
     """
-    user = build_postgres_repositories(engine).users.add(
-        User(
-            id=uuid4(),
-            auth_id=f"user_{uuid4()}",
-            email=None,
-            created_at=datetime(2026, 11, 1, tzinfo=UTC),
-        )
-    )
+    user_id = uuid4()
     with engine.begin() as connection:
         connection.execute(
             text(
-                "UPDATE users SET check_ins_enabled = :enabled, "
-                "check_in_next_due_at = NULL WHERE id = :id"
+                "INSERT INTO users (id, auth_id, created_at, check_ins_enabled, "
+                "check_in_next_due_at) VALUES (:id, :auth_id, :created_at, "
+                ":enabled, NULL)"
             ),
-            {"enabled": check_ins_enabled, "id": user.id},
+            {
+                "id": user_id,
+                "auth_id": f"user_{user_id}",
+                "created_at": datetime(2026, 11, 1, tzinfo=UTC),
+                "enabled": check_ins_enabled,
+            },
         )
-    return user.id
+    return user_id
 
 
 def next_due_at(engine: Engine, user_id: UUID) -> datetime | None:

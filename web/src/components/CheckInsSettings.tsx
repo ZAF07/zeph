@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 
 import { secondaryButton } from "@/components/button-styles";
+import { ChangedByAdminCaption } from "@/components/ChangedByAdminCaption";
 import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
 import { CheckInFrequencyPicker } from "@/components/CheckInFrequencyPicker";
 import { CheckInKindsList } from "@/components/CheckInKindsList";
@@ -12,7 +13,12 @@ import { QuietHoursFields } from "@/components/QuietHoursFields";
 import { RecentCheckInsList } from "@/components/RecentCheckInsList";
 import { SettingLabel } from "@/components/SettingLabel";
 import { Switch } from "@/components/Switch";
-import type { CheckInChanges, CheckIns, PauseLength } from "@/lib/api-client";
+import type {
+  ChatSetting,
+  CheckInChanges,
+  CheckIns,
+  PauseLength,
+} from "@/lib/api-client";
 import { pausedText, toTimeFieldValue } from "@/lib/check-ins";
 import { notAvailableText } from "@/lib/features";
 import {
@@ -36,7 +42,8 @@ const settingsRow =
 /**
  * The Check-ins page: the on/off switch, how often, quiet hours and time
  * zone, pausing, what Zeph might reach out about, and the recent Check-ins. It never shows when the next
- * Check-in will come; Zeph chooses the moment.
+ * Check-in will come; Zeph chooses the moment. A setting last changed in
+ * chat or by an Admin says so under it.
  *
  * @returns The page, a loading block, or an error with Try again.
  */
@@ -79,12 +86,18 @@ export function CheckInsSettings() {
     updatePreferences.mutate({ time_zone: timeZone });
   }
 
-  function chatCaption(changedAt: string | undefined) {
+  function changeCaption(setting: ChatSetting) {
     return (
-      <ChangedInChatCaption
-        changedAt={changedAt}
-        timeZone={timeZone ?? undefined}
-      />
+      <>
+        <ChangedInChatCaption
+          changedAt={changedInChat[setting]}
+          timeZone={timeZone ?? undefined}
+        />
+        <ChangedByAdminCaption
+          changedAt={checkIns?.changed_by_admin[setting]}
+          timeZone={timeZone ?? undefined}
+        />
+      </>
     );
   }
   let switchLabel = "Check-ins on";
@@ -204,7 +217,7 @@ export function CheckInsSettings() {
               <SettingLabel
                 title="How often, at most"
                 caption="Zeph will often check in less than this."
-                note={chatCaption(changedInChat.check_in_frequency)}
+                note={changeCaption("check_in_frequency")}
               />
               <CheckInFrequencyPicker
                 value={checkIns.frequency}
@@ -216,7 +229,7 @@ export function CheckInsSettings() {
               <SettingLabel
                 title="Quiet hours"
                 caption="Zeph never checks in during these hours."
-                note={chatCaption(changedInChat.quiet_hours)}
+                note={changeCaption("quiet_hours")}
               />
               <div className="flex flex-[2_1_480px] flex-col gap-3">
                 <QuietHoursFields
@@ -244,7 +257,7 @@ export function CheckInsSettings() {
                       </option>
                     ))}
                   </select>
-                  {chatCaption(changedInChat.time_zone)}
+                  {changeCaption("time_zone")}
                 </label>
               </div>
             </div>
@@ -252,7 +265,7 @@ export function CheckInsSettings() {
               <SettingLabel
                 title="Need some quiet?"
                 caption="Pause without changing anything else."
-                note={chatCaption(changedInChat.check_in_pause)}
+                note={changeCaption("check_in_pause")}
               />
               <div className="flex flex-wrap gap-2">
                 {pauseChoices.map((choice) => (

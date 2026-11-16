@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-query";
 
 import type {
+  CheckInScheduleFilter,
   CheckIns,
   EvalRunRequest,
   Me,
@@ -46,6 +47,11 @@ export const queryKeys = {
   checkInKinds: ["check-in-kinds"],
   needs: ["needs"],
   checkInLog: (days: number) => ["check-in-log", days],
+  allCheckInSchedule: ["check-in-schedule"],
+  checkInSchedule: (filter: CheckInScheduleFilter) => [
+    "check-in-schedule",
+    filter,
+  ],
   modelCallTraces: (filter: ModelCallTraceFilter) => [
     "model-call-traces",
     filter,

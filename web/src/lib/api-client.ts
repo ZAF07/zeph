@@ -116,7 +116,9 @@ export type CheckInKindSummary = {
  * A User's Check-in settings and recent Check-ins. Quiet hours are local
  * times like "22:00:00"; `paused_until` is null while paused until resumed.
  * `available` is false when an Admin has Check-ins off for them, so they
- * can't switch them. There is never a next Check-in time.
+ * can't switch them. `changed_by_admin` says when an Admin last changed
+ * each setting, until the User changes it. There is never a next Check-in
+ * time.
  */
 export type CheckIns = {
   enabled: boolean;
@@ -128,6 +130,7 @@ export type CheckIns = {
   paused_until: string | null;
   recent: RecentCheckIn[];
   kinds: CheckInKindSummary[];
+  changed_by_admin: Partial<Record<ChatSetting, string>>;
 };
 
 /** Check-in settings to change; a field left out stays as it is. */
@@ -481,6 +484,66 @@ export type CheckInLogEntry = {
   kind: string | null;
   skip_reason: string | null;
   status: CheckInStatus;
+};
+
+/** Why a User's due Check-in is held back right now. */
+export type HoldBackReason =
+  | "check_ins_off"
+  | "paused"
+  | "quiet_hours"
+  | "no_telegram_connection"
+  | "in_conversation"
+  | "limit_skip_done_today"
+  | "no_kind_to_send";
+
+/** Why a due Check-in is held back, and until when; `until` is null when not known. */
+export type HeldBack = {
+  reason: HoldBackReason;
+  until: string | null;
+};
+
+/**
+ * One opted-in User on the Check-in Schedule. Never message content.
+ * `next_due_at` is their Due Time; `held_back` is null unless the last tick
+ * held a due Check-in back; `changed_by_admin` lists the settings an Admin
+ * changed that the User hasn't changed since.
+ */
+export type CheckInScheduleEntry = {
+  user_id: string;
+  name: string | null;
+  email: string | null;
+  time_zone: string | null;
+  next_due_at: string | null;
+  frequency: CheckInFrequency;
+  quiet_hours_start: string;
+  quiet_hours_end: string;
+  paused: boolean;
+  paused_until: string | null;
+  check_ins_work: boolean;
+  held_back: HeldBack | null;
+  changed_by_admin: ChatSetting[];
+};
+
+/** One page of the Check-in Schedule, and when the backend read it. */
+export type CheckInSchedulePage = {
+  entries: CheckInScheduleEntry[];
+  total: number;
+  page: number;
+  page_size: number;
+  now: string;
+};
+
+/** Which page of the Check-in Schedule to load. */
+export type CheckInScheduleFilter = {
+  search: string;
+  page: number;
+};
+
+/** Check-in settings an Admin changes for a User; never the on/off switch. */
+export type AdminCheckInChanges = {
+  frequency?: CheckInFrequency;
+  quiet_hours_start?: string;
+  quiet_hours_end?: string;
 };
 
 /** What a Model Call Log trace was for. */
@@ -1065,6 +1128,18 @@ export type ApiClient = {
   deleteNeed: (id: string) => Promise<void>;
   moveNeed: (id: string, direction: MoveDirection) => Promise<Need[]>;
   listCheckInLog: (days: number) => Promise<CheckInLogEntry[]>;
+  listCheckInSchedule: (
+    filter: CheckInScheduleFilter,
+  ) => Promise<CheckInSchedulePage>;
+  changeUserCheckIns: (
+    userId: string,
+    changes: AdminCheckInChanges,
+  ) => Promise<CheckInScheduleEntry>;
+  pauseUserCheckIns: (
+    userId: string,
+    length: PauseLength,
+  ) => Promise<CheckInScheduleEntry>;
+  resumeUserCheckIns: (userId: string) => Promise<CheckInScheduleEntry>;
   listModelCallTraces: (
     filter: ModelCallTraceFilter,
   ) => Promise<ModelCallTrace[]>;
@@ -1404,6 +1479,32 @@ export function createApiClient(
           `/api/admin/check-ins?days=${days}`,
         )
       ).entries,
+    listCheckInSchedule: (filter) => {
+      const query = new URLSearchParams({
+        search: filter.search,
+        page: String(filter.page),
+      });
+      return request<CheckInSchedulePage>(
+        `/api/admin/check-in-schedule?${query.toString()}`,
+      );
+    },
+    changeUserCheckIns: (userId, changes) =>
+      request<CheckInScheduleEntry>(
+        `/api/admin/check-in-schedule/${userId}`,
+        "PATCH",
+        changes,
+      ),
+    pauseUserCheckIns: (userId, length) =>
+      request<CheckInScheduleEntry>(
+        `/api/admin/check-in-schedule/${userId}/pause`,
+        "PUT",
+        { length },
+      ),
+    resumeUserCheckIns: (userId) =>
+      request<CheckInScheduleEntry>(
+        `/api/admin/check-in-schedule/${userId}/pause`,
+        "DELETE",
+      ),
     listModelCallTraces: async (filter) => {
       const query = new URLSearchParams();
       if (filter.userId) {

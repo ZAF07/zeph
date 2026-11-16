@@ -13,7 +13,6 @@ from companion.core.check_in_decision import (
     CheckInPlan,
     CheckInRules,
     HoldBack,
-    HoldBackReason,
     SkipForDailyLimit,
     decide_check_in,
     next_due_after_change,
@@ -29,6 +28,7 @@ from companion.core.memory_retrieval import (
 )
 from companion.core.models import (
     DAILY_LIMIT_SKIP_REASON,
+    ChangedBy,
     ChatLine,
     ChatRole,
     ChatSetting,
@@ -41,6 +41,8 @@ from companion.core.models import (
     CheckInStatus,
     Curiosity,
     Feature,
+    HeldBack,
+    HoldBackReason,
     ModelStep,
     NextDueTimeChange,
     PauseLength,
@@ -117,6 +119,8 @@ class CheckInsPage:
         paused: Whether their Check-ins are paused right now.
         recent: Their newest Check-in decisions, newest first.
         kinds: The Check-in Kinds that may be sent to them.
+        changed_by_admin: When an Admin last changed each of their settings,
+            until they change it themselves.
     """
 
     settings: CheckInSettings
@@ -124,6 +128,7 @@ class CheckInsPage:
     paused: bool
     recent: list[RecentCheckIn]
     kinds: list[CheckInKind]
+    changed_by_admin: dict[ChatSetting, datetime]
 
 
 @dataclass(frozen=True)
@@ -266,19 +271,27 @@ def is_limit_skip_on_their_today(
 
 
 def due_time_change(user: User, plan: HoldBack) -> NextDueTimeChange | None:
-    """Work out the change to a held-back User's next due time.
+    """Work out the change to a held-back User's next due time and why it waits.
+
+    It is held back until its new due time; a User who stays due waits for
+    something with no known end, such as their next day.
 
     Args:
         user: The User, as read for this tick.
         plan: Why they are held back and until when.
 
     Returns:
-        The change; None if their due time stays as it is.
+        The change; None if their due time and why it waits stay as they are.
     """
     read_as = user.check_ins.next_due_at
-    if plan.retry_at == read_as:
+    held_back = HeldBack(
+        reason=plan.reason, until=None if plan.retry_at == read_as else plan.retry_at
+    )
+    if plan.retry_at == read_as and held_back == user.check_ins.held_back:
         return None
-    return NextDueTimeChange(user_id=user.id, read_as=read_as, becomes=plan.retry_at)
+    return NextDueTimeChange(
+        user_id=user.id, read_as=read_as, becomes=plan.retry_at, held_back=held_back
+    )
 
 
 def describe_recent_check_ins(
@@ -547,7 +560,10 @@ class CheckInService:
         self._clock = clock
 
     def change_settings(
-        self, user: User, changes: CheckInChanges, in_chat: bool = False
+        self,
+        user: User,
+        changes: CheckInChanges,
+        changed_by: ChangedBy = ChangedBy.DASHBOARD,
     ) -> User:
         """Change and save a User's Check-in settings.
 
@@ -558,8 +574,8 @@ class CheckInService:
         Args:
             user: The User making the change.
             changes: The settings to change; None leaves one as it is.
-            in_chat: True if the User asked for it in chat, not on the
-                Dashboard.
+            changed_by: Who changed it: the User on the Dashboard or in
+                chat, or an Admin.
 
         Returns:
             The saved User.
@@ -592,7 +608,7 @@ class CheckInService:
                     current, user.time_zone, now
                 ),
             )
-        recorded = record_where_changed(user, changed, in_chat, now)
+        recorded = record_where_changed(user, changed, changed_by, now)
         return self._save(recorded, updated)
 
     def settings_after_time_zone_change(self, user: User) -> CheckInSettings:
@@ -647,7 +663,12 @@ class CheckInService:
         )
         return self._with_next_due_time(current, updated)
 
-    def pause(self, user: User, length: PauseLength, in_chat: bool = False) -> User:
+    def pause(
+        self,
+        user: User,
+        length: PauseLength,
+        changed_by: ChangedBy = ChangedBy.DASHBOARD,
+    ) -> User:
         """Pause a User's Check-ins, keeping their other settings.
 
         Pausing turns Check-ins on if they were off.
@@ -655,8 +676,8 @@ class CheckInService:
         Args:
             user: The User pausing.
             length: For a day, a week or until they resume.
-            in_chat: True if the User asked for it in chat, not on the
-                Dashboard.
+            changed_by: Who changed it: the User on the Dashboard or in
+                chat, or an Admin.
 
         Returns:
             The saved User.
@@ -668,24 +689,24 @@ class CheckInService:
         )
         paused = replace(current, enabled=True, paused=True, paused_until=paused_until)
         recorded = record_where_changed(
-            user, [ChatSetting.CHECK_IN_PAUSE], in_chat, now
+            user, [ChatSetting.CHECK_IN_PAUSE], changed_by, now
         )
         return self._save(recorded, self._with_next_due_time(current, paused))
 
-    def resume(self, user: User, in_chat: bool = False) -> User:
+    def resume(self, user: User, changed_by: ChangedBy = ChangedBy.DASHBOARD) -> User:
         """End a pause on a User's Check-ins.
 
         Args:
             user: The User resuming.
-            in_chat: True if the User asked for it in chat, not on the
-                Dashboard.
+            changed_by: Who changed it: the User on the Dashboard or in
+                chat, or an Admin.
 
         Returns:
             The saved User.
         """
         current = user.check_ins
         recorded = record_where_changed(
-            user, [ChatSetting.CHECK_IN_PAUSE], in_chat, self._clock.now()
+            user, [ChatSetting.CHECK_IN_PAUSE], changed_by, self._clock.now()
         )
         resumed = replace(current, paused=False, paused_until=None)
         return self._save(recorded, self._with_next_due_time(current, resumed))
@@ -747,7 +768,8 @@ class CheckInService:
 
         Returns:
             Their settings, whether Check-ins are available and paused right
-            now, their recent Check-ins and the Check-in Kinds.
+            now, their recent Check-ins, the Check-in Kinds, and which
+            settings an Admin changed.
         """
         return CheckInsPage(
             settings=user.check_ins,
@@ -755,6 +777,7 @@ class CheckInService:
             paused=self.is_paused(user),
             recent=self.list_recent(user),
             kinds=self.list_kinds(),
+            changed_by_admin=user.settings_changed_by_admin,
         )
 
     def list_kinds(self) -> list[CheckInKind]:
@@ -831,7 +854,7 @@ class CheckInService:
                 logger.exception("Could not decide on a Check-in")
 
     def _hold_back(self, plans: list[tuple[UserSnapshot, CheckInPlan]]) -> None:
-        """Save every held-back User's next due time, in one statement.
+        """Save every held-back User's next due time and why, in one statement.
 
         This is done before any Check-in is sent, so a User who resumes or
         connects Telegram meanwhile changes their due time after it is read,
@@ -1284,6 +1307,9 @@ class CheckInService:
     def _save(self, user: User, settings: CheckInSettings) -> User:
         """Save a User's new Check-in settings.
 
+        A change that moves their Due Time ends any hold back: they are
+        decided again now, or not due until later.
+
         Args:
             user: The User.
             settings: Their new Check-in settings.
@@ -1291,4 +1317,6 @@ class CheckInService:
         Returns:
             The saved User.
         """
+        if settings.next_due_at != user.check_ins.next_due_at:
+            settings = replace(settings, held_back=None)
         return self._repositories.users.update(replace(user, check_ins=settings))

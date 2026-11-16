@@ -63,6 +63,7 @@ from companion.core.models import (
     UnderstandingShape,
     User,
     UserOverview,
+    UserPage,
     UserPortrait,
     WebSearchResult,
 )
@@ -2084,14 +2085,30 @@ class CheckInRepository(Protocol):
         """
         ...
 
+    def list_opted_in_users(self, search: str, limit: int, offset: int) -> UserPage:
+        """List one page of the Users who opted in to Check-ins.
+
+        Args:
+            search: Only Users whose name or email holds this, in any case;
+                "" for every one.
+            limit: The most Users on the page.
+            offset: How many matching Users come before the page.
+
+        Returns:
+            The page, soonest Due Time first and Users with none last, and
+            how many Users match.
+        """
+        ...
+
     def save_next_due_times(self, changes: Sequence[NextDueTimeChange]) -> None:
-        """Save many Users' next due times, in one statement.
+        """Save many Users' next due times, and why each is held back, in one statement.
 
         A User whose due time changed since it was read is left as it is, so
         a settings change made meanwhile is kept.
 
         Args:
-            changes: Each User's due time as read and the one to save.
+            changes: Each User's due time as read, the one to save, and why
+                they are held back.
         """
         ...
 
@@ -2111,6 +2128,8 @@ class CheckInRepository(Protocol):
         self, check_in: CheckIn, next_due_at: datetime, pause_until_resumed: bool
     ) -> None:
         """Save a Check-in decision and the User's next due time, together.
+
+        A decision ends any hold back, so why it was held back is cleared.
 
         Only the next due time and, when asked, the pause are changed, so
         settings the User changed meanwhile are kept.
