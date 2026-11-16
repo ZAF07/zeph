@@ -73,8 +73,8 @@ function reasonText(entry: CheckInLogEntry): string {
 
 /**
  * The admin Check-in log: every decision the Check-ins service made — sent,
- * skipped and why, or paused by the ignore rule — with totals. Never the
- * message text.
+ * skipped and why, or paused by the ignore rule — with totals, and which
+ * Admin asked for one with Check in Now. Never the message text.
  *
  * @returns The filters, totals and table, or a loading, empty or error state.
  */
@@ -236,10 +236,17 @@ export function CheckInLog() {
                       {entry.user_name ?? entry.user_email ?? "Unknown User"}
                     </td>
                     <td className={cell}>
-                      <span
-                        className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-[3px] text-xs font-medium ${pill.pill}`}
-                      >
-                        {pill.label}
+                      <span className="flex flex-col items-start gap-1">
+                        <span
+                          className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-[3px] text-xs font-medium ${pill.pill}`}
+                        >
+                          {pill.label}
+                        </span>
+                        {entry.requested_by ? (
+                          <span className="text-caption text-ink-muted">
+                            Asked for by {entry.requested_by}
+                          </span>
+                        ) : null}
                       </span>
                     </td>
                     <td className={cell}>{entry.kind ?? "—"}</td>

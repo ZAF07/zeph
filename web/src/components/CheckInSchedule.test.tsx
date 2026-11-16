@@ -12,6 +12,7 @@ const apiClient = {
   changeUserCheckIns: vi.fn<ApiClient["changeUserCheckIns"]>(),
   pauseUserCheckIns: vi.fn<ApiClient["pauseUserCheckIns"]>(),
   resumeUserCheckIns: vi.fn<ApiClient["resumeUserCheckIns"]>(),
+  checkInNow: vi.fn<ApiClient["checkInNow"]>(),
 };
 
 vi.mock("@/lib/use-api-client", () => ({
@@ -140,5 +141,98 @@ describe("CheckInSchedule", () => {
     expect(
       await screen.findByText("Couldn’t load the Check-in Schedule"),
     ).toBeVisible();
+  });
+
+  it("asks for a Check in Now for the selected Users and shows each result", async () => {
+    apiClient.checkInNow.mockResolvedValue([
+      { user_id: "ren", result: "requested" },
+      { user_id: "sam", result: "no_telegram_connection" },
+    ]);
+    const user = userEvent.setup();
+    renderWithQueries(<CheckInSchedule />);
+    await screen.findByText("Ren Okafor");
+    const checkInNow = screen.getByRole("button", { name: "Check in now" });
+    expect(checkInNow).toBeDisabled();
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "Select Ren Okafor" }),
+    );
+    await user.click(screen.getByRole("checkbox", { name: "Select Sam Lee" }));
+    expect(screen.getByText(/2 selected/)).toBeVisible();
+    await user.click(checkInNow);
+
+    expect(apiClient.checkInNow).toHaveBeenCalledWith(["ren", "sam"]);
+    const results = await screen.findByRole("status");
+    expect(within(results).getByText(/1 of 2 requested/)).toBeVisible();
+    expect(results).toHaveTextContent(
+      "Ren Okafor: Requested — goes out on the next tick",
+    );
+    expect(results).toHaveTextContent(
+      "Sam Lee: Refused — no Telegram Connection",
+    );
+    expect(
+      screen.getByRole("checkbox", { name: "Select Ren Okafor" }),
+    ).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Check in now" })).toBeDisabled();
+  });
+
+  it("selects everyone on the page at once, and clears them again", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<CheckInSchedule />);
+    await screen.findByText("Ren Okafor");
+    const wholePage = screen.getByRole("checkbox", {
+      name: "Select everyone on this page",
+    });
+
+    await user.click(wholePage);
+    expect(
+      screen.getByRole("checkbox", { name: "Select Sam Lee" }),
+    ).toBeChecked();
+    expect(screen.getByText(/2 selected/)).toBeVisible();
+
+    await user.click(wholePage);
+    expect(
+      screen.getByRole("checkbox", { name: "Select Ren Okafor" }),
+    ).not.toBeChecked();
+  });
+
+  it("selecting a row doesn't open its settings panel", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<CheckInSchedule />);
+    await screen.findByText("Ren Okafor");
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "Select Ren Okafor" }),
+    );
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("shows when a Check in Now is already waiting for a User", async () => {
+    apiClient.listCheckInSchedule.mockResolvedValue(
+      schedulePage([scheduleEntry({ check_in_now_waiting: true })]),
+    );
+    renderWithQueries(<CheckInSchedule />);
+
+    await screen.findByText("Ren Okafor");
+    expect(
+      within(rowFor("Ren Okafor")).getByText("Check in Now waiting"),
+    ).toBeVisible();
+  });
+
+  it("says nothing was requested when the Check in Now fails", async () => {
+    apiClient.checkInNow.mockRejectedValue(new Error("down"));
+    const user = userEvent.setup();
+    renderWithQueries(<CheckInSchedule />);
+    await screen.findByText("Ren Okafor");
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "Select Ren Okafor" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Check in now" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Nothing was requested",
+    );
   });
 });

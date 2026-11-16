@@ -36,6 +36,7 @@ from companion.core.models import (
     CheckInChanges,
     CheckInKind,
     CheckInLogEntry,
+    CheckInNowRequest,
     CheckInOutcome,
     CheckInSettings,
     CheckInStatus,
@@ -1022,6 +1023,9 @@ class CheckInService:
             if any(kind.raises_curiosity for kind in kinds)
             else []
         )
+        requested_by = (
+            plan.check_in_now.requested_by if plan.check_in_now is not None else None
+        )
         decision = self._decide(snapshot, kinds, shared_photos, curiosities_to_ask)
         if decision.kind is None:
             skipped = CheckIn(
@@ -1030,9 +1034,13 @@ class CheckInService:
                 outcome=CheckInOutcome.SKIPPED,
                 decided_at=now,
                 skip_reason=decision.skip_reason,
+                requested_by=requested_by,
             )
             self._repositories.check_ins.add(
-                skipped, plan.next_due_if_skipped, pause_until_resumed=False
+                skipped,
+                plan.next_due_if_skipped,
+                pause_until_resumed=False,
+                check_in_now=plan.check_in_now,
             )
             return
         shared_photo = decision.shared_photo
@@ -1046,6 +1054,7 @@ class CheckInService:
             message=decision.message,
             shared_photo_id=shared_photo.id if shared_photo is not None else None,
             curiosity_id=curiosity.id if curiosity is not None else None,
+            requested_by=requested_by,
         )
         was_sent = self._save_then_send(
             user,
@@ -1054,6 +1063,7 @@ class CheckInService:
             check_in,
             plan.next_due_if_sent,
             pause_until_resumed=False,
+            check_in_now=plan.check_in_now,
         )
         if was_sent and curiosity is not None:
             self._repositories.curiosities.mark_raised([curiosity.id], None, now)
@@ -1096,13 +1106,15 @@ class CheckInService:
         check_in: CheckIn,
         next_due_at: datetime,
         pause_until_resumed: bool,
+        check_in_now: CheckInNowRequest | None = None,
     ) -> bool:
         """Save a Check-in and the User's next due time, then send its message.
 
         Saving first means a failed save sends nothing, so a Check-in is
         never sent twice. If the chat channel clearly refuses the message,
         the Check-in is taken back and tried again after the retry gap, still
-        counting the next Due Time from the one it was first due at. If
+        counting the next Due Time from the one it was first due at, and any
+        Check in Now it was for waits again. If
         the User blocked the Companion, a Skipped Check-in takes its place and
         the next attempt is at the next Due Time, with no pause. Any other
         failure, such as a timeout, may still have delivered it, so it counts
@@ -1116,11 +1128,14 @@ class CheckInService:
             next_due_at: When their next Check-in may be sent.
             pause_until_resumed: Whether sending it pauses their Check-ins
                 until they resume.
+            check_in_now: The Admin's Check in Now it is for; None for none.
 
         Returns:
             True if the message counts as sent.
         """
-        self._repositories.check_ins.add(check_in, next_due_at, pause_until_resumed)
+        self._repositories.check_ins.add(
+            check_in, next_due_at, pause_until_resumed, check_in_now
+        )
         try:
             self._chat_channel.send_text(chat_id, message)
         except ChatBlockedError:
@@ -1130,6 +1145,7 @@ class CheckInService:
                 outcome=CheckInOutcome.SKIPPED,
                 decided_at=check_in.decided_at,
                 skip_reason=BLOCKED_SKIP_REASON,
+                requested_by=check_in.requested_by,
             )
             self._repositories.check_ins.undo_add(
                 check_in,
@@ -1137,6 +1153,7 @@ class CheckInService:
                 pause_until_resumed,
                 skipped,
                 held_back_due_at=None,
+                check_in_now=None,
             )
             return False
         except MessageRefusedError as error:
@@ -1148,6 +1165,7 @@ class CheckInService:
                 pause_until_resumed,
                 skipped=None,
                 held_back_due_at=user.check_ins.rhythm_due_at,
+                check_in_now=check_in_now,
             )
             return False
         except Exception:
@@ -1315,6 +1333,8 @@ class CheckInService:
             otherwise with the due time from `next_due_after_change`. A
             Held-back Check-in's first Due Time is dropped when off, just
             turned on or the frequency changed, since the rhythm starts again.
+            Turning them off also drops a waiting Check in Now; while one
+            waits, they stay due now.
         """
         if not updated.enabled:
             return replace(
@@ -1323,18 +1343,24 @@ class CheckInService:
                 paused_until=None,
                 next_due_at=None,
                 held_back_due_at=None,
+                check_in_now=None,
             )
         starts_new_rhythm = (
             not current.enabled or current.frequency != updated.frequency
         )
+        now = self._clock.now()
         return replace(
             updated,
             held_back_due_at=None if starts_new_rhythm else updated.held_back_due_at,
-            next_due_at=next_due_after_change(
-                current,
-                updated,
-                self._repositories.platform_settings.load().get(CHECK_IN_GAPS),
-                self._clock.now(),
+            next_due_at=(
+                now
+                if updated.check_in_now is not None
+                else next_due_after_change(
+                    current,
+                    updated,
+                    self._repositories.platform_settings.load().get(CHECK_IN_GAPS),
+                    now,
+                )
             ),
         )
 

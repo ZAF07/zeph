@@ -35,6 +35,7 @@ from companion.core.models import (
     CheckInFrequency,
     CheckInKind,
     CheckInKindDetails,
+    CheckInNowResult,
     CheckInOutcome,
     CheckInScheduleEntry,
     CheckInStatus,
@@ -125,6 +126,7 @@ class CheckInScheduleEntryResponse(BaseModel):
     check_ins_work: bool
     held_back: HeldBackResponse | None
     changed_by_admin: list[ChatSetting]
+    check_in_now_waiting: bool
 
 
 class CheckInScheduleResponse(BaseModel):
@@ -149,6 +151,25 @@ class AdminCheckInSettingsRequest(BaseModel):
     frequency: CheckInFrequency | None = None
     quiet_hours_start: time | None = None
     quiet_hours_end: time | None = None
+
+
+class CheckInNowRequestBody(BaseModel):
+    """The Users an Admin asks a Check in Now for."""
+
+    user_ids: list[UUID]
+
+
+class CheckInNowResultResponse(BaseModel):
+    """What happened to a Check in Now asked for one User."""
+
+    user_id: str
+    result: CheckInNowResult
+
+
+class CheckInNowResponse(BaseModel):
+    """What happened to a Check in Now for each User, in the order asked."""
+
+    results: list[CheckInNowResultResponse]
 
 
 class AdminPauseRequest(BaseModel):
@@ -441,6 +462,7 @@ class CheckInLogEntryResponse(BaseModel):
     kind: str | None
     skip_reason: str | None
     status: CheckInStatus
+    requested_by: str | None
 
 
 class CheckInLogResponse(BaseModel):
@@ -836,6 +858,7 @@ def to_check_in_log_entry_response(logged: LoggedCheckIn) -> CheckInLogEntryResp
         kind=check_in.kind_name,
         skip_reason=check_in.skip_reason,
         status=logged.status,
+        requested_by=logged.entry.requested_by_name,
     )
 
 
@@ -1160,6 +1183,7 @@ def to_check_in_schedule_entry_response(
             else None
         ),
         changed_by_admin=list(user.settings_changed_by_admin),
+        check_in_now_waiting=settings.check_in_now is not None,
     )
 
 
@@ -1821,6 +1845,31 @@ def build_admin_api_router(
             page=page,
             page_size=page_size,
             now=found.now,
+        )
+
+    @router.post("/check-in-schedule/check-in-now")
+    def check_in_now(
+        request: CheckInNowRequestBody,
+        admin: Annotated[User, Depends(current_admin)],
+    ) -> CheckInNowResponse:
+        """Ask for a Check-in on the next tick for each of the Users.
+
+        Args:
+            request: The Users.
+            admin: The Admin asking.
+
+        Returns:
+            Each User's result: requested, or refused and why.
+
+        Raises:
+            CoreError: 404 if any of them doesn't exist; nothing is saved.
+        """
+        results = check_in_schedule_service.check_in_now(request.user_ids, admin)
+        return CheckInNowResponse(
+            results=[
+                CheckInNowResultResponse(user_id=str(user_id), result=result)
+                for user_id, result in results.items()
+            ]
         )
 
     @router.patch("/check-in-schedule/{user_id}")

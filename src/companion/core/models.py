@@ -60,6 +60,27 @@ class HeldBack:
     until: datetime | None
 
 
+@dataclass(frozen=True)
+class CheckInNowRequest:
+    """An Admin's Check in Now waiting for a User's next tick.
+
+    Attributes:
+        requested_by: The Admin who asked; None if they were deleted since.
+        requested_at: When they asked.
+    """
+
+    requested_by: UUID | None
+    requested_at: datetime
+
+
+class CheckInNowResult(StrEnum):
+    """What happened to a Check in Now asked for one User."""
+
+    REQUESTED = "requested"
+    NOT_OPTED_IN = "not_opted_in"
+    NO_TELEGRAM_CONNECTION = "no_telegram_connection"
+
+
 class PauseLength(StrEnum):
     """How long a User pauses their Check-ins for."""
 
@@ -88,6 +109,8 @@ class CheckInSettings:
         held_back_due_at: The Due Time a Held-back Check-in was first due
             at, kept while hold-backs move `next_due_at`, so the next Due
             Time keeps the rhythm; None when nothing is held back.
+        check_in_now: An Admin's Check in Now waiting for the next tick;
+            None once it is decided, or when none was asked for.
     """
 
     enabled: bool = False
@@ -99,6 +122,7 @@ class CheckInSettings:
     next_due_at: datetime | None = None
     held_back: HeldBack | None = None
     held_back_due_at: datetime | None = None
+    check_in_now: CheckInNowRequest | None = None
 
     @property
     def rhythm_due_at(self) -> datetime | None:
@@ -1665,6 +1689,8 @@ class CheckIn:
             none was sent or it was deleted since.
         curiosity_id: The Curiosity its message asks; None if it asks none
             or it was deleted since.
+        requested_by: The Admin who asked for it with Check in Now; None
+            for a scheduled one, or if they were deleted since.
     """
 
     id: UUID
@@ -1678,6 +1704,7 @@ class CheckIn:
     replied_at: datetime | None = None
     shared_photo_id: UUID | None = None
     curiosity_id: UUID | None = None
+    requested_by: UUID | None = None
 
     @property
     def was_sent(self) -> bool:
@@ -1709,11 +1736,14 @@ class CheckInLogEntry:
         check_in: The Check-in decision.
         user_name: The User's name, if known.
         user_email: The User's email address, if known.
+        requested_by_name: The name, or else the email, of the Admin who
+            asked for it with Check in Now; None for a scheduled one.
     """
 
     check_in: CheckIn
     user_name: str | None
     user_email: str | None
+    requested_by_name: str | None = None
 
 
 class Feature(StrEnum):

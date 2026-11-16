@@ -67,6 +67,7 @@ from companion.core.models import (
     CheckInKindDetails,
     CheckInKindOverview,
     CheckInLogEntry,
+    CheckInNowRequest,
     CheckInOutcome,
     CheckInSettings,
     ChosenKnowledgeDocument,
@@ -201,6 +202,14 @@ def _to_user(row: Row[Any]) -> User:
                 else None
             ),
             held_back_due_at=row.check_in_held_back_due_at,
+            check_in_now=(
+                CheckInNowRequest(
+                    requested_by=row.check_in_now_requested_by,
+                    requested_at=row.check_in_now_requested_at,
+                )
+                if row.check_in_now_requested_at is not None
+                else None
+            ),
         ),
         settings_changed_in_chat=_to_setting_stamps(row.settings_changed_in_chat),
         settings_changed_by_admin=_to_setting_stamps(row.settings_changed_by_admin),
@@ -636,6 +645,7 @@ class PostgresUserRepository:
             The saved User.
         """
         held_back = user.check_ins.held_back
+        check_in_now = user.check_ins.check_in_now
         statement = (
             update(users)
             .where(users.c.id == user.id)
@@ -662,6 +672,12 @@ class PostgresUserRepository:
                 ),
                 check_in_held_back_until=(
                     held_back.until if held_back is not None else None
+                ),
+                check_in_now_requested_by=(
+                    check_in_now.requested_by if check_in_now is not None else None
+                ),
+                check_in_now_requested_at=(
+                    check_in_now.requested_at if check_in_now is not None else None
                 ),
                 settings_changed_in_chat=_from_setting_stamps(
                     user.settings_changed_in_chat
@@ -3907,7 +3923,7 @@ class PostgresCheckInRepository:
         """List onboarded Users with Check-ins on whose next one is due.
 
         Users whose Check-ins are off on the Admin side, for everyone or for
-        them, are left out but stay due.
+        them, are left out but stay due, unless a Check in Now is waiting.
 
         Args:
             now: The time to check at.
@@ -3939,7 +3955,10 @@ class PostgresCheckInRepository:
                 users.c.check_ins_enabled.is_(True),
                 users.c.onboarding_completed_at.is_not(None),
                 users.c.check_in_next_due_at <= now,
-                admin_side_on.is_(True),
+                or_(
+                    admin_side_on.is_(True),
+                    users.c.check_in_now_requested_at.is_not(None),
+                ),
             )
         )
         with self._database.connect() as connection:
@@ -4039,6 +4058,34 @@ class PostgresCheckInRepository:
                 ],
             )
 
+    def request_check_ins_now(
+        self, user_ids: Sequence[UUID], requested_by: UUID, now: datetime
+    ) -> None:
+        """Save a Check in Now on many Users and make them due now, in one statement.
+
+        Making them due now ends any hold back, so why it was held back is
+        cleared.
+
+        Args:
+            user_ids: The Users' IDs.
+            requested_by: The Admin who asked.
+            now: When they asked.
+        """
+        if not user_ids:
+            return
+        with self._database.begin() as connection:
+            connection.execute(
+                update(users)
+                .where(users.c.id.in_(user_ids))
+                .values(
+                    check_in_now_requested_by=requested_by,
+                    check_in_now_requested_at=now,
+                    check_in_next_due_at=now,
+                    check_in_held_back_reason=None,
+                    check_in_held_back_until=None,
+                )
+            )
+
     def set_due_now_unless_due_later(self, user_id: UUID, now: datetime) -> None:
         """Make a User with Check-ins on due now, unless they are due later.
 
@@ -4064,23 +4111,45 @@ class PostgresCheckInRepository:
             )
 
     def add(
-        self, check_in: CheckIn, next_due_at: datetime, pause_until_resumed: bool
+        self,
+        check_in: CheckIn,
+        next_due_at: datetime,
+        pause_until_resumed: bool,
+        check_in_now: CheckInNowRequest | None = None,
     ) -> None:
         """Save a Check-in decision and the User's next due time, together.
 
         A decision ends any hold back, so why it was held back is cleared.
+        The Check in Now it was decided for is done, so it is cleared too;
+        one asked for since is kept.
 
         Args:
             check_in: The Check-in decision.
             next_due_at: When the User's next Check-in may be sent.
             pause_until_resumed: Whether to also pause the User's Check-ins
                 until they resume.
+            check_in_now: The Check in Now it was decided for; None for a
+                scheduled one.
         """
+        requested_at = check_in_now.requested_at if check_in_now is not None else None
+        is_done = users.c.check_in_now_requested_at.is_not_distinct_from(
+            bindparam(
+                "decided_request_at",
+                requested_at,
+                type_=users.c.check_in_now_requested_at.type,
+            )
+        )
         user_changes: dict[str, Any] = {
             "check_in_next_due_at": next_due_at,
             "check_in_held_back_reason": None,
             "check_in_held_back_until": None,
             "check_in_held_back_due_at": None,
+            "check_in_now_requested_by": case(
+                (is_done, None), else_=users.c.check_in_now_requested_by
+            ),
+            "check_in_now_requested_at": case(
+                (is_done, None), else_=users.c.check_in_now_requested_at
+            ),
         }
         if pause_until_resumed:
             user_changes |= {"check_ins_paused": True, "check_ins_paused_until": None}
@@ -4099,6 +4168,7 @@ class PostgresCheckInRepository:
         end_pause: bool,
         skipped: CheckIn | None,
         held_back_due_at: datetime | None,
+        check_in_now: CheckInNowRequest | None,
     ) -> None:
         """Take back a saved Check-in that was never sent, together.
 
@@ -4109,11 +4179,18 @@ class PostgresCheckInRepository:
             skipped: A Skipped Check-in to save in its place; None for none.
             held_back_due_at: The Due Time it was first due at; None for
                 none.
+            check_in_now: The Check in Now it was sent for, put back to wait
+                again; None for none.
         """
         user_changes: dict[str, Any] = {
             "check_in_next_due_at": next_due_at,
             "check_in_held_back_due_at": held_back_due_at,
         }
+        if check_in_now is not None:
+            user_changes |= {
+                "check_in_now_requested_by": check_in_now.requested_by,
+                "check_in_now_requested_at": check_in_now.requested_at,
+            }
         if end_pause:
             user_changes |= {"check_ins_paused": False, "check_ins_paused_until": None}
         with self._database.begin() as connection:
@@ -4226,15 +4303,22 @@ class PostgresCheckInRepository:
             since: Only decisions after this are listed.
 
         Returns:
-            The decisions with who each User is.
+            The decisions with who each User is and, for a Check in Now,
+            which Admin asked.
         """
+        requesters = users.alias("requesters")
         with self._database.connect() as connection:
             rows = connection.execute(
                 self._select_check_ins()
                 .add_columns(
-                    users.c.name.label("user_name"), users.c.email.label("user_email")
+                    users.c.name.label("user_name"),
+                    users.c.email.label("user_email"),
+                    func.coalesce(requesters.c.name, requesters.c.email).label(
+                        "requested_by_name"
+                    ),
                 )
                 .join(users, users.c.id == check_ins.c.user_id)
+                .outerjoin(requesters, requesters.c.id == check_ins.c.requested_by)
                 .where(check_ins.c.decided_at > since)
                 .order_by(check_ins.c.decided_at.desc())
             ).all()
@@ -4243,6 +4327,7 @@ class PostgresCheckInRepository:
                 check_in=self._to_check_in(row),
                 user_name=row.user_name,
                 user_email=row.user_email,
+                requested_by_name=row.requested_by_name,
             )
             for row in rows
         ]
@@ -4310,6 +4395,7 @@ class PostgresCheckInRepository:
                 replied_at=check_in.replied_at,
                 shared_photo_id=check_in.shared_photo_id,
                 curiosity_id=check_in.curiosity_id,
+                requested_by=check_in.requested_by,
             )
         )
 
@@ -4346,6 +4432,7 @@ class PostgresCheckInRepository:
             replied_at=row.replied_at,
             shared_photo_id=row.shared_photo_id,
             curiosity_id=row.curiosity_id,
+            requested_by=row.requested_by,
         )
 
     def delete_for_user(self, user_id: UUID) -> None:

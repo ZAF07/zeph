@@ -56,6 +56,10 @@ users = Table(
     Column("check_in_held_back_reason", Text),
     Column("check_in_held_back_until", DateTime(timezone=True)),
     Column("check_in_held_back_due_at", DateTime(timezone=True)),
+    Column(
+        "check_in_now_requested_by", Uuid, ForeignKey("users.id", ondelete="SET NULL")
+    ),
+    Column("check_in_now_requested_at", DateTime(timezone=True)),
     Column("settings_changed_in_chat", JSONB, nullable=False, server_default="{}"),
     Column("settings_changed_by_admin", JSONB, nullable=False, server_default="{}"),
     Column("data_deletion_requested_at", DateTime(timezone=True)),
@@ -525,6 +529,7 @@ check_ins = Table(
         "shared_photo_id", Uuid, ForeignKey("shared_photos.id", ondelete="SET NULL")
     ),
     Column("curiosity_id", Uuid, ForeignKey("curiosities.id", ondelete="SET NULL")),
+    Column("requested_by", Uuid, ForeignKey("users.id", ondelete="SET NULL")),
 )
 
 feature_switches = Table(

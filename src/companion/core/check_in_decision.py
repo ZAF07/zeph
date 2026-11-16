@@ -5,6 +5,7 @@ from datetime import UTC, datetime, time, timedelta
 from companion.core.models import (
     CheckInFrequency,
     CheckInKind,
+    CheckInNowRequest,
     CheckInSettings,
     Conversation,
     Feature,
@@ -122,12 +123,15 @@ class AskModel:
         telegram_chat_id: The User's Telegram chat.
         next_due_if_sent: Their next due time if this Check-in is sent.
         next_due_if_skipped: Their next due time if it is skipped.
+        check_in_now: The Admin's Check in Now it is for; None for a
+            scheduled one.
     """
 
     kinds: tuple[CheckInKind, ...]
     telegram_chat_id: int
     next_due_if_sent: datetime
     next_due_if_skipped: datetime
+    check_in_now: CheckInNowRequest | None = None
 
 
 CheckInPlan = HoldBack | SkipForDailyLimit | AskAboutFewer | AskModel
@@ -140,11 +144,9 @@ def decide_check_in(
 
     Checked in this order: Check-ins off, paused, Quiet Hours, no Telegram
     Connection, mid-Conversation, the Daily Message Limit, ignored too many,
-    and whether any Kind may be sent. Photo Kinds are offered only with
-    Shared Photos and Photo Viewing working. Kinds that ask a Curiosity are
-    offered only with a Curiosity due, Curiosities working and the weekly
-    limit not reached. The next Due Time counts from the one the Check-in
-    was first due at, before any hold-back moved it.
+    and whether any Kind may be sent. The next Due Time counts from the one
+    the Check-in was first due at, before any hold-back moved it. A waiting
+    Check in Now is decided by `decide_check_in_now` instead.
 
     Args:
         facts: What is known about the User.
@@ -157,6 +159,8 @@ def decide_check_in(
     """
     snapshot = facts.snapshot
     settings = snapshot.user.check_ins
+    if settings.check_in_now is not None:
+        return decide_check_in_now(facts, settings.check_in_now, rules, now)
     current_due_at = settings.next_due_at
     previous_due_at = settings.rhythm_due_at
     if not snapshot.works(Feature.CHECK_INS):
@@ -187,20 +191,7 @@ def decide_check_in(
     next_due_if_sent = next_due_after_decision(previous_due_at, now, gap, now)
     if facts.ignored_in_a_row >= rules.ignore_threshold:
         return AskAboutFewer(telegram_chat_id=chat_id, next_due_at=next_due_if_sent)
-    photos_may_be_sent = facts.has_shared_photos and snapshot.works(
-        Feature.PHOTO_VIEWING
-    )
-    curiosity_may_be_asked = (
-        facts.has_due_curiosity
-        and snapshot.works(Feature.CURIOSITIES)
-        and facts.curiosity_check_ins_this_week < rules.curiosity_check_ins_per_week
-    )
-    kinds = tuple(
-        kind
-        for kind in rules.kinds
-        if (photos_may_be_sent or not kind.sends_shared_photo)
-        and (curiosity_may_be_asked or not kind.raises_curiosity)
-    )
+    kinds = kinds_that_may_be_sent(facts, rules)
     if not kinds:
         return HoldBack(HoldBackReason.NO_KIND_TO_SEND, retry_at=current_due_at)
     return AskModel(
@@ -210,6 +201,85 @@ def decide_check_in(
         next_due_if_skipped=next_due_after_decision(
             previous_due_at, facts.last_sent_at, gap, now
         ),
+    )
+
+
+def decide_check_in_now(
+    facts: CheckInFacts,
+    check_in_now: CheckInNowRequest,
+    rules: CheckInRules,
+    now: datetime,
+) -> CheckInPlan:
+    """Decide what to do for a User an Admin asked a Check in Now for.
+
+    It goes past the Feature switch, the pause, Quiet Hours, the half-gap,
+    the Daily Message Limit and the Ignore Threshold, straight to the
+    Check-in model. Only no Telegram Connection, mid-Conversation and no
+    Kind to send hold it back, and the request keeps waiting. Sent or
+    skipped, the next Due Time is one frequency gap from now.
+
+    Args:
+        facts: What is known about the User.
+        check_in_now: The Admin's request.
+        rules: The Admin-set Check-in rules.
+        now: The current time.
+
+    Returns:
+        Hold back, or ask the Check-in model.
+    """
+    settings = facts.snapshot.user.check_ins
+    chat_id = facts.telegram_chat_id
+    if chat_id is None:
+        return HoldBack(HoldBackReason.NO_TELEGRAM_CONNECTION, retry_at=None)
+    conversation = facts.latest_conversation
+    if conversation is not None and is_open(conversation, now, rules.quiet_gap):
+        return HoldBack(
+            HoldBackReason.IN_CONVERSATION,
+            retry_at=conversation.last_message_at + rules.quiet_gap,
+        )
+    kinds = kinds_that_may_be_sent(facts, rules)
+    if not kinds:
+        return HoldBack(HoldBackReason.NO_KIND_TO_SEND, retry_at=settings.next_due_at)
+    next_due_at = now + rules.frequency_gaps[settings.frequency]
+    return AskModel(
+        kinds=kinds,
+        telegram_chat_id=chat_id,
+        next_due_if_sent=next_due_at,
+        next_due_if_skipped=next_due_at,
+        check_in_now=check_in_now,
+    )
+
+
+def kinds_that_may_be_sent(
+    facts: CheckInFacts, rules: CheckInRules
+) -> tuple[CheckInKind, ...]:
+    """List the Check-in Kinds that may be sent to a due User.
+
+    Photo Kinds are offered only with Shared Photos and Photo Viewing
+    working. Kinds that ask a Curiosity are offered only with a Curiosity
+    due, Curiosities working and the weekly limit not reached.
+
+    Args:
+        facts: What is known about the User.
+        rules: The Admin-set Check-in rules.
+
+    Returns:
+        The Kinds, in order.
+    """
+    snapshot = facts.snapshot
+    photos_may_be_sent = facts.has_shared_photos and snapshot.works(
+        Feature.PHOTO_VIEWING
+    )
+    curiosity_may_be_asked = (
+        facts.has_due_curiosity
+        and snapshot.works(Feature.CURIOSITIES)
+        and facts.curiosity_check_ins_this_week < rules.curiosity_check_ins_per_week
+    )
+    return tuple(
+        kind
+        for kind in rules.kinds
+        if (photos_may_be_sent or not kind.sends_shared_photo)
+        and (curiosity_may_be_asked or not kind.raises_curiosity)
     )
 
 

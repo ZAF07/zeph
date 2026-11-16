@@ -89,7 +89,7 @@ A break from Check-ins for a day, a week or until the User resumes, which keeps 
 _Avoid_: Snooze, mute
 
 **Check in Now**:
-An Admin's request that the chosen Users get a Check-in straight away instead of waiting for their Due Time. It goes ahead even if the User is paused, in Quiet Hours, too soon after the last one, or has the Check-ins Feature off for them; mid-Conversation it becomes a Woven-in Check-in. The Check-in model may still choose to skip. It is refused, with the reason shown to the Admin, for a User who hasn't opted in to Check-ins or has no Telegram Connection. Their next Due Time is one frequency gap after it.
+An Admin's request that the chosen Users get a Check-in straight away instead of waiting for their Due Time. It goes ahead even if the User is paused, in Quiet Hours, too soon after the last one, over today's Daily Message Limit, past the Ignore Threshold, or has the Check-ins Feature off for them; mid-Conversation it becomes a Woven-in Check-in. The Check-in model may still choose to skip. It is refused, with the reason shown to the Admin, for a User who hasn't opted in to Check-ins or has no Telegram Connection. Their next Due Time is one frequency gap after it.
 _Avoid_: Force check-in, trigger, push now
 
 **Check-in Frequency**:

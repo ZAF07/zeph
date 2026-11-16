@@ -1,14 +1,26 @@
 "use client";
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 
-import { compactSecondaryButton } from "@/components/button-styles";
+import { CheckInNowResults } from "@/components/CheckInNowResults";
+import {
+  compactSecondaryButton,
+  primaryButton,
+} from "@/components/button-styles";
 import { inputField } from "@/components/form-styles";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LockIcon } from "@/components/LockIcon";
 import { UserCheckInSettingsPanel } from "@/components/UserCheckInSettingsPanel";
-import type { CheckInScheduleEntry } from "@/lib/api-client";
+import type {
+  CheckInNowResultForUser,
+  CheckInScheduleEntry,
+} from "@/lib/api-client";
 import {
   dueTimeText,
   heldBackText,
@@ -48,11 +60,22 @@ function frequencyLabel(entry: CheckInScheduleEntry): string {
 }
 
 /**
+ * Says what the Schedule calls a User.
+ *
+ * @param entry - The User's row.
+ * @returns Their name, else their email, else "This User".
+ */
+function displayName(entry: CheckInScheduleEntry): string {
+  return entry.name ?? entry.email ?? "This User";
+}
+
+/**
  * The admin Check-in Schedule page: every User who opted in to Check-ins,
  * soonest Due Time first, with their settings, whether the Check-ins Feature
  * works for them and why a Check-in is held back right now. Never message
  * content. Searchable by name or email and paged; Edit opens a panel to
- * change that User's settings.
+ * change that User's settings. Selected Users can be sent a Check in Now,
+ * with each one's result shown.
  *
  * @returns The search, table and paging, or a loading, empty or error state.
  */
@@ -62,6 +85,25 @@ export function CheckInSchedule() {
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<CheckInScheduleEntry | null>(null);
   const closeEditing = useCallback(() => setEditing(null), []);
+  const [selected, setSelected] = useState<Record<string, string>>({});
+  const [checkInNowOutcome, setCheckInNowOutcome] = useState<{
+    results: CheckInNowResultForUser[];
+    names: Record<string, string>;
+  } | null>(null);
+  const queryClient = useQueryClient();
+  const checkInNow = useMutation({
+    mutationFn: (names: Record<string, string>) =>
+      apiClient.checkInNow(Object.keys(names)),
+    onSuccess: (results, names) => {
+      setCheckInNowOutcome({ results, names });
+      setSelected({});
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.allCheckInSchedule,
+      });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.allCheckInLog });
+    },
+  });
+  const selectedCount = Object.keys(selected).length;
 
   const filter = { search, page };
   const scheduleQuery = useQuery({
@@ -73,6 +115,33 @@ export function CheckInSchedule() {
   const pageCount = schedule
     ? Math.max(1, Math.ceil(schedule.total / schedule.page_size))
     : 1;
+  const pageEntries = schedule?.entries ?? [];
+  const wholePageSelected =
+    pageEntries.length > 0 &&
+    pageEntries.every((entry) => entry.user_id in selected);
+
+  const toggle = (entry: CheckInScheduleEntry) => {
+    setSelected((current) => {
+      const { [entry.user_id]: wasSelected, ...others } = current;
+      return wasSelected === undefined
+        ? { ...current, [entry.user_id]: displayName(entry) }
+        : others;
+    });
+  };
+
+  const toggleWholePage = () => {
+    setSelected((current) => {
+      const next = { ...current };
+      for (const entry of pageEntries) {
+        if (wholePageSelected) {
+          delete next[entry.user_id];
+        } else {
+          next[entry.user_id] = displayName(entry);
+        }
+      }
+      return next;
+    });
+  };
 
   return (
     <>
@@ -120,8 +189,40 @@ export function CheckInSchedule() {
         </div>
       ) : null}
 
+      {checkInNowOutcome ? (
+        <CheckInNowResults
+          results={checkInNowOutcome.results}
+          names={checkInNowOutcome.names}
+          onDismiss={() => setCheckInNowOutcome(null)}
+        />
+      ) : null}
+
+      {checkInNow.isError ? (
+        <p
+          role="alert"
+          className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3.5 text-sm text-danger-deep"
+        >
+          Couldn’t ask for a Check in Now. Nothing was requested; try again.
+        </p>
+      ) : null}
+
       {schedule && schedule.total > 0 ? (
         <>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className={primaryButton}
+              disabled={selectedCount === 0 || checkInNow.isPending}
+              onClick={() => checkInNow.mutate(selected)}
+            >
+              {checkInNow.isPending ? "Asking…" : "Check in now"}
+            </button>
+            <span className="text-caption text-ink-muted">
+              {selectedCount === 0
+                ? "Select Users to send each a Check-in on the next tick."
+                : `${selectedCount} selected · goes past pause, Quiet Hours and the Feature switch`}
+            </span>
+          </div>
           <div className="relative overflow-x-auto rounded-xl border border-line bg-white">
             <table className="w-full min-w-[980px] border-collapse text-sm">
               <caption className="border-b border-line px-4 py-2.5 text-left">
@@ -133,6 +234,18 @@ export function CheckInSchedule() {
               </caption>
               <thead>
                 <tr>
+                  <th
+                    scope="col"
+                    className="w-0 border-b border-line bg-subtle py-3.5 pl-[18px]"
+                  >
+                    <input
+                      type="checkbox"
+                      className="size-4"
+                      aria-label="Select everyone on this page"
+                      checked={wholePageSelected}
+                      onChange={toggleWholePage}
+                    />
+                  </th>
                   {headings.map((heading) => (
                     <th
                       key={heading}
@@ -156,6 +269,18 @@ export function CheckInSchedule() {
                       onClick={() => setEditing(entry)}
                       className="cursor-pointer border-b border-line last:border-b-0 hover:bg-hover"
                     >
+                      <td
+                        className="py-3.5 pl-[18px]"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          className="size-4"
+                          aria-label={`Select ${displayName(entry)}`}
+                          checked={entry.user_id in selected}
+                          onChange={() => toggle(entry)}
+                        />
+                      </td>
                       <td className={`${cell} min-w-[170px]`}>
                         <span className="flex flex-col">
                           <span className="font-medium">
@@ -169,7 +294,20 @@ export function CheckInSchedule() {
                         </span>
                       </td>
                       <td className={`${cell} whitespace-nowrap`}>
-                        {dueTimeText(entry.next_due_at, schedule.now, timeZone)}
+                        <span className="flex flex-col items-start gap-1">
+                          {dueTimeText(
+                            entry.next_due_at,
+                            schedule.now,
+                            timeZone,
+                          )}
+                          {entry.check_in_now_waiting ? (
+                            <span
+                              className={`${pill} bg-blue-tint text-blue-deep`}
+                            >
+                              Check in Now waiting
+                            </span>
+                          ) : null}
+                        </span>
                       </td>
                       <td className={`${cell} whitespace-nowrap`}>
                         {frequencyLabel(entry)}
