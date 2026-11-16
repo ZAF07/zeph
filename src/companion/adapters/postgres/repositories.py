@@ -200,6 +200,7 @@ def _to_user(row: Row[Any]) -> User:
                 if row.check_in_held_back_reason is not None
                 else None
             ),
+            held_back_due_at=row.check_in_held_back_due_at,
         ),
         settings_changed_in_chat=_to_setting_stamps(row.settings_changed_in_chat),
         settings_changed_by_admin=_to_setting_stamps(row.settings_changed_by_admin),
@@ -655,6 +656,7 @@ class PostgresUserRepository:
                 check_ins_paused=user.check_ins.paused,
                 check_ins_paused_until=user.check_ins.paused_until,
                 check_in_next_due_at=user.check_ins.next_due_at,
+                check_in_held_back_due_at=user.check_ins.held_back_due_at,
                 check_in_held_back_reason=(
                     held_back.reason.value if held_back is not None else None
                 ),
@@ -3984,7 +3986,8 @@ class PostgresCheckInRepository:
         """Save many Users' next due times, and why each is held back, in one statement.
 
         A User whose due time changed since it was read is left as it is, so
-        a settings change made meanwhile is kept.
+        a settings change made meanwhile is kept. The Due Time a User was
+        first held back at is kept, so their rhythm counts from it.
 
         Args:
             changes: Each User's due time as read, the one to save, and why
@@ -4006,6 +4009,10 @@ class PostgresCheckInRepository:
                 check_in_held_back_reason=bindparam("held_back_reason"),
                 check_in_held_back_until=bindparam(
                     "held_back_until", type_=users.c.check_in_held_back_until.type
+                ),
+                check_in_held_back_due_at=func.coalesce(
+                    users.c.check_in_held_back_due_at,
+                    bindparam("read_as", type_=due_type),
                 ),
             )
         )
@@ -4073,6 +4080,7 @@ class PostgresCheckInRepository:
             "check_in_next_due_at": next_due_at,
             "check_in_held_back_reason": None,
             "check_in_held_back_until": None,
+            "check_in_held_back_due_at": None,
         }
         if pause_until_resumed:
             user_changes |= {"check_ins_paused": True, "check_ins_paused_until": None}
@@ -4090,6 +4098,7 @@ class PostgresCheckInRepository:
         next_due_at: datetime,
         end_pause: bool,
         skipped: CheckIn | None,
+        held_back_due_at: datetime | None,
     ) -> None:
         """Take back a saved Check-in that was never sent, together.
 
@@ -4098,8 +4107,13 @@ class PostgresCheckInRepository:
             next_due_at: When the User's next Check-in may be sent.
             end_pause: Whether to end the pause that saving it started.
             skipped: A Skipped Check-in to save in its place; None for none.
+            held_back_due_at: The Due Time it was first due at; None for
+                none.
         """
-        user_changes: dict[str, Any] = {"check_in_next_due_at": next_due_at}
+        user_changes: dict[str, Any] = {
+            "check_in_next_due_at": next_due_at,
+            "check_in_held_back_due_at": held_back_due_at,
+        }
         if end_pause:
             user_changes |= {"check_ins_paused": False, "check_ins_paused_until": None}
         with self._database.begin() as connection:

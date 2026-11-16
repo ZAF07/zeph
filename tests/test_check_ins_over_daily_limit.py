@@ -25,7 +25,11 @@ from tests.test_check_in_sending import (
     send_check_ins,
     set_up_user_with_check_ins,
 )
-from tests.test_post_conversation import have_conversation, processing_answer
+from tests.test_post_conversation import (
+    have_conversation,
+    processing_answer,
+    quiet_gap,
+)
 from tests.test_usage_limits import set_message_limit, usage_rows
 
 LIMIT_SKIP_REASON = "User had used up today's Daily Message Limit"
@@ -50,7 +54,9 @@ def message_before_the_check_in(
     have_conversation(
         client, chat_model, clock, scheduler, seeded_settings, "hi", processing_answer()
     )
-    clock.advance(timedelta(minutes=59))
+    clock.advance(
+        timedelta(hours=2) - quiet_gap(seeded_settings) - timedelta(minutes=1)
+    )
 
 
 def test_a_user_who_used_up_the_limit_gets_one_limit_skip_and_stays_due(

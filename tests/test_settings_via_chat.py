@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 from typing import Any
 
@@ -212,6 +213,30 @@ def test_changing_frequency_and_quiet_hours_in_chat(
         "check_in_frequency",
         "quiet_hours",
     }
+
+
+def test_asking_for_check_ins_a_few_times_a_day_in_chat(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+
+    call = reply_call(
+        client,
+        chat_model,
+        "check in with me a few times a day",
+        ToolCall("change_check_in_frequency", {"frequency": "a_few_times_a_day"}),
+        "Sure, a few times a day it is.",
+    )
+
+    assert check_ins(client, headers)["frequency"] == "a_few_times_a_day"
+    assert "at most a few times a day" in call.tool_results[0]
+    [frequency_tool] = [
+        tool for tool in call.tools if tool.name == "change_check_in_frequency"
+    ]
+    assert "a_few_times_a_day" in json.dumps(frequency_tool.parameters)
 
 
 def test_unclear_quiet_hours_change_nothing(

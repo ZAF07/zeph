@@ -8,8 +8,10 @@ import { LoadFailed } from "@/components/LoadFailed";
 import {
   ApiError,
   type AdminSettings,
+  type CheckInFrequency,
   type SettingValue,
 } from "@/lib/api-client";
+import { checkInFrequencyOptions } from "@/lib/check-ins";
 import { lastSavedNote, textSetting } from "@/lib/settings";
 import {
   useAdminSettings,
@@ -29,6 +31,20 @@ type TextField = {
   label: string;
   caption: string;
 };
+
+const checkInGapsKey = "check_in_hours_between";
+
+/** One field per Check-in Frequency; together they save the Check-in gaps. */
+const checkInGapFields: (NumberField & { frequency: CheckInFrequency })[] =
+  checkInFrequencyOptions.map((option) => ({
+    key: `${checkInGapsKey}.${option.value}`,
+    frequency: option.value,
+    label: `Gap for “${option.label}”`,
+    caption: "Fewest hours between two Check-ins for a User who picked it.",
+    unit: "hours",
+  }));
+
+const checkInGapKeys = checkInGapFields.map((field) => field.key);
 
 /** The number settings on this page, grouped by section. */
 const numberSections: { heading: string; fields: NumberField[] }[] = [
@@ -151,6 +167,7 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
           "Unanswered Check-ins in a row before Zeph pauses and asks once about fewer.",
         unit: "in a row",
       },
+      ...checkInGapFields,
     ],
   },
   {
@@ -308,6 +325,24 @@ const settingRow =
   "flex flex-wrap items-center justify-between gap-x-5 gap-y-3 border-t border-line px-5 py-3.5";
 
 /**
+ * Reads one field's saved value as text; a Check-in gap field reads its
+ * frequency's hours.
+ *
+ * @param settings - The saved settings.
+ * @param key - The field's key.
+ * @returns The value as text, or "" if it is missing.
+ */
+function savedText(settings: AdminSettings, key: string): string {
+  const gapField = checkInGapFields.find((field) => field.key === key);
+  if (!gapField) {
+    return textSetting(settings, key);
+  }
+  const gaps = settings[checkInGapsKey]?.value;
+  const hours = typeof gaps === "object" ? gaps[gapField.frequency] : undefined;
+  return hours === undefined ? "" : String(hours);
+}
+
+/**
  * Builds the form's starting values from the saved settings.
  *
  * @param settings - The saved settings.
@@ -315,7 +350,7 @@ const settingRow =
  */
 function savedDrafts(settings: AdminSettings): Record<string, string> {
   return Object.fromEntries(
-    allKeys.map((key) => [key, textSetting(settings, key)]),
+    allKeys.map((key) => [key, savedText(settings, key)]),
   );
 }
 
@@ -331,8 +366,8 @@ function settingValue(key: string, value: string): SettingValue {
 }
 
 /**
- * The admin Platform settings page's form: timings, message retention, web
- * search and shared wording, saved together with one button.
+ * The admin Platform settings page's form: timings, Check-in gaps, message
+ * retention, web search and shared wording, saved together with one button.
  *
  * @returns The form, or a loading block or error with Try again.
  */
@@ -416,8 +451,18 @@ export function PlatformSettingsForm() {
 
   function saveChanges() {
     const changes: Record<string, SettingValue> = Object.fromEntries(
-      changedKeys.map((key) => [key, settingValue(key, values[key] ?? "")]),
+      changedKeys
+        .filter((key) => !checkInGapKeys.includes(key))
+        .map((key) => [key, settingValue(key, values[key] ?? "")]),
     );
+    if (changedKeys.some((key) => checkInGapKeys.includes(key))) {
+      changes[checkInGapsKey] = Object.fromEntries(
+        checkInGapFields.map((field) => [
+          field.frequency,
+          Number(values[field.key] ?? ""),
+        ]),
+      );
+    }
     saveSettings.mutate(changes, { onSuccess: () => setDrafts(null) });
   }
 
@@ -484,7 +529,7 @@ export function PlatformSettingsForm() {
 
       <div className="sticky bottom-4 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-white px-4 py-3 shadow-[0_12px_24px_-16px_rgba(0,0,0,0.35)]">
         <span className="text-caption text-ink-muted">
-          {lastSavedNote(settings, allKeys)}
+          {lastSavedNote(settings, [...allKeys, checkInGapsKey])}
           {saveSettings.isSuccess ? (
             <span role="status" className="ml-2 text-blue-deep">
               Saved

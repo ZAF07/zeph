@@ -38,6 +38,7 @@ FREQUENCY_WORDS = {
     CheckInFrequency.WEEKLY: "at most once a week",
     CheckInFrequency.FEW_TIMES_A_WEEK: "at most a few times a week",
     CheckInFrequency.MOST_DAYS: "at most most days",
+    CheckInFrequency.A_FEW_TIMES_A_DAY: "at most a few times a day",
 }
 NO_ARGUMENTS: dict[str, Any] = {"type": "object", "properties": {}}
 PAUSE_PARAMETERS: dict[str, Any] = {
@@ -57,7 +58,9 @@ FREQUENCY_PARAMETERS: dict[str, Any] = {
         "frequency": {
             "type": "string",
             "enum": [frequency.value for frequency in CheckInFrequency],
-            "description": "Once a week, a few times a week, or most days.",
+            "description": (
+                "Once a week, a few times a week, most days, or a few times a day."
+            ),
         }
     },
     "required": ["frequency"],
@@ -333,7 +336,8 @@ class ReplySettingsTools:
             frequency = CheckInFrequency(str(arguments.get("frequency")))
         except ValueError:
             return (
-                "The frequency must be weekly, few_times_a_week or most_days. "
+                "The frequency must be weekly, few_times_a_week, most_days or "
+                "a_few_times_a_day. "
                 f"{NOTHING_CHANGED}"
             )
         self._check_ins.change_settings(

@@ -88,6 +88,20 @@ def test_user_can_change_frequency_and_quiet_hours_or_turn_check_ins_off(
     assert client.get("/api/check-ins", headers=headers).json() == turned_off
 
 
+def test_user_can_pick_a_few_times_a_day(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = auth_headers(auth_verifier, "user_maya")
+    onboard_with_check_ins(client, headers)
+
+    changed = client.patch(
+        "/api/check-ins", json={"frequency": "a_few_times_a_day"}, headers=headers
+    )
+
+    assert changed.status_code == 200
+    assert changed.json()["frequency"] == "a_few_times_a_day"
+
+
 def test_check_ins_never_show_a_next_check_in_time(
     client: TestClient, auth_verifier: FakeAuthVerifier
 ) -> None:

@@ -17,6 +17,7 @@ from companion.core.check_in_decision import (
     decide_check_in,
     next_due_after_change,
     next_due_after_check_in,
+    next_due_after_decision,
     next_due_after_quiet_hours_move,
 )
 from companion.core.features import feature_statuses, switches_for_everyone
@@ -59,6 +60,7 @@ GAPS = {
     CheckInFrequency.MOST_DAYS: timedelta(hours=24),
 }
 QUIET_GAP = timedelta(minutes=30)
+ONE_DAY = timedelta(hours=24)
 RULES = CheckInRules(
     frequency_gaps=GAPS,
     quiet_gap=QUIET_GAP,
@@ -66,7 +68,7 @@ RULES = CheckInRules(
     curiosity_check_ins_per_week=1,
     kinds=(HELLO, PHOTO_LOOK_BACK, WONDERING),
 )
-NEXT_GAP = NOW + timedelta(hours=24)
+NEXT_DUE = WAS_DUE_AT + timedelta(hours=24)
 
 
 def facts(
@@ -131,6 +133,7 @@ def facts(
         "has_shared_photos": False,
         "has_due_curiosity": False,
         "curiosity_check_ins_this_week": 0,
+        "last_sent_at": None,
     }
     return CheckInFacts(snapshot=snapshot, **(defaults | changes))
 
@@ -168,7 +171,12 @@ def at_singapore_time(hour: int, minute: int = 0, days: int = 0) -> datetime:
     return datetime(2026, 11, 14 + days, hour, minute, tzinfo=UTC) - timedelta(hours=8)
 
 
-ASK_MODEL = AskModel(kinds=(HELLO,), telegram_chat_id=CHAT_ID, next_due_at=NEXT_GAP)
+ASK_MODEL = AskModel(
+    kinds=(HELLO,),
+    telegram_chat_id=CHAT_ID,
+    next_due_if_sent=NEXT_DUE,
+    next_due_if_skipped=NEXT_DUE,
+)
 
 
 @pytest.mark.parametrize(
@@ -235,13 +243,13 @@ ASK_MODEL = AskModel(kinds=(HELLO,), telegram_chat_id=CHAT_ID, next_due_at=NEXT_
         pytest.param(
             facts(now=at_singapore_time(21, 59)),
             at_singapore_time(21, 59),
-            replace(ASK_MODEL, next_due_at=at_singapore_time(21, 59, 1)),
+            ASK_MODEL,
             id="a minute before Quiet Hours",
         ),
         pytest.param(
             facts(now=at_singapore_time(7, 30)),
             at_singapore_time(7, 30),
-            replace(ASK_MODEL, next_due_at=at_singapore_time(7, 30, 1)),
+            ASK_MODEL,
             id="Quiet Hours end",
         ),
         pytest.param(
@@ -301,8 +309,17 @@ ASK_MODEL = AskModel(kinds=(HELLO,), telegram_chat_id=CHAT_ID, next_due_at=NEXT_
         pytest.param(
             facts(used_up_daily_message_limit=True),
             NOW,
-            SkipForDailyLimit(),
+            SkipForDailyLimit(stays_due_at=WAS_DUE_AT),
             id="daily limit used up",
+        ),
+        pytest.param(
+            facts(
+                used_up_daily_message_limit=True,
+                check_ins={"held_back_due_at": WAS_DUE_AT - timedelta(hours=2)},
+            ),
+            NOW,
+            SkipForDailyLimit(stays_due_at=WAS_DUE_AT - timedelta(hours=2)),
+            id="daily limit used up after a hold-back: stays due at the first Due Time",
         ),
         pytest.param(
             facts(used_up_daily_message_limit=True, limit_skip_today=True),
@@ -313,13 +330,13 @@ ASK_MODEL = AskModel(kinds=(HELLO,), telegram_chat_id=CHAT_ID, next_due_at=NEXT_
         pytest.param(
             facts(used_up_daily_message_limit=True, ignored_in_a_row=3),
             NOW,
-            SkipForDailyLimit(),
+            SkipForDailyLimit(stays_due_at=WAS_DUE_AT),
             id="the daily limit comes before asking about fewer",
         ),
         pytest.param(
             facts(ignored_in_a_row=3),
             NOW,
-            AskAboutFewer(telegram_chat_id=CHAT_ID, next_due_at=NEXT_GAP),
+            AskAboutFewer(telegram_chat_id=CHAT_ID, next_due_at=NEXT_DUE),
             id="ignored the threshold in a row",
         ),
         pytest.param(facts(ignored_in_a_row=2), NOW, ASK_MODEL, id="ignored one fewer"),
@@ -368,8 +385,45 @@ ASK_MODEL = AskModel(kinds=(HELLO,), telegram_chat_id=CHAT_ID, next_due_at=NEXT_
         pytest.param(
             facts(check_ins={"frequency": CheckInFrequency.WEEKLY}),
             NOW,
-            replace(ASK_MODEL, next_due_at=NOW + timedelta(hours=168)),
-            id="next due one frequency gap later",
+            replace(
+                ASK_MODEL,
+                next_due_if_sent=WAS_DUE_AT + timedelta(hours=168),
+                next_due_if_skipped=WAS_DUE_AT + timedelta(hours=168),
+            ),
+            id="next due one frequency gap after the Due Time",
+        ),
+        pytest.param(
+            facts(
+                now=at_singapore_time(7, 30, 1),
+                check_ins={
+                    "next_due_at": at_singapore_time(7, 30, 1),
+                    "held_back_due_at": at_singapore_time(23),
+                },
+            ),
+            at_singapore_time(7, 30, 1),
+            replace(
+                ASK_MODEL,
+                next_due_if_sent=at_singapore_time(23, 0, 1),
+                next_due_if_skipped=at_singapore_time(23, 0, 1),
+            ),
+            id="held back by Quiet Hours across midnight: the rhythm stays",
+        ),
+        pytest.param(
+            facts(
+                now=at_singapore_time(7, 30, 1),
+                check_ins={
+                    "next_due_at": at_singapore_time(7, 30, 1),
+                    "held_back_due_at": at_singapore_time(10),
+                },
+                last_sent_at=at_singapore_time(10, 0, -1),
+            ),
+            at_singapore_time(7, 30, 1),
+            replace(
+                ASK_MODEL,
+                next_due_if_sent=at_singapore_time(19, 30, 1),
+                next_due_if_skipped=at_singapore_time(10, 0, 1),
+            ),
+            id="held back close to the next Due Time: a send pushes it half a gap",
         ),
     ],
 )
@@ -384,6 +438,53 @@ def test_with_no_kind_that_may_be_sent_the_user_stays_due() -> None:
 
     assert decide_check_in(facts(), only_photo_kinds, NOW) == HoldBack(
         HoldBackReason.NO_KIND_TO_SEND, retry_at=WAS_DUE_AT
+    )
+
+
+@pytest.mark.parametrize(
+    ("previous_due_at", "last_sent_at", "expected"),
+    [
+        pytest.param(None, None, NOW + ONE_DAY, id="no previous Due Time"),
+        pytest.param(
+            NOW - timedelta(minutes=5),
+            None,
+            NOW - timedelta(minutes=5) + ONE_DAY,
+            id="one gap after the previous Due Time",
+        ),
+        pytest.param(
+            NOW - timedelta(days=3, hours=1),
+            None,
+            NOW + timedelta(hours=23),
+            id="several missed Due Times are not made up",
+        ),
+        pytest.param(
+            NOW - ONE_DAY, None, NOW + ONE_DAY, id="a Due Time of now is not to come"
+        ),
+        pytest.param(
+            NOW - timedelta(hours=20),
+            NOW,
+            NOW + timedelta(hours=12),
+            id="within half a gap of the last sent: moved to the end of it",
+        ),
+        pytest.param(
+            NOW - timedelta(hours=20),
+            NOW - timedelta(hours=20),
+            NOW + timedelta(hours=4),
+            id="more than half a gap after the last sent: kept",
+        ),
+        pytest.param(
+            None,
+            NOW,
+            NOW + ONE_DAY,
+            id="no previous Due Time, sent now",
+        ),
+    ],
+)
+def test_next_due_after_decision(
+    previous_due_at: datetime | None, last_sent_at: datetime | None, expected: datetime
+) -> None:
+    assert (
+        next_due_after_decision(previous_due_at, last_sent_at, ONE_DAY, NOW) == expected
     )
 
 

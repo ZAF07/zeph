@@ -155,6 +155,29 @@ def read_check_in_gaps(value: Any) -> dict[CheckInFrequency, timedelta]:
     }
 
 
+def is_hours_by_frequency(value: Any, minimum: int, maximum: int) -> bool:
+    """Tell whether a value gives every frequency, and only those, its hours.
+
+    Args:
+        value: The value to check, e.g. {"weekly": 168, ...}.
+        minimum: The fewest hours allowed.
+        maximum: The most hours allowed.
+
+    Returns:
+        True if each frequency has a whole number of hours in the range.
+    """
+    if not isinstance(value, dict):
+        return False
+    if set(value) != {frequency.value for frequency in CheckInFrequency}:
+        return False
+    return all(
+        isinstance(hours, int)
+        and not isinstance(hours, bool)
+        and minimum <= hours <= maximum
+        for hours in value.values()
+    )
+
+
 CONNECTION_TOKEN_TTL = Setting("connection_token_ttl_minutes", read_minutes)
 WELCOME_MESSAGE = Setting("welcome_message", read_text)
 CONNECTION_TOKEN_INVALID_REPLY = Setting("connection_token_invalid_reply", read_text)
@@ -338,6 +361,7 @@ class SettingKind(StrEnum):
     WHOLE_NUMBER = "whole_number"
     MODEL = "model"
     ON_OFF = "on_off"
+    HOURS_BY_FREQUENCY = "hours_by_frequency"
 
 
 @dataclass(frozen=True)
@@ -361,8 +385,10 @@ class EditableSetting:
         key: The setting's key.
         label: The setting's name, as Admins see it.
         kind: What kind of value it holds.
-        minimum: The smallest allowed whole number.
-        maximum: The largest allowed whole number.
+        minimum: The smallest allowed whole number, or number of hours for
+            each frequency.
+        maximum: The largest allowed whole number, or number of hours for
+            each frequency.
         max_length: The longest allowed text.
         required_placeholders: The placeholders the text must keep.
         hint: One line on when the setting is used, shown under its label;
@@ -735,6 +761,13 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     EditableSetting(CHECK_IN_PROMPT.key, "Check-in prompt", SettingKind.TEXT),
     EditableSetting(CHECK_IN_MODEL.key, "Check-in model", SettingKind.MODEL),
     EditableSetting(CHECK_IN_THINKING.key, "Check-in thinking", SettingKind.ON_OFF),
+    EditableSetting(
+        CHECK_IN_GAPS.key,
+        "Check-in gaps",
+        SettingKind.HOURS_BY_FREQUENCY,
+        minimum=1,
+        maximum=720,
+    ),
     EditableSetting(
         CHECK_IN_IGNORE_THRESHOLD.key,
         "Ignore threshold",
@@ -1243,6 +1276,13 @@ class PlatformSettingsService:
         if setting.kind == SettingKind.ON_OFF:
             if not isinstance(value, bool):
                 raise InvalidSettingError(f"The {setting.label} must be on or off.")
+            return value
+        if setting.kind == SettingKind.HOURS_BY_FREQUENCY:
+            if not is_hours_by_frequency(value, setting.minimum, setting.maximum):
+                raise InvalidSettingError(
+                    f"The {setting.label} must give each frequency a whole "
+                    f"number of hours from {setting.minimum} to {setting.maximum}."
+                )
             return value
         if value not in self.model_choices():
             raise InvalidSettingError(

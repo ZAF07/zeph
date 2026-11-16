@@ -2104,7 +2104,8 @@ class CheckInRepository(Protocol):
         """Save many Users' next due times, and why each is held back, in one statement.
 
         A User whose due time changed since it was read is left as it is, so
-        a settings change made meanwhile is kept.
+        a settings change made meanwhile is kept. The Due Time a User was
+        first held back at is kept, so their rhythm counts from it.
 
         Args:
             changes: Each User's due time as read, the one to save, and why
@@ -2129,7 +2130,8 @@ class CheckInRepository(Protocol):
     ) -> None:
         """Save a Check-in decision and the User's next due time, together.
 
-        A decision ends any hold back, so why it was held back is cleared.
+        A decision ends any hold back, so why it was held back and the Due
+        Time they were first held back at are cleared.
 
         Only the next due time and, when asked, the pause are changed, so
         settings the User changed meanwhile are kept.
@@ -2148,17 +2150,21 @@ class CheckInRepository(Protocol):
         next_due_at: datetime,
         end_pause: bool,
         skipped: CheckIn | None,
+        held_back_due_at: datetime | None,
     ) -> None:
         """Take back a saved Check-in that was never sent, together.
 
-        Only the next due time and, when asked, the pause are changed, so
-        settings the User changed meanwhile are kept.
+        Only the next due time, the Due Time they were first held back at
+        and, when asked, the pause are changed, so settings the User changed
+        meanwhile are kept.
 
         Args:
             check_in: The saved Check-in to remove.
             next_due_at: When the User's next Check-in may be sent.
             end_pause: Whether to end the pause that saving it started.
             skipped: A Skipped Check-in to save in its place; None for none.
+            held_back_due_at: The Due Time it was first due at, so the next
+                one keeps the rhythm; None for none.
         """
         ...
 

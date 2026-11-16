@@ -11,6 +11,9 @@ from companion.adapters.postgres.database import MIGRATIONS_DIR, migrate
 def add_user_with_no_due_time(engine: Engine, check_ins_enabled: bool) -> UUID:
     """Add a User with Check-ins on or off and no next due time.
 
+    Written in SQL, since the database is at an older revision than the
+    repositories.
+
     Args:
         engine: The test database.
         check_ins_enabled: Whether their Check-ins are on.

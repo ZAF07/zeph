@@ -1,11 +1,15 @@
 import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from uuid import UUID
 
 import pytest
 import yaml
 from fastapi.testclient import TestClient
+from sqlalchemy import Engine
 
+from companion.adapters.postgres.repositories import build_postgres_repositories
+from companion.core.models import UserPortrait
 from tests.conftest import CHECK_IN_KINDS_SEED_FILE
 from tests.fakes import (
     FakeAuthVerifier,
@@ -497,6 +501,33 @@ def test_the_check_in_model_chooses_the_kind_from_recent_summaries_and_memory_it
     assert "Nervous about a job interview on Friday." in line.text
     assert "Wants a new job" in line.text
     assert recent_check_ins(client, headers)[0]["kind"] == "A follow-up"
+
+
+def test_the_check_in_model_is_given_the_user_portrait(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    engine: Engine,
+) -> None:
+    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    user_id = UUID(client.get("/api/me", headers=headers).json()["id"])
+    build_postgres_repositories(engine).user_portraits.save(
+        UserPortrait(
+            user_id=user_id,
+            text="Maya is a nurse who unwinds by baking on weekends.",
+            written_at=clock.now(),
+        )
+    )
+    chat_model.script(send_answer("baked anything lately?"))
+
+    clock.advance(ONE_DAY)
+    scheduler.tick()
+
+    [line] = chat_model.calls[-1].history
+    assert "Maya is a nurse who unwinds by baking on weekends." in line.text
 
 
 def test_a_skip_is_recorded_and_the_next_attempt_moves_to_the_following_slot(
