@@ -1,8 +1,10 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi.testclient import TestClient
+from sqlalchemy import Engine, text
 
+from companion.core.ports import MessageRefusedError
 from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
@@ -204,3 +206,62 @@ def test_a_check_in_never_comes_within_half_a_gap_of_the_last_sent_one(
     scheduler.tick()
 
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["morning!", "evening!"]
+
+
+def test_a_refused_check_in_tried_again_later_keeps_the_rhythm(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+) -> None:
+    set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    chat_channel.text_send_failures = [MessageRefusedError("Too Many Requests")]
+    chat_model.script(
+        send_answer("hey!"), send_answer("hey, how's it going?"), send_answer("hi")
+    )
+    clock.advance(ONE_DAY)
+    scheduler.tick()
+    clock.advance(timedelta(minutes=15))
+    scheduler.tick()
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["hey, how's it going?"]
+
+    clock.advance(ONE_DAY - timedelta(minutes=15))
+    scheduler.tick()
+
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
+        "hey, how's it going?",
+        "hi",
+    ]
+
+
+def test_changing_the_frequency_while_held_back_starts_a_new_rhythm(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    engine: Engine,
+) -> None:
+    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    change_check_ins(
+        client, headers, {"quiet_hours_start": "16:00", "quiet_hours_end": "18:00"}
+    )
+    clock.advance(ONE_DAY)
+    scheduler.tick()
+    assert held_back_due_at(engine) is not None
+
+    clock.advance(timedelta(minutes=30))
+    change_check_ins(client, headers, {"frequency": "weekly"})
+
+    assert held_back_due_at(engine) is None
+
+
+def held_back_due_at(engine: Engine) -> datetime | None:
+    """Read the only User's held-back Due Time straight from the database."""
+    with engine.connect() as connection:
+        due: datetime | None = connection.execute(
+            text("SELECT check_in_held_back_due_at FROM users")
+        ).scalar_one()
+    return due

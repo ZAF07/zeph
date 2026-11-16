@@ -100,6 +100,16 @@ class CheckInSettings:
     held_back: HeldBack | None = None
     held_back_due_at: datetime | None = None
 
+    @property
+    def rhythm_due_at(self) -> datetime | None:
+        """Give the Due Time the next one counts from, keeping the rhythm.
+
+        Returns:
+            The Due Time a Held-back Check-in was first due at, otherwise
+            the next due time; None for none.
+        """
+        return self.held_back_due_at or self.next_due_at
+
     def is_paused_at(self, now: datetime) -> bool:
         """Tell whether Check-ins are paused at a given time.
 

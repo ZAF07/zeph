@@ -158,7 +158,7 @@ def decide_check_in(
     snapshot = facts.snapshot
     settings = snapshot.user.check_ins
     current_due_at = settings.next_due_at
-    previous_due_at = settings.held_back_due_at or current_due_at
+    previous_due_at = settings.rhythm_due_at
     if not snapshot.works(Feature.CHECK_INS):
         return HoldBack(HoldBackReason.CHECK_INS_OFF, retry_at=current_due_at)
     if settings.is_paused_at(now):

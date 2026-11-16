@@ -899,7 +899,8 @@ class CheckInService:
         """Gather what is needed to decide on every due User's Check-in.
 
         Each kind of fact is read for all Users in one query, so the number
-        of queries stays the same however many Users are due.
+        of queries stays the same however many Users are due. At least one
+        sent Check-in is read per User, for when they were last sent one.
 
         Args:
             snapshots: The due Users, as read for this tick.
@@ -918,8 +919,9 @@ class CheckInService:
         newest = repositories.check_ins.list_recent_for_users(
             user_ids, 1, sent_only=False
         )
+        sent_check_ins_to_read = max(rules.ignore_threshold, 1)
         newest_sent = repositories.check_ins.list_recent_for_users(
-            user_ids, max(rules.ignore_threshold, 1), sent_only=True
+            user_ids, sent_check_ins_to_read, sent_only=True
         )
         with_shared_photos = repositories.user_memory.list_users_with_shared_photos(
             user_ids
@@ -1102,7 +1104,7 @@ class CheckInService:
         the Check-in is taken back and tried again after the retry gap, still
         counting the next Due Time from the one it was first due at. If
         the User blocked the Companion, a Skipped Check-in takes its place and
-        the next attempt is one frequency gap later, with no pause. Any other
+        the next attempt is at the next Due Time, with no pause. Any other
         failure, such as a timeout, may still have delivered it, so it counts
         as sent. If taking it back fails, that Check-in is missed.
 
@@ -1140,13 +1142,12 @@ class CheckInService:
         except MessageRefusedError as error:
             logger.warning("The chat channel refused a Check-in: %s", error)
             retry_at = retry_after_refusal(check_in.decided_at)
-            settings = user.check_ins
             self._repositories.check_ins.undo_add(
                 check_in,
                 retry_at,
                 pause_until_resumed,
                 skipped=None,
-                held_back_due_at=settings.held_back_due_at or settings.next_due_at,
+                held_back_due_at=user.check_ins.rhythm_due_at,
             )
             return False
         except Exception:

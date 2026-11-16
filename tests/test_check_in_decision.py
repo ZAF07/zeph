@@ -313,6 +313,15 @@ ASK_MODEL = AskModel(
             id="daily limit used up",
         ),
         pytest.param(
+            facts(
+                used_up_daily_message_limit=True,
+                check_ins={"held_back_due_at": WAS_DUE_AT - timedelta(hours=2)},
+            ),
+            NOW,
+            SkipForDailyLimit(stays_due_at=WAS_DUE_AT - timedelta(hours=2)),
+            id="daily limit used up after a hold-back: stays due at the first Due Time",
+        ),
+        pytest.param(
             facts(used_up_daily_message_limit=True, limit_skip_today=True),
             NOW,
             HoldBack(HoldBackReason.LIMIT_SKIP_DONE_TODAY, retry_at=WAS_DUE_AT),
