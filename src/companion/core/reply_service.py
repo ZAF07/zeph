@@ -1,3 +1,5 @@
+from concurrent.futures import ThreadPoolExecutor
+
 from companion.core.conversations import ConversationService
 from companion.core.curiosities import CuriosityRaiser
 from companion.core.knowledge_retrieval import KnowledgeRetrieval
@@ -7,6 +9,10 @@ from companion.core.models import MessageToAnswer, UserSnapshot
 from companion.core.reply_gate import ReplyGate, Stopped
 from companion.core.response_composition import ResponseComposer
 from companion.core.understanding import UnderstandingService, may_send_photo
+from companion.core.woven_check_ins import (
+    WovenCheckIns,
+    format_woven_check_in_for_reply,
+)
 
 
 class ReplyService:
@@ -19,8 +25,9 @@ class ReplyService:
     the User needs, which User Memory matters, which Threads and Curiosities
     to bring up and which Knowledge documents fit, then that memory, any
     older Conversations it asked to look up and passages from the Knowledge
-    documents it chose are recalled, then the reply is composed and
-    delivered, and the Threads and Curiosities it brought up are marked
+    documents it chose are recalled, while the Check-in model decides
+    whether to weave in a Check-in that is due, then the reply is composed
+    and delivered, and the Threads and Curiosities it brought up are marked
     raised. A struggling User is offered none of their Shared Photos back
     unless they asked for one. Every step reads the User from the same snapshot.
     """
@@ -35,6 +42,7 @@ class ReplyService:
         memory_retrieval: MemoryRetrieval,
         knowledge_retrieval: KnowledgeRetrieval,
         response_composer: ResponseComposer,
+        woven_check_ins: WovenCheckIns,
     ) -> None:
         """Set up the service.
 
@@ -51,6 +59,7 @@ class ReplyService:
             knowledge_retrieval: Finds passages in the Knowledge documents the
                 Understanding chose.
             response_composer: Writes the Companion's reply.
+            woven_check_ins: Lets the reply weave in a Check-in that is due.
         """
         self._reply_gate = reply_gate
         self._conversations = conversations
@@ -60,12 +69,14 @@ class ReplyService:
         self._memory_retrieval = memory_retrieval
         self._knowledge_retrieval = knowledge_retrieval
         self._response_composer = response_composer
+        self._woven_check_ins = woven_check_ins
 
     def handle(self, message: MessageToAnswer, snapshot: UserSnapshot) -> None:
         """Answer one screened Message: apply the house rules, then reply if needed.
 
         When the ReplyGate stops the reply nothing is composed. A failing
-        step raises, so the caller can send its fallback message.
+        step raises, so the caller can send its fallback message. A Check-in
+        woven into a reply that fails is taken back, so it stays due.
 
         Args:
             message: The Message to answer, its texts already saved and
@@ -82,27 +93,50 @@ class ReplyService:
             snapshot, message.conversation_id, saved_memory, reminded, due
         )
         form = understood.understanding.form
-        memory = self._memory_retrieval.recall(
-            snapshot, saved_memory, form.memory_categories, form.look_up_past
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            deciding = executor.submit(
+                self._woven_check_ins.decide,
+                snapshot,
+                message.conversation_id,
+                form,
+                saved_memory,
+                reminded,
+            )
+            memory = self._memory_retrieval.recall(
+                snapshot, saved_memory, form.memory_categories, form.look_up_past
+            )
+            knowledge = self._knowledge_retrieval.recall(snapshot, form.knowledge)
+            woven = deciding.result()
+        woven_check_in = (
+            self._woven_check_ins.save(snapshot, woven) if woven is not None else None
         )
-        knowledge = self._knowledge_retrieval.recall(snapshot, form.knowledge)
-        reply = self._response_composer.compose(
-            message.conversation_id,
-            snapshot,
-            memory.text,
-            knowledge,
-            reply_guidance=understood.reply_guidance,
-            data_deletion_note=gate_result.data_deletion_note,
-            shared_photo_ids=memory.shared_photo_ids if may_send_photo(form) else (),
-        )
-        self._conversations.deliver_reply(
-            message.user_id,
-            message.conversation_id,
-            message.chat_id,
-            reply.parts,
-            snapshot.settings,
-            reply.sticker.id if reply.sticker else None,
-            reply.shared_photo.id if reply.shared_photo else None,
-        )
+        reply_guidance = understood.reply_guidance
+        if woven is not None and woven_check_in is not None:
+            reply_guidance += f"\n\n{format_woven_check_in_for_reply(woven)}"
+        try:
+            reply = self._response_composer.compose(
+                message.conversation_id,
+                snapshot,
+                memory.text,
+                knowledge,
+                reply_guidance=reply_guidance,
+                data_deletion_note=gate_result.data_deletion_note,
+                shared_photo_ids=(
+                    memory.shared_photo_ids if may_send_photo(form) else ()
+                ),
+            )
+            self._conversations.deliver_reply(
+                message.user_id,
+                message.conversation_id,
+                message.chat_id,
+                reply.parts,
+                snapshot.settings,
+                reply.sticker.id if reply.sticker else None,
+                reply.shared_photo.id if reply.shared_photo else None,
+            )
+        except Exception:
+            if woven is not None and woven_check_in is not None:
+                self._woven_check_ins.take_back(snapshot, woven, woven_check_in)
+            raise
         self._thread_reminder.mark_raised(message.conversation_id, form.bring_up)
         self._curiosity_raiser.mark_raised(message.conversation_id, form.curiosities)

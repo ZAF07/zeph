@@ -465,7 +465,7 @@ def test_tick_reads_stay_the_same_as_due_and_requested_users_grow(
             text(
                 "SELECT count(*) FROM users WHERE check_in_now_requested_at "
                 "IS NOT NULL AND check_in_held_back_reason IN "
-                "('in_conversation', 'no_telegram_connection')"
+                "('waiting_to_be_woven_in', 'no_telegram_connection')"
             )
         ).scalar()
     assert held_back_requests == 5 + 15

@@ -36,8 +36,9 @@ There are six:
   some earlier messages, then sends Messages. Each Message's saved
   Understanding is checked: the Need picked, whether a Life Thread was found
   (reminded) and brought up or left alone, whether a Curiosity was raised,
-  whether the reply was told to gently ask why, and whether Knowledge was
-  chosen. The judge checks the reply where the case asks (a rant gets no
+  whether the reply was told to gently ask why, whether Knowledge was
+  chosen and, in cases with a Check-in due, whether it was woven into the
+  reply or left for later. The judge checks the reply where the case asks (a rant gets no
   fixing, an old story is raised naturally, a gentle probe). It also checks
   every model call kept its full content in the Model Call Log, and reports
   the time and tokens of each Understanding call.
@@ -55,8 +56,9 @@ Settings into it, seeds it and builds the whole app on it. Messages go
 through the real Telegram webhook and reply path, with the real DeepSeek
 model (for replies and for looking at photos) and the real fastembed
 embedder. The chat channel only records what Zeph sends and serves the test
-images, web search finds nothing and no Check-ins run, always, whatever the
-adapter settings say, so an Eval never reaches a real chat or spends Tavily
+images, web search finds nothing and no scheduled Check-ins run (a case can
+still make one due for a reply to weave in), always, whatever the adapter
+settings say, so an Eval never reaches a real chat or spends Tavily
 credits. The Model Call Log in the Eval database keeps full content.
 
 Runs go one at a time; a run started while another runs waits as Queued. If

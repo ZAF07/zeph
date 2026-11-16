@@ -287,10 +287,11 @@ ASK_MODEL = AskModel(
             facts(latest_conversation=conversation(NOW - timedelta(minutes=10))),
             NOW,
             HoldBack(
-                HoldBackReason.IN_CONVERSATION,
-                retry_at=NOW - timedelta(minutes=10) + QUIET_GAP,
+                HoldBackReason.WAITING_TO_BE_WOVEN_IN,
+                retry_at=WAS_DUE_AT,
+                until=NOW - timedelta(minutes=10) + QUIET_GAP,
             ),
-            id="mid-Conversation: due when it could end",
+            id="mid-Conversation: stays due, waiting to be woven in",
         ),
         pytest.param(
             facts(latest_conversation=conversation(NOW - QUIET_GAP)),

@@ -463,6 +463,7 @@ class CheckInLogEntryResponse(BaseModel):
     skip_reason: str | None
     status: CheckInStatus
     requested_by: str | None
+    woven_in: bool
 
 
 class CheckInLogResponse(BaseModel):
@@ -542,6 +543,14 @@ class UnderstandingShapeResponse(BaseModel):
     past_look_ups: int
 
 
+class CheckInShapeResponse(BaseModel):
+    """The shape of a woven-in Check-in decision: counts and the Kind, never words."""
+
+    kinds_offered: int
+    woven_in: bool
+    kind: str | None
+
+
 class ModelCallResponse(BaseModel):
     """One model call in a trace; `content` is null unless full content was kept."""
 
@@ -557,6 +566,7 @@ class ModelCallResponse(BaseModel):
     tools_called: list[str]
     content: ModelCallContentResponse | None
     understanding_shape: UnderstandingShapeResponse | None
+    check_in_shape: CheckInShapeResponse | None
 
 
 class ModelCallTraceResponse(BaseModel):
@@ -859,6 +869,7 @@ def to_check_in_log_entry_response(logged: LoggedCheckIn) -> CheckInLogEntryResp
         skip_reason=check_in.skip_reason,
         status=logged.status,
         requested_by=logged.entry.requested_by_name,
+        woven_in=check_in.woven_in,
     )
 
 
@@ -1032,6 +1043,15 @@ def to_model_call_response(call: ModelCall) -> ModelCallResponse:
         understanding_shape=(
             to_understanding_shape_response(call.understanding_shape)
             if call.understanding_shape
+            else None
+        ),
+        check_in_shape=(
+            CheckInShapeResponse(
+                kinds_offered=call.check_in_shape.kinds_offered,
+                woven_in=call.check_in_shape.woven_in,
+                kind=call.check_in_shape.kind,
+            )
+            if call.check_in_shape
             else None
         ),
     )

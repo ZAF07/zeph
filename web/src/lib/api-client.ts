@@ -491,6 +491,7 @@ export type CheckInLogEntry = {
   skip_reason: string | null;
   status: CheckInStatus;
   requested_by: string | null;
+  woven_in: boolean;
 };
 
 /** Why a User's due Check-in is held back right now. */
@@ -499,7 +500,7 @@ export type HoldBackReason =
   | "paused"
   | "quiet_hours"
   | "no_telegram_connection"
-  | "in_conversation"
+  | "waiting_to_be_woven_in"
   | "limit_skip_done_today"
   | "no_kind_to_send";
 
@@ -629,6 +630,13 @@ export type UnderstandingShape = {
   past_look_ups: number;
 };
 
+/** The shape of a woven-in Check-in decision: counts and the Kind, never any words. */
+export type CheckInShape = {
+  kinds_offered: number;
+  woven_in: boolean;
+  kind: string | null;
+};
+
 /** One model call in a trace; `content` is null unless it was kept. */
 export type ModelCall = {
   id: string;
@@ -643,6 +651,7 @@ export type ModelCall = {
   tools_called: string[];
   content: ModelCallContent | null;
   understanding_shape: UnderstandingShape | null;
+  check_in_shape: CheckInShape | null;
 };
 
 /** One Model Call Log trace with every call in it, in order. */

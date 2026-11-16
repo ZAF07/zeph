@@ -1,4 +1,5 @@
 import type {
+  CheckInShape,
   ModelStep,
   TraceKind,
   UnderstandingShape,
@@ -88,6 +89,23 @@ export function describeSteps(steps: ModelStep[]): string {
       count > 1 ? `${modelStepLabel(step)} ×${count}` : modelStepLabel(step),
     )
     .join(" → ");
+}
+
+/**
+ * Lists the facts of a woven-in Check-in decision's shape, as labels and values.
+ *
+ * @param shape - The decision's shape.
+ * @returns E.g. "Kinds offered: 4", "Decision: Weave in", "Kind chosen: A
+ * follow-up".
+ */
+export function checkInShapeFacts(
+  shape: CheckInShape,
+): { label: string; value: string }[] {
+  return [
+    { label: "Kinds offered", value: String(shape.kinds_offered) },
+    { label: "Decision", value: shape.woven_in ? "Weave in" : "Not now" },
+    { label: "Kind chosen", value: shape.kind ?? "—" },
+  ];
 }
 
 const intensityLabels: Record<UnderstandingShape["intensity"], string> = {

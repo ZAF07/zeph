@@ -44,6 +44,7 @@ const plainUsersTrace: ModelCallTraceDetails = {
       tools_called: [],
       content: null,
       understanding_shape: null,
+      check_in_shape: null,
     },
     {
       id: "c4",
@@ -68,6 +69,22 @@ const plainUsersTrace: ModelCallTraceDetails = {
         threads_held_back: 1,
         past_look_ups: 2,
       },
+      check_in_shape: null,
+    },
+    {
+      id: "c5",
+      step: "check_in",
+      model: "deepseek-flash",
+      thinking: true,
+      started_at: "2026-11-14T10:30:01Z",
+      duration_ms: 500,
+      tokens_in: 700,
+      tokens_out: 30,
+      error: null,
+      tools_called: [],
+      content: null,
+      understanding_shape: null,
+      check_in_shape: { kinds_offered: 4, woven_in: true, kind: "A follow-up" },
     },
     {
       id: "c2",
@@ -82,6 +99,7 @@ const plainUsersTrace: ModelCallTraceDetails = {
       tools_called: ["web_search"],
       content: null,
       understanding_shape: null,
+      check_in_shape: null,
     },
   ],
 };
@@ -124,6 +142,7 @@ const adminsTrace: ModelCallTraceDetails = {
         reasoning: "They want facts.",
       },
       understanding_shape: null,
+      check_in_shape: null,
     },
   ],
 };
@@ -152,7 +171,7 @@ describe("ModelCallTraceView", () => {
     expect(within(reply).getByText("web_search")).toBeInTheDocument();
     expect(within(reply).getByText("TimeoutError")).toBeInTheDocument();
     expect(screen.getAllByText("No content kept for this User")).toHaveLength(
-      3,
+      4,
     );
     expect(screen.queryByText("Instructions")).not.toBeInTheDocument();
   });
@@ -177,6 +196,21 @@ describe("ModelCallTraceView", () => {
     expect(factValue("Past look-ups")).toBe("2");
     const reply = screen.getByRole("article", { name: "Reply" });
     expect(within(reply).queryByText("Need picked")).not.toBeInTheDocument();
+  });
+
+  it("shows the shape of a woven-in Check-in decision", async () => {
+    apiClient.getModelCallTrace.mockResolvedValue(plainUsersTrace);
+
+    renderWithQueries(<ModelCallTraceView traceId="t1" />);
+
+    const checkIn = await screen.findByRole("article", { name: "Check-in" });
+    const factValue = (label: string) =>
+      within(checkIn).getByText(label).nextElementSibling?.textContent;
+    expect(factValue("Kinds offered")).toBe("4");
+    expect(factValue("Decision")).toBe("Weave in");
+    expect(factValue("Kind chosen")).toBe("A follow-up");
+    const reply = screen.getByRole("article", { name: "Reply" });
+    expect(within(reply).queryByText("Kinds offered")).not.toBeInTheDocument();
   });
 
   it("shows full content for an Admin's own chat, tool calls included", async () => {

@@ -308,6 +308,7 @@ PERSONAL_STICKERS_LIMIT = Setting("personal_stickers_limit", read_whole_number)
 CHECK_IN_MODEL = Setting("check_in_model", read_text)
 CHECK_IN_THINKING = Setting("check_in_thinking", read_on_off)
 CHECK_IN_PROMPT = Setting("check_in_prompt", read_text)
+WOVEN_CHECK_IN_PROMPT = Setting("woven_check_in_prompt", read_text)
 CHECK_IN_IGNORE_THRESHOLD = Setting("check_in_ignore_threshold", read_whole_number)
 CHECK_IN_FEWER_MESSAGE = Setting("check_in_fewer_message", read_text)
 CHECK_IN_GAPS = Setting("check_in_hours_between", read_check_in_gaps)
@@ -759,6 +760,9 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         maximum=60,
     ),
     EditableSetting(CHECK_IN_PROMPT.key, "Check-in prompt", SettingKind.TEXT),
+    EditableSetting(
+        WOVEN_CHECK_IN_PROMPT.key, "Woven-in Check-in prompt", SettingKind.TEXT
+    ),
     EditableSetting(CHECK_IN_MODEL.key, "Check-in model", SettingKind.MODEL),
     EditableSetting(CHECK_IN_THINKING.key, "Check-in thinking", SettingKind.ON_OFF),
     EditableSetting(
@@ -1115,15 +1119,23 @@ CORE_SERVICES: tuple[CoreService, ...] = (
     ),
     CoreService(
         name="Check-ins",
-        runs_when="Scheduler tick, for Users who are due",
+        runs_when=(
+            "Scheduler tick, for Users who are due; each reply, when one is "
+            "due mid-Conversation"
+        ),
         description=(
             "Decides whether to reach out to a User who opted in, which "
             "Check-in Kind to use and what to say, or to skip and give space, "
-            "from their recent Conversation Summaries and Memory Items."
+            "from their recent Conversation Summaries and Memory Items. When "
+            "one comes due mid-Conversation, the woven-in Check-in prompt "
+            "decides instead whether the reply weaves it in, from the "
+            "Conversation and how Zeph read the newest Message; never while "
+            "the User is struggling or paused."
         ),
         prompt_key=CHECK_IN_PROMPT.key,
         model_key=CHECK_IN_MODEL.key,
         thinking_key=CHECK_IN_THINKING.key,
+        extra_prompt_keys=(WOVEN_CHECK_IN_PROMPT.key,),
     ),
 )
 

@@ -84,10 +84,13 @@ class HoldBack:
         retry_at: The User's next due time; None for no due time, until they
             resume or connect Telegram. The current due time means they stay
             due.
+        until: When it may be decided on its own, for a User who stays due;
+            None to show `retry_at`, or nothing when they stay due.
     """
 
     reason: HoldBackReason
     retry_at: datetime | None
+    until: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -144,9 +147,11 @@ def decide_check_in(
 
     Checked in this order: Check-ins off, paused, Quiet Hours, no Telegram
     Connection, mid-Conversation, the Daily Message Limit, ignored too many,
-    and whether any Kind may be sent. The next Due Time counts from the one
-    the Check-in was first due at, before any hold-back moved it. A waiting
-    Check in Now is decided by `decide_check_in_now` instead.
+    and whether any Kind may be sent. Mid-Conversation the User stays due,
+    so a reply may weave the Check-in in, until the Conversation could end.
+    The next Due Time counts from the one the Check-in was first due at,
+    before any hold-back moved it. A waiting Check in Now is decided by
+    `decide_check_in_now` instead.
 
     Args:
         facts: What is known about the User.
@@ -178,8 +183,9 @@ def decide_check_in(
     conversation = facts.latest_conversation
     if conversation is not None and is_open(conversation, now, rules.quiet_gap):
         return HoldBack(
-            HoldBackReason.IN_CONVERSATION,
-            retry_at=conversation.last_message_at + rules.quiet_gap,
+            HoldBackReason.WAITING_TO_BE_WOVEN_IN,
+            retry_at=current_due_at,
+            until=conversation.last_message_at + rules.quiet_gap,
         )
     if facts.used_up_daily_message_limit:
         if facts.limit_skip_today:
@@ -234,7 +240,7 @@ def decide_check_in_now(
     conversation = facts.latest_conversation
     if conversation is not None and is_open(conversation, now, rules.quiet_gap):
         return HoldBack(
-            HoldBackReason.IN_CONVERSATION,
+            HoldBackReason.WAITING_TO_BE_WOVEN_IN,
             retry_at=conversation.last_message_at + rules.quiet_gap,
         )
     kinds = kinds_that_may_be_sent(facts, rules)

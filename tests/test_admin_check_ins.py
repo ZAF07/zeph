@@ -171,6 +171,7 @@ def test_the_check_in_log_shows_sends_and_skips_with_reasons_never_message_text(
             "skip_reason": "They said they were heading off on retreat.",
             "status": "skipped",
             "requested_by": None,
+            "woven_in": False,
         },
         {
             "decided_at": "2026-11-12T09:00:00Z",
@@ -181,6 +182,7 @@ def test_the_check_in_log_shows_sends_and_skips_with_reasons_never_message_text(
             "skip_reason": None,
             "status": "no_reply",
             "requested_by": None,
+            "woven_in": False,
         },
     ]
 

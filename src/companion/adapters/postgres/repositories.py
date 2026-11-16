@@ -70,6 +70,7 @@ from companion.core.models import (
     CheckInNowRequest,
     CheckInOutcome,
     CheckInSettings,
+    CheckInShape,
     ChosenKnowledgeDocument,
     ConnectionToken,
     Conversation,
@@ -4161,6 +4162,47 @@ class PostgresCheckInRepository:
                 .values(**user_changes)
             )
 
+    def add_woven_in(
+        self, check_in: CheckIn, due_at_read: datetime, next_due_at: datetime
+    ) -> bool:
+        """Save a Woven-in Check-in and the User's next due time, if still due.
+
+        Nothing is saved if their due time changed since it was read, e.g.
+        because a tick or another reply decided on this Check-in already. A
+        decision ends any hold back, so why it was held back and the Due
+        Time they were first held back at are cleared.
+
+        Args:
+            check_in: The Woven-in Check-in.
+            due_at_read: The User's due time as read for the reply.
+            next_due_at: When the User's next Check-in may be sent.
+
+        Returns:
+            True if it was saved.
+        """
+        due_type = users.c.check_in_next_due_at.type
+        with self._database.begin() as connection:
+            claimed = connection.execute(
+                update(users)
+                .where(
+                    users.c.id == check_in.user_id,
+                    users.c.check_in_next_due_at.is_not_distinct_from(
+                        bindparam("due_at_read", due_at_read, type_=due_type)
+                    ),
+                )
+                .values(
+                    check_in_next_due_at=next_due_at,
+                    check_in_held_back_reason=None,
+                    check_in_held_back_until=None,
+                    check_in_held_back_due_at=None,
+                )
+                .returning(users.c.id)
+            ).first()
+            if claimed is None:
+                return False
+            self._insert(connection, check_in)
+        return True
+
     def undo_add(
         self,
         check_in: CheckIn,
@@ -4333,7 +4375,11 @@ class PostgresCheckInRepository:
         ]
 
     def claim_reply(
-        self, user_id: UUID, replied_at: datetime, sent_since: datetime
+        self,
+        user_id: UUID,
+        replied_at: datetime,
+        sent_since: datetime,
+        woven_in_only: bool = False,
     ) -> CheckIn | None:
         """Mark the User's newest sent Check-in replied, if it can still be.
 
@@ -4341,6 +4387,7 @@ class PostgresCheckInRepository:
             user_id: The User's ID.
             replied_at: When they replied.
             sent_since: A Check-in sent at or before this can't get a reply.
+            woven_in_only: Whether only a Woven-in Check-in may be claimed.
 
         Returns:
             The Check-in they replied to, or None if their newest sent
@@ -4357,14 +4404,17 @@ class PostgresCheckInRepository:
             .limit(1)
             .scalar_subquery()
         )
+        conditions = [
+            check_ins.c.id == newest_id,
+            check_ins.c.replied_at.is_(None),
+            check_ins.c.decided_at > sent_since,
+        ]
+        if woven_in_only:
+            conditions.append(check_ins.c.woven_in.is_(True))
         with self._database.begin() as connection:
             claimed_id = connection.execute(
                 update(check_ins)
-                .where(
-                    check_ins.c.id == newest_id,
-                    check_ins.c.replied_at.is_(None),
-                    check_ins.c.decided_at > sent_since,
-                )
+                .where(*conditions)
                 .values(replied_at=replied_at)
                 .returning(check_ins.c.id)
             ).scalar()
@@ -4396,6 +4446,7 @@ class PostgresCheckInRepository:
                 shared_photo_id=check_in.shared_photo_id,
                 curiosity_id=check_in.curiosity_id,
                 requested_by=check_in.requested_by,
+                woven_in=check_in.woven_in,
             )
         )
 
@@ -4433,6 +4484,7 @@ class PostgresCheckInRepository:
             shared_photo_id=row.shared_photo_id,
             curiosity_id=row.curiosity_id,
             requested_by=row.requested_by,
+            woven_in=row.woven_in,
         )
 
     def delete_for_user(self, user_id: UUID) -> None:
@@ -4757,6 +4809,22 @@ def _to_understanding_shape(values: dict[str, Any]) -> UnderstandingShape:
     )
 
 
+def _to_check_in_shape(values: dict[str, Any]) -> CheckInShape:
+    """Read a woven-in Check-in call's stored shape.
+
+    Args:
+        values: The stored JSON.
+
+    Returns:
+        The shape.
+    """
+    return CheckInShape(
+        kinds_offered=values["kinds_offered"],
+        woven_in=values["woven_in"],
+        kind=values["kind"],
+    )
+
+
 def to_model_call(row: Row[Any]) -> ModelCall:
     """Turn a `model_calls` row into a model call.
 
@@ -4784,6 +4852,9 @@ def to_model_call(row: Row[Any]) -> ModelCall:
             _to_understanding_shape(row.understanding_shape)
             if row.understanding_shape
             else None
+        ),
+        check_in_shape=(
+            _to_check_in_shape(row.check_in_shape) if row.check_in_shape else None
         ),
     )
 
@@ -4827,6 +4898,9 @@ class PostgresModelCallRepository:
                         if call.understanding_shape
                         else None
                     ),
+                    check_in_shape=(
+                        asdict(call.check_in_shape) if call.check_in_shape else None
+                    ),
                 )
             )
 
@@ -4854,6 +4928,30 @@ class PostgresModelCallRepository:
                 update(model_calls)
                 .where(model_calls.c.id == newest_understanding_call)
                 .values(understanding_shape=asdict(shape))
+            )
+
+    def set_check_in_shape(self, trace_id: UUID, shape: CheckInShape) -> None:
+        """Save a woven-in Check-in decision's shape on a trace's newest Check-in call.
+
+        Args:
+            trace_id: The trace's ID.
+            shape: The decision's shape.
+        """
+        newest_check_in_call = (
+            select(model_calls.c.id)
+            .where(
+                model_calls.c.trace_id == trace_id,
+                model_calls.c.step == ModelStep.CHECK_IN.value,
+            )
+            .order_by(model_calls.c.position.desc())
+            .limit(1)
+            .scalar_subquery()
+        )
+        with self._database.begin() as connection:
+            connection.execute(
+                update(model_calls)
+                .where(model_calls.c.id == newest_check_in_call)
+                .values(check_in_shape=asdict(shape))
             )
 
     def list_traces(

@@ -81,7 +81,8 @@ class ConversationService:
         the Conversation just before the message is saved, the message is
         refused and tried again; it then starts a new Conversation, which
         cannot already be ended. So the message is never left out of a
-        Conversation's processing.
+        Conversation's processing. Within the reply window, it is the reply
+        to a Woven-in Check-in that is the User's newest sent Check-in.
 
         Args:
             user_id: The User who sent it.
@@ -110,6 +111,13 @@ class ConversationService:
                     sticker=sticker,
                 )
             )
+        now = self._clock.now()
+        self._repositories.check_ins.claim_reply(
+            user_id,
+            replied_at=now,
+            sent_since=now - settings.get(CHECK_IN_REPLY_WINDOW),
+            woven_in_only=True,
+        )
         self._chat_channel.show_typing(chat_id)
         return conversation_id
 

@@ -16,7 +16,7 @@ export const holdBackReasonLabels: Record<HoldBackReason, string> = {
   paused: "Paused",
   quiet_hours: "Quiet Hours",
   no_telegram_connection: "No Telegram Connection",
-  in_conversation: "In a Conversation",
+  waiting_to_be_woven_in: "Waiting to be woven in",
   limit_skip_done_today: "Today’s message limit used up",
   no_kind_to_send: "No Kind to send",
 };

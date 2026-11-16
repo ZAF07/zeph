@@ -339,6 +339,7 @@ class UnderstandingExpectations:
         curiosity_raised: Whether it must bring up a Curiosity.
         asked_why: Whether it must gently ask why they feel as they do.
         knowledge: Whether it must choose Knowledge documents to search.
+        woven_in: Whether the reply must weave in the due Check-in.
         rules: The IDs of the rules the Judge checks the reply against.
     """
 
@@ -349,6 +350,7 @@ class UnderstandingExpectations:
     curiosity_raised: bool | None = None
     asked_why: bool | None = None
     knowledge: bool | None = None
+    woven_in: bool | None = None
     rules: list[str] = field(default_factory=list)
 
     @property
@@ -385,6 +387,8 @@ class UnderstandingCase:
         earlier: Messages already in the open Conversation, oldest first.
         messages: What the person sends, in order.
         rules: Each rule its Messages name, by ID, and what the Judge checks.
+        check_in_due: Whether the person has Check-ins on, with one due when
+            the first Message is sent, so a reply may weave it in.
     """
 
     id: str
@@ -393,6 +397,7 @@ class UnderstandingCase:
     earlier: list[EarlierLine]
     messages: list[UnderstandingMessage]
     rules: dict[str, str] = field(default_factory=dict)
+    check_in_due: bool = False
 
 
 def read_safeguard_case(key: str, content: dict[str, Any]) -> SafeguardCase:
@@ -726,6 +731,7 @@ def to_understanding_message(entry: dict[str, Any]) -> UnderstandingMessage:
             curiosity_raised=expect.get("curiosity_raised"),
             asked_why=expect.get("asked_why"),
             knowledge=expect.get("knowledge"),
+            woven_in=expect.get("woven_in"),
             rules=expect.get("rules") or [],
         ),
     )
@@ -831,15 +837,17 @@ def read_understanding_case(key: str, content: dict[str, Any]) -> UnderstandingC
     Args:
         key: The case's key.
         content: `now`, `messages`, `rules` (each `{id, check}`) and
-            optionally `memory` and `earlier` (each `{who, text}`).
+            optionally `memory`, `earlier` (each `{who, text}`) and
+            `check_in_due`.
 
     Returns:
         The case.
 
     Raises:
         InvalidEvalCaseError: If it names an unknown rule or Life Thread,
-            writes a Thread's title outside it, or has a Thread raised in
-            its Conversation but no earlier lines.
+            writes a Thread's title outside it, has a Thread raised in its
+            Conversation but no earlier lines, or expects a Check-in woven
+            in or not with none due.
     """
     case = UnderstandingCase(
         id=key,
@@ -848,8 +856,16 @@ def read_understanding_case(key: str, content: dict[str, Any]) -> UnderstandingC
         earlier=[to_earlier_line(line) for line in content.get("earlier") or []],
         messages=[to_understanding_message(message) for message in content["messages"]],
         rules=read_rules(content),
+        check_in_due=content.get("check_in_due") is True,
     )
     require_checkable_names(case)
+    expects_woven_in = any(
+        message.expect.woven_in is not None for message in case.messages
+    )
+    if expects_woven_in and not case.check_in_due:
+        raise InvalidEvalCaseError(
+            f"{key} expects a Check-in woven in or not, so needs check_in_due: true"
+        )
     return case
 
 

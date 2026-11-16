@@ -530,6 +530,7 @@ check_ins = Table(
     ),
     Column("curiosity_id", Uuid, ForeignKey("curiosities.id", ondelete="SET NULL")),
     Column("requested_by", Uuid, ForeignKey("users.id", ondelete="SET NULL")),
+    Column("woven_in", Boolean, nullable=False, server_default="false"),
 )
 
 feature_switches = Table(
@@ -588,6 +589,7 @@ model_calls = Table(
     Column("tools_called", JSONB, nullable=False, server_default="[]"),
     Column("content", JSONB(none_as_null=True)),
     Column("understanding_shape", JSONB(none_as_null=True)),
+    Column("check_in_shape", JSONB(none_as_null=True)),
 )
 
 eval_cases = Table(
@@ -718,4 +720,5 @@ eval_model_calls = Table(
     Column("tools_called", JSONB, nullable=False),
     Column("content", JSONB(none_as_null=True)),
     Column("understanding_shape", JSONB(none_as_null=True)),
+    Column("check_in_shape", JSONB(none_as_null=True)),
 )

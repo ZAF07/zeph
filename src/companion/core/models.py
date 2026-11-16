@@ -42,7 +42,7 @@ class HoldBackReason(StrEnum):
     PAUSED = "paused"
     QUIET_HOURS = "quiet_hours"
     NO_TELEGRAM_CONNECTION = "no_telegram_connection"
-    IN_CONVERSATION = "in_conversation"
+    WAITING_TO_BE_WOVEN_IN = "waiting_to_be_woven_in"
     LIMIT_SKIP_DONE_TODAY = "limit_skip_done_today"
     NO_KIND_TO_SEND = "no_kind_to_send"
 
@@ -1691,6 +1691,8 @@ class CheckIn:
             or it was deleted since.
         requested_by: The Admin who asked for it with Check in Now; None
             for a scheduled one, or if they were deleted since.
+        woven_in: Whether it was woven into a reply mid-Conversation rather
+            than sent as a message of its own; its message is then None.
     """
 
     id: UUID
@@ -1705,6 +1707,7 @@ class CheckIn:
     shared_photo_id: UUID | None = None
     curiosity_id: UUID | None = None
     requested_by: UUID | None = None
+    woven_in: bool = False
 
     @property
     def was_sent(self) -> bool:
@@ -1979,6 +1982,21 @@ class UnderstandingShape:
 
 
 @dataclass(frozen=True)
+class CheckInShape:
+    """The shape of a woven-in Check-in decision, kept for every User. Never any words.
+
+    Attributes:
+        kinds_offered: How many Check-in Kinds it could choose from.
+        woven_in: Whether it chose to weave one in.
+        kind: The Kind it chose, by name; None for "not now".
+    """
+
+    kinds_offered: int
+    woven_in: bool
+    kind: str | None
+
+
+@dataclass(frozen=True)
 class ModelCall:
     """One model call in the Model Call Log.
 
@@ -2000,6 +2018,8 @@ class ModelCall:
             the full-content level.
         understanding_shape: The shape of the Understanding it made, kept for
             every User; None for other steps.
+        check_in_shape: The shape of the woven-in Check-in decision it made,
+            kept for every User; None for other calls.
     """
 
     id: UUID
@@ -2016,6 +2036,7 @@ class ModelCall:
     tools_called: tuple[str, ...]
     content: ModelCallContent | None
     understanding_shape: UnderstandingShape | None
+    check_in_shape: CheckInShape | None = None
 
 
 @dataclass(frozen=True)

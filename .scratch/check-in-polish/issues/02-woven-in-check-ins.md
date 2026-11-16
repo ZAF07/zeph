@@ -1,6 +1,6 @@
 # 02 — Check-in polish: Woven-in Check-ins
 
-Status: ready-for-agent
+Status: in-progress
 
 Track: A (User side).
 
@@ -72,3 +72,12 @@ Terms: Woven-in Check-in, Held-back Check-in, Quiet Hours, Check-in Log (`CONTEX
 Track B (issue 03) adds the held-back reason storage that the "waiting to be woven in" state uses. If 03 hasn't merged yet, add the storage here in the same shape the PRD gives (reason and until on the User's Check-in state). Whichever merges second reconciles it. Rebase, and renumber migrations if they clash.
 
 ## Comments
+
+### 2026-11-16 — plan (agent, branch `check-in-polish-02-woven-in`)
+
+- Held-back reason `in_conversation` is renamed `waiting_to_be_woven_in` (migration 0048 updates stored rows). Mid-Conversation the tick keeps the Due Time as it is and saves "until" = when the Conversation could end.
+- New core module `woven_check_ins.py`: the code rule (due, opted in + Feature on, not paused, not struggling), the call (Check-in model + new `woven_check_in_prompt`), reading the answer, and the reply section. `ReplyService` runs the call in a background thread next to the memory and Knowledge look-ups.
+- Saving: the Check-in (sent, Kind, `woven_in`) and the next Due Time are saved in one statement **before** the reply is delivered, only if the Due Time is still the one read (so a tick or a second reply can't log it twice). If composing or delivering the reply fails, it is taken back and stays due. This is the standalone "save, then send" rule, so a failed save never sends it and it is never sent twice.
+- Reply detection: the User's next message in the open Conversation claims a woven-in Check-in's reply (same reply window). The Ignore Threshold count passes over woven-in Check-ins.
+- Model Call Log: new `check_in_shape` (Kinds offered, woven in or not, Kind) on the newest Check-in call of the Message trace.
+- Evals: Understanding cases gain `check_in_due` and a per-Message `woven_in` expectation.

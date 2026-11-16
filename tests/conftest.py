@@ -245,6 +245,7 @@ def chat_model(seeded_settings: dict[str, Any]) -> ScriptedChatModel:
         ],
         portrait_prompt=seeded_settings["portrait_prompt"],
         curiosity_keeping_prompt=seeded_settings["curiosity_keeping_prompt"],
+        woven_check_in_prompt=seeded_settings["woven_check_in_prompt"],
     )
 
 
