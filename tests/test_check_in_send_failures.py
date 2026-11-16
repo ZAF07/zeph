@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from companion.adapters.postgres.repositories import PostgresCheckInRepository
-from companion.core.models import CheckIn
+from companion.core.models import CheckIn, CheckInNowRequest
 from companion.core.ports import ChatBlockedError, MessageRefusedError
 from tests.fakes import (
     FakeAuthVerifier,
@@ -38,12 +38,13 @@ def fail_the_next_save(monkeypatch: pytest.MonkeyPatch) -> None:
         check_in: CheckIn,
         next_due_at: datetime,
         pause_until_resumed: bool,
+        check_in_now: CheckInNowRequest | None = None,
     ) -> None:
         nonlocal failed
         if not failed:
             failed = True
             raise ConnectionError("the database dropped")
-        save(repository, check_in, next_due_at, pause_until_resumed)
+        save(repository, check_in, next_due_at, pause_until_resumed, check_in_now)
 
     monkeypatch.setattr(PostgresCheckInRepository, "add", fail_once)
 
