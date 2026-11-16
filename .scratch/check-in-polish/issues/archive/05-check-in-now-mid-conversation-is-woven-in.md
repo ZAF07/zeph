@@ -54,3 +54,9 @@ Caveats (from code review, left as is):
 - A tick already asking the Check-in model for a Check in Now (Conversation just ended) and a reply that weaves the same request in, if the User writes during that model call, could both send. The tick's save doesn't check the Due Time it read; scheduled Check-ins have had the same narrow race since issue 02. Fixing it means changing the tick's shared save path, so it is left for a follow-up.
 - If a second Admin asks for a Check in Now in the seconds between a woven-in save and that reply failing to send, taking it back restores the first request (same as the tick's take-back).
 
+
+## Completion
+
+- Completed: 2026-11-16
+- Commits: 8fec9a9 (implementation), fcd8014 (review fixes), a5af329 (archive, CONTEXT.md)
+- Merge: ae17d21
