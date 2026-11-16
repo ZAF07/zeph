@@ -118,4 +118,4 @@ Caveats (from code review, left as is):
 ## Completion
 
 - Completed: 2026-11-16
-- Commits: 7827e25 (implementation), 940b350 (review fixes)
+- Commits: 273a6bb (implementation), efd619c (review fixes), 7cc21b6 (archive), ac7e807 (rebase onto issue 04, migration 0049)
