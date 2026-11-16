@@ -634,6 +634,7 @@ class PostgresUserRepository:
         Returns:
             The saved User.
         """
+        held_back = user.check_ins.held_back
         statement = (
             update(users)
             .where(users.c.id == user.id)
@@ -654,6 +655,12 @@ class PostgresUserRepository:
                 check_ins_paused=user.check_ins.paused,
                 check_ins_paused_until=user.check_ins.paused_until,
                 check_in_next_due_at=user.check_ins.next_due_at,
+                check_in_held_back_reason=(
+                    held_back.reason.value if held_back is not None else None
+                ),
+                check_in_held_back_until=(
+                    held_back.until if held_back is not None else None
+                ),
                 settings_changed_in_chat=_from_setting_stamps(
                     user.settings_changed_in_chat
                 ),

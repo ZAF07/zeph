@@ -13,7 +13,7 @@ import type {
 } from "@/lib/api-client";
 import { schedulePauseText } from "@/lib/check-in-schedule";
 import { toTimeFieldValue } from "@/lib/check-ins";
-import { queryKeys } from "@/lib/queries";
+import { queryKeys, reloadUserPages } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 const pauseChoices: { length: PauseLength; label: string }[] = [
@@ -56,6 +56,8 @@ export function UserCheckInSettingsPanel({
       void queryClient.invalidateQueries({
         queryKey: queryKeys.allCheckInSchedule,
       });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.checkIns });
+      reloadUserPages(queryClient);
     },
   });
   const isSaving = save.isPending;

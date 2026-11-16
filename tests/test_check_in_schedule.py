@@ -524,3 +524,46 @@ def test_an_admin_can_never_turn_a_users_check_ins_on_or_off(
     assert check_ins(client, sam)["enabled"] is False
     assert check_ins(client, sam)["paused"] is False
     assert missing.status_code == 404
+
+
+def test_a_settings_change_that_moves_the_due_time_clears_the_old_reason(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+) -> None:
+    set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    admin = owner_headers(client, auth_verifier)
+    user_id = only_entry(client, admin)["user_id"]
+    clock.advance(ONE_DAY + timedelta(hours=6))
+    scheduler.tick()
+
+    entry = admin_change(client, admin, user_id, {"frequency": "weekly"})
+
+    assert entry["next_due_at"] == as_json_time(clock.now() + timedelta(weeks=1))
+    assert entry["held_back"] is None
+    assert only_entry(client, admin)["held_back"] is None
+
+
+def test_a_settings_change_that_keeps_the_due_time_keeps_the_reason(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+) -> None:
+    onboard(
+        client,
+        auth_verifier,
+        "user_maya",
+        check_ins_enabled=True,
+        check_in_frequency="most_days",
+    )
+    admin = owner_headers(client, auth_verifier)
+    user_id = only_entry(client, admin)["user_id"]
+    clock.advance(ONE_DAY)
+    scheduler.tick()
+
+    entry = admin_change(client, admin, user_id, {"quiet_hours_start": "21:00"})
+
+    assert entry["held_back"] == {"reason": "no_telegram_connection", "until": None}

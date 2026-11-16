@@ -1307,6 +1307,9 @@ class CheckInService:
     def _save(self, user: User, settings: CheckInSettings) -> User:
         """Save a User's new Check-in settings.
 
+        A change that moves their Due Time ends any hold back: they are
+        decided again now, or not due until later.
+
         Args:
             user: The User.
             settings: Their new Check-in settings.
@@ -1314,4 +1317,6 @@ class CheckInService:
         Returns:
             The saved User.
         """
+        if settings.next_due_at != user.check_ins.next_due_at:
+            settings = replace(settings, held_back=None)
         return self._repositories.users.update(replace(user, check_ins=settings))

@@ -63,3 +63,10 @@ Track A (issue 02) adds a "waiting to be woven in" held-back state. Leave room f
 - **Migration** `0046`: three new `users` columns. Renumber if track A takes 0046 first.
 - **Web:** `CheckInSchedule` (search, table, paging), `UserCheckInSettingsPanel` (dialog like `UserFeaturesPanel`), `ChangedByAdminCaption` on the User's Check-ins page, nav item next to Check-in Kinds / Check-in log. Formatting in `lib/check-in-schedule.ts`.
 - Leaves room for issue 04 (Check in Now: row checkboxes) and issue 02 (new held-back reason).
+
+### 2026-11-16 — code review and decisions
+
+- **Fixed from review:** a settings change that moves the Due Time now clears the saved held-back reason (it no longer applies; the User is decided again now or isn't due until later). One that keeps the Due Time (e.g. changing Quiet Hours while there's no Telegram Connection) keeps it. Tests for both. The settings panel now calls `reloadUserPages()` and reloads the Check-ins page (ADR-0012), so an Admin editing their own row sees it straight away. The three date helpers became one.
+- **Side panel:** the design file has no separate drawer, so the edit view reuses the existing `UserFeaturesPanel` dialog (a centred panel). Easy to restyle later if wanted.
+- **Kept on purpose:** `AdminCheckInChanges` stays its own type, so "no on/off switch" shows in the type. The API takes an optional `page_size` (1–100, default 25). The panel's dialog shell copies `UserFeaturesPanel`; a shared admin panel component would be a separate tidy-up.
+- **Not done:** the search runs on every keystroke with no delay. That's fine at today's scale.

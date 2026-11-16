@@ -83,7 +83,7 @@ class CheckInSettings:
         next_due_at: When the next Check-in may be sent; never shown to the
             User.
         held_back: Why the last tick held their due Check-in back; None
-            once it is decided. Only ticks save it.
+            once it is decided, or once a settings change moves the Due Time.
     """
 
     enabled: bool = False

@@ -17,32 +17,24 @@ export const holdBackReasonLabels: Record<HoldBackReason, string> = {
   no_kind_to_send: "No Kind to send",
 };
 
-/**
- * Writes a moment in the User's time, like "Tue 13:00".
- *
- * @param isoTimestamp - The moment, as the backend sends it.
- * @param timeZone - The User's time zone; the browser's when unknown.
- * @returns The weekday and time.
- */
-function weekdayAndTime(isoTimestamp: string, timeZone?: string): string {
-  const part = dateParts(new Date(isoTimestamp), {
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-    timeZone,
-  });
-  return `${part("weekday")} ${part("hour")}:${part("minute")}`;
-}
+/** Which parts of a moment to write: like "07:30", "Tue 13:00" or "Tue 24 Nov 10:00". */
+type MomentParts = "time" | "weekday" | "day";
 
 /**
- * Writes a moment in the User's time, like "Tue 24 Nov 10:00".
+ * Writes a moment in the User's time, with as many parts as asked for: the
+ * time ("07:30"), the weekday and time ("Tue 13:00") or the weekday, day,
+ * month and time ("Tue 24 Nov 10:00").
  *
  * @param isoTimestamp - The moment, as the backend sends it.
+ * @param parts - Which parts to write.
  * @param timeZone - The User's time zone; the browser's when unknown.
- * @returns The weekday, day, month and time.
+ * @returns The words.
  */
-function dayAndTime(isoTimestamp: string, timeZone?: string): string {
+function momentText(
+  isoTimestamp: string,
+  parts: MomentParts,
+  timeZone?: string,
+): string {
   const part = dateParts(new Date(isoTimestamp), {
     weekday: "short",
     day: "numeric",
@@ -52,24 +44,14 @@ function dayAndTime(isoTimestamp: string, timeZone?: string): string {
     hourCycle: "h23",
     timeZone,
   });
-  return `${part("weekday")} ${part("day")} ${part("month")} ${part("hour")}:${part("minute")}`;
-}
-
-/**
- * Writes a moment's time of day in the User's time, like "07:30".
- *
- * @param isoTimestamp - The moment, as the backend sends it.
- * @param timeZone - The User's time zone; the browser's when unknown.
- * @returns The hours and minutes.
- */
-function timeOnly(isoTimestamp: string, timeZone?: string): string {
-  const part = dateParts(new Date(isoTimestamp), {
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-    timeZone,
-  });
-  return `${part("hour")}:${part("minute")}`;
+  const time = `${part("hour")}:${part("minute")}`;
+  if (parts === "time") {
+    return time;
+  }
+  if (parts === "weekday") {
+    return `${part("weekday")} ${time}`;
+  }
+  return `${part("weekday")} ${part("day")} ${part("month")} ${time}`;
 }
 
 /**
@@ -109,7 +91,7 @@ export function dueTimeText(
   if (untilDue <= 0) {
     return "due now";
   }
-  return `${fromNowText(untilDue)} · ${weekdayAndTime(nextDueAt, timeZone)} their time`;
+  return `${fromNowText(untilDue)} · ${momentText(nextDueAt, "weekday", timeZone)} their time`;
 }
 
 /**
@@ -131,9 +113,11 @@ export function heldBackText(
     return reason;
   }
   const isWithinADay = Date.parse(heldBack.until) - Date.parse(now) < day;
-  const until = isWithinADay
-    ? timeOnly(heldBack.until, timeZone)
-    : dayAndTime(heldBack.until, timeZone);
+  const until = momentText(
+    heldBack.until,
+    isWithinADay ? "time" : "day",
+    timeZone,
+  );
   return `${reason}, until ${until}`;
 }
 
@@ -168,5 +152,5 @@ export function schedulePauseText(
   if (pausedUntil === null) {
     return "Paused until resumed";
   }
-  return `Paused until ${dayAndTime(pausedUntil, timeZone)}`;
+  return `Paused until ${momentText(pausedUntil, "day", timeZone)}`;
 }
