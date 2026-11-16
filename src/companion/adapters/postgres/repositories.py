@@ -4111,26 +4111,45 @@ class PostgresCheckInRepository:
             )
 
     def add(
-        self, check_in: CheckIn, next_due_at: datetime, pause_until_resumed: bool
+        self,
+        check_in: CheckIn,
+        next_due_at: datetime,
+        pause_until_resumed: bool,
+        check_in_now: CheckInNowRequest | None = None,
     ) -> None:
         """Save a Check-in decision and the User's next due time, together.
 
-        A decision ends any hold back, so why it was held back is cleared,
-        and any Check in Now is done, so it is cleared too.
+        A decision ends any hold back, so why it was held back is cleared.
+        The Check in Now it was decided for is done, so it is cleared too;
+        one asked for since is kept.
 
         Args:
             check_in: The Check-in decision.
             next_due_at: When the User's next Check-in may be sent.
             pause_until_resumed: Whether to also pause the User's Check-ins
                 until they resume.
+            check_in_now: The Check in Now it was decided for; None for a
+                scheduled one.
         """
+        requested_at = check_in_now.requested_at if check_in_now is not None else None
+        is_done = users.c.check_in_now_requested_at.is_not_distinct_from(
+            bindparam(
+                "decided_request_at",
+                requested_at,
+                type_=users.c.check_in_now_requested_at.type,
+            )
+        )
         user_changes: dict[str, Any] = {
             "check_in_next_due_at": next_due_at,
             "check_in_held_back_reason": None,
             "check_in_held_back_until": None,
             "check_in_held_back_due_at": None,
-            "check_in_now_requested_by": None,
-            "check_in_now_requested_at": None,
+            "check_in_now_requested_by": case(
+                (is_done, None), else_=users.c.check_in_now_requested_by
+            ),
+            "check_in_now_requested_at": case(
+                (is_done, None), else_=users.c.check_in_now_requested_at
+            ),
         }
         if pause_until_resumed:
             user_changes |= {"check_ins_paused": True, "check_ins_paused_until": None}

@@ -140,10 +140,10 @@ class CheckInScheduleService:
     ) -> dict[UUID, CheckInNowResult]:
         """Ask for a Check-in on the next tick for each of the Users.
 
-        A User who opted in and has a Telegram Connection gets the request
-        saved with the Admin, and is due now. The others are refused, and
-        nothing is saved or logged for them. Reads and the write stay the
-        same however many Users are asked for.
+        A User who opted in, finished onboarding and has a Telegram
+        Connection gets the request saved with the Admin, and is due now.
+        The others are refused, and nothing is saved or logged for them.
+        Reads and the write stay the same however many Users are asked for.
 
         Args:
             user_ids: The Users.
@@ -165,9 +165,10 @@ class CheckInScheduleService:
         if missing is not None:
             raise UserNotFoundError(missing)
         connections = self._repositories.telegram_connections.list_for_users(unique_ids)
-        results = {}
+        results: dict[UUID, CheckInNowResult] = {}
         for user_id in unique_ids:
-            if not found[user_id].check_ins.enabled:
+            user = found[user_id]
+            if not user.check_ins.enabled or user.onboarding_completed_at is None:
                 results[user_id] = CheckInNowResult.NOT_OPTED_IN
             elif user_id not in connections:
                 results[user_id] = CheckInNowResult.NO_TELEGRAM_CONNECTION

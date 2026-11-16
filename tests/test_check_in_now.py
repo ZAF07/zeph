@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
 from companion.adapters.postgres.repositories import build_postgres_repositories
-from companion.core.models import Conversation, Feature, User
+from companion.core.models import CheckIn, CheckInOutcome, Conversation, Feature, User
 from companion.core.ports import MessageRefusedError
 from tests.conftest import INITIAL_ADMIN_EMAIL
 from tests.fakes import (
@@ -469,3 +469,44 @@ def test_tick_reads_stay_the_same_as_due_and_requested_users_grow(
             )
         ).scalar()
     assert held_back_requests == 5 + 15
+
+
+def test_a_check_in_now_asked_while_a_scheduled_one_is_decided_still_waits(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    clock: FakeClock,
+    engine: Engine,
+) -> None:
+    _, admin, maya = requested_maya(client, auth_verifier, chat_channel)
+    check_in_now(client, admin, [maya])
+
+    build_postgres_repositories(engine).check_ins.add(
+        CheckIn(
+            id=uuid4(),
+            user_id=maya,
+            outcome=CheckInOutcome.SKIPPED,
+            decided_at=clock.now(),
+            skip_reason="decided from a read before the request",
+        ),
+        clock.now() + ONE_DAY,
+        pause_until_resumed=False,
+    )
+
+    assert only_entry(client, admin)["check_in_now_waiting"] is True
+
+
+def test_a_user_who_has_not_finished_onboarding_is_refused(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    engine: Engine,
+) -> None:
+    _, admin, maya = requested_maya(client, auth_verifier, chat_channel)
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE users SET onboarding_completed_at = NULL WHERE id = :id"),
+            {"id": maya},
+        )
+
+    assert check_in_now(client, admin, [maya]) == {str(maya): "not_opted_in"}

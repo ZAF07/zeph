@@ -86,7 +86,7 @@ export function CheckInSchedule() {
   const [editing, setEditing] = useState<CheckInScheduleEntry | null>(null);
   const closeEditing = useCallback(() => setEditing(null), []);
   const [selected, setSelected] = useState<Record<string, string>>({});
-  const [requested, setRequested] = useState<{
+  const [checkInNowOutcome, setCheckInNowOutcome] = useState<{
     results: CheckInNowResultForUser[];
     names: Record<string, string>;
   } | null>(null);
@@ -95,7 +95,7 @@ export function CheckInSchedule() {
     mutationFn: (names: Record<string, string>) =>
       apiClient.checkInNow(Object.keys(names)),
     onSuccess: (results, names) => {
-      setRequested({ results, names });
+      setCheckInNowOutcome({ results, names });
       setSelected({});
       void queryClient.invalidateQueries({
         queryKey: queryKeys.allCheckInSchedule,
@@ -189,11 +189,11 @@ export function CheckInSchedule() {
         </div>
       ) : null}
 
-      {requested ? (
+      {checkInNowOutcome ? (
         <CheckInNowResults
-          results={requested.results}
-          names={requested.names}
-          onDismiss={() => setRequested(null)}
+          results={checkInNowOutcome.results}
+          names={checkInNowOutcome.names}
+          onDismiss={() => setCheckInNowOutcome(null)}
         />
       ) : null}
 

@@ -1037,7 +1037,10 @@ class CheckInService:
                 requested_by=requested_by,
             )
             self._repositories.check_ins.add(
-                skipped, plan.next_due_if_skipped, pause_until_resumed=False
+                skipped,
+                plan.next_due_if_skipped,
+                pause_until_resumed=False,
+                check_in_now=plan.check_in_now,
             )
             return
         shared_photo = decision.shared_photo
@@ -1130,7 +1133,9 @@ class CheckInService:
         Returns:
             True if the message counts as sent.
         """
-        self._repositories.check_ins.add(check_in, next_due_at, pause_until_resumed)
+        self._repositories.check_ins.add(
+            check_in, next_due_at, pause_until_resumed, check_in_now
+        )
         try:
             self._chat_channel.send_text(chat_id, message)
         except ChatBlockedError:
