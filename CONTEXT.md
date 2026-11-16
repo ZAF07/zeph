@@ -73,27 +73,43 @@ A run of messages between a User and the Companion that ends after a quiet gap (
 _Avoid_: Session, thread, chat
 
 **Check-in**:
-A message the Companion sends first, unprompted, to a User who has opted in — meant to feel like a friend reaching out, not a task reminder. When the User is due (their frequency gap has passed), not paused, outside their Quiet Hours, has a Telegram Connection and is not mid-Conversation, the Companion either sends one of a Check-in Kind or skips it. Otherwise it is a Held-back Check-in. Check-ins are a Feature: when an Admin has them off for a User, none are decided or sent, and the User's own Check-in settings are kept for when they are back on. The User's first message within the reply window (set by an Admin) is its reply; after that it had no reply. A User never gets the same Check-in twice: one Telegram refuses is tried again a little later, and one whose delivery is unclear counts as sent. Users never see when the next one will come.
+A message the Companion sends first, unprompted, to a User who has opted in — meant to feel like a friend reaching out, not a task reminder. When the User is due (their Due Time has come), not paused, outside their Quiet Hours, has a Telegram Connection and is not mid-Conversation, the Companion either sends one of a Check-in Kind or skips it. Mid-Conversation it becomes a Woven-in Check-in instead. Otherwise it is a Held-back Check-in. Check-ins are a Feature: when an Admin has them off for a User, none are decided or sent, and the User's own Check-in settings are kept for when they are back on. The User's first message within the reply window (set by an Admin) is its reply; after that it had no reply. A User never gets the same Check-in twice: one Telegram refuses is tried again a little later, and one whose delivery is unclear counts as sent. Users never see when the next one will come.
 _Avoid_: Notification, nudge, reminder, push
 
+**Due Time**:
+When a User's next Check-in may be decided. It is one frequency gap after the previous Due Time, not after the moment the last Check-in went out, so a Held-back Check-in delays only itself and later ones keep their rhythm. A Due Time already passed means due now; Due Times missed while held back (e.g. a long pause) are not made up, so the next one is the first still to come. It never falls within half a frequency gap of the last sent Check-in; one that would is moved to the end of that half gap.
+_Avoid_: Next check-in time, schedule
+
 **Quiet Hours**:
-The local times, in the User's time zone, when the Companion never sends a Check-in. They may run past midnight (e.g. 22:00 until 07:30).
+The local times, in the User's time zone, when the Companion never sends a Check-in on its own. A Woven-in Check-in may still come then, since the User is already talking, and so may one an Admin asked for with Check in Now. They may run past midnight (e.g. 22:00 until 07:30).
 _Avoid_: Do not disturb, sleep hours
 
 **Check-in Pause**:
-A break from Check-ins for a day, a week or until the User resumes, which keeps every other Check-in setting. A timed pause ends by itself.
+A break from Check-ins for a day, a week or until the User resumes, which keeps every other Check-in setting. A timed pause ends by itself. Only an Admin's Check in Now gets through one.
 _Avoid_: Snooze, mute
 
+**Check in Now**:
+An Admin's request that the chosen Users get a Check-in straight away instead of waiting for their Due Time. It goes ahead even if the User is paused, in Quiet Hours, too soon after the last one, or has the Check-ins Feature off for them; mid-Conversation it becomes a Woven-in Check-in. The Check-in model may still choose to skip. It is refused, with the reason shown to the Admin, for a User who hasn't opted in to Check-ins or has no Telegram Connection. Their next Due Time is one frequency gap after it.
+_Avoid_: Force check-in, trigger, push now
+
+**Check-in Frequency**:
+How often, at most, a User wants Check-ins: once a week, a few times a week, most days or a few times a day. Each has a frequency gap set by Admins, which spaces the User's Due Times.
+_Avoid_: Schedule, cadence
+
 **Check-in Kind**:
-The style of a Check-in (e.g. casual hello, follow-up on something shared, present-moment prompt), chosen from the User's recent Conversation Summaries and Memory Items. Managed by Admins; any Kind can go to a User whether or not User Memory is on, since off only stops learning. Some Kinds send one of the User's own Shared Photos with the message (e.g. "a look back at a photo"); these go only to a User who has Shared Photos and Photo Viewing working. One Kind ("something I've been wondering") asks one of the User's Curiosities; it goes only to a User with Curiosities working, a Curiosity whose day has come, and fewer Curiosity Check-ins in the last 7 days than Admins allow. Admins can edit or remove these fixed-behaviour Kinds but not change what they do. Users see the Kinds read-only.
+The style of a Check-in (e.g. casual hello, follow-up on something shared, present-moment prompt), chosen from the User's User Portrait, recent Conversation Summaries and Memory Items. Managed by Admins; any Kind can go to a User whether or not User Memory is on, since off only stops learning. Some Kinds send one of the User's own Shared Photos with the message (e.g. "a look back at a photo"); these go only to a User who has Shared Photos and Photo Viewing working. One Kind ("something I've been wondering") asks one of the User's Curiosities; it goes only to a User with Curiosities working, a Curiosity whose day has come, and fewer Curiosity Check-ins in the last 7 days than Admins allow. Admins can edit or remove these fixed-behaviour Kinds but not change what they do. Users see the Kinds read-only.
 _Avoid_: Template, check-in type
 
+**Woven-in Check-in**:
+A due Check-in that arrives inside the Companion's reply while a Conversation is open, the way a friend drifts onto a side topic, rather than as a message of its own. Each reply may weave it in where it fits what is being talked about, or leave it out; it is never woven in while the User is struggling, nor while their Check-ins are paused. The Check-in model, not the Understanding, decides: after the Understanding, it sees the current Conversation, that Understanding and what the Companion knows about the User, and chooses whether to weave one in now and which Kind (only ones without fixed behaviour, since a reply already has its own ways to raise a Curiosity or send a Shared Photo back); the reply then weaves it in. One woven in is logged as sent with its Kind, marked woven in, moves the Due Time on, counts as replied once the User sends their next message, never counts toward the Ignore Threshold, and shows in the User's "Recent check-ins" like any other. If no reply weaves it in before the Conversation ends, it goes out on its own as usual.
+_Avoid_: Mid-conversation check-in, injected check-in
+
 **Held-back Check-in**:
-A due Check-in that waits because something stops it for now: the User paused, it is their Quiet Hours, they have no Telegram Connection, or they are mid-Conversation. Nothing is sent or logged; it is decided again once that ends, when the pause ends or Quiet Hours end, when the Conversation could end, or when the User resumes or connects Telegram. If the User changes the setting that held it back, it is decided again straight away.
+A due Check-in that waits because something stops it for now: the User paused, it is their Quiet Hours, or they have no Telegram Connection. Nothing is sent or logged; it is decided again once that ends, when the pause ends or Quiet Hours end, or when the User resumes or connects Telegram. If the User changes the setting that held it back, it is decided again straight away. Admins can see which Users have one held back right now and why; once it is no longer held back, nothing of it is kept.
 _Avoid_: Skipped (a skip is a decision and is logged)
 
 **Skipped Check-in**:
-A due Check-in the Companion chose not to send, or couldn't because Telegram won't reach the User (they blocked it, or their account is gone), with a reason only Admins see (e.g. the User asked for space). The next attempt waits a full frequency gap, as after a sent one. Users see it only as "gave you some space". One exception: a User who has used up today's Daily Message Limit gets no Check-in (nor a "would you like fewer?" message) for the rest of their day. That day gets one Skipped Check-in, which the User sees as "you'd reached today's message limit" and Admins see with the reason "User had used up today's Daily Message Limit", and the User stays due, so the next one can come on their next day.
+A due Check-in the Companion chose not to send, or couldn't because Telegram won't reach the User (they blocked it, or their account is gone), with a reason only Admins see (e.g. the User asked for space). The next Due Time is one frequency gap after this one's, as after a sent one. Users see it only as "gave you some space". One exception: a User who has used up today's Daily Message Limit gets no Check-in (nor a "would you like fewer?" message) for the rest of their day. That day gets one Skipped Check-in, which the User sees as "you'd reached today's message limit" and Admins see with the reason "User had used up today's Daily Message Limit", and the User stays due, so the next one can come on their next day.
 _Avoid_: Cancelled, missed, failed check-in
 
 **Ignore Threshold**:
@@ -101,7 +117,7 @@ The Admin-set number of sent Check-ins in a row with no reply after which the Co
 _Avoid_: Ignore limit, unanswered cap
 
 **Check-in Log**:
-The Admins' record of every Check-in decision — sent with its Kind, skipped with its reason, or paused by the Ignore Threshold — and whether the User replied. Never the message text.
+The Admins' record of every Check-in decision — sent with its Kind, skipped with its reason, or paused by the Ignore Threshold — and whether the User replied, whether it was woven in, and, for one asked for with Check in Now, which Admin asked. Never the message text.
 _Avoid_: Check-in history (that is the User's own "Recent check-ins")
 
 **Dashboard**:
@@ -111,6 +127,10 @@ _Avoid_: Portal, web app, console
 **Chat Setting Change**:
 A change to one of a User's settings made by telling the Companion in plain words instead of on the Dashboard: pausing or resuming Check-ins, Check-in frequency, quiet hours, User Memory on or off, time zone, forgetting a Memory Item or Life Thread, or Delete My Data. The Dashboard marks each such setting "Changed in chat" until it is next changed there; a forgotten Memory Item or Life Thread is simply gone, so there is nothing left to mark.
 _Avoid_: Chat command, slash command, bot setting
+
+**Admin Setting Change**:
+A change an Admin makes to a User's own Check-in settings (Check-in Frequency, Quiet Hours, pausing or resuming), to help a User who has trouble changing them. It changes the User's actual settings, not a separate Admin layer, and the Dashboard marks each one "Changed by an Admin" until it is next changed by the User, who can change it back at any time. An Admin can't opt a User in to Check-ins; to stop them for a User, Admins switch the Check-ins Feature off for that User.
+_Avoid_: Admin override (overrides are Feature choices)
 
 **Onboarding**:
 The steps a new User completes on the Dashboard before making their Telegram Connection: what the Companion should call them, acknowledging the AI Notice, what brings them here, country and time zone, and User Memory consent. A User who has not finished it cannot use the rest of the Dashboard, and cannot get a Connection Token or make a Telegram Connection.
