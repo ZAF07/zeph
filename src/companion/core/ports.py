@@ -14,6 +14,7 @@ from companion.core.models import (
     CheckInKindDetails,
     CheckInKindOverview,
     CheckInLogEntry,
+    CheckInNowRequest,
     ConnectionToken,
     Conversation,
     ConversationMessage,
@@ -2073,8 +2074,8 @@ class CheckInRepository(Protocol):
         """List onboarded Users with Check-ins on whose next one is due.
 
         Users whose Check-ins are off on the Admin side, for everyone or for
-        them, are left out but stay due. Pause and quiet hours are not
-        checked here.
+        them, are left out but stay due, unless a Check in Now is waiting.
+        Pause and quiet hours are not checked here.
 
         Args:
             now: The time to check at.
@@ -2113,6 +2114,21 @@ class CheckInRepository(Protocol):
         """
         ...
 
+    def request_check_ins_now(
+        self, user_ids: Sequence[UUID], requested_by: UUID, now: datetime
+    ) -> None:
+        """Save a Check in Now on many Users and make them due now, in one statement.
+
+        Making them due now ends any hold back, so why it was held back is
+        cleared.
+
+        Args:
+            user_ids: The Users' IDs.
+            requested_by: The Admin who asked.
+            now: When they asked.
+        """
+        ...
+
     def set_due_now_unless_due_later(self, user_id: UUID, now: datetime) -> None:
         """Make a User with Check-ins on due now, unless they are due later.
 
@@ -2131,7 +2147,8 @@ class CheckInRepository(Protocol):
         """Save a Check-in decision and the User's next due time, together.
 
         A decision ends any hold back, so why it was held back and the Due
-        Time they were first held back at are cleared.
+        Time they were first held back at are cleared. It also ends any
+        Check in Now, which is cleared too.
 
         Only the next due time and, when asked, the pause are changed, so
         settings the User changed meanwhile are kept.
@@ -2151,12 +2168,13 @@ class CheckInRepository(Protocol):
         end_pause: bool,
         skipped: CheckIn | None,
         held_back_due_at: datetime | None,
+        check_in_now: CheckInNowRequest | None,
     ) -> None:
         """Take back a saved Check-in that was never sent, together.
 
-        Only the next due time, the Due Time they were first held back at
-        and, when asked, the pause are changed, so settings the User changed
-        meanwhile are kept.
+        Only the next due time, the Due Time they were first held back at,
+        any Check in Now and, when asked, the pause are changed, so settings
+        the User changed meanwhile are kept.
 
         Args:
             check_in: The saved Check-in to remove.
@@ -2165,6 +2183,8 @@ class CheckInRepository(Protocol):
             skipped: A Skipped Check-in to save in its place; None for none.
             held_back_due_at: The Due Time it was first due at, so the next
                 one keeps the rhythm; None for none.
+            check_in_now: The Check in Now it was sent for, put back to wait
+                again; None for none.
         """
         ...
 
@@ -2224,7 +2244,8 @@ class CheckInRepository(Protocol):
             since: Only decisions after this are listed.
 
         Returns:
-            The decisions with who each User is.
+            The decisions with who each User is and, for a Check in Now,
+            which Admin asked.
         """
         ...
 

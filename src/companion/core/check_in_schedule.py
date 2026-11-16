@@ -8,6 +8,7 @@ from companion.core.models import (
     AdminCheckInChanges,
     ChangedBy,
     CheckInChanges,
+    CheckInNowResult,
     CheckInScheduleEntry,
     CheckInSchedulePage,
     Feature,
@@ -28,7 +29,8 @@ class CheckInScheduleService:
 
     An Admin Setting Change changes the User's real settings through the same
     rules as the User's own change, and marks each one "changed by an
-    Admin". Admins can never turn a User's Check-ins on or off.
+    Admin". Admins can never turn a User's Check-ins on or off. A Check in
+    Now asks for a Check-in on the next tick.
     """
 
     def __init__(
@@ -132,6 +134,55 @@ class CheckInScheduleService:
             self._opted_in_user(user_id), changed_by=ChangedBy.ADMIN
         )
         return self._entry(user)
+
+    def check_in_now(
+        self, user_ids: list[UUID], admin: User
+    ) -> dict[UUID, CheckInNowResult]:
+        """Ask for a Check-in on the next tick for each of the Users.
+
+        A User who opted in and has a Telegram Connection gets the request
+        saved with the Admin, and is due now. The others are refused, and
+        nothing is saved or logged for them. Reads and the write stay the
+        same however many Users are asked for.
+
+        Args:
+            user_ids: The Users.
+            admin: The Admin asking.
+
+        Returns:
+            Each User's result, in the order asked.
+
+        Raises:
+            UserNotFoundError: If any of them doesn't exist; nothing is saved.
+        """
+        unique_ids = list(dict.fromkeys(user_ids))
+        found = {
+            user.id: user for user in self._repositories.users.get_many(unique_ids)
+        }
+        missing = next(
+            (user_id for user_id in unique_ids if user_id not in found), None
+        )
+        if missing is not None:
+            raise UserNotFoundError(missing)
+        connections = self._repositories.telegram_connections.list_for_users(unique_ids)
+        results = {}
+        for user_id in unique_ids:
+            if not found[user_id].check_ins.enabled:
+                results[user_id] = CheckInNowResult.NOT_OPTED_IN
+            elif user_id not in connections:
+                results[user_id] = CheckInNowResult.NO_TELEGRAM_CONNECTION
+            else:
+                results[user_id] = CheckInNowResult.REQUESTED
+        self._repositories.check_ins.request_check_ins_now(
+            [
+                user_id
+                for user_id, result in results.items()
+                if result == CheckInNowResult.REQUESTED
+            ],
+            admin.id,
+            self._clock.now(),
+        )
+        return results
 
     def _opted_in_user(self, user_id: UUID) -> User:
         """Find a User who opted in to Check-ins.

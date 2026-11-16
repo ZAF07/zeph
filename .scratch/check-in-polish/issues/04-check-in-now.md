@@ -62,3 +62,13 @@ Terms: Check in Now, Check-in Log (`CONTEXT.md`).
 Changes the same Check-in decision and tick code as track A. Rebase on whatever has merged, and renumber migrations if they clash.
 
 ## Comments
+
+### 2026-11-16 — plan (branch `check-in-polish-04-check-in-now`)
+
+- **Models:** `CheckInNowRequest` (requested by, requested at) on `CheckInSettings.check_in_now`; `CheckIn.requested_by`; `CheckInLogEntry.requested_by_name`; `CheckInNowResult` (requested / not opted in / no Telegram Connection).
+- **Migration** `0048`: `users.check_in_now_requested_by` + `check_in_now_requested_at`, `check_ins.requested_by` (both FKs `ON DELETE SET NULL`). "Waiting" is judged by `requested_at`, so a deleted Admin doesn't drop the request.
+- **Request:** `CheckInScheduleService.check_in_now(user_ids, admin)`: bulk read of Users and Telegram Connections, one bulk write for the requested ones (request + Due Time now, held-back cleared). Unknown User → 404, nothing saved.
+- **Tick:** `list_due_users` also loads opted-in, onboarded Users with a request waiting, whatever the Feature switch. `decide_check_in` for a request: only no Telegram Connection (held back, request stays), mid-Conversation (waits as today; issue 05 weaves it in) and no Kind stop it; otherwise `AskModel` with next Due Time "now + gap" either way and the requesting Admin.
+- **After:** `check_ins.add` clears the request (any decision); a refused send puts it back. Turning Check-ins off drops it.
+- **API:** `POST /api/admin/check-in-schedule/check-in-now` `{user_ids}` → per-User result; Schedule rows gain `check_in_now_waiting`; log entries gain `requested_by`.
+- **Web:** row checkboxes + "Check in now" on the Schedule with per-User results; "Check in Now waiting" on the row; "Asked for by <Admin>" in the Check-in Log.
