@@ -2178,19 +2178,26 @@ class CheckInRepository(Protocol):
         ...
 
     def add_woven_in(
-        self, check_in: CheckIn, due_at_read: datetime, next_due_at: datetime
+        self,
+        check_in: CheckIn,
+        due_at_read: datetime,
+        next_due_at: datetime,
+        check_in_now: CheckInNowRequest | None = None,
     ) -> bool:
         """Save a Woven-in Check-in and the User's next due time, if still due.
 
         Nothing is saved if their due time changed since it was read, e.g.
         because a tick or another reply decided on this Check-in already. A
         decision ends any hold back, so why it was held back and the Due
-        Time they were first held back at are cleared.
+        Time they were first held back at are cleared. The Check in Now it
+        was woven in for is cleared too; one asked for since is kept.
 
         Args:
             check_in: The Woven-in Check-in.
             due_at_read: The User's due time as read for the reply.
             next_due_at: When the User's next Check-in may be sent.
+            check_in_now: The Check in Now it was woven in for; None for a
+                scheduled one.
 
         Returns:
             True if it was saved.

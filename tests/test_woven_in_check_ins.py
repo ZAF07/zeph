@@ -1,6 +1,7 @@
 import json
 from datetime import timedelta
 from typing import Any
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
@@ -8,6 +9,7 @@ from sqlalchemy import Engine
 
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.core.models import UserPortrait
+from tests.conftest import INITIAL_ADMIN_EMAIL
 from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
@@ -546,23 +548,153 @@ def test_the_woven_in_check_in_prompt_is_editable_by_admins(
     assert woven_call.instructions.endswith("Weave it in, maybe.")
 
 
-def test_a_waiting_check_in_now_is_not_woven_in_and_is_left_to_the_tick(
+def chat_then_check_in_now(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+) -> tuple[dict[str, str], dict[str, str], UUID]:
+    """Chat long before the Due Time, then ask for a Check in Now.
+
+    Returns:
+        Maya's headers, the Admin's headers and Maya's ID.
+    """
+    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    admin = owner_headers(client, auth_verifier)
+    maya = maya_id(client, headers)
+    clock.advance(timedelta(hours=1))
+    chat_model.script("oh nice!")
+    send_to_webhook(client, telegram_text_update("just got back from a run"))
+    check_in_now(client, admin, [maya])
+    chat_channel.sent.clear()
+    return headers, admin, maya
+
+
+def test_a_check_in_now_mid_conversation_is_woven_into_the_reply_and_logged(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    engine: Engine,
+) -> None:
+    _, admin, maya = chat_then_check_in_now(
+        client, auth_verifier, chat_channel, chat_model, clock
+    )
+    chat_model.script_woven_check_in(weave_answer())
+    chat_model.script("ha, love that. how did the board presentation go?")
+
+    send_to_webhook(client, telegram_text_update("now making a big salad"))
+
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
+        "ha, love that. how did the board presentation go?"
+    ]
+    assert NOTE in chat_model.calls[-1].instructions
+    [entry] = admin_log(client, auth_verifier)
+    assert (entry["outcome"], entry["woven_in"], entry["requested_by"]) == (
+        "sent",
+        True,
+        INITIAL_ADMIN_EMAIL,
+    )
+    assert only_entry(client, admin)["check_in_now_waiting"] is False
+    assert as_json_time(next_due_at(engine, maya) - ONE_DAY) == entry["decided_at"]
+
+
+def test_a_check_in_now_is_woven_in_past_the_pause_and_the_feature_switch(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
     chat_model: ScriptedChatModel,
     clock: FakeClock,
 ) -> None:
-    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
-    admin = owner_headers(client, auth_verifier)
-    clock.advance(timedelta(hours=1))
-    chat_model.script("oh nice!")
-    send_to_webhook(client, telegram_text_update("just got back from a run"))
-    check_in_now(client, admin, [maya_id(client, headers)])
+    headers, admin, maya = chat_then_check_in_now(
+        client, auth_verifier, chat_channel, chat_model, clock
+    )
+    pause_check_ins(client, headers, "week")
+    response = client.put(
+        f"/api/admin/users/{maya}/features/check_ins",
+        json={"switch": "off"},
+        headers=admin,
+    )
+    assert response.status_code == 200, response.text
     chat_model.script_woven_check_in(weave_answer())
-    chat_model.script("sounds tasty!")
+    chat_model.script("how did the board presentation go?")
 
     send_to_webhook(client, telegram_text_update("now making a big salad"))
 
+    [entry] = admin_log(client, auth_verifier)
+    assert (entry["woven_in"], entry["requested_by"]) == (True, INITIAL_ADMIN_EMAIL)
+    assert client.get("/api/check-ins", headers=headers).json()["paused"] is True
+
+
+def test_a_check_in_now_is_never_woven_in_while_the_user_is_struggling(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+) -> None:
+    _, admin, _ = chat_then_check_in_now(
+        client, auth_verifier, chat_channel, chat_model, clock
+    )
+    chat_model.script_understanding(understanding_answer(struggling=True))
+    chat_model.script("I'm here. that sounds really hard.")
+
+    send_to_webhook(client, telegram_text_update("my mum is in hospital again"))
+
     assert chat_model.woven_check_in_calls == []
+    assert admin_log(client, auth_verifier) == []
+    assert only_entry(client, admin)["check_in_now_waiting"] is True
+
+
+def test_a_check_in_now_not_woven_in_goes_out_on_its_own_after_the_conversation(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    engine: Engine,
+    seeded_settings: dict[str, Any],
+) -> None:
+    _, admin, maya = chat_then_check_in_now(
+        client, auth_verifier, chat_channel, chat_model, clock
+    )
+    chat_model.script_woven_check_in(json.dumps({"decision": "not_now"}))
+    chat_model.script("sounds tasty!")
+    send_to_webhook(client, telegram_text_update("now making a big salad"))
+    scheduler.tick()
+    assert only_entry(client, admin)["check_in_now_waiting"] is True
+    chat_channel.sent.clear()
+
+    chat_model.script(send_answer("hey, how was the salad?"))
+    chat_model.script_processing(processing_answer())
+    clock.advance(quiet_gap(seeded_settings))
+    scheduler.tick()
+
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["hey, how was the salad?"]
+    [entry] = admin_log(client, auth_verifier)
+    assert (entry["woven_in"], entry["requested_by"]) == (False, INITIAL_ADMIN_EMAIL)
+    assert only_entry(client, admin)["check_in_now_waiting"] is False
+    assert next_due_at(engine, maya) == clock.now() + ONE_DAY
+
+
+def test_a_woven_in_check_in_now_whose_reply_fails_to_send_keeps_waiting(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+) -> None:
+    _, admin, _ = chat_then_check_in_now(
+        client, auth_verifier, chat_channel, chat_model, clock
+    )
+    chat_model.script_woven_check_in(weave_answer())
+    chat_model.script("how did the board presentation go?")
+    chat_channel.text_send_failures.append(ConnectionError("telegram is down"))
+
+    send_to_webhook(client, telegram_text_update("now making a big salad"))
+
+    assert admin_log(client, auth_verifier) == []
     assert only_entry(client, admin)["check_in_now_waiting"] is True
