@@ -1476,10 +1476,19 @@ HOSTING_CASE = EvalCase(
 )
 
 
-def kept_outcome(move: int, result: str, why: str) -> dict[str, Any]:
-    """Build one Move Outcome as the keeping model writes it."""
+def kept_outcome(move_number: int, result: str, why: str) -> dict[str, Any]:
+    """Build one Move Outcome as the keeping model writes it.
+
+    Args:
+        move_number: The number the keeping model was shown the Move by.
+        result: helped, didnt_help or mixed.
+        why: Why it went that way.
+
+    Returns:
+        The Move Outcome as JSON-ready data.
+    """
     return {
-        "move": move,
+        "move": move_number,
         "situation": "Looking for app hosting under SGD 20.",
         "feeling": "frustrated",
         "result": result,
@@ -1563,6 +1572,13 @@ def test_a_move_outcome_case_keeps_outcomes_from_its_conversation_and_judges_the
         f"/api/admin/eval-runs/{run['id']}/results/{result['id']}", headers=admin
     ).json()
     assert [call["step"] for call in trace["calls"]] == ["move_outcomes"]
+    [saved] = PostgresEvalRunRepository(engine).list_results(UUID(run["id"]))
+    facts = saved.result.facts
+    assert set(facts["call"]) == {"duration_ms", "tokens_in", "tokens_out"}
+    assert {outcome["move"] for outcome in facts["outcomes"]} == {
+        "Plan steps",
+        "Research",
+    }
 
 
 def test_a_move_outcome_not_kept_or_with_the_wrong_result_fails(
@@ -1616,10 +1632,19 @@ def test_move_outcome_keeping_overrides_reach_only_their_variant(
         content={**HOSTING_CASE.content, "outcomes": [], "rules": []},
     )
     add_cases(engine, case)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE platform_settings SET value = "
+                '\'["deepseek-flash", "deepseek-pro"]\'::jsonb '
+                "WHERE key = 'available_models'"
+            )
+        )
     admin = owner_headers(client, auth_verifier)
     live_before = PostgresPlatformSettingsRepository(engine).load().values
     overrides = {
         "move_outcome_keeping_prompt": "Keep the lessons.",
+        "move_outcome_keeping_model": "deepseek-pro",
         "move_outcome_keeping_thinking": False,
     }
     start_run(client, admin, EvalName.MOVE_OUTCOME, variants=[{}, overrides])
@@ -1631,6 +1656,6 @@ def test_move_outcome_keeping_overrides_reach_only_their_variant(
     [variant_call] = [
         call for call in chat_model.calls if call.instructions == "Keep the lessons."
     ]
-    assert live_call.thinking is True
-    assert (variant_call.thinking, variant_call.model) == (False, live_call.model)
+    assert (live_call.model, live_call.thinking) == ("deepseek-flash", True)
+    assert (variant_call.model, variant_call.thinking) == ("deepseek-pro", False)
     assert PostgresPlatformSettingsRepository(engine).load().values == live_before

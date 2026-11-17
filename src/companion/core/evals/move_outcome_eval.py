@@ -11,12 +11,17 @@ from companion.core.evals.judge import JudgeSettings, judge_move_outcome_rules
 from companion.core.evals.models import CaseCheckResult, CaseOutcome, Check
 from companion.core.evals.persona_eval import verdict_check
 from companion.core.evals.ports import EvalCompanion
-from companion.core.evals.understanding_eval import transcript_line
+from companion.core.evals.understanding_eval import (
+    calls_in_new_traces,
+    transcript_line,
+)
 from companion.core.models import (
     Conversation,
     ConversationMessage,
     MessageDirection,
     MessageKind,
+    ModelCall,
+    ModelStep,
     MoodIntensity,
     MoveOutcome,
     MoveResult,
@@ -221,6 +226,27 @@ def outcome_facts(outcome: MoveOutcome) -> dict[str, str]:
     }
 
 
+def keeping_call_facts(calls: Sequence[ModelCall]) -> dict[str, int] | None:
+    """Write the Move Outcome keeping call's time and tokens for the report.
+
+    Args:
+        calls: The model calls the keeping step made.
+
+    Returns:
+        The last keeping call's `duration_ms`, `tokens_in` and `tokens_out`;
+        None if no Move was made, so nothing was asked.
+    """
+    keeping_calls = [call for call in calls if call.step == ModelStep.MOVE_OUTCOMES]
+    if not keeping_calls:
+        return None
+    call = keeping_calls[-1]
+    return {
+        "duration_ms": call.duration_ms,
+        "tokens_in": call.tokens_in,
+        "tokens_out": call.tokens_out,
+    }
+
+
 def check_move_outcome_case(
     case: MoveOutcomeCase, companion: EvalCompanion, judge: JudgeSettings
 ) -> CaseCheckResult:
@@ -237,8 +263,8 @@ def check_move_outcome_case(
 
     Returns:
         Each expected Move Outcome's checks, grouped by Move and role; its
-        facts hold every Move Outcome kept. A failed case notes them and
-        the Conversation.
+        facts hold every Move Outcome kept and the keeping call's time and
+        tokens. A failed case notes the Move Outcomes and the Conversation.
     """
     companion.move_clock(case.now - companion.now())
     user_id = companion.connect_user()
@@ -247,7 +273,10 @@ def check_move_outcome_case(
         repositories, user_id, case.messages, companion.now()
     )
     companion.move_clock(MESSAGE_GAP * len(case.messages) + ENDED_AFTER)
+    seen_trace_ids: set[UUID] = set()
+    calls_in_new_traces(repositories, user_id, seen_trace_ids)
     companion.keep_move_outcomes(conversation_id)
+    keeping_calls = calls_in_new_traces(repositories, user_id, seen_trace_ids)
 
     kept = repositories.move_outcomes.list_for_user(user_id)
     transcript_lines = [
@@ -265,7 +294,10 @@ def check_move_outcome_case(
     return CaseCheckResult(
         outcome=CaseOutcome.PASS if passed else CaseOutcome.FAIL,
         checks=checks,
-        facts={"outcomes": [outcome_facts(outcome) for outcome in kept]},
+        facts={
+            "outcomes": [outcome_facts(outcome) for outcome in kept],
+            "call": keeping_call_facts(keeping_calls),
+        },
         notes=(
             []
             if passed

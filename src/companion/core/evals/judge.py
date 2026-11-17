@@ -246,12 +246,51 @@ def judge_persona_rules(
     Returns:
         One verdict per rule, in the order given.
     """
-    rule_lines = "\n".join(f"- {rule}: {check}" for rule, check in rules.items())
-    question = f"Rules:\n{rule_lines}\n\nConversation:\n{transcript}"
+    return ask_about_rules(
+        chat_model,
+        judge,
+        judge.persona_instructions,
+        f"{rule_lines(rules)}\n\nConversation:\n{transcript}",
+        rules,
+    )
+
+
+def rule_lines(rules: Mapping[str, str]) -> str:
+    """Write rules as the Judge is shown them.
+
+    Args:
+        rules: Each rule's ID and what it checks.
+
+    Returns:
+        "Rules:" then one "- <id>: <check>" line per rule.
+    """
+    lines = "\n".join(f"- {rule}: {check}" for rule, check in rules.items())
+    return f"Rules:\n{lines}"
+
+
+def ask_about_rules(
+    chat_model: ChatModel,
+    judge: JudgeSettings,
+    instructions: str,
+    question: str,
+    rules: Mapping[str, str],
+) -> list[RuleVerdict]:
+    """Ask the judge for a verdict on each rule, with one of its prompts.
+
+    Args:
+        chat_model: The model that judges.
+        judge: The Judge's model and thinking.
+        instructions: The Judge's prompt for this kind of check.
+        question: The rules and what they are checked on.
+        rules: Each rule's ID and what it checks.
+
+    Returns:
+        One verdict per rule, in the order given.
+    """
     answer = chat_model.generate(
         model=judge.model,
         thinking=judge.thinking,
-        instructions=judge.persona_instructions,
+        instructions=instructions,
         history=[ChatLine(role=ChatRole.USER, text=question)],
     )
     return read_rule_verdicts(answer.text, list(rules))
@@ -308,15 +347,11 @@ def judge_move_outcome_rules(
     Returns:
         One verdict per rule, in the order given.
     """
-    rule_lines = "\n".join(f"- {rule}: {check}" for rule, check in rules.items())
-    question = (
-        f"Rules:\n{rule_lines}\n\nConversation:\n{transcript}\n\n"
-        f"Move Outcome kept:\n{outcome}"
+    return ask_about_rules(
+        chat_model,
+        judge,
+        judge.outcome_instructions,
+        f"{rule_lines(rules)}\n\nConversation:\n{transcript}\n\n"
+        f"Move Outcome kept:\n{outcome}",
+        rules,
     )
-    answer = chat_model.generate(
-        model=judge.model,
-        thinking=judge.thinking,
-        instructions=judge.outcome_instructions,
-        history=[ChatLine(role=ChatRole.USER, text=question)],
-    )
-    return read_rule_verdicts(answer.text, list(rules))
