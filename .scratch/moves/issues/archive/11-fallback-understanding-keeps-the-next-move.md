@@ -58,3 +58,5 @@ Caveats:
 - Completed: 2026-11-17
 - Commit: `b8b043d` — Moves issue 11: a fallback Understanding doesn't lose the next Move — Understandings record whether they were the fallback (migration 0056), and Curiosity keeping is shown the next Move of the newest Understanding the model made; ADR-0016 and CONTEXT.md say a fallback neither makes nor drops one
 - Commit: `0306536` — Moves issue 11: review fixes — test for a next Move made before a fallback, migration test name says it checks the column default, is_fallback docstring says it's this Understanding
+- Commit: `322b3a8` — Moves issue 11 done: archive issue with check and run evidence
+- Merge: `bd4c4e2` — Merge Moves issue 11: a fallback Understanding doesn't lose the next Move — Understandings record whether they were the fallback (migration 0056), and at Conversation end Curiosity keeping is shown the next Move of the newest Understanding the model made; ADR-0016 and CONTEXT.md say a fallback neither makes nor drops one
