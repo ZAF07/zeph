@@ -23,7 +23,7 @@ class MoveNameTakenError(ConflictError):
     """Raised when another Move already has the name, ignoring case."""
 
 
-def name_taken(name: str) -> MoveNameTakenError:
+def name_taken_error(name: str) -> MoveNameTakenError:
     """Make the error that refuses a Move name already in use.
 
     Args:
@@ -76,7 +76,7 @@ class MoveService:
         try:
             return self._repositories.moves.add(checked)
         except NameTakenError as error:
-            raise name_taken(checked.name) from error
+            raise name_taken_error(checked.name) from error
 
     def update(self, move_id: UUID, details: MoveDetails) -> Move:
         """Change a Move's name, when it fits, how to do it and needed Feature.
@@ -97,7 +97,7 @@ class MoveService:
         try:
             return self._repositories.moves.update(move_id, checked)
         except NameTakenError as error:
-            raise name_taken(checked.name) from error
+            raise name_taken_error(checked.name) from error
 
     def checked(self, move_id: UUID, details: MoveDetails) -> MoveDetails:
         """Check new details for a Move, without saving them.
@@ -216,5 +216,5 @@ class MoveService:
             for move in self._repositories.moves.list_all()
         )
         if is_taken:
-            raise name_taken(checked.name)
+            raise name_taken_error(checked.name)
         return checked

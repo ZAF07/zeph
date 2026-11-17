@@ -26,7 +26,7 @@ class FallbackNeedError(ConflictError):
     shown_message = "The fallback Need can't be deleted, only edited."
 
 
-def name_taken(name: str) -> InvalidNeedError:
+def name_taken_error(name: str) -> InvalidNeedError:
     """Make the error that refuses a Need name already in use.
 
     Args:
@@ -81,7 +81,7 @@ class NeedService:
         try:
             return self._repositories.needs.add(checked)
         except NameTakenError as error:
-            raise name_taken(checked.name) from error
+            raise name_taken_error(checked.name) from error
 
     def update(self, need_id: UUID, details: NeedDetails) -> Need:
         """Change a Need's name, when it fits, how to reply and ruled-out Moves.
@@ -103,7 +103,7 @@ class NeedService:
         try:
             return self._repositories.needs.update(need_id, checked)
         except NameTakenError as error:
-            raise name_taken(checked.name) from error
+            raise name_taken_error(checked.name) from error
 
     def checked(self, need_id: UUID, details: NeedDetails) -> NeedDetails:
         """Check new details for a Need, without saving them.
@@ -226,7 +226,7 @@ class NeedService:
             for need in self._repositories.needs.list_all()
         )
         if is_taken:
-            raise name_taken(checked.name)
+            raise name_taken_error(checked.name)
         move_ids = {move.id for move in self._repositories.moves.list_all()}
         if not checked.ruled_out_move_ids <= move_ids:
             raise MoveNotFoundError(checked.ruled_out_move_ids - move_ids)
