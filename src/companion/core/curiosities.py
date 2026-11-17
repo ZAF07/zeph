@@ -655,17 +655,16 @@ class CuriosityKeeper:
             category.id: category.name
             for category in self._repositories.memory_categories.list_all()
         }
+        unmade_next_move = describe_unmade_next_move(
+            self._repositories.understandings.list_for_conversation(conversation_id)
+        )
         entries = self._ask(
             snapshot,
             describe_curiosities_to_keep(
                 context,
                 category_names,
                 recently_raised,
-                describe_unmade_next_move(
-                    self._repositories.understandings.list_for_conversation(
-                        conversation_id
-                    )
-                ),
+                unmade_next_move,
                 messages,
                 snapshot,
             ),
