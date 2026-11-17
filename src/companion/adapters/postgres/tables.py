@@ -212,6 +212,7 @@ moves = Table(
     Column("when_it_fits", Text, nullable=False),
     Column("how_to_do_it", Text, nullable=False),
     Column("sort_order", Integer, nullable=False),
+    Column("needed_feature", Text, nullable=True),
     Index("moves_name_ignoring_case", text("lower(name)"), unique=True),
 )
 

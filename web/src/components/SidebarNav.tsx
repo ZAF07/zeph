@@ -23,6 +23,7 @@ const adminItems = [
   { label: "Knowledge", href: "/admin/knowledge" },
   { label: "Memory Categories", href: "/admin/memory-categories" },
   { label: "Needs", href: "/admin/needs" },
+  { label: "Moves", href: "/admin/moves" },
   { label: "Check-in Kinds", href: "/admin/check-in-kinds" },
   { label: "Check-in log", href: "/admin/check-in-log" },
   { label: "Check-in Schedule", href: "/admin/check-in-schedule" },

@@ -192,7 +192,8 @@ export type Feature =
   | "user_memory"
   | "settings_in_chat"
   | "photo_viewing"
-  | "personal_stickers";
+  | "personal_stickers"
+  | "curiosities";
 
 /** A Feature's switch for everyone and who last changed it, and when. */
 export type FeatureSwitch = {
@@ -472,11 +473,12 @@ export type CheckInKind = CheckInKindInput & {
 /** A Check-in Kind and how many Check-ins of it were sent in 30 days. */
 export type CheckInKindOverview = CheckInKind & { sent_last_30_days: number };
 
-/** A Need's name, when it fits and how to reply. */
+/** A Need's name, when it fits, how to reply and the Moves it rules out. */
 export type NeedInput = {
   name: string;
   when_it_fits: string;
   how_to_reply: string;
+  ruled_out_move_ids: string[];
 };
 
 /**
@@ -487,6 +489,20 @@ export type Need = NeedInput & {
   id: string;
   is_fallback: boolean;
 };
+
+/**
+ * A Move's name, when it fits, how to do it and the Feature it can't be
+ * made without; `needed_feature` is null for none.
+ */
+export type MoveInput = {
+  name: string;
+  when_it_fits: string;
+  how_to_do_it: string;
+  needed_feature: Feature | null;
+};
+
+/** A Move as Admins manage it: what Zeph does to help in a reply. */
+export type Move = MoveInput & { id: string };
 
 /**
  * One Check-in decision in the admin log. Never the message text.
@@ -1173,6 +1189,11 @@ export type ApiClient = {
   updateNeed: (id: string, need: NeedInput) => Promise<Need>;
   deleteNeed: (id: string) => Promise<void>;
   moveNeed: (id: string, direction: MoveDirection) => Promise<Need[]>;
+  listMoves: () => Promise<Move[]>;
+  addMove: (move: MoveInput) => Promise<Move>;
+  updateMove: (id: string, move: MoveInput) => Promise<Move>;
+  deleteMove: (id: string) => Promise<void>;
+  moveMove: (id: string, direction: MoveDirection) => Promise<Move[]>;
   listCheckInLog: (days: number) => Promise<CheckInLogEntry[]>;
   listCheckInSchedule: (
     filter: CheckInScheduleFilter,
@@ -1525,6 +1546,20 @@ export function createApiClient(
           { direction },
         )
       ).needs,
+    listMoves: async () =>
+      (await request<{ moves: Move[] }>("/api/admin/moves")).moves,
+    addMove: (move) => request<Move>("/api/admin/moves", "POST", move),
+    updateMove: (id, move) =>
+      request<Move>(`/api/admin/moves/${id}`, "PUT", move),
+    deleteMove: (id) => request<void>(`/api/admin/moves/${id}`, "DELETE"),
+    moveMove: async (id, direction) =>
+      (
+        await request<{ moves: Move[] }>(
+          `/api/admin/moves/${id}/move`,
+          "POST",
+          { direction },
+        )
+      ).moves,
     listCheckInLog: async (days) =>
       (
         await request<{ entries: CheckInLogEntry[] }>(

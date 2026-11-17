@@ -881,7 +881,7 @@ class MemoryCategory:
 
 
 class MoveDirection(StrEnum):
-    """Which way to move a Helpline or Need in its list."""
+    """Which way to move a Helpline, Need or Move in its list."""
 
     UP = "up"
     DOWN = "down"
@@ -895,11 +895,13 @@ class NeedDetails:
         name: Its name, e.g. "Be heard".
         when_it_fits: When to pick it, as the Understanding model is told.
         how_to_reply: How to reply when it is picked, as the reply is told.
+        ruled_out_move_ids: The Moves that never go with it.
     """
 
     name: str
     when_it_fits: str
     how_to_reply: str
+    ruled_out_move_ids: frozenset[UUID]
 
 
 @dataclass(frozen=True)
@@ -926,6 +928,23 @@ class Need:
 
 
 @dataclass(frozen=True)
+class MoveDetails:
+    """What an Admin sets on a Move.
+
+    Attributes:
+        name: Its name, e.g. "Research"; unique ignoring case.
+        when_it_fits: When to pick it, as the Understanding model is told.
+        how_to_do_it: How to make it, as the reply is told.
+        needed_feature: The Feature it can't be made without; None for none.
+    """
+
+    name: str
+    when_it_fits: str
+    how_to_do_it: str
+    needed_feature: "Feature | None"
+
+
+@dataclass(frozen=True)
 class Move:
     """What the Companion does to help in a reply. Managed by Admins.
 
@@ -935,6 +954,8 @@ class Move:
         when_it_fits: When to pick it, as the Understanding model is told.
         how_to_do_it: How to make it, as the reply is told.
         sort_order: Where it comes in the list, lowest first.
+        needed_feature: The Feature it can't be made without, e.g. Web
+            Search for Research; None for none.
     """
 
     id: UUID
@@ -942,6 +963,7 @@ class Move:
     when_it_fits: str
     how_to_do_it: str
     sort_order: int
+    needed_feature: "Feature | None"
 
 
 class MoodIntensity(StrEnum):

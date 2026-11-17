@@ -8,15 +8,21 @@ import {
   secondaryButton,
 } from "@/components/button-styles";
 import { fieldLabel, inputField } from "@/components/form-styles";
-import { ApiError, type MoveDirection, type NeedInput } from "@/lib/api-client";
+import {
+  ApiError,
+  type Move,
+  type MoveDirection,
+  type NeedInput,
+} from "@/lib/api-client";
 
 /**
- * One Need as an editable card: name, "when it fits", "how to reply", Move
- * up and down, Save and Remove. The fallback Need says so and has no Remove.
- * A new Need's card has Add and Cancel instead.
+ * One Need as an editable card: name, "when it fits", "how to reply", the
+ * Moves it rules out, Move up and down, Save and Remove. The fallback Need
+ * says so and has no Remove. A new Need's card has Add and Cancel instead.
  *
  * @param props - `initial` fills the card; `isNew` marks a Need not saved
- *   yet; `isFallback` marks the fallback Need; `onSave` saves and rejects if
+ *   yet; `moves` are every Move, to pick the ruled-out ones from;
+ *   `isFallback` marks the fallback Need; `onSave` saves and rejects if
  *   the backend refuses; `onRemove` removes the Need, or `onCancel` drops a
  *   new one; `onMove` moves it, and `canMoveUp` / `canMoveDown` say which
  *   ways it can go; `isMoving` disables the moves while one is saving.
@@ -25,6 +31,7 @@ import { ApiError, type MoveDirection, type NeedInput } from "@/lib/api-client";
 export function NeedCard({
   initial,
   isNew,
+  moves,
   isFallback = false,
   onSave,
   onRemove,
@@ -36,6 +43,7 @@ export function NeedCard({
 }: {
   initial: NeedInput;
   isNew: boolean;
+  moves: Move[];
   isFallback?: boolean;
   onSave: (need: NeedInput) => Promise<void>;
   onRemove?: () => Promise<void>;
@@ -49,6 +57,9 @@ export function NeedCard({
   const [name, setName] = useState(initial.name);
   const [whenItFits, setWhenItFits] = useState(initial.when_it_fits);
   const [howToReply, setHowToReply] = useState(initial.how_to_reply);
+  const [ruledOut, setRuledOut] = useState(
+    () => new Set(initial.ruled_out_move_ids),
+  );
   const [isBusy, setIsBusy] = useState(false);
   const [isConfirmingRemove, setIsConfirmingRemove] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +70,9 @@ export function NeedCard({
   const isChanged =
     name !== initial.name ||
     whenItFits !== initial.when_it_fits ||
-    howToReply !== initial.how_to_reply;
+    howToReply !== initial.how_to_reply ||
+    ruledOut.size !== initial.ruled_out_move_ids.length ||
+    initial.ruled_out_move_ids.some((id) => !ruledOut.has(id));
 
   async function run(action: () => Promise<void>, failureText: string) {
     setIsBusy(true);
@@ -80,9 +93,29 @@ export function NeedCard({
   function save() {
     void run(
       () =>
-        onSave({ name, when_it_fits: whenItFits, how_to_reply: howToReply }),
+        onSave({
+          name,
+          when_it_fits: whenItFits,
+          how_to_reply: howToReply,
+          ruled_out_move_ids: moves
+            .map((move) => move.id)
+            .filter((id) => ruledOut.has(id)),
+        }),
       "Couldn’t save the Need. Please try again.",
     );
+  }
+
+  function toggleRuledOut(moveId: string) {
+    setRuledOut((current) => {
+      const next = new Set(current);
+      if (next.has(moveId)) {
+        next.delete(moveId);
+      } else {
+        next.add(moveId);
+      }
+      return next;
+    });
+    setError(null);
   }
 
   return (
@@ -140,6 +173,32 @@ export function NeedCard({
             }}
           />
         </div>
+        <fieldset className={`${fieldLabel} m-0 border-0 p-0`}>
+          <legend className="mb-1.5">
+            Ruled-out Moves{" "}
+            <span className="text-caption font-normal text-ink-muted">
+              — never picked with this Need
+            </span>
+          </legend>
+          {moves.length === 0 ? (
+            <span className="text-caption font-normal text-ink-muted">
+              No Moves yet.
+            </span>
+          ) : (
+            <span className="flex flex-wrap gap-x-4 gap-y-2 font-normal">
+              {moves.map((move) => (
+                <label key={move.id} className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={ruledOut.has(move.id)}
+                    onChange={() => toggleRuledOut(move.id)}
+                  />
+                  {move.name}
+                </label>
+              ))}
+            </span>
+          )}
+        </fieldset>
       </div>
       {error ? (
         <p

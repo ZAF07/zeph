@@ -61,6 +61,25 @@ def format_search_results(
     )
 
 
+def web_search_limit_used_up(
+    repositories: Repositories, snapshot: UserSnapshot
+) -> bool:
+    """Say whether the User has made `web_search_daily_limit` searches today.
+
+    Reading a page counts as a web search too. Their day is the day where
+    they live.
+
+    Args:
+        repositories: Where usage is stored.
+        snapshot: The User.
+
+    Returns:
+        True once the Web Search Limit is used up for their day.
+    """
+    used_today = repositories.usage.count_web_searches(snapshot.user.id, snapshot.today)
+    return used_today >= snapshot.settings.get(WEB_SEARCH_DAILY_LIMIT)
+
+
 class WebSearchTools:
     """Offers web search and page reading to replies, within the daily limit."""
 
@@ -98,8 +117,7 @@ class WebSearchTools:
         user_id = snapshot.user.id
         today = snapshot.today
         source_reminder = settings.get(WEB_RESULT_SOURCE_REMINDER)
-        used_today = usage.count_web_searches(user_id, today)
-        if used_today >= daily_limit:
+        if web_search_limit_used_up(self._repositories, snapshot):
             return ReplyOffer(
                 tools=[], instructions=settings.get(REPLY_WEB_SEARCH_LIMIT_NOTE)
             )

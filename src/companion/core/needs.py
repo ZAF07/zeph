@@ -2,6 +2,7 @@ from uuid import UUID
 
 from companion.core.errors import ConflictError, InvalidError, NotFoundError
 from companion.core.models import MoveDirection, Need, NeedDetails
+from companion.core.moves import MoveNotFoundError
 from companion.core.ports import Repositories
 
 MAX_NAME_LENGTH = 80
@@ -26,7 +27,7 @@ class FallbackNeedError(ConflictError):
 
 
 class NeedService:
-    """Lets Admins add, edit, reorder and delete Needs.
+    """Lets Admins add, edit, reorder and delete Needs, with their rule-outs.
 
     The Understanding reads the list fresh before every reply, so changes take
     effect straight away. Saved Understandings name their Need, so deleting
@@ -53,7 +54,8 @@ class NeedService:
         """Add a Need last in the list.
 
         Args:
-            details: Its name, when it fits and how to reply.
+            details: Its name, when it fits, how to reply and the Moves it
+                rules out.
 
         Returns:
             The saved Need.
@@ -61,11 +63,12 @@ class NeedService:
         Raises:
             InvalidNeedError: If a field is blank or too long, or another Need
                 already has the name.
+            MoveNotFoundError: If a ruled-out Move doesn't exist.
         """
         return self._repositories.needs.add(self._checked_details(details, None))
 
     def update(self, need_id: UUID, details: NeedDetails) -> Need:
-        """Change a Need's name, when it fits and how to reply.
+        """Change a Need's name, when it fits, how to reply and ruled-out Moves.
 
         Args:
             need_id: The Need's ID.
@@ -78,6 +81,7 @@ class NeedService:
             NeedNotFoundError: If there is no such Need.
             InvalidNeedError: If a field is blank or too long, or another Need
                 already has the name.
+            MoveNotFoundError: If a ruled-out Move doesn't exist.
         """
         return self._repositories.needs.update(need_id, self.checked(need_id, details))
 
@@ -95,8 +99,9 @@ class NeedService:
             NeedNotFoundError: If there is no such Need.
             InvalidNeedError: If a field is blank or too long, or another Need
                 already has the name.
+            MoveNotFoundError: If a ruled-out Move doesn't exist.
         """
-        self._get(need_id)
+        self.get(need_id)
         return self._checked_details(details, need_id)
 
     def delete(self, need_id: UUID) -> None:
@@ -109,7 +114,7 @@ class NeedService:
             NeedNotFoundError: If there is no such Need.
             FallbackNeedError: If it is the fallback Need.
         """
-        if self._get(need_id).is_fallback:
+        if self.get(need_id).is_fallback:
             raise FallbackNeedError
         self._repositories.needs.delete(need_id)
 
@@ -128,7 +133,7 @@ class NeedService:
         Raises:
             NeedNotFoundError: If there is no such Need.
         """
-        self._get(need_id)
+        self.get(need_id)
         needs = self._repositories.needs.list_all()
         index = next(i for i, need in enumerate(needs) if need.id == need_id)
         neighbour_index = index - 1 if direction == MoveDirection.UP else index + 1
@@ -139,7 +144,7 @@ class NeedService:
             )
         return self._repositories.needs.list_all()
 
-    def _get(self, need_id: UUID) -> Need:
+    def get(self, need_id: UUID) -> Need:
         """Find a Need.
 
         Args:
@@ -172,11 +177,13 @@ class NeedService:
         Raises:
             InvalidNeedError: If a field is blank or too long, or another Need
                 already has the name.
+            MoveNotFoundError: If a ruled-out Move doesn't exist.
         """
         checked = NeedDetails(
             name=details.name.strip(),
             when_it_fits=details.when_it_fits.strip(),
             how_to_reply=details.how_to_reply.strip(),
+            ruled_out_move_ids=details.ruled_out_move_ids,
         )
         if not checked.name or not checked.when_it_fits or not checked.how_to_reply:
             raise InvalidNeedError(
@@ -200,4 +207,7 @@ class NeedService:
         )
         if is_taken:
             raise InvalidNeedError(f"There is already a Need called “{checked.name}”.")
+        move_ids = {move.id for move in self._repositories.moves.list_all()}
+        if not checked.ruled_out_move_ids <= move_ids:
+            raise MoveNotFoundError(checked.ruled_out_move_ids - move_ids)
         return checked

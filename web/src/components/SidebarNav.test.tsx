@@ -43,6 +43,7 @@ describe("SidebarNav", () => {
       "Knowledge",
       "Memory Categories",
       "Needs",
+      "Moves",
       "Check-in Kinds",
       "Check-in log",
       "Check-in Schedule",

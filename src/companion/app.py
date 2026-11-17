@@ -47,6 +47,7 @@ from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.message_retention import MessageRetention
 from companion.core.model_call_log import ModelCallLog
 from companion.core.move_outcomes import MoveOutcomeKeeper
+from companion.core.moves import MoveService
 from companion.core.needs import NeedService
 from companion.core.personal_stickers import (
     PersonalStickerKeeper,
@@ -454,6 +455,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             usage_limiter=usage_limiter,
             model_call_log=model_call_log,
             need_service=need_service,
+            move_service=MoveService(dependencies.repositories),
         )
     )
     setting_overrides = SettingOverrideService(platform_settings_service, need_service)
