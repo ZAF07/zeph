@@ -266,6 +266,7 @@ understandings = Table(
     Column("support_move", Text),
     Column("next_move", Text),
     Column("next_move_why", Text),
+    Column("is_fallback", Boolean, nullable=False, server_default="false"),
     Column("asked_why", Boolean, nullable=False),
     Column("made_at", DateTime(timezone=True), nullable=False),
 )
