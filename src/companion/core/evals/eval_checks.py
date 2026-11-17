@@ -3,6 +3,7 @@ from typing import Any
 
 from companion.core.evals.cases import (
     read_knowledge_case,
+    read_move_outcome_case,
     read_persona_case,
     read_photo_description_case,
     read_safeguard_case,
@@ -17,6 +18,7 @@ from companion.core.evals.models import (
     EvalName,
     StopCheck,
 )
+from companion.core.evals.move_outcome_eval import check_move_outcome_case
 from companion.core.evals.persona_eval import check_persona_case
 from companion.core.evals.photo_description_eval import check_photo_description_case
 from companion.core.evals.ports import EvalCompanion
@@ -101,6 +103,9 @@ CHECKERS: dict[EvalName, CaseChecker] = {
         read_photo_description_case, check_photo_description_case
     ),
     EvalName.UNDERSTANDING: check_understanding,
+    EvalName.MOVE_OUTCOME: judged_checker(
+        read_move_outcome_case, check_move_outcome_case
+    ),
 }
 
 READERS: dict[EvalName, Callable[[str, dict[str, Any]], object]] = {
@@ -110,6 +115,7 @@ READERS: dict[EvalName, Callable[[str, dict[str, Any]], object]] = {
     EvalName.SETTINGS: read_settings_case,
     EvalName.PHOTO_DESCRIPTIONS: read_photo_description_case,
     EvalName.UNDERSTANDING: read_understanding_case,
+    EvalName.MOVE_OUTCOME: read_move_outcome_case,
 }
 
 

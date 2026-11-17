@@ -4,7 +4,7 @@ The evals measure how the Companion behaves with the real LLM. They are not
 tests: they cost money and their results vary a little from run to run. They
 never run in `make check`.
 
-There are six:
+There are seven:
 
 - **Safeguard**: about 30 labelled messages (clear crises, subtle crises and
   false alarms like "this traffic is killing me"), and photos of test images
@@ -42,6 +42,17 @@ There are six:
   fixing, an old story is raised naturally, a gentle probe). It also checks
   every model call kept its full content in the Model Call Log, and reports
   the time and tokens of each Understanding call.
+- **Move Outcome**: each case gives a made-up User a finished Conversation:
+  its messages and, for each of the User's messages, the Need, the lead and
+  supporting Moves and the mood. They are saved as if they had happened, and
+  the real Move Outcome keeping step runs on them as it would after the
+  quiet gap, with the Move Outcome keeping prompt, model and thinking in the
+  Platform Settings (a Variant can override them). Each expected Move
+  Outcome passes if it was kept for that Move and role, with the expected
+  result, and the judge passes its rules on the situation, feeling and why
+  (e.g. "says the User wanted options, not questions", or "never labels the
+  User lazy"). Other Move Outcomes kept are listed but don't fail the case.
+  A case makes one keeping call plus the judge, so it is cheap.
 
 ## Where they run
 
@@ -83,7 +94,7 @@ From the terminal, with the stack running (`make up`, or `make restart` in a
 worktree, which runs its own stack and Eval database):
 
 ```sh
-make eval                                # all six Evals
+make eval                                # all seven Evals
 make eval EVALS=safeguard                # one Eval
 make eval EVALS=persona,understanding    # several
 make eval CASES=reminded-of-sister       # single cases, by key
@@ -227,7 +238,7 @@ the test images in `src/companion/seed/evals/images/`. On start-up the
 backend adds every case whose key (its `id`) isn't in the database yet, with
 its images. It never changes a case already there, edited or archived, so
 editing a seed file doesn't change an existing case, and keys must be unique
-across all six files. Each file explains its own format at the top; the
+across all seven files. Each file explains its own format at the top; the
 backend rewrites it into the form's shape when it reads it.
 
 - `safeguard.yaml`: add an `id`, a `kind` (`clear_crisis`, `subtle_crisis` or

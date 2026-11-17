@@ -15,6 +15,7 @@ CASE_FILES = {
     EvalName.SETTINGS: "settings.yaml",
     EvalName.PHOTO_DESCRIPTIONS: "photo_descriptions.yaml",
     EvalName.UNDERSTANDING: "understanding.yaml",
+    EvalName.MOVE_OUTCOME: "move_outcome.yaml",
 }
 
 
@@ -165,6 +166,40 @@ def understanding_cases(content: dict[str, Any]) -> list[EvalCase]:
     return cases
 
 
+def move_outcome_cases(content: dict[str, Any]) -> list[EvalCase]:
+    """Read the Move Outcome file into cases, each with its time and rules.
+
+    Args:
+        content: `now`, `rules` and `cases`.
+
+    Returns:
+        One case per entry, its `now` written as ISO text and the rules its
+        outcomes name as a list.
+    """
+    cases = []
+    for entry in content["cases"]:
+        named = [
+            rule
+            for outcome in entry.get("outcomes", [])
+            for rule in outcome.get("rules", [])
+        ]
+        now = entry.get("now", content["now"])
+        cases.append(
+            EvalCase(
+                key=entry["id"],
+                eval=EvalName.MOVE_OUTCOME,
+                content={
+                    **without_id(entry),
+                    "now": now.isoformat() if isinstance(now, datetime) else now,
+                    "rules": rules_named(
+                        content["rules"], list(dict.fromkeys(named)), entry["id"]
+                    ),
+                },
+            )
+        )
+    return cases
+
+
 def read_eval_case_file(
     name: EvalName, cases_file: Path, images_dir: Path
 ) -> list[EvalCase]:
@@ -187,6 +222,8 @@ def read_eval_case_file(
         cases = persona_cases(content)
     elif name == EvalName.UNDERSTANDING:
         cases = understanding_cases(content)
+    elif name == EvalName.MOVE_OUTCOME:
+        cases = move_outcome_cases(content)
     elif name == EvalName.SETTINGS:
         cases = [
             EvalCase(

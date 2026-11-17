@@ -1,0 +1,200 @@
+# Move Outcome eval. Each case gives a made-up User a finished Conversation:
+# its messages and, for each of the User's messages, how Zeph read it (the
+# Need, the lead and supporting Moves its reply made, and the mood). The
+# real Move Outcome keeping step then runs on it, as it does after the quiet
+# gap, and the Move Outcomes it keeps are checked.
+#
+# `now` is when the first message was sent (UTC, which is also the person's
+# time zone); the messages come a minute apart. A case can set its own `now`.
+#
+# messages: [{who, text, need, lead_move, support_move, mood}]
+#   who: person | zeph
+#   need, lead_move, support_move, mood: only on the person's messages, and
+#   every person message needs its Need; leave a Move out for none
+#
+# outcomes: the Move Outcomes that must be kept. Any others kept are listed
+# but don't fail the case.
+#   - move: <Move name>          as a message above made it
+#     role: lead | support
+#     result: helped | didnt_help | mixed   optional
+#     rules: [<rule id>]         the Judge checks the kept situation, feeling
+#                                and why against these
+
+now: 2026-11-14T13:00:00
+
+rules:
+  wanted_options: >-
+    The Move Outcome says the person wanted real options to compare, not more
+    questions back.
+  questions_handed_back: >-
+    The Move Outcome says asking the person for their shortlist or next step
+    handed the work back to them, when they had no shortlist yet.
+  frustrated_not_exhausted: >-
+    The feeling is about frustration or impatience (for example frustrated,
+    fed up, annoyed), not tiredness or exhaustion.
+  pushed_while_exhausted: >-
+    The Move Outcome links pushing not helping to the person being exhausted
+    or worn out at the time, not to pushing being wrong for them in general.
+  no_judging: >-
+    The situation, feeling and why describe the moment and what helped or
+    didn't. They never label or criticise the person, for example as lazy,
+    avoidant, a procrastinator, undisciplined or unable to commit, even
+    though the person called themselves lazy.
+
+cases:
+  - id: hosting-research-helped
+    messages:
+      - who: person
+        text: >-
+          i need to pick hosting for my app. budget is SGD 15-20 a month and it
+          has to have managed postgres
+        need: Accountability
+        lead_move: Plan steps
+        mood: focused
+      - who: zeph
+        text: Good plan to sort this now. What's on your shortlist so far?
+      - who: person
+        text: i don't really have one, that's the problem
+        need: Accountability
+        lead_move: Plan steps
+        mood: frustrated
+      - who: zeph
+        text: >-
+          Fair enough. What would you need to know to start a shortlist? Which
+          names have you heard of?
+      - who: person
+        text: >-
+          honestly i was hoping you'd just look it up. i've asked twice now
+        need: Accountability
+        lead_move: Research
+        support_move: Suggest
+        mood: frustrated
+      - who: zeph
+        text: >-
+          You're right, let me do the legwork. Three that fit under SGD 20 with
+          managed Postgres: Railway's hobby plan with its Postgres add-on,
+          Render's starter web service with a basic Postgres, and Fly.io with
+          its managed Postgres on the smallest size. If you want the simplest
+          setup I'd start with Railway.
+      - who: person
+        text: perfect, that's exactly what i needed. going with railway
+        need: Accountability
+        mood: relieved
+      - who: zeph
+        text: Nice. Shout if the deploy gives you trouble.
+    outcomes:
+      - move: Research
+        role: lead
+        result: helped
+        rules: [wanted_options]
+      - move: Plan steps
+        role: lead
+        result: didnt_help
+        rules: [questions_handed_back]
+
+  - id: push-helped-when-frustrated
+    messages:
+      - who: person
+        text: >-
+          the launch slipped AGAIN. i keep adding one more feature before the
+          beta and i'm sick of it
+        need: Accountability
+        lead_move: Push
+        support_move: Plan steps
+        mood: frustrated
+      - who: zeph
+        text: >-
+          Two weeks ago you said the beta goes out once sign-up works, and it
+          does. The new features can wait for feedback. What if the beta goes
+          out Friday, as it is, and the extras go on a list for after?
+      - who: person
+        text: >-
+          ugh. you're right. ok, beta goes out friday, extras on the list
+        need: Accountability
+        mood: determined
+      - who: zeph
+        text: Love it. Friday it is.
+    outcomes:
+      - move: Push
+        role: lead
+        result: helped
+        rules: [frustrated_not_exhausted]
+      - move: Plan steps
+        role: support
+        result: helped
+
+  - id: push-backfired-when-exhausted
+    now: 2026-11-14T22:30:00
+    messages:
+      - who: person
+        text: >-
+          long week. didn't get to the beta checklist at all, i'm completely
+          wiped
+        need: Accountability
+        lead_move: Push
+        mood: exhausted
+      - who: zeph
+        text: >-
+          You said the checklist would be done this week. Could you knock out
+          the first two items tonight so it doesn't slip again?
+      - who: person
+        text: >-
+          seriously? i just said i'm wiped. i don't need a lecture right now
+        need: Be heard
+        lead_move: Calm
+        mood: exhausted
+      - who: zeph
+        text: >-
+          Sorry, that was the wrong call. You've had a big week. The checklist
+          can wait. Rest tonight; it'll still be there tomorrow.
+      - who: person
+        text: thanks. yeah. that's better
+        need: Just chatting
+        mood: calmer
+      - who: zeph
+        text: Good. Sleep well.
+    outcomes:
+      - move: Push
+        role: lead
+        result: didnt_help
+        rules: [pushed_while_exhausted]
+      - move: Calm
+        role: lead
+        result: helped
+
+  - id: outcome-does-not-judge
+    messages:
+      - who: person
+        text: >-
+          i'm so lazy. i've put off filing my taxes for three weeks again
+        need: Think it through
+        lead_move: Reframe
+        mood: ashamed
+      - who: zeph
+        text: >-
+          Three weeks of putting off something dull and fiddly sounds more like
+          dread than laziness. What part of it feels worst?
+      - who: person
+        text: >-
+          i guess finding all the receipts. but it's still on me, i should
+          just do it
+        need: Think it through
+        lead_move: Plan steps
+        mood: ashamed
+      - who: zeph
+        text: >-
+          It is on you, and it can be small. Tonight, just find the receipts
+          folder. Nothing else.
+      - who: person
+        text: ok. i can do that much
+        need: Accountability
+        mood: a bit lighter
+      - who: zeph
+        text: That's the whole job for tonight.
+    outcomes:
+      - move: Reframe
+        role: lead
+        rules: [no_judging]
+      - move: Plan steps
+        role: lead
+        rules: [no_judging]

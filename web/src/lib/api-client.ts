@@ -791,14 +791,15 @@ export type Sticker = {
   added_at: string;
 };
 
-/** One of the six Evals. */
+/** One of the seven Evals. */
 export type EvalName =
   | "safeguard"
   | "persona"
   | "knowledge"
   | "settings"
   | "photo_descriptions"
-  | "understanding";
+  | "understanding"
+  | "move_outcome";
 
 /** An Eval and the cases a new run of it would run. */
 export type EvalSummary = { eval: EvalName; case_keys: string[] };

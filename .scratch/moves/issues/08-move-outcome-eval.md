@@ -1,6 +1,6 @@
 # 08 — Move Outcome Eval
 
-Status: ready-for-agent
+Status: in-progress
 Lane: B
 
 ## Parent
@@ -31,3 +31,14 @@ Admins can test whether the Companion learns the right lessons.
 ## Blocked by
 
 - `.scratch/moves/issues/04-move-outcomes-kept-and-shown.md`
+
+## Comments
+
+### 2026-11-17 — plan (worktree `ai-chat-companion-moves-08`, branch `moves-08-move-outcome-eval`)
+
+- New Eval `move_outcome`. Case: `now`, `messages` (each `who`, `text`; a User line also has `need`, `lead_move`, `support_move`, `mood`), `outcomes` expected (each `move`, `role`, optional `result`, `rules`) and case `rules`.
+- The check connects the made-up User, writes the finished Conversation and one Understanding per User line (with its Moves) into the Eval database, then runs the real `MoveOutcomeKeeper` (Conversation-end trace) through a new Eval app method. No reply calls, no summary, Threads or Portrait calls, so a case costs one keeping call plus the Judge.
+- Each expected outcome: kept (same Move and role), its result, and Judge rules on the kept situation, feeling and why. Extra outcomes are listed, not failed.
+- New Judge prompt "Move Outcomes prompt" (`outcome_instructions`) in `judge.yaml`; it seeds on start, no migration.
+- Variant overrides of the keeping prompt, model and thinking already work (all editable settings); a runner test proves they reach only their Variant.
+- Lane A (issue 06) edits Understanding case shapes; my changes are new blocks at the ends of `cases.py` and `case_shapes.py` to keep merges easy.

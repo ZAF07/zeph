@@ -29,7 +29,7 @@ def read_evals(names: str) -> list[EvalName]:
     """Read the Evals asked for on the command line.
 
     Args:
-        names: Comma-separated Eval names; "" for all six.
+        names: Comma-separated Eval names; "" for all seven.
 
     Returns:
         The Evals.

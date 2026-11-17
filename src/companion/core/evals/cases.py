@@ -5,7 +5,12 @@ from enum import StrEnum
 from typing import Any
 
 from companion.core.evals.case_shapes import InvalidFormError
-from companion.core.models import CuriositySensitivity, ThreadReaction
+from companion.core.models import (
+    CuriositySensitivity,
+    MoveResult,
+    MoveRole,
+    ThreadReaction,
+)
 
 
 class InvalidEvalCaseError(InvalidFormError):
@@ -883,3 +888,188 @@ def require_unique_keys(keys: Sequence[str]) -> None:
         if key in seen:
             raise InvalidEvalCaseError(f"The case key {key} is used twice")
         seen.add(key)
+
+
+@dataclass(frozen=True)
+class MoveOutcomeMessage:
+    """One message of a finished Conversation, with how Zeph read it.
+
+    Attributes:
+        from_person: True if the User sent it; False if Zeph did.
+        text: What it says.
+        need: The Need Zeph picked for it; "" on Zeph's messages.
+        lead_move: The Move the reply led with; "" for none.
+        support_move: The Move that supported it; "" for none.
+        mood: How the User seemed; "" if unclear.
+    """
+
+    from_person: bool
+    text: str
+    need: str = ""
+    lead_move: str = ""
+    support_move: str = ""
+    mood: str = ""
+
+
+@dataclass(frozen=True)
+class ExpectedMoveOutcome:
+    """A Move Outcome the keeping step must write.
+
+    Attributes:
+        move: The Move's name.
+        role: Whether it led a reply or supported one.
+        result: The result it must have; None to not check it.
+        rules: The IDs of the rules the Judge checks it against.
+    """
+
+    move: str
+    role: MoveRole
+    result: MoveResult | None
+    rules: list[str] = field(default_factory=list)
+
+    @property
+    def label(self) -> str:
+        """Name it as the Case Result groups its checks.
+
+        Returns:
+            E.g. "Research (lead)".
+        """
+        return f"{self.move} ({self.role.value})"
+
+
+@dataclass(frozen=True)
+class MoveOutcomeCase:
+    """A finished Conversation and the Move Outcomes it should leave.
+
+    Attributes:
+        id: The case's key.
+        now: When the first message was sent, in UTC.
+        messages: The Conversation, oldest first.
+        outcomes: The Move Outcomes that must be kept.
+        rules: What the Judge checks, by rule ID.
+    """
+
+    id: str
+    now: datetime
+    messages: list[MoveOutcomeMessage]
+    outcomes: list[ExpectedMoveOutcome]
+    rules: dict[str, str]
+
+
+def to_move_outcome_message(entry: dict[str, Any]) -> MoveOutcomeMessage:
+    """Read one message of a Move Outcome case.
+
+    Args:
+        entry: `who` and `text`, and optionally `need`, `lead_move`,
+            `support_move` and `mood`.
+
+    Returns:
+        The message.
+    """
+    return MoveOutcomeMessage(
+        from_person=entry["who"] == "person",
+        text=entry["text"],
+        need=(entry.get("need") or "").strip(),
+        lead_move=(entry.get("lead_move") or "").strip(),
+        support_move=(entry.get("support_move") or "").strip(),
+        mood=(entry.get("mood") or "").strip(),
+    )
+
+
+def move_outcome_message_problems(
+    messages: Sequence[MoveOutcomeMessage],
+) -> dict[str, str]:
+    """Find messages whose Need and Moves don't fit who sent them.
+
+    Args:
+        messages: The case's messages.
+
+    Returns:
+        What is wrong, by field path; empty when nothing is.
+    """
+    problems: dict[str, str] = {}
+    for number, message in enumerate(messages):
+        if message.from_person and not message.need:
+            problems[f"messages.{number}.need"] = (
+                "Write the Need Zeph picked for this message."
+            )
+        if not message.from_person:
+            for name in ("need", "lead_move", "support_move", "mood"):
+                if getattr(message, name):
+                    problems[f"messages.{number}.{name}"] = (
+                        "Only the User's messages have Moves, a Need or a mood."
+                    )
+    return problems
+
+
+def move_outcome_expectation_problems(case: MoveOutcomeCase) -> dict[str, str]:
+    """Find expected Move Outcomes no message made, or naming unknown rules.
+
+    Args:
+        case: The case.
+
+    Returns:
+        What is wrong, by field path; empty when nothing is.
+    """
+    made = {
+        (name.lower(), role)
+        for message in case.messages
+        for name, role in (
+            (message.lead_move, MoveRole.LEAD),
+            (message.support_move, MoveRole.SUPPORT),
+        )
+        if name
+    }
+    problems: dict[str, str] = {}
+    for number, outcome in enumerate(case.outcomes):
+        if (outcome.move.lower(), outcome.role) not in made:
+            problems[f"outcomes.{number}.move"] = (
+                f"No message made {outcome.move} as the {outcome.role.value} Move."
+            )
+        unknown_rules = [rule for rule in outcome.rules if rule not in case.rules]
+        if unknown_rules:
+            problems[f"outcomes.{number}.rules"] = "No such rule below: " + ", ".join(
+                unknown_rules
+            )
+    return problems
+
+
+def read_move_outcome_case(key: str, content: dict[str, Any]) -> MoveOutcomeCase:
+    """Read a Move Outcome case and check it can be checked.
+
+    Args:
+        key: The case's key.
+        content: `now`, `messages` (each `{who, text}`, the User's also with
+            `need`, `lead_move`, `support_move` and `mood`), `outcomes` (each
+            `{move, role, result, rules}`) and `rules` (each `{id, check}`).
+
+    Returns:
+        The case.
+
+    Raises:
+        InvalidEvalCaseError: If a User's message has no Need, a Zeph message
+            has Moves, a Need or a mood, or an expected Move Outcome names a
+            Move no message made or an unknown rule.
+    """
+    case = MoveOutcomeCase(
+        id=key,
+        now=to_utc(content["now"]),
+        messages=[to_move_outcome_message(entry) for entry in content["messages"]],
+        outcomes=[
+            ExpectedMoveOutcome(
+                move=entry["move"].strip(),
+                role=MoveRole(entry["role"]),
+                result=MoveResult(entry["result"]) if entry.get("result") else None,
+                rules=entry.get("rules") or [],
+            )
+            for entry in content.get("outcomes") or []
+        ],
+        rules=read_rules(content),
+    )
+    problems = move_outcome_message_problems(case.messages)
+    problems.update(move_outcome_expectation_problems(case))
+    if problems:
+        raise InvalidEvalCaseError(
+            f"{key} can't be checked: " + "; ".join(problems.values()), problems
+        )
+    return case

@@ -17,6 +17,7 @@ EVAL_TITLES = {
     EvalName.SETTINGS: "Settings",
     EvalName.PHOTO_DESCRIPTIONS: "Photo descriptions",
     EvalName.UNDERSTANDING: "Understanding",
+    EvalName.MOVE_OUTCOME: "Move Outcome",
 }
 OUTCOME_MARKS = {
     CaseOutcome.PASS: "PASS",
@@ -240,6 +241,7 @@ SCORES: dict[EvalName, Callable[[Sequence[CaseResult]], str]] = {
     EvalName.SETTINGS: cases_score("Settings"),
     EvalName.PHOTO_DESCRIPTIONS: cases_score("Photo descriptions"),
     EvalName.UNDERSTANDING: checks_score("Understanding", "checks and rules passed"),
+    EvalName.MOVE_OUTCOME: checks_score("Move Outcome", "checks and rules passed"),
 }
 
 

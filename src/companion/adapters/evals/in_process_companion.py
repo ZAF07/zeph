@@ -32,8 +32,12 @@ from companion.adapters.pypdf.text_extractor import PypdfTextExtractor
 from companion.app import AppDependencies, create_app
 from companion.core.evals.models import EvalImage, ModelTokens, Replies
 from companion.core.evals.ports import EvalSetupError
-from companion.core.models import PhotoImage
+from companion.core.model_call_log import ModelCallLog, start_trace
+from companion.core.models import Feature, PhotoImage, TraceKind
+from companion.core.move_outcomes import MoveOutcomeKeeper
 from companion.core.ports import ChatModel, Embedder, PhotoViewer, Repositories
+from companion.core.usage import UsageLimiter, UsageRecordingChatModel
+from companion.core.user_snapshot import UserSnapshotLoader
 
 WEBHOOK_SECRET = "eval-webhook-secret"
 BOT_USERNAME = "zeph_eval_bot"
@@ -192,6 +196,7 @@ class InProcessCompanion:
         self._counter = TokenCounter()
         self._chat_model = CountingChatModel(chat_model, self._counter)
         self._judge_chat_model = CountingChatModel(chat_model, self._counter)
+        self._photo_viewer = CountingPhotoViewer(photo_viewer, self._counter)
         self._chat_channel = RecordingChatChannel()
         self._accounts = EvalAccounts()
         self._timer = ManualTimer()
@@ -206,7 +211,7 @@ class InProcessCompanion:
             judge_settings=PostgresJudgeSettingsRepository(engine),
             chat_channel=self._chat_channel,
             chat_model=self._chat_model,
-            photo_viewer=CountingPhotoViewer(photo_viewer, self._counter),
+            photo_viewer=self._photo_viewer,
             auth_verifier=self._accounts,
             auth_accounts=self._accounts,
             text_extractor=PypdfTextExtractor(),
@@ -563,6 +568,51 @@ class InProcessCompanion:
             ),
             200,
             "Replacing a Knowledge Document's file",
+        )
+
+    def keep_move_outcomes(self, conversation_id: UUID) -> None:
+        """Run the Conversation-end Move Outcome keeping step on a Conversation.
+
+        It is built the way the app builds it for the quiet gap, with the
+        Model Call Log keeping full content, and runs in its own
+        Conversation-end trace.
+
+        Args:
+            conversation_id: The made-up User's finished Conversation.
+
+        Raises:
+            EvalSetupError: If no User is connected, or User Memory doesn't
+                work for them.
+        """
+        if self._user_id is None:
+            raise EvalSetupError("Connect the made-up User first")
+        repositories = self._repositories
+        snapshot = UserSnapshotLoader(repositories, self._clock).load(
+            self._user_id,
+            repositories.platform_settings.load(),
+            start_trace(TraceKind.CONVERSATION_END),
+        )
+        if not snapshot.works(Feature.USER_MEMORY):
+            raise EvalSetupError("User Memory doesn't work for the made-up User")
+        chat_model = UsageRecordingChatModel(
+            self._chat_model,
+            self._photo_viewer,
+            UsageLimiter(repositories, self._clock),
+            ModelCallLog(
+                repositories,
+                self._clock,
+                content_for_everyone=True,
+                developer_logs=False,
+            ),
+            self._clock,
+        )
+        keeper = MoveOutcomeKeeper(
+            repositories, chat_model, self._embedder, self._clock
+        )
+        keeper.keep_from(
+            snapshot,
+            conversation_id,
+            repositories.conversations.list_messages(conversation_id),
         )
 
     def close(self) -> None:

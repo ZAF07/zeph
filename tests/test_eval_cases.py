@@ -75,6 +75,24 @@ VALID_CONTENT: dict[EvalName, dict[str, Any]] = {
         ],
         "rules": [],
     },
+    EvalName.MOVE_OUTCOME: {
+        "now": "2026-11-14T13:00:00",
+        "messages": [
+            {
+                "who": "person",
+                "text": "i need hosting under SGD 20",
+                "need": "Accountability",
+                "lead_move": "Research",
+                "support_move": "",
+                "mood": "frustrated",
+            },
+            {"who": "zeph", "text": "Here are three hosts under SGD 20."},
+        ],
+        "outcomes": [
+            {"move": "Research", "role": "lead", "result": "helped", "rules": []}
+        ],
+        "rules": [],
+    },
 }
 
 
@@ -85,6 +103,7 @@ EDITS: dict[EvalName, dict[str, Any]] = {
     EvalName.SETTINGS: {"message": "please forget the walks"},
     EvalName.PHOTO_DESCRIPTIONS: {"must_leave_out": ["4929", "hunter2"]},
     EvalName.UNDERSTANDING: {"now": "2026-11-14T09:00:00"},
+    EvalName.MOVE_OUTCOME: {"now": "2026-11-15T09:00:00"},
 }
 
 
@@ -271,6 +290,43 @@ def test_an_invalid_save_is_refused_with_a_message_per_field(
             {"photo": "never-uploaded.png"},
             "photo",
             "upload it again",
+        ),
+        (
+            EvalName.MOVE_OUTCOME,
+            {
+                "messages": [
+                    {"who": "person", "text": "hi", "need": "Just chatting"},
+                    {"who": "zeph", "text": "hey", "lead_move": "Push"},
+                ]
+            },
+            "messages.1.lead_move",
+            "Only the User's messages have Moves",
+        ),
+        (
+            EvalName.MOVE_OUTCOME,
+            {"messages": [{"who": "person", "text": "hi", "lead_move": "Calm"}]},
+            "messages.0.need",
+            "Write the Need Zeph picked for this message.",
+        ),
+        (
+            EvalName.MOVE_OUTCOME,
+            {
+                "outcomes": [
+                    {"move": "Push", "role": "lead", "rules": []},
+                ]
+            },
+            "outcomes.0.move",
+            "No message made Push as the lead Move.",
+        ),
+        (
+            EvalName.MOVE_OUTCOME,
+            {
+                "outcomes": [
+                    {"move": "Research", "role": "lead", "rules": ["no_such"]},
+                ]
+            },
+            "outcomes.0.rules",
+            "No such rule below: no_such",
         ),
     ],
 )
