@@ -1776,7 +1776,9 @@ def test_with_web_search_off_an_understanding_case_cannot_research(
     assert "web_search" not in [tool.name for tool in reply.tools]
 
 
-EXHAUSTED_TEXT = "Asked to push through my task list late at night, exhausted"
+EXHAUSTED_SITUATION = "Asked to push through my task list late at night,"
+EXHAUSTED_FEELING = "exhausted"
+EXHAUSTED_TEXT = f"{EXHAUSTED_SITUATION} {EXHAUSTED_FEELING}"
 
 
 def test_an_understanding_case_gives_its_move_outcomes_and_checks_the_next_move(
@@ -1796,8 +1798,8 @@ def test_an_understanding_case_gives_its_move_outcomes_and_checks_the_next_move(
                     {
                         "move": "Push",
                         "role": "lead",
-                        "situation": "Asked to push through my task list late at",
-                        "feeling": "night, exhausted",
+                        "situation": EXHAUSTED_SITUATION,
+                        "feeling": EXHAUSTED_FEELING,
                         "result": "didnt_help",
                         "why": "They had nothing left to give.",
                         "days_ago": 2,

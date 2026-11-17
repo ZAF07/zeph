@@ -159,10 +159,7 @@ def give_made_up_memory(
         )
     )
     repositories.move_outcomes.add_many(
-        [
-            to_move_outcome_to_save(embedder, user_id, outcome, now)
-            for outcome in memory.move_outcomes
-        ]
+        to_move_outcomes_to_save(embedder, user_id, memory.move_outcomes, now)
     )
 
 
@@ -292,33 +289,46 @@ def to_thread_to_save(
     )
 
 
-def to_move_outcome_to_save(
-    embedder: Embedder, user_id: UUID, outcome: EvalMoveOutcome, now: datetime
-) -> MoveOutcomeToSave:
-    """Make a Move Outcome to save, embedded as the keeping step embeds one.
+def to_move_outcomes_to_save(
+    embedder: Embedder,
+    user_id: UUID,
+    outcomes: Sequence[EvalMoveOutcome],
+    now: datetime,
+) -> list[MoveOutcomeToSave]:
+    """Make Move Outcomes to save, embedded as the keeping step embeds them.
 
     Args:
-        embedder: Embeds its situation and feeling.
+        embedder: Embeds each one's situation and feeling, all in one call.
         user_id: The User's ID.
-        outcome: The made-up Move Outcome.
+        outcomes: The made-up Move Outcomes.
         now: When the case's first Message is sent.
 
     Returns:
-        The Move Outcome to save.
+        The Move Outcomes to save; none if there are none.
     """
-    move_outcome = MoveOutcome(
-        id=uuid4(),
-        user_id=user_id,
-        move=outcome.move,
-        role=outcome.role,
-        situation=outcome.situation,
-        feeling=outcome.feeling,
-        result=outcome.result,
-        why=outcome.why,
-        made_at=now - timedelta(days=outcome.days_ago),
+    if not outcomes:
+        return []
+    move_outcomes = [
+        MoveOutcome(
+            id=uuid4(),
+            user_id=user_id,
+            move=outcome.move,
+            role=outcome.role,
+            situation=outcome.situation,
+            feeling=outcome.feeling,
+            result=outcome.result,
+            why=outcome.why,
+            made_at=now - timedelta(days=outcome.days_ago),
+        )
+        for outcome in outcomes
+    ]
+    embeddings = embedder.embed_passages(
+        [text_to_embed(outcome) for outcome in move_outcomes]
     )
-    [embedding] = embedder.embed_passages([text_to_embed(move_outcome)])
-    return MoveOutcomeToSave(outcome=move_outcome, embedding=embedding)
+    return [
+        MoveOutcomeToSave(outcome=outcome, embedding=embedding)
+        for outcome, embedding in zip(move_outcomes, embeddings, strict=True)
+    ]
 
 
 def to_curiosity(user_id: UUID, curiosity: EvalCuriosity, now: datetime) -> Curiosity:

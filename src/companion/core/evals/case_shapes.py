@@ -886,6 +886,22 @@ THREAD_FIELDS = [
     ),
 ]
 
+MOVE_ROLE_FIELD = ShapeField(
+    "role",
+    "Lead or support",
+    "Whether the Move led a reply or supported one.",
+    FieldKind.CHOICE,
+    required=True,
+    options=[ChoiceOption("lead", "Lead"), ChoiceOption("support", "Support")],
+    default="lead",
+)
+
+MOVE_RESULT_OPTIONS = [
+    ChoiceOption("helped", "Helped"),
+    ChoiceOption("didnt_help", "Didn't help"),
+    ChoiceOption("mixed", "Mixed"),
+]
+
 UNDERSTANDING_MEMORY_FIELD = ShapeField(
     "memory",
     "Made-up User Memory",
@@ -990,18 +1006,7 @@ UNDERSTANDING_MEMORY_FIELD = ShapeField(
             "Move Outcome",
             [
                 text_field("move", "Move", "The Move's name, e.g. Push."),
-                ShapeField(
-                    "role",
-                    "Lead or support",
-                    "Whether the Move led a reply or supported one.",
-                    FieldKind.CHOICE,
-                    required=True,
-                    options=[
-                        ChoiceOption("lead", "Lead"),
-                        ChoiceOption("support", "Support"),
-                    ],
-                    default="lead",
-                ),
+                MOVE_ROLE_FIELD,
                 long_text_field("situation", "Situation", "What was going on."),
                 text_field("feeling", "Feeling", "How the User felt, e.g. exhausted."),
                 ShapeField(
@@ -1010,11 +1015,7 @@ UNDERSTANDING_MEMORY_FIELD = ShapeField(
                     "Whether it helped, didn't or was mixed.",
                     FieldKind.CHOICE,
                     required=True,
-                    options=[
-                        ChoiceOption("helped", "Helped"),
-                        ChoiceOption("didnt_help", "Didn't help"),
-                        ChoiceOption("mixed", "Mixed"),
-                    ],
+                    options=MOVE_RESULT_OPTIONS,
                     default="helped",
                 ),
                 long_text_field("why", "Why", "Why it went that way."),
@@ -1327,29 +1328,14 @@ MOVE_OUTCOME_SHAPE = FormShape(
                             "Move",
                             "The Move's name, as a message above made it.",
                         ),
-                        ShapeField(
-                            "role",
-                            "Lead or support",
-                            "Whether the Move led a reply or supported one.",
-                            FieldKind.CHOICE,
-                            required=True,
-                            options=[
-                                ChoiceOption("lead", "Lead"),
-                                ChoiceOption("support", "Support"),
-                            ],
-                            default="lead",
-                        ),
+                        MOVE_ROLE_FIELD,
                         ShapeField(
                             "result",
                             "Result",
                             "Whether it must be kept as helped, didn't help or "
                             "mixed. Leave empty to not check it.",
                             FieldKind.CHOICE,
-                            options=[
-                                ChoiceOption("helped", "Helped"),
-                                ChoiceOption("didnt_help", "Didn't help"),
-                                ChoiceOption("mixed", "Mixed"),
-                            ],
+                            options=MOVE_RESULT_OPTIONS,
                         ),
                         text_list_field(
                             "rules",
