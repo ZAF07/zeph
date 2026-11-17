@@ -49,6 +49,7 @@ from companion.core.models import (
     ModelCallTraceOverview,
     ModelStep,
     Move,
+    MoveDetails,
     MoveOutcome,
     MoveOutcomeToSave,
     Need,
@@ -890,7 +891,8 @@ class NeedRepository(Protocol):
         """Add a Need last in the list; it is never the fallback.
 
         Args:
-            details: Its name, when it fits and how to reply.
+            details: Its name, when it fits, how to reply and the Moves it
+                rules out.
 
         Returns:
             The saved Need.
@@ -898,7 +900,7 @@ class NeedRepository(Protocol):
         ...
 
     def update(self, need_id: UUID, details: NeedDetails) -> Need:
-        """Save a Need's name, when it fits and how to reply.
+        """Save a Need's name, when it fits, how to reply and ruled-out Moves.
 
         Args:
             need_id: The Need's ID.
@@ -934,6 +936,56 @@ class MoveRepository(Protocol):
 
         Returns:
             The Moves.
+        """
+        ...
+
+    def get(self, move_id: UUID) -> Move | None:
+        """Find one Move.
+
+        Args:
+            move_id: The Move's ID.
+
+        Returns:
+            The Move, or None if there is no such Move.
+        """
+        ...
+
+    def add(self, details: MoveDetails) -> Move:
+        """Add a Move last in the list.
+
+        Args:
+            details: Its name, when it fits, how to do it and needed Feature.
+
+        Returns:
+            The saved Move.
+        """
+        ...
+
+    def update(self, move_id: UUID, details: MoveDetails) -> Move:
+        """Save a Move's name, when it fits, how to do it and needed Feature.
+
+        Args:
+            move_id: The Move's ID.
+            details: Its new values.
+
+        Returns:
+            The saved Move.
+        """
+        ...
+
+    def delete(self, move_id: UUID) -> None:
+        """Remove a Move, and with it every Need's rule-out of it.
+
+        Args:
+            move_id: The Move's ID.
+        """
+        ...
+
+    def set_sort_orders(self, sort_orders: Mapping[UUID, int]) -> None:
+        """Save new sort orders for several Moves in one step.
+
+        Args:
+            sort_orders: The new sort order for each Move ID.
         """
         ...
 

@@ -20,12 +20,17 @@ RELOADED_SETTINGS = (
 )
 
 
-def downgrade_to_before_moves(database_url: str) -> None:
-    """Take the database back to the revision before Moves."""
+def downgrade_to(database_url: str, revision: str) -> None:
+    """Take the database back to an earlier revision."""
     config = Config()
     config.set_main_option("script_location", str(MIGRATIONS_DIR))
     config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
-    command.downgrade(config, "0049")
+    command.downgrade(config, revision)
+
+
+def downgrade_to_before_moves(database_url: str) -> None:
+    """Take the database back to the revision before Moves."""
+    downgrade_to(database_url, "0049")
 
 
 def move_names(engine: Engine) -> list[str]:
@@ -94,3 +99,25 @@ def test_seeding_adds_nothing_once_moves_exist(engine: Engine) -> None:
 
     assert move_names(engine) == [name for name in STARTER_MOVES if name != "Push"]
     assert "Push" not in stored_rule_outs(engine)["Be heard"]
+
+
+def test_the_migration_says_research_needs_web_search(
+    engine: Engine, database_url: str
+) -> None:
+    downgrade_to(database_url, "0051")
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text("UPDATE moves SET name = 'research' WHERE name = 'Research'")
+            )
+    finally:
+        migrate(database_url)
+
+    with engine.connect() as connection:
+        needed = dict(
+            connection.execute(text("SELECT name, needed_feature FROM moves")).all()
+        )
+    assert needed == {
+        **{name: None for name in STARTER_MOVES if name != "Research"},
+        "research": "web_search",
+    }

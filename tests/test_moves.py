@@ -13,6 +13,7 @@ from tests.fakes import (
 )
 from tests.telegram_helpers import (
     connect_telegram,
+    owner_headers,
     send_to_webhook,
     telegram_text_update,
 )
@@ -288,3 +289,88 @@ def test_the_fallback_understanding_has_no_moves(
     for move in STARTER_MOVES:
         assert how_to_do_it(move) not in chat_model.calls[-1].instructions
     assert saved_moves(engine) == [(None, None)]
+
+
+def test_with_web_search_off_research_is_never_offered_and_the_reply_says_so(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    engine: Engine,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    admin = owner_headers(client, auth_verifier)
+    client.put("/api/admin/features/web_search", json={"on": False}, headers=admin)
+
+    instructions = reply_to(
+        client,
+        chat_model,
+        "find me hosting under 20 SGD with managed postgres",
+        need="Advice",
+        lead_move="Research",
+        support_move="Suggest",
+    )
+
+    asked = chat_model.understanding_calls[-1].history[0].text
+    assert "- Research:" not in asked
+    assert "- Advice: Calm, Ground, Reframe, Mirror, Suggest, Plan steps, Push\n" in (
+        asked
+    )
+    assert how_to_do_it("Research") not in instructions
+    assert how_to_do_it("Suggest") in instructions
+    assert "these aren't available on this person's account" in instructions.lower()
+    assert "Web Search" in instructions
+    assert seeded_settings["reply_web_search_instructions"] not in instructions
+    assert saved_moves(engine) == [("Suggest", None)]
+
+
+def test_with_the_web_search_limit_used_up_research_is_never_offered(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    engine: Engine,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    admin = owner_headers(client, auth_verifier)
+    client.patch(
+        "/api/admin/settings",
+        json={"values": {"web_search_daily_limit": 0}},
+        headers=admin,
+    )
+
+    instructions = reply_to(
+        client,
+        chat_model,
+        "find me hosting under 20 SGD with managed postgres",
+        need="Advice",
+        lead_move="Research",
+    )
+
+    assert "- Research:" not in chat_model.understanding_calls[-1].history[0].text
+    assert how_to_do_it("Research") not in instructions
+    assert seeded_settings["reply_web_search_limit_note"] in instructions
+    assert saved_moves(engine) == [(None, None)]
+
+
+def test_a_move_needing_a_feature_that_works_is_offered(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    engine: Engine,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+
+    reply_to(
+        client,
+        chat_model,
+        "find me hosting under 20 SGD with managed postgres",
+        need="Advice",
+        lead_move="Research",
+    )
+
+    assert "- Research:" in chat_model.understanding_calls[-1].history[0].text
+    assert saved_moves(engine) == [("Research", None)]

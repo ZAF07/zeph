@@ -177,12 +177,16 @@ def live_value(key: str, settings: Mapping[str, Any], needs: Sequence[Need]) -> 
     return need_values(need) if need is not None else None
 
 
-def need_details(key: str, value: Any) -> NeedDetails:
+def need_details(
+    key: str, value: Any, ruled_out_move_ids: frozenset[UUID]
+) -> NeedDetails:
     """Read a Need override's value.
 
     Args:
         key: The override's key, for the message.
         value: Its value: a name, when it fits and how to reply.
+        ruled_out_move_ids: The live Need's ruled-out Moves, which an
+            override keeps.
 
     Returns:
         The details.
@@ -200,6 +204,7 @@ def need_details(key: str, value: Any) -> NeedDetails:
         name=value["name"],
         when_it_fits=value["when_it_fits"],
         how_to_reply=value["how_to_reply"],
+        ruled_out_move_ids=ruled_out_move_ids,
     )
 
 
@@ -246,9 +251,33 @@ class SettingOverrideService:
                 checked[key] = self._settings_service.checked_value(key, value)
             else:
                 checked[key] = need_values(
-                    self._need_service.checked(need_id, need_details(key, value))
+                    self._need_service.checked(
+                        need_id, self._need_details(need_id, key, value)
+                    )
                 )
         return checked
+
+    def _need_details(self, need_id: UUID, key: str, value: Any) -> NeedDetails:
+        """Read a Need override's value, keeping the live Need's ruled-out Moves.
+
+        Args:
+            need_id: The overridden Need's ID.
+            key: The override's key, for the message.
+            value: Its value: a name, when it fits and how to reply.
+
+        Returns:
+            The details.
+
+        The value is read before the live Need is looked up, so a malformed
+        value is refused as invalid even for a Need that doesn't exist.
+
+        Raises:
+            InvalidOverrideError: If a field is missing or not text.
+            NeedNotFoundError: If there is no such live Need.
+        """
+        details = need_details(key, value, frozenset())
+        live = self._need_service.get(need_id)
+        return replace(details, ruled_out_move_ids=live.ruled_out_move_ids)
 
     def choices(self) -> OverrideChoices:
         """List what a Variant can override, with each one's live value.
@@ -289,7 +318,9 @@ class SettingOverrideService:
         for key, value in checked.items():
             need_id = overridden_need_id(key)
             if need_id is not None:
-                self._need_service.update(need_id, need_details(key, value))
+                self._need_service.update(
+                    need_id, self._need_details(need_id, key, value)
+                )
         settings = {
             key: value
             for key, value in checked.items()

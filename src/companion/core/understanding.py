@@ -52,6 +52,7 @@ from companion.core.platform_settings import (
 from companion.core.ports import Clock, Repositories
 from companion.core.transcripts import split_off_latest_message, to_transcript_lines
 from companion.core.usage import UsageRecordingChatModel
+from companion.core.web_search import web_search_limit_used_up
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +142,25 @@ def allowed_moves(need: Need, moves: Sequence[Move]) -> list[Move]:
         The allowed Moves, in order.
     """
     return [move for move in moves if move.id not in need.ruled_out_move_ids]
+
+
+def moves_that_work(moves: Sequence[Move], working: set[Feature]) -> list[Move]:
+    """List the Moves the Companion can make for the User right now.
+
+    A Move that needs a Feature is left out unless that Feature works.
+
+    Args:
+        moves: Every Move, in order.
+        working: The Features that work for the User right now.
+
+    Returns:
+        The Moves it can make, in order.
+    """
+    return [
+        move
+        for move in moves
+        if move.needed_feature is None or move.needed_feature in working
+    ]
 
 
 def format_allowed_moves(need: Need, moves: Sequence[Move]) -> str:
@@ -795,7 +815,8 @@ class UnderstandingService:
     """Makes the Understanding of each Message before the Companion replies.
 
     One cheap model call fills in a fixed form: which Need fits, which Moves
-    the reply makes from those the Need allows, how the User seems and
+    the reply makes from those the Need allows (leaving out any whose needed
+    Feature doesn't work for the User right now), how the User seems and
     whether the Companion knows why, which Memory Categories matter, and
     which Life Threads and Curiosities to bring up. It sees this
     Conversation's earlier Understandings, so it knows how their mood is
@@ -834,8 +855,10 @@ class UnderstandingService:
         """Make and save the Understanding of the Conversation's newest Message.
 
         Its shape goes into the Model Call Log, for every User. An unknown
-        Need falls back to the fallback Need; an unknown Move, or one the
-        Need rules out, is dropped; an unreadable form or a failed call falls
+        Need falls back to the fallback Need; an unknown Move, one the Need
+        rules out, or one whose needed Feature doesn't work for the User
+        (Research once Web Search is off or its daily limit is used up), is
+        dropped; an unreadable form or a failed call falls
         back to the fallback Need with no Moves, no mood and no Memory
         Categories, so the reply still goes, with every reminded Life
         Thread that isn't held back but no Thread or Curiosity brought up.
@@ -852,7 +875,9 @@ class UnderstandingService:
         """
         messages = self._repositories.conversations.list_messages(conversation_id)
         needs = self._repositories.needs.list_all()
-        moves = self._repositories.moves.list_all()
+        moves = moves_that_work(
+            self._repositories.moves.list_all(), self._working_features(snapshot)
+        )
         earlier = self._repositories.understandings.list_for_conversation(
             conversation_id
         )
@@ -912,6 +937,24 @@ class UnderstandingService:
                 format_curiosities_for_reply(form.curiosities),
             ),
         )
+
+    def _working_features(self, snapshot: UserSnapshot) -> set[Feature]:
+        """List the Features that work for the User right now.
+
+        Web Search counts as not working once its daily limit is used up.
+
+        Args:
+            snapshot: The User being answered.
+
+        Returns:
+            The Features.
+        """
+        working = {feature for feature in Feature if snapshot.works(feature)}
+        if Feature.WEB_SEARCH in working and web_search_limit_used_up(
+            self._repositories, snapshot
+        ):
+            working.discard(Feature.WEB_SEARCH)
+        return working
 
     def _knowledge_documents(self, snapshot: UserSnapshot) -> list[KnowledgeDocument]:
         """List the Knowledge documents the Understanding may choose from.

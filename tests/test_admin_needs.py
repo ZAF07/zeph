@@ -42,6 +42,7 @@ def add_need(
         "name": "Celebrate",
         "when_it_fits": "They are sharing good news.",
         "how_to_reply": "Be glad with them; ask what it means to them.",
+        "ruled_out_move_ids": [],
     }
     body.update(overrides)
     response = client.post("/api/admin/needs", json=body, headers=admin)
@@ -89,6 +90,7 @@ def test_admin_can_add_edit_and_delete_needs(
             "name": "Share the joy",
             "when_it_fits": "Good news.",
             "how_to_reply": "Cheer them on.",
+            "ruled_out_move_ids": [],
         },
         headers=admin,
     )
@@ -109,7 +111,12 @@ def test_bad_needs_are_refused(
 ) -> None:
     admin = owner_headers(client, auth_verifier)
     advice_id = need_named(client, admin, "Advice")["id"]
-    good = {"name": "Celebrate", "when_it_fits": "Good news.", "how_to_reply": "Cheer."}
+    good = {
+        "name": "Celebrate",
+        "when_it_fits": "Good news.",
+        "how_to_reply": "Cheer.",
+        "ruled_out_move_ids": [],
+    }
 
     for bad in (
         {**good, "name": "  "},
@@ -170,6 +177,7 @@ def test_the_fallback_need_can_be_edited_but_not_deleted(
             "name": "Not sure yet",
             "when_it_fits": "It isn't clear.",
             "how_to_reply": "Ask one short question.",
+            "ruled_out_move_ids": fallback["ruled_out_move_ids"],
         },
         headers=admin,
     )
@@ -224,6 +232,7 @@ def test_an_edited_how_to_reply_reaches_the_next_reply(
             "name": "Advice",
             "when_it_fits": advice["when_it_fits"],
             "how_to_reply": "Give exactly one idea and stop.",
+            "ruled_out_move_ids": advice["ruled_out_move_ids"],
         },
         headers=admin,
     )

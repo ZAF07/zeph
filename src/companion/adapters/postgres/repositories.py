@@ -117,6 +117,7 @@ from companion.core.models import (
     ModelStep,
     MoodIntensity,
     Move,
+    MoveDetails,
     MoveOutcome,
     MoveOutcomeToSave,
     MoveResult,
@@ -312,7 +313,50 @@ def _to_move(row: Row[Any]) -> Move:
         when_it_fits=row.when_it_fits,
         how_to_do_it=row.how_to_do_it,
         sort_order=row.sort_order,
+        needed_feature=(
+            None if row.needed_feature is None else Feature(row.needed_feature)
+        ),
     )
+
+
+def _move_values(details: MoveDetails) -> dict[str, Any]:
+    """Turn a Move's details into `moves` column values.
+
+    Args:
+        details: The Move's details.
+
+    Returns:
+        The values, by column.
+    """
+    return {
+        "name": details.name,
+        "when_it_fits": details.when_it_fits,
+        "how_to_do_it": details.how_to_do_it,
+        "needed_feature": (
+            None if details.needed_feature is None else details.needed_feature.value
+        ),
+    }
+
+
+def _save_ruled_out_moves(
+    connection: Connection, need_id: UUID, move_ids: frozenset[UUID]
+) -> None:
+    """Replace the Moves a Need rules out.
+
+    Args:
+        connection: Where to save them, inside the Need's save.
+        need_id: The Need's ID.
+        move_ids: The Moves it now rules out.
+    """
+    connection.execute(
+        delete(need_ruled_out_moves).where(need_ruled_out_moves.c.need_id == need_id)
+    )
+    if move_ids:
+        connection.execute(
+            insert(need_ruled_out_moves).values(
+                [{"need_id": need_id, "move_id": move_id} for move_id in move_ids]
+            )
+        )
 
 
 def _to_check_in_kind(row: Row[Any]) -> CheckInKind:
@@ -1730,7 +1774,8 @@ class PostgresNeedRepository:
         """Add a Need last in the list; it is never the fallback.
 
         Args:
-            details: Its name, when it fits and how to reply.
+            details: Its name, when it fits, how to reply and the Moves it
+                rules out.
 
         Returns:
             The saved Need.
@@ -1749,10 +1794,11 @@ class PostgresNeedRepository:
                 )
                 .returning(needs)
             ).one()
-        return _to_need(row, frozenset())
+            _save_ruled_out_moves(connection, row.id, details.ruled_out_move_ids)
+        return _to_need(row, details.ruled_out_move_ids)
 
     def update(self, need_id: UUID, details: NeedDetails) -> Need:
-        """Save a Need's name, when it fits and how to reply.
+        """Save a Need's name, when it fits, how to reply and ruled-out Moves.
 
         Args:
             need_id: The Need's ID.
@@ -1772,8 +1818,8 @@ class PostgresNeedRepository:
                 )
                 .returning(needs)
             ).one()
-            ruled_out = _ruled_out_move_ids(connection, [need_id])
-        return _to_need(row, ruled_out[need_id])
+            _save_ruled_out_moves(connection, need_id, details.ruled_out_move_ids)
+        return _to_need(row, details.ruled_out_move_ids)
 
     def delete(self, need_id: UUID) -> None:
         """Remove a Need.
@@ -1819,6 +1865,83 @@ class PostgresMoveRepository:
         with self._database.connect() as connection:
             rows = connection.execute(select(moves).order_by(moves.c.sort_order)).all()
         return [_to_move(row) for row in rows]
+
+    def get(self, move_id: UUID) -> Move | None:
+        """Find one Move.
+
+        Args:
+            move_id: The Move's ID.
+
+        Returns:
+            The Move, or None if there is no such Move.
+        """
+        with self._database.connect() as connection:
+            row = connection.execute(select(moves).where(moves.c.id == move_id)).first()
+        return None if row is None else _to_move(row)
+
+    def add(self, details: MoveDetails) -> Move:
+        """Add a Move last in the list.
+
+        Args:
+            details: Its name, when it fits, how to do it and needed Feature.
+
+        Returns:
+            The saved Move.
+        """
+        with self._database.begin() as connection:
+            highest = connection.execute(select(func.max(moves.c.sort_order))).scalar()
+            row = connection.execute(
+                insert(moves)
+                .values(
+                    id=uuid4(),
+                    **_move_values(details),
+                    sort_order=0 if highest is None else int(highest) + 1,
+                )
+                .returning(moves)
+            ).one()
+        return _to_move(row)
+
+    def update(self, move_id: UUID, details: MoveDetails) -> Move:
+        """Save a Move's name, when it fits, how to do it and needed Feature.
+
+        Args:
+            move_id: The Move's ID.
+            details: Its new values.
+
+        Returns:
+            The saved Move.
+        """
+        with self._database.begin() as connection:
+            row = connection.execute(
+                update(moves)
+                .where(moves.c.id == move_id)
+                .values(**_move_values(details))
+                .returning(moves)
+            ).one()
+        return _to_move(row)
+
+    def delete(self, move_id: UUID) -> None:
+        """Remove a Move, and with it every Need's rule-out of it.
+
+        Args:
+            move_id: The Move's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(delete(moves).where(moves.c.id == move_id))
+
+    def set_sort_orders(self, sort_orders: Mapping[UUID, int]) -> None:
+        """Save new sort orders for several Moves in one step.
+
+        Args:
+            sort_orders: The new sort order for each Move ID.
+        """
+        with self._database.begin() as connection:
+            for move_id, sort_order in sort_orders.items():
+                connection.execute(
+                    update(moves)
+                    .where(moves.c.id == move_id)
+                    .values(sort_order=sort_order)
+                )
 
 
 class PostgresUnderstandingRepository:

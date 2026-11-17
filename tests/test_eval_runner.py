@@ -44,6 +44,8 @@ from tests.fakes import (
     ToolCall,
 )
 from tests.telegram_helpers import owner_headers
+from tests.test_moves import stored_rule_outs
+from tests.test_understanding import seeded_needs
 
 PERSONA_CASE = EvalCase(
     key="small-talk",
@@ -1203,6 +1205,9 @@ def test_make_live_applies_the_overrides_once_and_the_run_shows_who_when_and_wha
         if need.name == "Just chatting"
     ]
     assert need.when_it_fits == "They want light, easy chat."
+    assert stored_rule_outs(engine)["Just chatting"] == set(
+        seeded_needs()["Just chatting"]["ruled_out_moves"]
+    )
     variant_b = open_run(client, admin, run["id"])["variants"][1]
     assert variant_b["made_live"] == made_live
     again = make_live(client, admin, run["id"], "B")

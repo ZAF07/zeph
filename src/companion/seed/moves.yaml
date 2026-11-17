@@ -5,7 +5,9 @@
 # supporting Move, or none, from the Moves the picked Need allows (each Need
 # in needs.yaml lists the ones it rules out), reading each Move's
 # `when_it_fits`. The picked Moves' `how_to_do_it` go into the reply's
-# instructions after the Need's "how to reply".
+# instructions after the Need's "how to reply". A Move with a
+# `needed_feature` is offered only while that Feature works for the User (and,
+# for Web Search, while their daily limit isn't used up).
 
 - name: Calm
   when_it_fits: >-
@@ -72,6 +74,7 @@
     don't let a vague answer slide.
 
 - name: Research
+  needed_feature: web_search
   when_it_fits: >-
     They need practical options or facts found and compared for them, like
     products, services, places or prices, and doing the legwork would help

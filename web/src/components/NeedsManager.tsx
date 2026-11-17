@@ -12,12 +12,17 @@ import { useApiClient } from "@/lib/use-api-client";
 
 type Flash = { text: string; isError: boolean };
 
-const emptyNeed: NeedInput = { name: "", when_it_fits: "", how_to_reply: "" };
+const emptyNeed: NeedInput = {
+  name: "",
+  when_it_fits: "",
+  how_to_reply: "",
+  ruled_out_move_ids: [],
+};
 
 /**
  * The admin Needs manager: a card per Need, in order, to edit, move or
- * remove it, and a card to add a new one. The fallback Need can't be
- * removed.
+ * remove it and pick the Moves it rules out, and a card to add a new one.
+ * The fallback Need can't be removed.
  *
  * @returns The cards, or a loading or error state.
  */
@@ -29,6 +34,10 @@ export function NeedsManager() {
   const needsQuery = useQuery({
     queryKey: queryKeys.needs,
     queryFn: () => apiClient.listNeeds(),
+  });
+  const movesQuery = useQuery({
+    queryKey: queryKeys.moves,
+    queryFn: () => apiClient.listMoves(),
   });
   const moveMutation = useMutation({
     mutationFn: ({
@@ -47,6 +56,7 @@ export function NeedsManager() {
       }),
   });
   const needs = needsQuery.data;
+  const moves = movesQuery.data;
 
   async function reloadNeeds() {
     await queryClient.invalidateQueries({ queryKey: queryKeys.needs });
@@ -71,13 +81,16 @@ export function NeedsManager() {
     await reloadNeeds();
   }
 
-  if (!needs) {
-    if (needsQuery.isError) {
+  if (!needs || !moves) {
+    if (needsQuery.isError || movesQuery.isError) {
       return (
         <LoadFailed
           title="Couldn’t load Needs"
           body="Zeph keeps using the last saved Needs."
-          onRetry={() => void needsQuery.refetch()}
+          onRetry={() => {
+            void needsQuery.refetch();
+            void movesQuery.refetch();
+          }}
         />
       );
     }
@@ -126,6 +139,7 @@ export function NeedsManager() {
             key={need.id}
             initial={need}
             isNew={false}
+            moves={moves}
             isFallback={need.is_fallback}
             onSave={(input) => save(need, input)}
             onRemove={need.is_fallback ? undefined : () => remove(need)}
@@ -139,6 +153,7 @@ export function NeedsManager() {
           <NeedCard
             initial={emptyNeed}
             isNew
+            moves={moves}
             onSave={add}
             onCancel={() => setIsAdding(false)}
           />

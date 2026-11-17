@@ -3,7 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { NeedsManager } from "@/components/NeedsManager";
-import { ApiError, type ApiClient, type Need } from "@/lib/api-client";
+import {
+  ApiError,
+  type ApiClient,
+  type Move,
+  type Need,
+} from "@/lib/api-client";
 import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
@@ -12,6 +17,7 @@ const apiClient = {
   updateNeed: vi.fn<ApiClient["updateNeed"]>(),
   deleteNeed: vi.fn<ApiClient["deleteNeed"]>(),
   moveNeed: vi.fn<ApiClient["moveNeed"]>(),
+  listMoves: vi.fn<ApiClient["listMoves"]>(),
 };
 
 vi.mock("@/lib/use-api-client", () => ({
@@ -24,6 +30,7 @@ const beHeard: Need = {
   when_it_fits: "They are venting.",
   how_to_reply: "Listen and reflect back.",
   is_fallback: false,
+  ruled_out_move_ids: ["move-push"],
 };
 
 const advice: Need = {
@@ -32,6 +39,7 @@ const advice: Need = {
   when_it_fits: "They ask what to do.",
   how_to_reply: "Give a real view.",
   is_fallback: false,
+  ruled_out_move_ids: [],
 };
 
 const askMore: Need = {
@@ -40,6 +48,23 @@ const askMore: Need = {
   when_it_fits: "It isn't clear.",
   how_to_reply: "Ask one short question.",
   is_fallback: true,
+  ruled_out_move_ids: [],
+};
+
+const calm: Move = {
+  id: "move-calm",
+  name: "Calm",
+  when_it_fits: "They are anxious.",
+  how_to_do_it: "Slow things down.",
+  needed_feature: null,
+};
+
+const push: Move = {
+  id: "move-push",
+  name: "Push",
+  when_it_fits: "They are stalling.",
+  how_to_do_it: "Name the gap kindly.",
+  needed_feature: null,
 };
 
 async function findCard(name: string) {
@@ -50,6 +75,7 @@ describe("NeedsManager", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     apiClient.listNeeds.mockResolvedValue([beHeard, advice, askMore]);
+    apiClient.listMoves.mockResolvedValue([calm, push]);
   });
 
   it("shows each Need in order with its name, when it fits and how to reply", async () => {
@@ -99,8 +125,35 @@ describe("NeedsManager", () => {
       name: "Advice",
       when_it_fits: "They ask what to do.",
       how_to_reply: "One idea only.",
+      ruled_out_move_ids: [],
     });
     expect(await screen.findByText("Saved Advice.")).toBeInTheDocument();
+  });
+
+  it("shows the Moves each Need rules out", async () => {
+    renderWithQueries(<NeedsManager />);
+
+    const card = await findCard("Be heard");
+    expect(await card.findByRole("checkbox", { name: "Push" })).toBeChecked();
+    expect(card.getByRole("checkbox", { name: "Calm" })).not.toBeChecked();
+  });
+
+  it("saves a Need's changed rule-outs", async () => {
+    apiClient.updateNeed.mockResolvedValue(beHeard);
+    const user = userEvent.setup();
+    renderWithQueries(<NeedsManager />);
+    const card = await findCard("Be heard");
+
+    await user.click(await card.findByRole("checkbox", { name: "Calm" }));
+    await user.click(card.getByRole("checkbox", { name: "Push" }));
+    await user.click(card.getByRole("button", { name: "Save" }));
+
+    expect(apiClient.updateNeed).toHaveBeenCalledWith("need-be-heard", {
+      name: "Be heard",
+      when_it_fits: "They are venting.",
+      how_to_reply: "Listen and reflect back.",
+      ruled_out_move_ids: ["move-calm"],
+    });
   });
 
   it("adds a new Need", async () => {
@@ -113,12 +166,14 @@ describe("NeedsManager", () => {
     await user.type(card.getByLabelText("Name"), "Celebrate");
     await user.type(card.getByLabelText(/When it fits/), "Good news.");
     await user.type(card.getByLabelText(/How to reply/), "Cheer them on.");
+    await user.click(await card.findByRole("checkbox", { name: "Push" }));
     await user.click(card.getByRole("button", { name: "Add" }));
 
     expect(apiClient.addNeed).toHaveBeenCalledWith({
       name: "Celebrate",
       when_it_fits: "Good news.",
       how_to_reply: "Cheer them on.",
+      ruled_out_move_ids: ["move-push"],
     });
     expect(await screen.findByText("Added Celebrate.")).toBeInTheDocument();
   });

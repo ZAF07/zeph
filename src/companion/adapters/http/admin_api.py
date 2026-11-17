@@ -62,6 +62,8 @@ from companion.core.models import (
     ModelCallTraceOverview,
     ModelStep,
     MoodIntensity,
+    Move,
+    MoveDetails,
     MoveDirection,
     Need,
     NeedDetails,
@@ -76,6 +78,7 @@ from companion.core.models import (
     UserOverview,
     UserRole,
 )
+from companion.core.moves import MoveService
 from companion.core.needs import NeedService
 from companion.core.personal_stickers import PersonalStickerService
 from companion.core.platform_settings import (
@@ -351,7 +354,7 @@ class HelplineRequest(HelplineDetailsRequest):
 
 
 class MoveRequest(BaseModel):
-    """Which way to move a Helpline or Need in its list."""
+    """Which way to move a Helpline, Need or Move in its list."""
 
     direction: MoveDirection
 
@@ -423,6 +426,7 @@ class NeedResponse(BaseModel):
     when_it_fits: str
     how_to_reply: str
     is_fallback: bool
+    ruled_out_move_ids: list[str]
 
 
 class NeedsResponse(BaseModel):
@@ -432,11 +436,12 @@ class NeedsResponse(BaseModel):
 
 
 class NeedRequest(BaseModel):
-    """A Need's name, when it fits and how to reply."""
+    """A Need's name, when it fits, how to reply and the Moves it rules out."""
 
     name: str
     when_it_fits: str
     how_to_reply: str
+    ruled_out_move_ids: list[UUID]
 
     def to_details(self) -> NeedDetails:
         """Turn the request into Need details.
@@ -448,6 +453,45 @@ class NeedRequest(BaseModel):
             name=self.name,
             when_it_fits=self.when_it_fits,
             how_to_reply=self.how_to_reply,
+            ruled_out_move_ids=frozenset(self.ruled_out_move_ids),
+        )
+
+
+class MoveResponse(BaseModel):
+    """A Move as Admins see it."""
+
+    id: str
+    name: str
+    when_it_fits: str
+    how_to_do_it: str
+    needed_feature: Feature | None
+
+
+class MovesResponse(BaseModel):
+    """Every Move in order."""
+
+    moves: list[MoveResponse]
+
+
+class MoveDetailsRequest(BaseModel):
+    """A Move's name, when it fits, how to do it and the Feature it needs."""
+
+    name: str
+    when_it_fits: str
+    how_to_do_it: str
+    needed_feature: Feature | None
+
+    def to_details(self) -> MoveDetails:
+        """Turn the request into Move details.
+
+        Returns:
+            The details.
+        """
+        return MoveDetails(
+            name=self.name,
+            when_it_fits=self.when_it_fits,
+            how_to_do_it=self.how_to_do_it,
+            needed_feature=self.needed_feature,
         )
 
 
@@ -836,6 +880,7 @@ def to_need_response(need: Need) -> NeedResponse:
         when_it_fits=need.when_it_fits,
         how_to_reply=need.how_to_reply,
         is_fallback=need.is_fallback,
+        ruled_out_move_ids=sorted(str(move_id) for move_id in need.ruled_out_move_ids),
     )
 
 
@@ -849,6 +894,36 @@ def to_needs_response(needs: list[Need]) -> NeedsResponse:
         The response body.
     """
     return NeedsResponse(needs=[to_need_response(need) for need in needs])
+
+
+def to_move_response(move: Move) -> MoveResponse:
+    """Describe a Move for the admin area.
+
+    Args:
+        move: The Move.
+
+    Returns:
+        The response.
+    """
+    return MoveResponse(
+        id=str(move.id),
+        name=move.name,
+        when_it_fits=move.when_it_fits,
+        how_to_do_it=move.how_to_do_it,
+        needed_feature=move.needed_feature,
+    )
+
+
+def to_moves_response(moves: list[Move]) -> MovesResponse:
+    """Describe every Move for the admin area.
+
+    Args:
+        moves: The Moves, in order.
+
+    Returns:
+        The response.
+    """
+    return MovesResponse(moves=[to_move_response(move) for move in moves])
 
 
 def to_check_in_log_entry_response(logged: LoggedCheckIn) -> CheckInLogEntryResponse:
@@ -1230,6 +1305,7 @@ def build_admin_api_router(
     usage_limiter: UsageLimiter,
     model_call_log: ModelCallLog,
     need_service: NeedService,
+    move_service: MoveService,
 ) -> APIRouter:
     """Build the admin API routes.
 
@@ -1254,6 +1330,7 @@ def build_admin_api_router(
         usage_limiter: Reports usage per User per day.
         model_call_log: Lists and opens Model Call Log traces.
         need_service: Manages Needs.
+        move_service: Manages Moves.
 
     Returns:
         The router.
@@ -1772,13 +1849,13 @@ def build_admin_api_router(
 
         Raises:
             CoreError: 422 if a field is blank or too long, or the name is
-                taken.
+                taken; 404 if a ruled-out Move doesn't exist.
         """
         return to_need_response(need_service.add(request.to_details()))
 
     @router.put("/needs/{need_id}")
     def update_need(need_id: UUID, request: NeedRequest) -> NeedResponse:
-        """Change a Need's name, when it fits and how to reply.
+        """Change a Need's name, when it fits, how to reply and ruled-out Moves.
 
         Args:
             need_id: The Need to change.
@@ -1788,8 +1865,9 @@ def build_admin_api_router(
             The saved Need.
 
         Raises:
-            CoreError: 404 if there is no such Need; 422 if a field is blank
-                or too long, or the name is taken.
+            CoreError: 404 if there is no such Need or a ruled-out Move
+                doesn't exist; 422 if a field is blank or too long, or the
+                name is taken.
         """
         return to_need_response(need_service.update(need_id, request.to_details()))
 
@@ -1825,6 +1903,82 @@ def build_admin_api_router(
             CoreError: 404 if there is no such Need.
         """
         return to_needs_response(need_service.move(need_id, request.direction))
+
+    @router.get("/moves")
+    def list_moves() -> MovesResponse:
+        """List every Move in order.
+
+        Returns:
+            The Moves.
+        """
+        return to_moves_response(move_service.list_all())
+
+    @router.post("/moves", status_code=status.HTTP_201_CREATED)
+    def add_move(request: MoveDetailsRequest) -> MoveResponse:
+        """Add a Move last in the list.
+
+        Args:
+            request: The Move.
+
+        Returns:
+            The saved Move.
+
+        Raises:
+            CoreError: 422 if a field is blank or too long; 409 if another
+                Move already has the name.
+        """
+        return to_move_response(move_service.add(request.to_details()))
+
+    @router.put("/moves/{move_id}")
+    def update_move(move_id: UUID, request: MoveDetailsRequest) -> MoveResponse:
+        """Change a Move's name, when it fits, how to do it and needed Feature.
+
+        Args:
+            move_id: The Move to change.
+            request: Its new values.
+
+        Returns:
+            The saved Move.
+
+        Raises:
+            CoreError: 404 if there is no such Move; 422 if a field is blank
+                or too long; 409 if another Move already has the name.
+        """
+        return to_move_response(move_service.update(move_id, request.to_details()))
+
+    @router.delete("/moves/{move_id}", status_code=status.HTTP_204_NO_CONTENT)
+    def delete_move(move_id: UUID) -> Response:
+        """Remove a Move and every Need's rule-out of it.
+
+        Saved Understandings keep its name.
+
+        Args:
+            move_id: The Move to remove.
+
+        Returns:
+            An empty response.
+
+        Raises:
+            CoreError: 404 if there is no such Move.
+        """
+        move_service.delete(move_id)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @router.post("/moves/{move_id}/move")
+    def move_move(move_id: UUID, request: MoveRequest) -> MovesResponse:
+        """Move a Move up or down in the list.
+
+        Args:
+            move_id: The Move to move.
+            request: Which way to move it.
+
+        Returns:
+            Every Move in the new order.
+
+        Raises:
+            CoreError: 404 if there is no such Move.
+        """
+        return to_moves_response(move_service.move(move_id, request.direction))
 
     @router.get("/check-ins")
     def list_check_in_log(
