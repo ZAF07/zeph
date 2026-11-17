@@ -6,7 +6,10 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from companion.core.life_threads import read_text
+from companion.core.life_threads import (
+    read_text,
+    recent_incoming_texts,
+)
 from companion.core.memory_retrieval import format_day, format_time
 from companion.core.models import (
     ChatLine,
@@ -24,6 +27,8 @@ from companion.core.platform_settings import (
     MOVE_OUTCOME_KEEPING_MODEL,
     MOVE_OUTCOME_KEEPING_PROMPT,
     MOVE_OUTCOME_KEEPING_THINKING,
+    MOVE_OUTCOMES_CLOSENESS_PERCENT,
+    MOVE_OUTCOMES_PER_UNDERSTANDING,
 )
 from companion.core.ports import Clock, Embedder, Repositories
 from companion.core.transcripts import to_transcript_lines
@@ -356,3 +361,53 @@ class MoveOutcomeKeeper:
             if entries is not None:
                 return entries
         return None
+
+
+class MoveOutcomeFinder:
+    """Finds the User's past Move Outcomes that fit the Message being answered.
+
+    No model call: one search compares the User's last few texts with the
+    situation and feeling of each of their own Move Outcomes. They are used
+    even while User Memory is off, since off only stops learning.
+    """
+
+    def __init__(self, repositories: Repositories, embedder: Embedder) -> None:
+        """Set up the finder.
+
+        Args:
+            repositories: Where Conversations and Move Outcomes are stored.
+            embedder: Embeds the User's last few texts.
+        """
+        self._repositories = repositories
+        self._embedder = embedder
+
+    def find(self, snapshot: UserSnapshot, conversation_id: UUID) -> list[MoveOutcome]:
+        """Find the User's Move Outcomes closest to the Message being answered.
+
+        Only those at least as close as the Admin-set bar count, up to the
+        Admin-set number. If the search fails the reply goes ahead without
+        them.
+
+        Args:
+            snapshot: The User being answered.
+            conversation_id: The Conversation the Message is in.
+
+        Returns:
+            The Move Outcomes, closest first.
+        """
+        settings = snapshot.settings
+        limit = settings.get(MOVE_OUTCOMES_PER_UNDERSTANDING)
+        messages = self._repositories.conversations.list_messages(conversation_id)
+        recent_texts = recent_incoming_texts(messages)
+        if limit < 1 or not recent_texts:
+            return []
+        try:
+            return self._repositories.move_outcomes.find_by_meaning(
+                snapshot.user.id,
+                self._embedder.embed_query("\n".join(recent_texts)),
+                min_closeness=settings.get(MOVE_OUTCOMES_CLOSENESS_PERCENT) / 100,
+                limit=limit,
+            )
+        except Exception:
+            logger.exception("Could not search Move Outcomes")
+            return []

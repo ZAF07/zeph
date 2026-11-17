@@ -203,7 +203,7 @@ What the Companion does to help in a reply (e.g. Calm, Ground, Reframe, Mirror, 
 _Avoid_: Strategy, technique, action, intervention
 
 **Move Outcome**:
-What the Companion learned about how one Move went for a User: the Move, whether it led or supported, the situation, how the User felt, whether it helped, didn't or was mixed, why, and when. Kept when a Conversation ends, as part of User Memory, so the same Move can be known to help in one situation or mood and not in another. Before each reply the Understanding is shown the ones closest to the current situation and mood. Users see them under "What helps you" and can delete them; Admins see only how many a User has.
+What the Companion learned about how one Move went for a User: the Move, whether it led or supported, the situation, how the User felt, whether it helped, didn't or was mixed, why, and when. Kept when a Conversation ends, as part of User Memory, so the same Move can be known to help in one situation or mood and not in another. Before each reply the Understanding is shown, with their days, the User's own ones whose situation and feeling are closest in meaning to their last few messages, up to an Admin-set number (starting at 3) and only those past an Admin-set closeness bar; it reads them knowing a Move that helped before may not help now. They are used even while User Memory is off, which only stops new ones being kept. Users see them under "What helps you" and can delete them; Admins see only how many a User has.
 _Avoid_: Feedback, rating, result
 
 **Understanding**:

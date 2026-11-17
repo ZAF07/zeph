@@ -34,6 +34,7 @@ from companion.core.models import (
     ModelStep,
     MoodIntensity,
     Move,
+    MoveOutcome,
     Need,
     ThreadLeftAlone,
     ThreadToBringUp,
@@ -42,6 +43,7 @@ from companion.core.models import (
     UnderstandingShape,
     UserSnapshot,
 )
+from companion.core.move_outcomes import describe_move_outcome
 from companion.core.platform_settings import (
     HOME_GOALS_MEMORY_CATEGORY,
     REPLY_ASK_WHY_NOTE,
@@ -219,6 +221,7 @@ def describe_message_for_understanding(
     reminded: Sequence[RemindedThread],
     due: DueCuriosities,
     knowledge_documents: dict[int, KnowledgeDocument],
+    move_outcomes: Sequence[MoveOutcome],
 ) -> str:
     """Write what the Understanding model is given about the Message.
 
@@ -234,17 +237,24 @@ def describe_message_for_understanding(
         due: The Curiosities it may bring up.
         knowledge_documents: The Knowledge documents it may choose from, by
             number.
+        move_outcomes: The User's past Move Outcomes closest to the Message,
+            closest first.
 
     Returns:
-        The time, Needs, Moves and which each Need allows, User Portrait,
-        Goals, Memory Categories, recent Conversations, reminded Life
-        Threads, due Curiosities, Knowledge documents, earlier
-        Understandings, earlier Conversation and latest message.
+        The time, Needs, Moves and which each Need allows, past Move
+        Outcomes with their days, User Portrait, Goals, Memory Categories,
+        recent Conversations, reminded Life Threads, due Curiosities,
+        Knowledge documents, earlier Understandings, earlier Conversation
+        and latest message.
     """
     fallback = fallback_need(needs)
     need_lines = "\n".join(f"- {need.name}: {need.when_it_fits}" for need in needs)
     move_lines = "\n".join(f"- {move.name}: {move.when_it_fits}" for move in moves)
     allowed_lines = "\n".join(format_allowed_moves(need, moves) for need in needs)
+    outcome_lines = "\n".join(
+        f"- {describe_move_outcome(outcome, snapshot.user.time_zone)}"
+        for outcome in move_outcomes
+    )
     goals = saved.items_in(snapshot.settings.get(HOME_GOALS_MEMORY_CATEGORY))
     goal_lines = "\n".join(f"- {item.content}" for item in goals)
     category_lines = "\n".join(
@@ -267,6 +277,8 @@ def describe_message_for_understanding(
         f"Fallback Need: {fallback.name}\n\n"
         f"Moves:\n{move_lines or 'None.'}\n\n"
         f"Moves each Need allows:\n{allowed_lines}\n\n"
+        f"How Moves went for them before in moments like this, closest first:\n"
+        f"{outcome_lines or 'None found.'}\n\n"
         f"Their User Portrait:\n{saved.portrait or 'Not written yet.'}\n\n"
         f"Their Goals:\n{goal_lines or 'None saved.'}\n\n"
         f"Memory Categories with something saved:\n{category_lines or 'None yet.'}"
@@ -851,6 +863,7 @@ class UnderstandingService:
         saved: SavedMemory,
         reminded: Sequence[RemindedThread],
         due: DueCuriosities,
+        move_outcomes: Sequence[MoveOutcome],
     ) -> UnderstoodMessage:
         """Make and save the Understanding of the Conversation's newest Message.
 
@@ -869,6 +882,8 @@ class UnderstandingService:
             saved: The User's saved memory, read for this reply.
             reminded: The Life Threads the Message reminds the Companion of.
             due: The Curiosities it may bring up.
+            move_outcomes: The User's past Move Outcomes closest to the
+                Message, closest first.
 
         Returns:
             The saved Understanding and what it adds to the reply.
@@ -896,6 +911,7 @@ class UnderstandingService:
                 reminded,
                 due,
                 knowledge_documents,
+                move_outcomes,
             ),
             reminded,
             due,

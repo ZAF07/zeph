@@ -117,6 +117,20 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
           "How long Zeph waits before bringing up a Thread again after the User brushed it off. One they asked to drop is never brought up again.",
         unit: "days",
       },
+      {
+        key: "move_outcomes_per_understanding",
+        label: "Most Move Outcomes per Understanding",
+        caption:
+          "How many of the User’s past Move Outcomes, closest first, Zeph sees before each reply, so it picks help that has worked for them in moments like this.",
+        unit: "outcomes",
+      },
+      {
+        key: "move_outcomes_closeness_percent",
+        label: "Move Outcome closeness bar",
+        caption:
+          "How close in meaning a Move Outcome’s situation and feeling must be to the User’s last few messages. Real matches score about 75–85; unrelated ones up to about 62.",
+        unit: "%",
+      },
     ],
   },
   {

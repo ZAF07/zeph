@@ -5473,6 +5473,45 @@ class PostgresMoveOutcomeRepository:
                 delete(move_outcomes).where(move_outcomes.c.user_id == user_id)
             )
 
+    def find_by_meaning(
+        self,
+        user_id: UUID,
+        embedding: list[float],
+        min_closeness: float,
+        limit: int,
+    ) -> list[MoveOutcome]:
+        """Find a User's Move Outcomes closest in meaning to a search.
+
+        Closeness is cosine similarity. Move Outcomes with no embedding are
+        never found. The search stays within the User's own rows, found by
+        the user index.
+
+        Args:
+            user_id: The User's ID; only their Move Outcomes are searched.
+            embedding: The search's embedding.
+            min_closeness: How close a Move Outcome's situation and feeling
+                must be, from 0 to 1.
+            limit: The most to return.
+
+        Returns:
+            The closest Move Outcomes, closest first.
+        """
+        if limit < 1:
+            return []
+        distance = move_outcomes.c.embedding.cosine_distance(embedding)
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(*MOVE_OUTCOME_COLUMNS)
+                .where(
+                    move_outcomes.c.user_id == user_id,
+                    move_outcomes.c.embedding.is_not(None),
+                    distance <= 1 - min_closeness,
+                )
+                .order_by(distance, move_outcomes.c.position)
+                .limit(limit)
+            ).all()
+        return [_to_move_outcome(row) for row in rows]
+
 
 def _build_repositories(
     database: Database,

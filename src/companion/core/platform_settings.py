@@ -247,6 +247,12 @@ LIFE_THREADS_PER_REPLY = Setting("life_threads_per_reply", read_whole_number)
 LIFE_THREADS_CLOSENESS_PERCENT = Setting(
     "life_threads_closeness_percent", read_whole_number
 )
+MOVE_OUTCOMES_PER_UNDERSTANDING = Setting(
+    "move_outcomes_per_understanding", read_whole_number
+)
+MOVE_OUTCOMES_CLOSENESS_PERCENT = Setting(
+    "move_outcomes_closeness_percent", read_whole_number
+)
 LIFE_THREAD_BRUSHED_OFF_WAIT = Setting("life_thread_brushed_off_wait_days", read_days)
 LIFE_THREAD_KEEPING_MODEL = Setting("life_thread_keeping_model", read_text)
 LIFE_THREAD_KEEPING_THINKING = Setting("life_thread_keeping_thinking", read_on_off)
@@ -827,6 +833,20 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     EditableSetting(
         LIFE_THREADS_CLOSENESS_PERCENT.key,
         "Life Thread closeness bar",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=100,
+    ),
+    EditableSetting(
+        MOVE_OUTCOMES_PER_UNDERSTANDING.key,
+        "Most Move Outcomes per Understanding",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=10,
+    ),
+    EditableSetting(
+        MOVE_OUTCOMES_CLOSENESS_PERCENT.key,
+        "Move Outcome closeness bar",
         SettingKind.WHOLE_NUMBER,
         minimum=0,
         maximum=100,
