@@ -16,6 +16,7 @@ from companion.core.errors import InvalidError
 from companion.core.evals.models import EvalName, EvalRunState, StartedFrom
 from companion.core.evals.runs import EvalRunService
 from companion.core.evals.setting_overrides import SettingOverrideService
+from companion.core.moves import MoveService
 from companion.core.needs import NeedService
 from companion.core.platform_settings import PlatformSettingsService
 from companion.core.ports import Clock
@@ -119,6 +120,7 @@ def build_eval_run_service(engine: Engine, clock: Clock) -> EvalRunService:
         overrides=SettingOverrideService(
             PlatformSettingsService(repositories.platform_settings, clock),
             NeedService(repositories),
+            MoveService(repositories),
         ),
         clock=clock,
     )

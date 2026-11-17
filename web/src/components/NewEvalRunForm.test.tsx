@@ -89,6 +89,17 @@ describe("NewEvalRunForm", () => {
           },
         },
       ],
+      moves: [
+        {
+          key: "move:m-1",
+          name: "Research",
+          value: {
+            name: "Research",
+            when_it_fits: "They need options found.",
+            how_to_do_it: "Search and compare.",
+          },
+        },
+      ],
       models: ["deepseek-flash"],
     });
   });
@@ -286,6 +297,41 @@ describe("NewEvalRunForm", () => {
               name: "Be heard",
               when_it_fits: "Only when venting.",
               how_to_reply: "Listen first.",
+            },
+          },
+        ],
+      }),
+    );
+  });
+
+  it("changes a Move's text for one Variant, starting from its live text", async () => {
+    renderWithQueries(<NewEvalRunForm />);
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: /Safeguard/ }),
+    );
+    await userEvent.selectOptions(
+      await screen.findByRole("combobox", {
+        name: "Change a setting in Variant A",
+      }),
+      "move:m-1",
+    );
+    const howToDoIt = screen.getByRole("textbox", {
+      name: "Move: Research how to do it",
+    });
+    expect(howToDoIt).toHaveValue("Search and compare.");
+    await userEvent.clear(howToDoIt);
+    await userEvent.type(howToDoIt, "Find three options.");
+    await userEvent.click(screen.getByRole("button", { name: /Start run/ }));
+
+    expect(apiClient.startEvalRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variants: [
+          {
+            "move:m-1": {
+              name: "Research",
+              when_it_fits: "They need options found.",
+              how_to_do_it: "Find three options.",
             },
           },
         ],

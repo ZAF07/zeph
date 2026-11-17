@@ -15,10 +15,15 @@ from companion.adapters.postgres.database import (
     seed_needs,
     seed_platform_settings,
 )
-from companion.adapters.postgres.tables import metadata, platform_settings
+from companion.adapters.postgres.tables import (
+    metadata,
+    need_ruled_out_moves,
+    platform_settings,
+)
+from companion.adapters.postgres.tables import moves as moves_table
 from companion.adapters.postgres.tables import needs as needs_table
 from companion.core.evals.models import EvalImage
-from companion.core.models import Need
+from companion.core.models import Move, Need
 from companion.core.ports import ChatModel, Embedder, PhotoViewer
 
 
@@ -83,6 +88,7 @@ class PostgresEvalEnvironment:
         self,
         platform_settings: dict[str, Any],
         needs: Sequence[Need],
+        moves: Sequence[Move],
         images: Sequence[EvalImage],
     ) -> InProcessCompanion:
         """Empty the Eval database, seed it and build the app on it.
@@ -90,7 +96,9 @@ class PostgresEvalEnvironment:
         Args:
             platform_settings: The Platform Settings to write into it, by
                 key; settings missing here come from the seed.
-            needs: The Needs to write into it; the seed's when empty.
+            needs: The Needs to write into it, with their ruled-out Moves;
+                the seed's when empty.
+            moves: The Moves to write into it; the seed's when empty.
             images: The test images the case sends, by name.
 
         Returns:
@@ -99,6 +107,7 @@ class PostgresEvalEnvironment:
         self._empty()
         self._store_platform_settings(platform_settings)
         self._store_needs(needs)
+        self._store_moves(moves, needs)
         seed_platform_settings(self._engine, self._seed_dir / "platform_settings.yaml")
         seed_helplines(self._engine, self._seed_dir / "helplines.yaml")
         seed_memory_categories(self._engine, self._seed_dir / "memory_categories.yaml")
@@ -165,3 +174,37 @@ class PostgresEvalEnvironment:
         ]
         with self._engine.begin() as connection:
             connection.execute(insert(needs_table).values(rows))
+
+    def _store_moves(self, moves: Sequence[Move], needs: Sequence[Need]) -> None:
+        """Write Moves, and each Need's ruled-out Moves, into the Eval database.
+
+        Seeding afterwards adds Moves only when there are none, so these win.
+
+        Args:
+            moves: The Moves, with their IDs and order.
+            needs: The Needs already written, with their ruled-out Moves.
+        """
+        if not moves:
+            return
+        move_rows = [
+            {
+                "id": move.id,
+                "name": move.name,
+                "when_it_fits": move.when_it_fits,
+                "how_to_do_it": move.how_to_do_it,
+                "sort_order": move.sort_order,
+                "needed_feature": (
+                    None if move.needed_feature is None else move.needed_feature.value
+                ),
+            }
+            for move in moves
+        ]
+        rule_out_rows = [
+            {"need_id": need.id, "move_id": move_id}
+            for need in needs
+            for move_id in need.ruled_out_move_ids
+        ]
+        with self._engine.begin() as connection:
+            connection.execute(insert(moves_table).values(move_rows))
+            if rule_out_rows:
+                connection.execute(insert(need_ruled_out_moves).values(rule_out_rows))

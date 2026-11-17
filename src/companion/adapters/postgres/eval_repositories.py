@@ -51,7 +51,7 @@ from companion.core.evals.models import (
     StoredEvalCase,
     Variant,
 )
-from companion.core.models import ModelCall, Need
+from companion.core.models import Feature, ModelCall, Move, Need
 
 TAKE_RUN_LOCK = 7_301_013
 RUNNER_LOCK = 7_301_014
@@ -517,6 +517,7 @@ def _to_snapshot(row: Row[Any]) -> RunSnapshot | None:
         judge=row.judge_snapshot,
         cases=[_to_eval_case(case) for case in row.cases_snapshot],
         needs=[_to_need(need) for need in row.needs_snapshot],
+        moves=[_to_move(move) for move in row.moves_snapshot],
     )
 
 
@@ -563,6 +564,47 @@ def _to_need(values: dict[str, Any]) -> Need:
         ruled_out_move_ids=frozenset(
             UUID(move_id) for move_id in values.get("ruled_out_move_ids", [])
         ),
+    )
+
+
+def _move_values(move: Move) -> dict[str, Any]:
+    """Write a Move as JSON for a run's snapshot.
+
+    Args:
+        move: The Move.
+
+    Returns:
+        Its fields, the ID as text.
+    """
+    return {
+        "id": str(move.id),
+        "name": move.name,
+        "when_it_fits": move.when_it_fits,
+        "how_to_do_it": move.how_to_do_it,
+        "sort_order": move.sort_order,
+        "needed_feature": (
+            None if move.needed_feature is None else move.needed_feature.value
+        ),
+    }
+
+
+def _to_move(values: dict[str, Any]) -> Move:
+    """Read a Move from a run's snapshot.
+
+    Args:
+        values: Its fields, as `_move_values` wrote them.
+
+    Returns:
+        The Move.
+    """
+    needed_feature = values["needed_feature"]
+    return Move(
+        id=UUID(values["id"]),
+        name=values["name"],
+        when_it_fits=values["when_it_fits"],
+        how_to_do_it=values["how_to_do_it"],
+        sort_order=values["sort_order"],
+        needed_feature=None if needed_feature is None else Feature(needed_feature),
     )
 
 
@@ -960,6 +1002,7 @@ class PostgresEvalRunRepository:
                     judge_snapshot=snapshot.judge,
                     cases_snapshot=[_eval_case_values(case) for case in snapshot.cases],
                     needs_snapshot=[_need_values(need) for need in snapshot.needs],
+                    moves_snapshot=[_move_values(move) for move in snapshot.moves],
                     token_limit=token_limit,
                 )
             )

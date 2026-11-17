@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from typing import Any, Protocol
 from uuid import UUID
 
+from companion.core.evals.cases import EvalWebResult
 from companion.core.evals.models import (
     CaseHistoryRow,
     CaseResult,
@@ -19,7 +20,7 @@ from companion.core.evals.models import (
     StoredEvalCase,
     Variant,
 )
-from companion.core.models import ModelCall, Need
+from companion.core.models import ModelCall, Move, Need
 from companion.core.ports import ChatModel, Embedder, Repositories
 
 
@@ -152,6 +153,18 @@ class EvalCompanion(Protocol):
         """Turn Photo Viewing off for the User."""
         ...
 
+    def turn_web_search_off(self) -> None:
+        """Turn Web Search off for the User, as an Admin would."""
+        ...
+
+    def set_web_results(self, pages: Sequence[EvalWebResult]) -> None:
+        """Set the made-up pages every web search finds.
+
+        Args:
+            pages: The pages; none means searches find nothing.
+        """
+        ...
+
     def add_shared_photo(self, file_id: str, description: str, note: str) -> None:
         """Keep a Shared Photo for the User, as memory processing would.
 
@@ -263,6 +276,7 @@ class EvalEnvironment(Protocol):
         self,
         platform_settings: dict[str, Any],
         needs: Sequence[Need],
+        moves: Sequence[Move],
         images: Sequence[EvalImage],
     ) -> EvalCompanion:
         """Empty the Eval database, seed it and build the app on it.
@@ -270,7 +284,9 @@ class EvalEnvironment(Protocol):
         Args:
             platform_settings: The Platform Settings to write into it, by
                 key; settings missing here come from the seed.
-            needs: The Needs to write into it; the seed's when empty.
+            needs: The Needs to write into it, with their ruled-out Moves;
+                the seed's when empty.
+            moves: The Moves to write into it; the seed's when empty.
             images: The test images the case sends, by name.
 
         Returns:

@@ -22,6 +22,8 @@ class ObservedUnderstanding:
             the reply's instructions.
         woven_in: Whether the Check-in model chose to weave the due Check-in
             into the reply.
+        lead_move: The Move the reply led with; None for none.
+        support_move: The Move that supported it; None for none.
     """
 
     need: str
@@ -32,6 +34,8 @@ class ObservedUnderstanding:
     knowledge_documents: list[str]
     knowledge_in_reply: list[str]
     woven_in: bool
+    lead_move: str | None = None
+    support_move: str | None = None
 
 
 @dataclass(frozen=True)
@@ -63,6 +67,87 @@ def check_need(allowed: list[str], need: str) -> CheckResult:
         return CheckResult("need", True, f"picked {need}")
     expected = " or ".join(allowed)
     return CheckResult("need", False, f"picked {need}, expected {expected}")
+
+
+def is_one_of(name: str, allowed: Sequence[str]) -> bool:
+    """Say whether a Move's name is among those allowed, ignoring case.
+
+    Args:
+        name: The Move's name.
+        allowed: The names allowed.
+
+    Returns:
+        True if it is.
+    """
+    return name.lower() in {other.lower() for other in allowed}
+
+
+def check_lead_move(allowed: list[str], lead_move: str | None) -> CheckResult:
+    """Check the reply led with one of the Moves allowed.
+
+    Args:
+        allowed: The Moves it may lead with.
+        lead_move: The Move it led with; None for none.
+
+    Returns:
+        The check's outcome.
+    """
+    expected = " or ".join(allowed)
+    if lead_move is None:
+        return CheckResult("lead move", False, f"made no Move, expected {expected}")
+    if is_one_of(lead_move, allowed):
+        return CheckResult("lead move", True, f"led with {lead_move}")
+    return CheckResult("lead move", False, f"led with {lead_move}, expected {expected}")
+
+
+def check_support_move(allowed: list[str], support_move: str | None) -> CheckResult:
+    """Check the reply was supported by one of the Moves allowed.
+
+    Args:
+        allowed: The Moves that may support it.
+        support_move: The Move that supported it; None for none.
+
+    Returns:
+        The check's outcome.
+    """
+    expected = " or ".join(allowed)
+    if support_move is None:
+        return CheckResult(
+            "supporting move", False, f"had no supporting Move, expected {expected}"
+        )
+    if is_one_of(support_move, allowed):
+        return CheckResult("supporting move", True, f"supported with {support_move}")
+    return CheckResult(
+        "supporting move", False, f"supported with {support_move}, expected {expected}"
+    )
+
+
+def check_no_move(
+    expected: bool, lead_move: str | None, support_move: str | None
+) -> CheckResult:
+    """Check the reply made no Move, or led with one, as expected.
+
+    Args:
+        expected: True if it must make no Move; False if it must lead with one.
+        lead_move: The Move it led with; None for none.
+        support_move: The Move that supported it; None for none.
+
+    Returns:
+        The check's outcome.
+    """
+    if lead_move is not None:
+        made = f"led with {lead_move}"
+    elif support_move is not None:
+        made = f"supported with {support_move}"
+    else:
+        return CheckResult(
+            "no move",
+            expected,
+            "made no Move" if expected else "made no Move, expected one",
+        )
+    if expected:
+        return CheckResult("no move", False, f"{made}, expected no Move")
+    return CheckResult("no move", True, made)
 
 
 def check_each_thread(
@@ -189,13 +274,22 @@ def check_understanding(
         observed: What it did.
 
     Returns:
-        One outcome per check, in a fixed order: the Need, each Thread to
-        be found, brought up and left alone, then the Curiosity, asking why,
-        Knowledge and the woven-in Check-in.
+        One outcome per check, in a fixed order: the Need, the lead,
+        supporting and no Move, each Thread to be found, brought up and left
+        alone, then the Curiosity, asking why, Knowledge and the woven-in
+        Check-in.
     """
     checks = []
     if expect.need:
         checks.append(check_need(expect.need, observed.need))
+    if expect.lead_move:
+        checks.append(check_lead_move(expect.lead_move, observed.lead_move))
+    if expect.support_move:
+        checks.append(check_support_move(expect.support_move, observed.support_move))
+    if expect.no_move is not None:
+        checks.append(
+            check_no_move(expect.no_move, observed.lead_move, observed.support_move)
+        )
     checks += check_each_thread(
         "found",
         expect.found,

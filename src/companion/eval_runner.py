@@ -13,6 +13,7 @@ from companion.adapters.postgres.eval_repositories import (
     hold_runner_lock,
 )
 from companion.adapters.postgres.repositories import (
+    PostgresMoveRepository,
     PostgresNeedRepository,
     PostgresPlatformSettingsRepository,
 )
@@ -37,10 +38,10 @@ def run_forever() -> None:
     """Work Queued Eval Runs one at a time, for as long as the service is up.
 
     The Eval database is created if missing. The app is always built with
-    the recording chat channel, no web search and no scheduler, whatever
-    `.env` says, so an Eval never reaches a real chat or spends search
-    credits (ADR-0013). Runs left Running by an earlier runner are marked
-    Interrupted first.
+    the recording chat channel, a web search that finds only a case's
+    made-up pages, and no scheduler, whatever `.env` says, so an Eval never
+    reaches a real chat or spends search credits (ADR-0013). Runs left
+    Running by an earlier runner are marked Interrupted first.
     """
     logging.basicConfig(level=logging.INFO)
     quiet_http_client_logs()
@@ -54,6 +55,7 @@ def run_forever() -> None:
         judge_settings=PostgresJudgeSettingsRepository(engine),
         live_settings=PostgresPlatformSettingsRepository(engine),
         live_needs=PostgresNeedRepository(engine),
+        live_moves=PostgresMoveRepository(engine),
         environment=PostgresEvalEnvironment(
             database_url=settings.eval_database_url,
             chat_model=build_chat_model(settings),

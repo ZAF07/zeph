@@ -26,10 +26,12 @@ from companion.core.evals.models import (
 from companion.core.evals.runs import EvalRunService
 from companion.core.evals.setting_overrides import (
     SettingOverrideService,
+    move_override_key,
+    move_values,
     need_override_key,
     need_values,
 )
-from companion.core.models import Need, User
+from companion.core.models import Move, Need, User
 from companion.core.platform_settings import SettingKind
 
 
@@ -213,18 +215,27 @@ class NeedResponse(BaseModel):
     value: dict[str, str]
 
 
+class MoveResponse(BaseModel):
+    """A Move keyed as its override would be, `move:<id>`, with its text."""
+
+    key: str
+    name: str
+    value: dict[str, str]
+
+
 class OverrideChoicesResponse(BaseModel):
     """What a Variant can override, as on the settings pages."""
 
     settings: list[OverridableSettingResponse]
     needs: list[NeedResponse]
+    moves: list[MoveResponse]
     models: list[str]
 
 
 class LiveChangeResponse(BaseModel):
     """An overridden setting whose live value changed since the run started.
 
-    `now` is null for a Need deleted since.
+    `now` is null for a Need or Move deleted since.
     """
 
     key: str
@@ -269,6 +280,7 @@ class EvalRunSnapshotResponse(BaseModel):
     judge: dict[str, Any] | None
     cases: list[EvalCaseResponse] | None
     needs: list[NeedResponse] | None
+    moves: list[MoveResponse] | None
 
 
 class CaseHistoryEntryResponse(BaseModel):
@@ -416,6 +428,20 @@ def to_need_response(need: Need) -> NeedResponse:
     """
     return NeedResponse(
         key=need_override_key(need.id), name=need.name, value=need_values(need)
+    )
+
+
+def to_move_response(move: Move) -> MoveResponse:
+    """Turn a Move into its API shape, keyed as its override would be.
+
+    Args:
+        move: The Move.
+
+    Returns:
+        The response.
+    """
+    return MoveResponse(
+        key=move_override_key(move.id), name=move.name, value=move_values(move)
     )
 
 
@@ -644,6 +670,7 @@ def build_eval_api_router(
                 for choice in choices.settings
             ],
             needs=[to_need_response(need) for need in choices.needs],
+            moves=[to_move_response(move) for move in choices.moves],
             models=choices.models,
         )
 
@@ -768,8 +795,8 @@ def build_eval_api_router(
             run_id: The run's ID.
 
         Returns:
-            The snapshot, with the live Needs keyed as their overrides
-            would be; all null while the run is Queued.
+            The snapshot, with the live Needs and Moves keyed as their
+            overrides would be; all null while the run is Queued.
 
         Raises:
             CoreError: 404 if there is no such run.
@@ -777,13 +804,14 @@ def build_eval_api_router(
         snapshot = eval_run_service.get_snapshot(run_id)
         if snapshot is None:
             return EvalRunSnapshotResponse(
-                settings=None, judge=None, cases=None, needs=None
+                settings=None, judge=None, cases=None, needs=None, moves=None
             )
         return EvalRunSnapshotResponse(
             settings=snapshot.settings,
             judge=snapshot.judge,
             cases=[to_eval_case_response(case) for case in snapshot.cases],
             needs=[to_need_response(need) for need in snapshot.needs],
+            moves=[to_move_response(move) for move in snapshot.moves],
         )
 
     @router.get("/eval-runs/{run_id}/results/{result_id}")

@@ -5,7 +5,11 @@ import { useQuery } from "@tanstack/react-query";
 import { EvalVariantCard } from "@/components/EvalVariantCard";
 import type { EvalRunDetails } from "@/lib/api-client";
 import { queryKeys } from "@/lib/queries";
-import { needOverridePrefix, overrideLabel } from "@/lib/setting-overrides";
+import {
+  moveOverridePrefix,
+  needOverridePrefix,
+  overrideLabel,
+} from "@/lib/setting-overrides";
 import { useApiClient } from "@/lib/use-api-client";
 
 /**
@@ -38,7 +42,10 @@ export function EvalVariantsPanel({ run }: { run: EvalRunDetails }) {
   const snapshot = snapshotQuery.data;
 
   function labelOf(key: string): string {
-    return overrideLabel(key, choicesQuery.data, snapshot?.needs ?? []);
+    return overrideLabel(key, choicesQuery.data, {
+      needs: snapshot?.needs ?? [],
+      moves: snapshot?.moves ?? [],
+    });
   }
 
   function thenValueOf(key: string): unknown {
@@ -47,6 +54,9 @@ export function EvalVariantsPanel({ run }: { run: EvalRunDetails }) {
     }
     if (key.startsWith(needOverridePrefix)) {
       return snapshot.needs?.find((need) => need.key === key)?.value ?? null;
+    }
+    if (key.startsWith(moveOverridePrefix)) {
+      return snapshot.moves?.find((move) => move.key === key)?.value ?? null;
     }
     return snapshot.settings[key] ?? null;
   }

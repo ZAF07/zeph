@@ -11,6 +11,6 @@ Admins start Eval Runs from the Dashboard, so Evals can no longer be pytest test
 ## Consequences
 
 - Eval traces are not in the Model Call Log (its rows belong to a User); the Eval pages show them with the same trace view.
-- The `eval-runner` is always wired with the fake chat channel and fake web search, and no Check-in scheduler runs on the Eval database, so an Eval can never reach a real chat or spend search credits.
+- The `eval-runner` is always wired with the fake chat channel and fake web search, and no Check-in scheduler runs on the Eval database, so an Eval can never reach a real chat or spend search credits. The fake web search finds only the made-up pages a case gives it (2026-11-17, so Research can be tested); with none it finds nothing.
 - `make eval` needs the stack running (`make up`, or the worktree's own stack).
 - A run stopped by a runner restart ends Interrupted and is never retried by itself, because runs cost money.

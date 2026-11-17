@@ -4,6 +4,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import Any
 
+from companion.core.evals.cases import EvalWebResult
 from companion.core.evals.models import ModelTokens
 from companion.core.incoming_messages import MESSAGE_WAIT_PREFIX
 from companion.core.models import (
@@ -110,30 +111,41 @@ class RecordingChatChannel:
         return self.photos[file_id]
 
 
-class NoWebSearch:
-    """Web search for Evals: finds nothing, so no search credits are spent."""
+class CannedWebSearch:
+    """Web search for Evals: finds only a case's made-up pages, for free.
+
+    Every search finds every page set; with none set it finds nothing, so
+    no search credits are ever spent.
+    """
+
+    def __init__(self) -> None:
+        """Start with no pages to find."""
+        self.pages: list[EvalWebResult] = []
 
     def search(self, query: str) -> list[WebSearchResult]:
-        """Find nothing.
+        """Find every page set.
 
         Args:
             query: What to search for.
 
         Returns:
-            No results.
+            Each page's title, address and text.
         """
-        return []
+        return [
+            WebSearchResult(title=page.title, url=page.url, content=page.text)
+            for page in self.pages
+        ]
 
     def fetch_page(self, url: str) -> str:
-        """Read nothing.
+        """Read a page set, by its address.
 
         Args:
             url: The page's address.
 
         Returns:
-            "".
+            Its text; "" when no page set has that address.
         """
-        return ""
+        return next((page.text for page in self.pages if page.url == url), "")
 
 
 class EvalAccounts:

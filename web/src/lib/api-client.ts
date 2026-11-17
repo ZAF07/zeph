@@ -912,16 +912,31 @@ export type OverridableNeed = {
   value: NeedOverride;
 };
 
+/** A Move's text as an override's value. */
+export type MoveOverride = {
+  name: string;
+  when_it_fits: string;
+  how_to_do_it: string;
+};
+
+/** A Move a Variant can override, keyed `move:<id>`, with its live text. */
+export type OverridableMove = {
+  key: string;
+  name: string;
+  value: MoveOverride;
+};
+
 /** What a Variant can override, and the models a model setting can pick. */
 export type OverrideChoices = {
   settings: OverridableSetting[];
   needs: OverridableNeed[];
+  moves: OverridableMove[];
   models: string[];
 };
 
 /**
  * An overridden setting whose live value changed since the run started;
- * `now` is null for a Need deleted since.
+ * `now` is null for a Need or Move deleted since.
  */
 export type LiveChange = {
   key: string;
@@ -1078,14 +1093,15 @@ export type EvalCaseContent = {
 };
 
 /**
- * What a run used; every field is null while it is Queued. `needs` are the
- * live Needs, keyed as their overrides would be.
+ * What a run used; every field is null while it is Queued. `needs` and
+ * `moves` are the live Needs and Moves, keyed as their overrides would be.
  */
 export type EvalRunSnapshot = {
   settings: Record<string, unknown> | null;
   judge: Record<string, unknown> | null;
   cases: EvalCaseContent[] | null;
   needs: OverridableNeed[] | null;
+  moves: OverridableMove[] | null;
 };
 
 /**

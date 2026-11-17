@@ -17,11 +17,13 @@ from companion.adapters.postgres.eval_repositories import (
     PostgresJudgeSettingsRepository,
 )
 from companion.adapters.postgres.repositories import (
+    PostgresMoveRepository,
     PostgresNeedRepository,
     PostgresPlatformSettingsRepository,
 )
 from companion.core.evals.models import EvalCase, EvalName, EvalRunState
 from companion.core.evals.runner import EvalRunner
+from companion.core.models import Feature
 from companion.eval_terminal import build_eval_run_service, start_and_watch_run
 from companion.main import SEED_DIR
 from tests.conftest import shared_postgres_url
@@ -30,6 +32,7 @@ from tests.eval_run_helpers import (
     FALSE_ALARM_CASE,
     SETTINGS_CASE,
     add_cases,
+    move_key,
     need_key,
     open_run,
     start_run,
@@ -42,6 +45,7 @@ from tests.fakes import (
     FakePhotoViewer,
     ScriptedChatModel,
     ToolCall,
+    understanding_answer,
 )
 from tests.telegram_helpers import owner_headers
 from tests.test_moves import stored_rule_outs
@@ -130,6 +134,7 @@ def runner(
         judge_settings=PostgresJudgeSettingsRepository(engine),
         live_settings=PostgresPlatformSettingsRepository(engine),
         live_needs=PostgresNeedRepository(engine),
+        live_moves=PostgresMoveRepository(engine),
         environment=PostgresEvalEnvironment(
             database_url=eval_database_url,
             chat_model=chat_model,
@@ -879,6 +884,9 @@ def test_a_finished_run_shows_its_snapshot(
     ]
     assert [need["name"] for need in snapshot["needs"]] == [
         need.name for need in PostgresNeedRepository(engine).list_all()
+    ]
+    assert [move["name"] for move in snapshot["moves"]] == [
+        move.name for move in PostgresMoveRepository(engine).list_all()
     ]
 
 
@@ -1659,3 +1667,292 @@ def test_move_outcome_keeping_overrides_reach_only_their_variant(
     assert (live_call.model, live_call.thinking) == ("deepseek-flash", True)
     assert (variant_call.model, variant_call.thinking) == ("deepseek-pro", False)
     assert PostgresPlatformSettingsRepository(engine).load().values == live_before
+
+
+HOSTING_RESULT = {
+    "title": "Cheap app hosts in Singapore",
+    "url": "https://hosts.example/cheap",
+    "text": "Railway: about SGD 7 a month with managed Postgres.",
+}
+
+
+def test_an_understanding_case_checks_the_moves_and_searches_its_web_results(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    research_case = EvalCase(
+        key="hosting",
+        eval=EvalName.UNDERSTANDING,
+        content={
+            "now": "2026-11-13T18:30:00",
+            "web_results": [HOSTING_RESULT],
+            "messages": [
+                {
+                    "text": "which host under SGD 20 has managed postgres?",
+                    "expect": {
+                        "lead_move": ["Research"],
+                        "support_move": ["Suggest"],
+                        "no_move": False,
+                    },
+                },
+            ],
+            "rules": [],
+        },
+    )
+    add_cases(engine, research_case)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.UNDERSTANDING)
+    chat_model.script_understanding(
+        understanding_answer(
+            need="Accountability", lead_move="Research", support_move="Suggest"
+        )
+    )
+    chat_model.script(
+        ToolCall("web_search", {"query": "app hosting managed postgres"}),
+        ToolCall("fetch_page", {"url": HOSTING_RESULT["url"]}),
+        "Railway is about SGD 7 with Postgres, going by hosts.example.",
+    )
+
+    runner.work_next_run()
+
+    result = results_by_key(open_run(client, admin, run["id"]))["hosting"]
+    assert result["outcome"] == "pass", result
+    assert [
+        (check["name"], check["detail"])
+        for check in result["checks"]
+        if "move" in check["name"]
+    ] == [
+        ("lead move", "led with Research"),
+        ("supporting move", "supported with Suggest"),
+        ("no move", "led with Research"),
+    ]
+    [reply] = [call for call in chat_model.calls if call.tool_results]
+    search_result, page = reply.tool_results
+    assert HOSTING_RESULT["title"] in search_result
+    assert HOSTING_RESULT["text"] in page
+
+
+def test_with_web_search_off_an_understanding_case_cannot_research(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    no_search_case = EvalCase(
+        key="no-search",
+        eval=EvalName.UNDERSTANDING,
+        content={
+            "now": "2026-11-13T18:30:00",
+            "web_search": False,
+            "web_results": [HOSTING_RESULT],
+            "messages": [
+                {
+                    "text": "can you look up hosts for me?",
+                    "expect": {"no_move": True},
+                },
+            ],
+            "rules": [],
+        },
+    )
+    add_cases(engine, no_search_case)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.UNDERSTANDING)
+    chat_model.script_understanding(
+        understanding_answer(need="Accountability", lead_move="Research")
+    )
+    chat_model.script("I can't look things up for you, sorry.")
+
+    runner.work_next_run()
+
+    result = results_by_key(open_run(client, admin, run["id"]))["no-search"]
+    assert result["outcome"] == "pass", result
+    [understanding] = chat_model.understanding_calls
+    assert "- Research:" not in str(understanding)
+    reply = chat_model.calls[-1]
+    assert "web_search" not in [tool.name for tool in reply.tools]
+
+
+SUGGEST_CHANGE = {
+    "name": "Suggest",
+    "when_it_fits": "Only when they say the word pineapple.",
+    "how_to_do_it": "Offer two ideas.",
+}
+
+
+def test_a_move_override_reaches_only_its_variant_and_live_moves_stay(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, UNDERSTANDING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    key = move_key(client, admin, "Suggest")
+    live_moves = PostgresMoveRepository(engine).list_all()
+    start_run(
+        client, admin, EvalName.UNDERSTANDING, variants=[{}, {key: SUGGEST_CHANGE}]
+    )
+    chat_model.script("Hi!", "Hi!")
+
+    runner.work_next_run()
+
+    understanding_a, understanding_b = chat_model.understanding_calls
+    assert "pineapple" not in str(understanding_a)
+    assert "- Suggest: Only when they say the word pineapple." in str(understanding_b)
+    assert PostgresMoveRepository(engine).list_all() == live_moves
+
+
+def rule_out_live(
+    client: TestClient, admin: dict[str, str], need_name: str, move_name: str
+) -> None:
+    """Rule a Move out of a live Need too, as an Admin on the Needs page."""
+    needs = client.get("/api/admin/needs", headers=admin).json()["needs"]
+    moves = client.get("/api/admin/moves", headers=admin).json()["moves"]
+    [need] = [need for need in needs if need["name"] == need_name]
+    [move] = [move for move in moves if move["name"] == move_name]
+    response = client.put(
+        f"/api/admin/needs/{need['id']}",
+        json={
+            "name": need["name"],
+            "when_it_fits": need["when_it_fits"],
+            "how_to_reply": need["how_to_reply"],
+            "ruled_out_move_ids": [*need["ruled_out_move_ids"], move["id"]],
+        },
+        headers=admin,
+    )
+    assert response.status_code == 200, response.text
+
+
+def test_a_run_uses_the_live_moves_and_each_needs_live_rule_outs(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, UNDERSTANDING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    added = client.post(
+        "/api/admin/moves",
+        json={
+            "name": "Offer tea",
+            "when_it_fits": "They are cold and tired.",
+            "how_to_do_it": "Suggest a warm drink.",
+            "needed_feature": None,
+        },
+        headers=admin,
+    )
+    assert added.status_code == 201, added.text
+    rule_out_live(client, admin, "Just chatting", "Research")
+    start_run(client, admin, EvalName.UNDERSTANDING)
+    chat_model.script_understanding(
+        understanding_answer(need="Just chatting", lead_move="Offer tea")
+    )
+    chat_model.script("Tea time!")
+
+    runner.work_next_run()
+
+    [understanding] = chat_model.understanding_calls
+    assert "- Offer tea: They are cold and tired." in str(understanding)
+    assert "- Just chatting: Suggest, Offer tea" in str(understanding)
+
+
+def test_make_live_saves_a_move_override_and_keeps_its_needed_feature(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    key = move_key(client, admin, "Research")
+    change = {
+        "name": "Look it up",
+        "when_it_fits": "They need real options.",
+        "how_to_do_it": "Search and compare.",
+    }
+    run = finish_run_with_overrides(
+        client, admin, engine, chat_model, runner, {key: change}
+    )
+    assert live_changes(client, admin, run["id"], "B").json() == {"changes": []}
+
+    response = make_live(client, admin, run["id"], "B")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["made_live"]["applied_keys"] == [key]
+    [move] = [
+        move
+        for move in PostgresMoveRepository(engine).list_all()
+        if str(move.id) == key.removeprefix("move:")
+    ]
+    assert (move.name, move.when_it_fits, move.how_to_do_it) == (
+        "Look it up",
+        "They need real options.",
+        "Search and compare.",
+    )
+    assert move.needed_feature == Feature.WEB_SEARCH
+
+
+def test_a_move_changed_live_since_the_run_is_applied_only_if_confirmed(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    key = move_key(client, admin, "Suggest")
+    run = finish_run_with_overrides(
+        client, admin, engine, chat_model, runner, {key: SUGGEST_CHANGE}
+    )
+    edited = client.put(
+        f"/api/admin/moves/{key.removeprefix('move:')}",
+        json={
+            "name": "Suggest",
+            "when_it_fits": "Edited since.",
+            "how_to_do_it": "Edited since.",
+            "needed_feature": None,
+        },
+        headers=admin,
+    )
+    assert edited.status_code == 200, edited.text
+
+    [change] = live_changes(client, admin, run["id"], "B").json()["changes"]
+
+    assert change["key"] == key
+    assert change["now"]["when_it_fits"] == "Edited since."
+    assert change["override"] == SUGGEST_CHANGE
+    made_live = make_live(client, admin, run["id"], "B").json()["made_live"]
+    assert made_live["left_out_keys"] == [key]
+
+
+def test_a_move_deleted_before_the_run_starts_makes_its_variant_an_error(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, FALSE_ALARM_CASE)
+    admin = owner_headers(client, auth_verifier)
+    key = move_key(client, admin, "Suggest")
+    run = start_run(
+        client, admin, EvalName.SAFEGUARD, variants=[{}, {key: SUGGEST_CHANGE}]
+    )
+    deleted = client.delete(
+        f"/api/admin/moves/{key.removeprefix('move:')}", headers=admin
+    )
+    assert deleted.status_code == 204
+    chat_model.script()
+
+    runner.work_next_run()
+
+    variant_a, variant_b = open_run(client, admin, run["id"])["results"]
+    assert variant_a["outcome"] == "pass"
+    assert variant_b["outcome"] == "error"
+    assert "Move deleted before the run started" in variant_b["error"]

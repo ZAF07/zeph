@@ -5,7 +5,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
-from companion.core.models import Need
+from companion.core.models import Move, Need
 
 
 class EvalName(StrEnum):
@@ -300,12 +300,14 @@ class RunSnapshot:
         judge: The Judge's settings, by name.
         cases: Each case as it was when it started.
         needs: The live Needs when it started, in order.
+        moves: The live Moves when it started, in order.
     """
 
     settings: dict[str, Any]
     judge: dict[str, Any]
     cases: list[EvalCase]
     needs: list[Need] = field(default_factory=list)
+    moves: list[Move] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

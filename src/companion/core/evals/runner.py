@@ -26,10 +26,19 @@ from companion.core.evals.ports import (
     EvalRunRepository,
     JudgeSettingsRepository,
 )
-from companion.core.evals.setting_overrides import variant_needs, variant_settings
+from companion.core.evals.setting_overrides import (
+    variant_moves,
+    variant_needs,
+    variant_settings,
+)
 from companion.core.models import ModelCall
 from companion.core.platform_settings import EVAL_RUN_TOKEN_LIMIT
-from companion.core.ports import Clock, NeedRepository, PlatformSettingsRepository
+from companion.core.ports import (
+    Clock,
+    MoveRepository,
+    NeedRepository,
+    PlatformSettingsRepository,
+)
 
 TRACES_PER_CASE_AT_MOST = 500
 STOP_REASONS = {
@@ -51,6 +60,7 @@ class EvalRunner:
         judge_settings: JudgeSettingsRepository,
         live_settings: PlatformSettingsRepository,
         live_needs: NeedRepository,
+        live_moves: MoveRepository,
         environment: EvalEnvironment,
         clock: Clock,
     ) -> None:
@@ -63,6 +73,7 @@ class EvalRunner:
             judge_settings: The app database's Judge settings, read only.
             live_settings: The app database's Platform Settings, read only.
             live_needs: The app database's Needs, read only.
+            live_moves: The app database's Moves, read only.
             environment: Prepares the Eval database and builds the app on it.
             clock: Tells the time.
         """
@@ -72,6 +83,7 @@ class EvalRunner:
         self._judge_settings = judge_settings
         self._live_settings = live_settings
         self._live_needs = live_needs
+        self._live_moves = live_moves
         self._environment = environment
         self._clock = clock
 
@@ -112,6 +124,7 @@ class EvalRunner:
             judge=self._judge_settings.load(),
             cases=self._cases.list_for_keys(run.case_keys),
             needs=self._live_needs.list_all(),
+            moves=self._live_moves.list_all(),
         )
         token_limit = live.get(EVAL_RUN_TOKEN_LIMIT)
         self._runs.save_snapshot(run.id, snapshot, token_limit)
@@ -173,8 +186,9 @@ class EvalRunner:
             variant: The Variant.
             try_number: Which try of the case this is, from 1.
             case: The case.
-            snapshot: The live settings, Needs and Judge settings when the
-                run started; a Judge setting missing makes the case an Error.
+            snapshot: The live settings, Needs, Moves and Judge settings when
+                the run started; a Judge setting missing makes the case an
+                Error.
             tokens_before: The run's tokens before this case.
             token_limit: The most tokens the run may use.
 
@@ -203,6 +217,7 @@ class EvalRunner:
             companion = self._environment.fresh_companion(
                 variant_settings(snapshot.settings, variant.setting_overrides),
                 variant_needs(snapshot.needs, variant.setting_overrides),
+                variant_moves(snapshot.moves, variant.setting_overrides),
                 images,
             )
             result = check_case(case, companion, judge, should_stop)

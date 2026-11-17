@@ -92,3 +92,12 @@ def need_key(client: TestClient, admin: dict[str, str], name: str) -> str:
     return next(
         need["key"] for need in response.json()["needs"] if need["name"] == name
     )
+
+
+def move_key(client: TestClient, admin: dict[str, str], name: str) -> str:
+    """Find the override key of a live Move by its name."""
+    response = client.get("/api/admin/setting-override-choices", headers=admin)
+    assert response.status_code == 200, response.text
+    return next(
+        move["key"] for move in response.json()["moves"] if move["name"] == name
+    )

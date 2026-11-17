@@ -345,6 +345,10 @@ class UnderstandingExpectations:
         asked_why: Whether it must gently ask why they feel as they do.
         knowledge: Whether it must choose Knowledge documents to search.
         woven_in: Whether the reply must weave in the due Check-in.
+        lead_move: The Moves the reply may lead with, by name.
+        support_move: The Moves that may support it, by name.
+        no_move: True if the reply must make no Move; False if it must lead
+            with one.
         rules: The IDs of the rules the Judge checks the reply against.
     """
 
@@ -356,6 +360,9 @@ class UnderstandingExpectations:
     asked_why: bool | None = None
     knowledge: bool | None = None
     woven_in: bool | None = None
+    lead_move: list[str] = field(default_factory=list)
+    support_move: list[str] = field(default_factory=list)
+    no_move: bool | None = None
     rules: list[str] = field(default_factory=list)
 
     @property
@@ -382,6 +389,22 @@ class UnderstandingMessage:
 
 
 @dataclass(frozen=True)
+class EvalWebResult:
+    """A made-up web result the Eval's search finds, so Research costs nothing.
+
+    Attributes:
+        title: The page's title.
+        url: The page's address.
+        text: What the page says; the search shows it and reading the page
+            gives it.
+    """
+
+    title: str
+    url: str
+    text: str
+
+
+@dataclass(frozen=True)
 class UnderstandingCase:
     """A made-up User Memory and Conversation, then Messages to check.
 
@@ -394,6 +417,8 @@ class UnderstandingCase:
         rules: Each rule its Messages name, by ID, and what the Judge checks.
         check_in_due: Whether the person has Check-ins on, with one due when
             the first Message is sent, so a reply may weave it in.
+        web_search: Whether Web Search works for the person.
+        web_results: What every web search finds; none when empty.
     """
 
     id: str
@@ -403,6 +428,8 @@ class UnderstandingCase:
     messages: list[UnderstandingMessage]
     rules: dict[str, str] = field(default_factory=dict)
     check_in_due: bool = False
+    web_search: bool = True
+    web_results: list[EvalWebResult] = field(default_factory=list)
 
 
 def read_safeguard_case(key: str, content: dict[str, Any]) -> SafeguardCase:
@@ -737,9 +764,47 @@ def to_understanding_message(entry: dict[str, Any]) -> UnderstandingMessage:
             asked_why=expect.get("asked_why"),
             knowledge=expect.get("knowledge"),
             woven_in=expect.get("woven_in"),
+            lead_move=expect.get("lead_move") or [],
+            support_move=expect.get("support_move") or [],
+            no_move=expect.get("no_move"),
             rules=expect.get("rules") or [],
         ),
     )
+
+
+def to_eval_web_result(entry: dict[str, str]) -> EvalWebResult:
+    """Read a made-up web result.
+
+    Args:
+        entry: `{title, url, text}`.
+
+    Returns:
+        The result.
+    """
+    return EvalWebResult(title=entry["title"], url=entry["url"], text=entry["text"])
+
+
+def require_moves_or_no_move(case: UnderstandingCase) -> None:
+    """Check no Message expects both a Move and no Move.
+
+    Args:
+        case: The case.
+
+    Raises:
+        InvalidEvalCaseError: If a Message expects no Move and names Moves.
+    """
+    problems = {
+        f"messages.{number}.expect.no_move": "Expects no Move but names Moves "
+        "it may make. Leave the Moves empty, or turn this off."
+        for number, message in enumerate(case.messages)
+        if message.expect.no_move is True
+        and (message.expect.lead_move or message.expect.support_move)
+    }
+    if problems:
+        raise InvalidEvalCaseError(
+            f"{case.id} expects no_move and names Moves on the same Message",
+            problems,
+        )
 
 
 def texts_besides_threads(case: UnderstandingCase) -> list[str]:
@@ -842,8 +907,9 @@ def read_understanding_case(key: str, content: dict[str, Any]) -> UnderstandingC
     Args:
         key: The case's key.
         content: `now`, `messages`, `rules` (each `{id, check}`) and
-            optionally `memory`, `earlier` (each `{who, text}`) and
-            `check_in_due`.
+            optionally `memory`, `earlier` (each `{who, text}`),
+            `check_in_due`, `web_search` and `web_results` (each `{title,
+            url, text}`).
 
     Returns:
         The case.
@@ -851,8 +917,9 @@ def read_understanding_case(key: str, content: dict[str, Any]) -> UnderstandingC
     Raises:
         InvalidEvalCaseError: If it names an unknown rule or Life Thread,
             writes a Thread's title outside it, has a Thread raised in its
-            Conversation but no earlier lines, or expects a Check-in woven
-            in or not with none due.
+            Conversation but no earlier lines, expects a Check-in woven
+            in or not with none due, or expects no Move and names Moves on
+            the same Message.
     """
     case = UnderstandingCase(
         id=key,
@@ -862,8 +929,13 @@ def read_understanding_case(key: str, content: dict[str, Any]) -> UnderstandingC
         messages=[to_understanding_message(message) for message in content["messages"]],
         rules=read_rules(content),
         check_in_due=content.get("check_in_due") is True,
+        web_search=content.get("web_search") is not False,
+        web_results=[
+            to_eval_web_result(entry) for entry in content.get("web_results") or []
+        ],
     )
     require_checkable_names(case)
+    require_moves_or_no_move(case)
     expects_woven_in = any(
         message.expect.woven_in is not None for message in case.messages
     )

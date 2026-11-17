@@ -703,6 +703,7 @@ eval_runs = Table(
     Column("token_limit", Integer),
     Column("rerun_of", Uuid, ForeignKey("eval_runs.id", ondelete="SET NULL")),
     Column("needs_snapshot", JSONB, nullable=False, server_default="[]"),
+    Column("moves_snapshot", JSONB, nullable=False, server_default="[]"),
 )
 
 eval_variants = Table(
