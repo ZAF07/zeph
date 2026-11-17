@@ -89,3 +89,5 @@ Caveats:
 - Commit: `24fedb0` — Moves issue 08: Move Outcome Eval
 - Commit: `6e109f0` — Moves issue 08: review fixes
 - Commit: `3a40d98` — Moves issue 08: CONTEXT.md says the Judge marks Move Outcome cases and what the Move Outcome Eval checks
+- Commit: `bb2e0ad` — Moves issue 08 done: archive issue with check and run evidence
+- Merge: `139fb73` — Merge Moves issue 08: Move Outcome Eval — a case gives a made-up User a finished Conversation (messages and the Moves each Understanding made), runs the real Move Outcome keeping step with the Eval database's Platform Settings (a Variant may override the keeping prompt, model and thinking) and checks each expected Move Outcome: kept, its result, and Judge rules on its situation, feeling and why; new Judge Move Outcomes prompt; four starter cases in the seed
