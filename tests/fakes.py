@@ -509,14 +509,14 @@ class ScriptedChatModel:
 
     Safeguard, memory processing, Understanding, Life Thread keeping,
     Curiosity keeping, Move Outcome keeping, Portrait writing, Personal
-    Sticker keeping, woven-in
-    Check-in and Knowledge "when it helps" drafting calls are told apart by
-    their instructions and kept apart from reply calls, each with its own
-    script. The Safeguard defaults to "none", the Understanding to
-    `understanding_answer()`, Life Thread, Curiosity and Move Outcome
-    keeping to none kept, Portrait writing to an empty answer (no Portrait), a woven-in
-    Check-in to "not now" and drafting to `DEFAULT_WHEN_IT_HELPS`, so tests
-    about replies don't have to script them too. Set
+    Sticker keeping, woven-in Check-in and Knowledge "when it helps"
+    drafting calls are told apart by their instructions and kept apart from
+    reply calls, each with its own script. The Safeguard defaults to "none",
+    the Understanding to `understanding_answer()`, Life Thread, Curiosity
+    and Move Outcome keeping to none kept, Portrait writing to an empty
+    answer (no Portrait), a woven-in Check-in to "not now" and drafting to
+    `DEFAULT_WHEN_IT_HELPS`, so tests about replies don't have to script
+    them too. Set
     `before_next_reply` to run something once while the next reply is being
     "written", like a User acting during a slow model call, and
     `before_next_safeguard` likewise while the next text is being checked,
