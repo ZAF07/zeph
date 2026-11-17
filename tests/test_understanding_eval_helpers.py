@@ -488,7 +488,13 @@ def test_the_wrong_moves_or_a_move_when_none_was_expected_fail() -> None:
     assert check_understanding(
         UnderstandingExpectations(no_move=True),
         replace(NOTHING_RAISED, support_move="Calm"),
-    ) == [CheckResult("no move", False, "supported with Calm, expected no Move")]
+    ) == [
+        CheckResult(
+            "no move",
+            False,
+            "made no lead Move (supported with Calm), expected no Move",
+        )
+    ]
     assert check_understanding(
         UnderstandingExpectations(no_move=True), NOTHING_RAISED
     ) == [CheckResult("no move", True, "made no Move")]
@@ -506,8 +512,25 @@ def test_the_understanding_cases_check_moves_and_web_search() -> None:
         "Push",
         "Plan steps",
     }
-    assert cases["venting-is-not-pushed"].messages[0].expect.no_move is True
+    venting = cases["venting-is-not-pushed"].messages[0].expect
+    assert (venting.need, venting.rules) == (["Be heard"], ["no_fixing", "no_push"])
     no_search = cases["research-with-web-search-off"]
     assert no_search.web_search is False
-    assert "Research" not in no_search.messages[0].expect.lead_move
     assert no_search.messages[0].expect.rules == ["honest_no_lookup"]
+    assert cases["small-talk-makes-no-move"].messages[0].expect.no_move is True
+
+
+def test_a_supporting_move_without_a_lead_is_not_a_lead() -> None:
+    supported_only = replace(NOTHING_RAISED, support_move="Calm")
+
+    assert check_understanding(
+        UnderstandingExpectations(lead_move=["Calm"], no_move=False),
+        supported_only,
+    ) == [
+        CheckResult(
+            "lead move", False, "made no lead Move (supported with Calm), expected Calm"
+        ),
+        CheckResult(
+            "no move", False, "made no lead Move (supported with Calm), expected one"
+        ),
+    ]

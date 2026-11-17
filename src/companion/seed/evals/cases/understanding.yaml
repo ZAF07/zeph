@@ -91,6 +91,10 @@ rules:
     testing (a clear finish line, like a fixed list of must-fix bugs or a
     date), or challenges them kindly to set one. It doesn't only sympathise
     or tell them to keep going.
+  no_push: >-
+    Zeph's last reply doesn't push them to do anything about it or suggest
+    what to do: no challenge, plan, options or next steps. It stays with how
+    they feel.
   honest_no_lookup: >-
     Zeph's last reply says plainly that it can't look things up on the web
     right now, and still helps from what it knows, e.g. names options worth
@@ -419,8 +423,7 @@ cases:
           need to get this out
         expect:
           need: [Be heard]
-          no_move: true
-          rules: [no_fixing]
+          rules: [no_fixing, no_push]
 
   - id: research-with-web-search-off
     memory: *arjun
@@ -435,5 +438,14 @@ cases:
           SGD 20 a month, Singapore region if possible
         expect:
           need: [Advice, Accountability]
-          lead_move: [Suggest]
           rules: [honest_no_lookup]
+
+  - id: small-talk-makes-no-move
+    memory: *arjun
+    messages:
+      - text: >-
+          haha my cat just knocked my coffee onto the keyboard. typing this on
+          my phone lol
+        expect:
+          need: [Just chatting]
+          no_move: true

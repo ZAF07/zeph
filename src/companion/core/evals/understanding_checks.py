@@ -82,50 +82,52 @@ def is_one_of(name: str, allowed: Sequence[str]) -> bool:
     return name.lower() in {other.lower() for other in allowed}
 
 
-def check_lead_move(allowed: list[str], lead_move: str | None) -> CheckResult:
-    """Check the reply led with one of the Moves allowed.
+def describe_moves_made(lead_move: str | None, support_move: str | None) -> str:
+    """Say which Moves a reply made, for a check's detail.
 
     Args:
-        allowed: The Moves it may lead with.
         lead_move: The Move it led with; None for none.
-
-    Returns:
-        The check's outcome.
-    """
-    expected = " or ".join(allowed)
-    if lead_move is None:
-        return CheckResult("lead move", False, f"made no Move, expected {expected}")
-    if is_one_of(lead_move, allowed):
-        return CheckResult("lead move", True, f"led with {lead_move}")
-    return CheckResult("lead move", False, f"led with {lead_move}, expected {expected}")
-
-
-def check_support_move(allowed: list[str], support_move: str | None) -> CheckResult:
-    """Check the reply was supported by one of the Moves allowed.
-
-    Args:
-        allowed: The Moves that may support it.
         support_move: The Move that supported it; None for none.
 
     Returns:
+        E.g. "led with Research", "made no lead Move (supported with Calm)"
+        or "made no Move".
+    """
+    if lead_move is not None:
+        return f"led with {lead_move}"
+    if support_move is not None:
+        return f"made no lead Move (supported with {support_move})"
+    return "made no Move"
+
+
+def check_move_made(
+    name: str, allowed: list[str], made: str | None, made_detail: str, none_detail: str
+) -> CheckResult:
+    """Check a reply's lead or supporting Move is one of those allowed.
+
+    Args:
+        name: The check's name, e.g. "lead move".
+        allowed: The Moves allowed.
+        made: The Move made; None for none.
+        made_detail: What it did when a Move was made, with `{move}` for it.
+        none_detail: What it did when none was made.
+
+    Returns:
         The check's outcome.
     """
     expected = " or ".join(allowed)
-    if support_move is None:
-        return CheckResult(
-            "supporting move", False, f"had no supporting Move, expected {expected}"
-        )
-    if is_one_of(support_move, allowed):
-        return CheckResult("supporting move", True, f"supported with {support_move}")
-    return CheckResult(
-        "supporting move", False, f"supported with {support_move}, expected {expected}"
-    )
+    if made is None:
+        return CheckResult(name, False, f"{none_detail}, expected {expected}")
+    detail = made_detail.format(move=made)
+    if is_one_of(made, allowed):
+        return CheckResult(name, True, detail)
+    return CheckResult(name, False, f"{detail}, expected {expected}")
 
 
 def check_no_move(
     expected: bool, lead_move: str | None, support_move: str | None
 ) -> CheckResult:
-    """Check the reply made no Move, or led with one, as expected.
+    """Check the reply made no Move at all, or led with one, as expected.
 
     Args:
         expected: True if it must make no Move; False if it must lead with one.
@@ -135,18 +137,14 @@ def check_no_move(
     Returns:
         The check's outcome.
     """
-    if lead_move is not None:
-        made = f"led with {lead_move}"
-    elif support_move is not None:
-        made = f"supported with {support_move}"
-    else:
-        return CheckResult(
-            "no move",
-            expected,
-            "made no Move" if expected else "made no Move, expected one",
-        )
+    made = describe_moves_made(lead_move, support_move)
     if expected:
-        return CheckResult("no move", False, f"{made}, expected no Move")
+        made_none = lead_move is None and support_move is None
+        return CheckResult(
+            "no move", made_none, made if made_none else f"{made}, expected no Move"
+        )
+    if lead_move is None:
+        return CheckResult("no move", False, f"{made}, expected one")
     return CheckResult("no move", True, made)
 
 
@@ -283,9 +281,25 @@ def check_understanding(
     if expect.need:
         checks.append(check_need(expect.need, observed.need))
     if expect.lead_move:
-        checks.append(check_lead_move(expect.lead_move, observed.lead_move))
+        checks.append(
+            check_move_made(
+                "lead move",
+                expect.lead_move,
+                observed.lead_move,
+                "led with {move}",
+                describe_moves_made(None, observed.support_move),
+            )
+        )
     if expect.support_move:
-        checks.append(check_support_move(expect.support_move, observed.support_move))
+        checks.append(
+            check_move_made(
+                "supporting move",
+                expect.support_move,
+                observed.support_move,
+                "supported with {move}",
+                "had no supporting Move",
+            )
+        )
     if expect.no_move is not None:
         checks.append(
             check_no_move(expect.no_move, observed.lead_move, observed.support_move)

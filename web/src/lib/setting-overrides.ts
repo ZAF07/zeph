@@ -13,7 +13,7 @@ export const needOverridePrefix = "need:";
 export const moveOverridePrefix = "move:";
 
 /** The Needs and Moves when a run started, to name its overrides by. */
-export type OverriddenThen = {
+export type NeedsAndMovesAtRunStart = {
   needs: OverridableNeed[];
   moves: OverridableMove[];
 };
@@ -67,7 +67,7 @@ export function isMoveOverride(value: unknown): value is MoveOverride {
 export function overrideLabel(
   key: string,
   choices: OverrideChoices | undefined,
-  then: OverriddenThen = { needs: [], moves: [] },
+  then: NeedsAndMovesAtRunStart = { needs: [], moves: [] },
 ): string {
   if (key.startsWith(needOverridePrefix)) {
     const need =
