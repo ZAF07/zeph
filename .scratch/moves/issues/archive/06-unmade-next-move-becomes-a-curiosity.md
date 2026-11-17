@@ -64,3 +64,5 @@ Caveats:
 - Completed: 2026-11-17
 - Commit: `9104578` — Moves issue 06: an unmade next Move may become a Curiosity — Curiosity keeping is shown the next Move the newest Understanding still held when the Conversation ended, with why; the seed prompt explains it; migration 0055 reloads it
 - Commit: `abf3aa6` — Moves issue 06: review fix — load the unmade next Move into a named variable before asking, like the other inputs
+- Commit: `7cab2e2` — Moves issue 06 done: archive issue with check and run evidence; CONTEXT.md says which next Move can become a Curiosity
+- Merge: `11849b4` — Merge Moves issue 06: an unmade next Move may become a Curiosity — when a Conversation ends, Curiosity keeping is shown the next Move the newest Understanding still held, with why, and may turn it into a Curiosity about where the User has got to; the seed Curiosity keeping prompt explains it; migration 0055 reloads it
