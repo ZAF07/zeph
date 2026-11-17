@@ -183,6 +183,8 @@ def test_a_plain_users_understanding_shows_its_shape_and_never_its_words(
             threads_touched=[1],
             lead_move="Calm",
             support_move="Mirror",
+            next_move="Reframe",
+            next_move_why="once the anger has eased",
         )
     )
     chat_model.script("oh no, tell me more")
@@ -196,6 +198,7 @@ def test_a_plain_users_understanding_shows_its_shape_and_never_its_words(
         "need": "Be heard",
         "lead_move": "Calm",
         "support_move": "Mirror",
+        "next_move": "Reframe",
         "intensity": "high",
         "cause_known": False,
         "threads_reminded": 1,
@@ -205,7 +208,13 @@ def test_a_plain_users_understanding_shows_its_shape_and_never_its_words(
         "threads_held_back": 0,
         "past_look_ups": 2,
     }
-    for words in ("furious", "lighthouse", "Falling-out with Mei", MEI_STORY):
+    for words in (
+        "furious",
+        "lighthouse",
+        "anger has eased",
+        "Falling-out with Mei",
+        MEI_STORY,
+    ):
         assert words not in str(understanding)
         assert not any(words in row for row in stored_model_calls(engine))
 

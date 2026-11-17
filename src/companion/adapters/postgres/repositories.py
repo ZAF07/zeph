@@ -1972,6 +1972,8 @@ class PostgresUnderstandingRepository:
                     need=understanding.need,
                     lead_move=understanding.lead_move,
                     support_move=understanding.support_move,
+                    next_move=understanding.next_move,
+                    next_move_why=understanding.next_move_why,
                     asked_why=understanding.asked_why,
                     made_at=understanding.made_at,
                 )
@@ -2004,6 +2006,8 @@ class PostgresUnderstandingRepository:
                 made_at=row.made_at,
                 lead_move=row.lead_move,
                 support_move=row.support_move,
+                next_move=row.next_move,
+                next_move_why=row.next_move_why,
             )
             for row in rows
         ]
@@ -2113,6 +2117,8 @@ def _to_understanding_form(stored: dict[str, Any]) -> UnderstandingForm:
         asked_for_photo=stored.get("asked_for_photo", False),
         lead_move=stored.get("lead_move", ""),
         support_move=stored.get("support_move", ""),
+        next_move=stored.get("next_move", ""),
+        next_move_why=stored.get("next_move_why", ""),
     )
 
 
@@ -5057,7 +5063,8 @@ def _to_model_call_content(values: dict[str, Any]) -> ModelCallContent:
 def _to_understanding_shape(values: dict[str, Any]) -> UnderstandingShape:
     """Read an Understanding call's stored shape.
 
-    Shapes stored before Moves read as naming none.
+    Shapes stored before Moves, or before the next Move, read as naming
+    none.
 
     Args:
         values: The stored JSON.
@@ -5077,6 +5084,7 @@ def _to_understanding_shape(values: dict[str, Any]) -> UnderstandingShape:
         past_look_ups=values["past_look_ups"],
         lead_move=values.get("lead_move"),
         support_move=values.get("support_move"),
+        next_move=values.get("next_move"),
     )
 
 

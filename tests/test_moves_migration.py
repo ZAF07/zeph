@@ -121,3 +121,31 @@ def test_the_migration_says_research_needs_web_search(
         **{name: None for name in STARTER_MOVES if name != "Research"},
         "research": "web_search",
     }
+
+
+def test_the_next_move_migration_reloads_the_understanding_prompt(
+    engine: Engine, database_url: str
+) -> None:
+    downgrade_to(database_url, "0053")
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "UPDATE platform_settings SET value = to_jsonb('Old prompt'::text) "
+                    "WHERE key = 'understanding_prompt'"
+                )
+            )
+    finally:
+        migrate(database_url)
+
+    with engine.connect() as connection:
+        prompt = connection.execute(
+            text(
+                "SELECT value FROM platform_settings WHERE key = 'understanding_prompt'"
+            )
+        ).all()
+        next_moves = connection.execute(
+            text("SELECT next_move, next_move_why FROM understandings")
+        ).all()
+    assert prompt == []
+    assert next_moves == []

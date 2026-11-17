@@ -446,6 +446,8 @@ def understanding_answer(
     asked_for_photo: bool = False,
     lead_move: object = None,
     support_move: object = None,
+    next_move: object = None,
+    next_move_why: object = None,
 ) -> str:
     """Build the form the Understanding model answers with.
 
@@ -471,6 +473,9 @@ def understanding_answer(
         lead_move: The lead Move's name, or anything else a model might
             write there; None for no Move.
         support_move: The supporting Move's name, the same way.
+        next_move: The next Move's name, the same way.
+        next_move_why: Why that Move comes next, or anything else a model
+            might write there; None for no reason.
 
     Returns:
         The form as JSON.
@@ -485,6 +490,8 @@ def understanding_answer(
             "need": need,
             "lead_move": lead_move,
             "support_move": support_move,
+            "next_move": next_move,
+            "next_move_why": next_move_why,
             "nuance": nuance,
             "mood": mood,
             "intensity": intensity,

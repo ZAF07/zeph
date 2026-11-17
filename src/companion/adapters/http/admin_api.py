@@ -580,6 +580,7 @@ class UnderstandingShapeResponse(BaseModel):
     need: str
     lead_move: str | None
     support_move: str | None
+    next_move: str | None
     intensity: MoodIntensity
     cause_known: bool
     threads_reminded: int
@@ -1086,6 +1087,7 @@ def to_understanding_shape_response(
         need=shape.need,
         lead_move=shape.lead_move,
         support_move=shape.support_move,
+        next_move=shape.next_move,
         intensity=shape.intensity,
         cause_known=shape.cause_known,
         threads_reminded=shape.threads_reminded,
