@@ -164,6 +164,18 @@ def describe_move_outcome(outcome: MoveOutcome, time_zone: str | None) -> str:
     )
 
 
+def text_to_embed(outcome: MoveOutcome) -> str:
+    """Write what a Move Outcome is found by: its situation and feeling.
+
+    Args:
+        outcome: The Move Outcome.
+
+    Returns:
+        Its situation, then its feeling.
+    """
+    return f"{outcome.situation} {outcome.feeling}"
+
+
 def read_move_outcome_keeping_answer(answer: str) -> list[Any] | None:
     """Read the Move Outcomes the keeping model wrote from its JSON answer.
 
@@ -327,7 +339,7 @@ class MoveOutcomeKeeper:
         embeddings: Sequence[list[float] | None]
         try:
             embeddings = self._embedder.embed_passages(
-                [f"{outcome.situation} {outcome.feeling}" for outcome in outcomes]
+                [text_to_embed(outcome) for outcome in outcomes]
             )
         except Exception:
             logger.exception("Could not embed Move Outcomes")

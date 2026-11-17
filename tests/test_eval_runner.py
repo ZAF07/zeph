@@ -1776,6 +1776,76 @@ def test_with_web_search_off_an_understanding_case_cannot_research(
     assert "web_search" not in [tool.name for tool in reply.tools]
 
 
+EXHAUSTED_SITUATION = "Asked to push through my task list late at night,"
+EXHAUSTED_FEELING = "exhausted"
+EXHAUSTED_TEXT = f"{EXHAUSTED_SITUATION} {EXHAUSTED_FEELING}"
+
+
+def test_an_understanding_case_gives_its_move_outcomes_and_checks_the_next_move(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    exhausted_case = EvalCase(
+        key="exhausted",
+        eval=EvalName.UNDERSTANDING,
+        content={
+            "now": "2026-11-13T18:30:00",
+            "memory": {
+                "move_outcomes": [
+                    {
+                        "move": "Push",
+                        "role": "lead",
+                        "situation": EXHAUSTED_SITUATION,
+                        "feeling": EXHAUSTED_FEELING,
+                        "result": "didnt_help",
+                        "why": "They had nothing left to give.",
+                        "days_ago": 2,
+                    }
+                ]
+            },
+            "messages": [
+                {
+                    "text": EXHAUSTED_TEXT,
+                    "expect": {"lead_move": ["Calm"], "next_move": ["Plan steps"]},
+                },
+            ],
+            "rules": [],
+        },
+    )
+    add_cases(engine, exhausted_case)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.UNDERSTANDING)
+    chat_model.script_understanding(
+        understanding_answer(
+            need="Be heard",
+            lead_move="Calm",
+            next_move="Plan steps",
+            next_move_why="once they have rested",
+        )
+    )
+    chat_model.script("Rest first. The list can wait.")
+
+    runner.work_next_run()
+
+    result = results_by_key(open_run(client, admin, run["id"]))["exhausted"]
+    assert result["outcome"] == "pass", result
+    assert [
+        (check["name"], check["detail"])
+        for check in result["checks"]
+        if "move" in check["name"]
+    ] == [
+        ("lead move", "led with Calm"),
+        ("next move", "has Plan steps in mind next"),
+    ]
+    [understanding] = chat_model.understanding_calls
+    seen = understanding.history[0].text
+    assert "11 Nov 2026: Push (lead) didn't help." in seen
+    assert "They had nothing left to give." in seen
+
+
 SUGGEST_CHANGE = {
     "name": "Suggest",
     "when_it_fits": "Only when they say the word pineapple.",

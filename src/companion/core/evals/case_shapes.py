@@ -886,6 +886,22 @@ THREAD_FIELDS = [
     ),
 ]
 
+MOVE_ROLE_FIELD = ShapeField(
+    "role",
+    "Lead or support",
+    "Whether the Move led a reply or supported one.",
+    FieldKind.CHOICE,
+    required=True,
+    options=[ChoiceOption("lead", "Lead"), ChoiceOption("support", "Support")],
+    default="lead",
+)
+
+MOVE_RESULT_OPTIONS = [
+    ChoiceOption("helped", "Helped"),
+    ChoiceOption("didnt_help", "Didn't help"),
+    ChoiceOption("mixed", "Mixed"),
+]
+
 UNDERSTANDING_MEMORY_FIELD = ShapeField(
     "memory",
     "Made-up User Memory",
@@ -982,6 +998,38 @@ UNDERSTANDING_MEMORY_FIELD = ShapeField(
                 long_text_field("text", "Text", "The document's text."),
             ],
         ),
+        group_list_field(
+            "move_outcomes",
+            "Move Outcomes",
+            "What helped the User before, and what didn't. Zeph is shown those "
+            "closest to the Message being answered.",
+            "Move Outcome",
+            [
+                text_field("move", "Move", "The Move's name, e.g. Push."),
+                MOVE_ROLE_FIELD,
+                long_text_field("situation", "Situation", "What was going on."),
+                text_field("feeling", "Feeling", "How the User felt, e.g. exhausted."),
+                ShapeField(
+                    "result",
+                    "Result",
+                    "Whether it helped, didn't or was mixed.",
+                    FieldKind.CHOICE,
+                    required=True,
+                    options=MOVE_RESULT_OPTIONS,
+                    default="helped",
+                ),
+                long_text_field("why", "Why", "Why it went that way."),
+                ShapeField(
+                    "days_ago",
+                    "Days ago",
+                    "How many days before the case's time the Move was made.",
+                    FieldKind.WHOLE_NUMBER,
+                    required=True,
+                    minimum=0,
+                    default=1,
+                ),
+            ],
+        ),
     ],
 )
 
@@ -1036,6 +1084,14 @@ UNDERSTANDING_EXPECT_FIELD = ShapeField(
             "Makes no Move",
             "Yes: the reply must make no Move, just respond. No: it must lead "
             "with a Move. Leave the Moves above empty when this is Yes.",
+        ),
+        text_list_field(
+            "next_move",
+            "Next Move in mind",
+            "The Moves Zeph may have in mind to make later in the Conversation, "
+            "by name, e.g. Research. The case fails if it has another in mind, "
+            "or none.",
+            "Move",
         ),
         yes_no_unchecked_field(
             "curiosity_raised",
@@ -1272,29 +1328,14 @@ MOVE_OUTCOME_SHAPE = FormShape(
                             "Move",
                             "The Move's name, as a message above made it.",
                         ),
-                        ShapeField(
-                            "role",
-                            "Lead or support",
-                            "Whether the Move led a reply or supported one.",
-                            FieldKind.CHOICE,
-                            required=True,
-                            options=[
-                                ChoiceOption("lead", "Lead"),
-                                ChoiceOption("support", "Support"),
-                            ],
-                            default="lead",
-                        ),
+                        MOVE_ROLE_FIELD,
                         ShapeField(
                             "result",
                             "Result",
                             "Whether it must be kept as helped, didn't help or "
                             "mixed. Leave empty to not check it.",
                             FieldKind.CHOICE,
-                            options=[
-                                ChoiceOption("helped", "Helped"),
-                                ChoiceOption("didnt_help", "Didn't help"),
-                                ChoiceOption("mixed", "Mixed"),
-                            ],
+                            options=MOVE_RESULT_OPTIONS,
                         ),
                         text_list_field(
                             "rules",

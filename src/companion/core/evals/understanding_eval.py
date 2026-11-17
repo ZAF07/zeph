@@ -146,6 +146,7 @@ def describe_what_was_done(
         ),
         lead_move=understanding.lead_move,
         support_move=understanding.support_move,
+        next_move=understanding.next_move,
     )
 
 

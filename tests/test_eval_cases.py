@@ -303,6 +303,26 @@ def test_an_invalid_save_is_refused_with_a_message_per_field(
             "Expects no Move but names Moves",
         ),
         (
+            EvalName.UNDERSTANDING,
+            {
+                "memory": {
+                    "move_outcomes": [
+                        {
+                            "move": "Push",
+                            "role": "lead",
+                            "situation": "Launch slipped.",
+                            "feeling": "exhausted",
+                            "result": "worked",
+                            "why": "Too tired.",
+                            "days_ago": 3,
+                        }
+                    ]
+                }
+            },
+            "memory.move_outcomes.0.result",
+            "Pick one of: Helped, Didn't help, Mixed.",
+        ),
+        (
             EvalName.MOVE_OUTCOME,
             {
                 "messages": [

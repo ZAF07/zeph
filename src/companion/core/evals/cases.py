@@ -297,6 +297,29 @@ class EvalKnowledgeDocument:
 
 
 @dataclass(frozen=True)
+class EvalMoveOutcome:
+    """A Move Outcome the person already has when the case starts.
+
+    Attributes:
+        move: The Move's name.
+        role: Whether it led a reply or supported one.
+        situation: What was going on.
+        feeling: How the person felt.
+        result: Whether it helped, didn't or was mixed.
+        why: Why it went that way.
+        days_ago: How many days before the case's time the Move was made.
+    """
+
+    move: str
+    role: MoveRole
+    situation: str
+    feeling: str
+    result: MoveResult
+    why: str
+    days_ago: int = 1
+
+
+@dataclass(frozen=True)
 class EvalMemory:
     """The made-up User Memory a case starts with.
 
@@ -307,6 +330,7 @@ class EvalMemory:
         threads: Life Threads.
         curiosities: Waiting Curiosities.
         knowledge_documents: Knowledge Documents on the platform.
+        move_outcomes: What helped the person before, and what didn't.
     """
 
     portrait: str = ""
@@ -315,6 +339,7 @@ class EvalMemory:
     threads: list[EvalThread] = field(default_factory=list)
     curiosities: list[EvalCuriosity] = field(default_factory=list)
     knowledge_documents: list[EvalKnowledgeDocument] = field(default_factory=list)
+    move_outcomes: list[EvalMoveOutcome] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -349,6 +374,7 @@ class UnderstandingExpectations:
         support_move: The Moves that may support it, by name.
         no_move: True if the reply must make no Move; False if it must lead
             with one.
+        next_move: The Moves it may have in mind to make next, by name.
         rules: The IDs of the rules the Judge checks the reply against.
     """
 
@@ -363,6 +389,7 @@ class UnderstandingExpectations:
     lead_move: list[str] = field(default_factory=list)
     support_move: list[str] = field(default_factory=list)
     no_move: bool | None = None
+    next_move: list[str] = field(default_factory=list)
     rules: list[str] = field(default_factory=list)
 
     @property
@@ -691,8 +718,8 @@ def to_eval_memory(entry: dict[str, Any]) -> EvalMemory:
 
     Args:
         entry: A mapping with any of `portrait`, `items` (each
-            `{category, contents}`), `summaries`, `threads`, `curiosities`
-            and `knowledge_documents`.
+            `{category, contents}`), `summaries`, `threads`, `curiosities`,
+            `knowledge_documents` and `move_outcomes`.
 
     Returns:
         The memory.
@@ -728,6 +755,31 @@ def to_eval_memory(entry: dict[str, Any]) -> EvalMemory:
             )
             for document in entry.get("knowledge_documents") or []
         ],
+        move_outcomes=[
+            to_eval_move_outcome(outcome)
+            for outcome in entry.get("move_outcomes") or []
+        ],
+    )
+
+
+def to_eval_move_outcome(entry: dict[str, Any]) -> EvalMoveOutcome:
+    """Read a Move Outcome as written in the case.
+
+    Args:
+        entry: `move`, `role`, `situation`, `feeling`, `result` and `why`,
+            and optionally `days_ago`.
+
+    Returns:
+        The Move Outcome.
+    """
+    return EvalMoveOutcome(
+        move=entry["move"].strip(),
+        role=MoveRole(entry["role"]),
+        situation=entry["situation"],
+        feeling=entry["feeling"],
+        result=MoveResult(entry["result"]),
+        why=entry["why"],
+        days_ago=entry.get("days_ago", 1),
     )
 
 
@@ -767,6 +819,7 @@ def to_understanding_message(entry: dict[str, Any]) -> UnderstandingMessage:
             lead_move=expect.get("lead_move") or [],
             support_move=expect.get("support_move") or [],
             no_move=expect.get("no_move"),
+            next_move=expect.get("next_move") or [],
             rules=expect.get("rules") or [],
         ),
     )
@@ -815,7 +868,7 @@ def texts_besides_threads(case: UnderstandingCase) -> list[str]:
 
     Returns:
         The Portrait, Memory Items, Summaries, Curiosities, Knowledge
-        Documents, earlier messages and Messages.
+        Documents, Move Outcomes, earlier messages and Messages.
     """
     memory = case.memory
     return [
@@ -826,6 +879,10 @@ def texts_besides_threads(case: UnderstandingCase) -> list[str]:
         *(
             f"{document.title} {document.when_it_helps}"
             for document in memory.knowledge_documents
+        ),
+        *(
+            f"{outcome.situation} {outcome.feeling} {outcome.why}"
+            for outcome in memory.move_outcomes
         ),
         *(line.text for line in case.earlier),
         *(message.text for message in case.messages),
