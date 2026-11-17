@@ -1,6 +1,6 @@
 # 09 — Understanding Eval checks next Move and Move Outcomes
 
-Status: ready-for-agent
+Status: claimed
 Lane: whichever lane is free first
 
 ## Parent

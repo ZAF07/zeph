@@ -7,6 +7,7 @@ import pytest
 
 from companion.adapters.evals.terminal_report import eval_lines
 from companion.core.evals.cases import (
+    EvalMoveOutcome,
     InvalidEvalCaseError,
     UnderstandingCase,
     UnderstandingExpectations,
@@ -17,6 +18,7 @@ from companion.core.evals.understanding_checks import (
     ObservedUnderstanding,
     check_understanding,
 )
+from companion.core.models import MoveResult, MoveRole
 from tests.test_eval_helpers import case_result, from_file, seeded
 
 CASE_FILE_START = """\
@@ -535,3 +537,68 @@ def test_a_supporting_move_without_a_lead_is_not_a_lead() -> None:
             "no move", False, "made no lead Move (supported with Calm), expected one"
         ),
     ]
+
+
+def test_a_next_move_and_made_up_move_outcomes_are_read(tmp_path: Path) -> None:
+    [case] = read_cases(
+        tmp_path,
+        CASE_FILE_START + "  - id: exhausted\n"
+        "    memory:\n"
+        "      move_outcomes:\n"
+        "        - move: Push\n"
+        "          role: lead\n"
+        "          situation: Their launch slipped again.\n"
+        "          feeling: exhausted\n"
+        "          result: didnt_help\n"
+        "          why: They had nothing left to give.\n"
+        "          days_ago: 5\n"
+        "    messages:\n"
+        "      - text: which host?\n"
+        "        expect: {next_move: [Research, suggest]}\n",
+    )
+
+    [outcome] = case.memory.move_outcomes
+    assert outcome == EvalMoveOutcome(
+        move="Push",
+        role=MoveRole.LEAD,
+        situation="Their launch slipped again.",
+        feeling="exhausted",
+        result=MoveResult.DIDNT_HELP,
+        why="They had nothing left to give.",
+        days_ago=5,
+    )
+    assert case.messages[0].expect.next_move == ["Research", "suggest"]
+
+
+def test_the_next_move_in_mind_is_checked_ignoring_case() -> None:
+    expect = UnderstandingExpectations(next_move=["research"])
+
+    assert check_understanding(
+        expect, replace(NOTHING_RAISED, next_move="Research")
+    ) == [CheckResult("next move", True, "has Research in mind next")]
+    assert check_understanding(expect, replace(NOTHING_RAISED, next_move="Push")) == [
+        CheckResult("next move", False, "has Push in mind next, expected research")
+    ]
+    assert check_understanding(expect, NOTHING_RAISED) == [
+        CheckResult("next move", False, "has no next Move in mind, expected research")
+    ]
+
+
+def test_the_understanding_cases_check_the_next_move_and_move_outcomes() -> None:
+    seed_cases: list[UnderstandingCase] = seeded(EvalName.UNDERSTANDING)
+    cases = {case.id: case for case in seed_cases}
+
+    first, second = cases["next-move-held-then-made"].messages
+    assert first.expect.next_move and first.expect.next_move == second.expect.lead_move
+    exhausted = cases["no-push-when-exhausted"]
+    frustrated = cases["push-when-frustrated"]
+    assert exhausted.memory == frustrated.memory
+    assert {
+        (outcome.move, outcome.feeling, outcome.result)
+        for outcome in exhausted.memory.move_outcomes
+    } == {
+        ("Push", "exhausted, drained", MoveResult.DIDNT_HELP),
+        ("Push", "frustrated, fed up", MoveResult.HELPED),
+    }
+    assert exhausted.messages[0].expect.rules == ["no_push_while_exhausted"]
+    assert "Push" in frustrated.messages[0].expect.lead_move

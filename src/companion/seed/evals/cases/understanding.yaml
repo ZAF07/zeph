@@ -23,6 +23,14 @@
 #   curiosities: [{question, why, not_before_days_ago, sensitivity}]
 #                not_before_days_ago: 0 is today, 1 yesterday, null any time
 #   knowledge_documents: [{title, source, tradition, when_it_helps, text}]
+#   move_outcomes:                           what helped before, and what didn't
+#     - move: Push
+#       role: lead                           lead | support
+#       situation: ...
+#       feeling: exhausted
+#       result: didnt_help                   helped | didnt_help | mixed
+#       why: ...
+#       days_ago: 12                         when the Move was made
 #
 # earlier: [{person: ...}, {zeph: ...}]   already in the open Conversation
 #
@@ -43,6 +51,7 @@
 #   support_move: [<Move>, ...]  the Moves that may support it
 #   no_move: true|false          true: no Move, just respond; false: a lead
 #                                Move. Leave the Move lists empty when true.
+#   next_move: [<Move>, ...]     the Moves Zeph may have in mind to make next
 #   rules: [<rule id>]           the Judge checks Zeph's reply against these
 #
 # web_search: false   Web Search doesn't work for the person, so Research is
@@ -100,6 +109,13 @@ rules:
     right now, and still helps from what it knows, e.g. names options worth
     checking. It doesn't pretend to have searched or present prices as just
     found.
+  no_push_while_exhausted: >-
+    Zeph's last reply doesn't push them to keep working, fix the bug or
+    commit to a next step or plan. Saying it can wait, or that they should
+    rest, is fine.
+  pushes_for_one_step: >-
+    Zeph's last reply kindly challenges them to commit to one concrete thing
+    to do on the launch, today or tomorrow. It doesn't only sympathise.
   no_teaching: >-
     Zeph's last reply doesn't quote or teach any idea, teaching, philosophy,
     story or technique.
@@ -364,7 +380,7 @@ cases:
         he feels he's going in circles, and likes concrete options.
       items:
         Goals: [Launch the app to the first 50 users by January]
-    web_results:
+    web_results: &hosts
       - title: Railway pricing
         url: https://railway.example/pricing
         text: >-
@@ -449,3 +465,71 @@ cases:
         expect:
           need: [Just chatting]
           no_move: true
+
+  - id: next-move-held-then-made
+    memory: *arjun
+    web_results: *hosts
+    messages:
+      - text: >-
+          I need to sort out hosting for my app this week. where do I even
+          start
+        expect:
+          next_move: [Research]
+      - text: >-
+          it's a Next.js front end with a Python API and it needs managed
+          Postgres, I don't want to run my own database. budget is SGD 15-20
+          a month
+        expect:
+          lead_move: [Research]
+          rules: [names_hosts_under_budget]
+
+  - id: no-push-when-exhausted
+    now: 2026-11-14T01:00:00
+    memory: &arjun_with_outcomes
+      portrait: >-
+        Arjun is 29, a solo developer in Singapore building a habit-tracking
+        app on evenings and weekends. He's practical, gets frustrated when
+        he feels he's going in circles, and likes concrete options.
+      items:
+        Goals: [Launch the app to the first 50 users by January]
+      move_outcomes:
+        - move: Push
+          role: lead
+          situation: >-
+            Late at night after a long work day, the launch had slipped and
+            Zeph pushed them to fix the sign-up bug before bed.
+          feeling: exhausted, drained
+          result: didnt_help
+          why: >-
+            They had nothing left to give; the push made them feel worse and
+            they went quiet.
+          days_ago: 12
+        - move: Push
+          role: lead
+          situation: >-
+            The launch date slipped again and they were annoyed with
+            themselves for putting it off.
+          feeling: frustrated, fed up
+          result: helped
+          why: >-
+            Being challenged to pick one thing to ship that day turned the
+            frustration into action.
+          days_ago: 20
+    messages:
+      - text: >-
+          it's 1am, I've been at work since 8 and then on the app all evening.
+          launch slipped again, couldn't fix the sign-up bug. I'm completely
+          drained, nothing left
+        expect:
+          rules: [no_push_while_exhausted]
+
+  - id: push-when-frustrated
+    memory: *arjun_with_outcomes
+    messages:
+      - text: >-
+          ugh the launch slipped AGAIN. I keep saying next week and then
+          doing nothing. so annoyed with myself
+        expect:
+          need: [Accountability]
+          lead_move: [Push, Plan steps]
+          rules: [pushes_for_one_step]

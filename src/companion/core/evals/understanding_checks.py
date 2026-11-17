@@ -24,6 +24,7 @@ class ObservedUnderstanding:
             into the reply.
         lead_move: The Move the reply led with; None for none.
         support_move: The Move that supported it; None for none.
+        next_move: The Move it had in mind to make next; None for none.
     """
 
     need: str
@@ -36,6 +37,7 @@ class ObservedUnderstanding:
     woven_in: bool
     lead_move: str | None = None
     support_move: str | None = None
+    next_move: str | None = None
 
 
 @dataclass(frozen=True)
@@ -146,6 +148,25 @@ def check_no_move(
     if lead_move is None:
         return CheckResult("no move", False, f"{made}, expected one")
     return CheckResult("no move", True, made)
+
+
+def check_next_move(allowed: list[str], next_move: str | None) -> CheckResult:
+    """Check the Move the Understanding has in mind next is one of those allowed.
+
+    Args:
+        allowed: The Moves it may have in mind.
+        next_move: The Move it has in mind; None for none.
+
+    Returns:
+        The check's outcome.
+    """
+    return check_move_made(
+        "next move",
+        allowed,
+        next_move,
+        "has {move} in mind next",
+        "has no next Move in mind",
+    )
 
 
 def check_each_thread(
@@ -273,7 +294,7 @@ def check_understanding(
 
     Returns:
         One outcome per check, in a fixed order: the Need, the lead,
-        supporting and no Move, each Thread to be found, brought up and left
+        supporting, no and next Move, each Thread to be found, brought up and left
         alone, then the Curiosity, asking why, Knowledge and the woven-in
         Check-in.
     """
@@ -304,6 +325,8 @@ def check_understanding(
         checks.append(
             check_no_move(expect.no_move, observed.lead_move, observed.support_move)
         )
+    if expect.next_move:
+        checks.append(check_next_move(expect.next_move, observed.next_move))
     checks += check_each_thread(
         "found",
         expect.found,

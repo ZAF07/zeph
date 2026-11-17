@@ -6,6 +6,7 @@ from companion.core.evals.cases import (
     EarlierLine,
     EvalCuriosity,
     EvalMemory,
+    EvalMoveOutcome,
     EvalThread,
 )
 from companion.core.life_threads import name_keys
@@ -23,8 +24,11 @@ from companion.core.models import (
     MemorySource,
     MessageDirection,
     MessageKind,
+    MoveOutcome,
+    MoveOutcomeToSave,
     UserPortrait,
 )
+from companion.core.move_outcomes import text_to_embed
 from companion.core.ports import Embedder, Repositories
 
 MEMORY_ITEMS_DAYS_AGO = 30
@@ -99,7 +103,7 @@ def give_made_up_memory(
 
     Args:
         repositories: Where the User Memory is stored.
-        embedder: Embeds the Summaries and Life Threads.
+        embedder: Embeds the Summaries, Life Threads and Move Outcomes.
         user_id: The User's ID.
         memory: The made-up memory.
         now: When the case's first Message is sent.
@@ -153,6 +157,12 @@ def give_made_up_memory(
             updated=[],
             reactions={},
         )
+    )
+    repositories.move_outcomes.add_many(
+        [
+            to_move_outcome_to_save(embedder, user_id, outcome, now)
+            for outcome in memory.move_outcomes
+        ]
     )
 
 
@@ -280,6 +290,35 @@ def to_thread_to_save(
         name_keys=name_keys(thread.people),
         embedding=embedding,
     )
+
+
+def to_move_outcome_to_save(
+    embedder: Embedder, user_id: UUID, outcome: EvalMoveOutcome, now: datetime
+) -> MoveOutcomeToSave:
+    """Make a Move Outcome to save, embedded as the keeping step embeds one.
+
+    Args:
+        embedder: Embeds its situation and feeling.
+        user_id: The User's ID.
+        outcome: The made-up Move Outcome.
+        now: When the case's first Message is sent.
+
+    Returns:
+        The Move Outcome to save.
+    """
+    move_outcome = MoveOutcome(
+        id=uuid4(),
+        user_id=user_id,
+        move=outcome.move,
+        role=outcome.role,
+        situation=outcome.situation,
+        feeling=outcome.feeling,
+        result=outcome.result,
+        why=outcome.why,
+        made_at=now - timedelta(days=outcome.days_ago),
+    )
+    [embedding] = embedder.embed_passages([text_to_embed(move_outcome)])
+    return MoveOutcomeToSave(outcome=move_outcome, embedding=embedding)
 
 
 def to_curiosity(user_id: UUID, curiosity: EvalCuriosity, now: datetime) -> Curiosity:
