@@ -39,6 +39,7 @@ describe("model call labels", () => {
       need: "Ask more",
       lead_move: null,
       support_move: null,
+      next_move: null,
       intensity: "low",
       cause_known: true,
       threads_reminded: 0,
@@ -53,13 +54,15 @@ describe("model call labels", () => {
     expect(facts).toContainEqual({ label: "Mood intensity", value: "Low" });
     expect(facts).toContainEqual({ label: "Lead Move", value: "None" });
     expect(facts).toContainEqual({ label: "Supporting Move", value: "None" });
+    expect(facts).toContainEqual({ label: "Next Move", value: "None" });
   });
 
-  it("names the lead and supporting Moves an Understanding picked", () => {
+  it("names the lead, supporting and next Moves an Understanding picked", () => {
     const facts = understandingShapeFacts({
       need: "Accountability",
       lead_move: "Research",
       support_move: "Suggest",
+      next_move: "Plan steps",
       intensity: "medium",
       cause_known: true,
       threads_reminded: 0,
@@ -74,5 +77,6 @@ describe("model call labels", () => {
       label: "Supporting Move",
       value: "Suggest",
     });
+    expect(facts).toContainEqual({ label: "Next Move", value: "Plan steps" });
   });
 });

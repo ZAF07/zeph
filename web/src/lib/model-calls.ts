@@ -130,6 +130,7 @@ export function understandingShapeFacts(
     { label: "Need picked", value: shape.need },
     { label: "Lead Move", value: shape.lead_move ?? "None" },
     { label: "Supporting Move", value: shape.support_move ?? "None" },
+    { label: "Next Move", value: shape.next_move ?? "None" },
     { label: "Mood intensity", value: intensityLabels[shape.intensity] },
     { label: "Cause known", value: shape.cause_known ? "Yes" : "No" },
     { label: "Life Threads reminded", value: String(shape.threads_reminded) },

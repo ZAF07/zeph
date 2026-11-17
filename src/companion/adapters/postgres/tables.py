@@ -264,6 +264,8 @@ understandings = Table(
     Column("need", Text, nullable=False),
     Column("lead_move", Text),
     Column("support_move", Text),
+    Column("next_move", Text),
+    Column("next_move_why", Text),
     Column("asked_why", Boolean, nullable=False),
     Column("made_at", DateTime(timezone=True), nullable=False),
 )

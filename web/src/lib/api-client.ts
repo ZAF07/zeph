@@ -652,6 +652,7 @@ export type UnderstandingShape = {
   need: string;
   lead_move: string | null;
   support_move: string | null;
+  next_move: string | null;
   intensity: "low" | "medium" | "high";
   cause_known: boolean;
   threads_reminded: number;

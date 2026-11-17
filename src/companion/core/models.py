@@ -1253,6 +1253,10 @@ class UnderstandingForm:
         lead_move: The lead Move's name, as the model wrote it; "" for none.
         support_move: The supporting Move's name, as the model wrote it; ""
             for none.
+        next_move: The Move it means to make later in the Conversation, as
+            the model wrote it; "" for none.
+        next_move_why: Why, or when, that Move comes next, e.g. "once I know
+            their requirements"; "" for none.
         mood: How the User seems, e.g. "frustrated".
         intensity: How strongly they seem to feel it.
         cause_known: Whether the Companion knows why they feel that way.
@@ -1285,6 +1289,8 @@ class UnderstandingForm:
     asked_for_photo: bool = False
     lead_move: str = ""
     support_move: str = ""
+    next_move: str = ""
+    next_move_why: str = ""
 
 
 @dataclass(frozen=True)
@@ -1303,6 +1309,10 @@ class Understanding:
         made_at: When it was made.
         lead_move: The Move the reply led with, by name; None for none.
         support_move: The Move that supported it, by name; None for none.
+        next_move: The Move it means to make later in the Conversation, by
+            name; None for none.
+        next_move_why: Why, or when, that Move comes next; None when there
+            is no next Move.
     """
 
     id: UUID
@@ -1315,6 +1325,8 @@ class Understanding:
     made_at: datetime
     lead_move: str | None = None
     support_move: str | None = None
+    next_move: str | None = None
+    next_move_why: str | None = None
 
 
 @dataclass(frozen=True)
@@ -2084,6 +2096,8 @@ class UnderstandingShape:
         past_look_ups: How many phrases older Summaries were searched with.
         lead_move: The Move the reply led with, by name; None for none.
         support_move: The Move that supported it, by name; None for none.
+        next_move: The Move it meant to make later in the Conversation, by
+            name; None for none.
     """
 
     need: str
@@ -2097,6 +2111,7 @@ class UnderstandingShape:
     past_look_ups: int
     lead_move: str | None = None
     support_move: str | None = None
+    next_move: str | None = None
 
 
 @dataclass(frozen=True)

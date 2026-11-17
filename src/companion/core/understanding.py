@@ -68,10 +68,13 @@ class PickedMoves:
     Attributes:
         lead: The Move the reply leads with; None for none.
         support: The Move that supports it; None for none.
+        next: The Move the Companion means to make later in the
+            Conversation; None for none.
     """
 
     lead: Move | None = None
     support: Move | None = None
+    next: Move | None = None
 
     @property
     def lead_name(self) -> str | None:
@@ -82,6 +85,11 @@ class PickedMoves:
     def support_name(self) -> str | None:
         """The supporting Move's name; None for none."""
         return self.support.name if self.support else None
+
+    @property
+    def next_name(self) -> str | None:
+        """The next Move's name; None for none."""
+        return self.next.name if self.next else None
 
 
 @dataclass(frozen=True)
@@ -119,18 +127,27 @@ def format_earlier_understanding(understanding: Understanding) -> str:
         understanding: The earlier Understanding.
 
     Returns:
-        E.g. "- Need: Be heard; mood: furious (high); cause known: no;
-        asked why: no. They want to vent about their boss."
+        E.g. "- Need: Be heard; lead Move: Mirror; supporting Move: none;
+        mood: furious (high); cause known: no; asked why: no. They want to
+        vent about their boss. Next Move in mind: Plan steps, once they've
+        let it out."
     """
     form = understanding.form
     cause_known = "yes" if form.cause_known else "no"
     asked_why = "yes" if understanding.asked_why else "no"
-    line = (
-        f"- Need: {understanding.need}; mood: {form.mood or 'unclear'} "
+    parts = [
+        f"- Need: {understanding.need}; lead Move: "
+        f"{understanding.lead_move or 'none'}; supporting Move: "
+        f"{understanding.support_move or 'none'}; mood: {form.mood or 'unclear'} "
         f"({form.intensity.value}); cause known: {cause_known}; "
         f"asked why: {asked_why}."
-    )
-    return f"{line} {form.nuance}" if form.nuance else line
+    ]
+    if form.nuance:
+        parts.append(form.nuance)
+    if understanding.next_move:
+        why = f", {understanding.next_move_why}" if understanding.next_move_why else ""
+        parts.append(f"Next Move in mind: {understanding.next_move}{why}.")
+    return " ".join(parts)
 
 
 def allowed_moves(need: Need, moves: Sequence[Move]) -> list[Move]:
@@ -507,13 +524,13 @@ def keep_held_back_threads_alone(
 
 
 def read_move_name(value: Any) -> str:
-    """Read a Move's name from the form.
+    """Read a Move's name, or why it comes next, from the form.
 
     Args:
         value: The field's value.
 
     Returns:
-        The name without surrounding spaces; "" if it isn't text.
+        The text without surrounding spaces; "" if it isn't text.
     """
     return value.strip() if isinstance(value, str) else ""
 
@@ -615,6 +632,8 @@ def read_understanding_form(
         asked_for_photo=parsed.get("asked_for_photo") is True,
         lead_move=read_move_name(parsed.get("lead_move")),
         support_move=read_move_name(parsed.get("support_move")),
+        next_move=read_move_name(parsed.get("next_move")),
+        next_move_why=read_move_name(parsed.get("next_move_why")),
         **lists,
     )
     return keep_held_back_threads_alone(form, reminded)
@@ -682,28 +701,39 @@ def find_need(needs: Sequence[Need], name: str) -> Need:
 
 
 def pick_moves(
-    need: Need, moves: Sequence[Move], form: UnderstandingForm
+    need: Need, needs: Sequence[Need], moves: Sequence[Move], form: UnderstandingForm
 ) -> PickedMoves:
-    """Find the Moves the form named, keeping only those the Need allows.
+    """Find the Moves the form named, keeping only those that may be made.
 
-    An unknown Move, or one the Need rules out, is dropped rather than
+    The lead and supporting Moves must be ones the Need allows. The next
+    Move must be one some Need allows, since the User may need something
+    else by then. An unknown Move, or one ruled out, is dropped rather than
     failing the Understanding. A supporting Move the same as the lead is
     dropped too, and one left without a lead becomes the lead.
 
     Args:
         need: The Need the reply follows.
-        moves: Every Move.
+        needs: Every Need.
+        moves: Every Move that can be made for the User.
         form: This Message's form.
 
     Returns:
-        The lead and supporting Moves.
+        The lead, supporting and next Moves.
     """
     allowed = {move.name.lower(): move for move in allowed_moves(need, moves)}
+    allowed_later = {
+        move.name.lower(): move
+        for some_need in needs
+        for move in allowed_moves(some_need, moves)
+    }
     lead = allowed.get(form.lead_move.lower())
     support = allowed.get(form.support_move.lower())
+    next_move = allowed_later.get(form.next_move.lower())
     if lead is None:
-        return PickedMoves(lead=support)
-    return PickedMoves(lead=lead, support=None if support == lead else support)
+        return PickedMoves(lead=support, next=next_move)
+    return PickedMoves(
+        lead=lead, support=None if support == lead else support, next=next_move
+    )
 
 
 def should_ask_why(form: UnderstandingForm, earlier: Sequence[Understanding]) -> bool:
@@ -785,8 +815,9 @@ def describe_understanding_shape(
         reminded: The Life Threads the Message reminded the Companion of.
 
     Returns:
-        The Need, the Moves' names, intensity, whether the cause is known and
-        how many Life Threads and past look-ups there were; never any words.
+        The Need, the lead, supporting and next Moves' names, intensity,
+        whether the cause is known and how many Life Threads and past
+        look-ups there were; never any words.
     """
     ways = [item.how for item in form.bring_up]
     held_back = [item for item in reminded if item.hold_back]
@@ -802,6 +833,7 @@ def describe_understanding_shape(
         past_look_ups=len(form.look_up_past),
         lead_move=picked.lead_name,
         support_move=picked.support_name,
+        next_move=picked.next_name,
     )
 
 
@@ -828,11 +860,12 @@ class UnderstandingService:
 
     One cheap model call fills in a fixed form: which Need fits, which Moves
     the reply makes from those the Need allows (leaving out any whose needed
-    Feature doesn't work for the User right now), how the User seems and
-    whether the Companion knows why, which Memory Categories matter, and
-    which Life Threads and Curiosities to bring up. It sees this
-    Conversation's earlier Understandings, so it knows how their mood is
-    moving and whether it already asked why.
+    Feature doesn't work for the User right now), which Move it means to
+    make next and why, how the User seems and whether the Companion knows
+    why, which Memory Categories matter, and which Life Threads and
+    Curiosities to bring up. It sees this Conversation's earlier
+    Understandings with their Moves, so it knows how their mood is moving,
+    whether it already asked why, and which Move it had in mind next.
     """
 
     def __init__(
@@ -869,9 +902,10 @@ class UnderstandingService:
 
         Its shape goes into the Model Call Log, for every User. An unknown
         Need falls back to the fallback Need; an unknown Move, one the Need
-        rules out, or one whose needed Feature doesn't work for the User
-        (Research once Web Search is off or its daily limit is used up), is
-        dropped; an unreadable form or a failed call falls
+        rules out (for the next Move, one every Need rules out), or one whose
+        needed Feature doesn't work for the User (Research once Web Search
+        is off or its daily limit is used up), is dropped, with the next
+        Move's why; an unreadable form or a failed call falls
         back to the fallback Need with no Moves, no mood and no Memory
         Categories, so the reply still goes, with every reminded Life
         Thread that isn't held back but no Thread or Curiosity brought up.
@@ -923,7 +957,7 @@ class UnderstandingService:
         else:
             form = model_form
             need = find_need(needs, form.need)
-        picked = pick_moves(need, moves, form)
+        picked = pick_moves(need, needs, moves, form)
         asked_why = should_ask_why(form, earlier)
         understanding = Understanding(
             id=uuid4(),
@@ -936,6 +970,8 @@ class UnderstandingService:
             made_at=self._clock.now(),
             lead_move=picked.lead_name,
             support_move=picked.support_name,
+            next_move=picked.next_name,
+            next_move_why=form.next_move_why if picked.next else None,
         )
         self._repositories.understandings.add(understanding)
         self._model_call_log.record_understanding_shape(
