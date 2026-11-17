@@ -143,7 +143,7 @@ def test_an_unknown_or_odd_next_move_is_dropped_with_its_why(
         next_move_why=["if they dodge again"],
     )
 
-    assert saved_next_moves(engine) == [(None, None), (None, None), ("Push", "")]
+    assert saved_next_moves(engine) == [(None, None), (None, None), ("Push", None)]
 
 
 def test_a_next_move_that_cant_be_made_for_the_user_is_dropped(

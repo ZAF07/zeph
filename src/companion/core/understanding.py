@@ -523,8 +523,8 @@ def keep_held_back_threads_alone(
     )
 
 
-def read_move_name(value: Any) -> str:
-    """Read a Move's name, or why it comes next, from the form.
+def read_form_text(value: Any) -> str:
+    """Read a text field from the form, such as a Move's name.
 
     Args:
         value: The field's value.
@@ -630,10 +630,10 @@ def read_understanding_form(
         curiosities=read_curiosities_to_raise(parsed.get("bring_up"), due),
         struggling=parsed.get("struggling") is True,
         asked_for_photo=parsed.get("asked_for_photo") is True,
-        lead_move=read_move_name(parsed.get("lead_move")),
-        support_move=read_move_name(parsed.get("support_move")),
-        next_move=read_move_name(parsed.get("next_move")),
-        next_move_why=read_move_name(parsed.get("next_move_why")),
+        lead_move=read_form_text(parsed.get("lead_move")),
+        support_move=read_form_text(parsed.get("support_move")),
+        next_move=read_form_text(parsed.get("next_move")),
+        next_move_why=read_form_text(parsed.get("next_move_why")),
         **lists,
     )
     return keep_held_back_threads_alone(form, reminded)
@@ -721,14 +721,14 @@ def pick_moves(
         The lead, supporting and next Moves.
     """
     allowed = {move.name.lower(): move for move in allowed_moves(need, moves)}
-    allowed_later = {
+    allowed_by_any_need = {
         move.name.lower(): move
         for some_need in needs
         for move in allowed_moves(some_need, moves)
     }
     lead = allowed.get(form.lead_move.lower())
     support = allowed.get(form.support_move.lower())
-    next_move = allowed_later.get(form.next_move.lower())
+    next_move = allowed_by_any_need.get(form.next_move.lower())
     if lead is None:
         return PickedMoves(lead=support, next=next_move)
     return PickedMoves(
@@ -971,7 +971,7 @@ class UnderstandingService:
             lead_move=picked.lead_name,
             support_move=picked.support_name,
             next_move=picked.next_name,
-            next_move_why=form.next_move_why if picked.next else None,
+            next_move_why=(form.next_move_why or None) if picked.next else None,
         )
         self._repositories.understandings.add(understanding)
         self._model_call_log.record_understanding_shape(

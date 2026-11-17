@@ -1312,7 +1312,7 @@ class Understanding:
         next_move: The Move it means to make later in the Conversation, by
             name; None for none.
         next_move_why: Why, or when, that Move comes next; None when there
-            is no next Move.
+            is no next Move or no reason was given.
     """
 
     id: UUID
