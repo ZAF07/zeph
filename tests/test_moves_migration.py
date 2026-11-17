@@ -176,7 +176,7 @@ def test_the_unmade_next_move_migration_reloads_the_curiosity_keeping_prompt(
     assert prompt == []
 
 
-def test_the_fallback_migration_reads_existing_understandings_as_not_fallback(
+def test_the_fallback_migration_adds_a_column_that_defaults_to_not_fallback(
     engine: Engine, database_url: str
 ) -> None:
     downgrade_to(database_url, "0055")

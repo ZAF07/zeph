@@ -229,3 +229,30 @@ def test_understandings_store_whether_they_were_the_fallback(
             text("SELECT is_fallback FROM understandings ORDER BY position")
         ).scalars()
         assert list(stored) == [False, True]
+
+
+def test_a_next_move_made_before_a_fallback_is_not_passed(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+
+    hold_plan_steps(client, chat_model)
+    reply_to(
+        client,
+        chat_model,
+        "ok railway it is. what do I do now?",
+        need="Advice",
+        lead_move="Plan steps",
+    )
+    chat_model.script_understanding(RuntimeError("model down"))
+    chat_model.script("ok")
+    send_to_webhook(client, telegram_text_update("thanks!"))
+    end_current_conversation(chat_model, clock, scheduler, seeded_settings, [])
+
+    assert unmade_next_move_seen(chat_model) == "None."
