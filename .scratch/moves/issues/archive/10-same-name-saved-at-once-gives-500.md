@@ -52,3 +52,12 @@ Code review (Standards and Spec, sub-agents):
 - Fixed: `name_taken` renamed `name_taken_error` (it builds an error, not a yes/no check).
 - Filed: issue 12. Need names that differ only in case, saved at once, both save, because `needs_name_key` is case-sensitive (Moves' index is on `lower(name)`). This needs a migration, so it's kept out of this fix.
 - Kept: the short try/except in each of the four saves (plain to read); the index names as strings in `UNIQUE_NAME_INDEXES`, which is the name issue 12 adds to.
+
+## Completion
+
+- Completed: 2026-11-17
+- Commits (branch `moves-10-same-name-at-once`):
+  - `55947b9` Moves issue 10: a same-name save at the same moment is refused, not a 500
+  - `0e3f061` Moves issue 10: review fixes; file issue 12 for Need names differing only in case
+  - `eeb0871` Moves issue 10 done: archive issue with check and run evidence
+- Merge into `main`: `f9128f6` Merge Moves issue 10: a same-name Move or Need save at the same moment is refused (409 or 422), not a 500
