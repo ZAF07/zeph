@@ -75,3 +75,8 @@ Caveats:
 ## Completion
 
 - Completed: 2026-11-17
+- Commit: `ea46116` — Moves issue 02: Admins manage Moves, and Research needs Web Search
+- Commit: `1514c2e` — Moves issue 02: review fixes — reloadMovesAndNeeds says it reloads Needs too, the Move service is named in app.py like the Need service, the override docstring says why the value is read first
+- Commit: `7c6cd50` — Moves issue 02 done: archive issue with check and run evidence; CONTEXT.md says Moves have unique names, an Admin-set order and a needed Feature, and a deleted Move leaves every Need's rule-outs
+- Commit: `568f9a3` — Moves issue 02: archived issue says the migration is 0052 after issue 04, with the checks after rebasing
+- Merge: `ba91f5c` — Merge Moves issue 02: Admins manage Moves — list, add, edit, delete and reorder on their own Dashboard page; a Need's ruled-out Moves are picked on the Need card; a Move may need a Feature, Research needs Web Search, and a Move whose Feature doesn't work for the User or whose daily limit is used up is never offered to the Understanding
