@@ -506,8 +506,9 @@ def test_the_understanding_cases_check_moves_and_web_search() -> None:
 
     hosting = cases["hosting-research"]
     assert hosting.web_search and hosting.web_results
-    assert hosting.messages[2].expect.lead_move == ["Research"]
-    assert hosting.messages[2].expect.rules == ["names_hosts_under_budget"]
+    assert len(hosting.earlier) == 4
+    assert hosting.messages[0].expect.lead_move == ["Research"]
+    assert hosting.messages[0].expect.rules == ["names_hosts_under_budget"]
     assert set(cases["internal-testing-finish-line"].messages[0].expect.lead_move) == {
         "Push",
         "Plan steps",

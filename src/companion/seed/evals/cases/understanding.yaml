@@ -382,17 +382,17 @@ cases:
         text: >-
           Basic app USD 5 a month. Managed PostgreSQL from USD 15 a month
           (about SGD 20), Singapore data centre.
-    messages:
-      - text: >-
+    earlier:
+      - person: >-
           ok I really need to sort out hosting for my app this week. budget is
           like SGD 15-20 a month
-        expect:
-          need: [Accountability, Advice]
-      - text: >-
+      - zeph: love that you're tackling it! what's on your shortlist so far?
+      - person: >-
           it's a Next.js front end with a Python API, and it needs managed
           Postgres, I don't want to run my own database
-        expect:
-          need: [Accountability, Advice]
+      - zeph: >-
+          makes sense. which ones are you weighing up? what's on the shortlist?
+    messages:
       - text: >-
           honestly I don't have a shortlist, I just don't know what's out
           there. I keep putting this off
