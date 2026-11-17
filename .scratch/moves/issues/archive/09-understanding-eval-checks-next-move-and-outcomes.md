@@ -53,3 +53,13 @@ Evidence per acceptance criterion:
 Code review (Standards and Spec, sub-agents):
 - Fixed: shared Move role field and result choices; made-up Move Outcomes embedded in one call; runner test builds its outcome from named parts.
 - Kept, as follow-ups if wanted: "no Push" is checked only by the Judge (the case shape can't say "any Move but Push"; the real run made no Move); nothing stops `next-move-held-then-made` Message 1 from already leading with Research (its next-Move check would then likely fail); `push-when-frustrated` requires a Push or Plan steps lead and a Judge rule, stricter than "Push allowed", so it tests that the past outcome is used.
+
+## Completion
+
+- Completed: 2026-11-17
+- Final checks after rebasing on `origin/main` 7ad0eed (issue 10's merge): ruff, ruff format, mypy (181 files) clean; pytest 1284 passed; eslint, prettier, tsc clean; vitest 483 passed.
+- Commits (branch `moves-09-eval-next-move-outcomes`):
+  - `ea1e8d2` Moves issue 09: Understanding Eval checks next Move and Move Outcomes
+  - `34d634e` Moves issue 09: review fixes
+  - `19df4e1` Moves issue 09 done: archive issue with check and run evidence
+- Merge into `main`: `4bb14b4` Merge Moves issue 09: Understanding Eval checks next Move and Move Outcomes
