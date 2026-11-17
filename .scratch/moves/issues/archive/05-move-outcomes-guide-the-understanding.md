@@ -70,4 +70,4 @@ Caveats:
 - Commit: `928a2ff` — Moves issue 05: review fixes — Life Threads and Move Outcomes search with one shared recent_incoming_texts helper, its constant is named RECENT_TEXTS_TO_SEARCH, two docstrings rewrapped
 - Commit: `edc5224` — Moves issue 05 done: archive issue with check and run evidence
 - Merge: `753cdff` — Merge Moves issue 05: Move Outcomes guide the Understanding
-- Commit: `<follow-up>` — Moves issue 05: Dashboard check of the two new settings in the running app
+- Commit: `9c2793a` — Moves issue 05: archived issue has the running-app Dashboard check of the two new settings and that the Understanding follows the count
