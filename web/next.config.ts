@@ -2,8 +2,13 @@ import type { NextConfig } from "next";
 
 import { checkServerSettings } from "@/env";
 
-checkServerSettings();
-
-const nextConfig: NextConfig = {};
-
-export default nextConfig;
+/**
+ * Builds the Next.js config, checking server settings first.
+ *
+ * @param phase - The Next.js phase the config is loaded for.
+ * @returns The Next.js config.
+ */
+export default function nextConfig(phase: string): NextConfig {
+  checkServerSettings(phase);
+  return {};
+}
