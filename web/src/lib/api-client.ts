@@ -617,9 +617,11 @@ export type ModelCallContent = {
   reasoning: string | null;
 };
 
-/** The shape of an Understanding: the Need and counts, never any words. */
+/** The shape of an Understanding: the Need, Move names and counts, never any words. */
 export type UnderstandingShape = {
   need: string;
+  lead_move: string | null;
+  support_move: string | null;
   intensity: "low" | "medium" | "high";
   cause_known: boolean;
   threads_reminded: number;

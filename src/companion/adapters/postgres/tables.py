@@ -204,6 +204,35 @@ needs = Table(
     ),
 )
 
+moves = Table(
+    "moves",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("name", Text, nullable=False),
+    Column("when_it_fits", Text, nullable=False),
+    Column("how_to_do_it", Text, nullable=False),
+    Column("sort_order", Integer, nullable=False),
+    Index("moves_name_ignoring_case", text("lower(name)"), unique=True),
+)
+
+need_ruled_out_moves = Table(
+    "need_ruled_out_moves",
+    metadata,
+    Column(
+        "need_id",
+        Uuid,
+        ForeignKey("needs.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "move_id",
+        Uuid,
+        ForeignKey("moves.id", ondelete="CASCADE"),
+        primary_key=True,
+        index=True,
+    ),
+)
+
 understandings = Table(
     "understandings",
     metadata,
@@ -232,6 +261,8 @@ understandings = Table(
     ),
     Column("form", JSONB, nullable=False),
     Column("need", Text, nullable=False),
+    Column("lead_move", Text),
+    Column("support_move", Text),
     Column("asked_why", Boolean, nullable=False),
     Column("made_at", DateTime(timezone=True), nullable=False),
 )

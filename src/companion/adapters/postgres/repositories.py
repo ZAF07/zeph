@@ -40,6 +40,8 @@ from companion.adapters.postgres.tables import (
     memory_categories,
     memory_items,
     model_calls,
+    moves,
+    need_ruled_out_moves,
     needs,
     pending_auth_account_deletions,
     personal_stickers,
@@ -113,6 +115,7 @@ from companion.core.models import (
     ModelCallTraceOverview,
     ModelStep,
     MoodIntensity,
+    Move,
     Need,
     NeedDetails,
     NextDueTimeChange,
@@ -247,11 +250,12 @@ def _from_setting_stamps(stamps: dict[ChatSetting, datetime]) -> dict[str, str]:
     }
 
 
-def _to_need(row: Row[Any]) -> Need:
+def _to_need(row: Row[Any], ruled_out_move_ids: frozenset[UUID]) -> Need:
     """Turn a `needs` row into a Need.
 
     Args:
         row: The row.
+        ruled_out_move_ids: The Moves it rules out.
 
     Returns:
         The Need.
@@ -263,6 +267,46 @@ def _to_need(row: Row[Any]) -> Need:
         how_to_reply=row.how_to_reply,
         sort_order=row.sort_order,
         is_fallback=row.is_fallback,
+        ruled_out_move_ids=ruled_out_move_ids,
+    )
+
+
+def _ruled_out_move_ids(
+    connection: Connection, need_ids: Sequence[UUID]
+) -> dict[UUID, frozenset[UUID]]:
+    """Read the Moves each of some Needs rules out.
+
+    Args:
+        connection: Where to read them.
+        need_ids: The Needs' IDs.
+
+    Returns:
+        Each Need's ruled-out Move IDs; none for a Need that rules none out.
+    """
+    rows = connection.execute(
+        select(need_ruled_out_moves).where(need_ruled_out_moves.c.need_id.in_(need_ids))
+    ).all()
+    move_ids: dict[UUID, set[UUID]] = {need_id: set() for need_id in need_ids}
+    for row in rows:
+        move_ids[row.need_id].add(row.move_id)
+    return {need_id: frozenset(ids) for need_id, ids in move_ids.items()}
+
+
+def _to_move(row: Row[Any]) -> Move:
+    """Turn a `moves` row into a Move.
+
+    Args:
+        row: The row.
+
+    Returns:
+        The Move.
+    """
+    return Move(
+        id=row.id,
+        name=row.name,
+        when_it_fits=row.when_it_fits,
+        how_to_do_it=row.how_to_do_it,
+        sort_order=row.sort_order,
     )
 
 
@@ -1650,7 +1694,8 @@ class PostgresNeedRepository:
         """
         with self._database.connect() as connection:
             rows = connection.execute(select(needs).order_by(needs.c.sort_order)).all()
-        return [_to_need(row) for row in rows]
+            ruled_out = _ruled_out_move_ids(connection, [row.id for row in rows])
+        return [_to_need(row, ruled_out[row.id]) for row in rows]
 
     def get(self, need_id: UUID) -> Need | None:
         """Find one Need.
@@ -1663,7 +1708,10 @@ class PostgresNeedRepository:
         """
         with self._database.connect() as connection:
             row = connection.execute(select(needs).where(needs.c.id == need_id)).first()
-        return _to_need(row) if row else None
+            if row is None:
+                return None
+            ruled_out = _ruled_out_move_ids(connection, [need_id])
+        return _to_need(row, ruled_out[need_id])
 
     def add(self, details: NeedDetails) -> Need:
         """Add a Need last in the list; it is never the fallback.
@@ -1688,7 +1736,7 @@ class PostgresNeedRepository:
                 )
                 .returning(needs)
             ).one()
-        return _to_need(row)
+        return _to_need(row, frozenset())
 
     def update(self, need_id: UUID, details: NeedDetails) -> Need:
         """Save a Need's name, when it fits and how to reply.
@@ -1711,7 +1759,8 @@ class PostgresNeedRepository:
                 )
                 .returning(needs)
             ).one()
-        return _to_need(row)
+            ruled_out = _ruled_out_move_ids(connection, [need_id])
+        return _to_need(row, ruled_out[need_id])
 
     def delete(self, need_id: UUID) -> None:
         """Remove a Need.
@@ -1735,6 +1784,28 @@ class PostgresNeedRepository:
                     .where(needs.c.id == need_id)
                     .values(sort_order=sort_order)
                 )
+
+
+class PostgresMoveRepository:
+    """Stores Moves in Postgres."""
+
+    def __init__(self, database: Database) -> None:
+        """Set up the repository.
+
+        Args:
+            database: Where to run queries: the engine, or one transaction.
+        """
+        self._database = database
+
+    def list_all(self) -> list[Move]:
+        """List every Move in sort order.
+
+        Returns:
+            The Moves.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(select(moves).order_by(moves.c.sort_order)).all()
+        return [_to_move(row) for row in rows]
 
 
 class PostgresUnderstandingRepository:
@@ -1763,6 +1834,8 @@ class PostgresUnderstandingRepository:
                     message_id=understanding.message_id,
                     form=_understanding_form_values(understanding.form),
                     need=understanding.need,
+                    lead_move=understanding.lead_move,
+                    support_move=understanding.support_move,
                     asked_why=understanding.asked_why,
                     made_at=understanding.made_at,
                 )
@@ -1793,6 +1866,8 @@ class PostgresUnderstandingRepository:
                 need=row.need,
                 asked_why=row.asked_why,
                 made_at=row.made_at,
+                lead_move=row.lead_move,
+                support_move=row.support_move,
             )
             for row in rows
         ]
@@ -1855,7 +1930,7 @@ def _to_understanding_form(stored: dict[str, Any]) -> UnderstandingForm:
     """Turn a saved form back into an Understanding form.
 
     Forms saved before "struggling" and "asked_for_photo" were asked for
-    read them as false.
+    read them as false, and those saved before Moves read as naming none.
 
     Args:
         stored: The form as saved.
@@ -1900,6 +1975,8 @@ def _to_understanding_form(stored: dict[str, Any]) -> UnderstandingForm:
         ),
         struggling=stored.get("struggling", False),
         asked_for_photo=stored.get("asked_for_photo", False),
+        lead_move=stored.get("lead_move", ""),
+        support_move=stored.get("support_move", ""),
     )
 
 
@@ -4844,6 +4921,8 @@ def _to_model_call_content(values: dict[str, Any]) -> ModelCallContent:
 def _to_understanding_shape(values: dict[str, Any]) -> UnderstandingShape:
     """Read an Understanding call's stored shape.
 
+    Shapes stored before Moves read as naming none.
+
     Args:
         values: The stored JSON.
 
@@ -4860,6 +4939,8 @@ def _to_understanding_shape(values: dict[str, Any]) -> UnderstandingShape:
         threads_left_alone=values["threads_left_alone"],
         threads_held_back=values["threads_held_back"],
         past_look_ups=values["past_look_ups"],
+        lead_move=values.get("lead_move"),
+        support_move=values.get("support_move"),
     )
 
 
@@ -5174,6 +5255,7 @@ def _build_repositories(
         safeguard_events=PostgresSafeguardEventRepository(database),
         memory_categories=PostgresMemoryCategoryRepository(database),
         needs=PostgresNeedRepository(database),
+        moves=PostgresMoveRepository(database),
         understandings=PostgresUnderstandingRepository(database),
         user_memory=PostgresUserMemoryRepository(database),
         life_threads=PostgresLifeThreadRepository(database),

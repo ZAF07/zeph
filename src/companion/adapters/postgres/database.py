@@ -12,6 +12,8 @@ from companion.adapters.postgres.tables import (
     check_in_kinds,
     helplines,
     memory_categories,
+    moves,
+    need_ruled_out_moves,
     needs,
     platform_settings,
 )
@@ -181,3 +183,51 @@ def seed_needs(engine: Engine, seed_file: Path) -> None:
         if connection.execute(select(exists().select_from(needs))).scalar():
             return
         connection.execute(insert(needs).values(rows))
+
+
+def seed_moves(engine: Engine, moves_seed_file: Path, needs_seed_file: Path) -> None:
+    """Load the starting Moves and each starting Need's ruled-out Moves on first run.
+
+    Nothing is loaded once any Move exists, so Admin changes are never
+    overwritten. Load the Needs first: rule-outs go to the stored Needs that
+    have a seeded Need's name, ignoring case.
+
+    Args:
+        engine: The database engine.
+        moves_seed_file: YAML file listing Moves with `name`, `when_it_fits`
+            and `how_to_do_it`, in the order to show them.
+        needs_seed_file: YAML file listing Needs, each with an optional
+            `ruled_out_moves` list of Move names.
+    """
+    moves_seed = yaml.safe_load(moves_seed_file.read_text())
+    needs_seed = yaml.safe_load(needs_seed_file.read_text())
+    move_ids = {move["name"].lower(): uuid4() for move in moves_seed}
+    move_rows = [
+        {
+            "id": move_ids[move["name"].lower()],
+            "name": move["name"],
+            "when_it_fits": move["when_it_fits"],
+            "how_to_do_it": move["how_to_do_it"],
+            "sort_order": sort_order,
+        }
+        for sort_order, move in enumerate(moves_seed)
+    ]
+    with engine.begin() as connection:
+        if connection.execute(select(exists().select_from(moves))).scalar():
+            return
+        connection.execute(insert(moves).values(move_rows))
+        need_ids = {
+            name.lower(): need_id
+            for need_id, name in connection.execute(select(needs.c.id, needs.c.name))
+        }
+        rule_out_rows = [
+            {
+                "need_id": need_ids[need["name"].lower()],
+                "move_id": move_ids[move.lower()],
+            }
+            for need in needs_seed
+            if need["name"].lower() in need_ids
+            for move in need.get("ruled_out_moves", [])
+        ]
+        if rule_out_rows:
+            connection.execute(insert(need_ruled_out_moves).values(rule_out_rows))

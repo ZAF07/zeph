@@ -181,6 +181,8 @@ def test_a_plain_users_understanding_shows_its_shape_and_never_its_words(
             look_up_past=["sister wedding", "mum's care"],
             bring_up=[{"thread": 1, "how": "lead"}],
             threads_touched=[1],
+            lead_move="Calm",
+            support_move="Mirror",
         )
     )
     chat_model.script("oh no, tell me more")
@@ -192,6 +194,8 @@ def test_a_plain_users_understanding_shows_its_shape_and_never_its_words(
     assert understanding["content"] is None
     assert understanding["understanding_shape"] == {
         "need": "Be heard",
+        "lead_move": "Calm",
+        "support_move": "Mirror",
         "intensity": "high",
         "cause_known": False,
         "threads_reminded": 1,

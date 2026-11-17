@@ -60,6 +60,8 @@ const plainUsersTrace: ModelCallTraceDetails = {
       content: null,
       understanding_shape: {
         need: "Be heard",
+        lead_move: "Calm",
+        support_move: null,
         intensity: "high",
         cause_known: false,
         threads_reminded: 3,

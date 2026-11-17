@@ -11,6 +11,7 @@ from companion.adapters.postgres.database import (
     seed_check_in_kinds,
     seed_helplines,
     seed_memory_categories,
+    seed_moves,
     seed_needs,
     seed_platform_settings,
 )
@@ -103,6 +104,11 @@ class PostgresEvalEnvironment:
         seed_memory_categories(self._engine, self._seed_dir / "memory_categories.yaml")
         seed_check_in_kinds(self._engine, self._seed_dir / "check_in_kinds.yaml")
         seed_needs(self._engine, self._seed_dir / "needs.yaml")
+        seed_moves(
+            self._engine,
+            self._seed_dir / "moves.yaml",
+            self._seed_dir / "needs.yaml",
+        )
         return InProcessCompanion(
             engine=self._engine,
             chat_model=self._chat_model,
