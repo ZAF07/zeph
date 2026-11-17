@@ -8,7 +8,7 @@ import { checkServerSettings } from "@/env";
  * @param phase - The Next.js phase the config is loaded for.
  * @returns The Next.js config.
  */
-export default function nextConfig(phase: string): NextConfig {
+export default function buildNextConfig(phase: string): NextConfig {
   checkServerSettings(phase);
   return {};
 }

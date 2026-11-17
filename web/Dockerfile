@@ -1,6 +1,4 @@
-# Builds the Dashboard once and serves the production build (ADR-0005).
-# NEXT_PUBLIC_* values are inlined by `next build`, so Compose passes them in
-# from .env as build args. CLERK_SECRET_KEY is only given at run time.
+# A production build of the Dashboard; see ADR-0005.
 FROM node:22-alpine
 
 WORKDIR /app
@@ -12,8 +10,7 @@ RUN pnpm install --frozen-lockfile
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
-    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY \
-    NEXT_TELEMETRY_DISABLED=1
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 
 COPY . .
 RUN pnpm build

@@ -77,8 +77,7 @@ services:
         condition: service_healthy
     environment: *backend-environment
 
-  # A production build (ADR-0005): NEXT_PUBLIC_* keys are inlined when the
-  # image is built, so they are build args; the secret is given only at run time.
+  # A production build; NEXT_PUBLIC_* keys are build args (ADR-0005).
   web:
     build:
       context: ./web
