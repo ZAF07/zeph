@@ -6,6 +6,7 @@ from functools import partial
 from typing import Any, Protocol
 from uuid import UUID, uuid4
 
+from psycopg.errors import UniqueViolation
 from sqlalchemy import (
     ColumnElement,
     Connection,
@@ -23,6 +24,7 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.dialects.postgresql import aggregate_order_by, distinct_on, insert
+from sqlalchemy.exc import IntegrityError
 
 from companion.adapters.postgres.tables import (
     check_in_kinds,
@@ -148,7 +150,30 @@ from companion.core.models import (
     UserPortrait,
     UserRole,
 )
-from companion.core.ports import Repositories, Transaction
+from companion.core.ports import NameTakenError, Repositories, Transaction
+
+UNIQUE_NAME_INDEXES = {"needs_name_key", "moves_name_ignoring_case"}
+
+
+@contextmanager
+def _refusing_taken_names() -> Iterator[None]:
+    """Turn a clash on a Need's or Move's unique name into NameTakenError.
+
+    Two saves can both find a name free, then both save it; the unique index
+    stops the second.
+
+    Raises:
+        NameTakenError: If a save inside clashed on a unique name.
+    """
+    try:
+        yield
+    except IntegrityError as error:
+        if (
+            isinstance(error.orig, UniqueViolation)
+            and error.orig.diag.constraint_name in UNIQUE_NAME_INDEXES
+        ):
+            raise NameTakenError from error
+        raise
 
 
 class Database(Protocol):
@@ -1779,8 +1804,11 @@ class PostgresNeedRepository:
 
         Returns:
             The saved Need.
+
+        Raises:
+            NameTakenError: If another Need already has the name.
         """
-        with self._database.begin() as connection:
+        with _refusing_taken_names(), self._database.begin() as connection:
             highest = connection.execute(select(func.max(needs.c.sort_order))).scalar()
             row = connection.execute(
                 insert(needs)
@@ -1806,8 +1834,11 @@ class PostgresNeedRepository:
 
         Returns:
             The saved Need.
+
+        Raises:
+            NameTakenError: If another Need already has the name.
         """
-        with self._database.begin() as connection:
+        with _refusing_taken_names(), self._database.begin() as connection:
             row = connection.execute(
                 update(needs)
                 .where(needs.c.id == need_id)
@@ -1887,8 +1918,11 @@ class PostgresMoveRepository:
 
         Returns:
             The saved Move.
+
+        Raises:
+            NameTakenError: If another Move already has the name, ignoring case.
         """
-        with self._database.begin() as connection:
+        with _refusing_taken_names(), self._database.begin() as connection:
             highest = connection.execute(select(func.max(moves.c.sort_order))).scalar()
             row = connection.execute(
                 insert(moves)
@@ -1910,8 +1944,11 @@ class PostgresMoveRepository:
 
         Returns:
             The saved Move.
+
+        Raises:
+            NameTakenError: If another Move already has the name, ignoring case.
         """
-        with self._database.begin() as connection:
+        with _refusing_taken_names(), self._database.begin() as connection:
             row = connection.execute(
                 update(moves)
                 .where(moves.c.id == move_id)

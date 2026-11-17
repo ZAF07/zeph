@@ -1,8 +1,16 @@
+from dataclasses import replace
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
+from companion.adapters.postgres.repositories import (
+    PostgresMoveRepository,
+    build_postgres_repositories,
+)
+from companion.core.models import Move, MoveDetails
+from companion.core.moves import MoveNameTakenError, MoveService
 from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
@@ -170,6 +178,73 @@ def test_bad_moves_are_refused(
     ):
         assert response.status_code == 404
         assert response.json()["detail"] == "No such Move"
+
+
+class MovesSavedDuringTheNameCheck(PostgresMoveRepository):
+    """Moves where another save of a name lands just after it is checked."""
+
+    def __init__(self, engine: Engine, other_save: MoveDetails) -> None:
+        """Set up the Moves and the other save waiting to land."""
+        super().__init__(engine)
+        self._other_save: MoveDetails | None = other_save
+
+    def list_all(self) -> list[Move]:
+        """List the Moves as they were, then let the other save land."""
+        moves = super().list_all()
+        if self._other_save is not None:
+            super().add(self._other_save)
+            self._other_save = None
+        return moves
+
+
+def move_details(name: str) -> MoveDetails:
+    """A Move's details with the given name."""
+    return MoveDetails(
+        name=name,
+        when_it_fits="They are sharing good news.",
+        how_to_do_it="Be glad with them.",
+        needed_feature=None,
+    )
+
+
+def move_names(engine: Engine) -> list[str]:
+    """The stored Moves' names, in order."""
+    return [move.name for move in PostgresMoveRepository(engine).list_all()]
+
+
+def test_adding_a_name_another_save_took_at_the_same_moment_is_refused(
+    engine: Engine,
+) -> None:
+    racing = replace(
+        build_postgres_repositories(engine),
+        moves=MovesSavedDuringTheNameCheck(engine, move_details("Celebrate")),
+    )
+
+    with pytest.raises(MoveNameTakenError) as refused:
+        MoveService(racing).add(move_details("celebrate"))
+
+    assert str(refused.value) == "There is already a Move called “celebrate”."
+    assert move_names(engine) == [*STARTER_MOVES, "Celebrate"]
+
+
+def test_renaming_to_a_name_another_save_took_at_the_same_moment_is_refused(
+    engine: Engine,
+) -> None:
+    calm_id = next(
+        move.id
+        for move in PostgresMoveRepository(engine).list_all()
+        if move.name == "Calm"
+    )
+    racing = replace(
+        build_postgres_repositories(engine),
+        moves=MovesSavedDuringTheNameCheck(engine, move_details("Cheer")),
+    )
+
+    with pytest.raises(MoveNameTakenError) as refused:
+        MoveService(racing).update(calm_id, move_details("CHEER"))
+
+    assert str(refused.value) == "There is already a Move called “CHEER”."
+    assert move_names(engine) == [*STARTER_MOVES, "Cheer"]
 
 
 def test_admin_can_move_a_move_up_or_down(

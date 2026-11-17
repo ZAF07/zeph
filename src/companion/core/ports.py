@@ -865,6 +865,10 @@ class MemoryCategoryRepository(Protocol):
         ...
 
 
+class NameTakenError(Exception):
+    """Raised when a save would give a second Move or Need the same name."""
+
+
 class NeedRepository(Protocol):
     """Stores Needs, each with the Moves it rules out."""
 
@@ -896,6 +900,9 @@ class NeedRepository(Protocol):
 
         Returns:
             The saved Need.
+
+        Raises:
+            NameTakenError: If another Need already has the name.
         """
         ...
 
@@ -908,6 +915,9 @@ class NeedRepository(Protocol):
 
         Returns:
             The saved Need.
+
+        Raises:
+            NameTakenError: If another Need already has the name.
         """
         ...
 
@@ -958,6 +968,9 @@ class MoveRepository(Protocol):
 
         Returns:
             The saved Move.
+
+        Raises:
+            NameTakenError: If another Move already has the name, ignoring case.
         """
         ...
 
@@ -970,6 +983,9 @@ class MoveRepository(Protocol):
 
         Returns:
             The saved Move.
+
+        Raises:
+            NameTakenError: If another Move already has the name, ignoring case.
         """
         ...
 

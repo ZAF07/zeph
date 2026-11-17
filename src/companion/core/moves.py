@@ -2,7 +2,7 @@ from uuid import UUID
 
 from companion.core.errors import ConflictError, InvalidError, NotFoundError
 from companion.core.models import Move, MoveDetails, MoveDirection
-from companion.core.ports import Repositories
+from companion.core.ports import NameTakenError, Repositories
 
 MAX_NAME_LENGTH = 80
 MAX_WHEN_IT_FITS_LENGTH = 500
@@ -21,6 +21,18 @@ class InvalidMoveError(InvalidError):
 
 class MoveNameTakenError(ConflictError):
     """Raised when another Move already has the name, ignoring case."""
+
+
+def name_taken_error(name: str) -> MoveNameTakenError:
+    """Make the error that refuses a Move name already in use.
+
+    Args:
+        name: The name asked for.
+
+    Returns:
+        The error, saying which name is taken.
+    """
+    return MoveNameTakenError(f"There is already a Move called “{name}”.")
 
 
 class MoveService:
@@ -60,7 +72,11 @@ class MoveService:
             InvalidMoveError: If a field is blank or too long.
             MoveNameTakenError: If another Move already has the name.
         """
-        return self._repositories.moves.add(self._checked_details(details, None))
+        checked = self._checked_details(details, None)
+        try:
+            return self._repositories.moves.add(checked)
+        except NameTakenError as error:
+            raise name_taken_error(checked.name) from error
 
     def update(self, move_id: UUID, details: MoveDetails) -> Move:
         """Change a Move's name, when it fits, how to do it and needed Feature.
@@ -77,7 +93,11 @@ class MoveService:
             InvalidMoveError: If a field is blank or too long.
             MoveNameTakenError: If another Move already has the name.
         """
-        return self._repositories.moves.update(move_id, self.checked(move_id, details))
+        checked = self.checked(move_id, details)
+        try:
+            return self._repositories.moves.update(move_id, checked)
+        except NameTakenError as error:
+            raise name_taken_error(checked.name) from error
 
     def checked(self, move_id: UUID, details: MoveDetails) -> MoveDetails:
         """Check new details for a Move, without saving them.
@@ -196,7 +216,5 @@ class MoveService:
             for move in self._repositories.moves.list_all()
         )
         if is_taken:
-            raise MoveNameTakenError(
-                f"There is already a Move called “{checked.name}”."
-            )
+            raise name_taken_error(checked.name)
         return checked

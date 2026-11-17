@@ -1,8 +1,16 @@
+from dataclasses import replace
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
+from companion.adapters.postgres.repositories import (
+    PostgresNeedRepository,
+    build_postgres_repositories,
+)
+from companion.core.models import Need, NeedDetails
+from companion.core.needs import InvalidNeedError, NeedService
 from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
@@ -157,6 +165,75 @@ def test_bad_needs_are_refused(
         client.delete(f"/api/admin/needs/{MISSING_ID}", headers=admin).status_code
         == 404
     )
+
+
+class NeedsSavedDuringTheNameCheck(PostgresNeedRepository):
+    """Needs where another save of a name lands just after it is checked."""
+
+    def __init__(self, engine: Engine, other_save: NeedDetails) -> None:
+        """Set up the Needs and the other save waiting to land."""
+        super().__init__(engine)
+        self._other_save: NeedDetails | None = other_save
+
+    def list_all(self) -> list[Need]:
+        """List the Needs as they were, then let the other save land."""
+        needs = super().list_all()
+        if self._other_save is not None:
+            super().add(self._other_save)
+            self._other_save = None
+        return needs
+
+
+def need_details(name: str) -> NeedDetails:
+    """A Need's details with the given name."""
+    return NeedDetails(
+        name=name,
+        when_it_fits="Good news.",
+        how_to_reply="Cheer.",
+        ruled_out_move_ids=frozenset(),
+    )
+
+
+def need_names(engine: Engine) -> list[str]:
+    """The stored Needs' names, in order."""
+    return [need.name for need in PostgresNeedRepository(engine).list_all()]
+
+
+def test_adding_a_need_name_another_save_took_at_the_same_moment_is_refused(
+    engine: Engine,
+) -> None:
+    names_before = need_names(engine)
+    racing = replace(
+        build_postgres_repositories(engine),
+        needs=NeedsSavedDuringTheNameCheck(engine, need_details("Celebrate")),
+    )
+
+    with pytest.raises(InvalidNeedError) as refused:
+        NeedService(racing).add(need_details("Celebrate"))
+
+    assert str(refused.value) == "There is already a Need called “Celebrate”."
+    assert need_names(engine) == [*names_before, "Celebrate"]
+
+
+def test_renaming_a_need_to_a_name_another_save_took_at_once_is_refused(
+    engine: Engine,
+) -> None:
+    names_before = need_names(engine)
+    advice_id = next(
+        need.id
+        for need in PostgresNeedRepository(engine).list_all()
+        if need.name == "Advice"
+    )
+    racing = replace(
+        build_postgres_repositories(engine),
+        needs=NeedsSavedDuringTheNameCheck(engine, need_details("Cheer")),
+    )
+
+    with pytest.raises(InvalidNeedError) as refused:
+        NeedService(racing).update(advice_id, need_details("Cheer"))
+
+    assert str(refused.value) == "There is already a Need called “Cheer”."
+    assert need_names(engine) == [*names_before, "Cheer"]
 
 
 def test_the_fallback_need_can_be_edited_but_not_deleted(
