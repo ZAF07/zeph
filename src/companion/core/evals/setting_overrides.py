@@ -268,6 +268,9 @@ class SettingOverrideService:
         Returns:
             The details.
 
+        The value is read before the live Need is looked up, so a malformed
+        value is refused as invalid even for a Need that doesn't exist.
+
         Raises:
             InvalidOverrideError: If a field is missing or not text.
             NeedNotFoundError: If there is no such live Need.

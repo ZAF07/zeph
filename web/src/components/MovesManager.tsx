@@ -57,7 +57,7 @@ export function MovesManager() {
   const moves = movesQuery.data;
   const features = featuresQuery.data;
 
-  async function reloadMoves() {
+  async function reloadMovesAndNeeds() {
     await queryClient.invalidateQueries({ queryKey: queryKeys.moves });
     await queryClient.invalidateQueries({ queryKey: queryKeys.needs });
   }
@@ -66,19 +66,19 @@ export function MovesManager() {
     await apiClient.addMove(input);
     setIsAdding(false);
     setFlash({ text: `Added ${input.name.trim()}.`, isError: false });
-    await reloadMoves();
+    await reloadMovesAndNeeds();
   }
 
   async function save(move: Move, input: MoveInput) {
     await apiClient.updateMove(move.id, input);
     setFlash({ text: `Saved ${input.name.trim()}.`, isError: false });
-    await reloadMoves();
+    await reloadMovesAndNeeds();
   }
 
   async function remove(move: Move) {
     await apiClient.deleteMove(move.id);
     setFlash({ text: `Removed ${move.name}.`, isError: false });
-    await reloadMoves();
+    await reloadMovesAndNeeds();
   }
 
   if (!moves || !features) {
