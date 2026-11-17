@@ -1,11 +1,10 @@
 import Link from "next/link";
 
-import { SidebarAdminBadge } from "@/components/SidebarAdminBadge";
+import { SidebarAccount } from "@/components/SidebarAccount";
 import { SidebarAiNotice } from "@/components/SidebarAiNotice";
 import { SidebarNav } from "@/components/SidebarNav";
 import { ZephLogo } from "@/components/ZephLogo";
 import type { SidebarItem } from "@/components/SidebarNav";
-import type { CurrentAccount } from "@/lib/auth/server";
 
 /** The User pages, in the order the sidebar shows them. */
 const userSidebarItems: SidebarItem[] = [
@@ -38,10 +37,9 @@ const userSidebarItems: SidebarItem[] = [
 /**
  * The Dashboard sidebar: logo, navigation, the AI notice and who is signed in.
  *
- * @param props - `account` is the signed-in person.
  * @returns The sidebar.
  */
-export function Sidebar({ account }: { account: CurrentAccount }) {
+export function Sidebar() {
   return (
     <aside className="flex h-full min-h-full w-full flex-col gap-6 border-r border-line bg-subtle px-4 py-6 leading-[1.4]">
       <span
@@ -61,23 +59,7 @@ export function Sidebar({ account }: { account: CurrentAccount }) {
 
       <div className="mt-auto flex flex-col gap-2.5 px-1">
         <SidebarAiNotice />
-        <div className="flex items-center gap-2.5 p-2">
-          <span
-            aria-hidden="true"
-            className="flex size-8 flex-none items-center justify-center rounded-full bg-blue text-caption font-semibold text-white"
-          >
-            {account.name.charAt(0).toUpperCase()}
-          </span>
-          <span className="flex min-w-0 flex-col text-caption leading-[1.3]">
-            <span className="flex items-center gap-1.5 font-semibold">
-              {account.name}
-              <SidebarAdminBadge />
-            </span>
-            <span className="overflow-hidden text-ellipsis text-ink-muted">
-              {account.email}
-            </span>
-          </span>
-        </div>
+        <SidebarAccount />
       </div>
     </aside>
   );

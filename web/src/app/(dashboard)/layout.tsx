@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import { OnboardingGate } from "@/components/OnboardingGate";
 import { Sidebar } from "@/components/Sidebar";
-import { getCurrentAccount } from "@/lib/auth/server";
+import { isSignedIn } from "@/lib/auth/server";
 
 /**
  * The Dashboard shell: sidebar beside the page, for User and admin pages
@@ -17,14 +17,13 @@ export default async function DashboardLayout({
 }: {
   children: ReactNode;
 }) {
-  const account = await getCurrentAccount();
-  if (!account) {
+  if (!(await isSignedIn())) {
     redirect("/sign-in");
   }
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <div className="md:w-[260px] md:flex-none">
-        <Sidebar account={account} />
+        <Sidebar />
       </div>
       <main className="min-w-0 flex-1 px-4 py-12 md:px-12">
         <OnboardingGate>{children}</OnboardingGate>
