@@ -2154,26 +2154,33 @@ class CheckInRepository(Protocol):
     def add(
         self,
         check_in: CheckIn,
+        due_at_read: datetime | None,
         next_due_at: datetime,
         pause_until_resumed: bool,
         check_in_now: CheckInNowRequest | None = None,
-    ) -> None:
-        """Save a Check-in decision and the User's next due time, together.
+    ) -> bool:
+        """Save a Check-in decision and the User's next due time, if still due.
 
-        A decision ends any hold back, so why it was held back and the Due
-        Time they were first held back at are cleared. The Check in Now it
-        was decided for is cleared too; one asked for since is kept.
+        Nothing is saved if their due time changed since it was read, e.g.
+        because a reply wove this Check-in in already. A decision ends any
+        hold back, so why it was held back and the Due Time they were first
+        held back at are cleared. The Check in Now it was decided for is
+        cleared too; one asked for since is kept.
 
         Only the next due time and, when asked, the pause are changed, so
         settings the User changed meanwhile are kept.
 
         Args:
             check_in: The Check-in decision.
+            due_at_read: The User's due time as read for the decision.
             next_due_at: When the User's next Check-in may be sent.
             pause_until_resumed: Whether to also pause the User's Check-ins
                 until they resume.
             check_in_now: The Check in Now it was decided for; None for a
                 scheduled one.
+
+        Returns:
+            True if it was saved.
         """
         ...
 

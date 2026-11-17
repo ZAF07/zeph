@@ -155,7 +155,8 @@ def due_users_needing_no_model(
                         decided_at=now - timedelta(days=days_ago),
                         message="hey",
                     ),
-                    now,
+                    due_at_read=next_due_at(engine, user.id),
+                    next_due_at=now,
                     pause_until_resumed=False,
                 )
 

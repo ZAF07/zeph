@@ -4147,40 +4147,34 @@ class PostgresCheckInRepository:
     def add(
         self,
         check_in: CheckIn,
+        due_at_read: datetime | None,
         next_due_at: datetime,
         pause_until_resumed: bool,
         check_in_now: CheckInNowRequest | None = None,
-    ) -> None:
-        """Save a Check-in decision and the User's next due time, together.
+    ) -> bool:
+        """Save a Check-in decision and the User's next due time, if still due.
 
-        A decision ends any hold back, so why it was held back is cleared.
-        The Check in Now it was decided for is done, so it is cleared too;
-        one asked for since is kept.
+        Nothing is saved if their due time changed since it was read, e.g.
+        because a reply wove this Check-in in already. A decision ends any
+        hold back, so why it was held back and the Due Time they were first
+        held back at are cleared. The Check in Now it was decided for is
+        cleared too; one asked for since is kept.
 
         Args:
             check_in: The Check-in decision.
+            due_at_read: The User's due time as read for the decision.
             next_due_at: When the User's next Check-in may be sent.
             pause_until_resumed: Whether to also pause the User's Check-ins
                 until they resume.
             check_in_now: The Check in Now it was decided for; None for a
                 scheduled one.
+
+        Returns:
+            True if it was saved.
         """
-        user_changes: dict[str, Any] = {
-            "check_in_next_due_at": next_due_at,
-            "check_in_held_back_reason": None,
-            "check_in_held_back_until": None,
-            "check_in_held_back_due_at": None,
-            **_clear_check_in_now_if_decided(check_in_now),
-        }
-        if pause_until_resumed:
-            user_changes |= {"check_ins_paused": True, "check_ins_paused_until": None}
-        with self._database.begin() as connection:
-            self._insert(connection, check_in)
-            connection.execute(
-                update(users)
-                .where(users.c.id == check_in.user_id)
-                .values(**user_changes)
-            )
+        return self._add_if_still_due(
+            check_in, due_at_read, next_due_at, check_in_now, pause_until_resumed
+        )
 
     def add_woven_in(
         self,
@@ -4207,6 +4201,44 @@ class PostgresCheckInRepository:
         Returns:
             True if it was saved.
         """
+        return self._add_if_still_due(
+            check_in, due_at_read, next_due_at, check_in_now, pause_until_resumed=False
+        )
+
+    def _add_if_still_due(
+        self,
+        check_in: CheckIn,
+        due_at_read: datetime | None,
+        next_due_at: datetime,
+        check_in_now: CheckInNowRequest | None,
+        pause_until_resumed: bool,
+    ) -> bool:
+        """Move the User's due time on and save the Check-in, if still due.
+
+        The User's row is only changed if their due time is still the one
+        read, and the Check-in is only saved if it was, in one transaction.
+
+        Args:
+            check_in: The Check-in decision.
+            due_at_read: The User's due time as read for the decision.
+            next_due_at: When the User's next Check-in may be sent.
+            check_in_now: The Check in Now it was decided for; None for a
+                scheduled one.
+            pause_until_resumed: Whether to also pause the User's Check-ins
+                until they resume.
+
+        Returns:
+            True if it was saved.
+        """
+        user_changes: dict[str, Any] = {
+            "check_in_next_due_at": next_due_at,
+            "check_in_held_back_reason": None,
+            "check_in_held_back_until": None,
+            "check_in_held_back_due_at": None,
+            **_clear_check_in_now_if_decided(check_in_now),
+        }
+        if pause_until_resumed:
+            user_changes |= {"check_ins_paused": True, "check_ins_paused_until": None}
         due_type = users.c.check_in_next_due_at.type
         with self._database.begin() as connection:
             claimed = connection.execute(
@@ -4217,13 +4249,7 @@ class PostgresCheckInRepository:
                         bindparam("due_at_read", due_at_read, type_=due_type)
                     ),
                 )
-                .values(
-                    check_in_next_due_at=next_due_at,
-                    check_in_held_back_reason=None,
-                    check_in_held_back_until=None,
-                    check_in_held_back_due_at=None,
-                    **_clear_check_in_now_if_decided(check_in_now),
-                )
+                .values(**user_changes)
                 .returning(users.c.id)
             ).first()
             if claimed is None:

@@ -479,9 +479,10 @@ def test_a_check_in_now_asked_while_a_scheduled_one_is_decided_still_waits(
     engine: Engine,
 ) -> None:
     _, admin, maya = requested_maya(client, auth_verifier, chat_channel)
+    due_at_before_the_request = next_due_at(engine, maya)
     check_in_now(client, admin, [maya])
 
-    build_postgres_repositories(engine).check_ins.add(
+    saved = build_postgres_repositories(engine).check_ins.add(
         CheckIn(
             id=uuid4(),
             user_id=maya,
@@ -489,10 +490,12 @@ def test_a_check_in_now_asked_while_a_scheduled_one_is_decided_still_waits(
             decided_at=clock.now(),
             skip_reason="decided from a read before the request",
         ),
-        clock.now() + ONE_DAY,
+        due_at_read=due_at_before_the_request,
+        next_due_at=clock.now() + ONE_DAY,
         pause_until_resumed=False,
     )
 
+    assert saved is False
     assert only_entry(client, admin)["check_in_now_waiting"] is True
 
 

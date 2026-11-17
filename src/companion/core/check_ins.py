@@ -999,7 +999,8 @@ class CheckInService:
         and Kinds that ask a Curiosity with their due Curiosities. A
         Curiosity is marked raised once its message counts as sent. The next
         Due Time is the one for a send or a skip, unless the chat channel
-        refuses the message.
+        refuses the message. Nothing is saved or sent if the User's Due Time
+        changed since the tick read it.
 
         Args:
             snapshot: The User, as read for this tick.
@@ -1039,7 +1040,8 @@ class CheckInService:
             )
             self._repositories.check_ins.add(
                 skipped,
-                plan.next_due_if_skipped,
+                due_at_read=user.check_ins.next_due_at,
+                next_due_at=plan.next_due_if_skipped,
                 pause_until_resumed=False,
                 check_in_now=plan.check_in_now,
             )
@@ -1081,7 +1083,8 @@ class CheckInService:
         """Record a Skipped Check-in for a User who used up today's daily message limit.
 
         The User stays due at their Due Time, so a Check-in can come on their
-        next day and the rhythm stays.
+        next day and the rhythm stays. Nothing is saved if their Due Time
+        changed since the tick read it.
 
         Args:
             user: A due User who has used up today's daily message limit.
@@ -1096,7 +1099,10 @@ class CheckInService:
             skip_reason=DAILY_LIMIT_SKIP_REASON,
         )
         self._repositories.check_ins.add(
-            skipped, plan.stays_due_at, pause_until_resumed=False
+            skipped,
+            due_at_read=user.check_ins.next_due_at,
+            next_due_at=plan.stays_due_at,
+            pause_until_resumed=False,
         )
 
     def _save_then_send(
@@ -1112,7 +1118,9 @@ class CheckInService:
         """Save a Check-in and the User's next due time, then send its message.
 
         Saving first means a failed save sends nothing, so a Check-in is
-        never sent twice. If the chat channel clearly refuses the message,
+        never sent twice. Nothing is saved or sent if the User's Due Time
+        changed since the tick read it, e.g. because a reply wove this
+        Check-in in already. If the chat channel clearly refuses the message,
         the Check-in is taken back and tried again after the retry gap, still
         counting the next Due Time from the one it was first due at, and any
         Check in Now it was for waits again. If
@@ -1122,7 +1130,7 @@ class CheckInService:
         as sent. If taking it back fails, that Check-in is missed.
 
         Args:
-            user: The User it is for.
+            user: The User it is for, as read for the tick.
             chat_id: Their Telegram chat.
             message: The message to send.
             check_in: The Check-in to save.
@@ -1134,9 +1142,15 @@ class CheckInService:
         Returns:
             True if the message counts as sent.
         """
-        self._repositories.check_ins.add(
-            check_in, next_due_at, pause_until_resumed, check_in_now
+        saved = self._repositories.check_ins.add(
+            check_in,
+            due_at_read=user.check_ins.next_due_at,
+            next_due_at=next_due_at,
+            pause_until_resumed=pause_until_resumed,
+            check_in_now=check_in_now,
         )
+        if not saved:
+            return False
         try:
             self._chat_channel.send_text(chat_id, message)
         except ChatBlockedError:
