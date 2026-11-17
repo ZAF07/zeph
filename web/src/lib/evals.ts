@@ -34,6 +34,11 @@ export const evalDetails: Record<EvalName, { label: string; checks: string }> =
       checks:
         "Each Message’s Understanding picks the right Need, Life Threads, Curiosities and Knowledge.",
     },
+    move_outcome: {
+      label: "Move Outcome",
+      checks:
+        "A finished Conversation leaves the right Move Outcomes, with fair reasons that don’t judge the User.",
+    },
   };
 
 /** Every Eval, in the order shown. */

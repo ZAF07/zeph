@@ -113,6 +113,30 @@ describe("NewEvalRunForm", () => {
     expect(router.push).toHaveBeenCalledWith("/admin/evals/runs/run-9");
   });
 
+  it("offers the Move Outcome Eval with what it checks", async () => {
+    apiClient.listEvals.mockResolvedValue([
+      { eval: "move_outcome", case_keys: ["hosting-research-helped"] },
+    ]);
+    renderWithQueries(<NewEvalRunForm />);
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: /Move Outcome · 1 case/ }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Start run · 1 case" }),
+    );
+
+    expect(
+      screen.getByText(/leaves the right Move Outcomes/),
+    ).toBeInTheDocument();
+    expect(apiClient.startEvalRun).toHaveBeenCalledWith({
+      evals: ["move_outcome"],
+      case_keys: [],
+      variants: [{}],
+      repeats: 1,
+    });
+  });
+
   it("shows each Eval's cases and can't pick one with none", async () => {
     renderWithQueries(<NewEvalRunForm />);
 

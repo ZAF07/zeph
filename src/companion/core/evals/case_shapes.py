@@ -1126,6 +1126,147 @@ UNDERSTANDING_SHAPE = FormShape(
     ]
 )
 
+MOVE_OUTCOME_SHAPE = FormShape(
+    [
+        ShapeSection(
+            "When",
+            "The time the finished Conversation started.",
+            [
+                ShapeField(
+                    "now",
+                    "When the first message was sent",
+                    "In UTC, which is also the User's time zone. The messages "
+                    "come a minute apart from it.",
+                    FieldKind.DATE_TIME,
+                    required=True,
+                ),
+            ],
+        ),
+        ShapeSection(
+            "The finished Conversation",
+            "Every message, oldest first, with how Zeph read each of the User's "
+            "messages and the Moves its reply made. Move Outcome keeping reads "
+            "all of it when the Conversation ends.",
+            [
+                group_list_field(
+                    "messages",
+                    "Messages",
+                    "What the User and Zeph said, in order. Fill in the Need, "
+                    "Moves and mood only on the User's messages.",
+                    "Message",
+                    [
+                        ShapeField(
+                            "who",
+                            "From",
+                            "Who sent it.",
+                            FieldKind.CHOICE,
+                            required=True,
+                            options=[
+                                ChoiceOption("person", "The User"),
+                                ChoiceOption("zeph", "Zeph"),
+                            ],
+                            default="person",
+                        ),
+                        long_text_field("text", "Text", "What it says."),
+                        text_field(
+                            "need",
+                            "Need",
+                            "The Need Zeph picked for this message, by name, "
+                            "e.g. Accountability. Needed on the User's messages.",
+                            required=False,
+                        ),
+                        text_field(
+                            "lead_move",
+                            "Lead Move",
+                            "The Move Zeph's reply led with, by name, e.g. "
+                            "Research. Leave empty for none.",
+                            required=False,
+                        ),
+                        text_field(
+                            "support_move",
+                            "Supporting Move",
+                            "The Move that supported it, by name. Leave empty "
+                            "for none.",
+                            required=False,
+                        ),
+                        text_field(
+                            "mood",
+                            "Mood",
+                            "How the User seemed, e.g. frustrated. Leave empty "
+                            "if unclear.",
+                            required=False,
+                        ),
+                    ],
+                    required=True,
+                ),
+            ],
+        ),
+        ShapeSection(
+            "Move Outcomes to expect",
+            "The Move Outcomes the keeping step should write. Outcomes kept "
+            "beyond these are listed but don't fail the case.",
+            [
+                group_list_field(
+                    "outcomes",
+                    "Move Outcomes",
+                    "Each Move Outcome that must be kept, with its result and "
+                    "the rules the Judge checks it against.",
+                    "Move Outcome",
+                    [
+                        text_field(
+                            "move",
+                            "Move",
+                            "The Move's name, as a message above made it.",
+                        ),
+                        ShapeField(
+                            "role",
+                            "Lead or support",
+                            "Whether the Move led a reply or supported one.",
+                            FieldKind.CHOICE,
+                            required=True,
+                            options=[
+                                ChoiceOption("lead", "Lead"),
+                                ChoiceOption("support", "Support"),
+                            ],
+                            default="lead",
+                        ),
+                        ShapeField(
+                            "result",
+                            "Result",
+                            "Whether it must be kept as helped, didn't help or "
+                            "mixed. Leave empty to not check it.",
+                            FieldKind.CHOICE,
+                            options=[
+                                ChoiceOption("helped", "Helped"),
+                                ChoiceOption("didnt_help", "Didn't help"),
+                                ChoiceOption("mixed", "Mixed"),
+                            ],
+                        ),
+                        text_list_field(
+                            "rules",
+                            "Rules",
+                            "The IDs of the rules below the Judge checks this "
+                            "Move Outcome's situation, feeling and why against.",
+                            "Rule ID",
+                        ),
+                    ],
+                ),
+                group_list_field(
+                    "rules",
+                    "Rules",
+                    "What the Judge checks kept Move Outcomes against, e.g. says "
+                    "the User wanted options, not questions. Each rule has an ID "
+                    "and the check, written for the Judge; the case fails if any "
+                    "rule fails.",
+                    "Rule",
+                    RULES_FIELD.fields,
+                    unique_by="id",
+                ),
+            ],
+        ),
+    ]
+)
+
 CASE_SHAPES: dict[EvalName, FormShape] = {
     EvalName.SAFEGUARD: SAFEGUARD_SHAPE,
     EvalName.PERSONA: PERSONA_SHAPE,
@@ -1133,4 +1274,5 @@ CASE_SHAPES: dict[EvalName, FormShape] = {
     EvalName.SETTINGS: SETTINGS_SHAPE,
     EvalName.PHOTO_DESCRIPTIONS: PHOTO_DESCRIPTIONS_SHAPE,
     EvalName.UNDERSTANDING: UNDERSTANDING_SHAPE,
+    EvalName.MOVE_OUTCOME: MOVE_OUTCOME_SHAPE,
 }

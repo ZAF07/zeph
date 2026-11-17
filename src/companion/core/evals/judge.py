@@ -29,12 +29,15 @@ class JudgeSettings:
         persona_instructions: Its prompt for checking replies against rules.
         version_instructions: Its prompt for telling which version of a
             Knowledge Document a reply draws on.
+        outcome_instructions: Its prompt for checking a kept Move Outcome
+            against rules.
     """
 
     model: str
     thinking: bool
     persona_instructions: str
     version_instructions: str
+    outcome_instructions: str
 
     @classmethod
     def from_values(cls, values: Mapping[str, Any]) -> "JudgeSettings":
@@ -51,6 +54,7 @@ class JudgeSettings:
             thinking=values["thinking"],
             persona_instructions=values["persona_instructions"],
             version_instructions=values["version_instructions"],
+            outcome_instructions=values["outcome_instructions"],
         )
 
 
@@ -67,8 +71,9 @@ def judge_shape(model_choices: Sequence[str]) -> FormShape:
         [
             ShapeSection(
                 "Model",
-                "The model that marks Persona, Knowledge and Understanding "
-                "cases. Every Variant in a run is marked by the same Judge.",
+                "The model that marks Persona, Knowledge, Understanding and "
+                "Move Outcome cases. Every Variant in a run is marked by the "
+                "same Judge.",
                 [
                     ShapeField(
                         "model",
@@ -108,6 +113,15 @@ def judge_shape(model_choices: Sequence[str]) -> FormShape:
                         "How the Judge tells which version of a Knowledge "
                         "Document a reply draws on (Knowledge). It must ask "
                         'for JSON like {"version", "reason"}.',
+                    ),
+                    long_text_field(
+                        "outcome_instructions",
+                        "Move Outcomes prompt",
+                        "How the Judge checks a kept Move Outcome's situation, "
+                        "feeling and why against a case's rules (Move Outcome). "
+                        'It must ask for JSON like {"verdicts": [{"rule", '
+                        '"passed", "reason"}]}, or every rule fails as '
+                        "unreadable.",
                     ),
                 ],
             ),
@@ -232,12 +246,51 @@ def judge_persona_rules(
     Returns:
         One verdict per rule, in the order given.
     """
-    rule_lines = "\n".join(f"- {rule}: {check}" for rule, check in rules.items())
-    question = f"Rules:\n{rule_lines}\n\nConversation:\n{transcript}"
+    return ask_about_rules(
+        chat_model,
+        judge,
+        judge.persona_instructions,
+        f"{rule_lines(rules)}\n\nConversation:\n{transcript}",
+        rules,
+    )
+
+
+def rule_lines(rules: Mapping[str, str]) -> str:
+    """Write rules as the Judge is shown them.
+
+    Args:
+        rules: Each rule's ID and what it checks.
+
+    Returns:
+        "Rules:" then one "- <id>: <check>" line per rule.
+    """
+    lines = "\n".join(f"- {rule}: {check}" for rule, check in rules.items())
+    return f"Rules:\n{lines}"
+
+
+def ask_about_rules(
+    chat_model: ChatModel,
+    judge: JudgeSettings,
+    instructions: str,
+    question: str,
+    rules: Mapping[str, str],
+) -> list[RuleVerdict]:
+    """Ask the judge for a verdict on each rule, with one of its prompts.
+
+    Args:
+        chat_model: The model that judges.
+        judge: The Judge's model and thinking.
+        instructions: The Judge's prompt for this kind of check.
+        question: The rules and what they are checked on.
+        rules: Each rule's ID and what it checks.
+
+    Returns:
+        One verdict per rule, in the order given.
+    """
     answer = chat_model.generate(
         model=judge.model,
         thinking=judge.thinking,
-        instructions=judge.persona_instructions,
+        instructions=instructions,
         history=[ChatLine(role=ChatRole.USER, text=question)],
     )
     return read_rule_verdicts(answer.text, list(rules))
@@ -273,3 +326,32 @@ def judge_version(
         history=[ChatLine(role=ChatRole.USER, text=prompt)],
     )
     return read_version_verdict(answer.text, list(versions))
+
+
+def judge_move_outcome_rules(
+    chat_model: ChatModel,
+    judge: JudgeSettings,
+    transcript: str,
+    outcome: str,
+    rules: Mapping[str, str],
+) -> list[RuleVerdict]:
+    """Ask the judge whether a kept Move Outcome keeps each rule.
+
+    Args:
+        chat_model: The model that judges.
+        judge: The Judge's model, thinking and prompts.
+        transcript: The Conversation, one "Person:" or "Zeph:" line each.
+        outcome: The Move Outcome kept, as one line.
+        rules: Each rule's ID and what it checks.
+
+    Returns:
+        One verdict per rule, in the order given.
+    """
+    return ask_about_rules(
+        chat_model,
+        judge,
+        judge.outcome_instructions,
+        f"{rule_lines(rules)}\n\nConversation:\n{transcript}\n\n"
+        f"Move Outcome kept:\n{outcome}",
+        rules,
+    )

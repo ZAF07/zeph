@@ -1434,3 +1434,228 @@ def test_a_cancel_asked_for_after_the_last_case_still_ends_the_run_cancelled(
     runs.end(UUID(run["id"]), EvalRunState.FINISHED, clock.now())
 
     assert open_run(client, admin, run["id"])["state"] == "cancelled"
+
+
+HOSTING_RULE = {"id": "wanted_options", "check": "Says the User wanted options."}
+HOSTING_CASE = EvalCase(
+    key="hosting-research",
+    eval=EvalName.MOVE_OUTCOME,
+    content={
+        "now": "2026-11-14T13:00:00",
+        "messages": [
+            {
+                "who": "person",
+                "text": "i need hosting under SGD 20 with managed postgres",
+                "need": "Accountability",
+                "lead_move": "Plan steps",
+                "support_move": "",
+                "mood": "frustrated",
+            },
+            {"who": "zeph", "text": "What's on your shortlist?"},
+            {
+                "who": "person",
+                "text": "i told you, i don't have one",
+                "need": "Accountability",
+                "lead_move": "Research",
+                "support_move": "Suggest",
+                "mood": "frustrated",
+            },
+            {"who": "zeph", "text": "Here are three hosts under SGD 20."},
+        ],
+        "outcomes": [
+            {
+                "move": "Research",
+                "role": "lead",
+                "result": "helped",
+                "rules": ["wanted_options"],
+            },
+            {"move": "Plan steps", "role": "lead", "result": "didnt_help"},
+        ],
+        "rules": [HOSTING_RULE],
+    },
+)
+
+
+def kept_outcome(move_number: int, result: str, why: str) -> dict[str, Any]:
+    """Build one Move Outcome as the keeping model writes it.
+
+    Args:
+        move_number: The number the keeping model was shown the Move by.
+        result: helped, didnt_help or mixed.
+        why: Why it went that way.
+
+    Returns:
+        The Move Outcome as JSON-ready data.
+    """
+    return {
+        "move": move_number,
+        "situation": "Looking for app hosting under SGD 20.",
+        "feeling": "frustrated",
+        "result": result,
+        "why": why,
+    }
+
+
+def test_a_move_outcome_case_keeps_outcomes_from_its_conversation_and_judges_them(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, HOSTING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.MOVE_OUTCOME)
+    chat_model.script_move_outcome_keeping(
+        json.dumps(
+            {
+                "move_outcomes": [
+                    kept_outcome(
+                        1, "didnt_help", "They wanted options, not questions."
+                    ),
+                    kept_outcome(2, "helped", "Real hosts gave them options."),
+                ]
+            }
+        )
+    )
+    chat_model.script(
+        '{"verdicts": [{"rule": "wanted_options", "passed": true, '
+        '"reason": "Says they wanted options."}]}'
+    )
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "pass", result
+    assert result["checks"] == [
+        {
+            "name": "kept",
+            "passed": True,
+            "detail": "kept Research (lead)",
+            "group": "Research (lead)",
+        },
+        {
+            "name": "result",
+            "passed": True,
+            "detail": "helped",
+            "group": "Research (lead)",
+        },
+        {
+            "name": "wanted_options",
+            "passed": True,
+            "detail": "Says they wanted options.",
+            "group": "Research (lead)",
+        },
+        {
+            "name": "kept",
+            "passed": True,
+            "detail": "kept Plan steps (lead)",
+            "group": "Plan steps (lead)",
+        },
+        {
+            "name": "result",
+            "passed": True,
+            "detail": "didn't help",
+            "group": "Plan steps (lead)",
+        },
+    ]
+    [keeping_call] = chat_model.move_outcome_keeping_calls
+    shown = keeping_call.history[0].text
+    assert "[2] Research (lead)" in shown
+    assert "[3] Suggest (support)" in shown
+    assert "i told you, i don't have one" in shown
+    [judge_call] = [
+        call for call in chat_model.calls if "wanted_options" in call.history[0].text
+    ]
+    assert "Real hosts gave them options." in judge_call.history[0].text
+    trace = client.get(
+        f"/api/admin/eval-runs/{run['id']}/results/{result['id']}", headers=admin
+    ).json()
+    assert [call["step"] for call in trace["calls"]] == ["move_outcomes"]
+    [saved] = PostgresEvalRunRepository(engine).list_results(UUID(run["id"]))
+    facts = saved.result.facts
+    assert set(facts["call"]) == {"duration_ms", "tokens_in", "tokens_out"}
+    assert {outcome["move"] for outcome in facts["outcomes"]} == {
+        "Plan steps",
+        "Research",
+    }
+
+
+def test_a_move_outcome_not_kept_or_with_the_wrong_result_fails(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, HOSTING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.MOVE_OUTCOME)
+    chat_model.script_move_outcome_keeping(
+        json.dumps({"move_outcomes": [kept_outcome(1, "helped", "It gave a step.")]})
+    )
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "fail"
+    assert [
+        (check["group"], check["name"], check["passed"], check["detail"])
+        for check in result["checks"]
+    ] == [
+        ("Research (lead)", "kept", False, "no Move Outcome kept for Research (lead)"),
+        (
+            "Research (lead)",
+            "wanted_options",
+            False,
+            "no Move Outcome kept to judge",
+        ),
+        ("Plan steps (lead)", "kept", True, "kept Plan steps (lead)"),
+        ("Plan steps (lead)", "result", False, "expected didn't help, kept helped"),
+    ]
+    assert "Plan steps (lead) helped" in "\n".join(result["notes"])
+    assert not [
+        call for call in chat_model.calls if "wanted_options" in call.history[0].text
+    ]
+
+
+def test_move_outcome_keeping_overrides_reach_only_their_variant(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    case = EvalCase(
+        key="hosting-no-rules",
+        eval=EvalName.MOVE_OUTCOME,
+        content={**HOSTING_CASE.content, "outcomes": [], "rules": []},
+    )
+    add_cases(engine, case)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE platform_settings SET value = "
+                '\'["deepseek-flash", "deepseek-pro"]\'::jsonb '
+                "WHERE key = 'available_models'"
+            )
+        )
+    admin = owner_headers(client, auth_verifier)
+    live_before = PostgresPlatformSettingsRepository(engine).load().values
+    overrides = {
+        "move_outcome_keeping_prompt": "Keep the lessons.",
+        "move_outcome_keeping_model": "deepseek-pro",
+        "move_outcome_keeping_thinking": False,
+    }
+    start_run(client, admin, EvalName.MOVE_OUTCOME, variants=[{}, overrides])
+    chat_model.script(json.dumps({"move_outcomes": []}))
+
+    runner.work_next_run()
+
+    [live_call] = chat_model.move_outcome_keeping_calls
+    [variant_call] = [
+        call for call in chat_model.calls if call.instructions == "Keep the lessons."
+    ]
+    assert (live_call.model, live_call.thinking) == ("deepseek-flash", True)
+    assert (variant_call.model, variant_call.thinking) == ("deepseek-pro", False)
+    assert PostgresPlatformSettingsRepository(engine).load().values == live_before

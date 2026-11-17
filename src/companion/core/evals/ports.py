@@ -232,6 +232,21 @@ class EvalCompanion(Protocol):
         """
         ...
 
+    def keep_move_outcomes(self, conversation_id: UUID) -> None:
+        """Run the Conversation-end Move Outcome keeping step on a Conversation.
+
+        It runs as it does after the quiet gap, in its own Conversation-end
+        trace, with the Eval database's Platform Settings.
+
+        Args:
+            conversation_id: The made-up User's finished Conversation.
+
+        Raises:
+            EvalSetupError: If no User is connected, or User Memory doesn't
+                work for them.
+        """
+        ...
+
     def close(self) -> None:
         """Stop the app."""
         ...

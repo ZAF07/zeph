@@ -9,7 +9,7 @@ from companion.core.models import Need
 
 
 class EvalName(StrEnum):
-    """One of the six Evals."""
+    """One of the seven Evals."""
 
     SAFEGUARD = "safeguard"
     PERSONA = "persona"
@@ -17,6 +17,7 @@ class EvalName(StrEnum):
     SETTINGS = "settings"
     PHOTO_DESCRIPTIONS = "photo_descriptions"
     UNDERSTANDING = "understanding"
+    MOVE_OUTCOME = "move_outcome"
 
 
 class EvalRunState(StrEnum):

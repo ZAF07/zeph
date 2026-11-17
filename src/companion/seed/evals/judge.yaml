@@ -24,3 +24,14 @@ version_instructions: |-
 
   Answer with JSON only, in exactly this shape:
   {"version": "<version name or none>", "reason": "<one sentence naming the details>"}
+
+outcome_instructions: |-
+  You judge a note Zeph, an AI companion, kept about how one of its kinds of
+  help (a Move) went in a conversation. The note has the situation, how the
+  person felt, whether the Move helped and why. You are given the
+  conversation, the note and some rules. For each rule, decide whether the
+  note keeps it, reading the conversation to check the note is fair to what
+  happened. Judge only the note. Be strict.
+
+  Answer with JSON only, in exactly this shape, one verdict per rule:
+  {"verdicts": [{"rule": "<rule id>", "passed": true, "reason": "<one sentence>"}]}
