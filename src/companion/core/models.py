@@ -1313,6 +1313,8 @@ class Understanding:
             name; None for none.
         next_move_why: Why, or when, that Move comes next; None when there
             is no next Move or no reason was given.
+        is_fallback: Whether this is the fallback Understanding, made
+            because the Understanding model failed or couldn't be read.
     """
 
     id: UUID
@@ -1327,6 +1329,7 @@ class Understanding:
     support_move: str | None = None
     next_move: str | None = None
     next_move_why: str | None = None
+    is_fallback: bool = False
 
 
 @dataclass(frozen=True)

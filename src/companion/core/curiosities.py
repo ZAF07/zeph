@@ -490,16 +490,22 @@ def describe_unmade_next_move(understandings: Sequence[Understanding]) -> str:
     """Write the next Move the Companion still had in mind when it ended.
 
     Only the newest Understanding's next Move counts: an earlier one was
-    either made or dropped by a later Understanding.
+    either made or dropped by a later Understanding. A fallback
+    Understanding neither makes nor drops one, so it is skipped.
 
     Args:
         understandings: The Conversation's Understandings, oldest first.
 
     Returns:
         E.g. "Plan steps, once they've picked a host."; "None." if the newest
-        Understanding held no next Move.
+        Understanding that wasn't the fallback held no next Move.
     """
-    newest = understandings[-1] if understandings else None
+    made_by_the_model = [
+        understanding
+        for understanding in understandings
+        if not understanding.is_fallback
+    ]
+    newest = made_by_the_model[-1] if made_by_the_model else None
     if newest is None or not newest.next_move:
         return "None."
     why = f", {newest.next_move_why}" if newest.next_move_why else ""

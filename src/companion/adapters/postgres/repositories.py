@@ -1974,6 +1974,7 @@ class PostgresUnderstandingRepository:
                     support_move=understanding.support_move,
                     next_move=understanding.next_move,
                     next_move_why=understanding.next_move_why,
+                    is_fallback=understanding.is_fallback,
                     asked_why=understanding.asked_why,
                     made_at=understanding.made_at,
                 )
@@ -2008,6 +2009,7 @@ class PostgresUnderstandingRepository:
                 support_move=row.support_move,
                 next_move=row.next_move,
                 next_move_why=row.next_move_why,
+                is_fallback=row.is_fallback,
             )
             for row in rows
         ]

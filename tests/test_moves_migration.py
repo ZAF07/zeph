@@ -174,3 +174,19 @@ def test_the_unmade_next_move_migration_reloads_the_curiosity_keeping_prompt(
             )
         ).all()
     assert prompt == []
+
+
+def test_the_fallback_migration_adds_a_column_that_defaults_to_not_fallback(
+    engine: Engine, database_url: str
+) -> None:
+    downgrade_to(database_url, "0055")
+    migrate(database_url)
+
+    with engine.connect() as connection:
+        column = connection.execute(
+            text(
+                "SELECT is_nullable, column_default FROM information_schema.columns "
+                "WHERE table_name = 'understandings' AND column_name = 'is_fallback'"
+            )
+        ).one()
+    assert tuple(column) == ("NO", "false")

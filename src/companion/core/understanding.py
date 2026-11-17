@@ -972,6 +972,7 @@ class UnderstandingService:
             support_move=picked.support_name,
             next_move=picked.next_name,
             next_move_why=(form.next_move_why or None) if picked.next else None,
+            is_fallback=model_form is None,
         )
         self._repositories.understandings.add(understanding)
         self._model_call_log.record_understanding_shape(
