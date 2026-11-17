@@ -12,7 +12,12 @@ from companion.core.evals.ports import EvalRunRepository
 from companion.core.evals.runs import EvalRunNotFoundError
 from companion.core.evals.setting_overrides import SettingOverrideService, live_value
 from companion.core.models import User
-from companion.core.ports import Clock, NeedRepository, PlatformSettingsRepository
+from companion.core.ports import (
+    Clock,
+    MoveRepository,
+    NeedRepository,
+    PlatformSettingsRepository,
+)
 
 
 class VariantNotFoundError(NotFoundError):
@@ -74,6 +79,7 @@ class MakeLiveService:
         overrides: SettingOverrideService,
         live_settings: PlatformSettingsRepository,
         live_needs: NeedRepository,
+        live_moves: MoveRepository,
         clock: Clock,
     ) -> None:
         """Set up the service.
@@ -83,12 +89,14 @@ class MakeLiveService:
             overrides: Saves Setting Overrides as live settings.
             live_settings: The live Platform Settings, to compare with.
             live_needs: The live Needs, to compare with.
+            live_moves: The live Moves, to compare with.
             clock: Tells the time.
         """
         self._runs = runs
         self._overrides = overrides
         self._live_settings = live_settings
         self._live_needs = live_needs
+        self._live_moves = live_moves
         self._clock = clock
 
     def changes_since_run(self, run_id: UUID, letter: str) -> list[LiveChange]:
@@ -140,7 +148,7 @@ class MakeLiveService:
             AlreadyMadeLiveError: If the Variant was made live already.
             NoOverridesError: If the Variant has no overrides.
             InvalidError: If the settings save refuses an override.
-            NotFoundError: If an override's Need was deleted since.
+            NotFoundError: If an override's Need or Move was deleted since.
         """
         run, variant = self._variant_to_make_live(run_id, letter)
         changed = {change.key for change in self._changes(run, variant)}
@@ -210,12 +218,14 @@ class MakeLiveService:
         snapshot = run.snapshot
         then_settings = snapshot.settings if snapshot else {}
         then_needs = snapshot.needs if snapshot else []
+        then_moves = snapshot.moves if snapshot else []
         now_settings = self._live_settings.load().values
         now_needs = self._live_needs.list_all()
+        now_moves = self._live_moves.list_all()
         changes = []
         for key, override in variant.setting_overrides.items():
-            then = live_value(key, then_settings, then_needs)
-            now = live_value(key, now_settings, now_needs)
+            then = live_value(key, then_settings, then_needs, then_moves)
+            now = live_value(key, now_settings, now_needs, now_moves)
             if then != now:
                 changes.append(LiveChange(key, then, now, override))
         return changes

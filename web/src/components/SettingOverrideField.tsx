@@ -3,24 +3,32 @@ import {
   fieldCaption,
   inputField,
 } from "@/components/form-styles";
+import { MoveOverrideFields } from "@/components/MoveOverrideFields";
 import { NeedOverrideFields } from "@/components/NeedOverrideFields";
 import { Switch } from "@/components/Switch";
 import type { OverridableSetting } from "@/lib/api-client";
-import { describeSettingValue, isNeedOverride } from "@/lib/setting-overrides";
+import {
+  describeSettingValue,
+  isMoveOverride,
+  isNeedOverride,
+  moveOverridePrefix,
+} from "@/lib/setting-overrides";
 
 /**
  * The field for one Setting Override, of the same kind the settings pages
- * use: a text box, a whole number, a model to pick, an on/off switch, or a
- * Need's name, when it fits and how to reply. It shows the live value next
- * to it.
+ * use: a text box, a whole number, a model to pick, an on/off switch, a
+ * Need's name, when it fits and how to reply, or a Move's name, when it fits
+ * and how to do it. It shows the live value next to it.
  *
- * @param props - `label` names the setting; `setting` is its rule, or null
- *   for a Need; `models` are the models a model setting can pick; `liveValue`
- *   is its live value; `value` is the override; `onChange` gets a new value
- *   and `onRemove` drops the override.
+ * @param props - `overrideKey` is the override's key; `label` names the
+ *   setting; `setting` is its rule, or null for a Need or Move; `models` are
+ *   the models a model setting can pick; `liveValue` is its live value;
+ *   `value` is the override; `onChange` gets a new value and `onRemove` drops
+ *   the override.
  * @returns The field.
  */
 export function SettingOverrideField({
+  overrideKey,
   label,
   setting,
   models,
@@ -29,6 +37,7 @@ export function SettingOverrideField({
   onChange,
   onRemove,
 }: {
+  overrideKey: string;
   label: string;
   setting: OverridableSetting | null;
   models: string[];
@@ -56,7 +65,13 @@ export function SettingOverrideField({
         </button>
       </div>
       {setting?.hint ? <p className={fieldCaption}>{setting.hint}</p> : null}
-      {setting === null ? (
+      {setting === null && overrideKey.startsWith(moveOverridePrefix) ? (
+        <MoveOverrideFields
+          label={label}
+          value={isMoveOverride(value) ? value : null}
+          onChange={onChange}
+        />
+      ) : setting === null ? (
         <NeedOverrideFields
           label={label}
           value={isNeedOverride(value) ? value : null}

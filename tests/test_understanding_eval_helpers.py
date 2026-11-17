@@ -404,3 +404,134 @@ def test_a_thread_title_written_elsewhere_in_the_case_is_refused(
             + "      threads: [{title: Falling-out with Mei, story: S}]\n"
             "    messages: [{text: hi, expect: {found: [Falling-out with Mei]}}]\n",
         )
+
+
+def test_moves_are_read_and_a_move_expected_alongside_no_move_is_refused(
+    tmp_path: Path,
+) -> None:
+    [case] = read_cases(
+        tmp_path,
+        CASE_FILE_START + "  - id: hosting\n"
+        "    web_search: false\n"
+        "    web_results:\n"
+        "      - {title: Hosts, url: 'https://hosts.example', text: Cheap hosts.}\n"
+        "    messages:\n"
+        "      - text: which host?\n"
+        "        expect: {lead_move: [Research], support_move: [Suggest]}\n"
+        "      - text: ugh\n"
+        "        expect: {no_move: true}\n",
+    )
+
+    assert case.web_search is False
+    assert [(result.title, result.url, result.text) for result in case.web_results] == [
+        ("Hosts", "https://hosts.example", "Cheap hosts.")
+    ]
+    first, second = case.messages
+    assert (first.expect.lead_move, first.expect.support_move) == (
+        ["Research"],
+        ["Suggest"],
+    )
+    assert second.expect.no_move is True
+    with pytest.raises(InvalidEvalCaseError, match="no_move"):
+        read_cases(
+            tmp_path,
+            CASE_FILE_START + "  - id: hi\n    messages:\n"
+            "      - {text: hi, expect: {no_move: true, lead_move: [Push]}}\n",
+        )
+
+
+def test_a_case_without_web_settings_has_web_search_on_and_finds_nothing(
+    tmp_path: Path,
+) -> None:
+    [case] = read_cases(
+        tmp_path, CASE_FILE_START + "  - id: hi\n    messages: [{text: hi}]\n"
+    )
+
+    assert (case.web_search, case.web_results) == (True, [])
+
+
+def test_the_moves_made_are_checked_ignoring_case() -> None:
+    moved = replace(NOTHING_RAISED, lead_move="Research", support_move="Suggest")
+    expect = UnderstandingExpectations(
+        lead_move=["research", "Push"], support_move=["Suggest"], no_move=False
+    )
+
+    assert check_understanding(expect, moved) == [
+        CheckResult("lead move", True, "led with Research"),
+        CheckResult("supporting move", True, "supported with Suggest"),
+        CheckResult("no move", True, "led with Research"),
+    ]
+
+
+def test_the_wrong_moves_or_a_move_when_none_was_expected_fail() -> None:
+    pushed = replace(NOTHING_RAISED, lead_move="Push")
+
+    assert check_understanding(
+        UnderstandingExpectations(
+            lead_move=["Research"], support_move=["Suggest"], no_move=True
+        ),
+        pushed,
+    ) == [
+        CheckResult("lead move", False, "led with Push, expected Research"),
+        CheckResult(
+            "supporting move", False, "had no supporting Move, expected Suggest"
+        ),
+        CheckResult("no move", False, "led with Push, expected no Move"),
+    ]
+    assert check_understanding(
+        UnderstandingExpectations(lead_move=["Research", "Suggest"], no_move=False),
+        NOTHING_RAISED,
+    ) == [
+        CheckResult("lead move", False, "made no Move, expected Research or Suggest"),
+        CheckResult("no move", False, "made no Move, expected one"),
+    ]
+    assert check_understanding(
+        UnderstandingExpectations(no_move=True),
+        replace(NOTHING_RAISED, support_move="Calm"),
+    ) == [
+        CheckResult(
+            "no move",
+            False,
+            "made no lead Move (supported with Calm), expected no Move",
+        )
+    ]
+    assert check_understanding(
+        UnderstandingExpectations(no_move=True), NOTHING_RAISED
+    ) == [CheckResult("no move", True, "made no Move")]
+
+
+def test_the_understanding_cases_check_moves_and_web_search() -> None:
+    seed_cases: list[UnderstandingCase] = seeded(EvalName.UNDERSTANDING)
+    cases = {case.id: case for case in seed_cases}
+
+    hosting = cases["hosting-research"]
+    assert hosting.web_search and hosting.web_results
+    assert len(hosting.earlier) == 4
+    assert hosting.messages[0].expect.lead_move == ["Research"]
+    assert hosting.messages[0].expect.rules == ["names_hosts_under_budget"]
+    assert set(cases["internal-testing-finish-line"].messages[0].expect.lead_move) == {
+        "Push",
+        "Plan steps",
+    }
+    venting = cases["venting-is-not-pushed"].messages[0].expect
+    assert (venting.need, venting.rules) == (["Be heard"], ["no_fixing", "no_push"])
+    no_search = cases["research-with-web-search-off"]
+    assert no_search.web_search is False
+    assert no_search.messages[0].expect.rules == ["honest_no_lookup"]
+    assert cases["small-talk-makes-no-move"].messages[0].expect.no_move is True
+
+
+def test_a_supporting_move_without_a_lead_is_not_a_lead() -> None:
+    supported_only = replace(NOTHING_RAISED, support_move="Calm")
+
+    assert check_understanding(
+        UnderstandingExpectations(lead_move=["Calm"], no_move=False),
+        supported_only,
+    ) == [
+        CheckResult(
+            "lead move", False, "made no lead Move (supported with Calm), expected Calm"
+        ),
+        CheckResult(
+            "no move", False, "made no lead Move (supported with Calm), expected one"
+        ),
+    ]

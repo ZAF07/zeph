@@ -312,6 +312,7 @@ def test_a_queued_run_has_no_snapshot_yet(
         "judge": None,
         "cases": None,
         "needs": None,
+        "moves": None,
     }
 
 
@@ -414,6 +415,22 @@ def test_the_estimate_counts_every_variant_and_repeat(
         ({"variants": [{"daily_message_limit": -1}]}, 422),
         ({"variants": [{"model_prices": {}}]}, 422),
         ({"variants": [{"need:not-an-id": {}}]}, 422),
+        ({"variants": [{"move:not-an-id": {}}]}, 422),
+        ({"variants": [{f"move:{uuid4()}": {"name": "x"}}]}, 422),
+        (
+            {
+                "variants": [
+                    {
+                        f"move:{uuid4()}": {
+                            "name": "x",
+                            "when_it_fits": "y",
+                            "how_to_do_it": "z",
+                        }
+                    }
+                ]
+            },
+            404,
+        ),
         ({"variants": [{f"need:{uuid4()}": {"name": "x"}}]}, 422),
         (
             {
@@ -452,7 +469,7 @@ def test_variants_repeats_and_overrides_out_of_range_are_refused(
     assert runs == []
 
 
-def test_override_choices_list_the_editable_settings_needs_and_models(
+def test_override_choices_list_the_editable_settings_needs_moves_and_models(
     client: TestClient, auth_verifier: FakeAuthVerifier
 ) -> None:
     admin = owner_headers(client, auth_verifier)
@@ -473,4 +490,7 @@ def test_override_choices_list_the_editable_settings_needs_and_models(
     fallback = next(need for need in choices["needs"] if need["name"] == "Ask more")
     assert fallback["key"].startswith("need:")
     assert set(fallback["value"]) == {"name", "when_it_fits", "how_to_reply"}
+    research = next(move for move in choices["moves"] if move["name"] == "Research")
+    assert research["key"].startswith("move:")
+    assert set(research["value"]) == {"name", "when_it_fits", "how_to_do_it"}
     assert choices["models"] == ["deepseek-flash"]

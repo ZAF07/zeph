@@ -274,6 +274,7 @@ describe("EvalRunView", () => {
         },
       ],
       needs: [],
+      moves: [],
     });
     renderWithQueries(<EvalRunView runId="run-1" />);
 
@@ -357,6 +358,7 @@ describe("EvalRunView", () => {
           },
         ],
         needs: [],
+        moves: [],
         models: ["deepseek-flash"],
       });
       apiClient.getEvalRunSnapshot.mockResolvedValue({
@@ -364,6 +366,17 @@ describe("EvalRunView", () => {
         judge: {},
         cases: [],
         needs: [],
+        moves: [
+          {
+            key: "move:m-1",
+            name: "Research",
+            value: {
+              name: "Research",
+              when_it_fits: "They need options found.",
+              how_to_do_it: "Search and compare.",
+            },
+          },
+        ],
       });
     });
 
@@ -416,6 +429,38 @@ describe("EvalRunView", () => {
       expect(
         within(variantA).queryByRole("button", { name: /live$/ }),
       ).not.toBeInTheDocument();
+    });
+
+    it("shows a Move override with the Move's text when the run started", async () => {
+      apiClient.getEvalRun.mockResolvedValue({
+        ...comparison,
+        variants: [
+          comparison.variants[0],
+          {
+            letter: "B",
+            setting_overrides: {
+              "move:m-1": {
+                name: "Research",
+                when_it_fits: "They need options found.",
+                how_to_do_it: "Find three options.",
+              },
+            },
+            made_live: null,
+          },
+        ],
+      });
+      renderWithQueries(<EvalRunView runId="run-1" />);
+
+      const variantB = await screen.findByRole("region", { name: "Variant B" });
+      expect(
+        await within(variantB).findByText("Move: Research"),
+      ).toBeInTheDocument();
+      expect(
+        within(variantB).getByText("Live when it started:").parentElement,
+      ).toHaveTextContent("How to do it: Search and compare.");
+      expect(
+        within(variantB).getByText("Variant B:").parentElement,
+      ).toHaveTextContent("How to do it: Find three options.");
     });
 
     it("makes a Variant live in one click when nothing changed since", async () => {

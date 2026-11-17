@@ -9,8 +9,8 @@ import {
 
 /**
  * One Variant of a new run: the live settings, plus any Setting Overrides
- * the Admin adds. Picking a setting or Need to change starts it from its
- * live value; the live settings are never touched.
+ * the Admin adds. Picking a setting, Need or Move to change starts it from
+ * its live value; the live settings are never touched.
  *
  * @param props - `letter` is the Variant's letter; `overrides` its Setting
  *   Overrides; `choices` what can be overridden; `onChange` gets the new
@@ -35,11 +35,13 @@ export function VariantOverridesEditor({
     (setting) => !(setting.key in overrides),
   );
   const needsLeft = choices.needs.filter((need) => !(need.key in overrides));
+  const movesLeft = choices.moves.filter((move) => !(move.key in overrides));
 
   function liveValueOf(key: string): unknown {
     return (
       choices.settings.find((setting) => setting.key === key)?.value ??
-      choices.needs.find((need) => need.key === key)?.value
+      choices.needs.find((need) => need.key === key)?.value ??
+      choices.moves.find((move) => move.key === key)?.value
     );
   }
 
@@ -78,7 +80,8 @@ export function VariantOverridesEditor({
       {keys.map((key) => (
         <SettingOverrideField
           key={key}
-          label={overrideLabel(key, choices, [])}
+          overrideKey={key}
+          label={overrideLabel(key, choices)}
           setting={
             choices.settings.find((setting) => setting.key === key) ?? null
           }
@@ -111,6 +114,13 @@ export function VariantOverridesEditor({
           {needsLeft.map((need) => (
             <option key={need.key} value={need.key}>
               Need: {need.name}
+            </option>
+          ))}
+        </optgroup>
+        <optgroup label="Moves">
+          {movesLeft.map((move) => (
+            <option key={move.key} value={move.key}>
+              Move: {move.name}
             </option>
           ))}
         </optgroup>

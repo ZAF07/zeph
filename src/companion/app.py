@@ -462,7 +462,9 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             move_service=move_service,
         )
     )
-    setting_overrides = SettingOverrideService(platform_settings_service, need_service)
+    setting_overrides = SettingOverrideService(
+        platform_settings_service, need_service, move_service
+    )
     app.include_router(
         build_eval_api_router(
             current_admin=build_current_admin_dependency(current_user),
@@ -478,6 +480,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 setting_overrides,
                 dependencies.repositories.platform_settings,
                 dependencies.repositories.needs,
+                dependencies.repositories.moves,
                 dependencies.clock,
             ),
             setting_override_service=setting_overrides,

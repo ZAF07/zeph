@@ -218,6 +218,7 @@ def test_every_field_of_every_case_shape_and_the_judge_has_a_description(
     assert understanding == [
         "When",
         "Made-up User Memory",
+        "Web Search",
         "Earlier messages",
         "Messages and what to expect",
     ]
@@ -290,6 +291,16 @@ def test_an_invalid_save_is_refused_with_a_message_per_field(
             {"photo": "never-uploaded.png"},
             "photo",
             "upload it again",
+        ),
+        (
+            EvalName.UNDERSTANDING,
+            {
+                "messages": [
+                    {"text": "hi", "expect": {"no_move": True, "lead_move": ["Push"]}}
+                ]
+            },
+            "messages.0.expect.no_move",
+            "Expects no Move but names Moves",
         ),
         (
             EvalName.MOVE_OUTCOME,

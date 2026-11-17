@@ -9,12 +9,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
 from companion.adapters.evals.stand_ins import (
+    CannedWebSearch,
     CountingChatModel,
     CountingPhotoViewer,
     EvalAccounts,
     IdleScheduler,
     ManualTimer,
-    NoWebSearch,
     RecordingChatChannel,
     RunningClock,
     TokenCounter,
@@ -30,6 +30,7 @@ from companion.adapters.postgres.eval_repositories import (
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.adapters.pypdf.text_extractor import PypdfTextExtractor
 from companion.app import AppDependencies, create_app
+from companion.core.evals.cases import EvalWebResult
 from companion.core.evals.models import EvalImage, ModelTokens, Replies
 from companion.core.evals.ports import EvalSetupError
 from companion.core.model_call_log import ModelCallLog, start_trace
@@ -198,6 +199,7 @@ class InProcessCompanion:
         self._judge_chat_model = CountingChatModel(chat_model, self._counter)
         self._photo_viewer = CountingPhotoViewer(photo_viewer, self._counter)
         self._chat_channel = RecordingChatChannel()
+        self._web_search = CannedWebSearch()
         self._accounts = EvalAccounts()
         self._timer = ManualTimer()
         self._clock = RunningClock(datetime.now(UTC))
@@ -217,7 +219,7 @@ class InProcessCompanion:
             text_extractor=PypdfTextExtractor(),
             embedder=embedder,
             knowledge_vector_store=PgvectorKnowledgeVectorStore(engine),
-            web_search=NoWebSearch(),
+            web_search=self._web_search,
             clock=self._clock,
             scheduler=IdleScheduler(),
             timer=self._timer,
@@ -404,6 +406,32 @@ class InProcessCompanion:
             200,
             "Turning Photo Viewing off",
         )
+
+    def turn_web_search_off(self) -> None:
+        """Turn Web Search off for the User, as an Admin would.
+
+        Raises:
+            EvalSetupError: If the User isn't connected yet.
+        """
+        if self._user_id is None:
+            raise EvalSetupError("Connect the User before turning Web Search off")
+        require_status(
+            self._client.put(
+                f"/api/admin/users/{self._user_id}/features/web_search",
+                json={"switch": "off"},
+                headers=self._admin_headers(),
+            ),
+            200,
+            "Turning Web Search off",
+        )
+
+    def set_web_results(self, pages: Sequence[EvalWebResult]) -> None:
+        """Set the made-up pages every web search finds.
+
+        Args:
+            pages: The pages; none means searches find nothing.
+        """
+        self._web_search.pages = list(pages)
 
     def add_shared_photo(self, file_id: str, description: str, note: str) -> None:
         """Keep a Shared Photo for the User, as memory processing would.

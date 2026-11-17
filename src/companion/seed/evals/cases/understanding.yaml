@@ -39,7 +39,17 @@
 #   knowledge: true|false        Knowledge documents are chosen
 #   woven_in: true|false         the reply weaves in the due Check-in;
 #                                needs check_in_due: true
+#   lead_move: [<Move>, ...]     the Moves the reply may lead with
+#   support_move: [<Move>, ...]  the Moves that may support it
+#   no_move: true|false          true: no Move, just respond; false: a lead
+#                                Move. Leave the Move lists empty when true.
 #   rules: [<rule id>]           the Judge checks Zeph's reply against these
+#
+# web_search: false   Web Search doesn't work for the person, so Research is
+#                     never offered (default true)
+# web_results: [{title, url, text}]   made-up pages every web search finds;
+#                     Evals never search the real web, and with none a
+#                     search finds nothing
 
 now: 2026-11-13T18:30:00
 
@@ -71,6 +81,25 @@ rules:
   asks_about_presentation: >-
     Zeph's last reply asks how the presentation to the board went, naturally
     and warmly.
+  names_hosts_under_budget: >-
+    Zeph's last reply names at least two real hosting options that come to
+    about SGD 20 a month or less and include managed Postgres, with rough
+    prices, and says where the information came from. It doesn't hand the work
+    back by asking what's on their shortlist or what they have looked at.
+  sets_a_finish_line: >-
+    Zeph's last reply helps them pin down what "done" means for internal
+    testing (a clear finish line, like a fixed list of must-fix bugs or a
+    date), or challenges them kindly to set one. It doesn't only sympathise
+    or tell them to keep going.
+  no_push: >-
+    Zeph's last reply doesn't push them to do anything about it or suggest
+    what to do: no challenge, plan, options or next steps. It stays with how
+    they feel.
+  honest_no_lookup: >-
+    Zeph's last reply says plainly that it can't look things up on the web
+    right now, and still helps from what it knows, e.g. names options worth
+    checking. It doesn't pretend to have searched or present prices as just
+    found.
   no_teaching: >-
     Zeph's last reply doesn't quote or teach any idea, teaching, philosophy,
     story or technique.
@@ -326,3 +355,97 @@ cases:
           her job. and that's only the first part
         expect:
           woven_in: false
+
+  - id: hosting-research
+    memory: &arjun
+      portrait: >-
+        Arjun is 29, a solo developer in Singapore building a habit-tracking
+        app on evenings and weekends. He's practical, gets frustrated when
+        he feels he's going in circles, and likes concrete options.
+      items:
+        Goals: [Launch the app to the first 50 users by January]
+    web_results:
+      - title: Railway pricing
+        url: https://railway.example/pricing
+        text: >-
+          Hobby plan USD 5 a month (about SGD 7), usage included up to USD 5.
+          Postgres is a one-click managed database on the same plan, with
+          daily backups. Deploys from GitHub; Singapore region available.
+      - title: Render pricing
+        url: https://render.example/pricing
+        text: >-
+          Web service Starter USD 7 a month (about SGD 9.50). Managed Postgres
+          Basic from USD 6 a month (about SGD 8), with backups. Singapore
+          region available.
+      - title: DigitalOcean App Platform pricing
+        url: https://digitalocean.example/app-platform
+        text: >-
+          Basic app USD 5 a month. Managed PostgreSQL from USD 15 a month
+          (about SGD 20), Singapore data centre.
+    earlier:
+      - person: >-
+          ok I really need to sort out hosting for my app this week. budget is
+          like SGD 15-20 a month
+      - zeph: love that you're tackling it! what's on your shortlist so far?
+      - person: >-
+          it's a Next.js front end with a Python API, and it needs managed
+          Postgres, I don't want to run my own database
+      - zeph: >-
+          makes sense. which ones are you weighing up? what's on the shortlist?
+    messages:
+      - text: >-
+          honestly I don't have a shortlist, I just don't know what's out
+          there. I keep putting this off
+        expect:
+          need: [Accountability, Advice]
+          lead_move: [Research]
+          no_move: false
+          rules: [names_hosts_under_budget]
+
+  - id: internal-testing-finish-line
+    memory: *arjun
+    messages:
+      - text: >-
+          still in internal testing. every time I test I find something else
+          to fix and the list just keeps growing. feels like I'll never
+          launch
+        expect:
+          need: [Accountability, Think it through]
+          lead_move: [Push, Plan steps]
+          rules: [sets_a_finish_line]
+
+  - id: venting-is-not-pushed
+    memory: *arjun
+    messages:
+      - text: >-
+          my manager presented MY analysis in the meeting today like it was
+          his. didn't even mention me. I'm fuming. I don't need advice, I just
+          need to get this out
+        expect:
+          need: [Be heard]
+          rules: [no_fixing, no_push]
+
+  - id: research-with-web-search-off
+    memory: *arjun
+    web_search: false
+    web_results:
+      - title: Railway pricing
+        url: https://railway.example/pricing
+        text: Hobby plan USD 5 a month with managed Postgres.
+    messages:
+      - text: >-
+          can you find me a couple of cheap hosts with managed Postgres? under
+          SGD 20 a month, Singapore region if possible
+        expect:
+          need: [Advice, Accountability]
+          rules: [honest_no_lookup]
+
+  - id: small-talk-makes-no-move
+    memory: *arjun
+    messages:
+      - text: >-
+          haha my cat just knocked my coffee onto the keyboard. typing this on
+          my phone lol
+        expect:
+          need: [Just chatting]
+          no_move: true

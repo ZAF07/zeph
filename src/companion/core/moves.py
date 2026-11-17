@@ -77,10 +77,25 @@ class MoveService:
             InvalidMoveError: If a field is blank or too long.
             MoveNameTakenError: If another Move already has the name.
         """
-        self._get(move_id)
-        return self._repositories.moves.update(
-            move_id, self._checked_details(details, move_id)
-        )
+        return self._repositories.moves.update(move_id, self.checked(move_id, details))
+
+    def checked(self, move_id: UUID, details: MoveDetails) -> MoveDetails:
+        """Check new details for a Move, without saving them.
+
+        Args:
+            move_id: The Move's ID.
+            details: Its new values.
+
+        Returns:
+            The details with surrounding spaces removed.
+
+        Raises:
+            MoveNotFoundError: If there is no such Move.
+            InvalidMoveError: If a field is blank or too long.
+            MoveNameTakenError: If another Move already has the name.
+        """
+        self.get(move_id)
+        return self._checked_details(details, move_id)
 
     def delete(self, move_id: UUID) -> None:
         """Remove a Move, and with it every Need's rule-out of it.
@@ -91,7 +106,7 @@ class MoveService:
         Raises:
             MoveNotFoundError: If there is no such Move.
         """
-        self._get(move_id)
+        self.get(move_id)
         self._repositories.moves.delete(move_id)
 
     def move(self, move_id: UUID, direction: MoveDirection) -> list[Move]:
@@ -109,7 +124,7 @@ class MoveService:
         Raises:
             MoveNotFoundError: If there is no such Move.
         """
-        self._get(move_id)
+        self.get(move_id)
         moves = self._repositories.moves.list_all()
         index = next(i for i, move in enumerate(moves) if move.id == move_id)
         neighbour_index = index - 1 if direction == MoveDirection.UP else index + 1
@@ -120,7 +135,7 @@ class MoveService:
             )
         return self._repositories.moves.list_all()
 
-    def _get(self, move_id: UUID) -> Move:
+    def get(self, move_id: UUID) -> Move:
         """Find a Move.
 
         Args:

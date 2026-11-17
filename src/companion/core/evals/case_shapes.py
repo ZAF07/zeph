@@ -1017,6 +1017,26 @@ UNDERSTANDING_EXPECT_FIELD = ShapeField(
             "Life Threads, by title, it must not bring up.",
             "Thread title",
         ),
+        text_list_field(
+            "lead_move",
+            "Lead Move",
+            "The Moves the reply may lead with, by name, e.g. Research. The "
+            "case fails if it leads with another, or with none.",
+            "Move",
+        ),
+        text_list_field(
+            "support_move",
+            "Supporting Move",
+            "The Moves that may support the lead, by name, e.g. Suggest. The "
+            "case fails if another supports it, or none does.",
+            "Move",
+        ),
+        yes_no_unchecked_field(
+            "no_move",
+            "Makes no Move",
+            "Yes: the reply must make no Move, just respond. No: it must lead "
+            "with a Move. Leave the Moves above empty when this is Yes.",
+        ),
         yes_no_unchecked_field(
             "curiosity_raised",
             "Brings up a Curiosity",
@@ -1075,6 +1095,40 @@ UNDERSTANDING_SHAPE = FormShape(
             "Made-up User Memory",
             "What Zeph already knows about the made-up User.",
             [UNDERSTANDING_MEMORY_FIELD],
+        ),
+        ShapeSection(
+            "Web Search",
+            "Whether Zeph can look things up for the made-up User, and what it "
+            "finds. Evals never search the real web.",
+            [
+                ShapeField(
+                    "web_search",
+                    "Web Search works",
+                    "Whether Web Search works for the User. Off, Zeph can't do "
+                    "Research and should say plainly it can't look things up.",
+                    FieldKind.ON_OFF,
+                    default=True,
+                ),
+                group_list_field(
+                    "web_results",
+                    "What a search finds",
+                    "Made-up web pages every search finds, whatever it searches "
+                    "for. Leave empty and searches find nothing.",
+                    "Web page",
+                    [
+                        text_field("title", "Title", "The page's title."),
+                        text_field(
+                            "url", "Address", "The page's address, e.g. https://…"
+                        ),
+                        long_text_field(
+                            "text",
+                            "Text",
+                            "What the page says. A search shows it, and reading "
+                            "the page gives all of it.",
+                        ),
+                    ],
+                ),
+            ],
         ),
         ShapeSection(
             "Earlier messages",

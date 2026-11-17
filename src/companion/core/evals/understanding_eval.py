@@ -144,6 +144,8 @@ def describe_what_was_done(
             call.check_in_shape is not None and call.check_in_shape.woven_in
             for call in calls
         ),
+        lead_move=understanding.lead_move,
+        support_move=understanding.support_move,
     )
 
 
@@ -384,6 +386,9 @@ def check_understanding_case(
     repositories = companion.repositories
     if case.check_in_due:
         make_check_in_due(repositories, user_id, companion.now())
+    if not case.web_search:
+        companion.turn_web_search_off()
+    companion.set_web_results(case.web_results)
     open_conversation_id = open_conversation_with(
         repositories, user_id, case.earlier, companion.now()
     )
