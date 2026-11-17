@@ -72,3 +72,7 @@ Caveats:
 ## Completion
 
 - Completed: 2026-11-17
+- Commit: `2febe9b` — Move Outcomes kept and shown: a Conversation end keeps what helped for each Move made, the Portrait reads them, Users see and delete them under "What helps you", Admins see a count
+- Commit: `0c4d50c` — Rewrap the fake chat model's docstring (review fix)
+- Commit: `6b56f9e` — Moves issue 04 done: archive issue with check and run evidence
+- Merge: `41d00dc` — Merge Moves issue 04: Move Outcomes kept and shown
