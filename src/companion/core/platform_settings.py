@@ -261,6 +261,9 @@ CURIOSITY_CHECK_INS_PER_WEEK = Setting(
 CURIOSITY_KEEPING_MODEL = Setting("curiosity_keeping_model", read_text)
 CURIOSITY_KEEPING_THINKING = Setting("curiosity_keeping_thinking", read_on_off)
 CURIOSITY_KEEPING_PROMPT = Setting("curiosity_keeping_prompt", read_text)
+MOVE_OUTCOME_KEEPING_MODEL = Setting("move_outcome_keeping_model", read_text)
+MOVE_OUTCOME_KEEPING_THINKING = Setting("move_outcome_keeping_thinking", read_on_off)
+MOVE_OUTCOME_KEEPING_PROMPT = Setting("move_outcome_keeping_prompt", read_text)
 PORTRAIT_MODEL = Setting("portrait_model", read_text)
 PORTRAIT_THINKING = Setting("portrait_thinking", read_on_off)
 PORTRAIT_PROMPT = Setting("portrait_prompt", read_text)
@@ -716,6 +719,21 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         CURIOSITY_KEEPING_THINKING.key, "Curiosity keeping thinking", SettingKind.ON_OFF
     ),
     EditableSetting(
+        MOVE_OUTCOME_KEEPING_PROMPT.key,
+        "Move Outcome keeping prompt",
+        SettingKind.TEXT,
+    ),
+    EditableSetting(
+        MOVE_OUTCOME_KEEPING_MODEL.key,
+        "Move Outcome keeping model",
+        SettingKind.MODEL,
+    ),
+    EditableSetting(
+        MOVE_OUTCOME_KEEPING_THINKING.key,
+        "Move Outcome keeping thinking",
+        SettingKind.ON_OFF,
+    ),
+    EditableSetting(
         PERSONAL_STICKER_KEEPING_PROMPT.key,
         "Personal Sticker keeping prompt",
         SettingKind.TEXT,
@@ -1078,15 +1096,29 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         thinking_key=CURIOSITY_KEEPING_THINKING.key,
     ),
     CoreService(
+        name="Move Outcome keeping",
+        runs_when="After quiet gap, while User Memory works",
+        description=(
+            "Writes what Zeph learned about each Move it made: the situation, "
+            "how the User felt, whether it helped, didn’t or was mixed, and "
+            "why. Runs only when the Conversation’s Understandings made a "
+            "Move. Users see these under “What helps you”."
+        ),
+        prompt_key=MOVE_OUTCOME_KEEPING_PROMPT.key,
+        model_key=MOVE_OUTCOME_KEEPING_MODEL.key,
+        thinking_key=MOVE_OUTCOME_KEEPING_THINKING.key,
+    ),
+    CoreService(
         name="User Portrait",
         runs_when="After quiet gap while User Memory works, and after a deletion",
         description=(
             "Writes a short picture of the User from their Memory Items, Life "
-            "Threads and newest Conversation Summaries: who they are, what’s "
-            "going on now, recurring themes, what helps and what doesn’t, and "
-            "where they stand on their Goals. Every Understanding and reply "
-            "sees it. When the User deletes a Memory Item, Life Thread or "
-            "Summary, it is written again without it."
+            "Threads, Move Outcomes and newest Conversation Summaries: who "
+            "they are, what’s going on now, recurring themes, what helps and "
+            "what doesn’t, and where they stand on their Goals. Every "
+            "Understanding and reply sees it. When the User deletes a Memory "
+            "Item, Life Thread, Move Outcome or Summary, it is written again "
+            "without it."
         ),
         prompt_key=PORTRAIT_PROMPT.key,
         model_key=PORTRAIT_MODEL.key,

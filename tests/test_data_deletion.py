@@ -17,6 +17,7 @@ from tests.fakes import (
     FakeClock,
     FakeScheduler,
     ScriptedChatModel,
+    understanding_answer,
 )
 from tests.telegram_helpers import (
     OWNER_AUTH_ID,
@@ -58,8 +59,8 @@ def set_up_user_with_every_kind_of_data(
     """Give a User messages, User Memory, a Check-in and a Telegram Connection.
 
     Their User Memory holds a Memory Item, a Conversation Summary, a Shared
-    Photo, a Life Thread and a User Portrait, and they have a Personal
-    Sticker and a Curiosity.
+    Photo, a Life Thread, a Move Outcome and a User Portrait, and they have
+    a Personal Sticker and a Curiosity.
 
     Returns:
         Their Dashboard API headers and their User ID.
@@ -69,6 +70,9 @@ def set_up_user_with_every_kind_of_data(
         "/api/admin/features/personal_stickers",
         json={"on": True},
         headers=owner_headers(client, auth_verifier),
+    )
+    chat_model.script_understanding(
+        understanding_answer(need="Accountability", lead_move="Push")
     )
     chat_model.script("what a lovely desk", "haha")
     send_to_webhook(client, telegram_photo_update(caption="my new desk"))
@@ -86,6 +90,21 @@ def set_up_user_with_every_kind_of_data(
         )
     )
     chat_model.script_portrait("A designer who just started a new job.")
+    chat_model.script_move_outcome_keeping(
+        json.dumps(
+            {
+                "move_outcomes": [
+                    {
+                        "move": 1,
+                        "situation": "Setting up for a new job.",
+                        "feeling": "excited",
+                        "result": "helped",
+                        "why": "They got going.",
+                    }
+                ]
+            }
+        )
+    )
     chat_model.script_curiosity_keeping(
         json.dumps(
             {"curiosities": [{"ask": "How is the new job?", "why": "Just started."}]}

@@ -805,10 +805,10 @@ life_thread_keeping_prompt: |-
   }
 
 # When a Conversation ends and User Memory works for the User, this call
-# rewrites their User Portrait from their Memory Items, Life Threads and
-# newest Conversation Summaries. It also runs when the User deletes a Memory
-# Item, Life Thread or Summary, so the Portrait no longer holds it. It is
-# never shown the old Portrait.
+# rewrites their User Portrait from their Memory Items, Life Threads, Move
+# Outcomes and newest Conversation Summaries. It also runs when the User
+# deletes a Memory Item, Life Thread, Move Outcome or Summary, so the Portrait
+# no longer holds it. It is never shown the old Portrait.
 portrait_model: deepseek-flash
 portrait_thinking: true
 
@@ -817,16 +817,19 @@ portrait_prompt: |-
   companion: a short, living picture of them that Zeph reads before every
   reply, so it talks to them like a friend who knows them well. You are
   given today's date, what Zeph remembers about them (by Memory Category),
-  the Life Threads (ongoing stories in their life) and their most recent
-  Conversations, newest first.
+  the Life Threads (ongoing stories in their life), what has helped and
+  what hasn't (Move Outcomes: how each kind of help Zeph gave went, in what
+  situation and mood) and their most recent Conversations, newest first.
 
   Write about "they", in plain warm sentences, in a few short paragraphs:
   - Who they are: their life, work, people who matter, what they care about.
   - What's going on in their life now.
   - Themes they keep coming back to, and patterns (e.g. "low on Sunday
     nights").
-  - What has helped them and what hasn't (e.g. "walks help; pep talks
-    annoy them").
+  - What has helped them and what hasn't, and in what moods (e.g. "a firm
+    push helps when they're frustrated, not when they're exhausted; walks
+    help"). Draw on the Move Outcomes, and say a pattern only when they
+    show one.
   - Where they stand on their Goals.
   - Open questions Zeph is still curious about.
   Use only what you are given. Don't guess, diagnose or judge. Leave out
@@ -879,6 +882,48 @@ curiosity_keeping_prompt: |-
       {"curiosity": <number>, "close": true},
       {"curiosity": <number>,
        "reaction": "engaged" | "brushed_off" | "asked_to_drop"}
+    ]
+  }
+
+# When a Conversation ends and User Memory works for the User, this call
+# writes what Zeph learned about each Move it made (lead or supporting):
+# the situation, how the User felt, whether it helped and why. It runs only
+# when the Conversation's Understandings made a Move. Users see these under
+# "What helps you" on the Memories page.
+move_outcome_keeping_model: deepseek-flash
+move_outcome_keeping_thinking: true
+
+move_outcome_keeping_prompt: |-
+  You help Zeph, an AI companion, learn what kind of help works for one
+  person, in which situations and moods. In a Conversation that has just
+  ended, Zeph made some Moves: kinds of help like Calm, Ground, Reframe,
+  Mirror, Suggest, Plan steps, Push or Research, each leading a reply or
+  supporting it. You are given today's date, the Moves Zeph made (each with
+  a number), how Zeph read each message (the Need, the Moves and the mood)
+  and the Conversation.
+
+  For each Move you can tell the result of from what they said next, write
+  one Move Outcome:
+  - "situation": what was going on for them when Zeph made it, in a
+    sentence (e.g. "Their launch kept slipping and they couldn't say what
+    done meant.").
+  - "feeling": how they felt then, in a few words (e.g. "frustrated, a bit
+    stuck").
+  - "result": "helped" if they took it up, felt better or moved forward;
+    "didnt_help" if they pushed back, shut down or felt worse; "mixed" if
+    some of it landed and some didn't.
+  - "why": in a sentence, what about the moment made it land or not (e.g.
+    "Pinning down a finish line gave them a next step they took.").
+  Write about the moment and what helped, never judge the person: say
+  "a push didn't land while they were exhausted", never "they are lazy" or
+  "they can't take advice". Use only what the Conversation shows. Leave out
+  a Move whose result you can't tell. Write about "they".
+
+  Answer with JSON only, in exactly this shape:
+  {
+    "move_outcomes": [
+      {"move": <number>, "situation": "...", "feeling": "...",
+       "result": "helped" | "didnt_help" | "mixed", "why": "..."}
     ]
   }
 

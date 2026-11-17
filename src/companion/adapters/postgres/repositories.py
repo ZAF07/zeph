@@ -40,6 +40,7 @@ from companion.adapters.postgres.tables import (
     memory_categories,
     memory_items,
     model_calls,
+    move_outcomes,
     moves,
     need_ruled_out_moves,
     needs,
@@ -116,6 +117,10 @@ from companion.core.models import (
     ModelStep,
     MoodIntensity,
     Move,
+    MoveOutcome,
+    MoveOutcomeToSave,
+    MoveResult,
+    MoveRole,
     Need,
     NeedDetails,
     NextDueTimeChange,
@@ -765,6 +770,12 @@ class PostgresUserRepository:
             .where(life_threads.c.user_id == users.c.id)
             .scalar_subquery()
         )
+        move_outcome_count = (
+            select(func.count())
+            .select_from(move_outcomes)
+            .where(move_outcomes.c.user_id == users.c.id)
+            .scalar_subquery()
+        )
         has_portrait = (
             select(user_portraits.c.user_id)
             .where(
@@ -785,6 +796,7 @@ class PostgresUserRepository:
             messages_sent.label("messages_sent"),
             life_thread_count.label("life_thread_count"),
             has_portrait.label("has_portrait"),
+            move_outcome_count.label("move_outcome_count"),
         ).order_by(users.c.created_at.desc())
         with self._database.connect() as connection:
             rows = connection.execute(statement).all()
@@ -796,6 +808,7 @@ class PostgresUserRepository:
                 messages_sent=row.messages_sent,
                 life_thread_count=row.life_thread_count,
                 has_portrait=row.has_portrait,
+                move_outcome_count=row.move_outcome_count,
             )
             for row in rows
         ]
@@ -5232,6 +5245,112 @@ class PostgresModelCallRepository:
         )
 
 
+MOVE_OUTCOME_COLUMNS = [
+    column for column in move_outcomes.c if column.name not in {"embedding", "position"}
+]
+
+
+def _to_move_outcome(row: Row[Any]) -> MoveOutcome:
+    """Turn a `move_outcomes` row into a MoveOutcome.
+
+    Args:
+        row: The row.
+
+    Returns:
+        The Move Outcome.
+    """
+    return MoveOutcome(
+        id=row.id,
+        user_id=row.user_id,
+        move=row.move,
+        role=MoveRole(row.role),
+        situation=row.situation,
+        feeling=row.feeling,
+        result=MoveResult(row.result),
+        why=row.why,
+        made_at=row.made_at,
+    )
+
+
+class PostgresMoveOutcomeRepository:
+    """Stores Move Outcomes in Postgres, each with its embedding."""
+
+    def __init__(self, database: Database) -> None:
+        """Set up the repository.
+
+        Args:
+            database: Where to run queries: the engine, or one transaction.
+        """
+        self._database = database
+
+    def add_many(self, outcomes: Sequence[MoveOutcomeToSave]) -> None:
+        """Save new Move Outcomes, in one step.
+
+        Args:
+            outcomes: The Move Outcomes, each with its embedding.
+        """
+        if not outcomes:
+            return
+        with self._database.begin() as connection:
+            connection.execute(
+                insert(move_outcomes).values(
+                    [
+                        {**asdict(to_save.outcome), "embedding": to_save.embedding}
+                        for to_save in outcomes
+                    ]
+                )
+            )
+
+    def list_for_user(self, user_id: UUID) -> list[MoveOutcome]:
+        """List a User's Move Outcomes, newest made first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Move Outcomes.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(*MOVE_OUTCOME_COLUMNS)
+                .where(move_outcomes.c.user_id == user_id)
+                .order_by(move_outcomes.c.made_at.desc(), move_outcomes.c.position)
+            ).all()
+        return [_to_move_outcome(row) for row in rows]
+
+    def delete(self, user_id: UUID, outcome_id: UUID) -> bool:
+        """Delete one of a User's Move Outcomes.
+
+        Args:
+            user_id: The User's ID.
+            outcome_id: The Move Outcome's ID.
+
+        Returns:
+            True if it was deleted; False if the User has no such Move Outcome.
+        """
+        with self._database.begin() as connection:
+            deleted = connection.execute(
+                delete(move_outcomes)
+                .where(
+                    move_outcomes.c.user_id == user_id,
+                    move_outcomes.c.id == outcome_id,
+                )
+                .returning(move_outcomes.c.id)
+            ).first()
+        return deleted is not None
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete every one of a User's Move Outcomes.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(move_outcomes).where(move_outcomes.c.user_id == user_id)
+            )
+
+
 def _build_repositories(
     database: Database,
     transaction: Callable[[], AbstractContextManager[Transaction]],
@@ -5260,6 +5379,7 @@ def _build_repositories(
         user_memory=PostgresUserMemoryRepository(database),
         life_threads=PostgresLifeThreadRepository(database),
         curiosities=PostgresCuriosityRepository(database),
+        move_outcomes=PostgresMoveOutcomeRepository(database),
         user_portraits=PostgresUserPortraitRepository(database),
         knowledge_documents=PostgresKnowledgeDocumentRepository(database),
         usage=PostgresUsageRepository(database),

@@ -409,6 +409,28 @@ curiosities = Table(
     Index("ix_curiosities_user_id_state", "user_id", "state"),
 )
 
+move_outcomes = Table(
+    "move_outcomes",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("position", BigInteger, Identity(), nullable=False, unique=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("move", Text, nullable=False),
+    Column("role", Text, nullable=False),
+    Column("situation", Text, nullable=False),
+    Column("feeling", Text, nullable=False),
+    Column("result", Text, nullable=False),
+    Column("why", Text, nullable=False),
+    Column("made_at", DateTime(timezone=True), nullable=False),
+    Column("embedding", Vector(EMBEDDING_SIZE)),
+)
+
 shared_photos = Table(
     "shared_photos",
     metadata,

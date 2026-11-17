@@ -23,6 +23,9 @@ from companion.core.models import (
     MemoryGroup,
     MemoryItem,
     MemorySource,
+    MoveOutcome,
+    MoveResult,
+    MoveRole,
     OnboardingAnswers,
     PauseLength,
     PersonalSticker,
@@ -275,6 +278,25 @@ class LifeThreadsResponse(BaseModel):
     threads: list[LifeThreadResponse]
 
 
+class MoveOutcomeResponse(BaseModel):
+    """What was learned about one Move: the moment, how it went and why."""
+
+    id: str
+    move: str
+    role: MoveRole
+    situation: str
+    feeling: str
+    result: MoveResult
+    why: str
+    made_at: datetime
+
+
+class MoveOutcomesResponse(BaseModel):
+    """A User's Move Outcomes, newest made first."""
+
+    move_outcomes: list[MoveOutcomeResponse]
+
+
 class UserPortraitResponse(BaseModel):
     """A User's User Portrait and when it was last written."""
 
@@ -353,6 +375,28 @@ def to_life_thread_response(thread: LifeThread) -> LifeThreadResponse:
         story=thread.story,
         is_open=thread.is_open,
         updated_at=thread.updated_at,
+    )
+
+
+def to_move_outcome_response(outcome: MoveOutcome) -> MoveOutcomeResponse:
+    """Describe a Move Outcome for the Dashboard.
+
+    Args:
+        outcome: The Move Outcome.
+
+    Returns:
+        The Move, its role, the situation, how they felt, the result, why
+        and when.
+    """
+    return MoveOutcomeResponse(
+        id=str(outcome.id),
+        move=outcome.move,
+        role=outcome.role,
+        situation=outcome.situation,
+        feeling=outcome.feeling,
+        result=outcome.result,
+        why=outcome.why,
+        made_at=outcome.made_at,
     )
 
 
@@ -1023,6 +1067,46 @@ def build_dashboard_api_router(
             CoreError: 404 if the User has no such Life Thread.
         """
         user_memory_service.delete_thread(user.id, thread_id)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @router.get("/move-outcomes")
+    def list_move_outcomes(
+        user: Annotated[User, Depends(current_user)],
+    ) -> MoveOutcomesResponse:
+        """Return the User's Move Outcomes, newest made first.
+
+        Args:
+            user: The signed-in User.
+
+        Returns:
+            The Move Outcomes.
+        """
+        return MoveOutcomesResponse(
+            move_outcomes=[
+                to_move_outcome_response(outcome)
+                for outcome in user_memory_service.list_move_outcomes(user.id)
+            ]
+        )
+
+    @router.delete(
+        "/move-outcomes/{outcome_id}", status_code=status.HTTP_204_NO_CONTENT
+    )
+    def delete_move_outcome(
+        user: Annotated[User, Depends(current_user)], outcome_id: UUID
+    ) -> Response:
+        """Delete one of the User's Move Outcomes.
+
+        Args:
+            user: The signed-in User.
+            outcome_id: The Move Outcome's ID.
+
+        Returns:
+            An empty response.
+
+        Raises:
+            CoreError: 404 if the User has no such Move Outcome.
+        """
+        user_memory_service.delete_move_outcome(user.id, outcome_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @router.get("/user-portrait")

@@ -173,6 +173,7 @@ export type AdminUser = {
   conversation_count: number;
   messages_sent: number;
   life_thread_count: number;
+  move_outcome_count: number;
   has_portrait: boolean;
 };
 
@@ -421,6 +422,18 @@ export type LifeThread = {
   updated_at: string;
 };
 
+/** What Zeph learned about how one Move went: the moment, how and why. */
+export type MoveOutcome = {
+  id: string;
+  move: string;
+  role: "lead" | "support";
+  situation: string;
+  feeling: string;
+  result: "helped" | "didnt_help" | "mixed";
+  why: string;
+  made_at: string;
+};
+
 /** A photo that matters to the User, kept in their User Memory. */
 export type SharedPhoto = {
   id: string;
@@ -580,6 +593,7 @@ export type ModelStep =
   | "conversation_end"
   | "life_threads"
   | "curiosities"
+  | "move_outcomes"
   | "portrait"
   | "personal_stickers";
 
@@ -1110,6 +1124,8 @@ export type ApiClient = {
   deleteConversationSummary: (id: string) => Promise<void>;
   listLifeThreads: () => Promise<LifeThread[]>;
   deleteLifeThread: (id: string) => Promise<void>;
+  listMoveOutcomes: () => Promise<MoveOutcome[]>;
+  deleteMoveOutcome: (id: string) => Promise<void>;
   getUserPortrait: () => Promise<UserPortrait | null>;
   deleteUserPortrait: () => Promise<void>;
   listSharedPhotos: () => Promise<SharedPhoto[]>;
@@ -1397,6 +1413,11 @@ export function createApiClient(
       (await request<{ threads: LifeThread[] }>("/api/life-threads")).threads,
     deleteLifeThread: (id) =>
       request<void>(`/api/life-threads/${id}`, "DELETE"),
+    listMoveOutcomes: async () =>
+      (await request<{ move_outcomes: MoveOutcome[] }>("/api/move-outcomes"))
+        .move_outcomes,
+    deleteMoveOutcome: (id) =>
+      request<void>(`/api/move-outcomes/${id}`, "DELETE"),
     getUserPortrait: async () =>
       (await request<{ portrait: UserPortrait | null }>("/api/user-portrait"))
         .portrait,

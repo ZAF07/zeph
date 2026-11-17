@@ -11,6 +11,7 @@ from companion.core.models import (
     MemoryGroup,
     MemoryItem,
     MemorySource,
+    MoveOutcome,
     PlatformSettings,
     User,
     UserPortrait,
@@ -44,6 +45,12 @@ class LifeThreadNotFoundError(MemoryNotFoundError):
     shown_message = "Life Thread not found"
 
 
+class MoveOutcomeNotFoundError(MemoryNotFoundError):
+    """Raised when a User has no Move Outcome with that ID."""
+
+    shown_message = "Move Outcome not found"
+
+
 class UserPortraitNotFoundError(MemoryNotFoundError):
     """Raised when a User has no User Portrait."""
 
@@ -55,8 +62,9 @@ class UserMemoryService:
 
     While User Memory is off the Companion stops learning but keeps using what
     it has, so only saving is stopped here. Deleting a Memory Item, Life
-    Thread or Conversation Summary asks for the User Portrait to be written
-    again without it, whatever User Memory says, since that only forgets.
+    Thread, Move Outcome or Conversation Summary asks for the User Portrait
+    to be written again without it, whatever User Memory says, since that
+    only forgets.
     """
 
     def __init__(
@@ -191,6 +199,31 @@ class UserMemoryService:
         """
         if not self._repositories.life_threads.delete(user_id, thread_id):
             raise LifeThreadNotFoundError
+        self._rewrite_portrait(user_id)
+
+    def list_move_outcomes(self, user_id: UUID) -> list[MoveOutcome]:
+        """List a User's Move Outcomes, newest made first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Move Outcomes.
+        """
+        return self._repositories.move_outcomes.list_for_user(user_id)
+
+    def delete_move_outcome(self, user_id: UUID, outcome_id: UUID) -> None:
+        """Delete one of a User's Move Outcomes, so it is never used again.
+
+        Args:
+            user_id: The User's ID.
+            outcome_id: The Move Outcome's ID.
+
+        Raises:
+            MoveOutcomeNotFoundError: If the User has no such Move Outcome.
+        """
+        if not self._repositories.move_outcomes.delete(user_id, outcome_id):
+            raise MoveOutcomeNotFoundError
         self._rewrite_portrait(user_id)
 
     def find_portrait(self, user_id: UUID) -> UserPortrait | None:

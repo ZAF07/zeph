@@ -27,6 +27,7 @@ const countHeadings = new Set([
   "Conversations",
   "Messages sent",
   "Life Threads",
+  "Move Outcomes",
 ]);
 
 const pill =
@@ -220,6 +221,7 @@ export function AdminUsers() {
                     "Conversations",
                     "Messages sent",
                     "Life Threads",
+                    "Move Outcomes",
                     "Portrait",
                     "Role",
                   ].map((heading) => (
@@ -282,6 +284,9 @@ export function AdminUsers() {
                       </td>
                       <td className="px-[18px] py-3.5 text-right tabular-nums">
                         {user.life_thread_count}
+                      </td>
+                      <td className="px-[18px] py-3.5 text-right tabular-nums">
+                        {user.move_outcome_count}
                       </td>
                       <td className="px-[18px] py-3.5">
                         {user.has_portrait ? "Yes" : "No"}

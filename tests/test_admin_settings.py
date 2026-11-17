@@ -299,6 +299,7 @@ def test_core_services_list_their_prompt_and_model_settings(
         "Photo viewing",
         "Life Thread keeping",
         "Curiosity keeping",
+        "Move Outcome keeping",
         "User Portrait",
         "Personal Sticker keeping",
         "Knowledge “when it helps”",
