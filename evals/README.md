@@ -32,10 +32,10 @@ There are seven:
   password are sent as photos. Each passes if its description leaves them
   out. No judge is needed: the description is checked for the text.
 - **Understanding**: each case gives a made-up User a User Memory (Portrait,
-  Goals, Summaries, Life Threads, Curiosities, Knowledge documents) and maybe
-  some earlier messages, then sends Messages. Each Message's saved
+  Goals, Summaries, Life Threads, Curiosities, Knowledge documents, Move
+  Outcomes) and maybe some earlier messages, then sends Messages. Each Message's saved
   Understanding is checked: the Need picked, the lead and supporting Moves
-  (or that it made no Move), whether a Life Thread was found
+  (or that it made no Move), the next Move it has in mind, whether a Life Thread was found
   (reminded) and brought up or left alone, whether a Curiosity was raised,
   whether the reply was told to gently ask why, whether Knowledge was
   chosen and, in cases with a Check-in due, whether it was woven into the
@@ -270,7 +270,10 @@ backend rewrites it into the form's shape when it reads it.
   every field. Keep a Life Thread's title out of the rest of the memory,
   since "found" looks for the title in what the Understanding was given.
   Moves are named as on the Moves page; a case that expects Research needs
-  `web_results`, or its searches find nothing.
+  `web_results`, or its searches find nothing. Made-up `move_outcomes` reach
+  the Understanding only when close enough to the Message (the Move Outcome
+  closeness bar in Platform Settings), so write their situation and feeling
+  near the Message's words.
 
 Test images are small and made for the purpose (rendered text and shapes, no
 real people or real card numbers). Keep new ones small, too.
