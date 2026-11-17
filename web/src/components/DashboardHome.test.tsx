@@ -10,8 +10,14 @@ const apiClient = {
   getHome: vi.fn<ApiClient["getHome"]>(),
 };
 
+const signOut = vi.fn<(redirectUrl: string) => Promise<void>>();
+
 vi.mock("@/lib/use-api-client", () => ({
   useApiClient: () => apiClient,
+}));
+
+vi.mock("@/lib/auth/client", () => ({
+  useSignOut: () => signOut,
 }));
 
 function checkInsWith(overrides: Partial<HomeCheckIns> = {}): HomeCheckIns {
@@ -100,6 +106,7 @@ describe("DashboardHome", () => {
       "href",
       "https://t.me/zeph_bot",
     );
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeVisible();
     const telegram = section("Telegram");
     expect(
       within(telegram).getByText("Connected as @maya_l"),
@@ -127,6 +134,19 @@ describe("DashboardHome", () => {
     ).toHaveAttribute("href", "/connect-telegram");
     expect(screen.queryByRole("region", { name: "Telegram" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Talk to Zeph" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeVisible();
+  });
+
+  it("signs the User out to the sign-in page", async () => {
+    apiClient.getHome.mockResolvedValue(homeWith());
+    signOut.mockResolvedValue(undefined);
+
+    renderWithQueries(<DashboardHome />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Sign out" }),
+    );
+
+    expect(signOut).toHaveBeenCalledWith("/sign-in");
   });
 
   it("shows Check-ins on, with quiet hours and the last Check-in sent", async () => {

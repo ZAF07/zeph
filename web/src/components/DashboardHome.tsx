@@ -10,6 +10,7 @@ import { HomeTelegramCard } from "@/components/HomeTelegramCard";
 import { LoadFailed } from "@/components/LoadFailed";
 import { MemoryNote } from "@/components/MemoryNote";
 import { RecentlyRemembered } from "@/components/RecentlyRemembered";
+import { SignOutButton } from "@/components/SignOutButton";
 import { greeting, todayHeading } from "@/lib/home";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
@@ -45,11 +46,14 @@ export function DashboardHome() {
             {greeting(home?.name ?? null, now, timeZone)}
           </h1>
         </div>
-        {home?.telegram_connection ? (
-          <a href={home.telegram_chat_url} className={primaryButton}>
-            Talk to Zeph
-          </a>
-        ) : null}
+        <div className="flex flex-wrap gap-3">
+          {home?.telegram_connection ? (
+            <a href={home.telegram_chat_url} className={primaryButton}>
+              Talk to Zeph
+            </a>
+          ) : null}
+          <SignOutButton />
+        </div>
       </header>
 
       {homeQuery.isPending ? (
