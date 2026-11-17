@@ -149,3 +149,28 @@ def test_the_next_move_migration_reloads_the_understanding_prompt(
         ).all()
     assert prompt == []
     assert next_moves == []
+
+
+def test_the_unmade_next_move_migration_reloads_the_curiosity_keeping_prompt(
+    engine: Engine, database_url: str
+) -> None:
+    downgrade_to(database_url, "0054")
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "UPDATE platform_settings SET value = to_jsonb('Old prompt'::text) "
+                    "WHERE key = 'curiosity_keeping_prompt'"
+                )
+            )
+    finally:
+        migrate(database_url)
+
+    with engine.connect() as connection:
+        prompt = connection.execute(
+            text(
+                "SELECT value FROM platform_settings "
+                "WHERE key = 'curiosity_keeping_prompt'"
+            )
+        ).all()
+    assert prompt == []
