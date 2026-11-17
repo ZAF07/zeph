@@ -1,6 +1,6 @@
 # 10 — Two saves of the same Move or Need name at once give a 500
 
-Status: needs-triage
+Status: in-progress
 
 ## Symptom
 
