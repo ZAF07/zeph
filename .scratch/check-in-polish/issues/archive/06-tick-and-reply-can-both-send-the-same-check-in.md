@@ -73,4 +73,5 @@ Caveats:
 ## Completion
 
 - Completed: 2026-11-17
-- Commits: <filled in after merge>
+- Commits: fb07bce (implementation), b9372dd (review fixes), fe2545b (archive, CONTEXT.md)
+- Merge: 45c7095
