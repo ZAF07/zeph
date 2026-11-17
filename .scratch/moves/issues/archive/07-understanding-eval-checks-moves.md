@@ -69,4 +69,9 @@ Code review (Standards and Spec, sub-agents):
 ## Completion
 
 - Completed: 2026-11-17
-- Commit: <to be filled in after merge>
+- Commits (branch `moves-07-understanding-eval-moves`):
+  - `37192e3` Moves issue 07: Understanding Eval checks lead and supporting Moves
+  - `eeafad1` Moves issue 07: review fixes
+  - `a2ff028` Moves issue 07: hosting case built on the real chat
+  - `5c9153f` Moves issue 07 done: archive issue with check and run evidence
+- Merge into `main`: `a511d05` Merge Moves issue 07: Understanding Eval checks lead and supporting Moves
