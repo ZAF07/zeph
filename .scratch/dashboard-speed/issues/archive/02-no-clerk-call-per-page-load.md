@@ -52,4 +52,6 @@ Code review (standards and spec) found no blocking issues. Minor notes, left as 
 ## Completion
 
 - Completed: 2026-11-17
-- Commit: <to be filled in after merge>
+- Commit: `267cdf6` — Dashboard speed issue 02: the sidebar shows name and email from /me, and the shell checks sign-in with Clerk's local session — no Clerk Backend API call per page load
+- Commit: `275c754` — Dashboard speed issue 02 done: archive issue with timing, run and test evidence
+- Merge: `5b61e81` — Merge dashboard speed issue 02: the sidebar shows name and email from /me and the shell checks sign-in with Clerk's local session, so no Clerk Backend API call per page load — signed-in page HTML ~320 ms to ~10 ms in a production build
