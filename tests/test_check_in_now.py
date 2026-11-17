@@ -489,6 +489,7 @@ def test_a_check_in_now_asked_while_a_scheduled_one_is_decided_still_waits(
             decided_at=clock.now(),
             skip_reason="decided from a read before the request",
         ),
+        next_due_at(engine, maya),
         clock.now() + ONE_DAY,
         pause_until_resumed=False,
     )

@@ -698,3 +698,73 @@ def test_a_woven_in_check_in_now_whose_reply_fails_to_send_keeps_waiting(
 
     assert admin_log(client, auth_verifier) == []
     assert only_entry(client, admin)["check_in_now_waiting"] is True
+
+
+def weave_in_while_the_tick_decides(
+    client: TestClient, chat_model: ScriptedChatModel
+) -> None:
+    """Have the User's message weave the Check-in in during the tick's model call."""
+
+    def user_sends_a_message() -> None:
+        chat_model.script_woven_check_in(weave_answer())
+        send_to_webhook(client, telegram_text_update("now making a big salad"))
+
+    chat_model.script("how did the board presentation go?")
+    chat_model.script(send_answer("hey, how was your day?"))
+    chat_model.before_next_reply = user_sends_a_message
+
+
+def test_a_check_in_woven_in_while_the_tick_decides_it_is_sent_once(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    engine: Engine,
+    seeded_settings: dict[str, Any],
+) -> None:
+    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    due_at = next_due_at(engine, maya_id(client, headers))
+    open_a_conversation_until_due(client, chat_model, chat_channel, clock)
+    chat_model.script_processing(processing_answer())
+    clock.advance(quiet_gap(seeded_settings))
+    weave_in_while_the_tick_decides(client, chat_model)
+
+    scheduler.tick()
+
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
+        "how did the board presentation go?"
+    ]
+    [entry] = admin_log(client, auth_verifier)
+    assert entry["woven_in"] is True
+    assert due_at is not None
+    assert next_due_at(engine, maya_id(client, headers)) == due_at + ONE_DAY
+
+
+def test_a_check_in_now_woven_in_while_the_tick_decides_it_is_sent_once(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    engine: Engine,
+    seeded_settings: dict[str, Any],
+) -> None:
+    _, admin, maya = chat_then_check_in_now(
+        client, auth_verifier, chat_channel, chat_model, clock
+    )
+    chat_model.script_processing(processing_answer())
+    clock.advance(quiet_gap(seeded_settings))
+    weave_in_while_the_tick_decides(client, chat_model)
+
+    scheduler.tick()
+
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
+        "how did the board presentation go?"
+    ]
+    [entry] = admin_log(client, auth_verifier)
+    assert (entry["woven_in"], entry["requested_by"]) == (True, INITIAL_ADMIN_EMAIL)
+    assert only_entry(client, admin)["check_in_now_waiting"] is False
+    assert as_json_time(next_due_at(engine, maya) - ONE_DAY) == entry["decided_at"]

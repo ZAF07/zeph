@@ -36,15 +36,23 @@ def fail_the_next_save(monkeypatch: pytest.MonkeyPatch) -> None:
     def fail_once(
         repository: PostgresCheckInRepository,
         check_in: CheckIn,
+        due_at_read: datetime | None,
         next_due_at: datetime,
         pause_until_resumed: bool,
         check_in_now: CheckInNowRequest | None = None,
-    ) -> None:
+    ) -> bool:
         nonlocal failed
         if not failed:
             failed = True
             raise ConnectionError("the database dropped")
-        save(repository, check_in, next_due_at, pause_until_resumed, check_in_now)
+        return save(
+            repository,
+            check_in,
+            due_at_read,
+            next_due_at,
+            pause_until_resumed,
+            check_in_now,
+        )
 
     monkeypatch.setattr(PostgresCheckInRepository, "add", fail_once)
 
