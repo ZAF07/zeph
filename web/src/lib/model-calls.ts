@@ -118,8 +118,8 @@ const intensityLabels: Record<UnderstandingShape["intensity"], string> = {
  * Lists the facts of an Understanding's shape, as labels and values.
  *
  * @param shape - The Understanding's shape.
- * @returns E.g. "Need picked: Be heard", "Threads brought up: 2 (1 lead,
- * 1 weave)".
+ * @returns E.g. "Need picked: Be heard", "Lead Move: Calm", "Threads brought
+ * up: 2 (1 lead, 1 weave)".
  */
 export function understandingShapeFacts(
   shape: UnderstandingShape,
@@ -127,6 +127,8 @@ export function understandingShapeFacts(
   const broughtUp = shape.threads_led_with + shape.threads_woven_in;
   return [
     { label: "Need picked", value: shape.need },
+    { label: "Lead Move", value: shape.lead_move ?? "None" },
+    { label: "Supporting Move", value: shape.support_move ?? "None" },
     { label: "Mood intensity", value: intensityLabels[shape.intensity] },
     { label: "Cause known", value: shape.cause_known ? "Yes" : "No" },
     { label: "Life Threads reminded", value: String(shape.threads_reminded) },

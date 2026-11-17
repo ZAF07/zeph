@@ -530,9 +530,11 @@ class ModelCallContentResponse(BaseModel):
 
 
 class UnderstandingShapeResponse(BaseModel):
-    """The shape of an Understanding: the Need and counts, never any words."""
+    """The shape of an Understanding: the Need, Move names and counts, never words."""
 
     need: str
+    lead_move: str | None
+    support_move: str | None
     intensity: MoodIntensity
     cause_known: bool
     threads_reminded: int
@@ -1006,6 +1008,8 @@ def to_understanding_shape_response(
     """
     return UnderstandingShapeResponse(
         need=shape.need,
+        lead_move=shape.lead_move,
+        support_move=shape.support_move,
         intensity=shape.intensity,
         cause_known=shape.cause_known,
         threads_reminded=shape.threads_reminded,

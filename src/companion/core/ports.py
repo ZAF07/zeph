@@ -48,6 +48,7 @@ from companion.core.models import (
     ModelCallTraceDetails,
     ModelCallTraceOverview,
     ModelStep,
+    Move,
     Need,
     NeedDetails,
     NextDueTimeChange,
@@ -862,7 +863,7 @@ class MemoryCategoryRepository(Protocol):
 
 
 class NeedRepository(Protocol):
-    """Stores Needs."""
+    """Stores Needs, each with the Moves it rules out."""
 
     def list_all(self) -> list[Need]:
         """List every Need in sort order.
@@ -919,6 +920,18 @@ class NeedRepository(Protocol):
 
         Args:
             sort_orders: The new sort order for each Need ID.
+        """
+        ...
+
+
+class MoveRepository(Protocol):
+    """Stores Moves."""
+
+    def list_all(self) -> list[Move]:
+        """List every Move in sort order.
+
+        Returns:
+            The Moves.
         """
         ...
 
@@ -2438,6 +2451,7 @@ class Repositories:
     safeguard_events: SafeguardEventRepository
     memory_categories: MemoryCategoryRepository
     needs: NeedRepository
+    moves: MoveRepository
     understandings: UnderstandingRepository
     user_memory: UserMemoryRepository
     life_threads: LifeThreadRepository

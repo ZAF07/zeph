@@ -910,6 +910,7 @@ class Need:
         how_to_reply: How to reply when it is picked, as the reply is told.
         sort_order: Where it comes in the list, lowest first.
         is_fallback: Whether it is the one used when it isn't clear.
+        ruled_out_move_ids: The Moves that never go with it.
     """
 
     id: UUID
@@ -918,6 +919,26 @@ class Need:
     how_to_reply: str
     sort_order: int
     is_fallback: bool
+    ruled_out_move_ids: frozenset[UUID]
+
+
+@dataclass(frozen=True)
+class Move:
+    """What the Companion does to help in a reply. Managed by Admins.
+
+    Attributes:
+        id: Our ID for the Move.
+        name: Its name, e.g. "Research"; unique ignoring case.
+        when_it_fits: When to pick it, as the Understanding model is told.
+        how_to_do_it: How to make it, as the reply is told.
+        sort_order: Where it comes in the list, lowest first.
+    """
+
+    id: UUID
+    name: str
+    when_it_fits: str
+    how_to_do_it: str
+    sort_order: int
 
 
 class MoodIntensity(StrEnum):
@@ -1146,6 +1167,9 @@ class UnderstandingForm:
     Attributes:
         need: The picked Need's name.
         nuance: One sentence on what fits this moment.
+        lead_move: The lead Move's name, as the model wrote it; "" for none.
+        support_move: The supporting Move's name, as the model wrote it; ""
+            for none.
         mood: How the User seems, e.g. "frustrated".
         intensity: How strongly they seem to feel it.
         cause_known: Whether the Companion knows why they feel that way.
@@ -1176,6 +1200,8 @@ class UnderstandingForm:
     curiosities: tuple[CuriosityToRaise, ...] = ()
     struggling: bool = False
     asked_for_photo: bool = False
+    lead_move: str = ""
+    support_move: str = ""
 
 
 @dataclass(frozen=True)
@@ -1192,6 +1218,8 @@ class Understanding:
         asked_why: Whether the reply was asked to gently ask why they feel
             the way they do.
         made_at: When it was made.
+        lead_move: The Move the reply led with, by name; None for none.
+        support_move: The Move that supported it, by name; None for none.
     """
 
     id: UUID
@@ -1202,6 +1230,8 @@ class Understanding:
     need: str
     asked_why: bool
     made_at: datetime
+    lead_move: str | None = None
+    support_move: str | None = None
 
 
 @dataclass(frozen=True)
@@ -1968,6 +1998,8 @@ class UnderstandingShape:
         threads_held_back: How many reminded Threads were held back, whatever
             the model chose.
         past_look_ups: How many phrases older Summaries were searched with.
+        lead_move: The Move the reply led with, by name; None for none.
+        support_move: The Move that supported it, by name; None for none.
     """
 
     need: str
@@ -1979,6 +2011,8 @@ class UnderstandingShape:
     threads_left_alone: int
     threads_held_back: int
     past_look_ups: int
+    lead_move: str | None = None
+    support_move: str | None = None
 
 
 @dataclass(frozen=True)

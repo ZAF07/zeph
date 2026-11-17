@@ -1,0 +1,96 @@
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import Engine, text
+
+from companion.adapters.postgres.database import MIGRATIONS_DIR, migrate, seed_moves
+from tests.conftest import MOVES_SEED_FILE, NEEDS_SEED_FILE
+from tests.test_moves import STARTER_MOVES, stored_rule_outs
+from tests.test_understanding import how_to_reply
+
+OLD_ACCOUNTABILITY_HOW_TO_REPLY = (
+    "Hold them to what they said they want, kindly but honestly. Name the "
+    "progress or the slip without lecturing, ask what got in the way or what "
+    "the next small step is, and remind them why it matters to them."
+)
+RELOADED_SETTINGS = (
+    "persona",
+    "understanding_prompt",
+    "web_search_tool_description",
+    "reply_web_search_instructions",
+)
+
+
+def downgrade_to_before_moves(database_url: str) -> None:
+    """Take the database back to the revision before Moves."""
+    config = Config()
+    config.set_main_option("script_location", str(MIGRATIONS_DIR))
+    config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
+    command.downgrade(config, "0049")
+
+
+def move_names(engine: Engine) -> list[str]:
+    """The stored Moves' names, in order."""
+    with engine.connect() as connection:
+        return list(
+            connection.execute(text("SELECT name FROM moves ORDER BY sort_order"))
+            .scalars()
+            .all()
+        )
+
+
+def test_the_migration_adds_the_starter_moves_and_rule_outs_to_existing_needs(
+    engine: Engine, database_url: str
+) -> None:
+    downgrade_to_before_moves(database_url)
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text("UPDATE needs SET how_to_reply = :old WHERE name = :name"),
+                {"old": OLD_ACCOUNTABILITY_HOW_TO_REPLY, "name": "Accountability"},
+            )
+    finally:
+        migrate(database_url)
+
+    assert move_names(engine) == STARTER_MOVES
+    rule_outs = stored_rule_outs(engine)
+    assert rule_outs["Be heard"] == {
+        "Reframe",
+        "Suggest",
+        "Plan steps",
+        "Push",
+        "Research",
+    }
+    assert rule_outs["Ask more"] == set(STARTER_MOVES)
+    with engine.connect() as connection:
+        accountability = connection.execute(
+            text("SELECT how_to_reply FROM needs WHERE name = 'Accountability'")
+        ).scalar_one()
+        reloaded = connection.execute(
+            text("SELECT key FROM platform_settings WHERE key = ANY(:keys)"),
+            {"keys": list(RELOADED_SETTINGS)},
+        ).all()
+    assert accountability == how_to_reply("Accountability").strip()
+    assert reloaded == []
+
+
+def test_the_migration_adds_no_moves_to_a_database_without_needs(
+    engine: Engine, database_url: str
+) -> None:
+    downgrade_to_before_moves(database_url)
+    try:
+        with engine.begin() as connection:
+            connection.execute(text("TRUNCATE needs CASCADE"))
+    finally:
+        migrate(database_url)
+
+    assert move_names(engine) == []
+
+
+def test_seeding_adds_nothing_once_moves_exist(engine: Engine) -> None:
+    with engine.begin() as connection:
+        connection.execute(text("DELETE FROM moves WHERE name = 'Push'"))
+
+    seed_moves(engine, MOVES_SEED_FILE, NEEDS_SEED_FILE)
+
+    assert move_names(engine) == [name for name in STARTER_MOVES if name != "Push"]
+    assert "Push" not in stored_rule_outs(engine)["Be heard"]

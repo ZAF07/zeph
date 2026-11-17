@@ -527,7 +527,7 @@ def _need_values(need: Need) -> dict[str, Any]:
         need: The Need.
 
     Returns:
-        Its fields, the ID as text.
+        Its fields, the IDs as text.
     """
     return {
         "id": str(need.id),
@@ -536,11 +536,16 @@ def _need_values(need: Need) -> dict[str, Any]:
         "how_to_reply": need.how_to_reply,
         "sort_order": need.sort_order,
         "is_fallback": need.is_fallback,
+        "ruled_out_move_ids": sorted(
+            str(move_id) for move_id in need.ruled_out_move_ids
+        ),
     }
 
 
 def _to_need(values: dict[str, Any]) -> Need:
     """Read a Need from a run's snapshot.
+
+    Snapshots taken before Moves rule none out.
 
     Args:
         values: Its fields, as `_need_values` wrote them.
@@ -555,6 +560,9 @@ def _to_need(values: dict[str, Any]) -> Need:
         how_to_reply=values["how_to_reply"],
         sort_order=values["sort_order"],
         is_fallback=values["is_fallback"],
+        ruled_out_move_ids=frozenset(
+            UUID(move_id) for move_id in values.get("ruled_out_move_ids", [])
+        ),
     )
 
 

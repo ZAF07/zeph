@@ -36,6 +36,8 @@ describe("model call labels", () => {
   it("writes an Understanding with no Threads brought up as 0", () => {
     const facts = understandingShapeFacts({
       need: "Ask more",
+      lead_move: null,
+      support_move: null,
       intensity: "low",
       cause_known: true,
       threads_reminded: 0,
@@ -48,5 +50,28 @@ describe("model call labels", () => {
     expect(facts).toContainEqual({ label: "Threads brought up", value: "0" });
     expect(facts).toContainEqual({ label: "Cause known", value: "Yes" });
     expect(facts).toContainEqual({ label: "Mood intensity", value: "Low" });
+    expect(facts).toContainEqual({ label: "Lead Move", value: "None" });
+    expect(facts).toContainEqual({ label: "Supporting Move", value: "None" });
+  });
+
+  it("names the lead and supporting Moves an Understanding picked", () => {
+    const facts = understandingShapeFacts({
+      need: "Accountability",
+      lead_move: "Research",
+      support_move: "Suggest",
+      intensity: "medium",
+      cause_known: true,
+      threads_reminded: 0,
+      threads_led_with: 0,
+      threads_woven_in: 0,
+      threads_left_alone: 0,
+      threads_held_back: 0,
+      past_look_ups: 0,
+    });
+    expect(facts).toContainEqual({ label: "Lead Move", value: "Research" });
+    expect(facts).toContainEqual({
+      label: "Supporting Move",
+      value: "Suggest",
+    });
   });
 });

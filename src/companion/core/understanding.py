@@ -33,6 +33,7 @@ from companion.core.models import (
     MessageDirection,
     ModelStep,
     MoodIntensity,
+    Move,
     Need,
     ThreadLeftAlone,
     ThreadToBringUp,
@@ -58,15 +59,38 @@ LIST_FIELDS = ("memory_categories", "look_up_past")
 
 
 @dataclass(frozen=True)
+class PickedMoves:
+    """The Moves a reply makes, once checked against what its Need allows.
+
+    Attributes:
+        lead: The Move the reply leads with; None for none.
+        support: The Move that supports it; None for none.
+    """
+
+    lead: Move | None = None
+    support: Move | None = None
+
+    @property
+    def lead_name(self) -> str | None:
+        """The lead Move's name; None for none."""
+        return self.lead.name if self.lead else None
+
+    @property
+    def support_name(self) -> str | None:
+        """The supporting Move's name; None for none."""
+        return self.support.name if self.support else None
+
+
+@dataclass(frozen=True)
 class UnderstoodMessage:
     """A Message's saved Understanding, and what it tells the reply.
 
     Attributes:
         understanding: The Understanding, as saved.
         reply_guidance: The section of the reply instructions it adds: the
-            Need's "how to reply", the nuance and mood, the "ask why" note
-            when it applies, the Life Threads to bring up or leave alone, and
-            the Curiosities to bring up.
+            Need's "how to reply", the Moves' "how to do it", the nuance and
+            mood, the "ask why" note when it applies, the Life Threads to
+            bring up or leave alone, and the Curiosities to bring up.
     """
 
     understanding: Understanding
@@ -106,6 +130,33 @@ def format_earlier_understanding(understanding: Understanding) -> str:
     return f"{line} {form.nuance}" if form.nuance else line
 
 
+def allowed_moves(need: Need, moves: Sequence[Move]) -> list[Move]:
+    """List the Moves a Need allows: every Move it doesn't rule out.
+
+    Args:
+        need: The Need.
+        moves: Every Move, in order.
+
+    Returns:
+        The allowed Moves, in order.
+    """
+    return [move for move in moves if move.id not in need.ruled_out_move_ids]
+
+
+def format_allowed_moves(need: Need, moves: Sequence[Move]) -> str:
+    """Write which Moves a Need allows, as the Understanding reads it.
+
+    Args:
+        need: The Need.
+        moves: Every Move, in order.
+
+    Returns:
+        E.g. "- Be heard: Calm, Ground, Mirror", or "- Get it done: none".
+    """
+    names = ", ".join(move.name for move in allowed_moves(need, moves))
+    return f"- {need.name}: {names or 'none'}"
+
+
 def number_knowledge_documents(
     documents: Sequence[KnowledgeDocument],
 ) -> dict[int, KnowledgeDocument]:
@@ -141,6 +192,7 @@ def format_knowledge_document(number: int, document: KnowledgeDocument) -> str:
 def describe_message_for_understanding(
     snapshot: UserSnapshot,
     needs: Sequence[Need],
+    moves: Sequence[Move],
     saved: SavedMemory,
     earlier: Sequence[Understanding],
     messages: list[ConversationMessage],
@@ -153,6 +205,7 @@ def describe_message_for_understanding(
     Args:
         snapshot: The User being answered.
         needs: Every Need, in order.
+        moves: Every Move, in order.
         saved: The User's saved memory, read for this reply.
         earlier: This Conversation's earlier Understandings, oldest first.
         messages: The Conversation so far, oldest first; the User's messages
@@ -163,13 +216,15 @@ def describe_message_for_understanding(
             number.
 
     Returns:
-        The time, Needs, User Portrait, Goals, Memory Categories, recent
-        Conversations, reminded Life Threads, due Curiosities, Knowledge
-        documents, earlier Understandings, earlier Conversation and latest
-        message.
+        The time, Needs, Moves and which each Need allows, User Portrait,
+        Goals, Memory Categories, recent Conversations, reminded Life
+        Threads, due Curiosities, Knowledge documents, earlier
+        Understandings, earlier Conversation and latest message.
     """
     fallback = fallback_need(needs)
     need_lines = "\n".join(f"- {need.name}: {need.when_it_fits}" for need in needs)
+    move_lines = "\n".join(f"- {move.name}: {move.when_it_fits}" for move in moves)
+    allowed_lines = "\n".join(format_allowed_moves(need, moves) for need in needs)
     goals = saved.items_in(snapshot.settings.get(HOME_GOALS_MEMORY_CATEGORY))
     goal_lines = "\n".join(f"- {item.content}" for item in goals)
     category_lines = "\n".join(
@@ -190,6 +245,8 @@ def describe_message_for_understanding(
         f"Time where they are: {format_local_time(snapshot.local_now)}\n\n"
         f"Needs:\n{need_lines}\n"
         f"Fallback Need: {fallback.name}\n\n"
+        f"Moves:\n{move_lines or 'None.'}\n\n"
+        f"Moves each Need allows:\n{allowed_lines}\n\n"
         f"Their User Portrait:\n{saved.portrait or 'Not written yet.'}\n\n"
         f"Their Goals:\n{goal_lines or 'None saved.'}\n\n"
         f"Memory Categories with something saved:\n{category_lines or 'None yet.'}"
@@ -417,6 +474,18 @@ def keep_held_back_threads_alone(
     )
 
 
+def read_move_name(value: Any) -> str:
+    """Read a Move's name from the form.
+
+    Args:
+        value: The field's value.
+
+    Returns:
+        The name without surrounding spaces; "" if it isn't text.
+    """
+    return value.strip() if isinstance(value, str) else ""
+
+
 def read_knowledge_lookup(
     value: Any, by_number: dict[int, KnowledgeDocument]
 ) -> KnowledgeLookup | None:
@@ -512,6 +581,8 @@ def read_understanding_form(
         curiosities=read_curiosities_to_raise(parsed.get("bring_up"), due),
         struggling=parsed.get("struggling") is True,
         asked_for_photo=parsed.get("asked_for_photo") is True,
+        lead_move=read_move_name(parsed.get("lead_move")),
+        support_move=read_move_name(parsed.get("support_move")),
         **lists,
     )
     return keep_held_back_threads_alone(form, reminded)
@@ -578,6 +649,31 @@ def find_need(needs: Sequence[Need], name: str) -> Need:
     return fallback_need(needs)
 
 
+def pick_moves(
+    need: Need, moves: Sequence[Move], form: UnderstandingForm
+) -> PickedMoves:
+    """Find the Moves the form named, keeping only those the Need allows.
+
+    An unknown Move, or one the Need rules out, is dropped rather than
+    failing the Understanding. A supporting Move the same as the lead is
+    dropped too, and one left without a lead becomes the lead.
+
+    Args:
+        need: The Need the reply follows.
+        moves: Every Move.
+        form: This Message's form.
+
+    Returns:
+        The lead and supporting Moves.
+    """
+    allowed = {move.name.lower(): move for move in allowed_moves(need, moves)}
+    lead = allowed.get(form.lead_move.lower())
+    support = allowed.get(form.support_move.lower())
+    if lead is None:
+        return PickedMoves(lead=support)
+    return PickedMoves(lead=lead, support=None if support == lead else support)
+
+
 def should_ask_why(form: UnderstandingForm, earlier: Sequence[Understanding]) -> bool:
     """Say whether the reply should gently ask why the User feels as they do.
 
@@ -601,6 +697,7 @@ def should_ask_why(form: UnderstandingForm, earlier: Sequence[Understanding]) ->
 
 def format_reply_guidance(
     need: Need,
+    picked: PickedMoves,
     form: UnderstandingForm,
     ask_why_note: str,
     threads_section: str,
@@ -610,6 +707,7 @@ def format_reply_guidance(
 
     Args:
         need: The Need the reply follows.
+        picked: The Moves the reply makes.
         form: This Message's form.
         ask_why_note: The "ask why" note; "" when the reply shouldn't ask.
         threads_section: The Life Threads to bring up or leave alone; "" if
@@ -617,10 +715,17 @@ def format_reply_guidance(
         curiosities_section: The Curiosities to bring up; "" if none.
 
     Returns:
-        The Need and how to reply, the nuance, the mood, the note, the Life
-        Threads and the Curiosities.
+        The Need and how to reply, the lead and supporting Moves and how to
+        make them, the nuance, the mood, the note, the Life Threads and the
+        Curiosities.
     """
     lines = [f"What they need from you right now: {need.name}.", need.how_to_reply]
+    if picked.lead:
+        lines.append(f"Lead with: {picked.lead.name}. {picked.lead.how_to_do_it}")
+    if picked.support:
+        lines.append(
+            f"Support it with: {picked.support.name}. {picked.support.how_to_do_it}"
+        )
     if form.nuance:
         lines.append(form.nuance)
     if form.mood:
@@ -634,18 +739,22 @@ def format_reply_guidance(
 
 
 def describe_understanding_shape(
-    need: Need, form: UnderstandingForm, reminded: Sequence[RemindedThread]
+    need: Need,
+    picked: PickedMoves,
+    form: UnderstandingForm,
+    reminded: Sequence[RemindedThread],
 ) -> UnderstandingShape:
     """Describe the shape of an Understanding for the Model Call Log.
 
     Args:
         need: The Need the reply follows.
+        picked: The Moves the reply makes.
         form: The form the reply follows.
         reminded: The Life Threads the Message reminded the Companion of.
 
     Returns:
-        The Need, intensity, whether the cause is known and how many Life
-        Threads and past look-ups there were; never any words.
+        The Need, the Moves' names, intensity, whether the cause is known and
+        how many Life Threads and past look-ups there were; never any words.
     """
     ways = [item.how for item in form.bring_up]
     held_back = [item for item in reminded if item.hold_back]
@@ -659,6 +768,8 @@ def describe_understanding_shape(
         threads_left_alone=len(form.left_alone),
         threads_held_back=len(held_back),
         past_look_ups=len(form.look_up_past),
+        lead_move=picked.lead_name,
+        support_move=picked.support_name,
     )
 
 
@@ -683,9 +794,10 @@ def newest_incoming_message_id(messages: list[ConversationMessage]) -> UUID:
 class UnderstandingService:
     """Makes the Understanding of each Message before the Companion replies.
 
-    One cheap model call fills in a fixed form: which Need fits, how the
-    User seems and whether the Companion knows why, which Memory Categories
-    matter, and which Life Threads and Curiosities to bring up. It sees this
+    One cheap model call fills in a fixed form: which Need fits, which Moves
+    the reply makes from those the Need allows, how the User seems and
+    whether the Companion knows why, which Memory Categories matter, and
+    which Life Threads and Curiosities to bring up. It sees this
     Conversation's earlier Understandings, so it knows how their mood is
     moving and whether it already asked why.
     """
@@ -700,8 +812,8 @@ class UnderstandingService:
         """Set up the service.
 
         Args:
-            repositories: Where Needs, Conversations and Understandings are
-                stored.
+            repositories: Where Needs, Moves, Conversations and Understandings
+                are stored.
             chat_model: Fills in the form and records the tokens used.
             model_call_log: Records the shape of each Understanding.
             clock: Tells the current time.
@@ -722,8 +834,9 @@ class UnderstandingService:
         """Make and save the Understanding of the Conversation's newest Message.
 
         Its shape goes into the Model Call Log, for every User. An unknown
-        Need falls back to the fallback Need; an unreadable form or a failed
-        call falls back to the fallback Need with no mood and no Memory
+        Need falls back to the fallback Need; an unknown Move, or one the
+        Need rules out, is dropped; an unreadable form or a failed call falls
+        back to the fallback Need with no Moves, no mood and no Memory
         Categories, so the reply still goes, with every reminded Life
         Thread that isn't held back but no Thread or Curiosity brought up.
 
@@ -739,6 +852,7 @@ class UnderstandingService:
         """
         messages = self._repositories.conversations.list_messages(conversation_id)
         needs = self._repositories.needs.list_all()
+        moves = self._repositories.moves.list_all()
         earlier = self._repositories.understandings.list_for_conversation(
             conversation_id
         )
@@ -750,6 +864,7 @@ class UnderstandingService:
             describe_message_for_understanding(
                 snapshot,
                 needs,
+                moves,
                 saved,
                 earlier,
                 messages,
@@ -767,6 +882,7 @@ class UnderstandingService:
         else:
             form = model_form
             need = find_need(needs, form.need)
+        picked = pick_moves(need, moves, form)
         asked_why = should_ask_why(form, earlier)
         understanding = Understanding(
             id=uuid4(),
@@ -777,16 +893,19 @@ class UnderstandingService:
             need=need.name,
             asked_why=asked_why,
             made_at=self._clock.now(),
+            lead_move=picked.lead_name,
+            support_move=picked.support_name,
         )
         self._repositories.understandings.add(understanding)
         self._model_call_log.record_understanding_shape(
-            snapshot, describe_understanding_shape(need, form, reminded)
+            snapshot, describe_understanding_shape(need, picked, form, reminded)
         )
         ask_why_note = snapshot.settings.get(REPLY_ASK_WHY_NOTE) if asked_why else ""
         return UnderstoodMessage(
             understanding=understanding,
             reply_guidance=format_reply_guidance(
                 need,
+                picked,
                 form,
                 ask_why_note,
                 format_threads_for_reply(reminded, model_form, snapshot.user.time_zone),

@@ -444,6 +444,8 @@ def understanding_answer(
     knowledge_search: str = "",
     struggling: bool = False,
     asked_for_photo: bool = False,
+    lead_move: object = None,
+    support_move: object = None,
 ) -> str:
     """Build the form the Understanding model answers with.
 
@@ -466,6 +468,9 @@ def understanding_answer(
         knowledge_search: The phrase to search them with.
         struggling: Whether the User is struggling.
         asked_for_photo: Whether they asked to see one of their photos.
+        lead_move: The lead Move's name, or anything else a model might
+            write there; None for no Move.
+        support_move: The supporting Move's name, the same way.
 
     Returns:
         The form as JSON.
@@ -478,6 +483,8 @@ def understanding_answer(
     return json.dumps(
         {
             "need": need,
+            "lead_move": lead_move,
+            "support_move": support_move,
             "nuance": nuance,
             "mood": mood,
             "intensity": intensity,
