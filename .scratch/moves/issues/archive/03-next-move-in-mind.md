@@ -65,3 +65,11 @@ Caveats:
 - Issue 05 (Lane B) landed first with its own 0053, so this issue's migration became 0054 revising it. The rebase had no text conflicts; the merged Understanding prompt and module keep both lanes' changes (Move Outcomes and the next Move).
 - The Plan steps reply used a numbered list, which the Persona forbids (already noted in issue 01; Evals in issue 07).
 - Shared files touched: the seed settings file, `tests/fakes.py`, `tables.py`, and a new migration.
+
+## Completion
+
+- Completed: 2026-11-17
+- Commit: `f6fb4c1` — Moves issue 03: next Move in mind — each Understanding may hold a next Move and why, stored and shown with earlier lead and supporting Moves to later Understandings in the Conversation; the Model Call Log shows its name
+- Commit: `e21fe54` — Moves issue 03: review fixes — an empty next Move why is stored as none, read_form_text and allowed_by_any_need say what they read and hold
+- Commit: `9ae8132` — Moves issue 03 done: archive issue with check and run evidence; migration is 0054 after issue 05's 0053; CONTEXT.md says which next Moves are kept
+- Merge: `1847ef5` — Merge Moves issue 03: next Move in mind — each Understanding may hold a next Move and why (one some Need allows and that can be offered now), stored and shown with the earlier lead and supporting Moves to later Understandings in the Conversation; the Model Call Log shows the next Move's name; migration 0054 reloads the seed Understanding prompt, which explains it
