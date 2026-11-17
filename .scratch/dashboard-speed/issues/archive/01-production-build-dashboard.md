@@ -61,6 +61,15 @@ Evidence per acceptance criterion (worktree stack 3010/8010/5442):
 - ADR-0005: records it; the host `pnpm dev` steps were run in the worktree (web container stopped, `pnpm dev --port 3010`, `/admin/users` loaded signed in) and the container started again.
 - Checks: `pnpm lint`, `pnpm format:check`, `pnpm typecheck` clean, `pnpm test` 66 files / 458 passed. Backend (no Python changes): ruff, ruff format --check, mypy clean, pytest 1183 passed.
 
+- After rebasing on issue 02 (merged first): full checks again — ruff, ruff format --check, mypy clean, pytest 1183 passed; web lint, format:check, typecheck clean, 67 files / 462 passed. Combined build in the running stack: all 21 pages load with no page errors, full loads 659–1517 ms (most 0.66–0.9 s, issue 02 took out the Clerk call; one 6.9 s first hit on `/` straight after restart while the backend warmed up), sidebar clicks median 59 ms; signed-out visit still lands on `/sign-in`.
+
 Caveats:
 - `docker-compose.yml` is a shared file; only the web service changed.
 - The first `pnpm build` in the image adds ~40 s to `make restart`.
+
+
+## Completion
+
+- Completed: 2026-11-17
+- Commits: 505ec4c (implementation), a49c436 (review fixes), 6c97572 (archive)
+- Merge: a8bb6e3
