@@ -66,3 +66,7 @@ Caveats:
 ## Completion
 
 - Completed: 2026-11-17
+- Commit: `f8f1f90` — Move Outcomes guide the Understanding: before each reply the User's own Move Outcomes closest to their last few texts are shown to the Understanding with their days, up to an Admin-set number and past an Admin-set closeness bar, even with User Memory off; the seed Understanding prompt says what helped before may not help now
+- Commit: `928a2ff` — Moves issue 05: review fixes — Life Threads and Move Outcomes search with one shared recent_incoming_texts helper, its constant is named RECENT_TEXTS_TO_SEARCH, two docstrings rewrapped
+- Commit: `edc5224` — Moves issue 05 done: archive issue with check and run evidence
+- Merge: `753cdff` — Merge Moves issue 05: Move Outcomes guide the Understanding
