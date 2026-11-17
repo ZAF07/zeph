@@ -879,7 +879,8 @@ curiosity_keeping_prompt: |-
   nights, wonder why". You are given today's date, what Zeph remembers about
   them (Memory Items), the Life Threads this Conversation touches, the
   Curiosities waiting or brought up in this Conversation, ones already asked
-  recently, and the Conversation.
+  recently, the next Move Zeph had in mind but never made, and the
+  Conversation.
 
   - Write a new Curiosity for something worth asking about later: an event
     coming up, a decision they're weighing, something left unfinished, a
@@ -890,6 +891,13 @@ curiosity_keeping_prompt: |-
     Memory Item ("memory_item") or Life Thread ("thread") it comes from, if
     one. Usually none or one per Conversation; never one about something
     already asked recently or already waiting.
+  - A next Move is a kind of help Zeph meant to give later in the
+    Conversation (e.g. "Plan steps, once they've picked a host") but the
+    Conversation ended first. If it's still worth following up, write it as
+    a new Curiosity about where they've got to, not about the help itself
+    (e.g. "did they get the app deployed?", "did they decide what 'done'
+    means for internal testing?"). Leave it out if the Conversation shows it
+    no longer fits, e.g. they sorted it themselves or didn't want that help.
   - For a waiting Curiosity that has changed (e.g. the presentation moved),
     give its number with the new details. If it's no longer relevant (they
     already told Zeph, or it no longer applies), give its number with

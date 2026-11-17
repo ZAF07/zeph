@@ -30,6 +30,7 @@ from companion.core.models import (
     MemoryItem,
     ModelStep,
     ThreadReaction,
+    Understanding,
     UserSnapshot,
 )
 from companion.core.platform_settings import (
@@ -485,10 +486,31 @@ def describe_curiosity(curiosity: Curiosity, raised_here: set[UUID]) -> str:
     return f"({state}) {curiosity.question} Why: {curiosity.why}"
 
 
+def describe_unmade_next_move(understandings: Sequence[Understanding]) -> str:
+    """Write the next Move the Companion still had in mind when it ended.
+
+    Only the newest Understanding's next Move counts: an earlier one was
+    either made or dropped by a later Understanding.
+
+    Args:
+        understandings: The Conversation's Understandings, oldest first.
+
+    Returns:
+        E.g. "Plan steps, once they've picked a host."; "None." if the newest
+        Understanding held no next Move.
+    """
+    newest = understandings[-1] if understandings else None
+    if newest is None or not newest.next_move:
+        return "None."
+    why = f", {newest.next_move_why}" if newest.next_move_why else ""
+    return f"{newest.next_move}{why}."
+
+
 def describe_curiosities_to_keep(
     context: CuriosityKeepingContext,
     category_names: dict[UUID, str],
     recently_raised: Sequence[Curiosity],
+    unmade_next_move: str,
     messages: list[ConversationMessage],
     snapshot: UserSnapshot,
 ) -> str:
@@ -499,12 +521,14 @@ def describe_curiosities_to_keep(
         category_names: Every Memory Category's name, by ID.
         recently_raised: Curiosities raised in earlier Conversations, newest
             first.
+        unmade_next_move: The next Move the Companion had in mind but never
+            made, with why, or "None.".
         messages: The Conversation's messages, oldest first.
         snapshot: The User whose Conversation it was.
 
     Returns:
         Today's date, the Memory Items, Threads and Curiosities, those asked
-        recently, and the Conversation.
+        recently, the unmade next Move, and the Conversation.
     """
     time_zone = snapshot.user.time_zone
     item_lines = "\n".join(
@@ -536,6 +560,7 @@ def describe_curiosities_to_keep(
         f"Curiosities waiting or brought up in this Conversation:\n"
         f"{curiosity_lines or 'None yet.'}\n\n"
         f"Asked recently, don't ask again:\n{recent_lines or 'Nothing yet.'}\n\n"
+        f"A next Move Zeph had in mind but never made:\n{unmade_next_move}\n\n"
         f"The Conversation:\n{to_transcript_lines(messages)}"
     )
 
@@ -578,9 +603,10 @@ class CuriosityKeeper:
         """Update the User's Curiosities from an ended Conversation.
 
         The model sees the User's Memory Items, the Threads the Conversation
-        touches, their waiting Curiosities, those raised in it and those
-        raised recently. An unreadable answer is asked again once; if it is
-        still unreadable nothing changes.
+        touches, their waiting Curiosities, those raised in it, those raised
+        recently and the next Move the Companion had in mind but never made.
+        An unreadable answer is asked again once; if it is still unreadable
+        nothing changes.
 
         Args:
             snapshot: The User whose Conversation it was; User Memory and
@@ -629,10 +655,18 @@ class CuriosityKeeper:
             category.id: category.name
             for category in self._repositories.memory_categories.list_all()
         }
+        unmade_next_move = describe_unmade_next_move(
+            self._repositories.understandings.list_for_conversation(conversation_id)
+        )
         entries = self._ask(
             snapshot,
             describe_curiosities_to_keep(
-                context, category_names, recently_raised, messages, snapshot
+                context,
+                category_names,
+                recently_raised,
+                unmade_next_move,
+                messages,
+                snapshot,
             ),
         )
         if entries is None:
