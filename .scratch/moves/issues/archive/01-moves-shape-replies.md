@@ -81,3 +81,5 @@ Caveats:
 
 - Completed: 2026-11-17
 - Commit: `0ebe38f` — Moves issue 01: Moves shape replies — the Understanding picks a lead and at most one supporting Move from those the Need allows, and their "how to do it" goes into the reply
+- Commit: `322de19` — Moves issue 01 done: archive issue with check and run evidence
+- Merge: `32e1712` — Merge Moves issue 01: Moves shape replies — the Understanding picks a lead and at most one supporting Move from those the Need allows, their "how to do it" goes into the reply, Understandings store them and the Model Call Log shows their names
