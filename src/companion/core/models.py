@@ -334,6 +334,8 @@ class UserOverview:
         life_thread_count: How many Life Threads the Companion follows for
             them.
         has_portrait: Whether they have a User Portrait.
+        move_outcome_count: How many Move Outcomes the Companion keeps for
+            them.
     """
 
     user: User
@@ -342,6 +344,7 @@ class UserOverview:
     messages_sent: int
     life_thread_count: int
     has_portrait: bool
+    move_outcome_count: int
 
 
 @dataclass(frozen=True)
@@ -1115,6 +1118,64 @@ class CuriosityChanges:
     added: list[Curiosity]
     updated: list[Curiosity]
     reactions: dict[UUID, ThreadReaction]
+
+
+class MoveRole(StrEnum):
+    """Whether a Move led a reply or supported it."""
+
+    LEAD = "lead"
+    SUPPORT = "support"
+
+
+class MoveResult(StrEnum):
+    """Whether a Move helped the User."""
+
+    HELPED = "helped"
+    DIDNT_HELP = "didnt_help"
+    MIXED = "mixed"
+
+
+@dataclass(frozen=True)
+class MoveOutcome:
+    """What the Companion learned about how one Move went for a User.
+
+    Part of User Memory, kept when a Conversation ends.
+
+    Attributes:
+        id: Our ID for the Move Outcome.
+        user_id: The User it is about.
+        move: The Move's name when it was made; kept if the Move is deleted.
+        role: Whether the Move led the reply or supported it.
+        situation: What was going on.
+        feeling: How the User felt.
+        result: Whether it helped, didn't or was mixed.
+        why: Why it went that way.
+        made_at: When the Move was first made in the Conversation.
+    """
+
+    id: UUID
+    user_id: UUID
+    move: str
+    role: MoveRole
+    situation: str
+    feeling: str
+    result: MoveResult
+    why: str
+    made_at: datetime
+
+
+@dataclass(frozen=True)
+class MoveOutcomeToSave:
+    """A new Move Outcome, with what it is found by.
+
+    Attributes:
+        outcome: The Move Outcome.
+        embedding: Its situation and feeling embedded, so it can be found by
+            meaning; None if embedding failed.
+    """
+
+    outcome: MoveOutcome
+    embedding: list[float] | None
 
 
 @dataclass(frozen=True)
@@ -1925,6 +1986,7 @@ class ModelStep(StrEnum):
     CONVERSATION_END = "conversation_end"
     LIFE_THREADS = "life_threads"
     CURIOSITIES = "curiosities"
+    MOVE_OUTCOMES = "move_outcomes"
     PORTRAIT = "portrait"
     PERSONAL_STICKERS = "personal_stickers"
 

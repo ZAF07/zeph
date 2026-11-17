@@ -29,6 +29,7 @@ from companion.core.models import (
     Understanding,
     UserSnapshot,
 )
+from companion.core.move_outcomes import MoveOutcomeKeeper
 from companion.core.personal_stickers import PersonalStickerKeeper
 from companion.core.platform_settings import (
     MEMORY_PROCESSING_MODEL,
@@ -374,10 +375,10 @@ class PostConversationProcessor:
 
     It changes their Memory Items, keeps the photos that matter to them as
     Shared Photos, updates their Life Threads, keeps their Curiosities and
-    then rewrites their User Portrait. Each Summary records how their mood
-    moved and what the Companion offered and how it landed, and is embedded,
-    so it can be found by meaning however old it is. Separately from User
-    Memory, it keeps the User's Personal Stickers.
+    Move Outcomes and then rewrites their User Portrait. Each Summary records
+    how their mood moved and what the Companion offered and how it landed,
+    and is embedded, so it can be found by meaning however old it is.
+    Separately from User Memory, it keeps the User's Personal Stickers.
     """
 
     def __init__(
@@ -388,6 +389,7 @@ class PostConversationProcessor:
         personal_sticker_keeper: PersonalStickerKeeper,
         life_thread_keeper: LifeThreadKeeper,
         curiosity_keeper: CuriosityKeeper,
+        move_outcome_keeper: MoveOutcomeKeeper,
         portrait_writer: PortraitWriter,
         embedder: Embedder,
         clock: Clock,
@@ -406,6 +408,7 @@ class PostConversationProcessor:
             life_thread_keeper: Starts and adds to the User's Life Threads.
             curiosity_keeper: Writes, updates and closes the User's
                 Curiosities.
+            move_outcome_keeper: Keeps what was learned about each Move made.
             portrait_writer: Rewrites the User's Portrait.
             embedder: Embeds each Summary, so it can be found by meaning.
             clock: Tells the current time.
@@ -416,6 +419,7 @@ class PostConversationProcessor:
         self._personal_sticker_keeper = personal_sticker_keeper
         self._life_thread_keeper = life_thread_keeper
         self._curiosity_keeper = curiosity_keeper
+        self._move_outcome_keeper = move_outcome_keeper
         self._portrait_writer = portrait_writer
         self._embedder = embedder
         self._clock = clock
@@ -431,9 +435,10 @@ class PostConversationProcessor:
         unreadable answer is asked again once, and if it is still unreadable
         nothing is saved, so a bad answer is never retried forever. Once the
         Conversation is marked processed, its Life Threads are kept, then its
-        Curiosities while the Curiosities Feature works, and then the User
-        Portrait is rewritten; if any of them fails, the failure is logged
-        and not tried again, so nothing is ever added twice.
+        Curiosities while the Curiosities Feature works, then its Move
+        Outcomes, and then the User Portrait is rewritten; if any of them
+        fails, the failure is logged and not tried again, so nothing is ever
+        added twice.
 
         Args:
             conversation: The ended Conversation.
@@ -490,6 +495,7 @@ class PostConversationProcessor:
         self._keep_life_threads(snapshot, conversation.id, messages)
         if snapshot.works(Feature.CURIOSITIES):
             self._keep_curiosities(snapshot, conversation.id, messages)
+        self._keep_move_outcomes(snapshot, conversation.id, messages)
         self._write_portrait(snapshot)
 
     def _save_memory(
@@ -592,6 +598,24 @@ class PostConversationProcessor:
             self._curiosity_keeper.keep_from(snapshot, conversation_id, messages)
         except Exception:
             logger.exception("Could not keep Curiosities")
+
+    def _keep_move_outcomes(
+        self,
+        snapshot: UserSnapshot,
+        conversation_id: UUID,
+        messages: list[ConversationMessage],
+    ) -> None:
+        """Keep the User's Move Outcomes, logging a failure instead of raising.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            conversation_id: The ended Conversation.
+            messages: Its messages, oldest first.
+        """
+        try:
+            self._move_outcome_keeper.keep_from(snapshot, conversation_id, messages)
+        except Exception:
+            logger.exception("Could not keep Move Outcomes")
 
     def _embed(self, summary: ConversationSummary) -> list[float] | None:
         """Embed a Summary, logging a failure instead of raising.

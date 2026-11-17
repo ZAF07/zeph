@@ -8,6 +8,7 @@ import type {
   ConversationSummary,
   LifeThread,
   MemoryGroup,
+  MoveOutcome,
   SharedPhoto,
   UserPortrait,
 } from "@/lib/api-client";
@@ -27,6 +28,8 @@ const apiClient = {
   deleteSharedPhoto: vi.fn<ApiClient["deleteSharedPhoto"]>(),
   listLifeThreads: vi.fn<ApiClient["listLifeThreads"]>(),
   deleteLifeThread: vi.fn<ApiClient["deleteLifeThread"]>(),
+  listMoveOutcomes: vi.fn<ApiClient["listMoveOutcomes"]>(),
+  deleteMoveOutcome: vi.fn<ApiClient["deleteMoveOutcome"]>(),
   getUserPortrait: vi.fn<ApiClient["getUserPortrait"]>(),
   deleteUserPortrait: vi.fn<ApiClient["deleteUserPortrait"]>(),
 };
@@ -105,6 +108,29 @@ const lifeThreads: LifeThread[] = [
   },
 ];
 
+const moveOutcomes: MoveOutcome[] = [
+  {
+    id: "outcome-1",
+    move: "Push",
+    role: "lead",
+    situation: "Their launch kept slipping; they couldn’t say what done meant.",
+    feeling: "frustrated, a bit stuck",
+    result: "helped",
+    why: "Pinning down a finish line gave them a next step they took.",
+    made_at: "2026-11-14T09:00:00Z",
+  },
+  {
+    id: "outcome-2",
+    move: "Plan steps",
+    role: "support",
+    situation: "Planning the week after a long day.",
+    feeling: "exhausted",
+    result: "didnt_help",
+    why: "Too much to take in while they were worn out.",
+    made_at: "2026-11-08T09:00:00Z",
+  },
+];
+
 const portrait: UserPortrait = {
   text: "Maya is a designer weighing a new role. Walks help; pep talks don’t.",
   updated_at: "2026-11-13T09:00:00Z",
@@ -143,6 +169,8 @@ describe("Memories", () => {
     apiClient.deleteSharedPhoto.mockResolvedValue(undefined);
     apiClient.listLifeThreads.mockResolvedValue(lifeThreads);
     apiClient.deleteLifeThread.mockResolvedValue(undefined);
+    apiClient.listMoveOutcomes.mockResolvedValue(moveOutcomes);
+    apiClient.deleteMoveOutcome.mockResolvedValue(undefined);
     apiClient.getUserPortrait.mockResolvedValue(portrait);
     apiClient.deleteUserPortrait.mockResolvedValue(undefined);
     URL.createObjectURL = vi.fn(() => "blob:photo");
@@ -451,6 +479,84 @@ describe("Memories", () => {
     );
 
     expect(apiClient.deleteLifeThread).toHaveBeenCalledWith("thread-2");
+  });
+
+  it("shows what helps: each Move Outcome's situation, feeling, result, why and date", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<Memories />);
+
+    await user.click(
+      await screen.findByRole("tab", { name: "What helps you" }),
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "What helps you" }),
+    ).toBeVisible();
+    const [push, planSteps] = screen.getAllByRole("listitem");
+    expect(within(push).getByText("Push")).toBeVisible();
+    expect(within(push).getByText("Helped")).toBeVisible();
+    expect(
+      within(push).getByText(
+        "Their launch kept slipping; they couldn’t say what done meant.",
+      ),
+    ).toBeVisible();
+    expect(
+      within(push).getByText("You felt frustrated, a bit stuck"),
+    ).toBeVisible();
+    expect(
+      within(push).getByText(
+        "Pinning down a finish line gave them a next step they took.",
+      ),
+    ).toBeVisible();
+    expect(within(push).getByText("14 Nov")).toBeVisible();
+    expect(within(planSteps).getByText("Plan steps")).toBeVisible();
+    expect(within(planSteps).getByText("Didn’t help")).toBeVisible();
+  });
+
+  it("deletes a Move Outcome", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<Memories />);
+    await user.click(
+      await screen.findByRole("tab", { name: "What helps you" }),
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Delete what helps: Push, 14 Nov" }),
+    );
+
+    expect(apiClient.deleteMoveOutcome).toHaveBeenCalledWith("outcome-1");
+    expect(screen.queryByText("Push")).not.toBeInTheDocument();
+    expect(screen.getByText("Plan steps")).toBeVisible();
+  });
+
+  it("keeps a Move Outcome and explains when deleting it fails", async () => {
+    apiClient.deleteMoveOutcome.mockRejectedValue(new Error("down"));
+    const user = userEvent.setup();
+    renderWithQueries(<Memories />);
+    await user.click(
+      await screen.findByRole("tab", { name: "What helps you" }),
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Delete what helps: Push, 14 Nov" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn’t delete that. Please try again.",
+    );
+    expect(screen.getByText("Push")).toBeVisible();
+  });
+
+  it("explains when nothing is known yet about what helps", async () => {
+    apiClient.listMoveOutcomes.mockResolvedValue([]);
+    const user = userEvent.setup();
+    renderWithQueries(<Memories />);
+
+    await user.click(
+      await screen.findByRole("tab", { name: "What helps you" }),
+    );
+
+    expect(screen.getByText("Nothing here yet")).toBeVisible();
   });
 
   it("shows each Shared Photo with its photo, description, note and date", async () => {

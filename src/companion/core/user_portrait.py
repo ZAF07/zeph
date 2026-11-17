@@ -17,11 +17,13 @@ from companion.core.models import (
     MemoryCategory,
     MemoryItem,
     ModelStep,
+    MoveOutcome,
     PlatformSettings,
     TraceKind,
     UserPortrait,
     UserSnapshot,
 )
+from companion.core.move_outcomes import describe_move_outcome
 from companion.core.platform_settings import (
     PORTRAIT_MODEL,
     PORTRAIT_PROMPT,
@@ -40,6 +42,7 @@ def describe_user_memory(
     categories: Sequence[MemoryCategory],
     items: Sequence[MemoryItem],
     threads: Sequence[LifeThread],
+    move_outcomes: Sequence[MoveOutcome],
     summaries: Sequence[ConversationSummary],
     now: datetime,
     time_zone: str | None,
@@ -50,17 +53,21 @@ def describe_user_memory(
         categories: Every Memory Category, archived ones included.
         items: The User's Memory Items.
         threads: The User's Life Threads, open first.
+        move_outcomes: The User's Move Outcomes, newest first.
         summaries: Their newest Conversation Summaries, newest first.
         now: The current time.
         time_zone: The User's IANA time zone, for the days.
 
     Returns:
-        Today's date, the Memory Items by category, the Life Threads and the
-        recent Conversations.
+        Today's date, the Memory Items by category, the Life Threads, what
+        has helped and what hasn't, and the recent Conversations.
     """
     item_sections = format_items_by_category(categories, items)
     thread_lines = "\n".join(
         f"- {describe_thread(thread, time_zone)}" for thread in threads
+    )
+    outcome_lines = "\n".join(
+        f"- {describe_move_outcome(outcome, time_zone)}" for outcome in move_outcomes
     )
     summary_lines = "\n".join(summary_line(summary, time_zone) for summary in summaries)
     item_text = "\n\n".join(item_sections)
@@ -68,6 +75,7 @@ def describe_user_memory(
         f"Today: {format_day(now, time_zone)}\n\n"
         f"What Zeph remembers:\n{item_text or 'Nothing yet.'}\n\n"
         f"Life Threads:\n{thread_lines or 'None yet.'}\n\n"
+        f"What has helped and what hasn't:\n{outcome_lines or 'Nothing yet.'}\n\n"
         f"Recent Conversations, newest first:\n{summary_lines or 'None yet.'}"
     )
 
@@ -75,8 +83,8 @@ def describe_user_memory(
 class PortraitWriter:
     """Writes each User's User Portrait from their User Memory.
 
-    It is written from their Memory Items, Life Threads and newest
-    Conversation Summaries only, never from the old Portrait, so something
+    It is written from their Memory Items, Life Threads, Move Outcomes and
+    newest Conversation Summaries only, never from the old Portrait, so something
     they deleted is gone from the next one.
     """
 
@@ -90,8 +98,8 @@ class PortraitWriter:
         """Set up the writer.
 
         Args:
-            repositories: Where User Memory, Life Threads and Portraits are
-                stored.
+            repositories: Where User Memory, Life Threads, Move Outcomes and
+                Portraits are stored.
             user_snapshots: Reads a User and their Features for a rewrite.
             chat_model: Writes the Portrait and records the tokens used.
             clock: Tells the current time.
@@ -167,6 +175,7 @@ class PortraitWriter:
             self._repositories.memory_categories.list_all(),
             self._repositories.user_memory.list_items(user_id),
             self._repositories.life_threads.list_for_user(user_id),
+            self._repositories.move_outcomes.list_for_user(user_id),
             self._repositories.user_memory.list_summaries(
                 user_id, limit=SUMMARIES_FOR_PORTRAIT
             ),

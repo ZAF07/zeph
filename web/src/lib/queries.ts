@@ -30,6 +30,7 @@ export const queryKeys = {
   memoryGroups: ["memory-groups"],
   conversationSummaries: ["conversation-summaries"],
   lifeThreads: ["life-threads"],
+  moveOutcomes: ["move-outcomes"],
   userPortrait: ["user-portrait"],
   sharedPhotos: ["shared-photos"],
   checkIns: ["check-ins"],

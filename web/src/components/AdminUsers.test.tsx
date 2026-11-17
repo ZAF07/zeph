@@ -27,6 +27,7 @@ const maya: AdminUser = {
   conversation_count: 41,
   messages_sent: 612,
   life_thread_count: 7,
+  move_outcome_count: 3,
   has_portrait: true,
 };
 
@@ -40,6 +41,7 @@ const ren: AdminUser = {
   conversation_count: 0,
   messages_sent: 0,
   life_thread_count: 0,
+  move_outcome_count: 0,
   has_portrait: false,
 };
 
@@ -71,6 +73,10 @@ describe("AdminUsers", () => {
       screen.getByRole("columnheader", { name: "Life Threads" }),
     ).toBeInTheDocument();
     expect(mayaRow.getByText("7")).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "Move Outcomes" }),
+    ).toBeInTheDocument();
+    expect(mayaRow.getByText("3")).toBeInTheDocument();
     expect(
       screen.getByRole("columnheader", { name: "Portrait" }),
     ).toBeInTheDocument();

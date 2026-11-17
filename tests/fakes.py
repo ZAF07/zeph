@@ -508,14 +508,15 @@ class ScriptedChatModel:
     """Chat model that returns pre-written replies and records each call.
 
     Safeguard, memory processing, Understanding, Life Thread keeping,
-    Curiosity keeping, Portrait writing, Personal Sticker keeping, woven-in
-    Check-in and Knowledge "when it helps" drafting calls are told apart by
-    their instructions and kept apart from reply calls, each with its own
-    script. The Safeguard defaults to "none", the Understanding to
-    `understanding_answer()`, Life Thread and Curiosity keeping to none
-    kept, Portrait writing to an empty answer (no Portrait), a woven-in
-    Check-in to "not now" and drafting to `DEFAULT_WHEN_IT_HELPS`, so tests
-    about replies don't have to script them too. Set
+    Curiosity keeping, Move Outcome keeping, Portrait writing, Personal
+    Sticker keeping, woven-in Check-in and Knowledge "when it helps"
+    drafting calls are told apart by their instructions and kept apart from
+    reply calls, each with its own script. The Safeguard defaults to "none",
+    the Understanding to `understanding_answer()`, Life Thread, Curiosity
+    and Move Outcome keeping to none kept, Portrait writing to an empty
+    answer (no Portrait), a woven-in Check-in to "not now" and drafting to
+    `DEFAULT_WHEN_IT_HELPS`, so tests about replies don't have to script
+    them too. Set
     `before_next_reply` to run something once while the next reply is being
     "written", like a User acting during a slow model call, and
     `before_next_safeguard` likewise while the next text is being checked,
@@ -534,6 +535,7 @@ class ScriptedChatModel:
         portrait_prompt: str = "",
         curiosity_keeping_prompt: str = "",
         woven_check_in_prompt: str = "",
+        move_outcome_keeping_prompt: str = "",
     ) -> None:
         """Start with no replies scripted, no calls and no delay.
 
@@ -555,6 +557,8 @@ class ScriptedChatModel:
                 keeping call.
             woven_check_in_prompt: The prompt that marks a woven-in Check-in
                 call, which comes after the Persona.
+            move_outcome_keeping_prompt: The instructions that mark a Move
+                Outcome keeping call.
         """
         self._replies: list[str | Exception | ToolCall] = []
         self._safeguard_answers: list[str | Exception] = []
@@ -566,6 +570,7 @@ class ScriptedChatModel:
         self._portrait_answers: list[str | Exception] = []
         self._curiosity_keeping_answers: list[str | Exception] = []
         self._woven_check_in_answers: list[str | Exception] = []
+        self._move_outcome_keeping_answers: list[str | Exception] = []
         self.safeguard_prompt = safeguard_prompt
         self.memory_processing_prompt = memory_processing_prompt
         self.understanding_prompt = understanding_prompt
@@ -575,6 +580,7 @@ class ScriptedChatModel:
         self.curiosity_keeping_prompt = curiosity_keeping_prompt
         self.portrait_prompt = portrait_prompt
         self.woven_check_in_prompt = woven_check_in_prompt
+        self.move_outcome_keeping_prompt = move_outcome_keeping_prompt
         self.calls: list[ChatModelCall] = []
         self.safeguard_calls: list[ChatModelCall] = []
         self.processing_calls: list[ChatModelCall] = []
@@ -585,6 +591,7 @@ class ScriptedChatModel:
         self.portrait_calls: list[ChatModelCall] = []
         self.curiosity_keeping_calls: list[ChatModelCall] = []
         self.woven_check_in_calls: list[ChatModelCall] = []
+        self.move_outcome_keeping_calls: list[ChatModelCall] = []
         self.call_order: list[str] = []
         self.delay_seconds = 0.0
         self.before_next_reply: Callable[[], None] | None = None
@@ -656,6 +663,15 @@ class ScriptedChatModel:
                 returned, to act like a failing model.
         """
         self._curiosity_keeping_answers.extend(answers)
+
+    def script_move_outcome_keeping(self, *answers: str | Exception) -> None:
+        """Queue Move Outcome keeping answers, one per call.
+
+        Args:
+            answers: The JSON answers; an exception is raised instead of
+                returned, to act like a failing model.
+        """
+        self._move_outcome_keeping_answers.extend(answers)
 
     def script_woven_check_in(self, *answers: str | Exception) -> None:
         """Queue woven-in Check-in answers, one per call.
@@ -735,6 +751,17 @@ class ScriptedChatModel:
                 self._curiosity_keeping_answers.pop(0)
                 if self._curiosity_keeping_answers
                 else json.dumps({"curiosities": []})
+            )
+        elif (
+            self.move_outcome_keeping_prompt
+            and instructions == self.move_outcome_keeping_prompt
+        ):
+            self.move_outcome_keeping_calls.append(call)
+            self.call_order.append("move_outcome_keeping")
+            answer = (
+                self._move_outcome_keeping_answers.pop(0)
+                if self._move_outcome_keeping_answers
+                else json.dumps({"move_outcomes": []})
             )
         elif (
             self.memory_processing_prompt

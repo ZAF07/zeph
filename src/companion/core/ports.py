@@ -49,6 +49,8 @@ from companion.core.models import (
     ModelCallTraceOverview,
     ModelStep,
     Move,
+    MoveOutcome,
+    MoveOutcomeToSave,
     Need,
     NeedDetails,
     NextDueTimeChange,
@@ -1058,6 +1060,49 @@ class LifeThreadRepository(Protocol):
 
     def delete_for_user(self, user_id: UUID) -> None:
         """Delete every one of a User's Life Threads.
+
+        Args:
+            user_id: The User's ID.
+        """
+        ...
+
+
+class MoveOutcomeRepository(Protocol):
+    """Stores each User's Move Outcomes, found by meaning."""
+
+    def add_many(self, outcomes: Sequence[MoveOutcomeToSave]) -> None:
+        """Save new Move Outcomes, in one step.
+
+        Args:
+            outcomes: The Move Outcomes, each with its embedding.
+        """
+        ...
+
+    def list_for_user(self, user_id: UUID) -> list[MoveOutcome]:
+        """List a User's Move Outcomes, newest made first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Move Outcomes.
+        """
+        ...
+
+    def delete(self, user_id: UUID, outcome_id: UUID) -> bool:
+        """Delete one of a User's Move Outcomes.
+
+        Args:
+            user_id: The User's ID.
+            outcome_id: The Move Outcome's ID.
+
+        Returns:
+            True if it was deleted; False if the User has no such Move Outcome.
+        """
+        ...
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete every one of a User's Move Outcomes.
 
         Args:
             user_id: The User's ID.
@@ -2456,6 +2501,7 @@ class Repositories:
     user_memory: UserMemoryRepository
     life_threads: LifeThreadRepository
     curiosities: CuriosityRepository
+    move_outcomes: MoveOutcomeRepository
     user_portraits: UserPortraitRepository
     knowledge_documents: KnowledgeDocumentRepository
     usage: UsageRepository

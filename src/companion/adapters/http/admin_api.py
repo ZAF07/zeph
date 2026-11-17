@@ -100,6 +100,7 @@ class AdminUserResponse(BaseModel):
     conversation_count: int
     messages_sent: int
     life_thread_count: int
+    move_outcome_count: int
     has_portrait: bool
 
 
@@ -1171,6 +1172,7 @@ def to_admin_user_response(overview: UserOverview) -> AdminUserResponse:
         conversation_count=overview.conversation_count,
         messages_sent=overview.messages_sent,
         life_thread_count=overview.life_thread_count,
+        move_outcome_count=overview.move_outcome_count,
         has_portrait=overview.has_portrait,
     )
 

@@ -9,6 +9,7 @@ import { LifeThreadsList } from "@/components/LifeThreadsList";
 import { LoadFailed } from "@/components/LoadFailed";
 import { MemoryNote } from "@/components/MemoryNote";
 import { MemoryItemsList } from "@/components/MemoryItemsList";
+import { MoveOutcomesList } from "@/components/MoveOutcomesList";
 import { SharedPhotosList } from "@/components/SharedPhotosList";
 import { Switch } from "@/components/Switch";
 import { UserPortraitSection } from "@/components/UserPortraitSection";
@@ -16,21 +17,23 @@ import { notAvailableText } from "@/lib/features";
 import { queryKeys, useMe, useUpdatePreferences } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
-type Tab = "memories" | "portrait" | "threads" | "summaries" | "photos";
+type Tab =
+  "memories" | "portrait" | "threads" | "helps" | "summaries" | "photos";
 
 const tabs: { id: Tab; label: string }[] = [
   { id: "memories", label: "Memories" },
   { id: "portrait", label: "About you" },
   { id: "threads", label: "What’s going on" },
+  { id: "helps", label: "What helps you" },
   { id: "summaries", label: "Conversation Summaries" },
   { id: "photos", label: "Photos" },
 ];
 
 /**
  * The Memories page: what Zeph remembers, by Memory Category, its User
- * Portrait of the User, the Life Threads it follows, the Conversation
- * Summaries and the Shared Photos, each deletable, with the User Memory
- * switch.
+ * Portrait of the User, the Life Threads it follows, what helps them (Move
+ * Outcomes), the Conversation Summaries and the Shared Photos, each
+ * deletable, with the User Memory switch.
  *
  * @returns The page, a loading block, or an error with Try again.
  */
@@ -51,6 +54,10 @@ export function Memories() {
     queryKey: queryKeys.lifeThreads,
     queryFn: () => apiClient.listLifeThreads(),
   });
+  const outcomesQuery = useQuery({
+    queryKey: queryKeys.moveOutcomes,
+    queryFn: () => apiClient.listMoveOutcomes(),
+  });
   const portraitQuery = useQuery({
     queryKey: queryKeys.userPortrait,
     queryFn: () => apiClient.getUserPortrait(),
@@ -64,6 +71,7 @@ export function Memories() {
     groupsQuery,
     portraitQuery,
     threadsQuery,
+    outcomesQuery,
     summariesQuery,
     photosQuery,
   ];
@@ -71,11 +79,18 @@ export function Memories() {
   const me = meQuery.data;
   const groups = groupsQuery.data;
   const threads = threadsQuery.data;
+  const outcomes = outcomesQuery.data;
   const summaries = summariesQuery.data;
   const photos = photosQuery.data;
   const portrait = portraitQuery.data;
   const isLoaded = Boolean(
-    me && groups && portrait !== undefined && threads && summaries && photos,
+    me &&
+    groups &&
+    portrait !== undefined &&
+    threads &&
+    outcomes &&
+    summaries &&
+    photos,
   );
   const loadFailed = !isLoaded && queries.some((query) => query.isError);
   const timeZone = me?.time_zone ?? undefined;
@@ -94,8 +109,8 @@ export function Memories() {
           <h1 className="m-0 text-h1 font-normal">Memories</h1>
           <p className="m-0 max-w-[40em] text-body text-ink-soft">
             What Zeph remembers, what it knows about you, what’s going on in
-            your life, short summaries of past Conversations and the photos it
-            kept. Delete anything you’d rather it forgot.
+            your life, what helps you, short summaries of past Conversations and
+            the photos it kept. Delete anything you’d rather it forgot.
           </p>
           <p className="m-0 text-caption text-blue">
             You can also tell Zeph “forget that”.
@@ -187,6 +202,10 @@ export function Memories() {
 
       {isLoaded && threads && tab === "threads" ? (
         <LifeThreadsList threads={threads} timeZone={timeZone} />
+      ) : null}
+
+      {isLoaded && outcomes && tab === "helps" ? (
+        <MoveOutcomesList outcomes={outcomes} timeZone={timeZone} />
       ) : null}
 
       {isLoaded && summaries && tab === "summaries" ? (
