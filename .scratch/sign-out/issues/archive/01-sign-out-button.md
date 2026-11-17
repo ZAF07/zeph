@@ -52,4 +52,9 @@ Review (`/code-review`):
 ## Completion
 
 - Completed: 2026-11-18
-- Commit: <filled in after merge>
+- Final checks after rebasing on `origin/main` 3752169 (already up to date): `make check` exit 0 — ruff, ruff format, mypy (182 files) clean; pytest 1284 passed; eslint, prettier, tsc clean; vitest 484 passed. `pnpm build` compiled.
+- Commits (branch `sign-out-01-button`):
+  - `95431e0` Sign-out issue 01: Sign out button on Home next to Talk to Zeph
+  - `6b47465` Sign-out issue 01 done: archive issue with check and run evidence
+- Merge into `main`: `e565f53` Merge Sign-out issue 01: Sign out button on Home
+- No PR: `gh` returned 401 Bad credentials, so the branch was merged locally with `--no-ff` and pushed.
