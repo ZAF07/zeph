@@ -126,7 +126,7 @@ def test_the_migration_says_research_needs_web_search(
 def test_the_next_move_migration_reloads_the_understanding_prompt(
     engine: Engine, database_url: str
 ) -> None:
-    downgrade_to(database_url, "0052")
+    downgrade_to(database_url, "0053")
     try:
         with engine.begin() as connection:
             connection.execute(
