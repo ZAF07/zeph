@@ -46,7 +46,7 @@ from companion.core.memory_categories import MemoryCategoryService
 from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.message_retention import MessageRetention
 from companion.core.model_call_log import ModelCallLog
-from companion.core.move_outcomes import MoveOutcomeKeeper
+from companion.core.move_outcomes import MoveOutcomeFinder, MoveOutcomeKeeper
 from companion.core.moves import MoveService
 from companion.core.needs import NeedService
 from companion.core.personal_stickers import (
@@ -258,6 +258,9 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         ),
         curiosity_raiser=CuriosityRaiser(
             repositories=dependencies.repositories, clock=dependencies.clock
+        ),
+        move_outcome_finder=MoveOutcomeFinder(
+            repositories=dependencies.repositories, embedder=dependencies.embedder
         ),
         understanding=UnderstandingService(
             repositories=dependencies.repositories,

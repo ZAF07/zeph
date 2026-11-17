@@ -6,6 +6,7 @@ from companion.core.knowledge_retrieval import KnowledgeRetrieval
 from companion.core.life_threads import ThreadReminder
 from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.models import MessageToAnswer, UserSnapshot
+from companion.core.move_outcomes import MoveOutcomeFinder
 from companion.core.reply_gate import ReplyGate, Stopped
 from companion.core.response_composition import ResponseComposer
 from companion.core.understanding import UnderstandingService, may_send_photo
@@ -21,9 +22,11 @@ class ReplyService:
     The steps run in this order: the ReplyGate applies the house rules left
     once the Message's texts are saved and checked, then the Companion is
     reminded of the User's Life Threads the Message touches and lists the
-    Curiosities whose day has come, then the Understanding works out what
-    the User needs, which User Memory matters, which Threads and Curiosities
-    to bring up and which Knowledge documents fit, then that memory, any
+    Curiosities whose day has come and finds the User's past Move Outcomes
+    closest to the Message, then the Understanding works out what the User
+    needs and which Moves to make, which User Memory matters, which Threads
+    and Curiosities to bring up and which Knowledge documents fit, then that
+    memory, any
     older Conversations it asked to look up and passages from the Knowledge
     documents it chose are recalled, while the Check-in model decides
     whether to weave in a Check-in that is due, then the reply is composed
@@ -38,6 +41,7 @@ class ReplyService:
         conversations: ConversationService,
         thread_reminder: ThreadReminder,
         curiosity_raiser: CuriosityRaiser,
+        move_outcome_finder: MoveOutcomeFinder,
         understanding: UnderstandingService,
         memory_retrieval: MemoryRetrieval,
         knowledge_retrieval: KnowledgeRetrieval,
@@ -53,6 +57,8 @@ class ReplyService:
                 marks those brought up.
             curiosity_raiser: Lists the Curiosities whose day has come and
                 marks those brought up.
+            move_outcome_finder: Finds the User's past Move Outcomes that fit
+                each Message.
             understanding: Works out what the User needs before each reply.
             memory_retrieval: Reads the User Memory and picks out what the
                 Understanding chose.
@@ -65,6 +71,7 @@ class ReplyService:
         self._conversations = conversations
         self._thread_reminder = thread_reminder
         self._curiosity_raiser = curiosity_raiser
+        self._move_outcome_finder = move_outcome_finder
         self._understanding = understanding
         self._memory_retrieval = memory_retrieval
         self._knowledge_retrieval = knowledge_retrieval
@@ -91,8 +98,16 @@ class ReplyService:
         saved_memory = self._memory_retrieval.read(snapshot)
         reminded = self._thread_reminder.remind(snapshot, message.conversation_id)
         due = self._curiosity_raiser.due(snapshot, message.conversation_id)
+        move_outcomes = self._move_outcome_finder.find(
+            snapshot, message.conversation_id
+        )
         understood = self._understanding.understand(
-            snapshot, message.conversation_id, saved_memory, reminded, due
+            snapshot,
+            message.conversation_id,
+            saved_memory,
+            reminded,
+            due,
+            move_outcomes,
         )
         form = understood.understanding.form
         with ThreadPoolExecutor(max_workers=1) as executor:

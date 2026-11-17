@@ -1161,6 +1161,27 @@ class MoveOutcomeRepository(Protocol):
         """
         ...
 
+    def find_by_meaning(
+        self,
+        user_id: UUID,
+        embedding: list[float],
+        min_closeness: float,
+        limit: int,
+    ) -> list[MoveOutcome]:
+        """Find a User's Move Outcomes closest in meaning to a search.
+
+        Args:
+            user_id: The User's ID; only their Move Outcomes are searched.
+            embedding: The search's embedding.
+            min_closeness: How close a Move Outcome's situation and feeling
+                must be, from 0 to 1.
+            limit: The most to return.
+
+        Returns:
+            The closest Move Outcomes, closest first.
+        """
+        ...
+
 
 class UserPortraitRepository(Protocol):
     """Stores each User's User Portrait, and whether it must be written again.

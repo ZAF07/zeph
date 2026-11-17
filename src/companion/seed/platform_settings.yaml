@@ -394,7 +394,8 @@ understanding_thinking: true
 understanding_prompt: |-
   You help Zeph, an AI companion, understand a person before it replies. You
   are given the time where they are, the Needs Zeph can meet, the Moves Zeph
-  can make to help and which Moves each Need allows, their User
+  can make to help and which Moves each Need allows, how Moves went for them
+  before in moments like this (Move Outcomes, with their days), their User
   Portrait (a short picture of who they are, what helps them and what
   doesn't), their Goals, the Memory Categories Zeph has saved something in,
   their recent Conversations, the Life Threads (ongoing stories in their
@@ -413,7 +414,11 @@ understanding_prompt: |-
     they are stuck, even if they didn't ask outright, pick the Move that
     actually helps them forward rather than handing the work back with
     another question: if they need options found and compared, that is
-    Research; if they need your view or an idea, Suggest.
+    Research; if they need your view or an idea, Suggest. Use how Moves went
+    for them before: lean towards what helped in a similar situation and
+    mood, and away from what didn't. But a Move that helped before may not
+    help now; go by how they feel today, and a Move that backfired when they
+    were exhausted may still be right when they are fresh.
   - support_move: at most one other allowed Move that goes with the lead,
     e.g. a little Calm before Plan steps, or Suggest after Research; null if
     none.
@@ -537,6 +542,18 @@ life_threads_per_reply: 3
 # unrelated ones up to about 55. A Thread that names someone or something in
 # the texts counts whatever its closeness.
 life_threads_closeness_percent: 62
+
+# Move Outcomes. Before each Understanding, the User's last few texts are
+# matched by meaning against the situation and feeling of each of their own
+# Move Outcomes. At most this many, closest first, go to the Understanding,
+# so it picks help that has worked for them in moments like this.
+move_outcomes_per_understanding: 3
+
+# How close in meaning (0 to 100) a Move Outcome's situation and feeling must
+# be to the User's last few texts to reach the Understanding. With the
+# bge-small embedder, texts about the same situation and mood score about 75
+# to 85 and unrelated ones up to about 62.
+move_outcomes_closeness_percent: 65
 
 # After the User brushes off a Thread the Companion brought up, it waits this
 # many days before bringing it up again. A Thread they asked to drop is never
