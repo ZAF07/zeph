@@ -26,12 +26,11 @@ class ReplyService:
     closest to the Message, then the Understanding works out what the User
     needs and which Moves to make, which User Memory matters, which Threads
     and Curiosities to bring up and which Knowledge documents fit, then that
-    memory, any
-    older Conversations it asked to look up and passages from the Knowledge
-    documents it chose are recalled, while the Check-in model decides
-    whether to weave in a Check-in that is due, then the reply is composed
-    and delivered, and the Threads and Curiosities it brought up are marked
-    raised. A struggling User is offered none of their Shared Photos back
+    memory, any older Conversations it asked to look up and passages from
+    the Knowledge documents it chose are recalled, while the Check-in model
+    decides whether to weave in a Check-in that is due, then the reply is
+    composed and delivered, and the Threads and Curiosities it brought up
+    are marked raised. A struggling User is offered none of their Shared Photos back
     unless they asked for one. Every step reads the User from the same snapshot.
     """
 

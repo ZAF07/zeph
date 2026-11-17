@@ -36,7 +36,7 @@ from companion.core.usage import UsageRecordingChatModel
 
 logger = logging.getLogger(__name__)
 
-RECENT_TEXTS_TO_REMIND = 3
+RECENT_TEXTS_TO_SEARCH = 3
 LONGEST_NAME_IN_WORDS = 3
 MOST_THREADS_AT_CONVERSATION_END = 10
 REACTION_WORDS = {
@@ -144,6 +144,18 @@ def incoming_texts(messages: Sequence[ConversationMessage]) -> list[str]:
         for message in messages
         if message.direction == MessageDirection.INCOMING and message.content
     ]
+
+
+def recent_incoming_texts(messages: Sequence[ConversationMessage]) -> list[str]:
+    """List the last few texts the User sent, which searches by meaning use.
+
+    Args:
+        messages: The Conversation's messages, oldest first.
+
+    Returns:
+        Their last few texts, oldest first.
+    """
+    return incoming_texts(messages)[-RECENT_TEXTS_TO_SEARCH:]
 
 
 def hold_back_reason(
@@ -376,7 +388,7 @@ class ThreadReminder:
         settings = snapshot.settings
         limit = settings.get(LIFE_THREADS_PER_REPLY)
         messages = self._repositories.conversations.list_messages(conversation_id)
-        recent_texts = incoming_texts(messages)[-RECENT_TEXTS_TO_REMIND:]
+        recent_texts = recent_incoming_texts(messages)
         if limit < 1 or not recent_texts:
             return []
         threads = find_threads_in(

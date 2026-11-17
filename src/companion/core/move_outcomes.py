@@ -7,9 +7,8 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from companion.core.life_threads import (
-    RECENT_TEXTS_TO_REMIND,
-    incoming_texts,
     read_text,
+    recent_incoming_texts,
 )
 from companion.core.memory_retrieval import format_day, format_time
 from companion.core.models import (
@@ -399,7 +398,7 @@ class MoveOutcomeFinder:
         settings = snapshot.settings
         limit = settings.get(MOVE_OUTCOMES_PER_UNDERSTANDING)
         messages = self._repositories.conversations.list_messages(conversation_id)
-        recent_texts = incoming_texts(messages)[-RECENT_TEXTS_TO_REMIND:]
+        recent_texts = recent_incoming_texts(messages)
         if limit < 1 or not recent_texts:
             return []
         try:

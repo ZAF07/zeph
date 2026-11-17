@@ -242,10 +242,10 @@ def describe_message_for_understanding(
 
     Returns:
         The time, Needs, Moves and which each Need allows, past Move
-        Outcomes with their days, User Portrait,
-        Goals, Memory Categories, recent Conversations, reminded Life
-        Threads, due Curiosities, Knowledge documents, earlier
-        Understandings, earlier Conversation and latest message.
+        Outcomes with their days, User Portrait, Goals, Memory Categories,
+        recent Conversations, reminded Life Threads, due Curiosities,
+        Knowledge documents, earlier Understandings, earlier Conversation
+        and latest message.
     """
     fallback = fallback_need(needs)
     need_lines = "\n".join(f"- {need.name}: {need.when_it_fits}" for need in needs)
