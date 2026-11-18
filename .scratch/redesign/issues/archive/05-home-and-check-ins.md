@@ -126,3 +126,8 @@ All pages match the design.
 ```
 - Checks: `pnpm lint` clean, `pnpm format:check` clean, `pnpm typecheck` clean, `pnpm test` 88 files / 555 tests passed.
 - `/run` again on the rebuilt container with the same real data: pause, resume, quiet hours and the switch save, with no page errors and no sideways scroll on Home at 1280 or 390.
+
+## Completion
+
+- Completed: 2026-11-18
+- Commit: merge `b033250` into main (branch `redesign-05-home-and-check-ins`: `82006a5` Home and Check-ins, `ef6f98a` code-review fixes, `f925960` evidence and archive, `01efd5e` formatQuietHour after the rebase onto issue 04)
