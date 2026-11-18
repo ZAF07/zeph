@@ -1,4 +1,5 @@
 import { AccountSettings } from "@/components/AccountSettings";
+import { PageHeader } from "@/components/PageHeader";
 
 /**
  * The Account & privacy page, where a User changes their profile and
@@ -9,13 +10,11 @@ import { AccountSettings } from "@/components/AccountSettings";
 export default function AccountPage() {
   return (
     <>
-      <header className="flex flex-col gap-2">
-        <h1 className="m-0 text-h1 font-normal">Account &amp; privacy</h1>
-        <p className="m-0 max-w-[40em] text-body text-ink-soft">
-          Everything about you, and everything you’ve shared, is yours to change
-          or take back.
-        </p>
-      </header>
+      <PageHeader
+        eyebrow="Account & privacy"
+        title="Account & privacy"
+        lead="Your details, what Zeph is allowed to keep, and how to remove it."
+      />
       <AccountSettings />
     </>
   );

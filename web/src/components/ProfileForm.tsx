@@ -4,10 +4,16 @@ import { useState, type FormEvent } from "react";
 
 import { primaryButton } from "@/components/button-styles";
 import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
-import { fieldCaption, fieldLabel, inputField } from "@/components/form-styles";
 import { LocationFields } from "@/components/LocationFields";
+import { SavedNote } from "@/components/SavedNote";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type { Me } from "@/lib/api-client";
 import { useUpdatePreferences } from "@/lib/queries";
+
+const profileLabel = "flex min-w-0 flex-[1_1_240px] flex-col gap-1.5";
+const profileName = "text-[13px] text-soft";
+const profileBox =
+  "box-border flex min-h-[46px] w-full items-center rounded-input border bg-bg-deep px-3.5 text-[15px]";
 
 /**
  * The Profile section: what Zeph calls the User, their email, country and
@@ -51,55 +57,55 @@ export function ProfileForm({ me }: { me: Me }) {
     <form
       aria-labelledby="profile-heading"
       onSubmit={save}
-      className="flex flex-col gap-5 rounded-card border border-line bg-white p-8"
+      className="box-border rounded-card border border-line bg-panel px-6 py-[22px]"
     >
-      <h2 id="profile-heading" className="m-0 text-[17px] font-semibold">
+      <h2
+        id="profile-heading"
+        className="mt-0 mb-[14px] text-[17px] font-normal text-cream"
+      >
         Profile
       </h2>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(240px,100%),1fr))] gap-4">
-        <label className={fieldLabel}>
-          What Zeph calls you
+      <div className="flex flex-wrap gap-4">
+        <label className={profileLabel}>
+          <span className={profileName}>What Zeph calls you</span>
           <input
-            className={inputField}
+            className={`${profileBox} border-line-strong text-text`}
             type="text"
             maxLength={100}
             value={name}
             onChange={(event) => clearSavedOnEdit(setName)(event.target.value)}
           />
         </label>
-        <div className={fieldLabel}>
-          <span>Email</span>
-          <span className={`${inputField} flex items-center text-ink-soft`}>
+        <div className={profileLabel}>
+          <span className={profileName}>Email</span>
+          <span className={`${profileBox} border-line text-soft`}>
             {me.email ?? "—"}
           </span>
-          <span className={fieldCaption}>From your sign-in</span>
+          <span className="text-[12px] text-soft">From your sign-in</span>
         </div>
+        <LocationFields
+          inline
+          country={country}
+          timeZone={timeZone}
+          onCountryChange={clearSavedOnEdit(setCountry)}
+          onTimeZoneChange={clearSavedOnEdit(setTimeZone)}
+          timeZoneNote={
+            <ChangedInChatCaption
+              changedAt={me.changed_in_chat.time_zone}
+              timeZone={me.time_zone ?? undefined}
+            />
+          }
+        />
       </div>
-      <LocationFields
-        country={country}
-        timeZone={timeZone}
-        onCountryChange={clearSavedOnEdit(setCountry)}
-        onTimeZoneChange={clearSavedOnEdit(setTimeZone)}
-        timeZoneNote={
-          <ChangedInChatCaption
-            changedAt={me.changed_in_chat.time_zone}
-            timeZone={me.time_zone ?? undefined}
-          />
-        }
-      />
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="mt-[18px] flex flex-wrap items-center gap-3">
         <button type="submit" className={primaryButton} disabled={!canSave}>
           {updatePreferences.isPending ? "Saving…" : "Save changes"}
         </button>
-        {updatePreferences.isSuccess ? (
-          <p role="status" className="m-0 text-sm text-blue-deep">
-            Saved
-          </p>
-        ) : null}
+        {updatePreferences.isSuccess ? <SavedNote>Saved.</SavedNote> : null}
         {updatePreferences.isError ? (
-          <p role="alert" className="m-0 text-sm text-danger-deep">
+          <SaveFailedNote>
             We couldn’t save that. Please try again.
-          </p>
+          </SaveFailedNote>
         ) : null}
       </div>
     </form>

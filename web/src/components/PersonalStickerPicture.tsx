@@ -9,11 +9,11 @@ import { useImageUrl } from "@/lib/use-image-url";
 
 /**
  * A Personal Sticker's image, loaded through the API client. Shows the
- * sticker's emoji instead while it loads, or when it has no image or it
- * can't load.
+ * drawn dashed box instead while it loads, or when it has no image or it
+ * can't load, with the sticker's emoji or the word "Sticker".
  *
  * @param props - `sticker` is the User's Personal Sticker to show.
- * @returns The image, or its emoji in the same square.
+ * @returns The image, or the dashed box in the same square.
  */
 export function PersonalStickerPicture({
   sticker,
@@ -26,18 +26,18 @@ export function PersonalStickerPicture({
     () => apiClient.getPersonalStickerImage(sticker.id),
     sticker.has_image,
   ).url;
-  const label = `Sticker: ${sticker.emoji ?? "no emoji"}`;
+  const label = sticker.emoji ? `Sticker: ${sticker.emoji}` : "Sticker";
 
   if (imageUrl) {
     return (
-      <div className="relative aspect-square w-20 flex-none overflow-hidden rounded-xl bg-subtle">
+      <div className="relative box-content size-14 flex-none overflow-hidden rounded-input border border-transparent">
         <Image
           src={imageUrl}
           alt={label}
           fill
-          sizes="80px"
+          sizes="56px"
           unoptimized
-          className="object-contain p-1.5"
+          className="object-contain"
         />
       </div>
     );
@@ -46,9 +46,9 @@ export function PersonalStickerPicture({
     <div
       role="img"
       aria-label={label}
-      className="flex aspect-square w-20 flex-none items-center justify-center rounded-xl border border-dashed border-line-strong bg-subtle text-[36px]"
+      className="box-content flex size-14 flex-none items-center justify-center rounded-input border border-dashed border-line-strong text-[11px] text-soft"
     >
-      {sticker.emoji}
+      {sticker.emoji ?? "Sticker"}
     </div>
   );
 }

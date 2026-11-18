@@ -96,21 +96,13 @@ describe("AccountSettings", () => {
     renderWithQueries(<AccountSettings />);
 
     const yourData = within(
-      await screen.findByRole("region", { name: "Your data" }),
+      await screen.findByRole("region", { name: "Delete my data" }),
     );
     expect(
       yourData.getByText(
         "Removes your messages, memories and the private notes Zeph keeps.",
       ),
     ).toBeVisible();
-  });
-
-  it("says Delete my data can be asked for in chat", async () => {
-    renderWithQueries(<AccountSettings />);
-
-    expect(
-      await screen.findByText(/You can also tell Zeph “delete my data”/),
-    ).toBeInTheDocument();
   });
 
   it("marks the time zone and User Memory as changed in chat", async () => {
@@ -140,7 +132,7 @@ describe("AccountSettings", () => {
 
     await user.click(screen.getByRole("button", { name: "Save changes" }));
 
-    expect(await screen.findByText("Saved")).toBeInTheDocument();
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
     expect(screen.queryByText(/Changed in chat/)).not.toBeInTheDocument();
   });
 
@@ -168,7 +160,7 @@ describe("AccountSettings", () => {
     ]);
     await user.click(screen.getByRole("button", { name: "Save changes" }));
 
-    expect(await screen.findByText("Saved")).toBeInTheDocument();
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
     expect(apiClient.updatePreferences).toHaveBeenCalledWith({
       name: "May",
       country: "GB",
@@ -257,37 +249,32 @@ describe("AccountSettings", () => {
     ).toBeInTheDocument();
   });
 
-  it("states the retention period from settings and that memories stay", async () => {
+  it("states the retention period from settings", async () => {
     renderWithQueries(<AccountSettings />);
 
     expect(
-      await screen.findByText(
-        "Messages are deleted automatically after 14 days. Summaries and memories stay until you delete them.",
-      ),
+      await screen.findByText("Messages are otherwise kept for 14 days."),
     ).toBeInTheDocument();
   });
 
-  it("deletes the User's data only after DELETE is typed", async () => {
+  it("deletes the User's data only after confirming in the dialog", async () => {
     const user = userEvent.setup();
     renderWithQueries(<AccountSettings />);
     const yourData = within(
-      await screen.findByRole("region", { name: "Your data" }),
+      await screen.findByRole("region", { name: "Delete my data" }),
     );
 
     await user.click(yourData.getByRole("button", { name: "Delete my data" }));
-    const confirm = yourData.getByRole("button", { name: "Delete my data" });
-    expect(confirm).toBeDisabled();
-    await user.type(
-      yourData.getByLabelText("Type DELETE to confirm"),
-      "delete",
+    const dialog = within(
+      screen.getByRole("alertdialog", { name: "Delete my data?" }),
     );
-    expect(confirm).toBeDisabled();
-    await user.clear(yourData.getByLabelText("Type DELETE to confirm"));
-    await user.type(
-      yourData.getByLabelText("Type DELETE to confirm"),
-      "DELETE",
-    );
-    await user.click(confirm);
+    expect(
+      dialog.getByText(
+        "Removes your messages, memories and the private notes Zeph keeps. This can’t be undone.",
+      ),
+    ).toBeVisible();
+    expect(apiClient.deleteMyData).not.toHaveBeenCalled();
+    await user.click(dialog.getByRole("button", { name: "Delete my data" }));
 
     expect(apiClient.deleteMyData).toHaveBeenCalledTimes(1);
     expect(await yourData.findByRole("status")).toHaveTextContent(
@@ -296,19 +283,17 @@ describe("AccountSettings", () => {
     expect(apiClient.deleteAccount).not.toHaveBeenCalled();
   });
 
-  it("cancelling Delete my data deletes nothing", async () => {
+  it("keeping my data deletes nothing", async () => {
     const user = userEvent.setup();
     renderWithQueries(<AccountSettings />);
     const yourData = within(
-      await screen.findByRole("region", { name: "Your data" }),
+      await screen.findByRole("region", { name: "Delete my data" }),
     );
 
     await user.click(yourData.getByRole("button", { name: "Delete my data" }));
-    await user.click(yourData.getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: "Keep my data" }));
 
-    expect(
-      yourData.queryByLabelText("Type DELETE to confirm"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(apiClient.deleteMyData).not.toHaveBeenCalled();
   });
 
@@ -317,22 +302,22 @@ describe("AccountSettings", () => {
     const user = userEvent.setup();
     renderWithQueries(<AccountSettings />);
     const yourData = within(
-      await screen.findByRole("region", { name: "Your data" }),
+      await screen.findByRole("region", { name: "Delete my data" }),
     );
 
     await user.click(yourData.getByRole("button", { name: "Delete my data" }));
-    await user.type(
-      yourData.getByLabelText("Type DELETE to confirm"),
-      "DELETE",
+    await user.click(
+      within(
+        screen.getByRole("alertdialog", { name: "Delete my data?" }),
+      ).getByRole("button", { name: "Delete my data" }),
     );
-    await user.click(yourData.getByRole("button", { name: "Delete my data" }));
 
     expect(await yourData.findByRole("alert")).toHaveTextContent(
       "We couldn’t delete your data. Please try again.",
     );
   });
 
-  it("deletes the account after DELETE is typed, then signs out", async () => {
+  it("deletes the account after confirming in the dialog, then signs out", async () => {
     const user = userEvent.setup();
     renderWithQueries(<AccountSettings />);
     const deleteAccount = within(
@@ -342,15 +327,12 @@ describe("AccountSettings", () => {
     await user.click(
       deleteAccount.getByRole("button", { name: "Delete my account" }),
     );
-    const confirm = deleteAccount.getByRole("button", {
-      name: "Permanently delete account",
-    });
-    expect(confirm).toBeDisabled();
-    await user.type(
-      deleteAccount.getByLabelText("Type DELETE to confirm"),
-      "DELETE",
+    expect(apiClient.deleteAccount).not.toHaveBeenCalled();
+    await user.click(
+      within(
+        screen.getByRole("alertdialog", { name: "Delete your account?" }),
+      ).getByRole("button", { name: "Permanently delete account" }),
     );
-    await user.click(confirm);
 
     expect(apiClient.deleteAccount).toHaveBeenCalledTimes(1);
     await vi.waitFor(() => expect(signOut).toHaveBeenCalledWith("/sign-in"));
@@ -367,13 +349,9 @@ describe("AccountSettings", () => {
     await user.click(
       deleteAccount.getByRole("button", { name: "Delete my account" }),
     );
-    await user.click(
-      deleteAccount.getByRole("button", { name: "Keep my account" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Keep my account" }));
 
-    expect(
-      deleteAccount.getByRole("button", { name: "Delete my account" }),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(apiClient.deleteAccount).not.toHaveBeenCalled();
   });
 
@@ -390,12 +368,8 @@ describe("AccountSettings", () => {
     await user.click(
       deleteAccount.getByRole("button", { name: "Delete my account" }),
     );
-    await user.type(
-      deleteAccount.getByLabelText("Type DELETE to confirm"),
-      "DELETE",
-    );
     await user.click(
-      deleteAccount.getByRole("button", { name: "Permanently delete account" }),
+      screen.getByRole("button", { name: "Permanently delete account" }),
     );
 
     expect(await deleteAccount.findByRole("alert")).toHaveTextContent(

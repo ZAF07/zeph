@@ -3,14 +3,16 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { dangerButton } from "@/components/button-styles";
-import { DeleteConfirmation } from "@/components/DeleteConfirmation";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { DeletionRow } from "@/components/DeletionRow";
+import { SavedNote } from "@/components/SavedNote";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { useApiClient } from "@/lib/use-api-client";
 
 /**
- * The Your data section: how long messages are kept, and Delete my data
- * behind a type-DELETE confirmation. After a delete, every page loads its
- * data again.
+ * The Delete my data row: what it removes and how long messages are
+ * otherwise kept, with Delete my data behind a confirm dialog. After a
+ * delete, every page loads its data again.
  *
  * @param props - `retentionDays` is how many days messages are kept and
  *   `deleteMyDataDescription` says what Delete my data removes, both from
@@ -31,71 +33,53 @@ export function YourDataSection({
   const deleteMyData = useMutation({
     mutationFn: () => apiClient.deleteMyData(),
     onSuccess: () => void queryClient.invalidateQueries(),
-    onSettled: () => setIsConfirming(false),
   });
 
   return (
-    <section
-      aria-labelledby="your-data-heading"
-      className="flex flex-col rounded-card border border-line bg-white"
-    >
-      <h2
-        id="your-data-heading"
-        className="m-0 px-6 pb-2 pt-5 text-[17px] font-semibold"
-      >
-        Your data
-      </h2>
-      <p className="m-0 px-6 pb-4 text-[15px] text-ink-soft">
-        Messages are deleted automatically after {retentionDays}{" "}
-        {retentionDays === 1 ? "day" : "days"}. Summaries and memories stay
-        until you delete them.
-      </p>
-      <div className="flex flex-wrap items-start justify-between gap-4 border-t border-line px-6 py-4">
-        <span className="flex min-w-0 flex-[1_1_260px] flex-col gap-0.5">
-          <span className="font-semibold">Delete my data</span>
-          <span className="text-caption text-ink-muted">
+    <DeletionRow
+      headingId="your-data-heading"
+      title="Delete my data"
+      description={
+        <>
+          <p className="mt-1 mb-0 max-w-[620px] text-[14px] text-soft">
             {deleteMyDataDescription}
-          </span>
-          <span className="text-caption text-blue">
-            You can also tell Zeph “delete my data” — it will ask for the
-            confirmation word.
-          </span>
-        </span>
-        {isConfirming ? null : (
-          <button
-            type="button"
-            className={dangerButton}
-            onClick={() => {
-              deleteMyData.reset();
-              setIsConfirming(true);
-            }}
-          >
-            Delete my data
-          </button>
-        )}
-      </div>
-      {isConfirming ? (
-        <div className="mx-6 mb-5">
-          <DeleteConfirmation
-            confirmLabel="Delete my data"
-            cancelLabel="Cancel"
-            isDeleting={deleteMyData.isPending}
-            onConfirm={() => deleteMyData.mutate()}
-            onCancel={() => setIsConfirming(false)}
-          />
-        </div>
-      ) : null}
+          </p>
+          <p className="mt-1.5 mb-0 text-[13px] text-soft">
+            Messages are otherwise kept for {retentionDays}{" "}
+            {retentionDays === 1 ? "day" : "days"}.
+          </p>
+        </>
+      }
+      buttonLabel="Delete my data"
+      isDeleting={deleteMyData.isPending}
+      onStart={() => {
+        deleteMyData.reset();
+        setIsConfirming(true);
+      }}
+    >
+      <ConfirmDialog
+        open={isConfirming}
+        title="Delete my data?"
+        body={`${deleteMyDataDescription} This can’t be undone.`}
+        cancelLabel="Keep my data"
+        confirmLabel="Delete my data"
+        onConfirm={() => {
+          setIsConfirming(false);
+          deleteMyData.mutate();
+        }}
+        onCancel={() => setIsConfirming(false)}
+      />
       {deleteMyData.isSuccess ? (
-        <p role="status" className="m-0 px-6 pb-5 text-sm text-blue-deep">
+        <SavedNote>
           Your data has been deleted. Connect Telegram again whenever you want
           to start fresh.
-        </p>
+        </SavedNote>
       ) : null}
       {deleteMyData.isError ? (
-        <p role="alert" className="m-0 px-6 pb-5 text-sm text-danger-deep">
+        <SaveFailedNote>
           We couldn’t delete your data. Please try again.
-        </p>
+        </SaveFailedNote>
       ) : null}
-    </section>
+    </DeletionRow>
   );
 }
