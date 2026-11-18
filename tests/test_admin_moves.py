@@ -80,6 +80,7 @@ def test_admin_sees_the_moves_in_order_with_the_feature_each_needs(
         **{name: None for name in STARTER_MOVES},
         "Research": "web_search",
     }
+    assert not any(move["asks_a_question"] for move in moves)
     calm = move_named(client, admin, "Calm")
     assert calm["when_it_fits"] == seeded_moves()["Calm"]["when_it_fits"].strip()
     assert calm["how_to_do_it"] == seeded_moves()["Calm"]["how_to_do_it"].strip()
@@ -99,9 +100,10 @@ def test_admin_can_add_edit_and_delete_moves(
 ) -> None:
     admin = owner_headers(client, auth_verifier)
 
-    added = add_move(client, admin, name="  Celebrate  ")
+    added = add_move(client, admin, name="  Celebrate  ", asks_a_question=True)
     assert added["name"] == "Celebrate"
     assert added["needed_feature"] is None
+    assert added["asks_a_question"] is True
     assert list_moves(client, admin)[-1]["id"] == added["id"]
 
     response = client.put(
@@ -111,6 +113,7 @@ def test_admin_can_add_edit_and_delete_moves(
             "when_it_fits": "Good news.",
             "how_to_do_it": "Cheer them on.",
             "needed_feature": "web_search",
+            "asks_a_question": False,
         },
         headers=admin,
     )
@@ -120,7 +123,8 @@ def test_admin_can_add_edit_and_delete_moves(
         edited["when_it_fits"],
         edited["how_to_do_it"],
         edited["needed_feature"],
-    ) == ("Good news.", "Cheer them on.", "web_search")
+        edited["asks_a_question"],
+    ) == ("Good news.", "Cheer them on.", "web_search", False)
 
     response = client.delete(f"/api/admin/moves/{added['id']}", headers=admin)
     assert response.status_code == 204

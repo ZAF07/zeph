@@ -213,6 +213,7 @@ moves = Table(
     Column("how_to_do_it", Text, nullable=False),
     Column("sort_order", Integer, nullable=False),
     Column("needed_feature", Text, nullable=True),
+    Column("asks_a_question", Boolean, nullable=False, server_default="false"),
     Index("moves_name_ignoring_case", text("lower(name)"), unique=True),
 )
 

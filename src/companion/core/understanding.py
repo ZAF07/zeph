@@ -91,6 +91,11 @@ class PickedMoves:
         """The next Move's name; None for none."""
         return self.next.name if self.next else None
 
+    @property
+    def asks_a_question(self) -> bool:
+        """Whether the lead or supporting Move asks the User a question."""
+        return any(move.asks_a_question for move in (self.lead, self.support) if move)
+
 
 @dataclass(frozen=True)
 class UnderstoodMessage:
@@ -102,10 +107,13 @@ class UnderstoodMessage:
             Need's "how to reply", the Moves' "how to do it", the nuance and
             mood, the "ask why" note when it applies, the Life Threads to
             bring up or leave alone, and the Curiosities to bring up.
+        asks_a_question: Whether the reply already asks the User a question:
+            through a Move that asks one, asking why or a Curiosity.
     """
 
     understanding: Understanding
     reply_guidance: str
+    asks_a_question: bool = False
 
 
 def format_local_time(local_now: datetime) -> str:
@@ -179,6 +187,35 @@ def moves_that_work(moves: Sequence[Move], working: set[Feature]) -> list[Move]:
         move
         for move in moves
         if move.needed_feature is None or move.needed_feature in working
+    ]
+
+
+def moves_without_repeat_questions(
+    moves: Sequence[Move], earlier: Sequence[Understanding]
+) -> list[Move]:
+    """List the Moves, leaving out a question-asking one made in the previous reply.
+
+    A Move that asks a question is left out when the previous Understanding
+    in the Conversation made it, as lead or supporting, so it is never made
+    in two replies in a row.
+
+    Args:
+        moves: Every Move, in order.
+        earlier: This Conversation's earlier Understandings, oldest first.
+
+    Returns:
+        The Moves still offered, in order.
+    """
+    if not earlier:
+        return list(moves)
+    previous = earlier[-1]
+    made_last_time = {
+        name.lower() for name in (previous.lead_move, previous.support_move) if name
+    }
+    return [
+        move
+        for move in moves
+        if not (move.asks_a_question and move.name.lower() in made_last_time)
     ]
 
 
@@ -759,6 +796,29 @@ def should_ask_why(form: UnderstandingForm, earlier: Sequence[Understanding]) ->
     )
 
 
+def drop_moves_that_ask(picked: PickedMoves) -> PickedMoves:
+    """Drop the lead and supporting Moves that ask the User a question.
+
+    Used when the reply already asks another question, which wins. A
+    dropped lead Move leaves no lead: the supporting Move doesn't move up.
+
+    Args:
+        picked: The Moves the reply was to make.
+
+    Returns:
+        The Moves it makes; the next Move stays.
+    """
+    return PickedMoves(
+        lead=None if picked.lead and picked.lead.asks_a_question else picked.lead,
+        support=(
+            None
+            if picked.support and picked.support.asks_a_question
+            else picked.support
+        ),
+        next=picked.next,
+    )
+
+
 def format_reply_guidance(
     need: Need,
     picked: PickedMoves,
@@ -862,7 +922,8 @@ class UnderstandingService:
 
     One cheap model call fills in a fixed form: which Need fits, which Moves
     the reply makes from those the Need allows (leaving out any whose needed
-    Feature doesn't work for the User right now), which Move it means to
+    Feature doesn't work for the User right now, and any that asks a
+    question and was made in the previous reply), which Move it means to
     make next and why, how the User seems and whether the Companion knows
     why, which Memory Categories matter, and which Life Threads and
     Curiosities to bring up. It sees this Conversation's earlier
@@ -904,13 +965,17 @@ class UnderstandingService:
 
         Its shape goes into the Model Call Log, for every User. An unknown
         Need falls back to the fallback Need; an unknown Move, one the Need
-        rules out (for the next Move, one every Need rules out), or one whose
+        rules out (for the next Move, one every Need rules out), one whose
         needed Feature doesn't work for the User (Research once Web Search
-        is off or its daily limit is used up), is dropped, with the next
-        Move's why; an unreadable form or a failed call falls
-        back to the fallback Need with no Moves, no mood and no Memory
-        Categories, so the reply still goes, with every reminded Life
-        Thread that isn't held back but no Thread or Curiosity brought up.
+        is off or its daily limit is used up), or one that asks a question
+        and was made in the previous reply, is dropped, with the next
+        Move's why. A lead or supporting Move that asks a question is dropped
+        too, and not saved as made, when the reply asks why or raises a
+        Curiosity: only one question per reply. An unreadable form or a
+        failed call falls back to the fallback Need with no Moves, no mood
+        and no Memory Categories, so the reply still goes, with every
+        reminded Life Thread that isn't held back but no Thread or
+        Curiosity brought up.
 
         Args:
             snapshot: The User being answered.
@@ -926,11 +991,14 @@ class UnderstandingService:
         """
         messages = self._repositories.conversations.list_messages(conversation_id)
         needs = self._repositories.needs.list_all()
-        moves = moves_that_work(
-            self._repositories.moves.list_all(), self._working_features(snapshot)
-        )
         earlier = self._repositories.understandings.list_for_conversation(
             conversation_id
+        )
+        moves = moves_without_repeat_questions(
+            moves_that_work(
+                self._repositories.moves.list_all(), self._working_features(snapshot)
+            ),
+            earlier,
         )
         knowledge_documents = number_knowledge_documents(
             self._knowledge_documents(snapshot)
@@ -959,8 +1027,11 @@ class UnderstandingService:
         else:
             form = model_form
             need = find_need(needs, form.need)
-        picked = pick_moves(need, needs, moves, form)
         asked_why = should_ask_why(form, earlier)
+        asks_another_question = asked_why or bool(form.curiosities)
+        picked = pick_moves(need, needs, moves, form)
+        if asks_another_question:
+            picked = drop_moves_that_ask(picked)
         understanding = Understanding(
             id=uuid4(),
             user_id=snapshot.user.id,
@@ -991,6 +1062,7 @@ class UnderstandingService:
                 format_threads_for_reply(reminded, model_form, snapshot.user.time_zone),
                 format_curiosities_for_reply(form.curiosities),
             ),
+            asks_a_question=asks_another_question or picked.asks_a_question,
         )
 
     def _working_features(self, snapshot: UserSnapshot) -> set[Feature]:

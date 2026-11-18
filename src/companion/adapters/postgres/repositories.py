@@ -342,6 +342,7 @@ def _to_move(row: Row[Any]) -> Move:
         needed_feature=(
             None if row.needed_feature is None else Feature(row.needed_feature)
         ),
+        asks_a_question=row.asks_a_question,
     )
 
 
@@ -361,6 +362,7 @@ def _move_values(details: MoveDetails) -> dict[str, Any]:
         "needed_feature": (
             None if details.needed_feature is None else details.needed_feature.value
         ),
+        "asks_a_question": details.asks_a_question,
     }
 
 

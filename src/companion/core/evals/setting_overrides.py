@@ -435,7 +435,9 @@ class SettingOverrideService:
         return replace(details, ruled_out_move_ids=live.ruled_out_move_ids)
 
     def _move_details(self, move_id: UUID, key: str, value: Any) -> MoveDetails:
-        """Read a Move override's value, keeping the live Move's needed Feature.
+        """Read a Move override's value, keeping the live Move's other settings.
+
+        Its needed Feature and whether it asks a question can't be overridden.
 
         The value is read before the live Move is looked up, so a malformed
         value is refused as invalid even for a Move that doesn't exist.
@@ -462,6 +464,7 @@ class SettingOverrideService:
             when_it_fits=value["when_it_fits"],
             how_to_do_it=value["how_to_do_it"],
             needed_feature=live.needed_feature,
+            asks_a_question=live.asks_a_question,
         )
 
     def choices(self) -> OverrideChoices:

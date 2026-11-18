@@ -57,6 +57,7 @@ const calm: Move = {
   when_it_fits: "They are anxious.",
   how_to_do_it: "Slow things down.",
   needed_feature: null,
+  asks_a_question: false,
 };
 
 const push: Move = {
@@ -65,6 +66,7 @@ const push: Move = {
   when_it_fits: "They are stalling.",
   how_to_do_it: "Name the gap kindly.",
   needed_feature: null,
+  asks_a_question: false,
 };
 
 async function findCard(name: string) {

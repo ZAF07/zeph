@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import Engine, text
@@ -101,6 +103,33 @@ def test_seeding_adds_nothing_once_moves_exist(engine: Engine) -> None:
     assert "Push" not in stored_rule_outs(engine)["Be heard"]
 
 
+def test_seeding_reads_whether_a_move_asks_a_question(
+    engine: Engine, tmp_path: Path
+) -> None:
+    with engine.begin() as connection:
+        connection.execute(text("TRUNCATE moves CASCADE"))
+    moves_seed_file = tmp_path / "moves.yaml"
+    moves_seed_file.write_text(
+        "- name: Wonder\n"
+        "  when_it_fits: They mention their day.\n"
+        "  how_to_do_it: Ask one light question.\n"
+        "  asks_a_question: true\n"
+        "- name: Cheer\n"
+        "  when_it_fits: Good news.\n"
+        "  how_to_do_it: Cheer them on.\n"
+    )
+    needs_seed_file = tmp_path / "needs.yaml"
+    needs_seed_file.write_text("[]\n")
+
+    seed_moves(engine, moves_seed_file, needs_seed_file)
+
+    with engine.connect() as connection:
+        ticked = dict(
+            connection.execute(text("SELECT name, asks_a_question FROM moves")).all()
+        )
+    assert ticked == {"Wonder": True, "Cheer": False}
+
+
 def test_the_migration_says_research_needs_web_search(
     engine: Engine, database_url: str
 ) -> None:
@@ -190,3 +219,32 @@ def test_the_fallback_migration_adds_a_column_that_defaults_to_not_fallback(
             )
         ).one()
     assert tuple(column) == ("NO", "false")
+
+
+def test_the_asks_a_question_migration_leaves_existing_moves_unticked(
+    engine: Engine, database_url: str
+) -> None:
+    downgrade_to(database_url, "0058")
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "UPDATE platform_settings SET value = to_jsonb('Old prompt'::text) "
+                    "WHERE key = 'woven_check_in_prompt'"
+                )
+            )
+    finally:
+        migrate(database_url)
+
+    with engine.connect() as connection:
+        ticked = dict(
+            connection.execute(text("SELECT name, asks_a_question FROM moves")).all()
+        )
+        prompt = connection.execute(
+            text(
+                "SELECT value FROM platform_settings "
+                "WHERE key = 'woven_check_in_prompt'"
+            )
+        ).all()
+    assert ticked == {name: False for name in STARTER_MOVES}
+    assert prompt == []

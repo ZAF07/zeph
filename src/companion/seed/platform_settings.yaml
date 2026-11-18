@@ -1063,6 +1063,10 @@ woven_check_in_prompt: |-
   would repeat something you already asked or chose to leave alone in this
   Conversation. When unsure, say "not now": it will go out on its own later.
 
+  If you're told your reply already asks them a question, prefer "not now",
+  or weave one in only as a passing remark with no question of its own: a
+  reply asks at most one question.
+
   Answer with only a JSON object, no other text. To weave one in:
   {"decision": "weave_in", "kind": "<one Kind's exact name>", "note": "<one line on what to bring up>"}
   Otherwise:

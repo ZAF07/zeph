@@ -135,17 +135,23 @@ def describe_conversation_for_check_in(messages: Sequence[ConversationMessage]) 
 
 
 def describe_understanding_for_check_in(
-    form: UnderstandingForm, reminded: Sequence[RemindedThread]
+    form: UnderstandingForm,
+    reminded: Sequence[RemindedThread],
+    reply_asks_a_question: bool,
 ) -> str:
     """Write how the Companion read the newest Message, for the Check-in model.
 
     Args:
         form: This Message's Understanding.
         reminded: The Life Threads the Message reminded the Companion of.
+        reply_asks_a_question: Whether the reply already asks them a
+            question: through a Move that asks one, asking why or a
+            Curiosity.
 
     Returns:
         The Need, mood, nuance, Life Threads reminded of, brought up and left
-        alone, and Curiosities to bring up.
+        alone, Curiosities to bring up, and whether the reply already asks
+        a question.
     """
     lines = [
         f"What they need from you right now: {form.need}.",
@@ -165,6 +171,8 @@ def describe_understanding_for_check_in(
     if form.curiosities:
         questions = " ".join(item.question for item in form.curiosities)
         lines.append(f"Your reply will also ask: {questions}")
+    if reply_asks_a_question:
+        lines.append("Your reply already asks them a question.")
     return "\n".join(lines)
 
 
@@ -298,6 +306,7 @@ class WovenCheckIns:
         form: UnderstandingForm,
         saved: SavedMemory,
         reminded: Sequence[RemindedThread],
+        reply_asks_a_question: bool,
     ) -> WovenCheckIn | None:
         """Ask the Check-in model whether this reply weaves in the due Check-in.
 
@@ -311,6 +320,8 @@ class WovenCheckIns:
             form: This Message's Understanding.
             saved: The User's saved memory, read for this reply.
             reminded: The Life Threads the Message reminded the Companion of.
+            reply_asks_a_question: Whether the reply already asks them a
+                question, so the model is told.
 
         Returns:
             The Check-in to weave in; None for "not now" or no call.
@@ -335,7 +346,13 @@ class WovenCheckIns:
                     ChatLine(
                         role=ChatRole.USER,
                         text=self._describe(
-                            snapshot, conversation_id, kinds, form, saved, reminded
+                            snapshot,
+                            conversation_id,
+                            kinds,
+                            form,
+                            saved,
+                            reminded,
+                            reply_asks_a_question,
                         ),
                     )
                 ],
@@ -439,6 +456,7 @@ class WovenCheckIns:
         form: UnderstandingForm,
         saved: SavedMemory,
         reminded: Sequence[RemindedThread],
+        reply_asks_a_question: bool,
     ) -> str:
         """Gather and write what the Check-in model is told.
 
@@ -449,6 +467,8 @@ class WovenCheckIns:
             form: This Message's Understanding.
             saved: The User's saved memory, read for this reply.
             reminded: The Life Threads the Message reminded the Companion of.
+            reply_asks_a_question: Whether the reply already asks them a
+                question.
 
         Returns:
             The description.
@@ -481,5 +501,5 @@ class WovenCheckIns:
             describe_conversation_for_check_in(
                 self._repositories.conversations.list_messages(conversation_id)
             ),
-            describe_understanding_for_check_in(form, reminded),
+            describe_understanding_for_check_in(form, reminded, reply_asks_a_question),
         )

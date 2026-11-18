@@ -49,6 +49,7 @@ from tests.fakes import (
 )
 from tests.telegram_helpers import owner_headers
 from tests.test_moves import stored_rule_outs
+from tests.test_moves_that_ask_a_question import tick_asks_a_question
 from tests.test_understanding import seeded_needs
 
 PERSONA_CASE = EvalCase(
@@ -1966,6 +1967,59 @@ def test_make_live_saves_a_move_override_and_keeps_its_needed_feature(
         "Search and compare.",
     )
     assert move.needed_feature == Feature.WEB_SEARCH
+
+
+def test_a_run_keeps_each_moves_asks_a_question_in_its_snapshot(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, UNDERSTANDING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    tick_asks_a_question(client, admin, "Suggest")
+    run_id = UUID(start_run(client, admin, EvalName.UNDERSTANDING)["id"])
+    chat_model.script("Hi!")
+    runner.work_next_run()
+
+    tick_asks_a_question(client, admin, "Suggest", ticked=False)
+
+    run = PostgresEvalRunRepository(engine).get(run_id)
+    assert run is not None and run.snapshot is not None
+    ticked = {move.name for move in run.snapshot.moves if move.asks_a_question}
+    assert ticked == {"Suggest"}
+
+
+def test_make_live_of_a_move_override_never_changes_its_asks_a_question(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    tick_asks_a_question(client, admin, "Suggest")
+    key = move_key(client, admin, "Suggest")
+    run = finish_run_with_overrides(
+        client,
+        admin,
+        engine,
+        chat_model,
+        runner,
+        {key: {**SUGGEST_CHANGE, "asks_a_question": False}},
+    )
+
+    response = make_live(client, admin, run["id"], "B")
+
+    assert response.status_code == 200, response.text
+    [move] = [
+        move
+        for move in PostgresMoveRepository(engine).list_all()
+        if str(move.id) == key.removeprefix("move:")
+    ]
+    assert move.when_it_fits == SUGGEST_CHANGE["when_it_fits"]
+    assert move.asks_a_question is True
 
 
 def test_a_move_changed_live_since_the_run_is_applied_only_if_confirmed(

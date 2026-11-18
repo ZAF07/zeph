@@ -117,6 +117,7 @@ class ReplyService:
                 form,
                 saved_memory,
                 reminded,
+                understood.asks_a_question,
             )
             memory = self._memory_retrieval.recall(
                 snapshot, saved_memory, form.memory_categories, form.look_up_past
