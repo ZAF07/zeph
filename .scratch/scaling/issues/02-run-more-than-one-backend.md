@@ -10,7 +10,7 @@ Later we may want 2+ backend copies, to handle more Users or to stay up if one d
 - The per-User message queue (from issue 01) and the grouping wait (`Timer` port, `adapters/timer.py`) are held in memory.
 - Sticker adding mode is held in memory (`core/sticker_adding.py`).
 - Typing locks and waits are held in memory (`core/typing_keeper.py`).
-- The tick (Check-ins, ended Conversations, Portraits) runs in every process (`adapters/scheduler.py`). Two processes would send double Check-ins.
+- The tick (Check-ins, ended Conversations, Portraits) runs in every process (`adapters/scheduler.py`). The Due Time check on save stops double Check-ins, but both processes would make the same model calls (double cost). See `.scratch/check-in-job/` issue 06.
 
 ## Possible directions (not decided)
 

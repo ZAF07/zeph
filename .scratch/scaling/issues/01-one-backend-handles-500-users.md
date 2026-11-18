@@ -13,7 +13,7 @@ Design decided in ADR-0018. Running 2+ backends is parked in issue 02.
 
 ## Next
 
-`/to-prd`, then `/to-issues`.
+PRD written: `.scratch/scaling/PRD.md`. Issues: 03 (load test and baseline) and 04 (per-User queue), which can run in parallel. The tick speed-up stays in `.scratch/check-in-job/`; this work only measures it.
 
 ## Comments
 
