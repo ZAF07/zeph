@@ -4,7 +4,7 @@ import {
 } from "next/constants";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { checkServerSettings } from "@/env";
+import { checkServerSettings, designFixturesOn } from "@/env";
 
 describe("checkServerSettings", () => {
   afterEach(() => {
@@ -29,5 +29,20 @@ describe("checkServerSettings", () => {
     vi.stubEnv("CLERK_SECRET_KEY", "");
 
     expect(() => checkServerSettings(PHASE_PRODUCTION_BUILD)).not.toThrow();
+  });
+});
+
+describe("designFixturesOn", () => {
+  it("is on in development when NEXT_PUBLIC_DESIGN_FIXTURES=1", () => {
+    expect(designFixturesOn("development", "1")).toBe(true);
+  });
+
+  it("is off when the flag is missing or not 1", () => {
+    expect(designFixturesOn("development", undefined)).toBe(false);
+    expect(designFixturesOn("development", "true")).toBe(false);
+  });
+
+  it("is never on in a production build, even with the flag", () => {
+    expect(designFixturesOn("production", "1")).toBe(false);
   });
 });

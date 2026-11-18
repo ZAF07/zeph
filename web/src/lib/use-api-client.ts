@@ -3,8 +3,9 @@
 import { useMemo } from "react";
 
 import { env } from "@/env";
-import { createApiClient, type ApiClient } from "@/lib/api-client";
+import type { ApiClient } from "@/lib/api-client";
 import { useSessionToken } from "@/lib/auth/client";
+import { chooseApiClient } from "@/lib/choose-api-client";
 
 /**
  * Gives client components the API client, signed in as the current User.
@@ -13,5 +14,13 @@ import { useSessionToken } from "@/lib/auth/client";
  */
 export function useApiClient(): ApiClient {
   const getToken = useSessionToken();
-  return useMemo(() => createApiClient(env.apiUrl, getToken), [getToken]);
+  return useMemo(
+    () =>
+      chooseApiClient(
+        env,
+        getToken,
+        typeof document === "undefined" ? "" : document.cookie,
+      ),
+    [getToken],
+  );
 }

@@ -87,3 +87,32 @@ In a worktree, when your work is done, also run `make worktree-teardown`. It
 stops the worktree's stack and deletes its containers, images, network and
 database, so stacks don't pile up on the machine. It refuses to run in the
 main folder.
+
+## Design pixel test sessions
+
+`web/design/compare.cjs` needs two Playwright storageState files, a User and
+an Admin (ADR 0018). With the stack running on real data (`make up`):
+
+```bash
+eval "$(.claude/skills/run-dashboard/scripts/design-sessions.sh | grep '^export ')"
+```
+
+It runs `start-session.sh` once per role, saves each signed-in browser as a
+storageState file in `$TMPDIR/zeph-design-sessions/<worktree>/` (outside the
+repo), and adds the `zeph-design-as=admin` cookie to the Admin one. It
+replaces any `start-session.sh` session in this worktree. Then swap the web
+container for the fixture dev server on the same port and run the test:
+
+```bash
+docker compose stop web
+set -a; . ./.env; set +a
+(cd web && NEXT_PUBLIC_DESIGN_FIXTURES=1 pnpm dev --port $WEB_PORT) &
+BASE_URL=http://localhost:$WEB_PORT node web/design/compare.cjs Dashboard
+```
+
+Clerk's cookies don't depend on the port, so the sessions carry over. When
+done, delete the two Clerk test users, their `users` rows and the files:
+
+```bash
+.claude/skills/run-dashboard/scripts/design-sessions-cleanup.sh
+```
