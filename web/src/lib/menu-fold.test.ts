@@ -1,6 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { readMenuFolded, saveMenuFolded } from "@/lib/menu-fold";
+import {
+  isMenuFoldedCookie,
+  MENU_FOLDED_COOKIE,
+  readMenuFolded,
+  saveMenuFolded,
+  saveMenuFoldedCookie,
+} from "@/lib/menu-fold";
 
 /**
  * Builds a working in-memory storage for a test.
@@ -31,10 +37,10 @@ function blockedStorage(): Storage {
 }
 
 describe("menu fold", () => {
-  it("reads as unfolded when nothing has been saved", () => {
+  it("reads nothing when nothing has been saved", () => {
     const storage = memoryStorage();
 
-    expect(readMenuFolded(() => storage)).toBe(false);
+    expect(readMenuFolded(() => storage)).toBeNull();
   });
 
   it("reads back the fold that was saved", () => {
@@ -47,8 +53,32 @@ describe("menu fold", () => {
     expect(readMenuFolded(() => storage)).toBe(false);
   });
 
-  it("reads as unfolded, and saves nothing, when storage is blocked", () => {
-    expect(readMenuFolded(blockedStorage)).toBe(false);
+  it("reads nothing, and saves nothing, when storage is blocked", () => {
+    expect(readMenuFolded(blockedStorage)).toBeNull();
     expect(() => saveMenuFolded(blockedStorage, true)).not.toThrow();
+  });
+
+  it("saves the fold in a cookie the server can read for a year", () => {
+    const writeCookie = vi.fn();
+
+    saveMenuFoldedCookie(writeCookie, true);
+
+    expect(writeCookie).toHaveBeenCalledWith(
+      `${MENU_FOLDED_COOKIE}=1; path=/; max-age=31536000; samesite=lax`,
+    );
+  });
+
+  it("saves nothing, without failing, when cookies are blocked", () => {
+    const blockedCookies = () => {
+      throw new DOMException("Cookies are blocked", "SecurityError");
+    };
+
+    expect(() => saveMenuFoldedCookie(blockedCookies, true)).not.toThrow();
+  });
+
+  it("reads the cookie as folded only when it says so", () => {
+    expect(isMenuFoldedCookie("1")).toBe(true);
+    expect(isMenuFoldedCookie("0")).toBe(false);
+    expect(isMenuFoldedCookie(undefined)).toBe(false);
   });
 });

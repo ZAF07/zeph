@@ -20,10 +20,16 @@ const PHONE_MENU_ID = "phone-menu";
  * in it is chosen or the page changes, as with Back. `?design=menu-open`
  * opens it in design-fixture mode.
  *
- * @param props - `children` is the page.
+ * @param props - `children` is the page; `initialMenuFolded` is whether the fold cookie says the sidebar is folded.
  * @returns The page in its frame.
  */
-export function DashboardShell({ children }: { children: ReactNode }) {
+export function DashboardShell({
+  children,
+  initialMenuFolded,
+}: {
+  children: ReactNode;
+  initialMenuFolded: boolean;
+}) {
   const forcedMenuOpen = hasDesignFlag(useSearchParams(), "menu-open");
   const [phoneMenuOpen, setPhoneMenuOpen] = useState(forcedMenuOpen);
   const pathname = usePathname();
@@ -32,7 +38,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     setMenuPathname(pathname);
     setPhoneMenuOpen(false);
   }
-  const [menuFolded, setMenuFolded] = useMenuFolded();
+  const [menuFolded, setMenuFolded] = useMenuFolded(initialMenuFolded);
   const sidebarWidth = menuFolded ? "flex-[0_0_76px]" : "flex-[1_1_240px]";
 
   return (

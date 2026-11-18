@@ -47,11 +47,12 @@ vi.mock("next/navigation", () => ({
 /**
  * Renders the shell around a stand-in page.
  *
+ * @param initialMenuFolded - Whether the fold cookie says the sidebar is folded.
  * @returns What Testing Library's `render` returns.
  */
-function renderShell() {
+function renderShell(initialMenuFolded = false) {
   return renderWithQueries(
-    <DashboardShell>
+    <DashboardShell initialMenuFolded={initialMenuFolded}>
       <p>Page content</p>
     </DashboardShell>,
   );
@@ -154,6 +155,37 @@ describe("DashboardShell", () => {
     await user.click(screen.getByRole("button", { name: "Unfold the menu" }));
     expect(
       screen.getByRole("button", { name: "Fold the menu" }),
+    ).toBeInTheDocument();
+  });
+
+  it("draws the rail from the first paint when the fold cookie says so", () => {
+    renderShell(true);
+
+    expect(
+      screen.getByRole("button", { name: "Unfold the menu" }),
+    ).toBeInTheDocument();
+  });
+
+  it("saves the fold in a cookie, so the server draws it next time", async () => {
+    const user = userEvent.setup();
+    renderShell();
+
+    await user.click(screen.getByRole("button", { name: "Fold the menu" }));
+    expect(document.cookie).toContain("zeph-menu-folded=1");
+
+    await user.click(screen.getByRole("button", { name: "Unfold the menu" }));
+    expect(document.cookie).toContain("zeph-menu-folded=0");
+  });
+
+  it("keeps the cookie's fold when the browser blocks storage", () => {
+    vi.spyOn(window, "localStorage", "get").mockImplementation(() => {
+      throw new DOMException("Storage is blocked", "SecurityError");
+    });
+
+    renderShell(true);
+
+    expect(
+      screen.getByRole("button", { name: "Unfold the menu" }),
     ).toBeInTheDocument();
   });
 
@@ -262,7 +294,7 @@ describe("DashboardShell", () => {
     await user.click(screen.getByRole("button", { name: "Open the menu" }));
     navigation.pathname = "/memories";
     shell.rerender(
-      <DashboardShell>
+      <DashboardShell initialMenuFolded={false}>
         <p>Page content</p>
       </DashboardShell>,
     );
