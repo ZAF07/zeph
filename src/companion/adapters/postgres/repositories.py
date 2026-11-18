@@ -93,6 +93,7 @@ from companion.core.models import (
     Helpline,
     HelplineDetails,
     HoldBackReason,
+    HowSure,
     KnowledgeDetailsChange,
     KnowledgeDocument,
     KnowledgeFile,
@@ -2149,6 +2150,8 @@ def _to_understanding_form(stored: dict[str, Any]) -> UnderstandingForm:
                 question=item["question"],
                 why=item["why"],
                 how=BringUpWay(item["how"]),
+                guess=item.get("guess"),
+                how_sure=HowSure(item["how_sure"]) if item.get("how_sure") else None,
             )
             for item in stored.get("curiosities", [])
         ),
@@ -2691,6 +2694,8 @@ def _to_curiosity(row: Row[Any]) -> Curiosity:
         raised_at=row.raised_at,
         raised_conversation_id=row.raised_conversation_id,
         reaction=ThreadReaction(row.reaction) if row.reaction else None,
+        guess=row.guess,
+        how_sure=HowSure(row.how_sure) if row.how_sure else None,
     )
 
 
@@ -2803,6 +2808,8 @@ class PostgresCuriosityRepository:
                         not_before=bindparam("new_not_before"),
                         sensitivity=bindparam("new_sensitivity"),
                         state=bindparam("new_state"),
+                        guess=bindparam("new_guess"),
+                        how_sure=bindparam("new_how_sure"),
                     ),
                     [
                         {
@@ -2812,6 +2819,8 @@ class PostgresCuriosityRepository:
                             "new_not_before": curiosity.not_before,
                             "new_sensitivity": curiosity.sensitivity,
                             "new_state": curiosity.state,
+                            "new_guess": curiosity.guess,
+                            "new_how_sure": curiosity.how_sure,
                         }
                         for curiosity in changes.updated
                     ],

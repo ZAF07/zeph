@@ -485,6 +485,8 @@ def read_curiosities_to_raise(
                 if how in {way.value for way in BringUpWay}
                 else BringUpWay.WEAVE
             ),
+            guess=item.curiosity.guess,
+            how_sure=item.curiosity.how_sure,
         )
     return tuple(chosen.values())[: due.left]
 

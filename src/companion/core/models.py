@@ -1077,6 +1077,14 @@ class CuriositySensitivity(StrEnum):
     HIGH = "high"
 
 
+class HowSure(StrEnum):
+    """How sure the Companion is of a guess a Curiosity holds."""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
 class CuriosityState(StrEnum):
     """Where a Curiosity stands."""
 
@@ -1108,6 +1116,9 @@ class Curiosity:
             not yet, or if that Conversation is gone.
         reaction: How the User took it; None until the Conversation it was
             asked in ends, or if that isn't known.
+        guess: What the Companion suspects but isn't sure of, e.g. "their
+            mum lives in Singapore"; None for a plain Curiosity.
+        how_sure: How sure it is of the guess; None without one.
     """
 
     id: UUID
@@ -1123,6 +1134,8 @@ class Curiosity:
     raised_at: datetime | None = None
     raised_conversation_id: UUID | None = None
     reaction: ThreadReaction | None = None
+    guess: str | None = None
+    how_sure: HowSure | None = None
 
 
 @dataclass(frozen=True)
@@ -1209,12 +1222,16 @@ class CuriosityToRaise:
         question: What to ask, when it was chosen.
         why: Why the Companion wonders, when it was chosen.
         how: Lead with it, or weave it in.
+        guess: The guess it holds, when it was chosen; None for a plain one.
+        how_sure: How sure the Companion was of the guess; None without one.
     """
 
     curiosity_id: UUID
     question: str
     why: str
     how: BringUpWay
+    guess: str | None = None
+    how_sure: HowSure | None = None
 
 
 @dataclass(frozen=True)

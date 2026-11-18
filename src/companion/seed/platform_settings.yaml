@@ -898,6 +898,18 @@ curiosity_keeping_prompt: |-
     (e.g. "did they get the app deployed?", "did they decide what 'done'
     means for internal testing?"). Leave it out if the Conversation shows it
     no longer fits, e.g. they sorted it themselves or didn't want that help.
+  - A Curiosity can hold a guess: something Zeph suspects about them but
+    isn't sure of. Write one when they hinted at something without settling
+    it (e.g. "she's back to Singapore this morning" hints "their mum lives
+    in Singapore"), or when Zeph may have got something wrong. Give the
+    guess ("guess", a short statement about them), how sure Zeph is
+    ("how_sure": "low", "medium" or "high"), and a light question that
+    checks it. Zeph never states a guess as fact, only checks it gently.
+    Never write a guess about something they've already told Zeph, or
+    already in what Zeph remembers.
+  - Once they've answered a waiting guess, give its number with "close":
+    true. What they said is kept as a memory, so never write the answer as
+    a new guess.
   - For a waiting Curiosity that has changed (e.g. the presentation moved),
     give its number with the new details. If it's no longer relevant (they
     already told Zeph, or it no longer applies), give its number with
@@ -913,6 +925,10 @@ curiosity_keeping_prompt: |-
     "curiosities": [
       {"ask": "...", "why": "...", "not_before": "YYYY-MM-DD" | null,
        "sensitivity": "low" | "medium" | "high",
+       "memory_item": <number> | null, "thread": <number> | null},
+      {"ask": "...", "why": "...", "not_before": "YYYY-MM-DD" | null,
+       "sensitivity": "...", "guess": "...",
+       "how_sure": "low" | "medium" | "high",
        "memory_item": <number> | null, "thread": <number> | null},
       {"curiosity": <number>, "ask": "...", "why": "...",
        "not_before": "YYYY-MM-DD" | null, "sensitivity": "..."},
