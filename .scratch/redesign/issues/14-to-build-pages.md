@@ -54,3 +54,5 @@ Refs: `Plan`, `M-Plan`, `Admin`.
 ## Comments
 
 - 2026-11-18 — From issue 02: the menu already links Overview → `/admin`, Plans → `/admin/plans` and Plan → `/plan`, with their "To build" tags. Overview is marked only on `/admin` itself, so once `/admin` stops redirecting, the `Admin` ref's sidebar will match. No sidebar edits are needed.
+
+- 2026-11-18 — From issue 05: until `/plan` exists, the sidebar's Plan link makes Next prefetch `/plan?_rsc=…` at 1280, and that request never finishes. So the run-dashboard `drive.sh` (`networkidle`) times out on every signed-in page at 1280. Building `/plan` should end it; re-check with `drive.sh / shot.png 1280`.
