@@ -93,4 +93,4 @@ Diff image: `web/design/.diff/States.png` (git-ignored). The first run gave `FAI
 ## Completion
 
 - Completed: 2026-11-18
-- Commit: <to be filled in after merge>
+- Commit: merge `b1fd305` into main (branch `redesign-03-shared-states`: `91565f7` shared state parts, `dd51813` code-review fixes, `5dd2a4f` evidence and archive)
