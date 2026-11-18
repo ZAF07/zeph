@@ -58,7 +58,7 @@ Refs: `Dashboard`, `M-Dashboard`, `Dashboard--menu-folded`, `M-Menu`, `CheckIns`
 
 - 2026-11-18 — Implemented on branch `redesign-05-home-and-check-ins`. Evidence below.
 
-**Pixel test** (fixture dev server on WEB_PORT 3010, final code after the code-review fixes; `origin/main` had not moved, so no rebase was needed):
+**Pixel test** (fixture dev server on WEB_PORT 3010, final code after the code-review fixes):
 ```
 PASS  Dashboard                          0.01% differs, height 1268 vs 1268
 PASS  Dashboard--menu-folded             0.00% differs, height 1268 vs 1268
@@ -106,3 +106,23 @@ The first run failed by 1px per row on Home and 51px on CheckIns. The reference 
   - Fixed: the duplicated calendar-day count (now `calendarDaysAgo` in `dates.ts`, used by `formatAddedDay` and Home); the pill and card-row class strings, now one `card-styles.ts`, with `checkInStatusLabels` holding `isFilled` instead of class names; `PausedNotice.action` made optional.
   - Answered: the undrawn-state copy is listed above. `HomeMemoryLine` parses `**` in the component, as `MemoryNote` does.
 - Spec: nothing was implemented wrong. Changes reaching beyond these pages (the layout, `shell.ts`, "Weekly" on admin screens, the shared restyles) are reported above.
+
+**Rebase onto issue 04's merge** (`3f41b8b`, which landed while this was being finished):
+- One conflict in `lib/check-ins.ts` and its test: kept issue 04's `formatQuietHour` and this issue's `pausedText`.
+- `Switch.tsx` and the "Weekly" label were already identical.
+- `lib/home.ts` now uses `formatQuietHour` for "11:00 PM to 7:00 AM" instead of its own copy.
+
+After the rebase:
+```
+PASS  Onboarding                         0.12% differs, height 4302 vs 4302
+PASS  M-Onboarding                       0.06% differs, height 4681 vs 4681
+PASS  Dashboard                          0.01% differs, height 1268 vs 1268
+PASS  Dashboard--menu-folded             0.00% differs, height 1268 vs 1268
+PASS  M-Dashboard                        0.01% differs, height 2091 vs 2091
+PASS  M-Menu                             0.01% differs, height 2448 vs 2448
+PASS  CheckIns                           0.03% differs, height 1516 vs 1516
+PASS  M-CheckIns                         0.06% differs, height 2348 vs 2348
+All pages match the design.
+```
+- Checks: `pnpm lint` clean, `pnpm format:check` clean, `pnpm typecheck` clean, `pnpm test` 88 files / 555 tests passed.
+- `/run` again on the rebuilt container with the same real data: pause, resume, quiet hours and the switch save, with no page errors and no sideways scroll on Home at 1280 or 390.

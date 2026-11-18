@@ -3,7 +3,7 @@ import type {
   CheckInStatus,
   RecentCheckIn,
 } from "@/lib/api-client";
-import { checkInFrequencyOptions, formatTimeOfDay } from "@/lib/check-ins";
+import { checkInFrequencyOptions, formatQuietHour } from "@/lib/check-ins";
 import {
   calendarDaysAgo,
   dateParts,
@@ -89,7 +89,7 @@ export function checkInFrequencyText(frequency: CheckInFrequency): string {
  * @returns The line.
  */
 export function quietHoursText(start: string, end: string): string {
-  return `${formatLocalTime(start)} to ${formatLocalTime(end)}`;
+  return `${formatQuietHour(start)} to ${formatQuietHour(end)}`;
 }
 
 /**
@@ -139,16 +139,4 @@ function recentDayName(
     );
   }
   return formatAddedDay(isoTimestamp, now, timeZone);
-}
-
-/**
- * Writes a time of day the backend sends, like "22:00:00", as "10:00 PM".
- *
- * @param timeOfDay - The time as the backend sends it.
- * @returns The time.
- */
-function formatLocalTime(timeOfDay: string): string {
-  const [hours, minutes] = timeOfDay.split(":").map(Number);
-  const moment = new Date(Date.UTC(2000, 0, 1, hours, minutes));
-  return formatTimeOfDay(moment.toISOString(), "UTC").toUpperCase();
 }
