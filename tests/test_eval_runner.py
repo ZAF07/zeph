@@ -1930,7 +1930,7 @@ def test_a_run_uses_the_live_moves_and_each_needs_live_rule_outs(
 
     [understanding] = chat_model.understanding_calls
     assert "- Offer tea: They are cold and tired." in str(understanding)
-    assert "- Just chatting: Suggest, Offer tea" in str(understanding)
+    assert "- Just chatting: Suggest, Get curious, Offer tea" in str(understanding)
 
 
 def test_make_live_saves_a_move_override_and_keeps_its_needed_feature(
@@ -1988,7 +1988,7 @@ def test_a_run_keeps_each_moves_asks_a_question_in_its_snapshot(
     run = PostgresEvalRunRepository(engine).get(run_id)
     assert run is not None and run.snapshot is not None
     ticked = {move.name for move in run.snapshot.moves if move.asks_a_question}
-    assert ticked == {"Suggest"}
+    assert ticked == {"Suggest", "Get curious"}
 
 
 def test_make_live_of_a_move_override_never_changes_its_asks_a_question(

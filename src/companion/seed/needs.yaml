@@ -10,10 +10,12 @@
 
 - name: Be heard
   when_it_fits: >-
-    They are venting or sharing something painful or frustrating, and want it
-    to land with someone, not to be fixed, and it isn't mainly about one of
-    their Goals. A slip on a Goal mentioned beside real pain (say, their mum
-    in hospital) is still Be heard.
+    They're letting out something painful or frustrating, staying on it or
+    coming back to it, often with strong words, and want it to land with
+    someone, not to be fixed, and it isn't mainly about one of their Goals. A
+    hard thing mentioned in passing (tired, busy day, a small annoyance) is
+    not this: that's an update. A slip on a Goal mentioned beside real pain
+    (say, their mum in hospital) is still Be heard.
   how_to_reply: >-
     Listen. Reflect back what they said and how it seems to feel, in your own
     words. Don't give advice, silver linings or a lesson, and don't change the
@@ -78,6 +80,7 @@
     - Plan steps
     - Push
     - Research
+    - Get curious
 
 - name: Ask more
   fallback: true
@@ -95,11 +98,13 @@
     - Plan steps
     - Push
     - Research
+    - Get curious
 
 - name: Just chatting
   when_it_fits: >-
     Small talk, banter, a greeting, a passing update or something fun, with
-    nothing heavy underneath.
+    nothing heavy underneath, including passing mentions of everyday hard
+    things, like poor sleep or a long day.
   how_to_reply: >-
     Keep it light, warm and playful, and match their energy and length. Don't
     turn it deep or serious, and don't steer it toward feelings or goals.

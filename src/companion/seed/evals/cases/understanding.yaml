@@ -126,6 +126,14 @@ rules:
     Zeph's last reply checks, lightly and as a question, whether their mum
     lives in Singapore (e.g. "she's back in Singapore, right?"). It never
     states it as fact, and asks no more than one question.
+  one_light_question: >-
+    Zeph's last reply asks one short, light question about what they said
+    (e.g. what's on today, or how come so little sleep), the way a curious
+    friend would. It doesn't treat it as a crisis or a vent, guess how they
+    feel, or ask more than one question.
+  no_why_question: >-
+    Zeph's last reply doesn't ask why they feel this way. Asking what
+    happened or what was said is fine.
 
 cases:
   - id: rant-is-heard
@@ -559,3 +567,32 @@ cases:
         expect:
           lead_move: [Get curious]
           rules: [checks_guess_gently]
+
+  # The check-in and "long day" are earlier lines: Get curious asks a
+  # question, so it is never made in two replies in a row. Get curious is
+  # expected to lead, as Just chatting allows only Suggest and Research
+  # besides it.
+  - id: passing-update-gets-curious
+    now: 2026-11-13T08:30:00
+    memory: *arjun
+    earlier:
+      - zeph: morning! how's the day looking?
+      - person: It's going to be a long day
+      - zeph: oof, one of those. I'm here if you want company through it
+    messages:
+      - text: 5 hours sleep only
+        expect:
+          need: [Just chatting]
+          lead_move: [Get curious]
+          rules: [one_light_question]
+
+  - id: real-vent-is-heard
+    memory: *arjun
+    messages:
+      - text: >-
+          ugh I'm so done, my boss tore my work apart again in front of
+          everyone
+        expect:
+          need: [Be heard]
+          asked_why: false
+          rules: [no_why_question]
