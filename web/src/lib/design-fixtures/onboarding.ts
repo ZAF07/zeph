@@ -66,11 +66,11 @@ const LINK_MINUTES_LEFT = 14;
  * those reference files. They apply only on the `?design=all-steps` address,
  * so every other page keeps the shell's Alex, who has finished onboarding.
  *
- * @param address - The page's query string, like "?design=all-steps".
+ * @param queryString - The page's query string, like "?design=all-steps".
  * @returns The fixture calls, or none away from the all-steps address.
  */
-export function onboardingFixtures(address: string): Partial<ApiClient> {
-  if (!hasDesignFlag(new URLSearchParams(address), "all-steps", true)) {
+export function onboardingFixtures(queryString: string): Partial<ApiClient> {
+  if (!hasDesignFlag(new URLSearchParams(queryString), "all-steps", true)) {
     return {};
   }
   return {

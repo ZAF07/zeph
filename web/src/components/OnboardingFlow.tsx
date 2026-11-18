@@ -46,7 +46,7 @@ const stepHeading =
 const stepIntro = "m-0 text-[16px] text-soft";
 const stepPanel =
   "box-border flex flex-col gap-3 rounded-tile border border-line bg-panel px-5 py-[18px]";
-const fieldLabel = "flex flex-col gap-1.5";
+const textFieldLabel = "flex flex-col gap-1.5";
 const fieldName = "text-[14px] text-text";
 const textField =
   "box-border rounded-input border border-line-strong bg-bg-deep px-3.5 text-[15px] text-text placeholder:text-mute";
@@ -99,8 +99,8 @@ function startingAnswers(me: Me, checkIns: CheckIns): Answers {
  * onboarding goes to the Dashboard.
  *
  * @param props - `showAllSteps` stacks every step for the design sheet
- *   (`?design=all-steps`), each drawn ready to continue, instead of one at a
- *   time.
+ *   (`?design=all-steps`), each drawn ready to continue (its buttons do
+ *   nothing), instead of one at a time.
  * @returns The onboarding flow.
  */
 export function OnboardingFlow({
@@ -226,12 +226,12 @@ export function OnboardingFlow({
     setStep(step + 1);
   }
 
-  function stepContent(stepIndex: number, isDrawn: boolean) {
+  function stepContent(stepIndex: number, isDesignSheet: boolean) {
     if (!answers || !content) {
       return null;
     }
     if (stepIndex === HELLO_STEP) {
-      const showHint = !isDrawn && (needsName || needsAcknowledgement);
+      const showHint = !isDesignSheet && (needsName || needsAcknowledgement);
       return (
         <>
           <h1 className={stepHeading}>Hello. I’m Zeph.</h1>
@@ -239,7 +239,7 @@ export function OnboardingFlow({
             I’m an AI companion for reflection: a place to think out loud,
             notice what matters, and practise living by it.
           </p>
-          <label className={fieldLabel}>
+          <label className={textFieldLabel}>
             <span className={fieldName}>What should I call you?</span>
             <input
               className={`${textField} min-h-12`}
@@ -260,7 +260,9 @@ export function OnboardingFlow({
                 onChange={(event) =>
                   change({ aiNoticeAcknowledged: event.target.checked })
                 }
-                aria-describedby="onboarding-continue-hint"
+                aria-describedby={
+                  showHint ? "onboarding-continue-hint" : undefined
+                }
                 className="m-[3px_3px_3px_4px] size-[18px] flex-none accent-cream"
               />
               I understand Zeph is an AI and not professional care
@@ -308,7 +310,7 @@ export function OnboardingFlow({
               );
             })}
           </div>
-          <label className={fieldLabel}>
+          <label className={textFieldLabel}>
             <span className={fieldName}>
               In your own words <span className="text-soft">(optional)</span>
             </span>
@@ -337,7 +339,7 @@ export function OnboardingFlow({
             }}
             onTimeZoneChange={(timeZone) => change({ timeZone })}
             countryCaption={
-              isDrawn || countryFromBrowserUsed
+              isDesignSheet || countryFromBrowserUsed
                 ? "Filled in from your browser"
                 : undefined
             }
@@ -432,7 +434,7 @@ export function OnboardingFlow({
     );
   }
 
-  function stepButtons(stepIndex: number, isDrawn: boolean) {
+  function stepButtons(stepIndex: number, isDesignSheet: boolean) {
     if (stepIndex === TELEGRAM_STEP) {
       return (
         <div>
@@ -451,7 +453,7 @@ export function OnboardingFlow({
           <button
             type="button"
             className={secondaryButton}
-            onClick={() => setStep(step - 1)}
+            onClick={isDesignSheet ? undefined : () => setStep(step - 1)}
           >
             Back
           </button>
@@ -459,8 +461,8 @@ export function OnboardingFlow({
         <button
           type="button"
           className={primaryButton}
-          disabled={!isDrawn && !canLeave(stepIndex)}
-          onClick={next}
+          disabled={!isDesignSheet && !canLeave(stepIndex)}
+          onClick={isDesignSheet ? undefined : next}
         >
           {completeOnboarding.isPending ? (
             "Saving…"
@@ -477,13 +479,13 @@ export function OnboardingFlow({
     );
   }
 
-  function stepView(stepIndex: number, isDrawn: boolean) {
+  function stepView(stepIndex: number, isDesignSheet: boolean) {
     return (
       <>
         <OnboardingProgress labels={STEP_LABELS} currentStep={stepIndex} />
         <div aria-hidden="true" className="h-3" />
-        {stepContent(stepIndex, isDrawn)}
-        {stepButtons(stepIndex, isDrawn)}
+        {stepContent(stepIndex, isDesignSheet)}
+        {stepButtons(stepIndex, isDesignSheet)}
       </>
     );
   }

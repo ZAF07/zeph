@@ -5,14 +5,14 @@ import { useMemo, type ReactNode } from "react";
 import { countryOptions } from "@/lib/countries";
 import { timeZoneOptions } from "@/lib/time-zones";
 
-const fieldLabel = "flex min-w-0 flex-[1_1_240px] flex-col gap-1.5";
-const fieldName = "text-[13px] text-soft";
+const locationLabel = "flex min-w-0 flex-[1_1_240px] flex-col gap-1.5";
+const locationName = "text-[13px] text-soft";
 const selectBox = "relative flex";
 const selectField =
   "box-border min-h-[46px] w-full cursor-pointer appearance-none rounded-input border border-line-strong bg-bg-deep pl-3.5 pr-[34px] text-[15px] text-text";
 const selectChevron =
   "pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-soft";
-const fieldCaption = "text-[12px] text-soft";
+const locationCaption = "text-[12px] text-soft";
 
 /**
  * The chevron drawn at the right of each picker.
@@ -66,8 +66,8 @@ export function LocationFields({
 
   return (
     <div className="flex flex-wrap gap-4">
-      <label className={fieldLabel}>
-        <span className={fieldName}>Country</span>
+      <label className={locationLabel}>
+        <span className={locationName}>Country</span>
         <span className={selectBox}>
           <select
             className={selectField}
@@ -87,11 +87,11 @@ export function LocationFields({
           <Chevron />
         </span>
         {countryCaption ? (
-          <span className={fieldCaption}>{countryCaption}</span>
+          <span className={locationCaption}>{countryCaption}</span>
         ) : null}
       </label>
-      <label className={fieldLabel}>
-        <span className={fieldName}>Time zone</span>
+      <label className={locationLabel}>
+        <span className={locationName}>Time zone</span>
         <span className={selectBox}>
           <select
             className={selectField}
