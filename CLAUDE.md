@@ -18,7 +18,7 @@ Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agent
 
 ### UI design
 
-The Dashboard UI design lives in `docs/design/`: `zeph-product.html` (User pages) and `zeph-admin.html` (admin area). Build pages from these; ignore anything tagged "Later".
+The Dashboard UI design lives in `web/design/`. Its `README.md` is the build contract: read it in full before any UI work. Pages are built against `web/design/reference/*.html` and checked with the pixel test (`web/design/compare.cjs`); see ADR 0018.
 
 ## How I want you to work (process)
 

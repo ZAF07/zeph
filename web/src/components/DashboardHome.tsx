@@ -11,6 +11,7 @@ import { LoadFailed } from "@/components/LoadFailed";
 import { MemoryNote } from "@/components/MemoryNote";
 import { RecentlyRemembered } from "@/components/RecentlyRemembered";
 import { SignOutButton } from "@/components/SignOutButton";
+import { currentTime } from "@/lib/clock";
 import { greeting, todayHeading } from "@/lib/home";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
@@ -31,7 +32,7 @@ export function DashboardHome() {
     queryFn: () => apiClient.getHome(),
   });
 
-  const now = new Date();
+  const now = currentTime();
   const home = homeQuery.data;
   const timeZone = home?.time_zone ?? undefined;
 
