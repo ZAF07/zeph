@@ -77,3 +77,5 @@ Issue 04 runs at the same time in another worktree.
 - Commits:
   - `70c2e75` Get-curious issue 03: Get curious Move and the venting line
   - `2a8647c` Get-curious issue 03: CONTEXT.md Need draws the line between being heard and a passing update
+  - `17eeb13` Get-curious issue 03 done: archive issue with check, review and run evidence
+  - `15be1d5` Merge get-curious issue 03 into main

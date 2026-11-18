@@ -1,6 +1,6 @@
 # PRD: Get curious — the Companion gets to know the User
 
-Status: ready-for-agent
+Status: completed
 
 ## Problem Statement
 
@@ -135,3 +135,15 @@ The Companion listens but doesn't get to know the User.
 - Grilled 2026-11-18. Decisions are recorded in CONTEXT.md and ADR-0017; Get curious follows ADR-0016.
 - The platform isn't live yet, so reloading prompts from the seed (and losing any hand edits to those two prompts) is acceptable.
 - Move Outcomes already learn per User whether a Move helped, so whether a User enjoys being asked things is learned without new work.
+
+## Completion
+
+- Completed: 2026-11-18
+- Delivered by issues 01–04 (all archived in `.scratch/get-curious/issues/archive/`):
+  - 01 "Asks a question" checkbox on Moves: d553b87, review fixes 8ff7363, run fix f79905b, renumber e1ffaf5, archive aea45e3, merge 55c9dbf
+  - 02 Curiosity guesses: e7e484f, review fixes 45a72a1, run fix 30b8327, archive be3d78f, merge 465ce4e
+  - 03 Get curious Move and the venting line: 70c2e75 (includes review fixes), CONTEXT.md 2a8647c, archive 17eeb13, merge 15be1d5
+  - 04 Look-backs, Portrait and the guess Eval case: 2dd66b5, review fixes 0de4dba, archive 1f3e5bd, merge 6d87f34
+- The Curiosity-keeping Eval (story 40) is its own issue: `.scratch/curiosity-keeping-eval/issues/01-curiosity-keeping-eval.md` (needs-triage).
+- The three new Understanding Eval cases (passing update, real vent, guess check) are in the seed and have not been run; the owner decides when.
+- Checks on close-out (main at 15be1d5, same tree as the tested issue 03 branch): ruff, ruff format, mypy pass; pytest 1319 passed; pnpm lint, format:check, typecheck pass; Vitest 486 passed
