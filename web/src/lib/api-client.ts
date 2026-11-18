@@ -491,14 +491,16 @@ export type Need = NeedInput & {
 };
 
 /**
- * A Move's name, when it fits, how to do it and the Feature it can't be
- * made without; `needed_feature` is null for none.
+ * A Move's name, when it fits, how to do it, the Feature it can't be made
+ * without (`needed_feature` is null for none) and whether it asks the User
+ * a question, so it's never made twice in a row or with another question.
  */
 export type MoveInput = {
   name: string;
   when_it_fits: string;
   how_to_do_it: string;
   needed_feature: Feature | null;
+  asks_a_question: boolean;
 };
 
 /** A Move as Admins manage it: what Zeph does to help in a reply. */

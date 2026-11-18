@@ -936,12 +936,15 @@ class MoveDetails:
         when_it_fits: When to pick it, as the Understanding model is told.
         how_to_do_it: How to make it, as the reply is told.
         needed_feature: The Feature it can't be made without; None for none.
+        asks_a_question: Whether making it asks the User a question, so it is
+            never made in two replies in a row or with another question.
     """
 
     name: str
     when_it_fits: str
     how_to_do_it: str
     needed_feature: "Feature | None"
+    asks_a_question: bool = False
 
 
 @dataclass(frozen=True)
@@ -956,6 +959,8 @@ class Move:
         sort_order: Where it comes in the list, lowest first.
         needed_feature: The Feature it can't be made without, e.g. Web
             Search for Research; None for none.
+        asks_a_question: Whether making it asks the User a question, so it is
+            never made in two replies in a row or with another question.
     """
 
     id: UUID
@@ -964,6 +969,7 @@ class Move:
     how_to_do_it: str
     sort_order: int
     needed_feature: "Feature | None"
+    asks_a_question: bool = False
 
 
 class MoodIntensity(StrEnum):

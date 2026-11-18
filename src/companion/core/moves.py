@@ -194,6 +194,7 @@ class MoveService:
             when_it_fits=details.when_it_fits.strip(),
             how_to_do_it=details.how_to_do_it.strip(),
             needed_feature=details.needed_feature,
+            asks_a_question=details.asks_a_question,
         )
         if not checked.name or not checked.when_it_fits or not checked.how_to_do_it:
             raise InvalidMoveError(

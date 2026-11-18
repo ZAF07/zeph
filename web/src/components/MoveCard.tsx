@@ -18,7 +18,8 @@ import {
 
 /**
  * One Move as an editable card: name, "when it fits", "how to do it", the
- * Feature it needs, Move up and down, Save and Remove. A new Move's card has
+ * Feature it needs, whether it asks a question, Move up and down, Save and
+ * Remove. A new Move's card has
  * Add and Cancel instead.
  *
  * @param props - `initial` fills the card; `isNew` marks a Move not saved
@@ -59,6 +60,7 @@ export function MoveCard({
   const [neededFeature, setNeededFeature] = useState<Feature | null>(
     initial.needed_feature,
   );
+  const [asksAQuestion, setAsksAQuestion] = useState(initial.asks_a_question);
   const [isBusy, setIsBusy] = useState(false);
   const [isConfirmingRemove, setIsConfirmingRemove] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +72,8 @@ export function MoveCard({
     name !== initial.name ||
     whenItFits !== initial.when_it_fits ||
     howToDoIt !== initial.how_to_do_it ||
-    neededFeature !== initial.needed_feature;
+    neededFeature !== initial.needed_feature ||
+    asksAQuestion !== initial.asks_a_question;
 
   async function run(action: () => Promise<void>, failureText: string) {
     setIsBusy(true);
@@ -98,6 +101,7 @@ export function MoveCard({
           when_it_fits: whenItFits,
           how_to_do_it: howToDoIt,
           needed_feature: neededFeature,
+          asks_a_question: asksAQuestion,
         }),
       "Couldn’t save the Move. Please try again.",
     );
@@ -185,6 +189,20 @@ export function MoveCard({
             ))}
           </select>
         </div>
+        <label className="flex items-center gap-1.5 text-sm font-medium">
+          <input
+            type="checkbox"
+            checked={asksAQuestion}
+            onChange={(event) => {
+              setAsksAQuestion(event.target.checked);
+              setError(null);
+            }}
+          />
+          Asks a question{" "}
+          <span className="text-caption font-normal text-ink-muted">
+            — never made twice in a row, or with another question
+          </span>
+        </label>
       </div>
       {error ? (
         <p

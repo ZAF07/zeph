@@ -30,6 +30,7 @@ const calm: Move = {
   when_it_fits: "They are anxious.",
   how_to_do_it: "Slow things down.",
   needed_feature: null,
+  asks_a_question: false,
 };
 
 const push: Move = {
@@ -38,6 +39,7 @@ const push: Move = {
   when_it_fits: "They are stalling.",
   how_to_do_it: "Name the gap kindly.",
   needed_feature: null,
+  asks_a_question: false,
 };
 
 const research: Move = {
@@ -46,6 +48,7 @@ const research: Move = {
   when_it_fits: "They need options found.",
   how_to_do_it: "Look up real options.",
   needed_feature: "web_search",
+  asks_a_question: false,
 };
 
 const webSearch: FeatureSwitch = {
@@ -120,8 +123,47 @@ describe("MovesManager", () => {
       when_it_fits: "They are stalling.",
       how_to_do_it: "Ask for one step.",
       needed_feature: "stickers",
+      asks_a_question: false,
     });
     expect(await screen.findByText("Saved Push.")).toBeInTheDocument();
+  });
+
+  it("shows whether each Move asks a question", async () => {
+    apiClient.listMoves.mockResolvedValue([
+      calm,
+      { ...push, asks_a_question: true },
+    ]);
+    renderWithQueries(<MovesManager />);
+
+    expect(
+      (await findCard("Push")).getByRole("checkbox", {
+        name: /Asks a question/,
+      }),
+    ).toBeChecked();
+    expect(
+      (await findCard("Calm")).getByRole("checkbox", {
+        name: /Asks a question/,
+      }),
+    ).not.toBeChecked();
+  });
+
+  it("saves a Move with Asks a question ticked", async () => {
+    apiClient.updateMove.mockResolvedValue({ ...calm, asks_a_question: true });
+    const user = userEvent.setup();
+    renderWithQueries(<MovesManager />);
+    const card = await findCard("Calm");
+
+    await user.click(card.getByRole("checkbox", { name: /Asks a question/ }));
+    await user.click(card.getByRole("button", { name: "Save" }));
+
+    expect(apiClient.updateMove).toHaveBeenCalledWith("move-calm", {
+      name: "Calm",
+      when_it_fits: "They are anxious.",
+      how_to_do_it: "Slow things down.",
+      needed_feature: null,
+      asks_a_question: true,
+    });
+    expect(await screen.findByText("Saved Calm.")).toBeInTheDocument();
   });
 
   it("adds a new Move that needs no Feature", async () => {
@@ -141,6 +183,7 @@ describe("MovesManager", () => {
       when_it_fits: "Good news.",
       how_to_do_it: "Cheer them on.",
       needed_feature: null,
+      asks_a_question: false,
     });
     expect(await screen.findByText("Added Celebrate.")).toBeInTheDocument();
   });

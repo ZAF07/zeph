@@ -195,8 +195,8 @@ def seed_moves(engine: Engine, moves_seed_file: Path, needs_seed_file: Path) -> 
     Args:
         engine: The database engine.
         moves_seed_file: YAML file listing Moves with `name`, `when_it_fits`,
-            `how_to_do_it` and an optional `needed_feature`, in the order to
-            show them.
+            `how_to_do_it`, an optional `needed_feature` and an optional
+            `asks_a_question`, in the order to show them.
         needs_seed_file: YAML file listing Needs, each with an optional
             `ruled_out_moves` list of Move names.
     """
@@ -211,6 +211,7 @@ def seed_moves(engine: Engine, moves_seed_file: Path, needs_seed_file: Path) -> 
             "how_to_do_it": move["how_to_do_it"],
             "sort_order": sort_order,
             "needed_feature": move.get("needed_feature"),
+            "asks_a_question": move.get("asks_a_question", False),
         }
         for sort_order, move in enumerate(moves_seed)
     ]

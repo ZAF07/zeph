@@ -465,6 +465,7 @@ class MoveResponse(BaseModel):
     when_it_fits: str
     how_to_do_it: str
     needed_feature: Feature | None
+    asks_a_question: bool
 
 
 class MovesResponse(BaseModel):
@@ -474,12 +475,13 @@ class MovesResponse(BaseModel):
 
 
 class MoveDetailsRequest(BaseModel):
-    """A Move's name, when it fits, how to do it and the Feature it needs."""
+    """A Move's text, the Feature it needs and whether it asks a question."""
 
     name: str
     when_it_fits: str
     how_to_do_it: str
     needed_feature: Feature | None
+    asks_a_question: bool = False
 
     def to_details(self) -> MoveDetails:
         """Turn the request into Move details.
@@ -492,6 +494,7 @@ class MoveDetailsRequest(BaseModel):
             when_it_fits=self.when_it_fits,
             how_to_do_it=self.how_to_do_it,
             needed_feature=self.needed_feature,
+            asks_a_question=self.asks_a_question,
         )
 
 
@@ -912,6 +915,7 @@ def to_move_response(move: Move) -> MoveResponse:
         when_it_fits=move.when_it_fits,
         how_to_do_it=move.how_to_do_it,
         needed_feature=move.needed_feature,
+        asks_a_question=move.asks_a_question,
     )
 
 

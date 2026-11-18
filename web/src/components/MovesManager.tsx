@@ -17,6 +17,7 @@ const emptyMove: MoveInput = {
   when_it_fits: "",
   how_to_do_it: "",
   needed_feature: null,
+  asks_a_question: false,
 };
 
 /**

@@ -7,7 +7,10 @@
 # `when_it_fits`. The picked Moves' `how_to_do_it` go into the reply's
 # instructions after the Need's "how to reply". A Move with a
 # `needed_feature` is offered only while that Feature works for the User (and,
-# for Web Search, while their daily limit isn't used up).
+# for Web Search, while their daily limit isn't used up). A Move with
+# `asks_a_question: true` asks the User something: it is never made in two
+# replies in a row, and is dropped from a reply that already asks why or
+# raises a Curiosity. It is false when left out.
 
 - name: Calm
   when_it_fits: >-

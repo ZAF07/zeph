@@ -585,6 +585,7 @@ def _move_values(move: Move) -> dict[str, Any]:
         "needed_feature": (
             None if move.needed_feature is None else move.needed_feature.value
         ),
+        "asks_a_question": move.asks_a_question,
     }
 
 
@@ -595,7 +596,7 @@ def _to_move(values: dict[str, Any]) -> Move:
         values: Its fields, as `_move_values` wrote them.
 
     Returns:
-        The Move.
+        The Move; one kept before Moves could ask a question asks none.
     """
     needed_feature = values["needed_feature"]
     return Move(
@@ -605,6 +606,7 @@ def _to_move(values: dict[str, Any]) -> Move:
         how_to_do_it=values["how_to_do_it"],
         sort_order=values["sort_order"],
         needed_feature=None if needed_feature is None else Feature(needed_feature),
+        asks_a_question=values.get("asks_a_question", False),
     )
 
 
