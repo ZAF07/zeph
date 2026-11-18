@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zeph — Connect Telegram</title>
+<style>
+@font-face{font-family:Outfit;font-style:normal;font-weight:100 900;font-display:block;src:url(fonts/outfit-latin-wght-normal.woff2) format('woff2')}
+body{margin:0;background:#0A202C}
+a{color:inherit}a:hover{color:#F3E8D6}
+@media (min-width: 900px){.zside{position:sticky;top:0;align-self:flex-start;height:100vh;overflow-y:auto}}
+.zside::-webkit-scrollbar{width:6px}.zside::-webkit-scrollbar-thumb{background:#2A5263;border-radius:3px}
+
+</style>
+</head>
+<body>
+<div style="background: #0A202C; color: #EAF2F3; font-family: Outfit, system-ui, sans-serif; font-size: 16px; line-height: 1.55; font-weight: 300">
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh">
+<aside class="zside" style="flex: 1 1 240px; max-width: 100%; box-sizing: border-box; background: #071922; border-right: 1px solid #2A5263">
+
+<div style="box-sizing: border-box; min-height: 100%; padding: 18px 16px; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 0 12px 14px"><a href="Landing.html" style="font-size: 26px; font-weight: 400; text-decoration: none; color: #F3E8D6">Zeph</a><button type="button" aria-label="Fold the menu" style="flex: none; width: 44px; height: 44px; border: 1px solid #2A5263; border-radius: 10px; background: transparent; color: #BDD0D5; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6l-6 6 6 6M19 6l-6 6 6 6"/></svg></button></div>
+<nav aria-label="Dashboard" style="display: flex; flex-direction: column; gap: 2px">
+<a href="Dashboard.html" style="display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 14px; border-radius: 10px; font-size: 14px; font-weight: 400; text-decoration: none; color: #BDD0D5"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M4 10.5L12 4l8 6.5V20H4zM10 20v-5h4v5"/></svg><span>Home</span></a>
+<a href="Memories.html" style="display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 14px; border-radius: 10px; font-size: 14px; font-weight: 400; text-decoration: none; color: #BDD0D5"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8"/></svg><span>Memories</span></a>
+<a href="CheckIns.html" style="display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 14px; border-radius: 10px; font-size: 14px; font-weight: 400; text-decoration: none; color: #BDD0D5"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18M12 7v5l3 2"/></svg><span>Check-ins</span></a>
+<a href="Account.html" style="display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 14px; border-radius: 10px; font-size: 14px; font-weight: 400; text-decoration: none; color: #BDD0D5"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"/></svg><span>Account & privacy</span></a>
+<a href="Plan.html" style="display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 14px; border-radius: 10px; font-size: 14px; font-weight: 400; text-decoration: none; color: #BDD0D5"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M4 7h16v10H4zM4 11h16"/></svg><span>Plan<span style="margin-left: 8px; padding: 1px 8px; border-radius: 999px; border: 1px solid #F0A050; font-size: 10px; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; color: #F0A050">To build</span></span></a>
+</nav>
+<div style="margin-top: auto; padding-top: 20px; display: flex; flex-direction: column; gap: 12px">
+<p style="margin: 0; padding: 0 14px; font-size: 12px; color: #BDD0D5">Zeph is an AI, not a therapist or crisis service.</p>
+<div style="padding: 14px 14px 0; border-top: 1px solid #2A5263; display: flex; align-items: center; gap: 12px"><span style="flex: none; width: 36px; height: 36px; box-sizing: border-box; border-radius: 50%; border: 1px solid #5B8B96; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#BDD0D5" stroke-width="1.4" stroke-linecap="round"><circle cx="8" cy="5.4" r="2.8"/><path d="M2.6 14c.6-3 2.7-4.4 5.4-4.4s4.800 1.400 5.4 4.4"/></svg></span><div style="min-width: 0"><div style="font-size: 14px; font-weight: 400; color: #EAF2F3">Alex</div><div style="font-size: 12px; color: #BDD0D5">alex@example.com</div></div></div>
+<a href="Login.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 14px; font-size: 13px; color: #BDD0D5">Sign out</a>
+</div>
+</div>
+
+
+</aside>
+<main style="flex: 999 1 640px; min-width: 0; box-sizing: border-box; padding: 28px 32px 56px; display: flex; flex-direction: column; gap: 24px">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px 24px"><div style="flex: 1 1 380px; min-width: 0"><div style="display: flex; align-items: center; gap: 12px; font-size: 11px; font-weight: 500; letter-spacing: 2.5px; text-transform: uppercase; color: #BDD0D5"><span aria-hidden="true" style="width: 18px; height: 1px; background: #BDD0D5"></span>Telegram Connection</div><h1 style="margin: 14px 0 8px; font-weight: 400; font-size: 32px; line-height: 1.15; color: #F3E8D6">Connect Telegram</h1><p style="margin: 0; max-width: 600px; font-size: 15px; color: #BDD0D5">You talk to Zeph in Telegram. Open the link on this device, or scan the code with your phone.</p></div></div>
+<div style="box-sizing: border-box; padding: 26px 28px; border-radius: 16px; background: #102C3A; border: 1px solid #2A5263"><div style="display: flex; flex-wrap: wrap; align-items: center; gap: 24px 32px"><div role="img" aria-label="QR code that opens Zeph in Telegram" style="flex: none; width: 150px; height: 150px; box-sizing: border-box; border-radius: 12px; background: #F3E8D6; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; color: #0B2A3C">QR code</div><div style="flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 12px"><a href="#" style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; box-sizing: border-box; padding: 0 22px; border-radius: 999px; background: #F3E8D6; color: #0B2A3C; border: 1px solid #F3E8D6; font-size: 14px; font-weight: 500; text-decoration: none">Open in Telegram <span aria-hidden="true" style="margin-left: 10px">→</span></a><p style="margin: 0; font-size: 14px; color: #BDD0D5">Or message <span style="font-weight: 400; color: #EAF2F3">@zeph_bot</span> and send:</p><code style="padding: 8px 14px; border-radius: 10px; background: #071922; border: 1px solid #2A5263; font-size: 15px; color: #EAF2F3">/start 7QK2-M9PX</code><span style="font-size: 12px; color: #BDD0D5">Works once · expires in 14 minutes</span></div></div></div>
+<div style="display: flex; align-items: center; gap: 12px; padding-top: 28px; border-top: 1px dashed #5B8B96; font-size: 11px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; color: #F0A050">Other states of this card</div>
+<div style="display: flex; flex-wrap: wrap; gap: 16px">
+<div style="flex: 1 1 260px; min-width: 0; box-sizing: border-box; padding: 18px 20px; border-radius: 14px; border: 1px solid #2A5263"><div style="font-size: 15px; font-weight: 400; color: #F3E8D6">Waiting for you to say hello in Telegram…</div><div style="margin-top: 6px; font-size: 13px; color: #BDD0D5">Once you press Start in Telegram, this page will update on its own. Buttons: "I’ve pressed Start" and "Show the code again".</div></div>
+<div style="flex: 1 1 260px; min-width: 0; box-sizing: border-box; padding: 18px 20px; border-radius: 14px; border: 1px solid #2A5263"><div style="font-size: 15px; font-weight: 400; color: #F3E8D6">Zeph just said hello in Telegram</div><div style="margin-top: 6px; font-size: 13px; color: #BDD0D5">Connected as @alex. Reply whenever you’re ready, there’s no rush. Button: "Go to your Dashboard".</div></div>
+<div style="flex: 1 1 260px; min-width: 0; box-sizing: border-box; padding: 18px 20px; border-radius: 14px; border: 1px solid #2A5263"><div style="font-size: 15px; font-weight: 400; color: #F4A48C">This link has expired or was already used</div><div style="margin-top: 6px; font-size: 13px; color: #BDD0D5">For your security each link works once and only for a short while. Button: "Get a new link".</div></div>
+</div>
+<div style="display: flex; align-items: center; gap: 12px; padding-top: 28px; border-top: 1px dashed #5B8B96; font-size: 11px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; color: #F0A050">Banner shown on Home until connected</div>
+<div style="box-sizing: border-box; padding: 20px 24px; border-radius: 16px; border: 1px solid #F0A050; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px"><div style="flex: 1 1 320px"><h2 style="margin: 0; font-size: 17px; font-weight: 400; color: #F3E8D6">Zeph can't reach you yet.</h2><p style="margin: 4px 0 0; font-size: 14px; color: #BDD0D5">Conversations and Check-ins happen in Telegram. Connect once and Zeph will say hello.</p></div><a href="#" style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; box-sizing: border-box; padding: 0 22px; border-radius: 999px; background: #F3E8D6; color: #0B2A3C; border: 1px solid #F3E8D6; font-size: 14px; font-weight: 500; text-decoration: none">Connect Telegram</a></div>
+</main>
+</div>
+</div>
+</body>
+</html>

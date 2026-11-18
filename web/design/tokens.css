@@ -1,0 +1,50 @@
+/*
+ * Zeph design tokens. Replace the @theme block in src/app/globals.css with this one.
+ * Tailwind's default colours stay cleared, so pages can only use these.
+ * Every value below is copied from design/reference/*.html. Do not round, rename or add to them.
+ */
+@theme {
+  --color-*: initial;
+  --color-bg: #0a202c;          /* page background */
+  --color-bg-deep: #071922;     /* sidebar, footer, inputs, dialogs */
+  --color-panel: #102c3a;       /* cards and panels */
+  --color-line: #2a5263;        /* borders and dividers */
+  --color-line-strong: #5b8b96; /* input borders, outline pills, dashed empties */
+  --color-zeph: #2a5c66;        /* Zeph chat bubble, selected chip, chart bars */
+  --color-cream: #f3e8d6;       /* headings, primary button, switch on */
+  --color-text: #eaf2f3;        /* body text on dark */
+  --color-soft: #bdd0d5;        /* secondary text, labels */
+  --color-mute: #9db6be;        /* placeholders, footer captions, disabled text */
+  --color-ink: #0b2a3c;         /* text on cream */
+  --color-orange: #f0a050;      /* "To build" tag, unsaved changes, attention dot */
+  --color-danger: #f4a48c;      /* destructive actions and errors */
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  --font-sans: var(--font-outfit), system-ui, sans-serif;
+  --font-mono: ui-monospace, Menlo, monospace;
+
+  --radius-input: 10px;
+  --radius-note: 12px;
+  --radius-tile: 14px;
+  --radius-card: 16px;
+  --radius-banner: 18px;
+  --radius-pill: 999px;
+}
+
+/*
+ * Type. Outfit (next/font/google, weights 300 400 500 600), body 16px / 1.55 / weight 300.
+ * Headings are weight 400, never bold. Sizes used, and nothing in between:
+ *   11px  eyebrow labels (500, uppercase, letter-spacing 2.5px) and table heads (1.5px)
+ *   12px  captions, pills        13px  helper text, small links
+ *   14px  secondary body, nav    15px  field values, row titles
+ *   16px  body                   17px  card titles
+ *   20px  section titles         22-24px step and card-row titles
+ *   26px  wordmark               28px  phone page titles
+ *   32px  page titles            34px  landing section titles, phone hero
+ *   clamp(36px, 4.2vw, 50px)     landing and How It Works hero
+ *
+ * Spacing. Page gutter 32px desktop, 20px phone (16px inside the dashboard).
+ * Card padding 22px 24px. Gap between cards 24px desktop, 20px phone.
+ * Every tappable thing is at least 44px tall.
+ */
