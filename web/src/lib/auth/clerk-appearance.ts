@@ -37,10 +37,22 @@ export const clerkAppearance: ComponentProps<
     borderRadius: "10px",
   },
   elements: {
-    rootBox: { width: "100%" },
-    cardBox: { width: "100%", background: "transparent" },
-    card: { padding: 0, gap: "18px", background: "transparent" },
-    header: { alignItems: "flex-start", textAlign: "left", gap: "6px" },
+    rootBox: { width: "100%", minWidth: 0 },
+    cardBox: { width: "100%", minWidth: 0, background: "transparent" },
+    card: { minWidth: 0, padding: 0, gap: "18px", background: "transparent" },
+    header: {
+      minWidth: 0,
+      maxWidth: "100%",
+      alignItems: "flex-start",
+      textAlign: "left",
+      gap: "6px",
+    },
+    identityPreview: { minWidth: 0, maxWidth: "100%" },
+    identityPreviewText: {
+      minWidth: 0,
+      whiteSpace: "normal",
+      overflowWrap: "anywhere",
+    },
     headerTitle: {
       margin: 0,
       fontSize: "32px",
@@ -82,6 +94,11 @@ export const clerkAppearance: ComponentProps<
       color: "#eaf2f3",
       fontSize: "15px",
       "&::placeholder": { color: "#9db6be" },
+    },
+    otpCodeFieldInput: {
+      border: "1px solid #5b8b96 !important",
+      boxShadow: "none !important",
+      color: "#eaf2f3",
     },
     formFieldHintText: { fontSize: "12px", color: "#bdd0d5" },
     formButtonPrimary: {
