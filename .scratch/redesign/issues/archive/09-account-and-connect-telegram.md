@@ -105,4 +105,4 @@ Pages that share parts I changed still pass: Onboarding 0.12%, M-Onboarding 0.06
 ## Completion
 
 - Completed: 2026-11-19
-- Commit: <to be filled in after the merge>
+- Commit: merge `5ab64a3` into main (branch `redesign-09-account-telegram`: `5228e7c` Account & privacy and Connect Telegram in the new look, `efd8e25` code-review fixes, `032f6fb` evidence, archive and CONTEXT update)
