@@ -10,9 +10,6 @@ import { ProfileForm } from "@/components/ProfileForm";
 import { YourDataSection } from "@/components/YourDataSection";
 import { useMe, usePlatformContent } from "@/lib/queries";
 
-/** Does nothing: the switch beside the memory-off notice turns memory on. */
-function doNothing(): void {}
-
 /**
  * The editable parts of the Account & privacy page: Profile, User Memory,
  * Photo Viewing, Your stickers, Delete my data and Delete account.
@@ -54,12 +51,7 @@ export function AccountSettings() {
         timeZone={me.time_zone ?? undefined}
       >
         {me.memory_note ? (
-          <MemoryOffNotice
-            note={me.memory_note}
-            canTurnOn={false}
-            isSaving={false}
-            onTurnOn={doNothing}
-          />
+          <MemoryOffNotice note={me.memory_note} canTurnOn={false} />
         ) : null}
       </PreferenceSwitch>
       <PreferenceSwitch

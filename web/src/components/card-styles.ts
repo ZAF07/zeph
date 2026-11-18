@@ -10,6 +10,10 @@ export const cardLink = `inline-flex min-h-11 items-center text-[13px] text-text
 export const cardListRow =
   "flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-line py-3 first:border-t-0";
 
+/** The main panel card, as the Connect Telegram card is drawn. */
+export const panelCard =
+  "box-border rounded-card border border-line bg-panel px-7 py-[26px]";
+
 const pillBase =
   "rounded-pill px-2.5 py-0.5 text-[12px] font-normal whitespace-nowrap";
 

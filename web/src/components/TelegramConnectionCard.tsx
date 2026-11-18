@@ -6,6 +6,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { primaryButton, secondaryButton } from "@/components/button-styles";
+import { panelCard } from "@/components/card-styles";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LoadingPanel } from "@/components/LoadingPanel";
 import { TelegramStateCard } from "@/components/TelegramStateCard";
@@ -17,6 +18,18 @@ import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 const POLL_INTERVAL_MS = 3000;
+
+/** The words for each state where the link can't be used. */
+const linkProblemWords = {
+  expired: {
+    title: "This link has expired or was already used",
+    body: "For your security each link works once and only for a short while.",
+  },
+  connected_elsewhere: {
+    title: "That Telegram account is linked to another Zeph account",
+    body: "Sign in to that account and disconnect Telegram there first, or use a different Telegram account.",
+  },
+};
 
 /** Which state of the card is on screen. */
 type View =
@@ -190,7 +203,7 @@ export function TelegramConnectionCard({
   if (view.kind === "ready") {
     const { token } = view;
     return (
-      <div className="box-border rounded-card border border-line bg-panel px-7 py-[26px]">
+      <div className={panelCard}>
         <div className="flex flex-wrap items-center gap-x-8 gap-y-6">
           <div
             role="img"
@@ -284,21 +297,13 @@ export function TelegramConnectionCard({
   }
 
   if (view.kind === "expired" || view.kind === "connected_elsewhere") {
-    const isExpired = view.kind === "expired";
+    const { title, body } = linkProblemWords[view.kind];
     return (
       <TelegramStateCard
         role="alert"
         isProblem
-        title={
-          isExpired
-            ? "This link has expired or was already used"
-            : "That Telegram account is linked to another Zeph account"
-        }
-        body={
-          isExpired
-            ? "For your security each link works once and only for a short while."
-            : "Sign in to that account and disconnect Telegram there first, or use a different Telegram account."
-        }
+        title={title}
+        body={body}
         actions={
           <button
             type="button"

@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { panelCard } from "@/components/card-styles";
+
 /**
  * One of the Connect Telegram card's other states (waiting, connected,
  * expired, linked elsewhere), in the main card's box: a title, one line and
@@ -24,10 +26,7 @@ export function TelegramStateCard({
   actions: ReactNode;
 }) {
   return (
-    <div
-      role={role}
-      className="box-border rounded-card border border-line bg-panel px-7 py-[26px]"
-    >
+    <div role={role} className={panelCard}>
       <div
         className={`text-[15px] font-normal ${isProblem ? "text-danger" : "text-cream"}`}
       >
