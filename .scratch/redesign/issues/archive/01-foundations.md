@@ -104,4 +104,4 @@ FAIL  Dashboard--menu-folded             13.79% differs, height 800 vs 1268
 ## Completion
 
 - Completed: 2026-11-18
-- Commit: <to be filled in after merge>
+- Commit: merge `34bd54a` into main (branch `redesign-01-foundations`: `5303b9a` foundations, `6dd99c1` code-review fixes, `3f0e975` evidence and archive)
