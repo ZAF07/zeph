@@ -21,7 +21,10 @@ export const compactSecondaryButton =
 /** A destructive action. Keeps its colour on hover when a link. */
 export const dangerButton = `${base} border-danger bg-transparent text-danger hover:text-danger`;
 
-/** The button that confirms a destructive action. */
+/**
+ * The button that confirms a destructive action. The design draws it the
+ * same as `dangerButton`.
+ */
 export const confirmDangerButton = dangerButton;
 
 /** A round icon-only delete button inside a list row. */

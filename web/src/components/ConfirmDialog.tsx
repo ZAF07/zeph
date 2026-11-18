@@ -14,9 +14,9 @@ import { dangerButton, secondaryButton } from "@/components/button-styles";
  * as on the design's `States` sheet.
  *
  * @param props - `open` shows it; `title` and `body` say what will go;
- *   `cancelLabel` and `confirmLabel` name the two buttons; `isWorking` locks
- *   them while the deletion runs; `onConfirm` and `onCancel` are called when
- *   the person chooses; `modal` (default true) opens it over the page.
+ *   `cancelLabel` and `confirmLabel` name the two buttons; `onConfirm` and
+ *   `onCancel` are called when the person chooses; `modal` (default true)
+ *   opens it over the page.
  * @returns The dialog.
  */
 export function ConfirmDialog({
@@ -25,7 +25,6 @@ export function ConfirmDialog({
   body,
   cancelLabel,
   confirmLabel,
-  isWorking = false,
   onConfirm,
   onCancel,
   modal = true,
@@ -35,7 +34,6 @@ export function ConfirmDialog({
   body: string;
   cancelLabel: string;
   confirmLabel: string;
-  isWorking?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
   modal?: boolean;
@@ -71,20 +69,10 @@ export function ConfirmDialog({
         <h2 className="m-0 text-[20px] font-normal text-cream">{title}</h2>
         <p className="m-0 text-[14px] text-soft">{body}</p>
         <div className="flex flex-wrap justify-end gap-2 pt-1.5">
-          <button
-            type="button"
-            className={secondaryButton}
-            disabled={isWorking}
-            onClick={onCancel}
-          >
+          <button type="button" className={secondaryButton} onClick={onCancel}>
             {cancelLabel}
           </button>
-          <button
-            type="button"
-            className={dangerButton}
-            disabled={isWorking}
-            onClick={onConfirm}
-          >
+          <button type="button" className={dangerButton} onClick={onConfirm}>
             {confirmLabel}
           </button>
         </div>
