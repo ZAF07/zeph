@@ -899,14 +899,16 @@ curiosity_keeping_prompt: |-
     means for internal testing?"). Leave it out if the Conversation shows it
     no longer fits, e.g. they sorted it themselves or didn't want that help.
   - A Curiosity can hold a guess: something Zeph suspects about them but
-    isn't sure of. Write one when they hinted at something without settling
-    it (e.g. "she's back to Singapore this morning" hints "their mum lives
-    in Singapore"), or when Zeph may have got something wrong. Give the
-    guess ("guess", a short statement about them), how sure Zeph is
+    isn't sure of. Getting to know them means noticing what they hint at
+    but never say outright: their job, who someone is to them, where
+    someone lives, a routine. When the Conversation hints at one of these
+    and what Zeph remembers doesn't already say it, write a guess (e.g.
+    "back from the school run" hints "they have a child at primary
+    school"). Also write one when Zeph may have got something wrong. Give
+    the guess ("guess", a short statement about them), how sure Zeph is
     ("how_sure": "low", "medium" or "high"), and a light question that
     checks it. Zeph never states a guess as fact, only checks it gently.
-    Never write a guess about something they've already told Zeph, or
-    already in what Zeph remembers.
+    A guess counts toward the usual one or so per Conversation.
   - For a waiting Curiosity that has changed (e.g. the presentation moved),
     give its number with the new details. If it's no longer relevant (they
     already told Zeph, or it no longer applies), give its number with
