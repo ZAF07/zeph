@@ -38,6 +38,12 @@ vi.mock("@/lib/use-api-client", () => ({
   useApiClient: () => apiClient,
 }));
 
+const navigation = { search: "" };
+
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(navigation.search),
+}));
+
 const maya = { ...userWithRole("user"), time_zone: "UTC" };
 
 const groups: MemoryGroup[] = [
@@ -156,6 +162,8 @@ const sharedPhotos: SharedPhoto[] = [
 describe("Memories", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    navigation.search = "";
+    window.history.replaceState({}, "", "/memories");
     apiClient.getMe.mockResolvedValue(maya);
     apiClient.listMemoryGroups.mockResolvedValue(groups);
     apiClient.listConversationSummaries.mockResolvedValue(summaries);
@@ -175,6 +183,73 @@ describe("Memories", () => {
     apiClient.deleteUserPortrait.mockResolvedValue(undefined);
     URL.createObjectURL = vi.fn(() => "blob:photo");
     URL.revokeObjectURL = vi.fn();
+  });
+
+  it("swaps the panel and sets ?tab= when a tab is clicked, without a page load", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<Memories />);
+    const memoriesTab = await screen.findByRole("tab", { name: "Memories" });
+
+    await user.click(screen.getByRole("tab", { name: "Photos" }));
+
+    expect(window.location.pathname).toBe("/memories");
+    expect(window.location.search).toBe("?tab=photos");
+    expect(screen.getByRole("tab", { name: "Photos" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("heading", { name: "Photos" })).toBeVisible();
+    expect(screen.queryByText("Goes by Maya")).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Memories" })).toBe(memoriesTab);
+
+    await user.click(memoriesTab);
+
+    expect(window.location.search).toBe("");
+    expect(screen.getByText("Goes by Maya")).toBeVisible();
+  });
+
+  it("keeps other query flags when it sets ?tab=", async () => {
+    navigation.search = "design=menu-open";
+    window.history.replaceState({}, "", "/memories?design=menu-open");
+    const user = userEvent.setup();
+    renderWithQueries(<Memories />);
+
+    await user.click(await screen.findByRole("tab", { name: "About you" }));
+
+    expect(window.location.search).toBe("?design=menu-open&tab=about");
+  });
+
+  it.each([
+    ["about", "About you", "What I know about you"],
+    ["threads", "What's going on", "What's going on in your life"],
+    ["helps", "What helps you", "What helps you"],
+    ["summaries", "Conversation Summaries", "Conversation Summaries"],
+    ["photos", "Photos", "Photos"],
+  ])(
+    "opens the %s tab when loaded with ?tab=",
+    async (tab, tabName, heading) => {
+      navigation.search = `tab=${tab}`;
+      renderWithQueries(<Memories />);
+
+      expect(
+        await screen.findByRole("heading", { name: heading }),
+      ).toBeVisible();
+      expect(screen.getByRole("tab", { name: tabName })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+    },
+  );
+
+  it("opens the Memories tab when ?tab= is unknown", async () => {
+    navigation.search = "tab=nonsense";
+    renderWithQueries(<Memories />);
+
+    expect(await screen.findByText("Goes by Maya")).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Memories" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   it("marks User Memory as changed in chat with the day", async () => {
@@ -203,7 +278,6 @@ describe("Memories", () => {
     expect(
       screen.getByRole("region", { name: "What helps" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("3 memories, grouped by category")).toBeVisible();
   });
 
   it("deletes a single Memory Item", async () => {
@@ -223,7 +297,6 @@ describe("Memories", () => {
     expect(
       screen.queryByRole("region", { name: "What helps" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("2 memories, grouped by category")).toBeVisible();
   });
 
   it("keeps a Memory Item and explains when deleting it fails", async () => {
@@ -250,19 +323,29 @@ describe("Memories", () => {
     await user.click(
       await screen.findByRole("button", { name: "Delete all memories" }),
     );
-    expect(screen.getByText("Delete all 3 memories?")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Keep them" }));
+    const dialog = within(
+      screen.getByRole("alertdialog", { name: "Delete all memories?" }),
+    );
+    expect(
+      dialog.getByText(
+        "Zeph will forget every memory it holds about you. Conversation Summaries and your account stay. This can’t be undone.",
+      ),
+    ).toBeVisible();
+    await user.click(dialog.getByRole("button", { name: "Keep them" }));
     expect(apiClient.deleteAllMemoryItems).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
 
     await user.click(
       screen.getByRole("button", { name: "Delete all memories" }),
     );
-    await user.click(screen.getByRole("button", { name: "Yes, delete all" }));
+    await user.click(
+      within(
+        screen.getByRole("alertdialog", { name: "Delete all memories?" }),
+      ).getByRole("button", { name: "Delete all memories" }),
+    );
 
     expect(apiClient.deleteAllMemoryItems).toHaveBeenCalledOnce();
-    expect(
-      await screen.findByText("Zeph hasn’t remembered anything yet"),
-    ).toBeVisible();
+    expect(await screen.findByText("Nothing remembered yet")).toBeVisible();
     expect(
       screen.queryByRole("button", { name: "Delete all memories" }),
     ).not.toBeInTheDocument();
@@ -280,19 +363,22 @@ describe("Memories", () => {
       screen.getByRole("tab", { name: "Conversation Summaries" }),
     ).toHaveAttribute("aria-selected", "true");
     const [newest, older] = screen.getAllByRole("listitem");
-    expect(within(newest).getByText("Wed 11 Nov")).toBeVisible();
+    expect(within(newest).getByText("11 Nov")).toBeVisible();
     expect(
       within(newest).getByText(
         "Talked through whether to accept the new role.",
       ),
     ).toBeVisible();
+    expect(within(newest).getByText("Seemed")).toBeVisible();
     expect(
-      within(newest).getByText("You seemed unsettled at first, then calmer"),
+      within(newest).getByText("unsettled at first, then calmer"),
     ).toBeVisible();
+    expect(within(newest).getByText("Zeph offered")).toBeVisible();
     expect(
       within(newest).getByText("Suggested a walk; they said it helped."),
     ).toBeVisible();
-    expect(within(older).getByText("Mon 9 Nov")).toBeVisible();
+    expect(within(older).getByText("9 Nov")).toBeVisible();
+    expect(within(older).queryByText("Zeph offered")).not.toBeInTheDocument();
   });
 
   it("deletes a Conversation Summary", async () => {
@@ -303,7 +389,7 @@ describe("Memories", () => {
     );
 
     await user.click(
-      screen.getByRole("button", { name: "Delete summary from Mon 9 Nov" }),
+      screen.getByRole("button", { name: "Delete summary from 9 Nov" }),
     );
 
     expect(apiClient.deleteConversationSummary).toHaveBeenCalledWith(
@@ -336,7 +422,7 @@ describe("Memories", () => {
       screen.getByRole("heading", { name: "What I know about you" }),
     ).toBeVisible();
     expect(screen.getByText(portrait.text)).toBeVisible();
-    expect(screen.getByText("Updated 13 Nov")).toBeVisible();
+    expect(screen.getByText("Written 13 Nov")).toBeVisible();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
 
@@ -398,13 +484,13 @@ describe("Memories", () => {
     renderWithQueries(<Memories />);
 
     await user.click(
-      await screen.findByRole("tab", { name: "What’s going on" }),
+      await screen.findByRole("tab", { name: "What's going on" }),
     );
 
     expect(
-      screen.getByRole("heading", { name: "What’s going on in your life" }),
+      screen.getByRole("heading", { name: "What's going on in your life" }),
     ).toBeVisible();
-    const [open, settled] = screen.getAllByRole("listitem");
+    const [open, closed] = screen.getAllByRole("listitem");
     expect(within(open).getByText("Falling-out with Mei")).toBeVisible();
     expect(
       within(open).getByText(
@@ -413,16 +499,16 @@ describe("Memories", () => {
     ).toBeVisible();
     expect(within(open).getByText("Open")).toBeVisible();
     expect(within(open).getByText("Updated 12 Nov")).toBeVisible();
-    expect(within(settled).getByText("Moving flat")).toBeVisible();
-    expect(within(settled).getByText("Settled")).toBeVisible();
-    expect(within(settled).getByText("Updated 3 Oct")).toBeVisible();
+    expect(within(closed).getByText("Moving flat")).toBeVisible();
+    expect(within(closed).getByText("Closed")).toBeVisible();
+    expect(within(closed).getByText("Updated 3 Oct")).toBeVisible();
   });
 
   it("deletes a Life Thread", async () => {
     const user = userEvent.setup();
     renderWithQueries(<Memories />);
     await user.click(
-      await screen.findByRole("tab", { name: "What’s going on" }),
+      await screen.findByRole("tab", { name: "What's going on" }),
     );
 
     await user.click(
@@ -441,7 +527,7 @@ describe("Memories", () => {
     const user = userEvent.setup();
     renderWithQueries(<Memories />);
     await user.click(
-      await screen.findByRole("tab", { name: "What’s going on" }),
+      await screen.findByRole("tab", { name: "What's going on" }),
     );
 
     await user.click(
@@ -460,7 +546,7 @@ describe("Memories", () => {
     renderWithQueries(<Memories />);
 
     await user.click(
-      await screen.findByRole("tab", { name: "What’s going on" }),
+      await screen.findByRole("tab", { name: "What's going on" }),
     );
 
     expect(screen.getByText("Nothing here yet")).toBeVisible();
@@ -471,7 +557,7 @@ describe("Memories", () => {
     const user = userEvent.setup();
     renderWithQueries(<Memories />);
     await user.click(
-      await screen.findByRole("tab", { name: "What’s going on" }),
+      await screen.findByRole("tab", { name: "What's going on" }),
     );
 
     await user.click(
@@ -495,14 +581,15 @@ describe("Memories", () => {
     const [push, planSteps] = screen.getAllByRole("listitem");
     expect(within(push).getByText("Push")).toBeVisible();
     expect(within(push).getByText("Helped")).toBeVisible();
+    expect(within(push).getByText("When")).toBeVisible();
     expect(
       within(push).getByText(
         "Their launch kept slipping; they couldn’t say what done meant.",
       ),
     ).toBeVisible();
-    expect(
-      within(push).getByText("You felt frustrated, a bit stuck"),
-    ).toBeVisible();
+    expect(within(push).getByText("Feeling")).toBeVisible();
+    expect(within(push).getByText("frustrated, a bit stuck")).toBeVisible();
+    expect(within(push).getByText("Why")).toBeVisible();
     expect(
       within(push).getByText(
         "Pinning down a finish line gave them a next step they took.",
@@ -565,9 +652,7 @@ describe("Memories", () => {
 
     await user.click(await screen.findByRole("tab", { name: "Photos" }));
 
-    const cat = within(
-      screen.getByRole("listitem", { name: "Photo from Tue 10 Nov" }),
-    );
+    const cat = within(screen.getAllByRole("listitem")[0]);
     expect(
       await cat.findByAltText("A ginger cat asleep on a sunny windowsill."),
     ).toHaveAttribute("src", "blob:photo");
@@ -577,7 +662,7 @@ describe("Memories", () => {
     expect(
       cat.getByText("Miso is their cat, who keeps them company at home."),
     ).toBeVisible();
-    expect(cat.getByText("Tue 10 Nov")).toBeVisible();
+    expect(cat.getByText("Sent 10 Nov")).toBeVisible();
     expect(apiClient.getSharedPhotoImage).toHaveBeenCalledWith("photo-1");
     expect(apiClient.getSharedPhotoImage).toHaveBeenCalledWith("photo-2");
   });
@@ -593,6 +678,9 @@ describe("Memories", () => {
       await screen.findAllByText("This photo can’t be shown right now"),
     ).toHaveLength(2);
     expect(
+      screen.getByRole("img", { name: "Photo from 10 Nov" }),
+    ).toHaveTextContent("This photo can’t be shown right now");
+    expect(
       screen.getByText("A ginger cat asleep on a sunny windowsill."),
     ).toBeVisible();
   });
@@ -603,7 +691,7 @@ describe("Memories", () => {
     await user.click(await screen.findByRole("tab", { name: "Photos" }));
 
     await user.click(
-      screen.getByRole("button", { name: "Delete photo from Mon 2 Nov" }),
+      screen.getByRole("button", { name: "Delete photo from 2 Nov" }),
     );
 
     expect(apiClient.deleteSharedPhoto).toHaveBeenCalledWith("photo-2");
@@ -622,7 +710,7 @@ describe("Memories", () => {
     await user.click(await screen.findByRole("tab", { name: "Photos" }));
 
     await user.click(
-      screen.getByRole("button", { name: "Delete photo from Mon 2 Nov" }),
+      screen.getByRole("button", { name: "Delete photo from 2 Nov" }),
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -677,9 +765,43 @@ describe("Memories", () => {
     });
     renderWithQueries(<Memories />);
 
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Memory is paused.",
+    expect(await screen.findByText("Goes by Maya")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("Memory is paused.");
+  });
+
+  it("shows the whole note as the notice title when it doesn't open in bold", async () => {
+    apiClient.getMe.mockResolvedValue({
+      ...maya,
+      user_memory_enabled: false,
+      memory_note: "Zeph is resting. **Nothing is deleted.** Back soon.",
+    });
+    renderWithQueries(<Memories />);
+
+    expect(await screen.findByText("Goes by Maya")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Zeph is resting. **Nothing is deleted.** Back soon.",
     );
+  });
+
+  it("turns User Memory back on from the notice", async () => {
+    apiClient.getMe.mockResolvedValue({
+      ...maya,
+      user_memory_enabled: false,
+      memory_note: "**Memory is paused.** Zeph won’t learn anything new.",
+    });
+    apiClient.updatePreferences.mockResolvedValue(maya);
+    const user = userEvent.setup();
+    renderWithQueries(<Memories />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Turn memory on" }),
+    );
+
+    expect(apiClient.updatePreferences).toHaveBeenCalledWith({
+      user_memory_enabled: true,
+    });
+    expect(await screen.findByText("Memory on")).toBeVisible();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("shows Not available on your account with the switch disabled, and memories still deletable", async () => {
@@ -701,6 +823,9 @@ describe("Memories", () => {
     );
     await user.click(memorySwitch);
     expect(apiClient.updatePreferences).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("button", { name: "Turn memory on" }),
+    ).not.toBeInTheDocument();
 
     await user.click(
       screen.getByRole("button", { name: "Delete memory: Goes by Maya" }),
@@ -712,9 +837,8 @@ describe("Memories", () => {
     apiClient.listMemoryGroups.mockResolvedValue([]);
     renderWithQueries(<Memories />);
 
-    expect(
-      await screen.findByText("Zeph hasn’t remembered anything yet"),
-    ).toBeVisible();
+    expect(await screen.findByText("Nothing remembered yet")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Talk to Zeph" })).toBeVisible();
   });
 
   it("offers Try again when memories cannot be loaded", async () => {
@@ -725,7 +849,7 @@ describe("Memories", () => {
     renderWithQueries(<Memories />);
 
     expect(
-      await screen.findByText("We couldn’t load your memories"),
+      await screen.findByText("Couldn’t load your memories"),
     ).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Try again" }));
 

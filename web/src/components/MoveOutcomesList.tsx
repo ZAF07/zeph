@@ -2,9 +2,12 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { deleteIconButton } from "@/components/button-styles";
-import { DeleteIcon } from "@/components/DeleteIcon";
+import { filledPill, outlinedPill } from "@/components/card-styles";
 import { EmptyState } from "@/components/EmptyState";
+import { MemoriesPanelHeading } from "@/components/MemoriesPanelHeading";
+import { MemoryCard } from "@/components/MemoryCard";
+import { MemoryDetailLine } from "@/components/MemoryDetailLine";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type { MoveOutcome } from "@/lib/api-client";
 import { formatShortDay } from "@/lib/dates";
 import { queryKeys } from "@/lib/queries";
@@ -16,16 +19,10 @@ const resultLabels: Record<MoveOutcome["result"], string> = {
   mixed: "Mixed",
 };
 
-const resultStyles: Record<MoveOutcome["result"], string> = {
-  helped: "bg-blue-tint text-blue-deep",
-  didnt_help: "bg-code text-ink-body",
-  mixed: "bg-code text-ink-body",
-};
-
 /**
  * The "What helps you" tab: each Move Outcome, newest first, with the kind
- * of help, whether it helped, the situation, how the User felt, why and the
- * day; each can be deleted, so Zeph never uses it again.
+ * of help, whether it helped, when it was used, how the User felt, why and
+ * the day; each can be deleted, so Zeph never uses it again.
  *
  * @param props - `outcomes` are the User's Move Outcomes, newest first, and
  *   `timeZone` is the User's time zone.
@@ -51,57 +48,56 @@ export function MoveOutcomesList({
   });
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1.5">
-        <h2 className="m-0 text-[15px] font-semibold">What helps you</h2>
-        <p className="m-0 text-caption text-ink-muted">
-          What Zeph learned about the kinds of help that work for you, and when.
-          Delete one and Zeph won’t use it again.
-        </p>
-      </div>
+    <>
+      <MemoriesPanelHeading
+        title="What helps you"
+        body="What Zeph learned about the kinds of help that work for you, and when. Delete one and Zeph won't use it again."
+      />
 
       {deleteOutcome.isError ? (
-        <p role="alert" className="m-0 text-sm text-danger-deep">
+        <SaveFailedNote>
           We couldn’t delete that. Please try again.
-        </p>
+        </SaveFailedNote>
       ) : null}
 
       {outcomes.length > 0 ? (
-        <ul className="m-0 flex list-none flex-col gap-3 p-0">
+        <ul className="m-0 flex list-none flex-col gap-6 p-0">
           {outcomes.map((outcome) => {
             const day = formatShortDay(outcome.made_at, timeZone);
             return (
-              <li
-                key={outcome.id}
-                className="flex items-start gap-4 rounded-card border border-line bg-white py-5 pr-5 pl-6"
-              >
-                <span className="flex min-w-0 flex-auto flex-col gap-2">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="text-[15px] font-semibold">
-                      {outcome.move}
-                    </span>
-                    <span
-                      className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-[3px] text-xs font-medium ${resultStyles[outcome.result]}`}
-                    >
-                      {resultLabels[outcome.result]}
-                    </span>
-                  </span>
-                  <span className="text-[15px]">{outcome.situation}</span>
-                  <span className="text-[15px] text-ink-soft">
-                    {`You felt ${outcome.feeling}`}
-                  </span>
-                  <span className="text-[15px]">{outcome.why}</span>
-                  <span className="text-caption text-ink-muted">{day}</span>
-                </span>
-                <button
-                  type="button"
-                  aria-label={`Delete what helps: ${outcome.move}, ${day}`}
-                  className={deleteIconButton}
-                  disabled={deleteOutcome.isPending}
-                  onClick={() => deleteOutcome.mutate(outcome.id)}
+              <li key={outcome.id}>
+                <MemoryCard
+                  deleteLabel={`Delete what helps: ${outcome.move}, ${day}`}
+                  isDeleting={deleteOutcome.isPending}
+                  onDelete={() => deleteOutcome.mutate(outcome.id)}
                 >
-                  <DeleteIcon />
-                </button>
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <span className="text-[16px] font-normal text-text">
+                        {outcome.move}
+                      </span>
+                      <span
+                        className={
+                          outcome.result === "helped"
+                            ? filledPill
+                            : outlinedPill
+                        }
+                      >
+                        {resultLabels[outcome.result]}
+                      </span>
+                    </div>
+                    <MemoryDetailLine label="When">
+                      {outcome.situation}
+                    </MemoryDetailLine>
+                    <MemoryDetailLine label="Feeling">
+                      {outcome.feeling}
+                    </MemoryDetailLine>
+                    <MemoryDetailLine label="Why">
+                      {outcome.why}
+                    </MemoryDetailLine>
+                    <span className="text-[12px] text-soft">{day}</span>
+                  </div>
+                </MemoryCard>
               </li>
             );
           })}
@@ -112,6 +108,6 @@ export function MoveOutcomesList({
           body="When Zeph helps you in a chat, what it learned appears here a little while after the Conversation ends."
         />
       )}
-    </div>
+    </>
   );
 }

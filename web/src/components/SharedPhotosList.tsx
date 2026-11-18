@@ -5,9 +5,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { deleteIconButton } from "@/components/button-styles";
 import { DeleteIcon } from "@/components/DeleteIcon";
 import { EmptyState } from "@/components/EmptyState";
+import { MemoriesPanelHeading } from "@/components/MemoriesPanelHeading";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { SharedPhotoPicture } from "@/components/SharedPhotoPicture";
 import type { SharedPhoto } from "@/lib/api-client";
-import { formatWeekdayDay } from "@/lib/dates";
+import { formatShortDay } from "@/lib/dates";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
@@ -40,40 +42,39 @@ export function SharedPhotosList({
   });
 
   return (
-    <div className="flex flex-col gap-6">
-      <p className="m-0 text-caption text-ink-muted">
-        Photos you sent that Zeph thought mattered to you, with a note on why.
-        Zeph tries to leave out screenshots, receipts and memes. They stay until
-        you delete them.
-      </p>
+    <>
+      <MemoriesPanelHeading
+        title="Photos"
+        body="Photos you sent that Zeph thought mattered to you, with a note on why. Zeph tries to leave out screenshots, receipts and memes. They stay until you delete them."
+      />
 
       {deletePhoto.isError ? (
-        <p role="alert" className="m-0 text-sm text-danger-deep">
+        <SaveFailedNote>
           We couldn’t delete that. Please try again.
-        </p>
+        </SaveFailedNote>
       ) : null}
 
       {photos.length > 0 ? (
-        <ol className="m-0 grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2">
+        <ol className="m-0 flex list-none flex-col gap-6 p-0">
           {photos.map((photo) => {
-            const day = formatWeekdayDay(photo.sent_at, timeZone);
+            const day = formatShortDay(photo.sent_at, timeZone);
             return (
               <li
                 key={photo.id}
-                aria-label={`Photo from ${day}`}
-                className="flex flex-col gap-4 rounded-card border border-line bg-white p-4"
+                className="box-border rounded-card border border-line bg-panel py-[18px] pr-3 pl-[22px] [overflow-wrap:anywhere]"
               >
-                <SharedPhotoPicture photo={photo} />
-                <div className="flex items-start gap-4">
-                  <span className="flex min-w-0 flex-auto flex-col gap-2">
-                    <span className="text-caption font-semibold text-ink-body">
-                      {day}
-                    </span>
-                    <span className="text-[15px]">{photo.description}</span>
-                    <span className="text-caption text-ink-soft">
-                      {photo.note}
-                    </span>
-                  </span>
+                <div className="flex flex-wrap items-start gap-x-5 gap-y-4">
+                  <SharedPhotoPicture
+                    photo={photo}
+                    label={`Photo from ${day}`}
+                  />
+                  <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-1.5">
+                    <p className="m-0 text-[15px] text-text">
+                      {photo.description}
+                    </p>
+                    <p className="m-0 text-[14px] text-soft">{photo.note}</p>
+                    <span className="text-[12px] text-soft">{`Sent ${day}`}</span>
+                  </div>
                   <button
                     type="button"
                     aria-label={`Delete photo from ${day}`}
@@ -94,6 +95,6 @@ export function SharedPhotosList({
           body="When you send Zeph a photo that matters to you, it may keep it here after the Conversation ends."
         />
       )}
-    </div>
+    </>
   );
 }

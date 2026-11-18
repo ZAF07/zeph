@@ -3,14 +3,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import {
-  confirmDangerButton,
-  dangerButton,
-  deleteIconButton,
-  secondaryButton,
-} from "@/components/button-styles";
+import { dangerButton, deleteIconButton } from "@/components/button-styles";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DeleteIcon } from "@/components/DeleteIcon";
 import { EmptyState } from "@/components/EmptyState";
+import { PillLink } from "@/components/PillLink";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type { MemoryGroup } from "@/lib/api-client";
 import { memorySourceLabel } from "@/lib/memories";
 import { queryKeys } from "@/lib/queries";
@@ -18,7 +16,7 @@ import { useApiClient } from "@/lib/use-api-client";
 
 /**
  * The Memories tab: Memory Items grouped by Memory Category, each deletable,
- * and "Delete all memories" with a confirm step.
+ * and "Delete all memories", which asks first.
  *
  * @param props - `groups` are the User's Memory Items by category, and
  *   `timeZone` is the User's time zone.
@@ -59,59 +57,37 @@ export function MemoryItemsList({
 
   const deleteAll = useMutation({
     mutationFn: () => apiClient.deleteAllMemoryItems(),
-    onSuccess: () => {
-      setIsConfirmingDeleteAll(false);
-      showGroupsLeft([]);
-    },
+    onSuccess: () => showGroupsLeft([]),
   });
 
   const isDeleting = deleteItem.isPending || deleteAll.isPending;
   const deleteFailed = deleteItem.isError || deleteAll.isError;
 
   return (
-    <div className="flex flex-col gap-[42px]">
-      {memoryCount > 0 ? (
-        <p className="m-0 text-caption text-ink-muted">
-          {memoryCount} {memoryCount === 1 ? "memory" : "memories"}, grouped by
-          category
-        </p>
-      ) : null}
-
+    <>
       {deleteFailed ? (
-        <p role="alert" className="m-0 text-sm text-danger-deep">
+        <SaveFailedNote>
           We couldn’t delete that. Please try again.
-        </p>
+        </SaveFailedNote>
       ) : null}
 
       {groups.map((group) => (
-        <section
-          key={group.category}
-          aria-label={group.category}
-          className="flex flex-col gap-2.5"
-        >
-          <h2 className="m-0 flex items-baseline gap-2 text-[15px] font-semibold">
+        <section key={group.category} aria-label={group.category}>
+          <h3 className="mt-0 mb-2 text-[12px] font-medium tracking-[2px] text-soft uppercase">
             {group.category}
-            <span className="text-caption font-normal text-ink-muted">
-              {group.items.length}
-            </span>
-          </h2>
-          <ul className="m-0 list-none overflow-hidden rounded-card border border-line bg-white p-0">
+          </h3>
+          <ul className="m-0 box-border list-none rounded-card border border-line bg-panel px-[22px] py-1.5 [overflow-wrap:anywhere]">
             {group.items.map((item) => (
               <li
                 key={item.id}
-                className="flex flex-wrap items-center gap-3 border-t border-line py-3.5 pr-3 pl-6 first:border-t-0"
+                className="flex items-center justify-between gap-3 border-t border-line py-2 first:border-t-0"
               >
-                <span className="flex min-w-0 flex-auto flex-col gap-1">
-                  <span className="text-base">{item.content}</span>
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center whitespace-nowrap rounded-full bg-code px-2.5 py-[3px] text-xs font-medium text-ink-body">
-                      {group.category}
-                    </span>
-                    <span className="text-caption text-ink-muted">
-                      {memorySourceLabel(item, timeZone)}
-                    </span>
-                  </span>
-                </span>
+                <div className="min-w-0">
+                  <div className="text-[15px] text-text">{item.content}</div>
+                  <div className="text-[12px] text-soft">
+                    {memorySourceLabel(item, timeZone)}
+                  </div>
+                </div>
                 <button
                   type="button"
                   aria-label={`Delete memory: ${item.content}`}
@@ -132,65 +108,51 @@ export function MemoryItemsList({
 
       {memoryCount === 0 ? (
         <EmptyState
-          title="Zeph hasn’t remembered anything yet"
-          body="As you talk, meaningful details — goals, what helps, people you mention — will appear here, grouped by category."
-          action={
-            <a href="https://t.me/" className={secondaryButton}>
-              Open Telegram
-            </a>
-          }
+          title="Nothing remembered yet"
+          body="As you talk with Zeph, the details that matter will appear here. You can delete any of them."
+          action={<PillLink href="https://t.me/" label="Talk to Zeph" />}
         />
       ) : (
         <section
           aria-labelledby="delete-all-memories"
-          className="flex flex-col gap-3 rounded-card border border-danger-line p-6"
+          className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-line pt-5"
         >
-          <h2
-            id="delete-all-memories"
-            className="m-0 text-[17px] font-semibold text-danger"
-          >
-            Delete all memories
-          </h2>
-          <p className="m-0 text-[15px] text-ink-soft">
-            Removes every memory. Conversation Summaries and your account stay.
-            This can’t be undone.
-          </p>
-          {isConfirmingDeleteAll ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium">
-                Delete all {memoryCount}{" "}
-                {memoryCount === 1 ? "memory" : "memories"}?
-              </span>
-              <button
-                type="button"
-                className={confirmDangerButton}
-                disabled={isDeleting}
-                onClick={() => {
-                  deleteItem.reset();
-                  deleteAll.mutate();
-                }}
-              >
-                Yes, delete all
-              </button>
-              <button
-                type="button"
-                className={secondaryButton}
-                onClick={() => setIsConfirmingDeleteAll(false)}
-              >
-                Keep them
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className={`${dangerButton} self-start`}
-              onClick={() => setIsConfirmingDeleteAll(true)}
+          <div className="flex-[1_1_320px]">
+            <h2
+              id="delete-all-memories"
+              className="m-0 text-[17px] font-normal text-cream"
             >
               Delete all memories
-            </button>
-          )}
+            </h2>
+            <p className="mt-1 mb-0 text-[14px] text-soft">
+              Removes every memory. Conversation Summaries and your account
+              stay. This can&apos;t be undone.
+            </p>
+          </div>
+          <button
+            type="button"
+            className={dangerButton}
+            disabled={isDeleting}
+            onClick={() => setIsConfirmingDeleteAll(true)}
+          >
+            Delete all memories
+          </button>
         </section>
       )}
-    </div>
+
+      <ConfirmDialog
+        open={isConfirmingDeleteAll}
+        title="Delete all memories?"
+        body="Zeph will forget every memory it holds about you. Conversation Summaries and your account stay. This can’t be undone."
+        cancelLabel="Keep them"
+        confirmLabel="Delete all memories"
+        onCancel={() => setIsConfirmingDeleteAll(false)}
+        onConfirm={() => {
+          setIsConfirmingDeleteAll(false);
+          deleteItem.reset();
+          deleteAll.mutate();
+        }}
+      />
+    </>
   );
 }
