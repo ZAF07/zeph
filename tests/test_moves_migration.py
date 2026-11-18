@@ -224,7 +224,7 @@ def test_the_fallback_migration_adds_a_column_that_defaults_to_not_fallback(
 def test_the_asks_a_question_migration_leaves_existing_moves_unticked(
     engine: Engine, database_url: str
 ) -> None:
-    downgrade_to(database_url, "0057")
+    downgrade_to(database_url, "0058")
     try:
         with engine.begin() as connection:
             connection.execute(

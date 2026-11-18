@@ -44,5 +44,5 @@ None - can start immediately.
 
 ## Comments
 
-- 2026-11-18 (agent, branch `get-curious-01-asks-a-question`): started. Plan: `asks_a_question` on Move (model, table, migration 0058 which also reloads the Woven-in Check-in prompt, repo, seed loader, admin API, eval snapshot; Setting Overrides keep the live value). Understanding: filter out a ticked Move the previous Understanding made, next to the needed-Feature filter; after picking, drop ticked lead/support when the reply asks why or raises a Curiosity (support never moves up). Woven-in Check-in told when the reply already asks a question. Dashboard: checkbox on each Move card.
+- 2026-11-18 (agent, branch `get-curious-01-asks-a-question`): started. Plan: `asks_a_question` on Move (model, table, migration 0059 (renumbered after issue 02 took 0058) which also reloads the Woven-in Check-in prompt, repo, seed loader, admin API, eval snapshot; Setting Overrides keep the live value). Understanding: filter out a ticked Move the previous Understanding made, next to the needed-Feature filter; after picking, drop ticked lead/support when the reply asks why or raises a Curiosity (support never moves up). Woven-in Check-in told when the reply already asks a question. Dashboard: checkbox on each Move card.
 
