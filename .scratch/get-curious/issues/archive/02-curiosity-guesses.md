@@ -66,3 +66,9 @@ None - can start immediately.
 ## Completion
 
 - Completed: 2026-11-18
+- Commits:
+  - `e7e484f` Get-curious issue 02: Curiosities can hold a guess with how sure Zeph is
+  - `45a72a1` Get-curious issue 02 review fixes: drop unused guess update, share how-sure wording, fold close into the existing bullet
+  - `30b8327` Get-curious issue 02: keeping prompt says what hints to guess at, so the real model writes guesses
+  - `be3d78f` Get-curious issue 02 done: archive issue with check, review and run evidence
+  - `465ce4e` Merge get-curious issue 02 into main
