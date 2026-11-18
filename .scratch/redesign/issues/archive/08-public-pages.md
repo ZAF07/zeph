@@ -128,4 +128,4 @@ FAIL  Signup                             12.40% differs, height 885 vs 800 (Cler
 ## Completion
 
 - Completed: 2026-11-19
-- Commit: <to be filled in after merge>
+- Commit: merge `1a5b36d` into main (branch `redesign-08-public-pages`: `c16061d` Landing, How It Works and `/` routing, `a92413a` code-review fixes, `ddce8dc` evidence and archive)
