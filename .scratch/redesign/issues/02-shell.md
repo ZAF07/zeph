@@ -1,6 +1,6 @@
 # 02 — Redesign: shell (sidebar, fold, rail, phone bar and menu)
 
-Status: ready-for-agent
+Status: in-progress
 
 Lane: A. README slice: 1.
 
@@ -52,3 +52,9 @@ Refs: `Dashboard--menu-folded`, `M-Menu`. The page content inside the frame may 
 - [ ] `/code-review` run, and findings fixed or answered.
 
 ## Comments
+
+- 2026-11-18 — Started on branch `redesign-02-shell` (own worktree). Zaf's answers to the three gaps the references don't draw:
+  - **Folded rail for Admins:** User icons only, as drawn. Admins unfold the menu to reach admin pages.
+  - **Phone menu for Admins:** the sidebar's Admin group, same styles, after Plan inside the menu's nav, before the person row.
+  - **Links for pages not built yet:** Overview → `/admin` (redirects to Users until issue 14), Plans → `/admin/plans` and Plan → `/plan` (404 until issue 14).
+

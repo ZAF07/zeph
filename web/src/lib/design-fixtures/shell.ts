@@ -1,4 +1,4 @@
-import type { ApiClient, Me } from "@/lib/api-client";
+import type { ApiClient, Me, PlatformContent } from "@/lib/api-client";
 
 /** Alex, the User every User page in `design/reference/` is drawn for. */
 export const alex: Me = {
@@ -32,11 +32,29 @@ export const zaf: Me = {
 };
 
 /**
- * Builds the shell's fixtures: who is signed in.
+ * The Admin-worded content. The shell shows only the short AI notice, as
+ * drawn in the sidebar; pages that show the rest fill it in from their
+ * references.
+ */
+const platformContent: PlatformContent = {
+  ai_notice: "",
+  ai_notice_short: "Zeph is an AI, not a therapist or crisis service.",
+  user_memory_explanation: "",
+  photo_viewing_explanation: "",
+  onboarding_reason_choices: [],
+  message_retention_days: 30,
+  delete_my_data_description: "",
+};
+
+/**
+ * Builds the shell's fixtures: who is signed in, and the AI notice.
  *
  * @param signedIn - Alex, or Zaf when the browser asks to see the admin area.
  * @returns The fixture calls the shell needs.
  */
 export function shellFixtures(signedIn: Me): Partial<ApiClient> {
-  return { getMe: async () => signedIn };
+  return {
+    getMe: async () => signedIn,
+    getPlatformContent: async () => platformContent,
+  };
 }
