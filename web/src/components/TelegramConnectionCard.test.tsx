@@ -69,6 +69,39 @@ describe("TelegramConnectionCard", () => {
     expect(screen.getByText("@zeph_bot")).toBeInTheDocument();
   });
 
+  it("shows the compact ready link: QR code, Open in Telegram and expiry, no /start code", async () => {
+    const user = userEvent.setup();
+    apiClient.getTelegramConnection.mockResolvedValue(
+      notConnected(
+        connectionToken({
+          expires_at: new Date(Date.now() + 14 * 60000).toISOString(),
+        }),
+      ),
+    );
+
+    renderWithQueries(<TelegramConnectionCard compact />);
+
+    const openLink = await screen.findByRole("link", {
+      name: "Open in Telegram",
+    });
+    expect(openLink).toHaveAttribute(
+      "href",
+      "https://t.me/zeph_bot?start=7Q2K-ZEPH",
+    );
+    expect(
+      screen.getByRole("img", { name: "QR code that opens Zeph in Telegram" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Works once · expires in 14 minutes"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("/start 7Q2K-ZEPH")).not.toBeInTheDocument();
+
+    await user.click(openLink);
+    expect(
+      screen.getByText("Waiting for you to say hello in Telegram…"),
+    ).toBeInTheDocument();
+  });
+
   it("creates a new link when there is no active one", async () => {
     apiClient.getTelegramConnection.mockResolvedValue(
       notConnected(connectionToken({ status: "expired" })),

@@ -10,7 +10,7 @@ export const checkInFrequencyOptions: {
   value: CheckInFrequency;
   label: string;
 }[] = [
-  { value: "weekly", label: "Once a week" },
+  { value: "weekly", label: "Weekly" },
   { value: "few_times_a_week", label: "A few times a week" },
   { value: "most_days", label: "Most days" },
   { value: "a_few_times_a_day", label: "A few times a day" },
@@ -56,6 +56,23 @@ export function recentCheckInTitle(checkIn: RecentCheckIn): string {
  */
 export function toTimeFieldValue(timeOfDay: string): string {
   return timeOfDay.slice(0, 5);
+}
+
+/**
+ * Writes a backend time of day like "23:00:00" as "11:00 PM", for the quiet
+ * hours sentence.
+ *
+ * @param timeOfDay - The time as the backend sends it.
+ * @returns The time on a 12-hour clock.
+ */
+export function formatQuietHour(timeOfDay: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "UTC",
+  })
+    .format(new Date(`1970-01-01T${toTimeFieldValue(timeOfDay)}:00Z`))
+    .replace(/\s/g, " ");
 }
 
 /**

@@ -13,9 +13,9 @@ export function OnboardingProgress({
   currentStep: number;
 }) {
   return (
-    <nav aria-label="Onboarding progress" className="flex flex-col gap-2.5">
+    <nav aria-label="Onboarding progress" className="flex flex-col gap-2">
       <ol
-        className="m-0 grid list-none gap-1.5 p-0"
+        className="m-0 grid list-none gap-2 p-0"
         style={{
           gridTemplateColumns: `repeat(${labels.length}, minmax(0, 1fr))`,
         }}
@@ -26,17 +26,17 @@ export function OnboardingProgress({
             <li
               key={label}
               aria-current={isCurrent ? "step" : undefined}
-              className="flex min-w-0 flex-col gap-2"
+              className="flex flex-col gap-1.5"
             >
               <span
                 aria-hidden="true"
-                className={`block h-1 rounded-full ${
-                  index <= currentStep ? "bg-blue" : "bg-line"
+                className={`h-[3px] rounded-[2px] ${
+                  index <= currentStep ? "bg-cream" : "bg-line"
                 }`}
               />
               <span
-                className={`overflow-hidden text-ellipsis whitespace-nowrap text-xs ${
-                  isCurrent ? "font-semibold text-ink" : "text-ink-muted"
+                className={`overflow-hidden text-ellipsis whitespace-nowrap text-[12px] ${
+                  isCurrent ? "font-normal text-text" : "font-light text-soft"
                 }`}
               >
                 {label}
@@ -45,7 +45,7 @@ export function OnboardingProgress({
           );
         })}
       </ol>
-      <p className="m-0 text-caption text-ink-muted">
+      <p className="m-0 text-[12px] text-soft">
         Step {currentStep + 1} of {labels.length}
       </p>
     </nav>

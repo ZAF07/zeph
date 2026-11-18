@@ -143,7 +143,7 @@ describe("PlatformSettingsForm", () => {
       "Gap for “A few times a day”",
     );
     expect(fewTimesADay).toHaveValue(6);
-    expect(screen.getByLabelText("Gap for “Once a week”")).toHaveValue(168);
+    expect(screen.getByLabelText("Gap for “Weekly”")).toHaveValue(168);
     expect(screen.getByLabelText("Gap for “A few times a week”")).toHaveValue(
       56,
     );

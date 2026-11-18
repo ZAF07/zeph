@@ -1,0 +1,37 @@
+import Link from "next/link";
+import type { ReactNode } from "react";
+
+/**
+ * The frame around one onboarding step: the Zeph wordmark over a centred
+ * column. On the all-steps design sheet, every frame after the first has a
+ * dashed line above it.
+ *
+ * @param props - `hasSeparator` draws the dashed line; `children` is the step.
+ * @returns The step's section.
+ */
+export function OnboardingStepFrame({
+  hasSeparator = false,
+  children,
+}: {
+  hasSeparator?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      className={`box-border min-h-[700px] px-8 pb-16 pt-10 max-[899px]:px-5 ${
+        hasSeparator ? "border-t border-dashed border-line-strong" : ""
+      }`}
+    >
+      <div className="mx-auto flex max-w-[560px] flex-col gap-[22px]">
+        <Link
+          href="/"
+          aria-label="Zeph home"
+          className="self-start text-[26px] font-normal text-cream"
+        >
+          Zeph
+        </Link>
+        {children}
+      </div>
+    </section>
+  );
+}
