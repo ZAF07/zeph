@@ -2,10 +2,11 @@ import { env } from "@/env";
 
 /**
  * The moment design-fixture mode stands still at: Tuesday 17 Nov 2026,
- * 8:00 PM in Singapore, Alex's time zone, so the greeting reads "Good
- * evening" and it falls after every date drawn in `design/reference/`.
+ * 8:00 PM in Singapore, Alex's time zone, after every date drawn in
+ * `design/reference/`. The greeting reads "Good evening" only when it is told
+ * Alex's time zone, so the home fixture must give `alex.time_zone`.
  */
-export const DESIGN_FIXTURE_NOW = "2026-11-17T20:00:00+08:00";
+const DESIGN_FIXTURE_NOW = "2026-11-17T20:00:00+08:00";
 
 /**
  * Tells the time, fixed in design-fixture mode so pages match the reference.

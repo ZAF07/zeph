@@ -12,8 +12,12 @@ export type ApiClientSettings = {
 
 /**
  * Picks the API client: the design-fixture client when fixture mode is on,
- * otherwise the real one. The `NODE_ENV` check is written out here so a
- * production build drops the fixture client entirely.
+ * otherwise the real one.
+ *
+ * `process.env.NODE_ENV` is read here on purpose, outside the `env` module,
+ * repeating the check in `designFixturesOn`: the build only drops the fixture
+ * client when the literal check sits in this `if`. Without it, a production
+ * bundle still contains the fixture code.
  *
  * @param settings - The backend's address and whether fixture mode is on.
  * @param getToken - Returns the signed-in User's session token.

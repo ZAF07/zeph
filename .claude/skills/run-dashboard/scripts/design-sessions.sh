@@ -1,6 +1,7 @@
 #!/bin/bash
 # Make the two signed-in sessions the design pixel test needs (web/design/compare.cjs):
-# a plain User, and an Admin carrying the zeph-design-as=admin cookie.
+# a plain User, and an Admin carrying the zeph-design-as=admin cookie
+# (the name DESIGN_AS_COOKIE in web/src/lib/design-fixtures/fixture-client.ts).
 # Reuses start-session.sh, so the stack must be running (make up) with real
 # data, not design fixtures. Saves Playwright storageState files outside the
 # repo and prints the STATE_USER / STATE_ADMIN lines to export.

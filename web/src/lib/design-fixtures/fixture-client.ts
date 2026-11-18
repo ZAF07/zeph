@@ -16,8 +16,11 @@ import { telegramFixtures } from "@/lib/design-fixtures/telegram";
 /** Who the design fixtures sign in as: Alex the User, or Zaf the Admin. */
 export type DesignAs = "user" | "admin";
 
-/** The cookie that asks the design fixtures to sign in as Zaf. */
-export const DESIGN_AS_COOKIE = "zeph-design-as";
+/**
+ * The cookie that asks the design fixtures to sign in as Zaf. The
+ * run-dashboard skill's save-state.mjs sets the same name.
+ */
+const DESIGN_AS_COOKIE = "zeph-design-as";
 
 /**
  * Reads who to sign in as from the browser's cookies.

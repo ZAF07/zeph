@@ -46,3 +46,5 @@ Refs: `Dashboard`, `M-Dashboard`, `Dashboard--menu-folded`, `M-Menu`, `CheckIns`
 - [ ] `/code-review` run, and findings fixed or answered.
 
 ## Comments
+
+- From issue 01 (2026-11-18): in fixture mode the clock stands at Tue 17 Nov 2026, 8:00 PM Singapore (`currentTime()` in `web/src/lib/clock.ts`). `DashboardHome` greets in `home.time_zone`, so the home fixture must return `time_zone: alex.time_zone` (Asia/Singapore, from `design-fixtures/shell.ts`). Otherwise the greeting uses the browser's time zone, and a test machine on UTC reads "Good afternoon".
