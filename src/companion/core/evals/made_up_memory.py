@@ -355,5 +355,7 @@ def to_curiosity(user_id: UUID, curiosity: EvalCuriosity, now: datetime) -> Curi
         not_before=not_before,
         sensitivity=curiosity.sensitivity,
         state=CuriosityState.WAITING,
+        guess=curiosity.guess,
+        how_sure=curiosity.how_sure,
         created_at=now - timedelta(days=CURIOSITIES_DAYS_AGO),
     )

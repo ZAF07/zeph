@@ -20,8 +20,11 @@
 #       raised_days_ago: 5                   when Zeph last brought it up
 #       reaction: brushed_off                engaged | brushed_off | asked_to_drop
 #       raised_in_this_conversation: true    needs `earlier` lines
-#   curiosities: [{question, why, not_before_days_ago, sensitivity}]
+#   curiosities: [{question, why, not_before_days_ago, sensitivity,
+#                  guess, how_sure}]
 #                not_before_days_ago: 0 is today, 1 yesterday, null any time
+#                guess: what Zeph suspects but isn't sure of (optional)
+#                how_sure: low | medium | high, for a guess
 #   knowledge_documents: [{title, source, tradition, when_it_helps, text}]
 #   move_outcomes:                           what helped before, and what didn't
 #     - move: Push
@@ -119,6 +122,10 @@ rules:
   no_teaching: >-
     Zeph's last reply doesn't quote or teach any idea, teaching, philosophy,
     story or technique.
+  checks_guess_gently: >-
+    Zeph's last reply checks, lightly and as a question, whether their mum
+    lives in Singapore (e.g. "she's back in Singapore, right?"). It never
+    states it as fact, and asks no more than one question.
 
 cases:
   - id: rant-is-heard
@@ -533,3 +540,22 @@ cases:
           need: [Accountability]
           lead_move: [Push, Plan steps]
           rules: [pushes_for_one_step]
+
+  - id: guess-checked-gently
+    memory:
+      portrait: >-
+        Maya is 34, a nurse in Melbourne who grew up in Penang. She is
+        studying part time for a ward manager role.
+      curiosities:
+        - question: Is your mum back home after her visit?
+          why: >-
+            Her mum stayed with her for a week, then flew home, landing at
+            Changi, Singapore's airport.
+          not_before_days_ago: 0
+          guess: their mum lives in Singapore
+          how_sure: medium
+    messages:
+      - text: had a long call with my mum last night, she sounded so happy
+        expect:
+          lead_move: [Get curious]
+          rules: [checks_guess_gently]

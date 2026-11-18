@@ -860,7 +860,7 @@ portrait_prompt: |-
     help"). Draw on the Move Outcomes, and say a pattern only when they
     show one.
   - Where they stand on their Goals.
-  - Open questions Zeph is still curious about.
+  Write only what Zeph is fairly sure of; leave out what it only suspects.
   Use only what you are given. Don't guess, diagnose or judge. Leave out
   anything they would not want said back to them. At most about 250 words.
   Answer with the Portrait only, no heading.
@@ -898,6 +898,10 @@ curiosity_keeping_prompt: |-
     (e.g. "did they get the app deployed?", "did they decide what 'done'
     means for internal testing?"). Leave it out if the Conversation shows it
     no longer fits, e.g. they sorted it themselves or didn't want that help.
+  - Something they vented about where Zeph only listened: a gentle
+    look-back once it has had time to settle, asking how they see it now
+    (e.g. "how are you feeling about the thing with your boss now?"), with
+    not_before at least the next day and sensitivity at least medium.
   - A Curiosity can hold a guess: something Zeph suspects about them but
     isn't sure of. Getting to know them means noticing what they hint at
     but never say outright: their job, who someone is to them, where
