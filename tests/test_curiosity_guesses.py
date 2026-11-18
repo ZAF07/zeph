@@ -133,35 +133,6 @@ def test_an_answered_waiting_guess_is_closed_by_the_keeping_step(
     assert row["state"] == "closed"
 
 
-def test_a_waiting_guess_can_be_updated_with_how_sure_zeph_now_is(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-    scheduler: FakeScheduler,
-    seeded_settings: dict[str, Any],
-    engine: Engine,
-) -> None:
-    connect_telegram(client, auth_verifier, chat_channel)
-    mum_guess_is_waiting(client, chat_model, clock, scheduler, seeded_settings)
-
-    end_conversation(
-        client,
-        chat_model,
-        clock,
-        scheduler,
-        seeded_settings,
-        "flying to Singapore to see mum next month",
-        [{"curiosity": 1, "how_sure": "high"}],
-    )
-    [row] = stored_curiosities(engine)
-
-    assert row["guess"] == MUM_GUESS
-    assert row["how_sure"] == "high"
-    assert row["state"] == "waiting"
-
-
 def test_a_due_guess_is_shown_to_the_understanding_as_a_guess_to_check_gently(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,

@@ -127,6 +127,18 @@ def due_curiosities(waiting: Sequence[Curiosity], today: date) -> list[Curiosity
     ]
 
 
+def how_sure_word(how_sure: HowSure | None) -> str:
+    """Write how sure the Companion is of a guess.
+
+    Args:
+        how_sure: How sure it is; None reads as low.
+
+    Returns:
+        "low", "medium" or "high".
+    """
+    return (how_sure or HowSure.LOW).value
+
+
 def describe_guess(guess: str | None, how_sure: HowSure | None) -> str:
     """Write a Curiosity's guess as a model that may raise it reads it.
 
@@ -140,9 +152,8 @@ def describe_guess(guess: str | None, how_sure: HowSure | None) -> str:
     """
     if not guess:
         return ""
-    sureness = (how_sure or HowSure.LOW).value
     return (
-        f" A guess, not known: {guess} (how sure: {sureness}). "
+        f" A guess, not known: {guess} (how sure: {how_sure_word(how_sure)}). "
         "Check it gently; never state it as fact."
     )
 
@@ -413,8 +424,7 @@ def plan_waiting_change(entry: dict[str, Any], existing: Curiosity) -> Curiosity
 
     Returns:
         It closed, or with its new details; a "not before" day that can't be
-        read keeps the old one, and a guess given without how sure reads as
-        low.
+        read keeps the old one.
     """
     if entry.get("close") is True:
         return replace(existing, state=CuriosityState.CLOSED)
@@ -422,18 +432,12 @@ def plan_waiting_change(entry: dict[str, Any], existing: Curiosity) -> Curiosity
     if "not_before" in entry:
         given = entry["not_before"]
         not_before = None if given is None else read_day(given) or not_before
-    guess = read_text(entry, "guess") or existing.guess
-    how_sure = existing.how_sure
-    if guess and ("how_sure" in entry or how_sure is None):
-        how_sure = read_how_sure(entry.get("how_sure"))
     return replace(
         existing,
         question=read_text(entry, "ask") or existing.question,
         why=read_text(entry, "why") or existing.why,
         not_before=not_before,
         sensitivity=read_sensitivity(entry.get("sensitivity"), existing.sensitivity),
-        guess=guess,
-        how_sure=how_sure,
     )
 
 
@@ -535,8 +539,7 @@ def describe_curiosity(curiosity: Curiosity, raised_here: set[UUID]) -> str:
         )
         state = f"waiting; {day}; sensitivity {curiosity.sensitivity.value}"
     guess = (
-        f" Guess (how sure: {(curiosity.how_sure or HowSure.LOW).value}): "
-        f"{curiosity.guess}"
+        f" Guess (how sure: {how_sure_word(curiosity.how_sure)}): {curiosity.guess}"
         if curiosity.guess
         else ""
     )

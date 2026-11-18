@@ -2808,8 +2808,6 @@ class PostgresCuriosityRepository:
                         not_before=bindparam("new_not_before"),
                         sensitivity=bindparam("new_sensitivity"),
                         state=bindparam("new_state"),
-                        guess=bindparam("new_guess"),
-                        how_sure=bindparam("new_how_sure"),
                     ),
                     [
                         {
@@ -2819,8 +2817,6 @@ class PostgresCuriosityRepository:
                             "new_not_before": curiosity.not_before,
                             "new_sensitivity": curiosity.sensitivity,
                             "new_state": curiosity.state,
-                            "new_guess": curiosity.guess,
-                            "new_how_sure": curiosity.how_sure,
                         }
                         for curiosity in changes.updated
                     ],

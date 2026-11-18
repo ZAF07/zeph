@@ -907,13 +907,11 @@ curiosity_keeping_prompt: |-
     checks it. Zeph never states a guess as fact, only checks it gently.
     Never write a guess about something they've already told Zeph, or
     already in what Zeph remembers.
-  - Once they've answered a waiting guess, give its number with "close":
-    true. What they said is kept as a memory, so never write the answer as
-    a new guess.
   - For a waiting Curiosity that has changed (e.g. the presentation moved),
     give its number with the new details. If it's no longer relevant (they
     already told Zeph, or it no longer applies), give its number with
-    "close": true.
+    "close": true. Close a guess once they've answered it; what they said
+    is kept as a memory, so never write the answer as a new guess.
   - For each Curiosity marked "brought up in this Conversation", say how
     they took it: "engaged" if they talked about it, "brushed_off" if they
     changed the subject or gave a short answer, "asked_to_drop" if they
