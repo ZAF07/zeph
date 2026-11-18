@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatCheckInDay,
-  formatCheckInSentAt,
   formatQuietHour,
   formatTimeOfDay,
   pauseEndText,
@@ -35,7 +34,7 @@ describe("check-in wording", () => {
         status: "skipped",
         skipped_for_daily_limit: false,
       }),
-    ).toBe("Skipped — gave you some space");
+    ).toBe("Zeph gave you space");
   });
 
   it("writes a quiet hours time of day like 11:00 PM", () => {
@@ -49,23 +48,17 @@ describe("check-in wording", () => {
 
   it("says when a timed pause ends, in the User's time zone", () => {
     expect(pausedText("2026-11-11T17:00:00Z", "Asia/Singapore")).toBe(
-      "Paused until Thursday, 12 November.",
+      "Check-ins are paused until 12 Nov",
     );
   });
 
   it("says a pause lasts until the User resumes", () => {
-    expect(pausedText(null)).toBe("Paused until you resume.");
+    expect(pausedText(null)).toBe("Check-ins are paused until you resume");
   });
 
-  it("writes when a Check-in was sent", () => {
-    expect(formatCheckInSentAt("2026-11-09T10:42:00Z", "Asia/Singapore")).toBe(
-      "Mon 9 Nov · 6:42 pm",
-    );
-  });
-
-  it("writes the day of a skipped Check-in, without a time", () => {
+  it("writes the day of a Check-in with its weekday, without a time", () => {
     expect(formatCheckInDay("2026-11-06T17:00:00Z", "Asia/Singapore")).toBe(
-      "Sat 7 Nov",
+      "Saturday 7 Nov",
     );
   });
 

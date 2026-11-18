@@ -19,20 +19,7 @@ export function ChangedByAdminCaption({
     return null;
   }
   return (
-    <span className="inline-flex items-center gap-1.5 text-caption text-yellow-deep">
-      <svg
-        width="12"
-        height="12"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z" />
-      </svg>
+    <span className="text-[12px] text-soft">
       {`Changed by an Admin · ${formatShortDay(changedAt, timeZone)}`}
     </span>
   );

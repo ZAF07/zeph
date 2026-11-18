@@ -1,20 +1,19 @@
 import { EmptyState } from "@/components/EmptyState";
+import { filledPill, outlinedPill } from "@/components/card-styles";
 import type { RecentCheckIn } from "@/lib/api-client";
 import {
   checkInStatusLabels,
   formatCheckInDay,
-  formatCheckInSentAt,
   recentCheckInTitle,
 } from "@/lib/check-ins";
 
 /**
- * The "Recent check-ins" list: each Check-in's Kind, when it was sent and
- * whether the User replied, or that Zeph skipped it to give them space.
- * Never the message, a skip reason or a next time. Ends with how the
- * ignore rule works.
+ * The "Recent check-ins" list: each Check-in's Kind, the day it was sent and
+ * whether the User replied, or that Zeph gave them space. Never the message,
+ * a skip reason or a next time. Ends with how the ignore rule works.
  *
  * @param props - `checkIns` are the recent Check-ins, newest first;
- *   `timeZone` is the User's, to show times in.
+ *   `timeZone` is the User's, to show days in.
  * @returns The list, or a note that there are none yet.
  */
 export function RecentCheckInsList({
@@ -27,43 +26,37 @@ export function RecentCheckInsList({
   return (
     <section
       aria-labelledby="recent-check-ins-heading"
-      className="flex flex-col gap-4"
+      className="flex flex-col gap-5 min-[900px]:gap-6"
     >
-      <h2 id="recent-check-ins-heading" className="m-0 text-[28px] font-normal">
+      <h2
+        id="recent-check-ins-heading"
+        className="m-0 text-[20px] font-normal text-cream"
+      >
         Recent check-ins
       </h2>
       {checkIns.length === 0 ? (
         <EmptyState
-          title="No Check-ins yet"
-          body="When Zeph reaches out, or chooses to give you space, it’ll show here."
+          title="No check-ins yet"
+          body="When Zeph checks in, you’ll see it here with whether you replied."
         />
       ) : (
-        <ul className="m-0 list-none rounded-card border border-line bg-white p-0">
-          {checkIns.map((checkIn, index) => {
+        <ul className="m-0 box-border list-none rounded-card border border-line bg-panel px-[22px] py-1.5">
+          {checkIns.map((checkIn) => {
             const status = checkInStatusLabels[checkIn.status];
-            const isSkipped = checkIn.outcome === "skipped";
             return (
               <li
                 key={checkIn.id}
-                className={`flex flex-wrap items-center justify-between gap-3 px-6 py-4 ${
-                  index === 0 ? "" : "border-t border-line"
-                }`}
+                className="box-content flex min-h-14 flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-t border-line py-1.5 first:border-t-0"
               >
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span
-                    className={`font-medium ${isSkipped ? "text-ink-soft" : ""}`}
-                  >
+                <div>
+                  <div className="text-[15px] text-text">
                     {recentCheckInTitle(checkIn)}
-                  </span>
-                  <span className="text-caption text-ink-muted">
-                    {isSkipped
-                      ? formatCheckInDay(checkIn.decided_at, timeZone)
-                      : formatCheckInSentAt(checkIn.decided_at, timeZone)}
-                  </span>
-                </span>
-                <span
-                  className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-[3px] text-xs font-medium ${status.pill}`}
-                >
+                  </div>
+                  <div className="text-[12px] text-soft">
+                    {formatCheckInDay(checkIn.decided_at, timeZone)}
+                  </div>
+                </div>
+                <span className={status.isFilled ? filledPill : outlinedPill}>
                   {status.label}
                 </span>
               </li>
@@ -71,8 +64,8 @@ export function RecentCheckInsList({
           })}
         </ul>
       )}
-      <p className="m-0 text-sm text-ink-muted">
-        If a few go unanswered, Zeph will pause and ask once if you’d like
+      <p className="m-0 text-[13px] text-soft">
+        If a few go unanswered, Zeph will pause and ask once if you&apos;d like
         fewer.
       </p>
     </section>

@@ -5,9 +5,8 @@ import {
   checkInFrequencyText,
   greeting,
   lastCheckInText,
-  lastConversationText,
+  lastTalkedText,
   quietHoursText,
-  todayHeading,
 } from "@/lib/home";
 
 const singapore = "Asia/Singapore";
@@ -17,7 +16,7 @@ function checkInWith(overrides: Partial<RecentCheckIn> = {}): RecentCheckIn {
     id: "c1",
     outcome: "sent",
     kind: "A casual hello",
-    decided_at: "2026-11-09T10:00:00Z",
+    decided_at: "2026-11-10T10:00:00Z",
     status: "replied",
     skipped_for_daily_limit: false,
     ...overrides,
@@ -40,48 +39,42 @@ describe("home wording", () => {
     );
   });
 
-  it("writes today's date where the User is", () => {
-    expect(todayHeading(new Date("2026-11-11T12:00:00Z"), singapore)).toBe(
-      "Wednesday, 11 November",
-    );
-  });
-
-  it("says when the last Conversation was", () => {
+  it("says when the User last talked with Zeph", () => {
     const now = new Date("2026-11-11T12:00:00Z");
 
-    expect(lastConversationText("2026-11-11T11:48:00Z", now, singapore)).toBe(
-      "Last Conversation today at 7:48 pm.",
+    expect(lastTalkedText("2026-11-11T11:48:00Z", now, singapore)).toBe(
+      "You last talked with Zeph today.",
     );
-    expect(lastConversationText("2026-11-10T11:48:00Z", now, singapore)).toBe(
-      "Last Conversation yesterday at 7:48 pm.",
+    expect(lastTalkedText("2026-11-10T11:48:00Z", now, singapore)).toBe(
+      "You last talked with Zeph yesterday.",
     );
-    expect(lastConversationText("2026-11-02T01:05:00Z", now, singapore)).toBe(
-      "Last Conversation on 2 Nov at 9:05 am.",
+    expect(lastTalkedText("2026-11-02T01:05:00Z", now, singapore)).toBe(
+      "You last talked with Zeph on 2 Nov.",
     );
-    expect(lastConversationText(null, now, singapore)).toBe(
-      "No Conversations yet. Say hello in Telegram.",
+    expect(lastTalkedText(null, now, singapore)).toBe(
+      "You haven't talked with Zeph yet.",
     );
   });
 
-  it("says how often Check-ins come, at most", () => {
-    expect(checkInFrequencyText("few_times_a_week")).toBe(
-      "A few times a week, at most",
-    );
+  it("says how often Check-ins come, as the choice is named", () => {
+    expect(checkInFrequencyText("few_times_a_week")).toBe("A few times a week");
+    expect(checkInFrequencyText("weekly")).toBe("Weekly");
   });
 
   it("writes quiet hours as times of day", () => {
-    expect(quietHoursText("22:00:00", "07:30:00")).toBe(
-      "Never between 10:00 pm and 7:30 am",
-    );
+    expect(quietHoursText("23:00:00", "07:00:00")).toBe("11:00 PM to 7:00 AM");
+    expect(quietHoursText("22:00:00", "07:30:00")).toBe("10:00 PM to 7:30 AM");
   });
 
-  it("describes the last Check-in sent and whether the User replied", () => {
-    expect(lastCheckInText(checkInWith(), singapore)).toBe(
-      "Last Check-in: a casual hello, Mon 9 Nov · you replied",
+  it("names the day of the last Check-in, and whether the User replied", () => {
+    const now = new Date("2026-11-17T12:00:00Z");
+
+    expect(lastCheckInText(checkInWith(), now, singapore)).toBe(
+      "Tuesday · you replied",
     );
     expect(
-      lastCheckInText(checkInWith({ status: "no_reply" }), singapore),
-    ).toBe("Last Check-in: a casual hello, Mon 9 Nov · no reply");
+      lastCheckInText(checkInWith({ status: "no_reply" }), now, singapore),
+    ).toBe("Tuesday · no reply");
     expect(
       lastCheckInText(
         checkInWith({
@@ -89,9 +82,28 @@ describe("home wording", () => {
           kind: null,
           status: "sent",
         }),
+        now,
         singapore,
       ),
-    ).toBe("Last Check-in: asked if you’d like fewer, Mon 9 Nov");
-    expect(lastCheckInText(null, singapore)).toBe("No Check-ins sent yet.");
+    ).toBe("Tuesday");
+  });
+
+  it("says today, yesterday, a weekday up to a week back, then the date", () => {
+    const now = new Date("2026-11-17T12:00:00Z");
+    const sentAt = (decidedAt: string) =>
+      lastCheckInText(
+        checkInWith({ decided_at: decidedAt, status: "sent" }),
+        now,
+        singapore,
+      );
+
+    expect(sentAt("2026-11-17T02:00:00Z")).toBe("Today");
+    expect(sentAt("2026-11-16T02:00:00Z")).toBe("Yesterday");
+    expect(sentAt("2026-11-12T02:00:00Z")).toBe("Thursday");
+    expect(sentAt("2026-11-09T02:00:00Z")).toBe("9 Nov");
+  });
+
+  it("says there has been no Check-in yet", () => {
+    expect(lastCheckInText(null, new Date(), singapore)).toBe("None yet");
   });
 });

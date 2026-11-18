@@ -1,17 +1,18 @@
 "use client";
 
-import { useMemo } from "react";
-
 import { secondaryButton } from "@/components/button-styles";
 import { ChangedByAdminCaption } from "@/components/ChangedByAdminCaption";
 import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
-import { CheckInFrequencyPicker } from "@/components/CheckInFrequencyPicker";
+import { CheckInFrequencySegments } from "@/components/CheckInFrequencySegments";
 import { CheckInKindsList } from "@/components/CheckInKindsList";
-import { fieldLabel, inputField } from "@/components/form-styles";
+import { CheckInSettingRow } from "@/components/CheckInSettingRow";
 import { LoadFailed } from "@/components/LoadFailed";
+import { LoadingPanel } from "@/components/LoadingPanel";
+import { PageHero } from "@/components/PageHero";
+import { PausedNotice } from "@/components/PausedNotice";
 import { QuietHoursFields } from "@/components/QuietHoursFields";
 import { RecentCheckInsList } from "@/components/RecentCheckInsList";
-import { SettingLabel } from "@/components/SettingLabel";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { Switch } from "@/components/Switch";
 import type {
   ChatSetting,
@@ -21,13 +22,7 @@ import type {
 } from "@/lib/api-client";
 import { pausedText, toTimeFieldValue } from "@/lib/check-ins";
 import { notAvailableText } from "@/lib/features";
-import {
-  useCheckIns,
-  useMe,
-  useSaveCheckIns,
-  useUpdatePreferences,
-} from "@/lib/queries";
-import { timeZoneOptions } from "@/lib/time-zones";
+import { useCheckIns, useMe, useSaveCheckIns } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 const pauseChoices: { length: PauseLength; label: string }[] = [
@@ -36,36 +31,32 @@ const pauseChoices: { length: PauseLength; label: string }[] = [
   { length: "until_resumed", label: "Until I resume" },
 ];
 
-const settingsRow =
-  "flex flex-wrap items-center justify-between gap-x-5 gap-y-3 border-t border-line px-6 py-4";
+const pauseButton =
+  "min-h-11 cursor-pointer rounded-pill border border-soft bg-transparent px-[18px] text-[14px] text-text disabled:cursor-not-allowed disabled:border-line-strong disabled:text-mute";
 
 /**
- * The Check-ins page: the on/off switch, how often, quiet hours and time
- * zone, pausing, what Zeph might reach out about, and the recent Check-ins. It never shows when the next
- * Check-in will come; Zeph chooses the moment. A setting last changed in
- * chat or by an Admin says so under it.
+ * The Check-ins page: the on/off switch, how often, quiet hours, pausing,
+ * what a check-in can be, and the recent Check-ins. It never shows when the
+ * next Check-in will come; Zeph chooses the moment. A setting last changed
+ * in chat or by an Admin says so under it.
  *
- * @returns The page, a loading block, or an error with Try again.
+ * @returns The page, a loading panel, or an error with Try again.
  */
 export function CheckInsSettings() {
   const apiClient = useApiClient();
   const meQuery = useMe();
   const checkInsQuery = useCheckIns();
   const saveCheckIns = useSaveCheckIns();
-  const updatePreferences = useUpdatePreferences();
 
   const me = meQuery.data;
-  const timeZone = me?.time_zone ?? null;
-  const timeZones = useMemo(() => timeZoneOptions(timeZone), [timeZone]);
+  const timeZone = me?.time_zone ?? undefined;
   const isLoaded = me !== undefined && checkInsQuery.data !== undefined;
   const checkIns = isLoaded ? checkInsQuery.data : null;
   const loadFailed = !isLoaded && (meQuery.isError || checkInsQuery.isError);
   const changedInChat = me?.changed_in_chat ?? {};
-  const isSaving = saveCheckIns.isPending || updatePreferences.isPending;
-  const saveFailed = saveCheckIns.isError || updatePreferences.isError;
+  const isSaving = saveCheckIns.isPending;
 
   function save(sendChange: () => Promise<CheckIns>) {
-    updatePreferences.reset();
     saveCheckIns.mutate(sendChange);
   }
 
@@ -81,21 +72,16 @@ export function CheckInsSettings() {
     save(() => apiClient.resumeCheckIns());
   }
 
-  function changeTimeZone(timeZone: string) {
-    saveCheckIns.reset();
-    updatePreferences.mutate({ time_zone: timeZone });
-  }
-
   function changeCaption(setting: ChatSetting) {
     return (
       <>
         <ChangedInChatCaption
           changedAt={changedInChat[setting]}
-          timeZone={timeZone ?? undefined}
+          timeZone={timeZone}
         />
         <ChangedByAdminCaption
           changedAt={checkIns?.changed_by_admin[setting]}
-          timeZone={timeZone ?? undefined}
+          timeZone={timeZone}
         />
       </>
     );
@@ -111,37 +97,30 @@ export function CheckInsSettings() {
 
   return (
     <>
-      <header className="flex flex-wrap items-start justify-between gap-6">
-        <div className="flex flex-col gap-2">
-          <h1 className="m-0 text-h1 font-normal">Check-ins</h1>
-          <p className="m-0 max-w-[40em] text-body text-ink-soft">
-            Now and then Zeph can message you first on Telegram. There’s no
-            fixed schedule: Zeph chooses the moment and the kind, and sometimes
-            stays quiet to give you space.
-          </p>
-        </div>
-        {checkIns ? (
-          <div className="flex items-center gap-3 rounded-full border border-line bg-white py-1.5 pr-1.5 pl-[18px]">
-            <span className="text-sm font-medium">{switchLabel}</span>
-            <Switch
-              label="Check-ins"
-              checked={checkIns.enabled}
-              disabled={isSaving || !checkIns.available}
-              onChange={(enabled) => changeSettings({ enabled })}
-            />
-          </div>
-        ) : null}
-      </header>
+      <PageHero
+        background="checkIns"
+        eyebrow="Check-ins"
+        title="Check-ins"
+        body="Now and then Zeph can message you first on Telegram. There's no fixed schedule: Zeph chooses the moment and the kind, and sometimes stays quiet to give you space."
+        actions={
+          checkIns ? (
+            <div className="inline-flex items-center gap-1.5 rounded-pill border border-line bg-panel pr-1 pl-[18px]">
+              <span className="text-[14px] font-normal text-text">
+                {switchLabel}
+              </span>
+              <Switch
+                label="Check-ins"
+                checked={checkIns.enabled}
+                disabled={isSaving || !checkIns.available}
+                onChange={(enabled) => changeSettings({ enabled })}
+              />
+            </div>
+          ) : null
+        }
+      />
 
       {!isLoaded && !loadFailed ? (
-        <div
-          aria-busy="true"
-          aria-label="Loading Check-ins"
-          className="flex flex-col gap-5"
-        >
-          <span className="block h-[260px] rounded-card bg-subtle" />
-          <span className="block h-[180px] rounded-card bg-subtle" />
-        </div>
+        <LoadingPanel shape="card" label="Loading Check-ins" />
       ) : null}
 
       {loadFailed ? (
@@ -156,82 +135,66 @@ export function CheckInsSettings() {
       ) : null}
 
       {checkIns ? (
-        <div className="flex flex-col gap-9">
-          {saveFailed ? (
-            <p
-              role="alert"
-              className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3 text-sm text-danger-deep"
-            >
-              We couldn’t save that. Please try again.
-            </p>
+        <>
+          {saveCheckIns.isError ? (
+            <SaveFailedNote>
+              Couldn’t save your check-in settings. They are as you left them.
+              Try again.
+            </SaveFailedNote>
           ) : null}
 
           {checkIns.available ? null : (
-            <p
-              role="status"
-              className="m-0 rounded-xl bg-yellow-tint px-4 py-3.5 text-sm text-yellow-deep"
-            >
-              Check-ins aren’t available on your account, so Zeph won’t message
-              you first. Your settings are kept.
-            </p>
+            <PausedNotice
+              title="Check-ins aren’t available on your account"
+              body="Zeph won’t message you first. Your settings are kept."
+            />
           )}
 
           {checkIns.enabled && checkIns.paused ? (
-            <div
-              role="status"
-              className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-yellow-tint px-4 py-3.5 text-sm text-yellow-deep"
-            >
-              <span>
-                {pausedText(checkIns.paused_until, timeZone ?? undefined)}
-              </span>
-              <button
-                type="button"
-                className={secondaryButton}
-                disabled={isSaving}
-                onClick={resume}
-              >
-                Resume now
-              </button>
-            </div>
+            <PausedNotice
+              title={pausedText(checkIns.paused_until, timeZone)}
+              body="Zeph won’t message first until then. Everything else stays as it is."
+              action={
+                <button
+                  type="button"
+                  className={secondaryButton}
+                  disabled={isSaving}
+                  onClick={resume}
+                >
+                  Resume now
+                </button>
+              }
+            />
           ) : null}
           {checkIns.available && !checkIns.enabled ? (
-            <p
-              role="status"
-              className="m-0 rounded-xl bg-yellow-tint px-4 py-3.5 text-sm text-yellow-deep"
-            >
-              Check-ins are off. Zeph only replies when you message it.
-            </p>
+            <PausedNotice
+              title="Check-ins are off"
+              body="Zeph only replies when you message it."
+            />
           ) : null}
 
-          <section
-            aria-labelledby="check-in-settings-heading"
-            className="flex flex-col rounded-card border border-line bg-white"
-          >
-            <h2
-              id="check-in-settings-heading"
-              className="m-0 px-6 pt-5 pb-3 text-[17px] font-semibold"
-            >
-              Settings
-            </h2>
-            <div className={`${settingsRow} items-start`}>
-              <SettingLabel
-                title="How often, at most"
-                caption="Zeph will often check in less than this."
-                note={changeCaption("check_in_frequency")}
-              />
-              <CheckInFrequencyPicker
-                value={checkIns.frequency}
-                disabled={isSaving}
-                onChange={(frequency) => changeSettings({ frequency })}
-              />
-            </div>
-            <div className={`${settingsRow} items-start`}>
-              <SettingLabel
+          <section aria-label="Settings">
+            <div className="box-border rounded-card border border-line bg-panel px-6 py-1">
+              <div className="flex flex-col gap-3.5 py-[18px]">
+                <div>
+                  <div className="text-[15px] font-normal text-text">
+                    How often, at most
+                  </div>
+                  <div className="text-[13px] text-soft">
+                    Zeph will often check in less than this.
+                  </div>
+                </div>
+                <CheckInFrequencySegments
+                  value={checkIns.frequency}
+                  disabled={isSaving}
+                  onChange={(frequency) => changeSettings({ frequency })}
+                />
+                {changeCaption("check_in_frequency")}
+              </div>
+              <CheckInSettingRow
                 title="Quiet hours"
                 caption="Zeph never checks in during these hours."
-                note={changeCaption("quiet_hours")}
-              />
-              <div className="flex flex-[2_1_480px] flex-col gap-3">
+              >
                 <QuietHoursFields
                   start={toTimeFieldValue(checkIns.quiet_hours_start)}
                   end={toTimeFieldValue(checkIns.quiet_hours_end)}
@@ -243,57 +206,38 @@ export function CheckInsSettings() {
                     changeSettings({ quiet_hours_end: end })
                   }
                 />
-                <label className={fieldLabel}>
-                  Time zone
-                  <select
-                    className={inputField}
-                    disabled={isSaving}
-                    value={timeZone ?? ""}
-                    onChange={(event) => changeTimeZone(event.target.value)}
-                  >
-                    {timeZones.map((option) => (
-                      <option key={option.name} value={option.name}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  {changeCaption("time_zone")}
-                </label>
-              </div>
-            </div>
-            <div className={settingsRow}>
-              <SettingLabel
+                {changeCaption("quiet_hours")}
+              </CheckInSettingRow>
+              <CheckInSettingRow
                 title="Need some quiet?"
                 caption="Pause without changing anything else."
-                note={changeCaption("check_in_pause")}
-              />
-              <div className="flex flex-wrap gap-2">
-                {pauseChoices.map((choice) => (
-                  <button
-                    key={choice.length}
-                    type="button"
-                    className={secondaryButton}
-                    disabled={isSaving}
-                    onClick={() => pause(choice.length)}
-                  >
-                    {choice.label}
-                  </button>
-                ))}
-              </div>
+              >
+                <div className="flex flex-wrap gap-2">
+                  {pauseChoices.map((choice) => (
+                    <button
+                      key={choice.length}
+                      type="button"
+                      className={pauseButton}
+                      disabled={isSaving}
+                      onClick={() => pause(choice.length)}
+                    >
+                      {choice.label}
+                    </button>
+                  ))}
+                </div>
+                {changeCaption("check_in_pause")}
+              </CheckInSettingRow>
             </div>
-            <p className="m-0 px-6 pb-5 text-caption text-blue">
-              You can also just tell Zeph “take a week off from check-ins” or
-              “no messages after 9pm”.
+            <p className="mt-3 mb-0 text-[13px] text-soft">
+              You can also just tell Zeph &quot;take a week off from
+              check-ins&quot;.
             </p>
           </section>
 
           <CheckInKindsList kinds={checkIns.kinds} />
 
-          <RecentCheckInsList
-            checkIns={checkIns.recent}
-            timeZone={timeZone ?? undefined}
-          />
-        </div>
+          <RecentCheckInsList checkIns={checkIns.recent} timeZone={timeZone} />
+        </>
       ) : null}
     </>
   );

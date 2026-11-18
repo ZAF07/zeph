@@ -1,61 +1,44 @@
 import Link from "next/link";
 
+import { EmptyState } from "@/components/EmptyState";
+import { HomeCard } from "@/components/HomeCard";
+import { cardLink, cardListRow } from "@/components/card-styles";
 import type { RememberedItem } from "@/lib/api-client";
-import { formatShortDay } from "@/lib/dates";
 
 /**
  * "Recently remembered": the User's newest Memory Items with their Memory
- * Category and date, and a link to Memories.
+ * Category, and a link to Memories.
  *
- * @param props - `items` are the newest Memory Items, newest first;
- *   `timeZone` is the User's.
- * @returns The section.
+ * @param props - `items` are the newest Memory Items, newest first.
+ * @returns The card.
  */
-export function RecentlyRemembered({
-  items,
-  timeZone,
-}: {
-  items: RememberedItem[];
-  timeZone?: string;
-}) {
+export function RecentlyRemembered({ items }: { items: RememberedItem[] }) {
   return (
-    <section
-      aria-labelledby="recently-remembered-heading"
-      className="flex flex-col gap-1 rounded-card border border-line bg-white p-7"
-    >
-      <div className="flex items-baseline justify-between gap-4 pb-2">
-        <h2
-          id="recently-remembered-heading"
-          className="m-0 text-h3 font-semibold"
-        >
-          Recently remembered
-        </h2>
-        <Link
-          href="/memories"
-          className="inline-flex min-h-11 items-center text-sm"
-        >
+    <HomeCard
+      headingId="recently-remembered-heading"
+      title="Recently remembered"
+      aside={
+        <Link href="/memories" className={cardLink}>
           Review all
         </Link>
-      </div>
+      }
+      basis="wide"
+    >
       {items.length === 0 ? (
-        <p className="m-0 border-t border-line pt-3.5 text-caption text-ink-muted">
-          No memories yet. They’ll appear after your first Conversation.
-        </p>
+        <EmptyState
+          title="No memories yet"
+          body="They’ll appear after your first Conversation."
+        />
       ) : (
-        <ul className="m-0 flex list-none flex-col p-0">
+        <ul className="m-0 list-none p-0">
           {items.map((item) => (
-            <li
-              key={item.id}
-              className="flex flex-col border-t border-line py-3.5"
-            >
-              <span>{item.content}</span>
-              <span className="text-caption text-ink-muted">
-                {`${item.category} · ${formatShortDay(item.updated_at, timeZone)}`}
-              </span>
+            <li key={item.id} className={cardListRow}>
+              <span className="text-[14px] text-text">{item.content}</span>
+              <span className="text-[12px] text-soft">{item.category}</span>
             </li>
           ))}
         </ul>
       )}
-    </section>
+    </HomeCard>
   );
 }

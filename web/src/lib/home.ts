@@ -3,13 +3,13 @@ import type {
   CheckInStatus,
   RecentCheckIn,
 } from "@/lib/api-client";
+import { checkInFrequencyOptions, formatQuietHour } from "@/lib/check-ins";
 import {
-  checkInFrequencyOptions,
-  formatCheckInDay,
-  formatTimeOfDay,
-  recentCheckInTitle,
-} from "@/lib/check-ins";
-import { dateParts, formatAddedDay } from "@/lib/dates";
+  calendarDaysAgo,
+  dateParts,
+  formatAddedDay,
+  formatShortDay,
+} from "@/lib/dates";
 
 const replyLabels: Record<CheckInStatus, string | null> = {
   replied: "you replied",
@@ -44,100 +44,99 @@ export function greeting(
 }
 
 /**
- * Writes today's date where the User is, like "Wednesday, 11 November".
+ * Says when the User last talked with Zeph, like "You last talked with Zeph
+ * yesterday."
  *
- * @param now - The current moment.
- * @param timeZone - The User's time zone; the browser's by default.
- * @returns The date.
- */
-export function todayHeading(now: Date, timeZone?: string): string {
-  const part = dateParts(now, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone,
-  });
-  return `${part("weekday")}, ${part("day")} ${part("month")}`;
-}
-
-/**
- * Says when the User's last Conversation was, like "Last Conversation today
- * at 7:48 pm."
- *
- * @param lastConversationAt - When its newest message was sent; null if
- *   there has been none.
+ * @param lastConversationAt - When the last Conversation's newest message
+ *   was sent; null if there has been none.
  * @param now - The current moment.
  * @param timeZone - The User's time zone; the browser's by default.
  * @returns The sentence.
  */
-export function lastConversationText(
+export function lastTalkedText(
   lastConversationAt: string | null,
   now: Date,
   timeZone?: string,
 ): string {
   if (lastConversationAt === null) {
-    return "No Conversations yet. Say hello in Telegram.";
+    return "You haven't talked with Zeph yet.";
   }
   const day = formatAddedDay(lastConversationAt, now, timeZone);
   const when =
     day === "Today" || day === "Yesterday" ? day.toLowerCase() : `on ${day}`;
-  return `Last Conversation ${when} at ${formatTimeOfDay(lastConversationAt, timeZone)}.`;
+  return `You last talked with Zeph ${when}.`;
 }
 
 /**
- * Says how often Check-ins may come, like "A few times a week, at most".
+ * Names how often Check-ins may come, as the choice is called, like "A few
+ * times a week".
  *
  * @param frequency - The User's Check-in frequency.
- * @returns The line.
+ * @returns The name.
  */
 export function checkInFrequencyText(frequency: CheckInFrequency): string {
   const option = checkInFrequencyOptions.find(
     (entry) => entry.value === frequency,
   );
-  return `${option?.label ?? "Now and then"}, at most`;
+  return option?.label ?? "Now and then";
 }
 
 /**
- * Writes quiet hours, like "Never between 10:00 pm and 7:30 am".
+ * Writes quiet hours, like "11:00 PM to 7:00 AM".
  *
- * @param start - When quiet hours start, like "22:00:00".
- * @param end - When they end, like "07:30:00".
+ * @param start - When quiet hours start, like "23:00:00".
+ * @param end - When they end, like "07:00:00".
  * @returns The line.
  */
 export function quietHoursText(start: string, end: string): string {
-  return `Never between ${formatLocalTime(start)} and ${formatLocalTime(end)}`;
+  return `${formatQuietHour(start)} to ${formatQuietHour(end)}`;
 }
 
 /**
- * Describes the last Check-in sent, like "Last Check-in: a casual hello,
- * Mon 9 Nov · you replied". Never its message.
+ * Names the day of the last Check-in sent and whether the User replied, like
+ * "Tuesday · you replied". The day is "Today", "Yesterday", a weekday up to a
+ * week back, then a date like "9 Nov". Never its Kind or message.
  *
  * @param checkIn - The last Check-in sent, or null if none was.
+ * @param now - The current moment.
  * @param timeZone - The User's time zone; the browser's by default.
  * @returns The line.
  */
 export function lastCheckInText(
   checkIn: RecentCheckIn | null,
+  now: Date,
   timeZone?: string,
 ): string {
   if (checkIn === null) {
-    return "No Check-ins sent yet.";
+    return "None yet";
   }
-  const title = recentCheckInTitle(checkIn);
-  const what = title.charAt(0).toLowerCase() + title.slice(1);
-  const day = formatCheckInDay(checkIn.decided_at, timeZone);
+  const day = recentDayName(checkIn.decided_at, now, timeZone);
   const reply = replyLabels[checkIn.status];
-  return `Last Check-in: ${what}, ${day}${reply ? ` · ${reply}` : ""}`;
+  return reply ? `${day} · ${reply}` : day;
 }
 
 /**
- * Writes a time of day the backend sends, like "22:00:00", as "10:00 pm".
+ * Names a recent day: "Today", "Yesterday", its weekday up to a week back,
+ * then a date like "9 Nov".
  *
- * @param timeOfDay - The time as the backend sends it.
- * @returns The time.
+ * @param isoTimestamp - The moment, as the backend sends it.
+ * @param now - The current moment.
+ * @param timeZone - The time zone to count days in.
+ * @returns The day's name.
  */
-function formatLocalTime(timeOfDay: string): string {
-  const [hours, minutes] = timeOfDay.split(":").map(Number);
-  const moment = new Date(Date.UTC(2000, 0, 1, hours, minutes));
-  return formatTimeOfDay(moment.toISOString(), "UTC");
+function recentDayName(
+  isoTimestamp: string,
+  now: Date,
+  timeZone?: string,
+): string {
+  const daysAgo = calendarDaysAgo(isoTimestamp, now, timeZone);
+  if (daysAgo > 7) {
+    return formatShortDay(isoTimestamp, timeZone);
+  }
+  if (daysAgo > 1) {
+    return dateParts(new Date(isoTimestamp), { weekday: "long", timeZone })(
+      "weekday",
+    );
+  }
+  return formatAddedDay(isoTimestamp, now, timeZone);
 }

@@ -51,3 +51,5 @@ Refs: `Account`, `M-Account`, `ConnectTelegram`, `M-ConnectTelegram`.
 ## Comments
 
 - 2026-11-18 — From issue 02: the `getPlatformContent` fixture lives in `web/src/lib/design-fixtures/shell.ts`. Only `ai_notice_short` (the sidebar line) and `message_retention_days: 30` are filled in. If this page shows the other fields, fill them from its reference there; it is the shared shell fixture, so mention it in the issue.
+
+- 2026-11-18 — From issue 05: the `(user)` 880px column layout is gone (User pages now sit straight in `<main>`, as every reference draws). On a phone, the old Connect Telegram card printed a long Telegram username (`@maximiliana_featherstonehaugh_whittington_long`) 4px past the screen. Let long usernames wrap (Home uses `[overflow-wrap:anywhere]`). Time zone is set only on Account now: Zaf dropped it from Check-ins.
