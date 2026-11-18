@@ -9,7 +9,11 @@ import { AuthLayout } from "@/components/AuthLayout";
  */
 export default function SignInPage() {
   return (
-    <AuthLayout>
+    <AuthLayout
+      eyebrow="Welcome back"
+      switchPrompt="New to Zeph?"
+      switchLink={{ href: "/sign-up", label: "Sign up" }}
+    >
       <SignIn fallbackRedirectUrl="/" signUpUrl="/sign-up" />
     </AuthLayout>
   );
