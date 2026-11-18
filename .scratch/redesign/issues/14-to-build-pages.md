@@ -52,3 +52,5 @@ Refs: `Plan`, `M-Plan`, `Admin`.
 - [ ] `/code-review` run, and findings fixed or answered.
 
 ## Comments
+
+- 2026-11-18 — From issue 02: the menu already links Overview → `/admin`, Plans → `/admin/plans` and Plan → `/plan`, with their "To build" tags. Overview is marked only on `/admin` itself, so once `/admin` stops redirecting, the `Admin` ref's sidebar will match. No sidebar edits are needed.
