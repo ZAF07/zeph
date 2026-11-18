@@ -1,3 +1,5 @@
+import { siteTag } from "@/components/site-styles";
+
 /** One step on the How It Works page. */
 export type HowItWorksStepDetails = {
   title: string;
@@ -37,9 +39,7 @@ export function HowItWorksStep({
           <h3 className="m-0 text-[22px] leading-[1.2] font-normal text-cream">
             {step.title}
           </h3>
-          <span className="rounded-[6px] bg-white/7 px-2.5 py-0.5 text-[12px] font-normal text-soft">
-            {step.tag}
-          </span>
+          <span className={`${siteTag} text-soft`}>{step.tag}</span>
         </div>
         <p className="mt-2 mb-0 max-w-[560px] text-soft">{step.text}</p>
       </div>

@@ -1,5 +1,5 @@
 import { SectionIntro } from "@/components/SectionIntro";
-import { siteColumn } from "@/components/site-links";
+import { siteColumn, siteTag } from "@/components/site-styles";
 
 /**
  * The moments on the day's timeline, in order. `dotColor` and `tagColor` are the
@@ -68,9 +68,7 @@ export function LandingDay() {
                 aria-hidden="true"
                 className={`absolute top-[7px] -left-1.5 size-[11px] rounded-full ${moment.dotColor}`}
               />
-              <div
-                className={`inline-block rounded-[6px] bg-white/7 px-2.5 py-0.5 text-[12px] font-normal ${moment.tagColor}`}
-              >
+              <div className={`inline-block ${siteTag} ${moment.tagColor}`}>
                 {moment.tag}
               </div>
               <h3 className="mt-3 mb-2 text-[24px] leading-[1.2] font-normal text-cream">

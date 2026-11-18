@@ -8,7 +8,12 @@ import {
 import { PillLink } from "@/components/PillLink";
 import { SectionIntro } from "@/components/SectionIntro";
 import { siteBackgrounds } from "@/components/site-backgrounds";
-import { siteColumn } from "@/components/site-links";
+import {
+  siteColumn,
+  splitContent,
+  splitIntro,
+  splitSection,
+} from "@/components/site-styles";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHero } from "@/components/SiteHero";
 
@@ -85,9 +90,7 @@ export function HowItWorks() {
           them one tap.
         </p>
       </SiteHero>
-      <section
-        className={`${siteColumn} flex flex-wrap items-start gap-x-14 gap-y-9 pt-10 pb-[72px]`}
-      >
+      <section className={`${siteColumn} ${splitSection} pt-10 pb-[72px]`}>
         <SectionIntro
           eyebrow="From sign-up to check-in"
           title={
@@ -98,9 +101,9 @@ export function HowItWorks() {
             </>
           }
           body="Steps one and two happen once. The rest is the conversation itself."
-          className="max-w-[340px] min-w-0 flex-[1_1_280px]"
+          className={splitIntro}
         />
-        <ol className="m-0 flex min-w-0 flex-[999_1_560px] list-none flex-col p-0">
+        <ol className={`${splitContent} m-0 flex list-none flex-col p-0`}>
           {steps.map((step, index) => (
             <HowItWorksStep
               key={step.title}
@@ -111,9 +114,7 @@ export function HowItWorks() {
           ))}
         </ol>
       </section>
-      <section
-        className={`${siteColumn} flex flex-wrap items-start gap-x-14 gap-y-9 pt-6 pb-[72px]`}
-      >
+      <section className={`${siteColumn} ${splitSection} pt-6 pb-[72px]`}>
         <SectionIntro
           eyebrow="Your dashboard"
           title={
@@ -124,9 +125,9 @@ export function HowItWorks() {
             </>
           }
           body="Everything Zeph holds about you is visible on this site, and all of it can be removed."
-          className="max-w-[340px] min-w-0 flex-[1_1_280px]"
+          className={splitIntro}
         />
-        <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-5">
+        <div className={`${splitContent} flex flex-col gap-5`}>
           <div className="flex flex-wrap gap-4">
             {dashboardCards.map((card) => (
               <div

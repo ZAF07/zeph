@@ -1,6 +1,6 @@
 import { SectionIntro } from "@/components/SectionIntro";
 import { siteBackgrounds } from "@/components/site-backgrounds";
-import { siteColumn } from "@/components/site-links";
+import { siteColumn } from "@/components/site-styles";
 
 /**
  * The questions and answers. Answers in square brackets are the design's

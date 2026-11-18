@@ -1,14 +1,11 @@
 import Link from "next/link";
 
-import {
-  type SiteLink,
-  siteColumn,
-  siteNavLinks,
-} from "@/components/site-links";
+import { type SiteLink, siteNavLinks } from "@/components/site-links";
+import { siteColumn } from "@/components/site-styles";
 
 /**
- * The footer's link columns. Follow has no addresses yet, so its links go
- * nowhere, as drawn.
+ * The footer's link columns. Follow and Legal have no pages yet, so their
+ * links go nowhere, as drawn.
  */
 const footerColumns: { title: string; links: SiteLink[] }[] = [
   { title: "Product", links: siteNavLinks },
@@ -24,8 +21,8 @@ const footerColumns: { title: string; links: SiteLink[] }[] = [
   {
     title: "Legal",
     links: [
-      { href: "/terms", label: "Terms of Service" },
-      { href: "/privacy", label: "Privacy Policy" },
+      { href: "#", label: "Terms of Service" },
+      { href: "#", label: "Privacy Policy" },
     ],
   },
 ];

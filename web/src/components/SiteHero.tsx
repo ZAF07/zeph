@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import { Eyebrow } from "@/components/Eyebrow";
-import { siteColumn } from "@/components/site-links";
+import { siteColumn } from "@/components/site-styles";
 import { SiteHeader } from "@/components/SiteHeader";
 
 /**

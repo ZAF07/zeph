@@ -8,10 +8,3 @@ export const siteNavLinks: SiteLink[] = [
   { href: "/#pricing", label: "Pricing" },
   { href: "/#faq", label: "FAQ" },
 ];
-
-/**
- * The page width and side gutter every block of the public pages shares:
- * 1160px wide, 32px gutters, 20px below 900px.
- */
-export const siteColumn =
-  "mx-auto box-border max-w-[1160px] px-8 max-[899px]:px-5";

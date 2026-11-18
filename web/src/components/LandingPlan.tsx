@@ -45,7 +45,7 @@ export function LandingPlan({ plan }: { plan: LandingPlanDetails }) {
               height="14"
               viewBox="0 0 14 14"
               fill="none"
-              stroke="#BDD0D5"
+              stroke="currentColor"
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"

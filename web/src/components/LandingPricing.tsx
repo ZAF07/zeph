@@ -1,6 +1,11 @@
 import { LandingPlan, type LandingPlanDetails } from "@/components/LandingPlan";
 import { SectionIntro } from "@/components/SectionIntro";
-import { siteColumn } from "@/components/site-links";
+import {
+  siteColumn,
+  splitContent,
+  splitIntro,
+  splitSection,
+} from "@/components/site-styles";
 
 /** The plans, as drawn. Billing is still to build, so every button signs up. */
 const plans: LandingPlanDetails[] = [
@@ -54,7 +59,7 @@ export function LandingPricing() {
   return (
     <section
       id="pricing"
-      className={`${siteColumn} flex flex-wrap items-start gap-x-14 gap-y-9 pt-14 pb-24`}
+      className={`${siteColumn} ${splitSection} pt-14 pb-24`}
     >
       <SectionIntro
         eyebrow="Pricing"
@@ -66,9 +71,9 @@ export function LandingPricing() {
           </>
         }
         body="Start free, upgrade when you are ready for deeper support."
-        className="max-w-[340px] min-w-0 flex-[1_1_280px]"
+        className={splitIntro}
       />
-      <div className="min-w-0 flex-[999_1_560px]">
+      <div className={splitContent}>
         <div className="flex flex-wrap gap-y-9">
           {plans.map((plan) => (
             <LandingPlan key={plan.name} plan={plan} />

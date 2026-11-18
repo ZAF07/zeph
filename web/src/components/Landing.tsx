@@ -42,14 +42,14 @@ export function Landing() {
           >
             <span
               aria-hidden="true"
-              className="box-border flex size-[30px] items-center justify-center rounded-full border border-soft"
+              className="box-border flex size-[30px] items-center justify-center rounded-full border border-soft text-text"
             >
               <svg
                 width="10"
                 height="12"
                 viewBox="0 0 10 12"
                 fill="none"
-                stroke="#EAF2F3"
+                stroke="currentColor"
                 strokeWidth="1.3"
                 strokeLinejoin="round"
               >

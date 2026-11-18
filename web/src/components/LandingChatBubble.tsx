@@ -1,3 +1,6 @@
+/** Who sent a message in Landing's sample conversation. */
+export type ChatSender = "zeph" | "person";
+
 /**
  * One message in Landing's sample conversation: Zeph's on the left in a
  * filled bubble, the person's on the right in an outlined one, each beside
@@ -10,20 +13,20 @@ export function LandingChatBubble({
   from,
   text,
 }: {
-  from: "zeph" | "person";
+  from: ChatSender;
   text: string;
 }) {
   if (from === "zeph") {
     return (
       <div className="flex items-start gap-[14px]">
-        <span className="flex size-10 flex-none items-center justify-center rounded-full bg-zeph">
+        <span className="flex size-10 flex-none items-center justify-center rounded-full bg-zeph text-cream">
           <svg
             aria-hidden="true"
             width="18"
             height="10"
             viewBox="0 0 18 10"
             fill="none"
-            stroke="#F3E8D6"
+            stroke="currentColor"
             strokeWidth="1.8"
             strokeLinecap="round"
           >
@@ -41,14 +44,14 @@ export function LandingChatBubble({
       <div className="box-content max-w-[400px] rounded-tile border border-line-strong px-[18px] py-3 text-[14.5px] text-text">
         {text}
       </div>
-      <span className="box-border flex size-10 flex-none items-center justify-center rounded-full border border-line-strong">
+      <span className="box-border flex size-10 flex-none items-center justify-center rounded-full border border-line-strong text-soft">
         <svg
           aria-hidden="true"
           width="16"
           height="16"
           viewBox="0 0 16 16"
           fill="none"
-          stroke="#BDD0D5"
+          stroke="currentColor"
           strokeWidth="1.4"
           strokeLinecap="round"
         >
