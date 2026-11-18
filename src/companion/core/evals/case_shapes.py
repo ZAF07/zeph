@@ -978,6 +978,25 @@ UNDERSTANDING_MEMORY_FIELD = ShapeField(
                     ],
                     default="low",
                 ),
+                long_text_field(
+                    "guess",
+                    "Guess",
+                    "Something Zeph suspects about the User but isn't sure of, "
+                    'e.g. "their mum lives in Singapore". Leave empty for a '
+                    "plain Curiosity.",
+                    required=False,
+                ),
+                ShapeField(
+                    "how_sure",
+                    "How sure",
+                    "How sure Zeph is of the guess. Empty means low.",
+                    FieldKind.CHOICE,
+                    options=[
+                        ChoiceOption("low", "Low"),
+                        ChoiceOption("medium", "Medium"),
+                        ChoiceOption("high", "High"),
+                    ],
+                ),
             ],
         ),
         group_list_field(

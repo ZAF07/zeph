@@ -7,6 +7,7 @@ from typing import Any
 from companion.core.evals.case_shapes import InvalidFormError
 from companion.core.models import (
     CuriositySensitivity,
+    HowSure,
     MoveResult,
     MoveRole,
     ThreadReaction,
@@ -269,12 +270,16 @@ class EvalCuriosity:
             came (0 for today, below 0 for a day still to come); None for
             any time.
         sensitivity: How carefully it must be asked.
+        guess: What Zeph suspects but isn't sure of; None for a plain one.
+        how_sure: How sure it is of the guess; None without one.
     """
 
     question: str
     why: str
     not_before_days_ago: int | None = 0
     sensitivity: CuriositySensitivity = CuriositySensitivity.LOW
+    guess: str | None = None
+    how_sure: HowSure | None = None
 
 
 @dataclass(frozen=True)
@@ -742,6 +747,10 @@ def to_eval_memory(entry: dict[str, Any]) -> EvalMemory:
                 why=curiosity["why"],
                 not_before_days_ago=curiosity.get("not_before_days_ago", 0),
                 sensitivity=CuriositySensitivity(curiosity.get("sensitivity") or "low"),
+                guess=curiosity.get("guess") or None,
+                how_sure=HowSure(curiosity.get("how_sure") or "low")
+                if curiosity.get("guess")
+                else None,
             )
             for curiosity in entry.get("curiosities") or []
         ],

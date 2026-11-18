@@ -2,6 +2,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import pytest
 
@@ -12,6 +13,7 @@ from companion.core.evals.cases import (
     UnderstandingCase,
     UnderstandingExpectations,
 )
+from companion.core.evals.made_up_memory import to_curiosity
 from companion.core.evals.models import CaseOutcome, Check, EvalName
 from companion.core.evals.understanding_checks import (
     CheckResult,
@@ -602,3 +604,45 @@ def test_the_understanding_cases_check_the_next_move_and_move_outcomes() -> None
     }
     assert exhausted.messages[0].expect.rules == ["no_push_while_exhausted"]
     assert "Push" in frustrated.messages[0].expect.lead_move
+
+
+def test_a_made_up_guess_curiosity_is_read_and_saved_with_how_sure_zeph_is(
+    tmp_path: Path,
+) -> None:
+    [case] = read_cases(
+        tmp_path,
+        CASE_FILE_START + "  - id: mum\n"
+        "    memory:\n"
+        "      curiosities:\n"
+        "        - question: Is your mum back in Singapore?\n"
+        "          why: She went home after a visit.\n"
+        "          guess: their mum lives in Singapore\n"
+        "          how_sure: medium\n"
+        "        - question: How was the week?\n"
+        "          why: Busy week.\n"
+        "    messages:\n"
+        "      - text: talked to mum\n",
+    )
+    now = datetime(2026, 11, 13, 18, 30, tzinfo=UTC)
+
+    guess, plain = (
+        to_curiosity(uuid4(), curiosity, now) for curiosity in case.memory.curiosities
+    )
+
+    assert (guess.guess, guess.how_sure) == ("their mum lives in Singapore", "medium")
+    assert (plain.guess, plain.how_sure) == (None, None)
+
+
+def test_the_understanding_cases_check_a_guess_gently_with_get_curious() -> None:
+    seed_cases: list[UnderstandingCase] = seeded(EvalName.UNDERSTANDING)
+    case = {case.id: case for case in seed_cases}["guess-checked-gently"]
+
+    [curiosity] = case.memory.curiosities
+    [message] = case.messages
+    assert (curiosity.guess, curiosity.how_sure) == (
+        "their mum lives in Singapore",
+        "medium",
+    )
+    assert "mum" in message.text
+    assert message.expect.lead_move == ["Get curious"]
+    assert message.expect.rules == ["checks_guess_gently"]
