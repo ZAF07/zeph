@@ -9,7 +9,11 @@ import { AuthLayout } from "@/components/AuthLayout";
  */
 export default function SignUpPage() {
   return (
-    <AuthLayout>
+    <AuthLayout
+      eyebrow="Get started"
+      switchPrompt="Have an account?"
+      switchLink={{ href: "/sign-in", label: "Sign in" }}
+    >
       <SignUp forceRedirectUrl="/connect-telegram" signInUrl="/sign-in" />
     </AuthLayout>
   );

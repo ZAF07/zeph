@@ -2,39 +2,137 @@ import type { ComponentProps } from "react";
 import type { ClerkProvider } from "@clerk/nextjs";
 
 /**
- * Themes Clerk's prebuilt sign-up and sign-in with the design tokens.
+ * Themes Clerk's prebuilt sign-up and sign-in to match the card in the
+ * design's `Login` and `Signup` files.
  *
- * Colour values mirror the tokens in `globals.css`; element classes use the
- * Tailwind theme directly.
+ * Clerk sits flush inside `AuthLayout`'s card, which draws the card itself.
+ * Colour values mirror the tokens in `design/tokens.css`. Element styles are
+ * style objects, not Tailwind classes, because Clerk's own styles sit outside
+ * Tailwind's layers and would win over its classes. Clerk draws borders as
+ * box shadows with stronger rules, so those few values are `!important`.
  */
 export const clerkAppearance: ComponentProps<
   typeof ClerkProvider
 >["appearance"] = {
+  options: {
+    elevation: "flush",
+    logoPlacement: "none",
+  },
   variables: {
-    colorPrimary: "#0a0a0a",
-    colorPrimaryForeground: "#ffffff",
-    colorForeground: "#0a0a0a",
-    colorMutedForeground: "#525252",
-    colorBackground: "#ffffff",
-    colorInput: "#ffffff",
-    colorInputForeground: "#0a0a0a",
-    colorBorder: "#d4d4d4",
-    colorDanger: "#c81e1e",
-    colorRing: "#1f4fff",
-    fontFamily: "var(--font-geist-sans), system-ui, sans-serif",
-    fontSize: "15px",
+    colorPrimary: "#f3e8d6",
+    colorPrimaryForeground: "#0b2a3c",
+    colorForeground: "#eaf2f3",
+    colorMutedForeground: "#bdd0d5",
+    colorNeutral: "#eaf2f3",
+    colorBackground: "#071922",
+    colorInput: "rgba(7,25,34,.6)",
+    colorInputForeground: "#eaf2f3",
+    colorBorder: "#5b8b96",
+    colorDanger: "#f4a48c",
+    colorRing: "#f3e8d6",
+    colorShadow: "transparent",
+    fontFamily: "var(--font-outfit), system-ui, sans-serif",
+    fontSize: "14px",
+    fontWeight: { normal: 300, medium: 400, semibold: 500, bold: 400 },
     borderRadius: "10px",
   },
   elements: {
-    cardBox:
-      "w-full max-w-[420px] rounded-card border border-line shadow-[0_24px_48px_-32px_rgba(0,0,0,0.3)]",
-    card: "px-8 pt-9 pb-7 shadow-none",
-    headerTitle: "text-[30px] leading-[1.15] font-normal",
-    headerSubtitle: "text-sm text-ink-soft",
-    socialButtonsBlockButton:
-      "min-h-[46px] rounded-full border-line-strong font-medium",
-    formFieldInput: "min-h-12 rounded-input border-line-strong text-base",
-    formButtonPrimary: "min-h-12 rounded-full bg-ink text-[15px] font-medium",
-    footerActionLink: "font-semibold text-blue",
+    rootBox: { width: "100%" },
+    cardBox: { width: "100%", background: "transparent" },
+    card: { padding: 0, gap: "18px", background: "transparent" },
+    header: { alignItems: "flex-start", textAlign: "left", gap: "6px" },
+    headerTitle: {
+      margin: 0,
+      fontSize: "32px",
+      lineHeight: 1.15,
+      fontWeight: 400,
+      color: "#f3e8d6",
+    },
+    headerSubtitle: {
+      margin: 0,
+      fontSize: "14px",
+      lineHeight: 1.55,
+      fontWeight: 300,
+      color: "#bdd0d5",
+    },
+    main: { gap: "18px" },
+    socialButtonsBlockButton: {
+      minHeight: "44px",
+      borderRadius: "999px",
+      border: "1px solid #bdd0d5 !important",
+      background: "transparent",
+      boxShadow: "none !important",
+      color: "#eaf2f3",
+    },
+    socialButtonsBlockButtonText: { fontSize: "14px", fontWeight: 500 },
+    dividerLine: { background: "#2a5263" },
+    dividerText: { fontSize: "13px", color: "#bdd0d5" },
+    form: { gap: "18px" },
+    formFieldRow: { gap: "6px" },
+    formFieldLabel: { fontSize: "13px", fontWeight: 400, color: "#bdd0d5" },
+    formFieldAction: { fontSize: "13px", fontWeight: 300, color: "#eaf2f3" },
+    formFieldInput: {
+      minHeight: "46px",
+      boxSizing: "border-box",
+      padding: "0 14px",
+      borderRadius: "10px",
+      border: "1px solid #5b8b96 !important",
+      background: "rgba(7,25,34,.6)",
+      boxShadow: "none !important",
+      color: "#eaf2f3",
+      fontSize: "15px",
+      "&::placeholder": { color: "#9db6be" },
+    },
+    formFieldHintText: { fontSize: "12px", color: "#bdd0d5" },
+    formButtonPrimary: {
+      minHeight: "44px",
+      borderRadius: "999px",
+      border: "1px solid #f3e8d6 !important",
+      background: "#f3e8d6",
+      boxShadow: "none !important",
+      color: "#0b2a3c",
+      fontSize: "14px",
+      fontWeight: 500,
+      "&:hover, &:focus, &:active": { background: "#f3e8d6" },
+    },
+    footer: {
+      marginTop: "18px",
+      gap: "12px",
+      background: "transparent",
+      padding: 0,
+    },
+    footerAction: { justifyContent: "center", padding: 0 },
+    footerActionText: { fontSize: "13px", fontWeight: 300, color: "#bdd0d5" },
+    footerActionLink: {
+      fontSize: "13px",
+      fontWeight: 300,
+      color: "#bdd0d5",
+      textDecoration: "underline",
+      "&:hover": { color: "#f3e8d6" },
+    },
   },
+};
+
+/**
+ * The copy Clerk shows on the sign-in and sign-up pages, from the design's
+ * `Login` and `Signup` files.
+ */
+export const clerkLocalization: ComponentProps<
+  typeof ClerkProvider
+>["localization"] = {
+  signIn: {
+    start: {
+      title: "Sign in to Zeph",
+      subtitle:
+        "Your memories, check-ins and account live here. The conversation itself happens in Telegram.",
+    },
+  },
+  signUp: {
+    start: {
+      title: "Create your account",
+      subtitle:
+        "Sign up here, answer a few short questions, then meet Zeph in Telegram.",
+    },
+  },
+  formFieldInputPlaceholder__emailAddress: "you@example.com",
 };
