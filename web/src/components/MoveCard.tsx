@@ -188,18 +188,21 @@ export function MoveCard({
             ))}
           </select>
         </div>
-        <label className="flex items-center gap-1.5 text-sm font-medium">
+        <label className="flex items-start gap-1.5 text-sm font-medium">
           <input
             type="checkbox"
+            className="mt-1"
             checked={asksAQuestion}
             onChange={(event) => {
               setAsksAQuestion(event.target.checked);
               setError(null);
             }}
           />
-          Asks a question{" "}
-          <span className="text-caption font-normal text-ink-muted">
-            — never made twice in a row, or with another question
+          <span>
+            Asks a question{" "}
+            <span className="text-caption font-normal text-ink-muted">
+              — never made twice in a row, or with another question
+            </span>
           </span>
         </label>
       </div>
