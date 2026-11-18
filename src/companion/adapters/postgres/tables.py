@@ -410,6 +410,8 @@ curiosities = Table(
         index=True,
     ),
     Column("reaction", Text),
+    Column("guess", Text),
+    Column("how_sure", Text),
     Index("ix_curiosities_user_id_state", "user_id", "state"),
 )
 

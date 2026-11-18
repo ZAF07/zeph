@@ -26,6 +26,7 @@ from companion.core.models import (
     CuriosityState,
     CuriosityToRaise,
     Feature,
+    HowSure,
     LifeThread,
     MemoryItem,
     ModelStep,
@@ -126,6 +127,37 @@ def due_curiosities(waiting: Sequence[Curiosity], today: date) -> list[Curiosity
     ]
 
 
+def how_sure_word(how_sure: HowSure | None) -> str:
+    """Write how sure the Companion is of a guess.
+
+    Args:
+        how_sure: How sure it is; None reads as low.
+
+    Returns:
+        "low", "medium" or "high".
+    """
+    return (how_sure or HowSure.LOW).value
+
+
+def describe_guess(guess: str | None, how_sure: HowSure | None) -> str:
+    """Write a Curiosity's guess as a model that may raise it reads it.
+
+    Args:
+        guess: The guess; None for a plain Curiosity.
+        how_sure: How sure the Companion is of it.
+
+    Returns:
+        E.g. " A guess, not known: their mum lives in Singapore (how sure:
+        low). Check it gently; never state it as fact."; "" without a guess.
+    """
+    if not guess:
+        return ""
+    return (
+        f" A guess, not known: {guess} (how sure: {how_sure_word(how_sure)}). "
+        "Check it gently; never state it as fact."
+    )
+
+
 def describe_due_curiosities(due: DueCuriosities, time_zone: str | None) -> str:
     """Write the due Curiosities as the Understanding model reads them.
 
@@ -135,11 +167,13 @@ def describe_due_curiosities(due: DueCuriosities, time_zone: str | None) -> str:
 
     Returns:
         How many were raised of the most allowed, then one line per
-        Curiosity; "None." if none is offered.
+        Curiosity, with its guess if it holds one; "None." if none is
+        offered.
     """
     lines = [
         f"[{item.number}] {item.curiosity.question} Why: {item.curiosity.why} "
-        f"Sensitivity: {item.curiosity.sensitivity.value}. "
+        f"Sensitivity: {item.curiosity.sensitivity.value}."
+        f"{describe_guess(item.curiosity.guess, item.curiosity.how_sure)} "
         f"Saved {format_day(item.curiosity.created_at, time_zone)}."
         for item in due.offered
     ]
@@ -156,12 +190,14 @@ def format_curiosities_for_reply(chosen: Sequence[CuriosityToRaise]) -> str:
         chosen: The Curiosities the Understanding chose, and how.
 
     Returns:
-        The section; "" if none was chosen.
+        The section, with each one's guess to check if it holds one; "" if
+        none was chosen.
     """
     if not chosen:
         return ""
     lines = [
-        f"- {item.question} {HOW_TO_RAISE_WORDS[item.how]} Why you wonder: {item.why}"
+        f"- {item.question} {HOW_TO_RAISE_WORDS[item.how]} Why you wonder: "
+        f"{item.why}{describe_guess(item.guess, item.how_sure)}"
         for item in chosen
     ]
     return (
@@ -309,6 +345,20 @@ def read_sensitivity(value: Any, default: CuriositySensitivity) -> CuriositySens
     return default
 
 
+def read_how_sure(value: Any) -> HowSure:
+    """Read how sure the model said it is of a guess.
+
+    Args:
+        value: The value, e.g. "medium".
+
+    Returns:
+        How sure; an odd or missing value reads as low.
+    """
+    if value in {level.value for level in HowSure}:
+        return HowSure(value)
+    return HowSure.LOW
+
+
 def read_number(entry: dict[str, Any], key: str) -> int | None:
     """Read a number the model wrote for something it was shown.
 
@@ -335,8 +385,9 @@ def plan_new_curiosity(
         context: What it is checked against.
 
     Returns:
-        The Curiosity; None if it has no question or a "not before" day that
-        can't be read. An unknown Memory Item or Thread number is left out.
+        The Curiosity, with its guess and how sure the model is if it wrote
+        one; None if it has no question or a "not before" day that can't be
+        read. An unknown Memory Item or Thread number is left out.
     """
     question = read_text(entry, "ask")
     not_before_given = entry.get("not_before")
@@ -345,6 +396,7 @@ def plan_new_curiosity(
         return None
     item = context.items.get(read_number(entry, "memory_item") or 0)
     thread = context.threads.get(read_number(entry, "thread") or 0)
+    guess = read_text(entry, "guess")
     return Curiosity(
         id=uuid4(),
         user_id=context.user_id,
@@ -358,6 +410,8 @@ def plan_new_curiosity(
         created_at=context.now,
         source_memory_item_id=item.id if item else None,
         source_life_thread_id=thread.id if thread else None,
+        guess=guess,
+        how_sure=read_how_sure(entry.get("how_sure")) if guess else None,
     )
 
 
@@ -472,7 +526,8 @@ def describe_curiosity(curiosity: Curiosity, raised_here: set[UUID]) -> str:
 
     Returns:
         E.g. "(waiting; not before 13 Nov 2026; sensitivity low) How did the
-        presentation go? Why: They were nervous."
+        presentation go? Why: They were nervous.", then "Guess (how sure:
+        low): ..." if it holds one.
     """
     if curiosity.id in raised_here:
         state = "brought up in this Conversation"
@@ -483,7 +538,12 @@ def describe_curiosity(curiosity: Curiosity, raised_here: set[UUID]) -> str:
             else "any day"
         )
         state = f"waiting; {day}; sensitivity {curiosity.sensitivity.value}"
-    return f"({state}) {curiosity.question} Why: {curiosity.why}"
+    guess = (
+        f" Guess (how sure: {how_sure_word(curiosity.how_sure)}): {curiosity.guess}"
+        if curiosity.guess
+        else ""
+    )
+    return f"({state}) {curiosity.question} Why: {curiosity.why}{guess}"
 
 
 def describe_unmade_next_move(understandings: Sequence[Understanding]) -> str:

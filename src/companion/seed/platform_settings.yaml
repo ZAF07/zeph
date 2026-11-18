@@ -898,10 +898,22 @@ curiosity_keeping_prompt: |-
     (e.g. "did they get the app deployed?", "did they decide what 'done'
     means for internal testing?"). Leave it out if the Conversation shows it
     no longer fits, e.g. they sorted it themselves or didn't want that help.
+  - A Curiosity can hold a guess: something Zeph suspects about them but
+    isn't sure of. Getting to know them means noticing what they hint at
+    but never say outright: their job, who someone is to them, where
+    someone lives, a routine. When the Conversation hints at one of these
+    and what Zeph remembers doesn't already say it, write a guess (e.g.
+    "back from the school run" hints "they have a child at primary
+    school"). Also write one when Zeph may have got something wrong. Give
+    the guess ("guess", a short statement about them), how sure Zeph is
+    ("how_sure": "low", "medium" or "high"), and a light question that
+    checks it. Zeph never states a guess as fact, only checks it gently.
+    A guess counts toward the usual one or so per Conversation.
   - For a waiting Curiosity that has changed (e.g. the presentation moved),
     give its number with the new details. If it's no longer relevant (they
     already told Zeph, or it no longer applies), give its number with
-    "close": true.
+    "close": true. Close a guess once they've answered it; what they said
+    is kept as a memory, so never write the answer as a new guess.
   - For each Curiosity marked "brought up in this Conversation", say how
     they took it: "engaged" if they talked about it, "brushed_off" if they
     changed the subject or gave a short answer, "asked_to_drop" if they
@@ -913,6 +925,10 @@ curiosity_keeping_prompt: |-
     "curiosities": [
       {"ask": "...", "why": "...", "not_before": "YYYY-MM-DD" | null,
        "sensitivity": "low" | "medium" | "high",
+       "memory_item": <number> | null, "thread": <number> | null},
+      {"ask": "...", "why": "...", "not_before": "YYYY-MM-DD" | null,
+       "sensitivity": "...", "guess": "...",
+       "how_sure": "low" | "medium" | "high",
        "memory_item": <number> | null, "thread": <number> | null},
       {"curiosity": <number>, "ask": "...", "why": "...",
        "not_before": "YYYY-MM-DD" | null, "sensitivity": "..."},

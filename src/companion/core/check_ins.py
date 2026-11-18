@@ -19,7 +19,7 @@ from companion.core.check_in_decision import (
     next_due_after_quiet_hours_move,
     retry_after_refusal,
 )
-from companion.core.curiosities import due_curiosities
+from companion.core.curiosities import describe_guess, due_curiosities
 from companion.core.features import FeatureService
 from companion.core.memory_retrieval import (
     format_day,
@@ -369,7 +369,8 @@ def describe_due_curiosities_for_check_in(
 
     Returns:
         How to name a Curiosity for the Kinds that ask one, then one line
-        per Curiosity; "" if no offered Kind asks one or none is due.
+        per Curiosity, with its guess to check if it holds one; "" if no
+        offered Kind asks one or none is due.
     """
     curiosity_kinds = [kind.name for kind in kinds if kind.raises_curiosity]
     if not curiosity_kinds or not due_curiosities:
@@ -378,6 +379,7 @@ def describe_due_curiosities_for_check_in(
     curiosity_lines = "\n".join(
         f"{number}. {curiosity.question} Why: {curiosity.why} "
         f"Sensitivity: {curiosity.sensitivity.value}."
+        f"{describe_guess(curiosity.guess, curiosity.how_sure)}"
         for number, curiosity in enumerate(due_curiosities, start=1)
     )
     return (
