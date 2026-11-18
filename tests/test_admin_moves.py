@@ -80,7 +80,10 @@ def test_admin_sees_the_moves_in_order_with_the_feature_each_needs(
         **{name: None for name in STARTER_MOVES},
         "Research": "web_search",
     }
-    assert not any(move["asks_a_question"] for move in moves)
+    assert {move["name"]: move["asks_a_question"] for move in moves} == {
+        **{name: False for name in STARTER_MOVES},
+        "Get curious": True,
+    }
     calm = move_named(client, admin, "Calm")
     assert calm["when_it_fits"] == seeded_moves()["Calm"]["when_it_fits"].strip()
     assert calm["how_to_do_it"] == seeded_moves()["Calm"]["how_to_do_it"].strip()

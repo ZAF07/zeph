@@ -28,6 +28,7 @@ STARTER_MOVES = [
     "Plan steps",
     "Push",
     "Research",
+    "Get curious",
 ]
 
 
@@ -41,6 +42,12 @@ def how_to_do_it(move: str) -> str:
     """The seeded "how to do it" of a Move."""
     guidance: str = seeded_moves()[move]["how_to_do_it"]
     return guidance.strip()
+
+
+def when_it_fits(move: str) -> str:
+    """The seeded "when it fits" of a Move."""
+    wording: str = seeded_moves()[move]["when_it_fits"]
+    return wording.strip()
 
 
 def saved_moves(engine: Engine) -> list[tuple[str | None, str | None]]:
@@ -117,6 +124,18 @@ def test_a_fresh_install_has_the_starter_moves_and_rule_outs_in_order(
     assert "Accountability" not in rule_outs
 
 
+def test_a_fresh_install_has_get_curious_asking_a_question(engine: Engine) -> None:
+    with engine.connect() as connection:
+        asks_a_question_by_name = dict(
+            connection.execute(text("SELECT name, asks_a_question FROM moves")).all()
+        )
+
+    assert asks_a_question_by_name == {
+        **{name: False for name in STARTER_MOVES},
+        "Get curious": True,
+    }
+
+
 def test_the_understanding_is_shown_the_moves_and_which_each_need_allows(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
@@ -131,13 +150,40 @@ def test_the_understanding_is_shown_the_moves_and_which_each_need_allows(
     for name, move in seeded_moves().items():
         assert f"- {name}: {move['when_it_fits'].strip()}" in asked
     allowed = asked.split("Moves each Need allows:")[1]
-    assert "- Be heard: Calm, Ground, Mirror\n" in allowed
-    assert "- Think it through: Calm, Ground, Reframe, Mirror, Plan steps, Push\n" in (
-        allowed
-    )
+    assert "- Be heard: Calm, Ground, Mirror, Get curious\n" in allowed
+    assert (
+        "- Think it through: Calm, Ground, Reframe, Mirror, Plan steps, Push, "
+        "Get curious\n"
+    ) in allowed
     assert f"- Advice: {', '.join(STARTER_MOVES)}\n" in allowed
     assert "- Get it done: none\n" in allowed
-    assert "- Just chatting: Suggest, Research\n" in allowed
+    assert "- Ask more: none\n" in allowed
+    assert "- Just chatting: Suggest, Research, Get curious\n" in allowed
+
+
+def test_get_curious_is_offered_under_just_chatting_and_not_under_ask_more(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    engine: Engine,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+
+    chatting = reply_to(
+        client,
+        chat_model,
+        "5 hours sleep only",
+        need="Just chatting",
+        lead_move="Get curious",
+    )
+    unclear = reply_to(
+        client, chat_model, "hmm", need="Ask more", lead_move="Get curious"
+    )
+
+    assert how_to_do_it("Get curious") in chatting
+    assert how_to_do_it("Get curious") not in unclear
+    assert saved_moves(engine) == [("Get curious", None), (None, None)]
 
 
 def test_the_picked_moves_how_to_do_it_follows_the_needs_how_to_reply(
@@ -314,9 +360,10 @@ def test_with_web_search_off_research_is_never_offered_and_the_reply_says_so(
 
     asked = chat_model.understanding_calls[-1].history[0].text
     assert "- Research:" not in asked
-    assert "- Advice: Calm, Ground, Reframe, Mirror, Suggest, Plan steps, Push\n" in (
-        asked
-    )
+    assert (
+        "- Advice: Calm, Ground, Reframe, Mirror, Suggest, Plan steps, Push, "
+        "Get curious\n"
+    ) in asked
     assert how_to_do_it("Research") not in instructions
     assert how_to_do_it("Suggest") in instructions
     assert "these aren't available on this person's account" in instructions.lower()

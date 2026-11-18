@@ -646,3 +646,23 @@ def test_the_understanding_cases_check_a_guess_gently_with_get_curious() -> None
     assert "mum" in message.text
     assert message.expect.lead_move == ["Get curious"]
     assert message.expect.rules == ["checks_guess_gently"]
+
+
+def test_the_understanding_cases_draw_the_line_between_an_update_and_a_vent() -> None:
+    seed_cases: list[UnderstandingCase] = seeded(EvalName.UNDERSTANDING)
+    cases = {case.id: case for case in seed_cases}
+    update = cases["passing-update-gets-curious"]
+    vent = cases["real-vent-is-heard"]
+
+    check_in, long_day, _ = update.earlier
+    [sleep] = update.messages
+    assert not check_in.from_person and "morning" in check_in.text.lower()
+    assert long_day.text == "It's going to be a long day"
+    assert sleep.text == "5 hours sleep only"
+    assert sleep.expect.need == ["Just chatting"]
+    assert sleep.expect.lead_move == ["Get curious"]
+    assert sleep.expect.rules == ["one_light_question"]
+    [rant] = vent.messages
+    assert rant.expect.need == ["Be heard"]
+    assert rant.expect.asked_why is False
+    assert rant.expect.rules == ["no_why_question"]

@@ -42,6 +42,12 @@ def how_to_reply(need: str) -> str:
     return reply_guidance
 
 
+def need_when_it_fits(need: str) -> str:
+    """The seeded "when it fits" of a Need."""
+    wording: str = seeded_needs()[need]["when_it_fits"]
+    return wording.strip()
+
+
 def saved_understandings(engine: Engine) -> list[dict[str, Any]]:
     """Every saved Understanding, oldest first."""
     with engine.connect() as connection:
