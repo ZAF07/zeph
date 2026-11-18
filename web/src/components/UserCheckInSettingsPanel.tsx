@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { compactSecondaryButton } from "@/components/button-styles";
 import { CheckInFrequencyPicker } from "@/components/CheckInFrequencyPicker";
 import { QuietHoursFields } from "@/components/QuietHoursFields";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type {
   AdminCheckInChanges,
   CheckInScheduleEntry,
@@ -128,12 +129,9 @@ export function UserCheckInSettingsPanel({
         </p>
 
         {save.isError ? (
-          <p
-            role="alert"
-            className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3.5 text-sm text-danger-deep"
-          >
+          <SaveFailedNote>
             Couldn’t save that for {displayName}. Their settings are unchanged.
-          </p>
+          </SaveFailedNote>
         ) : null}
 
         <div className="flex flex-col rounded-card border border-line [&>*:first-child]:border-t-0">

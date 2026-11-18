@@ -25,8 +25,20 @@ function emptyRect(): DOMRect {
   };
 }
 
+/** jsdom has no modal dialogs, so opening one just marks it open. */
+function showDialog(this: HTMLDialogElement): void {
+  this.open = true;
+}
+
+/** Closing one marks it closed, for the same reason. */
+function closeDialog(this: HTMLDialogElement): void {
+  this.open = false;
+}
+
 Range.prototype.getClientRects ??= emptyRects;
 Range.prototype.getBoundingClientRect ??= emptyRect;
+HTMLDialogElement.prototype.showModal ??= showDialog;
+HTMLDialogElement.prototype.close ??= closeDialog;
 
 afterEach(() => {
   cleanup();

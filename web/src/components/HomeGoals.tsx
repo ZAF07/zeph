@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { EmptyState } from "@/components/EmptyState";
 import type { MemoryItem } from "@/lib/api-client";
 import { memorySourceLabel } from "@/lib/memories";
 
@@ -35,13 +36,10 @@ export function HomeGoals({
         </Link>
       </div>
       {goals.length === 0 ? (
-        <div className="flex flex-col gap-1 rounded-card border border-dashed border-line-strong px-6 py-8 text-center">
-          <span className="text-h3">Nothing here yet</span>
-          <p className="m-0 text-caption text-ink-muted">
-            When you mention something you’re working toward, Zeph will remember
-            it here.
-          </p>
-        </div>
+        <EmptyState
+          title="Nothing here yet"
+          body="When you mention something you’re working toward, Zeph will remember it here."
+        />
       ) : (
         <ul className="m-0 list-none rounded-card border border-line bg-white p-0">
           {goals.map((goal, index) => (

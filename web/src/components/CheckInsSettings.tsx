@@ -186,7 +186,7 @@ export function CheckInsSettings() {
               </span>
               <button
                 type="button"
-                className={`${secondaryButton} bg-white`}
+                className={secondaryButton}
                 disabled={isSaving}
                 onClick={resume}
               >

@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { CoreServiceCard } from "@/components/CoreServiceCard";
+import { EmptyState } from "@/components/EmptyState";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LockIcon } from "@/components/LockIcon";
 import { queryKeys } from "@/lib/queries";
@@ -50,14 +51,10 @@ export function PromptsAndModels() {
   const { services, model_choices: modelChoices } = coreServices;
   if (services.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
-        <span className="text-[22px] font-medium tracking-[-0.02em]">
-          No services configured
-        </span>
-        <p className="m-0 text-caption text-ink-muted">
-          Core services appear here once the backend registers them.
-        </p>
-      </div>
+      <EmptyState
+        title="No services configured"
+        body="Core services appear here once the backend registers them."
+      />
     );
   }
 

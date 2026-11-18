@@ -3,7 +3,9 @@
 import { useCallback, useState } from "react";
 
 import { primaryButton, secondaryButton } from "@/components/button-styles";
+import { EmptyState } from "@/components/EmptyState";
 import { KnowledgeTextEditor } from "@/components/KnowledgeTextEditor";
+import { SavedNote } from "@/components/SavedNote";
 import { TextChangesReview } from "@/components/TextChangesReview";
 import { ApiError, type KnowledgeDocumentWithText } from "@/lib/api-client";
 import { knowledgeStatusLabels } from "@/lib/knowledge-labels";
@@ -104,12 +106,10 @@ export function KnowledgeTextSection({
       </div>
 
       {isWaitingForFile ? (
-        <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-12 text-center">
-          <span className="text-[17px] font-medium">No text yet</span>
-          <p className="m-0 max-w-[34em] text-caption text-ink-muted">
-            The file is being read. Its text will show here when it’s ready.
-          </p>
-        </div>
+        <EmptyState
+          title="No text yet"
+          body="The file is being read. Its text will show here when it’s ready."
+        />
       ) : (
         <>
           <KnowledgeTextEditor
@@ -130,14 +130,7 @@ export function KnowledgeTextSection({
               </>
             }
           />
-          {savedMessage ? (
-            <p
-              role="status"
-              className="m-0 rounded-xl bg-blue-tint px-4 py-3.5 text-sm text-blue-deep"
-            >
-              {savedMessage}
-            </p>
-          ) : null}
+          {savedMessage ? <SavedNote>{savedMessage}</SavedNote> : null}
           <div className="flex flex-wrap gap-3">
             <button
               type="button"

@@ -9,6 +9,7 @@ import {
   deleteIconButton,
 } from "@/components/button-styles";
 import { DeleteIcon } from "@/components/DeleteIcon";
+import { EmptyState } from "@/components/EmptyState";
 import { KnowledgeStatusPill } from "@/components/KnowledgeStatusPill";
 import { KnowledgeUploadForm } from "@/components/KnowledgeUploadForm";
 import { LoadFailed } from "@/components/LoadFailed";
@@ -185,15 +186,10 @@ export function KnowledgeLibrary() {
       ) : null}
 
       {documents && documents.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
-          <span className="text-[22px] font-medium tracking-[-0.02em]">
-            The library is empty
-          </span>
-          <p className="m-0 max-w-[34em] text-caption text-ink-muted">
-            Until you add documents, Zeph relies on general knowledge only.
-            Start with a few primary texts per tradition.
-          </p>
-        </div>
+        <EmptyState
+          title="The library is empty"
+          body="Until you add documents, Zeph relies on general knowledge only. Start with a few primary texts per tradition."
+        />
       ) : null}
 
       {documents && documents.length > 0 ? (

@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { primaryButton } from "@/components/button-styles";
+import { EmptyState } from "@/components/EmptyState";
 import { EvalPill } from "@/components/EvalPill";
 import { LoadFailed } from "@/components/LoadFailed";
 import { formatSavedAt } from "@/lib/dates";
@@ -82,15 +83,10 @@ export function EvalRunsList() {
       ) : null}
 
       {runs !== undefined && runs.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
-          <span className="text-[22px] font-medium tracking-[-0.02em]">
-            No Eval Runs yet
-          </span>
-          <p className="m-0 max-w-[34em] text-caption text-ink-muted">
-            Start a run to check how the Companion behaves with the real model.
-            Runs cost money: each case calls DeepSeek.
-          </p>
-        </div>
+        <EmptyState
+          title="No Eval Runs yet"
+          body="Start a run to check how the Companion behaves with the real model. Runs cost money: each case calls DeepSeek."
+        />
       ) : null}
 
       {runs !== undefined && runs.length > 0 ? (

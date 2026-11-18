@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 
 import { primaryButton } from "@/components/button-styles";
+import { EmptyState } from "@/components/EmptyState";
 import { EvalCaseRow } from "@/components/EvalCaseRow";
 import { LoadFailed } from "@/components/LoadFailed";
 import type { EvalName } from "@/lib/api-client";
@@ -74,14 +75,10 @@ export function EvalCasesList({ evalName }: { evalName: EvalName }) {
       ) : null}
 
       {cases !== undefined && cases.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
-          <span className="text-[22px] font-medium tracking-[-0.02em]">
-            No {evalDetails[evalName].label} cases yet
-          </span>
-          <p className="m-0 max-w-[34em] text-caption text-ink-muted">
-            Add a case to check a situation you saw go wrong.
-          </p>
-        </div>
+        <EmptyState
+          title={`No ${evalDetails[evalName].label} cases yet`}
+          body="Add a case to check a situation you saw go wrong."
+        />
       ) : null}
 
       {cases !== undefined && cases.length > 0 ? (

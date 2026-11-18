@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { deleteIconButton } from "@/components/button-styles";
 import { DeleteIcon } from "@/components/DeleteIcon";
+import { EmptyState } from "@/components/EmptyState";
 import type { ConversationSummary } from "@/lib/api-client";
 import { formatWeekdayDay } from "@/lib/dates";
 import { queryKeys } from "@/lib/queries";
@@ -91,14 +92,10 @@ export function ConversationSummariesList({
           })}
         </ol>
       ) : (
-        <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
-          <span className="text-[22px] font-medium tracking-[-0.02em]">
-            No Conversation Summaries yet
-          </span>
-          <p className="m-0 text-caption text-ink-muted">
-            They appear a little while after a Conversation ends.
-          </p>
-        </div>
+        <EmptyState
+          title="No Conversation Summaries yet"
+          body="They appear a little while after a Conversation ends."
+        />
       )}
     </div>
   );

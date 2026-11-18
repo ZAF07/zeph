@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { primaryButton, secondaryButton } from "@/components/button-styles";
 import { fieldCaption, fieldLabel, inputField } from "@/components/form-styles";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { ApiError, type HelplineInput } from "@/lib/api-client";
 import { countryOptions } from "@/lib/countries";
 
@@ -137,14 +138,7 @@ export function HelplineForm({
           </span>
         </div>
       </div>
-      {error ? (
-        <p
-          role="alert"
-          className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3.5 text-sm text-danger-deep"
-        >
-          {error}
-        </p>
-      ) : null}
+      {error ? <SaveFailedNote>{error}</SaveFailedNote> : null}
       <div className="flex flex-wrap justify-end gap-2">
         <button type="button" className={secondaryButton} onClick={onCancel}>
           Cancel
