@@ -9,6 +9,7 @@ import { ToBuildTag } from "@/components/ToBuildTag";
 import {
   adminMenuItems,
   isAdminItemCurrent,
+  isUserItemCurrent,
   userMenuItems,
 } from "@/lib/dashboard-menu";
 import { useIsAdmin } from "@/lib/use-is-admin";
@@ -42,7 +43,7 @@ export function SidebarNav({ onLinkChoose }: { onLinkChoose?: () => void }) {
   return (
     <nav aria-label="Dashboard" className="flex flex-col gap-0.5">
       {userMenuItems.map((item) => {
-        const isCurrent = item.href === pathname;
+        const isCurrent = isUserItemCurrent(item.href, pathname);
         return (
           <Link
             key={item.href}

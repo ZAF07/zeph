@@ -243,6 +243,33 @@ describe("DashboardShell", () => {
     expect(phoneMenu()).toBeNull();
   });
 
+  it("closes the phone menu when the wordmark is chosen", async () => {
+    const user = userEvent.setup();
+    renderShell();
+
+    await user.click(screen.getByRole("button", { name: "Open the menu" }));
+    await user.click(
+      within(screen.getByRole("banner")).getByRole("link", { name: "Zeph" }),
+    );
+
+    expect(phoneMenu()).toBeNull();
+  });
+
+  it("closes the phone menu when the page changes, as with Back", async () => {
+    const user = userEvent.setup();
+    const shell = renderShell();
+
+    await user.click(screen.getByRole("button", { name: "Open the menu" }));
+    navigation.pathname = "/memories";
+    shell.rerender(
+      <DashboardShell>
+        <p>Page content</p>
+      </DashboardShell>,
+    );
+
+    expect(phoneMenu()).toBeNull();
+  });
+
   it("shows the Admin section to an Admin, with Admin in place of the email", async () => {
     apiClient.getMe.mockResolvedValue(userWithRole("admin"));
     navigation.pathname = "/admin/persona";

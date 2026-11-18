@@ -1,26 +1,31 @@
 import Link from "next/link";
 
+import { menuLinkHover } from "@/components/menu-styles";
+
 /**
  * The sticky top bar that replaces the sidebar below 900px: the wordmark and
  * the menu button, whose icon becomes a cross while the menu is open.
  *
- * @param props - `menuId` is the menu panel's id; `menuOpen` says whether it is open; `onMenuToggle` opens or closes it.
+ * @param props - `menuId` is the menu panel's id; `menuOpen` says whether it is open; `onMenuToggle` opens or closes it; `onWordmarkChoose` runs when the wordmark is chosen, so the menu closes.
  * @returns The top bar.
  */
 export function PhoneBar({
   menuId,
   menuOpen,
   onMenuToggle,
+  onWordmarkChoose,
 }: {
   menuId: string;
   menuOpen: boolean;
   onMenuToggle: () => void;
+  onWordmarkChoose: () => void;
 }) {
   return (
     <header className="sticky top-0 z-[5] box-border flex items-center justify-between gap-3 border-b border-line bg-bg-deep py-2 pr-2.5 pl-5 min-[900px]:hidden">
       <Link
         href="/"
-        className="text-[24px] font-normal text-cream no-underline"
+        onClick={onWordmarkChoose}
+        className={`text-[24px] font-normal text-cream no-underline ${menuLinkHover}`}
       >
         Zeph
       </Link>

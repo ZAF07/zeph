@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { foldButton } from "@/components/menu-styles";
+import { foldButton, menuLinkHover } from "@/components/menu-styles";
 import { SidebarAccount } from "@/components/SidebarAccount";
 import { SidebarAiNotice } from "@/components/SidebarAiNotice";
 import { SidebarNav } from "@/components/SidebarNav";
@@ -19,7 +19,7 @@ export function Sidebar({ onFold }: { onFold: () => void }) {
       <div className="flex items-center justify-between gap-2 pt-0 pr-0 pb-3 pl-3.5">
         <Link
           href="/"
-          className="text-[26px] font-normal text-cream no-underline"
+          className={`text-[26px] font-normal text-cream no-underline ${menuLinkHover}`}
         >
           Zeph
         </Link>

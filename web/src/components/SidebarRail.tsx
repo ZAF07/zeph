@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { MenuIcon } from "@/components/MenuIcon";
 import { foldButton, menuLinkHover } from "@/components/menu-styles";
 import { useSignOut } from "@/lib/auth/client";
-import { userMenuItems } from "@/lib/dashboard-menu";
+import { isUserItemCurrent, userMenuItems } from "@/lib/dashboard-menu";
 
 /**
  * The inside of the folded sidebar: a 76px rail of icons for the User pages,
@@ -43,7 +43,7 @@ export function SidebarRail({ onUnfold }: { onUnfold: () => void }) {
       <Link
         href="/"
         aria-label="Zeph"
-        className="flex size-11 items-center justify-center text-[24px] font-normal text-cream no-underline"
+        className={`flex size-11 items-center justify-center text-[24px] font-normal text-cream no-underline ${menuLinkHover}`}
       >
         Z
       </Link>
@@ -52,7 +52,7 @@ export function SidebarRail({ onUnfold }: { onUnfold: () => void }) {
         className="flex flex-col items-center gap-0.5"
       >
         {userMenuItems.map((item) => {
-          const isCurrent = item.href === pathname;
+          const isCurrent = isUserItemCurrent(item.href, pathname);
           return (
             <Link
               key={item.href}

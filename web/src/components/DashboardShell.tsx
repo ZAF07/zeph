@@ -1,6 +1,6 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 import { PhoneBar } from "@/components/PhoneBar";
@@ -16,8 +16,9 @@ const PHONE_MENU_ID = "phone-menu";
 /**
  * The frame every signed-in page sits in. At 900px and wider, a sticky
  * sidebar that folds into an icon rail; below that, a sticky top bar whose
- * button opens the menu above the page. `?design=menu-open` opens the phone
- * menu in design-fixture mode.
+ * button opens the menu above the page. The phone menu closes when a link
+ * in it is chosen or the page changes, as with Back. `?design=menu-open`
+ * opens it in design-fixture mode.
  *
  * @param props - `children` is the page.
  * @returns The page in its frame.
@@ -25,6 +26,12 @@ const PHONE_MENU_ID = "phone-menu";
 export function DashboardShell({ children }: { children: ReactNode }) {
   const forcedMenuOpen = hasDesignFlag(useSearchParams(), "menu-open");
   const [phoneMenuOpen, setPhoneMenuOpen] = useState(forcedMenuOpen);
+  const pathname = usePathname();
+  const [menuPathname, setMenuPathname] = useState(pathname);
+  if (pathname !== menuPathname) {
+    setMenuPathname(pathname);
+    setPhoneMenuOpen(false);
+  }
   const [menuFolded, setMenuFolded] = useMenuFolded();
   const sidebarWidth = menuFolded ? "flex-[0_0_76px]" : "flex-[1_1_240px]";
 
@@ -34,6 +41,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         menuId={PHONE_MENU_ID}
         menuOpen={phoneMenuOpen}
         onMenuToggle={() => setPhoneMenuOpen(!phoneMenuOpen)}
+        onWordmarkChoose={() => setPhoneMenuOpen(false)}
       />
       {phoneMenuOpen ? (
         <PhoneMenu

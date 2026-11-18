@@ -68,6 +68,17 @@ export const adminMenuItems: AdminMenuItem[] = [
 ];
 
 /**
+ * Says whether a User menu item is the page being viewed.
+ *
+ * @param href - The item's address.
+ * @param pathname - The address of the page being viewed.
+ * @returns True when the item should be marked as the current page.
+ */
+export function isUserItemCurrent(href: string, pathname: string): boolean {
+  return href === pathname;
+}
+
+/**
  * Says whether an admin menu item is the page being viewed. An item stays
  * marked on the pages under it, like a Knowledge document's page, except
  * Overview, which every admin page sits under.
