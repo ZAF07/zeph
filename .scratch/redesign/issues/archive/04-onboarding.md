@@ -115,4 +115,4 @@ After the rebase, `Dashboard--menu-folded` and `M-Menu` give the same 13.05% and
 ## Completion
 
 - Completed: 2026-11-18
-- Commit: <to be filled in after merge>
+- Commit: merge `ec25858` into main (branch `redesign-04-onboarding`: `d07d613` Onboarding in the new look, `b5c0492` code-review fixes, `23d0846` evidence and archive)
