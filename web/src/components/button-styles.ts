@@ -1,12 +1,15 @@
-/** Class names for the button styles on the Foundations screen. */
+/**
+ * Class names for the pill buttons on the design's `States` sheet. While a
+ * button is disabled (for example "Saving…") it takes the drawn working look.
+ */
 const base =
-  "inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-[22px] py-3 text-[15px] font-medium leading-tight whitespace-nowrap no-underline cursor-pointer";
+  "inline-flex min-h-11 cursor-pointer items-center justify-center rounded-pill border px-[22px] text-[14px] font-medium no-underline disabled:cursor-not-allowed disabled:border-line-strong disabled:bg-transparent disabled:text-mute";
 
-/** The one main action on a view. */
-export const primaryButton = `${base} border border-ink bg-ink text-white hover:text-white disabled:cursor-not-allowed disabled:border-line-strong disabled:bg-line-strong disabled:text-ink-muted`;
+/** The one main action on a view. Keeps its ink text on hover when a link. */
+export const primaryButton = `${base} border-cream bg-cream text-ink hover:text-ink`;
 
 /** A secondary action. */
-export const secondaryButton = `${base} border border-line-strong bg-transparent text-ink disabled:cursor-not-allowed disabled:opacity-60`;
+export const secondaryButton = `${base} border-soft bg-transparent text-text`;
 
 /** A quiet, link-like action. */
 export const quietButton = `${base} border border-transparent bg-transparent px-2 text-blue`;
@@ -15,11 +18,11 @@ export const quietButton = `${base} border border-transparent bg-transparent px-
 export const compactSecondaryButton =
   "inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full border border-line-strong bg-transparent px-3.5 py-2 text-sm font-medium leading-tight text-ink cursor-pointer disabled:cursor-not-allowed disabled:opacity-60";
 
-/** A destructive action, before it is confirmed. */
-export const dangerButton = `${base} border border-danger-line bg-danger-tint text-danger hover:text-danger`;
+/** A destructive action. Keeps its colour on hover when a link. */
+export const dangerButton = `${base} border-danger bg-transparent text-danger hover:text-danger`;
 
 /** The button that confirms a destructive action. */
-export const confirmDangerButton = `${base} border border-danger bg-danger text-white hover:text-white disabled:cursor-not-allowed disabled:opacity-60`;
+export const confirmDangerButton = dangerButton;
 
 /** A round icon-only delete button inside a list row. */
 export const deleteIconButton =

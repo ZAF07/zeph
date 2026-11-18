@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { secondaryButton } from "@/components/button-styles";
+import { EmptyState } from "@/components/EmptyState";
 import { inputField } from "@/components/form-styles";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LockIcon } from "@/components/LockIcon";
@@ -146,15 +147,10 @@ export function AdminUsage() {
       ) : null}
 
       {report && rows.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
-          <span className="text-[22px] font-medium tracking-[-0.02em]">
-            No usage yet
-          </span>
-          <p className="m-0 max-w-[34em] text-caption text-ink-muted">
-            Rows appear once Users message Zeph. You’ll see counts per User per
-            day — never message content.
-          </p>
-        </div>
+        <EmptyState
+          title="No usage yet"
+          body="Rows appear once Users message Zeph. You’ll see counts per User per day — never message content."
+        />
       ) : null}
 
       {report && rows.length > 0 ? (

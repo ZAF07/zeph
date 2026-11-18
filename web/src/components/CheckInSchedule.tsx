@@ -13,9 +13,11 @@ import {
   compactSecondaryButton,
   primaryButton,
 } from "@/components/button-styles";
+import { EmptyState } from "@/components/EmptyState";
 import { inputField } from "@/components/form-styles";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LockIcon } from "@/components/LockIcon";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { UserCheckInSettingsPanel } from "@/components/UserCheckInSettingsPanel";
 import type {
   CheckInNowResultForUser,
@@ -176,17 +178,14 @@ export function CheckInSchedule() {
       ) : null}
 
       {schedule && schedule.total === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
-          <span className="text-[22px] font-medium tracking-[-0.02em]">
-            {search.trim()
+        <EmptyState
+          title={
+            search.trim()
               ? "No one matches that search"
-              : "No one has opted in to Check-ins yet"}
-          </span>
-          <p className="m-0 text-caption text-ink-muted">
-            Users appear here once they turn Check-ins on. You’ll see their Due
-            Time and settings — never message content.
-          </p>
-        </div>
+              : "No one has opted in to Check-ins yet"
+          }
+          body="Users appear here once they turn Check-ins on. You’ll see their Due Time and settings — never message content."
+        />
       ) : null}
 
       {checkInNowOutcome ? (
@@ -198,12 +197,9 @@ export function CheckInSchedule() {
       ) : null}
 
       {checkInNow.isError ? (
-        <p
-          role="alert"
-          className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3.5 text-sm text-danger-deep"
-        >
+        <SaveFailedNote>
           Couldn’t ask for a Check in Now. Nothing was requested; try again.
-        </p>
+        </SaveFailedNote>
       ) : null}
 
       {schedule && schedule.total > 0 ? (

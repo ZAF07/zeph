@@ -27,8 +27,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
-      <html lang="en">
-        <body className={outfit.variable}>
+      <html lang="en" className={outfit.variable}>
+        <body>
           <QueryProvider>{children}</QueryProvider>
         </body>
       </html>

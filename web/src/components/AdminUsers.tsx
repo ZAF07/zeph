@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 
 import { compactSecondaryButton } from "@/components/button-styles";
+import { EmptyState } from "@/components/EmptyState";
 import { inputField } from "@/components/form-styles";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LockIcon } from "@/components/LockIcon";
@@ -186,15 +187,10 @@ export function AdminUsers() {
       ) : null}
 
       {users && users.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
-          <span className="text-[22px] font-medium tracking-[-0.02em]">
-            No users yet
-          </span>
-          <p className="m-0 text-caption text-ink-muted">
-            People appear here after they sign up. You’ll see sign-up date,
-            Telegram status and counts — never message text.
-          </p>
-        </div>
+        <EmptyState
+          title="No users yet"
+          body="People appear here after they sign up. You’ll see sign-up date, Telegram status and counts — never message text."
+        />
       ) : null}
 
       {users && users.length > 0 ? (

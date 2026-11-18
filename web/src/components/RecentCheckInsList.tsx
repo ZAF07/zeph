@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/EmptyState";
 import type { RecentCheckIn } from "@/lib/api-client";
 import {
   checkInStatusLabels,
@@ -32,13 +33,10 @@ export function RecentCheckInsList({
         Recent check-ins
       </h2>
       {checkIns.length === 0 ? (
-        <div className="flex flex-col gap-1 rounded-card border border-dashed border-line-strong px-6 py-8 text-center">
-          <span className="text-h3">No Check-ins yet</span>
-          <p className="m-0 text-caption text-ink-muted">
-            When Zeph reaches out, or chooses to give you space, it’ll show
-            here.
-          </p>
-        </div>
+        <EmptyState
+          title="No Check-ins yet"
+          body="When Zeph reaches out, or chooses to give you space, it’ll show here."
+        />
       ) : (
         <ul className="m-0 list-none rounded-card border border-line bg-white p-0">
           {checkIns.map((checkIn, index) => {

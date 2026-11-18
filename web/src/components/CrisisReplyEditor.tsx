@@ -5,6 +5,7 @@ import { useState } from "react";
 import { primaryButton } from "@/components/button-styles";
 import { fieldLabel, inputField } from "@/components/form-styles";
 import { LoadFailed } from "@/components/LoadFailed";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { ApiError } from "@/lib/api-client";
 import { lastSavedNote, textSetting } from "@/lib/settings";
 import {
@@ -92,12 +93,7 @@ export function CrisisReplyEditor() {
         />
       </label>
       {saveSettings.isError ? (
-        <p
-          role="alert"
-          className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3.5 text-sm text-danger-deep"
-        >
-          {failureMessage}
-        </p>
+        <SaveFailedNote>{failureMessage}</SaveFailedNote>
       ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="text-caption text-ink-muted">

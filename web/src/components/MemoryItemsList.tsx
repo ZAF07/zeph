@@ -10,6 +10,7 @@ import {
   secondaryButton,
 } from "@/components/button-styles";
 import { DeleteIcon } from "@/components/DeleteIcon";
+import { EmptyState } from "@/components/EmptyState";
 import type { MemoryGroup } from "@/lib/api-client";
 import { memorySourceLabel } from "@/lib/memories";
 import { queryKeys } from "@/lib/queries";
@@ -130,18 +131,15 @@ export function MemoryItemsList({
       ))}
 
       {memoryCount === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
-          <span className="text-[22px] font-medium tracking-[-0.02em]">
-            Zeph hasn’t remembered anything yet
-          </span>
-          <p className="m-0 max-w-[32em] text-caption text-ink-muted">
-            As you talk, meaningful details — goals, what helps, people you
-            mention — will appear here, grouped by category.
-          </p>
-          <a href="https://t.me/" className={secondaryButton}>
-            Open Telegram
-          </a>
-        </div>
+        <EmptyState
+          title="Zeph hasn’t remembered anything yet"
+          body="As you talk, meaningful details — goals, what helps, people you mention — will appear here, grouped by category."
+          action={
+            <a href="https://t.me/" className={secondaryButton}>
+              Open Telegram
+            </a>
+          }
+        />
       ) : (
         <section
           aria-labelledby="delete-all-memories"

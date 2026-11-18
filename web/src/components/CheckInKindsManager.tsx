@@ -5,7 +5,9 @@ import { useState } from "react";
 
 import { primaryButton } from "@/components/button-styles";
 import { CheckInKindCard } from "@/components/CheckInKindCard";
+import { EmptyState } from "@/components/EmptyState";
 import { LoadFailed } from "@/components/LoadFailed";
+import { SavedNote } from "@/components/SavedNote";
 import type { CheckInKindInput, CheckInKindOverview } from "@/lib/api-client";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
@@ -93,23 +95,13 @@ export function CheckInKindsManager() {
     <div className="flex flex-col gap-[30px]">
       {addButton}
 
-      {flash ? (
-        <p
-          role="status"
-          className="m-0 rounded-xl bg-blue-tint px-4 py-3.5 text-sm text-blue-deep"
-        >
-          {flash}
-        </p>
-      ) : null}
+      {flash ? <SavedNote>{flash}</SavedNote> : null}
 
       {kinds.length === 0 && !isAdding ? (
-        <div className="flex flex-col items-center gap-1 rounded-card border border-dashed border-line-strong px-6 py-8 text-center">
-          <span className="text-h3">No Check-in Kinds</span>
-          <p className="m-0 max-w-[34em] text-caption text-ink-muted">
-            Without at least one, Zeph won’t start any Check-ins — it will only
-            reply. Add a casual hello to begin.
-          </p>
-        </div>
+        <EmptyState
+          title="No Check-in Kinds"
+          body="Without at least one, Zeph won’t start any Check-ins — it will only reply. Add a casual hello to begin."
+        />
       ) : (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(420px,100%),1fr))] gap-4">
           {kinds.map((kind) => (

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { primaryButton, secondaryButton } from "@/components/button-styles";
 import { fieldLabel, inputField } from "@/components/form-styles";
 import { LoadFailed } from "@/components/LoadFailed";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import {
   ApiError,
   type AdminSettings,
@@ -533,12 +534,7 @@ export function PlatformSettingsForm() {
       </section>
 
       {saveSettings.isError ? (
-        <p
-          role="alert"
-          className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3.5 text-sm text-danger-deep"
-        >
-          {failureMessage}
-        </p>
+        <SaveFailedNote>{failureMessage}</SaveFailedNote>
       ) : null}
 
       <div className="sticky bottom-4 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-white px-4 py-3 shadow-[0_12px_24px_-16px_rgba(0,0,0,0.35)]">

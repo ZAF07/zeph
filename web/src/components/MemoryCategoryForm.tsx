@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { primaryButton, secondaryButton } from "@/components/button-styles";
 import { fieldLabel, inputField } from "@/components/form-styles";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { ApiError, type MemoryCategoryInput } from "@/lib/api-client";
 
 /**
@@ -93,14 +94,7 @@ export function MemoryCategoryForm({
           />
         </div>
       </div>
-      {error ? (
-        <p
-          role="alert"
-          className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3.5 text-sm text-danger-deep"
-        >
-          {error}
-        </p>
-      ) : null}
+      {error ? <SaveFailedNote>{error}</SaveFailedNote> : null}
       <div className="flex flex-wrap gap-2">
         <button
           type="submit"

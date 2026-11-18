@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { EmptyState } from "@/components/EmptyState";
 import { inputField } from "@/components/form-styles";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LockIcon } from "@/components/LockIcon";
@@ -152,15 +153,10 @@ export function ModelCallLog() {
       ) : null}
 
       {traces !== undefined && traces.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
-          <span className="text-[22px] font-medium tracking-[-0.02em]">
-            No model calls yet
-          </span>
-          <p className="m-0 max-w-[34em] text-caption text-ink-muted">
-            Traces appear as the Companion answers Messages, sends Check-ins and
-            wraps up Conversations. Nothing matches these filters yet.
-          </p>
-        </div>
+        <EmptyState
+          title="No model calls yet"
+          body="Traces appear as the Companion answers Messages, sends Check-ins and wraps up Conversations. Nothing matches these filters yet."
+        />
       ) : null}
 
       {traces !== undefined && traces.length > 0 ? (

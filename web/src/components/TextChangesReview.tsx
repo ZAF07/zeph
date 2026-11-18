@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 
 import { primaryButton, secondaryButton } from "@/components/button-styles";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { compareTexts } from "@/lib/text-changes";
 
 /**
@@ -108,14 +109,7 @@ export function TextChangesReview({
             return <span key={index}>{part.text}</span>;
           })}
         </div>
-        {error ? (
-          <p
-            role="alert"
-            className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3.5 text-sm text-danger-deep"
-          >
-            {error}
-          </p>
-        ) : null}
+        {error ? <SaveFailedNote>{error}</SaveFailedNote> : null}
         <div className="flex flex-wrap gap-3">
           <button
             ref={confirmRef}

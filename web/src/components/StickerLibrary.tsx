@@ -2,6 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { EmptyState } from "@/components/EmptyState";
 import { LoadFailed } from "@/components/LoadFailed";
 import { StickerAddPanel } from "@/components/StickerAddPanel";
 import { StickerCard } from "@/components/StickerCard";
@@ -71,14 +72,10 @@ export function StickerLibrary() {
       ) : null}
 
       {stickers && stickers.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
-          <span className="text-[22px] font-medium tracking-[-0.02em]">
-            No stickers yet
-          </span>
-          <p className="m-0 text-caption text-ink-muted">
-            Zeph replies in words only until you add some.
-          </p>
-        </div>
+        <EmptyState
+          title="No stickers yet"
+          body="Zeph replies in words only until you add some."
+        />
       ) : null}
 
       {stickers && stickers.length > 0 ? (

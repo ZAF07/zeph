@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { EmptyState } from "@/components/EmptyState";
 import { inputField } from "@/components/form-styles";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LockIcon } from "@/components/LockIcon";
@@ -189,15 +190,10 @@ export function CheckInLog() {
       ) : null}
 
       {isLoaded && entries.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
-          <span className="text-[22px] font-medium tracking-[-0.02em]">
-            No Check-in decisions yet
-          </span>
-          <p className="m-0 max-w-[34em] text-caption text-ink-muted">
-            Entries appear once Users turn Check-ins on. You’ll see the Kind or
-            skip reason per User — never the message text.
-          </p>
-        </div>
+        <EmptyState
+          title="No Check-in decisions yet"
+          body="Entries appear once Users turn Check-ins on. You’ll see the Kind or skip reason per User — never the message text."
+        />
       ) : null}
 
       {isLoaded && entries.length > 0 ? (

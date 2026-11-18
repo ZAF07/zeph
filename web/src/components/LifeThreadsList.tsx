@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { deleteIconButton } from "@/components/button-styles";
 import { DeleteIcon } from "@/components/DeleteIcon";
+import { EmptyState } from "@/components/EmptyState";
 import type { LifeThread } from "@/lib/api-client";
 import { formatShortDay } from "@/lib/dates";
 import { queryKeys } from "@/lib/queries";
@@ -89,15 +90,10 @@ export function LifeThreadsList({
           ))}
         </ul>
       ) : (
-        <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
-          <span className="text-[22px] font-medium tracking-[-0.02em]">
-            Nothing here yet
-          </span>
-          <p className="m-0 text-caption text-ink-muted">
-            When you tell Zeph about something ongoing, it appears here a little
-            while after the Conversation ends.
-          </p>
-        </div>
+        <EmptyState
+          title="Nothing here yet"
+          body="When you tell Zeph about something ongoing, it appears here a little while after the Conversation ends."
+        />
       )}
     </div>
   );

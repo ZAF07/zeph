@@ -4,6 +4,8 @@ import { useState } from "react";
 
 import { primaryButton, secondaryButton } from "@/components/button-styles";
 import { LoadFailed } from "@/components/LoadFailed";
+import { SavedNote } from "@/components/SavedNote";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { lastSavedNote, textSetting } from "@/lib/settings";
 import {
   useAdminSettings,
@@ -125,20 +127,12 @@ export function PersonaEditor() {
         </div>
       </section>
       {saveSettings.isSuccess ? (
-        <p
-          role="status"
-          className="m-0 rounded-xl bg-blue-tint px-4 py-3.5 text-sm text-blue-deep"
-        >
-          Saved. Zeph uses it from the next message.
-        </p>
+        <SavedNote>Saved. Zeph uses it from the next message.</SavedNote>
       ) : null}
       {saveSettings.isError ? (
-        <p
-          role="alert"
-          className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3.5 text-sm text-danger-deep"
-        >
+        <SaveFailedNote>
           Couldn’t save the Persona. Zeph keeps using the last saved version.
-        </p>
+        </SaveFailedNote>
       ) : null}
     </>
   );

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { deleteIconButton } from "@/components/button-styles";
 import { DeleteIcon } from "@/components/DeleteIcon";
+import { EmptyState } from "@/components/EmptyState";
 import { LoadFailed } from "@/components/LoadFailed";
 import { PersonalStickerPicture } from "@/components/PersonalStickerPicture";
 import type { PersonalSticker } from "@/lib/api-client";
@@ -113,13 +114,10 @@ export function PersonalStickersSection({ available }: { available: boolean }) {
       ) : null}
 
       {stickers && stickers.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-10 text-center">
-          <span className="text-[17px] font-medium">No stickers kept yet</span>
-          <p className="m-0 text-caption text-ink-muted">
-            When you send Zeph a sticker whose meaning is clear, it may keep it
-            here after the Conversation ends.
-          </p>
-        </div>
+        <EmptyState
+          title="No stickers kept yet"
+          body="When you send Zeph a sticker whose meaning is clear, it may keep it here after the Conversation ends."
+        />
       ) : null}
     </section>
   );

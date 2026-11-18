@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 
 import { compactSecondaryButton } from "@/components/button-styles";
 import { LoadFailed } from "@/components/LoadFailed";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type {
   AdminUser,
   UserFeatures,
@@ -153,13 +154,10 @@ export function UserFeaturesPanel({
         ) : null}
 
         {failedFeature ? (
-          <p
-            role="alert"
-            className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3.5 text-sm text-danger-deep"
-          >
+          <SaveFailedNote>
             Couldn’t change {failedFeature.name} for {displayName}. It is still{" "}
             {failedFeature.switch}.
-          </p>
+          </SaveFailedNote>
         ) : null}
 
         {userFeatures ? (

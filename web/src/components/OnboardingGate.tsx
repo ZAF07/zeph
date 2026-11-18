@@ -40,7 +40,7 @@ export function OnboardingGate({ children }: { children: ReactNode }) {
         </span>
         <button
           type="button"
-          className={`${secondaryButton} bg-white`}
+          className={secondaryButton}
           onClick={() => void me.refetch()}
         >
           Try again

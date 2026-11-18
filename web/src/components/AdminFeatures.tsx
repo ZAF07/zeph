@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { LoadFailed } from "@/components/LoadFailed";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { Switch } from "@/components/Switch";
 import type { FeatureSwitch } from "@/lib/api-client";
 import { lastChangeNote } from "@/lib/features";
@@ -64,13 +65,10 @@ export function AdminFeatures() {
   return (
     <div className="flex flex-col gap-4">
       {failedFeature ? (
-        <p
-          role="alert"
-          className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3.5 text-sm text-danger-deep"
-        >
+        <SaveFailedNote>
           Couldn’t change {failedFeature.name}. It is still{" "}
           {failedFeature.on ? "on" : "off"}.
-        </p>
+        </SaveFailedNote>
       ) : null}
       <ul className="m-0 flex list-none flex-col rounded-card border border-line bg-white p-0">
         {features.map((feature, index) => (

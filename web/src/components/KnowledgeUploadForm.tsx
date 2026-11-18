@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 import { primaryButton } from "@/components/button-styles";
 import { fieldLabel, inputField } from "@/components/form-styles";
 import { KnowledgeFileDrop } from "@/components/KnowledgeFileDrop";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { ApiError, type KnowledgeUpload } from "@/lib/api-client";
 import { knowledgeTraditions } from "@/lib/knowledge-labels";
 
@@ -127,14 +128,7 @@ export function KnowledgeUploadForm({
           </select>
         </label>
       </div>
-      {error ? (
-        <p
-          role="alert"
-          className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3.5 text-sm text-danger-deep"
-        >
-          {error}
-        </p>
-      ) : null}
+      {error ? <SaveFailedNote>{error}</SaveFailedNote> : null}
       <button
         type="submit"
         className={`${primaryButton} self-start`}
