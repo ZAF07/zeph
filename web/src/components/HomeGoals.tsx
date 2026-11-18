@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { EmptyState } from "@/components/EmptyState";
 import { HomeCard } from "@/components/HomeCard";
-import { cardLink } from "@/components/text-link-styles";
+import { cardLink, cardListRow } from "@/components/card-styles";
 import type { MemoryItem } from "@/lib/api-client";
 import { formatShortDay } from "@/lib/dates";
 
@@ -40,10 +40,7 @@ export function HomeGoals({
       ) : (
         <ul className="m-0 list-none p-0">
           {goals.map((goal) => (
-            <li
-              key={goal.id}
-              className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-line py-3 first:border-t-0"
-            >
+            <li key={goal.id} className={cardListRow}>
               <span className="text-[15px] font-normal text-text">
                 {goal.content}
               </span>

@@ -16,21 +16,18 @@ export const checkInFrequencyOptions: {
   { value: "a_few_times_a_day", label: "A few times a day" },
 ];
 
-/** The cream pill for a status worth noticing, like "Replied" or "On". */
-export const filledPill = "bg-cream text-ink";
-
-/** The outlined pill for any other status, like "No reply" or "Off". */
-export const outlinedPill = "border border-line-strong text-soft";
-
-/** What each Check-in status is called, and its pill's colours. */
+/**
+ * What each Check-in status is called, and whether its pill is the filled
+ * one (only for a reply).
+ */
 export const checkInStatusLabels: Record<
   CheckInStatus,
-  { label: string; pill: string }
+  { label: string; isFilled: boolean }
 > = {
-  sent: { label: "Sent", pill: outlinedPill },
-  replied: { label: "Replied", pill: filledPill },
-  no_reply: { label: "No reply", pill: outlinedPill },
-  skipped: { label: "Skipped", pill: outlinedPill },
+  sent: { label: "Sent", isFilled: false },
+  replied: { label: "Replied", isFilled: true },
+  no_reply: { label: "No reply", isFilled: false },
+  skipped: { label: "Skipped", isFilled: false },
 };
 
 /**

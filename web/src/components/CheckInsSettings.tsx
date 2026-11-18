@@ -147,7 +147,6 @@ export function CheckInsSettings() {
             <PausedNotice
               title="Check-ins aren’t available on your account"
               body="Zeph won’t message you first. Your settings are kept."
-              action={null}
             />
           )}
 
@@ -171,7 +170,6 @@ export function CheckInsSettings() {
             <PausedNotice
               title="Check-ins are off"
               body="Zeph only replies when you message it."
-              action={null}
             />
           ) : null}
 

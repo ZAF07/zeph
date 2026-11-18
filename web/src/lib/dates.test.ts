@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  calendarDaysAgo,
   formatAddedDay,
   formatDay,
   formatSavedAt,
@@ -61,6 +62,23 @@ describe("formatAddedDay", () => {
   it("counts days in the given time zone", () => {
     expect(formatAddedDay("2026-11-11T17:00:00Z", now, "Asia/Singapore")).toBe(
       "Today",
+    );
+  });
+});
+
+describe("calendarDaysAgo", () => {
+  const now = new Date("2026-11-17T12:00:00Z");
+
+  it("counts whole calendar days back in the given time zone", () => {
+    expect(calendarDaysAgo("2026-11-17T01:00:00Z", now, "Asia/Singapore")).toBe(
+      0,
+    );
+    expect(calendarDaysAgo("2026-11-16T16:30:00Z", now, "Asia/Singapore")).toBe(
+      0,
+    );
+    expect(calendarDaysAgo("2026-11-16T16:30:00Z", now, "UTC")).toBe(1);
+    expect(calendarDaysAgo("2026-11-10T11:00:00Z", now, "Asia/Singapore")).toBe(
+      7,
     );
   });
 });

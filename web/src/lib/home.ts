@@ -4,7 +4,12 @@ import type {
   RecentCheckIn,
 } from "@/lib/api-client";
 import { checkInFrequencyOptions, formatTimeOfDay } from "@/lib/check-ins";
-import { dateParts, formatAddedDay, formatShortDay } from "@/lib/dates";
+import {
+  calendarDaysAgo,
+  dateParts,
+  formatAddedDay,
+  formatShortDay,
+} from "@/lib/dates";
 
 const replyLabels: Record<CheckInStatus, string | null> = {
   replied: "you replied",
@@ -124,24 +129,16 @@ function recentDayName(
   now: Date,
   timeZone?: string,
 ): string {
-  const calendarDay = new Intl.DateTimeFormat("en-CA", { timeZone });
-  const daysAgo = Math.round(
-    (Date.parse(calendarDay.format(now)) -
-      Date.parse(calendarDay.format(new Date(isoTimestamp)))) /
-      (24 * 60 * 60 * 1000),
-  );
-  if (daysAgo === 0) {
-    return "Today";
+  const daysAgo = calendarDaysAgo(isoTimestamp, now, timeZone);
+  if (daysAgo > 7) {
+    return formatShortDay(isoTimestamp, timeZone);
   }
-  if (daysAgo === 1) {
-    return "Yesterday";
-  }
-  if (daysAgo <= 7) {
+  if (daysAgo > 1) {
     return dateParts(new Date(isoTimestamp), { weekday: "long", timeZone })(
       "weekday",
     );
   }
-  return formatShortDay(isoTimestamp, timeZone);
+  return formatAddedDay(isoTimestamp, now, timeZone);
 }
 
 /**

@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { EmptyState } from "@/components/EmptyState";
 import { HomeCard } from "@/components/HomeCard";
-import { cardLink } from "@/components/text-link-styles";
+import { cardLink, cardListRow } from "@/components/card-styles";
 import type { RememberedItem } from "@/lib/api-client";
 
 /**
@@ -32,10 +32,7 @@ export function RecentlyRemembered({ items }: { items: RememberedItem[] }) {
       ) : (
         <ul className="m-0 list-none p-0">
           {items.map((item) => (
-            <li
-              key={item.id}
-              className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-line py-3 first:border-t-0"
-            >
+            <li key={item.id} className={cardListRow}>
               <span className="text-[14px] text-text">{item.content}</span>
               <span className="text-[12px] text-soft">{item.category}</span>
             </li>

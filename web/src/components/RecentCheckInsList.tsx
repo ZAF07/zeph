@@ -1,5 +1,5 @@
 import { EmptyState } from "@/components/EmptyState";
-import { statusPill } from "@/components/text-link-styles";
+import { filledPill, outlinedPill } from "@/components/card-styles";
 import type { RecentCheckIn } from "@/lib/api-client";
 import {
   checkInStatusLabels,
@@ -56,7 +56,7 @@ export function RecentCheckInsList({
                     {formatCheckInDay(checkIn.decided_at, timeZone)}
                   </div>
                 </div>
-                <span className={`${statusPill} ${status.pill}`}>
+                <span className={status.isFilled ? filledPill : outlinedPill}>
                   {status.label}
                 </span>
               </li>

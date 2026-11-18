@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { HomeCard } from "@/components/HomeCard";
-import { cardLink } from "@/components/text-link-styles";
+import { cardLink } from "@/components/card-styles";
 import type { TelegramConnection } from "@/lib/api-client";
 
 /**
@@ -25,7 +25,7 @@ export function HomeTelegramCard({
     >
       <div className="flex items-center gap-3">
         <span aria-hidden="true" className="size-[9px] rounded-full bg-cream" />
-        <span className="text-[16px] font-normal text-text">
+        <span className="min-w-0 text-[16px] font-normal text-text [overflow-wrap:anywhere]">
           {connection.telegram_username
             ? `Connected as @${connection.telegram_username}`
             : "Connected"}

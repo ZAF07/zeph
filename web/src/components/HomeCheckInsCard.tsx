@@ -3,9 +3,9 @@ import Link from "next/link";
 import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
 import { DetailRow } from "@/components/DetailRow";
 import { HomeCard } from "@/components/HomeCard";
-import { cardLink, statusPill } from "@/components/text-link-styles";
+import { cardLink, filledPill, outlinedPill } from "@/components/card-styles";
 import type { HomeCheckIns } from "@/lib/api-client";
-import { filledPill, outlinedPill, pauseEndText } from "@/lib/check-ins";
+import { pauseEndText } from "@/lib/check-ins";
 import { notAvailableText } from "@/lib/features";
 import {
   checkInFrequencyText,
@@ -32,11 +32,11 @@ export function HomeCheckInsCard({
   timeZone?: string;
 }) {
   const isWorking = checkIns.available && checkIns.enabled;
-  let pill = <span className={`${statusPill} ${filledPill}`}>On</span>;
+  let pill = <span className={filledPill}>On</span>;
   if (!isWorking) {
-    pill = <span className={`${statusPill} ${outlinedPill}`}>Off</span>;
+    pill = <span className={outlinedPill}>Off</span>;
   } else if (checkIns.paused) {
-    pill = <span className={`${statusPill} ${outlinedPill}`}>Paused</span>;
+    pill = <span className={outlinedPill}>Paused</span>;
   }
 
   return (
