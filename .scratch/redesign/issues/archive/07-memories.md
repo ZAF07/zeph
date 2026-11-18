@@ -132,4 +132,4 @@ $ tsc --noEmit                               (no output)
 ## Completion
 
 - Completed: 2026-11-18
-- Commit: <to be filled in after merge>
+- Commit: 063bd51 (merge of redesign-07-memories: 5bd6a7d, 33a5101, f2e9835) — "Merge redesign issue 07: Memories — six tabs with ?tab= (no page load; phone tab row scrolls), illustrated hero with Memory switch, States parts for loading/error/empty/memory off/Delete all confirm, drawn delete icon and button; Memories, all five Memories--tab-*, and M-Memories PASS"
