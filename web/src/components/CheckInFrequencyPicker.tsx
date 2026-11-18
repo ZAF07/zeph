@@ -2,7 +2,7 @@ import type { CheckInFrequency } from "@/lib/api-client";
 import { checkInFrequencyOptions } from "@/lib/check-ins";
 
 /**
- * The "How often, at most" choice between once a week, a few times a week,
+ * The "How often, at most" choice between weekly, a few times a week,
  * most days and a few times a day.
  *
  * @param props - `value` is the picked frequency, `disabled` stops changes
@@ -22,7 +22,7 @@ export function CheckInFrequencyPicker({
     <div
       role="group"
       aria-label="How often"
-      className="inline-flex flex-wrap gap-1 self-start rounded-3xl bg-code p-1"
+      className="box-border flex flex-wrap rounded-pill border border-line bg-bg-deep p-1"
     >
       {checkInFrequencyOptions.map((option) => {
         const isPicked = option.value === value;
@@ -33,10 +33,10 @@ export function CheckInFrequencyPicker({
             aria-pressed={isPicked}
             disabled={disabled}
             onClick={() => onChange(option.value)}
-            className={`min-h-10 cursor-pointer rounded-full border-0 px-[18px] py-2.5 text-sm font-medium disabled:cursor-not-allowed ${
+            className={`min-h-11 flex-[1_1_auto] cursor-pointer rounded-pill border-0 px-3 text-[13px] disabled:cursor-not-allowed ${
               isPicked
-                ? "bg-white text-ink shadow-[0_1px_3px_rgba(0,0,0,0.12)]"
-                : "bg-transparent text-ink-soft"
+                ? "bg-cream font-medium text-ink"
+                : "bg-transparent font-light text-soft"
             }`}
           >
             {option.label}

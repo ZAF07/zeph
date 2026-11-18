@@ -63,25 +63,27 @@ function withMissingFixturesFailing(fixtures: Partial<ApiClient>): ApiClient {
 
 /**
  * Builds the API client for design-fixture mode (ADR 0018). It returns the
- * data drawn in `design/reference/` and never calls the backend.
+ * data drawn in `design/reference/` and never calls the backend. The shell's
+ * signed-in User comes first, so a page area's file can replace it, as the
+ * onboarding sheet does on its own address.
  *
  * @param designAs - Sign in as Alex the User, or Zaf the Admin.
  * @returns The fixture client.
  */
 export function createFixtureClient(designAs: DesignAs): ApiClient {
   return withMissingFixturesFailing({
+    ...shellFixtures(designAs === "admin" ? zaf : alex),
     ...homeFixtures,
     ...memoriesFixtures,
     ...checkInsFixtures,
     ...accountFixtures,
     ...telegramFixtures,
-    ...onboardingFixtures,
+    ...onboardingFixtures(globalThis.location?.search ?? ""),
     ...adminUsersFixtures,
     ...adminTablesFixtures,
     ...adminFormsFixtures,
     ...adminCardsFixtures,
     ...planFixtures,
     ...overviewFixtures,
-    ...shellFixtures(designAs === "admin" ? zaf : alex),
   });
 }

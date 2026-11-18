@@ -10,6 +10,7 @@ import {
   quietButton,
   secondaryButton,
 } from "@/components/button-styles";
+import { LoadingPanel } from "@/components/LoadingPanel";
 import type {
   ConnectionToken,
   TelegramConnectionStatus,
@@ -76,9 +77,16 @@ function minutesLeft(expiresAt: string): number {
  * checks the backend every few seconds so it updates on its own, and once
  * connected Home loads again so it shows the connection.
  *
+ * @param props - `compact` draws the loading and ready states as the small
+ *   card on the onboarding Telegram step: QR code (hidden on a phone), Open in
+ *   Telegram and the expiry, without the `/start` code.
  * @returns The card.
  */
-export function TelegramConnectionCard() {
+export function TelegramConnectionCard({
+  compact = false,
+}: {
+  compact?: boolean;
+}) {
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
   const [view, setView] = useState<View>({ kind: "loading" });
@@ -137,12 +145,55 @@ export function TelegramConnectionCard() {
     return () => clearInterval(timer);
   }, [isPolling, refresh]);
 
+  if (view.kind === "loading" && compact) {
+    return <LoadingPanel shape="card" label="Loading your Telegram link" />;
+  }
+
   if (view.kind === "loading") {
     return (
       <div
         aria-busy="true"
         className="h-[198px] rounded-card border border-line bg-subtle"
       />
+    );
+  }
+
+  if (view.kind === "ready" && compact) {
+    const { token } = view;
+    return (
+      <div className="box-border flex flex-col gap-3 rounded-tile border border-line bg-panel px-5 py-[18px]">
+        <div className="flex flex-wrap items-center gap-x-7 gap-y-5">
+          <div
+            role="img"
+            aria-label="QR code that opens Zeph in Telegram"
+            className="flex size-[126px] flex-none items-center justify-center rounded-note bg-cream text-ink max-[899px]:hidden"
+          >
+            <QRCodeSVG
+              value={token.deep_link_url}
+              size={102}
+              bgColor="transparent"
+              fgColor="currentColor"
+            />
+          </div>
+          <div className="flex flex-[1_1_220px] flex-col items-start gap-2.5">
+            <a
+              href={token.deep_link_url}
+              target="_blank"
+              rel="noreferrer"
+              className={primaryButton}
+              onClick={() => setView({ kind: "waiting", token })}
+            >
+              Open in Telegram{" "}
+              <span aria-hidden="true" className="ml-2.5">
+                →
+              </span>
+            </a>
+            <span className="text-[12px] text-soft">
+              Works once · expires in {minutesLeft(token.expires_at)} minutes
+            </span>
+          </div>
+        </div>
+      </div>
     );
   }
 

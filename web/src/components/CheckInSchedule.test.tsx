@@ -63,7 +63,7 @@ describe("CheckInSchedule", () => {
 
     const sam = within(rowFor("Sam Lee"));
     expect(sam.getByText("due now")).toBeVisible();
-    expect(sam.getByText("Once a week")).toBeVisible();
+    expect(sam.getByText("Weekly")).toBeVisible();
     expect(sam.getByText("Paused until Tue 24 Nov 10:00")).toBeVisible();
     expect(sam.getByText("Feature off")).toBeVisible();
     expect(sam.getByText("Quiet Hours, until 07:30")).toBeVisible();

@@ -4,20 +4,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import {
-  primaryButton,
-  quietButton,
-  secondaryButton,
-} from "@/components/button-styles";
+import { primaryButton, secondaryButton } from "@/components/button-styles";
 import { CheckInFrequencyPicker } from "@/components/CheckInFrequencyPicker";
-import { fieldLabel, inputField } from "@/components/form-styles";
+import { LoadFailed } from "@/components/LoadFailed";
+import { LoadingPanel } from "@/components/LoadingPanel";
 import { LocationFields } from "@/components/LocationFields";
 import { OnboardingProgress } from "@/components/OnboardingProgress";
-import { QuietHoursFields } from "@/components/QuietHoursFields";
+import { OnboardingStepFrame } from "@/components/OnboardingStepFrame";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { Switch } from "@/components/Switch";
 import { TelegramConnectionCard } from "@/components/TelegramConnectionCard";
 import type { CheckInFrequency, CheckIns, Me } from "@/lib/api-client";
-import { toTimeFieldValue } from "@/lib/check-ins";
+import { formatQuietHour, toTimeFieldValue } from "@/lib/check-ins";
 import { countryFromBrowser } from "@/lib/countries";
 import { paragraphs } from "@/lib/paragraphs";
 import {
@@ -26,7 +24,7 @@ import {
   useMe,
   usePlatformContent,
 } from "@/lib/queries";
-import { timeZoneFromBrowser, timeZoneLabel } from "@/lib/time-zones";
+import { timeZoneFromBrowser } from "@/lib/time-zones";
 
 const STEP_LABELS = [
   "Hello",
@@ -44,7 +42,15 @@ const MEMORY_STEP = 4;
 const TELEGRAM_STEP = 5;
 
 const stepHeading =
-  "m-0 text-[clamp(34px,5vw,44px)] font-normal leading-[1.08] tracking-[-0.035em]";
+  "m-0 text-[clamp(32px,4.4vw,42px)] font-normal leading-[1.1] tracking-[-0.4px] text-cream";
+const stepIntro = "m-0 text-[16px] text-soft";
+const stepPanel =
+  "box-border flex flex-col gap-3 rounded-tile border border-line bg-panel px-5 py-[18px]";
+const textFieldLabel = "flex flex-col gap-1.5";
+const fieldName = "text-[14px] text-text";
+const textField =
+  "box-border rounded-input border border-line-strong bg-bg-deep px-3.5 text-[15px] text-text placeholder:text-mute";
+const smallNote = "m-0 text-[13px] text-soft";
 
 /** The answers being filled in, before they are saved. */
 type Answers = {
@@ -89,11 +95,19 @@ function startingAnswers(me: Me, checkIns: CheckIns): Answers {
  * The onboarding steps a new User goes through before Connect Telegram:
  * name and AI notice, what brings them here, country and time zone,
  * Check-ins (off by default), User Memory consent, then Telegram. Answers
- * are saved when they leave the Memory step. A User who already finished onboarding goes to the Dashboard.
+ * are saved when they leave the Memory step. A User who already finished
+ * onboarding goes to the Dashboard.
  *
+ * @param props - `showAllSteps` stacks every step for the design sheet
+ *   (`?design=all-steps`), each drawn ready to continue (its buttons do
+ *   nothing), instead of one at a time.
  * @returns The onboarding flow.
  */
-export function OnboardingFlow() {
+export function OnboardingFlow({
+  showAllSteps = false,
+}: {
+  showAllSteps?: boolean;
+}) {
   const router = useRouter();
   const meQuery = useMe();
   const contentQuery = usePlatformContent();
@@ -126,37 +140,25 @@ export function OnboardingFlow() {
 
   if (loadFailed) {
     return (
-      <div
-        role="alert"
-        className="flex flex-col gap-3.5 rounded-card border border-danger-line bg-danger-tint p-7"
-      >
-        <p className="m-0 text-[17px] font-semibold text-danger-deep">
-          We couldn’t load this
-        </p>
-        <p className="m-0 text-[15px] text-ink-soft">
-          Something went wrong on our side. Please try again in a moment.
-        </p>
-        <button
-          type="button"
-          className={`${secondaryButton} self-start`}
-          onClick={() => {
+      <OnboardingStepFrame>
+        <LoadFailed
+          title="We couldn’t load this"
+          body="Something went wrong on our side. Please try again in a moment."
+          onRetry={() => {
             void meQuery.refetch();
             void contentQuery.refetch();
             void checkInsQuery.refetch();
           }}
-        >
-          Try again
-        </button>
-      </div>
+        />
+      </OnboardingStepFrame>
     );
   }
 
   if (!answers || !content) {
     return (
-      <div
-        aria-busy="true"
-        className="h-[360px] rounded-card border border-line bg-subtle"
-      />
+      <OnboardingStepFrame>
+        <LoadingPanel shape="card" label="Loading onboarding" />
+      </OnboardingStepFrame>
     );
   }
 
@@ -196,19 +198,25 @@ export function OnboardingFlow() {
     );
   }
 
-  const needsName = step === HELLO_STEP && !answers.name.trim();
-  const needsAcknowledgement =
-    step === HELLO_STEP && !answers.aiNoticeAcknowledged;
-  const needsLocation =
-    step === LOCATION_STEP && (!answers.country || !answers.timeZone);
-  const canContinue =
-    !needsName &&
-    !needsAcknowledgement &&
-    !needsLocation &&
-    !completeOnboarding.isPending;
+  const needsName = !answers.name.trim();
+  const needsAcknowledgement = !answers.aiNoticeAcknowledged;
+  const needsLocation = !answers.country || !answers.timeZone;
+
+  function canLeave(stepIndex: number): boolean {
+    if (completeOnboarding.isPending) {
+      return false;
+    }
+    if (stepIndex === HELLO_STEP) {
+      return !needsName && !needsAcknowledgement;
+    }
+    if (stepIndex === LOCATION_STEP) {
+      return !needsLocation;
+    }
+    return true;
+  }
 
   function next() {
-    if (!canContinue) {
+    if (!canLeave(step)) {
       return;
     }
     if (step === MEMORY_STEP) {
@@ -218,23 +226,23 @@ export function OnboardingFlow() {
     setStep(step + 1);
   }
 
-  return (
-    <div className="flex flex-col gap-8">
-      <OnboardingProgress labels={STEP_LABELS} currentStep={step} />
-
-      {step === HELLO_STEP ? (
-        <section className="flex flex-col gap-7">
-          <div className="flex flex-col gap-3">
-            <h1 className={stepHeading}>Hello. I’m Zeph.</h1>
-            <p className="m-0 text-[17px] text-ink-soft">
-              I’m an AI companion for reflection — a place to think out loud,
-              notice what matters, and practise living by it.
-            </p>
-          </div>
-          <label className={fieldLabel}>
-            What should I call you?
+  function stepContent(stepIndex: number, isDesignSheet: boolean) {
+    if (!answers || !content) {
+      return null;
+    }
+    if (stepIndex === HELLO_STEP) {
+      const showHint = !isDesignSheet && (needsName || needsAcknowledgement);
+      return (
+        <>
+          <h1 className={stepHeading}>Hello. I’m Zeph.</h1>
+          <p className={stepIntro}>
+            I’m an AI companion for reflection: a place to think out loud,
+            notice what matters, and practise living by it.
+          </p>
+          <label className={textFieldLabel}>
+            <span className={fieldName}>What should I call you?</span>
             <input
-              className={inputField}
+              className={`${textField} min-h-12`}
               type="text"
               autoComplete="given-name"
               placeholder="First name or nickname"
@@ -243,49 +251,45 @@ export function OnboardingFlow() {
               onChange={(event) => change({ name: event.target.value })}
             />
           </label>
-          <div className="flex flex-col gap-3.5 rounded-panel bg-yellow-tint p-5">
-            <p className="m-0 text-[15px] text-yellow-deep">
-              {content.ai_notice}
-            </p>
-            <label className="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] font-medium">
+          <div className={stepPanel}>
+            <p className="m-0 text-[14px] text-soft">{content.ai_notice}</p>
+            <label className="flex min-h-11 cursor-pointer items-center gap-3 text-[14px] text-text">
               <input
                 type="checkbox"
                 checked={answers.aiNoticeAcknowledged}
                 onChange={(event) =>
                   change({ aiNoticeAcknowledged: event.target.checked })
                 }
-                aria-describedby="onboarding-continue-hint"
-                className="size-[22px] flex-none accent-blue"
+                aria-describedby={
+                  showHint ? "onboarding-continue-hint" : undefined
+                }
+                className="m-[3px_3px_3px_4px] size-[18px] flex-none accent-cream"
               />
               I understand Zeph is an AI and not professional care
             </label>
           </div>
-          {needsName || needsAcknowledgement ? (
-            <p
-              id="onboarding-continue-hint"
-              className="m-0 text-caption text-ink-muted"
-            >
+          {showHint ? (
+            <p id="onboarding-continue-hint" className={smallNote}>
               {needsName
                 ? "Tell me what to call you to continue."
                 : "Tick the box above to continue."}
             </p>
           ) : null}
-        </section>
-      ) : null}
-
-      {step === INTENTIONS_STEP ? (
-        <section className="flex flex-col gap-7">
-          <div className="flex flex-col gap-3">
-            <h1 className={stepHeading}>What brings you here?</h1>
-            <p className="m-0 text-[17px] text-ink-soft">
-              Choose any that feel true right now. This shapes where we start,
-              not where we end up.
-            </p>
-          </div>
+        </>
+      );
+    }
+    if (stepIndex === INTENTIONS_STEP) {
+      return (
+        <>
+          <h1 className={stepHeading}>What brings you here?</h1>
+          <p className={stepIntro}>
+            Choose any that feel true right now. This shapes where we start, not
+            where we end up.
+          </p>
           <div
             role="group"
             aria-label="What brings you here"
-            className="flex flex-wrap gap-2.5"
+            className="flex flex-wrap gap-2"
           >
             {content.onboarding_reason_choices.map((reason) => {
               const isPicked = answers.reasons.includes(reason);
@@ -295,10 +299,10 @@ export function OnboardingFlow() {
                   type="button"
                   aria-pressed={isPicked}
                   onClick={() => toggleReason(reason)}
-                  className={`min-h-11 cursor-pointer rounded-full border px-4 py-2.5 text-sm font-medium ${
+                  className={`min-h-11 cursor-pointer rounded-pill border px-4 text-[14px] text-text ${
                     isPicked
-                      ? "border-blue bg-blue-tint text-ink"
-                      : "border-line-strong bg-transparent text-ink-body"
+                      ? "border-cream bg-zeph"
+                      : "border-line-strong bg-transparent"
                   }`}
                 >
                   {reason}
@@ -306,13 +310,12 @@ export function OnboardingFlow() {
               );
             })}
           </div>
-          <label className={fieldLabel}>
-            <span>
-              In your own words{" "}
-              <span className="font-normal text-ink-muted">(optional)</span>
+          <label className={textFieldLabel}>
+            <span className={fieldName}>
+              In your own words <span className="text-soft">(optional)</span>
             </span>
             <textarea
-              className={inputField}
+              className={`${textField} resize-y py-3`}
               rows={3}
               maxLength={2000}
               placeholder="e.g. I’ve been running on autopilot since starting a new job and want to feel more like myself."
@@ -320,11 +323,12 @@ export function OnboardingFlow() {
               onChange={(event) => change({ note: event.target.value })}
             />
           </label>
-        </section>
-      ) : null}
-
-      {step === LOCATION_STEP ? (
-        <section className="flex flex-col gap-7">
+        </>
+      );
+    }
+    if (stepIndex === LOCATION_STEP) {
+      return (
+        <>
           <h1 className={stepHeading}>Where are you?</h1>
           <LocationFields
             country={answers.country}
@@ -335,137 +339,168 @@ export function OnboardingFlow() {
             }}
             onTimeZoneChange={(timeZone) => change({ timeZone })}
             countryCaption={
-              countryFromBrowserUsed ? "Filled in from your browser" : undefined
+              isDesignSheet || countryFromBrowserUsed
+                ? "Filled in from your browser"
+                : undefined
             }
           />
-        </section>
-      ) : null}
-
-      {step === CHECK_INS_STEP ? (
-        <section className="flex flex-col gap-7">
-          <div className="flex flex-col gap-3">
-            <h1 className={stepHeading}>Should I check in?</h1>
-            <p className="m-0 text-[17px] text-ink-soft">
-              Now and then I can message you first on Telegram — a hello to see
-              how you are. I choose the moment, and sometimes I’ll stay quiet to
-              give you space.
-            </p>
-          </div>
-          <div className="flex items-center justify-between gap-4 rounded-panel border border-line bg-white p-5">
-            <span className="flex flex-col">
-              <span className="font-semibold">Check-ins</span>
-              <span className="text-caption text-ink-muted">
-                Off unless you turn them on
-              </span>
-            </span>
-            <Switch
-              label="Check-ins"
-              checked={answers.checkInsEnabled}
-              onChange={(checkInsEnabled) => change({ checkInsEnabled })}
-            />
-          </div>
-          {answers.checkInsEnabled ? (
-            <div className="flex flex-col gap-6">
-              <div className="flex flex-col gap-2.5">
-                <span className="text-sm font-semibold">
-                  How often, at most
-                </span>
+        </>
+      );
+    }
+    if (stepIndex === CHECK_INS_STEP) {
+      return (
+        <>
+          <h1 className={stepHeading}>Should I check in?</h1>
+          <p className={stepIntro}>
+            Now and then I can message you first on Telegram: a hello to see how
+            you are. I choose the moment, and sometimes I’ll stay quiet to give
+            you space.
+          </p>
+          <div className={stepPanel}>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-[15px] font-normal text-text">
+                  Check-ins
+                </div>
+                <div className="text-[13px] text-soft">
+                  Off unless you turn them on
+                </div>
+              </div>
+              <Switch
+                label="Check-ins"
+                checked={answers.checkInsEnabled}
+                onChange={(checkInsEnabled) => change({ checkInsEnabled })}
+              />
+            </div>
+            {answers.checkInsEnabled ? (
+              <>
                 <CheckInFrequencyPicker
                   value={answers.checkInFrequency}
                   onChange={(checkInFrequency) => change({ checkInFrequency })}
                 />
-              </div>
-              <div className="flex flex-col gap-2.5">
-                <span className="text-sm font-semibold">Quiet hours</span>
-                <QuietHoursFields
-                  start={answers.quietHoursStart}
-                  end={answers.quietHoursEnd}
-                  onStartChange={(quietHoursStart) =>
-                    change({ quietHoursStart })
-                  }
-                  onEndChange={(quietHoursEnd) => change({ quietHoursEnd })}
-                />
-                <p className="m-0 text-caption text-ink-muted">
+                <p className={smallNote}>
                   Never in your quiet hours, in your time zone:{" "}
-                  {timeZoneLabel(answers.timeZone)}.
+                  <span className="text-text">
+                    {formatQuietHour(answers.quietHoursStart)} to{" "}
+                    {formatQuietHour(answers.quietHoursEnd)}
+                  </span>
                 </p>
-              </div>
-            </div>
-          ) : null}
-          <p className="m-0 text-caption text-ink-muted">
+              </>
+            ) : null}
+          </div>
+          <p className={smallNote}>
             You can change this any time on your Check-ins page.
           </p>
-        </section>
-      ) : null}
-
-      {step === MEMORY_STEP ? (
-        <section className="flex flex-col gap-7">
-          <div className="flex flex-col gap-3">
-            <h1 className={stepHeading}>Can I remember things?</h1>
+        </>
+      );
+    }
+    if (stepIndex === MEMORY_STEP) {
+      return (
+        <>
+          <h1 className={stepHeading}>Can I remember things?</h1>
+          <div className={stepPanel}>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-[15px] font-normal text-text">
+                Remember meaningful details
+              </span>
+              <Switch
+                label="Remember meaningful details"
+                checked={answers.userMemoryEnabled}
+                onChange={(userMemoryEnabled) => change({ userMemoryEnabled })}
+              />
+            </div>
             {paragraphs(content.user_memory_explanation).map((paragraph) => (
-              <p key={paragraph} className="m-0 text-[17px] text-ink-soft">
+              <p key={paragraph} className="m-0 text-[14px] text-soft">
                 {paragraph}
               </p>
             ))}
           </div>
-          <div className="flex items-center justify-between gap-4 rounded-panel border border-line bg-white p-5">
-            <span className="font-semibold">Remember meaningful details</span>
-            <Switch
-              label="Remember meaningful details"
-              checked={answers.userMemoryEnabled}
-              onChange={(userMemoryEnabled) => change({ userMemoryEnabled })}
-            />
-          </div>
           {completeOnboarding.isError ? (
-            <p
-              role="alert"
-              className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3 text-sm text-danger-deep"
-            >
+            <SaveFailedNote>
               We couldn’t save your answers. Please try again.
-            </p>
+            </SaveFailedNote>
           ) : null}
-        </section>
-      ) : null}
+        </>
+      );
+    }
+    return (
+      <>
+        <h1 className={stepHeading}>Let’s meet on Telegram.</h1>
+        <p className={stepIntro}>
+          That’s where we’ll talk. Linking takes one tap.
+        </p>
+        <TelegramConnectionCard compact />
+      </>
+    );
+  }
 
-      {step === TELEGRAM_STEP ? (
-        <section className="flex flex-col gap-6">
-          <div className="flex flex-col gap-3">
-            <h1 className={stepHeading}>Let’s meet on Telegram.</h1>
-            <p className="m-0 text-[17px] text-ink-soft">
-              That’s where we’ll talk. Linking takes one tap.
-            </p>
-          </div>
-          <TelegramConnectionCard />
-        </section>
-      ) : null}
-
-      <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-line pt-6">
-        {step > HELLO_STEP ? (
+  function stepButtons(stepIndex: number, isDesignSheet: boolean) {
+    if (stepIndex === TELEGRAM_STEP) {
+      return (
+        <div>
+          <Link
+            href="/"
+            className="inline-flex min-h-11 items-center text-[14px] text-soft underline"
+          >
+            Skip for now
+          </Link>
+        </div>
+      );
+    }
+    return (
+      <div className="flex flex-wrap items-center gap-3 pt-2">
+        {stepIndex > HELLO_STEP ? (
           <button
             type="button"
             className={secondaryButton}
-            onClick={() => setStep(step - 1)}
+            onClick={isDesignSheet ? undefined : () => setStep(step - 1)}
           >
             Back
           </button>
-        ) : (
-          <span />
-        )}
-        {step < TELEGRAM_STEP ? (
-          <button
-            type="button"
-            className={primaryButton}
-            disabled={!canContinue}
-            onClick={next}
-          >
-            {completeOnboarding.isPending ? "Saving…" : "Continue"}
-          </button>
-        ) : (
-          <Link href="/" className={quietButton}>
-            Skip for now
-          </Link>
-        )}
+        ) : null}
+        <button
+          type="button"
+          className={primaryButton}
+          disabled={!isDesignSheet && !canLeave(stepIndex)}
+          onClick={isDesignSheet ? undefined : next}
+        >
+          {completeOnboarding.isPending ? (
+            "Saving…"
+          ) : (
+            <>
+              Continue{" "}
+              <span aria-hidden="true" className="ml-2.5">
+                →
+              </span>
+            </>
+          )}
+        </button>
       </div>
-    </div>
-  );
+    );
+  }
+
+  function stepView(stepIndex: number, isDesignSheet: boolean) {
+    return (
+      <>
+        <OnboardingProgress labels={STEP_LABELS} currentStep={stepIndex} />
+        <div aria-hidden="true" className="h-3" />
+        {stepContent(stepIndex, isDesignSheet)}
+        {stepButtons(stepIndex, isDesignSheet)}
+      </>
+    );
+  }
+
+  if (showAllSteps) {
+    return (
+      <>
+        {STEP_LABELS.map((label, stepIndex) => (
+          <OnboardingStepFrame key={label} hasSeparator={stepIndex > 0}>
+            {stepView(stepIndex, true)}
+          </OnboardingStepFrame>
+        ))}
+      </>
+    );
+  }
+
+  return <OnboardingStepFrame>{stepView(step, false)}</OnboardingStepFrame>;
 }

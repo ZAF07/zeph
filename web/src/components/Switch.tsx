@@ -25,11 +25,18 @@ export function Switch({
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`flex h-8 w-[52px] flex-none cursor-pointer rounded-full border-0 p-[3px] disabled:cursor-not-allowed disabled:opacity-60 ${
-        checked ? "justify-end bg-blue" : "justify-start bg-line-strong"
-      }`}
+      className="relative size-11 flex-none cursor-pointer border-0 bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-60"
     >
-      <span className="size-[26px] rounded-full bg-white" />
+      <span
+        className={`absolute left-[2px] top-[11px] h-[22px] w-10 rounded-[11px] ${
+          checked ? "bg-cream" : "bg-line"
+        }`}
+      />
+      <span
+        className={`absolute top-[14px] size-4 rounded-full ${
+          checked ? "left-[23px] bg-ink" : "left-[5px] bg-soft"
+        }`}
+      />
     </button>
   );
 }

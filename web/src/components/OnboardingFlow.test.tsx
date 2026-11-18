@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -299,7 +299,7 @@ describe("OnboardingFlow", () => {
       screen.queryByRole("group", { name: "How often" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("group", { name: "Quiet hours" }),
+      screen.queryByText(/Never in your quiet hours/),
     ).not.toBeInTheDocument();
 
     await user.click(checkInsSwitch);
@@ -308,13 +308,11 @@ describe("OnboardingFlow", () => {
       "aria-pressed",
       "true",
     );
-    const from = screen.getByLabelText("From");
-    expect(from).toHaveValue("22:00");
-    expect(screen.getByLabelText("Until")).toHaveValue("07:30");
-    fireEvent.change(from, { target: { value: "21:00" } });
     expect(
       screen.getByText(/Never in your quiet hours, in your time zone/),
-    ).toBeInTheDocument();
+    ).toHaveTextContent(
+      "Never in your quiet hours, in your time zone: 10:00 PM to 7:30 AM",
+    );
     await user.click(screen.getByRole("button", { name: "Continue" }));
     await user.click(screen.getByRole("button", { name: "Continue" }));
 
@@ -323,10 +321,41 @@ describe("OnboardingFlow", () => {
       expect.objectContaining({
         check_ins_enabled: true,
         check_in_frequency: "most_days",
-        quiet_hours_start: "21:00",
+        quiet_hours_start: "22:00",
         quiet_hours_end: "07:30",
       }),
     );
+  });
+
+  it("shows one step at a time", async () => {
+    await renderAtHelloStep();
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByText("Step 1 of 6")).toBeInTheDocument();
+  });
+
+  it("stacks all six steps for the design sheet, each drawn ready to continue", async () => {
+    renderWithQueries(<OnboardingFlow showAllSteps />);
+
+    await screen.findByRole("heading", { name: "Hello. I’m Zeph." });
+    expect(
+      screen.getAllByRole("heading", { level: 1 }).map((h) => h.textContent),
+    ).toEqual([
+      "Hello. I’m Zeph.",
+      "What brings you here?",
+      "Where are you?",
+      "Should I check in?",
+      "Can I remember things?",
+      "Let’s meet on Telegram.",
+    ]);
+    expect(screen.getByText("Step 6 of 6")).toBeInTheDocument();
+    for (const button of screen.getAllByRole("button", { name: "Continue" })) {
+      expect(button).toBeEnabled();
+    }
+    expect(
+      screen.queryByText("Tell me what to call you to continue."),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Filled in from your browser")).toBeInTheDocument();
   });
 
   it("sends a User who already finished onboarding to the Dashboard", async () => {

@@ -8,6 +8,7 @@ const getToken = async () => "token-1";
 describe("chooseApiClient", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    window.history.replaceState({}, "", "/");
   });
 
   it("signs in as Alex on design fixtures, without calling the backend", async () => {
@@ -48,6 +49,21 @@ describe("chooseApiClient", () => {
 
     expect(await client.getPlatformContent()).toMatchObject({
       ai_notice_short: "Zeph is an AI, not a therapist or crisis service.",
+    });
+  });
+
+  it("signs in as a new User on the onboarding all-steps address", async () => {
+    window.history.replaceState({}, "", "/onboarding?design=all-steps");
+
+    const client = chooseApiClient(
+      { apiUrl, designFixtures: true },
+      getToken,
+      "",
+    );
+
+    expect(await client.getMe()).toMatchObject({
+      name: null,
+      onboarding_completed_at: null,
     });
   });
 

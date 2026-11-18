@@ -46,13 +46,13 @@ describe("UserCheckInSettingsPanel", () => {
       <UserCheckInSettingsPanel entry={scheduleEntry()} onClose={() => {}} />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Once a week" }));
+    await user.click(screen.getByRole("button", { name: "Weekly" }));
 
     expect(apiClient.changeUserCheckIns).toHaveBeenCalledWith("ren", {
       frequency: "weekly",
     });
     expect(
-      await screen.findByRole("button", { name: "Once a week" }),
+      await screen.findByRole("button", { name: "Weekly" }),
     ).toHaveAttribute("aria-pressed", "true");
   });
 
@@ -116,7 +116,7 @@ describe("UserCheckInSettingsPanel", () => {
       <UserCheckInSettingsPanel entry={scheduleEntry()} onClose={() => {}} />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Once a week" }));
+    await user.click(screen.getByRole("button", { name: "Weekly" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Couldn’t save that for Ren Okafor",

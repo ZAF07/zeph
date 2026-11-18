@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatCheckInDay,
   formatCheckInSentAt,
+  formatQuietHour,
   formatTimeOfDay,
   pauseEndText,
   pausedText,
@@ -35,6 +36,11 @@ describe("check-in wording", () => {
         skipped_for_daily_limit: false,
       }),
     ).toBe("Skipped — gave you some space");
+  });
+
+  it("writes a quiet hours time of day like 11:00 PM", () => {
+    expect(formatQuietHour("23:00:00")).toBe("11:00 PM");
+    expect(formatQuietHour("07:30:00")).toBe("7:30 AM");
   });
 
   it("turns a backend time of day into a time field value", () => {

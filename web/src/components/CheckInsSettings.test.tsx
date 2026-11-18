@@ -128,10 +128,10 @@ describe("CheckInsSettings", () => {
     await renderLoaded();
     expect(screen.getByText(/Changed by an Admin/)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Once a week" }));
+    await user.click(screen.getByRole("button", { name: "Weekly" }));
 
     expect(
-      await screen.findByRole("button", { name: "Once a week" }),
+      await screen.findByRole("button", { name: "Weekly" }),
     ).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByText(/Changed by an Admin/)).not.toBeInTheDocument();
   });
@@ -149,10 +149,10 @@ describe("CheckInsSettings", () => {
     await renderLoaded();
     expect(screen.getByText("Changed in chat · 3 Nov")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Once a week" }));
+    await user.click(screen.getByRole("button", { name: "Weekly" }));
 
     expect(
-      await screen.findByRole("button", { name: "Once a week" }),
+      await screen.findByRole("button", { name: "Weekly" }),
     ).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByText(/Changed in chat/)).not.toBeInTheDocument();
   });
@@ -164,13 +164,13 @@ describe("CheckInsSettings", () => {
     const user = userEvent.setup();
     await renderLoaded();
 
-    await user.click(screen.getByRole("button", { name: "Once a week" }));
+    await user.click(screen.getByRole("button", { name: "Weekly" }));
 
     expect(apiClient.updateCheckIns).toHaveBeenCalledWith({
       frequency: "weekly",
     });
     expect(
-      await screen.findByRole("button", { name: "Once a week" }),
+      await screen.findByRole("button", { name: "Weekly" }),
     ).toHaveAttribute("aria-pressed", "true");
   });
 
