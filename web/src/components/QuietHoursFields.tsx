@@ -1,4 +1,6 @@
-import { fieldLabel, inputField } from "@/components/form-styles";
+/** A time field, drawn like the design's quiet hours boxes. */
+const timeField =
+  "box-border min-h-[46px] w-full rounded-input border border-line-strong bg-bg-deep px-3.5 text-[15px] text-text [color-scheme:dark] disabled:cursor-not-allowed";
 
 /**
  * The "From" and "Until" times of a User's quiet hours, in their local time.
@@ -21,11 +23,15 @@ export function QuietHoursFields({
   onEndChange: (end: string) => void;
 }) {
   return (
-    <div role="group" aria-label="Quiet hours" className="flex flex-wrap gap-3">
-      <label className={`${fieldLabel} flex-[1_1_120px]`}>
-        From
+    <div
+      role="group"
+      aria-label="Quiet hours"
+      className="flex w-full flex-wrap gap-3"
+    >
+      <label className="flex flex-[1_1_120px] flex-col gap-1.5">
+        <span className="text-[13px] text-soft">From</span>
         <input
-          className={inputField}
+          className={timeField}
           type="time"
           required
           disabled={disabled}
@@ -37,10 +43,10 @@ export function QuietHoursFields({
           }}
         />
       </label>
-      <label className={`${fieldLabel} flex-[1_1_120px]`}>
-        Until
+      <label className="flex flex-[1_1_120px] flex-col gap-1.5">
+        <span className="text-[13px] text-soft">Until</span>
         <input
-          className={inputField}
+          className={timeField}
           type="time"
           required
           disabled={disabled}

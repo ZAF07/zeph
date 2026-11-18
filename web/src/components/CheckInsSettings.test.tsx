@@ -9,7 +9,6 @@ import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   getMe: vi.fn<ApiClient["getMe"]>(),
-  updatePreferences: vi.fn<ApiClient["updatePreferences"]>(),
   getCheckIns: vi.fn<ApiClient["getCheckIns"]>(),
   updateCheckIns: vi.fn<ApiClient["updateCheckIns"]>(),
   pauseCheckIns: vi.fn<ApiClient["pauseCheckIns"]>(),
@@ -46,7 +45,7 @@ function checkInsWith(overrides: Partial<CheckIns> = {}): CheckIns {
 
 async function renderLoaded() {
   renderWithQueries(<CheckInsSettings />);
-  await screen.findByRole("heading", { name: "Settings" });
+  await screen.findByRole("region", { name: "Settings" });
 }
 
 describe("CheckInsSettings", () => {
@@ -69,14 +68,15 @@ describe("CheckInsSettings", () => {
     ).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByLabelText("From")).toHaveValue("22:00");
     expect(screen.getByLabelText("Until")).toHaveValue("07:30");
-    expect(screen.getByLabelText("Time zone")).toHaveValue("Asia/Singapore");
   });
 
   it("says Check-ins can be changed by telling Zeph", async () => {
     await renderLoaded();
 
     expect(
-      screen.getByText(/You can also just tell Zeph “take a week off/),
+      screen.getByText(
+        /You can also just tell Zeph "take a week off from check-ins"/,
+      ),
     ).toBeInTheDocument();
   });
 
@@ -191,15 +191,10 @@ describe("CheckInsSettings", () => {
     ).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("saves new quiet hours and a new time zone", async () => {
+  it("saves new quiet hours, and leaves the time zone to Account", async () => {
     apiClient.updateCheckIns.mockResolvedValue(
       checkInsWith({ quiet_hours_end: "08:15:00" }),
     );
-    apiClient.updatePreferences.mockResolvedValue({
-      ...maya,
-      time_zone: "Europe/London",
-    });
-    const user = userEvent.setup();
     await renderLoaded();
 
     fireEvent.change(screen.getByLabelText("Until"), {
@@ -211,13 +206,7 @@ describe("CheckInsSettings", () => {
       }),
     );
     expect(await screen.findByDisplayValue("08:15")).toBeInTheDocument();
-
-    await user.selectOptions(screen.getByLabelText("Time zone"), [
-      "Europe/London",
-    ]);
-    expect(apiClient.updatePreferences).toHaveBeenCalledWith({
-      time_zone: "Europe/London",
-    });
+    expect(screen.queryByLabelText("Time zone")).not.toBeInTheDocument();
   });
 
   it("turns Check-ins off and says Zeph will only reply", async () => {
@@ -231,10 +220,9 @@ describe("CheckInsSettings", () => {
 
     expect(apiClient.updateCheckIns).toHaveBeenCalledWith({ enabled: false });
     expect(
-      await screen.findByText(
-        "Check-ins are off. Zeph only replies when you message it.",
-      ),
+      await screen.findByText("Zeph only replies when you message it."),
     ).toBeInTheDocument();
+    expect(screen.getByText("Check-ins are off")).toBeInTheDocument();
     expect(screen.getByText("Check-ins off")).toBeInTheDocument();
   });
 
@@ -248,9 +236,10 @@ describe("CheckInsSettings", () => {
     expect(checkInsSwitch).toHaveAttribute("aria-checked", "true");
     expect(screen.getByText("Not available on your account")).toBeVisible();
     expect(
-      screen.getByText(
-        "Check-ins aren’t available on your account, so Zeph won’t message you first. Your settings are kept.",
-      ),
+      screen.getByText("Check-ins aren’t available on your account"),
+    ).toBeVisible();
+    expect(
+      screen.getByText("Zeph won’t message you first. Your settings are kept."),
     ).toBeVisible();
     await user.click(checkInsSwitch);
     expect(apiClient.updateCheckIns).not.toHaveBeenCalled();
@@ -268,7 +257,7 @@ describe("CheckInsSettings", () => {
 
     expect(apiClient.pauseCheckIns).toHaveBeenCalledWith("week");
     expect(
-      await screen.findByText("Paused until Wednesday, 18 November."),
+      await screen.findByText("Check-ins are paused until 18 Nov"),
     ).toBeInTheDocument();
     expect(screen.getByText("Paused")).toBeInTheDocument();
     expect(
@@ -292,7 +281,7 @@ describe("CheckInsSettings", () => {
 
     expect(apiClient.pauseCheckIns).toHaveBeenCalledWith("until_resumed");
     expect(
-      await screen.findByText("Paused until you resume."),
+      await screen.findByText("Check-ins are paused until you resume"),
     ).toBeInTheDocument();
   });
 
@@ -357,21 +346,21 @@ describe("CheckInsSettings", () => {
       screen.getByRole("region", { name: "Recent check-ins" }),
     ).getAllByRole("listitem");
     expect(items.map((item) => item.textContent)).toEqual([
-      "Skipped — you’d reached today’s message limitFri 13 NovSkipped",
-      "Asked if you’d like fewerThu 12 Nov · 6:42 pmSent",
-      "A casual helloWed 11 Nov · 6:42 pmNo reply",
-      "Skipped — gave you some spaceTue 10 NovSkipped",
-      "A casual helloMon 9 Nov · 6:42 pmReplied",
-      "A check-inThu 5 Nov · 12:15 pmNo reply",
+      "Skipped — you’d reached today’s message limitFriday 13 NovSkipped",
+      "Asked if you’d like fewerThursday 12 NovSent",
+      "A casual helloWednesday 11 NovNo reply",
+      "Zeph gave you spaceTuesday 10 NovSkipped",
+      "A casual helloMonday 9 NovReplied",
+      "A check-inThursday 5 NovNo reply",
     ]);
     expect(document.body.textContent).not.toMatch(/next check-in/i);
   });
 
-  it("lists what Zeph might reach out about, read-only, and explains the ignore rule", async () => {
+  it("lists what a check-in can be, read-only, and explains the ignore rule", async () => {
     await renderLoaded();
 
     const kinds = within(
-      screen.getByRole("region", { name: "What Zeph might reach out about" }),
+      screen.getByRole("region", { name: "What a check-in can be" }),
     ).getAllByRole("listitem");
     expect(kinds.map((kind) => kind.textContent)).toEqual([
       "A casual helloJust checking how you are.",
@@ -379,12 +368,12 @@ describe("CheckInsSettings", () => {
     ]);
     expect(
       within(
-        screen.getByRole("region", { name: "What Zeph might reach out about" }),
+        screen.getByRole("region", { name: "What a check-in can be" }),
       ).queryByRole("button"),
     ).not.toBeInTheDocument();
     expect(
       screen.getByText(
-        "If a few go unanswered, Zeph will pause and ask once if you’d like fewer.",
+        "If a few go unanswered, Zeph will pause and ask once if you'd like fewer.",
       ),
     ).toBeInTheDocument();
   });
@@ -392,7 +381,7 @@ describe("CheckInsSettings", () => {
   it("says there are no Check-ins yet", async () => {
     await renderLoaded();
 
-    expect(screen.getByText("No Check-ins yet")).toBeInTheDocument();
+    expect(screen.getByText("No check-ins yet")).toBeInTheDocument();
   });
 
   it("says when a change could not be saved", async () => {
@@ -403,7 +392,9 @@ describe("CheckInsSettings", () => {
     await user.click(screen.getByRole("button", { name: "Most days" }));
 
     expect(
-      await screen.findByText("We couldn’t save that. Please try again."),
+      await screen.findByText(
+        "Couldn’t save your check-in settings. They are as you left them. Try again.",
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "A few times a week" }),
@@ -421,7 +412,7 @@ describe("CheckInsSettings", () => {
     await user.click(screen.getByRole("button", { name: "Try again" }));
 
     expect(
-      await screen.findByRole("heading", { name: "Settings" }),
+      await screen.findByRole("region", { name: "Settings" }),
     ).toBeInTheDocument();
   });
 });

@@ -2,28 +2,31 @@
 
 import { useQuery } from "@tanstack/react-query";
 
-import { primaryButton } from "@/components/button-styles";
-import { ConnectTelegramBanner } from "@/components/ConnectTelegramBanner";
+import { AttentionCard } from "@/components/AttentionCard";
 import { HomeCheckInsCard } from "@/components/HomeCheckInsCard";
 import { HomeGoals } from "@/components/HomeGoals";
+import { HomeMemoryLine } from "@/components/HomeMemoryLine";
+import { HomePlanCard } from "@/components/HomePlanCard";
 import { HomeTelegramCard } from "@/components/HomeTelegramCard";
 import { LoadFailed } from "@/components/LoadFailed";
-import { MemoryNote } from "@/components/MemoryNote";
+import { LoadingPanel } from "@/components/LoadingPanel";
+import { PageHero } from "@/components/PageHero";
+import { PillLink } from "@/components/PillLink";
 import { RecentlyRemembered } from "@/components/RecentlyRemembered";
-import { SignOutButton } from "@/components/SignOutButton";
 import { currentTime } from "@/lib/clock";
-import { greeting, todayHeading } from "@/lib/home";
+import { greeting, lastTalkedText } from "@/lib/home";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
-const twoColumns =
-  "grid grid-cols-[repeat(auto-fit,minmax(min(320px,100%),1fr))] gap-6";
+const cardRow = "flex flex-wrap gap-6";
 
 /**
- * The Dashboard home: a greeting, the Telegram and Check-ins cards, what the
- * User is working toward, what Zeph recently remembered, and the AI notice.
+ * The Dashboard home: a greeting with when the User last talked with Zeph,
+ * the Telegram and Check-ins cards, the Memory line, what the User is working
+ * toward, what Zeph recently remembered, the Plan card (to build) and the AI
+ * notice.
  *
- * @returns The page, a loading block, or an error with Try again.
+ * @returns The page, loading panels, or an error with Try again.
  */
 export function DashboardHome() {
   const apiClient = useApiClient();
@@ -36,79 +39,82 @@ export function DashboardHome() {
   const home = homeQuery.data;
   const timeZone = home?.time_zone ?? undefined;
 
+  if (homeQuery.isPending) {
+    return (
+      <>
+        <LoadingPanel shape="banner" label="Loading your Dashboard" />
+        <LoadingPanel shape="card" label="Loading your cards" />
+      </>
+    );
+  }
+
+  if (!home) {
+    return (
+      <LoadFailed
+        title="We couldn’t load your Dashboard"
+        body="Something went wrong on our side. Zeph is still reachable in Telegram, and nothing you’ve shared is lost."
+        onRetry={() => void homeQuery.refetch()}
+      />
+    );
+  }
+
   return (
     <>
-      <header className="flex flex-wrap items-end justify-between gap-6">
-        <div className="flex flex-col gap-2">
-          <p className="m-0 text-sm text-ink-muted">
-            {todayHeading(now, timeZone)}
-          </p>
-          <h1 className="m-0 text-h1 font-normal">
-            {greeting(home?.name ?? null, now, timeZone)}
-          </h1>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          {home?.telegram_connection ? (
-            <a href={home.telegram_chat_url} className={primaryButton}>
-              Talk to Zeph
-            </a>
-          ) : null}
-          <SignOutButton />
-        </div>
-      </header>
-
-      {homeQuery.isPending ? (
-        <div
-          aria-busy="true"
-          aria-label="Loading your Dashboard"
-          className="flex flex-col gap-6"
-        >
-          <div className={twoColumns}>
-            <span className="block h-[180px] rounded-card bg-subtle" />
-            <span className="block h-[180px] rounded-card bg-subtle" />
-          </div>
-          <span className="block h-7 w-[320px] max-w-[80%] rounded bg-subtle" />
-          <span className="block h-[200px] rounded-card bg-subtle" />
-        </div>
-      ) : null}
-
-      {!home && homeQuery.isError ? (
-        <LoadFailed
-          title="We couldn’t load your Dashboard"
-          body="Something went wrong on our side. Zeph is still reachable in Telegram, and nothing you’ve shared is lost."
-          onRetry={() => void homeQuery.refetch()}
+      <PageHero
+        background="home"
+        eyebrow="Home"
+        title={greeting(home.name, now, timeZone)}
+        body={lastTalkedText(home.last_conversation_at, now, timeZone)}
+        actions={
+          home.telegram_connection ? (
+            <PillLink
+              href={home.telegram_chat_url}
+              label="Talk to Zeph"
+              primary
+            />
+          ) : null
+        }
+      />
+      {home.telegram_connection ? null : (
+        <AttentionCard
+          title="Zeph can’t reach you yet."
+          body="Conversations and check-ins happen in Telegram. Linking takes one tap."
+          action={
+            <PillLink
+              href="/connect-telegram"
+              label="Connect Telegram"
+              primary
+            />
+          }
         />
-      ) : null}
-
-      {home ? (
-        <>
-          {home.telegram_connection ? null : <ConnectTelegramBanner />}
-          <div className={twoColumns}>
-            {home.telegram_connection ? (
-              <HomeTelegramCard
-                connection={home.telegram_connection}
-                lastConversationAt={home.last_conversation_at}
-                now={now}
-                timeZone={timeZone}
-              />
-            ) : null}
-            <HomeCheckInsCard checkIns={home.check_ins} timeZone={timeZone} />
-          </div>
-          <MemoryNote note={home.memory_note} />
-          <HomeGoals goals={home.goals} timeZone={timeZone} />
-          <RecentlyRemembered
-            items={home.recently_remembered}
-            timeZone={timeZone}
-          />
-          <footer className="flex flex-col gap-1.5 border-t border-line pt-5">
-            <p className="m-0 max-w-[42em] text-sm text-ink-muted">
-              Zeph doesn’t count streaks or time spent. If you go quiet for a
-              while, that’s fine — it’ll be here when you’re ready.
-            </p>
-            <p className="m-0 text-caption text-ink-muted">{home.ai_notice}</p>
-          </footer>
-        </>
-      ) : null}
+      )}
+      <div className={cardRow}>
+        {home.telegram_connection ? (
+          <HomeTelegramCard connection={home.telegram_connection} />
+        ) : null}
+        <HomeCheckInsCard
+          checkIns={home.check_ins}
+          now={now}
+          timeZone={timeZone}
+        />
+      </div>
+      <HomeMemoryLine note={home.memory_note} />
+      <div className={`${cardRow} items-start`}>
+        <HomeGoals goals={home.goals} timeZone={timeZone} />
+        <RecentlyRemembered items={home.recently_remembered} />
+      </div>
+      <div className={cardRow}>
+        <HomePlanCard />
+      </div>
+      <footer className="flex flex-col gap-1.5 border-t border-line pt-5">
+        <p className="m-0 max-w-[620px] text-[14px] text-soft">
+          Zeph doesn&apos;t count streaks or time spent. If you go quiet for a
+          while, that&apos;s fine. It&apos;ll be here when you&apos;re ready.
+        </p>
+        <p className="m-0 max-w-[620px] text-[12px] text-soft">
+          {home.ai_notice}
+        </p>
+      </footer>
     </>
   );
 }

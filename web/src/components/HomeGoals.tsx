@@ -1,16 +1,18 @@
 import Link from "next/link";
 
 import { EmptyState } from "@/components/EmptyState";
+import { HomeCard } from "@/components/HomeCard";
+import { cardLink } from "@/components/text-link-styles";
 import type { MemoryItem } from "@/lib/api-client";
-import { memorySourceLabel } from "@/lib/memories";
+import { formatShortDay } from "@/lib/dates";
 
 /**
  * "What you're working toward": the User's Goals Memory Items, read-only,
- * with a link to Memories.
+ * with the day each was remembered and a link to Memories.
  *
  * @param props - `goals` are the Goals Memory Items, newest first;
  *   `timeZone` is the User's.
- * @returns The section.
+ * @returns The card.
  */
 export function HomeGoals({
   goals,
@@ -20,41 +22,38 @@ export function HomeGoals({
   timeZone?: string;
 }) {
   return (
-    <section
-      aria-labelledby="home-goals-heading"
-      className="flex flex-col gap-4"
-    >
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h2 id="home-goals-heading" className="m-0 text-h2 font-normal">
-          What you’re working toward
-        </h2>
-        <Link
-          href="/memories"
-          className="inline-flex min-h-11 items-center text-sm"
-        >
+    <HomeCard
+      headingId="home-goals-heading"
+      title="What you're working toward"
+      aside={
+        <Link href="/memories" className={cardLink}>
           See in Memories
         </Link>
-      </div>
+      }
+      basis="wide"
+    >
       {goals.length === 0 ? (
         <EmptyState
           title="Nothing here yet"
           body="When you mention something you’re working toward, Zeph will remember it here."
         />
       ) : (
-        <ul className="m-0 list-none rounded-card border border-line bg-white p-0">
-          {goals.map((goal, index) => (
+        <ul className="m-0 list-none p-0">
+          {goals.map((goal) => (
             <li
               key={goal.id}
-              className={`flex flex-col px-6 py-4 ${index === 0 ? "" : "border-t border-line"}`}
+              className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-line py-3 first:border-t-0"
             >
-              <span className="font-medium">{goal.content}</span>
-              <span className="text-caption text-ink-muted">
-                {memorySourceLabel(goal, timeZone)}
+              <span className="text-[15px] font-normal text-text">
+                {goal.content}
+              </span>
+              <span className="text-[12px] text-soft">
+                {`Remembered ${formatShortDay(goal.updated_at, timeZone)}`}
               </span>
             </li>
           ))}
         </ul>
       )}
-    </section>
+    </HomeCard>
   );
 }

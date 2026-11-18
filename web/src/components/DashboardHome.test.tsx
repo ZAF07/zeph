@@ -10,14 +10,8 @@ const apiClient = {
   getHome: vi.fn<ApiClient["getHome"]>(),
 };
 
-const signOut = vi.fn<(redirectUrl: string) => Promise<void>>();
-
 vi.mock("@/lib/use-api-client", () => ({
   useApiClient: () => apiClient,
-}));
-
-vi.mock("@/lib/auth/client", () => ({
-  useSignOut: () => signOut,
 }));
 
 function checkInsWith(overrides: Partial<HomeCheckIns> = {}): HomeCheckIns {
@@ -93,7 +87,7 @@ describe("DashboardHome", () => {
     vi.useRealTimers();
   });
 
-  it("greets the User and shows who Telegram is connected as", async () => {
+  it("greets the User, says when they last talked, and shows who Telegram is connected as", async () => {
     apiClient.getHome.mockResolvedValue(homeWith());
 
     renderWithQueries(<DashboardHome />);
@@ -101,19 +95,20 @@ describe("DashboardHome", () => {
     expect(
       await screen.findByRole("heading", { name: "Good evening, Maya." }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Wednesday, 11 November")).toBeInTheDocument();
+    expect(
+      screen.getByText("You last talked with Zeph today."),
+    ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Talk to Zeph" })).toHaveAttribute(
       "href",
       "https://t.me/zeph_bot",
     );
-    expect(screen.getByRole("button", { name: "Sign out" })).toBeVisible();
     const telegram = section("Telegram");
     expect(
       within(telegram).getByText("Connected as @maya_l"),
     ).toBeInTheDocument();
     expect(
-      within(telegram).getByText("Last Conversation today at 7:48 pm."),
-    ).toBeInTheDocument();
+      within(telegram).getByRole("link", { name: "Manage connection" }),
+    ).toHaveAttribute("href", "/connect-telegram");
     expect(
       screen.queryByRole("link", { name: "Connect Telegram" }),
     ).not.toBeInTheDocument();
@@ -126,27 +121,17 @@ describe("DashboardHome", () => {
 
     renderWithQueries(<DashboardHome />);
 
-    const banner = await screen.findByRole("region", {
-      name: "Zeph can’t reach you yet.",
-    });
     expect(
-      within(banner).getByRole("link", { name: "Connect Telegram" }),
+      await screen.findByText("Zeph can’t reach you yet."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Connect Telegram" }),
     ).toHaveAttribute("href", "/connect-telegram");
+    expect(
+      screen.getByText("You haven't talked with Zeph yet."),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Telegram" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Talk to Zeph" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Sign out" })).toBeVisible();
-  });
-
-  it("signs the User out to the sign-in page", async () => {
-    apiClient.getHome.mockResolvedValue(homeWith());
-    signOut.mockResolvedValue(undefined);
-
-    renderWithQueries(<DashboardHome />);
-    await userEvent.click(
-      await screen.findByRole("button", { name: "Sign out" }),
-    );
-
-    expect(signOut).toHaveBeenCalledWith("/sign-in");
   });
 
   it("shows Check-ins on, with quiet hours and the last Check-in sent", async () => {
@@ -158,19 +143,17 @@ describe("DashboardHome", () => {
     const checkIns = section("Check-ins");
     expect(within(checkIns).getByText("On")).toBeInTheDocument();
     expect(
-      within(checkIns).getByText("A few times a week, at most"),
+      within(checkIns).getByText("A few times a week"),
     ).toBeInTheDocument();
     expect(
-      within(checkIns).getByText("Never between 10:00 pm and 7:30 am"),
+      within(checkIns).getByText("10:00 PM to 7:30 AM"),
     ).toBeInTheDocument();
     expect(
-      within(checkIns).getByText(
-        "Last Check-in: a casual hello, Mon 9 Nov · you replied",
-      ),
+      within(checkIns).getByText("Monday · you replied"),
     ).toBeInTheDocument();
     expect(within(checkIns).queryByText(/next/i)).toBeNull();
     expect(
-      within(checkIns).getByRole("link", { name: "Check-in settings" }),
+      within(checkIns).getByRole("link", { name: "Change check-in settings" }),
     ).toHaveAttribute("href", "/check-ins");
   });
 
@@ -189,15 +172,16 @@ describe("DashboardHome", () => {
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     const checkIns = section("Check-ins");
-    expect(within(checkIns).getByText("Paused")).toBeInTheDocument();
+    expect(within(checkIns).getAllByText("Paused")).toHaveLength(2);
     expect(
       within(checkIns).getByText("until Wednesday, 18 November"),
     ).toBeInTheDocument();
     expect(
       within(checkIns).getByText("Changed in chat · 11 Nov"),
     ).toBeInTheDocument();
+    expect(within(checkIns).queryByText("How often")).toBeNull();
     expect(
-      within(checkIns).getByText(/^Last Check-in: a casual hello/),
+      within(checkIns).getByText("Monday · you replied"),
     ).toBeInTheDocument();
   });
 
@@ -214,7 +198,7 @@ describe("DashboardHome", () => {
     expect(
       within(checkIns).getByText("Zeph only replies when you message"),
     ).toBeInTheDocument();
-    expect(within(checkIns).queryByText(/^Last Check-in/)).toBeNull();
+    expect(within(checkIns).queryByText("Last check-in")).toBeNull();
   });
 
   it("shows Check-ins as not available when an Admin has them off", async () => {
@@ -230,7 +214,7 @@ describe("DashboardHome", () => {
     expect(
       within(checkIns).getByText("Not available on your account"),
     ).toBeInTheDocument();
-    expect(within(checkIns).queryByText(/A casual hello/)).toBeNull();
+    expect(within(checkIns).queryByText("Last check-in")).toBeNull();
   });
 
   it("shows Goals and recent Memory Items, each linking to Memories", async () => {
@@ -239,11 +223,9 @@ describe("DashboardHome", () => {
     renderWithQueries(<DashboardHome />);
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
-    const goals = section("What you’re working toward");
+    const goals = section("What you're working toward");
     expect(within(goals).getByText("Be present at dinner")).toBeInTheDocument();
-    expect(
-      within(goals).getByText("From a conversation · 2 Oct"),
-    ).toBeInTheDocument();
+    expect(within(goals).getByText("Remembered 2 Oct")).toBeInTheDocument();
     expect(
       within(goals).getByRole("link", { name: "See in Memories" }),
     ).toHaveAttribute("href", "/memories");
@@ -251,12 +233,23 @@ describe("DashboardHome", () => {
     expect(
       within(recent).getByText("Sister Jo is moving abroad"),
     ).toBeInTheDocument();
-    expect(
-      within(recent).getByText("Relationships · 6 Nov"),
-    ).toBeInTheDocument();
+    expect(within(recent).getByText("Relationships")).toBeInTheDocument();
     expect(
       within(recent).getByRole("link", { name: "Review all" }),
     ).toHaveAttribute("href", "/memories");
+  });
+
+  it("shows the Plan card as to build, with the design's placeholders", async () => {
+    apiClient.getHome.mockResolvedValue(homeWith());
+
+    renderWithQueries(<DashboardHome />);
+
+    await screen.findByRole("heading", { name: "Good evening, Maya." });
+    const plan = section("Plan To build");
+    expect(within(plan).getByText("[PLAN NAME]")).toBeInTheDocument();
+    expect(
+      within(plan).getByRole("link", { name: "Manage plan" }),
+    ).toHaveAttribute("href", "/plan");
   });
 
   it("says when nothing is remembered yet", async () => {
@@ -268,14 +261,12 @@ describe("DashboardHome", () => {
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     expect(
-      within(section("What you’re working toward")).getByText(
+      within(section("What you're working toward")).getByText(
         "Nothing here yet",
       ),
     ).toBeInTheDocument();
     expect(
-      within(section("Recently remembered")).getByText(
-        "No memories yet. They’ll appear after your first Conversation.",
-      ),
+      within(section("Recently remembered")).getByText("No memories yet"),
     ).toBeInTheDocument();
   });
 
@@ -294,9 +285,10 @@ describe("DashboardHome", () => {
     expect(note).toHaveTextContent(
       "Memory is paused. Zeph won’t learn anything new, but still uses what it already knows about you.",
     );
-    expect(within(note).getByText("Memory is paused.").tagName).toBe("STRONG");
+    expect(within(note).getByText("Memory is paused.").tagName).toBe("SPAN");
+    expect(screen.queryByText("Memory is on.")).toBeNull();
     expect(
-      within(section("What you’re working toward")).getByText(
+      within(section("What you're working toward")).getByText(
         "Be present at dinner",
       ),
     ).toBeInTheDocument();
@@ -307,12 +299,13 @@ describe("DashboardHome", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows no memory note while memory is on", async () => {
+  it("says Memory is on while it is", async () => {
     apiClient.getHome.mockResolvedValue(homeWith());
 
     renderWithQueries(<DashboardHome />);
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
+    expect(screen.getByText("Memory is on.")).toBeInTheDocument();
     expect(screen.queryByRole("status")).toBeNull();
   });
 
@@ -327,7 +320,7 @@ describe("DashboardHome", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/Zeph doesn’t count streaks or time spent/),
+      screen.getByText(/Zeph doesn't count streaks or time spent/),
     ).toBeInTheDocument();
   });
 

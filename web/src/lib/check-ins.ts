@@ -3,7 +3,7 @@ import type {
   CheckInStatus,
   RecentCheckIn,
 } from "@/lib/api-client";
-import { dateParts } from "@/lib/dates";
+import { dateParts, formatShortDay } from "@/lib/dates";
 
 /** The frequencies a User can pick, in the order they are shown. */
 export const checkInFrequencyOptions: {
@@ -16,15 +16,21 @@ export const checkInFrequencyOptions: {
   { value: "a_few_times_a_day", label: "A few times a day" },
 ];
 
+/** The cream pill for a status worth noticing, like "Replied" or "On". */
+export const filledPill = "bg-cream text-ink";
+
+/** The outlined pill for any other status, like "No reply" or "Off". */
+export const outlinedPill = "border border-line-strong text-soft";
+
 /** What each Check-in status is called, and its pill's colours. */
 export const checkInStatusLabels: Record<
   CheckInStatus,
   { label: string; pill: string }
 > = {
-  sent: { label: "Sent", pill: "bg-code text-ink-body" },
-  replied: { label: "Replied", pill: "bg-blue-tint text-blue-deep" },
-  no_reply: { label: "No reply", pill: "bg-code text-ink-body" },
-  skipped: { label: "Skipped", pill: "bg-code text-ink-body" },
+  sent: { label: "Sent", pill: outlinedPill },
+  replied: { label: "Replied", pill: filledPill },
+  no_reply: { label: "No reply", pill: outlinedPill },
+  skipped: { label: "Skipped", pill: outlinedPill },
 };
 
 /**
@@ -40,7 +46,7 @@ export function recentCheckInTitle(checkIn: RecentCheckIn): string {
     return "Skipped — you’d reached today’s message limit";
   }
   if (checkIn.outcome === "skipped") {
-    return "Skipped — gave you some space";
+    return "Zeph gave you space";
   }
   if (checkIn.outcome === "asked_about_fewer") {
     return "Asked if you’d like fewer";
@@ -76,8 +82,8 @@ export function formatQuietHour(timeOfDay: string): string {
 }
 
 /**
- * Says how long Check-ins are paused for, like "Paused until Thursday,
- * 12 November."
+ * Says how long Check-ins are paused for, like "Check-ins are paused until
+ * 25 Nov".
  *
  * @param pausedUntil - When the pause ends; null until the User resumes.
  * @param timeZone - The time zone to show the day in.
@@ -87,7 +93,9 @@ export function pausedText(
   pausedUntil: string | null,
   timeZone?: string,
 ): string {
-  return `Paused ${pauseEndText(pausedUntil, timeZone)}.`;
+  const until =
+    pausedUntil === null ? "you resume" : formatShortDay(pausedUntil, timeZone);
+  return `Check-ins are paused until ${until}`;
 }
 
 /**
@@ -114,20 +122,6 @@ export function pauseEndText(
 }
 
 /**
- * Writes when a Check-in was sent, like "Mon 9 Nov · 6:42 pm".
- *
- * @param isoTimestamp - When it was sent, as the backend sends it.
- * @param timeZone - The time zone to show it in.
- * @returns The day and time.
- */
-export function formatCheckInSentAt(
-  isoTimestamp: string,
-  timeZone?: string,
-): string {
-  return `${formatCheckInDay(isoTimestamp, timeZone)} · ${formatTimeOfDay(isoTimestamp, timeZone)}`;
-}
-
-/**
  * Writes the time of day of a moment, like "6:42 pm".
  *
  * @param isoTimestamp - The moment, as the backend sends it.
@@ -149,7 +143,7 @@ export function formatTimeOfDay(
 }
 
 /**
- * Writes the day of a Check-in, like "Fri 7 Nov", for a skipped one.
+ * Writes the day of a Check-in, like "Saturday 7 Nov".
  *
  * @param isoTimestamp - When it was decided, as the backend sends it.
  * @param timeZone - The time zone to show it in.
@@ -160,7 +154,7 @@ export function formatCheckInDay(
   timeZone?: string,
 ): string {
   const part = dateParts(new Date(isoTimestamp), {
-    weekday: "short",
+    weekday: "long",
     day: "numeric",
     month: "short",
     timeZone,

@@ -1,6 +1,6 @@
 # 05 — Redesign: Home and Check-ins
 
-Status: ready-for-agent
+Status: in-progress
 
 Lane: A. README slices: 2 and 4.
 
@@ -48,3 +48,10 @@ Refs: `Dashboard`, `M-Dashboard`, `Dashboard--menu-folded`, `M-Menu`, `CheckIns`
 ## Comments
 
 - From issue 01 (2026-11-18): in fixture mode the clock stands at Tue 17 Nov 2026, 8:00 PM Singapore (`currentTime()` in `web/src/lib/clock.ts`). `DashboardHome` greets in `home.time_zone`, so the home fixture must return `time_zone: alex.time_zone` (Asia/Singapore, from `design-fixtures/shell.ts`). Otherwise the greeting uses the browser's time zone, and a test machine on UTC reads "Good afternoon".
+
+- 2026-11-18 — Started on branch `redesign-05-home-and-check-ins` (own worktree, ports 3010/8010/5442). Zaf's answers to the gaps between the references and today's pages:
+  - **Time zone on Check-ins:** dropped. It is set on Account & privacy only, as drawn.
+  - **Hero "last talked" line:** "You last talked with Zeph today." / "…yesterday." / "…on 10 Nov." With none: "You haven't talked with Zeph yet."
+  - **Home "Last check-in" day:** "Today", "Yesterday", a weekday for up to 7 days ago, then "10 Nov". No Kind. Reply status as now.
+  - **Home Check-ins card when not On:** outline pill "Paused" or "Off" (the "No reply" style). Paused: first row "Paused · until Wednesday, 18 November", then quiet hours and last check-in. Off / not available: one row "Zeph only replies when you message" / "Not available on your account". The settings link always shows.
+  - Defaults stated and not objected to: no date line or Sign out in Home's header (Sign out is in the sidebar); `AttentionCard` when Telegram isn't connected; "Memory is on." line while memory is on, the backend's note in the same box while off; copy as drawn ("Weekly", "11:00 PM to 7:00 AM", "Zeph gave you space", "Tuesday 10 Nov", straight apostrophes); States-sheet parts and copy for paused, empty, save-failed and loading; `Switch` and the change captions restyled to the references (shared parts).

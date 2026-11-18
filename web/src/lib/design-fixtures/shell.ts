@@ -18,7 +18,10 @@ export const alex: Me = {
   personal_stickers_available: true,
   onboarding_completed_at: "2026-11-02T10:00:00+08:00",
   role: "user",
-  changed_in_chat: { user_memory: "2026-11-12T21:00:00+08:00" },
+  changed_in_chat: {
+    user_memory: "2026-11-12T21:00:00+08:00",
+    quiet_hours: "2026-11-12T21:00:00+08:00",
+  },
 };
 
 /** Zaf, the Admin every admin page in `design/reference/` is drawn for. */
