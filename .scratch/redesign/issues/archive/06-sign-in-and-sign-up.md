@@ -110,4 +110,4 @@ FAIL  Signup                             12.40% differs, height 885 vs 800 (Cler
 ## Completion
 
 - Completed: 2026-11-18
-- Commit: <to be filled in after merge>
+- Commit: merge `bcfb0d1` into main (branch `redesign-06-sign-in`: `3a9fa7c` sign in and sign up in the new look, `b7a44cf` long emails wrap and code-box borders, `ff3d159` code-review fixes, `8d8fac5` evidence and archive)
