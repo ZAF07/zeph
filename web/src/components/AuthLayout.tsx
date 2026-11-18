@@ -42,7 +42,7 @@ export function AuthLayout({
         <div className="mr-[clamp(0px,13vw,170px)] flex min-w-0 flex-[0_1_400px] flex-col gap-4 max-[899px]:mr-0">
           <div
             data-clerk-card
-            className="box-border flex flex-col gap-[18px] rounded-banner border border-line bg-[rgba(7,25,34,.8)] p-9 max-[899px]:px-[22px] max-[899px]:py-[26px]"
+            className="box-border flex flex-col gap-[18px] rounded-banner border border-line bg-bg-deep/80 p-9 max-[899px]:px-[22px] max-[899px]:py-[26px]"
           >
             <div className="flex items-center gap-3 text-[11px] font-medium tracking-[2.5px] text-soft uppercase">
               <span aria-hidden="true" className="h-px w-[18px] bg-soft" />

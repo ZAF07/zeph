@@ -2,14 +2,44 @@ import type { ComponentProps } from "react";
 import type { ClerkProvider } from "@clerk/nextjs";
 
 /**
+ * The design tokens Clerk needs, as plain values: Clerk works out its own
+ * shades from them, so it can't take CSS variables. They mirror
+ * `design/tokens.css`.
+ */
+const tokenColors = {
+  bgDeep: "#071922",
+  inputBg: "rgba(7,25,34,.6)",
+  line: "#2a5263",
+  lineStrong: "#5b8b96",
+  cream: "#f3e8d6",
+  text: "#eaf2f3",
+  soft: "#bdd0d5",
+  mute: "#9db6be",
+  ink: "#0b2a3c",
+  danger: "#f4a48c",
+};
+
+/**
+ * A 1px border in place of the box-shadow outline Clerk draws. Clerk's own
+ * rules for these are stronger than ours, so both are `!important`.
+ *
+ * @param color - The border colour.
+ * @returns The style values for a Clerk element.
+ */
+function outlined(color: string) {
+  return {
+    border: `1px solid ${color} !important`,
+    boxShadow: "none !important",
+  };
+}
+
+/**
  * Themes Clerk's prebuilt sign-up and sign-in to match the card in the
  * design's `Login` and `Signup` files.
  *
  * Clerk sits flush inside `AuthLayout`'s card, which draws the card itself.
- * Colour values mirror the tokens in `design/tokens.css`. Element styles are
- * style objects, not Tailwind classes, because Clerk's own styles sit outside
- * Tailwind's layers and would win over its classes. Clerk draws borders as
- * box shadows with stronger rules, so those few values are `!important`.
+ * Element styles are style objects, not Tailwind classes, because Clerk's own
+ * styles sit outside Tailwind's layers and would win over its classes.
  */
 export const clerkAppearance: ComponentProps<
   typeof ClerkProvider
@@ -19,17 +49,17 @@ export const clerkAppearance: ComponentProps<
     logoPlacement: "none",
   },
   variables: {
-    colorPrimary: "#f3e8d6",
-    colorPrimaryForeground: "#0b2a3c",
-    colorForeground: "#eaf2f3",
-    colorMutedForeground: "#bdd0d5",
-    colorNeutral: "#eaf2f3",
-    colorBackground: "#071922",
-    colorInput: "rgba(7,25,34,.6)",
-    colorInputForeground: "#eaf2f3",
-    colorBorder: "#5b8b96",
-    colorDanger: "#f4a48c",
-    colorRing: "#f3e8d6",
+    colorPrimary: tokenColors.cream,
+    colorPrimaryForeground: tokenColors.ink,
+    colorForeground: tokenColors.text,
+    colorMutedForeground: tokenColors.soft,
+    colorNeutral: tokenColors.text,
+    colorBackground: tokenColors.bgDeep,
+    colorInput: tokenColors.inputBg,
+    colorInputForeground: tokenColors.text,
+    colorBorder: tokenColors.lineStrong,
+    colorDanger: tokenColors.danger,
+    colorRing: tokenColors.cream,
     colorShadow: "transparent",
     fontFamily: "var(--font-outfit), system-ui, sans-serif",
     fontSize: "14px",
@@ -58,59 +88,63 @@ export const clerkAppearance: ComponentProps<
       fontSize: "32px",
       lineHeight: 1.15,
       fontWeight: 400,
-      color: "#f3e8d6",
+      color: tokenColors.cream,
     },
     headerSubtitle: {
       margin: 0,
       fontSize: "14px",
       lineHeight: 1.55,
       fontWeight: 300,
-      color: "#bdd0d5",
+      color: tokenColors.soft,
     },
     main: { gap: "18px" },
     socialButtonsBlockButton: {
+      ...outlined(tokenColors.soft),
       minHeight: "44px",
       borderRadius: "999px",
-      border: "1px solid #bdd0d5 !important",
       background: "transparent",
-      boxShadow: "none !important",
-      color: "#eaf2f3",
+      color: tokenColors.text,
     },
     socialButtonsBlockButtonText: { fontSize: "14px", fontWeight: 500 },
-    dividerLine: { background: "#2a5263" },
-    dividerText: { fontSize: "13px", color: "#bdd0d5" },
+    dividerLine: { background: tokenColors.line },
+    dividerText: { fontSize: "13px", color: tokenColors.soft },
     form: { gap: "18px" },
     formFieldRow: { gap: "6px" },
-    formFieldLabel: { fontSize: "13px", fontWeight: 400, color: "#bdd0d5" },
-    formFieldAction: { fontSize: "13px", fontWeight: 300, color: "#eaf2f3" },
+    formFieldLabel: {
+      fontSize: "13px",
+      fontWeight: 400,
+      color: tokenColors.soft,
+    },
+    formFieldAction: {
+      fontSize: "13px",
+      fontWeight: 300,
+      color: tokenColors.text,
+    },
     formFieldInput: {
+      ...outlined(tokenColors.lineStrong),
       minHeight: "46px",
       boxSizing: "border-box",
       padding: "0 14px",
       borderRadius: "10px",
-      border: "1px solid #5b8b96 !important",
-      background: "rgba(7,25,34,.6)",
-      boxShadow: "none !important",
-      color: "#eaf2f3",
+      background: tokenColors.inputBg,
+      color: tokenColors.text,
       fontSize: "15px",
-      "&::placeholder": { color: "#9db6be" },
+      "&::placeholder": { color: tokenColors.mute },
     },
     otpCodeFieldInput: {
-      border: "1px solid #5b8b96 !important",
-      boxShadow: "none !important",
-      color: "#eaf2f3",
+      ...outlined(tokenColors.lineStrong),
+      color: tokenColors.text,
     },
-    formFieldHintText: { fontSize: "12px", color: "#bdd0d5" },
+    formFieldHintText: { fontSize: "12px", color: tokenColors.soft },
     formButtonPrimary: {
+      ...outlined(tokenColors.cream),
       minHeight: "44px",
       borderRadius: "999px",
-      border: "1px solid #f3e8d6 !important",
-      background: "#f3e8d6",
-      boxShadow: "none !important",
-      color: "#0b2a3c",
+      background: tokenColors.cream,
+      color: tokenColors.ink,
       fontSize: "14px",
       fontWeight: 500,
-      "&:hover, &:focus, &:active": { background: "#f3e8d6" },
+      "&:hover, &:focus, &:active": { background: tokenColors.cream },
     },
     footer: {
       marginTop: "18px",
@@ -119,37 +153,17 @@ export const clerkAppearance: ComponentProps<
       padding: 0,
     },
     footerAction: { justifyContent: "center", padding: 0 },
-    footerActionText: { fontSize: "13px", fontWeight: 300, color: "#bdd0d5" },
+    footerActionText: {
+      fontSize: "13px",
+      fontWeight: 300,
+      color: tokenColors.soft,
+    },
     footerActionLink: {
       fontSize: "13px",
       fontWeight: 300,
-      color: "#bdd0d5",
+      color: tokenColors.soft,
       textDecoration: "underline",
-      "&:hover": { color: "#f3e8d6" },
+      "&:hover": { color: tokenColors.cream },
     },
   },
-};
-
-/**
- * The copy Clerk shows on the sign-in and sign-up pages, from the design's
- * `Login` and `Signup` files.
- */
-export const clerkLocalization: ComponentProps<
-  typeof ClerkProvider
->["localization"] = {
-  signIn: {
-    start: {
-      title: "Sign in to Zeph",
-      subtitle:
-        "Your memories, check-ins and account live here. The conversation itself happens in Telegram.",
-    },
-  },
-  signUp: {
-    start: {
-      title: "Create your account",
-      subtitle:
-        "Sign up here, answer a few short questions, then meet Zeph in Telegram.",
-    },
-  },
-  formFieldInputPlaceholder__emailAddress: "you@example.com",
 };

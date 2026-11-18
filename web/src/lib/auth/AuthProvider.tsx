@@ -2,10 +2,8 @@ import { ClerkProvider } from "@clerk/nextjs";
 import type { ReactNode } from "react";
 
 import { env } from "@/env";
-import {
-  clerkAppearance,
-  clerkLocalization,
-} from "@/lib/auth/clerk-appearance";
+import { clerkAppearance } from "@/lib/auth/clerk-appearance";
+import { clerkLocalization } from "@/lib/auth/clerk-localization";
 
 /**
  * Makes sign-in available to every page, with Clerk themed and worded as
