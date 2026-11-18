@@ -51,5 +51,9 @@ Issue 03 runs at the same time in another worktree.
 ## Completion
 
 - Completed: 2026-11-18
-- Commits: see below once merged
+- Commits:
+  - `2dd66b5` Get-curious issue 04: look-backs, a Portrait of only what Zeph is fairly sure of, and the guess Eval case
+  - `0de4dba` Get-curious issue 04 review fixes: renumber the migration to 0060 after issue 01's 0059, one helper reads an Eval Curiosity, share the low/medium/high options, the mum case only hints at Singapore
+  - `1f3e5bd` Get-curious issue 04 done: archive issue with check, review and run evidence; CONTEXT.md Curiosity lists look-backs
+  - `6d87f34` Merge get-curious issue 04 into main
 
