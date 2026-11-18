@@ -54,3 +54,17 @@ Refs: `Memories`, `Memories--tab-about`, `Memories--tab-threads`, `Memories--tab
 - Restyle the six panels from the refs. Reuse `PageHero` (new `memories` background), `filledPill`/`outlinedPill`, and the issue 03 parts: `LoadingPanel`, `LoadFailed`, `EmptyState`, `PausedNotice`, `ConfirmDialog`.
 - Choices taken from the refs/States sheet (will report): no category pill or "N memories" count on the Memories tab; Delete all uses the States confirm dialog; Life Thread pill reads "Closed" (was "Settled"); What helps uses When/Feeling/Why rows; summaries and photos show the short day ("12 Nov"); Portrait says "Written"; the memory note shows in `PausedNotice` (bold part as title, rest as body, "Turn memory on" when the User paused it).
 - Photos: the 120px box holds the real image; while it loads it shows "Photo" as drawn. The fixture image never resolves, so the drawn placeholder is what the test sees.
+
+### 2026-11-18 — /code-review (standards + spec)
+
+Fixed:
+- Memory-off notice reordered the note when it didn't open in bold. Now only a note that opens with `**…**` is split into title and body; any other note is the whole title (test added).
+- Photo label was on both the `<li>` and the placeholder `role="img"`; now only on the `role="img"` box, as drawn (test checks it).
+- `MemoryCard` flag renamed `roomy` → `compact`.
+- Unit tests for `memoriesTabFromQuery` and `searchWithMemoriesTab` (`web/src/lib/memories.test.ts`).
+
+Answered, not changed:
+- Shared `DeleteIcon` / `deleteIconButton` restyle reaches Knowledge and Personal Stickers too. Every drawn delete button (all in the Memories refs) has this look and none has the old red round one, so the shared part follows the design; those pages are restyled by their own issues.
+- Memory-off notice keeps the Admin-worded `memory_note` (domain: Admin-managed) inside the States "Memory is off" part rather than the sheet's sample copy, the same choice issue 05 made on Home.
+- Dropped on the Memories tab, because the refs don't draw them: "N memories, grouped by category", the per-category count, the category pill on each item, the count in the Delete all question.
+- Not taken (other areas' files or no third use yet): shared hero-background builder, merging `MemoriesPanelHeading` with Check-ins' heading, one parser shared with `MemoryNote` (Account's, which issue 09 replaces), a shared status-pill component, folding the photo card into `MemoryCard`.

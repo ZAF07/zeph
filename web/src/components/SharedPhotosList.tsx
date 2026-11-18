@@ -61,7 +61,6 @@ export function SharedPhotosList({
             return (
               <li
                 key={photo.id}
-                aria-label={`Photo from ${day}`}
                 className="box-border rounded-card border border-line bg-panel py-[18px] pr-3 pl-[22px] [overflow-wrap:anywhere]"
               >
                 <div className="flex flex-wrap items-start gap-x-5 gap-y-4">

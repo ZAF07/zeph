@@ -652,9 +652,7 @@ describe("Memories", () => {
 
     await user.click(await screen.findByRole("tab", { name: "Photos" }));
 
-    const cat = within(
-      screen.getByRole("listitem", { name: "Photo from 10 Nov" }),
-    );
+    const cat = within(screen.getAllByRole("listitem")[0]);
     expect(
       await cat.findByAltText("A ginger cat asleep on a sunny windowsill."),
     ).toHaveAttribute("src", "blob:photo");
@@ -679,6 +677,9 @@ describe("Memories", () => {
     expect(
       await screen.findAllByText("This photo can’t be shown right now"),
     ).toHaveLength(2);
+    expect(
+      screen.getByRole("img", { name: "Photo from 10 Nov" }),
+    ).toHaveTextContent("This photo can’t be shown right now");
     expect(
       screen.getByText("A ginger cat asleep on a sunny windowsill."),
     ).toBeVisible();
@@ -766,6 +767,20 @@ describe("Memories", () => {
 
     expect(await screen.findByText("Goes by Maya")).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("Memory is paused.");
+  });
+
+  it("shows the whole note as the notice title when it doesn't open in bold", async () => {
+    apiClient.getMe.mockResolvedValue({
+      ...maya,
+      user_memory_enabled: false,
+      memory_note: "Zeph is resting. **Nothing is deleted.** Back soon.",
+    });
+    renderWithQueries(<Memories />);
+
+    expect(await screen.findByText("Goes by Maya")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Zeph is resting. **Nothing is deleted.** Back soon.",
+    );
   });
 
   it("turns User Memory back on from the notice", async () => {

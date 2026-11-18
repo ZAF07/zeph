@@ -9,26 +9,26 @@ import { DeleteIcon } from "@/components/DeleteIcon";
  *
  * @param props - `deleteLabel` names the delete button for screen readers;
  *   `isDeleting` locks it; `onDelete` is called when it is pressed;
- *   `roomy` gives the 18px top and bottom padding most cards have instead
- *   of 16px; `children` is the content.
+ *   `compact` gives 16px top and bottom padding instead of the 18px most
+ *   cards have; `children` is the content.
  * @returns The card.
  */
 export function MemoryCard({
   deleteLabel,
   isDeleting,
   onDelete,
-  roomy = true,
+  compact = false,
   children,
 }: {
   deleteLabel: string;
   isDeleting: boolean;
   onDelete: () => void;
-  roomy?: boolean;
+  compact?: boolean;
   children: ReactNode;
 }) {
   return (
     <div
-      className={`box-border rounded-card border border-line bg-panel pr-3 pl-[22px] [overflow-wrap:anywhere] ${roomy ? "py-[18px]" : "py-4"}`}
+      className={`box-border rounded-card border border-line bg-panel pr-3 pl-[22px] [overflow-wrap:anywhere] ${compact ? "py-4" : "py-[18px]"}`}
     >
       <div className="flex items-start justify-between gap-3">
         {children}

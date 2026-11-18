@@ -3,8 +3,9 @@ import { PausedNotice } from "@/components/PausedNotice";
 
 /**
  * The Admin-worded note saying User Memory is off and why, drawn as the
- * design's "Memory is off" notice. The words between double asterisks are
- * its title and the rest its body.
+ * design's "Memory is off" notice. When the note opens with words between
+ * double asterisks, they are its title and the rest its body; otherwise the
+ * whole note is the title.
  *
  * @param props - `note` is the note the backend sent, "" while User Memory
  *   is on, which shows nothing; `canTurnOn` is false when an Admin has User
@@ -27,12 +28,12 @@ export function MemoryOffNotice({
     return null;
   }
   const [before, title, ...rest] = note.split("**");
-  const hasTitle = title !== undefined;
+  const hasTitle = before === "" && title !== undefined;
   return (
     <div role="status">
       <PausedNotice
         title={hasTitle ? title : note}
-        body={hasTitle ? `${before}${rest.join("")}` : ""}
+        body={hasTitle ? rest.join("") : ""}
         action={
           canTurnOn ? (
             <button
