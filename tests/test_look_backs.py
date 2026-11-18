@@ -95,7 +95,7 @@ def test_the_portrait_is_written_from_what_zeph_is_sure_of_without_open_question
 def test_the_look_backs_migration_reloads_the_keeping_and_portrait_prompts(
     engine: Engine, database_url: str
 ) -> None:
-    downgrade_to(database_url, "0058")
+    downgrade_to(database_url, "0059")
     try:
         with engine.begin() as connection:
             connection.execute(

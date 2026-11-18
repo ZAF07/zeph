@@ -4,8 +4,8 @@ The Curiosity keeping prompt now asks for a gentle look-back on a vent
 where Zeph only listened. The Portrait prompt no longer asks for open
 questions. Both reload from the seed on next start.
 
-Revision ID: 0059
-Revises: 0058
+Revision ID: 0060
+Revises: 0059
 Create Date: 2026-11-18
 """
 
@@ -13,8 +13,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0059"
-down_revision: str | None = "0058"
+revision: str = "0060"
+down_revision: str | None = "0059"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

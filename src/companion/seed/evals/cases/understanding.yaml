@@ -547,8 +547,10 @@ cases:
         Maya is 34, a nurse in Melbourne who grew up in Penang. She is
         studying part time for a ward manager role.
       curiosities:
-        - question: Is your mum back home in Singapore now?
-          why: She said her mum went back to Singapore after a visit.
+        - question: Is your mum back home after her visit?
+          why: >-
+            Her mum stayed with her for a week, then flew home, landing at
+            Changi, Singapore's airport.
           not_before_days_ago: 0
           guess: their mum lives in Singapore
           how_sure: medium

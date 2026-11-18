@@ -896,6 +896,12 @@ MOVE_ROLE_FIELD = ShapeField(
     default="lead",
 )
 
+LOW_MEDIUM_HIGH_OPTIONS = [
+    ChoiceOption("low", "Low"),
+    ChoiceOption("medium", "Medium"),
+    ChoiceOption("high", "High"),
+]
+
 MOVE_RESULT_OPTIONS = [
     ChoiceOption("helped", "Helped"),
     ChoiceOption("didnt_help", "Didn't help"),
@@ -971,11 +977,7 @@ UNDERSTANDING_MEMORY_FIELD = ShapeField(
                     "How carefully it must be asked. High ones wait for the "
                     "right moment. Empty means low.",
                     FieldKind.CHOICE,
-                    options=[
-                        ChoiceOption("low", "Low"),
-                        ChoiceOption("medium", "Medium"),
-                        ChoiceOption("high", "High"),
-                    ],
+                    options=LOW_MEDIUM_HIGH_OPTIONS,
                     default="low",
                 ),
                 long_text_field(
@@ -991,11 +993,7 @@ UNDERSTANDING_MEMORY_FIELD = ShapeField(
                     "How sure",
                     "How sure Zeph is of the guess. Empty means low.",
                     FieldKind.CHOICE,
-                    options=[
-                        ChoiceOption("low", "Low"),
-                        ChoiceOption("medium", "Medium"),
-                        ChoiceOption("high", "High"),
-                    ],
+                    options=LOW_MEDIUM_HIGH_OPTIONS,
                 ),
             ],
         ),

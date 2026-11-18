@@ -718,6 +718,28 @@ def to_eval_thread(entry: dict[str, Any]) -> EvalThread:
     )
 
 
+def to_eval_curiosity(entry: dict[str, Any]) -> EvalCuriosity:
+    """Read a waiting Curiosity as written in the case.
+
+    Args:
+        entry: A mapping with `question` and `why`, and optionally
+            `not_before_days_ago`, `sensitivity`, `guess` and `how_sure`.
+
+    Returns:
+        The Curiosity; a guess without `how_sure` is low, and `how_sure` is
+        dropped without a guess.
+    """
+    guess = entry.get("guess") or None
+    return EvalCuriosity(
+        question=entry["question"],
+        why=entry["why"],
+        not_before_days_ago=entry.get("not_before_days_ago", 0),
+        sensitivity=CuriositySensitivity(entry.get("sensitivity") or "low"),
+        guess=guess,
+        how_sure=HowSure(entry.get("how_sure") or "low") if guess else None,
+    )
+
+
 def to_eval_memory(entry: dict[str, Any]) -> EvalMemory:
     """Read a case's made-up User Memory.
 
@@ -742,17 +764,7 @@ def to_eval_memory(entry: dict[str, Any]) -> EvalMemory:
         ],
         threads=[to_eval_thread(thread) for thread in entry.get("threads") or []],
         curiosities=[
-            EvalCuriosity(
-                question=curiosity["question"],
-                why=curiosity["why"],
-                not_before_days_ago=curiosity.get("not_before_days_ago", 0),
-                sensitivity=CuriositySensitivity(curiosity.get("sensitivity") or "low"),
-                guess=curiosity.get("guess") or None,
-                how_sure=HowSure(curiosity.get("how_sure") or "low")
-                if curiosity.get("guess")
-                else None,
-            )
-            for curiosity in entry.get("curiosities") or []
+            to_eval_curiosity(curiosity) for curiosity in entry.get("curiosities") or []
         ],
         knowledge_documents=[
             EvalKnowledgeDocument(
