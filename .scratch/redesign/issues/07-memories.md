@@ -1,6 +1,6 @@
 # 07 — Redesign: Memories (six tabs)
 
-Status: ready-for-agent
+Status: in-progress
 
 Lane: A. README slice: 3.
 
@@ -47,3 +47,10 @@ Refs: `Memories`, `Memories--tab-about`, `Memories--tab-threads`, `Memories--tab
 - [ ] `/code-review` run, and findings fixed or answered.
 
 ## Comments
+
+### 2026-11-18 — plan (agent, branch `redesign-07-memories`)
+
+- Tab is read from `?tab=` on load and written with `history.replaceState` on click (no page load). The Memories tab has no `?tab=`; other params are kept.
+- Restyle the six panels from the refs. Reuse `PageHero` (new `memories` background), `filledPill`/`outlinedPill`, and the issue 03 parts: `LoadingPanel`, `LoadFailed`, `EmptyState`, `PausedNotice`, `ConfirmDialog`.
+- Choices taken from the refs/States sheet (will report): no category pill or "N memories" count on the Memories tab; Delete all uses the States confirm dialog; Life Thread pill reads "Closed" (was "Settled"); What helps uses When/Feeling/Why rows; summaries and photos show the short day ("12 Nov"); Portrait says "Written"; the memory note shows in `PausedNotice` (bold part as title, rest as body, "Turn memory on" when the User paused it).
+- Photos: the 120px box holds the real image; while it loads it shows "Photo" as drawn. The fixture image never resolves, so the drawn placeholder is what the test sees.

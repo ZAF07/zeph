@@ -27,6 +27,6 @@ export const dangerButton = `${base} border-danger bg-transparent text-danger ho
  */
 export const confirmDangerButton = dangerButton;
 
-/** A round icon-only delete button inside a list row. */
+/** An icon-only delete button inside a card or list row. */
 export const deleteIconButton =
-  "inline-flex size-11 flex-none cursor-pointer items-center justify-center rounded-full border border-transparent bg-transparent text-danger disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex size-11 flex-none cursor-pointer items-center justify-center rounded-input border-0 bg-transparent p-0 text-soft disabled:cursor-not-allowed disabled:opacity-60";

@@ -2,17 +2,19 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { deleteIconButton } from "@/components/button-styles";
-import { DeleteIcon } from "@/components/DeleteIcon";
 import { EmptyState } from "@/components/EmptyState";
+import { MemoriesPanelHeading } from "@/components/MemoriesPanelHeading";
+import { MemoryCard } from "@/components/MemoryCard";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type { UserPortrait } from "@/lib/api-client";
 import { formatShortDay } from "@/lib/dates";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 /**
- * The "About you" tab, headed "What I know about you": Zeph's User Portrait of the User and when
- * it was last written. It can be deleted, but not edited.
+ * The "About you" tab, headed "What I know about you": Zeph's User Portrait
+ * of the User and when it was last written. It can be deleted, but not
+ * edited.
  *
  * @param props - `portrait` is the User's Portrait, or null if they have
  *   none, and `timeZone` is the User's time zone.
@@ -34,48 +36,39 @@ export function UserPortraitSection({
   });
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1.5">
-        <h2 className="m-0 text-[15px] font-semibold">What I know about you</h2>
-        <p className="m-0 text-caption text-ink-muted">
-          Zeph’s short picture of you, written from your memories, so every
-          reply comes from knowing you. Delete it and Zeph stops using it; it is
-          written again after a later Conversation, while Memory is on.
-        </p>
-      </div>
+    <>
+      <MemoriesPanelHeading
+        title="What I know about you"
+        body="Zeph's short picture of you, written from your memories, so every reply comes from knowing you. Delete it and Zeph stops using it; it is written again after a later Conversation, while Memory is on."
+      />
 
       {deletePortrait.isError ? (
-        <p role="alert" className="m-0 text-sm text-danger-deep">
+        <SaveFailedNote>
           We couldn’t delete that. Please try again.
-        </p>
+        </SaveFailedNote>
       ) : null}
 
       {portrait ? (
-        <div className="flex items-start gap-4 rounded-card border border-line bg-white py-5 pr-5 pl-6">
-          <span className="flex min-w-0 flex-auto flex-col gap-2">
-            <span className="whitespace-pre-line text-[15px]">
+        <MemoryCard
+          deleteLabel="Delete what Zeph knows about you"
+          isDeleting={deletePortrait.isPending}
+          onDelete={() => deletePortrait.mutate()}
+        >
+          <div className="min-w-0">
+            <p className="mt-0 mb-2 text-[15px] whitespace-pre-line text-text">
               {portrait.text}
+            </p>
+            <span className="text-[12px] text-soft">
+              {`Written ${formatShortDay(portrait.updated_at, timeZone)}`}
             </span>
-            <span className="text-caption text-ink-muted">
-              {`Updated ${formatShortDay(portrait.updated_at, timeZone)}`}
-            </span>
-          </span>
-          <button
-            type="button"
-            aria-label="Delete what Zeph knows about you"
-            className={deleteIconButton}
-            disabled={deletePortrait.isPending}
-            onClick={() => deletePortrait.mutate()}
-          >
-            <DeleteIcon />
-          </button>
-        </div>
+          </div>
+        </MemoryCard>
       ) : (
         <EmptyState
           title="Nothing here yet"
           body="Zeph writes this a little while after a Conversation ends, while Memory is on."
         />
       )}
-    </div>
+    </>
   );
 }

@@ -2,17 +2,20 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { deleteIconButton } from "@/components/button-styles";
-import { DeleteIcon } from "@/components/DeleteIcon";
 import { EmptyState } from "@/components/EmptyState";
+import { MemoriesPanelHeading } from "@/components/MemoriesPanelHeading";
+import { MemoryCard } from "@/components/MemoryCard";
+import { MemoryDetailLine } from "@/components/MemoryDetailLine";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type { ConversationSummary } from "@/lib/api-client";
-import { formatWeekdayDay } from "@/lib/dates";
+import { formatShortDay } from "@/lib/dates";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 /**
  * The Conversation Summaries tab: a read-only list by date, newest first,
- * with how the User seemed; each summary can be deleted.
+ * with how the User seemed and what Zeph offered; each summary can be
+ * deleted.
  *
  * @param props - `summaries` are the User's Conversation Summaries, newest
  *   first, and `timeZone` is the User's time zone.
@@ -39,54 +42,44 @@ export function ConversationSummariesList({
   });
 
   return (
-    <div className="flex flex-col gap-6">
-      <p className="m-0 text-caption text-ink-muted">
-        After each Conversation, Zeph writes a short note so it can pick up
-        where you left off. These stay until you delete them.
-      </p>
+    <>
+      <MemoriesPanelHeading
+        title="Conversation Summaries"
+        body="After each Conversation, Zeph writes a short note so it can pick up where you left off. These stay until you delete them."
+      />
 
       {deleteSummary.isError ? (
-        <p role="alert" className="m-0 text-sm text-danger-deep">
+        <SaveFailedNote>
           We couldn’t delete that. Please try again.
-        </p>
+        </SaveFailedNote>
       ) : null}
 
       {summaries.length > 0 ? (
-        <ol className="m-0 flex list-none flex-col gap-3 p-0">
+        <ol className="m-0 flex list-none flex-col gap-6 p-0">
           {summaries.map((summary) => {
-            const day = formatWeekdayDay(summary.created_at, timeZone);
+            const day = formatShortDay(summary.created_at, timeZone);
             return (
-              <li
-                key={summary.id}
-                className="flex items-start gap-4 rounded-card border border-line bg-white py-5 pr-5 pl-6"
-              >
-                <span className="flex min-w-0 flex-auto flex-col gap-2">
-                  <span className="text-caption font-semibold text-ink-body">
-                    {day}
-                  </span>
-                  <span className="text-[15px]">{summary.summary}</span>
-                  <span className="inline-flex items-center gap-2 text-caption text-ink-soft">
-                    <span
-                      aria-hidden="true"
-                      className="size-2 rounded-full bg-blue opacity-50"
-                    />
-                    You seemed {summary.mood}
-                  </span>
-                  {summary.offered ? (
-                    <span className="text-caption text-ink-soft">
-                      {summary.offered}
-                    </span>
-                  ) : null}
-                </span>
-                <button
-                  type="button"
-                  aria-label={`Delete summary from ${day}`}
-                  className={deleteIconButton}
-                  disabled={deleteSummary.isPending}
-                  onClick={() => deleteSummary.mutate(summary.id)}
+              <li key={summary.id}>
+                <MemoryCard
+                  deleteLabel={`Delete summary from ${day}`}
+                  isDeleting={deleteSummary.isPending}
+                  onDelete={() => deleteSummary.mutate(summary.id)}
                 >
-                  <DeleteIcon />
-                </button>
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <p className="m-0 text-[15px] text-text">
+                      {summary.summary}
+                    </p>
+                    <MemoryDetailLine label="Seemed">
+                      {summary.mood}
+                    </MemoryDetailLine>
+                    {summary.offered ? (
+                      <MemoryDetailLine label="Zeph offered">
+                        {summary.offered}
+                      </MemoryDetailLine>
+                    ) : null}
+                    <span className="text-[12px] text-soft">{day}</span>
+                  </div>
+                </MemoryCard>
               </li>
             );
           })}
@@ -97,6 +90,6 @@ export function ConversationSummariesList({
           body="They appear a little while after a Conversation ends."
         />
       )}
-    </div>
+    </>
   );
 }

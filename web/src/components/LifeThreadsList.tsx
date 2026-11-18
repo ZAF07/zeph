@@ -2,9 +2,11 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { deleteIconButton } from "@/components/button-styles";
-import { DeleteIcon } from "@/components/DeleteIcon";
+import { filledPill, outlinedPill } from "@/components/card-styles";
 import { EmptyState } from "@/components/EmptyState";
+import { MemoriesPanelHeading } from "@/components/MemoriesPanelHeading";
+import { MemoryCard } from "@/components/MemoryCard";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type { LifeThread } from "@/lib/api-client";
 import { formatShortDay } from "@/lib/dates";
 import { queryKeys } from "@/lib/queries";
@@ -12,7 +14,7 @@ import { useApiClient } from "@/lib/use-api-client";
 
 /**
  * The "What's going on in your life" tab: each Life Thread's story, whether
- * it is open or settled and when it was last updated, open ones first; each
+ * it is open or closed and when it was last updated, open ones first; each
  * can be deleted, so Zeph never brings it up again.
  *
  * @param props - `threads` are the User's Life Threads, open first, and
@@ -39,53 +41,47 @@ export function LifeThreadsList({
   });
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1.5">
-        <h2 className="m-0 text-[15px] font-semibold">
-          What’s going on in your life
-        </h2>
-        <p className="m-0 text-caption text-ink-muted">
-          The ongoing stories Zeph follows, so it can ask how things went.
-          Delete one and Zeph won’t bring it up again.
-        </p>
-      </div>
+    <>
+      <MemoriesPanelHeading
+        title="What's going on in your life"
+        body="The ongoing stories Zeph follows, so it can ask how things went. Delete one and Zeph won't bring it up again."
+      />
 
       {deleteThread.isError ? (
-        <p role="alert" className="m-0 text-sm text-danger-deep">
+        <SaveFailedNote>
           We couldn’t delete that. Please try again.
-        </p>
+        </SaveFailedNote>
       ) : null}
 
       {threads.length > 0 ? (
-        <ul className="m-0 flex list-none flex-col gap-3 p-0">
+        <ul className="m-0 flex list-none flex-col gap-6 p-0">
           {threads.map((thread) => (
-            <li
-              key={thread.id}
-              className="flex items-start gap-4 rounded-card border border-line bg-white py-5 pr-5 pl-6"
-            >
-              <span className="flex min-w-0 flex-auto flex-col gap-2">
-                <span className="flex flex-wrap items-center gap-2">
-                  <span className="text-[15px] font-semibold">
-                    {thread.title}
-                  </span>
-                  <span className="inline-flex items-center whitespace-nowrap rounded-full bg-code px-2.5 py-[3px] text-xs font-medium text-ink-body">
-                    {thread.is_open ? "Open" : "Settled"}
-                  </span>
-                </span>
-                <span className="text-[15px]">{thread.story}</span>
-                <span className="text-caption text-ink-muted">
-                  {`Updated ${formatShortDay(thread.updated_at, timeZone)}`}
-                </span>
-              </span>
-              <button
-                type="button"
-                aria-label={`Delete story: ${thread.title}`}
-                className={deleteIconButton}
-                disabled={deleteThread.isPending}
-                onClick={() => deleteThread.mutate(thread.id)}
+            <li key={thread.id}>
+              <MemoryCard
+                deleteLabel={`Delete story: ${thread.title}`}
+                isDeleting={deleteThread.isPending}
+                onDelete={() => deleteThread.mutate(thread.id)}
+                roomy={false}
               >
-                <DeleteIcon />
-              </button>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="text-[16px] font-normal text-text">
+                      {thread.title}
+                    </span>
+                    <span
+                      className={thread.is_open ? filledPill : outlinedPill}
+                    >
+                      {thread.is_open ? "Open" : "Closed"}
+                    </span>
+                  </div>
+                  <p className="mt-2 mb-1.5 text-[14px] text-soft">
+                    {thread.story}
+                  </p>
+                  <span className="text-[12px] text-soft">
+                    {`Updated ${formatShortDay(thread.updated_at, timeZone)}`}
+                  </span>
+                </div>
+              </MemoryCard>
             </li>
           ))}
         </ul>
@@ -95,6 +91,6 @@ export function LifeThreadsList({
           body="When you tell Zeph about something ongoing, it appears here a little while after the Conversation ends."
         />
       )}
-    </div>
+    </>
   );
 }
