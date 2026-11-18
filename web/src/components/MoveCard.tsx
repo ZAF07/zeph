@@ -19,8 +19,7 @@ import {
 /**
  * One Move as an editable card: name, "when it fits", "how to do it", the
  * Feature it needs, whether it asks a question, Move up and down, Save and
- * Remove. A new Move's card has
- * Add and Cancel instead.
+ * Remove. A new Move's card has Add and Cancel instead.
  *
  * @param props - `initial` fills the card; `isNew` marks a Move not saved
  *   yet; `features` are the Features it can need; `onSave` saves and

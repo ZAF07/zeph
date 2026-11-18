@@ -49,6 +49,7 @@ from tests.fakes import (
 )
 from tests.telegram_helpers import owner_headers
 from tests.test_moves import stored_rule_outs
+from tests.test_moves_that_ask_a_question import tick_asks_a_question
 from tests.test_understanding import seeded_needs
 
 PERSONA_CASE = EvalCase(
@@ -1966,20 +1967,6 @@ def test_make_live_saves_a_move_override_and_keeps_its_needed_feature(
         "Search and compare.",
     )
     assert move.needed_feature == Feature.WEB_SEARCH
-
-
-def tick_asks_a_question(
-    client: TestClient, admin: dict[str, str], name: str, ticked: bool = True
-) -> None:
-    """Tick, or untick, a live Move's "asks a question" as an Admin."""
-    moves = client.get("/api/admin/moves", headers=admin).json()["moves"]
-    [move] = [move for move in moves if move["name"] == name]
-    response = client.put(
-        f"/api/admin/moves/{move['id']}",
-        json={**move, "asks_a_question": ticked},
-        headers=admin,
-    )
-    assert response.status_code == 200, response.text
 
 
 def test_a_run_keeps_each_moves_asks_a_question_in_its_snapshot(

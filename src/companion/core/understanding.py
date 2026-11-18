@@ -190,10 +190,10 @@ def moves_that_work(moves: Sequence[Move], working: set[Feature]) -> list[Move]:
     ]
 
 
-def moves_not_asked_last_time(
+def moves_without_repeat_questions(
     moves: Sequence[Move], earlier: Sequence[Understanding]
 ) -> list[Move]:
-    """List the Moves not left out for having just asked the User a question.
+    """List the Moves, leaving out a question-asking one made in the previous reply.
 
     A Move that asks a question is left out when the previous Understanding
     in the Conversation made it, as lead or supporting, so it is never made
@@ -994,7 +994,7 @@ class UnderstandingService:
         earlier = self._repositories.understandings.list_for_conversation(
             conversation_id
         )
-        moves = moves_not_asked_last_time(
+        moves = moves_without_repeat_questions(
             moves_that_work(
                 self._repositories.moves.list_all(), self._working_features(snapshot)
             ),
@@ -1028,8 +1028,9 @@ class UnderstandingService:
             form = model_form
             need = find_need(needs, form.need)
         asked_why = should_ask_why(form, earlier)
+        asks_another_question = asked_why or bool(form.curiosities)
         picked = pick_moves(need, needs, moves, form)
-        if asked_why or form.curiosities:
+        if asks_another_question:
             picked = drop_moves_that_ask(picked)
         understanding = Understanding(
             id=uuid4(),
@@ -1061,9 +1062,7 @@ class UnderstandingService:
                 format_threads_for_reply(reminded, model_form, snapshot.user.time_zone),
                 format_curiosities_for_reply(form.curiosities),
             ),
-            asks_a_question=(
-                asked_why or bool(form.curiosities) or picked.asks_a_question
-            ),
+            asks_a_question=asks_another_question or picked.asks_a_question,
         )
 
     def _working_features(self, snapshot: UserSnapshot) -> set[Feature]:

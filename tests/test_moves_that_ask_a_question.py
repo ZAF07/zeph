@@ -28,15 +28,14 @@ RAISE_CURIOSITY = {"bring_up": [{"curiosity": 1, "how": "lead"}]}
 
 
 def tick_asks_a_question(
-    client: TestClient, auth_verifier: FakeAuthVerifier, name: str
+    client: TestClient, admin: dict[str, str], name: str, ticked: bool = True
 ) -> None:
-    """Tick a Move's "asks a question" on the admin Moves API."""
-    admin = owner_headers(client, auth_verifier)
+    """Tick, or untick, a Move's "asks a question" on the admin Moves API."""
     moves = client.get("/api/admin/moves", headers=admin).json()["moves"]
     [move] = [move for move in moves if move["name"] == name]
     response = client.put(
         f"/api/admin/moves/{move['id']}",
-        json={**move, "asks_a_question": True},
+        json={**move, "asks_a_question": ticked},
         headers=admin,
     )
     assert response.status_code == 200, response.text
@@ -55,7 +54,7 @@ def test_a_move_that_asks_made_last_reply_is_offered_again_only_the_reply_after(
     chat_model: ScriptedChatModel,
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
-    tick_asks_a_question(client, auth_verifier, "Suggest")
+    tick_asks_a_question(client, owner_headers(client, auth_verifier), "Suggest")
 
     reply_to(client, chat_model, "bored tonight", lead_move="Suggest")
     reply_to(client, chat_model, "maybe a film")
@@ -75,7 +74,7 @@ def test_a_move_that_asks_made_as_support_is_not_offered_next_reply(
     chat_model: ScriptedChatModel,
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
-    tick_asks_a_question(client, auth_verifier, "Mirror")
+    tick_asks_a_question(client, owner_headers(client, auth_verifier), "Mirror")
 
     reply_to(
         client,
@@ -99,7 +98,7 @@ def test_a_move_that_asks_is_dropped_when_the_reply_asks_why(
     engine: Engine,
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
-    tick_asks_a_question(client, auth_verifier, "Suggest")
+    tick_asks_a_question(client, owner_headers(client, auth_verifier), "Suggest")
 
     instructions = reply_to(
         client, chat_model, "ugh, today", lead_move="Suggest", **ASK_WHY
@@ -122,7 +121,7 @@ def test_a_move_that_asks_is_dropped_when_the_reply_raises_a_curiosity(
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
     presentation_is_due(client, chat_model, clock, scheduler, seeded_settings)
-    tick_asks_a_question(client, auth_verifier, "Suggest")
+    tick_asks_a_question(client, owner_headers(client, auth_verifier), "Suggest")
 
     instructions = reply_to(
         client, chat_model, "hey you", lead_move="Suggest", **RAISE_CURIOSITY
@@ -141,7 +140,7 @@ def test_a_dropped_lead_move_that_asks_does_not_let_the_support_move_up(
     engine: Engine,
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
-    tick_asks_a_question(client, auth_verifier, "Suggest")
+    tick_asks_a_question(client, owner_headers(client, auth_verifier), "Suggest")
 
     instructions = reply_to(
         client,
@@ -191,7 +190,7 @@ def woven_call_told(
         What the Woven-in Check-in model was given.
     """
     set_up_user_with_check_ins(client, auth_verifier, chat_channel)
-    tick_asks_a_question(client, auth_verifier, "Suggest")
+    tick_asks_a_question(client, owner_headers(client, auth_verifier), "Suggest")
     open_a_conversation_until_due(client, chat_model, chat_channel, clock)
     chat_model.script_understanding(understanding_answer(**answer))
     chat_model.script("ok")
