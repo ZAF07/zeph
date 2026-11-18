@@ -112,3 +112,8 @@ The Admin sidebar differs only in which item is marked. The reference marks Over
 - Standards: no hard breaches. The current-page check for User links is now one helper (`isUserItemCurrent`). Kept as they are: the two fold SVGs, since each is used once; the `action` and `className` props, which the two layouts need; and `browserStorage()`, the injected default.
 - Spec: fixed the phone menu staying open after the wordmark or Back (it now closes on any page change), the missing 150ms ease on wordmark hover, and the fold flash (cookie, above). The `<a>` → `<button>` change is answered above.
 
+
+## Completion
+
+- Completed: 2026-11-18
+- Commit: merge `1e89ef3` into main (branch `redesign-02-shell`: `bc04bea` shell, `9209318` code-review fixes, `9f51e3c` fold cookie, `d401de0` evidence and archive)
