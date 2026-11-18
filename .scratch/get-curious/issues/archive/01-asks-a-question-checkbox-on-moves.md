@@ -68,4 +68,10 @@ None - can start immediately.
 ## Completion
 
 - Completed: 2026-11-18
-- Commits: <filled in after merge>
+- Commits:
+  - `d553b87` Get-curious issue 01: "Asks a question" checkbox on Moves
+  - `8ff7363` Get-curious issue 01: review fixes — one test helper, name the other-question check once, clearer filter name
+  - `f79905b` Get-curious issue 01: Asks a question label wraps as one line of text at phone width
+  - `e1ffaf5` Get-curious issue 01: renumber the asks-a-question migration to 0059, after issue 02's 0058
+  - `aea45e3` Get-curious issue 01 done: archive issue with check, review and run evidence; CONTEXT.md Move lists Asks a question
+  - `55c9dbf` Merge get-curious issue 01 into main
