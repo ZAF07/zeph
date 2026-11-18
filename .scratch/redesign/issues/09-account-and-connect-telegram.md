@@ -49,3 +49,5 @@ Refs: `Account`, `M-Account`, `ConnectTelegram`, `M-ConnectTelegram`.
 - [ ] `/code-review` run, and findings fixed or answered.
 
 ## Comments
+
+- 2026-11-18 — From issue 02: the `getPlatformContent` fixture lives in `web/src/lib/design-fixtures/shell.ts`. Only `ai_notice_short` (the sidebar line) and `message_retention_days: 30` are filled in. If this page shows the other fields, fill them from its reference there; it is the shared shell fixture, so mention it in the issue.

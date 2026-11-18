@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AdminGate } from "@/components/AdminGate";
 import { OnboardingGate } from "@/components/OnboardingGate";
-import { SidebarAdminBadge } from "@/components/SidebarAdminBadge";
+import { SidebarAccount } from "@/components/SidebarAccount";
 import type { ApiClient, Me } from "@/lib/api-client";
 import { renderWithQueries } from "@/test/render-with-queries";
 
@@ -87,7 +87,7 @@ describe("OnboardingGate", () => {
 
     renderWithQueries(
       <>
-        <SidebarAdminBadge />
+        <SidebarAccount />
         <OnboardingGate>
           <AdminGate>Admin page</AdminGate>
         </OnboardingGate>

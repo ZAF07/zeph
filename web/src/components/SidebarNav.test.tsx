@@ -19,8 +19,6 @@ vi.mock("next/navigation", () => ({
   usePathname: () => navigation.pathname,
 }));
 
-const userItems = [{ id: "home", label: "Home", href: "/", iconPath: "M0 0" }];
-
 describe("SidebarNav", () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -30,11 +28,12 @@ describe("SidebarNav", () => {
   it("shows the Admin group to an Admin, marking the page being viewed", async () => {
     apiClient.getMe.mockResolvedValue(userWithRole("admin"));
 
-    renderWithQueries(<SidebarNav items={userItems} />);
+    renderWithQueries(<SidebarNav />);
 
     const adminGroup = await screen.findByRole("group", { name: "Admin" });
     const links = within(adminGroup).getAllByRole("link");
     expect(links.map((link) => link.textContent)).toEqual([
+      "OverviewTo build",
       "Users",
       "Persona",
       "Prompts & models",
@@ -53,6 +52,7 @@ describe("SidebarNav", () => {
       "Usage",
       "Model call log",
       "Evals",
+      "PlansTo build",
     ]);
     expect(
       within(adminGroup).getByRole("link", { name: "Persona" }),
@@ -63,7 +63,7 @@ describe("SidebarNav", () => {
     apiClient.getMe.mockResolvedValue(userWithRole("admin"));
     navigation.pathname = "/admin/knowledge/letters";
 
-    renderWithQueries(<SidebarNav items={userItems} />);
+    renderWithQueries(<SidebarNav />);
 
     const adminGroup = await screen.findByRole("group", { name: "Admin" });
     expect(
@@ -74,7 +74,7 @@ describe("SidebarNav", () => {
   it("hides the Admin group from a User who is not an Admin", async () => {
     apiClient.getMe.mockResolvedValue(userWithRole("user"));
 
-    renderWithQueries(<SidebarNav items={userItems} />);
+    renderWithQueries(<SidebarNav />);
 
     await vi.waitFor(() => expect(apiClient.getMe).toHaveBeenCalled());
     expect(screen.getByRole("link", { name: "Home" })).toBeInTheDocument();

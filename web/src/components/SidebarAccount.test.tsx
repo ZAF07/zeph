@@ -19,14 +19,25 @@ describe("SidebarAccount", () => {
     apiClient.getMe.mockReset();
   });
 
-  it("shows the User's name, initial and email from /me", async () => {
+  it("shows the User's name and email from /me", async () => {
     apiClient.getMe.mockResolvedValue(userWithRole("user"));
 
     renderWithQueries(<SidebarAccount />);
 
     expect(await screen.findByText("Maya")).toBeInTheDocument();
     expect(screen.getByText("maya@example.com")).toBeInTheDocument();
-    expect(screen.getByText("M")).toBeInTheDocument();
+  });
+
+  it("keeps the full name and email on hover, for when they are cut short", async () => {
+    apiClient.getMe.mockResolvedValue(userWithRole("user"));
+
+    renderWithQueries(<SidebarAccount />);
+
+    expect(await screen.findByText("Maya")).toHaveAttribute("title", "Maya");
+    expect(screen.getByText("maya@example.com")).toHaveAttribute(
+      "title",
+      "maya@example.com",
+    );
   });
 
   it("shows the email as the name when the User has no name", async () => {
@@ -49,11 +60,22 @@ describe("SidebarAccount", () => {
     expect(screen.queryByText("Maya")).not.toBeInTheDocument();
   });
 
-  it("shows the Admin badge for an Admin", async () => {
+  it("shows Admin in place of the email for an Admin", async () => {
     apiClient.getMe.mockResolvedValue(userWithRole("admin"));
 
     renderWithQueries(<SidebarAccount />);
 
     expect(await screen.findByText("Admin")).toBeInTheDocument();
+    expect(screen.queryByText("maya@example.com")).toBeNull();
+  });
+
+  it("puts the given action at the end of the row", async () => {
+    apiClient.getMe.mockResolvedValue(userWithRole("user"));
+
+    renderWithQueries(<SidebarAccount action={<button>Sign out</button>} />);
+
+    expect(
+      await screen.findByRole("button", { name: "Sign out" }),
+    ).toBeInTheDocument();
   });
 });

@@ -3,119 +3,89 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { MenuIcon } from "@/components/MenuIcon";
+import { menuLinkHover } from "@/components/menu-styles";
+import { ToBuildTag } from "@/components/ToBuildTag";
+import {
+  adminMenuItems,
+  isAdminItemCurrent,
+  isUserItemCurrent,
+  userMenuItems,
+} from "@/lib/dashboard-menu";
 import { useIsAdmin } from "@/lib/use-is-admin";
 
-/** One link in the Dashboard sidebar. */
-export type SidebarItem = {
-  id: string;
-  label: string;
-  href: string;
-  iconPath: string;
-};
-
-/** The admin pages built so far; later issues add the rest. */
-const adminItems = [
-  { label: "Users", href: "/admin/users" },
-  { label: "Persona", href: "/admin/persona" },
-  { label: "Prompts & models", href: "/admin/prompts" },
-  { label: "Safety", href: "/admin/safety" },
-  { label: "Safeguard Events", href: "/admin/safeguard-events" },
-  { label: "Knowledge", href: "/admin/knowledge" },
-  { label: "Memory Categories", href: "/admin/memory-categories" },
-  { label: "Needs", href: "/admin/needs" },
-  { label: "Moves", href: "/admin/moves" },
-  { label: "Check-in Kinds", href: "/admin/check-in-kinds" },
-  { label: "Check-in log", href: "/admin/check-in-log" },
-  { label: "Check-in Schedule", href: "/admin/check-in-schedule" },
-  { label: "Sticker Library", href: "/admin/stickers" },
-  { label: "Features", href: "/admin/features" },
-  { label: "Platform settings", href: "/admin/settings" },
-  { label: "Usage", href: "/admin/usage" },
-  { label: "Model call log", href: "/admin/model-calls" },
-  { label: "Evals", href: "/admin/evals" },
-];
+/**
+ * Class names for a menu link, marked when it is the page being viewed.
+ *
+ * @param size - The User links' size, or the smaller admin links'.
+ * @param isCurrent - Whether the link is the page being viewed.
+ * @returns The link's class names.
+ */
+function menuLinkClass(size: "user" | "admin", isCurrent: boolean): string {
+  const sizing =
+    size === "user" ? "min-h-11 text-[14px]" : "min-h-10 text-[13px]";
+  const colours = isCurrent
+    ? "bg-panel text-cream"
+    : `text-soft ${menuLinkHover}`;
+  return `flex items-center gap-3 rounded-input px-3.5 font-normal no-underline ${sizing} ${colours}`;
+}
 
 /**
- * The sidebar's page links, highlighting the page being viewed. Admins also
- * see an Admin group of links; an admin link stays highlighted on the pages
- * under it, like a Knowledge document's page.
+ * The menu's page links, in the sidebar and the phone menu, marking the page
+ * being viewed. Admins also see the Admin section.
  *
- * @param props - `items` are the User page links to show.
+ * @param props - `onLinkChoose` runs when a link is chosen, so the phone menu can close.
  * @returns The navigation.
  */
-export function SidebarNav({ items }: { items: SidebarItem[] }) {
+export function SidebarNav({ onLinkChoose }: { onLinkChoose?: () => void }) {
   const pathname = usePathname();
   const isAdmin = useIsAdmin();
   return (
-    <nav aria-label="Dashboard" className="flex flex-col gap-5">
-      <ul className="m-0 flex list-none flex-wrap gap-0.5 p-0">
-        {items.map((item) => {
-          const isActive = item.href === pathname;
-          return (
-            <li key={item.id} className="flex-[1_1_150px]">
-              <Link
-                href={item.href}
-                aria-current={isActive ? "page" : undefined}
-                className={`flex min-h-11 items-center gap-3 rounded-input px-3 py-2.5 text-[15px] no-underline ${
-                  isActive
-                    ? "bg-hover font-semibold text-ink"
-                    : "bg-transparent text-ink-body"
-                }`}
-              >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                  className="flex-none"
-                >
-                  <path d={item.iconPath} />
-                </svg>
-                <span className="flex-1">{item.label}</span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-
+    <nav aria-label="Dashboard" className="flex flex-col gap-0.5">
+      {userMenuItems.map((item) => {
+        const isCurrent = isUserItemCurrent(item.href, pathname);
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            aria-current={isCurrent ? "page" : undefined}
+            onClick={onLinkChoose}
+            className={menuLinkClass("user", isCurrent)}
+          >
+            <MenuIcon path={item.iconPath} />
+            <span>
+              {item.label}
+              {item.toBuild ? <ToBuildTag /> : null}
+            </span>
+          </Link>
+        );
+      })}
       {isAdmin ? (
         <div
           role="group"
-          aria-labelledby="sidebar-admin-heading"
-          className="flex flex-col gap-1.5 border-t border-line pt-4"
+          aria-label="Admin"
+          className="mt-3 flex flex-col gap-px border-t border-line pt-3.5"
         >
-          <span
-            id="sidebar-admin-heading"
-            className="px-3 font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted"
-          >
+          <div className="px-3.5 pb-1.5 text-[11px] font-medium tracking-[2px] text-soft uppercase">
             Admin
-          </span>
-          <ul className="m-0 flex list-none flex-wrap gap-px p-0">
-            {adminItems.map((item) => {
-              const isActive =
-                item.href === pathname || pathname.startsWith(`${item.href}/`);
-              return (
-                <li key={item.href} className="flex-[1_1_150px]">
-                  <Link
-                    href={item.href}
-                    aria-current={isActive ? "page" : undefined}
-                    className={`flex min-h-10 items-center rounded-lg px-3 py-2 text-sm no-underline ${
-                      isActive
-                        ? "bg-hover font-semibold text-ink"
-                        : "bg-transparent text-ink-body"
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+          </div>
+          {adminMenuItems.map((item) => {
+            const isCurrent = isAdminItemCurrent(item.href, pathname);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={isCurrent ? "page" : undefined}
+                onClick={onLinkChoose}
+                className={menuLinkClass("admin", isCurrent)}
+              >
+                <span>
+                  {item.label}
+                  {item.toBuild ? <ToBuildTag /> : null}
+                </span>
+              </Link>
+            );
+          })}
         </div>
       ) : null}
     </nav>

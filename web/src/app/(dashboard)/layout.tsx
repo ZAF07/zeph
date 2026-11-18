@@ -1,16 +1,19 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { DashboardShell } from "@/components/DashboardShell";
 import { OnboardingGate } from "@/components/OnboardingGate";
-import { Sidebar } from "@/components/Sidebar";
 import { isSignedIn } from "@/lib/auth/server";
+import { isMenuFoldedCookie, MENU_FOLDED_COOKIE } from "@/lib/menu-fold";
 
 /**
- * The Dashboard shell: sidebar beside the page, for User and admin pages
- * alike. Users who have not finished onboarding are sent there first.
+ * The Dashboard frame around User and admin pages alike. Users who have not
+ * finished onboarding are sent there first. The fold cookie decides whether
+ * the sidebar is drawn folded from the first paint.
  *
  * @param props - `children` is the page.
- * @returns The shell.
+ * @returns The page in its frame.
  */
 export default async function DashboardLayout({
   children,
@@ -20,14 +23,12 @@ export default async function DashboardLayout({
   if (!(await isSignedIn())) {
     redirect("/sign-in");
   }
+  const menuFolded = isMenuFoldedCookie(
+    (await cookies()).get(MENU_FOLDED_COOKIE)?.value,
+  );
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
-      <div className="md:w-[260px] md:flex-none">
-        <Sidebar />
-      </div>
-      <main className="min-w-0 flex-1 px-4 py-12 md:px-12">
-        <OnboardingGate>{children}</OnboardingGate>
-      </main>
-    </div>
+    <DashboardShell initialMenuFolded={menuFolded}>
+      <OnboardingGate>{children}</OnboardingGate>
+    </DashboardShell>
   );
 }

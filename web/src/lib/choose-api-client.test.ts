@@ -39,6 +39,18 @@ describe("chooseApiClient", () => {
     expect(await client.getMe()).toMatchObject({ name: "Zaf", role: "admin" });
   });
 
+  it("gives the shell the AI notice drawn in the sidebar", async () => {
+    const client = chooseApiClient(
+      { apiUrl, designFixtures: true },
+      getToken,
+      "",
+    );
+
+    expect(await client.getPlatformContent()).toMatchObject({
+      ai_notice_short: "Zeph is an AI, not a therapist or crisis service.",
+    });
+  });
+
   it("fails a call that has no fixture yet, naming it", async () => {
     const client = chooseApiClient(
       { apiUrl, designFixtures: true },

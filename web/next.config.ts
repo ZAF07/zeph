@@ -3,12 +3,14 @@ import type { NextConfig } from "next";
 import { checkServerSettings } from "@/env";
 
 /**
- * Builds the Next.js config, checking server settings first.
+ * Builds the Next.js config, checking server settings first. The dev-mode
+ * badge is off, because it sits over the sidebar's Sign out and the design
+ * pixel test would see it.
  *
  * @param phase - The Next.js phase the config is loaded for.
  * @returns The Next.js config.
  */
 export default function buildNextConfig(phase: string): NextConfig {
   checkServerSettings(phase);
-  return {};
+  return { devIndicators: false };
 }
