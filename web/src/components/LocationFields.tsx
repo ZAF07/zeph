@@ -42,8 +42,9 @@ function Chevron() {
  * page. No reason is given for asking the country.
  *
  * @param props - `country` and `timeZone` are the chosen values, with their
- *   change handlers; `countryCaption` is an optional line under the country and
- *   `timeZoneNote` an optional line under the time zone.
+ *   change handlers; `countryCaption` is an optional line under the country,
+ *   `timeZoneNote` an optional line under the time zone, and `inline` drops
+ *   their own row so they wrap with the fields around them.
  * @returns The two fields side by side.
  */
 export function LocationFields({
@@ -53,6 +54,7 @@ export function LocationFields({
   onTimeZoneChange,
   countryCaption,
   timeZoneNote,
+  inline = false,
 }: {
   country: string;
   timeZone: string;
@@ -60,12 +62,13 @@ export function LocationFields({
   onTimeZoneChange: (timeZone: string) => void;
   countryCaption?: string;
   timeZoneNote?: ReactNode;
+  inline?: boolean;
 }) {
   const countries = useMemo(() => countryOptions(), []);
   const timeZones = useMemo(() => timeZoneOptions(timeZone), [timeZone]);
 
   return (
-    <div className="flex flex-wrap gap-4">
+    <div className={inline ? "contents" : "flex flex-wrap gap-4"}>
       <label className={locationLabel}>
         <span className={locationName}>Country</span>
         <span className={selectBox}>

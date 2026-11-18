@@ -5,12 +5,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { QRCodeSVG } from "qrcode.react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import {
-  primaryButton,
-  quietButton,
-  secondaryButton,
-} from "@/components/button-styles";
+import { primaryButton, secondaryButton } from "@/components/button-styles";
+import { panelCard } from "@/components/card-styles";
+import { LoadFailed } from "@/components/LoadFailed";
 import { LoadingPanel } from "@/components/LoadingPanel";
+import { TelegramStateCard } from "@/components/TelegramStateCard";
 import type {
   ConnectionToken,
   TelegramConnectionStatus,
@@ -19,6 +18,18 @@ import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 const POLL_INTERVAL_MS = 3000;
+
+/** The words for each state where the link can't be used. */
+const linkProblemWords = {
+  expired: {
+    title: "This link has expired or was already used",
+    body: "For your security each link works once and only for a short while.",
+  },
+  connected_elsewhere: {
+    title: "That Telegram account is linked to another Zeph account",
+    body: "Sign in to that account and disconnect Telegram there first, or use a different Telegram account.",
+  },
+};
 
 /** Which state of the card is on screen. */
 type View =
@@ -72,14 +83,15 @@ function minutesLeft(expiresAt: string): number {
 
 /**
  * The Connect Telegram card. Shows every state of the link: ready (QR code,
- * `/start` code, Open in Telegram), waiting for hello, connected, expired or
+ * hidden on a phone where the button is the action, `/start` code, Open in
+ * Telegram), waiting for hello, connected, expired or
  * already used, linked to another account, and couldn't create a link. It
  * checks the backend every few seconds so it updates on its own, and once
  * connected Home loads again so it shows the connection.
  *
- * @param props - `compact` draws the loading and ready states as the small
- *   card on the onboarding Telegram step: QR code (hidden on a phone), Open in
- *   Telegram and the expiry, without the `/start` code.
+ * @param props - `compact` draws the ready state as the small card on the
+ *   onboarding Telegram step: QR code, Open in Telegram and the expiry,
+ *   without the `/start` code.
  * @returns The card.
  */
 export function TelegramConnectionCard({
@@ -145,17 +157,8 @@ export function TelegramConnectionCard({
     return () => clearInterval(timer);
   }, [isPolling, refresh]);
 
-  if (view.kind === "loading" && compact) {
-    return <LoadingPanel shape="card" label="Loading your Telegram link" />;
-  }
-
   if (view.kind === "loading") {
-    return (
-      <div
-        aria-busy="true"
-        className="h-[198px] rounded-card border border-line bg-subtle"
-      />
-    );
+    return <LoadingPanel shape="card" label="Loading your Telegram link" />;
   }
 
   if (view.kind === "ready" && compact) {
@@ -200,35 +203,47 @@ export function TelegramConnectionCard({
   if (view.kind === "ready") {
     const { token } = view;
     return (
-      <div className="flex flex-wrap items-center gap-6 rounded-card border border-line bg-white p-6">
-        <div
-          role="img"
-          aria-label="QR code"
-          className="flex size-[150px] flex-none items-center justify-center rounded-card border border-line bg-white"
-        >
-          <QRCodeSVG value={token.deep_link_url} size={126} />
-        </div>
-        <div className="flex min-w-0 flex-[1_1_220px] flex-col gap-3">
-          <a
-            href={token.deep_link_url}
-            target="_blank"
-            rel="noreferrer"
-            className={`${primaryButton} self-start`}
-            onClick={() => setView({ kind: "waiting", token })}
+      <div className={panelCard}>
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-6">
+          <div
+            role="img"
+            aria-label="QR code that opens Zeph in Telegram"
+            className="box-border flex size-[150px] flex-none items-center justify-center rounded-note bg-cream text-ink max-[899px]:hidden"
           >
-            Open in Telegram
-          </a>
-          <p className="m-0 text-sm text-ink-soft">
-            Or find{" "}
-            <strong className="font-semibold">@{token.bot_username}</strong> and
-            send:
-          </p>
-          <code className="self-start rounded-lg bg-code px-3 py-2 font-mono text-[15px]">
-            /start {token.token}
-          </code>
-          <p className="m-0 text-caption text-ink-muted">
-            Works once · expires in {minutesLeft(token.expires_at)} minutes
-          </p>
+            <QRCodeSVG
+              value={token.deep_link_url}
+              size={126}
+              bgColor="transparent"
+              fgColor="currentColor"
+            />
+          </div>
+          <div className="flex min-w-0 flex-[1_1_260px] flex-col items-start gap-3">
+            <a
+              href={token.deep_link_url}
+              target="_blank"
+              rel="noreferrer"
+              className={primaryButton}
+              onClick={() => setView({ kind: "waiting", token })}
+            >
+              Open in Telegram{" "}
+              <span aria-hidden="true" className="ml-2.5">
+                →
+              </span>
+            </a>
+            <p className="m-0 text-[14px] text-soft">
+              Or message{" "}
+              <span className="font-normal text-text">
+                @{token.bot_username}
+              </span>{" "}
+              and send:
+            </p>
+            <code className="rounded-input border border-line bg-bg-deep px-3.5 py-2 font-[monospace] text-[15px] text-text">
+              /start {token.token}
+            </code>
+            <span className="text-[12px] text-soft">
+              Works once · expires in {minutesLeft(token.expires_at)} minutes
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -237,141 +252,76 @@ export function TelegramConnectionCard({
   if (view.kind === "waiting") {
     const { token } = view;
     return (
-      <div
+      <TelegramStateCard
         role="status"
-        className="flex flex-col gap-3.5 rounded-card border border-line bg-white p-7"
-      >
-        <p className="m-0 flex items-center gap-3 text-[17px] font-medium">
-          <span
-            aria-hidden="true"
-            className="size-2.5 rounded-full bg-orange-text"
-          />
-          Waiting for you to say hello in Telegram…
-        </p>
-        <p className="m-0 text-[15px] text-ink-soft">
-          Once you press Start in Telegram, this page will update on its own.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={secondaryButton}
-            onClick={() => void refresh()}
-          >
-            I’ve pressed Start
-          </button>
-          <button
-            type="button"
-            className={quietButton}
-            onClick={() => setView({ kind: "ready", token })}
-          >
-            Show the code again
-          </button>
-        </div>
-      </div>
+        title="Waiting for you to say hello in Telegram…"
+        body="Once you press Start in Telegram, this page will update on its own."
+        actions={
+          <>
+            <button
+              type="button"
+              className={primaryButton}
+              onClick={() => void refresh()}
+            >
+              I’ve pressed Start
+            </button>
+            <button
+              type="button"
+              className={secondaryButton}
+              onClick={() => setView({ kind: "ready", token })}
+            >
+              Show the code again
+            </button>
+          </>
+        }
+      />
     );
   }
 
   if (view.kind === "connected") {
+    const connectedAs = view.telegramUsername
+      ? `Connected as @${view.telegramUsername}.`
+      : "Connected.";
     return (
-      <div
+      <TelegramStateCard
         role="status"
-        className="flex flex-col gap-3.5 rounded-card bg-blue-tint p-7"
-      >
-        <p className="m-0 flex items-center gap-3 text-[19px] font-semibold text-blue-deep">
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
+        title="Zeph just said hello in Telegram"
+        body={`${connectedAs} Reply whenever you’re ready, there’s no rush.`}
+        actions={
+          <Link href="/" className={primaryButton}>
+            Go to your Dashboard
+          </Link>
+        }
+      />
+    );
+  }
+
+  if (view.kind === "expired" || view.kind === "connected_elsewhere") {
+    const { title, body } = linkProblemWords[view.kind];
+    return (
+      <TelegramStateCard
+        role="alert"
+        isProblem
+        title={title}
+        body={body}
+        actions={
+          <button
+            type="button"
+            className={primaryButton}
+            onClick={() => void createLink()}
           >
-            <path d="M5 12l5 5 9-10" />
-          </svg>
-          Zeph just said hello in Telegram
-        </p>
-        <p className="m-0 text-[15px] text-blue-deep">
-          {view.telegramUsername
-            ? `Connected as @${view.telegramUsername}.`
-            : "Connected."}{" "}
-          Reply whenever you’re ready — there’s no rush.
-        </p>
-        <Link href="/" className={`${primaryButton} self-start`}>
-          Go to your Dashboard
-        </Link>
-      </div>
-    );
-  }
-
-  if (view.kind === "expired") {
-    return (
-      <div
-        role="alert"
-        className="flex flex-col gap-3.5 rounded-card border border-danger-line bg-danger-tint p-7"
-      >
-        <p className="m-0 text-[17px] font-semibold text-danger-deep">
-          This link has expired or was already used
-        </p>
-        <p className="m-0 text-[15px] text-ink-soft">
-          For your security each link works once and only for a short while. Get
-          a fresh one and try again.
-        </p>
-        <button
-          type="button"
-          className={`${primaryButton} self-start`}
-          onClick={() => void createLink()}
-        >
-          Get a new link
-        </button>
-      </div>
-    );
-  }
-
-  if (view.kind === "connected_elsewhere") {
-    return (
-      <div
-        role="alert"
-        className="flex flex-col gap-3.5 rounded-card bg-yellow-tint p-7"
-      >
-        <p className="m-0 text-[17px] font-semibold text-yellow-deep">
-          That Telegram account is linked to another Zeph account
-        </p>
-        <p className="m-0 text-[15px] text-ink-soft">
-          Sign in to that account and disconnect Telegram there first, or use a
-          different Telegram account.
-        </p>
-        <button
-          type="button"
-          className={`${secondaryButton} self-start`}
-          onClick={() => void createLink()}
-        >
-          Get a new link
-        </button>
-      </div>
+            Get a new link
+          </button>
+        }
+      />
     );
   }
 
   return (
-    <div
-      role="alert"
-      className="flex flex-col gap-3.5 rounded-card border border-danger-line bg-danger-tint p-7"
-    >
-      <p className="m-0 text-[17px] font-semibold text-danger-deep">
-        We couldn’t create your link
-      </p>
-      <p className="m-0 text-[15px] text-ink-soft">
-        Something went wrong on our side. Please try again in a moment.
-      </p>
-      <button
-        type="button"
-        className={`${secondaryButton} self-start`}
-        onClick={() => void createLink()}
-      >
-        Try again
-      </button>
-    </div>
+    <LoadFailed
+      title="We couldn’t create your link"
+      body="Something went wrong on our side. Please try again in a moment."
+      onRetry={() => void createLink()}
+    />
   );
 }

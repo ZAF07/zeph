@@ -6,7 +6,9 @@ import { deleteIconButton } from "@/components/button-styles";
 import { DeleteIcon } from "@/components/DeleteIcon";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadFailed } from "@/components/LoadFailed";
+import { LoadingPanel } from "@/components/LoadingPanel";
 import { PersonalStickerPicture } from "@/components/PersonalStickerPicture";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type { PersonalSticker } from "@/lib/api-client";
 import { notAvailableText } from "@/lib/features";
 import { queryKeys } from "@/lib/queries";
@@ -44,37 +46,35 @@ export function PersonalStickersSection({ available }: { available: boolean }) {
   return (
     <section
       aria-labelledby="personal-stickers-heading"
-      className="flex flex-col gap-4 rounded-card border border-line bg-white p-8"
+      className="flex flex-col gap-5 min-[900px]:gap-6"
     >
-      <h2
-        id="personal-stickers-heading"
-        className="m-0 text-[17px] font-semibold"
-      >
-        Your stickers
-      </h2>
-      {available ? null : (
-        <p className="m-0 text-sm font-medium text-ink-soft">
-          {notAvailableText}
+      <div>
+        <h2
+          id="personal-stickers-heading"
+          className="m-0 text-[20px] font-normal text-cream"
+        >
+          Your stickers
+        </h2>
+        {available ? null : (
+          <p className="mt-1.5 mb-0 max-w-[600px] text-[14px] text-soft">
+            {notAvailableText}
+          </p>
+        )}
+        <p className="mt-1.5 mb-0 max-w-[600px] text-[14px] text-soft">
+          Stickers you sent that Zeph kept, so it can now and then reply in your
+          own stickers, with when it uses each. Remove any you’d rather it
+          didn’t use.
         </p>
-      )}
-      <p className="m-0 text-[15px] text-ink-soft">
-        Stickers you sent that Zeph kept, so it can now and then reply in your
-        own stickers, with when it uses each. Remove any you’d rather it didn’t
-        use.
-      </p>
+      </div>
 
       {removeSticker.isError ? (
-        <p role="alert" className="m-0 text-sm text-danger-deep">
+        <SaveFailedNote>
           We couldn’t remove that. Please try again.
-        </p>
+        </SaveFailedNote>
       ) : null}
 
       {stickersQuery.isPending ? (
-        <span
-          aria-busy="true"
-          aria-label="Loading your stickers"
-          className="block h-[96px] rounded-card bg-subtle"
-        />
+        <LoadingPanel shape="card" label="Loading your stickers" />
       ) : null}
 
       {!stickers && stickersQuery.isError ? (
@@ -86,30 +86,27 @@ export function PersonalStickersSection({ available }: { available: boolean }) {
       ) : null}
 
       {stickers && stickers.length > 0 ? (
-        <ul className="m-0 flex list-none flex-col gap-3 p-0">
-          {stickers.map((sticker) => {
-            const name = sticker.emoji ?? "with no emoji";
-            return (
-              <li
-                key={sticker.id}
-                className="flex items-center gap-4 rounded-card border border-line p-3"
+        <ul className="m-0 flex list-none flex-wrap gap-3 p-0">
+          {stickers.map((sticker) => (
+            <li
+              key={sticker.id}
+              className="flex min-w-0 flex-[1_1_200px] items-center gap-3 rounded-tile border border-line py-2.5 pr-1.5 pl-3"
+            >
+              <PersonalStickerPicture sticker={sticker} />
+              <span className="min-w-0 flex-1 text-[13px] text-soft">
+                {sticker.note}
+              </span>
+              <button
+                type="button"
+                aria-label={`Remove sticker ${sticker.emoji ?? "with no emoji"}`}
+                className={deleteIconButton}
+                disabled={removeSticker.isPending}
+                onClick={() => removeSticker.mutate(sticker.id)}
               >
-                <PersonalStickerPicture sticker={sticker} />
-                <span className="min-w-0 flex-auto text-[15px]">
-                  {sticker.note}
-                </span>
-                <button
-                  type="button"
-                  aria-label={`Remove sticker ${name}`}
-                  className={deleteIconButton}
-                  disabled={removeSticker.isPending}
-                  onClick={() => removeSticker.mutate(sticker.id)}
-                >
-                  <DeleteIcon />
-                </button>
-              </li>
-            );
-          })}
+                <DeleteIcon />
+              </button>
+            </li>
+          ))}
         </ul>
       ) : null}
 

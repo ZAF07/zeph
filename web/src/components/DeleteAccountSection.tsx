@@ -3,15 +3,16 @@
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { dangerButton } from "@/components/button-styles";
-import { DeleteConfirmation } from "@/components/DeleteConfirmation";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { DeletionRow } from "@/components/DeletionRow";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { ApiError } from "@/lib/api-client";
 import { useSignOut } from "@/lib/auth/client";
 import { useApiClient } from "@/lib/use-api-client";
 
 /**
- * The Delete account section: deletes the User's account and everything of
- * theirs behind a type-DELETE confirmation, then signs them out.
+ * The Delete account row: deletes the User's account and everything of
+ * theirs behind a confirm dialog, then signs them out.
  *
  * @returns The section.
  */
@@ -23,7 +24,6 @@ export function DeleteAccountSection() {
   const deleteAccount = useMutation({
     mutationFn: () => apiClient.deleteAccount(),
     onSuccess: () => signOut("/sign-in"),
-    onError: () => setIsConfirming(false),
   });
   const { error } = deleteAccount;
   const failureMessage =
@@ -32,45 +32,38 @@ export function DeleteAccountSection() {
       : "We couldn’t delete your account. Please try again.";
 
   return (
-    <section
-      aria-labelledby="delete-account-heading"
-      className="flex flex-col gap-3 rounded-card border border-danger-line p-6"
-    >
-      <h2
-        id="delete-account-heading"
-        className="m-0 text-[17px] font-semibold text-danger"
-      >
-        Delete account
-      </h2>
-      <p className="m-0 text-[15px] text-ink-soft">
-        Erases everything above plus your account. Only possible here on the
-        Dashboard. This can’t be undone.
-      </p>
-      {isConfirming ? (
-        <DeleteConfirmation
-          confirmLabel="Permanently delete account"
-          cancelLabel="Keep my account"
-          isDeleting={deleteAccount.isPending}
-          onConfirm={() => deleteAccount.mutate()}
-          onCancel={() => setIsConfirming(false)}
-        />
-      ) : (
-        <button
-          type="button"
-          className={`${dangerButton} self-start`}
-          onClick={() => {
-            deleteAccount.reset();
-            setIsConfirming(true);
-          }}
-        >
-          Delete my account
-        </button>
-      )}
-      {deleteAccount.isError ? (
-        <p role="alert" className="m-0 text-sm text-danger-deep">
-          {failureMessage}
+    <DeletionRow
+      headingId="delete-account-heading"
+      title="Delete account"
+      isDanger
+      description={
+        <p className="mt-1 mb-0 max-w-[620px] text-[14px] text-soft">
+          Erases everything above plus your account. Only possible here on the
+          Dashboard. This can’t be undone.
         </p>
+      }
+      buttonLabel="Delete my account"
+      isDeleting={deleteAccount.isPending}
+      onStart={() => {
+        deleteAccount.reset();
+        setIsConfirming(true);
+      }}
+    >
+      <ConfirmDialog
+        open={isConfirming}
+        title="Delete your account?"
+        body="Erases everything above plus your account. This can’t be undone."
+        cancelLabel="Keep my account"
+        confirmLabel="Permanently delete account"
+        onConfirm={() => {
+          setIsConfirming(false);
+          deleteAccount.mutate();
+        }}
+        onCancel={() => setIsConfirming(false)}
+      />
+      {deleteAccount.isError ? (
+        <SaveFailedNote>{failureMessage}</SaveFailedNote>
       ) : null}
-    </section>
+    </DeletionRow>
   );
 }
