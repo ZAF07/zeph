@@ -108,4 +108,4 @@ The three FAILs are issue 10's accepted numbers, unchanged. In fixture mode all 
 ## Completion
 
 - Completed: 2026-11-19
-- Commit: <to be filled in after merge>
+- Commit: merge `2e4864b` into main (branch `redesign-11-other-table-pages`: `c644948` the six pages built from the table template, `94ee27b` code-review fixes, `4569ad1` evidence, archive and screenshots, `beae03c` evidence re-run after rebasing on issue 13)
