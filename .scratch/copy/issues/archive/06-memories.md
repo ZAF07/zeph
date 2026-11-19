@@ -55,4 +55,9 @@ Not part of this issue: the Memory explanation, Photo Viewing explanation and th
 ## Completion
 
 - Completed: 2026-11-19
-- Commit: <to be filled in after the merge>
+- Commit: merge `f7e8189` into main — "Merge Copy issue 06: the Memories page reads every word from Copy (Memories tab, all six tabs and their states); the delete-all dialog has a one and a many slot, the many keeping the reference text; the Copy page shows one/many slot pairs side by side"
+  - Branch `copy-06-memories`:
+    - `05b6e0a` Copy 06: the Memories page reads every word from Copy (Memories tab)
+    - `646b6a8` Copy 06: delete-all dialog keeps the reference text for several memories (review)
+    - `b55e480` Copy 06: Memories fills its slots with fillCopy (after rebase on Copy 05)
+    - `a05550c` Copy 06: evidence recorded, issue completed and archived, screenshots; CONTEXT says how one/many slot pairs work; handover notes on 07 and 08
