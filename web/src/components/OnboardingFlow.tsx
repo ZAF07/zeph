@@ -101,9 +101,9 @@ function startingAnswers(me: Me, checkIns: CheckIns): Answers {
  * name and AI notice, what brings them here, country and time zone,
  * Check-ins (off by default), User Memory consent, then Telegram. Answers
  * are saved when they leave the Memory step. A User who already finished
- * onboarding goes to the Dashboard. Every word is Copy, apart from the AI
- * notice, the reason choices and the User Memory explanation, which are
- * Platform Settings. The Telegram card's words are Connect Telegram's Copy.
+ * onboarding goes to the Dashboard. Every word is Copy, apart from the
+ * reason choices, which are a Platform Setting. The User Memory explanation
+ * is Shared Copy and the Telegram card's words are Connect Telegram's Copy.
  *
  * @param props - `copy` is the website's Copy; `showAllSteps` stacks every
  *   step for the design sheet
@@ -268,7 +268,9 @@ export function OnboardingFlow({
             />
           </label>
           <div className={stepPanel}>
-            <p className="m-0 text-[14px] text-soft">{content.ai_notice}</p>
+            <p className="m-0 text-[14px] text-soft">
+              {onboardingCopy("hello.ai_notice")}
+            </p>
             <label className="flex min-h-11 cursor-pointer items-center gap-3 text-[14px] text-text">
               <input
                 type="checkbox"
@@ -441,11 +443,13 @@ export function OnboardingFlow({
                 onChange={(userMemoryEnabled) => change({ userMemoryEnabled })}
               />
             </div>
-            {paragraphs(content.user_memory_explanation).map((paragraph) => (
-              <p key={paragraph} className="m-0 text-[14px] text-soft">
-                {paragraph}
-              </p>
-            ))}
+            {paragraphs(readCopy(copy, "shared.memory_explanation")).map(
+              (paragraph) => (
+                <p key={paragraph} className="m-0 text-[14px] text-soft">
+                  {paragraph}
+                </p>
+              ),
+            )}
           </div>
           {completeOnboarding.isError ? (
             <SaveFailedNote>

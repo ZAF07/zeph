@@ -29,7 +29,7 @@ export function PhoneMenu({
       <div className="mt-2.5">
         <SidebarAccount copy={copy} action={<SidebarSignOut copy={copy} />} />
       </div>
-      <SidebarAiNotice />
+      <SidebarAiNotice copy={copy} />
     </div>
   );
 }

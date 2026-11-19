@@ -50,6 +50,7 @@ export default async function OnboardingPage({
           "connect_telegram.card.",
           "shared.wordmark",
           "shared.header.home_link_label",
+          "shared.memory_explanation",
         ])}
         showAllSteps={hasDesignFlag(query, "all-steps")}
       />

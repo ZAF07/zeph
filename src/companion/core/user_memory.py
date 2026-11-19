@@ -12,13 +12,10 @@ from companion.core.models import (
     MemoryItem,
     MemorySource,
     MoveOutcome,
-    PlatformSettings,
     User,
     UserPortrait,
 )
 from companion.core.platform_settings import (
-    MEMORY_NOT_AVAILABLE_NOTE,
-    MEMORY_PAUSED_NOTE,
     ONBOARDING_NAME_MEMORY_CATEGORY,
     ONBOARDING_REASONS_MEMORY_CATEGORY,
 )
@@ -81,29 +78,6 @@ class UserMemoryService:
         self._repositories = repositories
         self._features = features
         self._clock = clock
-
-    def memory_note(self, user: User, settings: PlatformSettings) -> str:
-        """Pick the Dashboard note that says User Memory is off, and why.
-
-        The Admin's switch has the final say, so its note wins over the
-        User's own.
-
-        Args:
-            user: The User.
-            settings: The platform settings, read once per request.
-
-        Returns:
-            The Admin-managed "isn't available" note when the Admin side has
-            User Memory off, the "paused" note when the User has it off, and
-            "" when it works.
-        """
-        if not self._features.available_for(user.id, Feature.USER_MEMORY):
-            note = MEMORY_NOT_AVAILABLE_NOTE
-        elif not user.user_memory_enabled:
-            note = MEMORY_PAUSED_NOTE
-        else:
-            return ""
-        return settings.get(note)
 
     def list_groups(self, user_id: UUID) -> list[MemoryGroup]:
         """List a User's Memory Items by Memory Category, in category order.

@@ -31,5 +31,7 @@ export default async function MemoriesPage() {
   if (!copy) {
     return <CopyLoadFailed />;
   }
-  return <Memories copy={pickCopy(copy, ["memories."])} />;
+  return (
+    <Memories copy={pickCopy(copy, ["memories.", "shared.memory_off."])} />
+  );
 }

@@ -32,14 +32,16 @@ vi.mock("@/lib/auth/client", () => ({
 }));
 
 const content: PlatformContent = {
-  ai_notice: "Seeded notice.",
-  ai_notice_short: "Zeph is an AI.",
-  user_memory_explanation: "Seeded memory explanation.",
-  photo_viewing_explanation:
-    "When off, Zeph won’t look at or remember your photos. Every photo is still checked for safety.\n\nWhen on, Zeph looks at your photos.",
   onboarding_reason_choices: [],
   message_retention_days: 14,
-  delete_my_data_description:
+};
+
+const editedCopy = {
+  ...seedCopy(),
+  "shared.memory_explanation": "Edited memory explanation.",
+  "account.photos.explanation":
+    "When off, Zeph won’t look at or remember your photos. Every photo is still checked for safety.\n\nWhen on, Zeph looks at your photos.",
+  "account.delete_data.description":
     "Removes your messages, memories and the private notes Zeph keeps.",
 };
 
@@ -53,7 +55,6 @@ const onboardedUser: Me = {
   time_zone: "Asia/Singapore",
   ai_notice_acknowledged_at: "2026-11-11T09:00:00Z",
   user_memory_enabled: true,
-  memory_note: "",
   user_memory_available: true,
   photo_viewing_enabled: true,
   photo_viewing_available: true,
@@ -83,7 +84,7 @@ describe("AccountSettings", () => {
       ...onboardedUser,
       personal_stickers_available: false,
     });
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
 
     const section = await screen.findByRole("region", {
       name: "Your stickers",
@@ -94,7 +95,7 @@ describe("AccountSettings", () => {
   });
 
   it("says what Delete my data removes, private notes included", async () => {
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
 
     const yourData = within(
       await screen.findByRole("region", { name: "Delete my data" }),
@@ -114,7 +115,7 @@ describe("AccountSettings", () => {
         user_memory: "2026-11-05T09:00:00Z",
       },
     });
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
 
     expect(
       await screen.findByText("Changed in chat · 3 Nov"),
@@ -128,7 +129,7 @@ describe("AccountSettings", () => {
       changed_in_chat: { time_zone: "2026-11-03T09:00:00Z" },
     });
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
     await screen.findByText("Changed in chat · 3 Nov");
 
     await user.click(screen.getByRole("button", { name: "Save changes" }));
@@ -138,7 +139,7 @@ describe("AccountSettings", () => {
   });
 
   it("shows the saved profile", async () => {
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
 
     expect(await screen.findByLabelText("What Zeph calls you")).toHaveValue(
       "Maya",
@@ -150,7 +151,7 @@ describe("AccountSettings", () => {
 
   it("saves a changed name, country and time zone", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
     const nameField = await screen.findByLabelText("What Zeph calls you");
 
     await user.clear(nameField);
@@ -171,7 +172,7 @@ describe("AccountSettings", () => {
 
   it("does not save an empty name", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
 
     await user.clear(await screen.findByLabelText("What Zeph calls you"));
 
@@ -181,7 +182,7 @@ describe("AccountSettings", () => {
   it("tells the User when saving the profile fails", async () => {
     apiClient.updatePreferences.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
 
     await user.click(
       await screen.findByRole("button", { name: "Save changes" }),
@@ -192,19 +193,18 @@ describe("AccountSettings", () => {
     ).toBeInTheDocument();
   });
 
-  it("turns User Memory off straight away, with the seeded explanation", async () => {
+  it("turns User Memory off straight away, with the explanation from Copy", async () => {
     apiClient.updatePreferences.mockResolvedValue({
       ...onboardedUser,
       user_memory_enabled: false,
-      memory_note: "**Memory is paused.** Zeph won’t learn anything new.",
     });
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
     const memorySwitch = await screen.findByRole("switch", {
       name: "Remember meaningful details",
     });
 
-    expect(screen.getByText("Seeded memory explanation.")).toBeInTheDocument();
+    expect(screen.getByText("Edited memory explanation.")).toBeInTheDocument();
     expect(memorySwitch).toHaveAttribute("aria-checked", "true");
 
     await user.click(memorySwitch);
@@ -216,8 +216,11 @@ describe("AccountSettings", () => {
       expect(memorySwitch).toHaveAttribute("aria-checked", "false"),
     );
     expect(screen.getByRole("status")).toHaveTextContent(
-      "Memory is paused. Zeph won’t learn anything new",
+      `Memory is paused.${seedCopy()["shared.memory_off.paused_body"]}`,
     );
+    expect(
+      within(screen.getByRole("status")).queryByRole("button"),
+    ).not.toBeInTheDocument();
   });
 
   it("shows Not available on your account with the User Memory switch disabled", async () => {
@@ -226,7 +229,7 @@ describe("AccountSettings", () => {
       user_memory_available: false,
     });
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
     const memorySwitch = await screen.findByRole("switch", {
       name: "Remember meaningful details",
     });
@@ -234,6 +237,9 @@ describe("AccountSettings", () => {
     expect(memorySwitch).toBeDisabled();
     expect(memorySwitch).toHaveAttribute("aria-checked", "true");
     expect(screen.getByText("Not available on your account")).toBeVisible();
+    expect(
+      screen.getByText("Memory isn’t available on your account."),
+    ).toBeVisible();
     await user.click(memorySwitch);
     expect(apiClient.updatePreferences).not.toHaveBeenCalled();
   });
@@ -241,7 +247,7 @@ describe("AccountSettings", () => {
   it("offers Try again when the account cannot be loaded", async () => {
     apiClient.getMe.mockRejectedValueOnce(new Error("down"));
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
 
     await user.click(await screen.findByRole("button", { name: "Try again" }));
 
@@ -251,7 +257,7 @@ describe("AccountSettings", () => {
   });
 
   it("states the retention period from settings", async () => {
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
 
     expect(
       await screen.findByText("Messages are otherwise kept for 14 days."),
@@ -277,7 +283,7 @@ describe("AccountSettings", () => {
 
   it("deletes the User's data only after confirming in the dialog", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
     const yourData = within(
       await screen.findByRole("region", { name: "Delete my data" }),
     );
@@ -303,7 +309,7 @@ describe("AccountSettings", () => {
 
   it("keeping my data deletes nothing", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
     const yourData = within(
       await screen.findByRole("region", { name: "Delete my data" }),
     );
@@ -318,7 +324,7 @@ describe("AccountSettings", () => {
   it("tells the User when deleting their data fails", async () => {
     apiClient.deleteMyData.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
     const yourData = within(
       await screen.findByRole("region", { name: "Delete my data" }),
     );
@@ -337,7 +343,7 @@ describe("AccountSettings", () => {
 
   it("deletes the account after confirming in the dialog, then signs out", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
     const deleteAccount = within(
       await screen.findByRole("region", { name: "Delete account" }),
     );
@@ -359,7 +365,7 @@ describe("AccountSettings", () => {
 
   it("keeps the account when the User chooses to", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
     const deleteAccount = within(
       await screen.findByRole("region", { name: "Delete account" }),
     );
@@ -378,7 +384,7 @@ describe("AccountSettings", () => {
       new ApiError(409, "/api/me", "You’re the only Admin."),
     );
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
     const deleteAccount = within(
       await screen.findByRole("region", { name: "Delete account" }),
     );
@@ -396,9 +402,9 @@ describe("AccountSettings", () => {
     expect(signOut).not.toHaveBeenCalled();
   });
 
-  it("turns Photo Viewing off straight away, with the seeded explanation", async () => {
+  it("turns Photo Viewing off straight away, with the explanation from Copy", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
     const photoSwitch = await screen.findByRole("switch", {
       name: "Look at my photos",
     });
@@ -429,7 +435,7 @@ describe("AccountSettings", () => {
       photo_viewing_available: false,
     });
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
     const photoSwitch = await screen.findByRole("switch", {
       name: "Look at my photos",
     });
@@ -449,7 +455,7 @@ describe("AccountSettings", () => {
       ...onboardedUser,
       changed_in_chat: { photo_viewing: "2026-11-07T09:00:00Z" },
     });
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
 
     const section = await screen.findByRole("region", {
       name: "Look at my photos",
@@ -462,7 +468,7 @@ describe("AccountSettings", () => {
   it("tells the User when changing Photo Viewing fails", async () => {
     apiClient.updatePreferences.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    renderWithQueries(<AccountSettings copy={editedCopy} />);
 
     await user.click(
       await screen.findByRole("switch", { name: "Look at my photos" }),
@@ -478,12 +484,6 @@ describe("AccountSettings", () => {
 
   describe("reads every word from Copy", () => {
     const changedAt = "2026-11-03T02:00:00Z";
-    const markedContent: PlatformContent = {
-      ...content,
-      user_memory_explanation: "⟦data⟧",
-      photo_viewing_explanation: "⟦data⟧",
-      delete_my_data_description: "⟦data⟧",
-    };
 
     /**
      * Says what words on the page did not come from Copy, leaving out the
@@ -507,7 +507,6 @@ describe("AccountSettings", () => {
     }
 
     beforeEach(() => {
-      apiClient.getPlatformContent.mockResolvedValue(markedContent);
       apiClient.getMe.mockResolvedValue({
         ...onboardedUser,
         name: "⟦data⟧",
@@ -558,7 +557,6 @@ describe("AccountSettings", () => {
         ...onboardedUser,
         name: "⟦data⟧",
         email: null,
-        memory_note: "⟦data⟧",
         user_memory_available: false,
         photo_viewing_available: false,
         personal_stickers_available: false,
@@ -621,7 +619,9 @@ describe("AccountSettings", () => {
         screen.getByRole("alertdialog", {
           name: "⟦account.delete_data.dialog_title⟧",
         }),
-      ).toHaveTextContent("⟦data⟧ ⟦account.delete_data.dialog_body⟧");
+      ).toHaveTextContent(
+        "⟦account.delete_data.description⟧ ⟦account.delete_data.dialog_body⟧",
+      );
       expect(words()).toEqual([]);
       await user.click(
         screen.getByRole("button", {

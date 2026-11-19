@@ -48,59 +48,6 @@ sticker_adding_summary_reply: >-
 # Adding mode ends after this many minutes without a sticker from the Admin.
 sticker_adding_quiet_gap_minutes: 5
 
-# Onboarding. The AI notice is shown on the first step with an "I understand"
-# tick; the short version stays on the Dashboard afterwards.
-ai_notice: >-
-  I'm an AI, not a person. I can be good company for thinking, but I'm not a
-  therapist, doctor or crisis service. If you're ever in danger, please contact
-  local emergency services or a Helpline.
-
-ai_notice_short: Zeph is an AI, not a therapist or crisis service.
-
-# Shown when asking for User Memory consent. A blank line starts a new
-# paragraph.
-user_memory_explanation: |-
-  So you don't have to repeat yourself, I can keep meaningful details — your
-  goals, what helps you, the people you mention.
-
-  You can see what I remember on your Dashboard and delete any of it, or tell
-  me "forget that" in chat.
-
-  I also keep a few private notes to follow up with you, like something to ask
-  about later. You won't see these, and Delete My Data removes them along with
-  everything else.
-
-# Shown with the Photo Viewing switch on the Dashboard. A blank line starts a
-# new paragraph.
-photo_viewing_explanation: |-
-  When off, Zeph won't look at or remember your photos. Every photo is still
-  checked for safety, so Zeph can share help if one looks worrying. Nothing
-  from that check is kept.
-
-  When on, Zeph looks at the photos you send and may keep the ones that matter
-  to you, listed on your Memories page.
-
-# Shown on the Dashboard (Home, Memories and next to the switch) while the
-# User has User Memory off. **Bold** marks the opening words.
-memory_paused_note: >-
-  **Memory is paused.** Nothing is deleted. Zeph won’t learn anything new, but
-  still uses what it already knows about you. Delete any memory you don’t want
-  Zeph to use, or use Delete My Data to remove everything.
-
-# Shown on the Dashboard instead of the note above while an Admin has User
-# Memory off for the User.
-memory_not_available_note: >-
-  **Memory isn’t available on your account.** Nothing is deleted. Zeph won’t
-  learn anything new, but still uses what it already knows about you. Delete
-  any memory you don’t want Zeph to use, or use Delete My Data to remove
-  everything.
-
-# Shown under "Delete my data" on Account & privacy.
-delete_my_data_description: >-
-  Removes your messages, memories, the private notes Zeph keeps to follow up
-  with you, Conversation Summaries, your stickers, Check-in history and
-  Telegram Connection. Your account stays, so you can start fresh.
-
 # The choice chips for "What brings you here?".
 onboarding_reason_choices:
   - Being more present

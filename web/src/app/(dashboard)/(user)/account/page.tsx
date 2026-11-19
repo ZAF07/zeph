@@ -39,7 +39,12 @@ export default async function AccountPage() {
         lead={text("lead")}
       />
       <AccountSettings
-        copy={pickCopy(copy, ["account.", "onboarding.location."])}
+        copy={pickCopy(copy, [
+          "account.",
+          "onboarding.location.",
+          "shared.memory_explanation",
+          "shared.memory_off.",
+        ])}
       />
     </>
   );

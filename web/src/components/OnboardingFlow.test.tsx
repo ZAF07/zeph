@@ -25,14 +25,15 @@ vi.mock("next/navigation", () => ({
 }));
 
 const content: PlatformContent = {
-  ai_notice: "Seeded notice: I am an AI, not a therapist.",
-  ai_notice_short: "Zeph is an AI.",
-  user_memory_explanation:
-    "Seeded memory paragraph one.\n\nSeeded memory paragraph two.",
-  photo_viewing_explanation: "Seeded photo explanation.",
   onboarding_reason_choices: ["Being more present", "Relationships"],
   message_retention_days: 30,
-  delete_my_data_description: "",
+};
+
+const editedCopy = {
+  ...seedCopy(),
+  "onboarding.hello.ai_notice": "Edited notice: I am an AI, not a therapist.",
+  "shared.memory_explanation":
+    "Edited memory paragraph one.\n\nEdited memory paragraph two.",
 };
 
 function newUser(overrides: Partial<Me> = {}): Me {
@@ -47,7 +48,6 @@ function newUser(overrides: Partial<Me> = {}): Me {
     ai_notice_acknowledged_at: null,
     user_memory_enabled: true,
     user_memory_available: true,
-    memory_note: "",
     photo_viewing_enabled: true,
     photo_viewing_available: true,
     personal_stickers_available: false,
@@ -65,8 +65,8 @@ function setBrowserLanguages(languages: string[]) {
   });
 }
 
-async function renderAtHelloStep() {
-  renderWithQueries(<OnboardingFlow copy={seedCopy()} />);
+async function renderAtHelloStep(copy = seedCopy()) {
+  renderWithQueries(<OnboardingFlow copy={copy} />);
   await screen.findByRole("heading", { name: "Hello. I’m Zeph." });
 }
 
@@ -103,10 +103,12 @@ describe("OnboardingFlow", () => {
     setBrowserLanguages(["en-SG", "en"]);
   });
 
-  it("shows the AI notice from platform settings", async () => {
-    await renderAtHelloStep();
+  it("shows the AI notice from Copy", async () => {
+    await renderAtHelloStep(editedCopy);
 
-    expect(screen.getByText(content.ai_notice)).toBeInTheDocument();
+    expect(
+      screen.getByText("Edited notice: I am an AI, not a therapist."),
+    ).toBeInTheDocument();
   });
 
   it("cannot continue until the User gives a name and ticks I understand", async () => {
@@ -219,9 +221,9 @@ describe("OnboardingFlow", () => {
     expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
   });
 
-  it("explains User Memory from platform settings, on by default and can be turned off", async () => {
+  it("explains User Memory from Shared Copy, on by default and can be turned off", async () => {
     const user = userEvent.setup();
-    await renderAtHelloStep();
+    await renderAtHelloStep(editedCopy);
     await user.type(screen.getByLabelText("What should I call you?"), "Maya");
     await user.click(screen.getByRole("checkbox"));
     for (let step = 0; step < 4; step++) {
@@ -229,10 +231,10 @@ describe("OnboardingFlow", () => {
     }
 
     expect(
-      screen.getByText("Seeded memory paragraph one."),
+      screen.getByText("Edited memory paragraph one."),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Seeded memory paragraph two."),
+      screen.getByText("Edited memory paragraph two."),
     ).toBeInTheDocument();
     const memorySwitch = screen.getByRole("switch", {
       name: "Remember meaningful details",
@@ -359,11 +361,9 @@ describe("OnboardingFlow", () => {
     expect(screen.getByText("Filled in from your browser")).toBeInTheDocument();
   });
 
-  it("shows only Copy text on every step, apart from Platform Settings", async () => {
+  it("shows only Copy text on every step, apart from the reason choices", async () => {
     apiClient.getPlatformContent.mockResolvedValue({
       ...content,
-      ai_notice: "⟦platform ai notice⟧",
-      user_memory_explanation: "⟦platform memory explanation⟧",
       onboarding_reason_choices: ["⟦platform reason⟧"],
     });
     apiClient.getCheckIns.mockResolvedValue({

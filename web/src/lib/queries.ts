@@ -123,7 +123,8 @@ export function useMe(): UseQueryResult<Me> {
 }
 
 /**
- * The Admin-worded text the User pages show, such as the AI notice.
+ * The Admin-managed settings the User pages show: the onboarding reason
+ * choices and how long messages are kept.
  *
  * @returns The query for the platform content.
  */

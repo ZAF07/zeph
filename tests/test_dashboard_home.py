@@ -128,7 +128,12 @@ def test_home_shows_goals_and_the_newest_memory_items_with_their_category(
     assert home["recently_remembered"][0]["updated_at"] == iso(clock)
 
 
-def test_with_memory_on_home_and_me_have_no_memory_note(
+def memory_flags(response: dict[str, Any]) -> tuple[bool, bool]:
+    """A Home or Me response's User Memory switch and whether it is available."""
+    return response["user_memory_enabled"], response["user_memory_available"]
+
+
+def test_with_memory_on_home_and_me_send_the_flags_and_no_memory_wording(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
 ) -> None:
@@ -136,15 +141,18 @@ def test_with_memory_on_home_and_me_have_no_memory_note(
     client.put("/api/onboarding", json=onboarding_answers(), headers=headers)
 
     home = get_home(client, headers)
+    me = client.get("/api/me", headers=headers).json()
 
-    assert home["memory_note"] == ""
-    assert client.get("/api/me", headers=headers).json()["memory_note"] == ""
+    assert memory_flags(home) == (True, True)
+    assert memory_flags(me) == (True, True)
+    for response in (home, me):
+        assert "memory_note" not in response
+        assert "ai_notice" not in response
 
 
-def test_with_user_memory_paused_home_shows_memories_with_the_paused_note(
+def test_with_user_memory_paused_home_shows_memories_and_says_it_is_off(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
-    seeded_settings: dict[str, Any],
 ) -> None:
     headers = auth_headers(auth_verifier, "user_maya")
     client.put("/api/onboarding", json=onboarding_answers(), headers=headers)
@@ -156,35 +164,13 @@ def test_with_user_memory_paused_home_shows_memories_with_the_paused_note(
 
     assert home["goals"] != []
     assert home["recently_remembered"] != []
-    assert home["memory_note"] == seeded_settings["memory_paused_note"]
-    assert me["memory_note"] == seeded_settings["memory_paused_note"]
+    assert memory_flags(home) == (False, True)
+    assert memory_flags(me) == (False, True)
 
 
-def test_with_user_memory_off_by_an_admin_home_shows_the_not_available_note(
+def test_with_user_memory_off_by_an_admin_home_says_it_is_not_available(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
-    seeded_settings: dict[str, Any],
-) -> None:
-    admin = owner_headers(client, auth_verifier)
-    headers = auth_headers(auth_verifier, "user_maya")
-    client.put("/api/onboarding", json=onboarding_answers(), headers=headers)
-    client.patch("/api/me", json={"user_memory_enabled": False}, headers=headers)
-    client.put("/api/admin/features/user_memory", json={"on": False}, headers=admin)
-
-    home = get_home(client, headers)
-
-    assert home["recently_remembered"] != []
-    assert home["memory_note"] == seeded_settings["memory_not_available_note"]
-    assert (
-        client.get("/api/me", headers=headers).json()["memory_note"]
-        == seeded_settings["memory_not_available_note"]
-    )
-
-
-def test_with_only_the_admins_switch_off_home_shows_the_not_available_note(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    seeded_settings: dict[str, Any],
 ) -> None:
     admin = owner_headers(client, auth_verifier)
     headers = auth_headers(auth_verifier, "user_maya")
@@ -193,28 +179,13 @@ def test_with_only_the_admins_switch_off_home_shows_the_not_available_note(
 
     home = get_home(client, headers)
 
-    assert client.get("/api/me", headers=headers).json()["user_memory_enabled"]
     assert home["goals"] != []
     assert home["recently_remembered"] != []
-    assert home["memory_note"] == seeded_settings["memory_not_available_note"]
-
-
-def test_an_edited_memory_note_is_shown_as_set(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-) -> None:
-    admin = owner_headers(client, auth_verifier)
-    headers = auth_headers(auth_verifier, "user_maya")
-    client.put("/api/onboarding", json=onboarding_answers(), headers=headers)
-    client.patch("/api/me", json={"user_memory_enabled": False}, headers=headers)
-    saved = client.patch(
-        "/api/admin/settings",
-        json={"values": {"memory_paused_note": "**Paused.** Edited."}},
-        headers=admin,
+    assert memory_flags(home) == (True, False)
+    assert memory_flags(client.get("/api/me", headers=headers).json()) == (
+        True,
+        False,
     )
-
-    assert saved.status_code == 200, saved.text
-    assert get_home(client, headers)["memory_note"] == "**Paused.** Edited."
 
 
 def test_goals_follow_the_goals_category_when_an_admin_renames_it(

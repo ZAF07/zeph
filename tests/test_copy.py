@@ -16,6 +16,20 @@ DESIGN_FIXTURE_COPY_FILE = (
     Path(__file__).parent.parent / "web/src/lib/design-fixtures/seed-copy.json"
 )
 
+
+MOVED_WORDING_TABS = {
+    "onboarding.hello.ai_notice": "onboarding",
+    "home.footer.ai_notice": "home",
+    "account.photos.explanation": "account",
+    "account.delete_data.description": "account",
+    "shared.dashboard.ai_notice": "shared",
+    "shared.memory_explanation": "shared",
+    "shared.memory_off.paused_title": "shared",
+    "shared.memory_off.paused_body": "shared",
+    "shared.memory_off.not_available_title": "shared",
+    "shared.memory_off.not_available_body": "shared",
+}
+
 TEST_SEED: list[dict[str, Any]] = [
     {
         "tab": "landing",
@@ -160,6 +174,35 @@ def test_home_connect_telegram_and_dashboard_menu_slots_carry_their_seed_text(
         shared["shared.dashboard.account"]["name"],
         shared["shared.dashboard.account"]["text"],
     ) == ("Dashboard menu: Account link", "Account & privacy")
+
+
+def test_the_wording_moved_from_platform_settings_is_copy_on_its_page_tab(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+
+    tabs = client.get("/api/admin/copy", headers=headers).json()["tabs"]
+
+    tab_by_key = {slot["key"]: tab["tab"] for tab in tabs for slot in tab["slots"]}
+    texts = client.get("/api/copy").json()["texts"]
+    assert {key: tab_by_key[key] for key in MOVED_WORDING_TABS} == MOVED_WORDING_TABS
+    assert texts["shared.memory_off.paused_title"] == "Memory is paused."
+    assert texts["shared.memory_off.not_available_title"] == (
+        "Memory isn’t available on your account."
+    )
+    for body in ("paused_body", "not_available_body"):
+        assert texts[f"shared.memory_off.{body}"].startswith("Nothing is deleted.")
+        assert "Delete My Data" in texts[f"shared.memory_off.{body}"]
+    assert texts["shared.dashboard.ai_notice"] == (
+        "Zeph is an AI, not a therapist or crisis service."
+    )
+    assert "private notes" in texts["shared.memory_explanation"]
+    assert "Delete My Data" in texts["shared.memory_explanation"]
+    assert "private notes" in texts["account.delete_data.description"]
+    assert texts["account.photos.explanation"].startswith(
+        "When off, Zeph won't look at or remember your photos."
+    )
+    assert not any("**" in text for text in texts.values())
 
 
 def test_a_tab_save_applies_every_change_and_shows_on_the_next_read(

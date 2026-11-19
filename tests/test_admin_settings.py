@@ -23,6 +23,16 @@ from tests.telegram_helpers import (
     telegram_text_update,
 )
 
+MOVED_TO_COPY = (
+    "ai_notice",
+    "ai_notice_short",
+    "user_memory_explanation",
+    "photo_viewing_explanation",
+    "memory_paused_note",
+    "memory_not_available_note",
+    "delete_my_data_description",
+)
+
 
 def test_admin_sees_each_editable_setting_with_its_seeded_value(
     client: TestClient,
@@ -45,7 +55,6 @@ def test_admin_sees_each_editable_setting_with_its_seeded_value(
     assert settings["web_search_daily_limit"]["value"] == 10
     assert settings["message_retention_days"]["value"] == 30
     assert settings["persona"]["updated_by"] is None
-    assert settings["ai_notice_short"]["value"] == seeded_settings["ai_notice_short"]
     assert "welcome_message" not in settings
 
 
@@ -329,7 +338,6 @@ def test_the_photo_settings_are_editable_with_their_seeded_values(
         "photo_description_prompt",
         "photo_not_viewed_note",
         "photo_viewing_off_note",
-        "photo_viewing_explanation",
     ):
         assert settings[key]["value"] == seeded_settings[key]
     response = client.get("/api/admin/core-services", headers=headers).json()
@@ -352,21 +360,19 @@ def test_the_message_wait_is_editable_with_a_seeded_value_of_a_few_seconds(
     assert settings["message_wait_seconds"]["value"] == 4
 
 
-def test_the_memory_notes_are_editable_with_their_seeded_values(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    seeded_settings: dict[str, Any],
+@pytest.mark.parametrize("key", MOVED_TO_COPY)
+def test_website_wording_moved_to_copy_is_no_longer_a_setting(
+    client: TestClient, auth_verifier: FakeAuthVerifier, key: str
 ) -> None:
     headers = owner_headers(client, auth_verifier)
 
     settings = client.get("/api/admin/settings", headers=headers).json()["settings"]
-
-    for key in ("memory_paused_note", "memory_not_available_note"):
-        assert settings[key]["value"] == seeded_settings[key]
-    assert seeded_settings["memory_paused_note"].startswith("**Memory is paused.**")
-    assert seeded_settings["memory_not_available_note"].startswith(
-        "**Memory isn’t available on your account.**"
+    saved = client.patch(
+        "/api/admin/settings", json={"values": {key: "Edited."}}, headers=headers
     )
+
+    assert key not in settings
+    assert saved.status_code == 422
 
 
 def test_the_photo_description_prompt_asks_for_danger_signs_and_leaves_out_secrets(

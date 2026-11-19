@@ -736,8 +736,6 @@ describe("Memories", () => {
     apiClient.updatePreferences.mockResolvedValue({
       ...maya,
       user_memory_enabled: false,
-      memory_note:
-        "**Memory is paused.** Zeph won’t learn anything new, but still uses what it already knows about you.",
     });
     const user = userEvent.setup();
     renderWithQueries(<Memories copy={seedCopy()} />);
@@ -752,7 +750,7 @@ describe("Memories", () => {
     });
     expect(await screen.findByText("Memory paused")).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent(
-      "Memory is paused. Zeph won’t learn anything new, but still uses what it already knows about you.",
+      `Memory is paused.${seedCopy()["shared.memory_off.paused_body"]}`,
     );
     expect(screen.getByText("Goes by Maya")).toBeVisible();
   });
@@ -761,8 +759,6 @@ describe("Memories", () => {
     apiClient.getMe.mockResolvedValue({
       ...maya,
       user_memory_enabled: false,
-      memory_note:
-        "**Memory is paused.** Zeph won’t learn anything new, but still uses what it already knows about you.",
     });
     renderWithQueries(<Memories copy={seedCopy()} />);
 
@@ -770,25 +766,33 @@ describe("Memories", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Memory is paused.");
   });
 
-  it("shows the whole note as the notice title when it doesn't open in bold", async () => {
+  it("draws the paused note's title and body from Copy as the notice's title and body", async () => {
     apiClient.getMe.mockResolvedValue({
       ...maya,
       user_memory_enabled: false,
-      memory_note: "Zeph is resting. **Nothing is deleted.** Back soon.",
     });
-    renderWithQueries(<Memories copy={seedCopy()} />);
+    const copy = {
+      ...seedCopy(),
+      "shared.memory_off.paused_title": "Zeph is resting.",
+      "shared.memory_off.paused_body": "Nothing is deleted. Back soon.",
+    };
+    renderWithQueries(<Memories copy={copy} />);
 
     expect(await screen.findByText("Goes by Maya")).toBeVisible();
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "Zeph is resting. **Nothing is deleted.** Back soon.",
+    const notice = screen.getByRole("status");
+    expect(within(notice).getByText("Zeph is resting.")).toHaveClass(
+      "text-[15px]",
+      "text-text",
     );
+    expect(
+      within(notice).getByText("Nothing is deleted. Back soon."),
+    ).toHaveClass("text-[13px]", "text-soft");
   });
 
   it("turns User Memory back on from the notice", async () => {
     apiClient.getMe.mockResolvedValue({
       ...maya,
       user_memory_enabled: false,
-      memory_note: "**Memory is paused.** Zeph won’t learn anything new.",
     });
     apiClient.updatePreferences.mockResolvedValue(maya);
     const user = userEvent.setup();
@@ -809,8 +813,6 @@ describe("Memories", () => {
     apiClient.getMe.mockResolvedValue({
       ...maya,
       user_memory_available: false,
-      memory_note:
-        "**Memory isn’t available on your account.** Zeph won’t learn anything new.",
     });
     const user = userEvent.setup();
     renderWithQueries(<Memories copy={seedCopy()} />);
@@ -820,7 +822,7 @@ describe("Memories", () => {
     expect(memorySwitch).toHaveAttribute("aria-checked", "true");
     expect(screen.getByText("Not available on your account")).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent(
-      "Memory isn’t available on your account. Zeph won’t learn anything new.",
+      `Memory isn’t available on your account.${seedCopy()["shared.memory_off.not_available_body"]}`,
     );
     await user.click(memorySwitch);
     expect(apiClient.updatePreferences).not.toHaveBeenCalled();
@@ -985,7 +987,6 @@ describe("Memories", () => {
       apiClient.getMe.mockResolvedValue({
         ...maya,
         user_memory_enabled: false,
-        memory_note: "⟦data⟧",
       });
 
       const { container } = renderWithQueries(<Memories copy={markedCopy()} />);

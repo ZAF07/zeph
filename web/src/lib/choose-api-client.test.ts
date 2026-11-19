@@ -40,7 +40,7 @@ describe("chooseApiClient", () => {
     expect(await client.getMe()).toMatchObject({ name: "Zaf", role: "admin" });
   });
 
-  it("gives the shell the AI notice drawn in the sidebar", async () => {
+  it("gives Account the message retention it draws", async () => {
     const client = chooseApiClient(
       { apiUrl, designFixtures: true },
       getToken,
@@ -48,7 +48,7 @@ describe("chooseApiClient", () => {
     );
 
     expect(await client.getPlatformContent()).toMatchObject({
-      ai_notice_short: "Zeph is an AI, not a therapist or crisis service.",
+      message_retention_days: 30,
     });
   });
 
