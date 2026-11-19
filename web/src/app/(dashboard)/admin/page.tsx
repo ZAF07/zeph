@@ -1,10 +1,12 @@
-import { redirect } from "next/navigation";
+import { AdminOverview } from "@/components/AdminOverview";
+import { overviewSample } from "@/lib/design-fixtures/overview";
 
 /**
- * The admin area's front door, which opens the Users page.
+ * The admin area's front door, the Overview. Its counts have no backend
+ * yet, so it shows the drawn sample values and makes no backend calls.
  *
- * @returns Nothing; it always redirects.
+ * @returns The page.
  */
 export default function AdminPage() {
-  redirect("/admin/users");
+  return <AdminOverview overview={overviewSample} />;
 }

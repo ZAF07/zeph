@@ -4,10 +4,13 @@ import type { ReactNode } from "react";
 const basisClasses = {
   narrow: "flex-[1_1_320px]",
   wide: "flex-[1_1_380px]",
+  main: "flex-[999_1_460px]",
+  side: "flex-[1_1_260px]",
 };
 
 /**
- * A titled panel on the Dashboard home, such as Telegram or Plan.
+ * A titled panel card, such as Telegram on the Dashboard home or Needs
+ * attention on the admin Overview.
  *
  * @param props - `headingId` ties the title to the section, `title` names
  *   the card, `aside` sits at the right of the title (a pill or a link),

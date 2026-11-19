@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { primaryButton, secondaryButton } from "@/components/button-styles";
+import { PlanIncludesList } from "@/components/PlanIncludesList";
 
 /** One plan in Landing's pricing section. */
 export type LandingPlanDetails = {
@@ -36,27 +37,7 @@ export function LandingPlan({ plan }: { plan: LandingPlanDetails }) {
         <span className="text-[34px] font-normal text-cream">{plan.price}</span>
         <span className="text-[13px] text-soft">/month</span>
       </div>
-      <ul className="mt-1.5 mb-[14px] flex flex-1 list-none flex-col gap-2 p-0">
-        {plan.features.map((feature) => (
-          <li key={feature} className="flex gap-2.5 text-[14px] text-soft">
-            <svg
-              aria-hidden="true"
-              width="14"
-              height="14"
-              viewBox="0 0 14 14"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="mt-1 flex-none"
-            >
-              <path d="M2 7.5l3.2 3.2L12 3.800" />
-            </svg>
-            <span>{feature}</span>
-          </li>
-        ))}
-      </ul>
+      <PlanIncludesList includes={plan.features} />
       <Link
         href="/sign-up"
         className={`${plan.primary ? primaryButton : secondaryButton} box-border w-full`}
