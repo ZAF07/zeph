@@ -1,6 +1,6 @@
 # PRD: Redesign — the Dashboard rebuilt to match the design folder exactly
 
-Status: ready-for-agent
+Status: completed
 
 ## Problem Statement
 
@@ -171,3 +171,17 @@ Existing pages will look broken after slice 0. That's expected.
 - Before slice 0, Zaf puts the full-resolution PNGs in `web/design/img-full/`.
 - `web/design/PROMPTS.md` has the prompts Zaf uses to start each slice. The once-at-start prompt (restate the rule, how a page is finished, the build order and open questions, then wait) applies before slice 0.
 - After each slice: report the PASS lines, the four check results and the `/run` evidence, list anything unsure, and stop for Zaf.
+
+## Comments
+
+- 2026-11-19 — PRD close-out check on `main` at `da739cc`. All 18 issues (01–18) are `completed` and archived in `issues/archive/`.
+  - **Checks:** `pnpm lint` clean, `pnpm format:check` clean, `pnpm typecheck` clean, `pnpm test` 114 files / 711 tests passed.
+  - **Pixel test, all 37 refs in `routes.json`:** signed-out refs on a production build (Clerk's dev-mode route check never lets `/sign-in` reach `networkidle`), signed-in refs on `NEXT_PUBLIC_DESIGN_FIXTURES=1 pnpm dev`. 27 PASS. The 10 FAILs match, to the decimal, the FAILs already accepted in their slices: Signup 12.40% (issue 06), ConnectTelegram 2.60% / M-ConnectTelegram 2.16% (issue 09), AdminUsers 2.84%, AdminCheckInLog 0.11%, M-AdminCheckInLog 6.32% (issue 10), AdminPersona 1.10% (issue 12), AdminCheckInKinds 0.08%, AdminCheckInKinds--all-folded 0.14%, M-AdminCheckInKinds 8.12% (issue 13). No drift since.
+  - **Fixture mode stays out of production:** in the production build, signed-in pages called the real API, as `designFixturesOn` in `web/src/env.ts` intends.
+  - **Running app, real data (main stack, port 3000):** all 35 Dashboard pages (5 public, 6 User, 24 admin) visited at 1280 and 390 as a signed-in Admin. Every page loaded with status 200, no page errors, no error state and no sideways scroll. One caveat outside this PRD: on Sticker Library, `/api/admin/stickers/<id>/image` returns 404 for the one sticker in the database (backend returns 404 when the sticker has no image a browser can show, or it couldn't be downloaded). The page still renders.
+  - **Contract items:** `docs/design/` is gone, CLAUDE.md's "UI design" section points to `web/design/README.md`, `web/design/img-full/` is gone, `/`, `/how-it-works` and `/pricing` are public, and `/admin` shows the Overview.
+
+## Completion
+
+- Completed: 2026-11-19
+- Commit: branch `redesign-prd-close-out`, merged into main
