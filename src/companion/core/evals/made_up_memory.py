@@ -13,10 +13,10 @@ from companion.core.life_threads import name_keys
 from companion.core.models import (
     Conversation,
     ConversationMessage,
-    ConversationSummary,
     Curiosity,
     CuriosityChanges,
     CuriosityState,
+    DaySummary,
     LifeThread,
     LifeThreadToSave,
     MemoryChanges,
@@ -30,6 +30,7 @@ from companion.core.models import (
 )
 from companion.core.move_outcomes import text_to_embed
 from companion.core.ports import Embedder, Repositories
+from companion.core.timing import users_today
 
 MEMORY_ITEMS_DAYS_AGO = 30
 PORTRAIT_DAYS_AGO = 1
@@ -130,13 +131,13 @@ def give_made_up_memory(
         repositories.user_memory.save_processed_conversation(
             conversation_id,
             written_at,
-            ConversationSummary(
+            DaySummary(
                 id=uuid4(),
-                conversation_id=conversation_id,
                 user_id=user_id,
+                day=users_today(None, written_at),
                 summary=summary.summary,
                 mood=summary.mood,
-                created_at=written_at,
+                written_at=written_at,
             ),
             MemoryChanges(added=[], updated=[], removed_ids=[]),
             summary_embedding=embedding,

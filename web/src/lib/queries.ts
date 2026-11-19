@@ -28,7 +28,7 @@ export const queryKeys = {
   platformContent: ["platform-content"],
   home: ["home"],
   memoryGroups: ["memory-groups"],
-  conversationSummaries: ["conversation-summaries"],
+  daySummaries: ["day-summaries"],
   lifeThreads: ["life-threads"],
   moveOutcomes: ["move-outcomes"],
   userPortrait: ["user-portrait"],

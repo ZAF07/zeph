@@ -54,7 +54,7 @@ from companion.core.stickers import (
 from companion.core.telegram_connection import OnboardingNotFinishedError
 from companion.core.user_data import LAST_ADMIN_ACCOUNT_DELETION
 from companion.core.user_memory import (
-    ConversationSummaryNotFoundError,
+    DaySummaryNotFoundError,
     MemoryNotFoundError,
 )
 from companion.core.users import InvalidProfileError
@@ -63,10 +63,10 @@ ERRORS_WITH_STATUS_AND_DETAIL: list[tuple[CoreError, type[CoreError], int, str]]
     (UserNotFoundError(uuid4()), NotFoundError, 404, "No such User"),
     (MemoryNotFoundError(), NotFoundError, 404, "Memory not found"),
     (
-        ConversationSummaryNotFoundError(),
+        DaySummaryNotFoundError(),
         NotFoundError,
         404,
-        "Conversation Summary not found",
+        "Day Summary not found",
     ),
     (SharedPhotoNotFoundError(uuid4()), NotFoundError, 404, "Shared Photo not found"),
     (

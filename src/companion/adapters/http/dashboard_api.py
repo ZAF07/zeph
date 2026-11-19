@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from datetime import datetime, time
+from datetime import date, datetime, time
 from typing import Annotated
 from uuid import UUID
 
@@ -18,7 +18,7 @@ from companion.core.models import (
     CheckInStatus,
     ConnectionToken,
     ConnectionTokenStatus,
-    ConversationSummary,
+    DaySummary,
     LifeThread,
     MemoryGroup,
     MemoryItem,
@@ -240,20 +240,21 @@ class MemoryItemsResponse(BaseModel):
     groups: list[MemoryGroupResponse]
 
 
-class ConversationSummaryResponse(BaseModel):
-    """A Conversation Summary, how the User seemed and what Zeph offered."""
+class DaySummaryResponse(BaseModel):
+    """A Day Summary: its day, how the User seemed and what Zeph offered."""
 
     id: str
+    day: date
     summary: str
     mood: str
     offered: str
-    created_at: datetime
+    written_at: datetime
 
 
-class ConversationSummariesResponse(BaseModel):
-    """A User's Conversation Summaries, newest first."""
+class DaySummariesResponse(BaseModel):
+    """A User's Day Summaries, newest day first."""
 
-    summaries: list[ConversationSummaryResponse]
+    summaries: list[DaySummaryResponse]
 
 
 class LifeThreadResponse(BaseModel):
@@ -414,21 +415,22 @@ def to_memory_items_response(groups: list[MemoryGroup]) -> MemoryItemsResponse:
     )
 
 
-def to_summary_response(summary: ConversationSummary) -> ConversationSummaryResponse:
-    """Describe a Conversation Summary for the Dashboard.
+def to_summary_response(summary: DaySummary) -> DaySummaryResponse:
+    """Describe a Day Summary for the Dashboard.
 
     Args:
-        summary: The Conversation Summary.
+        summary: The Day Summary.
 
     Returns:
         The response body.
     """
-    return ConversationSummaryResponse(
+    return DaySummaryResponse(
         id=str(summary.id),
+        day=summary.day,
         summary=summary.summary,
         mood=summary.mood,
         offered=summary.offered,
-        created_at=summary.created_at,
+        written_at=summary.written_at,
     )
 
 
@@ -977,19 +979,19 @@ def build_dashboard_api_router(
         user_memory_service.delete_item(user.id, item_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-    @router.get("/conversation-summaries")
-    def list_conversation_summaries(
+    @router.get("/day-summaries")
+    def list_day_summaries(
         user: Annotated[User, Depends(current_user)],
-    ) -> ConversationSummariesResponse:
-        """Return the User's Conversation Summaries, newest first.
+    ) -> DaySummariesResponse:
+        """Return the User's Day Summaries, newest day first.
 
         Args:
             user: The signed-in User.
 
         Returns:
-            The Conversation Summaries.
+            The Day Summaries.
         """
-        return ConversationSummariesResponse(
+        return DaySummariesResponse(
             summaries=[
                 to_summary_response(summary)
                 for summary in user_memory_service.list_summaries(user.id)
@@ -997,23 +999,23 @@ def build_dashboard_api_router(
         )
 
     @router.delete(
-        "/conversation-summaries/{summary_id}",
+        "/day-summaries/{summary_id}",
         status_code=status.HTTP_204_NO_CONTENT,
     )
-    def delete_conversation_summary(
+    def delete_day_summary(
         user: Annotated[User, Depends(current_user)], summary_id: UUID
     ) -> Response:
-        """Delete one of the User's Conversation Summaries.
+        """Delete one of the User's Day Summaries.
 
         Args:
             user: The signed-in User.
-            summary_id: The Conversation Summary's ID.
+            summary_id: The Day Summary's ID.
 
         Returns:
             An empty response.
 
         Raises:
-            CoreError: 404 if the User has no such Conversation Summary.
+            CoreError: 404 if the User has no such Day Summary.
         """
         user_memory_service.delete_summary(user.id, summary_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)

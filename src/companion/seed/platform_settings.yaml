@@ -72,7 +72,7 @@ message_wait_seconds: 4
 typing_repeat_seconds: 4
 
 # Raw messages older than this many days are deleted on the next scheduler
-# tick. Conversation Summaries and Memory Items stay until the User deletes
+# tick. Day Summaries and Memory Items stay until the User deletes
 # them.
 message_retention_days: 30
 
@@ -273,27 +273,44 @@ crisis_reply: |-
   If you’re in immediate danger, please call your local emergency number. I’m still here to keep talking while you reach out.
 
 # User Memory. When a Conversation ends, post-conversation processing writes a
-# Conversation Summary, changes the User's Memory Items and picks the photos to
+# Day Summary, changes the User's Memory Items and picks the photos to
 # keep as Shared Photos in one call.
 memory_processing_model: deepseek-flash
 memory_processing_thinking: true
 
 memory_processing_prompt: |-
   You look after the memory of Zeph, an AI companion people talk to on
-  Telegram. You are given a Conversation that has just ended, the Memory
-  Categories, what Zeph already remembers about the person, each item with a
-  number, a description of each photo the person sent, each with a number,
-  and how Zeph read their mood at each message.
+  Telegram. You are given a Conversation that has just ended, the person's
+  earlier Conversations today, the Memory Categories, what Zeph already
+  remembers about the person, each item with a number, a description of each
+  photo the person sent, each with a number, and how Zeph read their mood at
+  each message today.
 
-  Write a short summary of the Conversation: what was talked about, in one to
-  three plain sentences, about "they". Don't say how they seemed in the
-  summary. Separately, say in a few words how the person seemed, as an arc
-  when their mood moved (for example "anxious at first, calmer by the end" or
-  "light and content"). You are given how Zeph read their mood at each
-  message; use it, and the Conversation itself, for the arc. Then, in one
-  short sentence, say what Zeph offered and how it landed (for example
+  First write the Day Summary: one account of the person's whole day with
+  Zeph, written fresh from all of today's messages, the earlier
+  Conversations and the one that just ended. Its messages will be deleted
+  later, so the summary must stand in for them: someone reading it months
+  from now should understand both what happened and how it felt. Write it in
+  plain sentences, about "they", as long as the day needs (a short chat
+  needs a few sentences; a hard day needs a paragraph or two). Give the
+  facts: who was involved (by name or role), what happened, any numbers,
+  dates and decisions, and what Zeph advised and how they answered. Give the
+  feeling: how they felt and why, what it meant to them, and how their mood
+  moved and what moved it. Not a vague list of topics: "They talked about
+  work" says nothing; "Their manager, Priya, moved the launch up a week and
+  they felt it showed she doesn't trust them; they were angry at first and
+  calmer once they decided to raise it on Monday" says it all.
+
+  Separately, say in a few words how the person seemed through the day, as
+  an arc when their mood moved (for example "anxious at first, calmer by the
+  end" or "light and content"). You are given how Zeph read their mood at
+  each message; use it, and the messages themselves, for the arc. Then, in
+  one short sentence, say what Zeph offered and how it landed (for example
   "Suggested a walk; they said it helped." or "Offered advice; they wanted to
   vent, so it fell flat."); leave it empty if Zeph only chatted.
+
+  Everything below comes only from the Conversation that just ended: the
+  earlier Conversations today were already learned from.
 
   Then decide what Zeph should remember. Keep only meaningful, lasting facts
   the person shared about themselves: not small talk, not what the Companion
@@ -475,10 +492,10 @@ reply_memory_intro: >-
   What you remember about this person from earlier Conversations. Bring it up
   only when it fits, casually, the way a friend would:
 
-# How many of the newest Conversation Summaries go into each reply.
+# How many of the newest Day Summaries go into each reply.
 recent_conversation_summaries: 3
 
-# Older Conversation Summaries found by meaning. When the Understanding asks
+# Older Day Summaries found by meaning. When the Understanding asks
 # to look up the past, its phrases are matched against the User's own
 # Summaries; at most this many of the closest go into the reply, beyond the
 # newest ones above.
@@ -782,7 +799,7 @@ life_thread_keeping_prompt: |-
 
 # When a Conversation ends and User Memory works for the User, this call
 # rewrites their User Portrait from their Memory Items, Life Threads, Move
-# Outcomes and newest Conversation Summaries. It also runs when the User
+# Outcomes and newest Day Summaries. It also runs when the User
 # deletes a Memory Item, Life Thread, Move Outcome or Summary, so the Portrait
 # no longer holds it. It is never shown the old Portrait.
 portrait_model: deepseek-flash

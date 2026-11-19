@@ -967,7 +967,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         runs_when="Every reply",
         description=(
             "Writes Zeph’s reply from the Persona, the relevant memories, recent "
-            "Conversation Summaries, Knowledge and the Conversation so far."
+            "Day Summaries, Knowledge and the Conversation so far."
         ),
         prompt_key=RESPONSE_PROMPT.key,
         model_key=RESPONSE_MODEL.key,
@@ -1006,7 +1006,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         name="Post-conversation processing",
         runs_when="After quiet gap",
         description=(
-            "After a Conversation goes quiet, writes the Conversation Summary "
+            "After a Conversation goes quiet, rewrites the day's Day Summary "
             "and mood, and adds, updates or removes Memory Items by category."
         ),
         prompt_key=MEMORY_PROCESSING_PROMPT.key,
@@ -1092,7 +1092,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         runs_when="After quiet gap while User Memory works, and after a deletion",
         description=(
             "Writes a short picture of the User from their Memory Items, Life "
-            "Threads, Move Outcomes and newest Conversation Summaries: who "
+            "Threads, Move Outcomes and newest Day Summaries: who "
             "they are, what’s going on now, recurring themes, what helps and "
             "what doesn’t, and where they stand on their Goals. Every "
             "Understanding and reply sees it. When the User deletes a Memory "
@@ -1137,7 +1137,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         description=(
             "Decides whether to reach out to a User who opted in, which "
             "Check-in Kind to use and what to say, or to skip and give space, "
-            "from their recent Conversation Summaries and Memory Items. When "
+            "from their recent Day Summaries and Memory Items. When "
             "one comes due mid-Conversation, the woven-in Check-in prompt "
             "decides instead whether the reply weaves it in, from the "
             "Conversation and how Zeph read the newest Message; never while "

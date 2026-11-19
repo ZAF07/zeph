@@ -923,7 +923,7 @@ UNDERSTANDING_MEMORY_FIELD = ShapeField(
         MEMORY_ITEMS_FIELD,
         group_list_field(
             "summaries",
-            "Conversation Summaries",
+            "Day Summaries",
             "Earlier Conversations, as Zeph summed them up.",
             "Summary",
             [

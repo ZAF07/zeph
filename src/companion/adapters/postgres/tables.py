@@ -317,16 +317,10 @@ memory_items = Table(
     Column("updated_at", DateTime(timezone=True), nullable=False),
 )
 
-conversation_summaries = Table(
-    "conversation_summaries",
+day_summaries = Table(
+    "day_summaries",
     metadata,
     Column("id", Uuid, primary_key=True),
-    Column(
-        "conversation_id",
-        Uuid,
-        ForeignKey("conversations.id", ondelete="SET NULL"),
-        unique=True,
-    ),
     Column(
         "user_id",
         Uuid,
@@ -334,11 +328,13 @@ conversation_summaries = Table(
         nullable=False,
         index=True,
     ),
+    Column("day", Date, nullable=False),
     Column("summary", Text, nullable=False),
     Column("mood", Text, nullable=False),
-    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("written_at", DateTime(timezone=True), nullable=False),
     Column("embedding", Vector(EMBEDDING_SIZE)),
     Column("offered", Text, nullable=False, server_default=""),
+    UniqueConstraint("user_id", "day"),
 )
 
 life_threads = Table(

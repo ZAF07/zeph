@@ -2,7 +2,7 @@
 
 Read this before planning or changing anything in the reply path, the Conversation-end steps or User Memory. Terms in **bold** are defined in `CONTEXT.md`; this file says how they fit together.
 
-**Status:** target design, agreed on 19 Nov 2026 in a review of a real Conversation where Zeph brushed a User off mid-rant and only gave a useful Read after being pushed three times. It is **not built yet**. "Today" notes say where the code still differs. Open points are listed at the end.
+**Status:** target design, agreed on 19 Nov 2026 in a review of a real Conversation where Zeph brushed a User off mid-rant and only gave a useful Read after being pushed three times. It is **not built yet**, except where a "Built" note says a part now matches. "Today" notes say where the code still differs. Open points are listed at the end.
 
 ## What a reply is for
 
@@ -26,7 +26,7 @@ Agreed in the 19 Nov 2026 review. Each is explained in the step below it applies
 10. **Check-ins are an option, never an order:** weighed in the Reply Plan; the separate Woven-in Check-in model goes.
 11. **The Reply has a strict priority order,** with optional extras last.
 12. **Every Admin-editable field explains itself** with a short hint.
-13. **One Day Summary per User per day** (their time zone), rewritten from all of that day's messages each time a Conversation ends; replaces per-Day Summaries. A Conversation past midnight belongs to the day it started.
+13. **One Day Summary per User per day** (their time zone), rewritten from all of that day's messages each time a Conversation ends; replaces per-Conversation Summaries. A Conversation past midnight belongs to the day it started.
 14. **Learning happens when a Conversation ends,** not after each reply.
 15. **Knowing where the Conversation is going:** each Reply Plan says in a line where the Conversation is now and sees the earlier ones, so Zeph holds or pushes across the Conversation instead of flipping Need every message.
 16. **Commitments are followed up:** one the User agreed to goes into its Life Thread with its date (seen by the User), plus a hidden Curiosity to ask how it went once the day has passed. Goals the User shows plainly are kept in Goals; ones Zeph only infers are Patterns.
@@ -127,6 +127,7 @@ After the quiet gap (Admin-set), these run in order, each using what the earlier
 - **What:** the Day Summary (one per User per day, rewritten from all of that day's messages each time a Conversation ends), changes to Memory Items (single facts), and which photos to keep as Shared Photos.
 - **Why:** Message Retention deletes the raw messages (30 days today), so the Summary is what's left for every later look back and for Patterns.
 - **How:** one model call, rewriting the day's Summary from all of that day's messages each time. It is written to stand in for the messages: the facts (who, what, numbers, decisions, what Zeph advised and how the User answered) and the feeling (how they felt and why, what it meant to them, how their mood moved and what moved it), not a vague list of topics. Threads, Patterns and the rest learn from the Conversation that just ended, so nothing is learned twice.
+- *Built (19 Nov 2026): Day Summaries are kept in `day_summaries`, one per User and day. The call is given the day's earlier Conversations (for the Summary only) and the one that just ended (for Memory Items and photos too). Migration 0064 joined the old same-day Summaries without a model rewrite. The Dashboard's Copy still calls the tab "Conversation Summaries".*
 
 ### b. Life Threads
 
@@ -175,7 +176,7 @@ Every prompt is an Admin-editable Platform Setting (key in `platform_settings`),
 | Woven-in Check-in | `woven_check_in_prompt` | **yes** | Check-in Kinds, local time, recent Check-ins, memory, the Conversation, the Understanding | `core/woven_check_ins.py` |
 | Reply | `response_prompt` | **yes** | **Instructions** = Persona + `response_prompt` + the Understanding's guidance (the Need's "how to reply", the Moves' "how to do it", nuance, mood, ask-why note, Threads and Curiosities to raise) + the Woven-in Check-in, if any + memory text + Knowledge passages + each tool's instructions (web search, settings, stickers, photos) + Features not available + data deletion note, **one after another with no order of priority**. **Input** = the whole Conversation as chat turns. | `core/response_composition.py`, guidance from `format_reply_guidance` in `core/understanding.py` |
 | Check-in on its own | `check_in_prompt` | **yes** | Check-in Kinds, recent Check-ins, Shared Photos, due Curiosities, memory | `core/check_ins.py` |
-| Conversation end a. | `memory_processing_prompt` | no | Memory Categories, current Memory Items, photos sent, moods through the Conversation, the Conversation | `core/post_conversation.py` |
+| Conversation end a. | `memory_processing_prompt` | no | Memory Categories, current Memory Items, photos sent, moods through the day, the day's earlier Conversations, the Conversation that just ended. Writes the Day Summary. | `core/post_conversation.py` |
 | Conversation end b. | `life_thread_keeping_prompt` | no | Today, the Threads it may touch, the Conversation | `core/life_threads.py` |
 | Conversation end d. | `curiosity_keeping_prompt` | no | Today, Memory Items, Threads touched, Curiosities waiting or raised, those asked recently, the unmade next Move, the Conversation | `core/curiosities.py` |
 | Conversation end e. | `move_outcome_keeping_prompt` | no | The Moves each Understanding made, the Conversation | `core/move_outcomes.py` |
@@ -195,7 +196,7 @@ Every prompt is an Admin-editable Platform Setting (key in `platform_settings`),
 | 7. Reply | `response_prompt` | Instructions: the Persona's **voice** + `response_prompt` + the Reply Plan + only what it picked, **in a fixed priority order** (to settle). |
 | Woven-in Check-in | `woven_check_in_prompt` | retired: folded into the Reply Plan |
 | c. Patterns | new prompt | Input: Threads touched and closest, existing Patterns, the Conversations (or Summaries) behind their evidence |
-| a. Summary | `memory_processing_prompt` | asks for thorough Summaries that stand in for the messages |
+| a. Day Summary | `memory_processing_prompt` | built: rewrites the day's Summary from all of its messages, facts and feelings, to stand in for the messages |
 | f. Portrait | `portrait_prompt` | confirmed Patterns added to its input |
 
 Note the Persona: today it is in front of the calls that speak to the User and **not** in the Understanding. In the target, its **Outlook** goes to the Reply Plan (where the Read is formed) and its **voice** to the Reply.

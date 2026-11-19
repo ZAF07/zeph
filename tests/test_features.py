@@ -789,10 +789,10 @@ def test_with_user_memory_off_by_an_admin_memories_can_still_be_deleted(
     remember_some_things(client, chat_model, clock, scheduler, seeded_settings)
     switch_for_everyone(client, admin, "user_memory", on=False)
 
-    summaries = client.get("/api/conversation-summaries", headers=maya).json()
+    summaries = client.get("/api/day-summaries", headers=maya).json()
     deleted_items = client.delete("/api/memory-items", headers=maya)
     deleted_summary = client.delete(
-        f"/api/conversation-summaries/{summaries['summaries'][0]['id']}",
+        f"/api/day-summaries/{summaries['summaries'][0]['id']}",
         headers=maya,
     )
 
@@ -872,7 +872,7 @@ def test_with_user_memory_off_by_an_admin_conversation_end_keeps_nothing(
     scheduler.tick()
 
     assert chat_model.processing_calls == []
-    summaries = client.get("/api/conversation-summaries", headers=maya).json()
+    summaries = client.get("/api/day-summaries", headers=maya).json()
     assert summaries["summaries"] == []
     assert memory_contents(client, maya) == {}
 

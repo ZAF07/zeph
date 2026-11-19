@@ -218,7 +218,7 @@ class SettingsCase:
 
 @dataclass(frozen=True)
 class EvalSummary:
-    """A Conversation Summary from before the case starts.
+    """A Day Summary from before the case starts.
 
     Attributes:
         days_ago: How many days before the case's time it was written.
@@ -331,7 +331,7 @@ class EvalMemory:
     Attributes:
         portrait: The User Portrait; "" for none.
         items: Memory Items' contents by Memory Category name.
-        summaries: Conversation Summaries from earlier Conversations.
+        summaries: Day Summaries from earlier Conversations.
         threads: Life Threads.
         curiosities: Waiting Curiosities.
         knowledge_documents: Knowledge Documents on the platform.

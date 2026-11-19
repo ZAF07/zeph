@@ -7,40 +7,35 @@ import { MemoriesPanelHeading } from "@/components/MemoriesPanelHeading";
 import { MemoryCard } from "@/components/MemoryCard";
 import { MemoryDetailLine } from "@/components/MemoryDetailLine";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
-import type { ConversationSummary } from "@/lib/api-client";
+import type { DaySummary } from "@/lib/api-client";
 import { type Copy, fillCopy, readCopy } from "@/lib/copy";
-import { formatShortDay } from "@/lib/dates";
+import { formatShortCalendarDay } from "@/lib/dates";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 /**
- * The Conversation Summaries tab: a read-only list by date, newest first,
- * with how the User seemed and what Zeph offered; each summary can be
- * deleted.
+ * The Summaries tab: one read-only Day Summary per day, newest first, with
+ * how the User seemed and what Zeph offered; each one can be deleted.
  *
- * @param props - `summaries` are the User's Conversation Summaries, newest
- *   first, `copy` is the Memories page's Copy, and `timeZone` is the User's
- *   time zone.
+ * @param props - `summaries` are the User's Day Summaries, newest day first,
+ *   and `copy` is the Memories page's Copy.
  * @returns The tab's content.
  */
-export function ConversationSummariesList({
+export function DaySummariesList({
   summaries,
   copy,
-  timeZone,
 }: {
-  summaries: ConversationSummary[];
+  summaries: DaySummary[];
   copy: Copy;
-  timeZone?: string;
 }) {
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
 
   const deleteSummary = useMutation({
-    mutationFn: (summaryId: string) =>
-      apiClient.deleteConversationSummary(summaryId),
+    mutationFn: (summaryId: string) => apiClient.deleteDaySummary(summaryId),
     onSuccess: (_, summaryId) =>
       queryClient.setQueryData(
-        queryKeys.conversationSummaries,
+        queryKeys.daySummaries,
         summaries.filter((item) => item.id !== summaryId),
       ),
   });
@@ -61,7 +56,7 @@ export function ConversationSummariesList({
       {summaries.length > 0 ? (
         <ol className="m-0 flex list-none flex-col gap-6 p-0">
           {summaries.map((summary) => {
-            const day = formatShortDay(summary.created_at, timeZone);
+            const day = formatShortCalendarDay(summary.day);
             return (
               <li key={summary.id}>
                 <MemoryCard

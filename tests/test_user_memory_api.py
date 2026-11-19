@@ -1,3 +1,4 @@
+from datetime import timedelta
 from typing import Any
 
 from fastapi.testclient import TestClient
@@ -178,7 +179,7 @@ def test_deleting_all_memory_items_keeps_conversation_summaries(
 
     assert response.status_code == 204
     assert client.get("/api/memory-items", headers=headers).json() == {"groups": []}
-    summaries = client.get("/api/conversation-summaries", headers=headers).json()
+    summaries = client.get("/api/day-summaries", headers=headers).json()
     assert [entry["summary"] for entry in summaries["summaries"]] == ["Talked a lot."]
 
 
@@ -195,11 +196,10 @@ def test_a_user_can_list_and_delete_conversation_summaries(
     headers = auth_headers(auth_verifier, "user_maya")
     tom = auth_headers(auth_verifier, "user_tom")
     remember(client, chat_model, clock, scheduler, seeded_settings, "First.", [])
+    clock.advance(timedelta(days=1))
     remember(client, chat_model, clock, scheduler, seeded_settings, "Second.", [])
 
-    summaries = client.get("/api/conversation-summaries", headers=headers).json()[
-        "summaries"
-    ]
+    summaries = client.get("/api/day-summaries", headers=headers).json()["summaries"]
     assert [(entry["summary"], entry["mood"]) for entry in summaries] == [
         ("Second.", "calm"),
         ("First.", "calm"),
@@ -207,16 +207,14 @@ def test_a_user_can_list_and_delete_conversation_summaries(
     first_id = summaries[1]["id"]
 
     assert (
-        client.delete(f"/api/conversation-summaries/{first_id}", headers=tom)
+        client.delete(f"/api/day-summaries/{first_id}", headers=tom)
     ).status_code == 404
-    response = client.delete(f"/api/conversation-summaries/{first_id}", headers=headers)
+    response = client.delete(f"/api/day-summaries/{first_id}", headers=headers)
 
     assert response.status_code == 204
-    remaining = client.get("/api/conversation-summaries", headers=headers).json()
+    remaining = client.get("/api/day-summaries", headers=headers).json()
     assert [entry["summary"] for entry in remaining["summaries"]] == ["Second."]
-    missing = client.delete(
-        f"/api/conversation-summaries/{MISSING_ID}", headers=headers
-    )
+    missing = client.delete(f"/api/day-summaries/{MISSING_ID}", headers=headers)
     assert missing.status_code == 404
 
 
@@ -224,8 +222,8 @@ def test_user_memory_routes_need_sign_in(client: TestClient) -> None:
     assert client.get("/api/memory-items").status_code == 401
     assert client.delete("/api/memory-items").status_code == 401
     assert client.delete(f"/api/memory-items/{MISSING_ID}").status_code == 401
-    assert client.get("/api/conversation-summaries").status_code == 401
-    assert client.delete(f"/api/conversation-summaries/{MISSING_ID}").status_code == 401
+    assert client.get("/api/day-summaries").status_code == 401
+    assert client.delete(f"/api/day-summaries/{MISSING_ID}").status_code == 401
 
 
 def test_onboarding_with_user_memory_on_saves_name_and_reasons_as_memory_items(

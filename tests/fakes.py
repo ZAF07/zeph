@@ -458,7 +458,7 @@ def understanding_answer(
         intensity: How strongly: "low", "medium" or "high".
         cause_known: Whether the Companion knows why they feel that way.
         nuance: One sentence on what fits.
-        look_up_past: Phrases to search older Conversation Summaries with.
+        look_up_past: Phrases to search older Day Summaries with.
         bring_up: The Life Threads to bring up, e.g. {"thread": 1, "how":
             "lead"}.
         left_alone: The Life Threads to leave alone, e.g. {"thread": 1,

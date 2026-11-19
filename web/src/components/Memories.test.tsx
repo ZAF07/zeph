@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Memories } from "@/components/Memories";
 import type {
   ApiClient,
-  ConversationSummary,
+  DaySummary,
   LifeThread,
   MemoryGroup,
   MoveOutcome,
@@ -22,8 +22,8 @@ const apiClient = {
   listMemoryGroups: vi.fn<ApiClient["listMemoryGroups"]>(),
   deleteMemoryItem: vi.fn<ApiClient["deleteMemoryItem"]>(),
   deleteAllMemoryItems: vi.fn<ApiClient["deleteAllMemoryItems"]>(),
-  listConversationSummaries: vi.fn<ApiClient["listConversationSummaries"]>(),
-  deleteConversationSummary: vi.fn<ApiClient["deleteConversationSummary"]>(),
+  listDaySummaries: vi.fn<ApiClient["listDaySummaries"]>(),
+  deleteDaySummary: vi.fn<ApiClient["deleteDaySummary"]>(),
   listSharedPhotos: vi.fn<ApiClient["listSharedPhotos"]>(),
   getSharedPhotoImage: vi.fn<ApiClient["getSharedPhotoImage"]>(),
   deleteSharedPhoto: vi.fn<ApiClient["deleteSharedPhoto"]>(),
@@ -81,20 +81,22 @@ const groups: MemoryGroup[] = [
   },
 ];
 
-const summaries: ConversationSummary[] = [
+const summaries: DaySummary[] = [
   {
     id: "summary-1",
     summary: "Talked through whether to accept the new role.",
     mood: "unsettled at first, then calmer",
     offered: "Suggested a walk; they said it helped.",
-    created_at: "2026-11-11T09:00:00Z",
+    day: "2026-11-11",
+    written_at: "2026-11-11T23:30:00Z",
   },
   {
     id: "summary-2",
     summary: "A short Conversation after a morning swim.",
     mood: "light and content",
     offered: "",
-    created_at: "2026-11-09T09:00:00Z",
+    day: "2026-11-09",
+    written_at: "2026-11-09T09:00:00Z",
   },
 ];
 
@@ -167,10 +169,10 @@ describe("Memories", () => {
     window.history.replaceState({}, "", "/memories");
     apiClient.getMe.mockResolvedValue(maya);
     apiClient.listMemoryGroups.mockResolvedValue(groups);
-    apiClient.listConversationSummaries.mockResolvedValue(summaries);
+    apiClient.listDaySummaries.mockResolvedValue(summaries);
     apiClient.deleteMemoryItem.mockResolvedValue(undefined);
     apiClient.deleteAllMemoryItems.mockResolvedValue(undefined);
-    apiClient.deleteConversationSummary.mockResolvedValue(undefined);
+    apiClient.deleteDaySummary.mockResolvedValue(undefined);
     apiClient.listSharedPhotos.mockResolvedValue(sharedPhotos);
     apiClient.getSharedPhotoImage.mockResolvedValue(
       new Blob(["jpeg"], { type: "image/jpeg" }),
@@ -352,7 +354,7 @@ describe("Memories", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("lists Conversation Summaries by date with how the User seemed", async () => {
+  it("lists one Summary per day, by its day, with how the User seemed", async () => {
     const user = userEvent.setup();
     renderWithQueries(<Memories copy={seedCopy()} />);
 
@@ -382,7 +384,7 @@ describe("Memories", () => {
     expect(within(older).queryByText("Zeph offered")).not.toBeInTheDocument();
   });
 
-  it("deletes a Conversation Summary", async () => {
+  it("deletes a Day Summary", async () => {
     const user = userEvent.setup();
     renderWithQueries(<Memories copy={seedCopy()} />);
     await user.click(
@@ -393,16 +395,14 @@ describe("Memories", () => {
       screen.getByRole("button", { name: "Delete summary from 9 Nov" }),
     );
 
-    expect(apiClient.deleteConversationSummary).toHaveBeenCalledWith(
-      "summary-2",
-    );
+    expect(apiClient.deleteDaySummary).toHaveBeenCalledWith("summary-2");
     expect(
       screen.queryByText("A short Conversation after a morning swim."),
     ).not.toBeInTheDocument();
   });
 
-  it("explains when there are no Conversation Summaries yet", async () => {
-    apiClient.listConversationSummaries.mockResolvedValue([]);
+  it("explains when there are no Day Summaries yet", async () => {
+    apiClient.listDaySummaries.mockResolvedValue([]);
     const user = userEvent.setup();
     renderWithQueries(<Memories copy={seedCopy()} />);
 
@@ -913,7 +913,7 @@ describe("Memories", () => {
           why: "⟦data⟧",
         })),
       );
-      apiClient.listConversationSummaries.mockResolvedValue(
+      apiClient.listDaySummaries.mockResolvedValue(
         summaries.map((summary) => ({
           ...summary,
           summary: "⟦data⟧",
@@ -974,7 +974,7 @@ describe("Memories", () => {
       apiClient.getUserPortrait.mockResolvedValue(null);
       apiClient.listLifeThreads.mockResolvedValue([]);
       apiClient.listMoveOutcomes.mockResolvedValue([]);
-      apiClient.listConversationSummaries.mockResolvedValue([]);
+      apiClient.listDaySummaries.mockResolvedValue([]);
       apiClient.listSharedPhotos.mockResolvedValue([]);
 
       const { container } = renderWithQueries(<Memories copy={markedCopy()} />);

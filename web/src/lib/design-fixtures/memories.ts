@@ -1,6 +1,6 @@
 import type {
   ApiClient,
-  ConversationSummary,
+  DaySummary,
   LifeThread,
   MemoryGroup,
   MoveOutcome,
@@ -101,15 +101,16 @@ const moveOutcomes: MoveOutcome[] = [
   },
 ];
 
-/** Alex's Conversation Summaries, as drawn in `Memories--tab-summaries.html`. */
-const summaries: ConversationSummary[] = [
+/** Alex's Day Summaries, as drawn in `Memories--tab-summaries.html`. */
+const summaries: DaySummary[] = [
   {
     id: "design-summary-1",
     summary:
       "Talked about being tired but afraid to slow down. Traced the fear to self-trust more than productivity.",
     mood: "Tired, thoughtful",
     offered: "A question about what rest would look like as part of progress",
-    created_at: "2026-11-12T22:00:00+08:00",
+    day: "2026-11-12",
+    written_at: "2026-11-12T22:00:00+08:00",
   },
 ];
 
@@ -135,7 +136,7 @@ export const memoriesFixtures: Partial<ApiClient> = {
   getUserPortrait: async () => portrait,
   listLifeThreads: async () => lifeThreads,
   listMoveOutcomes: async () => moveOutcomes,
-  listConversationSummaries: async () => summaries,
+  listDaySummaries: async () => summaries,
   listSharedPhotos: async () => sharedPhotos,
   getSharedPhotoImage: () => new Promise<Blob>(() => {}),
 };

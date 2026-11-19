@@ -1474,27 +1474,31 @@ class MemoryGroup:
 
 
 @dataclass(frozen=True)
-class ConversationSummary:
-    """A short account of what one Conversation covered and how the User seemed.
+class DaySummary:
+    """An account of one of a User's days: what they talked about and how it felt.
+
+    There is one per User per day, in their time zone; it is rewritten from
+    all of that day's messages each time one of its Conversations ends. A
+    Conversation belongs to the day it started.
 
     Attributes:
         id: Our ID for the summary.
-        conversation_id: The Conversation it sums up.
-        user_id: The User who took part.
-        summary: What was talked about.
+        user_id: The User whose day it was.
+        day: The day, in the User's time zone.
+        summary: What happened and how it felt.
         mood: How the User seemed, as an arc when it moved, e.g. "unsettled
             at first, then calmer".
-        created_at: When it was written.
+        written_at: When it was last written.
         offered: What the Companion offered and how it landed, e.g.
             "Suggested a walk; they said it helped."; "" if nothing.
     """
 
     id: UUID
-    conversation_id: UUID
     user_id: UUID
+    day: date
     summary: str
     mood: str
-    created_at: datetime
+    written_at: datetime
     offered: str = ""
 
 

@@ -588,7 +588,7 @@ def test_a_failing_curiosity_keeper_still_saves_the_summary_and_is_not_retried(
 
     with engine.connect() as connection:
         summaries = connection.execute(
-            text("SELECT summary FROM conversation_summaries")
+            text("SELECT summary FROM day_summaries")
         ).scalars()
         assert list(summaries) == ["Talked about work."]
     assert len(chat_model.curiosity_keeping_calls) == 1
@@ -616,7 +616,7 @@ def test_no_dashboard_or_user_api_shows_curiosities(
             "/api/me",
             "/api/memory-items",
             "/api/life-threads",
-            "/api/conversation-summaries",
+            "/api/day-summaries",
         )
     ] + [
         client.get(path, headers=admin).text

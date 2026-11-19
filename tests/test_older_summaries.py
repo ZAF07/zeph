@@ -1,3 +1,4 @@
+from datetime import timedelta
 from typing import Any
 
 from fastapi.testclient import TestClient
@@ -44,8 +45,9 @@ def have_conversations(
     seeded_settings: dict[str, Any],
     summaries: tuple[str, ...],
 ) -> None:
-    """Have one processed Conversation per summary, oldest first."""
+    """Have one processed Conversation per summary, a day apart, oldest first."""
     for summary in summaries:
+        clock.advance(timedelta(days=1))
         have_conversation(
             client,
             chat_model,
@@ -103,7 +105,7 @@ def test_new_summaries_are_embedded_when_written(
 
     with engine.connect() as connection:
         embedded = connection.execute(
-            text("SELECT embedding IS NOT NULL FROM conversation_summaries")
+            text("SELECT embedding IS NOT NULL FROM day_summaries")
         ).scalar_one()
     assert embedded
 
@@ -126,7 +128,7 @@ def test_a_summary_is_still_saved_when_embedding_it_fails(
         client, chat_model, clock, scheduler, seeded_settings, (INTERVIEW_SUMMARY,)
     )
 
-    summaries = client.get("/api/conversation-summaries", headers=headers).json()
+    summaries = client.get("/api/day-summaries", headers=headers).json()
     assert [item["summary"] for item in summaries["summaries"]] == [INTERVIEW_SUMMARY]
 
 
@@ -151,8 +153,8 @@ def test_a_look_up_past_phrase_brings_an_old_summary_into_the_reply_with_its_dat
 
     instructions = ask_with_look_up_past(client, chat_model, [MATCHING_PHRASE])
 
-    assert "Older Conversations that may matter:" in instructions
-    assert f"- 11 Nov 2026: {INTERVIEW_SUMMARY} They seemed fine." in instructions
+    assert "Older days that may matter:" in instructions
+    assert f"- 12 Nov 2026: {INTERVIEW_SUMMARY} They seemed fine." in instructions
     for summary in OTHER_SUMMARIES:
         assert instructions.count(summary) == 1
 
@@ -179,7 +181,7 @@ def test_a_weak_match_adds_nothing(
     instructions = ask_with_look_up_past(client, chat_model, ["holiday in Spain"])
 
     assert INTERVIEW_SUMMARY not in instructions
-    assert "Older Conversations that may matter:" not in instructions
+    assert "Older days that may matter:" not in instructions
 
 
 def test_an_empty_look_up_past_searches_nothing(
@@ -292,20 +294,20 @@ def test_a_deleted_summary_is_no_longer_found(
         seeded_settings,
         (INTERVIEW_SUMMARY, *OTHER_SUMMARIES),
     )
-    summaries = client.get("/api/conversation-summaries", headers=headers).json()
+    summaries = client.get("/api/day-summaries", headers=headers).json()
     [interview_id] = [
         item["id"]
         for item in summaries["summaries"]
         if item["summary"] == INTERVIEW_SUMMARY
     ]
 
-    client.delete(f"/api/conversation-summaries/{interview_id}", headers=headers)
+    client.delete(f"/api/day-summaries/{interview_id}", headers=headers)
     instructions = ask_with_look_up_past(client, chat_model, [MATCHING_PHRASE])
 
     assert INTERVIEW_SUMMARY not in instructions
     with engine.connect() as connection:
         embeddings_left = connection.execute(
-            text("SELECT count(*) FROM conversation_summaries WHERE id = :id"),
+            text("SELECT count(*) FROM day_summaries WHERE id = :id"),
             {"id": interview_id},
         ).scalar_one()
     assert embeddings_left == 0

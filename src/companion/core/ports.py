@@ -19,12 +19,12 @@ from companion.core.models import (
     ConnectionToken,
     Conversation,
     ConversationMessage,
-    ConversationSummary,
     CopySeedSlot,
     CopySlot,
     Curiosity,
     CuriosityChanges,
     DailyUsage,
+    DaySummary,
     EmbeddedChunk,
     Feature,
     FeatureSwitch,
@@ -779,6 +779,21 @@ class ConversationRepository(Protocol):
         """
         ...
 
+    def list_started_between(
+        self, user_id: UUID, start: datetime, end: datetime
+    ) -> list[Conversation]:
+        """List a User's Conversations that started in a span of time.
+
+        Args:
+            user_id: The User's ID.
+            start: The earliest start, included.
+            end: The latest start, left out.
+
+        Returns:
+            The Conversations, oldest first.
+        """
+        ...
+
     def end_quiet(self, quiet_since: datetime, ended_at: datetime) -> None:
         """End every open Conversation with no message since a given time.
 
@@ -1373,7 +1388,7 @@ class CuriosityRepository(Protocol):
 
 
 class UserMemoryRepository(Protocol):
-    """Stores each User's Memory Items, Conversation Summaries and Shared Photos."""
+    """Stores each User's Memory Items, Day Summaries and Shared Photos."""
 
     def list_items(self, user_id: UUID) -> list[MemoryItem]:
         """List a User's Memory Items in the order they were saved.
@@ -1417,15 +1432,15 @@ class UserMemoryRepository(Protocol):
 
     def list_summaries(
         self, user_id: UUID, limit: int | None = None
-    ) -> list[ConversationSummary]:
-        """List a User's Conversation Summaries, newest first.
+    ) -> list[DaySummary]:
+        """List a User's Day Summaries, newest day first.
 
         Args:
             user_id: The User's ID.
             limit: The most to return; None for all of them.
 
         Returns:
-            The Conversation Summaries.
+            The Day Summaries.
         """
         ...
 
@@ -1436,8 +1451,8 @@ class UserMemoryRepository(Protocol):
         min_closeness: float,
         limit: int,
         leave_out: Sequence[UUID],
-    ) -> list[ConversationSummary]:
-        """Find a User's Conversation Summaries closest in meaning to any search.
+    ) -> list[DaySummary]:
+        """Find a User's Day Summaries closest in meaning to any search.
 
         Closeness is cosine similarity. Summaries with no embedding are never
         found.
@@ -1456,11 +1471,11 @@ class UserMemoryRepository(Protocol):
         ...
 
     def delete_summary(self, user_id: UUID, summary_id: UUID) -> bool:
-        """Delete one of a User's Conversation Summaries.
+        """Delete one of a User's Day Summaries.
 
         Args:
             user_id: The User's ID.
-            summary_id: The Conversation Summary's ID.
+            summary_id: The Day Summary's ID.
 
         Returns:
             True if it was deleted; False if the User has no such summary.
@@ -1471,19 +1486,21 @@ class UserMemoryRepository(Protocol):
         self,
         conversation_id: UUID,
         processed_at: datetime,
-        summary: ConversationSummary | None,
+        summary: DaySummary | None,
         changes: MemoryChanges,
         summary_embedding: list[float] | None = None,
     ) -> None:
         """Save what processing an ended Conversation produced, in one step.
 
         The Conversation is marked processed at the same time, so it is
-        never processed twice.
+        never processed twice. The Day Summary replaces the one already
+        kept for the User's day, keeping its ID.
 
         Args:
             conversation_id: The Conversation that was processed.
             processed_at: When processing finished.
-            summary: Its Conversation Summary; None when nothing is saved.
+            summary: The rewritten Day Summary of the day the Conversation
+                started; None when nothing is saved.
             changes: The changes to the User's Memory Items and the new
                 Shared Photos.
             summary_embedding: The Summary's embedding, so it can be found
@@ -1538,7 +1555,7 @@ class UserMemoryRepository(Protocol):
         ...
 
     def delete_for_user(self, user_id: UUID) -> None:
-        """Delete a User's Memory Items, Conversation Summaries and Shared Photos.
+        """Delete a User's Memory Items, Day Summaries and Shared Photos.
 
         Args:
             user_id: The User's ID.

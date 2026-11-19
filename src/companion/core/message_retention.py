@@ -8,7 +8,7 @@ from companion.core.ports import Clock, Repositories
 class MessageRetention:
     """Deletes raw messages once they are older than the Admin-set retention period.
 
-    Model Call Log entries go with them. Conversation Summaries and Memory
+    Model Call Log entries go with them. Day Summaries and Memory
     Items are kept until the User deletes them.
     """
 
