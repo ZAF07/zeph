@@ -16,13 +16,13 @@ export function searchCopySlots(
   tabs: CopyTab[],
   query: string,
 ): CopySearchMatch[] {
-  const words = query.trim().toLowerCase();
-  if (!words) {
+  const searchText = query.trim().toLowerCase();
+  if (!searchText) {
     return [];
   }
   return tabs.flatMap((tab) =>
     tab.slots
-      .filter((slot) => slot.text.toLowerCase().includes(words))
+      .filter((slot) => slot.text.toLowerCase().includes(searchText))
       .map((slot) => ({ tab, slot })),
   );
 }

@@ -96,35 +96,40 @@ export function CopyEditor() {
     saveTab.reset();
   }
 
+  function landOn(slotKey: string) {
+    setSearchQuery("");
+    setLandingSlot(slotKey);
+  }
+
   function switchTab({ tab: tabKey, slotKey }: TabSwitch) {
     setSwitchingTo(null);
     setSelectedTab(tabKey);
     discard();
     if (slotKey !== null) {
-      setSearchQuery("");
-      setLandingSlot(slotKey);
+      landOn(slotKey);
+    }
+  }
+
+  function requestSwitch(target: TabSwitch) {
+    if (isDirty) {
+      setSwitchingTo(target);
+    } else {
+      switchTab(target);
     }
   }
 
   function chooseTab(tabKey: string) {
-    if (tabKey === tab?.tab) {
-      return;
-    }
-    if (isDirty) {
-      setSwitchingTo({ tab: tabKey, slotKey: null });
-    } else {
-      switchTab({ tab: tabKey, slotKey: null });
+    if (tabKey !== tab?.tab) {
+      requestSwitch({ tab: tabKey, slotKey: null });
     }
   }
 
   function pickMatch(match: CopySearchMatch) {
-    if (match.tab.tab === tab?.tab) {
-      setSearchQuery("");
-      setLandingSlot(match.slot.key);
-    } else if (isDirty) {
-      setSwitchingTo({ tab: match.tab.tab, slotKey: match.slot.key });
+    const matchTabKey = match.tab.tab;
+    if (matchTabKey === tab?.tab) {
+      landOn(match.slot.key);
     } else {
-      switchTab({ tab: match.tab.tab, slotKey: match.slot.key });
+      requestSwitch({ tab: matchTabKey, slotKey: match.slot.key });
     }
   }
 
@@ -137,14 +142,12 @@ export function CopyEditor() {
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2.5">
-        <SearchField
-          label="Search all tabs"
-          placeholder="Search all tabs by text"
-          value={searchQuery}
-          onChange={setSearchQuery}
-        />
-      </div>
+      <SearchField
+        label="Search all tabs"
+        placeholder="Search all tabs by text"
+        value={searchQuery}
+        onChange={setSearchQuery}
+      />
       {searchQuery.trim() ? (
         <CopySearchResults
           matches={searchCopySlots(tabs, searchQuery)}

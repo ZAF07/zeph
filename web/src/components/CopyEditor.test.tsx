@@ -1,6 +1,6 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CopyEditor } from "@/components/CopyEditor";
 import { ApiError, type ApiClient, type CopyTab } from "@/lib/api-client";
@@ -73,6 +73,7 @@ const copyPage: CopyTab[] = [
 ];
 
 let scrolledInto: Element[] = [];
+const originalScrollIntoView = Element.prototype.scrollIntoView;
 
 describe("CopyEditor", () => {
   beforeEach(() => {
@@ -97,6 +98,10 @@ describe("CopyEditor", () => {
         ),
       })),
     );
+  });
+
+  afterEach(() => {
+    Element.prototype.scrollIntoView = originalScrollIntoView;
   });
 
   it("shows the Landing tab's slots in page order, each with its details", async () => {
