@@ -48,4 +48,4 @@ Above the builder notes: AdminCheckInLog 0.08%, M-AdminCheckInLog 6.34% (the mis
 ## Completion
 
 - Completed: 2026-11-19
-- Commit: <to be filled in after merge>
+- Commit: merge `7869a7d` into main (branch `redesign-10b-ignore-threshold-text`: `25fae08` paused rows name the Ignore Threshold, `8009919` code-review fix, `3dd3e8d` evidence and archive)
