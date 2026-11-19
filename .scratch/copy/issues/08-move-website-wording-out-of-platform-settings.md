@@ -14,7 +14,7 @@ The website wording that is a Platform Setting today becomes Copy, so every webs
 
 - AI notice and short AI notice
 - User Memory explanation and Photo Viewing explanation
-- "Memory is paused" and "Memory isn't available" notes, each split into a bold lead slot and a body slot (the design bolds the lead; no `**` markup remains)
+- "Memory is paused" and "Memory isn't available" notes, each split into a title slot and a body slot (the title and body of the design's "Memory is off" notice in `States`, as `PausedNotice` draws them; no `**` markup remains)
 - Delete My Data description
 
 Each moves into the Copy tab of the page that shows it (Shared if more than one page shows it). The Settings page drops these fields. Endpoints that sent this wording inside other data (e.g. the Home data and the signed-in User's Memory note) stop sending it; the web app picks the right slot from the flags it already gets. A migration drops the old settings; no backfill (the platform isn't live).
@@ -24,7 +24,7 @@ Stays as is: the onboarding reason choices and all chat wording (Platform Settin
 ## Acceptance criteria
 
 - [ ] Each listed wording is a Copy slot on the right tab and no longer a Platform Setting (not in the settings read or save, not on the Settings page).
-- [ ] The Memory notes show a bold lead and plain body exactly as the design draws them, picked by the User's Memory flags.
+- [ ] The Memory notes show as `PausedNotice` title and body, exactly as the "Memory is off" notice in `States` draws them, picked by the User's Memory flags.
 - [ ] No endpoint sends this wording outside the Copy reads.
 - [ ] Onboarding reason choices, chat wording and the Crisis Reply are untouched.
 - [ ] Seed text matches the references; the pixel test passes for every page showing this wording at both widths.

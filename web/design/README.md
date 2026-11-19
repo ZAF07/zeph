@@ -1,6 +1,8 @@
-# Zeph redesign — build contract
+# Zeph UI — build contract
 
-This folder is the design for the Zeph web app, in a form you build against and are tested against. It replaces the current light theme. Read this file fully before touching code.
+This folder is the design for the Zeph web app, in a form you build against and are tested against. The redesign is finished: every page in the app is built from these files. This file is now the contract for all UI work, including new pages and features. Read it fully before touching code.
+
+Adding a page or a feature? Start with "Building new UI" below.
 
 ## The one rule
 
@@ -185,7 +187,47 @@ PASS means at most 0.5% of pixels differ and the page height is within 8px. On F
 
 The sign-in and sign-up pages mask the Clerk card on both sides and allow 8%, because the Clerk widget cannot be matched pixel for pixel. Everything around the card is still checked.
 
-## Build order
+## Building new UI
+
+Use this section for every new page, new feature, or visible change to an existing page.
+
+### First, work out which kind of change it is
+
+1. **A change to a page that has a reference file.** The reference still wins. If the change would look different from the reference (new copy, a new part, a new layout), the reference must change first. Ask Zaf to update `reference/<Ref>.html` and rebuild its baseline. Then build to match it. It is done when `compare.cjs` prints PASS for that page at both widths.
+2. **A new admin page.** Build it from the template that fits: table (`AdminCheckInLog`), form (`AdminPersona`) or card list (`AdminCheckInKinds`). The foot of each template file lists the order its parts go in. Use the shared components below, with that page's real fields and columns. There is no pixel test for these pages, so in `/run` compare it by eye with the template at 1280 and 390.
+3. **A new user page, or any page that needs a part no reference or template shows.** Stop and ask Zaf for a reference file first. Once it is in `reference/`, with its baseline and its line in `routes.json`, build it like any other page: done when `compare.cjs` passes at both widths.
+
+You never edit `reference/`, `baseline/`, `tokens.css`, `routes.json`, `manifest.json` or the test scripts. Zaf changes the design; you build against it.
+
+### Rules for all UI work
+
+- Use only the values in `tokens.css` and the reference files: colours, sizes, weights, gaps, radii, shadows, icons, copy. No Tailwind default palette, no bold. If you need a value that is in neither, stop and ask.
+- Reuse the shared components before writing new markup. A new component is fine when it only arranges existing parts and token values in a way a reference already shows.
+- Build both widths, 1280 and 390. Layouts respond by wrapping, as in "Behaviour" above. Tables become cards on a phone. No sideways scrolling except the Memories tab row.
+- Every part that loads or saves data uses the shared states from `States`: loading, empty, couldn't load, saved, save failed and confirm. See them in the app at `/design-preview/states` in fixture mode.
+- A feature with no backend yet keeps the `ToBuildTag` and runs on fixture data only.
+- If the page calls a new API client method, add its fixture data in `src/lib/design-fixtures/` so fixture mode keeps working.
+- Check the page in the running app with real data (`/run`), not only fixtures: long names, many rows, nothing at all.
+- Then run `pnpm lint`, `pnpm format:check`, `pnpm typecheck` and `pnpm test`.
+
+### Shared components
+
+All in `src/components/`. Read a component's TSDoc before using it.
+
+| Need | Components |
+|---|---|
+| Page frame | `DashboardShell` (every signed-in page), `PublicHeader`, `SiteFooter` |
+| Page heading | `PageHero` (illustrated banner), `PageHeader` (plain), `AdminPageHeader`, `SectionIntro`, `Eyebrow` |
+| Panels | `HomeCard`, `CardRow`, `PillLink` |
+| Tables (table template) | `StatTiles`, `FilterPills`, `FilterPillLinks`, `SearchField`, `SelectFilter`, `DataTable`, `StatusPill`, `TableLoading`, `TableEmpty`, `TableNoMatches` |
+| Forms (form template) | `FormSectionHeading`, `FormEditor`, `FieldRows`, `FieldRow`, `FieldText`, `FieldNumber`, `FieldSelect`, `Switch`, `SaveBar` |
+| Card lists (card-list template) | `NewCardBox`, `CardList`, `CardListToolbar`, `FoldingCard`, `CardSaveBar`, `CardRemoveConfirm`, `CardListLoading` |
+| Shared states | `LoadingPanel`, `LoadFailed`, `EmptyState`, `SavedNote`, `SaveFailedNote`, `ConfirmDialog` |
+| Tags | `ToBuildTag`, `UnsavedTag` |
+
+## Build order (the redesign, finished)
+
+Kept as a record of how the redesign was built. New work follows "Building new UI" above.
 
 One slice at a time. After each: run the test for that slice's pages, run `pnpm lint`, `pnpm typecheck` and `pnpm test`, report the PASS lines, list anything you were unsure about, then stop and wait for Zaf.
 

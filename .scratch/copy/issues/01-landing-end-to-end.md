@@ -17,7 +17,7 @@ The whole Copy path, proved on one page. An Admin opens the new Copy page (`/adm
 - Tab save is all or nothing and turned away, with a reason per slot, for: empty text, over max length, a required placeholder missing, an unknown placeholder, a slot from another tab. Plain Users are refused.
 - One small pure helper fills `{name}` placeholders. Plain text only: no markdown, links or HTML read from Copy.
 - Landing reads every word from Copy, including its browser tab title and search description. The page code holds no default text. If Copy can't be read, Landing shows the normal error state.
-- The Copy page is one page with tabs (only Landing for now), built from the design's existing parts: a text field per slot with name, placeholders and a counter, and the card save bar. Field errors show on the failing slot.
+- The Copy page is one page with tabs (only Landing for now). It has no reference file, so read `web/design/README.md` ("Building new UI") first and build it only from existing parts and token values: tabs as `MemoriesTabs` draws them, a text field per slot with name, placeholders and a counter as `FormEditor` draws it, and `CardSaveBar`. No new colours, sizes or gaps. Field errors show on the failing slot.
 - The design fixture API client serves the seed Copy, and the Landing seed text matches the reference exactly.
 
 ## Acceptance criteria
@@ -31,6 +31,7 @@ The whole Copy path, proved on one page. An Admin opens the new Copy page (`/adm
 - [ ] Landing shows the normal error state when Copy can't be read.
 - [ ] Backend HTTP tests, Dashboard tests and placeholder helper tests cover the above; all Python and web checks pass.
 - [ ] The pixel test passes for the Landing refs at both widths.
+- [ ] `/run`: the Copy page at 1280 and 390 uses only existing parts and token values, checked by eye against `MemoriesTabs`, `FormEditor` and `CardSaveBar` on their own pages; screenshots at both widths.
 - [ ] `/run`: as an Admin, change the Landing main heading, reload signed-out `/` and see it; try a save over max length and see it turned away on that slot.
 
 ## Blocked by
