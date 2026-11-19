@@ -17,6 +17,17 @@ function lastSavedText(slot: CopySlot): string {
 }
 
 /**
+ * The page id of a Copy slot's editor, so a search result can take the
+ * Admin to it.
+ *
+ * @param key - The slot's key.
+ * @returns The id.
+ */
+export function copySlotFieldId(key: string): string {
+  return `copy-slot-${key}`;
+}
+
+/**
  * One Copy slot in the form template's short editor: its name, the
  * placeholders it takes and who last saved it along the top, with the
  * count against its max length, and the reason a save turned it away, if
@@ -44,7 +55,12 @@ export function CopySlotField({
     .join(" and ");
 
   return (
-    <div role="group" aria-label={slot.name} className="flex flex-col gap-1">
+    <div
+      id={copySlotFieldId(slot.key)}
+      role="group"
+      aria-label={slot.name}
+      className="flex flex-col gap-1"
+    >
       <FormEditor
         label={slot.name}
         size="short"
