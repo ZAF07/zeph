@@ -55,4 +55,8 @@ None.
 ## Completion
 
 - Completed: 2026-11-19
-- Commit: <to be filled in after merge>
+- Commit: merge `6772a65` into main — "Merge dev env issue 03: test Postgres keeps its data in memory (no Docker volume left per pytest run, suite about twice as fast); worktree teardown clears build cache older than 48 hours"
+  - Branch `docker-01-no-leftover-test-volumes`:
+    - `c5d751a` Dev env 03: test Postgres keeps its data in memory; worktree teardown clears old build cache
+    - `f2fd576` Dev env 03: cap the test Postgres tmpfs at 2 GB; teardown prunes all old build cache, not only loose cache (review)
+    - `3fc9ae6` Dev env 03: evidence recorded, issue completed and archived
