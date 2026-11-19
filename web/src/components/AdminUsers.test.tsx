@@ -10,6 +10,7 @@ const apiClient = {
   listAdminUsers: vi.fn<ApiClient["listAdminUsers"]>(),
   changeUserRole: vi.fn<ApiClient["changeUserRole"]>(),
   listUserFeatures: vi.fn<ApiClient["listUserFeatures"]>(),
+  listFeatures: vi.fn<ApiClient["listFeatures"]>(),
   setFeatureForUser: vi.fn<ApiClient["setFeatureForUser"]>(),
 };
 
@@ -46,146 +47,162 @@ const ren: AdminUser = {
 };
 
 function rowFor(name: string): HTMLElement {
-  const row = screen.getByText(name).closest("tr");
+  const row = within(screen.getByRole("table")).getByText(name).closest("tr");
   if (!row) {
     throw new Error(`No row for ${name}`);
   }
   return row;
 }
 
+async function openPanelFor(name: string) {
+  const user = userEvent.setup();
+  await screen.findByRole("table");
+  await user.click(
+    within(rowFor(name)).getByRole("button", { name: "Manage" }),
+  );
+  const panel = await screen.findByRole("region", { name });
+  return { user, panel: within(panel) };
+}
+
 describe("AdminUsers", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     apiClient.listAdminUsers.mockResolvedValue([maya, ren]);
+    apiClient.listUserFeatures.mockResolvedValue({
+      features: [],
+      personal_sticker_count: 0,
+    });
+    apiClient.listFeatures.mockResolvedValue([]);
   });
 
-  it("lists each User with sign-up date, Telegram status and counts", async () => {
+  it("lists each User with role, sign-up date, Telegram status and counts", async () => {
     renderWithQueries(<AdminUsers />);
 
-    await screen.findByText("Maya Lin");
+    await screen.findByRole("table");
     const mayaRow = within(rowFor("Maya Lin"));
     expect(mayaRow.getByText("maya@example.com")).toBeInTheDocument();
+    expect(mayaRow.getByText("Admin")).toBeInTheDocument();
     expect(mayaRow.getByText("2 Oct 2026")).toBeInTheDocument();
     expect(mayaRow.getByText("Connected")).toBeInTheDocument();
     expect(mayaRow.getByText("41")).toBeInTheDocument();
     expect(mayaRow.getByText("612")).toBeInTheDocument();
+    expect(mayaRow.getByText("[PLAN]")).toBeInTheDocument();
+    const renRow = within(rowFor("Ren Okafor"));
+    expect(renRow.getByText("User")).toBeInTheDocument();
+    expect(renRow.getByText("Not connected")).toBeInTheDocument();
+    expect(screen.getByText("2 users · 1 admin")).toBeInTheDocument();
+  });
+
+  it("shows each User as a card of label and value lines for phones", async () => {
+    renderWithQueries(<AdminUsers />);
+
+    await screen.findByRole("table");
+    const users = screen
+      .getAllByRole("term")
+      .filter((term) => term.textContent === "User")
+      .map((term) => term.nextElementSibling?.textContent);
+    expect(users).toEqual([
+      "Maya Linmaya@example.com",
+      "Ren Okaforren@example.com",
+    ]);
+  });
+
+  it("finds Users by name or email", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<AdminUsers />);
+    await screen.findByRole("table");
+
+    await user.type(screen.getByLabelText("Search by name or email"), "ren@");
+
+    const table = within(screen.getByRole("table"));
+    expect(table.queryByText("Maya Lin")).toBeNull();
+    expect(table.getByText("Ren Okafor")).toBeInTheDocument();
+  });
+
+  it("says when the search matches nobody", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<AdminUsers />);
+    await screen.findByRole("table");
+
+    await user.type(screen.getByLabelText("Search by name or email"), "zz");
+
+    expect(screen.getByText("Nothing matches these filters.")).toBeVisible();
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  it("opens a User in the side panel only when Manage is pressed", async () => {
+    renderWithQueries(<AdminUsers />);
+    await screen.findByRole("table");
+    expect(screen.queryByRole("region", { name: "Maya Lin" })).toBeNull();
+
+    const { panel } = await openPanelFor("Maya Lin");
+
     expect(
-      screen.getByRole("columnheader", { name: "Life Threads" }),
+      panel.getByText("maya@example.com · signed up 2 Oct 2026"),
     ).toBeInTheDocument();
-    expect(mayaRow.getByText("7")).toBeInTheDocument();
+    expect(panel.getByText("Life threads").nextSibling).toHaveTextContent("7");
+    expect(panel.getByText("Move outcomes").nextSibling).toHaveTextContent("3");
+    expect(panel.getByText("Portrait").nextSibling).toHaveTextContent(
+      "Written",
+    );
     expect(
-      screen.getByRole("columnheader", { name: "Move Outcomes" }),
-    ).toBeInTheDocument();
-    expect(mayaRow.getByText("3")).toBeInTheDocument();
-    expect(
-      screen.getByRole("columnheader", { name: "Portrait" }),
-    ).toBeInTheDocument();
-    expect(mayaRow.getByText("Yes")).toBeInTheDocument();
-    expect(within(rowFor("Ren Okafor")).getByText("No")).toBeInTheDocument();
-    expect(mayaRow.getByText("Admin")).toBeInTheDocument();
-    expect(
-      within(rowFor("Ren Okafor")).getByText("Not connected"),
-    ).toBeVisible();
-    expect(
-      screen.getByText(/No message content · 1 Admin · 2 Users/),
-    ).toBeVisible();
+      panel.getByRole("link", { name: "Open this user in Check-in Schedule" }),
+    ).toHaveAttribute(
+      "href",
+      "/admin/check-in-schedule?search=maya%40example.com",
+    );
+    expect(apiClient.listUserFeatures).toHaveBeenCalledWith("maya");
+  });
+
+  it("says when a User has no Portrait yet", async () => {
+    renderWithQueries(<AdminUsers />);
+
+    const { panel } = await openPanelFor("Ren Okafor");
+
+    expect(panel.getByText("Portrait").nextSibling).toHaveTextContent(
+      "Not written",
+    );
   });
 
   it("makes a User an Admin", async () => {
     apiClient.changeUserRole.mockResolvedValue({ id: "ren", role: "admin" });
-    const user = userEvent.setup();
     renderWithQueries(<AdminUsers />);
 
-    await user.click(
-      within(rowFor(await textOf("Ren Okafor"))).getByRole("button", {
-        name: "Make Admin",
-      }),
-    );
+    const { user, panel } = await openPanelFor("Ren Okafor");
+    await user.click(panel.getByRole("button", { name: "Make admin" }));
 
     expect(apiClient.changeUserRole).toHaveBeenCalledWith("ren", "admin");
+    expect(await panel.findByText("Ren Okafor is now an Admin.")).toBeVisible();
     expect(
-      await screen.findByText("Ren Okafor is now an Admin."),
-    ).toBeVisible();
-    expect(
-      within(rowFor("Ren Okafor")).getByRole("button", {
-        name: "Remove Admin",
-      }),
+      panel.getByRole("button", { name: "Remove admin" }),
     ).toBeInTheDocument();
-  });
-
-  it("opens a User's Features panel from their row", async () => {
-    apiClient.listUserFeatures.mockResolvedValue({
-      features: [
-        {
-          feature: "web_search",
-          name: "Web Search",
-          works: true,
-          reason: "on_for_everyone",
-          switch: "default",
-          changed_by_email: null,
-          changed_at: null,
-        },
-      ],
-      personal_sticker_count: 0,
-    });
-    const user = userEvent.setup();
-    renderWithQueries(<AdminUsers />);
-
-    await user.click(
-      within(rowFor(await textOf("Ren Okafor"))).getByRole("button", {
-        name: "Features",
-      }),
-    );
-
-    const dialog = await screen.findByRole("dialog", {
-      name: "Features for Ren Okafor",
-    });
-    expect(apiClient.listUserFeatures).toHaveBeenCalledWith("ren");
-    expect(await within(dialog).findByText("Web Search")).toBeVisible();
-    await user.click(within(dialog).getByRole("button", { name: "Close" }));
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(within(rowFor("Ren Okafor")).getByText("Admin")).toBeInTheDocument();
+    expect(screen.getByText("2 users · 2 admins")).toBeInTheDocument();
   });
 
   it("explains when the last Admin can't be removed", async () => {
     apiClient.changeUserRole.mockRejectedValue(
       new ApiError(409, "/api/admin/users/maya/role"),
     );
-    const user = userEvent.setup();
     renderWithQueries(<AdminUsers />);
 
-    await user.click(
-      within(rowFor(await textOf("Maya Lin"))).getByRole("button", {
-        name: "Remove Admin",
-      }),
-    );
+    const { user, panel } = await openPanelFor("Maya Lin");
+    await user.click(panel.getByRole("button", { name: "Remove admin" }));
 
-    expect(
-      await screen.findByText(
-        "Can’t remove Maya Lin: they’re the only Admin. Make someone else an Admin first, so the platform is never left without one.",
-      ),
-    ).toBeVisible();
+    expect(await panel.findByRole("alert")).toHaveTextContent(
+      "Can’t remove Maya Lin: they’re the only Admin. Make someone else an Admin first, so the platform is never left without one.",
+    );
     expect(within(rowFor("Maya Lin")).getByText("Admin")).toBeInTheDocument();
   });
 
-  it("finds Users by name or email and filters by Admins or Telegram", async () => {
-    const user = userEvent.setup();
+  it("shows soft loading rows while the list loads", async () => {
+    apiClient.listAdminUsers.mockReturnValue(new Promise(() => {}));
+
     renderWithQueries(<AdminUsers />);
-    await screen.findByText("Maya Lin");
 
-    await user.type(screen.getByLabelText("Search users"), "ren@");
-    expect(screen.queryByText("Maya Lin")).toBeNull();
-    expect(screen.getByText("Ren Okafor")).toBeVisible();
-
-    await user.clear(screen.getByLabelText("Search users"));
-    await user.click(screen.getByRole("button", { name: "Admins" }));
-    expect(screen.getByText("Maya Lin")).toBeVisible();
-    expect(screen.queryByText("Ren Okafor")).toBeNull();
-
-    await user.click(
-      screen.getByRole("button", { name: "Telegram not connected" }),
-    );
-    expect(screen.queryByText("Maya Lin")).toBeNull();
-    expect(screen.getByText("Ren Okafor")).toBeVisible();
+    expect(
+      await screen.findByRole("status", { name: "Loading users" }),
+    ).toBeInTheDocument();
   });
 
   it("shows an empty state before anyone signs up", async () => {
@@ -205,11 +222,6 @@ describe("AdminUsers", () => {
 
     await user.click(await screen.findByRole("button", { name: "Try again" }));
 
-    expect(await screen.findByText("Maya Lin")).toBeVisible();
+    expect(await screen.findByRole("table")).toBeInTheDocument();
   });
 });
-
-async function textOf(text: string): Promise<string> {
-  await screen.findByText(text);
-  return text;
-}

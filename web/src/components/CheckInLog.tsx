@@ -3,10 +3,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { EmptyState } from "@/components/EmptyState";
-import { inputField } from "@/components/form-styles";
+import { DataTable } from "@/components/DataTable";
+import { FilterPills } from "@/components/FilterPills";
 import { LoadFailed } from "@/components/LoadFailed";
-import { LockIcon } from "@/components/LockIcon";
+import { SearchField } from "@/components/SearchField";
+import { SelectFilter } from "@/components/SelectFilter";
+import { type StatTile, StatTiles } from "@/components/StatTiles";
+import { StatusPill } from "@/components/StatusPill";
+import type { TableColumn } from "@/components/TableCards";
+import { TableEmpty } from "@/components/TableEmpty";
+import { TableLoading } from "@/components/TableLoading";
+import { TableNoMatches } from "@/components/TableNoMatches";
 import type {
   CheckInLogEntry,
   CheckInOutcome,
@@ -17,13 +24,13 @@ import {
   filterCheckInLog,
   summarizeCheckInLog,
 } from "@/lib/check-in-log";
-import { formatSavedAt } from "@/lib/dates";
+import { formatLoggedAt } from "@/lib/dates";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 const periods = [
-  { days: 7, label: "Last 7 days" },
-  { days: 30, label: "Last 30 days" },
+  { value: "7", label: "Last 7 days" },
+  { value: "30", label: "Last 30 days" },
 ];
 
 const outcomeFilters: { id: CheckInLogOutcomeFilter; label: string }[] = [
@@ -32,13 +39,10 @@ const outcomeFilters: { id: CheckInLogOutcomeFilter; label: string }[] = [
   { id: "skipped", label: "Skipped" },
 ];
 
-const outcomePills: Record<CheckInOutcome, { label: string; pill: string }> = {
-  sent: { label: "Sent", pill: "bg-blue-tint text-blue-deep" },
-  skipped: { label: "Skipped", pill: "bg-code text-ink-body" },
-  asked_about_fewer: {
-    label: "Paused",
-    pill: "bg-yellow-tint text-yellow-deep",
-  },
+const outcomeLabels: Record<CheckInOutcome, string> = {
+  sent: "Sent",
+  skipped: "Skipped",
+  asked_about_fewer: "Paused",
 };
 
 const replyLabels: Record<CheckInStatus, string> = {
@@ -48,17 +52,6 @@ const replyLabels: Record<CheckInStatus, string> = {
   skipped: "—",
 };
 
-const headings = [
-  "Time",
-  "User",
-  "Outcome",
-  "Check-in Kind",
-  "Skip reason",
-  "Reply",
-];
-
-const cell = "px-[18px] py-3.5";
-
 /**
  * Says what the Check-in log shows in an entry's skip reason column.
  *
@@ -67,35 +60,20 @@ const cell = "px-[18px] py-3.5";
  */
 function reasonText(entry: CheckInLogEntry): string {
   if (entry.outcome === "asked_about_fewer") {
-    return "Ignore threshold reached — asked once about fewer";
+    return "Three in a row went unanswered";
   }
   return entry.skip_reason ?? "—";
 }
 
 /**
- * The admin Check-in log: every decision the Check-ins service made — sent,
- * woven into a reply or not, skipped and why, or paused by the ignore rule —
- * with totals, and which Admin asked for one with Check in Now. Never the
- * message text.
+ * Works out the totals above the Check-in log.
  *
- * @returns The filters, totals and table, or a loading, empty or error state.
+ * @param entries - The decisions in the period.
+ * @returns The four totals, in the drawn order.
  */
-export function CheckInLog() {
-  const apiClient = useApiClient();
-  const [days, setDays] = useState(7);
-  const [outcome, setOutcome] = useState<CheckInLogOutcomeFilter>("all");
-  const [userQuery, setUserQuery] = useState("");
-
-  const logQuery = useQuery({
-    queryKey: queryKeys.checkInLog(days),
-    queryFn: () => apiClient.listCheckInLog(days),
-  });
-  const isLoaded = logQuery.data !== undefined;
-
-  const entries = logQuery.data ?? [];
+function totalsOf(entries: CheckInLogEntry[]): StatTile[] {
   const summary = summarizeCheckInLog(entries);
-  const shown = filterCheckInLog(entries, outcome, userQuery);
-  const totals = [
+  return [
     { label: "Sent", value: String(summary.sent) },
     { label: "Skipped", value: String(summary.skipped) },
     {
@@ -108,165 +86,118 @@ export function CheckInLog() {
       value: String(summary.pausedByIgnoreRule),
     },
   ];
+}
+
+const columns: TableColumn<CheckInLogEntry>[] = [
+  {
+    heading: "Time",
+    isMain: true,
+    cell: (entry) => formatLoggedAt(entry.decided_at),
+  },
+  {
+    heading: "User",
+    isMain: true,
+    cell: (entry) => entry.user_name ?? entry.user_email ?? "Unknown User",
+  },
+  {
+    heading: "Outcome",
+    cell: (entry) => (
+      <span className="inline-flex flex-col items-start gap-[3px]">
+        <StatusPill filled={entry.outcome === "sent"}>
+          {outcomeLabels[entry.outcome]}
+        </StatusPill>
+        {entry.requested_by ? (
+          <span className="text-[12px] text-soft">
+            Asked for by {entry.requested_by}
+          </span>
+        ) : null}
+        {entry.woven_in ? (
+          <span className="text-[12px] text-soft">Woven in</span>
+        ) : null}
+      </span>
+    ),
+  },
+  { heading: "Check-in Kind", cell: (entry) => entry.kind ?? "—" },
+  { heading: "Skip reason", cell: reasonText },
+  { heading: "Reply", cell: (entry) => replyLabels[entry.status] },
+];
+
+/**
+ * The admin Check-in log: every decision the Check-ins service made — sent,
+ * woven into a reply or not, skipped and why, or paused by the ignore rule —
+ * with totals, and which Admin asked for one with Check in Now. Never the
+ * message text. Built from the admin table template.
+ *
+ * @returns The totals, filters and table, or a loading, no-match, empty or
+ *   error state in place of the table.
+ */
+export function CheckInLog() {
+  const apiClient = useApiClient();
+  const [days, setDays] = useState("7");
+  const [outcome, setOutcome] = useState<CheckInLogOutcomeFilter>("all");
+  const [userQuery, setUserQuery] = useState("");
+
+  const logQuery = useQuery({
+    queryKey: queryKeys.checkInLog(Number(days)),
+    queryFn: () => apiClient.listCheckInLog(Number(days)),
+  });
+  const entries = logQuery.data;
+  const shown = entries ? filterCheckInLog(entries, outcome, userQuery) : [];
 
   return (
     <>
+      {entries ? <StatTiles tiles={totalsOf(entries)} /> : null}
+
       <div className="flex flex-wrap items-center gap-2.5">
-        <label className="flex-[1_1_240px]">
-          <span className="sr-only">Filter by user</span>
-          <input
-            type="search"
-            className={`${inputField} min-h-10 py-2`}
-            placeholder="Filter by user"
-            value={userQuery}
-            onChange={(event) => setUserQuery(event.target.value)}
-          />
-        </label>
-        <div
-          role="group"
-          aria-label="Outcome"
-          className="flex flex-wrap gap-1.5"
-        >
-          {outcomeFilters.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              aria-pressed={outcome === option.id}
-              onClick={() => setOutcome(option.id)}
-              className={`min-h-10 cursor-pointer rounded-full border px-3.5 py-2 text-sm font-medium ${
-                outcome === option.id
-                  ? "border-ink bg-ink text-white"
-                  : "border-line-strong bg-transparent text-ink-body"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <label>
-          <span className="sr-only">Period</span>
-          <select
-            className={`${inputField} min-h-10 w-auto py-2`}
-            value={days}
-            onChange={(event) => setDays(Number(event.target.value))}
-          >
-            {periods.map((option) => (
-              <option key={option.days} value={option.days}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SearchField
+          label="Filter by user"
+          placeholder="Filter by user"
+          value={userQuery}
+          onChange={setUserQuery}
+        />
+        <FilterPills
+          label="Outcome"
+          options={outcomeFilters}
+          chosen={outcome}
+          onChoose={setOutcome}
+        />
+        <SelectFilter
+          label="Period"
+          options={periods}
+          value={days}
+          onChange={setDays}
+        />
       </div>
 
-      {logQuery.isPending ? (
-        <div
-          aria-busy="true"
-          aria-label="Loading log"
-          className="h-[240px] rounded-xl border border-line bg-subtle"
-        />
-      ) : null}
+      {logQuery.isPending ? <TableLoading label="Loading log" /> : null}
 
-      {!isLoaded && logQuery.isError ? (
+      {!entries && logQuery.isError ? (
         <LoadFailed
           title="Couldn’t load the Check-in log"
-          body="Check-ins are still being scheduled as normal."
+          body="Check your connection and try again."
           onRetry={() => void logQuery.refetch()}
         />
       ) : null}
 
-      {isLoaded ? (
-        <dl className="m-0 grid grid-cols-[repeat(auto-fit,minmax(min(180px,100%),1fr))] gap-3">
-          {totals.map((total) => (
-            <div
-              key={total.label}
-              className="flex flex-col gap-0.5 rounded-card border border-line bg-white px-[18px] py-4"
-            >
-              <dt className="text-caption text-ink-muted">{total.label}</dt>
-              <dd className="m-0 text-[30px] font-normal">{total.value}</dd>
-            </div>
-          ))}
-        </dl>
-      ) : null}
-
-      {isLoaded && entries.length === 0 ? (
-        <EmptyState
-          title="No Check-in decisions yet"
-          body="Entries appear once Users turn Check-ins on. You’ll see the Kind or skip reason per User — never the message text."
+      {entries && entries.length === 0 ? (
+        <TableEmpty
+          title="No check-ins yet"
+          body="Entries appear once users turn check-ins on."
         />
       ) : null}
 
-      {isLoaded && entries.length > 0 ? (
-        <div className="overflow-x-auto rounded-xl border border-line bg-white">
-          <table className="w-full min-w-[820px] border-collapse text-sm">
-            <caption className="border-b border-line px-4 py-2.5 text-left">
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted">
-                <LockIcon />
-                No message content
-              </span>
-            </caption>
-            <thead>
-              <tr>
-                {headings.map((heading) => (
-                  <th
-                    key={heading}
-                    scope="col"
-                    className="whitespace-nowrap border-b border-line bg-subtle px-[18px] py-3.5 text-left font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted"
-                  >
-                    {heading}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((entry) => {
-                const pill = outcomePills[entry.outcome];
-                return (
-                  <tr
-                    key={entry.id}
-                    className="border-b border-line last:border-b-0"
-                  >
-                    <td className={`${cell} whitespace-nowrap`}>
-                      {formatSavedAt(entry.decided_at)}
-                    </td>
-                    <td className={cell}>
-                      {entry.user_name ?? entry.user_email ?? "Unknown User"}
-                    </td>
-                    <td className={cell}>
-                      <span className="flex flex-col items-start gap-1">
-                        <span
-                          className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-[3px] text-xs font-medium ${pill.pill}`}
-                        >
-                          {pill.label}
-                        </span>
-                        {entry.requested_by ? (
-                          <span className="text-caption text-ink-muted">
-                            Asked for by {entry.requested_by}
-                          </span>
-                        ) : null}
-                        {entry.woven_in ? (
-                          <span className="text-caption text-ink-muted">
-                            Woven in
-                          </span>
-                        ) : null}
-                      </span>
-                    </td>
-                    <td className={cell}>{entry.kind ?? "—"}</td>
-                    <td className={cell}>{reasonText(entry)}</td>
-                    <td className={`${cell} whitespace-nowrap`}>
-                      {replyLabels[entry.status]}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {shown.length === 0 ? (
-            <p className="m-0 px-[18px] py-4 text-caption text-ink-muted">
-              Nothing matches these filters.
-            </p>
-          ) : null}
-        </div>
+      {entries && entries.length > 0 && shown.length === 0 ? (
+        <TableNoMatches />
+      ) : null}
+
+      {shown.length > 0 ? (
+        <DataTable
+          columns={columns}
+          rows={shown}
+          rowKey={(entry) => entry.id}
+          noMessageContent
+          minWidthClass="min-w-[820px]"
+        />
       ) : null}
     </>
   );

@@ -91,6 +91,20 @@ describe("CheckInSchedule", () => {
     });
   });
 
+  it("starts with the search a link asked for", async () => {
+    apiClient.listCheckInSchedule.mockResolvedValue(
+      schedulePage([scheduleEntry()]),
+    );
+    renderWithQueries(<CheckInSchedule initialSearch="ren@example.com" />);
+
+    await screen.findByText("Ren Okafor");
+    expect(screen.getByRole("searchbox")).toHaveValue("ren@example.com");
+    expect(apiClient.listCheckInSchedule).toHaveBeenCalledWith({
+      search: "ren@example.com",
+      page: 1,
+    });
+  });
+
   it("pages through the Schedule", async () => {
     apiClient.listCheckInSchedule.mockResolvedValue(
       schedulePage([scheduleEntry()], { total: 30 }),

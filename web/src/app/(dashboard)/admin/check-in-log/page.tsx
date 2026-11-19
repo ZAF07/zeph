@@ -8,12 +8,12 @@ import { CheckInLog } from "@/components/CheckInLog";
  */
 export default function AdminCheckInLogPage() {
   return (
-    <div className="flex flex-col gap-[22px]">
+    <>
       <AdminPageHeader
         title="Check-in log"
-        lead="Every decision the Check-ins service made: sent, or skipped and why. No content."
+        lead="Every check-in Zeph sent or chose to skip, newest first. You see the kind or the skip reason for each user, never the message text."
       />
       <CheckInLog />
-    </div>
+    </>
   );
 }

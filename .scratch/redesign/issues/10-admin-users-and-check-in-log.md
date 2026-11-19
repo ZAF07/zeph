@@ -48,3 +48,10 @@ Refs: `AdminUsers`, `AdminCheckInLog`, `M-AdminCheckInLog`.
 - [ ] `/code-review` run, and findings fixed or answered.
 
 ## Comments
+
+- 2026-11-19 — Decisions (Zaf, asked at start):
+  - Users: drop the All / Admins / Telegram not connected filters. Search only, as drawn.
+  - Users panel Feature switches: the switch shows whether the Feature works for the User. Flipping sets On or Off for them; flipping to the same value as everyone's switch sets Default.
+  - "Sample data" pill: never shown (both pages).
+  - Users panel: no User open until a row's Manage is pressed (so AdminUsers can't PASS as drawn; checked by parts instead).
+- 2026-11-19 — Chosen by me (following issue 09's decision): the orange builder notes and the state samples under them are left out of the Check-in Log page. The four states are tested per state in component tests.
