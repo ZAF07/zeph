@@ -51,7 +51,7 @@ What the Companion says in chat, and anything the Companion is told, stays in Pl
 29. As a plain User, I don't want to see the Copy page or call its save, so that only Admins change the website's words.
 30. As a visitor, I want the Landing, Pricing and How it works pages to show the current Copy without signing in, so that I read what Zeph says today.
 31. As a User, I want onboarding and my Dashboard pages to show the current Copy with my own values filled in, so that the words read naturally.
-32. As a visitor, I want the website to show its normal error state when it can't reach the backend, so that I never see stale or half-filled text.
+32. As a visitor, I want the website to keep showing the last Copy it read when it can't reach the backend, and its normal error state only when it has none, so that a backend blip doesn't take the website down and I never see half-filled text.
 33. As a developer, I want each slot's default text, name, tab, max length and placeholders kept in one seed file, so that adding a slot means one seed entry plus the page code that shows it.
 34. As a developer, I want new slots in the seed added on startup and slots an Admin already edited left alone, so that a deploy never overwrites an Admin's wording.
 35. As a developer, I want the seed text to match the design references, so that the pixel test keeps proving every page matches the design.
@@ -76,7 +76,7 @@ What the Companion says in chat, and anything the Companion is told, stays in Pl
   - The API client gets the Copy reads and the save. Pages never fetch it directly.
   - Website pages (Server Components where they are now) read Copy through the API client, and fill placeholders with one small pure helper. Page titles and descriptions come from Copy through the App Router's metadata.
   - Client components get Copy through a TanStack Query hook (ADR-0012), not prop-drilled from the root.
-  - If Copy can't be read, the page shows the website's normal error state. No default text is bundled into the web app.
+  - If Copy can't be read, the page shows the last Copy this web server read, whole; only if it has none does it show the website's normal error state. No default text is bundled into the web app. Admin pages never depend on Copy: they open even when it can't be read, so the Copy page is always reachable (issue 09).
   - The Copy admin page is one page with tabs. It has no reference file, so it is built only from the design's existing parts and token values (`web/design/README.md`, "Building new UI"): tabs like `MemoriesTabs`, a `FormEditor`-style text field per slot with a counter, the `CardSaveBar`, the existing unsaved-changes warning, `SearchField` and `EmptyState`. No pixel test covers it; it is checked by eye at 1280 and 390. Search filters slots across tabs by current text and jumps to the slot.
   - The design fixture API client used by the pixel test serves the seed Copy.
 - **Rollout order**: Landing end to end first (seed slots, store, public read, Copy page with one tab, checks, Landing reading Copy). Then the other pages, one at a time. The wording moved out of Platform Settings comes last.
@@ -92,7 +92,7 @@ What the Companion says in chat, and anything the Companion is told, stays in Pl
   - moved wording: no longer in Platform Settings reads or saves, and served as Copy.
 - **Dashboard seam: pages and components with a fake API client** (Vitest + React Testing Library; prior art: the existing settings page and Memories tests, `render-with-queries`). Covers:
   - each converted page shows the Copy it's given, with placeholders filled and the right one/many slot picked;
-  - a page shows the error state when Copy can't be read;
+  - a page shows the last good Copy when a read fails, and the error state when there is none;
   - the Copy page: tabs and slot order, search jumps to a slot, counter, one save per tab, field errors shown on the right slot, the unsaved-changes prompt when switching tabs.
 - The placeholder-filling helper gets small pure tests (prior art: `lib/*.test.ts`).
 - **Pixel test** (ADR-0018) keeps running unchanged against the design references, with the fixture client serving seed Copy.
@@ -108,7 +108,7 @@ What the Companion says in chat, and anything the Companion is told, stays in Pl
 - The admin pages' own words.
 - Backend validation reasons, chat wording, the Crisis Reply, and the onboarding reason choices.
 - Clerk's own form text.
-- A fallback copy of the text inside the web app for when the backend is down.
+- A fallback copy of the text inside the web app for when the backend is down, meaning default text written into the code. A copy kept in memory from an earlier read is allowed (issue 09).
 
 ## Further Notes
 
