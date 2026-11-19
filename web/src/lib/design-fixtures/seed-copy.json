@@ -1574,6 +1574,504 @@
     ]
   },
   {
+    "tab": "memories",
+    "name": "Memories",
+    "slots": [
+      {
+        "key": "memories.page_title",
+        "name": "Browser tab title",
+        "max_length": 70,
+        "text": "Zeph — Memories"
+      },
+      {
+        "key": "memories.page_description",
+        "name": "Search description",
+        "max_length": 160,
+        "text": "See what Zeph remembers about you, and delete anything you'd rather it forgot."
+      },
+      {
+        "key": "memories.hero.eyebrow",
+        "name": "Label above the heading",
+        "max_length": 40,
+        "text": "Memories"
+      },
+      {
+        "key": "memories.hero.heading",
+        "name": "Heading",
+        "max_length": 40,
+        "text": "Memories"
+      },
+      {
+        "key": "memories.hero.lead",
+        "name": "Line under the heading",
+        "max_length": 300,
+        "text": "What Zeph remembers, what it knows about you, what's going on in your life, what helps you, short summaries of past Conversations and the photos it kept. Delete anything you'd rather it forgot."
+      },
+      {
+        "key": "memories.switch.on",
+        "name": "Memory switch: words while on",
+        "max_length": 30,
+        "text": "Memory on"
+      },
+      {
+        "key": "memories.switch.paused",
+        "name": "Memory switch: words while paused",
+        "max_length": 30,
+        "text": "Memory paused"
+      },
+      {
+        "key": "memories.switch.not_available",
+        "name": "Memory switch: words when an Admin has Memory off",
+        "max_length": 40,
+        "text": "Not available on your account"
+      },
+      {
+        "key": "memories.switch.label",
+        "name": "Memory switch: name read out by screen readers",
+        "max_length": 40,
+        "text": "Memory"
+      },
+      {
+        "key": "memories.switch.changed_in_chat",
+        "name": "Memory switch: changed in chat line",
+        "max_length": 40,
+        "placeholders": ["day"],
+        "text": "Changed in chat · {day}"
+      },
+      {
+        "key": "memories.switch.save_failed",
+        "name": "Memory switch: couldn't change it",
+        "max_length": 100,
+        "text": "We couldn’t change that. Please try again."
+      },
+      {
+        "key": "memories.memory_off.turn_on",
+        "name": "Memory is off note: turn on button",
+        "max_length": 30,
+        "text": "Turn memory on"
+      },
+      {
+        "key": "memories.forget_that",
+        "name": "Line above the tabs",
+        "max_length": 100,
+        "text": "You can also tell Zeph \"forget that\"."
+      },
+      {
+        "key": "memories.tabs.label",
+        "name": "Tabs: name read out by screen readers",
+        "max_length": 40,
+        "text": "Memories"
+      },
+      {
+        "key": "memories.tabs.memories",
+        "name": "Tabs: Memories",
+        "max_length": 30,
+        "text": "Memories"
+      },
+      {
+        "key": "memories.tabs.about",
+        "name": "Tabs: About you",
+        "max_length": 30,
+        "text": "About you"
+      },
+      {
+        "key": "memories.tabs.threads",
+        "name": "Tabs: What's going on",
+        "max_length": 30,
+        "text": "What's going on"
+      },
+      {
+        "key": "memories.tabs.helps",
+        "name": "Tabs: What helps you",
+        "max_length": 30,
+        "text": "What helps you"
+      },
+      {
+        "key": "memories.tabs.summaries",
+        "name": "Tabs: Conversation Summaries",
+        "max_length": 30,
+        "text": "Conversation Summaries"
+      },
+      {
+        "key": "memories.tabs.photos",
+        "name": "Tabs: Photos",
+        "max_length": 30,
+        "text": "Photos"
+      },
+      {
+        "key": "memories.loading",
+        "name": "Loading, read out by screen readers",
+        "max_length": 60,
+        "text": "Loading memories"
+      },
+      {
+        "key": "memories.load_failed.title",
+        "name": "Couldn't load: title",
+        "max_length": 80,
+        "text": "Couldn’t load your memories"
+      },
+      {
+        "key": "memories.load_failed.body",
+        "name": "Couldn't load: message",
+        "max_length": 160,
+        "text": "Check your connection and try again. Nothing has been lost."
+      },
+      {
+        "key": "memories.load_failed.retry",
+        "name": "Couldn't load: try again button",
+        "max_length": 30,
+        "text": "Try again"
+      },
+      {
+        "key": "memories.delete_failed",
+        "name": "Couldn't delete, on every tab",
+        "max_length": 100,
+        "text": "We couldn’t delete that. Please try again."
+      },
+      {
+        "key": "memories.items.delete",
+        "name": "Memories tab: delete button, read out by screen readers",
+        "max_length": 60,
+        "placeholders": ["memory"],
+        "text": "Delete memory: {memory}"
+      },
+      {
+        "key": "memories.items.from_conversation",
+        "name": "Memories tab: from a conversation line",
+        "max_length": 60,
+        "placeholders": ["day"],
+        "text": "From a conversation · {day}"
+      },
+      {
+        "key": "memories.items.from_onboarding",
+        "name": "Memories tab: from onboarding line",
+        "max_length": 60,
+        "placeholders": ["day"],
+        "text": "From onboarding · {day}"
+      },
+      {
+        "key": "memories.items.empty_title",
+        "name": "Memories tab: nothing yet, title",
+        "max_length": 80,
+        "text": "Nothing remembered yet"
+      },
+      {
+        "key": "memories.items.empty_body",
+        "name": "Memories tab: nothing yet, message",
+        "max_length": 200,
+        "text": "As you talk with Zeph, the details that matter will appear here. You can delete any of them."
+      },
+      {
+        "key": "memories.items.empty_link",
+        "name": "Memories tab: nothing yet, Telegram link",
+        "max_length": 30,
+        "text": "Talk to Zeph"
+      },
+      {
+        "key": "memories.items.delete_all.heading",
+        "name": "Delete all memories: heading",
+        "max_length": 60,
+        "text": "Delete all memories"
+      },
+      {
+        "key": "memories.items.delete_all.body",
+        "name": "Delete all memories: message",
+        "max_length": 200,
+        "text": "Removes every memory. Conversation Summaries and your account stay. This can't be undone."
+      },
+      {
+        "key": "memories.items.delete_all.button",
+        "name": "Delete all memories: button",
+        "max_length": 30,
+        "text": "Delete all memories"
+      },
+      {
+        "key": "memories.items.delete_all.confirm_title",
+        "name": "Delete all memories, asking first: title",
+        "max_length": 60,
+        "text": "Delete all memories?"
+      },
+      {
+        "key": "memories.items.delete_all.confirm_body_one",
+        "name": "Delete all memories, asking first: one memory",
+        "max_length": 200,
+        "text": "Zeph will forget the one memory it holds about you. Conversation Summaries and your account stay. This can’t be undone."
+      },
+      {
+        "key": "memories.items.delete_all.confirm_body_many",
+        "name": "Delete all memories, asking first: several memories",
+        "max_length": 200,
+        "text": "Zeph will forget every memory it holds about you. Conversation Summaries and your account stay. This can’t be undone."
+      },
+      {
+        "key": "memories.items.delete_all.keep",
+        "name": "Delete all memories, asking first: keep button",
+        "max_length": 30,
+        "text": "Keep them"
+      },
+      {
+        "key": "memories.items.delete_all.confirm",
+        "name": "Delete all memories, asking first: delete button",
+        "max_length": 30,
+        "text": "Delete all memories"
+      },
+      {
+        "key": "memories.about.heading",
+        "name": "About you tab: heading",
+        "max_length": 60,
+        "text": "What I know about you"
+      },
+      {
+        "key": "memories.about.lead",
+        "name": "About you tab: line under the heading",
+        "max_length": 300,
+        "text": "Zeph's short picture of you, written from your memories, so every reply comes from knowing you. Delete it and Zeph stops using it; it is written again after a later Conversation, while Memory is on."
+      },
+      {
+        "key": "memories.about.delete",
+        "name": "About you tab: delete button, read out by screen readers",
+        "max_length": 60,
+        "text": "Delete what Zeph knows about you"
+      },
+      {
+        "key": "memories.about.written",
+        "name": "About you tab: written on",
+        "max_length": 40,
+        "placeholders": ["day"],
+        "text": "Written {day}"
+      },
+      {
+        "key": "memories.about.empty_title",
+        "name": "About you tab: nothing yet, title",
+        "max_length": 80,
+        "text": "Nothing here yet"
+      },
+      {
+        "key": "memories.about.empty_body",
+        "name": "About you tab: nothing yet, message",
+        "max_length": 200,
+        "text": "Zeph writes this a little while after a Conversation ends, while Memory is on."
+      },
+      {
+        "key": "memories.threads.heading",
+        "name": "What's going on tab: heading",
+        "max_length": 60,
+        "text": "What's going on in your life"
+      },
+      {
+        "key": "memories.threads.lead",
+        "name": "What's going on tab: line under the heading",
+        "max_length": 300,
+        "text": "The ongoing stories Zeph follows, so it can ask how things went. Delete one and Zeph won't bring it up again."
+      },
+      {
+        "key": "memories.threads.delete",
+        "name": "What's going on tab: delete button, read out by screen readers",
+        "max_length": 80,
+        "placeholders": ["story"],
+        "text": "Delete story: {story}"
+      },
+      {
+        "key": "memories.threads.open",
+        "name": "What's going on tab: open label",
+        "max_length": 20,
+        "text": "Open"
+      },
+      {
+        "key": "memories.threads.closed",
+        "name": "What's going on tab: closed label",
+        "max_length": 20,
+        "text": "Closed"
+      },
+      {
+        "key": "memories.threads.updated",
+        "name": "What's going on tab: updated on",
+        "max_length": 40,
+        "placeholders": ["day"],
+        "text": "Updated {day}"
+      },
+      {
+        "key": "memories.threads.empty_title",
+        "name": "What's going on tab: nothing yet, title",
+        "max_length": 80,
+        "text": "Nothing here yet"
+      },
+      {
+        "key": "memories.threads.empty_body",
+        "name": "What's going on tab: nothing yet, message",
+        "max_length": 200,
+        "text": "When you tell Zeph about something ongoing, it appears here a little while after the Conversation ends."
+      },
+      {
+        "key": "memories.helps.heading",
+        "name": "What helps you tab: heading",
+        "max_length": 60,
+        "text": "What helps you"
+      },
+      {
+        "key": "memories.helps.lead",
+        "name": "What helps you tab: line under the heading",
+        "max_length": 300,
+        "text": "What Zeph learned about the kinds of help that work for you, and when. Delete one and Zeph won't use it again."
+      },
+      {
+        "key": "memories.helps.delete",
+        "name": "What helps you tab: delete button, read out by screen readers",
+        "max_length": 80,
+        "placeholders": ["help", "day"],
+        "text": "Delete what helps: {help}, {day}"
+      },
+      {
+        "key": "memories.helps.helped",
+        "name": "What helps you tab: helped label",
+        "max_length": 20,
+        "text": "Helped"
+      },
+      {
+        "key": "memories.helps.didnt_help",
+        "name": "What helps you tab: didn't help label",
+        "max_length": 20,
+        "text": "Didn’t help"
+      },
+      {
+        "key": "memories.helps.mixed",
+        "name": "What helps you tab: mixed label",
+        "max_length": 20,
+        "text": "Mixed"
+      },
+      {
+        "key": "memories.helps.when",
+        "name": "What helps you tab: when label",
+        "max_length": 14,
+        "text": "When"
+      },
+      {
+        "key": "memories.helps.feeling",
+        "name": "What helps you tab: feeling label",
+        "max_length": 14,
+        "text": "Feeling"
+      },
+      {
+        "key": "memories.helps.why",
+        "name": "What helps you tab: why label",
+        "max_length": 14,
+        "text": "Why"
+      },
+      {
+        "key": "memories.helps.empty_title",
+        "name": "What helps you tab: nothing yet, title",
+        "max_length": 80,
+        "text": "Nothing here yet"
+      },
+      {
+        "key": "memories.helps.empty_body",
+        "name": "What helps you tab: nothing yet, message",
+        "max_length": 200,
+        "text": "When Zeph helps you in a chat, what it learned appears here a little while after the Conversation ends."
+      },
+      {
+        "key": "memories.summaries.heading",
+        "name": "Conversation Summaries tab: heading",
+        "max_length": 60,
+        "text": "Conversation Summaries"
+      },
+      {
+        "key": "memories.summaries.lead",
+        "name": "Conversation Summaries tab: line under the heading",
+        "max_length": 300,
+        "text": "After each Conversation, Zeph writes a short note so it can pick up where you left off. These stay until you delete them."
+      },
+      {
+        "key": "memories.summaries.delete",
+        "name": "Conversation Summaries tab: delete button, read out by screen readers",
+        "max_length": 60,
+        "placeholders": ["day"],
+        "text": "Delete summary from {day}"
+      },
+      {
+        "key": "memories.summaries.seemed",
+        "name": "Conversation Summaries tab: seemed label",
+        "max_length": 14,
+        "text": "Seemed"
+      },
+      {
+        "key": "memories.summaries.offered",
+        "name": "Conversation Summaries tab: Zeph offered label",
+        "max_length": 14,
+        "text": "Zeph offered"
+      },
+      {
+        "key": "memories.summaries.empty_title",
+        "name": "Conversation Summaries tab: nothing yet, title",
+        "max_length": 80,
+        "text": "No Conversation Summaries yet"
+      },
+      {
+        "key": "memories.summaries.empty_body",
+        "name": "Conversation Summaries tab: nothing yet, message",
+        "max_length": 200,
+        "text": "They appear a little while after a Conversation ends."
+      },
+      {
+        "key": "memories.photos.heading",
+        "name": "Photos tab: heading",
+        "max_length": 60,
+        "text": "Photos"
+      },
+      {
+        "key": "memories.photos.lead",
+        "name": "Photos tab: line under the heading",
+        "max_length": 300,
+        "text": "Photos you sent that Zeph thought mattered to you, with a note on why. Zeph tries to leave out screenshots, receipts and memes. They stay until you delete them."
+      },
+      {
+        "key": "memories.photos.photo_label",
+        "name": "Photos tab: photo, name read out by screen readers",
+        "max_length": 60,
+        "placeholders": ["day"],
+        "text": "Photo from {day}"
+      },
+      {
+        "key": "memories.photos.photo_loading",
+        "name": "Photos tab: photo box while it loads",
+        "max_length": 20,
+        "text": "Photo"
+      },
+      {
+        "key": "memories.photos.photo_failed",
+        "name": "Photos tab: photo box when it can't load",
+        "max_length": 60,
+        "text": "This photo can’t be shown right now"
+      },
+      {
+        "key": "memories.photos.sent",
+        "name": "Photos tab: sent on",
+        "max_length": 40,
+        "placeholders": ["day"],
+        "text": "Sent {day}"
+      },
+      {
+        "key": "memories.photos.delete",
+        "name": "Photos tab: delete button, read out by screen readers",
+        "max_length": 60,
+        "placeholders": ["day"],
+        "text": "Delete photo from {day}"
+      },
+      {
+        "key": "memories.photos.empty_title",
+        "name": "Photos tab: nothing yet, title",
+        "max_length": 80,
+        "text": "No photos kept yet"
+      },
+      {
+        "key": "memories.photos.empty_body",
+        "name": "Photos tab: nothing yet, message",
+        "max_length": 200,
+        "text": "When you send Zeph a photo that matters to you, it may keep it here after the Conversation ends."
+      }
+    ]
+  },
+  {
     "tab": "connect_telegram",
     "name": "Connect Telegram",
     "slots": [

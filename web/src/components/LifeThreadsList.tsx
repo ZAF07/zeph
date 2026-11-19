@@ -8,6 +8,7 @@ import { MemoriesPanelHeading } from "@/components/MemoriesPanelHeading";
 import { MemoryCard } from "@/components/MemoryCard";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type { LifeThread } from "@/lib/api-client";
+import { type Copy, fillCopy, readCopy } from "@/lib/copy";
 import { formatShortDay } from "@/lib/dates";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
@@ -17,15 +18,18 @@ import { useApiClient } from "@/lib/use-api-client";
  * it is open or closed and when it was last updated, open ones first; each
  * can be deleted, so Zeph never brings it up again.
  *
- * @param props - `threads` are the User's Life Threads, open first, and
- *   `timeZone` is the User's time zone.
+ * @param props - `threads` are the User's Life Threads, open first,
+ *   `copy` is the Memories page's Copy, and `timeZone` is the User's time
+ *   zone.
  * @returns The tab's content.
  */
 export function LifeThreadsList({
   threads,
+  copy,
   timeZone,
 }: {
   threads: LifeThread[];
+  copy: Copy;
   timeZone?: string;
 }) {
   const apiClient = useApiClient();
@@ -43,13 +47,13 @@ export function LifeThreadsList({
   return (
     <>
       <MemoriesPanelHeading
-        title="What's going on in your life"
-        body="The ongoing stories Zeph follows, so it can ask how things went. Delete one and Zeph won't bring it up again."
+        title={readCopy(copy, "memories.threads.heading")}
+        body={readCopy(copy, "memories.threads.lead")}
       />
 
       {deleteThread.isError ? (
         <SaveFailedNote>
-          We couldn’t delete that. Please try again.
+          {readCopy(copy, "memories.delete_failed")}
         </SaveFailedNote>
       ) : null}
 
@@ -58,7 +62,9 @@ export function LifeThreadsList({
           {threads.map((thread) => (
             <li key={thread.id}>
               <MemoryCard
-                deleteLabel={`Delete story: ${thread.title}`}
+                deleteLabel={fillCopy(copy, "memories.threads.delete", {
+                  story: thread.title,
+                })}
                 isDeleting={deleteThread.isPending}
                 onDelete={() => deleteThread.mutate(thread.id)}
                 compact
@@ -71,14 +77,21 @@ export function LifeThreadsList({
                     <span
                       className={thread.is_open ? filledPill : outlinedPill}
                     >
-                      {thread.is_open ? "Open" : "Closed"}
+                      {readCopy(
+                        copy,
+                        thread.is_open
+                          ? "memories.threads.open"
+                          : "memories.threads.closed",
+                      )}
                     </span>
                   </div>
                   <p className="mt-2 mb-1.5 text-[14px] text-soft">
                     {thread.story}
                   </p>
                   <span className="text-[12px] text-soft">
-                    {`Updated ${formatShortDay(thread.updated_at, timeZone)}`}
+                    {fillCopy(copy, "memories.threads.updated", {
+                      day: formatShortDay(thread.updated_at, timeZone),
+                    })}
                   </span>
                 </div>
               </MemoryCard>
@@ -87,8 +100,8 @@ export function LifeThreadsList({
         </ul>
       ) : (
         <EmptyState
-          title="Nothing here yet"
-          body="When you tell Zeph about something ongoing, it appears here a little while after the Conversation ends."
+          title={readCopy(copy, "memories.threads.empty_title")}
+          body={readCopy(copy, "memories.threads.empty_body")}
         />
       )}
     </>

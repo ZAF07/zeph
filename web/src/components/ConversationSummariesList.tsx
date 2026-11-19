@@ -8,6 +8,7 @@ import { MemoryCard } from "@/components/MemoryCard";
 import { MemoryDetailLine } from "@/components/MemoryDetailLine";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type { ConversationSummary } from "@/lib/api-client";
+import { type Copy, fillCopy, readCopy } from "@/lib/copy";
 import { formatShortDay } from "@/lib/dates";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
@@ -18,14 +19,17 @@ import { useApiClient } from "@/lib/use-api-client";
  * deleted.
  *
  * @param props - `summaries` are the User's Conversation Summaries, newest
- *   first, and `timeZone` is the User's time zone.
+ *   first, `copy` is the Memories page's Copy, and `timeZone` is the User's
+ *   time zone.
  * @returns The tab's content.
  */
 export function ConversationSummariesList({
   summaries,
+  copy,
   timeZone,
 }: {
   summaries: ConversationSummary[];
+  copy: Copy;
   timeZone?: string;
 }) {
   const apiClient = useApiClient();
@@ -44,13 +48,13 @@ export function ConversationSummariesList({
   return (
     <>
       <MemoriesPanelHeading
-        title="Conversation Summaries"
-        body="After each Conversation, Zeph writes a short note so it can pick up where you left off. These stay until you delete them."
+        title={readCopy(copy, "memories.summaries.heading")}
+        body={readCopy(copy, "memories.summaries.lead")}
       />
 
       {deleteSummary.isError ? (
         <SaveFailedNote>
-          We couldn’t delete that. Please try again.
+          {readCopy(copy, "memories.delete_failed")}
         </SaveFailedNote>
       ) : null}
 
@@ -61,7 +65,9 @@ export function ConversationSummariesList({
             return (
               <li key={summary.id}>
                 <MemoryCard
-                  deleteLabel={`Delete summary from ${day}`}
+                  deleteLabel={fillCopy(copy, "memories.summaries.delete", {
+                    day,
+                  })}
                   isDeleting={deleteSummary.isPending}
                   onDelete={() => deleteSummary.mutate(summary.id)}
                 >
@@ -69,11 +75,15 @@ export function ConversationSummariesList({
                     <p className="m-0 text-[15px] text-text">
                       {summary.summary}
                     </p>
-                    <MemoryDetailLine label="Seemed">
+                    <MemoryDetailLine
+                      label={readCopy(copy, "memories.summaries.seemed")}
+                    >
                       {summary.mood}
                     </MemoryDetailLine>
                     {summary.offered ? (
-                      <MemoryDetailLine label="Zeph offered">
+                      <MemoryDetailLine
+                        label={readCopy(copy, "memories.summaries.offered")}
+                      >
                         {summary.offered}
                       </MemoryDetailLine>
                     ) : null}
@@ -86,8 +96,8 @@ export function ConversationSummariesList({
         </ol>
       ) : (
         <EmptyState
-          title="No Conversation Summaries yet"
-          body="They appear a little while after a Conversation ends."
+          title={readCopy(copy, "memories.summaries.empty_title")}
+          body={readCopy(copy, "memories.summaries.empty_body")}
         />
       )}
     </>

@@ -125,6 +125,29 @@ describe("CopyEditor", () => {
     expect(screen.getByText("Takes {count}")).toBeVisible();
   });
 
+  it("shows a one slot and its many slot side by side, in one row", async () => {
+    const countSlot = copyPage[0].slots[2];
+    apiClient.getCopyPage.mockResolvedValue([
+      {
+        tab: "memories",
+        name: "Memories",
+        slots: [
+          { ...countSlot, key: "memories.heading", name: "Heading" },
+          { ...countSlot, key: "memories.count_one", name: "Count, one" },
+          { ...countSlot, key: "memories.count_many", name: "Count, many" },
+        ],
+      },
+    ]);
+
+    renderWithQueries(<CopyEditor />);
+
+    const one = await screen.findByRole("group", { name: "Count, one" });
+    const many = screen.getByRole("group", { name: "Count, many" });
+    const heading = screen.getByRole("group", { name: "Heading" });
+    expect(one.parentElement).toBe(many.parentElement);
+    expect(heading.parentElement).not.toBe(one.parentElement);
+  });
+
   it("saves every changed slot in the tab as one save", async () => {
     const user = userEvent.setup();
     renderWithQueries(<CopyEditor />);

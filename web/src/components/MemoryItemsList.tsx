@@ -10,23 +10,26 @@ import { EmptyState } from "@/components/EmptyState";
 import { PillLink } from "@/components/PillLink";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type { MemoryGroup } from "@/lib/api-client";
+import { type Copy, countSlotKey, fillCopy, readCopy } from "@/lib/copy";
 import { memorySourceLabel } from "@/lib/memories";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 /**
  * The Memories tab: Memory Items grouped by Memory Category, each deletable,
- * and "Delete all memories", which asks first.
+ * and "Delete all memories", which asks first, worded for one memory or several.
  *
- * @param props - `groups` are the User's Memory Items by category, and
- *   `timeZone` is the User's time zone.
+ * @param props - `groups` are the User's Memory Items by category, `copy`
+ *   is the Memories page's Copy, and `timeZone` is the User's time zone.
  * @returns The tab's content.
  */
 export function MemoryItemsList({
   groups,
+  copy,
   timeZone,
 }: {
   groups: MemoryGroup[];
+  copy: Copy;
   timeZone?: string;
 }) {
   const apiClient = useApiClient();
@@ -67,7 +70,7 @@ export function MemoryItemsList({
     <>
       {deleteFailed ? (
         <SaveFailedNote>
-          We couldn’t delete that. Please try again.
+          {readCopy(copy, "memories.delete_failed")}
         </SaveFailedNote>
       ) : null}
 
@@ -85,12 +88,14 @@ export function MemoryItemsList({
                 <div className="min-w-0">
                   <div className="text-[15px] text-text">{item.content}</div>
                   <div className="text-[12px] text-soft">
-                    {memorySourceLabel(item, timeZone)}
+                    {memorySourceLabel(item, copy, timeZone)}
                   </div>
                 </div>
                 <button
                   type="button"
-                  aria-label={`Delete memory: ${item.content}`}
+                  aria-label={fillCopy(copy, "memories.items.delete", {
+                    memory: item.content,
+                  })}
                   className={deleteIconButton}
                   disabled={isDeleting}
                   onClick={() => {
@@ -108,9 +113,14 @@ export function MemoryItemsList({
 
       {memoryCount === 0 ? (
         <EmptyState
-          title="Nothing remembered yet"
-          body="As you talk with Zeph, the details that matter will appear here. You can delete any of them."
-          action={<PillLink href="https://t.me/" label="Talk to Zeph" />}
+          title={readCopy(copy, "memories.items.empty_title")}
+          body={readCopy(copy, "memories.items.empty_body")}
+          action={
+            <PillLink
+              href="https://t.me/"
+              label={readCopy(copy, "memories.items.empty_link")}
+            />
+          }
         />
       ) : (
         <section
@@ -122,11 +132,10 @@ export function MemoryItemsList({
               id="delete-all-memories"
               className="m-0 text-[17px] font-normal text-cream"
             >
-              Delete all memories
+              {readCopy(copy, "memories.items.delete_all.heading")}
             </h2>
             <p className="mt-1 mb-0 text-[14px] text-soft">
-              Removes every memory. Conversation Summaries and your account
-              stay. This can&apos;t be undone.
+              {readCopy(copy, "memories.items.delete_all.body")}
             </p>
           </div>
           <button
@@ -135,17 +144,20 @@ export function MemoryItemsList({
             disabled={isDeleting}
             onClick={() => setIsConfirmingDeleteAll(true)}
           >
-            Delete all memories
+            {readCopy(copy, "memories.items.delete_all.button")}
           </button>
         </section>
       )}
 
       <ConfirmDialog
         open={isConfirmingDeleteAll}
-        title="Delete all memories?"
-        body="Zeph will forget every memory it holds about you. Conversation Summaries and your account stay. This can’t be undone."
-        cancelLabel="Keep them"
-        confirmLabel="Delete all memories"
+        title={readCopy(copy, "memories.items.delete_all.confirm_title")}
+        body={readCopy(
+          copy,
+          countSlotKey("memories.items.delete_all.confirm_body", memoryCount),
+        )}
+        cancelLabel={readCopy(copy, "memories.items.delete_all.keep")}
+        confirmLabel={readCopy(copy, "memories.items.delete_all.confirm")}
         onCancel={() => setIsConfirmingDeleteAll(false)}
         onConfirm={() => {
           setIsConfirmingDeleteAll(false);

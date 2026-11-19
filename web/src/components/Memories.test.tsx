@@ -12,6 +12,7 @@ import type {
   SharedPhoto,
   UserPortrait,
 } from "@/lib/api-client";
+import { markedCopy, seedCopy, wordsNotFromCopy } from "@/test/copy";
 import { userWithRole } from "@/test/fixtures";
 import { renderWithQueries } from "@/test/render-with-queries";
 
@@ -187,7 +188,7 @@ describe("Memories", () => {
 
   it("swaps the panel and sets ?tab= when a tab is clicked, without a page load", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
     const memoriesTab = await screen.findByRole("tab", { name: "Memories" });
 
     await user.click(screen.getByRole("tab", { name: "Photos" }));
@@ -212,7 +213,7 @@ describe("Memories", () => {
     navigation.search = "design=menu-open";
     window.history.replaceState({}, "", "/memories?design=menu-open");
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     await user.click(await screen.findByRole("tab", { name: "About you" }));
 
@@ -229,7 +230,7 @@ describe("Memories", () => {
     "opens the %s tab when loaded with ?tab=",
     async (tab, tabName, heading) => {
       navigation.search = `tab=${tab}`;
-      renderWithQueries(<Memories />);
+      renderWithQueries(<Memories copy={seedCopy()} />);
 
       expect(
         await screen.findByRole("heading", { name: heading }),
@@ -243,7 +244,7 @@ describe("Memories", () => {
 
   it("opens the Memories tab when ?tab= is unknown", async () => {
     navigation.search = "tab=nonsense";
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     expect(await screen.findByText("Goes by Maya")).toBeVisible();
     expect(screen.getByRole("tab", { name: "Memories" })).toHaveAttribute(
@@ -257,7 +258,7 @@ describe("Memories", () => {
       ...maya,
       changed_in_chat: { user_memory: "2026-11-03T09:00:00Z" },
     });
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     expect(
       await screen.findByText("Changed in chat · 3 Nov"),
@@ -265,7 +266,7 @@ describe("Memories", () => {
   });
 
   it("shows Memory Items grouped by Memory Category with where they came from", async () => {
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     const lifeDetails = within(
       await screen.findByRole("region", { name: "Life details" }),
@@ -282,7 +283,7 @@ describe("Memories", () => {
 
   it("deletes a single Memory Item", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     await user.click(
       await screen.findByRole("button", {
@@ -302,7 +303,7 @@ describe("Memories", () => {
   it("keeps a Memory Item and explains when deleting it fails", async () => {
     apiClient.deleteMemoryItem.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     await user.click(
       await screen.findByRole("button", {
@@ -318,7 +319,7 @@ describe("Memories", () => {
 
   it("deletes all Memory Items only after confirming", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     await user.click(
       await screen.findByRole("button", { name: "Delete all memories" }),
@@ -353,7 +354,7 @@ describe("Memories", () => {
 
   it("lists Conversation Summaries by date with how the User seemed", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     await user.click(
       await screen.findByRole("tab", { name: "Conversation Summaries" }),
@@ -383,7 +384,7 @@ describe("Memories", () => {
 
   it("deletes a Conversation Summary", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
     await user.click(
       await screen.findByRole("tab", { name: "Conversation Summaries" }),
     );
@@ -403,7 +404,7 @@ describe("Memories", () => {
   it("explains when there are no Conversation Summaries yet", async () => {
     apiClient.listConversationSummaries.mockResolvedValue([]);
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     await user.click(
       await screen.findByRole("tab", { name: "Conversation Summaries" }),
@@ -414,7 +415,7 @@ describe("Memories", () => {
 
   it("shows what Zeph knows about the User and when it was updated", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     await user.click(await screen.findByRole("tab", { name: "About you" }));
 
@@ -428,7 +429,7 @@ describe("Memories", () => {
 
   it("deletes what Zeph knows about the User", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
     await user.click(await screen.findByRole("tab", { name: "About you" }));
 
     await user.click(
@@ -443,7 +444,7 @@ describe("Memories", () => {
   it("keeps the Portrait and explains when deleting it fails", async () => {
     apiClient.deleteUserPortrait.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
     await user.click(await screen.findByRole("tab", { name: "About you" }));
 
     await user.click(
@@ -459,7 +460,7 @@ describe("Memories", () => {
   it("explains when there is no Portrait yet", async () => {
     apiClient.getUserPortrait.mockResolvedValue(null);
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     await user.click(await screen.findByRole("tab", { name: "About you" }));
 
@@ -469,7 +470,7 @@ describe("Memories", () => {
   it("still shows and deletes the Portrait when User Memory is off", async () => {
     apiClient.getMe.mockResolvedValue({ ...maya, user_memory_enabled: false });
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
     await user.click(await screen.findByRole("tab", { name: "About you" }));
 
     await user.click(
@@ -481,7 +482,7 @@ describe("Memories", () => {
 
   it("shows each Life Thread's story, whether it is open, and when it was updated", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     await user.click(
       await screen.findByRole("tab", { name: "What's going on" }),
@@ -506,7 +507,7 @@ describe("Memories", () => {
 
   it("deletes a Life Thread", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
     await user.click(
       await screen.findByRole("tab", { name: "What's going on" }),
     );
@@ -525,7 +526,7 @@ describe("Memories", () => {
   it("keeps a Life Thread and explains when deleting it fails", async () => {
     apiClient.deleteLifeThread.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
     await user.click(
       await screen.findByRole("tab", { name: "What's going on" }),
     );
@@ -543,7 +544,7 @@ describe("Memories", () => {
   it("explains when there are no Life Threads yet", async () => {
     apiClient.listLifeThreads.mockResolvedValue([]);
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     await user.click(
       await screen.findByRole("tab", { name: "What's going on" }),
@@ -555,7 +556,7 @@ describe("Memories", () => {
   it("still shows and deletes Life Threads when User Memory is off", async () => {
     apiClient.getMe.mockResolvedValue({ ...maya, user_memory_enabled: false });
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
     await user.click(
       await screen.findByRole("tab", { name: "What's going on" }),
     );
@@ -569,7 +570,7 @@ describe("Memories", () => {
 
   it("shows what helps: each Move Outcome's situation, feeling, result, why and date", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     await user.click(
       await screen.findByRole("tab", { name: "What helps you" }),
@@ -602,7 +603,7 @@ describe("Memories", () => {
 
   it("deletes a Move Outcome", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
     await user.click(
       await screen.findByRole("tab", { name: "What helps you" }),
     );
@@ -619,7 +620,7 @@ describe("Memories", () => {
   it("keeps a Move Outcome and explains when deleting it fails", async () => {
     apiClient.deleteMoveOutcome.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
     await user.click(
       await screen.findByRole("tab", { name: "What helps you" }),
     );
@@ -637,7 +638,7 @@ describe("Memories", () => {
   it("explains when nothing is known yet about what helps", async () => {
     apiClient.listMoveOutcomes.mockResolvedValue([]);
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     await user.click(
       await screen.findByRole("tab", { name: "What helps you" }),
@@ -648,7 +649,7 @@ describe("Memories", () => {
 
   it("shows each Shared Photo with its photo, description, note and date", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     await user.click(await screen.findByRole("tab", { name: "Photos" }));
 
@@ -670,7 +671,7 @@ describe("Memories", () => {
   it("says so when a Shared Photo's image can't be loaded", async () => {
     apiClient.getSharedPhotoImage.mockRejectedValue(new Error("gone"));
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     await user.click(await screen.findByRole("tab", { name: "Photos" }));
 
@@ -687,7 +688,7 @@ describe("Memories", () => {
 
   it("deletes a Shared Photo", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
     await user.click(await screen.findByRole("tab", { name: "Photos" }));
 
     await user.click(
@@ -706,7 +707,7 @@ describe("Memories", () => {
   it("keeps a Shared Photo and explains when deleting it fails", async () => {
     apiClient.deleteSharedPhoto.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
     await user.click(await screen.findByRole("tab", { name: "Photos" }));
 
     await user.click(
@@ -724,7 +725,7 @@ describe("Memories", () => {
   it("explains when there are no Shared Photos yet", async () => {
     apiClient.listSharedPhotos.mockResolvedValue([]);
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     await user.click(await screen.findByRole("tab", { name: "Photos" }));
 
@@ -739,7 +740,7 @@ describe("Memories", () => {
         "**Memory is paused.** Zeph won’t learn anything new, but still uses what it already knows about you.",
     });
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     const memorySwitch = await screen.findByRole("switch", { name: "Memory" });
     expect(memorySwitch).toHaveAttribute("aria-checked", "true");
@@ -763,7 +764,7 @@ describe("Memories", () => {
       memory_note:
         "**Memory is paused.** Zeph won’t learn anything new, but still uses what it already knows about you.",
     });
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     expect(await screen.findByText("Goes by Maya")).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("Memory is paused.");
@@ -775,7 +776,7 @@ describe("Memories", () => {
       user_memory_enabled: false,
       memory_note: "Zeph is resting. **Nothing is deleted.** Back soon.",
     });
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     expect(await screen.findByText("Goes by Maya")).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent(
@@ -791,7 +792,7 @@ describe("Memories", () => {
     });
     apiClient.updatePreferences.mockResolvedValue(maya);
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     await user.click(
       await screen.findByRole("button", { name: "Turn memory on" }),
@@ -812,7 +813,7 @@ describe("Memories", () => {
         "**Memory isn’t available on your account.** Zeph won’t learn anything new.",
     });
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     const memorySwitch = await screen.findByRole("switch", { name: "Memory" });
     expect(memorySwitch).toBeDisabled();
@@ -835,7 +836,7 @@ describe("Memories", () => {
 
   it("explains when nothing has been remembered yet", async () => {
     apiClient.listMemoryGroups.mockResolvedValue([]);
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     expect(await screen.findByText("Nothing remembered yet")).toBeVisible();
     expect(screen.getByRole("link", { name: "Talk to Zeph" })).toBeVisible();
@@ -846,7 +847,7 @@ describe("Memories", () => {
       .mockRejectedValueOnce(new Error("down"))
       .mockResolvedValue(groups);
     const user = userEvent.setup();
-    renderWithQueries(<Memories />);
+    renderWithQueries(<Memories copy={seedCopy()} />);
 
     expect(
       await screen.findByText("Couldn’t load your memories"),
@@ -854,5 +855,258 @@ describe("Memories", () => {
     await user.click(screen.getByRole("button", { name: "Try again" }));
 
     expect(await screen.findByText("Goes by Maya")).toBeVisible();
+  });
+
+  describe("reads every word from Copy", () => {
+    const tabSlots = [
+      "memories",
+      "about",
+      "threads",
+      "helps",
+      "summaries",
+      "photos",
+    ];
+
+    /**
+     * Says what words on the page did not come from Copy, leaving out the
+     * days shown on their own, like "12 Nov", which are values, not words.
+     *
+     * @param container - The rendered page.
+     * @returns Each piece of text not from Copy or a day.
+     */
+    function wordsNotFromCopyOrDays(container: HTMLElement): string[] {
+      const words = container.cloneNode(true) as HTMLElement;
+      words.querySelectorAll("span").forEach((span) => {
+        if (/^\d{1,2} [A-Z][a-z]{2,3}$/.test(span.textContent ?? "")) {
+          span.remove();
+        }
+      });
+      return wordsNotFromCopy(words);
+    }
+
+    function markData() {
+      apiClient.listMemoryGroups.mockResolvedValue(
+        groups.map((group) => ({
+          category: "⟦data⟧",
+          items: group.items.map((item) => ({ ...item, content: "⟦data⟧" })),
+        })),
+      );
+      apiClient.getUserPortrait.mockResolvedValue({
+        ...portrait,
+        text: "⟦data⟧",
+      });
+      apiClient.listLifeThreads.mockResolvedValue(
+        lifeThreads.map((thread) => ({
+          ...thread,
+          title: "⟦data⟧",
+          story: "⟦data⟧",
+        })),
+      );
+      apiClient.listMoveOutcomes.mockResolvedValue(
+        moveOutcomes.map((outcome) => ({
+          ...outcome,
+          move: "⟦data⟧",
+          situation: "⟦data⟧",
+          feeling: "⟦data⟧",
+          why: "⟦data⟧",
+        })),
+      );
+      apiClient.listConversationSummaries.mockResolvedValue(
+        summaries.map((summary) => ({
+          ...summary,
+          summary: "⟦data⟧",
+          mood: "⟦data⟧",
+          offered: "⟦data⟧",
+        })),
+      );
+      apiClient.listSharedPhotos.mockResolvedValue(
+        sharedPhotos.map((photo) => ({
+          ...photo,
+          description: "⟦data⟧",
+          note: "⟦data⟧",
+        })),
+      );
+    }
+
+    async function expectOnlyCopyOnEveryTab(container: HTMLElement) {
+      const user = userEvent.setup();
+      await screen.findByRole("tabpanel");
+      for (const tab of tabSlots) {
+        await user.click(
+          screen.getByRole("tab", { name: `⟦memories.tabs.${tab}⟧` }),
+        );
+        expect(wordsNotFromCopyOrDays(container)).toEqual([]);
+      }
+    }
+
+    it("shows only Copy text on every tab with things remembered", async () => {
+      markData();
+      apiClient.getMe.mockResolvedValue({
+        ...maya,
+        changed_in_chat: { user_memory: "2026-11-03T09:00:00Z" },
+      });
+
+      const { container } = renderWithQueries(<Memories copy={markedCopy()} />);
+
+      await expectOnlyCopyOnEveryTab(container);
+    });
+
+    it("shows only Copy text in a photo's box when it can't be shown", async () => {
+      const user = userEvent.setup();
+      markData();
+      apiClient.getSharedPhotoImage.mockRejectedValue(new Error("down"));
+      const { container } = renderWithQueries(<Memories copy={markedCopy()} />);
+
+      await user.click(
+        await screen.findByRole("tab", { name: "⟦memories.tabs.photos⟧" }),
+      );
+
+      expect(
+        (await screen.findAllByText("⟦memories.photos.photo_failed⟧")).length,
+      ).toBe(2);
+      expect(wordsNotFromCopyOrDays(container)).toEqual([]);
+    });
+
+    it("shows only Copy text on every tab with nothing remembered", async () => {
+      apiClient.listMemoryGroups.mockResolvedValue([]);
+      apiClient.getUserPortrait.mockResolvedValue(null);
+      apiClient.listLifeThreads.mockResolvedValue([]);
+      apiClient.listMoveOutcomes.mockResolvedValue([]);
+      apiClient.listConversationSummaries.mockResolvedValue([]);
+      apiClient.listSharedPhotos.mockResolvedValue([]);
+
+      const { container } = renderWithQueries(<Memories copy={markedCopy()} />);
+
+      await expectOnlyCopyOnEveryTab(container);
+    });
+
+    it("shows only Copy text while Memory is paused, with its note and button", async () => {
+      markData();
+      apiClient.getMe.mockResolvedValue({
+        ...maya,
+        user_memory_enabled: false,
+        memory_note: "⟦data⟧",
+      });
+
+      const { container } = renderWithQueries(<Memories copy={markedCopy()} />);
+
+      expect(
+        await screen.findByRole("button", {
+          name: "⟦memories.memory_off.turn_on⟧",
+        }),
+      ).toBeVisible();
+      expect(screen.getByText("⟦memories.switch.paused⟧")).toBeVisible();
+      expect(wordsNotFromCopy(container)).toEqual([]);
+    });
+
+    it("shows only Copy text when an Admin has Memory off", async () => {
+      markData();
+      apiClient.getMe.mockResolvedValue({
+        ...maya,
+        user_memory_enabled: false,
+        user_memory_available: false,
+      });
+
+      const { container } = renderWithQueries(<Memories copy={markedCopy()} />);
+
+      expect(
+        await screen.findByText("⟦memories.switch.not_available⟧"),
+      ).toBeVisible();
+      expect(wordsNotFromCopy(container)).toEqual([]);
+    });
+
+    it("shows only Copy text while loading", () => {
+      apiClient.listMemoryGroups.mockReturnValue(new Promise(() => {}));
+
+      const { container } = renderWithQueries(<Memories copy={markedCopy()} />);
+
+      expect(
+        screen.getByRole("status", { name: "⟦memories.loading⟧" }),
+      ).toBeInTheDocument();
+      expect(wordsNotFromCopy(container)).toEqual([]);
+    });
+
+    it("shows only Copy text when the memories couldn't load", async () => {
+      apiClient.listMemoryGroups.mockRejectedValue(new Error("down"));
+
+      const { container } = renderWithQueries(<Memories copy={markedCopy()} />);
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "⟦memories.load_failed.title⟧",
+      );
+      expect(
+        screen.getByRole("button", { name: "⟦memories.load_failed.retry⟧" }),
+      ).toBeVisible();
+      expect(wordsNotFromCopy(container)).toEqual([]);
+    });
+
+    it("shows only Copy text when a change or a delete fails, and in the delete all dialog", async () => {
+      const user = userEvent.setup();
+      markData();
+      apiClient.updatePreferences.mockRejectedValue(new Error("down"));
+      apiClient.deleteMemoryItem.mockRejectedValue(new Error("down"));
+
+      const { container } = renderWithQueries(<Memories copy={markedCopy()} />);
+      await user.click(
+        await screen.findByRole("switch", { name: "⟦memories.switch.label⟧" }),
+      );
+      await user.click(
+        (
+          await screen.findAllByRole("button", {
+            name: "⟦memories.items.delete⟧",
+          })
+        )[0],
+      );
+      await screen.findByText("⟦memories.delete_failed⟧");
+      await screen.findByText("⟦memories.switch.save_failed⟧");
+      await user.click(
+        screen.getByRole("button", {
+          name: "⟦memories.items.delete_all.button⟧",
+        }),
+      );
+
+      const dialog = within(screen.getByRole("alertdialog"));
+      expect(
+        dialog.getByText("⟦memories.items.delete_all.confirm_body_many⟧"),
+      ).toBeVisible();
+      expect(wordsNotFromCopy(container)).toEqual([]);
+    });
+
+    it("words the delete all dialog for one memory with one Memory Item", async () => {
+      const user = userEvent.setup();
+      apiClient.listMemoryGroups.mockResolvedValue([
+        { category: "Life details", items: [groups[0].items[0]] },
+      ]);
+      renderWithQueries(<Memories copy={markedCopy()} />);
+
+      await user.click(
+        await screen.findByRole("button", {
+          name: "⟦memories.items.delete_all.button⟧",
+        }),
+      );
+
+      expect(
+        within(screen.getByRole("alertdialog")).getByText(
+          "⟦memories.items.delete_all.confirm_body_one⟧",
+        ),
+      ).toBeVisible();
+    });
+
+    it("words the delete all dialog for several memories with more than one", async () => {
+      const user = userEvent.setup();
+      renderWithQueries(<Memories copy={markedCopy()} />);
+
+      await user.click(
+        await screen.findByRole("button", {
+          name: "⟦memories.items.delete_all.button⟧",
+        }),
+      );
+
+      expect(
+        within(screen.getByRole("alertdialog")).getByText(
+          "⟦memories.items.delete_all.confirm_body_many⟧",
+        ),
+      ).toBeVisible();
+    });
   });
 });

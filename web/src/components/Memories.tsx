@@ -18,7 +18,7 @@ import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { SharedPhotosList } from "@/components/SharedPhotosList";
 import { Switch } from "@/components/Switch";
 import { UserPortraitSection } from "@/components/UserPortraitSection";
-import { notAvailableText } from "@/lib/features";
+import { type Copy, readCopy } from "@/lib/copy";
 import {
   type MemoriesTab,
   memoriesTabFromQuery,
@@ -33,11 +33,13 @@ import { useApiClient } from "@/lib/use-api-client";
  * Outcomes), the Conversation Summaries and the Shared Photos, each
  * deletable, with the User Memory switch. One tab shows at a time; the
  * address's `?tab=` picks it, and choosing a tab updates `?tab=` without
- * loading the page again.
+ * loading the page again. Every word is the Memories tab's Copy.
  *
+ * @param props - `copy` holds the Memories page's Copy slots.
  * @returns The page, a loading panel, or an error with Try again.
  */
-export function Memories() {
+export function Memories({ copy }: { copy: Copy }) {
+  const memoriesCopy = (slot: string) => readCopy(copy, `memories.${slot}`);
   const apiClient = useApiClient();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<MemoriesTab>(() =>
@@ -100,9 +102,9 @@ export function Memories() {
 
   const memoryOn = me?.user_memory_enabled ?? false;
   const memoryUnavailable = me !== undefined && !me.user_memory_available;
-  let switchLabel = memoryOn ? "Memory on" : "Memory paused";
+  let switchLabel = memoriesCopy(memoryOn ? "switch.on" : "switch.paused");
   if (memoryUnavailable) {
-    switchLabel = notAvailableText;
+    switchLabel = memoriesCopy("switch.not_available");
   }
 
   function changeMemory(enabled: boolean) {
@@ -123,9 +125,9 @@ export function Memories() {
     <>
       <PageHero
         background="memories"
-        eyebrow="Memories"
-        title="Memories"
-        body="What Zeph remembers, what it knows about you, what's going on in your life, what helps you, short summaries of past Conversations and the photos it kept. Delete anything you'd rather it forgot."
+        eyebrow={memoriesCopy("hero.eyebrow")}
+        title={memoriesCopy("hero.heading")}
+        body={memoriesCopy("hero.lead")}
         actions={
           me ? (
             <>
@@ -134,7 +136,7 @@ export function Memories() {
                   {switchLabel}
                 </span>
                 <Switch
-                  label="Memory"
+                  label={memoriesCopy("switch.label")}
                   checked={memoryOn}
                   disabled={updatePreferences.isPending || memoryUnavailable}
                   onChange={changeMemory}
@@ -143,6 +145,7 @@ export function Memories() {
               <ChangedInChatCaption
                 changedAt={me.changed_in_chat.user_memory}
                 timeZone={timeZone}
+                text={memoriesCopy("switch.changed_in_chat")}
               />
             </>
           ) : null
@@ -150,9 +153,7 @@ export function Memories() {
       />
 
       {updatePreferences.isError ? (
-        <SaveFailedNote>
-          We couldn’t change that. Please try again.
-        </SaveFailedNote>
+        <SaveFailedNote>{memoriesCopy("switch.save_failed")}</SaveFailedNote>
       ) : null}
 
       {me ? (
@@ -161,23 +162,25 @@ export function Memories() {
           canTurnOn={!memoryUnavailable}
           isSaving={updatePreferences.isPending}
           onTurnOn={() => changeMemory(true)}
+          turnOnLabel={memoriesCopy("memory_off.turn_on")}
         />
       ) : null}
 
       <p className="m-0 text-[13px] text-cream">
-        You can also tell Zeph &quot;forget that&quot;.
+        {memoriesCopy("forget_that")}
       </p>
 
-      <MemoriesTabs selected={tab} onSelect={chooseTab} />
+      <MemoriesTabs copy={copy} selected={tab} onSelect={chooseTab} />
 
       {!isLoaded && !loadFailed ? (
-        <LoadingPanel shape="card" label="Loading memories" />
+        <LoadingPanel shape="card" label={memoriesCopy("loading")} />
       ) : null}
 
       {loadFailed ? (
         <LoadFailed
-          title="Couldn’t load your memories"
-          body="Check your connection and try again. Nothing has been lost."
+          title={memoriesCopy("load_failed.title")}
+          body={memoriesCopy("load_failed.body")}
+          retryLabel={memoriesCopy("load_failed.retry")}
           onRetry={() => {
             for (const query of queries) {
               void query.refetch();
@@ -189,25 +192,38 @@ export function Memories() {
       {isLoaded ? (
         <div role="tabpanel" className="flex flex-col gap-6">
           {groups && tab === "memories" ? (
-            <MemoryItemsList groups={groups} timeZone={timeZone} />
+            <MemoryItemsList groups={groups} copy={copy} timeZone={timeZone} />
           ) : null}
           {portrait !== undefined && tab === "about" ? (
-            <UserPortraitSection portrait={portrait} timeZone={timeZone} />
+            <UserPortraitSection
+              portrait={portrait}
+              copy={copy}
+              timeZone={timeZone}
+            />
           ) : null}
           {threads && tab === "threads" ? (
-            <LifeThreadsList threads={threads} timeZone={timeZone} />
+            <LifeThreadsList
+              threads={threads}
+              copy={copy}
+              timeZone={timeZone}
+            />
           ) : null}
           {outcomes && tab === "helps" ? (
-            <MoveOutcomesList outcomes={outcomes} timeZone={timeZone} />
+            <MoveOutcomesList
+              outcomes={outcomes}
+              copy={copy}
+              timeZone={timeZone}
+            />
           ) : null}
           {summaries && tab === "summaries" ? (
             <ConversationSummariesList
               summaries={summaries}
+              copy={copy}
               timeZone={timeZone}
             />
           ) : null}
           {photos && tab === "photos" ? (
-            <SharedPhotosList photos={photos} timeZone={timeZone} />
+            <SharedPhotosList photos={photos} copy={copy} timeZone={timeZone} />
           ) : null}
         </div>
       ) : null}

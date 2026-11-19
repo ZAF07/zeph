@@ -14,6 +14,7 @@ import { SearchField } from "@/components/SearchField";
 import { ApiError } from "@/lib/api-client";
 import type { Copy } from "@/lib/copy";
 import { type CopySearchMatch, searchCopySlots } from "@/lib/copy-search";
+import { copySlotRows } from "@/lib/copy-slot-rows";
 import { saveFailedMessage } from "@/lib/save-failed-message";
 import { useCopyPage, useSaveCopyTab } from "@/lib/use-copy-page";
 import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes-warning";
@@ -34,10 +35,10 @@ function bringSlotIntoView(slotKey: string) {
 
 /**
  * The Copy page's editor: a tab per website page, the chosen tab's slots in
- * page order and one save bar that saves the tab's changes together. A save
- * the backend turns away shows each reason on its slot. A search finds
- * slots in every tab by their text and takes the Admin to the one picked.
- * Switching tabs or leaving the page with unsaved edits asks first.
+ * page order (a "one" and "many" pair side by side) and one save bar that
+ * saves the tab's changes together. A save the backend turns away shows
+ * each reason on its slot. A search finds slots in every tab by their text
+ * and takes the Admin to the one picked. Switching tabs or leaving the page with unsaved edits asks first.
  *
  * @returns The editor, or a loading panel or error with Try again.
  */
@@ -160,14 +161,21 @@ export function CopyEditor() {
         aria-label={tab.name}
         className="flex flex-col gap-3"
       >
-        {tab.slots.map((slot) => (
-          <CopySlotField
-            key={slot.key}
-            slot={slot}
-            value={drafts[slot.key] ?? slot.text}
-            error={slotErrors[slot.key]}
-            onChange={(text) => edit(slot.key, text)}
-          />
+        {copySlotRows(tab.slots).map((row) => (
+          <div
+            key={row[0].key}
+            className="flex flex-wrap gap-3 [&>*]:flex-[1_1_360px]"
+          >
+            {row.map((slot) => (
+              <CopySlotField
+                key={slot.key}
+                slot={slot}
+                value={drafts[slot.key] ?? slot.text}
+                error={slotErrors[slot.key]}
+                onChange={(text) => edit(slot.key, text)}
+              />
+            ))}
+          </div>
         ))}
         <CardSaveBar
           note="Changes show on the next page load."

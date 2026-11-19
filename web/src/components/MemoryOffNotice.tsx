@@ -10,8 +10,9 @@ import { PausedNotice } from "@/components/PausedNotice";
  * @param props - `note` is the note the backend sent, "" while User Memory
  *   is on, which shows nothing; `canTurnOn` is false when an Admin has User
  *   Memory off, which hides "Turn memory on"; `isSaving` locks the button;
- *   `onTurnOn` turns User Memory back on, and without it there is no button
- *   (as on Account, where the switch beside the notice does that).
+ *   `onTurnOn` turns User Memory back on and `turnOnLabel` is the button's
+ *   words; without them there is no button (as on Account, where the
+ *   switch beside the notice does that).
  * @returns The notice, or nothing.
  */
 export function MemoryOffNotice({
@@ -19,11 +20,13 @@ export function MemoryOffNotice({
   canTurnOn,
   isSaving = false,
   onTurnOn,
+  turnOnLabel,
 }: {
   note: string;
   canTurnOn: boolean;
   isSaving?: boolean;
   onTurnOn?: () => void;
+  turnOnLabel?: string;
 }) {
   if (!note) {
     return null;
@@ -36,14 +39,14 @@ export function MemoryOffNotice({
         title={hasTitle ? title : note}
         body={hasTitle ? rest.join("") : ""}
         action={
-          canTurnOn && onTurnOn ? (
+          canTurnOn && onTurnOn && turnOnLabel ? (
             <button
               type="button"
               className={secondaryButton}
               disabled={isSaving}
               onClick={onTurnOn}
             >
-              Turn memory on
+              {turnOnLabel}
             </button>
           ) : undefined
         }

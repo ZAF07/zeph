@@ -31,6 +31,22 @@ export function readCopy(copy: Copy, key: string): string {
   return text;
 }
 
+/** How the keys of a "one" and "many" slot pair end. */
+export const countSlotEndings = { one: "_one", many: "_many" } as const;
+
+/**
+ * Names the slot of a "one" and "many" pair to show for a number: the slot
+ * ending `_one` for 1 and the slot ending `_many` otherwise.
+ *
+ * @param keyStart - The two slots' key without the ending, e.g.
+ *   `connect_telegram.card.expires`.
+ * @param count - The number.
+ * @returns The key of the slot to show.
+ */
+export function countSlotKey(keyStart: string, count: number): string {
+  return `${keyStart}${count === 1 ? countSlotEndings.one : countSlotEndings.many}`;
+}
+
 /**
  * Fills a Copy text's `{name}` placeholders with live values. The text is
  * plain: nothing in it is read as markdown, links or HTML.

@@ -16,6 +16,7 @@ import type {
 } from "@/lib/api-client";
 import {
   type Copy,
+  countSlotKey,
   fillPlaceholderParts,
   fillPlaceholders,
   readCopy,
@@ -107,7 +108,7 @@ export function TelegramConnectionCard({
   const expiryText = (token: ConnectionToken) => {
     const minutes = minutesLeft(token.expires_at);
     return fillPlaceholders(
-      cardCopy(minutes === 1 ? "expires_one" : "expires_many"),
+      readCopy(copy, countSlotKey("connect_telegram.card.expires", minutes)),
       { minutes },
     );
   };

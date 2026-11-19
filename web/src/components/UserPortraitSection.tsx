@@ -7,6 +7,7 @@ import { MemoriesPanelHeading } from "@/components/MemoriesPanelHeading";
 import { MemoryCard } from "@/components/MemoryCard";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type { UserPortrait } from "@/lib/api-client";
+import { type Copy, fillCopy, readCopy } from "@/lib/copy";
 import { formatShortDay } from "@/lib/dates";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
@@ -17,14 +18,17 @@ import { useApiClient } from "@/lib/use-api-client";
  * edited.
  *
  * @param props - `portrait` is the User's Portrait, or null if they have
- *   none, and `timeZone` is the User's time zone.
+ *   none, `copy` is the Memories page's Copy, and `timeZone` is the User's
+ *   time zone.
  * @returns The tab's content.
  */
 export function UserPortraitSection({
   portrait,
+  copy,
   timeZone,
 }: {
   portrait: UserPortrait | null;
+  copy: Copy;
   timeZone?: string;
 }) {
   const apiClient = useApiClient();
@@ -38,19 +42,19 @@ export function UserPortraitSection({
   return (
     <>
       <MemoriesPanelHeading
-        title="What I know about you"
-        body="Zeph's short picture of you, written from your memories, so every reply comes from knowing you. Delete it and Zeph stops using it; it is written again after a later Conversation, while Memory is on."
+        title={readCopy(copy, "memories.about.heading")}
+        body={readCopy(copy, "memories.about.lead")}
       />
 
       {deletePortrait.isError ? (
         <SaveFailedNote>
-          We couldn’t delete that. Please try again.
+          {readCopy(copy, "memories.delete_failed")}
         </SaveFailedNote>
       ) : null}
 
       {portrait ? (
         <MemoryCard
-          deleteLabel="Delete what Zeph knows about you"
+          deleteLabel={readCopy(copy, "memories.about.delete")}
           isDeleting={deletePortrait.isPending}
           onDelete={() => deletePortrait.mutate()}
         >
@@ -59,14 +63,16 @@ export function UserPortraitSection({
               {portrait.text}
             </p>
             <span className="text-[12px] text-soft">
-              {`Written ${formatShortDay(portrait.updated_at, timeZone)}`}
+              {fillCopy(copy, "memories.about.written", {
+                day: formatShortDay(portrait.updated_at, timeZone),
+              })}
             </span>
           </div>
         </MemoryCard>
       ) : (
         <EmptyState
-          title="Nothing here yet"
-          body="Zeph writes this a little while after a Conversation ends, while Memory is on."
+          title={readCopy(copy, "memories.about.empty_title")}
+          body={readCopy(copy, "memories.about.empty_body")}
         />
       )}
     </>

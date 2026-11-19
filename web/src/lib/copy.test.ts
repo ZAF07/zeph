@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  countSlotKey,
   fillCopy,
   fillPlaceholderParts,
   fillPlaceholders,
@@ -135,5 +136,19 @@ describe("pickCopy", () => {
       "onboarding.hello.intro": "I’m Zeph.",
       "shared.wordmark": "Zeph",
     });
+  });
+});
+
+describe("countSlotKey", () => {
+  it("names the one slot for 1", () => {
+    expect(countSlotKey("memories.confirm_body", 1)).toBe(
+      "memories.confirm_body_one",
+    );
+  });
+
+  it.each([0, 2, 37])("names the many slot for %i", (count) => {
+    expect(countSlotKey("memories.confirm_body", count)).toBe(
+      "memories.confirm_body_many",
+    );
   });
 });
