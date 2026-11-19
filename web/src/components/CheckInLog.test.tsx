@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -12,6 +12,10 @@ const apiClient = {
   getAdminSettings: vi.fn<ApiClient["getAdminSettings"]>(),
 };
 
+vi.mock("@/lib/use-api-client", () => ({
+  useApiClient: () => apiClient,
+}));
+
 /** The settings with only the Ignore Threshold, as the log reads it. */
 function settingsWithIgnoreThreshold(value: number) {
   return {
@@ -22,10 +26,6 @@ function settingsWithIgnoreThreshold(value: number) {
     },
   };
 }
-
-vi.mock("@/lib/use-api-client", () => ({
-  useApiClient: () => apiClient,
-}));
 
 const entries: CheckInLogEntry[] = [
   {
@@ -139,6 +139,17 @@ describe("CheckInLog", () => {
     expect(
       table().getByText("Five in a row went unanswered"),
     ).toBeInTheDocument();
+  });
+
+  it("keeps the loading rows until the settings have loaded too", async () => {
+    apiClient.getAdminSettings.mockReturnValue(new Promise(() => {}));
+    renderWithQueries(<CheckInLog />);
+
+    expect(
+      await screen.findByRole("status", { name: "Loading log" }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(apiClient.listCheckInLog).toHaveBeenCalled());
+    expect(screen.queryByRole("table")).toBeNull();
   });
 
   it("still shows the log when the settings can't load", async () => {
