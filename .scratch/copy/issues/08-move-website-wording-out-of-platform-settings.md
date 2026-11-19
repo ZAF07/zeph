@@ -1,0 +1,39 @@
+# 08 — Copy: move website wording out of Platform Settings
+
+Status: ready-for-agent
+
+Lane: whichever lane is free first.
+
+## Parent
+
+`.scratch/copy/PRD.md`
+
+## What to build
+
+The website wording that is a Platform Setting today becomes Copy, so every website word has one home:
+
+- AI notice and short AI notice
+- User Memory explanation and Photo Viewing explanation
+- "Memory is paused" and "Memory isn't available" notes, each split into a bold lead slot and a body slot (the design bolds the lead; no `**` markup remains)
+- Delete My Data description
+
+Each moves into the Copy tab of the page that shows it (Shared if more than one page shows it). The Settings page drops these fields. Endpoints that sent this wording inside other data (e.g. the Home data and the signed-in User's Memory note) stop sending it; the web app picks the right slot from the flags it already gets. A migration drops the old settings; no backfill (the platform isn't live).
+
+Stays as is: the onboarding reason choices and all chat wording (Platform Settings), and the Crisis Reply (Safety).
+
+## Acceptance criteria
+
+- [ ] Each listed wording is a Copy slot on the right tab and no longer a Platform Setting (not in the settings read or save, not on the Settings page).
+- [ ] The Memory notes show a bold lead and plain body exactly as the design draws them, picked by the User's Memory flags.
+- [ ] No endpoint sends this wording outside the Copy reads.
+- [ ] Onboarding reason choices, chat wording and the Crisis Reply are untouched.
+- [ ] Seed text matches the references; the pixel test passes for every page showing this wording at both widths.
+- [ ] Tests cover the move and the note picking; all Python and web checks pass.
+- [ ] `/run`: as an Admin, edit the "Memory is paused" lead, turn Memory off as a User and see it bold on Home and Memories; the Settings page no longer shows these fields.
+
+## Blocked by
+
+- `.scratch/copy/issues/03-onboarding.md`
+- `.scratch/copy/issues/05-home-and-connect-telegram.md`
+- `.scratch/copy/issues/06-memories.md`
+- `.scratch/copy/issues/07-check-ins-and-account.md`

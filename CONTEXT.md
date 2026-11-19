@@ -28,6 +28,10 @@ _Avoid_: System prompt, personality, character
 Everything Admins set that shapes how the Companion behaves for all Users: the Persona, each core service's prompt, model and whether the model thinks first, wording such as the Crisis Reply and the Limit Reply, and limits such as the Daily Message Limit or the Conversation quiet gap. A change an Admin saves applies from the next reply or Check-in; one already under way finishes with the Platform Settings it started with.
 _Avoid_: Config, system settings, admin config
 
+**Copy**:
+The Admin-managed words Users and visitors read on the website: the Landing, Pricing and How it works pages, onboarding and the User's side of the Dashboard. It is not Platform Settings: what the Companion says in chat, including the Crisis Reply, stays there, and so does anything the Companion is told, such as the onboarding reason choices. The admin pages' own words are not Copy. Copy changes only the words; how they look and where they sit come from the design.
+_Avoid_: Text, strings, content, wording
+
 **Sticker Library**:
 The Admin-managed set of global stickers the Companion may send to any User. Each has a "when to use" note written by an Admin; a sticker without one is never sent. Admins add stickers on the Dashboard, or in chat: by telling the Companion they want to add stickers (or whole sticker sets) and then sending them, until they send something that isn't a sticker or go quiet for a while; or by replying "add this" (or "add this set") to a sticker. Any other sticker an Admin sends is answered like any User's. Stickers Users send are read through their emoji. Sending stickers is the Stickers Feature: when it doesn't work for a User, the Companion sends them none, but still reads their stickers.
 _Avoid_: Sticker pack, emoji set
