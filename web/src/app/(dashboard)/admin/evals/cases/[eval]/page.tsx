@@ -21,13 +21,13 @@ export default async function AdminEvalCasesForEvalPage({
     notFound();
   }
   return (
-    <div className="flex flex-col gap-[22px]">
+    <>
       <AdminPageHeader
         title="Eval Cases"
         lead="The situations each Eval checks. Edits apply from the next run; past runs keep each case as it was. Edits never go back to the seed files."
       />
       <EvalAreaTabs />
       <EvalCasesList evalName={evalName} />
-    </div>
+    </>
   );
 }

@@ -8,7 +8,8 @@ import { TableCards, type TableColumn } from "@/components/TableCards";
  *
  * @param props - `columns` say what to show, `rows` are the rows,
  *   `rowKey` gives each row's key, `noMessageContent` adds the caption, and
- *   `minWidthClass` is the table's least width (e.g. `min-w-[820px]`).
+ *   `minWidthClass` is the table's least width (e.g. `min-w-[820px]`), and
+ *   `onRowClick`, when given, is called when a table row is clicked.
  * @returns The table and its phone cards.
  */
 export function DataTable<Row>({
@@ -17,12 +18,14 @@ export function DataTable<Row>({
   rowKey,
   noMessageContent = false,
   minWidthClass,
+  onRowClick,
 }: {
   columns: TableColumn<Row>[];
   rows: Row[];
   rowKey: (row: Row) => string;
   noMessageContent?: boolean;
   minWidthClass: string;
+  onRowClick?: (row: Row) => void;
 }) {
   return (
     <>
@@ -53,7 +56,10 @@ export function DataTable<Row>({
             {rows.map((row, index) => (
               <tr
                 key={rowKey(row)}
-                className={index > 0 ? "border-t border-line" : undefined}
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                className={`${index > 0 ? "border-t border-line" : ""} ${
+                  onRowClick ? "cursor-pointer" : ""
+                }`}
               >
                 {columns.map((column) => (
                   <td

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { AdminUserName } from "@/components/AdminUserName";
+import { rowActionButton } from "@/components/button-styles";
 import { LoadFailed } from "@/components/LoadFailed";
 import { RolePill } from "@/components/RolePill";
 import { SearchField } from "@/components/SearchField";
@@ -83,7 +84,7 @@ export function AdminUsers() {
     <button
       type="button"
       onClick={() => setManagedUserId(user.id)}
-      className="inline-flex min-h-11 cursor-pointer items-center border-0 bg-transparent p-0 font-[inherit] text-[13px] text-text underline hover:text-cream"
+      className={rowActionButton}
     >
       Manage
     </button>

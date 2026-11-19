@@ -184,3 +184,26 @@ export function describeCost(cost: {
     ? `${formatSgd(cost.cost_sgd)} + ${unpriced}`
     : unpriced;
 }
+
+/**
+ * The address of one Eval's list of cases.
+ *
+ * @param evalName - The Eval.
+ * @returns The address.
+ */
+export function evalCasesHref(evalName: EvalName): string {
+  return `/admin/evals/cases/${evalName}`;
+}
+
+/**
+ * The address of an Eval Case's editor.
+ *
+ * @param evalCase - The case's Eval and key.
+ * @returns The address.
+ */
+export function evalCaseEditHref(evalCase: {
+  eval: EvalName;
+  key: string;
+}): string {
+  return `${evalCasesHref(evalCase.eval)}/edit/${evalCase.key}`;
+}

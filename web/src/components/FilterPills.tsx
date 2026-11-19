@@ -1,3 +1,5 @@
+import { filterPillClass } from "@/components/filter-pill-styles";
+
 /** One choice in a row of filter pills. */
 export type FilterPillOption<Choice extends string> = {
   id: Choice;
@@ -31,11 +33,7 @@ export function FilterPills<Choice extends string>({
           type="button"
           aria-pressed={chosen === option.id}
           onClick={() => onChoose(option.id)}
-          className={`min-h-11 cursor-pointer rounded-pill border px-[18px] font-[inherit] text-[14px] ${
-            chosen === option.id
-              ? "border-cream bg-cream font-medium text-ink"
-              : "border-line-strong bg-transparent font-light text-text"
-          }`}
+          className={filterPillClass(chosen === option.id)}
         >
           {option.label}
         </button>

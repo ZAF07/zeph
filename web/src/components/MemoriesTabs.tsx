@@ -1,7 +1,5 @@
+import { tabClass, tabRow } from "@/components/tab-styles";
 import { type MemoriesTab, memoriesTabs } from "@/lib/memories";
-
-const tabBase =
-  "min-h-11 flex-none cursor-pointer border-0 border-b-2 bg-transparent px-0.5 text-[14px] whitespace-nowrap min-[900px]:flex-initial";
 
 /**
  * The Memories page's row of six tabs. From 900px up it wraps; on a phone it
@@ -19,11 +17,7 @@ export function MemoriesTabs({
   onSelect: (tab: MemoriesTab) => void;
 }) {
   return (
-    <div
-      role="tablist"
-      aria-label="Memories"
-      className="flex flex-nowrap gap-x-[22px] gap-y-1 overflow-x-auto border-b border-line min-[900px]:flex-wrap min-[900px]:gap-x-5 min-[900px]:overflow-x-visible"
-    >
+    <div role="tablist" aria-label="Memories" className={tabRow}>
       {memoriesTabs.map((option) => {
         const isSelected = option.id === selected;
         return (
@@ -33,11 +27,7 @@ export function MemoriesTabs({
             role="tab"
             aria-selected={isSelected}
             onClick={() => onSelect(option.id)}
-            className={`${tabBase} ${
-              isSelected
-                ? "border-cream font-normal text-cream"
-                : "border-transparent font-light text-soft"
-            }`}
+            className={tabClass(isSelected)}
           >
             {option.label}
           </button>

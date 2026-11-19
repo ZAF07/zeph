@@ -4,11 +4,20 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { EmptyState } from "@/components/EmptyState";
-import { inputField } from "@/components/form-styles";
+import { DataTable } from "@/components/DataTable";
+import { FilterToggle } from "@/components/FilterToggle";
 import { LoadFailed } from "@/components/LoadFailed";
-import { LockIcon } from "@/components/LockIcon";
-import type { ModelCallTraceFilter, ModelStep } from "@/lib/api-client";
+import { SelectFilter } from "@/components/SelectFilter";
+import { StatusPill } from "@/components/StatusPill";
+import type { TableColumn } from "@/components/TableCards";
+import { TableEmpty } from "@/components/TableEmpty";
+import { TableLoading } from "@/components/TableLoading";
+import { TableNoMatches } from "@/components/TableNoMatches";
+import type {
+  ModelCallTrace,
+  ModelCallTraceFilter,
+  ModelStep,
+} from "@/lib/api-client";
 import { formatSavedAt } from "@/lib/dates";
 import {
   describeSteps,
@@ -21,45 +30,94 @@ import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 const periods = [
-  { days: 1, label: "Last 24 hours" },
-  { days: 7, label: "Last 7 days" },
-  { days: 30, label: "Last 30 days" },
+  { value: "1", label: "Last 24 hours" },
+  { value: "7", label: "Last 7 days" },
+  { value: "30", label: "Last 30 days" },
 ];
 
-const headings = [
-  "Time",
-  "User",
-  "For",
-  "Steps",
-  "Tokens",
-  "Time taken",
-  "Errors",
-  "Content",
+const stepOptions = [
+  { value: "", label: "All steps" },
+  ...modelSteps.map((step) => ({ value: step.id, label: step.label })),
 ];
 
-const cell = "px-[18px] py-3.5";
+const columns: TableColumn<ModelCallTrace>[] = [
+  {
+    heading: "Time",
+    isMain: true,
+    cell: (trace) => (
+      <Link
+        href={`/admin/model-calls/${trace.trace_id}`}
+        className="whitespace-nowrap text-text underline"
+      >
+        {formatSavedAt(trace.started_at)}
+      </Link>
+    ),
+  },
+  {
+    heading: "User",
+    isMain: true,
+    cell: (trace) => trace.user_name ?? trace.user_email ?? "Unknown User",
+  },
+  { heading: "For", cell: (trace) => traceKindLabel(trace.kind) },
+  { heading: "Steps", cell: (trace) => describeSteps(trace.steps) },
+  {
+    heading: "Tokens",
+    cell: (trace) => formatTokens(trace.tokens_in, trace.tokens_out),
+  },
+  {
+    heading: "Time taken",
+    cell: (trace) => formatDuration(trace.duration_ms),
+  },
+  {
+    heading: "Errors",
+    cell: (trace) =>
+      trace.error_count === 0 ? (
+        "—"
+      ) : (
+        <StatusPill filled={false} danger>
+          {trace.error_count === 1 ? "1 error" : `${trace.error_count} errors`}
+        </StatusPill>
+      ),
+  },
+  {
+    heading: "Content",
+    cell: (trace) => (trace.has_content ? "Full" : "None"),
+  },
+];
+
+/**
+ * Reads a step filter's value back into a step.
+ *
+ * @param value - The chosen option's value; empty for all steps.
+ * @returns The step, or an empty string for all steps.
+ */
+function toStep(value: string): ModelStep | "" {
+  return modelSteps.find((step) => step.id === value)?.id ?? "";
+}
 
 /**
  * The admin Model Call Log: one trace per Message, Check-in or Conversation
  * end, newest first, filtered by User, step, period and errors. Each trace
  * opens on its own page. Content is only ever there for Admins' own chats
- * and Evals.
+ * and Evals. Built from the admin table template.
  *
- * @returns The filters and table, or a loading, empty or error state.
+ * @returns The filters and table, or a loading, no-match, empty or error
+ *   state in place of the table.
  */
 export function ModelCallLog() {
   const apiClient = useApiClient();
   const [userId, setUserId] = useState("");
   const [step, setStep] = useState<ModelStep | "">("");
-  const [days, setDays] = useState(7);
+  const [period, setPeriod] = useState("7");
   const [errorsOnly, setErrorsOnly] = useState(false);
 
   const filter: ModelCallTraceFilter = {
-    days,
+    days: Number(period),
     ...(userId ? { userId } : {}),
     ...(step ? { step } : {}),
     ...(errorsOnly ? { errorsOnly } : {}),
   };
+  const isNarrowed = userId !== "" || step !== "" || errorsOnly;
   const tracesQuery = useQuery({
     queryKey: queryKeys.modelCallTraces(filter),
     queryFn: () => apiClient.listModelCallTraces(filter),
@@ -69,80 +127,43 @@ export function ModelCallLog() {
     queryFn: () => apiClient.listAdminUsers(),
   });
   const traces = tracesQuery.data;
+  const userOptions = [
+    { value: "", label: "All Users" },
+    ...(usersQuery.data ?? []).map((user) => ({
+      value: user.id,
+      label: user.name ?? user.email ?? "Unknown User",
+    })),
+  ];
 
   return (
     <>
       <div className="flex flex-wrap items-center gap-2.5">
-        <label>
-          <span className="sr-only">User</span>
-          <select
-            className={`${inputField} min-h-10 w-auto py-2`}
-            value={userId}
-            onChange={(event) => setUserId(event.target.value)}
-          >
-            <option value="">All Users</option>
-            {(usersQuery.data ?? []).map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.name ?? user.email ?? "Unknown User"}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span className="sr-only">Step</span>
-          <select
-            className={`${inputField} min-h-10 w-auto py-2`}
-            value={step}
-            onChange={(event) =>
-              setStep(
-                modelSteps.find((option) => option.id === event.target.value)
-                  ?.id ?? "",
-              )
-            }
-          >
-            <option value="">All steps</option>
-            {modelSteps.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span className="sr-only">Period</span>
-          <select
-            className={`${inputField} min-h-10 w-auto py-2`}
-            value={days}
-            onChange={(event) => setDays(Number(event.target.value))}
-          >
-            {periods.map((option) => (
-              <option key={option.days} value={option.days}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="button"
-          aria-pressed={errorsOnly}
-          onClick={() => setErrorsOnly(!errorsOnly)}
-          className={`min-h-10 cursor-pointer rounded-full border px-3.5 py-2 text-sm font-medium ${
-            errorsOnly
-              ? "border-ink bg-ink text-white"
-              : "border-line-strong bg-transparent text-ink-body"
-          }`}
-        >
-          Errors only
-        </button>
+        <SelectFilter
+          label="User"
+          options={userOptions}
+          value={userId}
+          onChange={setUserId}
+        />
+        <SelectFilter
+          label="Step"
+          options={stepOptions}
+          value={step}
+          onChange={(value) => setStep(toStep(value))}
+        />
+        <SelectFilter
+          label="Period"
+          options={periods}
+          value={period}
+          onChange={setPeriod}
+        />
+        <FilterToggle
+          label="Errors only"
+          on={errorsOnly}
+          onChange={setErrorsOnly}
+        />
       </div>
 
-      {tracesQuery.isPending ? (
-        <div
-          aria-busy="true"
-          aria-label="Loading log"
-          className="h-[240px] rounded-xl border border-line bg-subtle"
-        />
-      ) : null}
+      {tracesQuery.isPending ? <TableLoading label="Loading log" /> : null}
 
       {traces === undefined && tracesQuery.isError ? (
         <LoadFailed
@@ -152,81 +173,24 @@ export function ModelCallLog() {
         />
       ) : null}
 
-      {traces !== undefined && traces.length === 0 ? (
-        <EmptyState
+      {traces !== undefined && traces.length === 0 && isNarrowed ? (
+        <TableNoMatches />
+      ) : null}
+
+      {traces !== undefined && traces.length === 0 && !isNarrowed ? (
+        <TableEmpty
           title="No model calls yet"
           body="Traces appear as the Companion answers Messages, sends Check-ins and wraps up Conversations. Nothing matches these filters yet."
         />
       ) : null}
 
       {traces !== undefined && traces.length > 0 ? (
-        <div className="overflow-x-auto rounded-xl border border-line bg-white">
-          <table className="w-full min-w-[920px] border-collapse text-sm">
-            <caption className="border-b border-line px-4 py-2.5 text-left">
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted">
-                <LockIcon />
-                Content only for Admins’ own chats and Evals
-              </span>
-            </caption>
-            <thead>
-              <tr>
-                {headings.map((heading) => (
-                  <th
-                    key={heading}
-                    scope="col"
-                    className="whitespace-nowrap border-b border-line bg-subtle px-[18px] py-3.5 text-left font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted"
-                  >
-                    {heading}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {traces.map((trace) => (
-                <tr
-                  key={trace.trace_id}
-                  className="border-b border-line last:border-b-0"
-                >
-                  <td className={`${cell} whitespace-nowrap`}>
-                    <Link
-                      href={`/admin/model-calls/${trace.trace_id}`}
-                      className="font-medium"
-                    >
-                      {formatSavedAt(trace.started_at)}
-                    </Link>
-                  </td>
-                  <td className={cell}>
-                    {trace.user_name ?? trace.user_email ?? "Unknown User"}
-                  </td>
-                  <td className={`${cell} whitespace-nowrap`}>
-                    {traceKindLabel(trace.kind)}
-                  </td>
-                  <td className={cell}>{describeSteps(trace.steps)}</td>
-                  <td className={`${cell} whitespace-nowrap`}>
-                    {formatTokens(trace.tokens_in, trace.tokens_out)}
-                  </td>
-                  <td className={`${cell} whitespace-nowrap`}>
-                    {formatDuration(trace.duration_ms)}
-                  </td>
-                  <td className={`${cell} whitespace-nowrap`}>
-                    {trace.error_count === 0 ? (
-                      "—"
-                    ) : (
-                      <span className="inline-flex items-center whitespace-nowrap rounded-full bg-danger-tint px-2.5 py-[3px] text-xs font-medium text-danger-deep">
-                        {trace.error_count === 1
-                          ? "1 error"
-                          : `${trace.error_count} errors`}
-                      </span>
-                    )}
-                  </td>
-                  <td className={`${cell} whitespace-nowrap`}>
-                    {trace.has_content ? "Full" : "None"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={columns}
+          rows={traces}
+          rowKey={(trace) => trace.trace_id}
+          minWidthClass="min-w-[920px]"
+        />
       ) : null}
     </>
   );

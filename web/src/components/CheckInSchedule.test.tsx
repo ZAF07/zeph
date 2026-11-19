@@ -19,8 +19,12 @@ vi.mock("@/lib/use-api-client", () => ({
   useApiClient: () => apiClient,
 }));
 
+function table() {
+  return within(screen.getByRole("table"));
+}
+
 function rowFor(name: string): HTMLElement {
-  const row = screen.getByText(name).closest("tr");
+  const row = table().getByText(name).closest("tr");
   if (!row) {
     throw new Error(`No row for ${name}`);
   }
@@ -51,7 +55,7 @@ describe("CheckInSchedule", () => {
   it("shows each opted-in User's Due Time, settings, Feature and held-back state", async () => {
     renderWithQueries(<CheckInSchedule />);
 
-    await screen.findByText("Ren Okafor");
+    await screen.findByRole("table");
     const ren = within(rowFor("Ren Okafor"));
     expect(ren.getByText("ren@example.com")).toBeVisible();
     expect(ren.getByText("in 3 h · Tue 13:00 their time")).toBeVisible();
@@ -67,7 +71,7 @@ describe("CheckInSchedule", () => {
     expect(sam.getByText("Paused until Tue 24 Nov 10:00")).toBeVisible();
     expect(sam.getByText("Feature off")).toBeVisible();
     expect(sam.getByText("Quiet Hours, until 07:30")).toBeVisible();
-    expect(screen.getByText(/No message content · 2 Users/)).toBeVisible();
+    expect(table().getByText("No message content")).toBeInTheDocument();
   });
 
   it("searches by name or email and starts again from the first page", async () => {
@@ -76,7 +80,7 @@ describe("CheckInSchedule", () => {
     );
     const user = userEvent.setup();
     renderWithQueries(<CheckInSchedule />);
-    await screen.findByText("Ren Okafor");
+    await screen.findByRole("table");
 
     await user.click(screen.getByRole("button", { name: "Next page" }));
     await user.type(screen.getByRole("searchbox"), "ren");
@@ -97,7 +101,7 @@ describe("CheckInSchedule", () => {
     );
     renderWithQueries(<CheckInSchedule initialSearch="ren@example.com" />);
 
-    await screen.findByText("Ren Okafor");
+    await screen.findByRole("table");
     expect(screen.getByRole("searchbox")).toHaveValue("ren@example.com");
     expect(apiClient.listCheckInSchedule).toHaveBeenCalledWith({
       search: "ren@example.com",
@@ -111,7 +115,7 @@ describe("CheckInSchedule", () => {
     );
     const user = userEvent.setup();
     renderWithQueries(<CheckInSchedule />);
-    await screen.findByText("Ren Okafor");
+    await screen.findByRole("table");
 
     expect(screen.getByText("Page 1 of 2")).toBeVisible();
     expect(
@@ -121,6 +125,48 @@ describe("CheckInSchedule", () => {
 
     expect(await screen.findByText("Page 2 of 2")).toBeVisible();
     expect(screen.getByRole("button", { name: "Next page" })).toBeDisabled();
+  });
+
+  it("also shows each User as a card of label and value lines for phones", async () => {
+    renderWithQueries(<CheckInSchedule />);
+    await screen.findByRole("table");
+
+    const lines = screen
+      .getAllByRole("term")
+      .map((term) => `${term.textContent}: ${term.nextSibling?.textContent}`);
+    expect(lines.slice(1, 9)).toEqual([
+      "User: Ren Okaforren@example.com",
+      "Due Time: in 3 h · Tue 13:00 their time",
+      "How often: Most days",
+      "Quiet hours: 22:00–07:30",
+      "Pause: Not paused",
+      "Check-ins: Works",
+      "Held back now: —",
+      "Actions: Edit",
+    ]);
+  });
+
+  it("says nothing matches a search that finds no one", async () => {
+    apiClient.listCheckInSchedule.mockResolvedValue(schedulePage([]));
+    renderWithQueries(<CheckInSchedule initialSearch="nobody" />);
+
+    expect(
+      await screen.findByText("Nothing matches these filters."),
+    ).toBeVisible();
+  });
+
+  it("opens a User's settings panel by clicking their row", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<CheckInSchedule />);
+    await screen.findByRole("table");
+
+    await user.click(within(rowFor("Ren Okafor")).getByText("Most days"));
+
+    expect(
+      screen.getByRole("dialog", {
+        name: "Check-in settings for Ren Okafor",
+      }),
+    ).toBeVisible();
   });
 
   it("says when nobody has opted in", async () => {
@@ -135,7 +181,7 @@ describe("CheckInSchedule", () => {
   it("opens a User's settings panel from their row", async () => {
     const user = userEvent.setup();
     renderWithQueries(<CheckInSchedule />);
-    await screen.findByText("Ren Okafor");
+    await screen.findByRole("table");
 
     await user.click(
       within(rowFor("Ren Okafor")).getByRole("button", { name: "Edit" }),
@@ -164,14 +210,14 @@ describe("CheckInSchedule", () => {
     ]);
     const user = userEvent.setup();
     renderWithQueries(<CheckInSchedule />);
-    await screen.findByText("Ren Okafor");
+    await screen.findByRole("table");
     const checkInNow = screen.getByRole("button", { name: "Check in now" });
     expect(checkInNow).toBeDisabled();
 
     await user.click(
-      screen.getByRole("checkbox", { name: "Select Ren Okafor" }),
+      table().getByRole("checkbox", { name: "Select Ren Okafor" }),
     );
-    await user.click(screen.getByRole("checkbox", { name: "Select Sam Lee" }));
+    await user.click(table().getByRole("checkbox", { name: "Select Sam Lee" }));
     expect(screen.getByText(/2 selected/)).toBeVisible();
     await user.click(checkInNow);
 
@@ -185,7 +231,7 @@ describe("CheckInSchedule", () => {
       "Sam Lee: Refused — no Telegram Connection",
     );
     expect(
-      screen.getByRole("checkbox", { name: "Select Ren Okafor" }),
+      table().getByRole("checkbox", { name: "Select Ren Okafor" }),
     ).not.toBeChecked();
     expect(screen.getByRole("button", { name: "Check in now" })).toBeDisabled();
   });
@@ -193,30 +239,30 @@ describe("CheckInSchedule", () => {
   it("selects everyone on the page at once, and clears them again", async () => {
     const user = userEvent.setup();
     renderWithQueries(<CheckInSchedule />);
-    await screen.findByText("Ren Okafor");
+    await screen.findByRole("table");
     const wholePage = screen.getByRole("checkbox", {
       name: "Select everyone on this page",
     });
 
     await user.click(wholePage);
     expect(
-      screen.getByRole("checkbox", { name: "Select Sam Lee" }),
+      table().getByRole("checkbox", { name: "Select Sam Lee" }),
     ).toBeChecked();
     expect(screen.getByText(/2 selected/)).toBeVisible();
 
     await user.click(wholePage);
     expect(
-      screen.getByRole("checkbox", { name: "Select Ren Okafor" }),
+      table().getByRole("checkbox", { name: "Select Ren Okafor" }),
     ).not.toBeChecked();
   });
 
   it("selecting a row doesn't open its settings panel", async () => {
     const user = userEvent.setup();
     renderWithQueries(<CheckInSchedule />);
-    await screen.findByText("Ren Okafor");
+    await screen.findByRole("table");
 
     await user.click(
-      screen.getByRole("checkbox", { name: "Select Ren Okafor" }),
+      table().getByRole("checkbox", { name: "Select Ren Okafor" }),
     );
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -228,7 +274,7 @@ describe("CheckInSchedule", () => {
     );
     renderWithQueries(<CheckInSchedule />);
 
-    await screen.findByText("Ren Okafor");
+    await screen.findByRole("table");
     expect(
       within(rowFor("Ren Okafor")).getByText("Check in Now waiting"),
     ).toBeVisible();
@@ -238,10 +284,10 @@ describe("CheckInSchedule", () => {
     apiClient.checkInNow.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
     renderWithQueries(<CheckInSchedule />);
-    await screen.findByText("Ren Okafor");
+    await screen.findByRole("table");
 
     await user.click(
-      screen.getByRole("checkbox", { name: "Select Ren Okafor" }),
+      table().getByRole("checkbox", { name: "Select Ren Okafor" }),
     );
     await user.click(screen.getByRole("button", { name: "Check in now" }));
 

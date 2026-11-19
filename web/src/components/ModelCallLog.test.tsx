@@ -137,6 +137,37 @@ describe("ModelCallLog", () => {
     );
   });
 
+  it("also shows each trace as a card of label and value lines for phones", async () => {
+    renderWithQueries(<ModelCallLog />);
+    await screen.findByRole("table");
+
+    const lines = screen
+      .getAllByRole("term")
+      .map((term) => `${term.textContent}: ${term.nextSibling?.textContent}`);
+    expect(lines.slice(1, 8)).toEqual([
+      "User: Maya Lin",
+      "For: Message",
+      "Steps: Safeguard ×2 → Reply",
+      "Tokens: 1,200 in / 80 out",
+      "Time taken: 2.4 s",
+      "Errors: 1 error",
+      "Content: None",
+    ]);
+  });
+
+  it("says nothing matches when a filter finds no traces", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<ModelCallLog />);
+    await screen.findByRole("table");
+    apiClient.listModelCallTraces.mockResolvedValue([]);
+
+    await user.click(screen.getByRole("button", { name: "Errors only" }));
+
+    expect(
+      await screen.findByText("Nothing matches these filters."),
+    ).toBeVisible();
+  });
+
   it("says when there are no traces yet", async () => {
     apiClient.listModelCallTraces.mockResolvedValue([]);
 

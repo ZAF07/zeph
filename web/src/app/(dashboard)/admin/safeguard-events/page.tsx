@@ -8,12 +8,12 @@ import { SafeguardEvents } from "@/components/SafeguardEvents";
  */
 export default function AdminSafeguardEventsPage() {
   return (
-    <div className="flex flex-col gap-[22px]">
+    <>
       <AdminPageHeader
         title="Safeguard Events"
         lead="Each time Safeguard detected risk and sent the Crisis Reply. Who and when only — never what was said."
       />
       <SafeguardEvents />
-    </div>
+    </>
   );
 }

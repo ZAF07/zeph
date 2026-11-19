@@ -1,70 +1,145 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { useState } from "react";
 
-import { primaryButton } from "@/components/button-styles";
-import { EmptyState } from "@/components/EmptyState";
-import { EvalCaseRow } from "@/components/EvalCaseRow";
+import { primaryButton, rowActionButton } from "@/components/button-styles";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { DataTable } from "@/components/DataTable";
+import { EvalCaseDuplicateDialog } from "@/components/EvalCaseDuplicateDialog";
+import { FilterPillLinks } from "@/components/FilterPillLinks";
 import { LoadFailed } from "@/components/LoadFailed";
-import type { EvalName } from "@/lib/api-client";
-import { evalDetails, evalOrder } from "@/lib/evals";
-import { queryKeys } from "@/lib/queries";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
+import { StatusPill } from "@/components/StatusPill";
+import type { TableColumn } from "@/components/TableCards";
+import { TableEmpty } from "@/components/TableEmpty";
+import { TableLoading } from "@/components/TableLoading";
+import type { EvalCase, EvalName } from "@/lib/api-client";
+import { formatSavedAt } from "@/lib/dates";
+import {
+  evalCaseEditHref,
+  evalCasesHref,
+  evalDetails,
+  evalOrder,
+} from "@/lib/evals";
+import { queryKeys, refreshEvalCases } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
+
+const evalLinks = evalOrder.map((name) => ({
+  href: evalCasesHref(name),
+  label: evalDetails[name].label,
+}));
 
 /**
  * One Eval's cases, archived ones too, with links to the other Evals and
- * a button to add a case. Each case can be edited, duplicated or archived.
+ * a button to add a case. Each case can be edited, duplicated (asking for
+ * the copy's key, then opening the copy) or archived (after confirming).
+ * Built from the admin table template.
  *
  * @param props - `evalName` is the Eval whose cases are shown.
- * @returns The list, or a loading, empty or error state.
+ * @returns The filters and table, or a loading, empty or error state in
+ *   place of the table.
  */
 export function EvalCasesList({ evalName }: { evalName: EvalName }) {
   const apiClient = useApiClient();
+  const queryClient = useQueryClient();
+  const [duplicating, setDuplicating] = useState<EvalCase | null>(null);
+  const [archiving, setArchiving] = useState<EvalCase | null>(null);
   const casesQuery = useQuery({
     queryKey: queryKeys.evalCases(evalName),
     queryFn: () => apiClient.listEvalCases(evalName),
   });
   const cases = casesQuery.data;
 
+  const archiveMutation = useMutation({
+    mutationFn: (key: string) => apiClient.archiveEvalCase(key),
+    onSuccess: () => refreshEvalCases(queryClient),
+    onSettled: () => setArchiving(null),
+  });
+
+  const columns: TableColumn<EvalCase>[] = [
+    {
+      heading: "Case",
+      isMain: true,
+      cell: (evalCase) => (
+        <Link
+          href={evalCaseEditHref(evalCase)}
+          className="break-all text-text underline"
+        >
+          {evalCase.key}
+        </Link>
+      ),
+    },
+    {
+      heading: "Status",
+      cell: (evalCase) =>
+        evalCase.archived || evalCase.edited ? (
+          <span className="inline-flex flex-wrap gap-1.5">
+            {evalCase.archived ? (
+              <StatusPill filled={false}>Archived</StatusPill>
+            ) : null}
+            {evalCase.edited ? (
+              <StatusPill filled={false}>Edited</StatusPill>
+            ) : null}
+          </span>
+        ) : (
+          "—"
+        ),
+    },
+    {
+      heading: "Changed",
+      cell: (evalCase) =>
+        evalCase.updated_by_name
+          ? `Changed ${formatSavedAt(evalCase.updated_at)} by ${evalCase.updated_by_name}`
+          : "From the seed files",
+    },
+    {
+      heading: "Actions",
+      cell: (evalCase) => (
+        <span className="inline-flex gap-4">
+          <Link href={evalCaseEditHref(evalCase)} className={rowActionButton}>
+            {evalCase.archived ? "View" : "Edit"}
+          </Link>
+          <button
+            type="button"
+            className={rowActionButton}
+            onClick={() => setDuplicating(evalCase)}
+          >
+            Duplicate
+          </button>
+          {evalCase.archived ? null : (
+            <button
+              type="button"
+              className={rowActionButton}
+              onClick={() => setArchiving(evalCase)}
+            >
+              Archive
+            </button>
+          )}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <nav aria-label="Evals" className="flex flex-wrap gap-1.5">
-          {evalOrder.map((name) => (
-            <Link
-              key={name}
-              href={`/admin/evals/cases/${name}`}
-              aria-current={name === evalName ? "page" : undefined}
-              className={`min-h-9 rounded-full px-3 py-1.5 text-sm no-underline ${
-                name === evalName
-                  ? "bg-hover font-semibold text-ink"
-                  : "text-ink-body"
-              }`}
-            >
-              {evalDetails[name].label}
-            </Link>
-          ))}
-        </nav>
-        <Link
-          href={`/admin/evals/cases/${evalName}/new`}
-          className={primaryButton}
-        >
+      <div className="flex flex-wrap items-center gap-2.5">
+        <FilterPillLinks
+          label="Evals"
+          links={evalLinks}
+          currentHref={evalCasesHref(evalName)}
+        />
+        <Link href={`${evalCasesHref(evalName)}/new`} className={primaryButton}>
           Add case
         </Link>
       </div>
-      <p className="m-0 text-caption text-ink-soft">
-        {evalDetails[evalName].checks} Archived cases stay so past runs still
-        show them, but new runs leave them out.
-      </p>
 
-      {casesQuery.isPending ? (
-        <div
-          aria-busy="true"
-          aria-label="Loading cases"
-          className="h-[240px] rounded-xl border border-line bg-subtle"
-        />
+      {archiveMutation.isError ? (
+        <SaveFailedNote>Couldn’t archive the case. Try again.</SaveFailedNote>
       ) : null}
+
+      {casesQuery.isPending ? <TableLoading label="Loading cases" /> : null}
 
       {cases === undefined && casesQuery.isError ? (
         <LoadFailed
@@ -75,18 +150,42 @@ export function EvalCasesList({ evalName }: { evalName: EvalName }) {
       ) : null}
 
       {cases !== undefined && cases.length === 0 ? (
-        <EmptyState
+        <TableEmpty
           title={`No ${evalDetails[evalName].label} cases yet`}
           body="Add a case to check a situation you saw go wrong."
         />
       ) : null}
 
       {cases !== undefined && cases.length > 0 ? (
-        <ul className="m-0 flex list-none flex-col overflow-hidden rounded-xl border border-line bg-white p-0">
-          {cases.map((evalCase) => (
-            <EvalCaseRow key={evalCase.key} evalCase={evalCase} />
-          ))}
-        </ul>
+        <DataTable
+          columns={columns}
+          rows={cases}
+          rowKey={(evalCase) => evalCase.key}
+          minWidthClass="min-w-[720px]"
+        />
+      ) : null}
+
+      {duplicating ? (
+        <EvalCaseDuplicateDialog
+          evalCase={duplicating}
+          onClose={() => setDuplicating(null)}
+        />
+      ) : null}
+
+      {archiving ? (
+        <ConfirmDialog
+          open
+          title={`Archive ${archiving.key}?`}
+          body="New runs leave it out; past runs still show it. Archived cases can’t be edited."
+          cancelLabel="Keep it"
+          confirmLabel="Archive"
+          onConfirm={() => {
+            if (!archiveMutation.isPending) {
+              archiveMutation.mutate(archiving.key);
+            }
+          }}
+          onCancel={() => setArchiving(null)}
+        />
       ) : null}
     </>
   );
