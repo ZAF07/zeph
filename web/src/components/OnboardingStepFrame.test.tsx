@@ -3,24 +3,29 @@ import { describe, expect, it } from "vitest";
 
 import { OnboardingStepFrame } from "@/components/OnboardingStepFrame";
 
+const words = { wordmark: "Zeph", homeLinkLabel: "Zeph home" };
+
 describe("OnboardingStepFrame", () => {
   it("shows the Zeph wordmark linking home above the step", () => {
-    render(<OnboardingStepFrame>Step body</OnboardingStepFrame>);
+    render(<OnboardingStepFrame {...words}>Step body</OnboardingStepFrame>);
 
-    expect(screen.getByRole("link", { name: "Zeph home" })).toHaveAttribute(
-      "href",
-      "/",
-    );
+    const home = screen.getByRole("link", { name: "Zeph home" });
+    expect(home).toHaveTextContent("Zeph");
+    expect(home).toHaveAttribute("href", "/");
     expect(screen.getByText("Step body")).toBeInTheDocument();
   });
 
   it("draws the dashed line only when asked", () => {
     const { container, rerender } = render(
-      <OnboardingStepFrame>Step body</OnboardingStepFrame>,
+      <OnboardingStepFrame {...words}>Step body</OnboardingStepFrame>,
     );
     expect(container.querySelector("section")).not.toHaveClass("border-dashed");
 
-    rerender(<OnboardingStepFrame hasSeparator>Step body</OnboardingStepFrame>);
+    rerender(
+      <OnboardingStepFrame {...words} hasSeparator>
+        Step body
+      </OnboardingStepFrame>,
+    );
     expect(container.querySelector("section")).toHaveClass("border-dashed");
   });
 });

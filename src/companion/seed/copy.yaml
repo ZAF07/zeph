@@ -576,6 +576,298 @@
       max_length: 30
       text: See pricing
 
+- tab: auth
+  name: Sign in and sign up
+  slots:
+    - key: auth.sign_in.page_title
+      name: "Sign in: browser tab title"
+      max_length: 70
+      text: Zeph — Sign in
+    - key: auth.sign_in.page_description
+      name: "Sign in: search description"
+      max_length: 160
+      text: Sign in to Zeph, your AI companion.
+    - key: auth.sign_in.header_prompt
+      name: "Sign in: line next to the sign-up button"
+      max_length: 40
+      text: New to Zeph?
+    - key: auth.sign_in.header_link
+      name: "Sign in: sign-up button"
+      max_length: 20
+      text: Sign up
+    - key: auth.sign_in.eyebrow
+      name: "Sign in: label above the form"
+      max_length: 30
+      text: Welcome back
+    - key: auth.sign_up.page_title
+      name: "Sign up: browser tab title"
+      max_length: 70
+      text: Zeph — Sign up
+    - key: auth.sign_up.page_description
+      name: "Sign up: search description"
+      max_length: 160
+      text: Create your Zeph account.
+    - key: auth.sign_up.header_prompt
+      name: "Sign up: line next to the sign-in button"
+      max_length: 40
+      text: Have an account?
+    - key: auth.sign_up.header_link
+      name: "Sign up: sign-in button"
+      max_length: 20
+      text: Sign in
+    - key: auth.sign_up.eyebrow
+      name: "Sign up: label above the form"
+      max_length: 30
+      text: Get started
+    - key: auth.terms_line
+      name: Terms line under the form
+      max_length: 200
+      placeholders: [terms, privacy]
+      text: >-
+        By continuing you agree to the {terms} and {privacy}. You must be 18
+        or older to use Zeph.
+    - key: auth.terms_link
+      name: Terms link
+      max_length: 30
+      text: Terms
+    - key: auth.privacy_link
+      name: Privacy policy link
+      max_length: 30
+      text: Privacy policy
+    - key: auth.ai_line
+      name: AI companion line at the bottom
+      max_length: 200
+      text: >-
+        Zeph is an AI companion. It isn’t a mental-health service and can’t
+        help in an emergency.
+
+- tab: onboarding
+  name: Onboarding
+  slots:
+    - key: onboarding.page_title
+      name: Browser tab title
+      max_length: 70
+      text: Zeph — Onboarding
+    - key: onboarding.page_description
+      name: Search description
+      max_length: 160
+      text: A few questions so Zeph knows where to start.
+    - key: onboarding.loading
+      name: Loading message, read out by screen readers
+      max_length: 60
+      text: Loading onboarding
+    - key: onboarding.load_failed.title
+      name: "Couldn’t load: title"
+      max_length: 60
+      text: We couldn’t load this
+    - key: onboarding.load_failed.body
+      name: "Couldn’t load: message"
+      max_length: 200
+      text: Something went wrong on our side. Please try again in a moment.
+    - key: onboarding.progress.label
+      name: "Progress bar: name read out by screen readers"
+      max_length: 40
+      text: Onboarding progress
+    - key: onboarding.progress.hello
+      name: "Progress bar: first step"
+      max_length: 20
+      text: Hello
+    - key: onboarding.progress.intentions
+      name: "Progress bar: second step"
+      max_length: 20
+      text: Intentions
+    - key: onboarding.progress.location
+      name: "Progress bar: third step"
+      max_length: 20
+      text: Location
+    - key: onboarding.progress.check_ins
+      name: "Progress bar: fourth step"
+      max_length: 20
+      text: Check-ins
+    - key: onboarding.progress.memory
+      name: "Progress bar: fifth step"
+      max_length: 20
+      text: Memory
+    - key: onboarding.progress.telegram
+      name: "Progress bar: sixth step"
+      max_length: 20
+      text: Telegram
+    - key: onboarding.progress.step_count
+      name: "Progress bar: step count"
+      max_length: 40
+      placeholders: [step, count]
+      text: Step {step} of {count}
+    - key: onboarding.hello.heading
+      name: "Hello: heading"
+      max_length: 60
+      text: Hello. I’m Zeph.
+    - key: onboarding.hello.intro
+      name: "Hello: line under the heading"
+      max_length: 300
+      text: >-
+        I’m an AI companion for reflection: a place to think out loud, notice
+        what matters, and practise living by it.
+    - key: onboarding.hello.name_label
+      name: "Hello: name field label"
+      max_length: 60
+      text: What should I call you?
+    - key: onboarding.hello.name_hint
+      name: "Hello: hint inside the name field"
+      max_length: 60
+      text: First name or nickname
+    - key: onboarding.hello.ai_notice_checkbox
+      name: "Hello: AI notice tick box"
+      max_length: 120
+      text: I understand Zeph is an AI and not professional care
+    - key: onboarding.hello.needs_name
+      name: "Hello: note when the name is missing"
+      max_length: 120
+      text: Tell me what to call you to continue.
+    - key: onboarding.hello.needs_tick
+      name: "Hello: note when the box isn’t ticked"
+      max_length: 120
+      text: Tick the box above to continue.
+    - key: onboarding.intentions.heading
+      name: "What brings you here: heading"
+      max_length: 60
+      text: What brings you here?
+    - key: onboarding.intentions.intro
+      name: "What brings you here: line under the heading"
+      max_length: 300
+      text: >-
+        Choose any that feel true right now. This shapes where we start, not
+        where we end up.
+    - key: onboarding.intentions.choices_label
+      name: "What brings you here: choices, name read out by screen readers"
+      max_length: 60
+      text: What brings you here
+    - key: onboarding.intentions.note_label
+      name: "What brings you here: note field label"
+      max_length: 60
+      text: In your own words
+    - key: onboarding.intentions.note_optional
+      name: "What brings you here: optional tag after the label"
+      max_length: 30
+      text: (optional)
+    - key: onboarding.intentions.note_hint
+      name: "What brings you here: hint inside the note field"
+      max_length: 200
+      text: >-
+        e.g. I’ve been running on autopilot since starting a new job and want
+        to feel more like myself.
+    - key: onboarding.location.heading
+      name: "Location: heading"
+      max_length: 60
+      text: Where are you?
+    - key: onboarding.location.country_label
+      name: "Location: country label"
+      max_length: 30
+      text: Country
+    - key: onboarding.location.country_choose
+      name: "Location: country picker before a choice"
+      max_length: 40
+      text: Choose your country
+    - key: onboarding.location.from_browser
+      name: "Location: note when the country came from the browser"
+      max_length: 60
+      text: Filled in from your browser
+    - key: onboarding.location.time_zone_label
+      name: "Location: time zone label"
+      max_length: 30
+      text: Time zone
+    - key: onboarding.location.time_zone_choose
+      name: "Location: time zone picker before a choice"
+      max_length: 40
+      text: Choose your time zone
+    - key: onboarding.check_ins.heading
+      name: "Check-ins: heading"
+      max_length: 60
+      text: Should I check in?
+    - key: onboarding.check_ins.intro
+      name: "Check-ins: line under the heading"
+      max_length: 300
+      text: >-
+        Now and then I can message you first on Telegram: a hello to see how
+        you are. I choose the moment, and sometimes I’ll stay quiet to give you
+        space.
+    - key: onboarding.check_ins.switch_title
+      name: "Check-ins: switch title"
+      max_length: 30
+      text: Check-ins
+    - key: onboarding.check_ins.switch_note
+      name: "Check-ins: line under the switch title"
+      max_length: 60
+      text: Off unless you turn them on
+    - key: onboarding.check_ins.frequency_label
+      name: "Check-ins: how-often choice, name read out by screen readers"
+      max_length: 30
+      text: How often
+    - key: onboarding.check_ins.frequency_weekly
+      name: "Check-ins: first how-often choice"
+      max_length: 30
+      text: Weekly
+    - key: onboarding.check_ins.frequency_few_times_a_week
+      name: "Check-ins: second how-often choice"
+      max_length: 30
+      text: A few times a week
+    - key: onboarding.check_ins.frequency_most_days
+      name: "Check-ins: third how-often choice"
+      max_length: 30
+      text: Most days
+    - key: onboarding.check_ins.frequency_a_few_times_a_day
+      name: "Check-ins: fourth how-often choice"
+      max_length: 30
+      text: A few times a day
+    - key: onboarding.check_ins.quiet_hours_lead
+      name: "Check-ins: quiet hours line"
+      max_length: 80
+      text: "Never in your quiet hours, in your time zone:"
+    - key: onboarding.check_ins.quiet_hours_range
+      name: "Check-ins: quiet hours times"
+      max_length: 40
+      placeholders: [start, end]
+      text: "{start} to {end}"
+    - key: onboarding.check_ins.change_later
+      name: "Check-ins: note under the panel"
+      max_length: 120
+      text: You can change this any time on your Check-ins page.
+    - key: onboarding.memory.heading
+      name: "Memory: heading"
+      max_length: 60
+      text: Can I remember things?
+    - key: onboarding.memory.switch_label
+      name: "Memory: switch label"
+      max_length: 60
+      text: Remember meaningful details
+    - key: onboarding.memory.save_failed
+      name: "Memory: note when the answers couldn’t be saved"
+      max_length: 120
+      text: We couldn’t save your answers. Please try again.
+    - key: onboarding.buttons.back
+      name: "Every step: back button"
+      max_length: 20
+      text: Back
+    - key: onboarding.buttons.continue
+      name: "Every step: continue button"
+      max_length: 20
+      text: Continue
+    - key: onboarding.buttons.saving
+      name: "Memory: continue button while saving"
+      max_length: 20
+      text: Saving…
+    - key: onboarding.telegram.heading
+      name: "Telegram: heading"
+      max_length: 60
+      text: Let’s meet on Telegram.
+    - key: onboarding.telegram.intro
+      name: "Telegram: line under the heading"
+      max_length: 200
+      text: That’s where we’ll talk. Linking takes one tap.
+    - key: onboarding.telegram.skip_link
+      name: "Telegram: skip link"
+      max_length: 30
+      text: Skip for now
+
 - tab: shared
   name: Shared
   slots:

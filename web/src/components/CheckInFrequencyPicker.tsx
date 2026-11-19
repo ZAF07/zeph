@@ -1,19 +1,23 @@
 import type { CheckInFrequency } from "@/lib/api-client";
-import { checkInFrequencyOptions } from "@/lib/check-ins";
 
 /**
  * The "How often, at most" choice between weekly, a few times a week,
  * most days and a few times a day.
  *
- * @param props - `value` is the picked frequency, `disabled` stops changes
- *   and `onChange` gets the new one.
+ * @param props - `label` names the group for screen readers; `options` are
+ *   the frequencies in order, each with its words; `value` is the picked
+ *   frequency, `disabled` stops changes and `onChange` gets the new one.
  * @returns The group of choice buttons.
  */
 export function CheckInFrequencyPicker({
+  label,
+  options,
   value,
   disabled = false,
   onChange,
 }: {
+  label: string;
+  options: { value: CheckInFrequency; label: string }[];
   value: CheckInFrequency;
   disabled?: boolean;
   onChange: (frequency: CheckInFrequency) => void;
@@ -21,10 +25,10 @@ export function CheckInFrequencyPicker({
   return (
     <div
       role="group"
-      aria-label="How often"
+      aria-label={label}
       className="box-border flex flex-wrap rounded-pill border border-line bg-bg-deep p-1"
     >
-      {checkInFrequencyOptions.map((option) => {
+      {options.map((option) => {
         const isPicked = option.value === value;
         return (
           <button

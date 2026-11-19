@@ -14,7 +14,7 @@ import type {
   PauseLength,
 } from "@/lib/api-client";
 import { schedulePauseText } from "@/lib/check-in-schedule";
-import { toTimeFieldValue } from "@/lib/check-ins";
+import { checkInFrequencyOptions, toTimeFieldValue } from "@/lib/check-ins";
 import { queryKeys, reloadUserPages } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
@@ -140,6 +140,8 @@ export function UserCheckInSettingsPanel({
           <div className={settingRow}>
             <span>How often, at most</span>
             <CheckInFrequencyPicker
+              label="How often"
+              options={checkInFrequencyOptions}
               value={current.frequency}
               disabled={isSaving}
               onChange={(frequency) => changeSettings({ frequency })}

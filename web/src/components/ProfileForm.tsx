@@ -85,6 +85,12 @@ export function ProfileForm({ me }: { me: Me }) {
         </div>
         <LocationFields
           inline
+          labels={{
+            country: "Country",
+            chooseCountry: "Choose your country",
+            timeZone: "Time zone",
+            chooseTimeZone: "Choose your time zone",
+          }}
           country={country}
           timeZone={timeZone}
           onCountryChange={clearSavedOnEdit(setCountry)}

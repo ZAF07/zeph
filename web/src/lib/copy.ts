@@ -64,3 +64,26 @@ export function pageMetadata(copy: Copy, tab: string): Metadata {
     description: readCopy(copy, `${tab}.page_description`),
   };
 }
+
+/**
+ * Fills a Copy text's `{name}` placeholders with page parts, such as links,
+ * so an Admin can move a link within the sentence but not drop it.
+ *
+ * @param text - The slot's text.
+ * @param parts - The part for each placeholder, by name.
+ * @returns The text split into its plain pieces and the parts, in order;
+ *   a placeholder with no part is left as written.
+ */
+export function fillPlaceholderParts<Part>(
+  text: string,
+  parts: Record<string, Part>,
+): (string | Part)[] {
+  return text
+    .split(/(\{[^{}]*\})/)
+    .filter((piece) => piece !== "")
+    .map((piece) => {
+      const name = piece.slice(1, -1);
+      const isPlaceholder = piece.startsWith("{") && piece.endsWith("}");
+      return isPlaceholder && Object.hasOwn(parts, name) ? parts[name] : piece;
+    });
+}

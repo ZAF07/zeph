@@ -6,13 +6,19 @@ import type { ReactNode } from "react";
  * column. On the all-steps design sheet, every frame after the first has a
  * dashed line above it.
  *
- * @param props - `hasSeparator` draws the dashed line; `children` is the step.
+ * @param props - `wordmark` and `homeLinkLabel` are the wordmark's words
+ *   and the name screen readers give its home link; `hasSeparator` draws
+ *   the dashed line; `children` is the step.
  * @returns The step's section.
  */
 export function OnboardingStepFrame({
+  wordmark,
+  homeLinkLabel,
   hasSeparator = false,
   children,
 }: {
+  wordmark: string;
+  homeLinkLabel: string;
   hasSeparator?: boolean;
   children: ReactNode;
 }) {
@@ -25,10 +31,10 @@ export function OnboardingStepFrame({
       <div className="mx-auto flex max-w-[560px] flex-col gap-[22px]">
         <Link
           href="/"
-          aria-label="Zeph home"
+          aria-label={homeLinkLabel}
           className="self-start text-[26px] font-normal text-cream"
         >
-          Zeph
+          {wordmark}
         </Link>
         {children}
       </div>

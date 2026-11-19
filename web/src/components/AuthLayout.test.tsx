@@ -2,14 +2,12 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { AuthLayout } from "@/components/AuthLayout";
+import type { Copy } from "@/lib/copy";
+import { markedCopy, seedCopy, wordsNotFromCopy } from "@/test/copy";
 
-function renderSignInLayout() {
+function renderLayout(page: "sign_in" | "sign_up", copy: Copy = seedCopy()) {
   return render(
-    <AuthLayout
-      eyebrow="Welcome back"
-      switchPrompt="New to Zeph?"
-      switchLink={{ href: "/sign-up", label: "Sign up" }}
-    >
+    <AuthLayout copy={copy} page={page}>
       <form aria-label="Clerk form" />
     </AuthLayout>,
   );
@@ -17,7 +15,7 @@ function renderSignInLayout() {
 
 describe("AuthLayout", () => {
   it("offers the other auth page in the header", () => {
-    renderSignInLayout();
+    renderLayout("sign_in");
 
     expect(screen.getByText("New to Zeph?")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Sign up" })).toHaveAttribute(
@@ -26,8 +24,18 @@ describe("AuthLayout", () => {
     );
   });
 
+  it("offers sign-in from the sign-up page", () => {
+    renderLayout("sign_up");
+
+    expect(screen.getByText("Have an account?")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+      "href",
+      "/sign-in",
+    );
+  });
+
   it("puts the eyebrow and the Clerk form inside the card", () => {
-    const { container } = renderSignInLayout();
+    const { container } = renderLayout("sign_in");
 
     const card = container.querySelector("[data-clerk-card]");
     expect(card).toHaveTextContent("Welcome back");
@@ -37,7 +45,7 @@ describe("AuthLayout", () => {
   });
 
   it("shows the Terms, 18+ and AI companion lines", () => {
-    renderSignInLayout();
+    renderLayout("sign_in");
 
     expect(screen.getByRole("link", { name: "Terms" })).toHaveAttribute(
       "href",
@@ -52,5 +60,36 @@ describe("AuthLayout", () => {
     expect(
       screen.getByText(/Zeph is an AI companion\. It isn’t a mental-health/),
     ).toBeInTheDocument();
+  });
+
+  it.each(["sign_in", "sign_up"] as const)(
+    "shows only Copy text around the Clerk form on %s, screen-reader labels included",
+    (page) => {
+      const { container } = renderLayout(page, markedCopy());
+
+      const ourWords = container.cloneNode(true) as HTMLElement;
+      ourWords.querySelector("form[aria-label='Clerk form']")?.remove();
+      expect(wordsNotFromCopy(ourWords)).toEqual([]);
+      expect(container).toHaveTextContent(`⟦auth.${page}.eyebrow⟧`);
+      expect(
+        screen.getByRole("link", { name: "⟦shared.header.home_link_label⟧" }),
+      ).toHaveTextContent("⟦shared.wordmark⟧");
+    },
+  );
+
+  it("keeps both links where an Admin moved them in the Terms line", () => {
+    renderLayout("sign_up", {
+      ...seedCopy(),
+      "auth.terms_line": "Read our {privacy} and {terms} first.",
+      "auth.terms_link": "terms of use",
+    });
+
+    expect(screen.getByText(/Read our/)).toHaveTextContent(
+      "Read our Privacy policy and terms of use first.",
+    );
+    expect(screen.getByRole("link", { name: "terms of use" })).toHaveAttribute(
+      "href",
+      "/terms",
+    );
   });
 });
