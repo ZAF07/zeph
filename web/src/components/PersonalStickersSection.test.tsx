@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PersonalStickersSection } from "@/components/PersonalStickersSection";
 import type { ApiClient, PersonalSticker } from "@/lib/api-client";
+import { seedCopy } from "@/test/copy";
 import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
@@ -43,7 +44,7 @@ describe("PersonalStickersSection", () => {
   });
 
   it("shows each kept sticker with its image and when Zeph uses it", async () => {
-    renderWithQueries(<PersonalStickersSection available />);
+    renderWithQueries(<PersonalStickersSection available copy={seedCopy()} />);
 
     const section = await screen.findByRole("region", {
       name: "Your stickers",
@@ -66,7 +67,7 @@ describe("PersonalStickersSection", () => {
 
   it("removes a sticker", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<PersonalStickersSection available />);
+    renderWithQueries(<PersonalStickersSection available copy={seedCopy()} />);
 
     await user.click(
       await screen.findByRole("button", { name: "Remove sticker 🤗" }),
@@ -80,7 +81,7 @@ describe("PersonalStickersSection", () => {
   it("says when a sticker couldn't be removed and keeps it", async () => {
     apiClient.deletePersonalSticker.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    renderWithQueries(<PersonalStickersSection available />);
+    renderWithQueries(<PersonalStickersSection available copy={seedCopy()} />);
 
     await user.click(
       await screen.findByRole("button", { name: "Remove sticker 🤗" }),
@@ -93,7 +94,9 @@ describe("PersonalStickersSection", () => {
   });
 
   it("still shows kept stickers when the Feature isn't available", async () => {
-    renderWithQueries(<PersonalStickersSection available={false} />);
+    renderWithQueries(
+      <PersonalStickersSection available={false} copy={seedCopy()} />,
+    );
 
     expect(
       await screen.findByText("Not available on your account"),
@@ -106,7 +109,7 @@ describe("PersonalStickersSection", () => {
 
   it("says when no sticker is kept yet", async () => {
     apiClient.listPersonalStickers.mockResolvedValue([]);
-    renderWithQueries(<PersonalStickersSection available />);
+    renderWithQueries(<PersonalStickersSection available copy={seedCopy()} />);
 
     expect(await screen.findByText("No stickers kept yet")).toBeVisible();
   });
@@ -116,7 +119,7 @@ describe("PersonalStickersSection", () => {
       .mockRejectedValueOnce(new Error("down"))
       .mockResolvedValueOnce([laugh]);
     const user = userEvent.setup();
-    renderWithQueries(<PersonalStickersSection available />);
+    renderWithQueries(<PersonalStickersSection available copy={seedCopy()} />);
 
     await user.click(await screen.findByRole("button", { name: "Try again" }));
 

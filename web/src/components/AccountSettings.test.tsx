@@ -9,6 +9,7 @@ import {
   type Me,
   type PlatformContent,
 } from "@/lib/api-client";
+import { markedCopy, seedCopy, wordsNotFromCopy } from "@/test/copy";
 import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
@@ -82,7 +83,7 @@ describe("AccountSettings", () => {
       ...onboardedUser,
       personal_stickers_available: false,
     });
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
 
     const section = await screen.findByRole("region", {
       name: "Your stickers",
@@ -93,7 +94,7 @@ describe("AccountSettings", () => {
   });
 
   it("says what Delete my data removes, private notes included", async () => {
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
 
     const yourData = within(
       await screen.findByRole("region", { name: "Delete my data" }),
@@ -113,7 +114,7 @@ describe("AccountSettings", () => {
         user_memory: "2026-11-05T09:00:00Z",
       },
     });
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
 
     expect(
       await screen.findByText("Changed in chat · 3 Nov"),
@@ -127,7 +128,7 @@ describe("AccountSettings", () => {
       changed_in_chat: { time_zone: "2026-11-03T09:00:00Z" },
     });
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
     await screen.findByText("Changed in chat · 3 Nov");
 
     await user.click(screen.getByRole("button", { name: "Save changes" }));
@@ -137,7 +138,7 @@ describe("AccountSettings", () => {
   });
 
   it("shows the saved profile", async () => {
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
 
     expect(await screen.findByLabelText("What Zeph calls you")).toHaveValue(
       "Maya",
@@ -149,7 +150,7 @@ describe("AccountSettings", () => {
 
   it("saves a changed name, country and time zone", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
     const nameField = await screen.findByLabelText("What Zeph calls you");
 
     await user.clear(nameField);
@@ -170,7 +171,7 @@ describe("AccountSettings", () => {
 
   it("does not save an empty name", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
 
     await user.clear(await screen.findByLabelText("What Zeph calls you"));
 
@@ -180,7 +181,7 @@ describe("AccountSettings", () => {
   it("tells the User when saving the profile fails", async () => {
     apiClient.updatePreferences.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
 
     await user.click(
       await screen.findByRole("button", { name: "Save changes" }),
@@ -198,7 +199,7 @@ describe("AccountSettings", () => {
       memory_note: "**Memory is paused.** Zeph won’t learn anything new.",
     });
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
     const memorySwitch = await screen.findByRole("switch", {
       name: "Remember meaningful details",
     });
@@ -225,7 +226,7 @@ describe("AccountSettings", () => {
       user_memory_available: false,
     });
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
     const memorySwitch = await screen.findByRole("switch", {
       name: "Remember meaningful details",
     });
@@ -240,7 +241,7 @@ describe("AccountSettings", () => {
   it("offers Try again when the account cannot be loaded", async () => {
     apiClient.getMe.mockRejectedValueOnce(new Error("down"));
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
 
     await user.click(await screen.findByRole("button", { name: "Try again" }));
 
@@ -250,16 +251,33 @@ describe("AccountSettings", () => {
   });
 
   it("states the retention period from settings", async () => {
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
 
     expect(
       await screen.findByText("Messages are otherwise kept for 14 days."),
     ).toBeInTheDocument();
   });
 
+  it("words the retention period for one day with the one slot", async () => {
+    apiClient.getPlatformContent.mockResolvedValue({
+      ...content,
+      message_retention_days: 1,
+    });
+    renderWithQueries(
+      <AccountSettings
+        copy={{
+          ...seedCopy(),
+          "account.delete_data.retention_one": "Kept for just {count} day.",
+        }}
+      />,
+    );
+
+    expect(await screen.findByText("Kept for just 1 day.")).toBeInTheDocument();
+  });
+
   it("deletes the User's data only after confirming in the dialog", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
     const yourData = within(
       await screen.findByRole("region", { name: "Delete my data" }),
     );
@@ -285,7 +303,7 @@ describe("AccountSettings", () => {
 
   it("keeping my data deletes nothing", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
     const yourData = within(
       await screen.findByRole("region", { name: "Delete my data" }),
     );
@@ -300,7 +318,7 @@ describe("AccountSettings", () => {
   it("tells the User when deleting their data fails", async () => {
     apiClient.deleteMyData.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
     const yourData = within(
       await screen.findByRole("region", { name: "Delete my data" }),
     );
@@ -319,7 +337,7 @@ describe("AccountSettings", () => {
 
   it("deletes the account after confirming in the dialog, then signs out", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
     const deleteAccount = within(
       await screen.findByRole("region", { name: "Delete account" }),
     );
@@ -341,7 +359,7 @@ describe("AccountSettings", () => {
 
   it("keeps the account when the User chooses to", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
     const deleteAccount = within(
       await screen.findByRole("region", { name: "Delete account" }),
     );
@@ -360,7 +378,7 @@ describe("AccountSettings", () => {
       new ApiError(409, "/api/me", "You’re the only Admin."),
     );
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
     const deleteAccount = within(
       await screen.findByRole("region", { name: "Delete account" }),
     );
@@ -380,7 +398,7 @@ describe("AccountSettings", () => {
 
   it("turns Photo Viewing off straight away, with the seeded explanation", async () => {
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
     const photoSwitch = await screen.findByRole("switch", {
       name: "Look at my photos",
     });
@@ -411,7 +429,7 @@ describe("AccountSettings", () => {
       photo_viewing_available: false,
     });
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
     const photoSwitch = await screen.findByRole("switch", {
       name: "Look at my photos",
     });
@@ -431,7 +449,7 @@ describe("AccountSettings", () => {
       ...onboardedUser,
       changed_in_chat: { photo_viewing: "2026-11-07T09:00:00Z" },
     });
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
 
     const section = await screen.findByRole("region", {
       name: "Look at my photos",
@@ -444,7 +462,7 @@ describe("AccountSettings", () => {
   it("tells the User when changing Photo Viewing fails", async () => {
     apiClient.updatePreferences.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    renderWithQueries(<AccountSettings />);
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
 
     await user.click(
       await screen.findByRole("switch", { name: "Look at my photos" }),
@@ -456,5 +474,228 @@ describe("AccountSettings", () => {
         "We couldn’t change that. Please try again.",
       ),
     ).toBeInTheDocument();
+  });
+
+  describe("reads every word from Copy", () => {
+    const changedAt = "2026-11-03T02:00:00Z";
+    const markedContent: PlatformContent = {
+      ...content,
+      user_memory_explanation: "⟦data⟧",
+      photo_viewing_explanation: "⟦data⟧",
+      delete_my_data_description: "⟦data⟧",
+    };
+
+    /**
+     * Says what words on the page did not come from Copy, leaving out the
+     * country and time zone names, which are values.
+     *
+     * @returns Each piece of text not from Copy.
+     */
+    function wordsNotFromCopyOnPage(): string[] {
+      const words = document.body.cloneNode(true) as HTMLElement;
+      words
+        .querySelectorAll("option:not([disabled])")
+        .forEach((place) => place.remove());
+      return wordsNotFromCopy(words);
+    }
+
+    async function renderMarked() {
+      renderWithQueries(<AccountSettings copy={markedCopy()} />);
+      await screen.findByRole("region", {
+        name: "⟦account.stickers.heading⟧",
+      });
+    }
+
+    beforeEach(() => {
+      apiClient.getPlatformContent.mockResolvedValue(markedContent);
+      apiClient.getMe.mockResolvedValue({
+        ...onboardedUser,
+        name: "⟦data⟧",
+        email: "⟦data⟧",
+        changed_in_chat: {
+          time_zone: changedAt,
+          user_memory: changedAt,
+          photo_viewing: changedAt,
+        },
+      });
+      apiClient.listPersonalStickers.mockResolvedValue([
+        {
+          id: "laugh",
+          emoji: "⟦data⟧",
+          note: "⟦data⟧",
+          has_image: false,
+          kept_at: changedAt,
+        },
+        {
+          id: "plain",
+          emoji: null,
+          note: "⟦data⟧",
+          has_image: false,
+          kept_at: changedAt,
+        },
+      ]);
+    });
+
+    it("with everything on, settings changed in chat and stickers kept", async () => {
+      await renderMarked();
+
+      expect(screen.getAllByText("⟦account.changed_in_chat⟧")).toHaveLength(3);
+      expect(
+        await screen.findByRole("button", {
+          name: "⟦account.stickers.remove⟧",
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", {
+          name: "⟦account.stickers.remove_no_emoji⟧",
+        }),
+      ).toBeInTheDocument();
+      expect(wordsNotFromCopyOnPage()).toEqual([]);
+    });
+
+    it("with no email, features off by an Admin and no stickers", async () => {
+      apiClient.getMe.mockResolvedValue({
+        ...onboardedUser,
+        name: "⟦data⟧",
+        email: null,
+        memory_note: "⟦data⟧",
+        user_memory_available: false,
+        photo_viewing_available: false,
+        personal_stickers_available: false,
+      });
+      apiClient.listPersonalStickers.mockResolvedValue([]);
+      await renderMarked();
+
+      expect(screen.getAllByText("⟦account.not_available⟧")).toHaveLength(3);
+      expect(
+        screen.getByText("⟦account.profile.no_email⟧"),
+      ).toBeInTheDocument();
+      expect(
+        await screen.findByText("⟦account.stickers.empty_title⟧"),
+      ).toBeInTheDocument();
+      expect(wordsNotFromCopyOnPage()).toEqual([]);
+    });
+
+    it("when the profile saves, and when changes fail", async () => {
+      apiClient.updatePreferences.mockResolvedValue({
+        ...onboardedUser,
+        name: "⟦data⟧",
+        email: "⟦data⟧",
+      });
+      const user = userEvent.setup();
+      await renderMarked();
+
+      await user.click(
+        screen.getByRole("button", { name: "⟦account.profile.save⟧" }),
+      );
+      expect(
+        await screen.findByText("⟦account.profile.saved⟧"),
+      ).toBeInTheDocument();
+      expect(wordsNotFromCopyOnPage()).toEqual([]);
+
+      apiClient.updatePreferences.mockRejectedValue(new Error("down"));
+      await user.click(
+        screen.getByRole("button", { name: "⟦account.profile.save⟧" }),
+      );
+      await user.click(
+        screen.getByRole("switch", { name: "⟦account.memory.title⟧" }),
+      );
+      expect(
+        await screen.findByText("⟦account.profile.save_failed⟧"),
+      ).toBeInTheDocument();
+      expect(
+        await screen.findByText("⟦account.switch_save_failed⟧"),
+      ).toBeInTheDocument();
+      expect(wordsNotFromCopyOnPage()).toEqual([]);
+    });
+
+    it("in the delete dialogs, and when deleting fails or is done", async () => {
+      const user = userEvent.setup();
+      await renderMarked();
+      const words = wordsNotFromCopyOnPage;
+
+      await user.click(
+        screen.getByRole("button", { name: "⟦account.delete_data.button⟧" }),
+      );
+      expect(
+        screen.getByRole("alertdialog", {
+          name: "⟦account.delete_data.dialog_title⟧",
+        }),
+      ).toHaveTextContent("⟦data⟧ ⟦account.delete_data.dialog_body⟧");
+      expect(words()).toEqual([]);
+      await user.click(
+        screen.getByRole("button", {
+          name: "⟦account.delete_data.dialog_confirm⟧",
+        }),
+      );
+      expect(
+        await screen.findByText("⟦account.delete_data.done⟧"),
+      ).toBeInTheDocument();
+      expect(words()).toEqual([]);
+
+      apiClient.deleteMyData.mockRejectedValue(new Error("down"));
+      apiClient.deleteAccount.mockRejectedValue(new Error("down"));
+      await user.click(
+        screen.getByRole("button", { name: "⟦account.delete_data.button⟧" }),
+      );
+      await user.click(
+        screen.getByRole("button", {
+          name: "⟦account.delete_data.dialog_confirm⟧",
+        }),
+      );
+      await user.click(
+        screen.getByRole("button", {
+          name: "⟦account.delete_account.button⟧",
+        }),
+      );
+      expect(
+        screen.getByRole("alertdialog", {
+          name: "⟦account.delete_account.dialog_title⟧",
+        }),
+      ).toBeInTheDocument();
+      expect(words()).toEqual([]);
+      await user.click(
+        screen.getByRole("button", {
+          name: "⟦account.delete_account.dialog_confirm⟧",
+        }),
+      );
+      expect(
+        await screen.findByText("⟦account.delete_data.failed⟧"),
+      ).toBeInTheDocument();
+      expect(
+        await screen.findByText("⟦account.delete_account.failed⟧"),
+      ).toBeInTheDocument();
+      expect(words()).toEqual([]);
+    });
+
+    it("while loading, and when loading fails", async () => {
+      apiClient.getMe.mockRejectedValue(new Error("down"));
+      renderWithQueries(<AccountSettings copy={markedCopy()} />);
+
+      expect(
+        screen.getByRole("status", { name: "⟦account.loading⟧" }),
+      ).toBeInTheDocument();
+      expect(wordsNotFromCopyOnPage()).toEqual([]);
+      expect(
+        await screen.findByText("⟦account.load_failed.title⟧"),
+      ).toBeInTheDocument();
+      expect(wordsNotFromCopyOnPage()).toEqual([]);
+    });
+
+    it("while the stickers load, and when they can't", async () => {
+      apiClient.listPersonalStickers.mockRejectedValue(new Error("down"));
+      renderWithQueries(<AccountSettings copy={markedCopy()} />);
+
+      expect(
+        await screen.findByRole("status", {
+          name: "⟦account.stickers.loading⟧",
+        }),
+      ).toBeInTheDocument();
+      expect(wordsNotFromCopyOnPage()).toEqual([]);
+      expect(
+        await screen.findByText("⟦account.stickers.load_failed_title⟧"),
+      ).toBeInTheDocument();
+      expect(wordsNotFromCopyOnPage()).toEqual([]);
+    });
   });
 });

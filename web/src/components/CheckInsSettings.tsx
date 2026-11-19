@@ -20,16 +20,16 @@ import type {
   CheckIns,
   PauseLength,
 } from "@/lib/api-client";
-import { pausedText, toTimeFieldValue } from "@/lib/check-ins";
-import { notAvailableText } from "@/lib/features";
+import {
+  checkInFrequencyChoices,
+  pausedText,
+  toTimeFieldValue,
+} from "@/lib/check-ins";
+import { type Copy, readCopy } from "@/lib/copy";
 import { useCheckIns, useMe, useSaveCheckIns } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
-const pauseChoices: { length: PauseLength; label: string }[] = [
-  { length: "day", label: "For a day" },
-  { length: "week", label: "For a week" },
-  { length: "until_resumed", label: "Until I resume" },
-];
+const pauseLengths: PauseLength[] = ["day", "week", "until_resumed"];
 
 const pauseButton =
   "min-h-11 cursor-pointer rounded-pill border border-soft bg-transparent px-[18px] text-[14px] text-text disabled:cursor-not-allowed disabled:border-line-strong disabled:text-mute";
@@ -38,11 +38,15 @@ const pauseButton =
  * The Check-ins page: the on/off switch, how often, quiet hours, pausing,
  * what a check-in can be, and the recent Check-ins. It never shows when the
  * next Check-in will come; Zeph chooses the moment. A setting last changed
- * in chat or by an Admin says so under it.
+ * in chat or by an Admin says so under it. Every word is the Check-ins
+ * tab's Copy, with the frequency names from Onboarding's.
  *
+ * @param props - `copy` holds the Check-ins page's Copy slots and
+ *   onboarding's frequency names.
  * @returns The page, a loading panel, or an error with Try again.
  */
-export function CheckInsSettings() {
+export function CheckInsSettings({ copy }: { copy: Copy }) {
+  const checkInsCopy = (slot: string) => readCopy(copy, `check_ins.${slot}`);
   const apiClient = useApiClient();
   const meQuery = useMe();
   const checkInsQuery = useCheckIns();
@@ -78,30 +82,32 @@ export function CheckInsSettings() {
         <ChangedInChatCaption
           changedAt={changedInChat[setting]}
           timeZone={timeZone}
+          text={checkInsCopy("changed_in_chat")}
         />
         <ChangedByAdminCaption
           changedAt={checkIns?.changed_by_admin[setting]}
           timeZone={timeZone}
+          text={checkInsCopy("changed_by_admin")}
         />
       </>
     );
   }
-  let switchLabel = "Check-ins on";
+  let switchLabel = checkInsCopy("switch.on");
   if (checkIns && !checkIns.available) {
-    switchLabel = notAvailableText;
+    switchLabel = checkInsCopy("switch.not_available");
   } else if (checkIns && !checkIns.enabled) {
-    switchLabel = "Check-ins off";
+    switchLabel = checkInsCopy("switch.off");
   } else if (checkIns?.paused) {
-    switchLabel = "Paused";
+    switchLabel = checkInsCopy("switch.paused");
   }
 
   return (
     <>
       <PageHero
         background="checkIns"
-        eyebrow="Check-ins"
-        title="Check-ins"
-        body="Now and then Zeph can message you first on Telegram. There's no fixed schedule: Zeph chooses the moment and the kind, and sometimes stays quiet to give you space."
+        eyebrow={checkInsCopy("hero.eyebrow")}
+        title={checkInsCopy("hero.heading")}
+        body={checkInsCopy("hero.lead")}
         actions={
           checkIns ? (
             <div className="inline-flex items-center gap-1.5 rounded-pill border border-line bg-panel pr-1 pl-[18px]">
@@ -109,7 +115,7 @@ export function CheckInsSettings() {
                 {switchLabel}
               </span>
               <Switch
-                label="Check-ins"
+                label={checkInsCopy("switch.label")}
                 checked={checkIns.enabled}
                 disabled={isSaving || !checkIns.available}
                 onChange={(enabled) => changeSettings({ enabled })}
@@ -120,13 +126,14 @@ export function CheckInsSettings() {
       />
 
       {!isLoaded && !loadFailed ? (
-        <LoadingPanel shape="card" label="Loading Check-ins" />
+        <LoadingPanel shape="card" label={checkInsCopy("loading")} />
       ) : null}
 
       {loadFailed ? (
         <LoadFailed
-          title="We couldn’t load your Check-in settings"
-          body="Your settings haven’t changed. Try again in a moment."
+          title={checkInsCopy("load_failed.title")}
+          body={checkInsCopy("load_failed.body")}
+          retryLabel={checkInsCopy("load_failed.retry")}
           onRetry={() => {
             void meQuery.refetch();
             void checkInsQuery.refetch();
@@ -137,23 +144,20 @@ export function CheckInsSettings() {
       {checkIns ? (
         <>
           {saveCheckIns.isError ? (
-            <SaveFailedNote>
-              Couldn’t save your check-in settings. They are as you left them.
-              Try again.
-            </SaveFailedNote>
+            <SaveFailedNote>{checkInsCopy("save_failed")}</SaveFailedNote>
           ) : null}
 
           {checkIns.available ? null : (
             <PausedNotice
-              title="Check-ins aren’t available on your account"
-              body="Zeph won’t message you first. Your settings are kept."
+              title={checkInsCopy("not_available.title")}
+              body={checkInsCopy("not_available.body")}
             />
           )}
 
           {checkIns.enabled && checkIns.paused ? (
             <PausedNotice
-              title={pausedText(checkIns.paused_until, timeZone)}
-              body="Zeph won’t message first until then. Everything else stays as it is."
+              title={pausedText(copy, checkIns.paused_until, timeZone)}
+              body={checkInsCopy("paused.body")}
               action={
                 <button
                   type="button"
@@ -161,30 +165,32 @@ export function CheckInsSettings() {
                   disabled={isSaving}
                   onClick={resume}
                 >
-                  Resume now
+                  {checkInsCopy("paused.resume")}
                 </button>
               }
             />
           ) : null}
           {checkIns.available && !checkIns.enabled ? (
             <PausedNotice
-              title="Check-ins are off"
-              body="Zeph only replies when you message it."
+              title={checkInsCopy("off.title")}
+              body={checkInsCopy("off.body")}
             />
           ) : null}
 
-          <section aria-label="Settings">
+          <section aria-label={checkInsCopy("settings.label")}>
             <div className="box-border rounded-card border border-line bg-panel px-6 py-1">
               <div className="flex flex-col gap-3.5 py-[18px]">
                 <div>
                   <div className="text-[15px] font-normal text-text">
-                    How often, at most
+                    {checkInsCopy("frequency.title")}
                   </div>
                   <div className="text-[13px] text-soft">
-                    Zeph will often check in less than this.
+                    {checkInsCopy("frequency.caption")}
                   </div>
                 </div>
                 <CheckInFrequencySegments
+                  label={checkInsCopy("frequency.label")}
+                  options={checkInFrequencyChoices(copy)}
                   value={checkIns.frequency}
                   disabled={isSaving}
                   onChange={(frequency) => changeSettings({ frequency })}
@@ -192,10 +198,15 @@ export function CheckInsSettings() {
                 {changeCaption("check_in_frequency")}
               </div>
               <CheckInSettingRow
-                title="Quiet hours"
-                caption="Zeph never checks in during these hours."
+                title={checkInsCopy("quiet_hours.title")}
+                caption={checkInsCopy("quiet_hours.caption")}
               >
                 <QuietHoursFields
+                  labels={{
+                    group: checkInsCopy("quiet_hours.label"),
+                    from: checkInsCopy("quiet_hours.from"),
+                    until: checkInsCopy("quiet_hours.until"),
+                  }}
                   start={toTimeFieldValue(checkIns.quiet_hours_start)}
                   end={toTimeFieldValue(checkIns.quiet_hours_end)}
                   disabled={isSaving}
@@ -209,19 +220,19 @@ export function CheckInsSettings() {
                 {changeCaption("quiet_hours")}
               </CheckInSettingRow>
               <CheckInSettingRow
-                title="Need some quiet?"
-                caption="Pause without changing anything else."
+                title={checkInsCopy("pause.title")}
+                caption={checkInsCopy("pause.caption")}
               >
                 <div className="flex flex-wrap gap-2">
-                  {pauseChoices.map((choice) => (
+                  {pauseLengths.map((length) => (
                     <button
-                      key={choice.length}
+                      key={length}
                       type="button"
                       className={pauseButton}
                       disabled={isSaving}
-                      onClick={() => pause(choice.length)}
+                      onClick={() => pause(length)}
                     >
-                      {choice.label}
+                      {checkInsCopy(`pause.${length}`)}
                     </button>
                   ))}
                 </div>
@@ -229,14 +240,17 @@ export function CheckInsSettings() {
               </CheckInSettingRow>
             </div>
             <p className="mt-3 mb-0 text-[13px] text-soft">
-              You can also just tell Zeph &quot;take a week off from
-              check-ins&quot;.
+              {checkInsCopy("tell_zeph")}
             </p>
           </section>
 
-          <CheckInKindsList kinds={checkIns.kinds} />
+          <CheckInKindsList kinds={checkIns.kinds} copy={copy} />
 
-          <RecentCheckInsList checkIns={checkIns.recent} timeZone={timeZone} />
+          <RecentCheckInsList
+            checkIns={checkIns.recent}
+            copy={copy}
+            timeZone={timeZone}
+          />
         </>
       ) : null}
     </>

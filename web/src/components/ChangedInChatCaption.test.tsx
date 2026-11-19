@@ -10,6 +10,7 @@ describe("ChangedInChatCaption", () => {
       <ChangedInChatCaption
         changedAt="2026-11-02T18:30:00Z"
         timeZone="Asia/Singapore"
+        text="Changed in chat · {day}"
       />,
     );
 
@@ -18,7 +19,10 @@ describe("ChangedInChatCaption", () => {
 
   it("shows nothing for a setting not changed in chat", () => {
     const { container } = renderWithQueries(
-      <ChangedInChatCaption changedAt={undefined} />,
+      <ChangedInChatCaption
+        changedAt={undefined}
+        text="Changed in chat · {day}"
+      />,
     );
 
     expect(container).toBeEmptyDOMElement();

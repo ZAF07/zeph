@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CheckInsSettings } from "@/components/CheckInsSettings";
 import type { ApiClient, CheckIns } from "@/lib/api-client";
+import { markedCopy, seedCopy, wordsNotFromCopy } from "@/test/copy";
 import { userWithRole } from "@/test/fixtures";
 import { renderWithQueries } from "@/test/render-with-queries";
 
@@ -44,7 +45,7 @@ function checkInsWith(overrides: Partial<CheckIns> = {}): CheckIns {
 }
 
 async function renderLoaded() {
-  renderWithQueries(<CheckInsSettings />);
+  renderWithQueries(<CheckInsSettings copy={seedCopy()} />);
   await screen.findByRole("region", { name: "Settings" });
 }
 
@@ -404,7 +405,7 @@ describe("CheckInsSettings", () => {
   it("shows an error with Try again when loading fails", async () => {
     apiClient.getCheckIns.mockRejectedValueOnce(new Error("down"));
     const user = userEvent.setup();
-    renderWithQueries(<CheckInsSettings />);
+    renderWithQueries(<CheckInsSettings copy={seedCopy()} />);
 
     expect(
       await screen.findByText("We couldn’t load your Check-in settings"),
@@ -414,5 +415,193 @@ describe("CheckInsSettings", () => {
     expect(
       await screen.findByRole("region", { name: "Settings" }),
     ).toBeInTheDocument();
+  });
+
+  describe("reads every word from Copy", () => {
+    const changedAt = "2026-11-03T02:00:00Z";
+
+    /**
+     * Says what words on the page did not come from Copy, leaving out the
+     * days of recent Check-ins, like "Friday 13 Nov", which are values.
+     *
+     * @param container - The rendered page.
+     * @returns Each piece of text not from Copy or a day.
+     */
+    function wordsNotFromCopyOrDays(container: HTMLElement): string[] {
+      const words = container.cloneNode(true) as HTMLElement;
+      words.querySelectorAll("div").forEach((line) => {
+        if (
+          /^[A-Z][a-z]+ \d{1,2} [A-Z][a-z]{2}$/.test(line.textContent ?? "")
+        ) {
+          line.remove();
+        }
+      });
+      return wordsNotFromCopy(words);
+    }
+
+    function markedCheckIns(overrides: Partial<CheckIns> = {}): CheckIns {
+      return checkInsWith({
+        kinds: [{ name: "⟦data⟧", description: "⟦data⟧" }],
+        recent: [
+          {
+            id: "check-in-4",
+            outcome: "skipped",
+            kind: null,
+            decided_at: "2026-11-13T10:42:00Z",
+            status: "skipped",
+            skipped_for_daily_limit: true,
+          },
+          {
+            id: "check-in-3",
+            outcome: "asked_about_fewer",
+            kind: null,
+            decided_at: "2026-11-12T10:42:00Z",
+            status: "sent",
+            skipped_for_daily_limit: false,
+          },
+          {
+            id: "check-in-2",
+            outcome: "sent",
+            kind: "⟦data⟧",
+            decided_at: "2026-11-11T10:42:00Z",
+            status: "replied",
+            skipped_for_daily_limit: false,
+          },
+          {
+            id: "check-in-1",
+            outcome: "skipped",
+            kind: null,
+            decided_at: "2026-11-10T10:42:00Z",
+            status: "no_reply",
+            skipped_for_daily_limit: false,
+          },
+          {
+            id: "check-in-0",
+            outcome: "sent",
+            kind: null,
+            decided_at: "2026-11-09T10:42:00Z",
+            status: "no_reply",
+            skipped_for_daily_limit: false,
+          },
+        ],
+        changed_by_admin: { quiet_hours: changedAt },
+        ...overrides,
+      });
+    }
+
+    async function renderMarked() {
+      const view = renderWithQueries(<CheckInsSettings copy={markedCopy()} />);
+      await screen.findByRole("region", {
+        name: "⟦check_ins.settings.label⟧",
+      });
+      return view;
+    }
+
+    beforeEach(() => {
+      apiClient.getMe.mockResolvedValue({
+        ...maya,
+        changed_in_chat: { check_in_frequency: changedAt },
+      });
+    });
+
+    it("with Check-ins on, settings changed and recent Check-ins", async () => {
+      apiClient.getCheckIns.mockResolvedValue(markedCheckIns());
+      const { container } = await renderMarked();
+
+      expect(screen.getByText("⟦check_ins.switch.on⟧")).toBeInTheDocument();
+      expect(
+        screen.getByText("⟦check_ins.changed_in_chat⟧"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("⟦check_ins.changed_by_admin⟧"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("⟦check_ins.recent.no_kind⟧"),
+      ).toBeInTheDocument();
+      expect(wordsNotFromCopyOrDays(container)).toEqual([]);
+    });
+
+    it("while paused, and with nothing sent yet", async () => {
+      apiClient.getCheckIns.mockResolvedValue(
+        markedCheckIns({ paused: true, paused_until: null, recent: [] }),
+      );
+      const { container } = await renderMarked();
+
+      expect(
+        screen.getByText("⟦check_ins.paused.title_until_resume⟧"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("⟦check_ins.recent.empty_title⟧"),
+      ).toBeInTheDocument();
+      expect(wordsNotFromCopyOrDays(container)).toEqual([]);
+    });
+
+    it("while paused until a day", async () => {
+      apiClient.getCheckIns.mockResolvedValue(
+        markedCheckIns({ paused: true, paused_until: changedAt }),
+      );
+      const { container } = await renderMarked();
+
+      expect(
+        screen.getByText("⟦check_ins.paused.title_until_day⟧"),
+      ).toBeInTheDocument();
+      expect(wordsNotFromCopyOrDays(container)).toEqual([]);
+    });
+
+    it("while off", async () => {
+      apiClient.getCheckIns.mockResolvedValue(
+        markedCheckIns({ enabled: false }),
+      );
+      const { container } = await renderMarked();
+
+      expect(screen.getByText("⟦check_ins.off.title⟧")).toBeInTheDocument();
+      expect(wordsNotFromCopyOrDays(container)).toEqual([]);
+    });
+
+    it("when an Admin has Check-ins off", async () => {
+      apiClient.getCheckIns.mockResolvedValue(
+        markedCheckIns({ available: false }),
+      );
+      const { container } = await renderMarked();
+
+      expect(
+        screen.getByText("⟦check_ins.not_available.title⟧"),
+      ).toBeInTheDocument();
+      expect(wordsNotFromCopyOrDays(container)).toEqual([]);
+    });
+
+    it("when a change couldn't be saved", async () => {
+      apiClient.getCheckIns.mockResolvedValue(markedCheckIns());
+      apiClient.updateCheckIns.mockRejectedValue(new Error("down"));
+      const user = userEvent.setup();
+      const { container } = await renderMarked();
+
+      await user.click(
+        screen.getByRole("button", {
+          name: "⟦onboarding.check_ins.frequency_most_days⟧",
+        }),
+      );
+
+      expect(
+        await screen.findByText("⟦check_ins.save_failed⟧"),
+      ).toBeInTheDocument();
+      expect(wordsNotFromCopyOrDays(container)).toEqual([]);
+    });
+
+    it("while loading, and when loading fails", async () => {
+      apiClient.getCheckIns.mockRejectedValue(new Error("down"));
+      const { container } = renderWithQueries(
+        <CheckInsSettings copy={markedCopy()} />,
+      );
+
+      expect(
+        screen.getByRole("status", { name: "⟦check_ins.loading⟧" }),
+      ).toBeInTheDocument();
+      expect(wordsNotFromCopyOrDays(container)).toEqual([]);
+      expect(
+        await screen.findByText("⟦check_ins.load_failed.title⟧"),
+      ).toBeInTheDocument();
+      expect(wordsNotFromCopyOrDays(container)).toEqual([]);
+    });
   });
 });

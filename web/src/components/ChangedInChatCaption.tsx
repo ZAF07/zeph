@@ -7,18 +7,17 @@ import { formatShortDay } from "@/lib/dates";
  *
  * @param props - `changedAt` is when it was changed in chat, or undefined
  *   if it wasn't; `timeZone` is the User's, to pick the day; `text` is the
- *   line's wording from Copy, with a `{day}` placeholder, on pages that read
- *   Copy.
+ *   line's wording from Copy, with a `{day}` placeholder.
  * @returns The caption, or nothing.
  */
 export function ChangedInChatCaption({
   changedAt,
   timeZone,
-  text = "Changed in chat · {day}",
+  text,
 }: {
   changedAt: string | undefined;
   timeZone?: string;
-  text?: string;
+  text: string;
 }) {
   if (!changedAt) {
     return null;

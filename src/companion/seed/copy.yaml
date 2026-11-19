@@ -1528,6 +1528,232 @@
         When you send Zeph a photo that matters to you, it may keep it here
         after the Conversation ends.
 
+- tab: check_ins
+  name: Check-ins
+  slots:
+    - key: check_ins.page_title
+      name: Browser tab title
+      max_length: 70
+      text: Zeph — Check-ins
+    - key: check_ins.page_description
+      name: Search description
+      max_length: 160
+      text: Choose how often Zeph may message you first, set quiet hours, or pause.
+    - key: check_ins.hero.eyebrow
+      name: Label above the heading
+      max_length: 40
+      text: Check-ins
+    - key: check_ins.hero.heading
+      name: Heading
+      max_length: 40
+      text: Check-ins
+    - key: check_ins.hero.lead
+      name: Line under the heading
+      max_length: 300
+      text: >-
+        Now and then Zeph can message you first on Telegram. There's no fixed
+        schedule: Zeph chooses the moment and the kind, and sometimes stays
+        quiet to give you space.
+    - key: check_ins.switch.on
+      name: "Check-ins switch: words while on"
+      max_length: 30
+      text: Check-ins on
+    - key: check_ins.switch.off
+      name: "Check-ins switch: words while off"
+      max_length: 30
+      text: Check-ins off
+    - key: check_ins.switch.paused
+      name: "Check-ins switch: words while paused"
+      max_length: 30
+      text: Paused
+    - key: check_ins.switch.not_available
+      name: "Check-ins switch: words when an Admin has Check-ins off"
+      max_length: 40
+      text: Not available on your account
+    - key: check_ins.switch.label
+      name: "Check-ins switch: name read out by screen readers"
+      max_length: 40
+      text: Check-ins
+    - key: check_ins.loading
+      name: "Loading: name read out by screen readers"
+      max_length: 60
+      text: Loading Check-ins
+    - key: check_ins.load_failed.title
+      name: "Couldn’t load: title"
+      max_length: 80
+      text: We couldn’t load your Check-in settings
+    - key: check_ins.load_failed.body
+      name: "Couldn’t load: message"
+      max_length: 200
+      text: Your settings haven’t changed. Try again in a moment.
+    - key: check_ins.load_failed.retry
+      name: "Couldn’t load: try again button"
+      max_length: 30
+      text: Try again
+    - key: check_ins.save_failed
+      name: Couldn’t save a change
+      max_length: 200
+      text: Couldn’t save your check-in settings. They are as you left them. Try again.
+    - key: check_ins.not_available.title
+      name: "Not available note: title"
+      max_length: 80
+      text: Check-ins aren’t available on your account
+    - key: check_ins.not_available.body
+      name: "Not available note: message"
+      max_length: 200
+      text: Zeph won’t message you first. Your settings are kept.
+    - key: check_ins.paused.title_until_resume
+      name: "Paused note: title with no end day"
+      max_length: 80
+      text: Check-ins are paused until you resume
+    - key: check_ins.paused.title_until_day
+      name: "Paused note: title with an end day"
+      max_length: 80
+      placeholders: [day]
+      text: Check-ins are paused until {day}
+    - key: check_ins.paused.body
+      name: "Paused note: message"
+      max_length: 200
+      text: Zeph won’t message first until then. Everything else stays as it is.
+    - key: check_ins.paused.resume
+      name: "Paused note: resume button"
+      max_length: 30
+      text: Resume now
+    - key: check_ins.off.title
+      name: "Off note: title"
+      max_length: 80
+      text: Check-ins are off
+    - key: check_ins.off.body
+      name: "Off note: message"
+      max_length: 200
+      text: Zeph only replies when you message it.
+    - key: check_ins.settings.label
+      name: "Settings card: name read out by screen readers"
+      max_length: 40
+      text: Settings
+    - key: check_ins.frequency.title
+      name: "How often: title"
+      max_length: 40
+      text: How often, at most
+    - key: check_ins.frequency.caption
+      name: "How often: line under the title"
+      max_length: 100
+      text: Zeph will often check in less than this.
+    - key: check_ins.frequency.label
+      name: "How often: choice, name read out by screen readers"
+      max_length: 30
+      text: How often
+    - key: check_ins.changed_in_chat
+      name: Line under a setting last changed in chat
+      max_length: 60
+      placeholders: [day]
+      text: Changed in chat · {day}
+    - key: check_ins.changed_by_admin
+      name: Line under a setting last changed by an Admin
+      max_length: 60
+      placeholders: [day]
+      text: Changed by an Admin · {day}
+    - key: check_ins.quiet_hours.title
+      name: "Quiet hours: title"
+      max_length: 40
+      text: Quiet hours
+    - key: check_ins.quiet_hours.caption
+      name: "Quiet hours: line under the title"
+      max_length: 100
+      text: Zeph never checks in during these hours.
+    - key: check_ins.quiet_hours.label
+      name: "Quiet hours: times, name read out by screen readers"
+      max_length: 40
+      text: Quiet hours
+    - key: check_ins.quiet_hours.from
+      name: "Quiet hours: start time label"
+      max_length: 20
+      text: From
+    - key: check_ins.quiet_hours.until
+      name: "Quiet hours: end time label"
+      max_length: 20
+      text: Until
+    - key: check_ins.pause.title
+      name: "Pause: title"
+      max_length: 40
+      text: Need some quiet?
+    - key: check_ins.pause.caption
+      name: "Pause: line under the title"
+      max_length: 100
+      text: Pause without changing anything else.
+    - key: check_ins.pause.day
+      name: "Pause: for a day button"
+      max_length: 30
+      text: For a day
+    - key: check_ins.pause.week
+      name: "Pause: for a week button"
+      max_length: 30
+      text: For a week
+    - key: check_ins.pause.until_resumed
+      name: "Pause: until resumed button"
+      max_length: 30
+      text: Until I resume
+    - key: check_ins.tell_zeph
+      name: Line under the settings card
+      max_length: 120
+      text: You can also just tell Zeph "take a week off from check-ins".
+    - key: check_ins.kinds.heading
+      name: "What a check-in can be: heading"
+      max_length: 60
+      text: What a check-in can be
+    - key: check_ins.kinds.lead
+      name: "What a check-in can be: line under the heading"
+      max_length: 120
+      text: Zeph picks the kind that fits the moment.
+    - key: check_ins.recent.heading
+      name: "Recent check-ins: heading"
+      max_length: 60
+      text: Recent check-ins
+    - key: check_ins.recent.empty_title
+      name: "Recent check-ins: none yet, title"
+      max_length: 60
+      text: No check-ins yet
+    - key: check_ins.recent.empty_body
+      name: "Recent check-ins: none yet, message"
+      max_length: 200
+      text: When Zeph checks in, you’ll see it here with whether you replied.
+    - key: check_ins.recent.daily_limit
+      name: "Recent check-ins: skipped for the day’s message limit"
+      max_length: 80
+      text: Skipped — you’d reached today’s message limit
+    - key: check_ins.recent.gave_space
+      name: "Recent check-ins: Zeph gave the User space"
+      max_length: 80
+      text: Zeph gave you space
+    - key: check_ins.recent.asked_about_fewer
+      name: "Recent check-ins: Zeph asked about fewer"
+      max_length: 80
+      text: Asked if you’d like fewer
+    - key: check_ins.recent.no_kind
+      name: "Recent check-ins: a check-in with no kind"
+      max_length: 80
+      text: A check-in
+    - key: check_ins.recent.sent
+      name: "Recent check-ins: sent tag"
+      max_length: 20
+      text: Sent
+    - key: check_ins.recent.replied
+      name: "Recent check-ins: replied tag"
+      max_length: 20
+      text: Replied
+    - key: check_ins.recent.no_reply
+      name: "Recent check-ins: no reply tag"
+      max_length: 20
+      text: No reply
+    - key: check_ins.recent.skipped
+      name: "Recent check-ins: skipped tag"
+      max_length: 20
+      text: Skipped
+    - key: check_ins.recent.ignore_rule
+      name: "Recent check-ins: line under the list"
+      max_length: 160
+      text: If a few go unanswered, Zeph will pause and ask once if you'd like fewer.
+
 - tab: connect_telegram
   name: Connect Telegram
   slots:
@@ -1657,6 +1883,240 @@
       name: "Couldn’t create a link: try again button"
       max_length: 30
       text: Try again
+
+- tab: account
+  name: Account
+  slots:
+    - key: account.page_title
+      name: Browser tab title
+      max_length: 70
+      text: Zeph — Account & privacy
+    - key: account.page_description
+      name: Search description
+      max_length: 160
+      text: Your details, what Zeph is allowed to keep, and how to remove it.
+    - key: account.header.eyebrow
+      name: Label above the heading
+      max_length: 40
+      text: Account & privacy
+    - key: account.header.heading
+      name: Heading
+      max_length: 40
+      text: Account & privacy
+    - key: account.header.lead
+      name: Line under the heading
+      max_length: 200
+      text: Your details, what Zeph is allowed to keep, and how to remove it.
+    - key: account.loading
+      name: "Loading: name read out by screen readers"
+      max_length: 60
+      text: Loading your account
+    - key: account.load_failed.title
+      name: "Couldn’t load: title"
+      max_length: 80
+      text: We couldn’t load your account
+    - key: account.load_failed.body
+      name: "Couldn’t load: message"
+      max_length: 200
+      text: Nothing has changed. Try again in a moment.
+    - key: account.load_failed.retry
+      name: "Couldn’t load: try again button (page and stickers)"
+      max_length: 30
+      text: Try again
+    - key: account.profile.heading
+      name: "Profile: heading"
+      max_length: 40
+      text: Profile
+    - key: account.profile.name_label
+      name: "Profile: name label"
+      max_length: 40
+      text: What Zeph calls you
+    - key: account.profile.email_label
+      name: "Profile: email label"
+      max_length: 30
+      text: Email
+    - key: account.profile.no_email
+      name: "Profile: email when there is none"
+      max_length: 30
+      text: —
+    - key: account.profile.email_note
+      name: "Profile: line under the email"
+      max_length: 60
+      text: From your sign-in
+    - key: account.changed_in_chat
+      name: Line under a setting last changed in chat
+      max_length: 60
+      placeholders: [day]
+      text: Changed in chat · {day}
+    - key: account.profile.save
+      name: "Profile: save button"
+      max_length: 30
+      text: Save changes
+    - key: account.profile.saving
+      name: "Profile: save button while saving"
+      max_length: 30
+      text: Saving…
+    - key: account.profile.saved
+      name: "Profile: saved note"
+      max_length: 60
+      text: Saved.
+    - key: account.profile.save_failed
+      name: "Profile: couldn’t save"
+      max_length: 100
+      text: We couldn’t save that. Please try again.
+    - key: account.memory.title
+      name: "Memory switch: heading and name read out by screen readers"
+      max_length: 60
+      text: Remember meaningful details
+    - key: account.not_available
+      name: Line when an Admin has a feature off for the User
+      max_length: 60
+      text: Not available on your account
+    - key: account.switch_save_failed
+      name: "Memory and photo switches: couldn’t change it"
+      max_length: 100
+      text: We couldn’t change that. Please try again.
+    - key: account.photos.title
+      name: "Photo switch: heading and name read out by screen readers"
+      max_length: 60
+      text: Look at my photos
+    - key: account.stickers.heading
+      name: "Your stickers: heading"
+      max_length: 40
+      text: Your stickers
+    - key: account.stickers.lead
+      name: "Your stickers: line under the heading"
+      max_length: 300
+      text: >-
+        Stickers you sent that Zeph kept, so it can now and then reply in your
+        own stickers, with when it uses each. Remove any you'd rather it
+        didn't use.
+    - key: account.stickers.remove_failed
+      name: "Your stickers: couldn’t remove one"
+      max_length: 100
+      text: We couldn’t remove that. Please try again.
+    - key: account.stickers.loading
+      name: "Your stickers: loading, name read out by screen readers"
+      max_length: 60
+      text: Loading your stickers
+    - key: account.stickers.load_failed_title
+      name: "Your stickers: couldn’t load, title"
+      max_length: 80
+      text: We couldn’t load your stickers
+    - key: account.stickers.load_failed_body
+      name: "Your stickers: couldn’t load, message"
+      max_length: 200
+      text: Nothing has been removed.
+    - key: account.stickers.picture
+      name: "Your stickers: picture, name read out by screen readers"
+      max_length: 40
+      placeholders: [emoji]
+      text: "Sticker: {emoji}"
+    - key: account.stickers.picture_no_emoji
+      name: "Your stickers: picture with no emoji, words and name read out"
+      max_length: 40
+      text: Sticker
+    - key: account.stickers.remove
+      name: "Your stickers: remove button, name read out by screen readers"
+      max_length: 60
+      placeholders: [emoji]
+      text: Remove sticker {emoji}
+    - key: account.stickers.remove_no_emoji
+      name: "Your stickers: remove button for a sticker with no emoji"
+      max_length: 60
+      text: Remove sticker with no emoji
+    - key: account.stickers.empty_title
+      name: "Your stickers: none yet, title"
+      max_length: 60
+      text: No stickers kept yet
+    - key: account.stickers.empty_body
+      name: "Your stickers: none yet, message"
+      max_length: 200
+      text: >-
+        When you send Zeph a sticker whose meaning is clear, it may keep it here
+        after the Conversation ends.
+    - key: account.delete_data.heading
+      name: "Delete my data: heading"
+      max_length: 40
+      text: Delete my data
+    - key: account.delete_data.retention_one
+      name: "Delete my data: how long messages are kept, one day"
+      max_length: 100
+      placeholders: [count]
+      text: Messages are otherwise kept for {count} day.
+    - key: account.delete_data.retention_many
+      name: "Delete my data: how long messages are kept, several days"
+      max_length: 100
+      placeholders: [count]
+      text: Messages are otherwise kept for {count} days.
+    - key: account.delete_data.button
+      name: "Delete my data: button"
+      max_length: 30
+      text: Delete my data
+    - key: account.deleting
+      name: Delete button while deleting (data and account)
+      max_length: 30
+      text: Deleting…
+    - key: account.delete_data.dialog_title
+      name: "Delete my data, asking first: title"
+      max_length: 60
+      text: Delete my data?
+    - key: account.delete_data.dialog_body
+      name: "Delete my data, asking first: message after what it removes"
+      max_length: 100
+      text: This can’t be undone.
+    - key: account.delete_data.dialog_cancel
+      name: "Delete my data, asking first: keep button"
+      max_length: 30
+      text: Keep my data
+    - key: account.delete_data.dialog_confirm
+      name: "Delete my data, asking first: delete button"
+      max_length: 30
+      text: Delete my data
+    - key: account.delete_data.done
+      name: "Delete my data: deleted note"
+      max_length: 200
+      text: >-
+        Your data has been deleted. Connect Telegram again whenever you want to
+        start fresh.
+    - key: account.delete_data.failed
+      name: "Delete my data: couldn’t delete"
+      max_length: 100
+      text: We couldn’t delete your data. Please try again.
+    - key: account.delete_account.heading
+      name: "Delete account: heading"
+      max_length: 40
+      text: Delete account
+    - key: account.delete_account.description
+      name: "Delete account: what it removes"
+      max_length: 200
+      text: >-
+        Erases everything above plus your account. Only possible here on the
+        Dashboard. This can't be undone.
+    - key: account.delete_account.button
+      name: "Delete account: button"
+      max_length: 30
+      text: Delete my account
+    - key: account.delete_account.dialog_title
+      name: "Delete account, asking first: title"
+      max_length: 60
+      text: Delete your account?
+    - key: account.delete_account.dialog_body
+      name: "Delete account, asking first: message"
+      max_length: 200
+      text: Erases everything above plus your account. This can’t be undone.
+    - key: account.delete_account.dialog_cancel
+      name: "Delete account, asking first: keep button"
+      max_length: 30
+      text: Keep my account
+    - key: account.delete_account.dialog_confirm
+      name: "Delete account, asking first: delete button"
+      max_length: 40
+      text: Permanently delete account
+    - key: account.delete_account.failed
+      name: "Delete account: couldn’t delete"
+      max_length: 100
+      text: We couldn’t delete your account. Please try again.
 
 - tab: shared
   name: Shared

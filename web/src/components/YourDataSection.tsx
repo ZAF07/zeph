@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DeletionRow } from "@/components/DeletionRow";
 import { SavedNote } from "@/components/SavedNote";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
+import { type Copy, countSlotKey, fillCopy, readCopy } from "@/lib/copy";
 import { useApiClient } from "@/lib/use-api-client";
 
 /**
@@ -16,16 +17,19 @@ import { useApiClient } from "@/lib/use-api-client";
  *
  * @param props - `retentionDays` is how many days messages are kept and
  *   `deleteMyDataDescription` says what Delete my data removes, both from
- *   platform settings.
+ *   platform settings; `copy` holds the Account page's Copy.
  * @returns The section.
  */
 export function YourDataSection({
   retentionDays,
   deleteMyDataDescription,
+  copy,
 }: {
   retentionDays: number;
   deleteMyDataDescription: string;
+  copy: Copy;
 }) {
+  const accountCopy = (slot: string) => readCopy(copy, `account.${slot}`);
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
   const [isConfirming, setIsConfirming] = useState(false);
@@ -38,19 +42,23 @@ export function YourDataSection({
   return (
     <DeletionRow
       headingId="your-data-heading"
-      title="Delete my data"
+      title={accountCopy("delete_data.heading")}
       description={
         <>
           <p className="mt-1 mb-0 max-w-[620px] text-[14px] text-soft">
             {deleteMyDataDescription}
           </p>
           <p className="mt-1.5 mb-0 text-[13px] text-soft">
-            Messages are otherwise kept for {retentionDays}{" "}
-            {retentionDays === 1 ? "day" : "days"}.
+            {fillCopy(
+              copy,
+              countSlotKey("account.delete_data.retention", retentionDays),
+              { count: retentionDays },
+            )}
           </p>
         </>
       }
-      buttonLabel="Delete my data"
+      buttonLabel={accountCopy("delete_data.button")}
+      deletingLabel={accountCopy("deleting")}
       isDeleting={deleteMyData.isPending}
       onStart={() => {
         deleteMyData.reset();
@@ -59,10 +67,10 @@ export function YourDataSection({
     >
       <ConfirmDialog
         open={isConfirming}
-        title="Delete my data?"
-        body={`${deleteMyDataDescription} This can’t be undone.`}
-        cancelLabel="Keep my data"
-        confirmLabel="Delete my data"
+        title={accountCopy("delete_data.dialog_title")}
+        body={`${deleteMyDataDescription} ${accountCopy("delete_data.dialog_body")}`}
+        cancelLabel={accountCopy("delete_data.dialog_cancel")}
+        confirmLabel={accountCopy("delete_data.dialog_confirm")}
         onConfirm={() => {
           setIsConfirming(false);
           deleteMyData.mutate();
@@ -70,15 +78,10 @@ export function YourDataSection({
         onCancel={() => setIsConfirming(false)}
       />
       {deleteMyData.isSuccess ? (
-        <SavedNote>
-          Your data has been deleted. Connect Telegram again whenever you want
-          to start fresh.
-        </SavedNote>
+        <SavedNote>{accountCopy("delete_data.done")}</SavedNote>
       ) : null}
       {deleteMyData.isError ? (
-        <SaveFailedNote>
-          We couldn’t delete your data. Please try again.
-        </SaveFailedNote>
+        <SaveFailedNote>{accountCopy("delete_data.failed")}</SaveFailedNote>
       ) : null}
     </DeletionRow>
   );

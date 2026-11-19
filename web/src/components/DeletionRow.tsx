@@ -9,7 +9,8 @@ import { dangerButton } from "@/components/button-styles";
  *
  * @param props - `headingId` labels the section; `title` is the heading,
  *   coral when `isDanger`; `description` says what goes; `buttonLabel` names
- *   the button, which shows "Deleting…" and is locked while `isDeleting`;
+ *   the button, which shows `deletingLabel` and is locked while
+ *   `isDeleting`;
  *   `onStart` is called when it is pressed; `children` is shown under the
  *   row (the confirm dialog and any result).
  * @returns The section.
@@ -20,6 +21,7 @@ export function DeletionRow({
   isDanger = false,
   description,
   buttonLabel,
+  deletingLabel,
   isDeleting,
   onStart,
   children,
@@ -29,6 +31,7 @@ export function DeletionRow({
   isDanger?: boolean;
   description: ReactNode;
   buttonLabel: string;
+  deletingLabel: string;
   isDeleting: boolean;
   onStart: () => void;
   children: ReactNode;
@@ -54,7 +57,7 @@ export function DeletionRow({
           disabled={isDeleting}
           onClick={onStart}
         >
-          {isDeleting ? "Deleting…" : buttonLabel}
+          {isDeleting ? deletingLabel : buttonLabel}
         </button>
       </div>
       {children}

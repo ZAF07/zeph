@@ -3,9 +3,14 @@ import type {
   CheckInStatus,
   RecentCheckIn,
 } from "@/lib/api-client";
-import { dateParts, formatLongDay, formatShortDay } from "@/lib/dates";
+import { fillCopy, readCopy, type Copy } from "@/lib/copy";
+import { dateParts, formatShortDay } from "@/lib/dates";
 
-/** The frequencies a User can pick, in the order they are shown. */
+/**
+ * The frequencies a User can pick, in the order they are shown, with the
+ * names admin pages use. Website pages name them from Copy with
+ * `checkInFrequencyChoices`.
+ */
 export const checkInFrequencyOptions: {
   value: CheckInFrequency;
   label: string;
@@ -17,38 +22,52 @@ export const checkInFrequencyOptions: {
 ];
 
 /**
- * What each Check-in status is called, and whether its pill is the filled
- * one (only for a reply).
+ * The frequencies a User can pick, in the order they are shown, named with
+ * the words onboarding gives them: their one home in Copy.
+ *
+ * @param copy - The page's Copy, with onboarding's frequency names.
+ * @returns Each frequency with its name.
  */
-export const checkInStatusLabels: Record<
-  CheckInStatus,
-  { label: string; isFilled: boolean }
-> = {
-  sent: { label: "Sent", isFilled: false },
-  replied: { label: "Replied", isFilled: true },
-  no_reply: { label: "No reply", isFilled: false },
-  skipped: { label: "Skipped", isFilled: false },
-};
+export function checkInFrequencyChoices(
+  copy: Copy,
+): { value: CheckInFrequency; label: string }[] {
+  return checkInFrequencyOptions.map((option) => ({
+    value: option.value,
+    label: readCopy(copy, `onboarding.check_ins.frequency_${option.value}`),
+  }));
+}
+
+/**
+ * Names a Check-in's status on the User's recent Check-ins, like "No reply".
+ *
+ * @param copy - The Check-ins page's Copy.
+ * @param status - The Check-in's status.
+ * @returns The status's name.
+ */
+export function checkInStatusText(copy: Copy, status: CheckInStatus): string {
+  return readCopy(copy, `check_ins.recent.${status}`);
+}
 
 /**
  * Names a recent Check-in for the User: its Kind, that they had reached the
  * day's message limit, or that Zeph gave them space or asked about fewer.
  * Never the Check-in model's reason for a skip.
  *
+ * @param copy - The Check-ins page's Copy.
  * @param checkIn - The recent Check-in.
  * @returns The line to show.
  */
-export function recentCheckInTitle(checkIn: RecentCheckIn): string {
+export function recentCheckInTitle(copy: Copy, checkIn: RecentCheckIn): string {
   if (checkIn.skipped_for_daily_limit) {
-    return "Skipped — you’d reached today’s message limit";
+    return readCopy(copy, "check_ins.recent.daily_limit");
   }
   if (checkIn.outcome === "skipped") {
-    return "Zeph gave you space";
+    return readCopy(copy, "check_ins.recent.gave_space");
   }
   if (checkIn.outcome === "asked_about_fewer") {
-    return "Asked if you’d like fewer";
+    return readCopy(copy, "check_ins.recent.asked_about_fewer");
   }
-  return checkIn.kind ?? "A check-in";
+  return checkIn.kind ?? readCopy(copy, "check_ins.recent.no_kind");
 }
 
 /**
@@ -82,34 +101,22 @@ export function formatQuietHour(timeOfDay: string): string {
  * Says how long Check-ins are paused for, like "Check-ins are paused until
  * 25 Nov".
  *
+ * @param copy - The Check-ins page's Copy.
  * @param pausedUntil - When the pause ends; null until the User resumes.
  * @param timeZone - The time zone to show the day in.
  * @returns The sentence.
  */
 export function pausedText(
-  pausedUntil: string | null,
-  timeZone?: string,
-): string {
-  const until =
-    pausedUntil === null ? "you resume" : formatShortDay(pausedUntil, timeZone);
-  return `Check-ins are paused until ${until}`;
-}
-
-/**
- * Says when a pause on Check-ins ends, like "until Thursday, 12 November".
- *
- * @param pausedUntil - When the pause ends; null until the User resumes.
- * @param timeZone - The time zone to show the day in.
- * @returns The words after "Paused".
- */
-export function pauseEndText(
+  copy: Copy,
   pausedUntil: string | null,
   timeZone?: string,
 ): string {
   if (pausedUntil === null) {
-    return "until you resume";
+    return readCopy(copy, "check_ins.paused.title_until_resume");
   }
-  return `until ${formatLongDay(pausedUntil, timeZone)}`;
+  return fillCopy(copy, "check_ins.paused.title_until_day", {
+    day: formatShortDay(pausedUntil, timeZone),
+  });
 }
 
 /**
