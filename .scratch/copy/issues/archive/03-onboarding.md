@@ -59,4 +59,8 @@ Not part of this issue:
 ## Completion
 
 - Completed: 2026-11-19
-- Commit: <filled in after the merge>
+- Commit: merge `f343660` into main — "Merge Copy issue 03: Onboarding, the words around sign-in and sign-up, and the Telegram link card read every word from Copy (Sign in and sign up, Onboarding and Connect Telegram tabs); reason choices stay a Platform Setting; pages send the browser only the slots they show"
+  - Branch `copy-03-onboarding`:
+    - `9a209c0` Copy 03: Onboarding and the words around sign-in and sign-up read from Copy
+    - `ad469b0` Copy 03: the Telegram link card reads from Copy (Connect Telegram tab)
+    - `0587df7` Copy 03: evidence recorded, issue completed and archived, screenshots; CONTEXT names the sign-in surrounds and the link card's one home; handover notes on 05 and 07
