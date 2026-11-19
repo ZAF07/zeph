@@ -8,6 +8,7 @@ import { LocationFields } from "@/components/LocationFields";
 import { SavedNote } from "@/components/SavedNote";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type { Me } from "@/lib/api-client";
+import { type Copy, readCopy } from "@/lib/copy";
 import { useUpdatePreferences } from "@/lib/queries";
 
 const profileLabel = "flex min-w-0 flex-[1_1_240px] flex-col gap-1.5";
@@ -19,10 +20,14 @@ const profileBox =
  * The Profile section: what Zeph calls the User, their email, country and
  * time zone, saved with one button.
  *
- * @param props - `me` is the signed-in User as last loaded.
+ * @param props - `me` is the signed-in User as last loaded; `copy` holds
+ *   the Account page's Copy and onboarding's location labels.
  * @returns The form.
  */
-export function ProfileForm({ me }: { me: Me }) {
+export function ProfileForm({ me, copy }: { me: Me; copy: Copy }) {
+  const profileCopy = (slot: string) => readCopy(copy, `account.${slot}`);
+  const locationCopy = (slot: string) =>
+    readCopy(copy, `onboarding.location.${slot}`);
   const updatePreferences = useUpdatePreferences();
   const [name, setName] = useState(me.name ?? "");
   const [country, setCountry] = useState(me.country ?? "");
@@ -63,11 +68,13 @@ export function ProfileForm({ me }: { me: Me }) {
         id="profile-heading"
         className="mt-0 mb-[14px] text-[17px] font-normal text-cream"
       >
-        Profile
+        {profileCopy("profile.heading")}
       </h2>
       <div className="flex flex-wrap gap-4">
         <label className={profileLabel}>
-          <span className={profileName}>What Zeph calls you</span>
+          <span className={profileName}>
+            {profileCopy("profile.name_label")}
+          </span>
           <input
             className={`${profileBox} border-line-strong text-text`}
             type="text"
@@ -77,19 +84,23 @@ export function ProfileForm({ me }: { me: Me }) {
           />
         </label>
         <div className={profileLabel}>
-          <span className={profileName}>Email</span>
-          <span className={`${profileBox} border-line text-soft`}>
-            {me.email ?? "—"}
+          <span className={profileName}>
+            {profileCopy("profile.email_label")}
           </span>
-          <span className="text-[12px] text-soft">From your sign-in</span>
+          <span className={`${profileBox} border-line text-soft`}>
+            {me.email ?? profileCopy("profile.no_email")}
+          </span>
+          <span className="text-[12px] text-soft">
+            {profileCopy("profile.email_note")}
+          </span>
         </div>
         <LocationFields
           inline
           labels={{
-            country: "Country",
-            chooseCountry: "Choose your country",
-            timeZone: "Time zone",
-            chooseTimeZone: "Choose your time zone",
+            country: locationCopy("country_label"),
+            chooseCountry: locationCopy("country_choose"),
+            timeZone: locationCopy("time_zone_label"),
+            chooseTimeZone: locationCopy("time_zone_choose"),
           }}
           country={country}
           timeZone={timeZone}
@@ -99,19 +110,22 @@ export function ProfileForm({ me }: { me: Me }) {
             <ChangedInChatCaption
               changedAt={me.changed_in_chat.time_zone}
               timeZone={me.time_zone ?? undefined}
+              text={profileCopy("changed_in_chat")}
             />
           }
         />
       </div>
       <div className="mt-[18px] flex flex-wrap items-center gap-3">
         <button type="submit" className={primaryButton} disabled={!canSave}>
-          {updatePreferences.isPending ? "Saving…" : "Save changes"}
+          {updatePreferences.isPending
+            ? profileCopy("profile.saving")
+            : profileCopy("profile.save")}
         </button>
-        {updatePreferences.isSuccess ? <SavedNote>Saved.</SavedNote> : null}
+        {updatePreferences.isSuccess ? (
+          <SavedNote>{profileCopy("profile.saved")}</SavedNote>
+        ) : null}
         {updatePreferences.isError ? (
-          <SaveFailedNote>
-            We couldn’t save that. Please try again.
-          </SaveFailedNote>
+          <SaveFailedNote>{profileCopy("profile.save_failed")}</SaveFailedNote>
         ) : null}
       </div>
     </form>

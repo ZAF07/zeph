@@ -10,7 +10,7 @@ import { LoadingPanel } from "@/components/LoadingPanel";
 import { PersonalStickerPicture } from "@/components/PersonalStickerPicture";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type { PersonalSticker } from "@/lib/api-client";
-import { notAvailableText } from "@/lib/features";
+import { type Copy, fillCopy, readCopy } from "@/lib/copy";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
@@ -21,10 +21,17 @@ import { useApiClient } from "@/lib/use-api-client";
  * what was kept.
  *
  * @param props - `available` is false when Personal Stickers doesn't work
- *   for the User.
+ *   for the User; `copy` holds the Account page's Copy.
  * @returns The section.
  */
-export function PersonalStickersSection({ available }: { available: boolean }) {
+export function PersonalStickersSection({
+  available,
+  copy,
+}: {
+  available: boolean;
+  copy: Copy;
+}) {
+  const accountCopy = (slot: string) => readCopy(copy, `account.${slot}`);
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
   const stickersQuery = useQuery({
@@ -53,34 +60,31 @@ export function PersonalStickersSection({ available }: { available: boolean }) {
           id="personal-stickers-heading"
           className="m-0 text-[20px] font-normal text-cream"
         >
-          Your stickers
+          {accountCopy("stickers.heading")}
         </h2>
         {available ? null : (
           <p className="mt-1.5 mb-0 max-w-[600px] text-[14px] text-soft">
-            {notAvailableText}
+            {accountCopy("not_available")}
           </p>
         )}
         <p className="mt-1.5 mb-0 max-w-[600px] text-[14px] text-soft">
-          Stickers you sent that Zeph kept, so it can now and then reply in your
-          own stickers, with when it uses each. Remove any you’d rather it
-          didn’t use.
+          {accountCopy("stickers.lead")}
         </p>
       </div>
 
       {removeSticker.isError ? (
-        <SaveFailedNote>
-          We couldn’t remove that. Please try again.
-        </SaveFailedNote>
+        <SaveFailedNote>{accountCopy("stickers.remove_failed")}</SaveFailedNote>
       ) : null}
 
       {stickersQuery.isPending ? (
-        <LoadingPanel shape="card" label="Loading your stickers" />
+        <LoadingPanel shape="card" label={accountCopy("stickers.loading")} />
       ) : null}
 
       {!stickers && stickersQuery.isError ? (
         <LoadFailed
-          title="We couldn’t load your stickers"
-          body="Nothing has been removed."
+          title={accountCopy("stickers.load_failed_title")}
+          body={accountCopy("stickers.load_failed_body")}
+          retryLabel={accountCopy("load_failed.retry")}
           onRetry={() => void stickersQuery.refetch()}
         />
       ) : null}
@@ -92,13 +96,19 @@ export function PersonalStickersSection({ available }: { available: boolean }) {
               key={sticker.id}
               className="flex min-w-0 flex-[1_1_200px] items-center gap-3 rounded-tile border border-line py-2.5 pr-1.5 pl-3"
             >
-              <PersonalStickerPicture sticker={sticker} />
+              <PersonalStickerPicture sticker={sticker} copy={copy} />
               <span className="min-w-0 flex-1 text-[13px] text-soft">
                 {sticker.note}
               </span>
               <button
                 type="button"
-                aria-label={`Remove sticker ${sticker.emoji ?? "with no emoji"}`}
+                aria-label={
+                  sticker.emoji
+                    ? fillCopy(copy, "account.stickers.remove", {
+                        emoji: sticker.emoji,
+                      })
+                    : accountCopy("stickers.remove_no_emoji")
+                }
                 className={deleteIconButton}
                 disabled={removeSticker.isPending}
                 onClick={() => removeSticker.mutate(sticker.id)}
@@ -112,8 +122,8 @@ export function PersonalStickersSection({ available }: { available: boolean }) {
 
       {stickers && stickers.length === 0 ? (
         <EmptyState
-          title="No stickers kept yet"
-          body="When you send Zeph a sticker whose meaning is clear, it may keep it here after the Conversation ends."
+          title={accountCopy("stickers.empty_title")}
+          body={accountCopy("stickers.empty_body")}
         />
       ) : null}
     </section>

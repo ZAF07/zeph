@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { Switch } from "@/components/Switch";
-import { notAvailableText } from "@/lib/features";
+import { type Copy, readCopy } from "@/lib/copy";
 import { paragraphs } from "@/lib/paragraphs";
 import { useUpdatePreferences } from "@/lib/queries";
 
@@ -23,7 +23,8 @@ const settingParagraph = "mt-0 mb-2 max-w-[620px] text-[14px] text-soft";
  *   `available` is false when an Admin has the feature off for the User,
  *   which disables the switch; `explanation` is the Admin-worded text;
  *   `changedInChatAt` is when it was last changed in chat, if it was;
- *   `timeZone` is the User's; `children` is shown above the explanation.
+ *   `timeZone` is the User's; `copy` holds the Account page's Copy;
+ *   `children` is shown above the explanation.
  * @returns The card.
  */
 export function PreferenceSwitch({
@@ -34,6 +35,7 @@ export function PreferenceSwitch({
   explanation,
   changedInChatAt,
   timeZone,
+  copy,
   children,
 }: {
   preference: SwitchPreference;
@@ -43,8 +45,10 @@ export function PreferenceSwitch({
   explanation: string;
   changedInChatAt: string | undefined;
   timeZone?: string;
+  copy: Copy;
   children?: ReactNode;
 }) {
+  const accountCopy = (slot: string) => readCopy(copy, `account.${slot}`);
   const updatePreferences = useUpdatePreferences();
   const headingId = `${preference}-heading`;
 
@@ -62,7 +66,7 @@ export function PreferenceSwitch({
             {title}
           </h2>
           {available ? null : (
-            <p className={settingParagraph}>{notAvailableText}</p>
+            <p className={settingParagraph}>{accountCopy("not_available")}</p>
           )}
           {children ? <div className="mb-2">{children}</div> : null}
           {paragraphs(explanation).map((paragraph) => (
@@ -75,13 +79,14 @@ export function PreferenceSwitch({
               <ChangedInChatCaption
                 changedAt={changedInChatAt}
                 timeZone={timeZone}
+                text={accountCopy("changed_in_chat")}
               />
             </div>
           ) : null}
           {updatePreferences.isError ? (
             <div className="mt-2">
               <SaveFailedNote>
-                We couldn’t change that. Please try again.
+                {accountCopy("switch_save_failed")}
               </SaveFailedNote>
             </div>
           ) : null}

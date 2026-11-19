@@ -96,7 +96,9 @@ def test_admin_sees_each_tab_with_slots_in_page_order(
         ("onboarding", "Onboarding"),
         ("home", "Home"),
         ("memories", "Memories"),
+        ("check_ins", "Check-ins"),
         ("connect_telegram", "Connect Telegram"),
+        ("account", "Account"),
         ("shared", "Shared"),
     ]
     seed = yaml.safe_load(COPY_SEED_FILE.read_text())

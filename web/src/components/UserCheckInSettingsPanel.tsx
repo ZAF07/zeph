@@ -155,6 +155,7 @@ export function UserCheckInSettingsPanel({
               </span>
             </span>
             <QuietHoursFields
+              labels={{ group: "Quiet hours", from: "From", until: "Until" }}
               start={toTimeFieldValue(current.quiet_hours_start)}
               end={toTimeFieldValue(current.quiet_hours_end)}
               disabled={isSaving}

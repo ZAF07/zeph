@@ -1,13 +1,21 @@
 import type { CheckInKindSummary } from "@/lib/api-client";
+import { type Copy, readCopy } from "@/lib/copy";
 
 /**
  * The read-only "What a check-in can be" list: each Check-in Kind that may
  * be sent to the User, with its description.
  *
- * @param props - `kinds` are the Check-in Kinds, in order.
+ * @param props - `kinds` are the Check-in Kinds, in order; `copy` holds the
+ *   Check-ins page's Copy.
  * @returns The list, or nothing if there are no Kinds.
  */
-export function CheckInKindsList({ kinds }: { kinds: CheckInKindSummary[] }) {
+export function CheckInKindsList({
+  kinds,
+  copy,
+}: {
+  kinds: CheckInKindSummary[];
+  copy: Copy;
+}) {
   if (kinds.length === 0) {
     return null;
   }
@@ -21,10 +29,10 @@ export function CheckInKindsList({ kinds }: { kinds: CheckInKindSummary[] }) {
           id="check-in-kinds-heading"
           className="m-0 text-[20px] font-normal text-cream"
         >
-          What a check-in can be
+          {readCopy(copy, "check_ins.kinds.heading")}
         </h2>
         <p className="mt-1.5 mb-0 max-w-[600px] text-[14px] text-soft">
-          Zeph picks the kind that fits the moment.
+          {readCopy(copy, "check_ins.kinds.lead")}
         </p>
       </div>
       <ul className="m-0 flex list-none flex-wrap gap-4 p-0">

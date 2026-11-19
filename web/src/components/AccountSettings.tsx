@@ -8,15 +8,22 @@ import { PersonalStickersSection } from "@/components/PersonalStickersSection";
 import { PreferenceSwitch } from "@/components/PreferenceSwitch";
 import { ProfileForm } from "@/components/ProfileForm";
 import { YourDataSection } from "@/components/YourDataSection";
+import { type Copy, readCopy } from "@/lib/copy";
 import { useMe, usePlatformContent } from "@/lib/queries";
 
 /**
  * The editable parts of the Account & privacy page: Profile, User Memory,
- * Photo Viewing, Your stickers, Delete my data and Delete account.
+ * Photo Viewing, Your stickers, Delete my data and Delete account. Every
+ * word is the Account tab's Copy, with the location labels from
+ * Onboarding's, except the explanations and the Delete my data description,
+ * which are still Platform Settings.
  *
+ * @param props - `copy` holds the Account page's Copy slots and
+ *   onboarding's location labels.
  * @returns The sections, a loading panel, or an error with Try again.
  */
-export function AccountSettings() {
+export function AccountSettings({ copy }: { copy: Copy }) {
+  const accountCopy = (slot: string) => readCopy(copy, `account.${slot}`);
   const meQuery = useMe();
   const contentQuery = usePlatformContent();
   const me = meQuery.data;
@@ -26,8 +33,9 @@ export function AccountSettings() {
     if (meQuery.isError || contentQuery.isError) {
       return (
         <LoadFailed
-          title="We couldn’t load your account"
-          body="Nothing has changed. Try again in a moment."
+          title={accountCopy("load_failed.title")}
+          body={accountCopy("load_failed.body")}
+          retryLabel={accountCopy("load_failed.retry")}
           onRetry={() => {
             void meQuery.refetch();
             void contentQuery.refetch();
@@ -35,15 +43,16 @@ export function AccountSettings() {
         />
       );
     }
-    return <LoadingPanel shape="card" label="Loading your account" />;
+    return <LoadingPanel shape="card" label={accountCopy("loading")} />;
   }
 
   return (
     <>
-      <ProfileForm me={me} />
+      <ProfileForm me={me} copy={copy} />
       <PreferenceSwitch
         preference="user_memory_enabled"
-        title="Remember meaningful details"
+        title={accountCopy("memory.title")}
+        copy={copy}
         enabled={me.user_memory_enabled}
         available={me.user_memory_available}
         explanation={content.user_memory_explanation}
@@ -56,19 +65,24 @@ export function AccountSettings() {
       </PreferenceSwitch>
       <PreferenceSwitch
         preference="photo_viewing_enabled"
-        title="Look at my photos"
+        title={accountCopy("photos.title")}
+        copy={copy}
         enabled={me.photo_viewing_enabled}
         available={me.photo_viewing_available}
         explanation={content.photo_viewing_explanation}
         changedInChatAt={me.changed_in_chat.photo_viewing}
         timeZone={me.time_zone ?? undefined}
       />
-      <PersonalStickersSection available={me.personal_stickers_available} />
+      <PersonalStickersSection
+        available={me.personal_stickers_available}
+        copy={copy}
+      />
       <YourDataSection
         retentionDays={content.message_retention_days}
         deleteMyDataDescription={content.delete_my_data_description}
+        copy={copy}
       />
-      <DeleteAccountSection />
+      <DeleteAccountSection copy={copy} />
     </>
   );
 }
