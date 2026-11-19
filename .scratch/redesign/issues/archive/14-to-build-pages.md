@@ -91,4 +91,4 @@ Pages touched by the shared-part changes still pass: Landing 0.03%, M-Landing 0.
 ## Completion
 
 - Completed: 2026-11-19
-- Commit: <to be filled in after merge>
+- Commit: 38fad63 (merge into main) — "Merge redesign issue 14: To build pages — Plan (/plan) and admin Overview (/admin, no longer a redirect) built to their references on drawn sample data with the To build tags and the Sample data label, Open links going to the real admin pages; admin Plans shows the To build empty state with Zaf's copy; no backend calls for these pages in any mode; ends the /plan prefetch hang at 1280". Branch commits: e1a8f80 (pages), 729c3b1 (code-review fixes), 773b4c5 (evidence and archive).
