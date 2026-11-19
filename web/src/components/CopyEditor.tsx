@@ -1,25 +1,43 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { CardSaveBar } from "@/components/CardSaveBar";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { CopySlotField } from "@/components/CopySlotField";
+import { CopySearchResults } from "@/components/CopySearchResults";
+import { copySlotFieldId, CopySlotField } from "@/components/CopySlotField";
 import { CopyTabs } from "@/components/CopyTabs";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LoadingPanel } from "@/components/LoadingPanel";
 import { SavedNote } from "@/components/SavedNote";
+import { SearchField } from "@/components/SearchField";
 import { ApiError } from "@/lib/api-client";
 import type { Copy } from "@/lib/copy";
+import { type CopySearchMatch, searchCopySlots } from "@/lib/copy-search";
 import { saveFailedMessage } from "@/lib/save-failed-message";
 import { useCopyPage, useSaveCopyTab } from "@/lib/use-copy-page";
 import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes-warning";
 
+/** Where a tab switch is going: the tab, and the slot to land on, if any. */
+type TabSwitch = { tab: string; slotKey: string | null };
+
+/**
+ * Scrolls a Copy slot's editor into view and puts the cursor in it.
+ *
+ * @param slotKey - The slot's key.
+ */
+function bringSlotIntoView(slotKey: string) {
+  const field = document.getElementById(copySlotFieldId(slotKey));
+  field?.scrollIntoView({ block: "center" });
+  field?.querySelector("textarea")?.focus({ preventScroll: true });
+}
+
 /**
  * The Copy page's editor: a tab per website page, the chosen tab's slots in
  * page order and one save bar that saves the tab's changes together. A save
- * the backend turns away shows each reason on its slot. Switching tabs or
- * leaving the page with unsaved edits asks first.
+ * the backend turns away shows each reason on its slot. A search finds
+ * slots in every tab by their text and takes the Admin to the one picked.
+ * Switching tabs or leaving the page with unsaved edits asks first.
  *
  * @returns The editor, or a loading panel or error with Try again.
  */
@@ -28,7 +46,9 @@ export function CopyEditor() {
   const saveTab = useSaveCopyTab();
   const [selectedTab, setSelectedTab] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Copy>({});
-  const [switchingTo, setSwitchingTo] = useState<string | null>(null);
+  const [switchingTo, setSwitchingTo] = useState<TabSwitch | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [landingSlot, setLandingSlot] = useState<string | null>(null);
   const tabs = pageQuery.data;
   const tab = tabs?.find((found) => found.tab === selectedTab) ?? tabs?.[0];
   const changedTexts: Copy = Object.fromEntries(
@@ -38,6 +58,13 @@ export function CopyEditor() {
   );
   const isDirty = Object.keys(changedTexts).length > 0;
   const leaving = useUnsavedChangesWarning(isDirty);
+
+  useEffect(() => {
+    if (landingSlot !== null) {
+      bringSlotIntoView(landingSlot);
+      setLandingSlot(null);
+    }
+  }, [landingSlot]);
 
   if (!tabs) {
     if (pageQuery.isError) {
@@ -69,10 +96,14 @@ export function CopyEditor() {
     saveTab.reset();
   }
 
-  function switchTab(tabKey: string) {
+  function switchTab({ tab: tabKey, slotKey }: TabSwitch) {
     setSwitchingTo(null);
     setSelectedTab(tabKey);
     discard();
+    if (slotKey !== null) {
+      setSearchQuery("");
+      setLandingSlot(slotKey);
+    }
   }
 
   function chooseTab(tabKey: string) {
@@ -80,9 +111,20 @@ export function CopyEditor() {
       return;
     }
     if (isDirty) {
-      setSwitchingTo(tabKey);
+      setSwitchingTo({ tab: tabKey, slotKey: null });
     } else {
-      switchTab(tabKey);
+      switchTab({ tab: tabKey, slotKey: null });
+    }
+  }
+
+  function pickMatch(match: CopySearchMatch) {
+    if (match.tab.tab === tab?.tab) {
+      setSearchQuery("");
+      setLandingSlot(match.slot.key);
+    } else if (isDirty) {
+      setSwitchingTo({ tab: match.tab.tab, slotKey: match.slot.key });
+    } else {
+      switchTab({ tab: match.tab.tab, slotKey: match.slot.key });
     }
   }
 
@@ -95,6 +137,20 @@ export function CopyEditor() {
 
   return (
     <>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <SearchField
+          label="Search all tabs"
+          placeholder="Search all tabs by text"
+          value={searchQuery}
+          onChange={setSearchQuery}
+        />
+      </div>
+      {searchQuery.trim() ? (
+        <CopySearchResults
+          matches={searchCopySlots(tabs, searchQuery)}
+          onPick={pickMatch}
+        />
+      ) : null}
       <CopyTabs tabs={tabs} selected={tab.tab} onSelect={chooseTab} />
       <section
         role="tabpanel"

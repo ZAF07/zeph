@@ -72,9 +72,15 @@ const copyPage: CopyTab[] = [
   },
 ];
 
+let scrolledInto: Element[] = [];
+
 describe("CopyEditor", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    scrolledInto = [];
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolledInto.push(this);
+    };
     apiClient.getCopyPage.mockResolvedValue(copyPage);
     apiClient.saveCopyTab.mockImplementation(async (_tab, texts) =>
       copyPage.map((tab) => ({
@@ -292,6 +298,118 @@ describe("CopyEditor", () => {
     );
 
     expect(router.push).toHaveBeenCalledWith("/admin/settings");
+  });
+
+  it("lists the slots from any tab whose text holds the words searched for", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<CopyEditor />);
+
+    await user.type(
+      await screen.findByRole("searchbox", { name: "Search all tabs" }),
+      "start",
+    );
+
+    const results = screen.getByRole("list", { name: "Search results" });
+    expect(within(results).getAllByRole("button")).toHaveLength(1);
+    expect(
+      within(results).getByRole("button", {
+        name: /Pricing · Plus plan: button/,
+      }),
+    ).toHaveTextContent("Start Plus");
+  });
+
+  it("says when no slot holds the words searched for", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<CopyEditor />);
+
+    await user.type(
+      await screen.findByRole("searchbox", { name: "Search all tabs" }),
+      "billing",
+    );
+
+    expect(screen.getByText("No slots match")).toBeVisible();
+    expect(screen.queryByRole("list", { name: "Search results" })).toBeNull();
+  });
+
+  it("opens a result's tab with its slot in view, ready to edit", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<CopyEditor />);
+    await user.type(
+      await screen.findByRole("searchbox", { name: "Search all tabs" }),
+      "start",
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: /Pricing · Plus plan: button/ }),
+    );
+
+    expect(
+      screen.getByRole("tab", { name: "Pricing", selected: true }),
+    ).toBeVisible();
+    const button = screen.getByRole("textbox", { name: "Plus plan: button" });
+    expect(button).toHaveFocus();
+    expect(scrolledInto).toContain(
+      screen.getByRole("group", { name: "Plus plan: button" }),
+    );
+    expect(
+      screen.getByRole("searchbox", { name: "Search all tabs" }),
+    ).toHaveValue("");
+  });
+
+  it("asks before opening a result in another tab with unsaved edits", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<CopyEditor />);
+    const heading = await screen.findByRole("textbox", {
+      name: "Main heading, first line",
+    });
+    await user.type(heading, " Now");
+    await user.type(
+      screen.getByRole("searchbox", { name: "Search all tabs" }),
+      "start",
+    );
+    const result = screen.getByRole("button", {
+      name: /Pricing · Plus plan: button/,
+    });
+
+    await user.click(result);
+    await user.click(
+      within(
+        screen.getByRole("alertdialog", {
+          name: "Switch tabs and lose your changes?",
+        }),
+      ).getByRole("button", { name: "Keep editing" }),
+    );
+    expect(
+      screen.getByRole("tab", { name: "Landing", selected: true }),
+    ).toBeVisible();
+    expect(heading).toHaveValue("Think Deeper, Now");
+
+    await user.click(result);
+    await user.click(screen.getByRole("button", { name: "Switch tab" }));
+    expect(
+      screen.getByRole("textbox", { name: "Plus plan: button" }),
+    ).toHaveFocus();
+  });
+
+  it("jumps to a result in the same tab without asking and keeps the edits", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<CopyEditor />);
+    const heading = await screen.findByRole("textbox", {
+      name: "Main heading, first line",
+    });
+    await user.type(heading, " Now");
+    await user.type(
+      screen.getByRole("searchbox", { name: "Search all tabs" }),
+      "memory items",
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: /Landing · Memory count/ }),
+    );
+
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.getByRole("textbox", { name: "Memory count" })).toHaveFocus();
+    expect(heading).toHaveValue("Think Deeper, Now");
   });
 
   it("says when the Copy page couldn't load", async () => {
