@@ -94,6 +94,7 @@ def test_admin_sees_each_tab_with_slots_in_page_order(
         ("how_it_works", "How it works"),
         ("auth", "Sign in and sign up"),
         ("onboarding", "Onboarding"),
+        ("home", "Home"),
         ("connect_telegram", "Connect Telegram"),
         ("shared", "Shared"),
     ]
@@ -133,6 +134,29 @@ def test_onboarding_and_sign_in_slots_carry_their_seed_name_text_and_placeholder
         "count",
     ]
     assert slots["auth.terms_line"]["placeholders"] == ["terms", "privacy"]
+
+
+def test_home_connect_telegram_and_dashboard_menu_slots_carry_their_seed_text(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+
+    tabs = client.get("/api/admin/copy", headers=headers).json()["tabs"]
+
+    slots_by_tab = {tab["tab"]: tab["slots"] for tab in tabs}
+    home = {slot["key"]: slot for slot in slots_by_tab["home"]}
+    assert home["home.hero.greeting_evening"]["text"] == "Good evening, {name}."
+    assert home["home.hero.greeting_evening"]["placeholders"] == ["name"]
+    assert home["home.check_ins.quiet_hours"]["placeholders"] == ["start", "end"]
+    connect_telegram_keys = [slot["key"] for slot in slots_by_tab["connect_telegram"]]
+    assert connect_telegram_keys.index("connect_telegram.heading") < (
+        connect_telegram_keys.index("connect_telegram.card.loading")
+    )
+    shared = {slot["key"]: slot for slot in slots_by_tab["shared"]}
+    assert (
+        shared["shared.dashboard.account"]["name"],
+        shared["shared.dashboard.account"]["text"],
+    ) == ("Dashboard menu: Account link", "Account & privacy")
 
 
 def test_a_tab_save_applies_every_change_and_shows_on_the_next_read(

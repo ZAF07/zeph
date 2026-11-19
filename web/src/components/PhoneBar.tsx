@@ -1,20 +1,23 @@
 import Link from "next/link";
 
 import { menuLinkHover } from "@/components/menu-styles";
+import { readCopy, type Copy } from "@/lib/copy";
 
 /**
  * The sticky top bar that replaces the sidebar below 900px: the wordmark and
  * the menu button, whose icon becomes a cross while the menu is open.
  *
- * @param props - `menuId` is the menu panel's id; `menuOpen` says whether it is open; `onMenuToggle` opens or closes it; `onWordmarkChoose` runs when the wordmark is chosen, so the menu closes.
+ * @param props - `copy` is the menu's Copy; `menuId` is the menu panel's id; `menuOpen` says whether it is open; `onMenuToggle` opens or closes it; `onWordmarkChoose` runs when the wordmark is chosen, so the menu closes.
  * @returns The top bar.
  */
 export function PhoneBar({
+  copy,
   menuId,
   menuOpen,
   onMenuToggle,
   onWordmarkChoose,
 }: {
+  copy: Copy;
   menuId: string;
   menuOpen: boolean;
   onMenuToggle: () => void;
@@ -27,11 +30,16 @@ export function PhoneBar({
         onClick={onWordmarkChoose}
         className={`text-[24px] font-normal text-cream no-underline ${menuLinkHover}`}
       >
-        Zeph
+        {readCopy(copy, "shared.wordmark")}
       </Link>
       <button
         type="button"
-        aria-label={menuOpen ? "Close the menu" : "Open the menu"}
+        aria-label={readCopy(
+          copy,
+          menuOpen
+            ? "shared.dashboard.close_menu"
+            : "shared.dashboard.open_menu",
+        )}
         aria-expanded={menuOpen}
         aria-controls={menuId}
         onClick={onMenuToggle}

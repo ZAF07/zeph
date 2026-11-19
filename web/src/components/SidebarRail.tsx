@@ -6,23 +6,31 @@ import { usePathname } from "next/navigation";
 import { MenuIcon } from "@/components/MenuIcon";
 import { foldButton, menuLinkHover } from "@/components/menu-styles";
 import { useSignOut } from "@/lib/auth/client";
+import { readCopy, type Copy } from "@/lib/copy";
 import { isUserItemCurrent, userMenuItems } from "@/lib/dashboard-menu";
 
 /**
  * The inside of the folded sidebar: a 76px rail of icons for the User pages,
  * with Sign out at the foot. Admins unfold the menu to reach admin pages.
  *
- * @param props - `onUnfold` brings the full sidebar back.
+ * @param props - `copy` is the menu's Copy; `onUnfold` brings the full sidebar back.
  * @returns The rail's contents.
  */
-export function SidebarRail({ onUnfold }: { onUnfold: () => void }) {
+export function SidebarRail({
+  copy,
+  onUnfold,
+}: {
+  copy: Copy;
+  onUnfold: () => void;
+}) {
+  const signOutLabel = readCopy(copy, "shared.dashboard.sign_out");
   const pathname = usePathname();
   const signOut = useSignOut();
   return (
     <div className="box-border flex min-h-full flex-col items-center gap-1.5 px-0 py-[18px]">
       <button
         type="button"
-        aria-label="Unfold the menu"
+        aria-label={readCopy(copy, "shared.dashboard.unfold_menu")}
         onClick={onUnfold}
         className={foldButton}
       >
@@ -42,23 +50,24 @@ export function SidebarRail({ onUnfold }: { onUnfold: () => void }) {
       </button>
       <Link
         href="/"
-        aria-label="Zeph"
+        aria-label={readCopy(copy, "shared.wordmark")}
         className={`flex size-11 items-center justify-center text-[24px] font-normal text-cream no-underline ${menuLinkHover}`}
       >
-        Z
+        {readCopy(copy, "shared.dashboard.rail_wordmark")}
       </Link>
       <nav
-        aria-label="Dashboard"
+        aria-label={readCopy(copy, "shared.dashboard.menu_label")}
         className="flex flex-col items-center gap-0.5"
       >
         {userMenuItems.map((item) => {
           const isCurrent = isUserItemCurrent(item.href, pathname);
+          const label = readCopy(copy, item.labelCopyKey);
           return (
             <Link
               key={item.href}
               href={item.href}
-              aria-label={item.label}
-              title={item.label}
+              aria-label={label}
+              title={label}
               aria-current={isCurrent ? "page" : undefined}
               className={`flex size-11 items-center justify-center rounded-input no-underline ${
                 isCurrent ? "bg-panel text-cream" : `text-soft ${menuLinkHover}`
@@ -71,8 +80,8 @@ export function SidebarRail({ onUnfold }: { onUnfold: () => void }) {
       </nav>
       <button
         type="button"
-        aria-label="Sign out"
-        title="Sign out"
+        aria-label={signOutLabel}
+        title={signOutLabel}
         onClick={() => void signOut("/sign-in")}
         className={`mt-auto flex size-11 cursor-pointer items-center justify-center rounded-input border-0 bg-transparent text-soft ${menuLinkHover}`}
       >

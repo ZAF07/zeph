@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  fillCopy,
   fillPlaceholderParts,
   fillPlaceholders,
   MissingCopyError,
@@ -100,6 +101,22 @@ describe("fillPlaceholderParts", () => {
 
   it("leaves a placeholder it has no part for as written", () => {
     expect(fillPlaceholderParts("See {nmae}", {})).toEqual(["See ", "{nmae}"]);
+  });
+});
+
+describe("fillCopy", () => {
+  it("reads a slot and fills its placeholders", () => {
+    const copy = { "home.goals.remembered": "Remembered {day}" };
+
+    expect(fillCopy(copy, "home.goals.remembered", { day: "2 Oct" })).toBe(
+      "Remembered 2 Oct",
+    );
+  });
+
+  it("raises for a slot the Copy doesn't have", () => {
+    expect(() => fillCopy({}, "home.goals.remembered", {})).toThrow(
+      MissingCopyError,
+    );
   });
 });
 

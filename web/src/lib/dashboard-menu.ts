@@ -1,12 +1,18 @@
-/** A User page in the Dashboard menu, as `design/reference/Dashboard.html` lists it. */
+/**
+ * A User page in the Dashboard menu, as `design/reference/Dashboard.html`
+ * lists it. Its label is Copy, in the Shared tab.
+ */
 export type UserMenuItem = {
-  label: string;
+  labelCopyKey: string;
   href: string;
   iconPath: string;
   toBuild?: boolean;
 };
 
-/** An admin page in the Dashboard menu, as `design/reference/Admin.html` lists it. */
+/**
+ * An admin page in the Dashboard menu, as `design/reference/Admin.html`
+ * lists it. Admin pages' own words are not Copy.
+ */
 export type AdminMenuItem = {
   label: string;
   href: string;
@@ -16,27 +22,27 @@ export type AdminMenuItem = {
 /** The User pages, in the order the menu shows them. */
 export const userMenuItems: UserMenuItem[] = [
   {
-    label: "Home",
+    labelCopyKey: "shared.dashboard.home",
     href: "/",
     iconPath: "M4 10.5L12 4l8 6.5V20H4zM10 20v-5h4v5",
   },
   {
-    label: "Memories",
+    labelCopyKey: "shared.dashboard.memories",
     href: "/memories",
     iconPath: "M12 3v4M12 17v4M3 12h4M17 12h4M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8",
   },
   {
-    label: "Check-ins",
+    labelCopyKey: "shared.dashboard.check_ins",
     href: "/check-ins",
     iconPath: "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18M12 7v5l3 2",
   },
   {
-    label: "Account & privacy",
+    labelCopyKey: "shared.dashboard.account",
     href: "/account",
     iconPath: "M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z",
   },
   {
-    label: "Plan",
+    labelCopyKey: "shared.dashboard.plan",
     href: "/plan",
     iconPath: "M4 7h16v10H4zM4 11h16",
     toBuild: true,

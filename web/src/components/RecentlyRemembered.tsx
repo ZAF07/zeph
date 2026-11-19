@@ -4,31 +4,37 @@ import { EmptyState } from "@/components/EmptyState";
 import { HomeCard } from "@/components/HomeCard";
 import { cardLink, cardListRow } from "@/components/card-styles";
 import type { RememberedItem } from "@/lib/api-client";
+import { readCopy, type Copy } from "@/lib/copy";
 
 /**
  * "Recently remembered": the User's newest Memory Items with their Memory
  * Category, and a link to Memories.
  *
- * @param props - `items` are the newest Memory Items, newest first.
+ * @param props - `copy` is Home's Copy; `items` are the newest Memory Items,
+ *   newest first.
  * @returns The card.
  */
-export function RecentlyRemembered({ items }: { items: RememberedItem[] }) {
+export function RecentlyRemembered({
+  copy,
+  items,
+}: {
+  copy: Copy;
+  items: RememberedItem[];
+}) {
+  const text = (key: string) => readCopy(copy, `home.recent.${key}`);
   return (
     <HomeCard
       headingId="recently-remembered-heading"
-      title="Recently remembered"
+      title={text("title")}
       aside={
         <Link href="/memories" className={cardLink}>
-          Review all
+          {text("review_link")}
         </Link>
       }
       basis="wide"
     >
       {items.length === 0 ? (
-        <EmptyState
-          title="No memories yet"
-          body="They’ll appear after your first Conversation."
-        />
+        <EmptyState title={text("empty_title")} body={text("empty_body")} />
       ) : (
         <ul className="m-0 list-none p-0">
           {items.map((item) => (

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { MenuIcon } from "@/components/MenuIcon";
 import { menuLinkHover } from "@/components/menu-styles";
 import { ToBuildTag } from "@/components/ToBuildTag";
+import { readCopy, type Copy } from "@/lib/copy";
 import {
   adminMenuItems,
   isAdminItemCurrent,
@@ -32,16 +33,26 @@ function menuLinkClass(size: "user" | "admin", isCurrent: boolean): string {
 
 /**
  * The menu's page links, in the sidebar and the phone menu, marking the page
- * being viewed. Admins also see the Admin section.
+ * being viewed. Admins also see the Admin section, whose words are not
+ * Copy.
  *
- * @param props - `onLinkChoose` runs when a link is chosen, so the phone menu can close.
+ * @param props - `copy` is the menu's Copy; `onLinkChoose` runs when a link is chosen, so the phone menu can close.
  * @returns The navigation.
  */
-export function SidebarNav({ onLinkChoose }: { onLinkChoose?: () => void }) {
+export function SidebarNav({
+  copy,
+  onLinkChoose,
+}: {
+  copy: Copy;
+  onLinkChoose?: () => void;
+}) {
   const pathname = usePathname();
   const isAdmin = useIsAdmin();
   return (
-    <nav aria-label="Dashboard" className="flex flex-col gap-0.5">
+    <nav
+      aria-label={readCopy(copy, "shared.dashboard.menu_label")}
+      className="flex flex-col gap-0.5"
+    >
       {userMenuItems.map((item) => {
         const isCurrent = isUserItemCurrent(item.href, pathname);
         return (
@@ -54,7 +65,7 @@ export function SidebarNav({ onLinkChoose }: { onLinkChoose?: () => void }) {
           >
             <MenuIcon path={item.iconPath} />
             <span>
-              {item.label}
+              {readCopy(copy, item.labelCopyKey)}
               {item.toBuild ? <ToBuildTag /> : null}
             </span>
           </Link>

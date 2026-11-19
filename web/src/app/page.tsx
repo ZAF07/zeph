@@ -5,44 +5,45 @@ import { DashboardHome } from "@/components/DashboardHome";
 import { Landing } from "@/components/Landing";
 import { SiteLoadFailed } from "@/components/SiteLoadFailed";
 import { isSignedIn } from "@/lib/auth/server";
-import { pageMetadata } from "@/lib/copy";
+import { pageMetadata, pickCopy } from "@/lib/copy";
 import { loadCopy } from "@/lib/server-copy";
 
 /**
- * The browser tab title and search description of `/`. Signed out, they
- * are Landing's, from Copy; signed in, or when Copy can't be read, the
+ * The browser tab title and search description of `/`, from Copy: Home's
+ * when signed in, Landing's when signed out. When Copy can't be read, the
  * root layout's stay.
  *
  * @returns The page's metadata.
  */
 export async function generateMetadata(): Promise<Metadata> {
-  if (await isSignedIn()) {
-    return {};
-  }
   const copy = await loadCopy();
   if (!copy) {
     return {};
   }
-  return pageMetadata(copy, "landing");
+  return pageMetadata(copy, (await isSignedIn()) ? "home" : "landing");
 }
 
 /**
  * The `/` page: Landing for signed-out people, and the Dashboard home a
- * User lands on after onboarding for signed-in ones.
+ * User lands on after onboarding for signed-in ones. Both read Copy on the
+ * server; Home gets only the slots it shows: its own and onboarding's
+ * Check-in frequency names.
  *
- * @returns The page.
+ * @returns The page, or the error state when Copy can't be read.
  */
 export default async function RootPage() {
-  if (await isSignedIn()) {
-    return (
-      <DashboardFrame>
-        <DashboardHome />
-      </DashboardFrame>
-    );
-  }
   const copy = await loadCopy();
   if (!copy) {
     return <SiteLoadFailed />;
+  }
+  if (await isSignedIn()) {
+    return (
+      <DashboardFrame>
+        <DashboardHome
+          copy={pickCopy(copy, ["home.", "onboarding.check_ins.frequency_"])}
+        />
+      </DashboardFrame>
+    );
   }
   return <Landing copy={copy} />;
 }

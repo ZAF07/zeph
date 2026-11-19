@@ -872,9 +872,326 @@
       max_length: 30
       text: Skip for now
 
+- tab: home
+  name: Home
+  slots:
+    - key: home.page_title
+      name: Browser tab title
+      max_length: 70
+      text: Zeph — Home
+    - key: home.page_description
+      name: Search description
+      max_length: 160
+      text: Your Zeph Dashboard.
+    - key: home.loading
+      name: Loading message, read out by screen readers
+      max_length: 60
+      text: Loading your Dashboard
+    - key: home.loading_cards
+      name: Loading message for the cards, read out by screen readers
+      max_length: 60
+      text: Loading your cards
+    - key: home.load_failed.title
+      name: "Couldn’t load: title"
+      max_length: 60
+      text: We couldn’t load your Dashboard
+    - key: home.load_failed.body
+      name: "Couldn’t load: message"
+      max_length: 200
+      text: >-
+        Something went wrong on our side. Zeph is still reachable in Telegram,
+        and nothing you’ve shared is lost.
+    - key: home.load_failed.retry
+      name: "Couldn’t load: try again button"
+      max_length: 30
+      text: Try again
+    - key: home.hero.eyebrow
+      name: Label above the greeting
+      max_length: 30
+      text: Home
+    - key: home.hero.greeting_morning
+      name: Greeting before noon
+      max_length: 60
+      placeholders: [name]
+      text: Good morning, {name}.
+    - key: home.hero.greeting_morning_no_name
+      name: Greeting before noon, when the User gave no name
+      max_length: 60
+      text: Good morning.
+    - key: home.hero.greeting_afternoon
+      name: Greeting from noon to 6 PM
+      max_length: 60
+      placeholders: [name]
+      text: Good afternoon, {name}.
+    - key: home.hero.greeting_afternoon_no_name
+      name: Greeting from noon to 6 PM, when the User gave no name
+      max_length: 60
+      text: Good afternoon.
+    - key: home.hero.greeting_evening
+      name: Greeting after 6 PM
+      max_length: 60
+      placeholders: [name]
+      text: Good evening, {name}.
+    - key: home.hero.greeting_evening_no_name
+      name: Greeting after 6 PM, when the User gave no name
+      max_length: 60
+      text: Good evening.
+    - key: home.hero.last_talked_never
+      name: "Last talked: before the first conversation"
+      max_length: 100
+      text: You haven't talked with Zeph yet.
+    - key: home.hero.last_talked_today
+      name: "Last talked: today"
+      max_length: 100
+      text: You last talked with Zeph today.
+    - key: home.hero.last_talked_yesterday
+      name: "Last talked: yesterday"
+      max_length: 100
+      text: You last talked with Zeph yesterday.
+    - key: home.hero.last_talked_on_day
+      name: "Last talked: on an earlier day"
+      max_length: 100
+      placeholders: [day]
+      text: You last talked with Zeph on {day}.
+    - key: home.hero.talk_button
+      name: Talk to Zeph button
+      max_length: 30
+      text: Talk to Zeph
+    - key: home.not_connected.title
+      name: "Telegram not connected: title"
+      max_length: 80
+      text: Zeph can’t reach you yet.
+    - key: home.not_connected.body
+      name: "Telegram not connected: message"
+      max_length: 200
+      text: >-
+        Conversations and Check-ins happen in Telegram. Connect once and Zeph
+        will say hello.
+    - key: home.not_connected.button
+      name: "Telegram not connected: connect button"
+      max_length: 30
+      text: Connect Telegram
+    - key: home.telegram.title
+      name: "Telegram card: title"
+      max_length: 40
+      text: Telegram
+    - key: home.telegram.caption
+      name: "Telegram card: line under the title"
+      max_length: 100
+      text: Where your conversations with Zeph happen.
+    - key: home.telegram.connected_as
+      name: "Telegram card: who it’s connected as"
+      max_length: 80
+      placeholders: [username]
+      text: Connected as @{username}
+    - key: home.telegram.connected_no_username
+      name: "Telegram card: when the Telegram account has no username"
+      max_length: 80
+      text: Connected
+    - key: home.telegram.manage_link
+      name: "Telegram card: manage link"
+      max_length: 30
+      text: Manage connection
+    - key: home.check_ins.title
+      name: "Check-ins card: title"
+      max_length: 40
+      text: Check-ins
+    - key: home.check_ins.on
+      name: "Check-ins card: on tag"
+      max_length: 12
+      text: "On"
+    - key: home.check_ins.paused
+      name: "Check-ins card: paused tag"
+      max_length: 12
+      text: Paused
+    - key: home.check_ins.off
+      name: "Check-ins card: off tag"
+      max_length: 12
+      text: "Off"
+    - key: home.check_ins.caption
+      name: "Check-ins card: line under the title"
+      max_length: 100
+      text: Zeph chooses the moment. There is no fixed schedule.
+    - key: home.check_ins.status_label
+      name: "Check-ins card: status label, when Check-ins are off"
+      max_length: 30
+      text: Status
+    - key: home.check_ins.not_available
+      name: "Check-ins card: status when not on the User’s account"
+      max_length: 80
+      text: Not available on your account
+    - key: home.check_ins.turned_off
+      name: "Check-ins card: status when the User turned them off"
+      max_length: 80
+      text: Zeph only replies when you message
+    - key: home.check_ins.paused_label
+      name: "Check-ins card: paused label"
+      max_length: 30
+      text: Paused
+    - key: home.check_ins.paused_until_resume
+      name: "Check-ins card: paused with no end day"
+      max_length: 60
+      text: until you resume
+    - key: home.check_ins.paused_until_day
+      name: "Check-ins card: paused until a day"
+      max_length: 60
+      placeholders: [day]
+      text: until {day}
+    - key: home.check_ins.changed_in_chat
+      name: "Check-ins card: pause changed in chat"
+      max_length: 60
+      placeholders: [day]
+      text: Changed in chat · {day}
+    - key: home.check_ins.frequency_label
+      name: "Check-ins card: how often label"
+      max_length: 30
+      text: How often
+    - key: home.check_ins.quiet_hours_label
+      name: "Check-ins card: quiet hours label"
+      max_length: 30
+      text: Quiet hours
+    - key: home.check_ins.quiet_hours
+      name: "Check-ins card: quiet hours"
+      max_length: 40
+      placeholders: [start, end]
+      text: "{start} to {end}"
+    - key: home.check_ins.last_label
+      name: "Check-ins card: last check-in label"
+      max_length: 30
+      text: Last check-in
+    - key: home.check_ins.last_none
+      name: "Check-ins card: no check-in sent yet"
+      max_length: 40
+      text: None yet
+    - key: home.check_ins.last_today
+      name: "Check-ins card: last check-in today"
+      max_length: 20
+      text: Today
+    - key: home.check_ins.last_yesterday
+      name: "Check-ins card: last check-in yesterday"
+      max_length: 20
+      text: Yesterday
+    - key: home.check_ins.last_replied
+      name: "Check-ins card: last check-in, the User replied"
+      max_length: 60
+      placeholders: [day]
+      text: "{day} · you replied"
+    - key: home.check_ins.last_no_reply
+      name: "Check-ins card: last check-in, no reply"
+      max_length: 60
+      placeholders: [day]
+      text: "{day} · no reply"
+    - key: home.check_ins.settings_link
+      name: "Check-ins card: settings link"
+      max_length: 40
+      text: Change check-in settings
+    - key: home.memory.on_title
+      name: "Memory on: note title"
+      max_length: 40
+      text: Memory is on.
+    - key: home.memory.on_body
+      name: "Memory on: note"
+      max_length: 200
+      text: >-
+        Zeph keeps meaningful details between conversations. You can review or
+        delete any of them in Memories, or tell Zeph "forget that".
+    - key: home.goals.title
+      name: "Working toward: title"
+      max_length: 40
+      text: What you're working toward
+    - key: home.goals.memories_link
+      name: "Working toward: Memories link"
+      max_length: 30
+      text: See in Memories
+    - key: home.goals.empty_title
+      name: "Working toward: empty title"
+      max_length: 40
+      text: Nothing here yet
+    - key: home.goals.empty_body
+      name: "Working toward: empty message"
+      max_length: 200
+      text: >-
+        When you mention something you’re working toward, Zeph will remember
+        it here.
+    - key: home.goals.remembered
+      name: "Working toward: day remembered"
+      max_length: 40
+      placeholders: [day]
+      text: Remembered {day}
+    - key: home.recent.title
+      name: "Recently remembered: title"
+      max_length: 40
+      text: Recently remembered
+    - key: home.recent.review_link
+      name: "Recently remembered: Memories link"
+      max_length: 30
+      text: Review all
+    - key: home.recent.empty_title
+      name: "Recently remembered: empty title"
+      max_length: 40
+      text: No memories yet
+    - key: home.recent.empty_body
+      name: "Recently remembered: empty message"
+      max_length: 200
+      text: They’ll appear after your first Conversation.
+    - key: home.plan.title
+      name: "Plan card: title"
+      max_length: 30
+      text: Plan
+    - key: home.plan.caption
+      name: "Plan card: renewal line"
+      max_length: 80
+      text: Renews on [RENEWAL DATE].
+    - key: home.plan.name
+      name: "Plan card: plan name"
+      max_length: 40
+      text: "[PLAN NAME]"
+    - key: home.plan.price
+      name: "Plan card: price"
+      max_length: 40
+      text: · [PRICE] /month
+    - key: home.plan.manage_button
+      name: "Plan card: manage button"
+      max_length: 30
+      text: Manage plan
+    - key: home.footer.no_streaks
+      name: Line at the bottom about streaks
+      max_length: 200
+      text: >-
+        Zeph doesn't count streaks or time spent. If you go quiet for a while,
+        that's fine. It'll be here when you're ready.
+
 - tab: connect_telegram
   name: Connect Telegram
   slots:
+    - key: connect_telegram.page_title
+      name: Browser tab title
+      max_length: 70
+      text: Zeph — Connect Telegram
+    - key: connect_telegram.page_description
+      name: Search description
+      max_length: 160
+      text: Link Telegram, where you talk with Zeph.
+    - key: connect_telegram.eyebrow
+      name: Label above the heading
+      max_length: 40
+      text: Telegram Connection
+    - key: connect_telegram.heading
+      name: Heading
+      max_length: 40
+      text: Connect Telegram
+    - key: connect_telegram.lead
+      name: Line under the heading
+      max_length: 120
+      text: You talk to Zeph in Telegram.
+    - key: connect_telegram.lead_computer
+      name: Line under the heading, rest of it on a computer
+      max_length: 120
+      text: Open the link on this device, or scan the code with your phone.
+    - key: connect_telegram.lead_phone
+      name: Line under the heading, rest of it on a phone
+      max_length: 120
+      text: Tap the button and Telegram opens with Zeph ready.
     - key: connect_telegram.card.loading
       name: "Link card: loading message, read out by screen readers"
       max_length: 60
@@ -1069,3 +1386,71 @@
       name: "Footer: AI notice"
       max_length: 100
       text: Zeph is an AI. It is not therapy or medical care.
+    - key: shared.dashboard.unfold_menu
+      name: "Dashboard menu: unfold button, read out by screen readers"
+      max_length: 40
+      text: Unfold the menu
+    - key: shared.dashboard.rail_wordmark
+      name: "Dashboard menu: wordmark when folded"
+      max_length: 4
+      text: Z
+    - key: shared.dashboard.fold_menu
+      name: "Dashboard menu: fold button, read out by screen readers"
+      max_length: 40
+      text: Fold the menu
+    - key: shared.dashboard.open_menu
+      name: "Dashboard menu: phone menu button when closed, read out by screen readers"
+      max_length: 40
+      text: Open the menu
+    - key: shared.dashboard.close_menu
+      name: "Dashboard menu: phone menu button when open, read out by screen readers"
+      max_length: 40
+      text: Close the menu
+    - key: shared.dashboard.menu_label
+      name: "Dashboard menu: name read out by screen readers"
+      max_length: 40
+      text: Dashboard
+    - key: shared.dashboard.home
+      name: "Dashboard menu: Home link"
+      max_length: 24
+      text: Home
+    - key: shared.dashboard.memories
+      name: "Dashboard menu: Memories link"
+      max_length: 24
+      text: Memories
+    - key: shared.dashboard.check_ins
+      name: "Dashboard menu: Check-ins link"
+      max_length: 24
+      text: Check-ins
+    - key: shared.dashboard.account
+      name: "Dashboard menu: Account link"
+      max_length: 24
+      text: Account & privacy
+    - key: shared.dashboard.plan
+      name: "Dashboard menu: Plan link"
+      max_length: 24
+      text: Plan
+    - key: shared.dashboard.loading_account
+      name: "Dashboard menu: loading the account, read out by screen readers"
+      max_length: 60
+      text: Loading your account
+    - key: shared.dashboard.sign_out
+      name: "Dashboard menu: sign-out button"
+      max_length: 20
+      text: Sign out
+    - key: shared.dashboard.loading
+      name: "Dashboard: loading message, read out by screen readers"
+      max_length: 60
+      text: Loading your Dashboard
+    - key: shared.dashboard.load_failed.title
+      name: "Dashboard couldn’t load: title"
+      max_length: 60
+      text: We couldn’t load this
+    - key: shared.dashboard.load_failed.body
+      name: "Dashboard couldn’t load: message"
+      max_length: 200
+      text: Nothing you’ve shared is lost.
+    - key: shared.dashboard.load_failed.retry
+      name: "Dashboard couldn’t load: try again button"
+      max_length: 30
+      text: Try again

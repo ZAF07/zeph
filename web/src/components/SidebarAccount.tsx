@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 
+import { readCopy, type Copy } from "@/lib/copy";
 import { useMe } from "@/lib/queries";
 
 /** Keeps a line of the row to one line, ending with an ellipsis if too long. */
@@ -12,12 +13,18 @@ const cutShort = "overflow-hidden text-ellipsis whitespace-nowrap";
  * and, below it, their email, or "Admin" for an Admin. A User with no name
  * is shown by their email. A name or email too long for the row is cut
  * short with an ellipsis and shown in full on hover. Placeholders stand in
- * while `/me` loads.
+ * while `/me` loads. "Admin" is an admin word, not Copy.
  *
- * @param props - `action` sits at the end of the row, as Sign out does in the phone menu.
+ * @param props - `copy` is the menu's Copy; `action` sits at the end of the row, as Sign out does in the phone menu.
  * @returns The signed-in User's row.
  */
-export function SidebarAccount({ action }: { action?: ReactNode }) {
+export function SidebarAccount({
+  copy,
+  action,
+}: {
+  copy: Copy;
+  action?: ReactNode;
+}) {
   const me = useMe().data;
   const name = me ? me.name || me.email : null;
   const detail = me?.role === "admin" ? "Admin" : (me?.email ?? null);
@@ -57,7 +64,9 @@ export function SidebarAccount({ action }: { action?: ReactNode }) {
         </div>
       ) : (
         <div className={`${textWidth} flex flex-col gap-1.5`}>
-          <span className="sr-only">Loading your account</span>
+          <span className="sr-only">
+            {readCopy(copy, "shared.dashboard.loading_account")}
+          </span>
           <span aria-hidden="true" className="h-3 w-20 rounded bg-line" />
           <span aria-hidden="true" className="h-3 w-32 rounded bg-line" />
         </div>
