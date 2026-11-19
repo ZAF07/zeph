@@ -131,4 +131,10 @@ No pixel test for this issue (no refs).
 ## Completion
 
 - Completed: 2026-11-19
-- Commit: <filled in after merge>
+- Commit: merge `ab9d4c0` into main — "Merge redesign issue 15: uncovered admin pages — eval run, result trace, case editors, new eval, Judge, Model Prices, case history, Knowledge Document and model-call trace restyled with tokens and existing parts (no old theme left on admin pages), CodeMirror theme on the tokens; Helplines, the eval run grid and Model Prices show rows as cards on a phone; Helplines remove, Knowledge delete, replace file, discard text and the leave-with-unsaved-text guard use the shared confirm dialog; pills cream, danger or outlined (Error is not a fail)"
+  - Branch `redesign-15-uncovered-admin-pages`:
+    - `1038093` Redesign 15: uncovered admin pages restyled with tokens and existing parts — eval run, result trace, case editors, new eval, Judge, Model Prices, case history, Knowledge Document, model-call trace and editor theme; Helplines table moves onto DataTable (phone cards)
+    - `7760bf0` Redesign 15: code-review fixes — Error pill outlined (not a fail), save results as SavedNote/SaveFailedNote, 44px toggles and case ticks, editor theme without mixed colours, shared table head class and card tag tone type
+    - `f09550a` Redesign 15: eval run grid and Model Prices as phone cards below 900px (no sideways scroll); Helplines remove, Knowledge delete, replace file, discard text and the leave-with-unsaved-text guard ask in the shared ConfirmDialog instead of the browser's confirm
+    - `f14bcbb` Redesign 15: code-review fixes — leave guard only holds plain same-tab in-app links (new-tab, download, off-site and same-page links go to the browser) with tests; plainer card keys; shorter dialog bodies
+    - `85c9274` Redesign 15: evidence recorded, issue completed and archived, screenshots at both widths
