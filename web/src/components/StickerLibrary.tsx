@@ -1,34 +1,32 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
+import { CardCount } from "@/components/CardCount";
+import { CardList } from "@/components/CardList";
+import { CardListFlash, type Flash } from "@/components/CardListFlash";
+import { CardListLoading } from "@/components/CardListLoading";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadFailed } from "@/components/LoadFailed";
-import { StickerAddPanel } from "@/components/StickerAddPanel";
+import { StickerAddBox } from "@/components/StickerAddBox";
 import { StickerCard } from "@/components/StickerCard";
 import type { Sticker } from "@/lib/api-client";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 /**
- * Writes a sticker count like "6 stickers".
- *
- * @param count - How many stickers there are.
- * @returns The count with the right word.
- */
-function stickerCountLabel(count: number): string {
-  return `${count} ${count === 1 ? "sticker" : "stickers"}`;
-}
-
-/**
- * The admin Sticker Library: the "Add stickers" card, then every sticker
- * with its "when to use" note and Remove.
+ * The admin Sticker Library, from the card-list template: a folding card
+ * per sticker with its "when to use" note and Remove, and the "Add
+ * stickers" box above the list.
  *
  * @returns The library, or a loading, empty or error state.
  */
 export function StickerLibrary() {
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
+  const [isAdding, setIsAdding] = useState(false);
+  const [flash, setFlash] = useState<Flash | null>(null);
   const stickersQuery = useQuery({
     queryKey: queryKeys.stickers,
     queryFn: () => apiClient.listStickers(),
@@ -39,61 +37,73 @@ export function StickerLibrary() {
     await queryClient.invalidateQueries({ queryKey: queryKeys.stickers });
   }
 
-  async function remove(sticker: Sticker) {
-    await apiClient.removeSticker(sticker.id);
+  async function saveNote(sticker: Sticker, note: string) {
+    await apiClient.saveStickerNote(sticker.id, note);
+    setFlash({ text: "Saved the note.", isError: false });
     await reloadStickers();
   }
 
-  return (
-    <div className="flex flex-col gap-[30px]">
-      <StickerAddPanel onAdded={() => void reloadStickers()} />
+  async function remove(sticker: Sticker) {
+    await apiClient.removeSticker(sticker.id);
+    setFlash({ text: "Removed the sticker.", isError: false });
+    await reloadStickers();
+  }
 
-      {stickersQuery.isPending ? (
-        <div
-          aria-busy="true"
-          aria-label="Loading stickers"
-          className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3"
-        >
-          {[1, 2, 3, 4].map((placeholder) => (
-            <span
-              key={placeholder}
-              className="h-60 rounded-2xl border border-line bg-subtle"
-            />
-          ))}
-        </div>
-      ) : null}
-
-      {!stickers && stickersQuery.isError ? (
+  if (!stickers) {
+    if (stickersQuery.isError) {
+      return (
         <LoadFailed
           title="Couldn’t load stickers"
           body="Zeph keeps sending stickers from the last saved library."
           onRetry={() => void stickersQuery.refetch()}
         />
-      ) : null}
+      );
+    }
+    return <CardListLoading label="Loading stickers" />;
+  }
 
-      {stickers && stickers.length === 0 ? (
-        <EmptyState
-          title="No stickers yet"
-          body="Zeph replies in words only until you add some."
+  return (
+    <CardList
+      items={stickers}
+      count={
+        <CardCount
+          count={stickers.length}
+          words={stickers.length === 1 ? "sticker" : "stickers"}
         />
-      ) : null}
-
-      {stickers && stickers.length > 0 ? (
+      }
+      addLabel="Add stickers"
+      onAdd={() => {
+        setIsAdding(true);
+        setFlash(null);
+      }}
+      isAddDisabled={isAdding}
+      aboveList={
         <>
-          <p className="m-0 text-caption text-ink-muted">
-            {stickerCountLabel(stickers.length)}
-          </p>
-          <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(min(200px,100%),1fr))] gap-3 p-0">
-            {stickers.map((sticker) => (
-              <StickerCard
-                key={sticker.id}
-                sticker={sticker}
-                onRemove={() => remove(sticker)}
-              />
-            ))}
-          </ul>
+          <CardListFlash flash={flash} />
+          {isAdding ? (
+            <StickerAddBox
+              onAdded={() => void reloadStickers()}
+              onClose={() => setIsAdding(false)}
+            />
+          ) : null}
+          {stickers.length === 0 ? (
+            <EmptyState
+              title="No stickers yet"
+              body="Zeph replies in words only until you add some."
+            />
+          ) : null}
         </>
-      ) : null}
-    </div>
+      }
+      renderCard={(sticker, _index, folding) => (
+        <StickerCard
+          key={sticker.id}
+          sticker={sticker}
+          isOpen={folding.isOpen}
+          onToggle={folding.onToggle}
+          onSaveNote={(note) => saveNote(sticker, note)}
+          onRemove={() => remove(sticker)}
+        />
+      )}
+    />
   );
 }

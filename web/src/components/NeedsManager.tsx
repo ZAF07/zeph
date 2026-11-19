@@ -3,28 +3,24 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { primaryButton } from "@/components/button-styles";
+import { CardCount } from "@/components/CardCount";
+import { CardList } from "@/components/CardList";
+import { CardListFlash, type Flash } from "@/components/CardListFlash";
+import { CardListLoading } from "@/components/CardListLoading";
 import { LoadFailed } from "@/components/LoadFailed";
 import { NeedCard } from "@/components/NeedCard";
+import { NewNeedBox } from "@/components/NewNeedBox";
 import type { MoveDirection, Need, NeedInput } from "@/lib/api-client";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
-type Flash = { text: string; isError: boolean };
-
-const emptyNeed: NeedInput = {
-  name: "",
-  when_it_fits: "",
-  how_to_reply: "",
-  ruled_out_move_ids: [],
-};
-
 /**
- * The admin Needs manager: a card per Need, in order, to edit, move or
- * remove it and pick the Moves it rules out, and a card to add a new one.
- * The fallback Need can't be removed.
+ * The admin Needs manager, from the card-list template: a folding card per
+ * Need, in order, to edit, move or remove it and pick the Moves it rules
+ * out, and a box above the list to add one. The fallback Need can't be
+ * removed.
  *
- * @returns The cards, or a loading or error state.
+ * @returns The list, or a loading or error state.
  */
 export function NeedsManager() {
   const apiClient = useApiClient();
@@ -94,71 +90,51 @@ export function NeedsManager() {
         />
       );
     }
-    return (
-      <div
-        aria-busy="true"
-        aria-label="Loading Needs"
-        className="flex flex-col gap-4"
-      >
-        <span className="block h-[260px] rounded-card bg-subtle" />
-        <span className="block h-[260px] rounded-card bg-subtle" />
-      </div>
-    );
+    return <CardListLoading label="Loading Needs" />;
   }
 
   return (
-    <div className="flex flex-col gap-[30px]">
-      <button
-        type="button"
-        className={`${primaryButton} self-start`}
-        disabled={isAdding}
-        onClick={() => {
-          setIsAdding(true);
-          setFlash(null);
-        }}
-      >
-        Add Need
-      </button>
-
-      {flash ? (
-        <p
-          role="status"
-          className={`m-0 rounded-xl px-4 py-3.5 text-sm ${
-            flash.isError
-              ? "border border-danger-line bg-danger-tint text-danger-deep"
-              : "bg-blue-tint text-blue-deep"
-          }`}
-        >
-          {flash.text}
-        </p>
-      ) : null}
-
-      <div className="flex flex-col gap-4">
-        {needs.map((need, index) => (
-          <NeedCard
-            key={need.id}
-            initial={need}
-            isNew={false}
-            moves={moves}
-            isFallback={need.is_fallback}
-            onSave={(input) => save(need, input)}
-            onRemove={need.is_fallback ? undefined : () => remove(need)}
-            onMove={(direction) => moveMutation.mutate({ need, direction })}
-            canMoveUp={index > 0}
-            canMoveDown={index < needs.length - 1}
-            isMoving={moveMutation.isPending}
-          />
-        ))}
-        {isAdding ? (
-          <NeedCard
-            initial={emptyNeed}
-            isNew
-            moves={moves}
-            onSave={add}
-            onCancel={() => setIsAdding(false)}
-          />
-        ) : null}
-      </div>
-    </div>
+    <CardList
+      items={needs}
+      count={
+        <CardCount
+          count={needs.length}
+          words={needs.length === 1 ? "Need" : "Needs"}
+        />
+      }
+      addLabel="Add Need"
+      onAdd={() => {
+        setIsAdding(true);
+        setFlash(null);
+      }}
+      isAddDisabled={isAdding}
+      aboveList={
+        <>
+          <CardListFlash flash={flash} />
+          {isAdding ? (
+            <NewNeedBox
+              moves={moves}
+              onAdd={add}
+              onCancel={() => setIsAdding(false)}
+            />
+          ) : null}
+        </>
+      }
+      renderCard={(need, index, folding) => (
+        <NeedCard
+          key={need.id}
+          need={need}
+          moves={moves}
+          isOpen={folding.isOpen}
+          onToggle={folding.onToggle}
+          onSave={(input) => save(need, input)}
+          onRemove={() => remove(need)}
+          onMove={(direction) => moveMutation.mutate({ need, direction })}
+          canMoveUp={index > 0}
+          canMoveDown={index < needs.length - 1}
+          isMoving={moveMutation.isPending}
+        />
+      )}
+    />
   );
 }

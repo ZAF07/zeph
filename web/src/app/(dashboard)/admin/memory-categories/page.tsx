@@ -8,12 +8,12 @@ import { MemoryCategoriesManager } from "@/components/MemoryCategoriesManager";
  */
 export default function AdminMemoryCategoriesPage() {
   return (
-    <div className="flex flex-col gap-[30px]">
+    <>
       <AdminPageHeader
         title="Memory Categories"
-        lead="How Zeph sorts what it remembers. Names appear to Users on their Memories page."
+        lead="How Zeph sorts what it remembers. Names appear to Users on their Memories page. Categories can’t be deleted, because Memory Items belong to them: archive one instead."
       />
       <MemoryCategoriesManager />
-    </div>
+    </>
   );
 }

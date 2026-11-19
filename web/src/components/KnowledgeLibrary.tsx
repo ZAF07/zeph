@@ -1,54 +1,33 @@
 "use client";
 
-import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import {
-  compactSecondaryButton,
-  deleteIconButton,
-} from "@/components/button-styles";
-import { DeleteIcon } from "@/components/DeleteIcon";
+import { CardCount } from "@/components/CardCount";
+import { CardList } from "@/components/CardList";
+import { CardListFlash, type Flash } from "@/components/CardListFlash";
+import { CardListLoading } from "@/components/CardListLoading";
 import { EmptyState } from "@/components/EmptyState";
-import { KnowledgeStatusPill } from "@/components/KnowledgeStatusPill";
-import { KnowledgeUploadForm } from "@/components/KnowledgeUploadForm";
+import { KnowledgeDocumentCard } from "@/components/KnowledgeDocumentCard";
+import { KnowledgeUploadBox } from "@/components/KnowledgeUploadBox";
 import { LoadFailed } from "@/components/LoadFailed";
 import type { KnowledgeDocument, KnowledgeUpload } from "@/lib/api-client";
 import { formatAddedDay } from "@/lib/dates";
-import {
-  knowledgeFileTypeLabels,
-  knowledgeStatusOrder,
-} from "@/lib/knowledge-labels";
+import { knowledgeStatusOrder } from "@/lib/knowledge-labels";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
-type Flash = { text: string; isError: boolean };
-
 const pendingCheckMilliseconds = 3000;
 
-const headings = [
-  "Title",
-  "Source / author",
-  "Tradition",
-  "Type",
-  "Status",
-  "Added",
-];
-
-const headingCell =
-  "whitespace-nowrap border-b border-line bg-subtle px-[18px] py-3.5 font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted";
-
 /**
- * Writes the table caption, like "6 documents · 4 ready · 1 failed".
+ * Writes how many documents there are of each status, like " · 4 ready ·
+ * 1 failed", for after the document count.
  *
  * @param documents - Every document in the library.
- * @returns The count of documents and of each status there is.
+ * @returns The count of each status there is, each after a " · ".
  */
-function countsCaption(documents: KnowledgeDocument[]): string {
-  const total = `${documents.length} ${
-    documents.length === 1 ? "document" : "documents"
-  }`;
-  const perStatus = knowledgeStatusOrder
+function statusCounts(documents: KnowledgeDocument[]): string {
+  return knowledgeStatusOrder
     .map((status) => ({
       status,
       count: documents.filter(
@@ -56,22 +35,22 @@ function countsCaption(documents: KnowledgeDocument[]): string {
       ).length,
     }))
     .filter(({ count }) => count > 0)
-    .map(({ status, count }) => `${count} ${status}`);
-  return [total, ...perStatus].join(" · ");
+    .map(({ status, count }) => ` · ${count} ${status}`)
+    .join("");
 }
 
 /**
- * The admin Knowledge library: upload a document, then see each one's
- * status while it is indexed, open its page from its title, retry one that
- * failed, or delete one. Checks again every few seconds while any document
- * is pending.
+ * The admin Knowledge library, from the card-list template: a folding card
+ * per document showing its status while it is indexed, with Open document,
+ * Retry for one that failed, and Delete; and the "Add a document" box above
+ * the list. Checks again every few seconds while any document is pending.
  *
- * @returns The upload form and document table, or a loading, empty or error
- *   state.
+ * @returns The library, or a loading, empty or error state.
  */
 export function KnowledgeLibrary() {
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
+  const [isAdding, setIsAdding] = useState(false);
   const [flash, setFlash] = useState<Flash | null>(null);
 
   const documentsQuery = useQuery({
@@ -95,6 +74,7 @@ export function KnowledgeLibrary() {
   async function upload(newDocument: KnowledgeUpload) {
     setFlash(null);
     const uploaded = await apiClient.uploadKnowledgeDocument(newDocument);
+    setIsAdding(false);
     setFlash({
       text: `Uploaded ${uploaded.title}. It’s being indexed now.`,
       isError: false,
@@ -102,7 +82,7 @@ export function KnowledgeLibrary() {
     await reloadDocuments();
   }
 
-  const rowAction = useMutation({
+  const change = useMutation({
     mutationFn: async ({
       action,
     }: {
@@ -125,172 +105,84 @@ export function KnowledgeLibrary() {
         isError: true,
       }),
   });
-  const busyId = rowAction.isPending ? rowAction.variables.target.id : null;
+  const changingId = change.isPending ? change.variables.target.id : null;
 
-  function runRowAction(
-    target: KnowledgeDocument,
-    action: () => Promise<unknown>,
-    successText: string | null,
-  ) {
-    rowAction.mutate({ target, action, successText });
-  }
-
-  function remove(knowledgeDocument: KnowledgeDocument) {
-    if (
-      !window.confirm(
-        `Delete ${knowledgeDocument.title}? Zeph will stop drawing on it.`,
-      )
-    ) {
-      return;
-    }
-    runRowAction(
-      knowledgeDocument,
-      () => apiClient.deleteKnowledgeDocument(knowledgeDocument.id),
-      `Deleted ${knowledgeDocument.title}.`,
-    );
-  }
-
-  const now = new Date();
-
-  return (
-    <div className="flex flex-col gap-[30px]">
-      <KnowledgeUploadForm onUpload={upload} />
-
-      {flash ? (
-        <p
-          role="status"
-          className={`m-0 rounded-xl px-4 py-3.5 text-sm ${
-            flash.isError
-              ? "border border-danger-line bg-danger-tint text-danger-deep"
-              : "bg-blue-tint text-blue-deep"
-          }`}
-        >
-          {flash.text}
-        </p>
-      ) : null}
-
-      {documentsQuery.isPending ? (
-        <div
-          aria-busy="true"
-          aria-label="Loading documents"
-          className="h-[240px] rounded-xl border border-line bg-subtle"
-        />
-      ) : null}
-
-      {!documents && documentsQuery.isError ? (
+  if (!documents) {
+    if (documentsQuery.isError) {
+      return (
         <LoadFailed
           title="Couldn’t load the document list"
           body="Zeph keeps using documents that are already Ready."
           onRetry={() => void documentsQuery.refetch()}
         />
-      ) : null}
+      );
+    }
+    return <CardListLoading label="Loading documents" />;
+  }
 
-      {documents && documents.length === 0 ? (
-        <EmptyState
-          title="The library is empty"
-          body="Until you add documents, Zeph relies on general knowledge only. Start with a few primary texts per tradition."
+  const now = new Date();
+
+  return (
+    <CardList
+      items={documents}
+      count={
+        <>
+          <CardCount
+            count={documents.length}
+            words={documents.length === 1 ? "document" : "documents"}
+          />
+          {statusCounts(documents)}
+        </>
+      }
+      addLabel="Add a document"
+      onAdd={() => {
+        setIsAdding(true);
+        setFlash(null);
+      }}
+      isAddDisabled={isAdding}
+      aboveList={
+        <>
+          <CardListFlash flash={flash} />
+          {isAdding ? (
+            <KnowledgeUploadBox
+              onUpload={upload}
+              onCancel={() => setIsAdding(false)}
+            />
+          ) : null}
+          {documents.length === 0 ? (
+            <EmptyState
+              title="The library is empty"
+              body="Until you add documents, Zeph relies on general knowledge only. Start with a few primary texts per tradition."
+            />
+          ) : null}
+        </>
+      }
+      renderCard={(knowledgeDocument, _index, folding) => (
+        <KnowledgeDocumentCard
+          key={knowledgeDocument.id}
+          knowledgeDocument={knowledgeDocument}
+          addedDay={formatAddedDay(knowledgeDocument.created_at, now)}
+          isOpen={folding.isOpen}
+          onToggle={folding.onToggle}
+          onRetry={() =>
+            change.mutate({
+              target: knowledgeDocument,
+              action: () =>
+                apiClient.retryKnowledgeDocument(knowledgeDocument.id),
+              successText: null,
+            })
+          }
+          onDelete={() =>
+            change.mutate({
+              target: knowledgeDocument,
+              action: () =>
+                apiClient.deleteKnowledgeDocument(knowledgeDocument.id),
+              successText: `Deleted ${knowledgeDocument.title}.`,
+            })
+          }
+          isChanging={changingId === knowledgeDocument.id}
         />
-      ) : null}
-
-      {documents && documents.length > 0 ? (
-        <div className="overflow-x-auto rounded-xl border border-line bg-white">
-          <table className="w-full min-w-[860px] border-collapse text-sm">
-            <caption className="border-b border-line px-4 py-2.5 text-left text-caption text-ink-muted">
-              {countsCaption(documents)}
-            </caption>
-            <thead>
-              <tr>
-                {headings.map((heading) => (
-                  <th
-                    key={heading}
-                    scope="col"
-                    className={`${headingCell} text-left`}
-                  >
-                    {heading}
-                  </th>
-                ))}
-                <th scope="col" className={`${headingCell} text-right`}>
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {documents.map((knowledgeDocument) => {
-                const isBusy = busyId === knowledgeDocument.id;
-                return (
-                  <tr
-                    key={knowledgeDocument.id}
-                    className="border-b border-line last:border-b-0"
-                  >
-                    <td className="px-[18px] py-3.5 font-medium">
-                      <Link
-                        href={`/admin/knowledge/${knowledgeDocument.id}`}
-                        className="text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink"
-                      >
-                        {knowledgeDocument.title}
-                      </Link>
-                    </td>
-                    <td className="px-[18px] py-3.5">
-                      {knowledgeDocument.source}
-                    </td>
-                    <td className="px-[18px] py-3.5">
-                      {knowledgeDocument.tradition}
-                    </td>
-                    <td className="px-[18px] py-3.5">
-                      {knowledgeFileTypeLabels[knowledgeDocument.file_type]}
-                    </td>
-                    <td className="px-[18px] py-3.5">
-                      <span className="inline-flex flex-col gap-0.5">
-                        <KnowledgeStatusPill
-                          status={knowledgeDocument.status}
-                        />
-                        {knowledgeDocument.failure_reason ? (
-                          <span className="text-caption text-ink-muted">
-                            {knowledgeDocument.failure_reason}
-                          </span>
-                        ) : null}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-[18px] py-3.5">
-                      {formatAddedDay(knowledgeDocument.created_at, now)}
-                    </td>
-                    <td className="whitespace-nowrap px-[18px] py-2 text-right">
-                      {knowledgeDocument.status === "failed" ? (
-                        <button
-                          type="button"
-                          className={compactSecondaryButton}
-                          disabled={isBusy}
-                          onClick={() =>
-                            runRowAction(
-                              knowledgeDocument,
-                              () =>
-                                apiClient.retryKnowledgeDocument(
-                                  knowledgeDocument.id,
-                                ),
-                              null,
-                            )
-                          }
-                        >
-                          Retry
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        className={deleteIconButton}
-                        aria-label={`Delete ${knowledgeDocument.title}`}
-                        disabled={isBusy}
-                        onClick={() => remove(knowledgeDocument)}
-                      >
-                        <DeleteIcon />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
-    </div>
+      )}
+    />
   );
 }

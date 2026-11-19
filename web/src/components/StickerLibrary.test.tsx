@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -33,12 +33,29 @@ function sticker(id: string, emoji: string, note: string): Sticker {
 const seedling = sticker("seedling", "🌱", "Celebrating a small step forward");
 const leaf = sticker("leaf", "🍃", "");
 
-function cardFor(emoji: string): ReturnType<typeof within> {
-  const card = screen.getByLabelText(`Emoji: ${emoji}`).closest("li");
-  if (!card) {
-    throw new Error(`No card for ${emoji}`);
-  }
-  return within(card);
+async function findCard(emoji: string): Promise<ReturnType<typeof within>> {
+  fireEvent.click(await screen.findByRole("button", { name: "Expand all" }));
+  return within(
+    await screen.findByRole("region", { name: `${emoji} CalmCreatures` }),
+  );
+}
+
+async function expectCount(text: string) {
+  expect(
+    await screen.findByText(
+      (_, element) =>
+        element?.tagName === "SPAN" &&
+        element.textContent === text &&
+        element.children.length === 1,
+    ),
+  ).toBeInTheDocument();
+}
+
+async function openAddBox() {
+  await userEvent.click(
+    await screen.findByRole("button", { name: "Add stickers" }),
+  );
+  return within(screen.getByRole("region", { name: "Add stickers" }));
 }
 
 describe("StickerLibrary", () => {
@@ -57,12 +74,14 @@ describe("StickerLibrary", () => {
   it("lists stickers with their notes and marks the ones that need a note", async () => {
     renderWithQueries(<StickerLibrary />);
 
-    expect(await screen.findByText("2 stickers")).toBeInTheDocument();
+    await expectCount("2 stickers");
+    const seedlingCard = await findCard("🌱");
     expect(
-      cardFor("🌱").getByRole("textbox", { name: "When to use" }),
+      seedlingCard.getByRole("textbox", { name: "When to use" }),
     ).toHaveValue("Celebrating a small step forward");
-    expect(cardFor("🌱").queryByText("Needs a note")).toBeNull();
-    expect(cardFor("🍃").getByText("Needs a note")).toBeInTheDocument();
+    expect(seedlingCard.queryByText("Needs a note")).toBeNull();
+    const leafCard = await findCard("🍃");
+    expect(leafCard.getByText("Needs a note")).toBeInTheDocument();
   });
 
   it("shows the empty state when there are no stickers", async () => {
@@ -88,19 +107,19 @@ describe("StickerLibrary", () => {
     await userEvent.click(
       within(alert).getByRole("button", { name: "Try again" }),
     );
-    expect(await screen.findByText("2 stickers")).toBeInTheDocument();
+    await expectCount("2 stickers");
   });
 
   it("imports a sticker set by name and shows how many were added", async () => {
     apiClient.importStickerSet.mockResolvedValue(2);
     renderWithQueries(<StickerLibrary />);
-    await screen.findByText("2 stickers");
+    const box = await openAddBox();
 
     await userEvent.type(
-      screen.getByRole("textbox", { name: "Sticker set name" }),
+      box.getByRole("textbox", { name: "Sticker set name" }),
       "CalmCreatures",
     );
-    await userEvent.click(screen.getByRole("button", { name: "Import set" }));
+    await userEvent.click(box.getByRole("button", { name: "Import set" }));
 
     expect(apiClient.importStickerSet).toHaveBeenCalledWith("CalmCreatures");
     expect(
@@ -120,33 +139,40 @@ describe("StickerLibrary", () => {
       ),
     );
     renderWithQueries(<StickerLibrary />);
-    await screen.findByText("2 stickers");
+    const box = await openAddBox();
 
     await userEvent.type(
-      screen.getByRole("textbox", { name: "Sticker set name" }),
+      box.getByRole("textbox", { name: "Sticker set name" }),
       "Nope",
     );
-    await userEvent.click(screen.getByRole("button", { name: "Import set" }));
+    await userEvent.click(box.getByRole("button", { name: "Import set" }));
 
-    expect(
-      await screen.findByText("There is no sticker set called “Nope”."),
-    ).toBeInTheDocument();
+    expect(await box.findByRole("alert")).toHaveTextContent(
+      "There is no sticker set called “Nope”.",
+    );
+  });
+
+  it("closes the add box with Cancel", async () => {
+    renderWithQueries(<StickerLibrary />);
+    const box = await openAddBox();
+
+    await userEvent.click(box.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("region", { name: "Add stickers" })).toBeNull();
   });
 
   it("explains both ways to add stickers in the Telegram chat", async () => {
     renderWithQueries(<StickerLibrary />);
-    await screen.findByText("2 stickers");
+    const box = await openAddBox();
 
     await userEvent.click(
-      screen.getByRole("tab", { name: "Send from your Telegram" }),
+      box.getByRole("tab", { name: "Send from your Telegram" }),
     );
 
     expect(
-      await screen.findByText(/Tell Zeph you want to add stickers/),
+      await box.findByText(/Tell Zeph you want to add stickers/),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Reply “add this” to a sticker/),
-    ).toBeInTheDocument();
+    expect(box.getByText(/Reply “add this” to a sticker/)).toBeInTheDocument();
     expect(screen.queryByText(/Listening for stickers/)).toBeNull();
   });
 
@@ -156,78 +182,106 @@ describe("StickerLibrary", () => {
       latest_token: null,
     });
     renderWithQueries(<StickerLibrary />);
-    await screen.findByText("2 stickers");
+    const box = await openAddBox();
 
     await userEvent.click(
-      screen.getByRole("tab", { name: "Send from your Telegram" }),
+      box.getByRole("tab", { name: "Send from your Telegram" }),
     );
 
     expect(
-      await screen.findByRole("link", { name: "Connect Telegram" }),
+      await box.findByRole("link", { name: "Connect Telegram" }),
     ).toHaveAttribute("href", "/connect-telegram");
   });
 
-  it("saves a changed note when leaving the field", async () => {
+  it("saves a changed note with Save", async () => {
     apiClient.saveStickerNote.mockResolvedValue({
       ...leaf,
       note: "A calm moment",
     });
     renderWithQueries(<StickerLibrary />);
-    await screen.findByText("2 stickers");
+    const card = await findCard("🍃");
+    expect(card.getByRole("button", { name: "Save" })).toBeDisabled();
+    apiClient.listStickers.mockResolvedValue([
+      seedling,
+      { ...leaf, note: "A calm moment" },
+    ]);
 
-    const note = cardFor("🍃").getByRole("textbox", { name: "When to use" });
-    await userEvent.type(note, "A calm moment");
-    await userEvent.tab();
+    await userEvent.type(
+      card.getByRole("textbox", { name: "When to use" }),
+      "A calm moment",
+    );
+    await userEvent.click(card.getByRole("button", { name: "Save" }));
 
     expect(apiClient.saveStickerNote).toHaveBeenCalledWith(
       "leaf",
       "A calm moment",
     );
-    expect(await cardFor("🍃").findByText("Saved")).toBeInTheDocument();
-    expect(cardFor("🍃").queryByText("Needs a note")).toBeNull();
+    expect(await screen.findByText("Saved the note.")).toBeInTheDocument();
+    await vi.waitFor(() => expect(card.queryByText("Needs a note")).toBeNull());
   });
 
-  it("does not save a note that was not changed", async () => {
+  it("does not save when leaving the field", async () => {
     renderWithQueries(<StickerLibrary />);
-    await screen.findByText("2 stickers");
+    const card = await findCard("🌱");
 
-    await userEvent.click(
-      cardFor("🌱").getByRole("textbox", { name: "When to use" }),
+    await userEvent.type(
+      card.getByRole("textbox", { name: "When to use" }),
+      "!",
     );
     await userEvent.tab();
 
     expect(apiClient.saveStickerNote).not.toHaveBeenCalled();
+    expect(card.getByText("Unsaved changes")).toBeInTheDocument();
+  });
+
+  it("does not count spaces alone as a change", async () => {
+    renderWithQueries(<StickerLibrary />);
+    const card = await findCard("🌱");
+
+    await userEvent.type(
+      card.getByRole("textbox", { name: "When to use" }),
+      "  ",
+    );
+
+    expect(card.queryByText("Unsaved changes")).toBeNull();
+    expect(card.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
   it("shows when a note couldn't be saved", async () => {
     apiClient.saveStickerNote.mockRejectedValue(new Error("down"));
     renderWithQueries(<StickerLibrary />);
-    await screen.findByText("2 stickers");
+    const card = await findCard("🍃");
 
     await userEvent.type(
-      cardFor("🍃").getByRole("textbox", { name: "When to use" }),
+      card.getByRole("textbox", { name: "When to use" }),
       "Calm",
     );
-    await userEvent.tab();
+    await userEvent.click(card.getByRole("button", { name: "Save" }));
 
-    expect(
-      await cardFor("🍃").findByText("Couldn’t save. Try again."),
-    ).toBeInTheDocument();
+    expect(await card.findByRole("alert")).toHaveTextContent(
+      "Couldn’t save. Try again.",
+    );
   });
 
-  it("removes a sticker", async () => {
+  it("removes a sticker after confirming", async () => {
     apiClient.removeSticker.mockResolvedValue();
     renderWithQueries(<StickerLibrary />);
-    await screen.findByText("2 stickers");
+    const card = await findCard("🍃");
     apiClient.listStickers.mockResolvedValue([seedling]);
 
+    await userEvent.click(card.getByRole("button", { name: "Remove" }));
+    expect(apiClient.removeSticker).not.toHaveBeenCalled();
     await userEvent.click(
-      cardFor("🍃").getByRole("button", { name: "Remove" }),
+      within(card.getByRole("alertdialog")).getByRole("button", {
+        name: "Remove",
+      }),
     );
 
     expect(apiClient.removeSticker).toHaveBeenCalledWith("leaf");
-    expect(await screen.findByText("1 sticker")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Emoji: 🍃")).toBeNull();
+    await expectCount("1 sticker");
+    expect(
+      screen.queryByRole("region", { name: "🍃 CalmCreatures" }),
+    ).toBeNull();
   });
 
   it("shows a sticker's image when it has one", async () => {

@@ -8,7 +8,7 @@ import { useApiClient } from "@/lib/use-api-client";
 import { useImageUrl } from "@/lib/use-image-url";
 
 /**
- * A sticker's image, loaded through the API client. Shows the sticker's
+ * A sticker's image as a 44px square, loaded through the API client. Shows the sticker's
  * emoji instead while it loads, or when it has no image or it can't load.
  *
  * @param props - `sticker` is the Sticker Library sticker to show.
@@ -25,14 +25,14 @@ export function StickerPicture({ sticker }: { sticker: Sticker }) {
 
   if (imageUrl) {
     return (
-      <div className="relative aspect-square overflow-hidden rounded-xl bg-subtle">
+      <div className="relative size-11 flex-none overflow-hidden rounded-input">
         <Image
           src={imageUrl}
           alt={label}
           fill
-          sizes="200px"
+          sizes="44px"
           unoptimized
-          className="object-contain p-2"
+          className="object-contain p-0.5"
         />
       </div>
     );
@@ -41,7 +41,7 @@ export function StickerPicture({ sticker }: { sticker: Sticker }) {
     <div
       role="img"
       aria-label={label}
-      className="flex aspect-square items-center justify-center rounded-xl border border-dashed border-line-strong bg-subtle text-[56px]"
+      className="flex size-11 flex-none items-center justify-center rounded-input border border-dashed border-line-strong text-[24px]"
     >
       {sticker.emoji}
     </div>

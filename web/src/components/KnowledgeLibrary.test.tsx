@@ -1,4 +1,4 @@
-import { act, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -56,12 +56,27 @@ const being = knowledgeDocument("being", "Being and Time (excerpt)", {
   failure_reason: "Scanned PDF — no text found",
 });
 
-function rowFor(title: string): ReturnType<typeof within> {
-  const row = screen.getByText(title).closest("tr");
-  if (!row) {
-    throw new Error(`No row for ${title}`);
-  }
-  return within(row);
+async function findCard(title: string): Promise<ReturnType<typeof within>> {
+  fireEvent.click(await screen.findByRole("button", { name: "Expand all" }));
+  return within(await screen.findByRole("region", { name: title }));
+}
+
+async function expectCount(text: string) {
+  expect(
+    await screen.findByText(
+      (_, element) =>
+        element?.tagName === "SPAN" &&
+        element.textContent === text &&
+        element.children.length === 1,
+    ),
+  ).toBeInTheDocument();
+}
+
+async function openUploadBox(): Promise<ReturnType<typeof within>> {
+  await userEvent.click(
+    await screen.findByRole("button", { name: "Add a document" }),
+  );
+  return within(screen.getByRole("region", { name: "Add a document" }));
 }
 
 async function chooseFile(name: string): Promise<File> {
@@ -83,43 +98,42 @@ describe("KnowledgeLibrary", () => {
   it("lists documents with their type, status and why one failed", async () => {
     renderWithQueries(<KnowledgeLibrary />);
 
-    await screen.findByText("Letters to Lucilius");
+    await expectCount("2 documents · 1 ready · 1 failed");
+    const lettersCard = await findCard("Letters to Lucilius");
     expect(
-      screen.getByText("2 documents · 1 ready · 1 failed"),
-    ).toBeInTheDocument();
-    const lettersRow = rowFor("Letters to Lucilius");
-    expect(lettersRow.getByText("Seneca")).toBeInTheDocument();
-    expect(lettersRow.getByText("Stoicism")).toBeInTheDocument();
-    expect(lettersRow.getByText("PDF")).toBeInTheDocument();
-    expect(lettersRow.getByText("Ready")).toBeInTheDocument();
-    expect(lettersRow.getByText("2 Oct")).toBeInTheDocument();
-    expect(lettersRow.queryByRole("button", { name: "Retry" })).toBeNull();
+      lettersCard.getByRole("button", { name: /^Letters to Lucilius/ }),
+    ).toHaveTextContent("Letters to LuciliusSeneca · StoicismReady2 Oct");
+    expect(lettersCard.getByText("PDF")).toBeInTheDocument();
+    expect(lettersCard.getByText("letters.pdf")).toBeInTheDocument();
+    expect(lettersCard.queryByRole("button", { name: "Retry" })).toBeNull();
     expect(
-      lettersRow.getByRole("link", { name: "Letters to Lucilius" }),
+      lettersCard.getByRole("link", { name: "Open document" }),
     ).toHaveAttribute("href", "/admin/knowledge/letters");
-    const beingRow = rowFor("Being and Time (excerpt)");
-    expect(beingRow.getByText("Failed")).toBeInTheDocument();
+    const beingCard = await findCard("Being and Time (excerpt)");
+    expect(beingCard.getByText("Failed")).toBeInTheDocument();
     expect(
-      beingRow.getByText("Scanned PDF — no text found"),
+      beingCard.getByText("Scanned PDF — no text found"),
     ).toBeInTheDocument();
-    expect(beingRow.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(
+      beingCard.getByRole("button", { name: "Retry" }),
+    ).toBeInTheDocument();
   });
 
   it("uploads a document with its title, source and tradition", async () => {
     apiClient.uploadKnowledgeDocument.mockResolvedValue(notes);
     renderWithQueries(<KnowledgeLibrary />);
-    await screen.findByText("Letters to Lucilius");
-    const upload = screen.getByRole("button", { name: "Upload" });
+    const box = await openUploadBox();
+    const upload = box.getByRole("button", { name: "Upload" });
     expect(upload).toBeDisabled();
 
     const file = await chooseFile("self-compassion.md");
-    expect(screen.getByText("self-compassion.md")).toBeInTheDocument();
-    const title = screen.getByLabelText("Title");
+    expect(box.getByText("self-compassion.md")).toBeInTheDocument();
+    const title = box.getByLabelText("Title");
     await userEvent.clear(title);
     await userEvent.type(title, "Notes on self-compassion");
-    await userEvent.type(screen.getByLabelText("Source / author"), "Me");
+    await userEvent.type(box.getByLabelText("Source / author"), "Me");
     await userEvent.selectOptions(
-      screen.getByLabelText("Tradition"),
+      box.getByLabelText("Tradition"),
       "Psychology",
     );
     apiClient.listKnowledgeDocuments.mockResolvedValue([notes, letters, being]);
@@ -137,18 +151,18 @@ describe("KnowledgeLibrary", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      rowFor("Notes on self-compassion").getByText("Pending"),
+      (await findCard("Notes on self-compassion")).getByText("Pending"),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("Title")).toHaveValue("");
+    expect(screen.queryByRole("region", { name: "Add a document" })).toBeNull();
   });
 
   it("suggests a title from the file name", async () => {
     renderWithQueries(<KnowledgeLibrary />);
-    await screen.findByText("Letters to Lucilius");
+    const box = await openUploadBox();
 
     await chooseFile("tao-te-ching.txt");
 
-    expect(screen.getByLabelText("Title")).toHaveValue("tao te ching");
+    expect(box.getByLabelText("Title")).toHaveValue("tao te ching");
   });
 
   it("shows why the backend refused an upload", async () => {
@@ -160,15 +174,15 @@ describe("KnowledgeLibrary", () => {
       ),
     );
     renderWithQueries(<KnowledgeLibrary />);
-    await screen.findByText("Letters to Lucilius");
+    const box = await openUploadBox();
 
     await chooseFile("huge.txt");
-    await userEvent.type(screen.getByLabelText("Source / author"), "Me");
-    await userEvent.click(screen.getByRole("button", { name: "Upload" }));
+    await userEvent.type(box.getByLabelText("Source / author"), "Me");
+    await userEvent.click(box.getByRole("button", { name: "Upload" }));
 
-    expect(
-      await screen.findByText("The file is bigger than 20 MB."),
-    ).toBeInTheDocument();
+    expect(await box.findByRole("alert")).toHaveTextContent(
+      "The file is bigger than 20 MB.",
+    );
   });
 
   it("retries a failed document", async () => {
@@ -178,53 +192,54 @@ describe("KnowledgeLibrary", () => {
       failure_reason: null,
     });
     renderWithQueries(<KnowledgeLibrary />);
-    await screen.findByText("Being and Time (excerpt)");
+    const beingCard = await findCard("Being and Time (excerpt)");
     apiClient.listKnowledgeDocuments.mockResolvedValue([
       letters,
       { ...being, status: "ready", failure_reason: null },
     ]);
 
-    await userEvent.click(
-      rowFor("Being and Time (excerpt)").getByRole("button", { name: "Retry" }),
-    );
+    await userEvent.click(beingCard.getByRole("button", { name: "Retry" }));
 
     expect(apiClient.retryKnowledgeDocument).toHaveBeenCalledWith("being");
-    expect(
-      await screen.findByText("2 documents · 2 ready"),
-    ).toBeInTheDocument();
+    await expectCount("2 documents · 2 ready");
   });
 
-  it("deletes a document after confirming", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+  it("deletes a document after confirming in its card", async () => {
     apiClient.deleteKnowledgeDocument.mockResolvedValue();
     renderWithQueries(<KnowledgeLibrary />);
-    await screen.findByText("Letters to Lucilius");
+    const card = await findCard("Letters to Lucilius");
     apiClient.listKnowledgeDocuments.mockResolvedValue([being]);
 
+    await userEvent.click(card.getByRole("button", { name: "Delete" }));
+    const confirm = card.getByRole("alertdialog", {
+      name: "Delete this document?",
+    });
+    expect(confirm).toHaveTextContent(
+      "Delete “Letters to Lucilius”?Zeph will stop drawing on it.",
+    );
+    expect(apiClient.deleteKnowledgeDocument).not.toHaveBeenCalled();
     await userEvent.click(
-      screen.getByRole("button", { name: "Delete Letters to Lucilius" }),
+      within(confirm).getByRole("button", { name: "Delete" }),
     );
 
-    expect(window.confirm).toHaveBeenCalledWith(
-      "Delete Letters to Lucilius? Zeph will stop drawing on it.",
-    );
     expect(apiClient.deleteKnowledgeDocument).toHaveBeenCalledWith("letters");
     expect(
       await screen.findByText("Deleted Letters to Lucilius."),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Seneca")).toBeNull();
+    expect(
+      screen.queryByRole("region", { name: "Letters to Lucilius" }),
+    ).toBeNull();
   });
 
-  it("keeps a document when deleting is not confirmed", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
+  it("keeps a document when Keep it is chosen", async () => {
     renderWithQueries(<KnowledgeLibrary />);
-    await screen.findByText("Letters to Lucilius");
+    const card = await findCard("Letters to Lucilius");
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "Delete Letters to Lucilius" }),
-    );
+    await userEvent.click(card.getByRole("button", { name: "Delete" }));
+    await userEvent.click(card.getByRole("button", { name: "Keep it" }));
 
     expect(apiClient.deleteKnowledgeDocument).not.toHaveBeenCalled();
+    expect(card.queryByRole("alertdialog")).toBeNull();
   });
 
   it("checks again while a document is pending until it is ready", async () => {
@@ -269,6 +284,8 @@ describe("KnowledgeLibrary", () => {
     ).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
 
-    expect(await screen.findByText("Letters to Lucilius")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("region", { name: "Letters to Lucilius" }),
+    ).toBeInTheDocument();
   });
 });

@@ -28,7 +28,7 @@ export function KnowledgeFileDrop({
     <label
       onDragOver={(event) => event.preventDefault()}
       onDrop={dropFile}
-      className="flex cursor-pointer flex-col items-center gap-1.5 rounded-[14px] border-[1.5px] border-dashed border-line-strong bg-white px-4 py-7 text-center"
+      className="flex cursor-pointer flex-col items-center gap-1.5 rounded-tile border border-dashed border-line-strong bg-bg-deep px-4 py-7 text-center"
     >
       <svg
         width="24"
@@ -40,12 +40,12 @@ export function KnowledgeFileDrop({
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden="true"
-        className="text-blue"
+        className="text-soft"
       >
         <path d="M12 16V4M7 9l5-5 5 5M4 16v4h16v-4" />
       </svg>
-      <span className="font-medium">Drop a file or choose one</span>
-      <span className="text-caption text-ink-muted">
+      <span className="text-[15px] text-text">Drop a file or choose one</span>
+      <span className="text-[12px] text-soft">
         {file ? file.name : "Text, Markdown or PDF · up to 20 MB"}
       </span>
       <input
