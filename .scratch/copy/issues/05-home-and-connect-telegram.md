@@ -28,3 +28,7 @@ Not part of this issue:
 ## Blocked by
 
 - `.scratch/copy/issues/01-landing-end-to-end.md`
+
+## Comments
+
+- 2026-11-19 — From issue 03: the Telegram link card (`TelegramConnectionCard`) already reads Copy, because onboarding shows it. Its slots are `connect_telegram.card.*` in the Connect Telegram tab; add the page's own slots (heading, lead, tab title) before them. `/connect-telegram` reads Copy on the server and shows `CopyLoadFailed` when it can't. Onboarding passes Copy as a prop rather than through a query hook (see issue 03's decisions); choose one way for the Dashboard pages.

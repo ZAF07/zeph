@@ -28,3 +28,7 @@ Not part of this issue:
 ## Blocked by
 
 - `.scratch/copy/issues/01-landing-end-to-end.md`
+
+## Comments
+
+- 2026-11-19 — From issue 03: `LocationFields` and `CheckInFrequencyPicker` now take their words from the page. `ProfileForm` and `UserCheckInSettingsPanel` pass the old words in code until this issue makes them Copy. Onboarding has its own slots for the same words (`onboarding.location.*`, `onboarding.check_ins.frequency_*`); decide whether Account and Check-ins share those (one home) or get their own.

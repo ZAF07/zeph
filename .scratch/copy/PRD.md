@@ -115,3 +115,4 @@ What the Companion says in chat, and anything the Companion is told, stays in Pl
 - Decisions came from a `/grill-with-docs` session on 2026-11-19. See ADR-0019 and the **Copy** entry in `CONTEXT.md`.
 - ADR numbering: there are already two `0018` ADRs. Check that 0019 is still free when this lands.
 - Copy touches every User page component, so it must start only after all redesign work is merged.
+- Issue 03 (onboarding): onboarding reads Copy on the server and passes its own slots to the client flow (`pickCopy`), rather than a TanStack Query hook, so web code holds no "loading Copy" words. The page needs Copy on the server anyway for its title and error state.
