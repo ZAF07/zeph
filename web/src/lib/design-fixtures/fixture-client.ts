@@ -5,6 +5,7 @@ import { adminFormsFixtures } from "@/lib/design-fixtures/admin-forms";
 import { adminTablesFixtures } from "@/lib/design-fixtures/admin-tables";
 import { adminUsersFixtures } from "@/lib/design-fixtures/admin-users";
 import { checkInsFixtures } from "@/lib/design-fixtures/check-ins";
+import { copyFixtures } from "@/lib/design-fixtures/copy";
 import { homeFixtures } from "@/lib/design-fixtures/home";
 import { memoriesFixtures } from "@/lib/design-fixtures/memories";
 import { onboardingFixtures } from "@/lib/design-fixtures/onboarding";
@@ -85,5 +86,6 @@ export function createFixtureClient(designAs: DesignAs): ApiClient {
     ...adminCardsFixtures,
     ...planFixtures,
     ...overviewFixtures,
+    ...copyFixtures,
   });
 }

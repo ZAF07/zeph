@@ -2,10 +2,44 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { Landing } from "@/components/Landing";
+import { markedCopy, seedCopy, withoutMarkedCopy } from "@/test/copy";
 
 describe("Landing", () => {
+  it("shows only Copy text in every section; icons aside, it has no words of its own", () => {
+    const { container } = render(<Landing copy={markedCopy()} />);
+
+    const sections = container.querySelectorAll("section");
+    expect(sections).toHaveLength(5);
+    for (const section of sections) {
+      const words = section.cloneNode(true) as HTMLElement;
+      words
+        .querySelectorAll("[aria-hidden='true']")
+        .forEach((icon) => icon.remove());
+      expect(withoutMarkedCopy(words.textContent ?? "")).toBe("");
+    }
+    expect(screen.getByRole("heading", { level: 1 }).textContent?.trim()).toBe(
+      "⟦landing.hero.heading_first_line⟧ ⟦landing.hero.heading_second_line⟧",
+    );
+  });
+
+  it("shows an Admin's changed main heading", () => {
+    const copy = {
+      ...seedCopy(),
+      "landing.hero.heading_first_line": "Think Slower,",
+    };
+
+    render(<Landing copy={copy} />);
+
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Think Slower, Live More Deliberately.",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("sends every plan's button to sign-up", () => {
-    const { container } = render(<Landing />);
+    const { container } = render(<Landing copy={seedCopy()} />);
 
     const pricing = within(container.querySelector("#pricing") as HTMLElement);
     for (const name of ["Get Started", "Start Plus", "Start Pro"]) {
@@ -17,7 +51,7 @@ describe("Landing", () => {
   });
 
   it("keeps each FAQ answer folded inside its question", () => {
-    const { container } = render(<Landing />);
+    const { container } = render(<Landing copy={seedCopy()} />);
 
     const questions = container.querySelectorAll("#faq details");
     expect(questions).toHaveLength(5);
@@ -29,7 +63,7 @@ describe("Landing", () => {
   });
 
   it("links the footer's Product column to the site's pages", () => {
-    render(<Landing />);
+    render(<Landing copy={seedCopy()} />);
 
     const footer = within(screen.getByRole("contentinfo"));
     expect(footer.getByRole("link", { name: "How It Works" })).toHaveAttribute(

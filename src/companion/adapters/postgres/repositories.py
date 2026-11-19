@@ -33,6 +33,7 @@ from companion.adapters.postgres.tables import (
     conversation_messages,
     conversation_summaries,
     conversations,
+    copy_slots,
     curiosities,
     daily_usage,
     feature_switches,
@@ -81,6 +82,8 @@ from companion.core.models import (
     Conversation,
     ConversationMessage,
     ConversationSummary,
+    CopySeedSlot,
+    CopySlot,
     Curiosity,
     CuriosityChanges,
     CuriositySensitivity,
@@ -1507,6 +1510,131 @@ class PostgresPlatformSettingsRepository:
                     .where(platform_settings.c.key == key)
                     .values(value=value, updated_at=updated_at, updated_by=updated_by)
                 )
+
+
+class PostgresCopyRepository:
+    """Stores website Copy in Postgres, one row per slot."""
+
+    def __init__(self, database: Database) -> None:
+        """Set up the repository.
+
+        Args:
+            database: Where to run queries: the engine, or one transaction.
+        """
+        self._database = database
+
+    def list_slots(self) -> list[CopySlot]:
+        """List every slot, by tab order and then page order.
+
+        Returns:
+            The slots, with when and by whom each was last saved.
+        """
+        statement = (
+            select(
+                copy_slots,
+                func.coalesce(users.c.name, users.c.email).label("updated_by_name"),
+            )
+            .select_from(copy_slots.outerjoin(users))
+            .order_by(copy_slots.c.tab_order, copy_slots.c.slot_order)
+        )
+        with self._database.connect() as connection:
+            rows = connection.execute(statement).all()
+        return [
+            CopySlot(
+                key=row.key,
+                tab=row.tab,
+                tab_name=row.tab_name,
+                name=row.name,
+                text=row.text,
+                max_length=row.max_length,
+                placeholders=tuple(row.placeholders),
+                updated_at=row.updated_at,
+                updated_by_name=row.updated_by_name,
+            )
+            for row in rows
+        ]
+
+    def texts(self) -> dict[str, str]:
+        """Read every slot's current text.
+
+        Returns:
+            Each slot's text by key.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(select(copy_slots.c.key, copy_slots.c.text))
+            return {row.key: row.text for row in rows}
+
+    def save_texts(
+        self, texts: Mapping[str, str], updated_at: datetime, updated_by: UUID
+    ) -> None:
+        """Save new texts for several slots in one step.
+
+        Args:
+            texts: The new text for each slot key.
+            updated_at: When they are being saved.
+            updated_by: The Admin saving them.
+        """
+        with self._database.begin() as connection:
+            for key, text in texts.items():
+                connection.execute(
+                    update(copy_slots)
+                    .where(copy_slots.c.key == key)
+                    .values(text=text, updated_at=updated_at, updated_by=updated_by)
+                )
+
+    def sync_with_seed(self, seed: Sequence[CopySeedSlot], now: datetime) -> None:
+        """Make the stored slots follow the seed, in one step.
+
+        Slots not stored yet are added with the seed text. Stored slots keep
+        their text; their name, tab, order, max length and placeholders take
+        the seed's. Stored slots missing from the seed are removed.
+
+        Args:
+            seed: Every slot the seed file defines.
+            now: When new slots are added.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(copy_slots).where(
+                    copy_slots.c.key.not_in([slot.key for slot in seed])
+                )
+            )
+            if not seed:
+                return
+            statement = insert(copy_slots).values(
+                [
+                    {
+                        "key": slot.key,
+                        "tab": slot.tab,
+                        "tab_name": slot.tab_name,
+                        "tab_order": slot.tab_order,
+                        "slot_order": slot.slot_order,
+                        "name": slot.name,
+                        "text": slot.text,
+                        "max_length": slot.max_length,
+                        "placeholders": list(slot.placeholders),
+                        "updated_at": now,
+                    }
+                    for slot in seed
+                ]
+            )
+            connection.execute(
+                statement.on_conflict_do_update(
+                    index_elements=[copy_slots.c.key],
+                    set_={
+                        column: statement.excluded[column]
+                        for column in (
+                            "tab",
+                            "tab_name",
+                            "tab_order",
+                            "slot_order",
+                            "name",
+                            "max_length",
+                            "placeholders",
+                        )
+                    },
+                )
+            )
 
 
 class PostgresHelplineRepository:
@@ -5586,6 +5714,7 @@ def _build_repositories(
         connection_tokens=PostgresConnectionTokenRepository(database),
         conversations=PostgresConversationRepository(database),
         platform_settings=PostgresPlatformSettingsRepository(database),
+        copy=PostgresCopyRepository(database),
         helplines=PostgresHelplineRepository(database),
         safeguard_events=PostgresSafeguardEventRepository(database),
         memory_categories=PostgresMemoryCategoryRepository(database),

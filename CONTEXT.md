@@ -29,7 +29,7 @@ Everything Admins set that shapes how the Companion behaves for all Users: the P
 _Avoid_: Config, system settings, admin config
 
 **Copy**:
-The Admin-managed words Users and visitors read on the website: the Landing, Pricing and How it works pages, onboarding and the User's side of the Dashboard. It is not Platform Settings: what the Companion says in chat, including the Crisis Reply, stays there, and so does anything the Companion is told, such as the onboarding reason choices. The admin pages' own words are not Copy. Copy changes only the words; how they look and where they sit come from the design.
+The Admin-managed words Users and visitors read on the website: the Landing, Pricing and How it works pages, onboarding and the User's side of the Dashboard. It is not Platform Settings: what the Companion says in chat, including the Crisis Reply, stays there, and so does anything the Companion is told, such as the onboarding reason choices. The admin pages' own words are not Copy. Copy changes only the words; how they look and where they sit come from the design. It is made of fixed slots the code defines (e.g. "Landing: Sign-up button"), each plain text with a max length and any `{name}` placeholders it must keep, grouped into one tab per website page on the Copy admin page.
 _Avoid_: Text, strings, content, wording
 
 **Sticker Library**:

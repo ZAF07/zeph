@@ -48,6 +48,19 @@ export const env = {
 };
 
 /**
+ * The backend's address as the Dashboard's own server reaches it, for pages
+ * that load data while rendering on the server. Inside Docker the browser's
+ * address (`NEXT_PUBLIC_API_URL`) points at the host, so the stack sets
+ * `SERVER_API_URL` to the backend's address on the Docker network. Without
+ * it, the browser's address is used.
+ *
+ * @returns The backend's address for server-side calls.
+ */
+export function serverApiUrl(): string {
+  return process.env.SERVER_API_URL || env.apiUrl;
+}
+
+/**
  * Stops the Dashboard server from starting when a server-only key is missing.
  * Called from `next.config.ts`; Clerk reads the key itself at request time.
  * Skipped while `next build` runs, so the image is built without the secret.

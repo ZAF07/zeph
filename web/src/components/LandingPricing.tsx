@@ -6,77 +6,88 @@ import {
   splitIntro,
   splitSection,
 } from "@/components/site-styles";
+import { type Copy, readCopy } from "@/lib/copy";
 
-/** The plans, as drawn. Billing is still to build, so every button signs up. */
-const plans: LandingPlanDetails[] = [
+/**
+ * The plans, as drawn: the start of each plan's Copy slot keys, how many
+ * lines it includes, whether it has a badge and whether its button is the
+ * primary one. Billing is still to build, so every button signs up.
+ */
+const plans = [
   {
-    name: "Free",
-    blurb: "Start your journey with Zeph.",
-    price: "S$0",
-    features: [
-      "Thoughtful conversations",
-      "Basic daily check-ins",
-      "Core reflection prompts",
-    ],
-    action: "Get Started",
+    slotPrefix: "landing.pricing.free",
+    features: 3,
+    badge: false,
     primary: false,
   },
   {
-    name: "Plus",
-    badge: "Most Popular",
-    blurb: "A proactive companion for real progress.",
-    price: "S$12",
-    features: [
-      "Everything in Free",
-      "Proactive check-ins throughout the day",
-      "Goal and habit support",
-      "Longer memory and context",
-    ],
-    action: "Start Plus",
+    slotPrefix: "landing.pricing.plus",
+    features: 4,
+    badge: true,
     primary: true,
   },
   {
-    name: "Pro",
-    blurb: "A more personalized and ongoing partnership.",
-    price: "S$19",
-    features: [
-      "Everything in Plus",
-      "Deeper long-term insights",
-      "Custom routines and focus areas",
-      "Early access to new features",
-    ],
-    action: "Start Pro",
+    slotPrefix: "landing.pricing.pro",
+    features: 4,
+    badge: false,
     primary: false,
   },
 ];
 
 /**
+ * Reads one plan's words from the Copy.
+ *
+ * @param copy - The website's Copy.
+ * @param plan - Which plan, and how it is drawn.
+ * @returns The plan to draw.
+ */
+function planDetails(
+  copy: Copy,
+  plan: (typeof plans)[number],
+): LandingPlanDetails {
+  const text = (part: string) => readCopy(copy, `${plan.slotPrefix}.${part}`);
+  return {
+    name: text("name"),
+    badge: plan.badge ? text("badge") : undefined,
+    blurb: text("blurb"),
+    price: text("price"),
+    perMonth: readCopy(copy, "landing.pricing.per_month"),
+    features: Array.from({ length: plan.features }, (_, index) =>
+      text(`feature_${index + 1}`),
+    ),
+    action: text("button"),
+    primary: plan.primary,
+  };
+}
+
+/**
  * Landing's pricing section: the intro and the three plans.
  *
+ * @param props - `copy` is the website's Copy.
  * @returns The section.
  */
-export function LandingPricing() {
+export function LandingPricing({ copy }: { copy: Copy }) {
   return (
     <section
       id="pricing"
       className={`${siteColumn} ${splitSection} pt-14 pb-24`}
     >
       <SectionIntro
-        eyebrow="Pricing"
+        eyebrow={readCopy(copy, "landing.pricing.eyebrow")}
         title={
           <>
-            Simple plans
+            {readCopy(copy, "landing.pricing.heading_first_line")}
             <br />
-            that grow with you.
+            {readCopy(copy, "landing.pricing.heading_second_line")}
           </>
         }
-        body="Start free, upgrade when you are ready for deeper support."
+        body={readCopy(copy, "landing.pricing.lead")}
         className={splitIntro}
       />
       <div className={splitContent}>
         <div className="flex flex-wrap gap-y-9">
           {plans.map((plan) => (
-            <LandingPlan key={plan.name} plan={plan} />
+            <LandingPlan key={plan.slotPrefix} plan={planDetails(copy, plan)} />
           ))}
         </div>
       </div>

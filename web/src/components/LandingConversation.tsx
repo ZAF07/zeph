@@ -9,39 +9,22 @@ import {
   splitIntro,
   splitSection,
 } from "@/components/site-styles";
+import { type Copy, readCopy } from "@/lib/copy";
 
-/** The sample conversation, in order. `pause` draws the three dots. */
-const conversation: ({ from: ChatSender; text: string } | { from: "pause" })[] =
+/**
+ * The sample conversation, in order: who sends each message and the Copy
+ * slot holding its words. `pause` draws the three dots.
+ */
+const conversation: ({ from: ChatSender; slot: string } | { from: "pause" })[] =
   [
-    {
-      from: "zeph",
-      text: "You've been pushing hard lately. How are you actually feeling beneath the momentum?",
-    },
-    {
-      from: "person",
-      text: "Honestly? Tired. But I'm also afraid to slow down. It feels like I'll fall behind if I do.",
-    },
-    {
-      from: "zeph",
-      text: "That's a familiar pattern: equating rest with losing ground. What do you think you're really afraid of if you take a proper break?",
-    },
-    {
-      from: "person",
-      text: "Maybe that I'm not as capable as I think. That the progress will stop, and I'll be left with the same old doubts again.",
-    },
-    {
-      from: "zeph",
-      text: "That's a useful insight. It sounds less about productivity and more about self-trust. What would it look like to rest as part of your progress, and not as a pause from it?",
-    },
+    { from: "zeph", slot: "landing.conversations.message_1" },
+    { from: "person", slot: "landing.conversations.message_2" },
+    { from: "zeph", slot: "landing.conversations.message_3" },
+    { from: "person", slot: "landing.conversations.message_4" },
+    { from: "zeph", slot: "landing.conversations.message_5" },
     { from: "pause" },
-    {
-      from: "person",
-      text: "I'm thinking of a bigger change, maybe moving to a van and travelling for a while. It feels exciting, but also a bit reckless. Am I just escaping from something?",
-    },
-    {
-      from: "zeph",
-      text: "It could be both: an escape and a deliberate step toward a life that feels more like you. Let's unpack it. What are you hoping to find on the road, and what are you hoping to leave behind?",
-    },
+    { from: "person", slot: "landing.conversations.message_6" },
+    { from: "zeph", slot: "landing.conversations.message_7" },
     { from: "pause" },
   ];
 
@@ -49,24 +32,25 @@ const conversation: ({ from: ChatSender; text: string } | { from: "pause" })[] =
  * Landing's "Conversations with Zeph" section: the intro and a sample
  * conversation.
  *
+ * @param props - `copy` is the website's Copy.
  * @returns The section.
  */
-export function LandingConversation() {
+export function LandingConversation({ copy }: { copy: Copy }) {
   return (
     <section
       id="conversations"
       className={`${siteColumn} ${splitSection} pt-14 pb-[72px]`}
     >
       <SectionIntro
-        eyebrow="Conversations with Zeph"
+        eyebrow={readCopy(copy, "landing.conversations.eyebrow")}
         title={
           <>
-            Real conversations
+            {readCopy(copy, "landing.conversations.heading_first_line")}
             <br />
-            for real growth.
+            {readCopy(copy, "landing.conversations.heading_second_line")}
           </>
         }
-        body="See how Zeph thinks, responds, and helps you go deeper."
+        body={readCopy(copy, "landing.conversations.lead")}
         className={splitIntro}
       />
       <div className={splitContent}>
@@ -86,7 +70,7 @@ export function LandingConversation() {
               <LandingChatBubble
                 key={index}
                 from={message.from}
-                text={message.text}
+                text={readCopy(copy, message.slot)}
               />
             ),
           )}

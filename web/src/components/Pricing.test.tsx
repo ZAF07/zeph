@@ -2,10 +2,11 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { Pricing } from "@/components/Pricing";
+import { seedCopy } from "@/test/copy";
 
 describe("Pricing", () => {
   it("shows the three plans, each signing up", () => {
-    const { container } = render(<Pricing />);
+    const { container } = render(<Pricing copy={seedCopy()} />);
 
     const pricing = within(container.querySelector("#pricing") as HTMLElement);
     for (const plan of ["Free", "Plus", "Pro"]) {
@@ -20,7 +21,7 @@ describe("Pricing", () => {
   });
 
   it("sits between the site header and footer", () => {
-    render(<Pricing />);
+    render(<Pricing copy={seedCopy()} />);
 
     expect(screen.getByRole("link", { name: "Zeph home" })).toHaveAttribute(
       "href",

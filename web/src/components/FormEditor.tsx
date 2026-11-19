@@ -14,7 +14,8 @@ const minHeightClass = {
  * @param props - `label` names the text for screen readers; `caption` is
  *   the line at the top left, such as when it was last saved; `value` is the
  *   text and `onChange` gets the new text; `size` picks the tall or short
- *   box; `describedById` is the id of a hint about the text, if any;
+ *   box; `maxLength`, when given, shows in the count as the most characters
+ *   allowed; `describedById` is the id of a hint about the text, if any;
  *   `children` goes at the foot, usually the save bar.
  * @returns The editor box.
  */
@@ -24,6 +25,7 @@ export function FormEditor({
   value,
   onChange,
   size = "tall",
+  maxLength,
   describedById,
   children,
 }: {
@@ -32,6 +34,7 @@ export function FormEditor({
   value: string;
   onChange: (value: string) => void;
   size?: "tall" | "short";
+  maxLength?: number;
   describedById?: string;
   children?: ReactNode;
 }) {
@@ -39,7 +42,11 @@ export function FormEditor({
     <div className="rounded-card border border-line bg-panel">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line px-5 py-3 text-[12px] text-soft">
         <span>{caption}</span>
-        <span className="font-mono">{value.length} characters</span>
+        <span className="font-mono">
+          {maxLength === undefined
+            ? `${value.length} characters`
+            : `${value.length} / ${maxLength} characters`}
+        </span>
       </div>
       <textarea
         aria-label={label}

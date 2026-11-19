@@ -36,6 +36,7 @@ export const queryKeys = {
   checkIns: ["check-ins"],
   personalStickers: ["personal-stickers"],
   adminSettings: ["admin-settings"],
+  copyPage: ["copy-page"],
   coreServices: ["core-services"],
   adminUsers: ["admin-users"],
   features: ["features"],
