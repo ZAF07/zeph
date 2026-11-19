@@ -65,4 +65,8 @@ The whole Copy path, proved on one page. An Admin opens the new Copy page (`/adm
 ## Completion
 
 - Completed: 2026-11-19
-- Commit: to be filled in after merge
+- Commit: merge `78af035` into main — "Merge Copy issue 01: Landing reads every word from Copy (store apart from Platform Settings, public read, Admin Copy page with all-or-nothing tab save); Landing and Pricing show the error state when Copy can't be read"
+  - Branch `copy-01-landing`:
+    - `478e804` Copy 01: Landing reads every word from Copy, with the Copy admin page
+    - `5e450b3` Copy 01: name the Landing key prefixes slotPrefix (review)
+    - `6f1802e` Copy 01: evidence recorded, issue completed and archived, screenshots at both widths; CONTEXT says what a Copy slot is
