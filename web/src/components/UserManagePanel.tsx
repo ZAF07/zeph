@@ -12,6 +12,7 @@ import { ApiError, type AdminUser, type UserRole } from "@/lib/api-client";
 import { formatDay } from "@/lib/dates";
 import { queryKeys, reloadUserPages } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
+import { displayNameOf, roleLabel } from "@/lib/users";
 
 type RoleNote = { text: string; isError: boolean };
 
@@ -32,7 +33,7 @@ export function UserManagePanel({ user }: { user: AdminUser }) {
   const queryClient = useQueryClient();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [roleNote, setRoleNote] = useState<RoleNote | null>(null);
-  const displayName = user.name ?? user.email ?? "This User";
+  const displayName = displayNameOf(user);
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -97,9 +98,7 @@ export function UserManagePanel({ user }: { user: AdminUser }) {
 
         <h3 className={sectionHeading}>Role</h3>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-[14px] text-text">
-            {user.role === "admin" ? "Admin" : "User"}
-          </span>
+          <span className="text-[14px] text-text">{roleLabel(user.role)}</span>
           <button
             type="button"
             disabled={changeRole.isPending}

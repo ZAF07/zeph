@@ -20,6 +20,7 @@ import {
 } from "@/lib/features";
 import { queryKeys, reloadUserPages } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
+import { displayNameOf } from "@/lib/users";
 
 /**
  * One User's Feature switches in the Users side panel: one row per Feature
@@ -34,7 +35,7 @@ import { useApiClient } from "@/lib/use-api-client";
 export function UserFeatureSwitches({ user }: { user: AdminUser }) {
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
-  const displayName = user.name ?? user.email ?? "This User";
+  const displayName = displayNameOf(user);
   const userFeaturesKey = queryKeys.userFeatures(user.id);
 
   const userFeaturesQuery = useQuery({
