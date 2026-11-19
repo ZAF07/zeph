@@ -210,7 +210,6 @@ describe("HelplinesManager", () => {
   });
 
   it("removes a Helpline after confirming", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     apiClient.deleteHelpline.mockResolvedValue();
     const user = userEvent.setup();
     renderWithQueries(<HelplinesManager />);
@@ -220,13 +219,17 @@ describe("HelplinesManager", () => {
       table().getByRole("button", { name: "Remove Samaritans" }),
     );
 
-    expect(window.confirm).toHaveBeenCalledWith("Remove Samaritans?");
+    await user.click(
+      within(
+        screen.getByRole("alertdialog", { name: "Remove Samaritans?" }),
+      ).getByRole("button", { name: "Remove" }),
+    );
+
     expect(apiClient.deleteHelpline).toHaveBeenCalledWith("uk");
     expect(await screen.findByText("Removed Samaritans.")).toBeVisible();
   });
 
   it("keeps a Helpline when removing is not confirmed", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
     const user = userEvent.setup();
     renderWithQueries(<HelplinesManager />);
     await findInTable("Samaritans");
@@ -234,7 +237,9 @@ describe("HelplinesManager", () => {
     await user.click(
       table().getByRole("button", { name: "Remove Samaritans" }),
     );
+    await user.click(screen.getByRole("button", { name: "Keep it" }));
 
+    expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(apiClient.deleteHelpline).not.toHaveBeenCalled();
   });
 

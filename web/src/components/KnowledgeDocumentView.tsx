@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { AdminPageHeader } from "@/components/AdminPageHeader";
 import { cardLink } from "@/components/card-styles";
@@ -11,6 +12,7 @@ import {
   compactSecondaryButton,
   dangerButton,
 } from "@/components/button-styles";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { KnowledgeDetailsForm } from "@/components/KnowledgeDetailsForm";
 import { KnowledgeReplaceFileForm } from "@/components/KnowledgeReplaceFileForm";
 import { KnowledgeStatusPill } from "@/components/KnowledgeStatusPill";
@@ -41,6 +43,7 @@ const libraryPath = "/admin/knowledge";
  */
 export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
   const apiClient = useApiClient();
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const router = useRouter();
   const queryClient = useQueryClient();
   const documentKey = queryKeys.knowledgeDocument(documentId);
@@ -112,15 +115,10 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
     deleteDocument.isPending ||
     deleteDocument.isSuccess;
 
-  function remove(knowledgeDocument: KnowledgeDocumentWithText) {
-    if (
-      window.confirm(
-        `Delete ${knowledgeDocument.title}? Zeph will stop drawing on it.`,
-      )
-    ) {
-      retryDocument.reset();
-      deleteDocument.mutate();
-    }
+  function remove() {
+    setIsConfirmingDelete(false);
+    retryDocument.reset();
+    deleteDocument.mutate();
   }
 
   const backLink = (
@@ -237,7 +235,7 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
           type="button"
           className={dangerButton}
           disabled={isBusy}
-          onClick={() => remove(knowledgeDocument)}
+          onClick={() => setIsConfirmingDelete(true)}
         >
           Delete document
         </button>
@@ -245,6 +243,18 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
           Zeph stops drawing on it straight away. This can’t be undone.
         </p>
       </div>
+
+      {isConfirmingDelete ? (
+        <ConfirmDialog
+          open
+          title={`Delete ${knowledgeDocument.title}?`}
+          body="Zeph will stop drawing on it straight away. This can’t be undone."
+          cancelLabel="Keep it"
+          confirmLabel="Delete"
+          onConfirm={remove}
+          onCancel={() => setIsConfirmingDelete(false)}
+        />
+      ) : null}
     </div>
   );
 }

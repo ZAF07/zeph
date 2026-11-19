@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 
 import { secondaryButton } from "@/components/button-styles";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { KnowledgeFileDrop } from "@/components/KnowledgeFileDrop";
 import { SavedNote } from "@/components/SavedNote";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
@@ -32,29 +33,31 @@ export function KnowledgeReplaceFileForm({
   const [fileInputKey, setFileInputKey] = useState(0);
   const [flash, setFlash] = useState<Flash | null>(null);
   const [isReplacing, setIsReplacing] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
 
   function chooseFile(chosen: File | null) {
     setFile(chosen);
     setFlash(null);
   }
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!file) {
       return;
     }
-    if (
-      knowledgeDocument.text_edited &&
-      !window.confirm(
-        "This document’s text was edited. Replacing the file replaces those edits with the new file’s text. Continue?",
-      )
-    ) {
+    if (knowledgeDocument.text_edited) {
+      setIsConfirming(true);
       return;
     }
+    void replace(file);
+  }
+
+  async function replace(chosen: File) {
+    setIsConfirming(false);
     setIsReplacing(true);
     setFlash(null);
     try {
-      const replaced = await onReplace(file);
+      const replaced = await onReplace(chosen);
       setFile(null);
       setFileInputKey((key) => key + 1);
       setFlash({
@@ -75,38 +78,51 @@ export function KnowledgeReplaceFileForm({
   }
 
   return (
-    <form
-      aria-labelledby="replace-file-heading"
-      onSubmit={(event) => void submit(event)}
-      className="flex flex-col gap-4 rounded-card border border-line bg-panel px-6 py-[22px]"
-    >
-      <div className="flex flex-col gap-1">
-        <h2
-          id="replace-file-heading"
-          className="m-0 text-[17px] font-normal text-cream"
-        >
-          Replace file
-        </h2>
-        <p className="m-0 text-[13px] text-soft">
-          Swap in a better translation or a corrected version. The title,
-          source, tradition and added date stay; the new file is read and
-          re-indexed.
-        </p>
-      </div>
-      <KnowledgeFileDrop
-        file={file}
-        inputKey={fileInputKey}
-        onChoose={chooseFile}
-      />
-      {flash?.isError ? <SaveFailedNote>{flash.text}</SaveFailedNote> : null}
-      {flash && !flash.isError ? <SavedNote>{flash.text}</SavedNote> : null}
-      <button
-        type="submit"
-        className={`${secondaryButton} self-start`}
-        disabled={file === null || isReplacing}
+    <>
+      <form
+        aria-labelledby="replace-file-heading"
+        onSubmit={submit}
+        className="flex flex-col gap-4 rounded-card border border-line bg-panel px-6 py-[22px]"
       >
-        {isReplacing ? "Replacing…" : "Replace file"}
-      </button>
-    </form>
+        <div className="flex flex-col gap-1">
+          <h2
+            id="replace-file-heading"
+            className="m-0 text-[17px] font-normal text-cream"
+          >
+            Replace file
+          </h2>
+          <p className="m-0 text-[13px] text-soft">
+            Swap in a better translation or a corrected version. The title,
+            source, tradition and added date stay; the new file is read and
+            re-indexed.
+          </p>
+        </div>
+        <KnowledgeFileDrop
+          file={file}
+          inputKey={fileInputKey}
+          onChoose={chooseFile}
+        />
+        {flash?.isError ? <SaveFailedNote>{flash.text}</SaveFailedNote> : null}
+        {flash && !flash.isError ? <SavedNote>{flash.text}</SavedNote> : null}
+        <button
+          type="submit"
+          className={`${secondaryButton} self-start`}
+          disabled={file === null || isReplacing}
+        >
+          {isReplacing ? "Replacing…" : "Replace file"}
+        </button>
+      </form>
+      {isConfirming && file ? (
+        <ConfirmDialog
+          open
+          title="Replace your edited text?"
+          body="This document’s text was edited. Replacing the file replaces those edits with the new file’s text."
+          cancelLabel="Keep my edits"
+          confirmLabel="Replace"
+          onConfirm={() => void replace(file)}
+          onCancel={() => setIsConfirming(false)}
+        />
+      ) : null}
+    </>
   );
 }

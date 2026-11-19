@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { secondaryButton } from "@/components/button-styles";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DataTable } from "@/components/DataTable";
 import { EmptyState } from "@/components/EmptyState";
 import { FieldSelect } from "@/components/FieldSelect";
@@ -156,6 +157,7 @@ export function HelplinesManager() {
   const [countryFilter, setCountryFilter] = useState("all");
   const [editing, setEditing] = useState<Editing | null>(null);
   const [flash, setFlash] = useState<Flash | null>(null);
+  const [removing, setRemoving] = useState<Helpline | null>(null);
 
   const helplinesQuery = useQuery({
     queryKey: queryKeys.helplines,
@@ -208,9 +210,7 @@ export function HelplinesManager() {
   }
 
   function remove(helpline: Helpline) {
-    if (!window.confirm(`Remove ${helpline.name}?`)) {
-      return;
-    }
+    setRemoving(null);
     runRowAction(
       helpline,
       () => apiClient.deleteHelpline(helpline.id),
@@ -337,7 +337,7 @@ export function HelplinesManager() {
               className={iconButton}
               aria-label={`Remove ${helpline.name}`}
               disabled={isBusy}
-              onClick={() => remove(helpline)}
+              onClick={() => setRemoving(helpline)}
             >
               ✕
             </button>
@@ -421,6 +421,17 @@ export function HelplinesManager() {
       <p className="m-0 text-[13px] text-soft">
         Shared with Users whose country has no Helplines. It can’t be removed.
       </p>
+      {removing ? (
+        <ConfirmDialog
+          open
+          title={`Remove ${removing.name}?`}
+          body="Users in its country stop being shown it. You can add it again later."
+          cancelLabel="Keep it"
+          confirmLabel="Remove"
+          onConfirm={() => remove(removing)}
+          onCancel={() => setRemoving(null)}
+        />
+      ) : null}
     </section>
   );
 }

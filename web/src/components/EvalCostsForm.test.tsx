@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -23,6 +23,14 @@ const seeded: EvalCosts = {
   token_limit: 1_000_000,
 };
 
+function table() {
+  return within(screen.getByRole("table"));
+}
+
+async function findInTable(text: string): Promise<HTMLElement> {
+  return within(await screen.findByRole("table")).findByText(text);
+}
+
 describe("EvalCostsForm", () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -35,16 +43,16 @@ describe("EvalCostsForm", () => {
   it("marks a model with no price and saves prices with the limit", async () => {
     renderWithQueries(<EvalCostsForm />);
 
-    expect(await screen.findByText("no price set")).toBeInTheDocument();
-    const flashOut = screen.getByLabelText("deepseek-flash SGD out");
+    expect(await findInTable("no price set")).toBeInTheDocument();
+    const flashOut = table().getByLabelText("deepseek-flash SGD out");
     await userEvent.clear(flashOut);
     await userEvent.type(flashOut, "2");
     await userEvent.type(
-      screen.getByLabelText("deepseek-v4-pro SGD in"),
+      table().getByLabelText("deepseek-v4-pro SGD in"),
       "1.69",
     );
     await userEvent.type(
-      screen.getByLabelText("deepseek-v4-pro SGD out"),
+      table().getByLabelText("deepseek-v4-pro SGD out"),
       "5.07",
     );
     const limit = screen.getByLabelText("Most tokens one run may use");
@@ -75,8 +83,8 @@ describe("EvalCostsForm", () => {
     await userEvent.click(
       await screen.findByRole("button", { name: "Add a model" }),
     );
-    await userEvent.type(screen.getByLabelText("Model name"), "x");
-    await userEvent.type(screen.getByLabelText("x SGD in"), "1");
+    await userEvent.type(table().getByLabelText("Model name"), "x");
+    await userEvent.type(table().getByLabelText("x SGD in"), "1");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(apiClient.saveEvalCosts.mock.calls[0]?.[0].prices[2]).toEqual({
