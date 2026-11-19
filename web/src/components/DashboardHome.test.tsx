@@ -311,11 +311,16 @@ describe("DashboardHome", () => {
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     const note = screen.getByRole("status");
     expect(note).toHaveTextContent(
-      `Memory is paused. ${seedCopy()["shared.memory_off.paused_body"]}`,
+      `Memory is paused.${seedCopy()["shared.memory_off.paused_body"]}`,
     );
     expect(within(note).getByText("Memory is paused.")).toHaveClass(
+      "text-[15px]",
       "text-text",
     );
+    expect(
+      within(note).getByText(seedCopy()["shared.memory_off.paused_body"]),
+    ).toHaveClass("text-[13px]", "text-soft");
+    expect(within(note).queryByRole("button")).toBeNull();
     expect(screen.queryByText("Memory is on.")).toBeNull();
     expect(
       within(section("What you're working toward")).getByText(
@@ -353,9 +358,10 @@ describe("DashboardHome", () => {
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     expect(screen.getByRole("status")).toHaveTextContent(
-      "Edited: not on your plan. Edited: nothing is deleted.",
+      "Edited: not on your plan.Edited: nothing is deleted.",
     );
     expect(screen.getByText("Edited: not on your plan.")).toHaveClass(
+      "text-[15px]",
       "text-text",
     );
     expect(screen.queryByText("Memory is paused.")).toBeNull();

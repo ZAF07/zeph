@@ -13,21 +13,12 @@ from companion.adapters.postgres.database import (
 from tests.conftest import SEED_FILE
 from tests.fakes import FakeAuthVerifier, FakeChatChannel, ScriptedChatModel, ToolCall
 from tests.telegram_helpers import TELEGRAM_CHAT_ID, owner_headers
+from tests.test_admin_settings import MOVED_TO_COPY
 from tests.test_check_in_sending import set_up_user_with_check_ins
 from tests.test_photo_viewing import stored_setting
 from tests.test_settings_via_chat import reply_call
 
 RELOADED_KEYS = ("data_deleted_reply",)
-
-MOVED_TO_COPY = (
-    "ai_notice",
-    "ai_notice_short",
-    "user_memory_explanation",
-    "photo_viewing_explanation",
-    "memory_paused_note",
-    "memory_not_available_note",
-    "delete_my_data_description",
-)
 
 
 def test_the_delete_my_data_lines_in_chat_mention_private_notes(

@@ -27,6 +27,7 @@ export function YourDataSection({
   copy: Copy;
 }) {
   const accountCopy = (slot: string) => readCopy(copy, `account.${slot}`);
+  const description = accountCopy("delete_data.description");
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
   const [isConfirming, setIsConfirming] = useState(false);
@@ -43,7 +44,7 @@ export function YourDataSection({
       description={
         <>
           <p className="mt-1 mb-0 max-w-[620px] text-[14px] text-soft">
-            {accountCopy("delete_data.description")}
+            {description}
           </p>
           <p className="mt-1.5 mb-0 text-[13px] text-soft">
             {fillCopy(
@@ -65,7 +66,7 @@ export function YourDataSection({
       <ConfirmDialog
         open={isConfirming}
         title={accountCopy("delete_data.dialog_title")}
-        body={`${accountCopy("delete_data.description")} ${accountCopy("delete_data.dialog_body")}`}
+        body={`${description} ${accountCopy("delete_data.dialog_body")}`}
         cancelLabel={accountCopy("delete_data.dialog_cancel")}
         confirmLabel={accountCopy("delete_data.dialog_confirm")}
         onConfirm={() => {

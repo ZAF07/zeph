@@ -1,3 +1,4 @@
+import type { Me } from "@/lib/api-client";
 import { readCopy, type Copy } from "@/lib/copy";
 
 /** The title and body of the note saying User Memory is off and why. */
@@ -16,7 +17,7 @@ export type MemoryOffNote = { title: string; body: string };
  */
 export function memoryOffNote(
   copy: Copy,
-  memory: { user_memory_enabled: boolean; user_memory_available: boolean },
+  memory: Pick<Me, "user_memory_enabled" | "user_memory_available">,
 ): MemoryOffNote | null {
   if (memory.user_memory_available && memory.user_memory_enabled) {
     return null;
