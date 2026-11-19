@@ -92,6 +92,19 @@ def pytest_configure_node(node: Any) -> None:
     node.workerinput["shared_postgres_url"] = shared_postgres_url(node.config)
 
 
+def throwaway_postgres() -> PostgresContainer:
+    """A test Postgres with pgvector that leaves nothing on disk.
+
+    Its data lives in memory (tmpfs at the data folder), so Docker makes no
+    volume for it, and nothing is left behind even if a run is killed.
+
+    Returns:
+        The container, not started yet.
+    """
+    postgres = PostgresContainer("pgvector/pgvector:pg16", driver="psycopg")
+    return postgres.with_tmpfs_mount("/var/lib/postgresql/data")
+
+
 def shared_postgres_url(config: pytest.Config) -> str:
     """The URL of the test run's one throwaway Postgres with pgvector.
 
@@ -110,7 +123,7 @@ def shared_postgres_url(config: pytest.Config) -> str:
         url: str = config.workerinput["shared_postgres_url"]
         return url
     if POSTGRES_CONTAINER not in config.stash:
-        postgres = PostgresContainer("pgvector/pgvector:pg16", driver="psycopg")
+        postgres = throwaway_postgres()
         postgres.start()
         config.stash[POSTGRES_CONTAINER] = postgres
     return config.stash[POSTGRES_CONTAINER].get_connection_url()

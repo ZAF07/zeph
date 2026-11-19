@@ -49,9 +49,11 @@ worktree-setup:
 	cd web && pnpm install
 
 ## Stop this worktree's stack and delete its containers, images, network and database. Run when done.
+## Also clears Docker build cache older than 48 hours, so it doesn't fill the disk; newer cache keeps builds fast.
 worktree-teardown:
 	$(REQUIRE_WORKTREE)
 	$(WORKTREE_COMPOSE) down --volumes --remove-orphans --rmi local
+	docker builder prune --force --filter until=48h
 
 ## Replace this worktree's database with a copy of the main stack's (both stacks running).
 ## Telegram links are removed from the copy so this stack's Check-ins never reach real Users.
