@@ -17,7 +17,7 @@ A search box on the Copy page finds slots by their current text across every tab
 - [ ] Typing part of a sentence lists the matching slots from any tab, with tab and slot name.
 - [ ] Picking a result opens its tab and brings the slot into view.
 - [ ] With unsaved edits, picking a result in another tab asks first.
-- [ ] No matches shows the design's empty state.
+- [ ] The search box is the shared `SearchField`; no matches shows the shared `EmptyState`. No new colours, sizes or gaps (`web/design/README.md`, "Building new UI").
 - [ ] Tests cover search, jump and the prompt; all web checks pass.
 - [ ] `/run`: as an Admin, from one tab, search for a sentence that lives in another tab and land on it.
 

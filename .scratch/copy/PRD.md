@@ -38,7 +38,7 @@ What the Companion says in chat, and anything the Companion is told, stays in Pl
 16. As an Admin, I want a save over a slot's max length turned away, with the reason shown on that slot, so that a long heading can't break the page on a phone.
 17. As an Admin, I want an empty slot turned away on save, so that no heading or button goes blank.
 18. As an Admin, I want each slot to hold plain text only, so that I can't break the design's styling by accident.
-19. As an Admin, I want text that the design shows as a bold lead-in (e.g. "Memory is paused.") to be its own slot, so that I can change it and the design still bolds it.
+19. As an Admin, I want text that the design shows as a notice's title (e.g. "Memory is paused.") to be its own slot, so that I can change it and the design still shows it as the title.
 20. As an Admin, I want my saved change to show on the next page load, so that I can check it right away.
 21. As an Admin, I want to see who last changed a slot and when, so that I know where a wording came from.
 22. As an Admin, I want each website page's browser tab title and search description to be Copy, so that I can tune how Zeph shows in search results and link previews.
@@ -63,7 +63,7 @@ What the Companion says in chat, and anything the Companion is told, stays in Pl
 - **A slot** has: a stable key (e.g. `landing.hero.heading`), the tab it belongs to, its order in that tab, a short name, its text, a max length, the placeholders it requires (by name), who last changed it and when.
 - **Core module**: a Copy service, behind a Copy repository port, with: read all Copy (for the website), read the Copy page (slots grouped by tab, for Admins), and save one tab's changed texts. The save checks each text for: not empty, within max length, every required placeholder present, no unknown placeholder. Any failure turns away the whole save, with a reason per failing slot. A save can change only slots in the named tab.
 - **Placeholders** are written `{name}`. Plurals are two slots ("one" and "many"); the web app picks one by the number. There are no plural rules or formatting inside the text.
-- **Plain text only.** No markdown, links or HTML are read from Copy. Links, buttons and styling stay in page code; Copy gives only their words. A bold lead-in in the design is its own slot.
+- **Plain text only.** No markdown, links or HTML are read from Copy. Links, buttons and styling stay in page code; Copy gives only their words. A notice title in the design is its own slot.
 - **HTTP API**:
   - A public read of all Copy (no sign-in), returning every slot's key and text. The backend may keep this in memory and refresh it on save, so a change shows on the next page load.
   - An Admin read of the Copy page: tabs in order, each with its slots (key, name, text, max length, placeholders, last changed by and when).
@@ -77,7 +77,7 @@ What the Companion says in chat, and anything the Companion is told, stays in Pl
   - Website pages (Server Components where they are now) read Copy through the API client, and fill placeholders with one small pure helper. Page titles and descriptions come from Copy through the App Router's metadata.
   - Client components get Copy through a TanStack Query hook (ADR-0012), not prop-drilled from the root.
   - If Copy can't be read, the page shows the website's normal error state. No default text is bundled into the web app.
-  - The Copy admin page is one page with tabs, built from the design's existing parts as the redesign did (tabs like Memories, a text field per slot with a counter, the card save bar, the existing unsaved-changes warning). Search filters slots across tabs by current text and jumps to the slot.
+  - The Copy admin page is one page with tabs. It has no reference file, so it is built only from the design's existing parts and token values (`web/design/README.md`, "Building new UI"): tabs like `MemoriesTabs`, a `FormEditor`-style text field per slot with a counter, the `CardSaveBar`, the existing unsaved-changes warning, `SearchField` and `EmptyState`. No pixel test covers it; it is checked by eye at 1280 and 390. Search filters slots across tabs by current text and jumps to the slot.
   - The design fixture API client used by the pixel test serves the seed Copy.
 - **Rollout order**: Landing end to end first (seed slots, store, public read, Copy page with one tab, checks, Landing reading Copy). Then the other pages, one at a time. The wording moved out of Platform Settings comes last.
 
