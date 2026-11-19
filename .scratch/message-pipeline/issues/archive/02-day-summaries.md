@@ -72,4 +72,8 @@ None - can start immediately
 ## Completion
 
 - Completed: 2026-11-19
-- Commit: <to be filled in after merge>
+- Commit: `1eac4c0` (merge into main): "Merge message pipeline issue 02: Day Summaries, one per User per day (their time zone), rewritten from all of the day's messages each time a Conversation ends, a Conversation past midnight in the day it started; prompt asks for facts and feelings; replies, look-ups, Check-ins and the Portrait read dated Day Summaries; /api/day-summaries lists one per day; migration 0064 joins same-day Summaries"
+- Branch commits:
+  - `1ec0396` "Day Summaries: one Summary per User per day, rewritten from all of the day's messages; migration 0064 joins same-day Summaries; /api/day-summaries; memory processing prompt asks for facts and feelings"
+  - `6c9430c` "Day Summaries review: only Conversations that started earlier count as earlier today; day description in its own helper; one calendar day format; Eval day uses the shared rule"
+  - `7c0f86b` "Day Summaries: issue 02 evidence recorded, completed and archived"
