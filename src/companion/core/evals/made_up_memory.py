@@ -30,6 +30,7 @@ from companion.core.models import (
 )
 from companion.core.move_outcomes import text_to_embed
 from companion.core.ports import Embedder, Repositories
+from companion.core.timing import users_today
 
 MEMORY_ITEMS_DAYS_AGO = 30
 PORTRAIT_DAYS_AGO = 1
@@ -133,7 +134,7 @@ def give_made_up_memory(
             DaySummary(
                 id=uuid4(),
                 user_id=user_id,
-                day=written_at.date(),
+                day=users_today(None, written_at),
                 summary=summary.summary,
                 mood=summary.mood,
                 written_at=written_at,

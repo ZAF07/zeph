@@ -2,7 +2,7 @@
 
 Read this before planning or changing anything in the reply path, the Conversation-end steps or User Memory. Terms in **bold** are defined in `CONTEXT.md`; this file says how they fit together.
 
-**Status:** target design, agreed on 19 Nov 2026 in a review of a real Conversation where Zeph brushed a User off mid-rant and only gave a useful Read after being pushed three times. It is **not built yet**. "Today" notes say where the code still differs; "Built" notes mark the parts that now match. Open points are listed at the end.
+**Status:** target design, agreed on 19 Nov 2026 in a review of a real Conversation where Zeph brushed a User off mid-rant and only gave a useful Read after being pushed three times. It is **not built yet**, except where a "Built" note says a part now matches. "Today" notes say where the code still differs. Open points are listed at the end.
 
 ## What a reply is for
 

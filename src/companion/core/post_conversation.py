@@ -367,7 +367,7 @@ def describe_conversation(
     items_by_number: dict[int, MemoryItem],
     photos_by_number: dict[int, SentPhoto],
     moods: str,
-    earlier_today: str = "None.",
+    earlier_today: str,
 ) -> str:
     """Write what the post-conversation processing model is given.
 
@@ -513,32 +513,8 @@ class PostConversationProcessor:
             if snapshot.works(Feature.PHOTO_VIEWING)
             else {}
         )
-        time_zone = snapshot.user.time_zone
-        day = users_today(time_zone, conversation.started_at)
-        days_conversations = self._repositories.conversations.list_started_between(
-            user_id, *day_span(day, time_zone)
-        )
-        understandings = self._repositories.understandings
-        moods = describe_moods(
-            [
-                understanding
-                for days_conversation in days_conversations
-                for understanding in understandings.list_for_conversation(
-                    days_conversation.id
-                )
-            ],
-            time_zone,
-        )
-        earlier = [
-            EarlierConversation(
-                started_at=days_conversation.started_at,
-                messages=self._repositories.conversations.list_messages(
-                    days_conversation.id
-                ),
-            )
-            for days_conversation in days_conversations
-            if days_conversation.id != conversation.id
-        ]
+        day = users_today(snapshot.user.time_zone, conversation.started_at)
+        moods, earlier_today = self._describe_day_so_far(snapshot, conversation, day)
         answer = self._ask(
             snapshot,
             describe_conversation(
@@ -547,7 +523,7 @@ class PostConversationProcessor:
                 items_by_number,
                 photos_by_number,
                 moods,
-                describe_earlier_conversations(earlier, time_zone),
+                earlier_today,
             ),
         )
         if answer is None:
@@ -570,6 +546,55 @@ class PostConversationProcessor:
             self._keep_curiosities(snapshot, conversation.id, messages)
         self._keep_move_outcomes(snapshot, conversation.id, messages)
         self._write_portrait(snapshot)
+
+    def _describe_day_so_far(
+        self, snapshot: UserSnapshot, conversation: Conversation, day: date
+    ) -> tuple[str, str]:
+        """Describe the day up to the ended Conversation, for its Day Summary.
+
+        Only Conversations that started that day before it count, so one
+        that started later and may still be open is never passed in as
+        already learned from.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            conversation: The ended Conversation.
+            day: The day it started, in the User's time zone.
+
+        Returns:
+            How the Companion read their mood at each Message so far that
+            day, and the day's earlier Conversations, written for the model.
+        """
+        time_zone = snapshot.user.time_zone
+        conversations = self._repositories.conversations
+        conversations_that_day = [
+            conversation_that_day
+            for conversation_that_day in conversations.list_started_between(
+                snapshot.user.id, *day_span(day, time_zone)
+            )
+            if conversation_that_day.started_at <= conversation.started_at
+        ]
+        moods = describe_moods(
+            [
+                understanding
+                for conversation_that_day in conversations_that_day
+                for understanding in (
+                    self._repositories.understandings.list_for_conversation(
+                        conversation_that_day.id
+                    )
+                )
+            ],
+            time_zone,
+        )
+        earlier = [
+            EarlierConversation(
+                started_at=conversation_that_day.started_at,
+                messages=conversations.list_messages(conversation_that_day.id),
+            )
+            for conversation_that_day in conversations_that_day
+            if conversation_that_day.id != conversation.id
+        ]
+        return moods, describe_earlier_conversations(earlier, time_zone)
 
     def _save_memory(
         self,

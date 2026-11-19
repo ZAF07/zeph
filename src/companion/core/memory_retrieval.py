@@ -1,7 +1,7 @@
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
@@ -83,6 +83,18 @@ def shared_photo_line(
     return f"{line} Why it matters: {photo.note}"
 
 
+def format_calendar_day(day: date) -> str:
+    """Write a calendar day like "9 Nov 2026".
+
+    Args:
+        day: The day.
+
+    Returns:
+        The day.
+    """
+    return f"{day.day} {day:%b %Y}"
+
+
 def format_day(moment: datetime, time_zone: str | None) -> str:
     """Write a day like "9 Nov 2026" in the User's time zone.
 
@@ -94,7 +106,7 @@ def format_day(moment: datetime, time_zone: str | None) -> str:
         The day.
     """
     local = moment.astimezone(ZoneInfo(time_zone)) if time_zone else moment
-    return f"{local.day} {local:%b %Y}"
+    return format_calendar_day(local.date())
 
 
 def format_time(moment: datetime, time_zone: str | None) -> str:
@@ -122,7 +134,7 @@ def summary_line(summary: DaySummary) -> str:
         Suggested a walk; they said it helped."
     """
     line = (
-        f"- {summary.day.day} {summary.day:%b %Y}: {summary.summary} "
+        f"- {format_calendar_day(summary.day)}: {summary.summary} "
         f"They seemed {summary.mood}."
     )
     return f"{line} {summary.offered}" if summary.offered else line
