@@ -127,7 +127,7 @@ class ReplyService:
             self._woven_check_ins.save(snapshot, woven) if woven is not None else None
         )
         check_in_offer = (
-            WovenCheckInOffer(woven)
+            WovenCheckInOffer(woven, woven_check_in)
             if woven is not None and woven_check_in is not None
             else None
         )
@@ -146,14 +146,9 @@ class ReplyService:
                     memory.shared_photo_ids if may_send_photo(form) else ()
                 ),
             )
-            if (
-                woven is not None
-                and woven_check_in is not None
-                and check_in_offer is not None
-                and not check_in_offer.was_brought_up
-            ):
-                self._woven_check_ins.take_back(snapshot, woven, woven_check_in)
-                woven_check_in = None
+            if check_in_offer is not None and not check_in_offer.was_brought_up:
+                self._take_back(snapshot, check_in_offer)
+                check_in_offer = None
             self._conversations.deliver_reply(
                 message.user_id,
                 message.conversation_id,
@@ -166,8 +161,17 @@ class ReplyService:
         except ReplyPartlySentError:
             raise
         except Exception:
-            if woven is not None and woven_check_in is not None:
-                self._woven_check_ins.take_back(snapshot, woven, woven_check_in)
+            if check_in_offer is not None:
+                self._take_back(snapshot, check_in_offer)
             raise
         self._thread_reminder.mark_raised(message.conversation_id, form.bring_up)
         self._curiosity_raiser.mark_raised(message.conversation_id, form.curiosities)
+
+    def _take_back(self, snapshot: UserSnapshot, offer: WovenCheckInOffer) -> None:
+        """Take back the Woven-in Check-in offered to a reply, so it stays due.
+
+        Args:
+            snapshot: The User being answered, as read for the reply.
+            offer: The Check-in offered to the reply, with its saved row.
+        """
+        self._woven_check_ins.take_back(snapshot, offer.woven, offer.check_in)

@@ -286,16 +286,22 @@ class WovenCheckInOffer:
     """Offers a reply the due Check-in as an optional extra, and notes its use.
 
     Attributes:
+        woven: The Check-in the reply may bring up.
+        check_in: The Check-in as saved before the reply, to take back if
+            the reply leaves it out or fails.
         offer: The section and the bring_up_check_in tool for the reply.
         was_brought_up: Whether the reply called the tool, so brought it up.
     """
 
-    def __init__(self, woven: WovenCheckIn) -> None:
+    def __init__(self, woven: WovenCheckIn, check_in: CheckIn) -> None:
         """Make the offer for one reply.
 
         Args:
             woven: The Check-in the reply may bring up.
+            check_in: The Check-in as saved before the reply.
         """
+        self.woven = woven
+        self.check_in = check_in
         self.was_brought_up = False
         self.offer = ReplyOffer(
             tools=[

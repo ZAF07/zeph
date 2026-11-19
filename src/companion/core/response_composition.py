@@ -22,7 +22,13 @@ from companion.core.platform_settings import (
     RESPONSE_THINKING,
 )
 from companion.core.ports import Repositories
-from companion.core.reply_tools import ReplyContext, ReplyOffer, ReplyToolProvider
+from companion.core.reply_tools import (
+    NO_GUIDANCE,
+    ReplyContext,
+    ReplyGuidance,
+    ReplyOffer,
+    ReplyToolProvider,
+)
 from companion.core.usage import UsageRecordingChatModel
 
 BLANK_LINE = re.compile(r"\n\s*\n")
@@ -51,24 +57,6 @@ MEMORY_HEADING = "## 4. What you remember"
 OPTIONAL_EXTRAS_HEADING = (
     "## 6. Optional extras: use one only if it fits what they need right now"
 )
-
-
-@dataclass(frozen=True)
-class ReplyGuidance:
-    """What the Understanding adds to the reply's instructions, by priority.
-
-    Attributes:
-        boundaries: The Life Threads to leave alone, each with why; "" if
-            none.
-        plan: The Need's "how to reply", the Moves' "how to do it", the
-            nuance and mood, the "ask why" note when it applies and the
-            Life Threads to bring up; "" if none.
-        curiosities: The Curiosities it chose to bring up; "" if none.
-    """
-
-    boundaries: str = ""
-    plan: str = ""
-    curiosities: str = ""
 
 
 class EmptyReplyError(Exception):
@@ -104,9 +92,6 @@ def split_into_messages(reply: str) -> list[str]:
     """
     parts = (part.strip() for part in BLANK_LINE.split(reply))
     return [part for part in parts if part]
-
-
-NO_GUIDANCE = ReplyGuidance()
 
 
 def write_instructions(

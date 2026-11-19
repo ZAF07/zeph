@@ -53,7 +53,7 @@ from companion.core.platform_settings import (
     UNDERSTANDING_THINKING,
 )
 from companion.core.ports import Clock, Repositories
-from companion.core.response_composition import ReplyGuidance
+from companion.core.reply_tools import ReplyGuidance
 from companion.core.transcripts import split_off_latest_message, to_transcript_lines
 from companion.core.usage import UsageRecordingChatModel
 from companion.core.web_search import web_search_limit_used_up

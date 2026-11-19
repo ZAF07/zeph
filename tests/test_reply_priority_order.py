@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
 from companion.adapters.postgres.repositories import build_postgres_repositories
-from companion.core.reply_tools import ReplyOffer
+from companion.core.reply_tools import ReplyGuidance, ReplyOffer
 from companion.core.response_composition import (
     ANSWER_THE_QUESTION,
     ASKED_NOW_HEADING,
@@ -13,7 +13,6 @@ from companion.core.response_composition import (
     MEMORY_HEADING,
     OPTIONAL_EXTRAS_HEADING,
     PRIORITY_ORDER,
-    ReplyGuidance,
     write_instructions,
 )
 from companion.core.woven_check_ins import BRING_UP_CHECK_IN_TOOL
