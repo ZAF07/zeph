@@ -17,6 +17,7 @@ Restyle the admin pages no reference or template covers, so nothing is left in t
 - new eval, judge, costs, case history
 - Knowledge Document detail
 - model-call trace
+- the Safety page's Helplines table: move it onto the table-template parts (`DataTable`, so each row becomes a label-and-value card below 900px), keeping its add, edit, reorder and fallback behaviour as they are
 
 Use **only the tokens and existing parts** (cards, field rows, tables, save bar, states, card-list parts). Don't change layout order, behaviour or copy, except where the old theme's wording is replaced by a part's fixed copy. There's no pixel test. The code editor theme must use the tokens too.
 
@@ -24,6 +25,7 @@ Use **only the tokens and existing parts** (cards, field rows, tables, save bar,
 
 - [ ] No old-theme colours or Tailwind default palette classes remain on any admin page (search shown).
 - [ ] Screenshots of each page at both widths are attached.
+- [ ] The Safety page's Helplines table shows each row as a label-and-value card on a phone, with no sideways scroll (screenshot at 390, and its existing tests pass, updated only for markup).
 - [ ] A list of every choice the agent made itself (spacing, which part, editor colours) is in this issue for Zaf.
 - [ ] Every page works as before (the existing tests pass, and a `/run` check covers one eval run and one case edit). **Don't start a real eval run without asking Zaf, because evals cost money.**
 
@@ -53,3 +55,4 @@ Use **only the tokens and existing parts** (cards, field rows, tables, save bar,
 - [ ] `/code-review` run, and findings fixed or answered.
 
 ## Comments
+- 2026-11-19 — Added from issue 11: the Safety page's Helplines table still scrolls sideways on a phone (noted in issue 12); the README wants table rows as cards there. Also: issue 11 already rebuilt the eval case list for one eval (`EvalCasesList`) from the table template, so that page only needs a check here, not a restyle.
