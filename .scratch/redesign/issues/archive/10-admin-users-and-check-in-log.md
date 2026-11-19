@@ -105,4 +105,4 @@ Why, and the parts compared on their own with the same pixelmatch settings:
 ## Completion
 
 - Completed: 2026-11-19
-- Commit: <to be filled in after merge>
+- Commit: merge `355658d` into main (branch `redesign-10-admin-tables`: `b1b9bd0` admin Users and Check-in Log in the new look with the table template parts, `af1dc04` code-review fixes, `89af056` evidence, archive and CONTEXT update, `f417a5b` shared ChevronDownIcon, `536733c` evidence re-run after rebasing on issue 12)
