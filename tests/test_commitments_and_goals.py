@@ -23,7 +23,7 @@ from tests.test_moves_migration import downgrade_to
 
 CALL_MUM_FOLLOW_UP = "Did you get to call your mum?"
 CALL_MUM_WHY = "They agreed to call their mum tonight after the argument."
-KEPT_PROMPTS = (
+CHANGED_PROMPT_KEYS = (
     "memory_processing_prompt",
     "life_thread_keeping_prompt",
     "curiosity_keeping_prompt",
@@ -51,7 +51,7 @@ def stored_prompts(engine: Engine) -> dict[str, str]:
                 "SELECT key, value #>> '{}' FROM platform_settings "
                 "WHERE key = ANY(:keys)"
             ),
-            {"keys": list(KEPT_PROMPTS)},
+            {"keys": list(CHANGED_PROMPT_KEYS)},
         ).all()
     return {key: value for key, value in rows}
 
@@ -65,7 +65,9 @@ def challenges_description(engine: Engine) -> str:
     return description
 
 
-def set_stored(engine: Engine, prompts: dict[str, str], challenges: str) -> None:
+def store_prompts_and_challenges_description(
+    engine: Engine, prompts: dict[str, str], challenges: str
+) -> None:
     """Store the given prompt values and Challenges description."""
     with engine.begin() as connection:
         for key, value in prompts.items():
@@ -182,7 +184,9 @@ def test_the_migration_reloads_prompts_and_wording_still_matching_the_old_seed(
     migration = commitments_migration()
     downgrade_to(database_url, "0064")
     try:
-        set_stored(engine, migration.OLD_PROMPTS, migration.OLD_CHALLENGES_DESCRIPTION)
+        store_prompts_and_challenges_description(
+            engine, migration.OLD_PROMPTS, migration.OLD_CHALLENGES_DESCRIPTION
+        )
     finally:
         migrate(database_url)
 
@@ -193,10 +197,12 @@ def test_the_migration_reloads_prompts_and_wording_still_matching_the_old_seed(
 def test_the_migration_keeps_prompts_and_wording_an_admin_edited(
     engine: Engine, database_url: str
 ) -> None:
-    edited_prompts = {key: f"Admin's own {key}" for key in KEPT_PROMPTS}
+    edited_prompts = {key: f"Admin's own {key}" for key in CHANGED_PROMPT_KEYS}
     downgrade_to(database_url, "0064")
     try:
-        set_stored(engine, edited_prompts, "Admin's own Challenges wording.")
+        store_prompts_and_challenges_description(
+            engine, edited_prompts, "Admin's own Challenges wording."
+        )
     finally:
         migrate(database_url)
 
