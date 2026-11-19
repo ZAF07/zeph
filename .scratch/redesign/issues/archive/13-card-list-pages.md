@@ -171,4 +171,8 @@ Pages with more fields add form-template `FieldRow`s inside the open card, as de
 ## Completion
 
 - Completed: 2026-11-19
-- Commit: <filled in after the merge>
+- Commit: merge `4d1b692` into main — "Merge redesign issue 13: card-list pages — Check-in Kinds is the card-list template (folding cards with a whole-row toggle, Expand all / Collapse all, the unsaved tag that keeps text when folded, remove confirm inside the card, add box above the list, loading, empty, couldn't-load and couldn't-save in the save bar, ?design=all-folded) and Memory Categories, Needs, Moves, Sticker Library and Knowledge are built from its parts with Zaf's agreed field rows; add, edit and remove work as before; refs match by parts at 0.00% (no Sample data pill, builder notes left out)"
+  - Branch `redesign-13-card-list-pages`:
+    - `08a1935` Redesign 13: card-list pages — Check-in Kinds as the card-list template (folding cards, whole-row toggle, Expand/Collapse all, unsaved tag that keeps text, in-card remove confirm, add box, loading, save bar) and Memory Categories, Needs, Moves, Sticker Library and Knowledge built from its parts
+    - `19d4c95` Redesign 13: code-review fixes — archived categories start folded, sticker row drops made-up copy and ignores space-only edits, Knowledge Pending tag and Open document first, unit tests for card helpers and useCardAction, needInputOf
+    - `e93dfcb` Redesign 13: evidence recorded, issue completed and archived, screenshots at both widths
