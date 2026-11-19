@@ -5,14 +5,14 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 
 import { primaryButton } from "@/components/button-styles";
-import { fieldCaption, fieldLabel, inputField } from "@/components/form-styles";
+import { CardListFlash, type Flash } from "@/components/CardListFlash";
+import { CardTextField } from "@/components/CardTextField";
+import { NewCardBox } from "@/components/NewCardBox";
 import { ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 type AddMethod = "set" | "telegram";
-
-type Flash = { text: string; isError: boolean };
 
 const addMethods: { id: AddMethod; label: string }[] = [
   { id: "set", label: "By sticker set name" },
@@ -35,13 +35,21 @@ function importedMessage(count: number, setName: string): string {
 }
 
 /**
- * The "Add stickers" card: import a whole sticker set by name, or read how
- * to add stickers in the Admin's own Telegram chat with Zeph.
+ * The "Add stickers" box above the Sticker Library list: import a whole
+ * sticker set by name, or read how to add stickers in the Admin's own
+ * Telegram chat with Zeph.
  *
- * @param props - `onAdded` reloads the library after stickers are added.
- * @returns The card with its two tabs.
+ * @param props - `onAdded` reloads the library after stickers are added;
+ *   `onClose` closes the box.
+ * @returns The box with its two tabs.
  */
-export function StickerAddPanel({ onAdded }: { onAdded: () => void }) {
+export function StickerAddBox({
+  onAdded,
+  onClose,
+}: {
+  onAdded: () => void;
+  onClose: () => void;
+}) {
   const apiClient = useApiClient();
   const [method, setMethod] = useState<AddMethod>("set");
   const [setName, setSetName] = useState("");
@@ -80,19 +88,11 @@ export function StickerAddPanel({ onAdded }: { onAdded: () => void }) {
   }
 
   return (
-    <section
-      aria-labelledby="add-stickers-heading"
-      className="flex flex-col rounded-card border border-line bg-white"
-    >
-      <div className="px-5 pt-4">
-        <h2 id="add-stickers-heading" className="m-0 text-[17px] font-semibold">
-          Add stickers
-        </h2>
-      </div>
+    <NewCardBox title="Add stickers" status={null} onCancel={onClose}>
       <div
         role="tablist"
         aria-label="Add method"
-        className="flex gap-1 overflow-x-auto border-b border-line px-3"
+        className="flex flex-nowrap gap-x-[22px] overflow-x-auto border-b border-line"
       >
         {addMethods.map((option) => (
           <button
@@ -101,10 +101,10 @@ export function StickerAddPanel({ onAdded }: { onAdded: () => void }) {
             role="tab"
             aria-selected={method === option.id}
             onClick={() => setMethod(option.id)}
-            className={`-mb-px min-h-12 cursor-pointer whitespace-nowrap border-0 border-b-2 bg-transparent px-4 py-3 text-[15px] ${
+            className={`min-h-11 flex-none cursor-pointer border-0 border-b-2 bg-transparent px-0.5 text-[14px] whitespace-nowrap ${
               method === option.id
-                ? "border-ink font-semibold text-ink"
-                : "border-transparent font-medium text-ink-soft"
+                ? "border-cream font-normal text-cream"
+                : "border-transparent font-light text-soft"
             }`}
           >
             {option.label}
@@ -113,51 +113,30 @@ export function StickerAddPanel({ onAdded }: { onAdded: () => void }) {
       </div>
 
       {method === "set" ? (
-        <form
-          onSubmit={importSet}
-          className="flex flex-wrap items-end gap-2.5 px-5 pb-5 pt-4"
-        >
-          <label className={`${fieldLabel} flex-[1_1_280px]`}>
-            Sticker set name
-            <input
-              type="text"
-              value={setName}
-              onChange={(event) => setSetName(event.target.value)}
-              placeholder="e.g. CalmCreatures"
-              className={`${inputField} font-mono`}
-            />
-          </label>
+        <form onSubmit={importSet} className="flex flex-col gap-[14px]">
+          <CardTextField
+            label="Sticker set name"
+            hint="The part after t.me/addstickers/. Every sticker in the set is added without a note; add notes before Zeph can use them."
+            placeholder="e.g. CalmCreatures"
+            value={setName}
+            onChange={setSetName}
+          />
           <button
             type="submit"
-            className={primaryButton}
+            className={`${primaryButton} self-start`}
             disabled={importStickerSet.isPending || setName.trim() === ""}
           >
             {importStickerSet.isPending ? "Importing…" : "Import set"}
           </button>
-          <p className={`${fieldCaption} basis-full`}>
-            The part after t.me/addstickers/. Every sticker in the set is added
-            without a note; add notes before Zeph can use them.
-          </p>
-          {flash ? (
-            <p
-              role="status"
-              className={`m-0 basis-full rounded-xl px-4 py-3.5 text-sm ${
-                flash.isError
-                  ? "border border-danger-line bg-danger-tint text-danger-deep"
-                  : "bg-blue-tint text-blue-deep"
-              }`}
-            >
-              {flash.text}
-            </p>
-          ) : null}
+          <CardListFlash flash={flash} />
         </form>
       ) : (
-        <div className="flex flex-col gap-2.5 px-5 pb-5 pt-4">
-          <p className="m-0 text-[15px] text-ink-soft">
+        <div className="flex flex-col gap-2.5">
+          <p className="m-0 text-[14px] text-soft">
             From the Telegram account linked to your Admin account, add stickers
             in your chat with Zeph in one of two ways:
           </p>
-          <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5 text-[15px] text-ink-soft">
+          <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5 text-[14px] text-soft">
             <li>
               Tell Zeph you want to add stickers, as single stickers or whole
               sets, then send them. Each one gets a 👍. Send any message that
@@ -168,17 +147,20 @@ export function StickerAddPanel({ onAdded }: { onAdded: () => void }) {
               its whole set.
             </li>
           </ul>
-          <p className="m-0 text-caption text-ink-muted">
+          <p className="m-0 text-[13px] text-soft">
             Refresh this page to see them below as “Needs a note”.
           </p>
           {hasTelegram === false ? (
-            <p className="m-0 text-caption text-ink-muted">
+            <p className="m-0 text-[13px] text-soft">
               Your account has no Telegram yet.{" "}
-              <Link href="/connect-telegram">Connect Telegram</Link> first.
+              <Link href="/connect-telegram" className="text-text underline">
+                Connect Telegram
+              </Link>{" "}
+              first.
             </p>
           ) : null}
         </div>
       )}
-    </section>
+    </NewCardBox>
   );
 }

@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -47,16 +47,18 @@ const habits = category("habits", "Habits (old)", {
   item_count: 23,
 });
 
-function section(name: RegExp): ReturnType<typeof within> {
-  return within(screen.getByRole("region", { name }));
+async function findCard(name: string): Promise<ReturnType<typeof within>> {
+  await screen.findAllByRole("button", { name: "Expand all" });
+  for (const expandAll of screen.getAllByRole("button", {
+    name: "Expand all",
+  })) {
+    fireEvent.click(expandAll);
+  }
+  return within(await screen.findByRole("region", { name }));
 }
 
-function rowFor(name: string): ReturnType<typeof within> {
-  const row = screen.getByText(name).closest("li");
-  if (!row) {
-    throw new Error(`No row for ${name}`);
-  }
-  return within(row);
+function cardToggle(card: ReturnType<typeof within>, name: string) {
+  return card.getByRole("button", { name: new RegExp(`^${name}`) });
 }
 
 describe("MemoryCategoriesManager", () => {
@@ -68,31 +70,43 @@ describe("MemoryCategoriesManager", () => {
   it("lists active and archived categories with their item counts", async () => {
     renderWithQueries(<MemoryCategoriesManager />);
 
-    await screen.findByText("Goals");
-    const active = section(/Active/);
-    expect(active.getByText("Goals")).toBeInTheDocument();
-    expect(active.getByText("· 97 items")).toBeInTheDocument();
-    expect(active.getByText("About Goals")).toBeInTheDocument();
-    expect(active.getByText("Values & beliefs")).toBeInTheDocument();
-    expect(active.queryByText("Habits (old)")).toBeNull();
+    const goalsCard = await findCard("Goals");
+    expect(cardToggle(goalsCard, "Goals")).toHaveTextContent(
+      "GoalsAbout Goals97 items",
+    );
     expect(
-      active.getByRole("switch", { name: "Always include Values & beliefs" }),
+      screen.getByText("active categories", { exact: false }),
+    ).toHaveTextContent("2 active categories");
+    const valuesCard = await findCard("Values & beliefs");
+    expect(cardToggle(valuesCard, "Values")).toHaveTextContent(
+      "Always included",
+    );
+    expect(
+      valuesCard.getByRole("switch", {
+        name: "Always include Values & beliefs",
+      }),
     ).toHaveAttribute("aria-checked", "true");
     expect(
-      active.getByRole("switch", { name: "Always include Goals" }),
+      goalsCard.getByRole("switch", { name: "Always include Goals" }),
     ).toHaveAttribute("aria-checked", "false");
-    const archived = section(/Archived/);
-    expect(archived.getByText("Habits (old)")).toBeInTheDocument();
-    expect(archived.getByText("· 23 items kept")).toBeInTheDocument();
+    const habitsCard = await findCard("Habits (old)");
+    expect(cardToggle(habitsCard, "Habits")).toHaveTextContent("23 items kept");
+    expect(habitsCard.queryByRole("switch")).toBeNull();
+    expect(screen.getByText("archived", { exact: false })).toHaveTextContent(
+      "1 archived",
+    );
     expect(screen.queryByRole("button", { name: /Delete/ })).toBeNull();
   });
 
-  it("says when nothing is archived", async () => {
+  it("shows no archived list when nothing is archived", async () => {
     apiClient.listMemoryCategories.mockResolvedValue([goals]);
 
     renderWithQueries(<MemoryCategoriesManager />);
 
-    expect(await screen.findByText("Nothing archived.")).toBeInTheDocument();
+    await findCard("Goals");
+    expect(screen.getAllByRole("button", { name: "Expand all" })).toHaveLength(
+      1,
+    );
   });
 
   it("adds a category and shows it in the list", async () => {
@@ -103,14 +117,14 @@ describe("MemoryCategoriesManager", () => {
     });
     apiClient.addMemoryCategory.mockResolvedValue(work);
     renderWithQueries(<MemoryCategoriesManager />);
-    await screen.findByText("Goals");
+    await findCard("Goals");
     apiClient.listMemoryCategories.mockResolvedValue([goals, values, work]);
 
     await user.click(screen.getByRole("button", { name: "Add category" }));
-    const form = within(screen.getByRole("form", { name: "New category" }));
-    await user.type(form.getByLabelText("Name"), "Work");
-    await user.type(form.getByLabelText(/Description/), "Job and colleagues");
-    await user.click(form.getByRole("button", { name: "Save category" }));
+    const box = await findCard("New category");
+    await user.type(box.getByLabelText("Name"), "Work");
+    await user.type(box.getByLabelText("Description"), "Job and colleagues");
+    await user.click(box.getByRole("button", { name: "Add" }));
 
     expect(apiClient.addMemoryCategory).toHaveBeenCalledWith({
       name: "Work",
@@ -118,8 +132,8 @@ describe("MemoryCategoriesManager", () => {
       always_include: false,
     });
     expect(await screen.findByRole("status")).toHaveTextContent("Added Work.");
-    expect(section(/Active/).getByText("Work")).toBeInTheDocument();
-    expect(screen.queryByRole("form", { name: "New category" })).toBeNull();
+    expect(await screen.findByRole("region", { name: "Work" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "New category" })).toBeNull();
   });
 
   it("shows why the backend refused a category", async () => {
@@ -132,15 +146,15 @@ describe("MemoryCategoriesManager", () => {
       ),
     );
     renderWithQueries(<MemoryCategoriesManager />);
-    await screen.findByText("Goals");
+    await findCard("Goals");
 
     await user.click(screen.getByRole("button", { name: "Add category" }));
-    const form = within(screen.getByRole("form", { name: "New category" }));
-    await user.type(form.getByLabelText("Name"), "goals");
-    await user.type(form.getByLabelText(/Description/), "Again");
-    await user.click(form.getByRole("button", { name: "Save category" }));
+    const box = await findCard("New category");
+    await user.type(box.getByLabelText("Name"), "goals");
+    await user.type(box.getByLabelText("Description"), "Again");
+    await user.click(box.getByRole("button", { name: "Add" }));
 
-    expect(await form.findByRole("alert")).toHaveTextContent(
+    expect(await box.findByRole("alert")).toHaveTextContent(
       "There is already a category called Goals.",
     );
   });
@@ -152,18 +166,16 @@ describe("MemoryCategoriesManager", () => {
       name: "Aims",
     });
     renderWithQueries(<MemoryCategoriesManager />);
-    await screen.findByText("Goals");
+    const card = await findCard("Goals");
 
-    await user.click(rowFor("Goals").getByRole("button", { name: "Edit" }));
-    const form = within(screen.getByRole("form", { name: "Edit Goals" }));
-    const name = form.getByLabelText("Name");
+    const name = card.getByLabelText("Name");
     expect(name).toHaveValue("Goals");
     await user.clear(name);
     await user.type(name, "Aims");
-    const description = form.getByLabelText(/Description/);
+    const description = card.getByLabelText("Description");
     await user.clear(description);
     await user.type(description, "What they work towards");
-    await user.click(form.getByRole("button", { name: "Save category" }));
+    await user.click(card.getByRole("button", { name: "Save" }));
 
     expect(apiClient.updateMemoryCategory).toHaveBeenCalledWith("goals", {
       name: "Aims",
@@ -173,17 +185,17 @@ describe("MemoryCategoriesManager", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("Saved Aims.");
   });
 
-  it("turns always include on and off", async () => {
+  it("turns always include on and off as soon as it is switched", async () => {
     const user = userEvent.setup();
     apiClient.updateMemoryCategory.mockResolvedValue({
       ...goals,
       always_include: true,
     });
     renderWithQueries(<MemoryCategoriesManager />);
-    await screen.findByText("Goals");
+    const card = await findCard("Goals");
 
     await user.click(
-      screen.getByRole("switch", { name: "Always include Goals" }),
+      card.getByRole("switch", { name: "Always include Goals" }),
     );
 
     expect(apiClient.updateMemoryCategory).toHaveBeenCalledWith("goals", {
@@ -196,7 +208,7 @@ describe("MemoryCategoriesManager", () => {
     );
   });
 
-  it("archives an active category and restores an archived one", async () => {
+  it("archives an active category after confirming and restores an archived one", async () => {
     const user = userEvent.setup();
     apiClient.archiveMemoryCategory.mockResolvedValue({
       ...goals,
@@ -207,32 +219,45 @@ describe("MemoryCategoriesManager", () => {
       archived: false,
     });
     renderWithQueries(<MemoryCategoriesManager />);
-    await screen.findByText("Goals");
+    const goalsCard = await findCard("Goals");
 
-    await user.click(rowFor("Goals").getByRole("button", { name: "Archive" }));
+    await user.click(goalsCard.getByRole("button", { name: "Archive" }));
+    expect(apiClient.archiveMemoryCategory).not.toHaveBeenCalled();
+    const confirm = goalsCard.getByRole("alertdialog", {
+      name: "Archive this category?",
+    });
+    await user.click(within(confirm).getByRole("button", { name: "Archive" }));
     expect(apiClient.archiveMemoryCategory).toHaveBeenCalledWith("goals");
     expect(await screen.findByRole("status")).toHaveTextContent(
       "Archived Goals. Its memories are kept.",
     );
 
-    await user.click(
-      rowFor("Habits (old)").getByRole("button", { name: "Restore" }),
-    );
+    const habitsCard = await findCard("Habits (old)");
+    await user.click(habitsCard.getByRole("button", { name: "Restore" }));
     expect(apiClient.restoreMemoryCategory).toHaveBeenCalledWith("habits");
     expect(await screen.findByRole("status")).toHaveTextContent(
       "Restored Habits (old).",
     );
   });
 
+  async function archiveGoals(user: ReturnType<typeof userEvent.setup>) {
+    const card = await findCard("Goals");
+    await user.click(card.getByRole("button", { name: "Archive" }));
+    await user.click(
+      within(card.getByRole("alertdialog")).getByRole("button", {
+        name: "Archive",
+      }),
+    );
+  }
+
   it("says when a change fails", async () => {
     const user = userEvent.setup();
     apiClient.archiveMemoryCategory.mockRejectedValue(new Error("offline"));
     renderWithQueries(<MemoryCategoriesManager />);
-    await screen.findByText("Goals");
 
-    await user.click(rowFor("Goals").getByRole("button", { name: "Archive" }));
+    await archiveGoals(user);
 
-    expect(await screen.findByRole("status")).toHaveTextContent(
+    expect(await screen.findByRole("alert")).toHaveTextContent(
       "Couldn’t change Goals. Please try again.",
     );
   });
@@ -245,11 +270,10 @@ describe("MemoryCategoriesManager", () => {
       new ApiError(409, "/api/admin/memory-categories/goals/archive", reason),
     );
     renderWithQueries(<MemoryCategoriesManager />);
-    await screen.findByText("Goals");
 
-    await user.click(rowFor("Goals").getByRole("button", { name: "Archive" }));
+    await archiveGoals(user);
 
-    expect(await screen.findByRole("status")).toHaveTextContent(reason);
+    expect(await screen.findByRole("alert")).toHaveTextContent(reason);
   });
 
   it("shows the empty state when there are no categories", async () => {
@@ -269,6 +293,8 @@ describe("MemoryCategoriesManager", () => {
     expect(alert).toHaveTextContent("Couldn’t load Memory Categories");
     await user.click(within(alert).getByRole("button", { name: "Try again" }));
 
-    expect(await screen.findByText("Goals")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("region", { name: "Goals" }),
+    ).toBeInTheDocument();
   });
 });

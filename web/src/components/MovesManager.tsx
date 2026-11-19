@@ -3,28 +3,23 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { primaryButton } from "@/components/button-styles";
+import { CardCount } from "@/components/CardCount";
+import { CardList } from "@/components/CardList";
+import { CardListFlash, type Flash } from "@/components/CardListFlash";
+import { CardListLoading } from "@/components/CardListLoading";
 import { LoadFailed } from "@/components/LoadFailed";
 import { MoveCard } from "@/components/MoveCard";
+import { NewMoveBox } from "@/components/NewMoveBox";
 import type { Move, MoveDirection, MoveInput } from "@/lib/api-client";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
-type Flash = { text: string; isError: boolean };
-
-const emptyMove: MoveInput = {
-  name: "",
-  when_it_fits: "",
-  how_to_do_it: "",
-  needed_feature: null,
-  asks_a_question: false,
-};
-
 /**
- * The admin Moves manager: a card per Move, in order, to edit, move or
- * remove it and choose the Feature it needs, and a card to add a new one.
+ * The admin Moves manager, from the card-list template: a folding card per
+ * Move, in order, to edit, move or remove it and choose the Feature it
+ * needs, and a box above the list to add one.
  *
- * @returns The cards, or a loading or error state.
+ * @returns The list, or a loading or error state.
  */
 export function MovesManager() {
   const apiClient = useApiClient();
@@ -95,70 +90,51 @@ export function MovesManager() {
         />
       );
     }
-    return (
-      <div
-        aria-busy="true"
-        aria-label="Loading Moves"
-        className="flex flex-col gap-4"
-      >
-        <span className="block h-[300px] rounded-card bg-subtle" />
-        <span className="block h-[300px] rounded-card bg-subtle" />
-      </div>
-    );
+    return <CardListLoading label="Loading Moves" />;
   }
 
   return (
-    <div className="flex flex-col gap-[30px]">
-      <button
-        type="button"
-        className={`${primaryButton} self-start`}
-        disabled={isAdding}
-        onClick={() => {
-          setIsAdding(true);
-          setFlash(null);
-        }}
-      >
-        Add Move
-      </button>
-
-      {flash ? (
-        <p
-          role="status"
-          className={`m-0 rounded-xl px-4 py-3.5 text-sm ${
-            flash.isError
-              ? "border border-danger-line bg-danger-tint text-danger-deep"
-              : "bg-blue-tint text-blue-deep"
-          }`}
-        >
-          {flash.text}
-        </p>
-      ) : null}
-
-      <div className="flex flex-col gap-4">
-        {moves.map((move, index) => (
-          <MoveCard
-            key={move.id}
-            initial={move}
-            isNew={false}
-            features={features}
-            onSave={(input) => save(move, input)}
-            onRemove={() => remove(move)}
-            onMove={(direction) => moveMutation.mutate({ move, direction })}
-            canMoveUp={index > 0}
-            canMoveDown={index < moves.length - 1}
-            isMoving={moveMutation.isPending}
-          />
-        ))}
-        {isAdding ? (
-          <MoveCard
-            initial={emptyMove}
-            isNew
-            features={features}
-            onSave={add}
-            onCancel={() => setIsAdding(false)}
-          />
-        ) : null}
-      </div>
-    </div>
+    <CardList
+      items={moves}
+      count={
+        <CardCount
+          count={moves.length}
+          words={moves.length === 1 ? "Move" : "Moves"}
+        />
+      }
+      addLabel="Add Move"
+      onAdd={() => {
+        setIsAdding(true);
+        setFlash(null);
+      }}
+      isAddDisabled={isAdding}
+      aboveList={
+        <>
+          <CardListFlash flash={flash} />
+          {isAdding ? (
+            <NewMoveBox
+              features={features}
+              onAdd={add}
+              onCancel={() => setIsAdding(false)}
+            />
+          ) : null}
+        </>
+      }
+      renderCard={(move, index, folding) => (
+        <MoveCard
+          key={move.id}
+          move={move}
+          features={features}
+          isOpen={folding.isOpen}
+          onToggle={folding.onToggle}
+          onSave={(input) => save(move, input)}
+          onRemove={() => remove(move)}
+          onMove={(direction) => moveMutation.mutate({ move, direction })}
+          canMoveUp={index > 0}
+          canMoveDown={index < moves.length - 1}
+          isMoving={moveMutation.isPending}
+        />
+      )}
+    />
   );
 }

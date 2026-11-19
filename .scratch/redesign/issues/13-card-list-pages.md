@@ -55,3 +55,10 @@ Refs: `AdminCheckInKinds`, `AdminCheckInKinds--all-folded`, `M-AdminCheckInKinds
 - [ ] `/code-review` run, and findings fixed or answered.
 
 ## Comments
+
+- 2026-11-19 — Decisions (Zaf, asked at start):
+  - Pixel test: as issues 09/10/12, no "Sample data" pill and no orange builder notes or samples. Checked by parts. The "Unsaved changes" tag on "A follow-up" comes from a real edit in the check script, not from fixture data.
+  - Needs and Moves: the extra fields (ruled-out Moves checkboxes; "Needs a Feature" select and "asks a question" checkbox) are form-template field rows inside the open card. Move up/down are 44px round arrow buttons at the left of the save bar (as Helplines). The fallback Need has no Remove, and its bar says so.
+  - Memory Categories: Name, Description, and "Always include" as a switch field row that still saves the moment it is flipped (as now), apart from the card's Save. Archive replaces Remove (with the confirm). Archived categories are a second "Archived" list of folded cards; their open card has only Restore.
+  - Sticker Library: folded row has the picture, emoji, start of the note (or "Needs a note"). Open card: "When to use" field and the save bar (Save replaces save-on-leave), Remove with the confirm. "Add stickers" stays above the list as the adding box, with its tabs.
+  - Knowledge: folded row has title, "source · tradition", status pill, added day. Open card: read-only lines (type, file name, failure reason); the bar has "Open document", Retry (if failed) and Delete with the confirm (replacing the browser confirm). The upload form stays above as the adding box.

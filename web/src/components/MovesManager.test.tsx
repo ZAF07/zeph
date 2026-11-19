@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -67,6 +67,7 @@ const stickers: FeatureSwitch = {
 };
 
 async function findCard(name: string) {
+  fireEvent.click(await screen.findByRole("button", { name: "Expand all" }));
   return within(await screen.findByRole("region", { name }));
 }
 
@@ -218,7 +219,11 @@ describe("MovesManager", () => {
     await user.click(card.getByRole("button", { name: "Remove" }));
     expect(apiClient.deleteMove).not.toHaveBeenCalled();
     apiClient.listMoves.mockResolvedValue([calm, research]);
-    await user.click(card.getByRole("button", { name: "Remove Push" }));
+    await user.click(
+      within(card.getByRole("alertdialog")).getByRole("button", {
+        name: "Remove",
+      }),
+    );
 
     expect(apiClient.deleteMove).toHaveBeenCalledWith("move-push");
     expect(await screen.findByText("Removed Push.")).toBeInTheDocument();

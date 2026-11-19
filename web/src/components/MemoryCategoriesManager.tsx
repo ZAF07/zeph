@@ -3,13 +3,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import {
-  compactSecondaryButton,
-  primaryButton,
-} from "@/components/button-styles";
+import { ArchivedMemoryCategoryCard } from "@/components/ArchivedMemoryCategoryCard";
+import { CardCount } from "@/components/CardCount";
+import { CardList } from "@/components/CardList";
+import { CardListFlash, type Flash } from "@/components/CardListFlash";
+import { CardListLoading } from "@/components/CardListLoading";
+import { EmptyState } from "@/components/EmptyState";
 import { LoadFailed } from "@/components/LoadFailed";
-import { MemoryCategoryForm } from "@/components/MemoryCategoryForm";
-import { Switch } from "@/components/Switch";
+import { MemoryCategoryCard } from "@/components/MemoryCategoryCard";
+import { NewMemoryCategoryBox } from "@/components/NewMemoryCategoryBox";
 import {
   ApiError,
   type MemoryCategoryInput,
@@ -18,38 +20,18 @@ import {
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
-type Editing =
-  { kind: "add" } | { kind: "edit"; category: MemoryCategoryOverview };
-
-type Flash = { text: string; isError: boolean };
-
-const emptyCategory: MemoryCategoryInput = {
-  name: "",
-  description: "",
-  always_include: false,
-};
-
 /**
- * Writes a Memory Item count like "· 97 items".
+ * The admin Memory Categories manager, from the card-list template: a
+ * folding card per active category to change its name, description and
+ * "always include", or archive it; then the archived ones, each with
+ * Restore; and a box above the list to add one. There is no delete.
  *
- * @param count - How many Memory Items there are.
- * @returns The count with the right word.
- */
-function itemCountLabel(count: number): string {
-  return `· ${count} ${count === 1 ? "item" : "items"}`;
-}
-
-/**
- * The admin Memory Categories manager: active categories with their
- * "always include" switch and Archive, archived ones with Restore, and a form
- * to add a category or change its name and description. There is no delete.
- *
- * @returns The lists and form, or a loading, empty or error state.
+ * @returns The lists, or a loading, empty or error state.
  */
 export function MemoryCategoriesManager() {
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
-  const [editing, setEditing] = useState<Editing | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
   const [flash, setFlash] = useState<Flash | null>(null);
 
   const categoriesQuery = useQuery({
@@ -66,7 +48,7 @@ export function MemoryCategoriesManager() {
     });
   }
 
-  const rowAction = useMutation({
+  const change = useMutation({
     mutationFn: async ({
       action,
     }: {
@@ -92,268 +74,127 @@ export function MemoryCategoriesManager() {
         isError: true,
       }),
   });
-  const busyId = rowAction.isPending ? rowAction.variables.target.id : null;
+  const changingId = change.isPending ? change.variables.target.id : null;
 
-  function runRowAction(
-    target: MemoryCategoryOverview,
-    action: () => Promise<unknown>,
-    successText: string | null,
-  ) {
-    rowAction.mutate({ target, action, successText });
-  }
-
-  function startEditing(next: Editing) {
-    setEditing(next);
-    setFlash(null);
-  }
-
-  async function saveForm(input: MemoryCategoryInput) {
-    if (editing?.kind === "edit") {
-      await apiClient.updateMemoryCategory(editing.category.id, input);
-      setFlash({ text: `Saved ${input.name.trim()}.`, isError: false });
-    } else {
-      await apiClient.addMemoryCategory(input);
-      setFlash({ text: `Added ${input.name.trim()}.`, isError: false });
-    }
-    setEditing(null);
+  async function add(input: MemoryCategoryInput) {
+    await apiClient.addMemoryCategory(input);
+    setIsAdding(false);
+    setFlash({ text: `Added ${input.name.trim()}.`, isError: false });
     await reloadCategories();
   }
 
-  const header = (
-    <>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <p
-          role="note"
-          className="m-0 max-w-[48em] flex-1 rounded-xl bg-yellow-tint px-4 py-3.5 text-sm text-yellow-deep"
-        >
-          Categories can’t be deleted, because existing Memory Items belong to
-          them. Archive instead: Zeph stops saving new memories there, and Users
-          still see and can delete the ones they have.
-        </p>
-        <button
-          type="button"
-          className={primaryButton}
-          onClick={() => startEditing({ kind: "add" })}
-        >
-          Add category
-        </button>
-      </div>
-
-      {flash ? (
-        <p
-          role="status"
-          className={`m-0 rounded-xl px-4 py-3.5 text-sm ${
-            flash.isError
-              ? "border border-danger-line bg-danger-tint text-danger-deep"
-              : "bg-blue-tint text-blue-deep"
-          }`}
-        >
-          {flash.text}
-        </p>
-      ) : null}
-
-      {editing ? (
-        <MemoryCategoryForm
-          key={editing.kind === "edit" ? editing.category.id : "add"}
-          title={
-            editing.kind === "edit"
-              ? `Edit ${editing.category.name}`
-              : "New category"
-          }
-          initial={editing.kind === "edit" ? editing.category : emptyCategory}
-          onSubmit={saveForm}
-          onCancel={() => setEditing(null)}
-        />
-      ) : null}
-    </>
-  );
+  async function save(
+    category: MemoryCategoryOverview,
+    input: MemoryCategoryInput,
+  ) {
+    await apiClient.updateMemoryCategory(category.id, input);
+    setFlash({ text: `Saved ${input.name.trim()}.`, isError: false });
+    await reloadCategories();
+  }
 
   if (!categories) {
-    return (
-      <div className="flex flex-col gap-[30px]">
-        {header}
-        {categoriesQuery.isError ? (
-          <LoadFailed
-            title="Couldn’t load Memory Categories"
-            body="Zeph keeps using the last saved set."
-            onRetry={() => void categoriesQuery.refetch()}
-          />
-        ) : (
-          <div
-            aria-busy="true"
-            aria-label="Loading categories"
-            className="h-[320px] rounded-card border border-line bg-subtle"
-          />
-        )}
-      </div>
-    );
+    if (categoriesQuery.isError) {
+      return (
+        <LoadFailed
+          title="Couldn’t load Memory Categories"
+          body="Zeph keeps using the last saved set."
+          onRetry={() => void categoriesQuery.refetch()}
+        />
+      );
+    }
+    return <CardListLoading label="Loading categories" />;
   }
 
   const active = categories.filter((category) => !category.archived);
   const archived = categories.filter((category) => category.archived);
 
-  if (categories.length === 0) {
-    return (
-      <div className="flex flex-col gap-[30px]">
-        {header}
-        <div className="flex flex-col gap-1 rounded-xl border border-dashed border-line-strong px-5 py-6">
-          <span className="font-semibold">No categories yet</span>
-          <p className="m-0 max-w-[34em] text-caption text-ink-muted">
-            Zeph needs at least one active category to save memories. Suggested
-            starters: Life details, Relationships, Goals, Values & beliefs,
-            Challenges, Preferences, What helps.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col gap-[30px]">
-      {header}
-
-      <section
-        aria-labelledby="active-categories-heading"
-        className="flex flex-col rounded-card border border-line bg-white"
-      >
-        <h2
-          id="active-categories-heading"
-          className="m-0 px-5 pb-2 pt-4 text-[17px] font-semibold"
-        >
-          Active{" "}
-          <span className="text-caption font-normal text-ink-muted">
-            {active.length}
-          </span>
-        </h2>
-        <ul className="m-0 list-none p-0">
-          {active.map((category) => {
-            const isBusy = busyId === category.id;
-            return (
-              <li
-                key={category.id}
-                className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3"
-              >
-                <span className="flex min-w-0 flex-[1_1_280px] flex-col">
-                  <span>
-                    <span className="font-semibold">{category.name}</span>{" "}
-                    <span className="text-caption text-ink-muted">
-                      {itemCountLabel(category.item_count)}
-                    </span>
-                  </span>
-                  <span className="text-caption text-ink-soft">
-                    {category.description}
-                  </span>
-                </span>
-                <span className="flex flex-wrap items-center gap-2.5">
-                  <span className="inline-flex items-center gap-2 text-[13px]">
-                    Always include
-                    <Switch
-                      label={`Always include ${category.name}`}
-                      checked={category.always_include}
-                      disabled={isBusy}
-                      onChange={(checked) =>
-                        runRowAction(
-                          category,
-                          () =>
-                            apiClient.updateMemoryCategory(category.id, {
-                              name: category.name,
-                              description: category.description,
-                              always_include: checked,
-                            }),
-                          null,
-                        )
-                      }
-                    />
-                  </span>
-                  <button
-                    type="button"
-                    className={compactSecondaryButton}
-                    disabled={isBusy}
-                    onClick={() => startEditing({ kind: "edit", category })}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className={compactSecondaryButton}
-                    disabled={isBusy}
-                    onClick={() =>
-                      runRowAction(
-                        category,
-                        () => apiClient.archiveMemoryCategory(category.id),
-                        `Archived ${category.name}. Its memories are kept.`,
-                      )
-                    }
-                  >
-                    Archive
-                  </button>
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-        <p className="m-0 border-t border-line px-5 py-3 text-caption text-ink-muted">
-          “Always include” sends every memory in that category to Zeph on each
-          reply, not just the most relevant ones. Use sparingly.
-        </p>
-      </section>
-
-      <section
-        aria-labelledby="archived-categories-heading"
-        className="flex flex-col rounded-card border border-line"
-      >
-        <h2
-          id="archived-categories-heading"
-          className="m-0 px-5 pb-2 pt-4 text-[17px] font-semibold text-ink-soft"
-        >
-          Archived{" "}
-          <span className="text-caption font-normal text-ink-muted">
-            {archived.length}
-          </span>
-        </h2>
-        {archived.length === 0 ? (
-          <p className="m-0 px-5 pb-4 text-caption text-ink-muted">
-            Nothing archived.
-          </p>
-        ) : (
-          <ul className="m-0 list-none p-0">
-            {archived.map((category) => (
-              <li
-                key={category.id}
-                className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3"
-              >
-                <span className="flex min-w-0 flex-[1_1_280px] flex-col">
-                  <span>
-                    <span className="font-semibold text-ink-soft">
-                      {category.name}
-                    </span>{" "}
-                    <span className="text-caption text-ink-muted">
-                      {itemCountLabel(category.item_count)} kept
-                    </span>
-                  </span>
-                  <span className="text-caption text-ink-muted">
-                    {category.description}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  className={compactSecondaryButton}
-                  disabled={busyId === category.id}
-                  onClick={() =>
-                    runRowAction(
-                      category,
-                      () => apiClient.restoreMemoryCategory(category.id),
-                      `Restored ${category.name}.`,
-                    )
-                  }
-                >
-                  Restore
-                </button>
-              </li>
-            ))}
-          </ul>
+    <>
+      <CardList
+        items={active}
+        count={
+          <CardCount
+            count={active.length}
+            words={
+              active.length === 1 ? "active category" : "active categories"
+            }
+          />
+        }
+        addLabel="Add category"
+        onAdd={() => {
+          setIsAdding(true);
+          setFlash(null);
+        }}
+        isAddDisabled={isAdding}
+        aboveList={
+          <>
+            <CardListFlash flash={flash} />
+            {isAdding ? (
+              <NewMemoryCategoryBox
+                onAdd={add}
+                onCancel={() => setIsAdding(false)}
+              />
+            ) : null}
+            {categories.length === 0 && !isAdding ? (
+              <EmptyState
+                title="No categories yet"
+                body="Zeph needs at least one active category to save memories. Suggested starters: Life details, Relationships, Goals, Values & beliefs, Challenges, Preferences, What helps."
+              />
+            ) : null}
+          </>
+        }
+        renderCard={(category, _index, folding) => (
+          <MemoryCategoryCard
+            key={category.id}
+            category={category}
+            isOpen={folding.isOpen}
+            onToggle={folding.onToggle}
+            onSave={(input) => save(category, input)}
+            onAlwaysIncludeChange={(alwaysInclude) =>
+              change.mutate({
+                target: category,
+                action: () =>
+                  apiClient.updateMemoryCategory(category.id, {
+                    name: category.name,
+                    description: category.description,
+                    always_include: alwaysInclude,
+                  }),
+                successText: null,
+              })
+            }
+            onArchive={() =>
+              change.mutate({
+                target: category,
+                action: () => apiClient.archiveMemoryCategory(category.id),
+                successText: `Archived ${category.name}. Its memories are kept.`,
+              })
+            }
+            isChanging={changingId === category.id}
+          />
         )}
-      </section>
-    </div>
+      />
+      {archived.length > 0 ? (
+        <CardList
+          items={archived}
+          count={<CardCount count={archived.length} words="archived" />}
+          renderCard={(category, _index, folding) => (
+            <ArchivedMemoryCategoryCard
+              key={category.id}
+              category={category}
+              isOpen={folding.isOpen}
+              onToggle={folding.onToggle}
+              onRestore={() =>
+                change.mutate({
+                  target: category,
+                  action: () => apiClient.restoreMemoryCategory(category.id),
+                  successText: `Restored ${category.name}.`,
+                })
+              }
+              isChanging={changingId === category.id}
+            />
+          )}
+        />
+      ) : null}
+    </>
   );
 }

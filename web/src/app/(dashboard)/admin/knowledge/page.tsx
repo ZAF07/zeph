@@ -8,12 +8,12 @@ import { KnowledgeLibrary } from "@/components/KnowledgeLibrary";
  */
 export default function AdminKnowledgePage() {
   return (
-    <div className="flex flex-col gap-9">
+    <>
       <AdminPageHeader
         title="Knowledge"
         lead="The curated library Zeph draws on. Documents are split and indexed after upload; only “Ready” documents are used."
       />
       <KnowledgeLibrary />
-    </div>
+    </>
   );
 }

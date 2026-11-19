@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -70,6 +70,7 @@ const push: Move = {
 };
 
 async function findCard(name: string) {
+  fireEvent.click(await screen.findByRole("button", { name: "Expand all" }));
   return within(await screen.findByRole("region", { name }));
 }
 
@@ -210,7 +211,11 @@ describe("NeedsManager", () => {
     await user.click(card.getByRole("button", { name: "Remove" }));
     expect(apiClient.deleteNeed).not.toHaveBeenCalled();
     apiClient.listNeeds.mockResolvedValue([beHeard, askMore]);
-    await user.click(card.getByRole("button", { name: "Remove Advice" }));
+    await user.click(
+      within(card.getByRole("alertdialog")).getByRole("button", {
+        name: "Remove",
+      }),
+    );
 
     expect(apiClient.deleteNeed).toHaveBeenCalledWith("need-advice");
     expect(await screen.findByText("Removed Advice.")).toBeInTheDocument();

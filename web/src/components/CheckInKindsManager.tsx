@@ -3,22 +3,26 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { primaryButton } from "@/components/button-styles";
+import { secondaryButton } from "@/components/button-styles";
+import { CardCount } from "@/components/CardCount";
+import { CardListLoading } from "@/components/CardListLoading";
+import { CardList } from "@/components/CardList";
 import { CheckInKindCard } from "@/components/CheckInKindCard";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadFailed } from "@/components/LoadFailed";
+import { NewCheckInKindBox } from "@/components/NewCheckInKindBox";
 import { SavedNote } from "@/components/SavedNote";
 import type { CheckInKindInput, CheckInKindOverview } from "@/lib/api-client";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
-const emptyKind: CheckInKindInput = { name: "", description: "" };
-
 /**
- * The admin Check-in Kinds manager: a card per Kind to edit its name and
- * description, or remove it, and a card to add a new one.
+ * The admin Check-in Kinds manager, the card-list template: the count,
+ * Expand all, Collapse all and Add, then a folding card per Kind to edit
+ * its name and description or remove it. A new Kind is added in a box
+ * above the list.
  *
- * @returns The cards, or a loading, empty or error state.
+ * @returns The list, or a loading, empty or error state.
  */
 export function CheckInKindsManager() {
   const apiClient = useApiClient();
@@ -55,78 +59,72 @@ export function CheckInKindsManager() {
     await reloadKinds();
   }
 
-  const addButton = (
-    <button
-      type="button"
-      className={`${primaryButton} self-start`}
-      disabled={isAdding}
-      onClick={() => {
-        setIsAdding(true);
-        setFlash(null);
-      }}
-    >
-      Add Check-in Kind
-    </button>
-  );
+  function startAdding() {
+    setIsAdding(true);
+    setFlash(null);
+  }
 
   if (!kinds) {
     if (kindsQuery.isError) {
       return (
         <LoadFailed
           title="Couldn’t load Check-in Kinds"
-          body="Check-ins keep running with the last saved set."
+          body="Check your connection and try again."
           onRetry={() => void kindsQuery.refetch()}
         />
       );
     }
-    return (
-      <div
-        aria-busy="true"
-        aria-label="Loading Check-in Kinds"
-        className="grid gap-4 sm:grid-cols-2"
-      >
-        <span className="block h-[220px] rounded-card bg-subtle" />
-        <span className="block h-[220px] rounded-card bg-subtle" />
-      </div>
-    );
+    return <CardListLoading label="Loading Check-in Kinds" />;
   }
 
   return (
-    <div className="flex flex-col gap-[30px]">
-      {addButton}
-
-      {flash ? <SavedNote>{flash}</SavedNote> : null}
-
-      {kinds.length === 0 && !isAdding ? (
-        <EmptyState
-          title="No Check-in Kinds"
-          body="Without at least one, Zeph won’t start any Check-ins — it will only reply. Add a casual hello to begin."
+    <CardList
+      items={kinds}
+      count={
+        <CardCount
+          count={kinds.length}
+          words={kinds.length === 1 ? "kind" : "kinds"}
         />
-      ) : (
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(420px,100%),1fr))] gap-4">
-          {kinds.map((kind) => (
-            <CheckInKindCard
-              key={kind.id}
-              initial={kind}
-              isNew={false}
-              sentLast30Days={kind.sent_last_30_days}
-              sendsSharedPhoto={kind.sends_shared_photo}
-              raisesCuriosity={kind.raises_curiosity}
-              onSave={(input) => save(kind, input)}
-              onRemove={() => remove(kind)}
-            />
-          ))}
+      }
+      addLabel="Add a Check-in Kind"
+      onAdd={startAdding}
+      isAddDisabled={isAdding}
+      aboveList={
+        <>
+          {flash ? <SavedNote>{flash}</SavedNote> : null}
           {isAdding ? (
-            <CheckInKindCard
-              initial={emptyKind}
-              isNew
-              sentLast30Days={0}
-              onSave={add}
+            <NewCheckInKindBox
+              onAdd={add}
               onCancel={() => setIsAdding(false)}
             />
           ) : null}
-        </div>
+          {kinds.length === 0 && !isAdding ? (
+            <EmptyState
+              title="No Check-in Kinds"
+              body="Without a kind, Zeph can’t start a check-in. Add one to begin."
+              action={
+                <button
+                  type="button"
+                  className={secondaryButton}
+                  onClick={startAdding}
+                >
+                  Add a Check-in Kind
+                </button>
+              }
+            />
+          ) : null}
+        </>
+      }
+      renderCard={(kind, _index, folding) => (
+        <CheckInKindCard
+          key={kind.id}
+          kind={kind}
+          isOpen={folding.isOpen}
+          onToggle={folding.onToggle}
+          onSave={(input) => save(kind, input)}
+          onRemove={() => remove(kind)}
+        />
       )}
-    </div>
+    />
   );
 }
