@@ -80,7 +80,7 @@ Why, and the parts compared on their own with the same pixelmatch settings:
 - **Doesn’t fit as drawn (reported):** at 1280 a very long name or email widens the Users table’s first column, so the table scrolls sideways inside its card (the drawn table already scrolls a little: 720px in a ~600px card) and the dates and Telegram status wrap onto two lines.
 
 **Chosen myself / unsure (for Zaf to confirm).**
-- Paused rows say the drawn "Three in a row went unanswered", but the Ignore Threshold is an Admin setting (3 now). If it changes, this text is wrong.
+- Paused rows say the drawn "Three in a row went unanswered", but the Ignore Threshold is an Admin setting (3 now). If it changes, this text is wrong. → Fixed in issue 17: the number now comes from the setting (Zaf, 2026-11-19).
 - The Feature switch is on when the Admins’ switches allow the Feature for the User. That is the same as "works" except when the User turned it off themselves (or Stickers is off): then the switch is on and the line under it says why it is off.
 - Feature lines not drawn: "Works: on for this user", "Off for this user", "Off: the user turned it off", "Off: Stickers is off for this user". Stickers off: "Off for everyone · N personal stickers kept". The "Changed … by …" line stays under a Feature set for one User.
 - The Users panel has no close (none drawn); Manage on another row swaps it. Its heading takes focus when it opens.
