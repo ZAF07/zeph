@@ -9,6 +9,7 @@ from companion.adapters.knowledge_seed import read_knowledge_seed
 from companion.adapters.postgres.database import (
     migrate,
     seed_check_in_kinds,
+    seed_copy,
     seed_helplines,
     seed_memory_categories,
     seed_moves,
@@ -26,6 +27,7 @@ from companion.core.evals.case_seed import add_seed_cases, add_seed_judge_settin
 from companion.core.knowledge import KnowledgeService
 from companion.main import (
     CHECK_IN_KINDS_SEED_FILE,
+    COPY_SEED_FILE,
     EVAL_CASES_DIR,
     EVAL_IMAGES_DIR,
     HELPLINES_SEED_FILE,
@@ -68,7 +70,8 @@ def register_telegram_webhook(
 def prepare() -> None:
     """Get everything ready before the backend starts serving.
 
-    Checks settings, migrates the database, loads seed data (adding new Eval
+    Checks settings, migrates the database, loads seed data (making Copy
+    follow its seed file while keeping Admin-edited text, adding new Eval
     Cases by key with their images, and Judge settings not stored yet,
     embedding the starter Knowledge and drafting when each document helps on first run,
     finishing any upload a restart interrupted and saving the text of
@@ -79,6 +82,7 @@ def prepare() -> None:
     migrate(settings.database_url)
     engine = build_database_engine(settings)
     seed_platform_settings(engine, SEED_FILE)
+    seed_copy(engine, COPY_SEED_FILE)
     seed_helplines(engine, HELPLINES_SEED_FILE)
     seed_memory_categories(engine, MEMORY_CATEGORIES_SEED_FILE)
     seed_check_in_kinds(engine, CHECK_IN_KINDS_SEED_FILE)

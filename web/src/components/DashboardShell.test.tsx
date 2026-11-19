@@ -333,6 +333,7 @@ describe("DashboardShell", () => {
       "Sticker Library",
       "Features",
       "Platform settings",
+      "Copy",
       "Usage",
       "Model call log",
       "Evals",

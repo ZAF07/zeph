@@ -9,6 +9,7 @@ export type LandingPlanDetails = {
   badge?: string;
   blurb: string;
   price: string;
+  perMonth: string;
   features: string[];
   action: string;
   primary: boolean;
@@ -35,7 +36,7 @@ export function LandingPlan({ plan }: { plan: LandingPlanDetails }) {
       <p className="m-0 min-h-11 text-[14px] text-soft">{plan.blurb}</p>
       <div className="flex items-baseline gap-2 border-b border-line pb-[14px]">
         <span className="text-[34px] font-normal text-cream">{plan.price}</span>
-        <span className="text-[13px] text-soft">/month</span>
+        <span className="text-[13px] text-soft">{plan.perMonth}</span>
       </div>
       <PlanIncludesList includes={plan.features} />
       <Link

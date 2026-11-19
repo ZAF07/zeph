@@ -1,0 +1,363 @@
+# Website Copy (ADR-0019): every word Users and visitors read on the website,
+# one tab per page, each tab's slots in the order they appear on the page.
+# Loaded on every start: new slots are added with this text, a stored slot
+# keeps the text an Admin gave it, and its name, tab, order, max length and
+# placeholders always follow this file. Slots taken out of this file are
+# removed. The text must match the design references (web/design/reference/).
+#
+# A slot takes `{name}` placeholders only when it lists them, and its text
+# must keep every one. Text is plain: no markdown, links or HTML.
+
+- tab: landing
+  name: Landing
+  slots:
+    - key: landing.page_title
+      name: Browser tab title
+      max_length: 70
+      text: Zeph — Your AI companion
+    - key: landing.page_description
+      name: Search description
+      max_length: 160
+      text: >-
+        A thinking partner that challenges your perspective, helps you make
+        better decisions, and stays with you through the ups and downs.
+    - key: landing.hero.eyebrow
+      name: Label above the main heading
+      max_length: 40
+      text: Your AI companion
+    - key: landing.hero.heading_first_line
+      name: Main heading, first line
+      max_length: 40
+      text: Think Deeper,
+    - key: landing.hero.heading_second_line
+      name: Main heading, second line
+      max_length: 40
+      text: Live More Deliberately.
+    - key: landing.hero.lead
+      name: Line under the main heading
+      max_length: 200
+      text: >-
+        A thinking partner that challenges your perspective, helps you make
+        better decisions, and stays with you through the ups and downs.
+    - key: landing.hero.sign_up_button
+      name: Sign-up button
+      max_length: 30
+      text: Get Started Free
+    - key: landing.hero.how_it_works_link
+      name: How it works link
+      max_length: 30
+      text: See How It Works
+    - key: landing.conversations.eyebrow
+      name: "Conversations: label"
+      max_length: 40
+      text: Conversations with Zeph
+    - key: landing.conversations.heading_first_line
+      name: "Conversations: heading, first line"
+      max_length: 30
+      text: Real conversations
+    - key: landing.conversations.heading_second_line
+      name: "Conversations: heading, second line"
+      max_length: 30
+      text: for real growth.
+    - key: landing.conversations.lead
+      name: "Conversations: line under the heading"
+      max_length: 120
+      text: See how Zeph thinks, responds, and helps you go deeper.
+    - key: landing.conversations.message_1
+      name: "Conversations: message 1, from Zeph"
+      max_length: 250
+      text: >-
+        You've been pushing hard lately. How are you actually feeling beneath
+        the momentum?
+    - key: landing.conversations.message_2
+      name: "Conversations: message 2, from the person"
+      max_length: 250
+      text: >-
+        Honestly? Tired. But I'm also afraid to slow down. It feels like I'll
+        fall behind if I do.
+    - key: landing.conversations.message_3
+      name: "Conversations: message 3, from Zeph"
+      max_length: 250
+      text: >-
+        That's a familiar pattern: equating rest with losing ground. What do
+        you think you're really afraid of if you take a proper break?
+    - key: landing.conversations.message_4
+      name: "Conversations: message 4, from the person"
+      max_length: 250
+      text: >-
+        Maybe that I'm not as capable as I think. That the progress will stop,
+        and I'll be left with the same old doubts again.
+    - key: landing.conversations.message_5
+      name: "Conversations: message 5, from Zeph"
+      max_length: 250
+      text: >-
+        That's a useful insight. It sounds less about productivity and more
+        about self-trust. What would it look like to rest as part of your
+        progress, and not as a pause from it?
+    - key: landing.conversations.message_6
+      name: "Conversations: message 6, from the person"
+      max_length: 250
+      text: >-
+        I'm thinking of a bigger change, maybe moving to a van and travelling
+        for a while. It feels exciting, but also a bit reckless. Am I just
+        escaping from something?
+    - key: landing.conversations.message_7
+      name: "Conversations: message 7, from Zeph"
+      max_length: 250
+      text: >-
+        It could be both: an escape and a deliberate step toward a life that
+        feels more like you. Let's unpack it. What are you hoping to find on
+        the road, and what are you hoping to leave behind?
+    - key: landing.day.eyebrow
+      name: "A day with Zeph: label"
+      max_length: 40
+      text: A day with Zeph
+    - key: landing.day.heading_first_line
+      name: "A day with Zeph: heading, first line"
+      max_length: 30
+      text: A thoughtful presence
+    - key: landing.day.heading_second_line
+      name: "A day with Zeph: heading, second line"
+      max_length: 30
+      text: throughout your day.
+    - key: landing.day.lead
+      name: "A day with Zeph: line under the heading"
+      max_length: 200
+      text: >-
+        Not just when you ask, but when it matters. Zeph chooses the moment to
+        reach out, and stays quiet when you need space.
+    - key: landing.day.check_ins.tag
+      name: "A day with Zeph: first moment, tag"
+      max_length: 24
+      text: Check-ins
+    - key: landing.day.check_ins.title
+      name: "A day with Zeph: first moment, title"
+      max_length: 40
+      text: It reaches out first, gently.
+    - key: landing.day.check_ins.text
+      name: "A day with Zeph: first moment, text"
+      max_length: 160
+      text: >-
+        Opt-in messages at times you choose. A question for the morning, never
+        a streak to protect.
+    - key: landing.day.applied_wisdom.tag
+      name: "A day with Zeph: second moment, tag"
+      max_length: 24
+      text: Applied wisdom
+    - key: landing.day.applied_wisdom.title
+      name: "A day with Zeph: second moment, title"
+      max_length: 40
+      text: Old ideas, when they are useful.
+    - key: landing.day.applied_wisdom.text
+      name: "A day with Zeph: second moment, text"
+      max_length: 160
+      text: >-
+        Eastern and Western philosophy, psychology and mindfulness, offered in
+        plain words at the moment they apply.
+    - key: landing.day.reflection.tag
+      name: "A day with Zeph: third moment, tag"
+      max_length: 24
+      text: Reflection
+    - key: landing.day.reflection.title
+      name: "A day with Zeph: third moment, title"
+      max_length: 40
+      text: A place to think out loud.
+    - key: landing.day.reflection.text
+      name: "A day with Zeph: third moment, text"
+      max_length: 160
+      text: >-
+        Talk through the day. Zeph asks, listens and disagrees when it should.
+        It will not flatter you.
+    - key: landing.day.memory.tag
+      name: "A day with Zeph: fourth moment, tag"
+      max_length: 24
+      text: Memory
+    - key: landing.day.memory.title
+      name: "A day with Zeph: fourth moment, title"
+      max_length: 40
+      text: It remembers, with permission.
+    - key: landing.day.memory.text
+      name: "A day with Zeph: fourth moment, text"
+      max_length: 160
+      text: >-
+        What you care about carries into tomorrow's conversation. You can read
+        every memory and remove any of them.
+    - key: landing.pricing.eyebrow
+      name: "Pricing: label"
+      max_length: 40
+      text: Pricing
+    - key: landing.pricing.heading_first_line
+      name: "Pricing: heading, first line"
+      max_length: 30
+      text: Simple plans
+    - key: landing.pricing.heading_second_line
+      name: "Pricing: heading, second line"
+      max_length: 30
+      text: that grow with you.
+    - key: landing.pricing.lead
+      name: "Pricing: line under the heading"
+      max_length: 120
+      text: Start free, upgrade when you are ready for deeper support.
+    - key: landing.pricing.per_month
+      name: "Pricing: after each price"
+      max_length: 12
+      text: /month
+    - key: landing.pricing.free.name
+      name: "Free plan: name"
+      max_length: 16
+      text: Free
+    - key: landing.pricing.free.blurb
+      name: "Free plan: line under the name"
+      max_length: 60
+      text: Start your journey with Zeph.
+    - key: landing.pricing.free.price
+      name: "Free plan: price"
+      max_length: 8
+      text: S$0
+    - key: landing.pricing.free.feature_1
+      name: "Free plan: first thing it includes"
+      max_length: 45
+      text: Thoughtful conversations
+    - key: landing.pricing.free.feature_2
+      name: "Free plan: second thing it includes"
+      max_length: 45
+      text: Basic daily check-ins
+    - key: landing.pricing.free.feature_3
+      name: "Free plan: third thing it includes"
+      max_length: 45
+      text: Core reflection prompts
+    - key: landing.pricing.free.button
+      name: "Free plan: button"
+      max_length: 20
+      text: Get Started
+    - key: landing.pricing.plus.name
+      name: "Plus plan: name"
+      max_length: 16
+      text: Plus
+    - key: landing.pricing.plus.badge
+      name: "Plus plan: badge"
+      max_length: 16
+      text: Most Popular
+    - key: landing.pricing.plus.blurb
+      name: "Plus plan: line under the name"
+      max_length: 60
+      text: A proactive companion for real progress.
+    - key: landing.pricing.plus.price
+      name: "Plus plan: price"
+      max_length: 8
+      text: S$12
+    - key: landing.pricing.plus.feature_1
+      name: "Plus plan: first thing it includes"
+      max_length: 45
+      text: Everything in Free
+    - key: landing.pricing.plus.feature_2
+      name: "Plus plan: second thing it includes"
+      max_length: 45
+      text: Proactive check-ins throughout the day
+    - key: landing.pricing.plus.feature_3
+      name: "Plus plan: third thing it includes"
+      max_length: 45
+      text: Goal and habit support
+    - key: landing.pricing.plus.feature_4
+      name: "Plus plan: fourth thing it includes"
+      max_length: 45
+      text: Longer memory and context
+    - key: landing.pricing.plus.button
+      name: "Plus plan: button"
+      max_length: 20
+      text: Start Plus
+    - key: landing.pricing.pro.name
+      name: "Pro plan: name"
+      max_length: 16
+      text: Pro
+    - key: landing.pricing.pro.blurb
+      name: "Pro plan: line under the name"
+      max_length: 60
+      text: A more personalized and ongoing partnership.
+    - key: landing.pricing.pro.price
+      name: "Pro plan: price"
+      max_length: 8
+      text: S$19
+    - key: landing.pricing.pro.feature_1
+      name: "Pro plan: first thing it includes"
+      max_length: 45
+      text: Everything in Plus
+    - key: landing.pricing.pro.feature_2
+      name: "Pro plan: second thing it includes"
+      max_length: 45
+      text: Deeper long-term insights
+    - key: landing.pricing.pro.feature_3
+      name: "Pro plan: third thing it includes"
+      max_length: 45
+      text: Custom routines and focus areas
+    - key: landing.pricing.pro.feature_4
+      name: "Pro plan: fourth thing it includes"
+      max_length: 45
+      text: Early access to new features
+    - key: landing.pricing.pro.button
+      name: "Pro plan: button"
+      max_length: 20
+      text: Start Pro
+    - key: landing.faq.eyebrow
+      name: "FAQ: label"
+      max_length: 40
+      text: FAQ
+    - key: landing.faq.heading
+      name: "FAQ: heading"
+      max_length: 40
+      text: Common questions.
+    - key: landing.faq.lead
+      name: "FAQ: line under the heading"
+      max_length: 120
+      text: Everything you need to know about Zeph.
+    - key: landing.faq.question_1
+      name: "FAQ: first question"
+      max_length: 80
+      text: What is Zeph?
+    - key: landing.faq.answer_1
+      name: "FAQ: first answer"
+      max_length: 400
+      text: >-
+        Zeph is an AI companion you talk to on Telegram. It draws on
+        philosophy, psychology and mindfulness to help you reflect, question
+        your assumptions and decide what matters to you.
+    - key: landing.faq.question_2
+      name: "FAQ: second question"
+      max_length: 80
+      text: How is this different from a regular AI chat?
+    - key: landing.faq.answer_2
+      name: "FAQ: second answer"
+      max_length: 400
+      text: >-
+        Zeph remembers what you have told it, with your permission, and it can
+        reach out first at times you choose. It is built to ask good
+        questions, and it will disagree with you when that is more useful than
+        agreeing.
+    - key: landing.faq.question_3
+      name: "FAQ: third question"
+      max_length: 80
+      text: Will Zeph proactively check in with me?
+    - key: landing.faq.answer_3
+      name: "FAQ: third answer"
+      max_length: 400
+      text: >-
+        Only if you turn check-ins on. You pick the times and how often in your
+        dashboard, and you can switch them off at any time.
+    - key: landing.faq.question_4
+      name: "FAQ: fourth question"
+      max_length: 80
+      text: Is my data private and secure?
+    - key: landing.faq.answer_4
+      name: "FAQ: fourth answer"
+      max_length: 400
+      text: >-
+        You decide what Zeph remembers, and you can read, remove or export it
+        from your dashboard. [YOUR DATA HANDLING DETAILS]
+    - key: landing.faq.question_5
+      name: "FAQ: fifth question"
+      max_length: 80
+      text: Can I cancel my subscription anytime?
+    - key: landing.faq.answer_5
+      name: "FAQ: fifth answer"
+      max_length: 400
+      text: "[YOUR CANCELLATION POLICY]"

@@ -20,6 +20,8 @@ from companion.core.models import (
     Conversation,
     ConversationMessage,
     ConversationSummary,
+    CopySeedSlot,
+    CopySlot,
     Curiosity,
     CuriosityChanges,
     DailyUsage,
@@ -1579,6 +1581,51 @@ class PlatformSettingsRepository(Protocol):
         ...
 
 
+class CopyRepository(Protocol):
+    """Stores website Copy, kept apart from platform settings (ADR-0019)."""
+
+    def list_slots(self) -> list[CopySlot]:
+        """List every slot, by tab order and then page order.
+
+        Returns:
+            The slots, with when and by whom each was last saved.
+        """
+        ...
+
+    def texts(self) -> dict[str, str]:
+        """Read every slot's current text.
+
+        Returns:
+            Each slot's text by key.
+        """
+        ...
+
+    def save_texts(
+        self, texts: Mapping[str, str], updated_at: datetime, updated_by: UUID
+    ) -> None:
+        """Save new texts for several slots in one step.
+
+        Args:
+            texts: The new text for each slot key.
+            updated_at: When they are being saved.
+            updated_by: The Admin saving them.
+        """
+        ...
+
+    def sync_with_seed(self, seed: Sequence[CopySeedSlot], now: datetime) -> None:
+        """Make the stored slots follow the seed, in one step.
+
+        Slots not stored yet are added with the seed text. Stored slots keep
+        their text; their name, tab, order, max length and placeholders take
+        the seed's. Stored slots missing from the seed are removed.
+
+        Args:
+            seed: Every slot the seed file defines.
+            now: When new slots are added.
+        """
+        ...
+
+
 class HelplineRepository(Protocol):
     """Stores Helplines per country and the one international fallback."""
 
@@ -2581,6 +2628,7 @@ class Repositories:
     connection_tokens: ConnectionTokenRepository
     conversations: ConversationRepository
     platform_settings: PlatformSettingsRepository
+    copy: CopyRepository
     helplines: HelplineRepository
     safeguard_events: SafeguardEventRepository
     memory_categories: MemoryCategoryRepository

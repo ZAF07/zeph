@@ -61,6 +61,7 @@ export const adminMenuItems: AdminMenuItem[] = [
   { label: "Sticker Library", href: "/admin/stickers" },
   { label: "Features", href: "/admin/features" },
   { label: "Platform settings", href: "/admin/settings" },
+  { label: "Copy", href: "/admin/copy" },
   { label: "Usage", href: "/admin/usage" },
   { label: "Model call log", href: "/admin/model-calls" },
   { label: "Evals", href: "/admin/evals" },

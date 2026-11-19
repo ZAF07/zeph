@@ -44,6 +44,7 @@ from companion.core.ports import (
 SEED_DIR = Path(__file__).parent / "seed"
 SEED_FILE = SEED_DIR / "platform_settings.yaml"
 HELPLINES_SEED_FILE = SEED_DIR / "helplines.yaml"
+COPY_SEED_FILE = SEED_DIR / "copy.yaml"
 MEMORY_CATEGORIES_SEED_FILE = SEED_DIR / "memory_categories.yaml"
 CHECK_IN_KINDS_SEED_FILE = SEED_DIR / "check_in_kinds.yaml"
 NEEDS_SEED_FILE = SEED_DIR / "needs.yaml"

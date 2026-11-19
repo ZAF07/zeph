@@ -1,3 +1,5 @@
+import type { Copy } from "@/lib/copy";
+
 /** Where a connection token stands, as reported by the backend. */
 export type ConnectionTokenStatus =
   "active" | "used" | "expired" | "connected_elsewhere";
@@ -1138,6 +1140,24 @@ export type ModelPrice = {
 /** The Model Prices and the Eval run token limit. */
 export type EvalCosts = { prices: ModelPrice[]; token_limit: number };
 
+/** A Copy slot as Admins see it on the Copy page (ADR-0019). */
+export type CopySlot = {
+  key: string;
+  name: string;
+  text: string;
+  max_length: number;
+  placeholders: string[];
+  updated_at: string;
+  updated_by: string | null;
+};
+
+/** One tab of the Copy page: a website page and its slots in page order. */
+export type CopyTab = {
+  tab: string;
+  name: string;
+  slots: CopySlot[];
+};
+
 /** Every call the Dashboard makes to the backend. */
 export type ApiClient = {
   getMe: () => Promise<Me>;
@@ -1146,6 +1166,7 @@ export type ApiClient = {
   deleteMyData: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   getPlatformContent: () => Promise<PlatformContent>;
+  getCopy: () => Promise<Copy>;
   getHome: () => Promise<Home>;
   getTelegramConnection: () => Promise<TelegramConnectionStatus>;
   createConnectionToken: () => Promise<ConnectionToken>;
@@ -1184,6 +1205,8 @@ export type ApiClient = {
     featureSwitch: UserFeatureSwitch,
   ) => Promise<UserFeatureStatus>;
   getAdminSettings: () => Promise<AdminSettings>;
+  getCopyPage: () => Promise<CopyTab[]>;
+  saveCopyTab: (tab: string, texts: Copy) => Promise<CopyTab[]>;
   updateAdminSettings: (
     values: Record<string, SettingValue>,
   ) => Promise<AdminSettings>;
@@ -1426,6 +1449,7 @@ export function createApiClient(
     deleteMyData: () => request<void>("/api/me/data", "DELETE"),
     deleteAccount: () => request<void>("/api/me", "DELETE"),
     getPlatformContent: () => request<PlatformContent>("/api/platform-content"),
+    getCopy: async () => (await request<{ texts: Copy }>("/api/copy")).texts,
     getHome: () => request<Home>("/api/home"),
     getTelegramConnection: () =>
       request<TelegramConnectionStatus>("/api/telegram-connection"),
@@ -1503,6 +1527,16 @@ export function createApiClient(
           { values },
         )
       ).settings,
+    getCopyPage: async () =>
+      (await request<{ tabs: CopyTab[] }>("/api/admin/copy")).tabs,
+    saveCopyTab: async (tab, texts) =>
+      (
+        await request<{ tabs: CopyTab[] }>(
+          `/api/admin/copy/${encodeURIComponent(tab)}`,
+          "PUT",
+          { texts },
+        )
+      ).tabs,
     getCoreServices: () => request<CoreServices>("/api/admin/core-services"),
     listHelplines: () => request<Helplines>("/api/admin/helplines"),
     addHelpline: (helpline) =>

@@ -8,6 +8,7 @@ from alembic.config import Config
 from sqlalchemy import Engine, exists, select
 from sqlalchemy.dialects.postgresql import insert
 
+from companion.adapters.postgres.repositories import PostgresCopyRepository
 from companion.adapters.postgres.tables import (
     check_in_kinds,
     helplines,
@@ -17,6 +18,7 @@ from companion.adapters.postgres.tables import (
     needs,
     platform_settings,
 )
+from companion.core.models import CopySeedSlot
 
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
@@ -53,6 +55,51 @@ def seed_platform_settings(engine: Engine, seed_file: Path) -> None:
         connection.execute(
             insert(platform_settings).values(rows).on_conflict_do_nothing()
         )
+
+
+def read_copy_seed(seed_file: Path) -> list[CopySeedSlot]:
+    """Read the Copy seed file.
+
+    Args:
+        seed_file: YAML file listing tabs in order, each with a `tab` key, a
+            `name` and its `slots` in page order. A slot has a `key`, `name`,
+            `max_length`, `text` and optional `placeholders`.
+
+    Returns:
+        Every slot the file defines.
+    """
+    tabs = yaml.safe_load(seed_file.read_text())
+    return [
+        CopySeedSlot(
+            key=slot["key"],
+            tab=tab["tab"],
+            tab_name=tab["name"],
+            tab_order=tab_order,
+            slot_order=slot_order,
+            name=slot["name"],
+            text=slot["text"],
+            max_length=slot["max_length"],
+            placeholders=tuple(slot.get("placeholders", [])),
+        )
+        for tab_order, tab in enumerate(tabs)
+        for slot_order, slot in enumerate(tab["slots"])
+    ]
+
+
+def seed_copy(engine: Engine, seed_file: Path) -> None:
+    """Make the stored Copy follow the seed file, keeping Admin-edited text.
+
+    New slots are added with the seed text, and slots taken out of the seed
+    are removed. A stored slot keeps its text, but its name, tab, order, max
+    length and placeholders always come from the seed.
+
+    Args:
+        engine: The database engine.
+        seed_file: The Copy seed file.
+    """
+    PostgresCopyRepository(engine).sync_with_seed(
+        read_copy_seed(seed_file), datetime.now(UTC)
+    )
 
 
 def seed_helplines(engine: Engine, seed_file: Path) -> None:

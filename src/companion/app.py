@@ -10,6 +10,7 @@ from companion.adapters.http.auth import (
     build_current_admin_dependency,
     build_current_user_dependency,
 )
+from companion.adapters.http.copy_api import build_copy_api_router
 from companion.adapters.http.dashboard_api import build_dashboard_api_router
 from companion.adapters.http.errors import add_core_error_handlers
 from companion.adapters.http.eval_api import build_eval_api_router
@@ -21,6 +22,7 @@ from companion.core.check_in_kinds import CheckInKindService
 from companion.core.check_in_schedule import CheckInScheduleService
 from companion.core.check_ins import CheckInService
 from companion.core.conversations import ConversationService
+from companion.core.copy import CopyService
 from companion.core.curiosities import CuriosityKeeper, CuriosityRaiser
 from companion.core.evals.case_editing import EvalCaseService
 from companion.core.evals.costs import EvalCostsService
@@ -403,6 +405,15 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     current_user = build_current_user_dependency(
         dependencies.auth_verifier, user_service
     )
+    current_admin = build_current_admin_dependency(current_user)
+    app.include_router(
+        build_copy_api_router(
+            current_admin=current_admin,
+            copy_service=CopyService(
+                dependencies.repositories.copy, dependencies.clock
+            ),
+        )
+    )
     app.include_router(
         build_dashboard_api_router(
             current_user=current_user,
@@ -430,7 +441,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     )
     app.include_router(
         build_admin_api_router(
-            current_admin=build_current_admin_dependency(current_user),
+            current_admin=current_admin,
             admin_user_service=AdminUserService(dependencies.repositories),
             feature_service=feature_service,
             platform_settings_service=platform_settings_service,
@@ -467,7 +478,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     )
     app.include_router(
         build_eval_api_router(
-            current_admin=build_current_admin_dependency(current_user),
+            current_admin=current_admin,
             eval_run_service=EvalRunService(
                 dependencies.eval_runs,
                 dependencies.eval_cases,
@@ -491,7 +502,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     )
     app.include_router(
         build_eval_case_api_router(
-            current_admin=build_current_admin_dependency(current_user),
+            current_admin=current_admin,
             eval_case_service=EvalCaseService(
                 dependencies.eval_cases, dependencies.eval_images, dependencies.clock
             ),

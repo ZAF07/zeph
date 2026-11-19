@@ -143,6 +143,22 @@ platform_settings = Table(
     Column("updated_by", Uuid, ForeignKey("users.id", ondelete="SET NULL")),
 )
 
+copy_slots = Table(
+    "copy_slots",
+    metadata,
+    Column("key", Text, primary_key=True),
+    Column("tab", Text, nullable=False),
+    Column("tab_name", Text, nullable=False),
+    Column("tab_order", Integer, nullable=False),
+    Column("slot_order", Integer, nullable=False),
+    Column("name", Text, nullable=False),
+    Column("text", Text, nullable=False),
+    Column("max_length", Integer, nullable=False),
+    Column("placeholders", ARRAY(Text), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("updated_by", Uuid, ForeignKey("users.id", ondelete="SET NULL")),
+)
+
 helplines = Table(
     "helplines",
     metadata,

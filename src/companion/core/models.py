@@ -2297,3 +2297,73 @@ class UserSnapshot:
             Its status.
         """
         return next(status for status in self.features if status.feature == feature)
+
+
+@dataclass(frozen=True)
+class CopySeedSlot:
+    """A Copy slot as the seed file defines it (ADR-0019).
+
+    Attributes:
+        key: The slot's stable key, e.g. `landing.hero.eyebrow`.
+        tab: The key of the Copy page tab it belongs to, e.g. `landing`.
+        tab_name: The tab's name, e.g. "Landing".
+        tab_order: Where the tab sits among the tabs, from 0.
+        slot_order: Where the slot sits in its tab, in page order, from 0.
+        name: The slot's short name, e.g. "Sign-up button".
+        text: Its starting text.
+        max_length: The most characters its text may have.
+        placeholders: The `{name}` placeholders its text must keep, by name.
+    """
+
+    key: str
+    tab: str
+    tab_name: str
+    tab_order: int
+    slot_order: int
+    name: str
+    text: str
+    max_length: int
+    placeholders: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class CopySlot:
+    """A Copy slot as stored, with its current text.
+
+    Attributes:
+        key: The slot's stable key.
+        tab: The key of the tab it belongs to.
+        tab_name: The tab's name.
+        name: The slot's short name.
+        text: Its current text.
+        max_length: The most characters its text may have.
+        placeholders: The `{name}` placeholders its text must keep.
+        updated_at: When its text was last saved or seeded.
+        updated_by_name: The name, or else email, of the Admin who last saved
+            it; None while it has its seed text.
+    """
+
+    key: str
+    tab: str
+    tab_name: str
+    name: str
+    text: str
+    max_length: int
+    placeholders: tuple[str, ...]
+    updated_at: datetime
+    updated_by_name: str | None
+
+
+@dataclass(frozen=True)
+class CopyTab:
+    """One tab of the Copy page: a website page and its slots.
+
+    Attributes:
+        tab: The tab's key.
+        name: The tab's name.
+        slots: Its slots, in page order.
+    """
+
+    tab: str
+    name: str
+    slots: list[CopySlot]
