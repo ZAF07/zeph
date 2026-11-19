@@ -4,10 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { secondaryButton } from "@/components/button-styles";
-import { EmptyState } from "@/components/EmptyState";
-import { inputField } from "@/components/form-styles";
+import { DataTable } from "@/components/DataTable";
 import { LoadFailed } from "@/components/LoadFailed";
-import { LockIcon } from "@/components/LockIcon";
+import { SelectFilter } from "@/components/SelectFilter";
+import { type StatTile, StatTiles } from "@/components/StatTiles";
+import { StatusPill } from "@/components/StatusPill";
+import type { TableColumn } from "@/components/TableCards";
+import { TableEmpty } from "@/components/TableEmpty";
+import { TableLoading } from "@/components/TableLoading";
 import type { DailyUsage } from "@/lib/api-client";
 import { formatShortDay } from "@/lib/dates";
 import {
@@ -21,23 +25,52 @@ import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 const periods = [
-  { days: 1, label: "Today" },
-  { days: 7, label: "Last 7 days" },
-  { days: 30, label: "Last 30 days" },
+  { value: "1", label: "Today" },
+  { value: "7", label: "Last 7 days" },
+  { value: "30", label: "Last 30 days" },
 ];
 
-const headings = [
-  "Date",
-  "User",
-  "Messages",
-  "Tokens in",
-  "Tokens out",
-  "Web searches",
-  "Limits",
+const columns: TableColumn<DailyUsage>[] = [
+  {
+    heading: "Date",
+    isMain: true,
+    cell: (row) => (
+      <span className="whitespace-nowrap">
+        {formatShortDay(row.day, "UTC")}
+      </span>
+    ),
+  },
+  {
+    heading: "User",
+    isMain: true,
+    cell: (row) => row.user_name ?? row.user_email ?? "Unknown User",
+  },
+  { heading: "Messages", cell: (row) => formatFullCount(row.message_count) },
+  { heading: "Tokens in", cell: (row) => formatFullCount(row.tokens_in) },
+  { heading: "Tokens out", cell: (row) => formatFullCount(row.tokens_out) },
+  {
+    heading: "Web searches",
+    cell: (row) => formatFullCount(row.web_search_count),
+  },
+  {
+    heading: "Limits",
+    cell: (row) => {
+      const reached = limitsReached(row);
+      if (reached.length === 0) {
+        return "—";
+      }
+      return (
+        <span className="inline-flex flex-wrap justify-end gap-1.5">
+          {reached.map((note) => (
+            <StatusPill key={note} filled={false}>
+              {note}
+            </StatusPill>
+          ))}
+        </span>
+      );
+    },
+  },
 ];
-
-const cell = "px-[18px] py-3.5";
-const numberCell = `${cell} text-right tabular-nums`;
 
 /**
  * Hands the browser a CSV file of the usage rows to save.
@@ -58,53 +91,61 @@ function downloadCsv(rows: DailyUsage[], days: number) {
 }
 
 /**
+ * Works out the totals above the usage table.
+ *
+ * @param rows - The usage rows in the period.
+ * @param periodLabel - The period in lower case, like "today".
+ * @returns The four totals.
+ */
+function totalsOf(rows: DailyUsage[], periodLabel: string): StatTile[] {
+  const summary = summarizeUsage(rows);
+  return [
+    { label: "Tokens in", value: summary.tokensIn },
+    { label: "Tokens out", value: summary.tokensOut },
+    { label: "Messages", value: summary.messages },
+    { label: "Web searches", value: summary.webSearches },
+  ].map((total) => ({
+    label: `${total.label} · ${periodLabel}`,
+    value: formatUsageCount(total.value),
+  }));
+}
+
+/**
  * The admin Usage page's body: tokens, messages and web searches per User per
  * day for a chosen period, with totals and a CSV download. Counts only, never
- * message content.
+ * message content. Built from the admin table template.
  *
- * @returns The controls, totals and table, or a loading, empty or error state.
+ * @returns The totals, filters and table, or a loading, empty or error state
+ *   in place of the table.
  */
 export function AdminUsage() {
   const apiClient = useApiClient();
-  const [days, setDays] = useState(1);
+  const [period, setPeriod] = useState("1");
+  const days = Number(period);
   const usageQuery = useQuery({
     queryKey: queryKeys.usage(days),
     queryFn: () => apiClient.getUsage(days),
   });
   const report = usageQuery.data;
-
   const rows = report?.rows ?? [];
   const periodLabel = (
-    periods.find((option) => option.days === days)?.label ?? ""
+    periods.find((option) => option.value === period)?.label ?? ""
   ).toLowerCase();
-  const summary = summarizeUsage(rows);
-  const totals = [
-    { label: "Tokens in", value: summary.tokensIn },
-    { label: "Tokens out", value: summary.tokensOut },
-    { label: "Messages", value: summary.messages },
-    { label: "Web searches", value: summary.webSearches },
-  ];
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-end gap-2.5">
-        <label className="flex-[1_1_200px] sm:flex-none">
-          <span className="sr-only">Period</span>
-          <select
-            className={`${inputField} min-h-10 py-2 sm:w-[220px]`}
-            value={days}
-            onChange={(event) => setDays(Number(event.target.value))}
-          >
-            {periods.map((option) => (
-              <option key={option.days} value={option.days}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+      {report ? <StatTiles tiles={totalsOf(rows, periodLabel)} /> : null}
+
+      <div className="flex flex-wrap items-center gap-2.5">
+        <SelectFilter
+          label="Period"
+          options={periods}
+          value={period}
+          onChange={setPeriod}
+        />
         <button
           type="button"
-          className={`${secondaryButton} flex-[1_1_200px] sm:flex-none`}
+          className={secondaryButton}
           disabled={rows.length === 0}
           onClick={() => downloadCsv(rows, days)}
         >
@@ -112,13 +153,7 @@ export function AdminUsage() {
         </button>
       </div>
 
-      {usageQuery.isPending ? (
-        <div
-          aria-busy="true"
-          aria-label="Loading usage"
-          className="h-[240px] rounded-xl border border-line bg-subtle"
-        />
-      ) : null}
+      {usageQuery.isPending ? <TableLoading label="Loading usage" /> : null}
 
       {!report && usageQuery.isError ? (
         <LoadFailed
@@ -128,112 +163,22 @@ export function AdminUsage() {
         />
       ) : null}
 
-      {report ? (
-        <dl className="m-0 grid grid-cols-[repeat(auto-fit,minmax(min(180px,100%),1fr))] gap-3">
-          {totals.map((total) => (
-            <div
-              key={total.label}
-              className="flex flex-col gap-0.5 rounded-card border border-line bg-white px-[18px] py-4"
-            >
-              <dt className="text-caption text-ink-muted">
-                {total.label} · {periodLabel}
-              </dt>
-              <dd className="m-0 text-[30px] font-normal">
-                {formatUsageCount(total.value)}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      ) : null}
-
       {report && rows.length === 0 ? (
-        <EmptyState
+        <TableEmpty
           title="No usage yet"
           body="Rows appear once Users message Zeph. You’ll see counts per User per day — never message content."
         />
       ) : null}
 
-      {report && rows.length > 0 ? (
-        <div className="overflow-x-auto rounded-xl border border-line bg-white">
-          <table className="w-full min-w-[820px] border-collapse text-sm">
-            <caption className="border-b border-line px-4 py-2.5 text-left">
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted">
-                <LockIcon />
-                No message content · daily limit {
-                  report.daily_message_limit
-                }{" "}
-                messages, {report.web_search_daily_limit} web searches
-              </span>
-            </caption>
-            <thead>
-              <tr>
-                {headings.map((heading, index) => (
-                  <th
-                    key={heading}
-                    scope="col"
-                    className={`whitespace-nowrap border-b border-line bg-subtle px-[18px] py-3.5 font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted ${
-                      index >= 2 && index <= 5 ? "text-right" : "text-left"
-                    }`}
-                  >
-                    {heading}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const reached = limitsReached(row);
-                return (
-                  <tr
-                    key={`${row.day}-${row.user_id}`}
-                    className="border-b border-line last:border-b-0"
-                  >
-                    <td className={`${cell} whitespace-nowrap`}>
-                      {formatShortDay(row.day, "UTC")}
-                    </td>
-                    <td className={cell}>
-                      {row.user_name ?? row.user_email ?? "Unknown User"}
-                    </td>
-                    <td className={numberCell}>
-                      {formatFullCount(row.message_count)}
-                    </td>
-                    <td className={numberCell}>
-                      {formatFullCount(row.tokens_in)}
-                    </td>
-                    <td className={numberCell}>
-                      {formatFullCount(row.tokens_out)}
-                    </td>
-                    <td className={numberCell}>
-                      {formatFullCount(row.web_search_count)}
-                    </td>
-                    <td className={cell}>
-                      {reached.length === 0 ? (
-                        "—"
-                      ) : (
-                        <span className="flex flex-wrap gap-1.5">
-                          {reached.map((note) => (
-                            <span
-                              key={note}
-                              className="inline-flex items-center whitespace-nowrap rounded-full bg-yellow-tint px-2.5 py-[3px] text-xs font-medium text-yellow-deep"
-                            >
-                              {note}
-                            </span>
-                          ))}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      {rows.length > 0 ? (
+        <DataTable
+          columns={columns}
+          rows={rows}
+          rowKey={(row) => `${row.day}-${row.user_id}`}
+          noMessageContent
+          minWidthClass="min-w-[820px]"
+        />
       ) : null}
-
-      <p className="m-0 text-caption text-ink-muted">
-        Tokens include Safeguard, response composition, post-conversation
-        processing and Check-ins.
-      </p>
     </>
   );
 }

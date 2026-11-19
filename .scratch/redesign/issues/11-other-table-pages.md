@@ -1,6 +1,6 @@
 # 11 — Redesign: other table pages
 
-Status: ready-for-agent
+Status: in-progress
 
 Lane: B. README slice: 12 (the pages the template's foot lists).
 
@@ -47,3 +47,8 @@ There are no references of their own, so there's no pixel test. Each page must u
 ## Comments
 
 - 2026-11-19 — From issue 10: the table template parts are in `web/src/components/`: `AdminPageHeader`, `StatTiles`, `SearchField`, `FilterPills`, `SelectFilter`, `DataTable` (table from 900px, `TableCards` below), `StatusPill`, `TableLoading`, `TableNoMatches`, `TableEmpty`, and the shared `LoadFailed` for "couldn't load". Check-in Schedule already takes `?search=` (`initialSearch`) for the Users panel's link. From issue 12: the Safety page's Helplines table still scrolls sideways on a phone; the README wants rows as cards, so it should move onto these parts here or in a follow-up.
+- 2026-11-19 — Decisions (Zaf, asked at start), for parts the template doesn't draw:
+  - Extra controls reuse the closest drawn parts: page buttons (New run, Add case, Download CSV, Check in now) are the Check-in Kinds "Add a Check-in Kind" button at the end of the filter row; on/off toggles (Errors only, Show terminal runs) are one filter pill, cream when on; row buttons (Edit, Duplicate, Archive, Schedule's Edit) take the Users "Manage" look in a last "Actions" column (a line on phone cards); paging is outline buttons under the table; panels and the Duplicate/Archive steps use the shared form and confirm parts.
+  - Pills: the template's cream / outline StatusPill; only errors and failures (error counts, failed runs, risk type) use the danger colour.
+  - Evals tab row (Runs, Cases, Judge, Model Prices) takes the Memories tabs look; the Eval cases row naming each Eval is filter pills as links.
+  - Extra text is dropped: captions are just "No message content", and the notes under tables (Safeguard "International fallback…", Usage "Tokens include…", Schedule "Changes here…", Eval cases intro) go.

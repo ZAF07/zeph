@@ -4,46 +4,91 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { EmptyState } from "@/components/EmptyState";
-import { inputField } from "@/components/form-styles";
+import { DataTable } from "@/components/DataTable";
+import { FilterPills } from "@/components/FilterPills";
 import { LoadFailed } from "@/components/LoadFailed";
-import { LockIcon } from "@/components/LockIcon";
-import type { RiskType, SafeguardEventFilter } from "@/lib/api-client";
+import { SelectFilter } from "@/components/SelectFilter";
+import { StatusPill } from "@/components/StatusPill";
+import type { TableColumn } from "@/components/TableCards";
+import { TableEmpty } from "@/components/TableEmpty";
+import { TableLoading } from "@/components/TableLoading";
+import { TableNoMatches } from "@/components/TableNoMatches";
+import type {
+  RiskType,
+  SafeguardEvent,
+  SafeguardEventFilter,
+} from "@/lib/api-client";
 import { countryName } from "@/lib/countries";
 import { formatSavedAt } from "@/lib/dates";
 import { queryKeys } from "@/lib/queries";
 import { riskTypeLabel, riskTypes } from "@/lib/risk-types";
 import { useApiClient } from "@/lib/use-api-client";
 
-const periods: { value: string; label: string; phrase: string }[] = [
-  { value: "30", label: "Last 30 days", phrase: "in the last 30 days" },
-  { value: "7", label: "Last 7 days", phrase: "in the last 7 days" },
-  { value: "all", label: "All time", phrase: "in total" },
+type RiskFilter = RiskType | "all";
+
+const periods = [
+  { value: "30", label: "Last 30 days" },
+  { value: "7", label: "Last 7 days" },
+  { value: "all", label: "All time" },
 ];
 
-const headings = [
-  "User",
-  "Time",
-  "Risk type",
-  "Crisis Reply",
-  "Helplines shown",
+const riskFilters: { id: RiskFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  ...riskTypes,
+];
+
+const columns: TableColumn<SafeguardEvent>[] = [
+  {
+    heading: "User",
+    isMain: true,
+    cell: (event) => (
+      <Link href="/admin/users" className="text-text underline">
+        {event.user_name ?? event.user_email ?? "Unknown User"}
+      </Link>
+    ),
+  },
+  {
+    heading: "Time",
+    isMain: true,
+    cell: (event) => (
+      <span className="whitespace-nowrap">
+        {formatSavedAt(event.created_at)}
+      </span>
+    ),
+  },
+  {
+    heading: "Risk type",
+    cell: (event) => (
+      <StatusPill filled={false} danger>
+        {riskTypeLabel(event.risk_type)}
+      </StatusPill>
+    ),
+  },
+  { heading: "Crisis Reply", cell: () => "Sent" },
+  {
+    heading: "Helplines shown",
+    cell: (event) =>
+      event.helplines_country
+        ? countryName(event.helplines_country)
+        : "International fallback",
+  },
 ];
 
 /**
  * The admin Safeguard Events page: each time the Safeguard detected risk and
- * sent the Crisis Reply. Who and when only, never what was said.
+ * sent the Crisis Reply. Who and when only, never what was said. Built from
+ * the admin table template.
  *
- * @returns The filters and table, or a loading, empty or error state.
+ * @returns The filters and table, or a loading, no-match, empty or error
+ *   state in place of the table.
  */
 export function SafeguardEvents() {
   const apiClient = useApiClient();
-  const [riskType, setRiskType] = useState<RiskType | null>(null);
+  const [riskType, setRiskType] = useState<RiskFilter>("all");
   const [period, setPeriod] = useState("30");
-  const periodPhrase =
-    periods.find((option) => option.value === period)?.phrase ?? "";
 
   const filter: SafeguardEventFilter = {
-    riskType: riskType ?? undefined,
+    riskType: riskType === "all" ? undefined : riskType,
     days: period === "all" ? undefined : Number(period),
   };
   const eventsQuery = useQuery({
@@ -52,59 +97,24 @@ export function SafeguardEvents() {
   });
   const events = eventsQuery.data;
 
-  const riskFilters: { id: RiskType | null; label: string }[] = [
-    { id: null, label: "All" },
-    ...riskTypes,
-  ];
-
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div
-          role="group"
-          aria-label="Risk type"
-          className="flex flex-wrap gap-1.5"
-        >
-          {riskFilters.map((option) => (
-            <button
-              key={option.label}
-              type="button"
-              aria-pressed={riskType === option.id}
-              onClick={() => setRiskType(option.id)}
-              className={`min-h-10 cursor-pointer rounded-full border px-3.5 py-2 text-sm font-medium ${
-                riskType === option.id
-                  ? "border-ink bg-ink text-white"
-                  : "border-line-strong bg-transparent text-ink-body"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-col gap-1 text-caption text-ink-muted">
-          <label htmlFor="safeguard-event-period">Period</label>
-          <select
-            id="safeguard-event-period"
-            className={`${inputField} min-h-10 w-auto py-2`}
-            value={period}
-            onChange={(event) => setPeriod(event.target.value)}
-          >
-            {periods.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <FilterPills
+          label="Risk type"
+          options={riskFilters}
+          chosen={riskType}
+          onChoose={setRiskType}
+        />
+        <SelectFilter
+          label="Period"
+          options={periods}
+          value={period}
+          onChange={setPeriod}
+        />
       </div>
 
-      {eventsQuery.isPending ? (
-        <div
-          aria-busy="true"
-          aria-label="Loading events"
-          className="h-[240px] rounded-xl border border-line bg-subtle"
-        />
-      ) : null}
+      {eventsQuery.isPending ? <TableLoading label="Loading events" /> : null}
 
       {!events && eventsQuery.isError ? (
         <LoadFailed
@@ -114,72 +124,25 @@ export function SafeguardEvents() {
         />
       ) : null}
 
-      {events && events.length === 0 ? (
-        <EmptyState
+      {events && events.length === 0 && riskType !== "all" ? (
+        <TableNoMatches />
+      ) : null}
+
+      {events && events.length === 0 && riskType === "all" ? (
+        <TableEmpty
           title="No Safeguard Events in this period"
           body="When Safeguard detects risk you’ll see the User, the time and the risk type here. Message content is never stored for Admins, so it will never appear."
         />
       ) : null}
 
       {events && events.length > 0 ? (
-        <>
-          <div className="overflow-x-auto rounded-xl border border-line bg-white">
-            <table className="w-full min-w-[760px] border-collapse text-sm">
-              <caption className="border-b border-line px-4 py-2.5 text-left">
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted">
-                  <LockIcon />
-                  No message content · {events.length}{" "}
-                  {events.length === 1 ? "event" : "events"} {periodPhrase}
-                </span>
-              </caption>
-              <thead>
-                <tr>
-                  {headings.map((heading) => (
-                    <th
-                      key={heading}
-                      scope="col"
-                      className="whitespace-nowrap border-b border-line bg-subtle px-[18px] py-3.5 text-left font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted"
-                    >
-                      {heading}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {events.map((event) => (
-                  <tr
-                    key={event.id}
-                    className="border-b border-line last:border-b-0"
-                  >
-                    <td className="px-[18px] py-3.5">
-                      <Link href="/admin/users" className="font-medium">
-                        {event.user_name ?? event.user_email ?? "Unknown User"}
-                      </Link>
-                    </td>
-                    <td className="whitespace-nowrap px-[18px] py-3.5">
-                      {formatSavedAt(event.created_at)}
-                    </td>
-                    <td className="px-[18px] py-3.5">
-                      <span className="inline-flex items-center whitespace-nowrap rounded-full bg-danger-tint px-2.5 py-[3px] text-xs font-medium text-danger-deep">
-                        {riskTypeLabel(event.risk_type)}
-                      </span>
-                    </td>
-                    <td className="px-[18px] py-3.5">Sent</td>
-                    <td className="px-[18px] py-3.5">
-                      {event.helplines_country
-                        ? countryName(event.helplines_country)
-                        : "International fallback"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="m-0 text-caption text-ink-muted">
-            “International fallback” means the User’s country had no Helplines —
-            add them in <Link href="/admin/safety">Safety</Link>.
-          </p>
-        </>
+        <DataTable
+          columns={columns}
+          rows={events}
+          rowKey={(event) => event.id}
+          noMessageContent
+          minWidthClass="min-w-[760px]"
+        />
       ) : null}
     </>
   );

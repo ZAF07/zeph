@@ -15,7 +15,7 @@ export default async function AdminCheckInSchedulePage({
 }) {
   const { search } = await searchParams;
   return (
-    <div className="flex flex-col gap-[22px]">
+    <>
       <AdminPageHeader
         title="Check-in Schedule"
         lead="Everyone who opted in to Check-ins: when each is due, their settings, and why one is held back right now. No content."
@@ -23,6 +23,6 @@ export default async function AdminCheckInSchedulePage({
       <CheckInSchedule
         initialSearch={typeof search === "string" ? search : ""}
       />
-    </div>
+    </>
   );
 }

@@ -75,11 +75,8 @@ describe("AdminUsage", () => {
   it("shows today's totals and usage per User per day, never message content", async () => {
     renderWithQueries(<AdminUsage />);
 
-    expect(
-      await screen.findByText(
-        "No message content · daily limit 60 messages, 10 web searches",
-      ),
-    ).toBeInTheDocument();
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByText("No message content")).toBeInTheDocument();
     expect(apiClient.getUsage).toHaveBeenCalledWith(1);
     expect(totalValue("Tokens in · today")).toBe("120K");
     expect(totalValue("Tokens out · today")).toBe("13.3K");
@@ -97,11 +94,25 @@ describe("AdminUsage", () => {
         "Message limit reachedSearch limit reached",
       ],
     ]);
-    expect(
-      screen.getByText(
-        "Tokens include Safeguard, response composition, post-conversation processing and Check-ins.",
-      ),
-    ).toBeVisible();
+  });
+
+  it("also shows each row as a card of label and value lines for phones", async () => {
+    renderWithQueries(<AdminUsage />);
+    await screen.findByRole("table");
+
+    const lines = screen
+      .getAllByRole("term")
+      .slice(4)
+      .map((term) => `${term.textContent}: ${term.nextSibling?.textContent}`);
+    expect(lines.slice(0, 7)).toEqual([
+      "Date: 11 Nov",
+      "User: Maya Lin",
+      "Messages: 24",
+      "Tokens in: 31,240",
+      "Tokens out: 3,880",
+      "Web searches: 1",
+      "Limits: —",
+    ]);
   });
 
   it("loads a longer period when picked", async () => {

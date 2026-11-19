@@ -8,12 +8,12 @@ import { AdminUsage } from "@/components/AdminUsage";
  */
 export default function AdminUsagePage() {
   return (
-    <div className="flex flex-col gap-[22px]">
+    <>
       <AdminPageHeader
         title="Usage"
         lead="Tokens, messages and web searches per User per day. Counts only."
       />
       <AdminUsage />
-    </div>
+    </>
   );
 }

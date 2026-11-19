@@ -9,13 +9,13 @@ import { EvalRunsList } from "@/components/EvalRunsList";
  */
 export default function AdminEvalRunsPage() {
   return (
-    <div className="flex flex-col gap-[22px]">
+    <>
       <AdminPageHeader
         title="Evals"
         lead="Check how the Companion behaves with the real model. Each run uses made-up Users in its own Eval database, never real ones."
       />
       <EvalAreaTabs />
       <EvalRunsList />
-    </div>
+    </>
   );
 }

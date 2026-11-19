@@ -21,6 +21,16 @@ vi.mock("next/navigation", () => ({
   useRouter: () => router,
 }));
 
+/**
+ * The table's body rows, one per case.
+ *
+ * @returns The rows.
+ */
+async function caseRows(): Promise<HTMLElement[]> {
+  const table = await screen.findByRole("table");
+  return within(table).getAllByRole("row").slice(1);
+}
+
 describe("EvalCasesList", () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -39,7 +49,7 @@ describe("EvalCasesList", () => {
   it("lists the Eval's cases with whether each was edited or archived", async () => {
     renderWithQueries(<EvalCasesList evalName="persona" />);
 
-    const rows = await screen.findAllByRole("listitem");
+    const rows = await caseRows();
     expect(
       rows.map((row) => within(row).getAllByRole("link")[0].textContent),
     ).toEqual(["small-talk", "are-you-human", "old-case"]);
@@ -59,6 +69,40 @@ describe("EvalCasesList", () => {
     expect(apiClient.listEvalCases).toHaveBeenCalledWith("persona");
   });
 
+  it("also shows each case as a card of label and value lines for phones", async () => {
+    renderWithQueries(<EvalCasesList evalName="persona" />);
+    await caseRows();
+
+    const lines = screen
+      .getAllByRole("term")
+      .map((term) => `${term.textContent}: ${term.nextSibling?.textContent}`);
+    expect(lines.slice(0, 4)).toEqual([
+      "Case: small-talk",
+      "Status: —",
+      "Changed: From the seed files",
+      "Actions: EditDuplicateArchive",
+    ]);
+  });
+
+  it("says the case wasn't archived when archiving fails", async () => {
+    apiClient.archiveEvalCase.mockRejectedValue(new Error("down"));
+    renderWithQueries(<EvalCasesList evalName="persona" />);
+
+    const [first] = await caseRows();
+    await userEvent.click(
+      within(first).getByRole("button", { name: "Archive" }),
+    );
+    await userEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Archive",
+      }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Couldn’t archive the case. Try again.",
+    );
+  });
+
   it("archives a case only after confirming", async () => {
     apiClient.archiveEvalCase.mockResolvedValue({
       ...smallTalkCase,
@@ -66,16 +110,17 @@ describe("EvalCasesList", () => {
     });
     renderWithQueries(<EvalCasesList evalName="persona" />);
 
-    const [first] = await screen.findAllByRole("listitem");
+    const [first] = await caseRows();
     await userEvent.click(
       within(first).getByRole("button", { name: "Archive" }),
     );
     expect(apiClient.archiveEvalCase).not.toHaveBeenCalled();
-    expect(
-      within(first).getByText(/New runs leave it out/),
-    ).toBeInTheDocument();
+    const confirm = screen.getByRole("alertdialog", {
+      name: "Archive small-talk?",
+    });
+    expect(within(confirm).getByText(/New runs leave it out/)).toBeVisible();
     await userEvent.click(
-      within(first).getByRole("button", { name: "Archive" }),
+      within(confirm).getByRole("button", { name: "Archive" }),
     );
 
     expect(apiClient.archiveEvalCase).toHaveBeenCalledWith("small-talk");
@@ -91,25 +136,22 @@ describe("EvalCasesList", () => {
       .mockResolvedValueOnce({ ...smallTalkCase, key: "small-talk-2" });
     renderWithQueries(<EvalCasesList evalName="persona" />);
 
-    const [first] = await screen.findAllByRole("listitem");
+    const [first] = await caseRows();
     await userEvent.click(
       within(first).getByRole("button", { name: "Duplicate" }),
     );
-    const key = within(first).getByRole("textbox", {
-      name: "Key for the copy",
-    });
+    const dialog = within(
+      screen.getByRole("dialog", { name: "Duplicate small-talk" }),
+    );
+    const key = dialog.getByRole("textbox", { name: "Key for the copy" });
     expect(key).toHaveValue("small-talk-copy");
-    await userEvent.click(
-      within(first).getByRole("button", { name: "Duplicate" }),
-    );
-    expect(await within(first).findByRole("alert")).toHaveTextContent(
+    await userEvent.click(dialog.getByRole("button", { name: "Duplicate" }));
+    expect(await dialog.findByRole("alert")).toHaveTextContent(
       "Another case has this key.",
     );
     await userEvent.clear(key);
     await userEvent.type(key, "small-talk-2");
-    await userEvent.click(
-      within(first).getByRole("button", { name: "Duplicate" }),
-    );
+    await userEvent.click(dialog.getByRole("button", { name: "Duplicate" }));
 
     expect(apiClient.duplicateEvalCase).toHaveBeenLastCalledWith(
       "small-talk",

@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
-import { compactSecondaryButton } from "@/components/button-styles";
+import { secondaryButton } from "@/components/button-styles";
 import { CheckInFrequencyPicker } from "@/components/CheckInFrequencyPicker";
 import { QuietHoursFields } from "@/components/QuietHoursFields";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
@@ -23,7 +23,8 @@ const pauseChoices: { length: PauseLength; label: string }[] = [
   { length: "until_resumed", label: "Until resumed" },
 ];
 
-const settingRow = "flex flex-col gap-2.5 border-t border-line px-5 py-4";
+const settingRow =
+  "flex flex-col gap-2.5 border-t border-line px-5 py-4 text-[14px] text-text";
 
 /**
  * The side panel where an Admin changes one opted-in User's own Check-in
@@ -90,23 +91,23 @@ export function UserCheckInSettingsPanel({
   }
 
   return (
-    <div className="fixed inset-0 z-[400] flex items-center justify-center bg-ink/40 p-4">
+    <div className="fixed inset-0 z-[400] flex items-center justify-center bg-bg-deep/70 p-4">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="user-check-ins-heading"
-        className="flex max-h-[min(90vh,720px)] w-full max-w-[640px] flex-col gap-4 overflow-y-auto rounded-panel bg-white p-6 shadow-xl"
+        className="flex max-h-[min(90vh,720px)] w-full max-w-[640px] flex-col gap-4 overflow-y-auto rounded-banner border border-line bg-bg-deep px-7 py-[26px] text-text shadow-[0_24px_60px_rgba(0,0,0,.45)]"
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-1">
             <h2
               id="user-check-ins-heading"
-              className="m-0 text-h3 font-semibold"
+              className="m-0 text-[20px] font-normal text-cream"
             >
               Check-in settings for {displayName}
             </h2>
             {entry.name && entry.email ? (
-              <p className="m-0 break-all text-caption text-ink-muted">
+              <p className="m-0 text-[13px] break-all text-soft">
                 {entry.email}
               </p>
             ) : null}
@@ -114,14 +115,14 @@ export function UserCheckInSettingsPanel({
           <button
             ref={closeRef}
             type="button"
-            className={compactSecondaryButton}
+            className={secondaryButton}
             disabled={isSaving}
             onClick={onClose}
           >
             Close
           </button>
         </div>
-        <p className="m-0 text-caption text-ink-muted">
+        <p className="m-0 text-[14px] text-soft">
           These are {displayName}’s own settings. Each change saves straight
           away, and they’ll see “Changed by an Admin” until they change it back.
           To stop their Check-ins, turn the Check-ins Feature off for them on
@@ -136,7 +137,7 @@ export function UserCheckInSettingsPanel({
 
         <div className="flex flex-col rounded-card border border-line [&>*:first-child]:border-t-0">
           <div className={settingRow}>
-            <span className="font-semibold">How often, at most</span>
+            <span>How often, at most</span>
             <CheckInFrequencyPicker
               value={current.frequency}
               disabled={isSaving}
@@ -144,9 +145,9 @@ export function UserCheckInSettingsPanel({
             />
           </div>
           <div className={settingRow}>
-            <span className="font-semibold">
+            <span>
               Quiet hours{" "}
-              <span className="font-normal text-ink-muted">
+              <span className="text-soft">
                 · in their time{timeZone ? ` (${timeZone})` : ""}
               </span>
             </span>
@@ -161,8 +162,8 @@ export function UserCheckInSettingsPanel({
             />
           </div>
           <div className={settingRow}>
-            <span className="font-semibold">Pause</span>
-            <span className="text-caption text-ink-muted">
+            <span>Pause</span>
+            <span className="text-[13px] text-soft">
               {schedulePauseText(
                 current.paused,
                 current.paused_until,
@@ -174,7 +175,7 @@ export function UserCheckInSettingsPanel({
                 <button
                   key={choice.length}
                   type="button"
-                  className={compactSecondaryButton}
+                  className={secondaryButton}
                   disabled={isSaving}
                   onClick={() => pause(choice.length)}
                 >
@@ -184,7 +185,7 @@ export function UserCheckInSettingsPanel({
               {current.paused ? (
                 <button
                   type="button"
-                  className={compactSecondaryButton}
+                  className={secondaryButton}
                   disabled={isSaving}
                   onClick={resume}
                 >

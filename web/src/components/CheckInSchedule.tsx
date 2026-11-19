@@ -10,14 +10,19 @@ import { useCallback, useState } from "react";
 
 import { CheckInNowResults } from "@/components/CheckInNowResults";
 import {
-  compactSecondaryButton,
   primaryButton,
+  rowActionButton,
+  secondaryButton,
 } from "@/components/button-styles";
-import { EmptyState } from "@/components/EmptyState";
-import { inputField } from "@/components/form-styles";
+import { DataTable } from "@/components/DataTable";
 import { LoadFailed } from "@/components/LoadFailed";
-import { LockIcon } from "@/components/LockIcon";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
+import { SearchField } from "@/components/SearchField";
+import { StatusPill } from "@/components/StatusPill";
+import type { TableColumn } from "@/components/TableCards";
+import { TableEmpty } from "@/components/TableEmpty";
+import { TableLoading } from "@/components/TableLoading";
+import { TableNoMatches } from "@/components/TableNoMatches";
 import { UserCheckInSettingsPanel } from "@/components/UserCheckInSettingsPanel";
 import type {
   CheckInNowResultForUser,
@@ -33,20 +38,7 @@ import { checkInFrequencyOptions } from "@/lib/check-ins";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
-const headings = [
-  "User",
-  "Due Time",
-  "How often",
-  "Quiet hours",
-  "Pause",
-  "Check-ins",
-  "Held back now",
-];
-
-const pill =
-  "inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-[3px] text-xs font-medium";
-
-const cell = "px-[18px] py-3.5";
+const checkbox = "size-4 cursor-pointer accent-cream";
 
 /**
  * Names a Check-in Frequency the way the User's Check-ins page does.
@@ -75,13 +67,15 @@ function displayName(entry: CheckInScheduleEntry): string {
  * The admin Check-in Schedule page: every User who opted in to Check-ins,
  * soonest Due Time first, with their settings, whether the Check-ins Feature
  * works for them and why a Check-in is held back right now. Never message
- * content. Searchable by name or email and paged; Edit opens a panel to
- * change that User's settings. Selected Users can be sent a Check in Now,
- * with each one's result shown.
+ * content. Searchable by name or email and paged; Edit (or clicking a row)
+ * opens a panel to change that User's settings. Selected Users can be sent
+ * a Check in Now, with each one's result shown. Built from the admin table
+ * template.
  *
  * @param props - `initialSearch` fills the search box at the start, for
  *   links that open one User (from the Users page); empty by default.
- * @returns The search, table and paging, or a loading, empty or error state.
+ * @returns The filters, table and paging, or a loading, no-match, empty or
+ *   error state in place of the table.
  */
 export function CheckInSchedule({
   initialSearch = "",
@@ -151,48 +145,137 @@ export function CheckInSchedule({
     });
   };
 
+  const now = schedule?.now ?? "";
+  const columns: TableColumn<CheckInScheduleEntry>[] = [
+    {
+      heading: "Select",
+      cell: (entry) => (
+        <span
+          className="inline-flex"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            className={checkbox}
+            aria-label={`Select ${displayName(entry)}`}
+            checked={entry.user_id in selected}
+            onChange={() => toggle(entry)}
+          />
+        </span>
+      ),
+    },
+    {
+      heading: "User",
+      isMain: true,
+      cell: (entry) => (
+        <span className="inline-flex flex-col">
+          <span>{entry.name ?? entry.email ?? "—"}</span>
+          {entry.name ? (
+            <span className="text-[12px] break-all text-soft">
+              {entry.email}
+            </span>
+          ) : null}
+        </span>
+      ),
+    },
+    {
+      heading: "Due Time",
+      isMain: true,
+      cell: (entry) => (
+        <span className="inline-flex flex-col items-end gap-1 min-[900px]:items-start">
+          {dueTimeText(entry.next_due_at, now, entry.time_zone ?? undefined)}
+          {entry.check_in_now_waiting ? (
+            <StatusPill filled={false}>Check in Now waiting</StatusPill>
+          ) : null}
+        </span>
+      ),
+    },
+    { heading: "How often", cell: (entry) => frequencyLabel(entry) },
+    {
+      heading: "Quiet hours",
+      cell: (entry) =>
+        quietHoursText(entry.quiet_hours_start, entry.quiet_hours_end),
+    },
+    {
+      heading: "Pause",
+      cell: (entry) =>
+        schedulePauseText(
+          entry.paused,
+          entry.paused_until,
+          entry.time_zone ?? undefined,
+        ),
+    },
+    {
+      heading: "Check-ins",
+      cell: (entry) => (
+        <StatusPill filled={entry.check_ins_work}>
+          {entry.check_ins_work ? "Works" : "Feature off"}
+        </StatusPill>
+      ),
+    },
+    {
+      heading: "Held back now",
+      cell: (entry) =>
+        entry.held_back
+          ? heldBackText(entry.held_back, now, entry.time_zone ?? undefined)
+          : "—",
+    },
+    {
+      heading: "Actions",
+      cell: (entry) => (
+        <button
+          type="button"
+          className={rowActionButton}
+          onClick={(event) => {
+            event.stopPropagation();
+            setEditing(entry);
+          }}
+        >
+          Edit
+        </button>
+      ),
+    },
+  ];
+
   return (
     <>
-      <label className="max-w-[480px]">
-        <span className="sr-only">Search Users</span>
-        <input
-          className={inputField}
-          type="search"
+      <div className="flex flex-wrap items-center gap-2.5">
+        <SearchField
+          label="Search Users"
           placeholder="Search by name or email"
           value={search}
-          onChange={(event) => {
-            setSearch(event.target.value);
+          onChange={(value) => {
+            setSearch(value);
             setPage(1);
           }}
         />
-      </label>
-
-      {scheduleQuery.isPending ? (
-        <div
-          aria-busy="true"
-          aria-label="Loading the Check-in Schedule"
-          className="h-[240px] rounded-xl border border-line bg-subtle"
-        />
-      ) : null}
-
-      {!schedule && scheduleQuery.isError ? (
-        <LoadFailed
-          title="Couldn’t load the Check-in Schedule"
-          body="No settings were changed."
-          onRetry={() => void scheduleQuery.refetch()}
-        />
-      ) : null}
-
-      {schedule && schedule.total === 0 ? (
-        <EmptyState
-          title={
-            search.trim()
-              ? "No one matches that search"
-              : "No one has opted in to Check-ins yet"
-          }
-          body="Users appear here once they turn Check-ins on. You’ll see their Due Time and settings — never message content."
-        />
-      ) : null}
+        {schedule && schedule.total > 0 ? (
+          <>
+            <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-[14px] text-text">
+              <input
+                type="checkbox"
+                className={checkbox}
+                checked={wholePageSelected}
+                onChange={toggleWholePage}
+              />
+              Select everyone on this page
+            </label>
+            <button
+              type="button"
+              className={primaryButton}
+              disabled={selectedCount === 0 || checkInNow.isPending}
+              onClick={() => checkInNow.mutate(selected)}
+            >
+              {checkInNow.isPending ? "Asking…" : "Check in now"}
+            </button>
+            <span className="text-[13px] text-soft">
+              {selectedCount === 0
+                ? "Select Users to send each a Check-in on the next tick."
+                : `${selectedCount} selected · goes past pause, Quiet Hours and the Feature switch`}
+            </span>
+          </>
+        ) : null}
+      </div>
 
       {checkInNowOutcome ? (
         <CheckInNowResults
@@ -208,171 +291,47 @@ export function CheckInSchedule({
         </SaveFailedNote>
       ) : null}
 
+      {scheduleQuery.isPending ? (
+        <TableLoading label="Loading the Check-in Schedule" />
+      ) : null}
+
+      {!schedule && scheduleQuery.isError ? (
+        <LoadFailed
+          title="Couldn’t load the Check-in Schedule"
+          body="No settings were changed."
+          onRetry={() => void scheduleQuery.refetch()}
+        />
+      ) : null}
+
+      {schedule && schedule.total === 0 && search.trim() ? (
+        <TableNoMatches />
+      ) : null}
+
+      {schedule && schedule.total === 0 && !search.trim() ? (
+        <TableEmpty
+          title="No one has opted in to Check-ins yet"
+          body="Users appear here once they turn Check-ins on. You’ll see their Due Time and settings — never message content."
+        />
+      ) : null}
+
       {schedule && schedule.total > 0 ? (
         <>
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              className={primaryButton}
-              disabled={selectedCount === 0 || checkInNow.isPending}
-              onClick={() => checkInNow.mutate(selected)}
-            >
-              {checkInNow.isPending ? "Asking…" : "Check in now"}
-            </button>
-            <span className="text-caption text-ink-muted">
-              {selectedCount === 0
-                ? "Select Users to send each a Check-in on the next tick."
-                : `${selectedCount} selected · goes past pause, Quiet Hours and the Feature switch`}
-            </span>
-          </div>
-          <div className="relative overflow-x-auto rounded-xl border border-line bg-white">
-            <table className="w-full min-w-[980px] border-collapse text-sm">
-              <caption className="border-b border-line px-4 py-2.5 text-left">
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted">
-                  <LockIcon />
-                  No message content · {schedule.total}{" "}
-                  {schedule.total === 1 ? "User" : "Users"} opted in
-                </span>
-              </caption>
-              <thead>
-                <tr>
-                  <th
-                    scope="col"
-                    className="w-0 border-b border-line bg-subtle py-3.5 pl-[18px]"
-                  >
-                    <input
-                      type="checkbox"
-                      className="size-4"
-                      aria-label="Select everyone on this page"
-                      checked={wholePageSelected}
-                      onChange={toggleWholePage}
-                    />
-                  </th>
-                  {headings.map((heading) => (
-                    <th
-                      key={heading}
-                      scope="col"
-                      className="whitespace-nowrap border-b border-line bg-subtle px-[18px] py-3.5 text-left font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted"
-                    >
-                      {heading}
-                    </th>
-                  ))}
-                  <th scope="col" className="border-b border-line bg-subtle">
-                    <span className="sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {schedule.entries.map((entry) => {
-                  const timeZone = entry.time_zone ?? undefined;
-                  return (
-                    <tr
-                      key={entry.user_id}
-                      onClick={() => setEditing(entry)}
-                      className="cursor-pointer border-b border-line last:border-b-0 hover:bg-hover"
-                    >
-                      <td
-                        className="py-3.5 pl-[18px]"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        <input
-                          type="checkbox"
-                          className="size-4"
-                          aria-label={`Select ${displayName(entry)}`}
-                          checked={entry.user_id in selected}
-                          onChange={() => toggle(entry)}
-                        />
-                      </td>
-                      <td className={`${cell} min-w-[170px]`}>
-                        <span className="flex flex-col">
-                          <span className="font-medium">
-                            {entry.name ?? entry.email ?? "—"}
-                          </span>
-                          {entry.name ? (
-                            <span className="break-all text-caption text-ink-muted">
-                              {entry.email}
-                            </span>
-                          ) : null}
-                        </span>
-                      </td>
-                      <td className={`${cell} whitespace-nowrap`}>
-                        <span className="flex flex-col items-start gap-1">
-                          {dueTimeText(
-                            entry.next_due_at,
-                            schedule.now,
-                            timeZone,
-                          )}
-                          {entry.check_in_now_waiting ? (
-                            <span
-                              className={`${pill} bg-blue-tint text-blue-deep`}
-                            >
-                              Check in Now waiting
-                            </span>
-                          ) : null}
-                        </span>
-                      </td>
-                      <td className={`${cell} whitespace-nowrap`}>
-                        {frequencyLabel(entry)}
-                      </td>
-                      <td className={`${cell} whitespace-nowrap tabular-nums`}>
-                        {quietHoursText(
-                          entry.quiet_hours_start,
-                          entry.quiet_hours_end,
-                        )}
-                      </td>
-                      <td className={cell}>
-                        {schedulePauseText(
-                          entry.paused,
-                          entry.paused_until,
-                          timeZone,
-                        )}
-                      </td>
-                      <td className={cell}>
-                        <span
-                          className={`${pill} ${
-                            entry.check_ins_work
-                              ? "bg-blue-tint text-blue-deep"
-                              : "bg-yellow-tint text-yellow-deep"
-                          }`}
-                        >
-                          {entry.check_ins_work ? "Works" : "Feature off"}
-                        </span>
-                      </td>
-                      <td className={cell}>
-                        {entry.held_back
-                          ? heldBackText(
-                              entry.held_back,
-                              schedule.now,
-                              timeZone,
-                            )
-                          : "—"}
-                      </td>
-                      <td className={cell}>
-                        <button
-                          type="button"
-                          className={compactSecondaryButton}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setEditing(entry);
-                          }}
-                        >
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={columns}
+            rows={schedule.entries}
+            rowKey={(entry) => entry.user_id}
+            noMessageContent
+            minWidthClass="min-w-[900px]"
+            onRowClick={setEditing}
+          />
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-caption text-ink-muted">
+            <span className="text-[13px] text-soft">
               Page {page} of {pageCount}
             </span>
             <span className="flex gap-2">
               <button
                 type="button"
-                className={compactSecondaryButton}
+                className={secondaryButton}
                 disabled={page <= 1}
                 onClick={() => setPage(page - 1)}
               >
@@ -380,7 +339,7 @@ export function CheckInSchedule({
               </button>
               <button
                 type="button"
-                className={compactSecondaryButton}
+                className={secondaryButton}
                 disabled={page >= pageCount}
                 onClick={() => setPage(page + 1)}
               >
@@ -388,11 +347,6 @@ export function CheckInSchedule({
               </button>
             </span>
           </div>
-          <p className="m-0 text-caption text-ink-muted">
-            Changes here change the User’s own settings, by the same rules as
-            their own changes. Admins can’t turn a User’s Check-ins on or off;
-            to stop them, use the Check-ins Feature switch on the Users page.
-          </p>
         </>
       ) : null}
 

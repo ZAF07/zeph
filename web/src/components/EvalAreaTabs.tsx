@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { tabClass, tabRow } from "@/components/tab-styles";
+
 const tabs = [
   {
     label: "Runs",
@@ -31,14 +33,15 @@ const tabs = [
 
 /**
  * The Eval area's parts: its runs, its cases, the Judge and the Model
- * Prices, highlighting the part being viewed.
+ * Prices, drawn as the Memories tab row, with the part being viewed
+ * chosen.
  *
  * @returns The links.
  */
 export function EvalAreaTabs() {
   const pathname = usePathname();
   return (
-    <nav aria-label="Eval area" className="flex flex-wrap gap-1.5">
+    <nav aria-label="Eval area" className={tabRow}>
       {tabs.map((tab) => {
         const isActive = tab.isActive(pathname);
         return (
@@ -46,11 +49,7 @@ export function EvalAreaTabs() {
             key={tab.label}
             href={tab.href}
             aria-current={isActive ? "page" : undefined}
-            className={`min-h-10 rounded-full border px-3.5 py-2 text-sm font-medium no-underline ${
-              isActive
-                ? "border-ink bg-ink text-white hover:text-white"
-                : "border-line-strong bg-transparent text-ink-body"
-            }`}
+            className={tabClass(isActive)}
           >
             {tab.label}
           </Link>

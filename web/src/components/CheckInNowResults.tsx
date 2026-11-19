@@ -1,4 +1,4 @@
-import { quietButton } from "@/components/button-styles";
+import { rowActionButton } from "@/components/button-styles";
 import type { CheckInNowResultForUser } from "@/lib/api-client";
 import { checkInNowResultLabels } from "@/lib/check-in-schedule";
 
@@ -24,20 +24,20 @@ export function CheckInNowResults({
   return (
     <div
       role="status"
-      className="flex flex-col gap-2 rounded-xl bg-blue-tint px-4 py-3.5 text-sm text-blue-deep"
+      className="flex flex-col gap-2 rounded-card border border-line bg-panel px-[18px] py-4 text-[14px] text-text"
     >
       <div className="flex items-center justify-between gap-3">
-        <span className="font-medium">
+        <span className="text-cream">
           Check in now: {requested.length} of {results.length} requested
         </span>
-        <button type="button" className={quietButton} onClick={onDismiss}>
+        <button type="button" className={rowActionButton} onClick={onDismiss}>
           Dismiss
         </button>
       </div>
       <ul className="m-0 flex list-none flex-col gap-1 p-0">
         {results.map((item) => (
           <li key={item.user_id}>
-            <span className="font-medium">
+            <span className="text-cream">
               {names[item.user_id] ?? item.user_id}
             </span>
             : {checkInNowResultLabels[item.result]}

@@ -69,15 +69,33 @@ describe("EvalRunsList", () => {
 
   it("shows terminal runs only once the toggle is on", async () => {
     renderWithQueries(<EvalRunsList />);
-    await screen.findByRole("table");
-    expect(screen.queryByText("Terminal")).not.toBeInTheDocument();
+    const table = await screen.findByRole("table");
+    expect(within(table).queryByText("Terminal")).not.toBeInTheDocument();
 
     const toggle = screen.getByRole("button", { name: "Show terminal runs" });
     await userEvent.click(toggle);
 
-    expect(await screen.findByText("Terminal")).toBeInTheDocument();
+    expect(
+      await within(screen.getByRole("table")).findByText("Terminal"),
+    ).toBeInTheDocument();
     expect(toggle).toHaveAttribute("aria-pressed", "true");
     expect(apiClient.listEvalRuns).toHaveBeenLastCalledWith(true);
+  });
+
+  it("also shows each run as a card of label and value lines for phones", async () => {
+    renderWithQueries(<EvalRunsList />);
+    await screen.findByRole("table");
+
+    const lines = screen
+      .getAllByRole("term")
+      .map((term) => `${term.textContent}: ${term.nextSibling?.textContent}`);
+    expect(lines.slice(1)).toEqual([
+      "Started by: Owner",
+      "Evals: Safeguard, Persona",
+      "State: Finished",
+      "Results: 29 passed · 1 failed · 1 error",
+      "Tokens and cost: 40,000 in / 2,000 outS$0.0183",
+    ]);
   });
 
   it("says so when there are no runs yet", async () => {
