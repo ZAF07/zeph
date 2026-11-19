@@ -9,6 +9,8 @@ from sqlalchemy import Engine
 
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.core.models import UserPortrait
+from companion.core.response_composition import OPTIONAL_EXTRAS_HEADING
+from companion.core.woven_check_ins import BRING_UP_CHECK_IN_TOOL
 from tests.conftest import INITIAL_ADMIN_EMAIL
 from tests.fakes import (
     FakeAuthVerifier,
@@ -16,6 +18,7 @@ from tests.fakes import (
     FakeClock,
     FakeScheduler,
     ScriptedChatModel,
+    ToolCall,
     understanding_answer,
 )
 from tests.telegram_helpers import (
@@ -41,6 +44,7 @@ from tests.test_web_search import change_settings
 
 FOLLOW_UP_DESCRIPTION = "On something you shared, like a decision or a hard day."
 NOTE = "Ask how the presentation to the board went."
+BRING_UP = ToolCall(BRING_UP_CHECK_IN_TOOL, {})
 
 
 def weave_answer(kind: str = "A follow-up", note: str = NOTE) -> str:
@@ -85,7 +89,7 @@ def test_a_check_in_due_mid_conversation_is_woven_into_the_reply_and_logged(
     due_at = next_due_at(engine, maya_id(client, headers))
     open_a_conversation_until_due(client, chat_model, chat_channel, clock)
     chat_model.script_woven_check_in(weave_answer())
-    chat_model.script("ha, love that. how did the board presentation go?")
+    chat_model.script(BRING_UP, "ha, love that. how did the board presentation go?")
 
     send_to_webhook(client, telegram_text_update("now making a big salad"))
 
@@ -111,6 +115,56 @@ def test_a_check_in_due_mid_conversation_is_woven_into_the_reply_and_logged(
     assert next_due_at(engine, maya_id(client, headers)) == due_at + ONE_DAY
     admin = owner_headers(client, auth_verifier)
     assert only_entry(client, admin)["held_back"] is None
+
+
+def test_a_due_check_in_reaches_the_reply_as_an_optional_extra_not_an_order(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+) -> None:
+    set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    open_a_conversation_until_due(client, chat_model, chat_channel, clock)
+    chat_model.script_woven_check_in(weave_answer())
+    chat_model.script("sounds tasty!")
+
+    send_to_webhook(client, telegram_text_update("now making a big salad"))
+
+    reply_call = chat_model.calls[-1]
+    instructions = reply_call.instructions
+    assert "Weave it into this reply" not in instructions
+    assert "Bring it up only if it fits what they need right now" in instructions
+    assert instructions.index(OPTIONAL_EXTRAS_HEADING) < instructions.index(NOTE)
+    assert BRING_UP_CHECK_IN_TOOL in [tool.name for tool in reply_call.tools]
+
+
+def test_a_check_in_the_reply_leaves_out_is_not_logged_and_stays_due(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    engine: Engine,
+) -> None:
+    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    due_at = next_due_at(engine, maya_id(client, headers))
+    open_a_conversation_until_due(client, chat_model, chat_channel, clock)
+    chat_model.script_woven_check_in(weave_answer(), weave_answer())
+    chat_model.script("sounds tasty!", BRING_UP, "how did the board presentation go?")
+
+    send_to_webhook(client, telegram_text_update("now making a big salad"))
+
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["sounds tasty!"]
+    assert admin_log(client, auth_verifier) == []
+    assert recent_check_ins(client, headers) == []
+    assert next_due_at(engine, maya_id(client, headers)) == due_at
+
+    send_to_webhook(client, telegram_text_update("with feta"))
+
+    assert len(chat_model.woven_check_in_calls) == 2
+    [entry] = admin_log(client, auth_verifier)
+    assert (entry["outcome"], entry["woven_in"]) == ("sent", True)
 
 
 def test_the_woven_in_call_is_given_the_conversation_understanding_and_portrait(
@@ -237,7 +291,7 @@ def test_a_check_in_can_be_woven_in_during_quiet_hours(
     )
     open_a_conversation_until_due(client, chat_model, chat_channel, clock)
     chat_model.script_woven_check_in(weave_answer())
-    chat_model.script("how did the board presentation go?")
+    chat_model.script(BRING_UP, "how did the board presentation go?")
 
     send_to_webhook(client, telegram_text_update("now making a big salad"))
 
@@ -337,7 +391,7 @@ def test_a_woven_in_check_in_is_not_woven_in_again_nor_sent_on_its_own(
     set_up_user_with_check_ins(client, auth_verifier, chat_channel)
     open_a_conversation_until_due(client, chat_model, chat_channel, clock)
     chat_model.script_woven_check_in(weave_answer())
-    chat_model.script("how did the board presentation go?")
+    chat_model.script(BRING_UP, "how did the board presentation go?")
     send_to_webhook(client, telegram_text_update("now making a big salad"))
     chat_model.script("so glad!")
     send_to_webhook(client, telegram_text_update("it went great"))
@@ -362,7 +416,7 @@ def test_the_users_next_message_counts_as_the_woven_in_check_ins_reply(
     headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
     open_a_conversation_until_due(client, chat_model, chat_channel, clock)
     chat_model.script_woven_check_in(weave_answer())
-    chat_model.script("how did the board presentation go?")
+    chat_model.script(BRING_UP, "how did the board presentation go?")
     send_to_webhook(client, telegram_text_update("now making a big salad"))
     assert recent_check_ins(client, headers)[0]["status"] == "sent"
 
@@ -392,7 +446,7 @@ def test_woven_in_check_ins_never_count_toward_the_ignore_threshold(
     threshold = seeded_settings["check_in_ignore_threshold"]
     open_a_conversation_until_due(client, chat_model, chat_channel, clock)
     chat_model.script_woven_check_in(weave_answer())
-    chat_model.script("how did the board presentation go?")
+    chat_model.script(BRING_UP, "how did the board presentation go?")
     send_to_webhook(client, telegram_text_update("now making a big salad"))
     chat_model.script_processing(processing_answer())
     clock.advance(quiet_gap(seeded_settings) + timedelta(minutes=1))
@@ -421,7 +475,7 @@ def test_a_reply_that_fails_to_send_logs_no_check_in_and_it_stays_due(
     due_at = next_due_at(engine, maya_id(client, headers))
     open_a_conversation_until_due(client, chat_model, chat_channel, clock)
     chat_model.script_woven_check_in(weave_answer())
-    chat_model.script("how did the board presentation go?")
+    chat_model.script(BRING_UP, "how did the board presentation go?")
     chat_channel.text_send_failures.append(ConnectionError("telegram is down"))
 
     send_to_webhook(client, telegram_text_update("now making a big salad"))
@@ -443,7 +497,9 @@ def test_a_reply_that_fails_after_its_first_part_keeps_the_woven_in_check_in(
     due_at = next_due_at(engine, maya_id(client, headers))
     open_a_conversation_until_due(client, chat_model, chat_channel, clock)
     chat_model.script_woven_check_in(weave_answer())
-    chat_model.script("how did the board presentation go?\n\nand how's the salad?")
+    chat_model.script(
+        BRING_UP, "how did the board presentation go?\n\nand how's the salad?"
+    )
     send_text = chat_channel.send_text
 
     def fail_the_second_part(chat_id: int, text: str) -> None:
@@ -505,7 +561,7 @@ def test_the_model_call_log_shows_the_woven_in_step_with_its_shape_only(
     set_up_user_with_check_ins(client, auth_verifier, chat_channel)
     open_a_conversation_until_due(client, chat_model, chat_channel, clock)
     chat_model.script_woven_check_in(weave_answer())
-    chat_model.script("how did the board presentation go?")
+    chat_model.script(BRING_UP, "how did the board presentation go?")
     send_to_webhook(client, telegram_text_update("now making a big salad"))
     admin = owner_headers(client, auth_verifier)
 
@@ -583,7 +639,7 @@ def test_a_check_in_now_mid_conversation_is_woven_into_the_reply_and_logged(
         client, auth_verifier, chat_channel, chat_model, clock
     )
     chat_model.script_woven_check_in(weave_answer())
-    chat_model.script("ha, love that. how did the board presentation go?")
+    chat_model.script(BRING_UP, "ha, love that. how did the board presentation go?")
 
     send_to_webhook(client, telegram_text_update("now making a big salad"))
 
@@ -619,7 +675,7 @@ def test_a_check_in_now_is_woven_in_past_the_pause_and_the_feature_switch(
     )
     assert response.status_code == 200, response.text
     chat_model.script_woven_check_in(weave_answer())
-    chat_model.script("how did the board presentation go?")
+    chat_model.script(BRING_UP, "how did the board presentation go?")
 
     send_to_webhook(client, telegram_text_update("now making a big salad"))
 
@@ -691,7 +747,7 @@ def test_a_woven_in_check_in_now_whose_reply_fails_to_send_keeps_waiting(
         client, auth_verifier, chat_channel, chat_model, clock
     )
     chat_model.script_woven_check_in(weave_answer())
-    chat_model.script("how did the board presentation go?")
+    chat_model.script(BRING_UP, "how did the board presentation go?")
     chat_channel.text_send_failures.append(ConnectionError("telegram is down"))
 
     send_to_webhook(client, telegram_text_update("now making a big salad"))
@@ -709,7 +765,7 @@ def weave_in_while_the_tick_decides(
         chat_model.script_woven_check_in(weave_answer())
         send_to_webhook(client, telegram_text_update("now making a big salad"))
 
-    chat_model.script("how did the board presentation go?")
+    chat_model.script(BRING_UP, "how did the board presentation go?")
     chat_model.script(send_answer("hey, how was your day?"))
     chat_model.before_next_reply = user_sends_a_message
 

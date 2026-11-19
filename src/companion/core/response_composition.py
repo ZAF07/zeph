@@ -22,10 +22,53 @@ from companion.core.platform_settings import (
     RESPONSE_THINKING,
 )
 from companion.core.ports import Repositories
-from companion.core.reply_tools import ReplyContext, ReplyToolProvider
+from companion.core.reply_tools import ReplyContext, ReplyOffer, ReplyToolProvider
 from companion.core.usage import UsageRecordingChatModel
 
 BLANK_LINE = re.compile(r"\n\s*\n")
+PRIORITY_ORDER = (
+    "Everything below is in order of priority. When two things clash, the "
+    "higher one wins:\n"
+    "1. Safety, privacy and their own boundaries.\n"
+    "2. What they just asked or need right now.\n"
+    "3. Today's guidance: what they need from you, the Moves and how to make "
+    "them.\n"
+    "4. What you remember about them, used accurately. Never state something "
+    "you only suspect as fact.\n"
+    "5. Your voice, as described at the top.\n"
+    "6. Optional extras: a Check-in, something you've been wondering about "
+    "them, Knowledge passages, a sticker, a photo of theirs. Leave out any "
+    "that doesn't fit what they need right now."
+)
+BOUNDARIES_HEADING = "## 1. Safety, privacy and their boundaries"
+ASKED_NOW_HEADING = "## 2. What they just asked or need right now"
+ANSWER_THE_QUESTION = (
+    "If their message asks you something directly, answer it first, before "
+    "anything else."
+)
+GUIDANCE_HEADING = "## 3. Today's guidance"
+MEMORY_HEADING = "## 4. What you remember"
+OPTIONAL_EXTRAS_HEADING = (
+    "## 6. Optional extras: use one only if it fits what they need right now"
+)
+
+
+@dataclass(frozen=True)
+class ReplyGuidance:
+    """What the Understanding adds to the reply's instructions, by priority.
+
+    Attributes:
+        boundaries: The Life Threads to leave alone, each with why; "" if
+            none.
+        plan: The Need's "how to reply", the Moves' "how to do it", the
+            nuance and mood, the "ask why" note when it applies and the
+            Life Threads to bring up; "" if none.
+        curiosities: The Curiosities it chose to bring up; "" if none.
+    """
+
+    boundaries: str = ""
+    plan: str = ""
+    curiosities: str = ""
 
 
 class EmptyReplyError(Exception):
@@ -61,6 +104,54 @@ def split_into_messages(reply: str) -> list[str]:
     """
     parts = (part.strip() for part in BLANK_LINE.split(reply))
     return [part for part in parts if part]
+
+
+NO_GUIDANCE = ReplyGuidance()
+
+
+def write_instructions(
+    voice: str,
+    response_prompt: str,
+    boundaries: Sequence[str],
+    asked_now: Sequence[str],
+    guidance: str,
+    memory: str,
+    optional_extras: Sequence[str],
+) -> str:
+    """Write the reply's instructions in their priority order.
+
+    The voice and response prompt come first, then the priority order with
+    its clash rule, then one section per level that has something in it.
+    The "what they just asked" section always tells the reply to answer a
+    direct question first.
+
+    Args:
+        voice: The Persona.
+        response_prompt: The Admin-set response prompt.
+        boundaries: What keeps them safe and respects their boundaries,
+            e.g. Threads to leave alone or a data deletion note.
+        asked_now: The tools' instructions and notes on what they may ask for.
+        guidance: Today's guidance from the Understanding; "" if none.
+        memory: The User Memory that matters; "" if none.
+        optional_extras: The extras the reply may leave out, e.g. a
+            Woven-in Check-in, Curiosities or Knowledge passages.
+
+    Returns:
+        The instructions.
+    """
+    levels = (
+        (BOUNDARIES_HEADING, list(boundaries)),
+        (ASKED_NOW_HEADING, [ANSWER_THE_QUESTION, *asked_now]),
+        (GUIDANCE_HEADING, [guidance]),
+        (MEMORY_HEADING, [memory]),
+        (OPTIONAL_EXTRAS_HEADING, list(optional_extras)),
+    )
+    parts = [voice, response_prompt, PRIORITY_ORDER]
+    for heading, sections in levels:
+        filled = [section for section in sections if section]
+        if filled:
+            parts.append("\n\n".join([heading, *filled]))
+    return "\n\n".join(part for part in parts if part)
 
 
 def to_chat_history(messages: list[ConversationMessage]) -> list[ChatLine]:
@@ -121,19 +212,21 @@ class ResponseComposer:
         knowledge: str = "",
         data_deletion_note: str = "",
         shared_photo_ids: Sequence[UUID] = (),
-        reply_guidance: str = "",
+        guidance: ReplyGuidance = NO_GUIDANCE,
+        optional_offers: Sequence[ReplyOffer] = (),
     ) -> ComposedReply:
         """Compose a reply to the Conversation's newest message.
 
-        Uses the Persona, response prompt and model from platform settings,
-        then what the Understanding found the User needs, what the Companion
-        remembers and the Knowledge that may fit, and
-        gives the model every earlier message in the Conversation. Each tool
-        provider offers its tools and instructions, and a sticker or Shared
-        Photo a tool picks is sent with the reply, after any fixed text a
-        tool asked to close the reply with. When a Feature doesn't
-        work for the User, the instructions say so, so the reply can tell
-        them plainly.
+        The instructions follow a strict priority order (see
+        `write_instructions`): the Persona and response prompt, then safety
+        and the User's boundaries, what they just asked, what the
+        Understanding found they need, what the Companion remembers, and
+        last the optional extras the reply may leave out. The model gets
+        every earlier message in the Conversation. Each tool provider offers
+        its tools and instructions, and a sticker or Shared Photo a tool
+        picks is sent with the reply, after any fixed text a tool asked to
+        close the reply with. When a Feature doesn't work for the User, the
+        instructions say so, so the reply can tell them plainly.
 
         Args:
             conversation_id: The Conversation to reply in.
@@ -144,8 +237,9 @@ class ResponseComposer:
                 User's request to delete their data, and why; "" if it didn't.
             shared_photo_ids: The User's Shared Photos that matter for the
                 message, which the reply may send one of; empty if none.
-            reply_guidance: What the Understanding adds: the Need's "how to
-                reply", the nuance and mood; "" if none.
+            guidance: What the Understanding adds, by priority.
+            optional_offers: Optional extras with their own tools, such as a
+                Woven-in Check-in, whose instructions go last.
 
         Returns:
             The reply as short messages, an optional sticker and an optional
@@ -161,18 +255,25 @@ class ResponseComposer:
         offers = [
             provider.offer(snapshot, context) for provider in self._tool_providers
         ]
-        instructions = f"{settings.get(PERSONA)}\n\n{settings.get(RESPONSE_PROMPT)}"
-        sections = (
-            reply_guidance,
-            memory,
-            knowledge,
-            *(offer.instructions for offer in offers),
-            self._features.unavailable_note(snapshot.unavailable_features, settings),
-            data_deletion_note,
+        instructions = write_instructions(
+            voice=settings.get(PERSONA),
+            response_prompt=settings.get(RESPONSE_PROMPT),
+            boundaries=(data_deletion_note, guidance.boundaries),
+            asked_now=(
+                *(offer.instructions for offer in offers),
+                self._features.unavailable_note(
+                    snapshot.unavailable_features, settings
+                ),
+            ),
+            guidance=guidance.plan,
+            memory=memory,
+            optional_extras=(
+                *(offer.instructions for offer in optional_offers),
+                guidance.curiosities,
+                knowledge,
+            ),
         )
-        for section in sections:
-            if section:
-                instructions += f"\n\n{section}"
+        offers += optional_offers
         history = to_chat_history(
             self._repositories.conversations.list_messages(conversation_id)
         )

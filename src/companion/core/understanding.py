@@ -16,6 +16,7 @@ from companion.core.life_threads import (
     RemindedThread,
     describe_reminded_threads,
     format_threads_for_reply,
+    format_threads_left_alone,
 )
 from companion.core.memory_retrieval import SavedMemory, format_day, summary_line
 from companion.core.model_call_log import ModelCallLog
@@ -52,6 +53,7 @@ from companion.core.platform_settings import (
     UNDERSTANDING_THINKING,
 )
 from companion.core.ports import Clock, Repositories
+from companion.core.response_composition import ReplyGuidance
 from companion.core.transcripts import split_off_latest_message, to_transcript_lines
 from companion.core.usage import UsageRecordingChatModel
 from companion.core.web_search import web_search_limit_used_up
@@ -103,16 +105,17 @@ class UnderstoodMessage:
 
     Attributes:
         understanding: The Understanding, as saved.
-        reply_guidance: The section of the reply instructions it adds: the
-            Need's "how to reply", the Moves' "how to do it", the nuance and
-            mood, the "ask why" note when it applies, the Life Threads to
-            bring up or leave alone, and the Curiosities to bring up.
+        reply_guidance: What it adds to the reply's instructions, by
+            priority: the Life Threads to leave alone; the Need's "how to
+            reply", the Moves' "how to do it", the nuance and mood, the "ask
+            why" note when it applies and the Life Threads to bring up; and
+            the Curiosities to bring up.
         asks_a_question: Whether the reply already asks the User a question:
             through a Move that asks one, asking why or a Curiosity.
     """
 
     understanding: Understanding
-    reply_guidance: str
+    reply_guidance: ReplyGuidance
     asks_a_question: bool = False
 
 
@@ -823,23 +826,26 @@ def format_reply_guidance(
     form: UnderstandingForm,
     ask_why_note: str,
     threads_section: str,
+    left_alone_section: str,
     curiosities_section: str,
-) -> str:
-    """Write the Understanding's section of the reply instructions.
+) -> ReplyGuidance:
+    """Write what the Understanding adds to the reply's instructions.
 
     Args:
         need: The Need the reply follows.
         picked: The Moves the reply makes.
         form: This Message's form.
         ask_why_note: The "ask why" note; "" when the reply shouldn't ask.
-        threads_section: The Life Threads to bring up or leave alone; "" if
-            none matter.
+        threads_section: The Life Threads that matter and those to bring up;
+            "" if none matter.
+        left_alone_section: The Life Threads to leave alone; "" if none.
         curiosities_section: The Curiosities to bring up; "" if none.
 
     Returns:
-        The Need and how to reply, the lead and supporting Moves and how to
-        make them, the nuance, the mood, the note, the Life Threads and the
-        Curiosities.
+        The Threads to leave alone as a boundary; the Need and how to reply,
+        the lead and supporting Moves and how to make them, the nuance, the
+        mood, the note and the Threads to bring up as the plan; and the
+        Curiosities, as an optional extra.
     """
     lines = [f"What they need from you right now: {need.name}.", need.how_to_reply]
     if picked.lead:
@@ -854,10 +860,12 @@ def format_reply_guidance(
         lines.append(f"How they seem: {form.mood} ({form.intensity.value}).")
     if ask_why_note:
         lines.append(ask_why_note)
-    sections = [
-        section for section in (threads_section, curiosities_section) if section
-    ]
-    return "\n\n".join(["\n".join(lines), *sections])
+    plan = "\n".join(lines)
+    if threads_section:
+        plan += f"\n\n{threads_section}"
+    return ReplyGuidance(
+        boundaries=left_alone_section, plan=plan, curiosities=curiosities_section
+    )
 
 
 def describe_understanding_shape(
@@ -1058,6 +1066,7 @@ class UnderstandingService:
                 form,
                 ask_why_note,
                 format_threads_for_reply(reminded, model_form, snapshot.user.time_zone),
+                format_threads_left_alone(model_form),
                 format_curiosities_for_reply(form.curiosities),
             ),
             asks_a_question=asks_another_question or picked.asks_a_question,
