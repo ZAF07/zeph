@@ -9,10 +9,11 @@ Each piece of Copy is a fixed slot that the code defines. Admins change the word
 - **Copy as more Platform Settings.** Rejected: it would mix website text with what shapes the Companion.
 - **Markdown or rich text.** Rejected: styling belongs to the design, and links to routes belong in code. Bold lead-ins are split into their own slot instead.
 - **Admins editing page structure** (adding sections, a page builder). Rejected for now: pages would drift from the design reference with no test to catch it. A list that really needs to grow becomes its own Admin-managed list.
+- **Copy as files beside the web code, written by the Copy page.** Rejected: edits are lost when the web app restarts or is deployed, aren't shared between web servers, and the save rules would move into the Dashboard, which holds no business logic.
 
 ## Consequences
 
 - A save is turned away if a slot is over its max length or its placeholders (e.g. `{count}`) are missing or unknown. Plurals get a "one" and a "many" slot.
-- One public endpoint, needing no sign-in, serves the Copy so signed-out visitors can see it. If the backend is down, the website shows its normal error state; no default text is bundled into the web app.
+- One public endpoint, needing no sign-in, serves the Copy so signed-out visitors can see it. If a read fails, each web server shows the last Copy it read, whole; only with none does the website show its normal error state. No default text is bundled into the web app. Admin pages never depend on Copy, so the Copy page opens even when Copy can't be read.
 - Text from the backend's own rules (validation reasons) is not Copy.
 - One language for now; adding languages later means adding text per slot, not reshaping it.

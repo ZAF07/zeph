@@ -27,7 +27,7 @@ Cut the database reads behind Copy while keeping the rule from the PRD: an Admin
   - HTTP caching (`Cache-Control` / `ETag`) or a CDN in front of the public read.
 - How does a save reach every process holding a cache? ADR-0018 says there is one backend process today, but the standing rule is to design for many concurrent Users with no single-process assumptions. Decide which wins here.
 - Is "shows on the next page load" still the rule, or is a short delay (seconds) acceptable?
-- What happens on a cache miss when the database is down: stale Copy, or the normal error state (ADR-0019 says no default text in the web app)?
+- ~~What happens on a cache miss when the database is down: stale Copy, or the normal error state?~~ Decided 2026-11-19: stale Copy. Each web server keeps the last Copy it read and shows it, whole, when a read fails; with none, the normal error state. Still no default text in the web app (ADR-0019, PRD story 32).
 
 ## Acceptance criteria
 
@@ -36,8 +36,15 @@ To be written after the grill. At least:
 - [ ] A saved change still shows on the next page load (or within the delay the grill agrees).
 - [ ] A tab save never shows half its changes.
 - [ ] Repeated page loads don't each read the database, shown by a test or measurement.
+- [ ] When a Copy read fails, pages show the last good Copy this web server read; with none, the normal error state.
+- [ ] Admin pages, the Copy page included, open even when Copy can't be read (today `DashboardFrame` shows the couldn't-load page in place of every page, admin ones too).
 - [ ] `/run`: as an Admin, change a Landing slot, reload signed-out `/` and see it.
+- [ ] `/run`: with the Copy read failing, a page loaded before still shows its words, and `/admin/copy` opens.
 
 ## Blocked by
 
 - All other Copy issues (02–08) completed. The owner will revisit this after them.
+
+## Comments
+
+- 2026-11-19 — From issue 05's review: when Copy can't be read, `DashboardFrame` shows the couldn't-load page for every Dashboard page, admin pages included, so a failing Copy read locks Admins out of the Copy page. Agreed with the owner: fix it here, with "keep the last good Copy" and admin pages not depending on Copy. Storing Copy as files beside the web code was considered and rejected (ADR-0019).
