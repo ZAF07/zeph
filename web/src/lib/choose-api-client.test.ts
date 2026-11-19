@@ -74,8 +74,8 @@ describe("chooseApiClient", () => {
       "",
     );
 
-    await expect(client.listAdminUsers()).rejects.toThrow(
-      "No design fixture for listAdminUsers yet",
+    await expect(client.getModelCallTrace("trace-1")).rejects.toThrow(
+      "No design fixture for getModelCallTrace yet",
     );
   });
 

@@ -7,17 +7,16 @@ export function LockIcon() {
   return (
     <svg
       width="12"
-      height="12"
-      viewBox="0 0 24 24"
+      height="14"
+      viewBox="0 0 12 14"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth="1.3"
       strokeLinecap="round"
-      strokeLinejoin="round"
       aria-hidden="true"
     >
-      <rect x="5" y="11" width="14" height="9" rx="2" />
-      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+      <rect x="1.5" y="6" width="9" height="7" rx="1.5" />
+      <path d="M3.5 6V4a2.5 2.5 0 0 1 5 0v2" />
     </svg>
   );
 }

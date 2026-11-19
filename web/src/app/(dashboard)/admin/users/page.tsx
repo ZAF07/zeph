@@ -11,7 +11,7 @@ export default function AdminUsersPage() {
     <>
       <AdminPageHeader
         title="Users"
-        lead="Everyone with an account. Counts only — Admins never see what Users write."
+        lead="Activity counts only. You never see what anyone wrote."
       />
       <AdminUsers />
     </>

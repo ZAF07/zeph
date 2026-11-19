@@ -79,11 +79,17 @@ function displayName(entry: CheckInScheduleEntry): string {
  * change that User's settings. Selected Users can be sent a Check in Now,
  * with each one's result shown.
  *
+ * @param props - `initialSearch` fills the search box at the start, for
+ *   links that open one User (from the Users page); empty by default.
  * @returns The search, table and paging, or a loading, empty or error state.
  */
-export function CheckInSchedule() {
+export function CheckInSchedule({
+  initialSearch = "",
+}: {
+  initialSearch?: string;
+}) {
   const apiClient = useApiClient();
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch);
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<CheckInScheduleEntry | null>(null);
   const closeEditing = useCallback(() => setEditing(null), []);

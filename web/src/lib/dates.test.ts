@@ -5,6 +5,7 @@ import {
   formatAddedDay,
   formatDay,
   formatLastSavedAt,
+  formatLoggedAt,
   formatSavedAt,
   formatShortDay,
   formatWeekdayDay,
@@ -13,6 +14,10 @@ import {
 describe("formatDay", () => {
   it("writes a day the way the admin tables show it", () => {
     expect(formatDay("2026-10-02T09:00:00Z", "UTC")).toBe("2 Oct 2026");
+  });
+
+  it("writes September as Sep, as the design does", () => {
+    expect(formatDay("2026-09-12T09:00:00Z", "UTC")).toBe("12 Sep 2026");
   });
 
   it("uses the given time zone", () => {
@@ -48,7 +53,25 @@ describe("formatShortDay", () => {
   });
 });
 
+describe("formatLoggedAt", () => {
+  it("writes the weekday, day and 12-hour time of a log entry", () => {
+    expect(formatLoggedAt("2026-11-17T18:42:00Z", "UTC")).toBe(
+      "Tue 17 Nov, 6:42 PM",
+    );
+  });
+
+  it("uses the given time zone", () => {
+    expect(formatLoggedAt("2026-11-17T01:05:00Z", "Asia/Singapore")).toBe(
+      "Tue 17 Nov, 9:05 AM",
+    );
+  });
+});
+
 describe("formatWeekdayDay", () => {
+  it("writes September as Sep", () => {
+    expect(formatWeekdayDay("2026-09-15T09:00:00Z", "UTC")).toBe("Tue 15 Sep");
+  });
+
   it("writes the weekday, day and month of a Conversation Summary", () => {
     expect(formatWeekdayDay("2026-11-11T09:00:00Z", "UTC")).toBe("Wed 11 Nov");
   });

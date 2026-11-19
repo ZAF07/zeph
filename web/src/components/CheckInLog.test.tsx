@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CheckInLog } from "@/components/CheckInLog";
 import type { ApiClient, CheckInLogEntry } from "@/lib/api-client";
+import { formatLoggedAt } from "@/lib/dates";
 import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
@@ -66,6 +67,10 @@ function rowTexts() {
   );
 }
 
+function table() {
+  return within(screen.getByRole("table"));
+}
+
 describe("CheckInLog", () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -90,26 +95,51 @@ describe("CheckInLog", () => {
         "aiko@example.com",
         "Paused",
         "—",
-        "Ignore threshold reached — asked once about fewer",
+        "Three in a row went unanswered",
         "Waiting",
       ],
     ]);
+  });
+
+  it("shows when each decision was made, with the weekday and a 12-hour time", async () => {
+    renderWithQueries(<CheckInLog />);
+
+    await screen.findByRole("table");
+    const firstCells = table()
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => within(row).getAllByRole("cell")[0].textContent);
+    expect(firstCells).toEqual(
+      entries.map((entry) => formatLoggedAt(entry.decided_at)),
+    );
   });
 
   it("says which Admin asked for a Check in Now", async () => {
     renderWithQueries(<CheckInLog />);
 
     await screen.findByRole("table");
-    expect(screen.getByText("Asked for by Sam Admin")).toBeVisible();
-    expect(screen.getAllByText(/Asked for by/)).toHaveLength(1);
+    expect(table().getByText("Asked for by Sam Admin")).toBeVisible();
+    expect(table().getAllByText(/Asked for by/)).toHaveLength(1);
+  });
+
+  it("shows each row as a card of label and value lines for phones", async () => {
+    renderWithQueries(<CheckInLog />);
+
+    await screen.findByRole("table");
+    const mayaCard = screen
+      .getAllByRole("term")
+      .filter((term) => term.textContent === "User")
+      .map((term) => term.nextElementSibling?.textContent);
+    expect(mayaCard).toEqual(["Maya Lin", "Ren Okafor", "aiko@example.com"]);
   });
 
   it("shows the totals for the period", async () => {
     renderWithQueries(<CheckInLog />);
 
     await screen.findByRole("table");
-    const terms = screen.getAllByRole("term").map((term) => term.textContent);
-    const values = screen
+    const totals = within(screen.getByRole("region", { name: "Totals" }));
+    const terms = totals.getAllByRole("term").map((term) => term.textContent);
+    const values = totals
       .getAllByRole("definition")
       .map((value) => value.textContent);
     expect(terms).toEqual([
@@ -137,21 +167,58 @@ describe("CheckInLog", () => {
     expect(apiClient.listCheckInLog).toHaveBeenLastCalledWith(30);
   });
 
-  it("says when there are no decisions yet", async () => {
+  it("shows soft loading rows while the log loads", async () => {
+    apiClient.listCheckInLog.mockReturnValue(new Promise(() => {}));
+    renderWithQueries(<CheckInLog />);
+
+    expect(
+      await screen.findByRole("status", { name: "Loading log" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  it("says when the filters match nothing, in place of the table", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<CheckInLog />);
+    await screen.findByRole("table");
+
+    await user.type(screen.getByPlaceholderText("Filter by user"), "nobody");
+
+    expect(
+      screen.getByText("Nothing matches these filters."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  it("says when nothing is logged yet", async () => {
     apiClient.listCheckInLog.mockResolvedValue([]);
     renderWithQueries(<CheckInLog />);
 
+    expect(await screen.findByText("No check-ins yet")).toBeInTheDocument();
     expect(
-      await screen.findByText("No Check-in decisions yet"),
+      screen.getByText("Entries appear once users turn check-ins on."),
     ).toBeInTheDocument();
+    expect(screen.queryByRole("table")).toBeNull();
   });
 
   it("offers Try again when the log can't load", async () => {
-    apiClient.listCheckInLog.mockRejectedValue(new Error("down"));
+    apiClient.listCheckInLog
+      .mockRejectedValueOnce(new Error("down"))
+      .mockResolvedValue(entries);
+    const user = userEvent.setup();
     renderWithQueries(<CheckInLog />);
 
+    const alert = await screen.findByRole("alert");
     expect(
-      await screen.findByText("Couldn’t load the Check-in log"),
+      within(alert).getByRole("heading", {
+        name: "Couldn’t load the Check-in log",
+      }),
     ).toBeInTheDocument();
+    expect(
+      within(alert).getByText("Check your connection and try again."),
+    ).toBeInTheDocument();
+
+    await user.click(within(alert).getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("table")).toBeInTheDocument();
   });
 });

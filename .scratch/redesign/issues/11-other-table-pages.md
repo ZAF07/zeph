@@ -45,3 +45,5 @@ There are no references of their own, so there's no pixel test. Each page must u
 - [ ] `/code-review` run, and findings fixed or answered.
 
 ## Comments
+
+- 2026-11-19 — From issue 10: the table template parts are in `web/src/components/`: `AdminPageHeader`, `StatTiles`, `SearchField`, `FilterPills`, `SelectFilter`, `DataTable` (table from 900px, `TableCards` below), `StatusPill`, `TableLoading`, `TableNoMatches`, `TableEmpty`, and the shared `LoadFailed` for "couldn't load". Check-in Schedule already takes `?search=` (`initialSearch`) for the Users panel's link. From issue 12: the Safety page's Helplines table still scrolls sideways on a phone; the README wants rows as cards, so it should move onto these parts here or in a follow-up.

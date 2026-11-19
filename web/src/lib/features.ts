@@ -1,4 +1,8 @@
-import type { FeatureReason } from "@/lib/api-client";
+import type {
+  FeatureReason,
+  UserFeatureStatus,
+  UserFeatureSwitch,
+} from "@/lib/api-client";
 import { formatSavedAt } from "@/lib/dates";
 
 /**
@@ -26,20 +30,66 @@ export function lastChangeNote(change: {
 export const notAvailableText = "Not available on your account";
 
 const reasonTexts: Record<FeatureReason, string> = {
-  on_for_everyone: "On: on for everyone",
-  on_for_user: "On: turned on for this User",
-  off_for_everyone: "Off: turned off for everyone",
-  off_for_user: "Off: turned off for this User",
-  turned_off_by_user: "Off: the User turned it off",
-  stickers_off: "Off: Stickers is off for this User",
+  on_for_everyone: "Works: on for everyone",
+  on_for_user: "Works: on for this user",
+  off_for_everyone: "Off for everyone",
+  off_for_user: "Off for this user",
+  turned_off_by_user: "Off: the user turned it off",
+  stickers_off: "Off: Stickers is off for this user",
 };
 
 /**
- * Says in plain words whether a Feature works for a User, and why.
+ * Says in plain words whether a Feature works for a User, and why, as the
+ * Users panel shows it. The Stickers line says how many Personal Stickers
+ * the User keeps (never which) in place of the reason when it works.
  *
- * @param reason - Why it works or doesn't.
- * @returns A line like "Off: turned off for everyone".
+ * @param status - The Feature's status for the User.
+ * @param personalStickerCount - How many Personal Stickers the User keeps.
+ * @returns A line like "Works: on for everyone" or "Works · 4 personal
+ *   stickers kept".
  */
-export function reasonText(reason: FeatureReason): string {
-  return reasonTexts[reason];
+export function userFeatureLine(
+  status: UserFeatureStatus,
+  personalStickerCount: number,
+): string {
+  if (status.feature !== "stickers") {
+    return reasonTexts[status.reason];
+  }
+  const stickers = `${personalStickerCount} personal sticker${
+    personalStickerCount === 1 ? "" : "s"
+  } kept`;
+  const state = status.works ? "Works" : reasonTexts[status.reason];
+  return `${state} · ${stickers}`;
+}
+
+/**
+ * Tells whether an Admin's switch lets a Feature work for a User.
+ *
+ * @param featureSwitch - The switch for the User.
+ * @param isOnForEveryone - Whether the Feature is on for everyone.
+ * @returns True when it is on for the User.
+ */
+export function isOnForUser(
+  featureSwitch: UserFeatureSwitch,
+  isOnForEveryone: boolean,
+): boolean {
+  return featureSwitch === "default" ? isOnForEveryone : featureSwitch === "on";
+}
+
+/**
+ * Picks the switch to save when an Admin turns a Feature on or off for a
+ * User: Default when that matches everyone's switch, otherwise On or Off.
+ *
+ * @param turnOn - Whether the Admin turned it on.
+ * @param isOnForEveryone - Whether the Feature is on for everyone.
+ * @returns The switch for the User.
+ */
+export function switchForUser(
+  turnOn: boolean,
+  isOnForEveryone: boolean,
+): UserFeatureSwitch {
+  if (turnOn === isOnForEveryone) {
+    return "default";
+  }
+  return turnOn ? "on" : "off";
 }

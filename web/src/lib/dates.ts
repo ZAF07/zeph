@@ -14,6 +14,20 @@ export function dateParts(
 }
 
 /**
+ * Writes a moment's short month as the design does: three letters, so
+ * September is "Sep" (some browsers write "Sept" in British English).
+ *
+ * @param moment - The moment.
+ * @param timeZone - The time zone to read it in; the browser's by default.
+ * @returns The month, like "Sep".
+ */
+function shortMonth(moment: Date, timeZone?: string): string {
+  return new Intl.DateTimeFormat("en-US", { month: "short", timeZone }).format(
+    moment,
+  );
+}
+
+/**
  * Writes a day like "2 Oct 2026".
  *
  * @param isoTimestamp - The moment, as the backend sends it.
@@ -21,12 +35,9 @@ export function dateParts(
  * @returns The day.
  */
 export function formatDay(isoTimestamp: string, timeZone?: string): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone,
-  }).format(new Date(isoTimestamp));
+  const moment = new Date(isoTimestamp);
+  const part = dateParts(moment, { day: "numeric", year: "numeric", timeZone });
+  return `${part("day")} ${shortMonth(moment, timeZone)} ${part("year")}`;
 }
 
 /**
@@ -109,15 +120,34 @@ export function formatWeekdayDay(
   isoTimestamp: string,
   timeZone?: string,
 ): string {
-  const parts = new Intl.DateTimeFormat("en-GB", {
+  const moment = new Date(isoTimestamp);
+  const part = dateParts(moment, {
     weekday: "short",
     day: "numeric",
-    month: "short",
     timeZone,
-  }).formatToParts(new Date(isoTimestamp));
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((entry) => entry.type === type)?.value ?? "";
-  return `${part("weekday")} ${part("day")} ${part("month")}`;
+  });
+  return `${part("weekday")} ${part("day")} ${shortMonth(moment, timeZone)}`;
+}
+
+/**
+ * Writes when a log entry happened, like "Tue 17 Nov, 6:42 PM", as the
+ * admin log tables show it.
+ *
+ * @param isoTimestamp - The moment, as the backend sends it.
+ * @param timeZone - The time zone to show it in; the browser's by default.
+ * @returns The weekday, day, month and 12-hour time.
+ */
+export function formatLoggedAt(
+  isoTimestamp: string,
+  timeZone?: string,
+): string {
+  const time = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone,
+  }).format(new Date(isoTimestamp));
+  return `${formatWeekdayDay(isoTimestamp, timeZone)}, ${time}`;
 }
 
 /**
