@@ -13,7 +13,9 @@ import { type Copy, readCopy } from "@/lib/copy";
 /**
  * The page signed-out people see at `/`, from the design's `Landing` file:
  * the pavilion hero, a sample conversation, a day with Zeph, pricing, the
- * FAQ and the footer. Every word comes from the Copy's Landing slots.
+ * FAQ and the footer. Every word comes from Copy: the Landing slots, the
+ * Pricing slots for the plans and the Shared slots for the header and
+ * footer.
  *
  * @param props - `copy` is the website's Copy.
  * @returns The page.
@@ -22,6 +24,7 @@ export function Landing({ copy }: { copy: Copy }) {
   return (
     <>
       <SiteHero
+        copy={copy}
         background={siteBackgrounds.landingHero}
         padding="pt-11 pb-[300px] max-[899px]:pt-7 max-[899px]:pb-[350px]"
         eyebrow={readCopy(copy, "landing.hero.eyebrow")}
@@ -70,7 +73,7 @@ export function Landing({ copy }: { copy: Copy }) {
       <LandingDay copy={copy} />
       <LandingPricing copy={copy} />
       <LandingFaq copy={copy} />
-      <SiteFooter />
+      <SiteFooter copy={copy} />
     </>
   );
 }

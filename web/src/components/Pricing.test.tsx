@@ -2,9 +2,18 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { Pricing } from "@/components/Pricing";
-import { seedCopy } from "@/test/copy";
+import { markedCopy, seedCopy, wordsNotFromCopy } from "@/test/copy";
 
 describe("Pricing", () => {
+  it("shows only Copy text, header and footer included", () => {
+    const { container } = render(<Pricing copy={markedCopy()} />);
+
+    expect(wordsNotFromCopy(container)).toEqual([]);
+    expect(
+      screen.getByRole("heading", { level: 3, name: "⟦pricing.plus.name⟧" }),
+    ).toBeInTheDocument();
+  });
+
   it("shows the three plans, each signing up", () => {
     const { container } = render(<Pricing copy={seedCopy()} />);
 

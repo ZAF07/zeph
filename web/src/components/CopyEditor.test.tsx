@@ -15,6 +15,12 @@ vi.mock("@/lib/use-api-client", () => ({
   useApiClient: () => apiClient,
 }));
 
+const router = { push: vi.fn() };
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => router,
+}));
+
 const copyPage: CopyTab[] = [
   {
     tab: "landing",
@@ -49,16 +55,31 @@ const copyPage: CopyTab[] = [
       },
     ],
   },
+  {
+    tab: "pricing",
+    name: "Pricing",
+    slots: [
+      {
+        key: "pricing.plus.button",
+        name: "Plus plan: button",
+        text: "Start Plus",
+        max_length: 20,
+        placeholders: [],
+        updated_at: "2026-11-11T09:00:00Z",
+        updated_by: null,
+      },
+    ],
+  },
 ];
 
 describe("CopyEditor", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     apiClient.getCopyPage.mockResolvedValue(copyPage);
-    apiClient.saveCopyTab.mockImplementation(async (_tab, texts) => [
-      {
-        ...copyPage[0],
-        slots: copyPage[0].slots.map((slot) =>
+    apiClient.saveCopyTab.mockImplementation(async (_tab, texts) =>
+      copyPage.map((tab) => ({
+        ...tab,
+        slots: tab.slots.map((slot) =>
           slot.key in texts
             ? {
                 ...slot,
@@ -68,8 +89,8 @@ describe("CopyEditor", () => {
               }
             : slot,
         ),
-      },
-    ]);
+      })),
+    );
   });
 
   it("shows the Landing tab's slots in page order, each with its details", async () => {
@@ -184,6 +205,93 @@ describe("CopyEditor", () => {
 
     expect(heading).toHaveValue("Think Deeper,");
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
+
+  it("asks before switching tabs with unsaved edits, and keeps them on Keep editing", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<CopyEditor />);
+    const heading = await screen.findByRole("textbox", {
+      name: "Main heading, first line",
+    });
+    await user.type(heading, " Now");
+
+    await user.click(screen.getByRole("tab", { name: "Pricing" }));
+    const dialog = screen.getByRole("alertdialog", {
+      name: "Switch tabs and lose your changes?",
+    });
+    await user.click(
+      within(dialog).getByRole("button", { name: "Keep editing" }),
+    );
+
+    expect(screen.getByRole("tab", { name: "Landing" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(heading).toHaveValue("Think Deeper, Now");
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("switches tabs and drops the edits once the Admin says to", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<CopyEditor />);
+    await user.type(
+      await screen.findByRole("textbox", { name: "Main heading, first line" }),
+      " Now",
+    );
+
+    await user.click(screen.getByRole("tab", { name: "Pricing" }));
+    await user.click(screen.getByRole("button", { name: "Switch tab" }));
+
+    expect(
+      screen.getByRole("textbox", { name: "Plus plan: button" }),
+    ).toHaveValue("Start Plus");
+    await user.click(screen.getByRole("tab", { name: "Landing" }));
+    expect(
+      screen.getByRole("textbox", { name: "Main heading, first line" }),
+    ).toHaveValue("Think Deeper,");
+  });
+
+  it("switches tabs without asking once the edits are saved", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<CopyEditor />);
+    await user.type(
+      await screen.findByRole("textbox", { name: "Main heading, first line" }),
+      " Now",
+    );
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByText("Saved. It shows on the next page load.");
+
+    await user.click(screen.getByRole("tab", { name: "Pricing" }));
+
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(
+      screen.getByRole("textbox", { name: "Plus plan: button" }),
+    ).toBeVisible();
+  });
+
+  it("asks before following a link away with unsaved edits", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(
+      <>
+        <a href="/admin/settings">Platform settings</a>
+        <CopyEditor />
+      </>,
+    );
+    await user.type(
+      await screen.findByRole("textbox", { name: "Main heading, first line" }),
+      " Now",
+    );
+
+    await user.click(screen.getByRole("link", { name: "Platform settings" }));
+    await user.click(
+      within(
+        screen.getByRole("alertdialog", {
+          name: "Leave and lose your changes?",
+        }),
+      ).getByRole("button", { name: "Leave" }),
+    );
+
+    expect(router.push).toHaveBeenCalledWith("/admin/settings");
   });
 
   it("says when the Copy page couldn't load", async () => {

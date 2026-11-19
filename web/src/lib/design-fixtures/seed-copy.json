@@ -214,180 +214,6 @@
         "text": "What you care about carries into tomorrow's conversation. You can read every memory and remove any of them."
       },
       {
-        "key": "landing.pricing.eyebrow",
-        "name": "Pricing: label",
-        "max_length": 40,
-        "text": "Pricing"
-      },
-      {
-        "key": "landing.pricing.heading_first_line",
-        "name": "Pricing: heading, first line",
-        "max_length": 30,
-        "text": "Simple plans"
-      },
-      {
-        "key": "landing.pricing.heading_second_line",
-        "name": "Pricing: heading, second line",
-        "max_length": 30,
-        "text": "that grow with you."
-      },
-      {
-        "key": "landing.pricing.lead",
-        "name": "Pricing: line under the heading",
-        "max_length": 120,
-        "text": "Start free, upgrade when you are ready for deeper support."
-      },
-      {
-        "key": "landing.pricing.per_month",
-        "name": "Pricing: after each price",
-        "max_length": 12,
-        "text": "/month"
-      },
-      {
-        "key": "landing.pricing.free.name",
-        "name": "Free plan: name",
-        "max_length": 16,
-        "text": "Free"
-      },
-      {
-        "key": "landing.pricing.free.blurb",
-        "name": "Free plan: line under the name",
-        "max_length": 60,
-        "text": "Start your journey with Zeph."
-      },
-      {
-        "key": "landing.pricing.free.price",
-        "name": "Free plan: price",
-        "max_length": 8,
-        "text": "S$0"
-      },
-      {
-        "key": "landing.pricing.free.feature_1",
-        "name": "Free plan: first thing it includes",
-        "max_length": 45,
-        "text": "Thoughtful conversations"
-      },
-      {
-        "key": "landing.pricing.free.feature_2",
-        "name": "Free plan: second thing it includes",
-        "max_length": 45,
-        "text": "Basic daily check-ins"
-      },
-      {
-        "key": "landing.pricing.free.feature_3",
-        "name": "Free plan: third thing it includes",
-        "max_length": 45,
-        "text": "Core reflection prompts"
-      },
-      {
-        "key": "landing.pricing.free.button",
-        "name": "Free plan: button",
-        "max_length": 20,
-        "text": "Get Started"
-      },
-      {
-        "key": "landing.pricing.plus.name",
-        "name": "Plus plan: name",
-        "max_length": 16,
-        "text": "Plus"
-      },
-      {
-        "key": "landing.pricing.plus.badge",
-        "name": "Plus plan: badge",
-        "max_length": 16,
-        "text": "Most Popular"
-      },
-      {
-        "key": "landing.pricing.plus.blurb",
-        "name": "Plus plan: line under the name",
-        "max_length": 60,
-        "text": "A proactive companion for real progress."
-      },
-      {
-        "key": "landing.pricing.plus.price",
-        "name": "Plus plan: price",
-        "max_length": 8,
-        "text": "S$12"
-      },
-      {
-        "key": "landing.pricing.plus.feature_1",
-        "name": "Plus plan: first thing it includes",
-        "max_length": 45,
-        "text": "Everything in Free"
-      },
-      {
-        "key": "landing.pricing.plus.feature_2",
-        "name": "Plus plan: second thing it includes",
-        "max_length": 45,
-        "text": "Proactive check-ins throughout the day"
-      },
-      {
-        "key": "landing.pricing.plus.feature_3",
-        "name": "Plus plan: third thing it includes",
-        "max_length": 45,
-        "text": "Goal and habit support"
-      },
-      {
-        "key": "landing.pricing.plus.feature_4",
-        "name": "Plus plan: fourth thing it includes",
-        "max_length": 45,
-        "text": "Longer memory and context"
-      },
-      {
-        "key": "landing.pricing.plus.button",
-        "name": "Plus plan: button",
-        "max_length": 20,
-        "text": "Start Plus"
-      },
-      {
-        "key": "landing.pricing.pro.name",
-        "name": "Pro plan: name",
-        "max_length": 16,
-        "text": "Pro"
-      },
-      {
-        "key": "landing.pricing.pro.blurb",
-        "name": "Pro plan: line under the name",
-        "max_length": 60,
-        "text": "A more personalized and ongoing partnership."
-      },
-      {
-        "key": "landing.pricing.pro.price",
-        "name": "Pro plan: price",
-        "max_length": 8,
-        "text": "S$19"
-      },
-      {
-        "key": "landing.pricing.pro.feature_1",
-        "name": "Pro plan: first thing it includes",
-        "max_length": 45,
-        "text": "Everything in Plus"
-      },
-      {
-        "key": "landing.pricing.pro.feature_2",
-        "name": "Pro plan: second thing it includes",
-        "max_length": 45,
-        "text": "Deeper long-term insights"
-      },
-      {
-        "key": "landing.pricing.pro.feature_3",
-        "name": "Pro plan: third thing it includes",
-        "max_length": 45,
-        "text": "Custom routines and focus areas"
-      },
-      {
-        "key": "landing.pricing.pro.feature_4",
-        "name": "Pro plan: fourth thing it includes",
-        "max_length": 45,
-        "text": "Early access to new features"
-      },
-      {
-        "key": "landing.pricing.pro.button",
-        "name": "Pro plan: button",
-        "max_length": 20,
-        "text": "Start Pro"
-      },
-      {
         "key": "landing.faq.eyebrow",
         "name": "FAQ: label",
         "max_length": 40,
@@ -464,6 +290,594 @@
         "name": "FAQ: fifth answer",
         "max_length": 400,
         "text": "[YOUR CANCELLATION POLICY]"
+      }
+    ]
+  },
+  {
+    "tab": "pricing",
+    "name": "Pricing",
+    "slots": [
+      {
+        "key": "pricing.page_title",
+        "name": "Browser tab title",
+        "max_length": 70,
+        "text": "Zeph — Pricing"
+      },
+      {
+        "key": "pricing.page_description",
+        "name": "Search description",
+        "max_length": 160,
+        "text": "Simple plans that grow with you. Start free, upgrade when you are ready for deeper support."
+      },
+      {
+        "key": "pricing.eyebrow",
+        "name": "Label",
+        "max_length": 40,
+        "text": "Pricing"
+      },
+      {
+        "key": "pricing.heading_first_line",
+        "name": "Heading, first line",
+        "max_length": 30,
+        "text": "Simple plans"
+      },
+      {
+        "key": "pricing.heading_second_line",
+        "name": "Heading, second line",
+        "max_length": 30,
+        "text": "that grow with you."
+      },
+      {
+        "key": "pricing.lead",
+        "name": "Line under the heading",
+        "max_length": 120,
+        "text": "Start free, upgrade when you are ready for deeper support."
+      },
+      {
+        "key": "pricing.per_month",
+        "name": "After each price",
+        "max_length": 12,
+        "text": "/month"
+      },
+      {
+        "key": "pricing.free.name",
+        "name": "Free plan: name",
+        "max_length": 16,
+        "text": "Free"
+      },
+      {
+        "key": "pricing.free.blurb",
+        "name": "Free plan: line under the name",
+        "max_length": 60,
+        "text": "Start your journey with Zeph."
+      },
+      {
+        "key": "pricing.free.price",
+        "name": "Free plan: price",
+        "max_length": 8,
+        "text": "S$0"
+      },
+      {
+        "key": "pricing.free.feature_1",
+        "name": "Free plan: first thing it includes",
+        "max_length": 45,
+        "text": "Thoughtful conversations"
+      },
+      {
+        "key": "pricing.free.feature_2",
+        "name": "Free plan: second thing it includes",
+        "max_length": 45,
+        "text": "Basic daily check-ins"
+      },
+      {
+        "key": "pricing.free.feature_3",
+        "name": "Free plan: third thing it includes",
+        "max_length": 45,
+        "text": "Core reflection prompts"
+      },
+      {
+        "key": "pricing.free.button",
+        "name": "Free plan: button",
+        "max_length": 20,
+        "text": "Get Started"
+      },
+      {
+        "key": "pricing.plus.name",
+        "name": "Plus plan: name",
+        "max_length": 16,
+        "text": "Plus"
+      },
+      {
+        "key": "pricing.plus.badge",
+        "name": "Plus plan: badge",
+        "max_length": 16,
+        "text": "Most Popular"
+      },
+      {
+        "key": "pricing.plus.blurb",
+        "name": "Plus plan: line under the name",
+        "max_length": 60,
+        "text": "A proactive companion for real progress."
+      },
+      {
+        "key": "pricing.plus.price",
+        "name": "Plus plan: price",
+        "max_length": 8,
+        "text": "S$12"
+      },
+      {
+        "key": "pricing.plus.feature_1",
+        "name": "Plus plan: first thing it includes",
+        "max_length": 45,
+        "text": "Everything in Free"
+      },
+      {
+        "key": "pricing.plus.feature_2",
+        "name": "Plus plan: second thing it includes",
+        "max_length": 45,
+        "text": "Proactive check-ins throughout the day"
+      },
+      {
+        "key": "pricing.plus.feature_3",
+        "name": "Plus plan: third thing it includes",
+        "max_length": 45,
+        "text": "Goal and habit support"
+      },
+      {
+        "key": "pricing.plus.feature_4",
+        "name": "Plus plan: fourth thing it includes",
+        "max_length": 45,
+        "text": "Longer memory and context"
+      },
+      {
+        "key": "pricing.plus.button",
+        "name": "Plus plan: button",
+        "max_length": 20,
+        "text": "Start Plus"
+      },
+      {
+        "key": "pricing.pro.name",
+        "name": "Pro plan: name",
+        "max_length": 16,
+        "text": "Pro"
+      },
+      {
+        "key": "pricing.pro.blurb",
+        "name": "Pro plan: line under the name",
+        "max_length": 60,
+        "text": "A more personalized and ongoing partnership."
+      },
+      {
+        "key": "pricing.pro.price",
+        "name": "Pro plan: price",
+        "max_length": 8,
+        "text": "S$19"
+      },
+      {
+        "key": "pricing.pro.feature_1",
+        "name": "Pro plan: first thing it includes",
+        "max_length": 45,
+        "text": "Everything in Plus"
+      },
+      {
+        "key": "pricing.pro.feature_2",
+        "name": "Pro plan: second thing it includes",
+        "max_length": 45,
+        "text": "Deeper long-term insights"
+      },
+      {
+        "key": "pricing.pro.feature_3",
+        "name": "Pro plan: third thing it includes",
+        "max_length": 45,
+        "text": "Custom routines and focus areas"
+      },
+      {
+        "key": "pricing.pro.feature_4",
+        "name": "Pro plan: fourth thing it includes",
+        "max_length": 45,
+        "text": "Early access to new features"
+      },
+      {
+        "key": "pricing.pro.button",
+        "name": "Pro plan: button",
+        "max_length": 20,
+        "text": "Start Pro"
+      }
+    ]
+  },
+  {
+    "tab": "how_it_works",
+    "name": "How it works",
+    "slots": [
+      {
+        "key": "how_it_works.page_title",
+        "name": "Browser tab title",
+        "max_length": 70,
+        "text": "Zeph — How it works"
+      },
+      {
+        "key": "how_it_works.page_description",
+        "name": "Search description",
+        "max_length": 160,
+        "text": "You sign up here and talk to Zeph in Telegram. This site is where you see what it remembers and decide how it behaves."
+      },
+      {
+        "key": "how_it_works.hero.eyebrow",
+        "name": "Label above the main heading",
+        "max_length": 40,
+        "text": "How it works"
+      },
+      {
+        "key": "how_it_works.hero.heading_first_line",
+        "name": "Main heading, first line",
+        "max_length": 30,
+        "text": "One conversation,"
+      },
+      {
+        "key": "how_it_works.hero.heading_second_line",
+        "name": "Main heading, second line",
+        "max_length": 30,
+        "text": "carried through your days."
+      },
+      {
+        "key": "how_it_works.hero.lead",
+        "name": "Line under the main heading",
+        "max_length": 200,
+        "text": "You sign up here and talk to Zeph in Telegram. This site is where you see what it remembers and decide how it behaves. Five steps, most of them one tap."
+      },
+      {
+        "key": "how_it_works.steps.eyebrow",
+        "name": "Steps: label",
+        "max_length": 40,
+        "text": "From sign-up to check-in"
+      },
+      {
+        "key": "how_it_works.steps.heading_first_line",
+        "name": "Steps: heading, first line",
+        "max_length": 30,
+        "text": "What happens,"
+      },
+      {
+        "key": "how_it_works.steps.heading_second_line",
+        "name": "Steps: heading, second line",
+        "max_length": 30,
+        "text": "in order."
+      },
+      {
+        "key": "how_it_works.steps.lead",
+        "name": "Steps: line under the heading",
+        "max_length": 120,
+        "text": "Steps one and two happen once. The rest is the conversation itself."
+      },
+      {
+        "key": "how_it_works.steps.step_1.title",
+        "name": "Step 1: title",
+        "max_length": 40,
+        "text": "Create your account"
+      },
+      {
+        "key": "how_it_works.steps.step_1.tag",
+        "name": "Step 1: tag",
+        "max_length": 24,
+        "text": "About two minutes"
+      },
+      {
+        "key": "how_it_works.steps.step_1.text",
+        "name": "Step 1: text",
+        "max_length": 250,
+        "text": "Sign up on this site and answer a few short questions: what to call you, what brings you here, and whether Zeph may remember things and check in on you."
+      },
+      {
+        "key": "how_it_works.steps.step_2.title",
+        "name": "Step 2: title",
+        "max_length": 40,
+        "text": "Connect Telegram"
+      },
+      {
+        "key": "how_it_works.steps.step_2.tag",
+        "name": "Step 2: tag",
+        "max_length": 24,
+        "text": "One tap"
+      },
+      {
+        "key": "how_it_works.steps.step_2.text",
+        "name": "Step 2: text",
+        "max_length": 250,
+        "text": "One tap links your account to Zeph on Telegram. Every conversation happens there, so there is no new app to learn."
+      },
+      {
+        "key": "how_it_works.steps.step_3.title",
+        "name": "Step 3: title",
+        "max_length": 40,
+        "text": "Talk it through"
+      },
+      {
+        "key": "how_it_works.steps.step_3.tag",
+        "name": "Step 3: tag",
+        "max_length": 24,
+        "text": "Whenever you like"
+      },
+      {
+        "key": "how_it_works.steps.step_3.text",
+        "name": "Step 3: text",
+        "max_length": 250,
+        "text": "Message Zeph the way you would message a thoughtful friend. It asks questions, listens, and disagrees when that is more useful than agreeing. It draws on philosophy, psychology and mindfulness, in plain words."
+      },
+      {
+        "key": "how_it_works.steps.step_4.title",
+        "name": "Step 4: title",
+        "max_length": 40,
+        "text": "It remembers, with your permission"
+      },
+      {
+        "key": "how_it_works.steps.step_4.tag",
+        "name": "Step 4: tag",
+        "max_length": 24,
+        "text": "Your choice"
+      },
+      {
+        "key": "how_it_works.steps.step_4.text",
+        "name": "Step 4: text",
+        "max_length": 250,
+        "text": "If you allow it, Zeph keeps the details that matter, like your goals and the people you mention, so you never start from zero. You can read every memory and delete any of them."
+      },
+      {
+        "key": "how_it_works.steps.step_5.title",
+        "name": "Step 5: title",
+        "max_length": 40,
+        "text": "It checks in, if you want it to"
+      },
+      {
+        "key": "how_it_works.steps.step_5.tag",
+        "name": "Step 5: tag",
+        "max_length": 24,
+        "text": "Your choice"
+      },
+      {
+        "key": "how_it_works.steps.step_5.text",
+        "name": "Step 5: text",
+        "max_length": 250,
+        "text": "Turn check-ins on and Zeph will sometimes message you first. You set how often at most and your quiet hours. Zeph chooses the moment, and sometimes stays quiet to give you space."
+      },
+      {
+        "key": "how_it_works.dashboard.eyebrow",
+        "name": "Your dashboard: label",
+        "max_length": 40,
+        "text": "Your dashboard"
+      },
+      {
+        "key": "how_it_works.dashboard.heading_first_line",
+        "name": "Your dashboard: heading, first line",
+        "max_length": 30,
+        "text": "You decide"
+      },
+      {
+        "key": "how_it_works.dashboard.heading_second_line",
+        "name": "Your dashboard: heading, second line",
+        "max_length": 30,
+        "text": "what Zeph keeps."
+      },
+      {
+        "key": "how_it_works.dashboard.lead",
+        "name": "Your dashboard: line under the heading",
+        "max_length": 120,
+        "text": "Everything Zeph holds about you is visible on this site, and all of it can be removed."
+      },
+      {
+        "key": "how_it_works.dashboard.memories.title",
+        "name": "Your dashboard: first card, title",
+        "max_length": 30,
+        "text": "Memories"
+      },
+      {
+        "key": "how_it_works.dashboard.memories.text",
+        "name": "Your dashboard: first card, text",
+        "max_length": 120,
+        "text": "Read what Zeph remembers and delete any of it, one item or everything."
+      },
+      {
+        "key": "how_it_works.dashboard.check_ins.title",
+        "name": "Your dashboard: second card, title",
+        "max_length": 30,
+        "text": "Check-ins"
+      },
+      {
+        "key": "how_it_works.dashboard.check_ins.text",
+        "name": "Your dashboard: second card, text",
+        "max_length": 120,
+        "text": "Change how often, set quiet hours, pause for a day or a week, or switch them off."
+      },
+      {
+        "key": "how_it_works.dashboard.account.title",
+        "name": "Your dashboard: third card, title",
+        "max_length": 30,
+        "text": "Account & privacy"
+      },
+      {
+        "key": "how_it_works.dashboard.account.text",
+        "name": "Your dashboard: third card, text",
+        "max_length": 120,
+        "text": "Turn memory off, stop Zeph looking at photos, delete your data or your account."
+      },
+      {
+        "key": "how_it_works.dashboard.not_title",
+        "name": "What Zeph is not: title",
+        "max_length": 40,
+        "text": "What Zeph is not."
+      },
+      {
+        "key": "how_it_works.dashboard.not_text",
+        "name": "What Zeph is not: text",
+        "max_length": 200,
+        "text": "Zeph is an AI. It is not a therapist, a doctor or a crisis service, and it cannot help in an emergency."
+      },
+      {
+        "key": "how_it_works.ready.heading",
+        "name": "Sign-up band: heading",
+        "max_length": 40,
+        "text": "Ready when you are."
+      },
+      {
+        "key": "how_it_works.ready.text",
+        "name": "Sign-up band: line under the heading",
+        "max_length": 120,
+        "text": "Start free. It takes about two minutes to reach your first conversation."
+      },
+      {
+        "key": "how_it_works.ready.sign_up_button",
+        "name": "Sign-up band: sign-up button",
+        "max_length": 30,
+        "text": "Get Started Free"
+      },
+      {
+        "key": "how_it_works.ready.pricing_link",
+        "name": "Sign-up band: pricing button",
+        "max_length": 30,
+        "text": "See pricing"
+      }
+    ]
+  },
+  {
+    "tab": "shared",
+    "name": "Shared",
+    "slots": [
+      {
+        "key": "shared.wordmark",
+        "name": "Wordmark in the header and footer",
+        "max_length": 20,
+        "text": "Zeph"
+      },
+      {
+        "key": "shared.header.home_link_label",
+        "name": "Header: home link, read out by screen readers",
+        "max_length": 40,
+        "text": "Zeph home"
+      },
+      {
+        "key": "shared.nav.how_it_works",
+        "name": "Menu: How it works link",
+        "max_length": 24,
+        "text": "How It Works"
+      },
+      {
+        "key": "shared.nav.conversations",
+        "name": "Menu: Conversations link",
+        "max_length": 24,
+        "text": "Conversations"
+      },
+      {
+        "key": "shared.nav.pricing",
+        "name": "Menu: Pricing link",
+        "max_length": 24,
+        "text": "Pricing"
+      },
+      {
+        "key": "shared.nav.faq",
+        "name": "Menu: FAQ link",
+        "max_length": 24,
+        "text": "FAQ"
+      },
+      {
+        "key": "shared.header.log_in",
+        "name": "Header: log-in link",
+        "max_length": 20,
+        "text": "Log in"
+      },
+      {
+        "key": "shared.header.sign_up_button",
+        "name": "Header: sign-up button",
+        "max_length": 20,
+        "text": "Get Started"
+      },
+      {
+        "key": "shared.header.open_menu",
+        "name": "Header: phone menu button when closed, read out by screen readers",
+        "max_length": 40,
+        "text": "Open the menu"
+      },
+      {
+        "key": "shared.header.close_menu",
+        "name": "Header: phone menu button when open, read out by screen readers",
+        "max_length": 40,
+        "text": "Close the menu"
+      },
+      {
+        "key": "shared.header.menu_label",
+        "name": "Header: phone menu, read out by screen readers",
+        "max_length": 40,
+        "text": "Site"
+      },
+      {
+        "key": "shared.footer.line",
+        "name": "Footer: line under the wordmark",
+        "max_length": 100,
+        "text": "A thinking partner for the hours of your day, on Telegram."
+      },
+      {
+        "key": "shared.footer.product_title",
+        "name": "Footer: first column title",
+        "max_length": 20,
+        "text": "Product"
+      },
+      {
+        "key": "shared.footer.follow_title",
+        "name": "Footer: second column title",
+        "max_length": 20,
+        "text": "Follow"
+      },
+      {
+        "key": "shared.footer.follow_telegram",
+        "name": "Footer: Telegram link",
+        "max_length": 24,
+        "text": "Telegram"
+      },
+      {
+        "key": "shared.footer.follow_x",
+        "name": "Footer: X link",
+        "max_length": 24,
+        "text": "X"
+      },
+      {
+        "key": "shared.footer.follow_youtube",
+        "name": "Footer: YouTube link",
+        "max_length": 24,
+        "text": "YouTube"
+      },
+      {
+        "key": "shared.footer.follow_instagram",
+        "name": "Footer: Instagram link",
+        "max_length": 24,
+        "text": "Instagram"
+      },
+      {
+        "key": "shared.footer.legal_title",
+        "name": "Footer: third column title",
+        "max_length": 20,
+        "text": "Legal"
+      },
+      {
+        "key": "shared.footer.terms",
+        "name": "Footer: terms link",
+        "max_length": 30,
+        "text": "Terms of Service"
+      },
+      {
+        "key": "shared.footer.privacy",
+        "name": "Footer: privacy link",
+        "max_length": 30,
+        "text": "Privacy Policy"
+      },
+      {
+        "key": "shared.footer.copyright",
+        "name": "Footer: copyright",
+        "max_length": 40,
+        "text": "© 2026 Zeph"
+      },
+      {
+        "key": "shared.footer.ai_notice",
+        "name": "Footer: AI notice",
+        "max_length": 100,
+        "text": "Zeph is an AI. It is not therapy or medical care."
       }
     ]
   }

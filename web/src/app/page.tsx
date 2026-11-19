@@ -5,7 +5,7 @@ import { DashboardHome } from "@/components/DashboardHome";
 import { Landing } from "@/components/Landing";
 import { SiteLoadFailed } from "@/components/SiteLoadFailed";
 import { isSignedIn } from "@/lib/auth/server";
-import { readCopy } from "@/lib/copy";
+import { pageMetadata } from "@/lib/copy";
 import { loadCopy } from "@/lib/server-copy";
 
 /**
@@ -23,10 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
   if (!copy) {
     return {};
   }
-  return {
-    title: readCopy(copy, "landing.page_title"),
-    description: readCopy(copy, "landing.page_description"),
-  };
+  return pageMetadata(copy, "landing");
 }
 
 /**

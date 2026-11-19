@@ -12,7 +12,8 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn() }),
 }));
 
-const { default: PricingPage } = await import("@/app/pricing/page");
+const { default: PricingPage, generateMetadata } =
+  await import("@/app/pricing/page");
 
 describe("the /pricing page", () => {
   beforeEach(() => {
@@ -22,7 +23,7 @@ describe("the /pricing page", () => {
   it("shows the plans worded by Copy", async () => {
     loadCopy.mockResolvedValue({
       ...seedCopy(),
-      "landing.pricing.plus.button": "Try Plus",
+      "pricing.plus.button": "Try Plus",
     });
 
     render(await PricingPage());
@@ -31,6 +32,18 @@ describe("the /pricing page", () => {
       "href",
       "/sign-up",
     );
+  });
+
+  it("takes its tab title and description from Copy", async () => {
+    loadCopy.mockResolvedValue({
+      ...seedCopy(),
+      "pricing.page_title": "Zeph plans",
+    });
+
+    expect(await generateMetadata()).toEqual({
+      title: "Zeph plans",
+      description: seedCopy()["pricing.page_description"],
+    });
   });
 
   it("shows the error state when Copy can't be read", async () => {

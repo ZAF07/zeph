@@ -6,7 +6,13 @@ import { PublicHeader } from "@/components/PublicHeader";
 
 describe("PublicHeader", () => {
   it("shows the Zeph wordmark linking home and the actions", () => {
-    render(<PublicHeader actions={<Link href="/sign-up">Sign up</Link>} />);
+    render(
+      <PublicHeader
+        wordmark="Zeph"
+        homeLinkLabel="Zeph home"
+        actions={<Link href="/sign-up">Sign up</Link>}
+      />,
+    );
 
     expect(screen.getByRole("link", { name: "Zeph home" })).toHaveAttribute(
       "href",
@@ -21,6 +27,8 @@ describe("PublicHeader", () => {
   it("puts the nav links in a nav", () => {
     render(
       <PublicHeader
+        wordmark="Zeph"
+        homeLinkLabel="Zeph home"
         nav={<Link href="/how-it-works">How It Works</Link>}
         actions={null}
       />,

@@ -29,6 +29,8 @@ export function AuthLayout({
   return (
     <div className="flex min-h-[800px] flex-col [background:linear-gradient(180deg,rgba(10,32,44,.25),rgba(10,32,44,.25)),url(/design/auth-archway.jpg)_left_bottom/cover_no-repeat_#0A202C] max-[899px]:min-h-[920px] max-[899px]:[background:linear-gradient(180deg,#0A202C_0%,#0A202C_calc(100%_-_390px),rgba(10,32,44,0)_calc(100%_-_260px)),url(/design/auth-archway.jpg)_left_bottom/auto_390px_no-repeat_#0A202C]">
       <PublicHeader
+        wordmark="Zeph"
+        homeLinkLabel="Zeph home"
         actions={
           <>
             <span className="text-soft max-[899px]:hidden">{switchPrompt}</span>
