@@ -80,5 +80,6 @@ None - can start immediately
 ## Completion
 
 - Completed: 2026-11-20
-- Commit: <filled in after merge>
+- Commit: 9588059 "Merge message pipeline issue 01: the Reply's instructions follow a strict priority order (safety and boundaries, what they just asked, today's guidance, memory, voice, optional extras) with one clash rule and an 'answer a direct question first' line; a due Woven-in Check-in is an optional extra with a bring_up_check_in tool and is taken back when the Reply leaves it out; the unreliable tool signal is handed to issue 09"
+- Branch commits: 8cf4a30 (priority order and optional Check-in), 02d0195 (review fixes), 9f88dee (hand-off to 09), then the archive commit
 
