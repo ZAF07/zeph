@@ -11,6 +11,7 @@ describe("isPublicRoute", () => {
   it.each([
     "/",
     "/how-it-works",
+    "/pricing",
     "/sign-in",
     "/sign-in/factor-one",
     "/sign-up",

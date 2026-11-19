@@ -13,7 +13,7 @@ describe("SiteHeader", () => {
     );
     expect(screen.getByRole("link", { name: "Pricing" })).toHaveAttribute(
       "href",
-      "/#pricing",
+      "/pricing",
     );
     expect(screen.getByRole("link", { name: "Log in" })).toHaveAttribute(
       "href",

@@ -5,6 +5,6 @@ export type SiteLink = { href: string; label: string };
 export const siteNavLinks: SiteLink[] = [
   { href: "/how-it-works", label: "How It Works" },
   { href: "/#conversations", label: "Conversations" },
-  { href: "/#pricing", label: "Pricing" },
+  { href: "/pricing", label: "Pricing" },
   { href: "/#faq", label: "FAQ" },
 ];
