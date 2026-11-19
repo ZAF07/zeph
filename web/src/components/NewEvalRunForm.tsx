@@ -9,6 +9,7 @@ import { EvalRunEstimateNote } from "@/components/EvalRunEstimateNote";
 import { fieldCaption, fieldLabel, inputField } from "@/components/form-styles";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LoadingPanel } from "@/components/LoadingPanel";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { VariantOverridesEditor } from "@/components/VariantOverridesEditor";
 import {
   ApiError,
@@ -187,7 +188,7 @@ export function NewEvalRunForm() {
                   <ul className="m-0 mt-1.5 flex list-none flex-col gap-1 p-0">
                     {summary.case_keys.map((key) => (
                       <li key={key}>
-                        <label className="flex cursor-pointer items-center gap-2 font-mono text-[12px] text-text">
+                        <label className="flex min-h-11 cursor-pointer items-center gap-2 font-mono text-[12px] text-text">
                           <input
                             type="checkbox"
                             className="size-3.5 accent-cream"
@@ -280,11 +281,11 @@ export function NewEvalRunForm() {
         Cases are run as they are now; edit them under Cases.
       </p>
       {startMutation.isError ? (
-        <p role="alert" className="m-0 text-[13px] text-danger">
+        <SaveFailedNote>
           {refusal
             ? `Couldn’t start the run: ${refusal}`
             : "Couldn’t start the run. Try again."}
-        </p>
+        </SaveFailedNote>
       ) : null}
       <div>
         <button

@@ -10,6 +10,9 @@ const toneClass = {
   danger: "border-danger text-danger",
 };
 
+/** Which colours a card tag takes. */
+export type CardTagTone = keyof typeof toneClass;
+
 /**
  * A small pill on a card's folded row, such as "Unsaved changes" or
  * "Sends a Shared Photo". A padlock marks a fact that can't be changed here.
@@ -23,7 +26,7 @@ export function CardTag({
   locked = false,
   children,
 }: {
-  tone?: "plain" | "orange" | "danger";
+  tone?: CardTagTone;
   locked?: boolean;
   children: ReactNode;
 }) {

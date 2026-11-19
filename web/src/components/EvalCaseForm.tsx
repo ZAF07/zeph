@@ -6,6 +6,8 @@ import { useState, type FormEvent } from "react";
 
 import { primaryButton } from "@/components/button-styles";
 import { fieldCaption, inputField } from "@/components/form-styles";
+import { SavedNote } from "@/components/SavedNote";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { ShapeFormSections } from "@/components/ShapeFormSections";
 import type {
   EvalCase,
@@ -120,14 +122,12 @@ export function EvalCaseForm({
             {existing ? "Save case" : "Add case"}
           </button>
           {errors.summary ? (
-            <p role="alert" className="m-0 text-[13px] text-danger">
-              {errors.summary}
-            </p>
+            <SaveFailedNote>{errors.summary}</SaveFailedNote>
           ) : null}
           {saveMutation.isSuccess && existing ? (
-            <p role="status" className="m-0 text-[13px] text-soft">
+            <SavedNote>
               Saved. The next run uses it; past runs keep the case as it was.
-            </p>
+            </SavedNote>
           ) : null}
         </div>
       )}

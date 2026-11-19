@@ -134,7 +134,7 @@ export function KnowledgeTextEditor({
               type="button"
               aria-pressed={view === option.view}
               onClick={() => setView(option.view)}
-              className={`${option.wideOnly ? "hidden lg:inline-flex" : "inline-flex"} min-h-10 cursor-pointer items-center rounded-pill border-0 px-3.5 font-[inherit] text-[13px] ${
+              className={`${option.wideOnly ? "hidden lg:inline-flex" : "inline-flex"} min-h-11 cursor-pointer items-center rounded-pill border-0 px-3.5 font-[inherit] text-[13px] ${
                 view === option.view
                   ? "bg-cream font-medium text-ink"
                   : "bg-transparent font-light text-text hover:text-cream"

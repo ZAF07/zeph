@@ -39,7 +39,5 @@ export function AdminGate({ children }: { children: ReactNode }) {
     );
   }
 
-  return (
-    <LoadingPanel shape="card" label="Opening the admin area" />
-  );
+  return <LoadingPanel shape="card" label="Opening the admin area" />;
 }

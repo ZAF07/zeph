@@ -1,3 +1,4 @@
+import type { CardTagTone } from "@/components/CardTag";
 import type { KnowledgeFileType, KnowledgeStatus } from "@/lib/api-client";
 
 /** The traditions an Admin can file a Knowledge document under. */
@@ -24,7 +25,7 @@ export const knowledgeFileTypeLabels: Record<KnowledgeFileType, string> = {
  */
 export const knowledgeStatusLabels: Record<
   KnowledgeStatus,
-  { label: string; tone: "plain" | "orange" | "danger" }
+  { label: string; tone: CardTagTone }
 > = {
   ready: { label: "Ready", tone: "plain" },
   pending: { label: "Pending", tone: "orange" },

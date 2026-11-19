@@ -24,17 +24,6 @@ const bgDeep = color("bg-deep", "#071922");
 const zeph = color("zeph", "#2a5c66");
 const orange = color("orange", "#f0a050");
 
-/**
- * A token's colour, see-through, for a soft fill.
- *
- * @param token - The colour, from `color`.
- * @param percent - How much of it shows, from 0 to 100.
- * @returns A CSS colour.
- */
-function faint(token: string, percent: number): string {
-  return `color-mix(in srgb, ${token} ${percent}%, transparent)`;
-}
-
 /** The editor's look, in Zeph's colours and type. */
 export const zephEditorTheme = EditorView.theme({
   "&": {
@@ -57,13 +46,13 @@ export const zephEditorTheme = EditorView.theme({
     borderRight: `1px solid ${line}`,
   },
   ".cm-lineNumbers .cm-gutterElement": { padding: "0 10px 0 14px" },
-  ".cm-activeLine": { backgroundColor: faint(zeph, 25) },
-  ".cm-activeLineGutter": { backgroundColor: faint(zeph, 40), color: text },
+  ".cm-activeLine": { backgroundColor: bgDeep },
+  ".cm-activeLineGutter": { backgroundColor: zeph, color: text },
   ".cm-cursor": { borderLeftColor: cream, borderLeftWidth: "2px" },
   "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, ::selection":
     { backgroundColor: zeph },
   ".cm-searchMatch": {
-    backgroundColor: faint(orange, 25),
+    backgroundColor: "transparent",
     outline: `1px solid ${orange}`,
     borderRadius: "2px",
   },

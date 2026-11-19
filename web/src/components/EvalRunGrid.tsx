@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { CaseResultCard } from "@/components/CaseResultCard";
 import { EvalPill } from "@/components/EvalPill";
+import { tableHeadCell } from "@/components/table-styles";
 import type { EvalRunDetails } from "@/lib/api-client";
 import { describeCost, describeTotals } from "@/lib/evals";
 import { formatDuration, formatTokens } from "@/lib/model-calls";
@@ -14,10 +15,6 @@ import {
   resultsByCell,
   triesPill,
 } from "@/lib/eval-run-grid";
-
-/** The look of a column head, as the admin table draws it. */
-const headClass =
-  "border-b border-line px-[18px] py-3 text-[11px] font-medium tracking-[1.5px] whitespace-nowrap text-soft uppercase";
 
 /**
  * A run's Case Results side by side: a row per case and a column per
@@ -44,11 +41,11 @@ export function EvalRunGrid({ run }: { run: EvalRunDetails }) {
         <table className="w-full border-collapse text-left text-[13px] text-text">
           <thead>
             <tr>
-              <th scope="col" className={headClass}>
+              <th scope="col" className={tableHeadCell}>
                 Case
               </th>
               {run.variants.map((variant) => (
-                <th key={variant.letter} scope="col" className={headClass}>
+                <th key={variant.letter} scope="col" className={tableHeadCell}>
                   Variant {variant.letter}
                 </th>
               ))}

@@ -67,14 +67,17 @@ export const runStateLabels: Record<
   },
 };
 
-/** Each outcome's label and pill look: cream for a pass, danger otherwise. */
+/**
+ * Each outcome's label and pill look: cream for a pass, danger for a fail,
+ * outlined for an error, which doesn't count as a fail.
+ */
 export const outcomeLabels: Record<
   CaseOutcome,
   { label: string; pill: string }
 > = {
   pass: { label: "Pass", pill: "bg-cream text-ink" },
   fail: { label: "Fail", pill: "border border-danger text-danger" },
-  error: { label: "Error", pill: "border border-danger text-danger" },
+  error: { label: "Error", pill: "border border-line-strong text-soft" },
 };
 
 /**

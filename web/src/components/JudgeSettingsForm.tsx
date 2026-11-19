@@ -4,6 +4,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 
 import { primaryButton } from "@/components/button-styles";
+import { SavedNote } from "@/components/SavedNote";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { ShapeFormSections } from "@/components/ShapeFormSections";
 import type { FormValues, JudgeSettings } from "@/lib/api-client";
 import { savingErrors } from "@/lib/eval-forms";
@@ -53,14 +55,10 @@ export function JudgeSettingsForm({ settings }: { settings: JudgeSettings }) {
           Save Judge
         </button>
         {errors.summary ? (
-          <p role="alert" className="m-0 text-[13px] text-danger">
-            {errors.summary}
-          </p>
+          <SaveFailedNote>{errors.summary}</SaveFailedNote>
         ) : null}
         {saveMutation.isSuccess ? (
-          <p role="status" className="m-0 text-[13px] text-soft">
-            Saved. The next run uses it.
-          </p>
+          <SavedNote>Saved. The next run uses it.</SavedNote>
         ) : null}
       </div>
     </form>

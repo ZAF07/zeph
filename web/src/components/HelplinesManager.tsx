@@ -269,7 +269,7 @@ export function HelplinesManager() {
       heading: "Order",
       cell: (row) => {
         if (row.kind === "fallback") {
-          return "Always last";
+          return <span className="text-soft">Always last</span>;
         }
         const { helpline } = row;
         const { position, total } = placeInCountry(helplines, helpline);

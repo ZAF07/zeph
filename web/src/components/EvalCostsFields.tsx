@@ -5,6 +5,9 @@ import { useState, type FormEvent } from "react";
 
 import { primaryButton, secondaryButton } from "@/components/button-styles";
 import { fieldCaption, fieldLabel, inputField } from "@/components/form-styles";
+import { SavedNote } from "@/components/SavedNote";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
+import { tableHeadCell } from "@/components/table-styles";
 import { ApiError, type EvalCosts } from "@/lib/api-client";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
@@ -87,11 +90,7 @@ export function EvalCostsFields({ costs }: { costs: EvalCosts }) {
             <thead>
               <tr>
                 {["Model", "SGD in per 1M", "SGD out per 1M"].map((heading) => (
-                  <th
-                    key={heading}
-                    scope="col"
-                    className="border-b border-line px-[18px] py-3 text-left text-[11px] font-medium tracking-[1.5px] whitespace-nowrap text-soft uppercase"
-                  >
+                  <th key={heading} scope="col" className={tableHeadCell}>
                     {heading}
                   </th>
                 ))}
@@ -183,16 +182,14 @@ export function EvalCostsFields({ costs }: { costs: EvalCosts }) {
       </section>
 
       {error ? (
-        <p role="alert" className="m-0 text-[13px] text-danger">
+        <SaveFailedNote>
           {error instanceof ApiError && error.detail
             ? error.detail
             : "Couldn’t save. Try again."}
-        </p>
+        </SaveFailedNote>
       ) : null}
       {saveMutation.isSuccess ? (
-        <p role="status" className="m-0 text-[13px] text-soft">
-          Saved. New runs use these from now on.
-        </p>
+        <SavedNote>Saved. New runs use these from now on.</SavedNote>
       ) : null}
       <div>
         <button
