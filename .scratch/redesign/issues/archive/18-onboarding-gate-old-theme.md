@@ -34,4 +34,7 @@ Issue 15's old-theme search left two files outside the admin pages:
 ## Completion
 
 - Completed: 2026-11-19
-- Commit: <filled in after merge>
+- Commit: merge `9301fa9` into main — "Merge redesign issue 18: OnboardingGate's loading and couldn't-load states use the shared LoadingPanel and LoadFailed (no old theme left in web/src); unused SettingLabel removed"
+  - Branch `redesign-18-onboarding-gate-old-theme`:
+    - `10d247b` Redesign 18: OnboardingGate uses the shared LoadingPanel and LoadFailed instead of old-theme boxes; unused SettingLabel removed
+    - `258e9d9` Redesign 18: Try again test; evidence recorded, issue completed and archived, screenshots at both widths
