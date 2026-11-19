@@ -1,4 +1,5 @@
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AdminGate } from "@/components/AdminGate";
@@ -77,6 +78,21 @@ describe("OnboardingGate", () => {
       screen.getByRole("status", { name: "Loading your Dashboard" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Connect Telegram page")).not.toBeInTheDocument();
+  });
+
+  it("loads again on Try again after the check fails", async () => {
+    apiClient.getMe
+      .mockRejectedValueOnce(new Error("down"))
+      .mockResolvedValue(user("2026-11-11T09:00:00Z"));
+    renderWithQueries(<OnboardingGate>Connect Telegram page</OnboardingGate>);
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Try again" }),
+    );
+
+    expect(
+      await screen.findByText("Connect Telegram page"),
+    ).toBeInTheDocument();
   });
 
   it("does not show the page when the check fails", async () => {
