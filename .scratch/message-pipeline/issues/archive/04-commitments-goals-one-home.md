@@ -60,3 +60,12 @@ User stories covered: 39, 40, 41, 42, 43, 44.
 - The Curiosity keeping prompt still asks for a Curiosity about "a pattern you notice". This goes against "never made to check a Pattern" (README step d, CONTEXT Pattern). It is outside this issue, so I left it for issue 08 (Patterns kept). In the run, the model wrote one run Curiosity "more a pattern to watch than a plan to push".
 - The Life Thread prompt says to start a Thread for a commitment when none fits, so a one-off promise can become its own small Thread.
 - Code review: Standards found no rule breaks; I fixed its two naming points. From the Spec review I fixed "no follow-up for a commitment already done in the Conversation".
+
+## Completion
+
+- Completed: 2026-11-20
+- Commit: `958ed8d` (merge into main): "Merge message pipeline issue 04: commitments the User agreed to go into their Life Thread with the day due and how they went (suggestions aren't commitments), each followed up by a Curiosity not before the day after; goals shown plainly kept in Goals; memory processing and Life Thread keeping prompts state one home per thing learned; Challenges drops patterns; migration 0065 reloads only prompts and wording still matching the old seed"
+- Branch commits:
+  - `690da13` "Commitments, goals, one home: Life Thread keeping keeps agreed commitments with their day and how they went; Curiosity keeping follows each up after its day; memory processing keeps goals shown plainly; both prompts state the one-home rule; Challenges drops patterns; migration 0065 reloads only unedited prompts and wording"
+  - `f0c16c4` "Commitments review: no follow-up for a commitment already done in the Conversation; clearer test helper names"
+  - `87f628b` "Commitments, goals, one home: issue 04 evidence recorded, completed and archived"
