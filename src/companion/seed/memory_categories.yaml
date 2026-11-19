@@ -26,7 +26,7 @@
 
 - name: Challenges
   description: >-
-    What they find hard or keep running into: worries, patterns, struggles.
+    What they find hard or keep running into: worries, struggles, setbacks.
   always_include: true
 
 - name: Preferences
