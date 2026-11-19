@@ -1,3 +1,5 @@
+import { ChevronDownIcon } from "@/components/ChevronDownIcon";
+
 /** One choice in a select filter. */
 export type SelectFilterOption = { value: string; label: string };
 
@@ -29,17 +31,7 @@ export function SelectFilter({
         className="box-border inline-flex min-h-11 items-center gap-2.5 rounded-input border border-line-strong bg-panel px-[14px] text-[14px] text-text"
       >
         {chosen?.label}
-        <svg
-          width="12"
-          height="8"
-          viewBox="0 0 12 8"
-          fill="none"
-          stroke="var(--color-soft)"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        >
-          <path d="M1 1.5l5 5 5-5" />
-        </svg>
+        <ChevronDownIcon className="text-soft" />
       </span>
       <select
         aria-label={label}
