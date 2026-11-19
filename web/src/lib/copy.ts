@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 /** The website's Copy: every slot's current text, by slot key (ADR-0019). */
 export type Copy = Record<string, string>;
 
@@ -45,4 +47,20 @@ export function fillPlaceholders(
   return text.replace(/\{([^{}]*)\}/g, (placeholder, name: string) =>
     Object.hasOwn(values, name) ? String(values[name]) : placeholder,
   );
+}
+
+/**
+ * Gives a website page's browser tab title and search description from
+ * its tab's `page_title` and `page_description` slots.
+ *
+ * @param copy - The Copy.
+ * @param tab - The page's Copy tab key, e.g. `pricing`.
+ * @returns The page's title and description.
+ * @throws MissingCopyError if the tab has no such slots.
+ */
+export function pageMetadata(copy: Copy, tab: string): Metadata {
+  return {
+    title: readCopy(copy, `${tab}.page_title`),
+    description: readCopy(copy, `${tab}.page_description`),
+  };
 }

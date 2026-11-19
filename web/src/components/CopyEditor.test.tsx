@@ -251,7 +251,7 @@ describe("CopyEditor", () => {
     ).toHaveValue("Think Deeper,");
   });
 
-  it("switches tabs without asking when nothing is unsaved", async () => {
+  it("switches tabs without asking once the edits are saved", async () => {
     const user = userEvent.setup();
     renderWithQueries(<CopyEditor />);
     await user.type(

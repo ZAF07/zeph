@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { Pricing } from "@/components/Pricing";
 import { SiteLoadFailed } from "@/components/SiteLoadFailed";
-import { readCopy } from "@/lib/copy";
+import { pageMetadata } from "@/lib/copy";
 import { loadCopy } from "@/lib/server-copy";
 
 /**
@@ -16,10 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
   if (!copy) {
     return {};
   }
-  return {
-    title: readCopy(copy, "pricing.page_title"),
-    description: readCopy(copy, "pricing.page_description"),
-  };
+  return pageMetadata(copy, "pricing");
 }
 
 /**

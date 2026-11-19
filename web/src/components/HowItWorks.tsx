@@ -18,8 +18,14 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHero } from "@/components/SiteHero";
 import { type Copy, readCopy } from "@/lib/copy";
 
-/** How many steps the page has; each one's words are Copy slots. */
-const STEP_COUNT = 5;
+/** The Copy slot key prefixes of the steps, in order. */
+const stepSlotPrefixes = [
+  "how_it_works.steps.step_1",
+  "how_it_works.steps.step_2",
+  "how_it_works.steps.step_3",
+  "how_it_works.steps.step_4",
+  "how_it_works.steps.step_5",
+];
 
 /** The Copy slot key prefixes of the Dashboard cards, in order. */
 const dashboardCardSlotPrefixes = [
@@ -35,10 +41,9 @@ const dashboardCardSlotPrefixes = [
  * @returns The five steps in order.
  */
 function stepDetails(copy: Copy): HowItWorksStepDetails[] {
-  return Array.from({ length: STEP_COUNT }, (_, index) => {
-    const text = (part: string) =>
-      readCopy(copy, `how_it_works.steps.step_${index + 1}.${part}`);
-    return { title: text("title"), tag: text("tag"), text: text("text") };
+  return stepSlotPrefixes.map((slotPrefix) => {
+    const slot = (part: string) => readCopy(copy, `${slotPrefix}.${part}`);
+    return { title: slot("title"), tag: slot("tag"), text: slot("text") };
   });
 }
 

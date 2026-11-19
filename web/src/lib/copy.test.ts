@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { fillPlaceholders, MissingCopyError, readCopy } from "@/lib/copy";
+import {
+  fillPlaceholders,
+  MissingCopyError,
+  pageMetadata,
+  readCopy,
+} from "@/lib/copy";
 
 describe("fillPlaceholders", () => {
   it("puts each value in place of its placeholder, wherever it sits", () => {
@@ -48,5 +53,23 @@ describe("readCopy", () => {
     expect(() => readCopy({}, "landing.faq.heading")).toThrow(
       new MissingCopyError("landing.faq.heading"),
     );
+  });
+});
+
+describe("pageMetadata", () => {
+  it("gives a page's tab title and description from its tab's slots", () => {
+    const copy = {
+      "pricing.page_title": "Zeph — Pricing",
+      "pricing.page_description": "Simple plans.",
+    };
+
+    expect(pageMetadata(copy, "pricing")).toEqual({
+      title: "Zeph — Pricing",
+      description: "Simple plans.",
+    });
+  });
+
+  it("fails rather than leave the title blank when a slot is missing", () => {
+    expect(() => pageMetadata({}, "pricing")).toThrow(MissingCopyError);
   });
 });
