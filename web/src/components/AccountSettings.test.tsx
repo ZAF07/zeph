@@ -258,6 +258,23 @@ describe("AccountSettings", () => {
     ).toBeInTheDocument();
   });
 
+  it("words the retention period for one day with the one slot", async () => {
+    apiClient.getPlatformContent.mockResolvedValue({
+      ...content,
+      message_retention_days: 1,
+    });
+    renderWithQueries(
+      <AccountSettings
+        copy={{
+          ...seedCopy(),
+          "account.delete_data.retention_one": "Kept for just {count} day.",
+        }}
+      />,
+    );
+
+    expect(await screen.findByText("Kept for just 1 day.")).toBeInTheDocument();
+  });
+
   it("deletes the User's data only after confirming in the dialog", async () => {
     const user = userEvent.setup();
     renderWithQueries(<AccountSettings copy={seedCopy()} />);
