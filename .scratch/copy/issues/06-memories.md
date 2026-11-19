@@ -26,3 +26,7 @@ Not part of this issue: the Memory explanation, Photo Viewing explanation and th
 ## Blocked by
 
 - `.scratch/copy/issues/01-landing-end-to-end.md`
+
+## Comments
+
+- 2026-11-19 — From issue 05: `ChangedInChatCaption` takes an optional `text` (with a `{day}` placeholder); `Memories` still uses its default words in code. Pass a Memories slot and, once 07 has done the same, drop the default. The Dashboard menu's "Memories" item is Shared's `shared.dashboard.memories`; Copy reaches Dashboard pages as props read on the server (`DashboardFrame`, `/`).

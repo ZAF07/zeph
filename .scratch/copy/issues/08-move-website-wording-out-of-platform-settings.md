@@ -37,3 +37,7 @@ Stays as is: the onboarding reason choices and all chat wording (Platform Settin
 - `.scratch/copy/issues/05-home-and-connect-telegram.md`
 - `.scratch/copy/issues/06-memories.md`
 - `.scratch/copy/issues/07-check-ins-and-account.md`
+
+## Comments
+
+- 2026-11-19 — From issue 05: Home and the Dashboard menu read Copy now, except the AI notice (Home's footer, from `/home`'s `ai_notice`), the short AI notice (`SidebarAiNotice`, from Platform Settings) and the Memory-off note (`HomeMemoryLine`'s `note`, with `**bold**`). Home's "Memory is on." note is already Copy (`home.memory.on_title`, `on_body`); the paused and not-available notes can sit next to it in the Home tab. The frame gives the menu only `shared.dashboard.*` and `shared.wordmark` (`DashboardFrame` `pickCopy`); widen it when the short AI notice moves.
