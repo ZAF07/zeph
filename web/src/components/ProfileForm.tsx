@@ -25,7 +25,7 @@ const profileBox =
  * @returns The form.
  */
 export function ProfileForm({ me, copy }: { me: Me; copy: Copy }) {
-  const profileCopy = (slot: string) => readCopy(copy, `account.${slot}`);
+  const accountCopy = (slot: string) => readCopy(copy, `account.${slot}`);
   const locationCopy = (slot: string) =>
     readCopy(copy, `onboarding.location.${slot}`);
   const updatePreferences = useUpdatePreferences();
@@ -68,12 +68,12 @@ export function ProfileForm({ me, copy }: { me: Me; copy: Copy }) {
         id="profile-heading"
         className="mt-0 mb-[14px] text-[17px] font-normal text-cream"
       >
-        {profileCopy("profile.heading")}
+        {accountCopy("profile.heading")}
       </h2>
       <div className="flex flex-wrap gap-4">
         <label className={profileLabel}>
           <span className={profileName}>
-            {profileCopy("profile.name_label")}
+            {accountCopy("profile.name_label")}
           </span>
           <input
             className={`${profileBox} border-line-strong text-text`}
@@ -85,13 +85,13 @@ export function ProfileForm({ me, copy }: { me: Me; copy: Copy }) {
         </label>
         <div className={profileLabel}>
           <span className={profileName}>
-            {profileCopy("profile.email_label")}
+            {accountCopy("profile.email_label")}
           </span>
           <span className={`${profileBox} border-line text-soft`}>
-            {me.email ?? profileCopy("profile.no_email")}
+            {me.email ?? accountCopy("profile.no_email")}
           </span>
           <span className="text-[12px] text-soft">
-            {profileCopy("profile.email_note")}
+            {accountCopy("profile.email_note")}
           </span>
         </div>
         <LocationFields
@@ -110,7 +110,7 @@ export function ProfileForm({ me, copy }: { me: Me; copy: Copy }) {
             <ChangedInChatCaption
               changedAt={me.changed_in_chat.time_zone}
               timeZone={me.time_zone ?? undefined}
-              text={profileCopy("changed_in_chat")}
+              text={accountCopy("changed_in_chat")}
             />
           }
         />
@@ -118,14 +118,14 @@ export function ProfileForm({ me, copy }: { me: Me; copy: Copy }) {
       <div className="mt-[18px] flex flex-wrap items-center gap-3">
         <button type="submit" className={primaryButton} disabled={!canSave}>
           {updatePreferences.isPending
-            ? profileCopy("profile.saving")
-            : profileCopy("profile.save")}
+            ? accountCopy("profile.saving")
+            : accountCopy("profile.save")}
         </button>
         {updatePreferences.isSuccess ? (
-          <SavedNote>{profileCopy("profile.saved")}</SavedNote>
+          <SavedNote>{accountCopy("profile.saved")}</SavedNote>
         ) : null}
         {updatePreferences.isError ? (
-          <SaveFailedNote>{profileCopy("profile.save_failed")}</SaveFailedNote>
+          <SaveFailedNote>{accountCopy("profile.save_failed")}</SaveFailedNote>
         ) : null}
       </div>
     </form>

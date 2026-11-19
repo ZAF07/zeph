@@ -1989,8 +1989,8 @@
       max_length: 300
       text: >-
         Stickers you sent that Zeph kept, so it can now and then reply in your
-        own stickers, with when it uses each. Remove any you’d rather it
-        didn’t use.
+        own stickers, with when it uses each. Remove any you'd rather it
+        didn't use.
     - key: account.stickers.remove_failed
       name: "Your stickers: couldn’t remove one"
       max_length: 100
@@ -2092,7 +2092,7 @@
       max_length: 200
       text: >-
         Erases everything above plus your account. Only possible here on the
-        Dashboard. This can’t be undone.
+        Dashboard. This can't be undone.
     - key: account.delete_account.button
       name: "Delete account: button"
       max_length: 30

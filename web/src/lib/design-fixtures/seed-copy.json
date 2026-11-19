@@ -2747,7 +2747,7 @@
         "key": "account.stickers.lead",
         "name": "Your stickers: line under the heading",
         "max_length": 300,
-        "text": "Stickers you sent that Zeph kept, so it can now and then reply in your own stickers, with when it uses each. Remove any you’d rather it didn’t use."
+        "text": "Stickers you sent that Zeph kept, so it can now and then reply in your own stickers, with when it uses each. Remove any you'd rather it didn't use."
       },
       {
         "key": "account.stickers.remove_failed",
@@ -2889,7 +2889,7 @@
         "key": "account.delete_account.description",
         "name": "Delete account: what it removes",
         "max_length": 200,
-        "text": "Erases everything above plus your account. Only possible here on the Dashboard. This can’t be undone."
+        "text": "Erases everything above plus your account. Only possible here on the Dashboard. This can't be undone."
       },
       {
         "key": "account.delete_account.button",
