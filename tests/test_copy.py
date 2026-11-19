@@ -92,6 +92,9 @@ def test_admin_sees_each_tab_with_slots_in_page_order(
         ("landing", "Landing"),
         ("pricing", "Pricing"),
         ("how_it_works", "How it works"),
+        ("auth", "Sign in and sign up"),
+        ("onboarding", "Onboarding"),
+        ("connect_telegram", "Connect Telegram"),
         ("shared", "Shared"),
     ]
     seed = yaml.safe_load(COPY_SEED_FILE.read_text())
@@ -110,6 +113,26 @@ def test_admin_sees_each_tab_with_slots_in_page_order(
         "placeholders": [],
         "updated_by": None,
     }
+
+
+def test_onboarding_and_sign_in_slots_carry_their_seed_name_text_and_placeholders(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+
+    tabs = client.get("/api/admin/copy", headers=headers).json()["tabs"]
+
+    slots = {slot["key"]: slot for tab in tabs for slot in tab["slots"]}
+    question = slots["onboarding.intentions.heading"]
+    assert (question["name"], question["text"]) == (
+        "What brings you here: heading",
+        "What brings you here?",
+    )
+    assert slots["onboarding.progress.step_count"]["placeholders"] == [
+        "step",
+        "count",
+    ]
+    assert slots["auth.terms_line"]["placeholders"] == ["terms", "privacy"]
 
 
 def test_a_tab_save_applies_every_change_and_shows_on_the_next_read(

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OnboardingFlow } from "@/components/OnboardingFlow";
 import type { ApiClient, Me, PlatformContent } from "@/lib/api-client";
+import { markedCopy, seedCopy, wordsNotFromCopy } from "@/test/copy";
 import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
@@ -65,7 +66,7 @@ function setBrowserLanguages(languages: string[]) {
 }
 
 async function renderAtHelloStep() {
-  renderWithQueries(<OnboardingFlow />);
+  renderWithQueries(<OnboardingFlow copy={seedCopy()} />);
   await screen.findByRole("heading", { name: "Hello. I’m Zeph." });
 }
 
@@ -335,7 +336,7 @@ describe("OnboardingFlow", () => {
   });
 
   it("stacks all six steps for the design sheet, each drawn ready to continue", async () => {
-    renderWithQueries(<OnboardingFlow showAllSteps />);
+    renderWithQueries(<OnboardingFlow copy={seedCopy()} showAllSteps />);
 
     await screen.findByRole("heading", { name: "Hello. I’m Zeph." });
     expect(
@@ -358,12 +359,78 @@ describe("OnboardingFlow", () => {
     expect(screen.getByText("Filled in from your browser")).toBeInTheDocument();
   });
 
+  it("shows only Copy text on every step, apart from Platform Settings", async () => {
+    apiClient.getPlatformContent.mockResolvedValue({
+      ...content,
+      ai_notice: "⟦platform ai notice⟧",
+      user_memory_explanation: "⟦platform memory explanation⟧",
+      onboarding_reason_choices: ["⟦platform reason⟧"],
+    });
+    apiClient.getCheckIns.mockResolvedValue({
+      ...(await apiClient.getCheckIns()),
+      enabled: true,
+    });
+    apiClient.getMe.mockResolvedValue(newUser({ name: "Maya" }));
+
+    const { container } = renderWithQueries(
+      <OnboardingFlow copy={markedCopy()} showAllSteps />,
+    );
+    await screen.findByRole("link", {
+      name: /⟦connect_telegram.card.open_button⟧/,
+    });
+
+    const steps = container.querySelectorAll("section");
+    expect(steps).toHaveLength(6);
+    for (const step of steps) {
+      const words = step.cloneNode(true) as HTMLElement;
+      words
+        .querySelectorAll("option:not([disabled])")
+        .forEach((country) => country.remove());
+      expect(wordsNotFromCopy(words)).toEqual([]);
+    }
+    expect(
+      screen.getByRole("textbox", { name: "⟦onboarding.hello.name_label⟧" }),
+    ).toHaveAttribute("placeholder", "⟦onboarding.hello.name_hint⟧");
+    expect(
+      screen.getByRole("textbox", {
+        name: /⟦onboarding.intentions.note_label⟧/,
+      }),
+    ).toHaveAttribute("placeholder", "⟦onboarding.intentions.note_hint⟧");
+  });
+
+  it("shows an Admin's changed question, with the reason choices still from Platform Settings", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(
+      <OnboardingFlow
+        copy={{
+          ...seedCopy(),
+          "onboarding.intentions.heading": "What made you come today?",
+          "onboarding.progress.step_count": "{step}/{count}",
+        }}
+      />,
+    );
+    await screen.findByRole("heading", { name: "Hello. I’m Zeph." });
+    expect(screen.getByText("1/6")).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("What should I call you?"), "Maya");
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(
+      screen.getByRole("heading", { name: "What made you come today?" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("2/6")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Being more present" }),
+    ).toBeInTheDocument();
+  });
+
   it("sends a User who already finished onboarding to the Dashboard", async () => {
     apiClient.getMe.mockResolvedValue(
       newUser({ onboarding_completed_at: "2026-11-11T09:00:00Z" }),
     );
 
-    renderWithQueries(<OnboardingFlow />);
+    renderWithQueries(<OnboardingFlow copy={seedCopy()} />);
 
     await vi.waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
   });

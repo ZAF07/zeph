@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  fillPlaceholderParts,
   fillPlaceholders,
   MissingCopyError,
   pageMetadata,
+  pickCopy,
   readCopy,
 } from "@/lib/copy";
 
@@ -71,5 +73,50 @@ describe("pageMetadata", () => {
 
   it("fails rather than leave the title blank when a slot is missing", () => {
     expect(() => pageMetadata({}, "pricing")).toThrow(MissingCopyError);
+  });
+});
+
+describe("fillPlaceholderParts", () => {
+  it("puts each part in place of its placeholder, keeping the text around it", () => {
+    const terms = { kind: "terms link" };
+    const privacy = { kind: "privacy link" };
+
+    expect(
+      fillPlaceholderParts("Agree to the {terms} and {privacy}.", {
+        terms,
+        privacy,
+      }),
+    ).toEqual(["Agree to the ", terms, " and ", privacy, "."]);
+  });
+
+  it("follows the placeholders wherever an Admin moved them", () => {
+    const terms = { kind: "terms link" };
+    const privacy = { kind: "privacy link" };
+
+    expect(
+      fillPlaceholderParts("{privacy}, then {terms}", { terms, privacy }),
+    ).toEqual([privacy, ", then ", terms]);
+  });
+
+  it("leaves a placeholder it has no part for as written", () => {
+    expect(fillPlaceholderParts("See {nmae}", {})).toEqual(["See ", "{nmae}"]);
+  });
+});
+
+describe("pickCopy", () => {
+  it("keeps only the slots whose keys start with one of the prefixes", () => {
+    const copy = {
+      "onboarding.hello.heading": "Hello.",
+      "onboarding.hello.intro": "I’m Zeph.",
+      "shared.wordmark": "Zeph",
+      "shared.footer.line": "On Telegram.",
+      "landing.hero.eyebrow": "Your AI companion",
+    };
+
+    expect(pickCopy(copy, ["onboarding.", "shared.wordmark"])).toEqual({
+      "onboarding.hello.heading": "Hello.",
+      "onboarding.hello.intro": "I’m Zeph.",
+      "shared.wordmark": "Zeph",
+    });
   });
 });

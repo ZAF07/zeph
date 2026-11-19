@@ -15,7 +15,12 @@ import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { Switch } from "@/components/Switch";
 import { TelegramConnectionCard } from "@/components/TelegramConnectionCard";
 import type { CheckInFrequency, CheckIns, Me } from "@/lib/api-client";
-import { formatQuietHour, toTimeFieldValue } from "@/lib/check-ins";
+import {
+  checkInFrequencyOptions,
+  formatQuietHour,
+  toTimeFieldValue,
+} from "@/lib/check-ins";
+import { type Copy, fillPlaceholders, readCopy } from "@/lib/copy";
 import { countryFromBrowser } from "@/lib/countries";
 import { paragraphs } from "@/lib/paragraphs";
 import {
@@ -26,13 +31,13 @@ import {
 } from "@/lib/queries";
 import { timeZoneFromBrowser } from "@/lib/time-zones";
 
-const STEP_LABELS = [
-  "Hello",
-  "Intentions",
-  "Location",
-  "Check-ins",
-  "Memory",
-  "Telegram",
+const STEP_KEYS = [
+  "hello",
+  "intentions",
+  "location",
+  "check_ins",
+  "memory",
+  "telegram",
 ];
 const HELLO_STEP = 0;
 const INTENTIONS_STEP = 1;
@@ -96,16 +101,21 @@ function startingAnswers(me: Me, checkIns: CheckIns): Answers {
  * name and AI notice, what brings them here, country and time zone,
  * Check-ins (off by default), User Memory consent, then Telegram. Answers
  * are saved when they leave the Memory step. A User who already finished
- * onboarding goes to the Dashboard.
+ * onboarding goes to the Dashboard. Every word is Copy, apart from the AI
+ * notice, the reason choices and the User Memory explanation, which are
+ * Platform Settings. The Telegram card's words are Connect Telegram's Copy.
  *
- * @param props - `showAllSteps` stacks every step for the design sheet
+ * @param props - `copy` is the website's Copy; `showAllSteps` stacks every
+ *   step for the design sheet
  *   (`?design=all-steps`), each drawn ready to continue (its buttons do
  *   nothing), instead of one at a time.
  * @returns The onboarding flow.
  */
 export function OnboardingFlow({
+  copy,
   showAllSteps = false,
 }: {
+  copy: Copy;
   showAllSteps?: boolean;
 }) {
   const router = useRouter();
@@ -120,6 +130,12 @@ export function OnboardingFlow({
   const me = meQuery.data;
   const checkIns = checkInsQuery.data;
   const content = contentQuery.data;
+  const onboardingCopy = (key: string) => readCopy(copy, `onboarding.${key}`);
+  const frame = {
+    wordmark: readCopy(copy, "shared.wordmark"),
+    homeLinkLabel: readCopy(copy, "shared.header.home_link_label"),
+  };
+  const stepLabels = STEP_KEYS.map((key) => onboardingCopy(`progress.${key}`));
 
   useEffect(() => {
     if (answers || !me || !checkIns) {
@@ -140,10 +156,11 @@ export function OnboardingFlow({
 
   if (loadFailed) {
     return (
-      <OnboardingStepFrame>
+      <OnboardingStepFrame {...frame}>
         <LoadFailed
-          title="We couldn’t load this"
-          body="Something went wrong on our side. Please try again in a moment."
+          title={onboardingCopy("load_failed.title")}
+          body={onboardingCopy("load_failed.body")}
+          retryLabel={onboardingCopy("load_failed.retry")}
           onRetry={() => {
             void meQuery.refetch();
             void contentQuery.refetch();
@@ -156,8 +173,8 @@ export function OnboardingFlow({
 
   if (!answers || !content) {
     return (
-      <OnboardingStepFrame>
-        <LoadingPanel shape="card" label="Loading onboarding" />
+      <OnboardingStepFrame {...frame}>
+        <LoadingPanel shape="card" label={onboardingCopy("loading")} />
       </OnboardingStepFrame>
     );
   }
@@ -234,18 +251,17 @@ export function OnboardingFlow({
       const showHint = !isDesignSheet && (needsName || needsAcknowledgement);
       return (
         <>
-          <h1 className={stepHeading}>Hello. I’m Zeph.</h1>
-          <p className={stepIntro}>
-            I’m an AI companion for reflection: a place to think out loud,
-            notice what matters, and practise living by it.
-          </p>
+          <h1 className={stepHeading}>{onboardingCopy("hello.heading")}</h1>
+          <p className={stepIntro}>{onboardingCopy("hello.intro")}</p>
           <label className={textFieldLabel}>
-            <span className={fieldName}>What should I call you?</span>
+            <span className={fieldName}>
+              {onboardingCopy("hello.name_label")}
+            </span>
             <input
               className={`${textField} min-h-12`}
               type="text"
               autoComplete="given-name"
-              placeholder="First name or nickname"
+              placeholder={onboardingCopy("hello.name_hint")}
               maxLength={100}
               value={answers.name}
               onChange={(event) => change({ name: event.target.value })}
@@ -265,14 +281,14 @@ export function OnboardingFlow({
                 }
                 className="m-[3px_3px_3px_4px] size-[18px] flex-none accent-cream"
               />
-              I understand Zeph is an AI and not professional care
+              {onboardingCopy("hello.ai_notice_checkbox")}
             </label>
           </div>
           {showHint ? (
             <p id="onboarding-continue-hint" className={smallNote}>
               {needsName
-                ? "Tell me what to call you to continue."
-                : "Tick the box above to continue."}
+                ? onboardingCopy("hello.needs_name")
+                : onboardingCopy("hello.needs_tick")}
             </p>
           ) : null}
         </>
@@ -281,14 +297,13 @@ export function OnboardingFlow({
     if (stepIndex === INTENTIONS_STEP) {
       return (
         <>
-          <h1 className={stepHeading}>What brings you here?</h1>
-          <p className={stepIntro}>
-            Choose any that feel true right now. This shapes where we start, not
-            where we end up.
-          </p>
+          <h1 className={stepHeading}>
+            {onboardingCopy("intentions.heading")}
+          </h1>
+          <p className={stepIntro}>{onboardingCopy("intentions.intro")}</p>
           <div
             role="group"
-            aria-label="What brings you here"
+            aria-label={onboardingCopy("intentions.choices_label")}
             className="flex flex-wrap gap-2"
           >
             {content.onboarding_reason_choices.map((reason) => {
@@ -312,13 +327,16 @@ export function OnboardingFlow({
           </div>
           <label className={textFieldLabel}>
             <span className={fieldName}>
-              In your own words <span className="text-soft">(optional)</span>
+              {onboardingCopy("intentions.note_label")}{" "}
+              <span className="text-soft">
+                {onboardingCopy("intentions.note_optional")}
+              </span>
             </span>
             <textarea
               className={`${textField} resize-y py-3`}
               rows={3}
               maxLength={2000}
-              placeholder="e.g. I’ve been running on autopilot since starting a new job and want to feel more like myself."
+              placeholder={onboardingCopy("intentions.note_hint")}
               value={answers.note}
               onChange={(event) => change({ note: event.target.value })}
             />
@@ -329,8 +347,14 @@ export function OnboardingFlow({
     if (stepIndex === LOCATION_STEP) {
       return (
         <>
-          <h1 className={stepHeading}>Where are you?</h1>
+          <h1 className={stepHeading}>{onboardingCopy("location.heading")}</h1>
           <LocationFields
+            labels={{
+              country: onboardingCopy("location.country_label"),
+              chooseCountry: onboardingCopy("location.country_choose"),
+              timeZone: onboardingCopy("location.time_zone_label"),
+              chooseTimeZone: onboardingCopy("location.time_zone_choose"),
+            }}
             country={answers.country}
             timeZone={answers.timeZone}
             onCountryChange={(country) => {
@@ -340,7 +364,7 @@ export function OnboardingFlow({
             onTimeZoneChange={(timeZone) => change({ timeZone })}
             countryCaption={
               isDesignSheet || countryFromBrowserUsed
-                ? "Filled in from your browser"
+                ? onboardingCopy("location.from_browser")
                 : undefined
             }
           />
@@ -350,24 +374,20 @@ export function OnboardingFlow({
     if (stepIndex === CHECK_INS_STEP) {
       return (
         <>
-          <h1 className={stepHeading}>Should I check in?</h1>
-          <p className={stepIntro}>
-            Now and then I can message you first on Telegram: a hello to see how
-            you are. I choose the moment, and sometimes I’ll stay quiet to give
-            you space.
-          </p>
+          <h1 className={stepHeading}>{onboardingCopy("check_ins.heading")}</h1>
+          <p className={stepIntro}>{onboardingCopy("check_ins.intro")}</p>
           <div className={stepPanel}>
             <div className="flex items-center justify-between gap-4">
               <div>
                 <div className="text-[15px] font-normal text-text">
-                  Check-ins
+                  {onboardingCopy("check_ins.switch_title")}
                 </div>
                 <div className="text-[13px] text-soft">
-                  Off unless you turn them on
+                  {onboardingCopy("check_ins.switch_note")}
                 </div>
               </div>
               <Switch
-                label="Check-ins"
+                label={onboardingCopy("check_ins.switch_title")}
                 checked={answers.checkInsEnabled}
                 onChange={(checkInsEnabled) => change({ checkInsEnabled })}
               />
@@ -375,21 +395,33 @@ export function OnboardingFlow({
             {answers.checkInsEnabled ? (
               <>
                 <CheckInFrequencyPicker
+                  label={onboardingCopy("check_ins.frequency_label")}
+                  options={checkInFrequencyOptions.map((option) => ({
+                    value: option.value,
+                    label: onboardingCopy(
+                      `check_ins.frequency_${option.value}`,
+                    ),
+                  }))}
                   value={answers.checkInFrequency}
                   onChange={(checkInFrequency) => change({ checkInFrequency })}
                 />
                 <p className={smallNote}>
-                  Never in your quiet hours, in your time zone:{" "}
+                  {onboardingCopy("check_ins.quiet_hours_lead")}{" "}
                   <span className="text-text">
-                    {formatQuietHour(answers.quietHoursStart)} to{" "}
-                    {formatQuietHour(answers.quietHoursEnd)}
+                    {fillPlaceholders(
+                      onboardingCopy("check_ins.quiet_hours_range"),
+                      {
+                        start: formatQuietHour(answers.quietHoursStart),
+                        end: formatQuietHour(answers.quietHoursEnd),
+                      },
+                    )}
                   </span>
                 </p>
               </>
             ) : null}
           </div>
           <p className={smallNote}>
-            You can change this any time on your Check-ins page.
+            {onboardingCopy("check_ins.change_later")}
           </p>
         </>
       );
@@ -397,14 +429,14 @@ export function OnboardingFlow({
     if (stepIndex === MEMORY_STEP) {
       return (
         <>
-          <h1 className={stepHeading}>Can I remember things?</h1>
+          <h1 className={stepHeading}>{onboardingCopy("memory.heading")}</h1>
           <div className={stepPanel}>
             <div className="flex items-center justify-between gap-4">
               <span className="text-[15px] font-normal text-text">
-                Remember meaningful details
+                {onboardingCopy("memory.switch_label")}
               </span>
               <Switch
-                label="Remember meaningful details"
+                label={onboardingCopy("memory.switch_label")}
                 checked={answers.userMemoryEnabled}
                 onChange={(userMemoryEnabled) => change({ userMemoryEnabled })}
               />
@@ -417,7 +449,7 @@ export function OnboardingFlow({
           </div>
           {completeOnboarding.isError ? (
             <SaveFailedNote>
-              We couldn’t save your answers. Please try again.
+              {onboardingCopy("memory.save_failed")}
             </SaveFailedNote>
           ) : null}
         </>
@@ -425,11 +457,9 @@ export function OnboardingFlow({
     }
     return (
       <>
-        <h1 className={stepHeading}>Let’s meet on Telegram.</h1>
-        <p className={stepIntro}>
-          That’s where we’ll talk. Linking takes one tap.
-        </p>
-        <TelegramConnectionCard compact />
+        <h1 className={stepHeading}>{onboardingCopy("telegram.heading")}</h1>
+        <p className={stepIntro}>{onboardingCopy("telegram.intro")}</p>
+        <TelegramConnectionCard copy={copy} compact />
       </>
     );
   }
@@ -442,7 +472,7 @@ export function OnboardingFlow({
             href="/"
             className="inline-flex min-h-11 items-center text-[14px] text-soft underline"
           >
-            Skip for now
+            {onboardingCopy("telegram.skip_link")}
           </Link>
         </div>
       );
@@ -455,7 +485,7 @@ export function OnboardingFlow({
             className={secondaryButton}
             onClick={isDesignSheet ? undefined : () => setStep(step - 1)}
           >
-            Back
+            {onboardingCopy("buttons.back")}
           </button>
         ) : null}
         <button
@@ -465,10 +495,10 @@ export function OnboardingFlow({
           onClick={isDesignSheet ? undefined : next}
         >
           {completeOnboarding.isPending ? (
-            "Saving…"
+            onboardingCopy("buttons.saving")
           ) : (
             <>
-              Continue{" "}
+              {onboardingCopy("buttons.continue")}{" "}
               <span aria-hidden="true" className="ml-2.5">
                 →
               </span>
@@ -482,7 +512,15 @@ export function OnboardingFlow({
   function stepView(stepIndex: number, isDesignSheet: boolean) {
     return (
       <>
-        <OnboardingProgress labels={STEP_LABELS} currentStep={stepIndex} />
+        <OnboardingProgress
+          label={onboardingCopy("progress.label")}
+          labels={stepLabels}
+          currentStep={stepIndex}
+          stepCount={fillPlaceholders(onboardingCopy("progress.step_count"), {
+            step: stepIndex + 1,
+            count: STEP_KEYS.length,
+          })}
+        />
         <div aria-hidden="true" className="h-3" />
         {stepContent(stepIndex, isDesignSheet)}
         {stepButtons(stepIndex, isDesignSheet)}
@@ -493,8 +531,12 @@ export function OnboardingFlow({
   if (showAllSteps) {
     return (
       <>
-        {STEP_LABELS.map((label, stepIndex) => (
-          <OnboardingStepFrame key={label} hasSeparator={stepIndex > 0}>
+        {STEP_KEYS.map((stepKey, stepIndex) => (
+          <OnboardingStepFrame
+            {...frame}
+            key={stepKey}
+            hasSeparator={stepIndex > 0}
+          >
             {stepView(stepIndex, true)}
           </OnboardingStepFrame>
         ))}
@@ -502,5 +544,9 @@ export function OnboardingFlow({
     );
   }
 
-  return <OnboardingStepFrame>{stepView(step, false)}</OnboardingStepFrame>;
+  return (
+    <OnboardingStepFrame {...frame}>
+      {stepView(step, false)}
+    </OnboardingStepFrame>
+  );
 }

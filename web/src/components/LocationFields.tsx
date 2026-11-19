@@ -14,6 +14,14 @@ const selectChevron =
   "pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-soft";
 const locationCaption = "text-[12px] text-soft";
 
+/** The words on the pickers, given by the page that shows them. */
+export type LocationLabels = {
+  country: string;
+  chooseCountry: string;
+  timeZone: string;
+  chooseTimeZone: string;
+};
+
 /**
  * The chevron drawn at the right of each picker.
  *
@@ -41,13 +49,15 @@ function Chevron() {
  * The country and time zone pickers, used in onboarding and on the Account
  * page. No reason is given for asking the country.
  *
- * @param props - `country` and `timeZone` are the chosen values, with their
+ * @param props - `labels` are the pickers' words, from the page that shows
+ *   them; `country` and `timeZone` are the chosen values, with their
  *   change handlers; `countryCaption` is an optional line under the country,
  *   `timeZoneNote` an optional line under the time zone, and `inline` drops
  *   their own row so they wrap with the fields around them.
  * @returns The two fields side by side.
  */
 export function LocationFields({
+  labels,
   country,
   timeZone,
   onCountryChange,
@@ -56,6 +66,7 @@ export function LocationFields({
   timeZoneNote,
   inline = false,
 }: {
+  labels: LocationLabels;
   country: string;
   timeZone: string;
   onCountryChange: (country: string) => void;
@@ -70,7 +81,7 @@ export function LocationFields({
   return (
     <div className={inline ? "contents" : "flex flex-wrap gap-4"}>
       <label className={locationLabel}>
-        <span className={locationName}>Country</span>
+        <span className={locationName}>{labels.country}</span>
         <span className={selectBox}>
           <select
             className={selectField}
@@ -79,7 +90,7 @@ export function LocationFields({
             onChange={(event) => onCountryChange(event.target.value)}
           >
             <option value="" disabled>
-              Choose your country
+              {labels.chooseCountry}
             </option>
             {countries.map((option) => (
               <option key={option.code} value={option.code}>
@@ -94,7 +105,7 @@ export function LocationFields({
         ) : null}
       </label>
       <label className={locationLabel}>
-        <span className={locationName}>Time zone</span>
+        <span className={locationName}>{labels.timeZone}</span>
         <span className={selectBox}>
           <select
             className={selectField}
@@ -103,7 +114,7 @@ export function LocationFields({
             onChange={(event) => onTimeZoneChange(event.target.value)}
           >
             <option value="" disabled>
-              Choose your time zone
+              {labels.chooseTimeZone}
             </option>
             {timeZones.map((option) => (
               <option key={option.name} value={option.name}>

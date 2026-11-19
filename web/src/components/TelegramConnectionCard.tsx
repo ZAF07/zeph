@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { QRCodeSVG } from "qrcode.react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 
 import { primaryButton, secondaryButton } from "@/components/button-styles";
 import { panelCard } from "@/components/card-styles";
@@ -14,21 +14,21 @@ import type {
   ConnectionToken,
   TelegramConnectionStatus,
 } from "@/lib/api-client";
+import {
+  type Copy,
+  fillPlaceholderParts,
+  fillPlaceholders,
+  readCopy,
+} from "@/lib/copy";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 const POLL_INTERVAL_MS = 3000;
 
-/** The words for each state where the link can't be used. */
-const linkProblemWords = {
-  expired: {
-    title: "This link has expired or was already used",
-    body: "For your security each link works once and only for a short while.",
-  },
-  connected_elsewhere: {
-    title: "That Telegram account is linked to another Zeph account",
-    body: "Sign in to that account and disconnect Telegram there first, or use a different Telegram account.",
-  },
+/** The Copy slot names for each state where the link can't be used. */
+const linkProblemSlots = {
+  expired: { title: "expired_title", body: "expired_body" },
+  connected_elsewhere: { title: "elsewhere_title", body: "elsewhere_body" },
 };
 
 /** Which state of the card is on screen. */
@@ -87,18 +87,30 @@ function minutesLeft(expiresAt: string): number {
  * Telegram), waiting for hello, connected, expired or
  * already used, linked to another account, and couldn't create a link. It
  * checks the backend every few seconds so it updates on its own, and once
- * connected Home loads again so it shows the connection.
+ * connected Home loads again so it shows the connection. Its words are the
+ * Connect Telegram tab's `connect_telegram.card.*` Copy slots.
  *
- * @param props - `compact` draws the ready state as the small card on the
+ * @param props - `copy` holds the card's Copy slots; `compact` draws the ready state as the small card on the
  *   onboarding Telegram step: QR code, Open in Telegram and the expiry,
  *   without the `/start` code.
  * @returns The card.
  */
 export function TelegramConnectionCard({
+  copy,
   compact = false,
 }: {
+  copy: Copy;
   compact?: boolean;
 }) {
+  const cardCopy = (slot: string) =>
+    readCopy(copy, `connect_telegram.card.${slot}`);
+  const expiryText = (token: ConnectionToken) => {
+    const minutes = minutesLeft(token.expires_at);
+    return fillPlaceholders(
+      cardCopy(minutes === 1 ? "expires_one" : "expires_many"),
+      { minutes },
+    );
+  };
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
   const [view, setView] = useState<View>({ kind: "loading" });
@@ -158,7 +170,7 @@ export function TelegramConnectionCard({
   }, [isPolling, refresh]);
 
   if (view.kind === "loading") {
-    return <LoadingPanel shape="card" label="Loading your Telegram link" />;
+    return <LoadingPanel shape="card" label={cardCopy("loading")} />;
   }
 
   if (view.kind === "ready" && compact) {
@@ -168,7 +180,7 @@ export function TelegramConnectionCard({
         <div className="flex flex-wrap items-center gap-x-7 gap-y-5">
           <div
             role="img"
-            aria-label="QR code that opens Zeph in Telegram"
+            aria-label={cardCopy("qr_label")}
             className="flex size-[126px] flex-none items-center justify-center rounded-note bg-cream text-ink max-[899px]:hidden"
           >
             <QRCodeSVG
@@ -186,14 +198,12 @@ export function TelegramConnectionCard({
               className={primaryButton}
               onClick={() => setView({ kind: "waiting", token })}
             >
-              Open in Telegram{" "}
+              {cardCopy("open_button")}{" "}
               <span aria-hidden="true" className="ml-2.5">
                 →
               </span>
             </a>
-            <span className="text-[12px] text-soft">
-              Works once · expires in {minutesLeft(token.expires_at)} minutes
-            </span>
+            <span className="text-[12px] text-soft">{expiryText(token)}</span>
           </div>
         </div>
       </div>
@@ -207,7 +217,7 @@ export function TelegramConnectionCard({
         <div className="flex flex-wrap items-center gap-x-8 gap-y-6">
           <div
             role="img"
-            aria-label="QR code that opens Zeph in Telegram"
+            aria-label={cardCopy("qr_label")}
             className="box-border flex size-[150px] flex-none items-center justify-center rounded-note bg-cream text-ink max-[899px]:hidden"
           >
             <QRCodeSVG
@@ -225,24 +235,26 @@ export function TelegramConnectionCard({
               className={primaryButton}
               onClick={() => setView({ kind: "waiting", token })}
             >
-              Open in Telegram{" "}
+              {cardCopy("open_button")}{" "}
               <span aria-hidden="true" className="ml-2.5">
                 →
               </span>
             </a>
             <p className="m-0 text-[14px] text-soft">
-              Or message{" "}
-              <span className="font-normal text-text">
-                @{token.bot_username}
-              </span>{" "}
-              and send:
+              {fillPlaceholderParts(cardCopy("message_bot"), {
+                bot: (
+                  <span className="font-normal text-text">
+                    @{token.bot_username}
+                  </span>
+                ),
+              }).map((piece, index) => (
+                <Fragment key={index}>{piece}</Fragment>
+              ))}
             </p>
             <code className="rounded-input border border-line bg-bg-deep px-3.5 py-2 font-[monospace] text-[15px] text-text">
               /start {token.token}
             </code>
-            <span className="text-[12px] text-soft">
-              Works once · expires in {minutesLeft(token.expires_at)} minutes
-            </span>
+            <span className="text-[12px] text-soft">{expiryText(token)}</span>
           </div>
         </div>
       </div>
@@ -254,8 +266,8 @@ export function TelegramConnectionCard({
     return (
       <TelegramStateCard
         role="status"
-        title="Waiting for you to say hello in Telegram…"
-        body="Once you press Start in Telegram, this page will update on its own."
+        title={cardCopy("waiting_title")}
+        body={cardCopy("waiting_body")}
         actions={
           <>
             <button
@@ -263,14 +275,14 @@ export function TelegramConnectionCard({
               className={primaryButton}
               onClick={() => void refresh()}
             >
-              I’ve pressed Start
+              {cardCopy("pressed_start")}
             </button>
             <button
               type="button"
               className={secondaryButton}
               onClick={() => setView({ kind: "ready", token })}
             >
-              Show the code again
+              {cardCopy("show_code")}
             </button>
           </>
         }
@@ -280,16 +292,18 @@ export function TelegramConnectionCard({
 
   if (view.kind === "connected") {
     const connectedAs = view.telegramUsername
-      ? `Connected as @${view.telegramUsername}.`
-      : "Connected.";
+      ? fillPlaceholders(cardCopy("connected_as"), {
+          username: view.telegramUsername,
+        })
+      : cardCopy("connected_no_username");
     return (
       <TelegramStateCard
         role="status"
-        title="Zeph just said hello in Telegram"
-        body={`${connectedAs} Reply whenever you’re ready, there’s no rush.`}
+        title={cardCopy("connected_title")}
+        body={`${connectedAs} ${cardCopy("connected_body")}`}
         actions={
           <Link href="/" className={primaryButton}>
-            Go to your Dashboard
+            {cardCopy("dashboard_link")}
           </Link>
         }
       />
@@ -297,20 +311,20 @@ export function TelegramConnectionCard({
   }
 
   if (view.kind === "expired" || view.kind === "connected_elsewhere") {
-    const { title, body } = linkProblemWords[view.kind];
+    const slots = linkProblemSlots[view.kind];
     return (
       <TelegramStateCard
         role="alert"
         isProblem
-        title={title}
-        body={body}
+        title={cardCopy(slots.title)}
+        body={cardCopy(slots.body)}
         actions={
           <button
             type="button"
             className={primaryButton}
             onClick={() => void createLink()}
           >
-            Get a new link
+            {cardCopy("new_link")}
           </button>
         }
       />
@@ -319,8 +333,9 @@ export function TelegramConnectionCard({
 
   return (
     <LoadFailed
-      title="We couldn’t create your link"
-      body="Something went wrong on our side. Please try again in a moment."
+      title={cardCopy("create_failed_title")}
+      body={cardCopy("create_failed_body")}
+      retryLabel={cardCopy("create_failed_retry")}
       onRetry={() => void createLink()}
     />
   );
