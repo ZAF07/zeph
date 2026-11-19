@@ -23,15 +23,14 @@ export function SidebarRail({
   copy: Copy;
   onUnfold: () => void;
 }) {
-  const text = (key: string) => readCopy(copy, key);
-  const signOutLabel = text("shared.dashboard.sign_out");
+  const signOutLabel = readCopy(copy, "shared.dashboard.sign_out");
   const pathname = usePathname();
   const signOut = useSignOut();
   return (
     <div className="box-border flex min-h-full flex-col items-center gap-1.5 px-0 py-[18px]">
       <button
         type="button"
-        aria-label={text("shared.dashboard.unfold_menu")}
+        aria-label={readCopy(copy, "shared.dashboard.unfold_menu")}
         onClick={onUnfold}
         className={foldButton}
       >
@@ -51,18 +50,18 @@ export function SidebarRail({
       </button>
       <Link
         href="/"
-        aria-label={text("shared.wordmark")}
+        aria-label={readCopy(copy, "shared.wordmark")}
         className={`flex size-11 items-center justify-center text-[24px] font-normal text-cream no-underline ${menuLinkHover}`}
       >
-        {text("shared.dashboard.rail_wordmark")}
+        {readCopy(copy, "shared.dashboard.rail_wordmark")}
       </Link>
       <nav
-        aria-label={text("shared.dashboard.menu_label")}
+        aria-label={readCopy(copy, "shared.dashboard.menu_label")}
         className="flex flex-col items-center gap-0.5"
       >
         {userMenuItems.map((item) => {
           const isCurrent = isUserItemCurrent(item.href, pathname);
-          const label = text(item.labelCopyKey);
+          const label = readCopy(copy, item.labelCopyKey);
           return (
             <Link
               key={item.href}

@@ -1,6 +1,6 @@
 import type { CheckInFrequency, RecentCheckIn } from "@/lib/api-client";
 import { formatQuietHour } from "@/lib/check-ins";
-import { fillPlaceholders, readCopy, type Copy } from "@/lib/copy";
+import { fillCopy, readCopy, type Copy } from "@/lib/copy";
 import {
   calendarDaysAgo,
   dateParts,
@@ -34,7 +34,7 @@ export function greeting(
   const partOfDay = hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
   const key = `home.hero.greeting_${partOfDay}`;
   return name
-    ? fillPlaceholders(readCopy(copy, key), { name })
+    ? fillCopy(copy, key, { name })
     : readCopy(copy, `${key}_no_name`);
 }
 
@@ -65,15 +65,16 @@ export function lastTalkedText(
   if (daysAgo === 1) {
     return readCopy(copy, "home.hero.last_talked_yesterday");
   }
-  return fillPlaceholders(readCopy(copy, "home.hero.last_talked_on_day"), {
+  return fillCopy(copy, "home.hero.last_talked_on_day", {
     day: formatShortDay(lastConversationAt, timeZone),
   });
 }
 
 /**
- * Names how often Check-ins may come, like "A few times a week".
+ * Names how often Check-ins may come, like "A few times a week", with the
+ * names onboarding gives the choices: their one home in Copy.
  *
- * @param copy - Home's Copy.
+ * @param copy - Home's Copy, with onboarding's frequency names.
  * @param frequency - The User's Check-in frequency.
  * @returns The name.
  */
@@ -81,7 +82,7 @@ export function checkInFrequencyText(
   copy: Copy,
   frequency: CheckInFrequency,
 ): string {
-  return readCopy(copy, `home.check_ins.frequency_${frequency}`);
+  return readCopy(copy, `onboarding.check_ins.frequency_${frequency}`);
 }
 
 /**
@@ -93,7 +94,7 @@ export function checkInFrequencyText(
  * @returns The line.
  */
 export function quietHoursText(copy: Copy, start: string, end: string): string {
-  return fillPlaceholders(readCopy(copy, "home.check_ins.quiet_hours"), {
+  return fillCopy(copy, "home.check_ins.quiet_hours", {
     start: formatQuietHour(start),
     end: formatQuietHour(end),
   });
@@ -115,7 +116,7 @@ export function homePauseEndText(
   if (pausedUntil === null) {
     return readCopy(copy, "home.check_ins.paused_until_resume");
   }
-  return fillPlaceholders(readCopy(copy, "home.check_ins.paused_until_day"), {
+  return fillCopy(copy, "home.check_ins.paused_until_day", {
     day: formatLongDay(pausedUntil, timeZone),
   });
 }
@@ -142,12 +143,12 @@ export function lastCheckInText(
   }
   const day = recentDayName(copy, checkIn.decided_at, now, timeZone);
   if (checkIn.status === "replied") {
-    return fillPlaceholders(readCopy(copy, "home.check_ins.last_replied"), {
+    return fillCopy(copy, "home.check_ins.last_replied", {
       day,
     });
   }
   if (checkIn.status === "no_reply") {
-    return fillPlaceholders(readCopy(copy, "home.check_ins.last_no_reply"), {
+    return fillCopy(copy, "home.check_ins.last_no_reply", {
       day,
     });
   }

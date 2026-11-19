@@ -4,7 +4,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { HomeCard } from "@/components/HomeCard";
 import { cardLink, cardListRow } from "@/components/card-styles";
 import type { MemoryItem } from "@/lib/api-client";
-import { fillPlaceholders, readCopy, type Copy } from "@/lib/copy";
+import { fillCopy, readCopy, type Copy } from "@/lib/copy";
 import { formatShortDay } from "@/lib/dates";
 
 /**
@@ -46,7 +46,7 @@ export function HomeGoals({
                 {goal.content}
               </span>
               <span className="text-[12px] text-soft">
-                {fillPlaceholders(text("remembered"), {
+                {fillCopy(copy, "home.goals.remembered", {
                   day: formatShortDay(goal.updated_at, timeZone),
                 })}
               </span>

@@ -50,6 +50,24 @@ export function fillPlaceholders(
 }
 
 /**
+ * Reads one slot's text and fills its `{name}` placeholders with live
+ * values.
+ *
+ * @param copy - The Copy.
+ * @param key - The slot's key, e.g. `home.goals.remembered`.
+ * @param values - The value for each placeholder, by name.
+ * @returns The filled text.
+ * @throws MissingCopyError if there is no such slot.
+ */
+export function fillCopy(
+  copy: Copy,
+  key: string,
+  values: Record<string, string | number>,
+): string {
+  return fillPlaceholders(readCopy(copy, key), values);
+}
+
+/**
  * Gives a website page's browser tab title and search description from
  * its tab's `page_title` and `page_description` slots.
  *

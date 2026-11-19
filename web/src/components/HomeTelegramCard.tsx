@@ -3,7 +3,7 @@ import Link from "next/link";
 import { HomeCard } from "@/components/HomeCard";
 import { cardLink } from "@/components/card-styles";
 import type { TelegramConnection } from "@/lib/api-client";
-import { fillPlaceholders, readCopy, type Copy } from "@/lib/copy";
+import { fillCopy, readCopy, type Copy } from "@/lib/copy";
 
 /**
  * The Dashboard home card for a made Telegram Connection: who it is
@@ -32,7 +32,7 @@ export function HomeTelegramCard({
         <span aria-hidden="true" className="size-[9px] rounded-full bg-cream" />
         <span className="min-w-0 text-[16px] font-normal text-text [overflow-wrap:anywhere]">
           {connection.telegram_username
-            ? fillPlaceholders(text("connected_as"), {
+            ? fillCopy(copy, "home.telegram.connected_as", {
                 username: connection.telegram_username,
               })
             : text("connected_no_username")}

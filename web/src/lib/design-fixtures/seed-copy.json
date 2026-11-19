@@ -1412,30 +1412,6 @@
         "text": "How often"
       },
       {
-        "key": "home.check_ins.frequency_weekly",
-        "name": "Check-ins card: how often, weekly",
-        "max_length": 40,
-        "text": "Weekly"
-      },
-      {
-        "key": "home.check_ins.frequency_few_times_a_week",
-        "name": "Check-ins card: how often, a few times a week",
-        "max_length": 40,
-        "text": "A few times a week"
-      },
-      {
-        "key": "home.check_ins.frequency_most_days",
-        "name": "Check-ins card: how often, most days",
-        "max_length": 40,
-        "text": "Most days"
-      },
-      {
-        "key": "home.check_ins.frequency_a_few_times_a_day",
-        "name": "Check-ins card: how often, a few times a day",
-        "max_length": 40,
-        "text": "A few times a day"
-      },
-      {
         "key": "home.check_ins.quiet_hours_label",
         "name": "Check-ins card: quiet hours label",
         "max_length": 30,

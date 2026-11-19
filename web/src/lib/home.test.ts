@@ -136,7 +136,7 @@ describe("home wording", () => {
       ...copy,
       "home.hero.greeting_evening": "Evening {name}, welcome back.",
       "home.hero.last_talked_on_day": "Your last chat was {day}.",
-      "home.check_ins.frequency_weekly": "Once a week",
+      "onboarding.check_ins.frequency_weekly": "Once a week",
       "home.check_ins.quiet_hours": "Quiet from {start} until {end}",
       "home.check_ins.last_yesterday": "The day before",
       "home.check_ins.last_replied": "You answered ({day})",

@@ -104,7 +104,7 @@ describe("the / page", () => {
     expect(await generateMetadata()).toEqual({});
   });
 
-  it("shows Home in the Dashboard frame when signed in, giving it only Home's slots", async () => {
+  it("shows Home in the Dashboard frame when signed in, giving it only the slots it shows", async () => {
     isSignedIn.mockResolvedValue(true);
 
     render(await RootPage());
@@ -115,7 +115,14 @@ describe("the / page", () => {
     ).not.toBeInTheDocument();
     const keys = Object.keys(homeCopy.mock.lastCall?.[0] ?? {});
     expect(keys.length).toBeGreaterThan(0);
-    expect(keys.every((key) => key.startsWith("home."))).toBe(true);
+    expect(keys).toContain("onboarding.check_ins.frequency_weekly");
+    expect(
+      keys.every(
+        (key) =>
+          key.startsWith("home.") ||
+          key.startsWith("onboarding.check_ins.frequency_"),
+      ),
+    ).toBe(true);
   });
 
   it("shows the error state, not Home, when signed in and Copy can't be read", async () => {
