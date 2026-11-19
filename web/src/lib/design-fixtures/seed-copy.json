@@ -942,6 +942,12 @@
         "text": "First name or nickname"
       },
       {
+        "key": "onboarding.hello.ai_notice",
+        "name": "Hello: AI notice above the tick box",
+        "max_length": 600,
+        "text": "I'm an AI, not a person. I can be good company for thinking, but I'm not a therapist, doctor or crisis service. If you're ever in danger, please contact local emergency services or a Helpline."
+      },
+      {
         "key": "onboarding.hello.ai_notice_checkbox",
         "name": "Hello: AI notice tick box",
         "max_length": 120,
@@ -1570,6 +1576,12 @@
         "name": "Line at the bottom about streaks",
         "max_length": 200,
         "text": "Zeph doesn't count streaks or time spent. If you go quiet for a while, that's fine. It'll be here when you're ready."
+      },
+      {
+        "key": "home.footer.ai_notice",
+        "name": "AI notice at the bottom",
+        "max_length": 200,
+        "text": "Zeph is an AI companion. It isn't a mental-health service and can't help in an emergency."
       }
     ]
   },
@@ -2738,6 +2750,12 @@
         "text": "Look at my photos"
       },
       {
+        "key": "account.photos.explanation",
+        "name": "Look at my photos: what Photo Viewing is; a blank line starts a new paragraph",
+        "max_length": 1000,
+        "text": "When off, Zeph won't look at or remember your photos. Every photo is still checked for safety, so Zeph can share help if one looks worrying. Nothing from that check is kept.\n\nWhen on, Zeph looks at the photos you send and may keep the ones that matter to you, listed on your Memories page."
+      },
+      {
         "key": "account.stickers.heading",
         "name": "Your stickers: heading",
         "max_length": 40,
@@ -2816,6 +2834,12 @@
         "name": "Delete my data: heading",
         "max_length": 40,
         "text": "Delete my data"
+      },
+      {
+        "key": "account.delete_data.description",
+        "name": "Delete my data: what it removes",
+        "max_length": 400,
+        "text": "Removes your messages, memories, the private notes Zeph keeps to follow up with you, Conversation Summaries, your stickers, Check-in history and Telegram Connection. Your account stays, so you can start fresh."
       },
       {
         "key": "account.delete_data.retention_one",
@@ -3138,6 +3162,12 @@
         "text": "Plan"
       },
       {
+        "key": "shared.dashboard.ai_notice",
+        "name": "Dashboard menu: short AI notice",
+        "max_length": 120,
+        "text": "Zeph is an AI, not a therapist or crisis service."
+      },
+      {
         "key": "shared.dashboard.loading_account",
         "name": "Dashboard menu: loading the account, read out by screen readers",
         "max_length": 60,
@@ -3172,6 +3202,36 @@
         "name": "Dashboard couldn’t load: try again button",
         "max_length": 30,
         "text": "Try again"
+      },
+      {
+        "key": "shared.memory_explanation",
+        "name": "What User Memory is, in onboarding and on Account; a blank line starts a new paragraph",
+        "max_length": 1000,
+        "text": "So you don't have to repeat yourself, I can keep meaningful details: your goals, what helps you, the people you mention.\n\nYou can see what I remember on your Dashboard and delete any of it, or tell me \"forget that\" in chat.\n\nI also keep a few private notes to follow up with you, like something to ask about later. You won't see these, and Delete My Data removes them along with everything else."
+      },
+      {
+        "key": "shared.memory_off.paused_title",
+        "name": "Memory paused by the User: title, on Home, Memories and Account",
+        "max_length": 60,
+        "text": "Memory is paused."
+      },
+      {
+        "key": "shared.memory_off.paused_body",
+        "name": "Memory paused by the User: message",
+        "max_length": 400,
+        "text": "Nothing is deleted. Zeph won’t learn anything new, but still uses what it already knows about you. Delete any memory you don’t want Zeph to use, or use Delete My Data to remove everything."
+      },
+      {
+        "key": "shared.memory_off.not_available_title",
+        "name": "Memory off by an Admin: title, on Home, Memories and Account",
+        "max_length": 60,
+        "text": "Memory isn’t available on your account."
+      },
+      {
+        "key": "shared.memory_off.not_available_body",
+        "name": "Memory off by an Admin: message",
+        "max_length": 400,
+        "text": "Nothing is deleted. Zeph won’t learn anything new, but still uses what it already knows about you. Delete any memory you don’t want Zeph to use, or use Delete My Data to remove everything."
       }
     ]
   }

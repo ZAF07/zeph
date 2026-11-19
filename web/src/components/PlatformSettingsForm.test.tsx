@@ -29,9 +29,6 @@ const settings: AdminSettings = {
   message_wait_seconds: seeded(4),
   typing_repeat_seconds: seeded(4),
   web_search_daily_limit: seeded(10),
-  ai_notice: seeded("I'm an AI."),
-  ai_notice_short: seeded("Zeph is an AI."),
-  user_memory_explanation: seeded("I can keep details."),
   check_in_ignore_threshold: seeded(3),
   check_in_hours_between: seeded({
     weekly: 168,
@@ -60,12 +57,8 @@ const settings: AdminSettings = {
   sticker_adding_quiet_gap_minutes: seeded(5),
   photo_not_viewed_note: seeded("Say the photo didn't come through."),
   photo_viewing_off_note: seeded("Say you didn't look at the photo."),
-  photo_viewing_explanation: seeded("When off, Zeph won't look at photos."),
   onboarding_unfinished_reply: seeded("Finish setting up: {dashboard_url}"),
-  memory_paused_note: seeded("**Memory is paused.** Still used."),
-  memory_not_available_note: seeded("**Memory isn’t available.** Still used."),
   memory_off_chat_line: seeded("Nothing is deleted."),
-  delete_my_data_description: seeded("Removes everything, private notes too."),
   data_deleted_reply: seeded("Done, all deleted."),
 };
 
@@ -89,20 +82,26 @@ describe("PlatformSettingsForm", () => {
     expect(await screen.findByLabelText("Conversation quiet gap")).toHaveValue(
       60,
     );
-    expect(screen.getByLabelText(/^AI notice/)).toHaveValue("I'm an AI.");
-    expect(screen.getByLabelText(/Short AI notice/)).toHaveValue(
-      "Zeph is an AI.",
-    );
-    expect(screen.getByLabelText(/Memory explanation/)).toHaveValue(
-      "I can keep details.",
-    );
-    expect(screen.getByLabelText(/Memory is paused” note/)).toHaveValue(
-      "**Memory is paused.** Still used.",
-    );
-    expect(screen.getByLabelText(/Memory isn’t available” note/)).toHaveValue(
-      "**Memory isn’t available.** Still used.",
+    expect(screen.getByLabelText(/“Memory off” line in chat/)).toHaveValue(
+      "Nothing is deleted.",
     );
     expect(screen.getAllByText("Using the starting values")[0]).toBeVisible();
+  });
+
+  it("leaves the website wording to the Copy page", async () => {
+    renderWithQueries(<PlatformSettingsForm />);
+
+    await screen.findByLabelText("Conversation quiet gap");
+    for (const label of [
+      /AI notice/,
+      /Memory explanation/,
+      /Photo Viewing explanation/,
+      /Memory is paused/,
+      /Memory isn’t available/,
+      /“Delete my data” description/,
+    ]) {
+      expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+    }
   });
 
   it("saves only the settings that changed", async () => {
@@ -496,12 +495,12 @@ describe("PlatformSettingsForm", () => {
   it("discards unsaved changes", async () => {
     const user = userEvent.setup();
     renderWithQueries(<PlatformSettingsForm />);
-    const notice = await screen.findByLabelText(/^AI notice/);
+    const line = await screen.findByLabelText(/“Memory off” line in chat/);
 
-    await user.type(notice, " Extra.");
+    await user.type(line, " Extra.");
     await user.click(screen.getByRole("button", { name: "Discard" }));
 
-    expect(notice).toHaveValue("I'm an AI.");
+    expect(line).toHaveValue("Nothing is deleted.");
   });
 
   it("says so when saving fails", async () => {
@@ -509,14 +508,17 @@ describe("PlatformSettingsForm", () => {
     const user = userEvent.setup();
     renderWithQueries(<PlatformSettingsForm />);
 
-    await user.type(await screen.findByLabelText(/^AI notice/), " Extra.");
+    await user.type(
+      await screen.findByLabelText(/“Memory off” line in chat/),
+      " Extra.",
+    );
     await user.click(screen.getByRole("button", { name: "Save settings" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Couldn’t save. The platform keeps running on the last saved values.",
     );
-    expect(screen.getByLabelText(/^AI notice/)).toHaveValue(
-      "I'm an AI. Extra.",
+    expect(screen.getByLabelText(/“Memory off” line in chat/)).toHaveValue(
+      "Nothing is deleted. Extra.",
     );
   });
 
@@ -534,48 +536,38 @@ describe("PlatformSettingsForm", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows and saves the memory-off line and the Delete my data wording", async () => {
+  it("shows and saves the memory-off line and the data deleted reply", async () => {
     const user = userEvent.setup();
     renderWithQueries(<PlatformSettingsForm />);
     const line = await screen.findByLabelText(/“Memory off” line in chat/);
-    const description = screen.getByLabelText(/“Delete my data” description/);
     const deleted = screen.getByLabelText(/“Data deleted” reply/);
     expect(line).toHaveValue("Nothing is deleted.");
-    expect(description).toHaveValue("Removes everything, private notes too.");
     expect(deleted).toHaveValue("Done, all deleted.");
 
     await user.clear(line);
     await user.type(line, "Nothing was deleted.");
-    await user.clear(description);
-    await user.type(description, "Removes it all.");
     await user.clear(deleted);
     await user.type(deleted, "All gone.");
     await user.click(screen.getByRole("button", { name: "Save settings" }));
 
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       memory_off_chat_line: "Nothing was deleted.",
-      delete_my_data_description: "Removes it all.",
       data_deleted_reply: "All gone.",
     });
   });
 
-  it("shows and saves the Photo Viewing off note and explanation", async () => {
+  it("shows and saves the Photo Viewing off note", async () => {
     const user = userEvent.setup();
     renderWithQueries(<PlatformSettingsForm />);
     const note = await screen.findByLabelText(/Photo Viewing off” note/);
-    const explanation = screen.getByLabelText(/Photo Viewing explanation/);
     expect(note).toHaveValue("Say you didn't look at the photo.");
-    expect(explanation).toHaveValue("When off, Zeph won't look at photos.");
 
     await user.clear(note);
     await user.type(note, "You didn't look.");
-    await user.clear(explanation);
-    await user.type(explanation, "Off means no looking.");
     await user.click(screen.getByRole("button", { name: "Save settings" }));
 
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       photo_viewing_off_note: "You didn't look.",
-      photo_viewing_explanation: "Off means no looking.",
     });
   });
 });

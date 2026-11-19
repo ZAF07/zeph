@@ -47,7 +47,7 @@ export function Sidebar({ copy, onFold }: { copy: Copy; onFold: () => void }) {
       </div>
       <SidebarNav copy={copy} />
       <div className="mt-auto flex flex-col gap-3 pt-5">
-        <SidebarAiNotice />
+        <SidebarAiNotice copy={copy} />
         <SidebarAccount copy={copy} />
         <SidebarSignOut copy={copy} className="px-3.5" />
       </div>

@@ -48,16 +48,21 @@ describe("the /account page", () => {
     ).toBeInTheDocument();
   });
 
-  it("gives the settings only its own Copy slots and the location labels", async () => {
+  it("gives the settings only its own Copy slots, the location labels and the Shared Memory slots", async () => {
     render(await AccountPage());
 
     const keys = Object.keys(accountCopy.mock.lastCall?.[0] ?? {});
     expect(keys).toContain("account.profile.heading");
     expect(keys).toContain("onboarding.location.country_label");
+    expect(keys).toContain("shared.memory_explanation");
+    expect(keys).toContain("shared.memory_off.not_available_body");
     expect(
       keys.every(
         (key) =>
-          key.startsWith("account.") || key.startsWith("onboarding.location."),
+          key.startsWith("account.") ||
+          key.startsWith("onboarding.location.") ||
+          key === "shared.memory_explanation" ||
+          key.startsWith("shared.memory_off."),
       ),
     ).toBe(true);
   });

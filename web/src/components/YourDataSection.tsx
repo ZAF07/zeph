@@ -15,21 +15,19 @@ import { useApiClient } from "@/lib/use-api-client";
  * otherwise kept, with Delete my data behind a confirm dialog. After a
  * delete, every page loads its data again.
  *
- * @param props - `retentionDays` is how many days messages are kept and
- *   `deleteMyDataDescription` says what Delete my data removes, both from
+ * @param props - `retentionDays` is how many days messages are kept, from
  *   platform settings; `copy` holds the Account page's Copy.
  * @returns The section.
  */
 export function YourDataSection({
   retentionDays,
-  deleteMyDataDescription,
   copy,
 }: {
   retentionDays: number;
-  deleteMyDataDescription: string;
   copy: Copy;
 }) {
   const accountCopy = (slot: string) => readCopy(copy, `account.${slot}`);
+  const description = accountCopy("delete_data.description");
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
   const [isConfirming, setIsConfirming] = useState(false);
@@ -46,7 +44,7 @@ export function YourDataSection({
       description={
         <>
           <p className="mt-1 mb-0 max-w-[620px] text-[14px] text-soft">
-            {deleteMyDataDescription}
+            {description}
           </p>
           <p className="mt-1.5 mb-0 text-[13px] text-soft">
             {fillCopy(
@@ -68,7 +66,7 @@ export function YourDataSection({
       <ConfirmDialog
         open={isConfirming}
         title={accountCopy("delete_data.dialog_title")}
-        body={`${deleteMyDataDescription} ${accountCopy("delete_data.dialog_body")}`}
+        body={`${description} ${accountCopy("delete_data.dialog_body")}`}
         cancelLabel={accountCopy("delete_data.dialog_cancel")}
         confirmLabel={accountCopy("delete_data.dialog_confirm")}
         onConfirm={() => {

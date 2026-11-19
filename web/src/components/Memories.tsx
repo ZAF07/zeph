@@ -24,6 +24,7 @@ import {
   memoriesTabFromQuery,
   searchWithMemoriesTab,
 } from "@/lib/memories";
+import { memoryOffNote } from "@/lib/memory-off-note";
 import { queryKeys, useMe, useUpdatePreferences } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
@@ -35,7 +36,8 @@ import { useApiClient } from "@/lib/use-api-client";
  * address's `?tab=` picks it, and choosing a tab updates `?tab=` without
  * loading the page again. Every word is the Memories tab's Copy.
  *
- * @param props - `copy` holds the Memories page's Copy slots.
+ * @param props - `copy` holds the Memories page's Copy slots and the
+ *   Shared Memory-off notes.
  * @returns The page, a loading panel, or an error with Try again.
  */
 export function Memories({ copy }: { copy: Copy }) {
@@ -158,7 +160,7 @@ export function Memories({ copy }: { copy: Copy }) {
 
       {me ? (
         <MemoryOffNotice
-          note={me.memory_note}
+          note={memoryOffNote(copy, me)}
           canTurnOn={!memoryUnavailable}
           isSaving={updatePreferences.isPending}
           onTurnOn={() => changeMemory(true)}

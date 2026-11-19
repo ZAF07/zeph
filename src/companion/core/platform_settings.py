@@ -190,13 +190,6 @@ REPLY_FAILED_MESSAGE = Setting("reply_failed_message", read_text)
 UNSUPPORTED_MESSAGE_REPLY = Setting("unsupported_message_reply", read_text)
 STICKER_ADDING_SUMMARY_REPLY = Setting("sticker_adding_summary_reply", read_text)
 STICKER_ADDING_QUIET_GAP = Setting("sticker_adding_quiet_gap_minutes", read_minutes)
-AI_NOTICE = Setting("ai_notice", read_text)
-AI_NOTICE_SHORT = Setting("ai_notice_short", read_text)
-USER_MEMORY_EXPLANATION = Setting("user_memory_explanation", read_text)
-PHOTO_VIEWING_EXPLANATION = Setting("photo_viewing_explanation", read_text)
-MEMORY_PAUSED_NOTE = Setting("memory_paused_note", read_text)
-MEMORY_NOT_AVAILABLE_NOTE = Setting("memory_not_available_note", read_text)
-DELETE_MY_DATA_DESCRIPTION = Setting("delete_my_data_description", read_text)
 ONBOARDING_REASON_CHOICES = Setting("onboarding_reason_choices", read_text_list)
 CONVERSATION_QUIET_GAP = Setting("conversation_quiet_gap_minutes", read_minutes)
 MESSAGE_WAIT_SECONDS = Setting("message_wait_seconds", read_whole_number)
@@ -943,43 +936,9 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         minimum=0,
         maximum=1000,
     ),
-    EditableSetting(AI_NOTICE.key, "AI notice", SettingKind.TEXT, max_length=2_000),
-    EditableSetting(
-        AI_NOTICE_SHORT.key, "Short AI notice", SettingKind.TEXT, max_length=200
-    ),
-    EditableSetting(
-        USER_MEMORY_EXPLANATION.key,
-        "Memory explanation",
-        SettingKind.TEXT,
-        max_length=4_000,
-    ),
-    EditableSetting(
-        PHOTO_VIEWING_EXPLANATION.key,
-        "Photo Viewing explanation",
-        SettingKind.TEXT,
-        max_length=4_000,
-    ),
-    EditableSetting(
-        MEMORY_PAUSED_NOTE.key,
-        "“Memory is paused” note",
-        SettingKind.TEXT,
-        max_length=1_000,
-    ),
-    EditableSetting(
-        MEMORY_NOT_AVAILABLE_NOTE.key,
-        "“Memory isn’t available” note",
-        SettingKind.TEXT,
-        max_length=1_000,
-    ),
     EditableSetting(
         MEMORY_OFF_CHAT_LINE.key,
         "“Memory off” line in chat",
-        SettingKind.TEXT,
-        max_length=1_000,
-    ),
-    EditableSetting(
-        DELETE_MY_DATA_DESCRIPTION.key,
-        "“Delete my data” description",
         SettingKind.TEXT,
         max_length=1_000,
     ),
@@ -1199,25 +1158,17 @@ EDITABLE_SETTINGS_BY_KEY: dict[str, EditableSetting] = {
 
 @dataclass(frozen=True)
 class DashboardContent:
-    """Admin-managed wording and settings the Dashboard shows to Users.
+    """Admin-managed settings the Dashboard shows to Users.
+
+    The words around them are Copy (ADR-0019).
 
     Attributes:
-        ai_notice: The full AI notice.
-        ai_notice_short: The short AI notice.
-        user_memory_explanation: What User Memory is.
-        photo_viewing_explanation: What Photo Viewing is.
         onboarding_reason_choices: The "What brings you here?" choices.
         message_retention_days: How many days messages are kept.
-        delete_my_data_description: What Delete My Data removes.
     """
 
-    ai_notice: str
-    ai_notice_short: str
-    user_memory_explanation: str
-    photo_viewing_explanation: str
     onboarding_reason_choices: list[str]
     message_retention_days: int
-    delete_my_data_description: str
 
 
 class InvalidSettingError(InvalidError):
@@ -1251,21 +1202,15 @@ class PlatformSettingsService:
         return self._settings.get_many(list(self._editable_by_key))
 
     def dashboard_content(self) -> DashboardContent:
-        """Read the Admin-managed wording the Dashboard shows to Users.
+        """Read the Admin-managed settings the Dashboard shows to Users.
 
         Returns:
-            The AI notices, explanations, onboarding choices, how long
-            messages are kept and what Delete My Data removes.
+            The onboarding choices and how long messages are kept.
         """
         settings = self._settings.load()
         return DashboardContent(
-            ai_notice=settings.get(AI_NOTICE),
-            ai_notice_short=settings.get(AI_NOTICE_SHORT),
-            user_memory_explanation=settings.get(USER_MEMORY_EXPLANATION),
-            photo_viewing_explanation=settings.get(PHOTO_VIEWING_EXPLANATION),
             onboarding_reason_choices=settings.get(ONBOARDING_REASON_CHOICES),
             message_retention_days=settings.get(MESSAGE_RETENTION_DAYS),
-            delete_my_data_description=settings.get(DELETE_MY_DATA_DESCRIPTION),
         )
 
     def model_choices(self) -> list[str]:

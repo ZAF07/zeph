@@ -34,16 +34,8 @@ const checkIns: CheckIns = {
   changed_by_admin: {},
 };
 
-/** The Admin-worded text the steps show. The AI notice is a placeholder. */
+/** The reason choices drawn on the Intentions step. */
 const platformContent: PlatformContent = {
-  ai_notice: "[AI NOTICE, WORDED BY ADMINS IN PLATFORM SETTINGS]",
-  ai_notice_short: "Zeph is an AI, not a therapist or crisis service.",
-  user_memory_explanation: [
-    "So you don't have to repeat yourself, I can keep meaningful details: your goals, what helps you, the people you mention.",
-    'You can see what I remember on your Dashboard and delete any of it, or tell me "forget that" in chat.',
-    "I also keep a few private notes to follow up with you, like something to ask about later. You won't see these, and Delete My Data removes them along with everything else.",
-  ].join("\n\n"),
-  photo_viewing_explanation: "",
   onboarding_reason_choices: [
     "Being more present",
     "Making sense of a decision",
@@ -55,7 +47,6 @@ const platformContent: PlatformContent = {
     "Living more deliberately",
   ],
   message_retention_days: 30,
-  delete_my_data_description: "",
 };
 
 /** How long the drawn Telegram link has left. */

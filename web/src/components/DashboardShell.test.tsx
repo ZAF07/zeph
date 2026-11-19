@@ -11,7 +11,6 @@ import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   getMe: vi.fn<ApiClient["getMe"]>(),
-  getPlatformContent: vi.fn<ApiClient["getPlatformContent"]>(),
 };
 
 vi.mock("@/lib/use-api-client", () => ({
@@ -78,15 +77,6 @@ describe("DashboardShell", () => {
     navigation.search = "";
     designMode.on = false;
     apiClient.getMe.mockResolvedValue(userWithRole("user"));
-    apiClient.getPlatformContent.mockResolvedValue({
-      ai_notice: "Long notice.",
-      ai_notice_short: "Zeph is an AI, not a therapist or crisis service.",
-      user_memory_explanation: "",
-      photo_viewing_explanation: "",
-      onboarding_reason_choices: [],
-      message_retention_days: 30,
-      delete_my_data_description: "",
-    });
   });
 
   afterEach(() => {
@@ -395,7 +385,7 @@ describe("DashboardShell", () => {
     ["the folded rail", true, ""],
     ["the open phone menu", false, "menu-open"],
   ])(
-    "shows a User only Copy text in %s, apart from who they are and the AI notice",
+    "shows a User only Copy text in %s, apart from who they are",
     async (_menu, folded, design) => {
       designMode.on = design !== "";
       navigation.search = design ? `design=${design}` : "";
@@ -404,17 +394,8 @@ describe("DashboardShell", () => {
 
       if (!folded) {
         await screen.findAllByText("maya@example.com");
-        await screen.findAllByText(
-          "Zeph is an AI, not a therapist or crisis service.",
-        );
       }
-      const notCopy = [
-        "Maya",
-        "maya@example.com",
-        "Zeph is an AI, not a therapist or crisis service.",
-        "To build",
-        "Page content",
-      ];
+      const notCopy = ["Maya", "maya@example.com", "To build", "Page content"];
       const words = wordsNotFromCopy(container)
         .map((text) =>
           notCopy

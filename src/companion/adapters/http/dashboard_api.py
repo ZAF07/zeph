@@ -56,7 +56,6 @@ class MeResponse(BaseModel):
     ai_notice_acknowledged_at: datetime | None
     user_memory_enabled: bool
     user_memory_available: bool
-    memory_note: str
     photo_viewing_enabled: bool
     photo_viewing_available: bool
     personal_stickers_available: bool
@@ -153,15 +152,10 @@ class CheckInsResponse(BaseModel):
 
 
 class PlatformContentResponse(BaseModel):
-    """Admin-managed wording and settings the Dashboard shows to Users."""
+    """Admin-managed settings the Dashboard shows to Users."""
 
-    ai_notice: str
-    ai_notice_short: str
-    user_memory_explanation: str
-    photo_viewing_explanation: str
     onboarding_reason_choices: list[str]
     message_retention_days: int
-    delete_my_data_description: str
 
 
 class ConnectionTokenResponse(BaseModel):
@@ -234,10 +228,10 @@ class HomeResponse(BaseModel):
     telegram_chat_url: str
     last_conversation_at: datetime | None
     check_ins: HomeCheckInsResponse
-    memory_note: str
+    user_memory_enabled: bool
+    user_memory_available: bool
     goals: list[MemoryItemResponse]
     recently_remembered: list[RememberedItemResponse]
-    ai_notice: str
 
 
 class MemoryItemsResponse(BaseModel):
@@ -514,7 +508,6 @@ def to_me_response(me: Me) -> MeResponse:
         ai_notice_acknowledged_at=user.ai_notice_acknowledged_at,
         user_memory_enabled=user.user_memory_enabled,
         user_memory_available=me.user_memory_available,
-        memory_note=me.memory_note,
         photo_viewing_enabled=user.photo_viewing_enabled,
         photo_viewing_available=me.photo_viewing_available,
         personal_stickers_available=me.personal_stickers_available,
@@ -676,7 +669,8 @@ def build_dashboard_api_router(
                     else None
                 ),
             ),
-            memory_note=home.memory_note,
+            user_memory_enabled=user.user_memory_enabled,
+            user_memory_available=home.user_memory_available,
             goals=[to_memory_item_response(item) for item in home.goals],
             recently_remembered=[
                 RememberedItemResponse(
@@ -685,7 +679,6 @@ def build_dashboard_api_router(
                 )
                 for remembered in home.recently_remembered
             ],
-            ai_notice=home.ai_notice,
         )
 
     @router.get("/me")
@@ -872,24 +865,18 @@ def build_dashboard_api_router(
     def get_platform_content(
         user: Annotated[User, Depends(current_user)],
     ) -> PlatformContentResponse:
-        """Return the Admin-managed wording the Dashboard shows to Users.
+        """Return the Admin-managed settings the Dashboard shows to Users.
 
         Args:
             user: The signed-in User.
 
         Returns:
-            The AI notice, User Memory explanation, onboarding choices, how
-            long messages are kept and what Delete My Data removes.
+            The onboarding choices and how long messages are kept.
         """
         content = platform_settings_service.dashboard_content()
         return PlatformContentResponse(
-            ai_notice=content.ai_notice,
-            ai_notice_short=content.ai_notice_short,
-            user_memory_explanation=content.user_memory_explanation,
-            photo_viewing_explanation=content.photo_viewing_explanation,
             onboarding_reason_choices=content.onboarding_reason_choices,
             message_retention_days=content.message_retention_days,
-            delete_my_data_description=content.delete_my_data_description,
         )
 
     @router.get("/telegram-connection")

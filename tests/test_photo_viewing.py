@@ -338,33 +338,6 @@ def test_the_user_switches_photo_viewing_on_the_dashboard(
     assert me(client, maya)["photo_viewing_enabled"] is False
 
 
-def test_the_dashboard_gets_the_admin_managed_photo_viewing_explanation(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    seeded_settings: dict[str, Any],
-) -> None:
-    maya = auth_headers(auth_verifier, "user_maya")
-    admin = owner_headers(client, auth_verifier)
-
-    seeded = client.get("/api/platform-content", headers=maya).json()
-    client.patch(
-        "/api/admin/settings",
-        json={"values": {"photo_viewing_explanation": "Edited explanation."}},
-        headers=admin,
-    )
-    edited = client.get("/api/platform-content", headers=maya).json()
-
-    assert (
-        seeded["photo_viewing_explanation"]
-        == (seeded_settings["photo_viewing_explanation"])
-    )
-    assert " ".join(seeded["photo_viewing_explanation"].split()).startswith(
-        "When off, Zeph won't look at or remember your photos. Every photo is "
-        "still checked for safety"
-    )
-    assert edited["photo_viewing_explanation"] == "Edited explanation."
-
-
 @pytest.mark.parametrize("how", ["by_an_admin_for_the_user", "for_everyone"])
 def test_with_the_admin_side_off_the_switch_is_not_available_and_kept(
     client: TestClient, auth_verifier: FakeAuthVerifier, how: str

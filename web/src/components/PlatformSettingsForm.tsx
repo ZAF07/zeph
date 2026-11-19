@@ -254,47 +254,10 @@ const webSearchLimitField: NumberField = {
 /** The shared wording on this page. */
 const textFields: TextField[] = [
   {
-    key: "ai_notice",
-    label: "AI notice",
-    caption: "— shown in onboarding and on the Dashboard",
-  },
-  {
-    key: "ai_notice_short",
-    label: "Short AI notice",
-    caption: "— always shown at the foot of the Dashboard sidebar",
-  },
-  {
-    key: "user_memory_explanation",
-    label: "Memory explanation",
-    caption: "— shown when asking for User Memory consent",
-  },
-  {
-    key: "photo_viewing_explanation",
-    label: "Photo Viewing explanation",
-    caption: "— shown with the Photo Viewing switch on Account & privacy",
-  },
-  {
-    key: "memory_paused_note",
-    label: "“Memory is paused” note",
-    caption:
-      "— shown on Home, Memories and by the switch while a User has memory off; **bold** marks the opening words",
-  },
-  {
-    key: "memory_not_available_note",
-    label: "“Memory isn’t available” note",
-    caption:
-      "— shown instead while an Admin has memory off for the User; **bold** marks the opening words",
-  },
-  {
     key: "memory_off_chat_line",
     label: "“Memory off” line in chat",
     caption:
       "— always sent as its own message after the reply when a User turns memory off in chat",
-  },
-  {
-    key: "delete_my_data_description",
-    label: "“Delete my data” description",
-    caption: "— shown under Delete my data on Account & privacy",
   },
   {
     key: "data_deleted_reply",

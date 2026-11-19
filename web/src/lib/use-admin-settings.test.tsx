@@ -2,8 +2,8 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SidebarAiNotice } from "@/components/SidebarAiNotice";
 import type { ApiClient, PlatformContent } from "@/lib/api-client";
+import { usePlatformContent } from "@/lib/queries";
 import { useSaveAdminSettings } from "@/lib/use-admin-settings";
 import { renderWithQueries } from "@/test/render-with-queries";
 
@@ -16,26 +16,23 @@ vi.mock("@/lib/use-api-client", () => ({
   useApiClient: () => apiClient,
 }));
 
-function contentWithNotice(notice: string): PlatformContent {
-  return {
-    ai_notice: "",
-    ai_notice_short: notice,
-    onboarding_reason_choices: [],
-    user_memory_explanation: "",
-    photo_viewing_explanation: "",
-    message_retention_days: 30,
-    delete_my_data_description: "",
-  };
+function contentWithRetention(days: number): PlatformContent {
+  return { onboarding_reason_choices: [], message_retention_days: days };
 }
 
-function SaveNoticeButton() {
+function RetentionDays() {
+  const days = usePlatformContent().data?.message_retention_days;
+  return days === undefined ? null : <p>{`Kept ${days} days`}</p>;
+}
+
+function SaveRetentionButton() {
   const saveSettings = useSaveAdminSettings();
   return (
     <button
       type="button"
-      onClick={() => saveSettings.mutate({ ai_notice_short: "New notice" })}
+      onClick={() => saveSettings.mutate({ message_retention_days: 14 })}
     >
-      Save notice
+      Save retention
     </button>
   );
 }
@@ -45,22 +42,22 @@ describe("useSaveAdminSettings", () => {
     vi.resetAllMocks();
   });
 
-  it("shows saved wording in the User-facing parts of the page", async () => {
+  it("shows saved settings in the User-facing parts of the page", async () => {
     apiClient.getPlatformContent
-      .mockResolvedValueOnce(contentWithNotice("Old notice"))
-      .mockResolvedValue(contentWithNotice("New notice"));
+      .mockResolvedValueOnce(contentWithRetention(30))
+      .mockResolvedValue(contentWithRetention(14));
     apiClient.updateAdminSettings.mockResolvedValue({});
     const user = userEvent.setup();
     renderWithQueries(
       <>
-        <SidebarAiNotice />
-        <SaveNoticeButton />
+        <RetentionDays />
+        <SaveRetentionButton />
       </>,
     );
-    await screen.findByText("Old notice");
+    await screen.findByText("Kept 30 days");
 
-    await user.click(screen.getByRole("button", { name: "Save notice" }));
+    await user.click(screen.getByRole("button", { name: "Save retention" }));
 
-    expect(await screen.findByText("New notice")).toBeInTheDocument();
+    expect(await screen.findByText("Kept 14 days")).toBeInTheDocument();
   });
 });

@@ -116,11 +116,13 @@ describe("the / page", () => {
     const keys = Object.keys(homeCopy.mock.lastCall?.[0] ?? {});
     expect(keys.length).toBeGreaterThan(0);
     expect(keys).toContain("onboarding.check_ins.frequency_weekly");
+    expect(keys).toContain("shared.memory_off.paused_title");
     expect(
       keys.every(
         (key) =>
           key.startsWith("home.") ||
-          key.startsWith("onboarding.check_ins.frequency_"),
+          key.startsWith("onboarding.check_ins.frequency_") ||
+          key.startsWith("shared.memory_off."),
       ),
     ).toBe(true);
   });

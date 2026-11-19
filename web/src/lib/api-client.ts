@@ -42,9 +42,7 @@ export type ChatSetting =
  * says when each setting was last changed in chat; a setting changed on the
  * Dashboard since is left out. `user_memory_available` and
  * `photo_viewing_available` are false when an Admin has that Feature off for
- * them, so they can't switch it. `memory_note` is the Admin-worded note
- * saying User Memory is off and why; "" while it works.
- * `personal_stickers_available` says whether
+ * them, so they can't switch it. `personal_stickers_available` says whether
  * Personal Stickers works for them; they have no switch of their own.
  */
 export type Me = {
@@ -58,7 +56,6 @@ export type Me = {
   ai_notice_acknowledged_at: string | null;
   user_memory_enabled: boolean;
   user_memory_available: boolean;
-  memory_note: string;
   photo_viewing_enabled: boolean;
   photo_viewing_available: boolean;
   personal_stickers_available: boolean;
@@ -153,15 +150,10 @@ export type PreferenceChanges = {
   time_zone?: string;
 };
 
-/** Admin-managed wording and settings the Dashboard shows to Users. */
+/** Admin-managed settings the Dashboard shows to Users. */
 export type PlatformContent = {
-  ai_notice: string;
-  ai_notice_short: string;
-  user_memory_explanation: string;
-  photo_viewing_explanation: string;
   onboarding_reason_choices: string[];
   message_retention_days: number;
-  delete_my_data_description: string;
 };
 
 /** A User as Admins see them: activity counts, never message text. */
@@ -384,9 +376,9 @@ export type HomeCheckIns = {
 
 /**
  * What the Dashboard home shows a User. `goals` and `recently_remembered`
- * are newest first, shown whether or not User Memory is on. `memory_note`
- * is the Admin-worded note saying User Memory is off and why; "" while it
- * works.
+ * are newest first, shown whether or not User Memory is on.
+ * `user_memory_enabled` is the User's own User Memory switch and
+ * `user_memory_available` is false when an Admin has it off for them.
  */
 export type Home = {
   name: string | null;
@@ -395,10 +387,10 @@ export type Home = {
   telegram_chat_url: string;
   last_conversation_at: string | null;
   check_ins: HomeCheckIns;
-  memory_note: string;
+  user_memory_enabled: boolean;
+  user_memory_available: boolean;
   goals: MemoryItem[];
   recently_remembered: RememberedItem[];
-  ai_notice: string;
 };
 
 /** A short account of one Conversation, how the User seemed and what Zeph offered. */

@@ -10,12 +10,8 @@ from companion.core.models import (
     TelegramConnection,
     User,
 )
-from companion.core.platform_settings import (
-    AI_NOTICE_SHORT,
-    HOME_GOALS_MEMORY_CATEGORY,
-)
+from companion.core.platform_settings import HOME_GOALS_MEMORY_CATEGORY
 from companion.core.ports import Repositories
-from companion.core.user_memory import UserMemoryService
 
 RECENTLY_REMEMBERED_LIMIT = 3
 
@@ -48,9 +44,8 @@ class Home:
             shown whether or not User Memory is on.
         recently_remembered: Their newest Memory Items, newest first, shown
             whether or not User Memory is on.
-        memory_note: The Admin-managed note saying User Memory is off and
-            why; "" when it works.
-        ai_notice: The short AI notice.
+        user_memory_available: Whether the Admin side allows User Memory for
+            them.
     """
 
     telegram_connection: TelegramConnection | None
@@ -60,8 +55,7 @@ class Home:
     last_check_in: RecentCheckIn | None
     goals: list[MemoryItem]
     recently_remembered: list[RememberedItem]
-    memory_note: str
-    ai_notice: str
+    user_memory_available: bool
 
 
 class HomeService:
@@ -72,7 +66,6 @@ class HomeService:
         repositories: Repositories,
         check_in_service: CheckInService,
         features: FeatureService,
-        user_memory_service: UserMemoryService,
     ) -> None:
         """Set up the service.
 
@@ -81,13 +74,12 @@ class HomeService:
                 Memory Categories and settings are stored.
             check_in_service: Tells whether Check-ins are paused and which
                 was sent last.
-            features: Says whether the Admin side allows Check-ins.
-            user_memory_service: Picks the note saying User Memory is off.
+            features: Says whether the Admin side allows Check-ins and User
+                Memory.
         """
         self._repositories = repositories
         self._check_in_service = check_in_service
         self._features = features
-        self._user_memory_service = user_memory_service
 
     def get(self, user: User) -> Home:
         """Gather a User's Dashboard home.
@@ -99,7 +91,7 @@ class HomeService:
 
         Returns:
             Their Telegram Connection, Check-in status, Goals, newest Memory
-            Items, memory note and the short AI notice.
+            Items and whether User Memory is available.
         """
         settings = self._repositories.platform_settings.load()
         latest_conversation = self._repositories.conversations.get_latest_for_user(
@@ -120,8 +112,9 @@ class HomeService:
             last_check_in=self._check_in_service.last_sent(user, settings),
             goals=goals,
             recently_remembered=recently_remembered,
-            memory_note=self._user_memory_service.memory_note(user, settings),
-            ai_notice=settings.get(AI_NOTICE_SHORT),
+            user_memory_available=self._features.available_for(
+                user.id, Feature.USER_MEMORY
+            ),
         )
 
     def _goals_and_recently_remembered(

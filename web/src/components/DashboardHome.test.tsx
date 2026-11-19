@@ -49,7 +49,8 @@ function homeWith(overrides: Partial<Home> = {}): Home {
     telegram_chat_url: "https://t.me/zeph_bot",
     last_conversation_at: "2026-11-11T11:48:00Z",
     check_ins: checkInsWith(),
-    memory_note: "",
+    user_memory_enabled: true,
+    user_memory_available: true,
     goals: [
       {
         id: "g1",
@@ -69,14 +70,13 @@ function homeWith(overrides: Partial<Home> = {}): Home {
         category: "Relationships",
       },
     ],
-    ai_notice: "Zeph is an AI, not a therapist or crisis service.",
     ...overrides,
   };
 }
 
 /**
  * Says what words on Home did not come from marked Copy, besides the
- * User's own data and the wording that is still a Platform Setting.
+ * User's own data.
  *
  * @param container - The rendered page.
  * @param allowed - Words that are allowed not to be Copy.
@@ -95,12 +95,11 @@ function homeWordsNotFromCopy(
     .filter((text) => text !== "");
 }
 
-/** The User's data and the Platform Settings words the Home fixture shows. */
+/** The User's data the Home fixture shows, and the "To build" tag. */
 const notCopy = [
   "Be present at dinner",
   "Sister Jo is moving abroad",
   "Relationships",
-  "Zeph is an AI, not a therapist or crisis service.",
   "To build",
 ];
 
@@ -304,10 +303,7 @@ describe("DashboardHome", () => {
 
   it("keeps showing Goals and Recently remembered with the note while memory is off", async () => {
     apiClient.getHome.mockResolvedValue(
-      homeWith({
-        memory_note:
-          "**Memory is paused.** Zeph won’t learn anything new, but still uses what it already knows about you.",
-      }),
+      homeWith({ user_memory_enabled: false }),
     );
 
     renderWithQueries(<DashboardHome copy={seedCopy()} />);
@@ -315,9 +311,16 @@ describe("DashboardHome", () => {
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     const note = screen.getByRole("status");
     expect(note).toHaveTextContent(
-      "Memory is paused. Zeph won’t learn anything new, but still uses what it already knows about you.",
+      `Memory is paused.${seedCopy()["shared.memory_off.paused_body"]}`,
     );
-    expect(within(note).getByText("Memory is paused.").tagName).toBe("SPAN");
+    expect(within(note).getByText("Memory is paused.")).toHaveClass(
+      "text-[15px]",
+      "text-text",
+    );
+    expect(
+      within(note).getByText(seedCopy()["shared.memory_off.paused_body"]),
+    ).toHaveClass("text-[13px]", "text-soft");
+    expect(within(note).queryByRole("button")).toBeNull();
     expect(screen.queryByText("Memory is on.")).toBeNull();
     expect(
       within(section("What you're working toward")).getByText(
@@ -341,6 +344,29 @@ describe("DashboardHome", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
+  it("says Memory isn't available while an Admin has it off, even with the User's switch on", async () => {
+    apiClient.getHome.mockResolvedValue(
+      homeWith({ user_memory_available: false }),
+    );
+    const copy = {
+      ...seedCopy(),
+      "shared.memory_off.not_available_title": "Edited: not on your plan.",
+      "shared.memory_off.not_available_body": "Edited: nothing is deleted.",
+    };
+
+    renderWithQueries(<DashboardHome copy={copy} />);
+
+    await screen.findByRole("heading", { name: "Good evening, Maya." });
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Edited: not on your plan.Edited: nothing is deleted.",
+    );
+    expect(screen.getByText("Edited: not on your plan.")).toHaveClass(
+      "text-[15px]",
+      "text-text",
+    );
+    expect(screen.queryByText("Memory is paused.")).toBeNull();
+  });
+
   it("shows the AI notice and that Zeph doesn't count streaks", async () => {
     apiClient.getHome.mockResolvedValue(homeWith());
 
@@ -348,7 +374,7 @@ describe("DashboardHome", () => {
 
     expect(
       await screen.findByText(
-        "Zeph is an AI, not a therapist or crisis service.",
+        "Zeph is an AI companion. It isn't a mental-health service and can't help in an emergency.",
       ),
     ).toBeInTheDocument();
     expect(
@@ -410,6 +436,8 @@ describe("DashboardHome", () => {
       "Check-ins off",
       homeWith({ check_ins: checkInsWith({ enabled: false }) }),
     ],
+    ["Memory paused", homeWith({ user_memory_enabled: false })],
+    ["Memory not available", homeWith({ user_memory_available: false })],
     [
       "Check-ins not available",
       homeWith({

@@ -34,7 +34,8 @@ const home: Home = {
       skipped_for_daily_limit: false,
     },
   },
-  memory_note: "",
+  user_memory_enabled: true,
+  user_memory_available: true,
   goals: [
     {
       id: "design-goal-1",
@@ -77,8 +78,6 @@ const home: Home = {
       category: "Family",
     },
   ],
-  ai_notice:
-    "Zeph is an AI companion. It isn't a mental-health service and can't help in an emergency.",
 };
 
 /**

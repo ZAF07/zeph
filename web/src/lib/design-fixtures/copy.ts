@@ -26,6 +26,15 @@ export const seedTexts: Copy = Object.fromEntries(
   seedTabs.flatMap((tab) => tab.slots.map((slot) => [slot.key, slot.text])),
 );
 
+/**
+ * Slots whose reference draws a placeholder in place of the real words, such
+ * as Onboarding's AI notice, so the pages match the references as drawn.
+ */
+const referencePlaceholders: Copy = {
+  "onboarding.hello.ai_notice":
+    "[AI NOTICE, WORDED BY ADMINS IN PLATFORM SETTINGS]",
+};
+
 /** The Copy page with every slot still on its seed text. */
 const copyPage: CopyTab[] = seedTabs.map((tab) => ({
   tab: tab.tab,
@@ -43,9 +52,10 @@ const copyPage: CopyTab[] = seedTabs.map((tab) => ({
 
 /**
  * Design fixtures for Copy: the seed text, which matches the reference
- * files, for the public pages and the Copy admin page.
+ * files, for the public pages and the Copy admin page. The pages show the
+ * references' placeholders where they draw one.
  */
 export const copyFixtures: Partial<ApiClient> = {
-  getCopy: () => Promise.resolve(seedTexts),
+  getCopy: () => Promise.resolve({ ...seedTexts, ...referencePlaceholders }),
   getCopyPage: () => Promise.resolve(copyPage),
 };

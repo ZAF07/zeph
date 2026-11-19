@@ -9,17 +9,18 @@ import { PreferenceSwitch } from "@/components/PreferenceSwitch";
 import { ProfileForm } from "@/components/ProfileForm";
 import { YourDataSection } from "@/components/YourDataSection";
 import { type Copy, readCopy } from "@/lib/copy";
+import { memoryOffNote } from "@/lib/memory-off-note";
 import { useMe, usePlatformContent } from "@/lib/queries";
 
 /**
  * The editable parts of the Account & privacy page: Profile, User Memory,
  * Photo Viewing, Your stickers, Delete my data and Delete account. Every
  * word is the Account tab's Copy, with the location labels from
- * Onboarding's, except the explanations and the Delete my data description,
- * which are still Platform Settings.
+ * Onboarding's and the User Memory explanation and Memory-off notes from
+ * Shared.
  *
- * @param props - `copy` holds the Account page's Copy slots and
- *   onboarding's location labels.
+ * @param props - `copy` holds the Account page's Copy slots, onboarding's
+ *   location labels and the Shared Memory slots.
  * @returns The sections, a loading panel, or an error with Try again.
  */
 export function AccountSettings({ copy }: { copy: Copy }) {
@@ -55,13 +56,11 @@ export function AccountSettings({ copy }: { copy: Copy }) {
         copy={copy}
         enabled={me.user_memory_enabled}
         available={me.user_memory_available}
-        explanation={content.user_memory_explanation}
+        explanation={readCopy(copy, "shared.memory_explanation")}
         changedInChatAt={me.changed_in_chat.user_memory}
         timeZone={me.time_zone ?? undefined}
       >
-        {me.memory_note ? (
-          <MemoryOffNotice note={me.memory_note} canTurnOn={false} />
-        ) : null}
+        <MemoryOffNotice note={memoryOffNote(copy, me)} canTurnOn={false} />
       </PreferenceSwitch>
       <PreferenceSwitch
         preference="photo_viewing_enabled"
@@ -69,7 +68,7 @@ export function AccountSettings({ copy }: { copy: Copy }) {
         copy={copy}
         enabled={me.photo_viewing_enabled}
         available={me.photo_viewing_available}
-        explanation={content.photo_viewing_explanation}
+        explanation={accountCopy("photos.explanation")}
         changedInChatAt={me.changed_in_chat.photo_viewing}
         timeZone={me.time_zone ?? undefined}
       />
@@ -79,7 +78,6 @@ export function AccountSettings({ copy }: { copy: Copy }) {
       />
       <YourDataSection
         retentionDays={content.message_retention_days}
-        deleteMyDataDescription={content.delete_my_data_description}
         copy={copy}
       />
       <DeleteAccountSection copy={copy} />
