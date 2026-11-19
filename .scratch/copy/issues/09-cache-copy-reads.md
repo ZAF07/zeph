@@ -48,3 +48,4 @@ To be written after the grill. At least:
 ## Comments
 
 - 2026-11-19 — From issue 05's review: when Copy can't be read, `DashboardFrame` shows the couldn't-load page for every Dashboard page, admin pages included, so a failing Copy read locks Admins out of the Copy page. Agreed with the owner: fix it here, with "keep the last good Copy" and admin pages not depending on Copy. Storing Copy as files beside the web code was considered and rejected (ADR-0019).
+- 2026-11-19 — From issue 08: Copy issues 02–08 are all completed, so this one's "Blocked by" is clear. The Dashboard menu now also reads the short AI notice from Copy (`shared.dashboard.ai_notice`, in `SidebarAiNotice`), so when admin pages stop depending on Copy, the menu needs that slot too, or should show nothing when Copy can't be read.
