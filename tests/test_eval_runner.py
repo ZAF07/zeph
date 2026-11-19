@@ -24,6 +24,7 @@ from companion.adapters.postgres.repositories import (
 from companion.core.evals.models import EvalCase, EvalName, EvalRunState
 from companion.core.evals.runner import EvalRunner
 from companion.core.models import Feature
+from companion.core.woven_check_ins import BRING_UP_CHECK_IN_TOOL
 from companion.eval_terminal import build_eval_run_service, start_and_watch_run
 from companion.main import SEED_DIR
 from tests.conftest import shared_postgres_url
@@ -313,7 +314,11 @@ def test_an_understanding_case_checks_whether_the_due_check_in_was_woven_in(
             }
         )
     )
-    chat_model.script("sounds cosy! how did the presentation go?", "so glad!")
+    chat_model.script(
+        ToolCall(BRING_UP_CHECK_IN_TOOL, {}),
+        "sounds cosy! how did the presentation go?",
+        "so glad!",
+    )
 
     runner.work_next_run()
 

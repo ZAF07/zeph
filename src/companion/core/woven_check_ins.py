@@ -3,6 +3,7 @@ import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 from companion.core.check_in_decision import next_due_after_decision
@@ -39,10 +40,21 @@ from companion.core.platform_settings import (
     PERSONA,
     WOVEN_CHECK_IN_PROMPT,
 )
-from companion.core.ports import Clock, Repositories
+from companion.core.ports import ChatTool, Clock, Repositories
+from companion.core.reply_tools import ReplyOffer
 from companion.core.usage import UsageRecordingChatModel
 
 logger = logging.getLogger(__name__)
+
+BRING_UP_CHECK_IN_TOOL = "bring_up_check_in"
+BRING_UP_CHECK_IN_DESCRIPTION = (
+    "Call this first, before writing, whenever your reply will bring up the "
+    "due Check-in. Don't call it if you leave the Check-in out."
+)
+BRING_UP_CHECK_IN_ANSWER = (
+    "Noted. Now write your reply and bring it up naturally, once, the way a "
+    "friend drifts onto a side topic, without saying it is a Check-in."
+)
 
 
 @dataclass(frozen=True)
@@ -252,30 +264,79 @@ def read_woven_check_in_answer(
 
 
 def format_woven_check_in_for_reply(woven: WovenCheckIn) -> str:
-    """Write the reply's section on the Check-in to weave in.
+    """Write the reply's section on the due Check-in, as an optional extra.
 
     Args:
-        woven: The Check-in to weave in.
+        woven: The Check-in the reply may bring up.
 
     Returns:
-        The section.
+        The section, which says the reply may leave it out and must call
+        the bring_up_check_in tool first if it brings it up.
     """
     return (
-        "A Check-in with them is due, and this is a good moment for it. Weave "
-        "it into this reply naturally, once, the way a friend drifts onto a "
-        "side topic, without saying it is a Check-in:\n"
+        "A Check-in with them is due. Bring it up only if it fits what they "
+        "need right now; if it doesn't, leave it out and it will wait. If you "
+        f"bring it up, call {BRING_UP_CHECK_IN_TOOL} first, before writing:\n"
         f"- {woven.kind.name}: {woven.kind.description} "
         f"What to bring up: {woven.note}"
     )
+
+
+class WovenCheckInOffer:
+    """Offers a reply the due Check-in as an optional extra, and notes its use.
+
+    Attributes:
+        woven: The Check-in the reply may bring up.
+        check_in: The Check-in as saved before the reply, to take back if
+            the reply leaves it out or fails.
+        offer: The section and the bring_up_check_in tool for the reply.
+        was_brought_up: Whether the reply called the tool, so brought it up.
+    """
+
+    def __init__(self, woven: WovenCheckIn, check_in: CheckIn) -> None:
+        """Make the offer for one reply.
+
+        Args:
+            woven: The Check-in the reply may bring up.
+            check_in: The Check-in as saved before the reply.
+        """
+        self.woven = woven
+        self.check_in = check_in
+        self.was_brought_up = False
+        self.offer = ReplyOffer(
+            tools=[
+                ChatTool(
+                    name=BRING_UP_CHECK_IN_TOOL,
+                    description=BRING_UP_CHECK_IN_DESCRIPTION,
+                    parameters={"type": "object", "properties": {}},
+                    run=self._bring_up,
+                )
+            ],
+            instructions=format_woven_check_in_for_reply(woven),
+        )
+
+    def _bring_up(self, arguments: dict[str, Any]) -> str:
+        """Note that the reply brings the Check-in up.
+
+        Args:
+            arguments: The model's arguments; none are needed.
+
+        Returns:
+            What the model is told back.
+        """
+        self.was_brought_up = True
+        return BRING_UP_CHECK_IN_ANSWER
 
 
 class WovenCheckIns:
     """Lets a reply weave in a Check-in that comes due mid-Conversation.
 
     After the Understanding, the Check-in model decides whether this reply
-    weaves the Check-in in and which Kind, or leaves it for later. One woven
-    in is saved before the reply goes, and taken back if the reply fails,
-    so it is never sent twice and is only logged when it was sent.
+    is offered the Check-in and which Kind, or leaves it for later. The
+    reply gets it as an optional extra it may leave out. One offered is
+    saved before the reply goes, and taken back if the reply fails or
+    leaves it out, so it is never sent twice and is only logged when it was
+    sent.
     """
 
     def __init__(

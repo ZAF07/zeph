@@ -47,6 +47,27 @@ class ReplyOffer:
     closing_text: str = ""
 
 
+@dataclass(frozen=True)
+class ReplyGuidance:
+    """What the Understanding adds to the reply's instructions, by priority.
+
+    Attributes:
+        boundaries: The Life Threads to leave alone, each with why; "" if
+            none.
+        plan: The Need's "how to reply", the Moves' "how to do it", the
+            nuance and mood, the "ask why" note when it applies and the
+            Life Threads to bring up; "" if none.
+        curiosities: The Curiosities it chose to bring up; "" if none.
+    """
+
+    boundaries: str = ""
+    plan: str = ""
+    curiosities: str = ""
+
+
+NO_GUIDANCE = ReplyGuidance()
+
+
 class ReplyToolProvider(Protocol):
     """Offers a reply the tools of one Feature, when it works for the User."""
 

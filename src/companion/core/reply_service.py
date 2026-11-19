@@ -10,10 +10,7 @@ from companion.core.move_outcomes import MoveOutcomeFinder
 from companion.core.reply_gate import ReplyGate, Stopped
 from companion.core.response_composition import ResponseComposer
 from companion.core.understanding import UnderstandingService, may_send_photo
-from companion.core.woven_check_ins import (
-    WovenCheckIns,
-    format_woven_check_in_for_reply,
-)
+from companion.core.woven_check_ins import WovenCheckInOffer, WovenCheckIns
 
 
 class ReplyService:
@@ -28,10 +25,11 @@ class ReplyService:
     and Curiosities to bring up and which Knowledge documents fit, then that
     memory, any older Conversations it asked to look up and passages from
     the Knowledge documents it chose are recalled, while the Check-in model
-    decides whether to weave in a Check-in that is due, then the reply is
-    composed and delivered, and the Threads and Curiosities it brought up
-    are marked raised. A struggling User is offered none of their Shared Photos back
-    unless they asked for one. Every step reads the User from the same snapshot.
+    decides whether to offer the reply a Check-in that is due, then the
+    reply is composed, in its strict priority order, and delivered, and the
+    Threads and Curiosities it brought up are marked raised. A struggling
+    User is offered none of their Shared Photos back unless they asked for
+    one. Every step reads the User from the same snapshot.
     """
 
     def __init__(
@@ -81,10 +79,11 @@ class ReplyService:
         """Answer one screened Message: apply the house rules, then reply if needed.
 
         When the ReplyGate stops the reply nothing is composed. A failing
-        step raises, so the caller can send its fallback message. A Check-in
-        woven into a reply that fails before any of it is sent is taken
-        back, so it stays due; once part of the reply is sent, it counts as
-        sent and is never woven in again.
+        step raises, so the caller can send its fallback message. A due
+        Check-in is offered to the reply as an optional extra. One the reply
+        leaves out, or offered to a reply that fails before any of it is
+        sent, is taken back, so it stays due; once part of a reply that
+        brought it up is sent, it counts as sent and is never woven in again.
 
         Args:
             message: The Message to answer, its texts already saved and
@@ -127,21 +126,29 @@ class ReplyService:
         woven_check_in = (
             self._woven_check_ins.save(snapshot, woven) if woven is not None else None
         )
-        reply_guidance = understood.reply_guidance
-        if woven is not None and woven_check_in is not None:
-            reply_guidance += f"\n\n{format_woven_check_in_for_reply(woven)}"
+        check_in_offer = (
+            WovenCheckInOffer(woven, woven_check_in)
+            if woven is not None and woven_check_in is not None
+            else None
+        )
         try:
             reply = self._response_composer.compose(
                 message.conversation_id,
                 snapshot,
                 memory.text,
                 knowledge,
-                reply_guidance=reply_guidance,
+                guidance=understood.reply_guidance,
+                optional_offers=(
+                    [check_in_offer.offer] if check_in_offer is not None else []
+                ),
                 data_deletion_note=gate_result.data_deletion_note,
                 shared_photo_ids=(
                     memory.shared_photo_ids if may_send_photo(form) else ()
                 ),
             )
+            if check_in_offer is not None and not check_in_offer.was_brought_up:
+                self._take_back(snapshot, check_in_offer)
+                check_in_offer = None
             self._conversations.deliver_reply(
                 message.user_id,
                 message.conversation_id,
@@ -154,8 +161,17 @@ class ReplyService:
         except ReplyPartlySentError:
             raise
         except Exception:
-            if woven is not None and woven_check_in is not None:
-                self._woven_check_ins.take_back(snapshot, woven, woven_check_in)
+            if check_in_offer is not None:
+                self._take_back(snapshot, check_in_offer)
             raise
         self._thread_reminder.mark_raised(message.conversation_id, form.bring_up)
         self._curiosity_raiser.mark_raised(message.conversation_id, form.curiosities)
+
+    def _take_back(self, snapshot: UserSnapshot, offer: WovenCheckInOffer) -> None:
+        """Take back the Woven-in Check-in offered to a reply, so it stays due.
+
+        Args:
+            snapshot: The User being answered, as read for the reply.
+            offer: The Check-in offered to the reply, with its saved row.
+        """
+        self._woven_check_ins.take_back(snapshot, offer.woven, offer.check_in)

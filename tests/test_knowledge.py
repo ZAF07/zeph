@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, func, select, update
 
 from companion.adapters.postgres.tables import knowledge_chunks, knowledge_documents
+from companion.core.response_composition import OPTIONAL_EXTRAS_HEADING
 from tests.fakes import (
     DEFAULT_WHEN_IT_HELPS,
     FakeAuthVerifier,
@@ -734,7 +735,8 @@ def test_a_failed_document_never_reaches_the_reply(
     )
 
     assert seeded_settings["reply_knowledge_intro"] not in instructions
-    assert instructions.endswith(seeded_settings["reply_settings_instructions"])
+    assert seeded_settings["reply_settings_instructions"] in instructions
+    assert OPTIONAL_EXTRAS_HEADING not in instructions
 
 
 def test_a_deleted_document_and_its_chunks_are_gone_from_replies(

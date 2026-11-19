@@ -252,12 +252,13 @@ def format_threads_for_reply(
     form: UnderstandingForm | None,
     time_zone: str | None,
 ) -> str:
-    """Write the reply's section on Life Threads.
+    """Write the reply's section on the Life Threads that matter here.
 
     With a form, the Threads it touches or brings up go in with their
-    stories, then how to bring each up, then what to leave alone. Without
-    one, because the Understanding failed, every reminded Thread that isn't
-    held back goes in with its story and nothing is brought up.
+    stories, then how to bring each up; the ones to leave alone are left
+    out, for `format_threads_left_alone`. Without one, because the
+    Understanding failed, every reminded Thread that isn't held back goes in
+    with its story and nothing is brought up.
 
     Args:
         reminded: The Threads the Companion was reminded of.
@@ -270,7 +271,6 @@ def format_threads_for_reply(
     if form is None:
         mattering = [item.thread for item in reminded if not item.hold_back]
         bring_up_lines: list[str] = []
-        left_alone_lines: list[str] = []
     else:
         left_alone_ids = {item.thread_id for item in form.left_alone}
         mattering_titles = set(form.threads_touched) | {
@@ -285,9 +285,6 @@ def format_threads_for_reply(
         bring_up_lines = [
             f"- {item.title}: {BRING_UP_WORDS[item.how]}." for item in form.bring_up
         ]
-        left_alone_lines = [
-            f"- {item.title}: {item.reason}" for item in form.left_alone
-        ]
     sections = []
     if mattering:
         sections.append(
@@ -301,11 +298,22 @@ def format_threads_for_reply(
             "Bring up, the way a friend who remembers would:\n"
             + "\n".join(bring_up_lines)
         )
-    if left_alone_lines:
-        sections.append(
-            "Leave alone, don't raise these:\n" + "\n".join(left_alone_lines)
-        )
     return "\n\n".join(sections)
+
+
+def format_threads_left_alone(form: UnderstandingForm | None) -> str:
+    """Write the reply's section on the Life Threads to leave alone.
+
+    Args:
+        form: The Understanding's form; None if it couldn't be made.
+
+    Returns:
+        The Threads to leave alone, each with why; "" if there are none.
+    """
+    if form is None or not form.left_alone:
+        return ""
+    lines = [f"- {item.title}: {item.reason}" for item in form.left_alone]
+    return "Leave alone, don't raise these:\n" + "\n".join(lines)
 
 
 def find_threads_in(

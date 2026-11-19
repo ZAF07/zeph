@@ -237,10 +237,9 @@ def test_the_composer_offers_every_providers_tools_and_instructions_in_order(
     assert reply.parts == ["Hello there"]
     [call] = chat_model.calls
     assert [tool.name for tool in call.tools] == ["one", "two", "three"]
-    assert (
-        "They like tea.\n\nBreathing helps.\n\nUse one.\n\nUse none."
-        in call.instructions
-    )
+    assert "Use one.\n\nUse none." in call.instructions
+    assert "They like tea." in call.instructions
+    assert "Breathing helps." in call.instructions
     expected_context = ReplyContext(
         conversation_id=conversation_id, shared_photo_ids=tuple(shared_photo_ids)
     )
