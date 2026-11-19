@@ -68,6 +68,17 @@ describe("OnboardingGate", () => {
     expect(router.replace).not.toHaveBeenCalled();
   });
 
+  it("shows the loading panel while it checks", () => {
+    apiClient.getMe.mockReturnValue(new Promise(() => {}));
+
+    renderWithQueries(<OnboardingGate>Connect Telegram page</OnboardingGate>);
+
+    expect(
+      screen.getByRole("status", { name: "Loading your Dashboard" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Connect Telegram page")).not.toBeInTheDocument();
+  });
+
   it("does not show the page when the check fails", async () => {
     apiClient.getMe.mockRejectedValue(new Error("down"));
 
@@ -76,6 +87,9 @@ describe("OnboardingGate", () => {
     expect(
       await screen.findByRole("button", { name: "Try again" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "We couldn’t load this",
+    );
     expect(screen.queryByText("Connect Telegram page")).not.toBeInTheDocument();
   });
 

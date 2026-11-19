@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 
-import { secondaryButton } from "@/components/button-styles";
+import { LoadFailed } from "@/components/LoadFailed";
+import { LoadingPanel } from "@/components/LoadingPanel";
 import { useMe } from "@/lib/queries";
 
 /**
@@ -31,28 +32,13 @@ export function OnboardingGate({ children }: { children: ReactNode }) {
 
   if (me.isError) {
     return (
-      <div
-        role="alert"
-        className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-danger-line bg-danger-tint p-4 text-danger-deep"
-      >
-        <span className="text-sm">
-          We couldn’t load this. Nothing you’ve shared is lost.
-        </span>
-        <button
-          type="button"
-          className={secondaryButton}
-          onClick={() => void me.refetch()}
-        >
-          Try again
-        </button>
-      </div>
+      <LoadFailed
+        title="We couldn’t load this"
+        body="Nothing you’ve shared is lost."
+        onRetry={() => void me.refetch()}
+      />
     );
   }
 
-  return (
-    <div
-      aria-busy="true"
-      className="h-[200px] rounded-card border border-line bg-subtle"
-    />
-  );
+  return <LoadingPanel shape="banner" label="Loading your Dashboard" />;
 }
