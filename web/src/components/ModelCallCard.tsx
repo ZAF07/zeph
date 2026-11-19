@@ -2,6 +2,7 @@ import { useId } from "react";
 
 import { LockIcon } from "@/components/LockIcon";
 import { ModelCallContentDetails } from "@/components/ModelCallContentDetails";
+import { StatusPill } from "@/components/StatusPill";
 import type { ModelCall } from "@/lib/api-client";
 import {
   checkInShapeFacts,
@@ -41,29 +42,29 @@ export function ModelCallCard({ call }: { call: ModelCall }) {
   return (
     <article
       aria-labelledby={headingId}
-      className="flex flex-col gap-4 rounded-card border border-line bg-white px-[22px] py-5"
+      className="flex flex-col gap-4 rounded-card border border-line bg-panel px-6 py-[22px] text-[14px] text-text"
     >
       <div className="flex flex-wrap items-center gap-2.5">
-        <h2 id={headingId} className="m-0 text-[17px] font-semibold">
+        <h2 id={headingId} className="m-0 text-[17px] font-normal text-cream">
           {modelStepLabel(call.step)}
         </h2>
         {call.error ? (
-          <span className="inline-flex items-center rounded-full bg-danger-tint px-2.5 py-[3px] text-xs font-medium text-danger-deep">
+          <StatusPill filled={false} danger>
             {call.error}
-          </span>
+          </StatusPill>
         ) : null}
       </div>
       <dl className="m-0 grid grid-cols-[repeat(auto-fit,minmax(min(160px,100%),1fr))] gap-3">
         {facts.map((fact) => (
           <div key={fact.label} className="flex flex-col gap-0.5">
-            <dt className="text-caption text-ink-muted">{fact.label}</dt>
+            <dt className="text-[13px] text-soft">{fact.label}</dt>
             <dd className="m-0 break-words">{fact.value}</dd>
           </div>
         ))}
       </dl>
       {call.content ? (
         <details>
-          <summary className="cursor-pointer text-sm font-medium">
+          <summary className="cursor-pointer text-[14px] text-text">
             Content
           </summary>
           <div className="pt-3">
@@ -71,7 +72,7 @@ export function ModelCallCard({ call }: { call: ModelCall }) {
           </div>
         </details>
       ) : (
-        <p className="m-0 inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted">
+        <p className="m-0 inline-flex items-center gap-1.5 text-[12px] text-soft">
           <LockIcon />
           No content kept for this User
         </p>

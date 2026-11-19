@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 
 import { primaryButton, secondaryButton } from "@/components/button-styles";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { KnowledgeTextEditor } from "@/components/KnowledgeTextEditor";
 import { SavedNote } from "@/components/SavedNote";
@@ -10,8 +11,6 @@ import { TextChangesReview } from "@/components/TextChangesReview";
 import { ApiError, type KnowledgeDocumentWithText } from "@/lib/api-client";
 import { knowledgeStatusLabels } from "@/lib/knowledge-labels";
 import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes-warning";
-
-const leaveMessage = "You have unsaved text changes. Leave and lose them?";
 
 /**
  * A Knowledge document's Text section: the text Zeph draws on in the
@@ -37,11 +36,12 @@ export function KnowledgeTextSection({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
+  const [isConfirmingDiscard, setIsConfirmingDiscard] = useState(false);
 
   const savedText = knowledgeDocument.text ?? "";
   const text = draft ?? savedText;
   const hasUnsavedChanges = draft !== null && draft !== savedText;
-  useUnsavedChangesWarning(hasUnsavedChanges, leaveMessage);
+  const leaving = useUnsavedChangesWarning(hasUnsavedChanges);
 
   const openReview = useCallback(() => {
     if (hasUnsavedChanges) {
@@ -74,10 +74,9 @@ export function KnowledgeTextSection({
   }
 
   function discard() {
-    if (window.confirm("Discard your unsaved text changes?")) {
-      setDraft(null);
-      setSavedMessage(null);
-    }
+    setIsConfirmingDiscard(false);
+    setDraft(null);
+    setSavedMessage(null);
   }
 
   function edit(value: string) {
@@ -95,10 +94,13 @@ export function KnowledgeTextSection({
       className="flex flex-col gap-3"
     >
       <div className="flex flex-col gap-1">
-        <h2 id="document-text-heading" className="m-0 text-h3 font-semibold">
+        <h2
+          id="document-text-heading"
+          className="m-0 text-[17px] font-normal text-cream"
+        >
           Text
         </h2>
-        <p className="m-0 text-caption text-ink-muted">
+        <p className="m-0 text-[13px] text-soft">
           {knowledgeDocument.text === null && !isWaitingForFile
             ? "No text could be read from this file. Type or paste its text, then save to make it Ready."
             : "What Zeph draws on. Saving your changes re-indexes the document."}
@@ -119,11 +121,7 @@ export function KnowledgeTextSection({
             onSave={openReview}
             statusNote={
               <>
-                <span
-                  className={
-                    hasUnsavedChanges ? "font-medium text-orange-text" : ""
-                  }
-                >
+                <span className={hasUnsavedChanges ? "text-orange" : ""}>
                   {hasUnsavedChanges ? "Unsaved changes" : "Saved"}
                 </span>
                 {` · ${statusLabel}`}
@@ -144,7 +142,7 @@ export function KnowledgeTextSection({
               type="button"
               className={secondaryButton}
               disabled={!hasUnsavedChanges}
-              onClick={discard}
+              onClick={() => setIsConfirmingDiscard(true)}
             >
               Discard changes
             </button>
@@ -160,6 +158,30 @@ export function KnowledgeTextSection({
           error={saveError}
           onConfirm={() => void save()}
           onCancel={closeReview}
+        />
+      ) : null}
+
+      {isConfirmingDiscard ? (
+        <ConfirmDialog
+          open
+          title="Discard your unsaved text changes?"
+          body="Your edits since the last save aren’t kept."
+          cancelLabel="Keep editing"
+          confirmLabel="Discard"
+          onConfirm={discard}
+          onCancel={() => setIsConfirmingDiscard(false)}
+        />
+      ) : null}
+
+      {leaving.leavingTo !== null ? (
+        <ConfirmDialog
+          open
+          title="Leave and lose your text changes?"
+          body="Your edits since the last save aren’t kept."
+          cancelLabel="Keep editing"
+          confirmLabel="Leave"
+          onConfirm={leaving.leave}
+          onCancel={leaving.stay}
         />
       ) : null}
     </section>

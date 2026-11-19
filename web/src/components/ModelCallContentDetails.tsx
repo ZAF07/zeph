@@ -1,9 +1,9 @@
 import type { ModelCallContent } from "@/lib/api-client";
 
 const label =
-  "m-0 font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted";
+  "m-0 text-[11px] font-medium tracking-[1.5px] text-soft uppercase";
 const textBlock =
-  "m-0 max-h-[320px] overflow-auto whitespace-pre-wrap break-words rounded-lg bg-code px-3.5 py-3 font-mono text-xs";
+  "m-0 max-h-[320px] overflow-auto whitespace-pre-wrap break-words rounded-input bg-bg-deep px-3.5 py-3 font-mono text-[12px] text-text";
 
 /**
  * What a model call was given and answered: instructions, history, tools
@@ -29,9 +29,7 @@ export function ModelCallContentDetails({
         <ol className="m-0 flex list-none flex-col gap-1.5 p-0">
           {content.history.map((line, index) => (
             <li key={index} className="flex flex-col gap-0.5">
-              <span className="text-xs font-medium text-ink-muted">
-                {line.role}
-              </span>
+              <span className="text-[12px] text-soft">{line.role}</span>
               <pre className={textBlock}>{line.text}</pre>
             </li>
           ))}
@@ -40,7 +38,7 @@ export function ModelCallContentDetails({
       {content.tools_offered.length > 0 ? (
         <section className="flex flex-col gap-1.5">
           <h3 className={label}>Tools offered</h3>
-          <p className="m-0 text-sm">
+          <p className="m-0 text-[14px]">
             {content.tools_offered.map((tool) => tool.name).join(", ")}
           </p>
         </section>
@@ -51,7 +49,7 @@ export function ModelCallContentDetails({
           <ol className="m-0 flex list-none flex-col gap-2.5 p-0">
             {content.tool_calls.map((toolCall, index) => (
               <li key={index} className="flex flex-col gap-1">
-                <span className="text-sm font-medium">{toolCall.name}</span>
+                <span className="text-[14px] text-cream">{toolCall.name}</span>
                 <pre className={textBlock}>
                   {JSON.stringify(toolCall.arguments, null, 2)}
                 </pre>

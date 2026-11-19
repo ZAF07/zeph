@@ -14,9 +14,8 @@ export function SettingValueLine({
   value: unknown;
 }) {
   return (
-    <span className="whitespace-pre-wrap break-words text-ink-body">
-      <span className="text-ink-muted">{name}:</span>{" "}
-      {describeSettingValue(value)}
+    <span className="break-words whitespace-pre-wrap text-text">
+      <span className="text-soft">{name}:</span> {describeSettingValue(value)}
     </span>
   );
 }

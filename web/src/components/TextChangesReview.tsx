@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 
 import { primaryButton, secondaryButton } from "@/components/button-styles";
+import { dialogSurface } from "@/components/dialog-styles";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { compareTexts } from "@/lib/text-changes";
 
@@ -52,18 +53,21 @@ export function TextChangesReview({
   }, [isSaving, onCancel]);
 
   return (
-    <div className="fixed inset-0 z-[400] flex items-center justify-center bg-ink/40 p-4">
+    <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/60 p-4">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="review-changes-heading"
-        className="flex max-h-[min(90vh,820px)] w-full max-w-[860px] flex-col gap-4 rounded-panel bg-white p-6 shadow-xl"
+        className={`flex max-h-[min(90vh,820px)] w-full max-w-[860px] flex-col gap-4 px-7 py-[26px] ${dialogSurface}`}
       >
         <div className="flex flex-col gap-1">
-          <h2 id="review-changes-heading" className="m-0 text-h3 font-semibold">
+          <h2
+            id="review-changes-heading"
+            className="m-0 text-[20px] font-normal text-cream"
+          >
             Review changes
           </h2>
-          <p className="m-0 text-caption text-ink-muted">
+          <p className="m-0 text-[14px] text-soft">
             {comparison.addedWords}{" "}
             {comparison.addedWords === 1 ? "word" : "words"} added ·{" "}
             {comparison.removedWords}{" "}
@@ -73,14 +77,14 @@ export function TextChangesReview({
         </div>
         <div
           aria-label="Changes"
-          className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap break-words rounded-input border border-line bg-subtle p-4 font-mono text-[13px] leading-relaxed"
+          className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap break-words rounded-input border border-line bg-panel p-4 font-mono text-[13px] leading-relaxed text-text"
         >
           {comparison.parts.map((part, index) => {
             if (part.kind === "skipped") {
               return (
                 <span
                   key={index}
-                  className="mx-1 inline-block rounded bg-hover px-1.5 font-sans text-xs text-ink-muted"
+                  className="mx-1 inline-block rounded-[6px] bg-bg-deep px-1.5 font-sans text-[12px] text-soft"
                 >
                   {part.characters.toLocaleString("en-GB")} unchanged characters
                 </span>
@@ -90,7 +94,7 @@ export function TextChangesReview({
               return (
                 <ins
                   key={index}
-                  className="rounded-sm bg-blue-tint text-blue-deep no-underline"
+                  className="rounded-[4px] bg-zeph text-cream no-underline"
                 >
                   {part.text}
                 </ins>
@@ -100,7 +104,7 @@ export function TextChangesReview({
               return (
                 <del
                   key={index}
-                  className="rounded-sm bg-danger-tint text-danger-deep"
+                  className="rounded-[4px] text-danger line-through"
                 >
                   {part.text}
                 </del>

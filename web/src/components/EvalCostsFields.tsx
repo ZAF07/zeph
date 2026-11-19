@@ -5,6 +5,10 @@ import { useState, type FormEvent } from "react";
 
 import { primaryButton, secondaryButton } from "@/components/button-styles";
 import { fieldCaption, fieldLabel, inputField } from "@/components/form-styles";
+import { SavedNote } from "@/components/SavedNote";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
+import { tableHeadCell } from "@/components/table-styles";
+import { TableCards, type TableColumn } from "@/components/TableCards";
 import { ApiError, type EvalCosts } from "@/lib/api-client";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
@@ -69,12 +73,74 @@ export function EvalCostsFields({ costs }: { costs: EvalCosts }) {
     });
   }
 
+  /**
+   * A price row's model: its name, or a box for a new model's name, with
+   * "no price set" when both prices are empty.
+   *
+   * @param row - The row.
+   * @param index - Its place in the list.
+   * @returns The cell's content.
+   */
+  function modelCell(row: PriceRow, index: number) {
+    return (
+      <>
+        {savedModels.has(row.model) ? (
+          <span className="font-mono">{row.model}</span>
+        ) : (
+          <input
+            aria-label="Model name"
+            className={inputField}
+            value={row.model}
+            onChange={(event) =>
+              changeRow(index, { model: event.target.value })
+            }
+          />
+        )}
+        {row.sgdIn === "" && row.sgdOut === "" ? (
+          <span className="ml-2 text-[13px] text-soft">no price set</span>
+        ) : null}
+      </>
+    );
+  }
+
+  /**
+   * A box for one of a row's prices.
+   *
+   * @param row - The row.
+   * @param index - Its place in the list.
+   * @param price - Which price: in or out.
+   * @returns The box.
+   */
+  function priceCell(row: PriceRow, index: number, price: "sgdIn" | "sgdOut") {
+    return (
+      <input
+        aria-label={`${row.model || "New model"} ${price === "sgdIn" ? "SGD in" : "SGD out"}`}
+        className={inputField}
+        inputMode="decimal"
+        value={row[price]}
+        onChange={(event) => changeRow(index, { [price]: event.target.value })}
+      />
+    );
+  }
+
+  const priceColumns: TableColumn<{ row: PriceRow; index: number }>[] = [
+    { heading: "Model", cell: ({ row, index }) => modelCell(row, index) },
+    {
+      heading: "SGD in per 1M",
+      cell: ({ row, index }) => priceCell(row, index, "sgdIn"),
+    },
+    {
+      heading: "SGD out per 1M",
+      cell: ({ row, index }) => priceCell(row, index, "sgdOut"),
+    },
+  ];
+
   const error = saveMutation.error;
 
   return (
     <form onSubmit={save} className="flex flex-col gap-6">
       <section className="flex flex-col gap-3">
-        <h2 className="m-0 text-[17px] font-semibold">Model Prices</h2>
+        <h2 className="m-0 text-[17px] font-normal text-cream">Model Prices</h2>
         <p className={fieldCaption}>
           SGD per 1,000,000 tokens the model reads (in) and writes (out). Use
           DeepSeek’s peak, cache-miss price so estimates are never too low.
@@ -82,16 +148,12 @@ export function EvalCostsFields({ costs }: { costs: EvalCosts }) {
           cost, marked “no price set”, and never stop a run. A run keeps the
           prices it started with.
         </p>
-        <div className="overflow-x-auto rounded-xl border border-line bg-white">
-          <table className="w-full min-w-[560px] border-collapse text-sm">
+        <div className="overflow-x-auto rounded-card border border-line bg-panel max-[899px]:hidden">
+          <table className="w-full min-w-[560px] border-collapse text-[14px] text-text">
             <thead>
               <tr>
-                {["Model", "SGD in per 1M", "SGD out per 1M"].map((heading) => (
-                  <th
-                    key={heading}
-                    scope="col"
-                    className="border-b border-line bg-subtle px-[18px] py-3 text-left font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted"
-                  >
+                {priceColumns.map(({ heading }) => (
+                  <th key={heading} scope="col" className={tableHeadCell}>
                     {heading}
                   </th>
                 ))}
@@ -103,52 +165,23 @@ export function EvalCostsFields({ costs }: { costs: EvalCosts }) {
                   key={index}
                   className="border-b border-line last:border-b-0"
                 >
+                  <td className="px-[18px] py-2.5">{modelCell(row, index)}</td>
                   <td className="px-[18px] py-2.5">
-                    {savedModels.has(row.model) ? (
-                      <span className="font-mono">{row.model}</span>
-                    ) : (
-                      <input
-                        aria-label="Model name"
-                        className={inputField}
-                        value={row.model}
-                        onChange={(event) =>
-                          changeRow(index, { model: event.target.value })
-                        }
-                      />
-                    )}
-                    {row.sgdIn === "" && row.sgdOut === "" ? (
-                      <span className="ml-2 text-caption text-ink-muted">
-                        no price set
-                      </span>
-                    ) : null}
+                    {priceCell(row, index, "sgdIn")}
                   </td>
                   <td className="px-[18px] py-2.5">
-                    <input
-                      aria-label={`${row.model || "New model"} SGD in`}
-                      className={inputField}
-                      inputMode="decimal"
-                      value={row.sgdIn}
-                      onChange={(event) =>
-                        changeRow(index, { sgdIn: event.target.value })
-                      }
-                    />
-                  </td>
-                  <td className="px-[18px] py-2.5">
-                    <input
-                      aria-label={`${row.model || "New model"} SGD out`}
-                      className={inputField}
-                      inputMode="decimal"
-                      value={row.sgdOut}
-                      onChange={(event) =>
-                        changeRow(index, { sgdOut: event.target.value })
-                      }
-                    />
+                    {priceCell(row, index, "sgdOut")}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        <TableCards
+          columns={priceColumns}
+          rows={rows.map((row, index) => ({ row, index }))}
+          rowKey={({ index }) => String(index)}
+        />
         <div>
           <button
             type="button"
@@ -163,7 +196,9 @@ export function EvalCostsFields({ costs }: { costs: EvalCosts }) {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="m-0 text-[17px] font-semibold">Eval run token limit</h2>
+        <h2 className="m-0 text-[17px] font-normal text-cream">
+          Eval run token limit
+        </h2>
         <label className={`${fieldLabel} max-w-[320px]`}>
           Most tokens one run may use
           <input
@@ -181,16 +216,14 @@ export function EvalCostsFields({ costs }: { costs: EvalCosts }) {
       </section>
 
       {error ? (
-        <p role="alert" className="m-0 text-caption text-danger">
+        <SaveFailedNote>
           {error instanceof ApiError && error.detail
             ? error.detail
             : "Couldn’t save. Try again."}
-        </p>
+        </SaveFailedNote>
       ) : null}
       {saveMutation.isSuccess ? (
-        <p role="status" className="m-0 text-caption text-ink-muted">
-          Saved. New runs use these from now on.
-        </p>
+        <SavedNote>Saved. New runs use these from now on.</SavedNote>
       ) : null}
       <div>
         <button

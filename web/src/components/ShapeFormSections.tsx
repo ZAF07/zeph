@@ -32,13 +32,13 @@ export function ShapeFormSections({
         <section
           key={section.title}
           aria-label={section.title}
-          className="flex flex-col gap-5 rounded-card border border-line bg-white p-6"
+          className="flex flex-col gap-5 rounded-card border border-line bg-panel px-6 py-[22px]"
         >
           <header className="flex flex-col gap-1">
-            <h2 className="m-0 text-h3 font-semibold">{section.title}</h2>
-            <p className="m-0 text-caption text-ink-soft">
-              {section.description}
-            </p>
+            <h2 className="m-0 text-[17px] font-normal text-cream">
+              {section.title}
+            </h2>
+            <p className="m-0 text-[13px] text-soft">{section.description}</p>
           </header>
           <ShapeGroupFields
             fields={section.fields}

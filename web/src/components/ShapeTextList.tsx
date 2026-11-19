@@ -28,10 +28,10 @@ export function ShapeTextList({
   return (
     <section aria-label={field.label} className="flex min-w-0 flex-col gap-2">
       <div className="flex flex-col gap-1.5">
-        <h3 className="m-0 text-sm font-medium">
+        <h3 className="m-0 text-[15px] font-normal text-text">
           {field.label}
           {field.required ? null : (
-            <span className="font-normal text-ink-muted"> · optional</span>
+            <span className="text-soft"> · optional</span>
           )}
         </h3>
         <p className={fieldCaption}>{field.description}</p>
@@ -66,14 +66,14 @@ export function ShapeTextList({
             </button>
           </div>
           {errors[fieldPath(path, index)] ? (
-            <p role="alert" className="m-0 text-caption text-danger">
+            <p role="alert" className="m-0 text-[13px] text-danger">
               {errors[fieldPath(path, index)]}
             </p>
           ) : null}
         </div>
       ))}
       {error ? (
-        <p role="alert" className="m-0 text-caption text-danger">
+        <p role="alert" className="m-0 text-[13px] text-danger">
           {error}
         </p>
       ) : null}

@@ -15,13 +15,6 @@ import {
   knowledgeStatusLabels,
 } from "@/lib/knowledge-labels";
 
-/** The status tag's colours: orange while indexing, danger when it failed. */
-const statusTone = {
-  ready: "plain",
-  pending: "orange",
-  failed: "danger",
-} as const;
-
 /**
  * One Knowledge document as a card of the card list. The folded row shows
  * its title, source and tradition, its status and the day it was added.
@@ -61,7 +54,7 @@ export function KnowledgeDocumentCard({
       title={knowledgeDocument.title}
       summary={`${knowledgeDocument.source} · ${knowledgeDocument.tradition}`}
       tags={
-        <CardTag tone={statusTone[knowledgeDocument.status]}>
+        <CardTag tone={knowledgeStatusLabels[knowledgeDocument.status].tone}>
           {knowledgeStatusLabels[knowledgeDocument.status].label}
         </CardTag>
       }

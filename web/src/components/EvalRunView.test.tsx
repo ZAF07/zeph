@@ -85,6 +85,14 @@ async function waitForNextCheck() {
   });
 }
 
+function grid() {
+  return within(screen.getByRole("table"));
+}
+
+async function findGrid() {
+  return within(await screen.findByRole("table"));
+}
+
 describe("EvalRunView", () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -122,7 +130,9 @@ describe("EvalRunView", () => {
     renderWithQueries(<EvalRunView runId="run-1" />);
 
     await userEvent.click(
-      await screen.findByRole("button", {
+      await (
+        await findGrid()
+      ).findByRole("button", {
         name: "reminded-of-sister on Variant A",
       }),
     );
@@ -136,7 +146,7 @@ describe("EvalRunView", () => {
     expect(screen.getByText(/Suggests a lawyer\./)).toBeInTheDocument();
     expect(screen.getByText("2 checks, 1 failed")).toBeInTheDocument();
     await userEvent.click(
-      screen.getByRole("button", { name: "traffic on Variant A" }),
+      grid().getByRole("button", { name: "traffic on Variant A" }),
     );
     const erroredCard = screen.getByRole("listitem", { name: "traffic" });
     expect(
@@ -247,7 +257,9 @@ describe("EvalRunView", () => {
     renderWithQueries(<EvalRunView runId="run-1" />);
 
     await userEvent.click(
-      await screen.findByRole("button", { name: "plan on Variant A" }),
+      await (
+        await findGrid()
+      ).findByRole("button", { name: "plan on Variant A" }),
     );
     const card = screen.getByRole("listitem", { name: "plan" });
 
@@ -384,13 +396,15 @@ describe("EvalRunView", () => {
       apiClient.getEvalRun.mockResolvedValue(comparison);
       renderWithQueries(<EvalRunView runId="run-1" />);
 
-      const cellB = await screen.findByRole("button", {
+      const cellB = await (
+        await findGrid()
+      ).findByRole("button", {
         name: "plan on Variant B",
       });
       expect(within(cellB).getByText("1 of 2 passed")).toBeInTheDocument();
       expect(
         within(
-          screen.getByRole("button", { name: "plan on Variant A" }),
+          grid().getByRole("button", { name: "plan on Variant A" }),
         ).getByText("2 of 2 passed"),
       ).toBeInTheDocument();
       const totalsB = screen.getByRole("cell", { name: "Variant B totals" });

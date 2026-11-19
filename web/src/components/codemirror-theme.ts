@@ -6,33 +6,30 @@ import { tags } from "@lezer/highlight";
  * Reads a Zeph design token, with its value as a fallback.
  *
  * @param name - The token's name, like "line" for `--color-line`.
- * @param fallback - Its value on the Foundations screen.
+ * @param fallback - Its value in `design/tokens.css`.
  * @returns A CSS colour.
  */
 function color(name: string, fallback: string): string {
   return `var(--color-${name}, ${fallback})`;
 }
 
-const ink = color("ink", "#0a0a0a");
-const inkSoft = color("ink-soft", "#525252");
-const inkMuted = color("ink-muted", "#6b6b6b");
-const line = color("line", "#ebebeb");
-const lineStrong = color("line-strong", "#d4d4d4");
-const subtle = color("subtle", "#fafafa");
-const code = color("code", "#f4f4f5");
-const blue = color("blue", "#1f4fff");
-const blueTint = color("blue-tint", "#edf1ff");
-const blueDeep = color("blue-deep", "#1533b3");
-const yellow = color("yellow", "#ffc633");
-const yellowTint = color("yellow-tint", "#fff6cc");
-const orangeText = color("orange-text", "#c2410c");
+const text = color("text", "#eaf2f3");
+const soft = color("soft", "#bdd0d5");
+const mute = color("mute", "#9db6be");
+const cream = color("cream", "#f3e8d6");
+const ink = color("ink", "#0b2a3c");
+const line = color("line", "#2a5263");
+const lineStrong = color("line-strong", "#5b8b96");
+const bgDeep = color("bg-deep", "#071922");
+const zeph = color("zeph", "#2a5c66");
+const orange = color("orange", "#f0a050");
 
 /** The editor's look, in Zeph's colours and type. */
 export const zephEditorTheme = EditorView.theme({
   "&": {
     height: "100%",
-    backgroundColor: "#ffffff",
-    color: ink,
+    backgroundColor: "transparent",
+    color: text,
     fontSize: "14px",
   },
   "&.cm-focused": { outline: "none" },
@@ -41,28 +38,31 @@ export const zephEditorTheme = EditorView.theme({
     lineHeight: "1.7",
     overflow: "auto",
   },
-  ".cm-content": { padding: "16px 0", caretColor: blue },
+  ".cm-content": { padding: "16px 0", caretColor: cream },
   ".cm-line": { padding: "0 20px 0 14px" },
   ".cm-gutters": {
-    backgroundColor: subtle,
-    color: inkMuted,
+    backgroundColor: bgDeep,
+    color: mute,
     borderRight: `1px solid ${line}`,
   },
   ".cm-lineNumbers .cm-gutterElement": { padding: "0 10px 0 14px" },
-  ".cm-activeLine": { backgroundColor: "rgba(31, 79, 255, 0.04)" },
-  ".cm-activeLineGutter": { backgroundColor: blueTint, color: blueDeep },
-  ".cm-cursor": { borderLeftColor: blue, borderLeftWidth: "2px" },
+  ".cm-activeLine": { backgroundColor: bgDeep },
+  ".cm-activeLineGutter": { backgroundColor: zeph, color: text },
+  ".cm-cursor": { borderLeftColor: cream, borderLeftWidth: "2px" },
   "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, ::selection":
-    { backgroundColor: "#d6e0ff" },
+    { backgroundColor: zeph },
   ".cm-searchMatch": {
-    backgroundColor: yellowTint,
-    outline: `1px solid ${yellow}`,
+    backgroundColor: "transparent",
+    outline: `1px solid ${orange}`,
     borderRadius: "2px",
   },
-  ".cm-searchMatch.cm-searchMatch-selected": { backgroundColor: yellow },
-  ".cm-panels": {
-    backgroundColor: subtle,
+  ".cm-searchMatch.cm-searchMatch-selected": {
+    backgroundColor: orange,
     color: ink,
+  },
+  ".cm-panels": {
+    backgroundColor: bgDeep,
+    color: text,
   },
   ".cm-panels.cm-panels-top": { borderBottom: `1px solid ${line}` },
   ".cm-panel.cm-search": {
@@ -79,7 +79,7 @@ export const zephEditorTheme = EditorView.theme({
     display: "inline-flex",
     alignItems: "center",
     gap: "4px",
-    color: inkSoft,
+    color: soft,
   },
   ".cm-panel.cm-search [name=close]": {
     top: "10px",
@@ -88,7 +88,7 @@ export const zephEditorTheme = EditorView.theme({
     height: "28px",
     borderRadius: "999px",
     fontSize: "18px",
-    color: inkSoft,
+    color: soft,
     cursor: "pointer",
   },
   ".cm-textfield": {
@@ -97,8 +97,9 @@ export const zephEditorTheme = EditorView.theme({
     margin: 0,
     padding: "6px 10px",
     border: `1px solid ${lineStrong}`,
-    borderRadius: "8px",
-    backgroundColor: "#ffffff",
+    borderRadius: "10px",
+    backgroundColor: bgDeep,
+    color: text,
     fontSize: "14px",
   },
   ".cm-button": {
@@ -108,26 +109,25 @@ export const zephEditorTheme = EditorView.theme({
     border: `1px solid ${lineStrong}`,
     borderRadius: "999px",
     backgroundImage: "none",
-    backgroundColor: "#ffffff",
-    color: ink,
+    backgroundColor: "transparent",
+    color: text,
     fontSize: "13px",
     fontWeight: 500,
     cursor: "pointer",
     textTransform: "capitalize",
   },
-  ".cm-button:active": { backgroundImage: "none", backgroundColor: blueTint },
+  ".cm-button:active": { backgroundImage: "none", backgroundColor: zeph },
 });
 
 /** How Markdown is coloured in the editor. */
 export const zephMarkdownHighlight = HighlightStyle.define([
-  { tag: tags.heading, fontWeight: "600", color: ink },
-  { tag: tags.heading1, fontWeight: "700" },
-  { tag: tags.strong, fontWeight: "700" },
+  { tag: tags.heading, fontWeight: "400", color: cream },
+  { tag: tags.strong, fontWeight: "500", color: cream },
   { tag: tags.emphasis, fontStyle: "italic" },
-  { tag: tags.quote, color: inkSoft, fontStyle: "italic" },
-  { tag: tags.list, color: orangeText },
-  { tag: [tags.link, tags.url], color: blue },
-  { tag: tags.monospace, backgroundColor: code, borderRadius: "3px" },
-  { tag: [tags.processingInstruction, tags.meta], color: inkMuted },
-  { tag: tags.contentSeparator, color: inkMuted },
+  { tag: tags.quote, color: soft, fontStyle: "italic" },
+  { tag: tags.list, color: soft },
+  { tag: [tags.link, tags.url], color: soft, textDecoration: "underline" },
+  { tag: tags.monospace, backgroundColor: bgDeep, borderRadius: "3px" },
+  { tag: [tags.processingInstruction, tags.meta], color: mute },
+  { tag: tags.contentSeparator, color: mute },
 ]);

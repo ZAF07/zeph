@@ -5,7 +5,9 @@ import { useQuery } from "@tanstack/react-query";
 
 import { AdminPageHeader } from "@/components/AdminPageHeader";
 import { EvalPill } from "@/components/EvalPill";
+import { cardLink } from "@/components/card-styles";
 import { LoadFailed } from "@/components/LoadFailed";
+import { LoadingPanel } from "@/components/LoadingPanel";
 import { ApiError, type CaseHistoryEntry } from "@/lib/api-client";
 import { formatSavedAt } from "@/lib/dates";
 import { countOf, evalDetails, outcomeLabels } from "@/lib/evals";
@@ -51,7 +53,7 @@ export function CaseHistoryView({ caseKey }: { caseKey: string }) {
     historyQuery.error instanceof ApiError && historyQuery.error.status === 404;
 
   const backLink = (
-    <Link href="/admin/evals" className="w-fit text-sm font-medium">
+    <Link href="/admin/evals" className={`${cardLink} w-fit`}>
       ← Eval Runs
     </Link>
   );
@@ -61,13 +63,9 @@ export function CaseHistoryView({ caseKey }: { caseKey: string }) {
       <div className="flex flex-col gap-9">
         {backLink}
         {historyQuery.isPending ? (
-          <div
-            aria-busy="true"
-            aria-label="Loading the case"
-            className="h-[320px] rounded-xl border border-line bg-subtle"
-          />
+          <LoadingPanel shape="card" label="Loading the case" />
         ) : isNotFound ? (
-          <p className="m-0 rounded-card border border-dashed border-line-strong px-6 py-16 text-center text-caption text-ink-muted">
+          <p className="m-0 rounded-card border border-dashed border-line-strong px-6 py-[22px] text-[14px] text-soft">
             There’s no case named {caseKey}.
           </p>
         ) : (
@@ -90,14 +88,16 @@ export function CaseHistoryView({ caseKey }: { caseKey: string }) {
           history.case.archived ? ", archived" : ""
         }. How it went in its most recent runs, newest first.`}
       />
-      <details className="rounded-xl border border-line bg-white px-[18px] py-3.5">
-        <summary className="cursor-pointer font-medium">The case now</summary>
-        <pre className="m-0 mt-2 max-h-80 overflow-auto whitespace-pre-wrap rounded-lg bg-subtle px-3 py-2 font-mono text-xs">
+      <details className="rounded-card border border-line bg-panel px-[18px] py-3.5">
+        <summary className="cursor-pointer text-[15px] text-text">
+          The case now
+        </summary>
+        <pre className="m-0 mt-2 max-h-80 overflow-auto rounded-input bg-bg-deep px-3 py-2 font-mono text-[12px] whitespace-pre-wrap text-text">
           {JSON.stringify(history.case.content, null, 2)}
         </pre>
       </details>
       {history.entries.length === 0 ? (
-        <p className="m-0 rounded-card border border-dashed border-line-strong px-6 py-12 text-center text-caption text-ink-muted">
+        <p className="m-0 rounded-card border border-dashed border-line-strong px-6 py-[22px] text-[14px] text-soft">
           This case hasn’t run yet.
         </p>
       ) : (
@@ -106,14 +106,17 @@ export function CaseHistoryView({ caseKey }: { caseKey: string }) {
             const changes = describeChanges(entry);
             return (
               <li key={entry.result_id} className="flex flex-col">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-line bg-white px-[18px] py-3">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card border border-line bg-panel px-[18px] py-3 text-[14px] text-text">
                   <EvalPill {...outcomeLabels[entry.outcome]} />
-                  <Link href={`/admin/evals/runs/${entry.run_id}`}>
+                  <Link
+                    href={`/admin/evals/runs/${entry.run_id}`}
+                    className="underline"
+                  >
                     {formatSavedAt(entry.run_queued_at)}
                   </Link>
                   <Link
                     href={`/admin/evals/runs/${entry.run_id}/results/${entry.result_id}`}
-                    className="ml-auto text-caption"
+                    className="ml-auto text-[13px] underline"
                   >
                     Full trace
                   </Link>
@@ -121,7 +124,7 @@ export function CaseHistoryView({ caseKey }: { caseKey: string }) {
                 {changes ? (
                   <p
                     aria-label="Changed since the run before"
-                    className="m-0 ml-[18px] border-l-2 border-yellow-deep py-2 pl-3 text-caption text-yellow-deep"
+                    className="m-0 ml-[18px] border-l-2 border-orange py-2 pl-3 text-[13px] text-orange"
                   >
                     Changed since the run below: {changes}
                   </p>

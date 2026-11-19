@@ -1,4 +1,5 @@
 import { LockIcon } from "@/components/LockIcon";
+import { tableHeadCell } from "@/components/table-styles";
 import { TableCards, type TableColumn } from "@/components/TableCards";
 
 /**
@@ -42,11 +43,7 @@ export function DataTable<Row>({
           <thead>
             <tr>
               {columns.map((column) => (
-                <th
-                  key={column.heading}
-                  scope="col"
-                  className="border-b border-line px-[18px] py-3 text-left text-[11px] font-medium tracking-[1.5px] whitespace-nowrap text-soft uppercase"
-                >
+                <th key={column.heading} scope="col" className={tableHeadCell}>
                   {column.heading}
                 </th>
               ))}

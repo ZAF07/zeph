@@ -58,12 +58,12 @@ export function VariantOverridesEditor({
   return (
     <section
       aria-label={`Variant ${letter}`}
-      className="flex flex-col gap-3 rounded-xl border border-line bg-subtle px-[18px] py-3.5"
+      className="flex flex-col gap-3 rounded-card border border-line bg-panel px-[18px] py-3.5 text-[14px] text-text"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="m-0 text-body font-semibold">
+        <h3 className="m-0 text-[17px] font-normal text-cream">
           Variant {letter}{" "}
-          <span className="font-normal text-ink-muted">
+          <span className="text-soft">
             · {describeVariantSettings(keys.length)}
           </span>
         </h3>

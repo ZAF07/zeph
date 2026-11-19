@@ -59,8 +59,16 @@ const seeded: Helplines = {
   international_fallback: fallback,
 };
 
+function table() {
+  return within(screen.getByRole("table"));
+}
+
+async function findInTable(text: string): Promise<HTMLElement> {
+  return within(await screen.findByRole("table")).findByText(text);
+}
+
 function rowFor(name: string): HTMLElement {
-  const row = screen.getByText(name).closest("tr");
+  const row = table().getByText(name).closest("tr");
   if (!row) {
     throw new Error(`No row for ${name}`);
   }
@@ -76,12 +84,12 @@ describe("HelplinesManager", () => {
   it("lists every country's Helplines with the fallback last", async () => {
     renderWithQueries(<HelplinesManager />);
 
-    await screen.findByText("Samaritans of Singapore (SOS)");
+    await findInTable("Samaritans of Singapore (SOS)");
     const sosRow = within(rowFor("Samaritans of Singapore (SOS)"));
     expect(sosRow.getByText("Singapore")).toBeInTheDocument();
     expect(sosRow.getByText("1767")).toBeInTheDocument();
     expect(sosRow.getByText("24 hours")).toBeInTheDocument();
-    const rows = screen.getAllByRole("row");
+    const rows = table().getAllByRole("row");
     expect(rows.at(-1)).toHaveTextContent("International fallback");
     expect(rows.at(-1)).toHaveTextContent("findahelpline.com");
     expect(
@@ -94,12 +102,12 @@ describe("HelplinesManager", () => {
   it("filters by country", async () => {
     const user = userEvent.setup();
     renderWithQueries(<HelplinesManager />);
-    await screen.findByText("Samaritans");
+    await findInTable("Samaritans");
 
     await user.selectOptions(screen.getByLabelText("Country"), "Singapore");
 
-    expect(screen.queryByText("Samaritans")).toBeNull();
-    expect(screen.getByText("IMH Mental Health Helpline")).toBeVisible();
+    expect(table().queryByText("Samaritans")).toBeNull();
+    expect(table().getByText("IMH Mental Health Helpline")).toBeVisible();
   });
 
   it("adds a Helpline", async () => {
@@ -108,7 +116,7 @@ describe("HelplinesManager", () => {
     );
     const user = userEvent.setup();
     renderWithQueries(<HelplinesManager />);
-    await screen.findByText("Samaritans");
+    await findInTable("Samaritans");
 
     await user.click(screen.getByRole("button", { name: "Add Helpline" }));
     const form = within(screen.getByRole("form", { name: "Add Helpline" }));
@@ -132,7 +140,7 @@ describe("HelplinesManager", () => {
     apiClient.updateHelpline.mockResolvedValue({ ...imh, hours: "Mon–Fri" });
     const user = userEvent.setup();
     renderWithQueries(<HelplinesManager />);
-    await screen.findByText("IMH Mental Health Helpline");
+    await findInTable("IMH Mental Health Helpline");
 
     await user.click(
       within(rowFor("IMH Mental Health Helpline")).getByRole("button", {
@@ -161,7 +169,7 @@ describe("HelplinesManager", () => {
     );
     const user = userEvent.setup();
     renderWithQueries(<HelplinesManager />);
-    await screen.findByText("IMH Mental Health Helpline");
+    await findInTable("IMH Mental Health Helpline");
 
     await user.click(
       within(rowFor("IMH Mental Health Helpline")).getByRole("button", {
@@ -181,10 +189,10 @@ describe("HelplinesManager", () => {
     apiClient.updateInternationalFallback.mockResolvedValue(fallback);
     const user = userEvent.setup();
     renderWithQueries(<HelplinesManager />);
-    await screen.findByText("Find A Helpline");
+    await findInTable("Find A Helpline");
 
     await user.click(
-      screen.getByRole("button", { name: "Edit international fallback" }),
+      table().getByRole("button", { name: "Edit international fallback" }),
     );
     const form = within(
       screen.getByRole("form", { name: "Edit international fallback" }),
@@ -202,27 +210,36 @@ describe("HelplinesManager", () => {
   });
 
   it("removes a Helpline after confirming", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     apiClient.deleteHelpline.mockResolvedValue();
     const user = userEvent.setup();
     renderWithQueries(<HelplinesManager />);
-    await screen.findByText("Samaritans");
+    await findInTable("Samaritans");
 
-    await user.click(screen.getByRole("button", { name: "Remove Samaritans" }));
+    await user.click(
+      table().getByRole("button", { name: "Remove Samaritans" }),
+    );
 
-    expect(window.confirm).toHaveBeenCalledWith("Remove Samaritans?");
+    await user.click(
+      within(
+        screen.getByRole("alertdialog", { name: "Remove Samaritans?" }),
+      ).getByRole("button", { name: "Remove" }),
+    );
+
     expect(apiClient.deleteHelpline).toHaveBeenCalledWith("uk");
     expect(await screen.findByText("Removed Samaritans.")).toBeVisible();
   });
 
   it("keeps a Helpline when removing is not confirmed", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
     const user = userEvent.setup();
     renderWithQueries(<HelplinesManager />);
-    await screen.findByText("Samaritans");
+    await findInTable("Samaritans");
 
-    await user.click(screen.getByRole("button", { name: "Remove Samaritans" }));
+    await user.click(
+      table().getByRole("button", { name: "Remove Samaritans" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Keep it" }));
 
+    expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(apiClient.deleteHelpline).not.toHaveBeenCalled();
   });
 
@@ -230,23 +247,23 @@ describe("HelplinesManager", () => {
     apiClient.moveHelpline.mockResolvedValue([imh, sos]);
     const user = userEvent.setup();
     renderWithQueries(<HelplinesManager />);
-    await screen.findByText("Samaritans");
+    await findInTable("Samaritans");
 
     expect(
-      screen.getByRole("button", {
+      table().getByRole("button", {
         name: "Move Samaritans of Singapore (SOS) up",
       }),
     ).toBeDisabled();
     expect(
-      screen.getByRole("button", {
+      table().getByRole("button", {
         name: "Move IMH Mental Health Helpline down",
       }),
     ).toBeDisabled();
     expect(
-      screen.getByRole("button", { name: "Move Samaritans up" }),
+      table().getByRole("button", { name: "Move Samaritans up" }),
     ).toBeDisabled();
     await user.click(
-      screen.getByRole("button", {
+      table().getByRole("button", {
         name: "Move IMH Mental Health Helpline up",
       }),
     );
@@ -258,10 +275,10 @@ describe("HelplinesManager", () => {
     apiClient.moveHelpline.mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
     renderWithQueries(<HelplinesManager />);
-    await screen.findByText("Samaritans");
+    await findInTable("Samaritans");
 
     await user.click(
-      screen.getByRole("button", {
+      table().getByRole("button", {
         name: "Move IMH Mental Health Helpline up",
       }),
     );
@@ -281,7 +298,7 @@ describe("HelplinesManager", () => {
     renderWithQueries(<HelplinesManager />);
 
     expect(await screen.findByText("No Helplines yet")).toBeVisible();
-    expect(screen.getByText("Find A Helpline")).toBeVisible();
+    expect(table().getByText("Find A Helpline")).toBeVisible();
   });
 
   it("offers Try again when Helplines cannot be loaded", async () => {
@@ -293,6 +310,6 @@ describe("HelplinesManager", () => {
 
     await user.click(await screen.findByRole("button", { name: "Try again" }));
 
-    expect(await screen.findByText("Samaritans")).toBeVisible();
+    expect(await findInTable("Samaritans")).toBeVisible();
   });
 });

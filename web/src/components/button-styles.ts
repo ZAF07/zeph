@@ -11,12 +11,9 @@ export const primaryButton = `${base} border-cream bg-cream text-ink hover:text-
 /** A secondary action. */
 export const secondaryButton = `${base} border-soft bg-transparent text-text`;
 
-/** A quiet, link-like action. */
-export const quietButton = `${base} border border-transparent bg-transparent px-2 text-blue`;
-
 /** A small secondary action inside a table row. */
 export const compactSecondaryButton =
-  "inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full border border-line-strong bg-transparent px-3.5 py-2 text-sm font-medium leading-tight text-ink cursor-pointer disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex min-h-11 cursor-pointer items-center justify-center rounded-pill border border-line-strong bg-transparent px-3.5 text-[13px] font-medium whitespace-nowrap text-text disabled:cursor-not-allowed disabled:text-mute";
 
 /**
  * An action inside an admin table row, drawn as the Users page's "Manage":

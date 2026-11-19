@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { secondaryButton } from "@/components/button-styles";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { DataTable } from "@/components/DataTable";
 import { EmptyState } from "@/components/EmptyState";
 import { FieldSelect } from "@/components/FieldSelect";
 import { FormSectionHeading } from "@/components/FormSectionHeading";
@@ -12,6 +14,7 @@ import { LoadFailed } from "@/components/LoadFailed";
 import { LoadingPanel } from "@/components/LoadingPanel";
 import { SavedNote } from "@/components/SavedNote";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
+import type { TableColumn } from "@/components/TableCards";
 import type {
   ApiClient,
   Helpline,
@@ -37,12 +40,10 @@ type FormSetup = {
   save: (input: HelplineInput) => Promise<string>;
 };
 
-const headings = ["Country", "Name", "Number", "Hours", "Order"];
-
-const headCell =
-  "whitespace-nowrap border-b border-line px-[18px] py-3.5 text-left text-[11px] font-medium uppercase tracking-[1.5px] text-soft";
-
-const cell = "px-[18px] py-3.5";
+/** One row of the table: a country's Helpline, or the international fallback. */
+type HelplineRow =
+  | { kind: "helpline"; helpline: Helpline }
+  | { kind: "fallback"; helpline: Helpline };
 
 const iconButton =
   "inline-flex size-11 cursor-pointer items-center justify-center rounded-pill border border-line-strong bg-transparent text-text disabled:cursor-not-allowed disabled:text-mute";
@@ -156,6 +157,7 @@ export function HelplinesManager() {
   const [countryFilter, setCountryFilter] = useState("all");
   const [editing, setEditing] = useState<Editing | null>(null);
   const [flash, setFlash] = useState<Flash | null>(null);
+  const [removing, setRemoving] = useState<Helpline | null>(null);
 
   const helplinesQuery = useQuery({
     queryKey: queryKeys.helplines,
@@ -208,9 +210,7 @@ export function HelplinesManager() {
   }
 
   function remove(helpline: Helpline) {
-    if (!window.confirm(`Remove ${helpline.name}?`)) {
-      return;
-    }
+    setRemoving(null);
     runRowAction(
       helpline,
       () => apiClient.deleteHelpline(helpline.id),
@@ -241,6 +241,111 @@ export function HelplinesManager() {
   const shownHelplines = helplines.filter(
     (helpline) => countryFilter === "all" || helpline.country === countryFilter,
   );
+
+  const rows: HelplineRow[] = [
+    ...shownHelplines.map((helpline) => ({
+      kind: "helpline" as const,
+      helpline,
+    })),
+    { kind: "fallback", helpline: fallback },
+  ];
+  const columns: TableColumn<HelplineRow>[] = [
+    {
+      heading: "Country",
+      cell: (row) =>
+        row.kind === "fallback"
+          ? "International fallback"
+          : countryName(row.helpline.country ?? ""),
+    },
+    { heading: "Name", isMain: true, cell: (row) => row.helpline.name },
+    {
+      heading: "Number",
+      cell: (row) => (
+        <span className="tabular-nums">{row.helpline.number}</span>
+      ),
+    },
+    { heading: "Hours", cell: (row) => row.helpline.hours ?? "—" },
+    {
+      heading: "Order",
+      cell: (row) => {
+        if (row.kind === "fallback") {
+          return <span className="text-soft">Always last</span>;
+        }
+        const { helpline } = row;
+        const { position, total } = placeInCountry(helplines, helpline);
+        const isBusy = busyId === helpline.id;
+        return (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-4 tabular-nums">{position}</span>
+            <button
+              type="button"
+              className={iconButton}
+              aria-label={`Move ${helpline.name} up`}
+              disabled={isBusy || position === 1}
+              onClick={() => move(helpline, "up")}
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              className={iconButton}
+              aria-label={`Move ${helpline.name} down`}
+              disabled={isBusy || position === total}
+              onClick={() => move(helpline, "down")}
+            >
+              ↓
+            </button>
+          </span>
+        );
+      },
+    },
+    {
+      heading: "Actions",
+      cell: (row) => {
+        if (row.kind === "fallback") {
+          return (
+            <button
+              type="button"
+              className={secondaryButton}
+              aria-label="Edit international fallback"
+              onClick={() => {
+                setEditing({ kind: "fallback" });
+                setFlash(null);
+              }}
+            >
+              Edit
+            </button>
+          );
+        }
+        const { helpline } = row;
+        const isBusy = busyId === helpline.id;
+        return (
+          <span className="inline-flex gap-1.5">
+            <button
+              type="button"
+              className={secondaryButton}
+              disabled={isBusy}
+              onClick={() => {
+                setEditing({ kind: "edit", helpline });
+                setFlash(null);
+              }}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              className={iconButton}
+              aria-label={`Remove ${helpline.name}`}
+              disabled={isBusy}
+              onClick={() => setRemoving(helpline)}
+            >
+              ✕
+            </button>
+          </span>
+        );
+      },
+    },
+  ];
 
   return (
     <section
@@ -305,108 +410,28 @@ export function HelplinesManager() {
         />
       ) : null}
 
-      <div className="relative overflow-x-auto rounded-card border border-line bg-panel">
-        <table className="w-full min-w-[760px] border-collapse text-[14px]">
-          <thead>
-            <tr>
-              {headings.map((heading) => (
-                <th key={heading} scope="col" className={headCell}>
-                  {heading}
-                </th>
-              ))}
-              <th scope="col" className={headCell}>
-                <span className="sr-only">Actions</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {shownHelplines.map((helpline) => {
-              const { position, total } = placeInCountry(helplines, helpline);
-              const isBusy = busyId === helpline.id;
-              return (
-                <tr key={helpline.id} className="border-b border-line">
-                  <td className={cell}>
-                    {countryName(helpline.country ?? "")}
-                  </td>
-                  <td className={`${cell} text-text`}>{helpline.name}</td>
-                  <td className={`${cell} tabular-nums`}>{helpline.number}</td>
-                  <td className={cell}>{helpline.hours ?? "—"}</td>
-                  <td className={cell}>
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="w-4 tabular-nums">{position}</span>
-                      <button
-                        type="button"
-                        className={iconButton}
-                        aria-label={`Move ${helpline.name} up`}
-                        disabled={isBusy || position === 1}
-                        onClick={() => move(helpline, "up")}
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        className={iconButton}
-                        aria-label={`Move ${helpline.name} down`}
-                        disabled={isBusy || position === total}
-                        onClick={() => move(helpline, "down")}
-                      >
-                        ↓
-                      </button>
-                    </span>
-                  </td>
-                  <td className={`${cell} text-right`}>
-                    <span className="inline-flex gap-1.5">
-                      <button
-                        type="button"
-                        className={secondaryButton}
-                        disabled={isBusy}
-                        onClick={() => {
-                          setEditing({ kind: "edit", helpline });
-                          setFlash(null);
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className={iconButton}
-                        aria-label={`Remove ${helpline.name}`}
-                        disabled={isBusy}
-                        onClick={() => remove(helpline)}
-                      >
-                        ✕
-                      </button>
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-            <tr className="bg-bg-deep">
-              <td className={cell}>International fallback</td>
-              <td className={cell}>{fallback.name}</td>
-              <td className={cell}>{fallback.number}</td>
-              <td className={cell}>{fallback.hours ?? "—"}</td>
-              <td className={`${cell} text-soft`}>Always last</td>
-              <td className={`${cell} text-right`}>
-                <button
-                  type="button"
-                  className={secondaryButton}
-                  aria-label="Edit international fallback"
-                  onClick={() => {
-                    setEditing({ kind: "fallback" });
-                    setFlash(null);
-                  }}
-                >
-                  Edit
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        rows={rows}
+        rowKey={(row) =>
+          row.kind === "fallback" ? "fallback" : row.helpline.id
+        }
+        minWidthClass="min-w-[760px]"
+      />
       <p className="m-0 text-[13px] text-soft">
         Shared with Users whose country has no Helplines. It can’t be removed.
       </p>
+      {removing ? (
+        <ConfirmDialog
+          open
+          title={`Remove ${removing.name}?`}
+          body="Users in its country stop being shown it. You can add it again later."
+          cancelLabel="Keep it"
+          confirmLabel="Remove"
+          onConfirm={() => remove(removing)}
+          onCancel={() => setRemoving(null)}
+        />
+      ) : null}
     </section>
   );
 }

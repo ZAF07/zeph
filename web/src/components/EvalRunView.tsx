@@ -8,7 +8,9 @@ import { EvalRunActions } from "@/components/EvalRunActions";
 import { EvalRunGrid } from "@/components/EvalRunGrid";
 import { EvalRunSnapshotDetails } from "@/components/EvalRunSnapshotDetails";
 import { EvalVariantsPanel } from "@/components/EvalVariantsPanel";
+import { cardLink } from "@/components/card-styles";
 import { LoadFailed } from "@/components/LoadFailed";
+import { LoadingPanel } from "@/components/LoadingPanel";
 import type { EvalRunDetails } from "@/lib/api-client";
 import { formatSavedAt } from "@/lib/dates";
 import {
@@ -72,11 +74,7 @@ export function EvalRunView({ runId }: { runId: string }) {
         onRetry={() => void runQuery.refetch()}
       />
     ) : (
-      <div
-        aria-busy="true"
-        aria-label="Loading run"
-        className="h-[320px] rounded-xl border border-line bg-subtle"
-      />
+      <LoadingPanel shape="card" label="Loading run" />
     );
   }
 
@@ -88,22 +86,25 @@ export function EvalRunView({ runId }: { runId: string }) {
   return (
     <div className="flex flex-col gap-[22px]">
       <header className="flex flex-col gap-2">
-        <Link href="/admin/evals" className="text-caption text-ink-muted">
+        <Link href="/admin/evals" className={`${cardLink} w-fit`}>
           ← Eval Runs
         </Link>
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="m-0 text-h1 font-normal">
+          <h1 className="m-0 text-[32px] leading-[1.15] font-normal text-cream">
             {describeEvals(run.evals)}
           </h1>
           <EvalPill {...runStateLabels[run.state]} />
         </div>
-        <p className="m-0 text-body text-ink-soft">
+        <p className="m-0 text-[14px] text-soft">
           Started {startedBy}, {formatSavedAt(run.queued_at)}.
           {run.rerun_of ? (
             <>
               {" "}
               Re-runs the failed cases of{" "}
-              <Link href={`/admin/evals/runs/${run.rerun_of}`}>
+              <Link
+                href={`/admin/evals/runs/${run.rerun_of}`}
+                className="underline"
+              >
                 an earlier run
               </Link>
               .
@@ -114,46 +115,49 @@ export function EvalRunView({ runId }: { runId: string }) {
 
       <EvalRunActions run={run} />
 
-      <div className="flex flex-wrap gap-x-8 gap-y-2 rounded-xl border border-line bg-white px-[18px] py-3.5">
+      <div className="flex flex-wrap gap-x-8 gap-y-2 rounded-card border border-line bg-panel px-[18px] py-3.5 text-[14px] text-text">
         <p className="m-0" aria-live="polite">
           {progressText(run)}
         </p>
         <p className="m-0">{describeTotals(run)}</p>
-        <p className="m-0 text-ink-muted">
+        <p className="m-0 text-soft">
           {formatTokens(run.tokens_in, run.tokens_out)}
         </p>
-        <p className="m-0 text-ink-muted">{describeCost(run)}</p>
+        <p className="m-0 text-soft">{describeCost(run)}</p>
       </div>
       {run.errored > 0 ? (
-        <p className="m-0 text-caption text-ink-muted">
+        <p className="m-0 text-[13px] text-soft">
           Errors are cases that couldn’t be checked, such as the model not
           answering. They don’t count as fails.
         </p>
       ) : null}
       {run.cancel_requested && isRunGoing(run.state) ? (
-        <p className="m-0 text-caption text-ink-muted">
+        <p className="m-0 text-[13px] text-soft">
           Cancelling. The run stops after the case it is on, keeping every
           finished case.
         </p>
       ) : null}
       {run.state === "cancelled" ? (
-        <p className="m-0 text-caption text-ink-muted">
+        <p className="m-0 text-[13px] text-soft">
           An Admin cancelled this run. The cases finished before it stopped are
           kept.
         </p>
       ) : null}
       {run.state === "stopped_over_limit" ? (
-        <p className="m-0 text-caption text-ink-muted">
+        <p className="m-0 text-[13px] text-soft">
           This run went over its token limit
           {run.token_limit !== null
             ? ` of ${run.token_limit.toLocaleString("en")}`
             : ""}{" "}
           and stopped by itself. The limit is set on{" "}
-          <Link href="/admin/evals/costs">Model Prices</Link>.
+          <Link href="/admin/evals/costs" className="underline">
+            Model Prices
+          </Link>
+          .
         </p>
       ) : null}
       {run.state === "interrupted" ? (
-        <p className="m-0 text-caption text-ink-muted">
+        <p className="m-0 text-[13px] text-soft">
           The runner stopped during this run, so it ended early. It isn’t
           started again by itself, since runs cost money.
         </p>
@@ -166,7 +170,7 @@ export function EvalRunView({ runId }: { runId: string }) {
       {run.results.length > 0 ? (
         <EvalRunGrid run={run} />
       ) : (
-        <div className="rounded-card border border-dashed border-line-strong px-6 py-12 text-center text-caption text-ink-muted">
+        <div className="rounded-card border border-dashed border-line-strong px-6 py-[22px] text-[14px] text-soft">
           Case Results appear here as each case finishes.
         </div>
       )}

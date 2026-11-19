@@ -8,6 +8,8 @@ import { primaryButton, secondaryButton } from "@/components/button-styles";
 import { EvalRunEstimateNote } from "@/components/EvalRunEstimateNote";
 import { fieldCaption, fieldLabel, inputField } from "@/components/form-styles";
 import { LoadFailed } from "@/components/LoadFailed";
+import { LoadingPanel } from "@/components/LoadingPanel";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { VariantOverridesEditor } from "@/components/VariantOverridesEditor";
 import {
   ApiError,
@@ -132,18 +134,16 @@ export function NewEvalRunForm() {
         onRetry={() => void evalsQuery.refetch()}
       />
     ) : (
-      <div
-        aria-busy="true"
-        aria-label="Loading Evals"
-        className="h-[320px] rounded-xl border border-line bg-subtle"
-      />
+      <LoadingPanel shape="card" label="Loading Evals" />
     );
   }
 
   return (
     <form onSubmit={start} className="flex flex-col gap-5">
       <fieldset className="m-0 flex flex-col gap-2.5 border-0 p-0">
-        <legend className="mb-2.5 text-body font-medium">Evals to run</legend>
+        <legend className="mb-2.5 text-[15px] font-normal text-text">
+          Evals to run
+        </legend>
         {evals.map((summary) => {
           const details = evalDetails[summary.eval];
           const count = summary.case_keys.length;
@@ -154,30 +154,30 @@ export function NewEvalRunForm() {
           return (
             <div
               key={summary.eval}
-              className="flex flex-col gap-1.5 rounded-xl border border-line bg-white px-[18px] py-3.5"
+              className="flex flex-col gap-1.5 rounded-card border border-line bg-panel px-[18px] py-3.5 text-[14px] text-text"
             >
               <label className="flex cursor-pointer items-start gap-3">
                 <input
                   type="checkbox"
-                  className="mt-1 size-4"
+                  className="mt-1 size-4 accent-cream"
                   checked={isWhole}
                   disabled={count === 0}
                   onChange={() => toggleEval(summary.eval)}
                 />
                 <span className="flex flex-col gap-0.5">
-                  <span className="font-medium">
+                  <span className="text-[15px] text-cream">
                     {details.label}{" "}
-                    <span className="font-normal text-ink-muted">
+                    <span className="text-soft">
                       · {countOf(count, "case")}
                     </span>
                   </span>
-                  <span className="text-caption text-ink-soft">
+                  <span className="text-[13px] text-soft">
                     {details.checks}
                   </span>
                 </span>
               </label>
               {count > 0 ? (
-                <details className="ml-7 text-caption text-ink-muted">
+                <details className="ml-7 text-[13px] text-soft">
                   <summary className="cursor-pointer">
                     {isWhole
                       ? "Cases"
@@ -188,10 +188,10 @@ export function NewEvalRunForm() {
                   <ul className="m-0 mt-1.5 flex list-none flex-col gap-1 p-0">
                     {summary.case_keys.map((key) => (
                       <li key={key}>
-                        <label className="flex cursor-pointer items-center gap-2 font-mono text-xs">
+                        <label className="flex min-h-11 cursor-pointer items-center gap-2 font-mono text-[12px] text-text">
                           <input
                             type="checkbox"
-                            className="size-3.5"
+                            className="size-3.5 accent-cream"
                             checked={isWhole || singleCases.includes(key)}
                             disabled={isWhole}
                             onChange={() => toggleCase(key)}
@@ -208,7 +208,9 @@ export function NewEvalRunForm() {
         })}
       </fieldset>
       <fieldset className="m-0 flex flex-col gap-2.5 border-0 p-0">
-        <legend className="mb-1 text-body font-medium">Variants</legend>
+        <legend className="mb-1 text-[15px] font-normal text-text">
+          Variants
+        </legend>
         <p className={`${fieldCaption} mb-1.5`}>
           Each Variant runs the same cases, side by side. A runs the live
           settings unless you change some; add B or C to try other settings.
@@ -230,16 +232,12 @@ export function NewEvalRunForm() {
             />
           ))
         ) : choicesQuery.isError ? (
-          <p className="m-0 text-caption text-danger">
+          <p className="m-0 text-[13px] text-danger">
             Couldn’t load the settings to change. The run can still use the live
             settings.
           </p>
         ) : (
-          <div
-            aria-busy="true"
-            aria-label="Loading settings"
-            className="h-[64px] rounded-xl border border-line bg-subtle"
-          />
+          <LoadingPanel shape="card" label="Loading settings" />
         )}
         {choices && variants.length < variantLetters.length ? (
           <div>
@@ -274,20 +272,20 @@ export function NewEvalRunForm() {
       {caseCount > 0 ? (
         <EvalRunEstimateNote runRequest={runRequest} />
       ) : (
-        <p className="m-0 text-caption text-ink-muted">
+        <p className="m-0 text-[13px] text-soft">
           Each case calls DeepSeek, so a run costs money. Pick Evals or cases to
           see an estimate.
         </p>
       )}
-      <p className="m-0 text-caption text-ink-muted">
+      <p className="m-0 text-[13px] text-soft">
         Cases are run as they are now; edit them under Cases.
       </p>
       {startMutation.isError ? (
-        <p role="alert" className="m-0 text-caption text-danger">
+        <SaveFailedNote>
           {refusal
             ? `Couldn’t start the run: ${refusal}`
             : "Couldn’t start the run. Try again."}
-        </p>
+        </SaveFailedNote>
       ) : null}
       <div>
         <button

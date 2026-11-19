@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { EvalCaseForm } from "@/components/EvalCaseForm";
 import { LoadFailed } from "@/components/LoadFailed";
+import { LoadingPanel } from "@/components/LoadingPanel";
 import type { EvalName } from "@/lib/api-client";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
@@ -53,13 +54,7 @@ export function EvalCaseEditor({
     shape === undefined ||
     (caseKey !== undefined && existing === undefined)
   ) {
-    return (
-      <div
-        aria-busy="true"
-        aria-label="Loading the case"
-        className="h-[420px] rounded-xl border border-line bg-subtle"
-      />
-    );
+    return <LoadingPanel shape="card" label="Loading the case" />;
   }
   return (
     <EvalCaseForm

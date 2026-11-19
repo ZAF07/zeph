@@ -44,7 +44,7 @@ export function EvalImageField({
     <div className="flex flex-col gap-2.5">
       {name ? (
         <div className="flex flex-wrap items-center gap-3">
-          <div className="relative size-24 overflow-hidden rounded-input border border-line bg-subtle">
+          <div className="relative size-24 overflow-hidden rounded-input border border-line bg-bg-deep">
             {image.url ? (
               <Image
                 src={image.url}
@@ -56,7 +56,7 @@ export function EvalImageField({
               />
             ) : null}
           </div>
-          <span className="font-mono text-caption text-ink-muted">{name}</span>
+          <span className="font-mono text-[13px] text-soft">{name}</span>
           <button
             type="button"
             className={compactSecondaryButton}
@@ -72,7 +72,7 @@ export function EvalImageField({
         type="file"
         accept="image/png,image/jpeg,image/webp"
         disabled={disabled || uploadMutation.isPending}
-        className="text-caption"
+        className="text-[13px] text-soft file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-pill file:border file:border-line-strong file:bg-transparent file:px-3.5 file:font-[inherit] file:text-[13px] file:font-medium file:text-text"
         onChange={(event) => {
           const file = event.target.files?.[0];
           if (file) {
@@ -81,10 +81,10 @@ export function EvalImageField({
         }}
       />
       {uploadMutation.isPending ? (
-        <p className="m-0 text-caption text-ink-muted">Uploading…</p>
+        <p className="m-0 text-[13px] text-soft">Uploading…</p>
       ) : null}
       {uploadMutation.isError ? (
-        <p role="alert" className="m-0 text-caption text-danger">
+        <p role="alert" className="m-0 text-[13px] text-danger">
           Couldn’t upload it. Use a PNG, JPEG or WebP image of at most 5 MB.
         </p>
       ) : null}

@@ -360,8 +360,6 @@ describe("KnowledgeDocumentView", () => {
   });
 
   it("discards unsaved changes only after confirming", async () => {
-    const confirm = vi.spyOn(window, "confirm");
-    confirm.mockReturnValueOnce(false).mockReturnValueOnce(true);
     renderWithQueries(<KnowledgeDocumentView documentId="breathing" />);
     const editor = await screen.findByRole("textbox", {
       name: "Text of Mindful breathing",
@@ -371,16 +369,22 @@ describe("KnowledgeDocumentView", () => {
     const discard = screen.getByRole("button", { name: "Discard changes" });
 
     await userEvent.click(discard);
+    await userEvent.click(screen.getByRole("button", { name: "Keep editing" }));
     expect(editor).toHaveTextContent(/^x# Mindful/);
     await userEvent.click(discard);
+    await userEvent.click(
+      within(
+        screen.getByRole("alertdialog", {
+          name: "Discard your unsaved text changes?",
+        }),
+      ).getByRole("button", { name: "Discard" }),
+    );
 
-    expect(confirm).toHaveBeenCalledWith("Discard your unsaved text changes?");
     expect(editor).toHaveTextContent(/^# Mindful/);
     expect(screen.getByText("Saved")).toBeInTheDocument();
   });
 
   it("asks before following a link with unsaved changes", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     renderWithQueries(<KnowledgeDocumentView documentId="breathing" />);
     const editor = await screen.findByRole("textbox", {
       name: "Text of Mindful breathing",
@@ -390,14 +394,22 @@ describe("KnowledgeDocumentView", () => {
 
     await userEvent.click(screen.getByRole("link", { name: "← Knowledge" }));
 
-    expect(confirm).toHaveBeenCalledWith(
-      "You have unsaved text changes. Leave and lose them?",
+    const leave = within(
+      screen.getByRole("alertdialog", {
+        name: "Leave and lose your text changes?",
+      }),
     );
+    expect(router.push).not.toHaveBeenCalled();
+    await userEvent.click(leave.getByRole("button", { name: "Keep editing" }));
     expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+    expect(router.push).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("link", { name: "← Knowledge" }));
+    await userEvent.click(screen.getByRole("button", { name: "Leave" }));
+    expect(router.push).toHaveBeenCalledWith("/admin/knowledge");
   });
 
   it("replaces an edited document's file after confirming", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     apiClient.getKnowledgeDocument.mockResolvedValue({
       ...breathing,
       text_edited: true,
@@ -428,9 +440,15 @@ describe("KnowledgeDocumentView", () => {
       replace.getByRole("button", { name: "Replace file" }),
     );
 
-    expect(confirm).toHaveBeenCalledWith(
-      expect.stringContaining("Replacing the file replaces those edits"),
+    const confirm = within(
+      screen.getByRole("alertdialog", { name: "Replace your edited text?" }),
     );
+    expect(
+      confirm.getByText(/Replacing the file replaces those edits/),
+    ).toBeInTheDocument();
+    expect(apiClient.replaceKnowledgeDocumentFile).not.toHaveBeenCalled();
+    await userEvent.click(confirm.getByRole("button", { name: "Replace" }));
+
     expect(apiClient.replaceKnowledgeDocumentFile).toHaveBeenCalledWith(
       "breathing",
       file,
@@ -552,20 +570,21 @@ describe("KnowledgeDocumentView", () => {
 
   it("deletes the document after confirming, then goes back to the list", async () => {
     apiClient.deleteKnowledgeDocument.mockResolvedValue(undefined);
-    const confirm = vi.spyOn(window, "confirm");
-    confirm.mockReturnValueOnce(false).mockReturnValueOnce(true);
     renderWithQueries(<KnowledgeDocumentView documentId="breathing" />);
     const remove = await screen.findByRole("button", {
       name: "Delete document",
     });
 
     await userEvent.click(remove);
+    await userEvent.click(screen.getByRole("button", { name: "Keep it" }));
     expect(apiClient.deleteKnowledgeDocument).not.toHaveBeenCalled();
     await userEvent.click(remove);
-
-    expect(confirm).toHaveBeenCalledWith(
-      "Delete Mindful breathing? Zeph will stop drawing on it.",
+    await userEvent.click(
+      within(
+        screen.getByRole("alertdialog", { name: "Delete Mindful breathing?" }),
+      ).getByRole("button", { name: "Delete" }),
     );
+
     expect(apiClient.deleteKnowledgeDocument).toHaveBeenCalledWith("breathing");
     expect(router.push).toHaveBeenCalledWith("/admin/knowledge");
   });

@@ -44,33 +44,40 @@ export const evalDetails: Record<EvalName, { label: string; checks: string }> =
 /** Every Eval, in the order shown. */
 export const evalOrder = Object.keys(evalDetails) as EvalName[];
 
-/** Each run state's label and pill colours. */
+/** Each run state's label and pill look: cream when finished, danger when it
+ * ended early, outlined otherwise. */
 export const runStateLabels: Record<
   EvalRunState,
   { label: string; pill: string }
 > = {
-  queued: { label: "Queued", pill: "bg-subtle text-ink-body" },
-  running: { label: "Running", pill: "bg-yellow-tint text-yellow-deep" },
-  finished: { label: "Finished", pill: "bg-blue-tint text-blue-deep" },
-  cancelled: { label: "Cancelled", pill: "bg-subtle text-ink-body" },
+  queued: { label: "Queued", pill: "border border-line-strong text-soft" },
+  running: { label: "Running", pill: "border border-line-strong text-soft" },
+  finished: { label: "Finished", pill: "bg-cream text-ink" },
+  cancelled: {
+    label: "Cancelled",
+    pill: "border border-line-strong text-soft",
+  },
   stopped_over_limit: {
     label: "Stopped over limit",
-    pill: "bg-danger-tint text-danger-deep",
+    pill: "border border-danger text-danger",
   },
   interrupted: {
     label: "Interrupted",
-    pill: "bg-danger-tint text-danger-deep",
+    pill: "border border-danger text-danger",
   },
 };
 
-/** Each outcome's label and pill colours. */
+/**
+ * Each outcome's label and pill look: cream for a pass, danger for a fail,
+ * outlined for an error, which doesn't count as a fail.
+ */
 export const outcomeLabels: Record<
   CaseOutcome,
   { label: string; pill: string }
 > = {
-  pass: { label: "Pass", pill: "bg-blue-tint text-blue-deep" },
-  fail: { label: "Fail", pill: "bg-danger-tint text-danger-deep" },
-  error: { label: "Error", pill: "bg-yellow-tint text-yellow-deep" },
+  pass: { label: "Pass", pill: "bg-cream text-ink" },
+  fail: { label: "Fail", pill: "border border-danger text-danger" },
+  error: { label: "Error", pill: "border border-line-strong text-soft" },
 };
 
 /**

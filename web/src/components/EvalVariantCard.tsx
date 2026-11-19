@@ -51,16 +51,16 @@ export function EvalVariantCard({
   return (
     <section
       aria-label={`Variant ${variant.letter}`}
-      className="flex flex-col gap-2.5 rounded-xl border border-line bg-white px-[18px] py-3.5"
+      className="flex flex-col gap-2.5 rounded-card border border-line bg-panel px-[18px] py-3.5 text-[14px] text-text"
     >
-      <h2 className="m-0 text-body font-semibold">
+      <h2 className="m-0 text-[17px] font-normal text-cream">
         Variant {variant.letter}{" "}
-        <span className="font-normal text-ink-muted">
+        <span className="text-soft">
           · {describeVariantSettings(keys.length)}
         </span>
       </h2>
       {keys.length > 0 ? (
-        <ul className="m-0 flex list-none flex-col gap-2 p-0 text-caption">
+        <ul className="m-0 flex list-none flex-col gap-2 p-0 text-[13px]">
           {keys.map((key) => {
             const then = thenValueOf(key);
             const override = variant.setting_overrides[key];
@@ -79,12 +79,12 @@ export function EvalVariantCard({
               <li key={key} className="flex flex-col gap-0.5">
                 {isShort(then) && isShort(override) ? (
                   <>
-                    <span className="font-medium">{labelOf(key)}</span>
+                    <span className="text-text">{labelOf(key)}</span>
                     {lines}
                   </>
                 ) : (
                   <details>
-                    <summary className="cursor-pointer font-medium">
+                    <summary className="cursor-pointer text-text">
                       {labelOf(key)}
                     </summary>
                     <div className="mt-1 flex flex-col gap-1">{lines}</div>
@@ -96,8 +96,8 @@ export function EvalVariantCard({
         </ul>
       ) : null}
       {madeLive ? (
-        <div className="flex flex-col gap-0.5 rounded-lg bg-blue-tint px-3 py-2 text-caption text-blue-deep">
-          <p className="m-0 font-medium">
+        <div className="flex flex-col gap-0.5 rounded-note border border-line bg-bg-deep px-3.5 py-2.5 text-[13px] text-text">
+          <p className="m-0 text-cream">
             Made live by {madeLive.by_name ?? "an Admin"},{" "}
             {formatSavedAt(madeLive.at)}.
           </p>

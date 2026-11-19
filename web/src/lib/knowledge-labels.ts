@@ -1,3 +1,4 @@
+import type { CardTagTone } from "@/components/CardTag";
 import type { KnowledgeFileType, KnowledgeStatus } from "@/lib/api-client";
 
 /** The traditions an Admin can file a Knowledge document under. */
@@ -18,14 +19,17 @@ export const knowledgeFileTypeLabels: Record<KnowledgeFileType, string> = {
   pdf: "PDF",
 };
 
-/** Each Knowledge status's label and pill colours, in the order counted. */
+/**
+ * Each Knowledge status's label and tag tone, in the order counted: orange
+ * while indexing, danger when it failed.
+ */
 export const knowledgeStatusLabels: Record<
   KnowledgeStatus,
-  { label: string; pill: string }
+  { label: string; tone: CardTagTone }
 > = {
-  ready: { label: "Ready", pill: "bg-blue-tint text-blue-deep" },
-  pending: { label: "Pending", pill: "bg-yellow-tint text-yellow-deep" },
-  failed: { label: "Failed", pill: "bg-danger-tint text-danger-deep" },
+  ready: { label: "Ready", tone: "plain" },
+  pending: { label: "Pending", tone: "orange" },
+  failed: { label: "Failed", tone: "danger" },
 };
 
 /** Every Knowledge status, in the order counted. */

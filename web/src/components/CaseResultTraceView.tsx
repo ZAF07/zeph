@@ -5,7 +5,10 @@ import { useQuery } from "@tanstack/react-query";
 
 import { AdminPageHeader } from "@/components/AdminPageHeader";
 import { CaseResultCard } from "@/components/CaseResultCard";
+import { cardLink } from "@/components/card-styles";
 import { LoadFailed } from "@/components/LoadFailed";
+import { LoadingPanel } from "@/components/LoadingPanel";
+import { StatTiles } from "@/components/StatTiles";
 import { ModelCallCard } from "@/components/ModelCallCard";
 import { ApiError } from "@/lib/api-client";
 import { evalDetails } from "@/lib/evals";
@@ -38,10 +41,7 @@ export function CaseResultTraceView({
     traceQuery.error instanceof ApiError && traceQuery.error.status === 404;
 
   const backLink = (
-    <Link
-      href={`/admin/evals/runs/${runId}`}
-      className="w-fit text-sm font-medium"
-    >
+    <Link href={`/admin/evals/runs/${runId}`} className={`${cardLink} w-fit`}>
       ← Eval Run
     </Link>
   );
@@ -51,13 +51,9 @@ export function CaseResultTraceView({
       <div className="flex flex-col gap-9">
         {backLink}
         {traceQuery.isPending ? (
-          <div
-            aria-busy="true"
-            aria-label="Loading the trace"
-            className="h-[420px] rounded-xl border border-line bg-subtle"
-          />
+          <LoadingPanel shape="card" label="Loading the trace" />
         ) : isNotFound ? (
-          <p className="m-0 rounded-card border border-dashed border-line-strong px-6 py-16 text-center text-caption text-ink-muted">
+          <p className="m-0 rounded-card border border-dashed border-line-strong px-6 py-[22px] text-[14px] text-soft">
             This Case Result is gone. Its run may have been deleted.
           </p>
         ) : (
@@ -98,25 +94,15 @@ export function CaseResultTraceView({
       <ol className="m-0 list-none p-0">
         <CaseResultCard runId={runId} result={result} />
       </ol>
-      <dl className="m-0 grid grid-cols-[repeat(auto-fit,minmax(min(180px,100%),1fr))] gap-3">
-        {totals.map((total) => (
-          <div
-            key={total.label}
-            className="flex flex-col gap-0.5 rounded-card border border-line bg-white px-[18px] py-4"
-          >
-            <dt className="text-caption text-ink-muted">{total.label}</dt>
-            <dd className="m-0 text-[22px] font-normal">{total.value}</dd>
-          </div>
-        ))}
-      </dl>
-      <p className="m-0 text-caption text-ink-muted">
+      <StatTiles tiles={totals} />
+      <p className="m-0 text-[13px] text-soft">
         The case’s own tokens also count the Judge, whose calls aren’t listed
         here.
       </p>
       {calls.length > 0 ? (
         calls.map((call) => <ModelCallCard key={call.id} call={call} />)
       ) : (
-        <p className="m-0 rounded-card border border-dashed border-line-strong px-6 py-12 text-center text-caption text-ink-muted">
+        <p className="m-0 rounded-card border border-dashed border-line-strong px-6 py-[22px] text-[14px] text-soft">
           This case made no model calls.
         </p>
       )}
