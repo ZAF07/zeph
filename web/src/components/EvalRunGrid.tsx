@@ -21,13 +21,13 @@ import {
 type GridCardRow = { kind: "case"; caseKey: string } | { kind: "totals" };
 
 /**
- * Gives a phone card its key. The totals card's key can't be a case key.
+ * Gives a phone card its key.
  *
  * @param row - The card's row.
  * @returns The key.
  */
 function cardRowKey(row: GridCardRow): string {
-  return row.kind === "totals" ? "\u0000totals" : row.caseKey;
+  return row.kind === "totals" ? "totals" : `case:${row.caseKey}`;
 }
 
 /**

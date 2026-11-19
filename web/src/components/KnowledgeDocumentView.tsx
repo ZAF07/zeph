@@ -248,7 +248,7 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
         <ConfirmDialog
           open
           title={`Delete ${knowledgeDocument.title}?`}
-          body="Zeph will stop drawing on it straight away. This can’t be undone."
+          body="This can’t be undone."
           cancelLabel="Keep it"
           confirmLabel="Delete"
           onConfirm={remove}

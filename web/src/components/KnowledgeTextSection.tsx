@@ -177,7 +177,7 @@ export function KnowledgeTextSection({
         <ConfirmDialog
           open
           title="Leave and lose your text changes?"
-          body="You have unsaved text changes. Your edits since the last save aren’t kept."
+          body="Your edits since the last save aren’t kept."
           cancelLabel="Keep editing"
           confirmLabel="Leave"
           onConfirm={leaving.leave}
