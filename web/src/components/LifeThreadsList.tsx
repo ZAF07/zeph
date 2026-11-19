@@ -8,7 +8,7 @@ import { MemoriesPanelHeading } from "@/components/MemoriesPanelHeading";
 import { MemoryCard } from "@/components/MemoryCard";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type { LifeThread } from "@/lib/api-client";
-import { type Copy, fillPlaceholders, readCopy } from "@/lib/copy";
+import { type Copy, fillCopy, readCopy } from "@/lib/copy";
 import { formatShortDay } from "@/lib/dates";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
@@ -62,10 +62,9 @@ export function LifeThreadsList({
           {threads.map((thread) => (
             <li key={thread.id}>
               <MemoryCard
-                deleteLabel={fillPlaceholders(
-                  readCopy(copy, "memories.threads.delete"),
-                  { story: thread.title },
-                )}
+                deleteLabel={fillCopy(copy, "memories.threads.delete", {
+                  story: thread.title,
+                })}
                 isDeleting={deleteThread.isPending}
                 onDelete={() => deleteThread.mutate(thread.id)}
                 compact
@@ -90,12 +89,9 @@ export function LifeThreadsList({
                     {thread.story}
                   </p>
                   <span className="text-[12px] text-soft">
-                    {fillPlaceholders(
-                      readCopy(copy, "memories.threads.updated"),
-                      {
-                        day: formatShortDay(thread.updated_at, timeZone),
-                      },
-                    )}
+                    {fillCopy(copy, "memories.threads.updated", {
+                      day: formatShortDay(thread.updated_at, timeZone),
+                    })}
                   </span>
                 </div>
               </MemoryCard>

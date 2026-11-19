@@ -9,7 +9,7 @@ import { MemoriesPanelHeading } from "@/components/MemoriesPanelHeading";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { SharedPhotoPicture } from "@/components/SharedPhotoPicture";
 import type { SharedPhoto } from "@/lib/api-client";
-import { type Copy, fillPlaceholders, readCopy } from "@/lib/copy";
+import { type Copy, fillCopy, readCopy } from "@/lib/copy";
 import { formatShortDay } from "@/lib/dates";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
@@ -62,8 +62,7 @@ export function SharedPhotosList({
         <ol className="m-0 flex list-none flex-col gap-6 p-0">
           {photos.map((photo) => {
             const day = formatShortDay(photo.sent_at, timeZone);
-            const withDay = (slot: string) =>
-              fillPlaceholders(readCopy(copy, slot), { day });
+            const withDay = (slot: string) => fillCopy(copy, slot, { day });
             return (
               <li
                 key={photo.id}

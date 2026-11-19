@@ -1,5 +1,5 @@
 import type { MemoryItem } from "@/lib/api-client";
-import { type Copy, fillPlaceholders, readCopy } from "@/lib/copy";
+import { type Copy, fillCopy } from "@/lib/copy";
 import { formatShortDay } from "@/lib/dates";
 
 /**
@@ -20,7 +20,7 @@ export function memorySourceLabel(
     item.source === "onboarding"
       ? "memories.items.from_onboarding"
       : "memories.items.from_conversation";
-  return fillPlaceholders(readCopy(copy, slot), {
+  return fillCopy(copy, slot, {
     day: formatShortDay(item.updated_at, timeZone),
   });
 }

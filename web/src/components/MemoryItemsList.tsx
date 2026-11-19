@@ -10,12 +10,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PillLink } from "@/components/PillLink";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type { MemoryGroup } from "@/lib/api-client";
-import {
-  type Copy,
-  countSlotKey,
-  fillPlaceholders,
-  readCopy,
-} from "@/lib/copy";
+import { type Copy, countSlotKey, fillCopy, readCopy } from "@/lib/copy";
 import { memorySourceLabel } from "@/lib/memories";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
@@ -98,10 +93,9 @@ export function MemoryItemsList({
                 </div>
                 <button
                   type="button"
-                  aria-label={fillPlaceholders(
-                    readCopy(copy, "memories.items.delete"),
-                    { memory: item.content },
-                  )}
+                  aria-label={fillCopy(copy, "memories.items.delete", {
+                    memory: item.content,
+                  })}
                   className={deleteIconButton}
                   disabled={isDeleting}
                   onClick={() => {

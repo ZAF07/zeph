@@ -8,7 +8,7 @@ import { MemoryCard } from "@/components/MemoryCard";
 import { MemoryDetailLine } from "@/components/MemoryDetailLine";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type { ConversationSummary } from "@/lib/api-client";
-import { type Copy, fillPlaceholders, readCopy } from "@/lib/copy";
+import { type Copy, fillCopy, readCopy } from "@/lib/copy";
 import { formatShortDay } from "@/lib/dates";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
@@ -65,10 +65,9 @@ export function ConversationSummariesList({
             return (
               <li key={summary.id}>
                 <MemoryCard
-                  deleteLabel={fillPlaceholders(
-                    readCopy(copy, "memories.summaries.delete"),
-                    { day },
-                  )}
+                  deleteLabel={fillCopy(copy, "memories.summaries.delete", {
+                    day,
+                  })}
                   isDeleting={deleteSummary.isPending}
                   onDelete={() => deleteSummary.mutate(summary.id)}
                 >

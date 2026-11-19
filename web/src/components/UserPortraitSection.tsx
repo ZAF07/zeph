@@ -7,7 +7,7 @@ import { MemoriesPanelHeading } from "@/components/MemoriesPanelHeading";
 import { MemoryCard } from "@/components/MemoryCard";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type { UserPortrait } from "@/lib/api-client";
-import { type Copy, fillPlaceholders, readCopy } from "@/lib/copy";
+import { type Copy, fillCopy, readCopy } from "@/lib/copy";
 import { formatShortDay } from "@/lib/dates";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
@@ -63,7 +63,7 @@ export function UserPortraitSection({
               {portrait.text}
             </p>
             <span className="text-[12px] text-soft">
-              {fillPlaceholders(readCopy(copy, "memories.about.written"), {
+              {fillCopy(copy, "memories.about.written", {
                 day: formatShortDay(portrait.updated_at, timeZone),
               })}
             </span>
