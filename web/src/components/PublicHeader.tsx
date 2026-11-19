@@ -6,13 +6,19 @@ import type { ReactNode } from "react";
  * left, actions on the right. Below 900px it takes the phone layout and the
  * nav links are hidden.
  *
- * @param props - `nav` is the nav links, if any; `actions` sits on the right.
+ * @param props - `wordmark` is the Zeph wordmark linking home and
+ *   `homeLinkLabel` that link's name for screen readers; `nav` is the nav
+ *   links, if any; `actions` sits on the right.
  * @returns The header.
  */
 export function PublicHeader({
+  wordmark,
+  homeLinkLabel,
   nav,
   actions,
 }: {
+  wordmark: string;
+  homeLinkLabel: string;
   nav?: ReactNode;
   actions: ReactNode;
 }) {
@@ -21,10 +27,10 @@ export function PublicHeader({
       <div className="flex flex-wrap items-center gap-x-12 gap-y-2">
         <Link
           href="/"
-          aria-label="Zeph home"
+          aria-label={homeLinkLabel}
           className="text-[26px] font-normal tracking-[0.2px] text-cream no-underline max-[899px]:text-[24px]"
         >
-          Zeph
+          {wordmark}
         </Link>
         <nav className="flex flex-wrap items-center gap-x-2.5 gap-y-1 max-[899px]:hidden">
           {nav}

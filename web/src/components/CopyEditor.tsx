@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { CardSaveBar } from "@/components/CardSaveBar";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { CopySlotField } from "@/components/CopySlotField";
 import { CopyTabs } from "@/components/CopyTabs";
 import { LoadFailed } from "@/components/LoadFailed";
@@ -12,11 +13,13 @@ import { ApiError } from "@/lib/api-client";
 import type { Copy } from "@/lib/copy";
 import { saveFailedMessage } from "@/lib/save-failed-message";
 import { useCopyPage, useSaveCopyTab } from "@/lib/use-copy-page";
+import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes-warning";
 
 /**
  * The Copy page's editor: a tab per website page, the chosen tab's slots in
  * page order and one save bar that saves the tab's changes together. A save
- * the backend turns away shows each reason on its slot.
+ * the backend turns away shows each reason on its slot. Switching tabs or
+ * leaving the page with unsaved edits asks first.
  *
  * @returns The editor, or a loading panel or error with Try again.
  */
@@ -25,7 +28,16 @@ export function CopyEditor() {
   const saveTab = useSaveCopyTab();
   const [selectedTab, setSelectedTab] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Copy>({});
+  const [switchingTo, setSwitchingTo] = useState<string | null>(null);
   const tabs = pageQuery.data;
+  const tab = tabs?.find((found) => found.tab === selectedTab) ?? tabs?.[0];
+  const changedTexts: Copy = Object.fromEntries(
+    (tab?.slots ?? [])
+      .filter((slot) => (drafts[slot.key] ?? slot.text) !== slot.text)
+      .map((slot) => [slot.key, drafts[slot.key] ?? slot.text]),
+  );
+  const isDirty = Object.keys(changedTexts).length > 0;
+  const leaving = useUnsavedChangesWarning(isDirty);
 
   if (!tabs) {
     if (pageQuery.isError) {
@@ -40,17 +52,10 @@ export function CopyEditor() {
     return <LoadingPanel shape="card" label="Loading Copy" />;
   }
 
-  const tab = tabs.find((found) => found.tab === selectedTab) ?? tabs[0];
   if (!tab) {
     return null;
   }
 
-  const changedTexts: Copy = Object.fromEntries(
-    tab.slots
-      .filter((slot) => (drafts[slot.key] ?? slot.text) !== slot.text)
-      .map((slot) => [slot.key, drafts[slot.key] ?? slot.text]),
-  );
-  const isDirty = Object.keys(changedTexts).length > 0;
   const slotErrors =
     saveTab.error instanceof ApiError ? saveTab.error.fields : {};
 
@@ -64,6 +69,23 @@ export function CopyEditor() {
     saveTab.reset();
   }
 
+  function switchTab(tabKey: string) {
+    setSwitchingTo(null);
+    setSelectedTab(tabKey);
+    discard();
+  }
+
+  function chooseTab(tabKey: string) {
+    if (tabKey === tab?.tab) {
+      return;
+    }
+    if (isDirty) {
+      setSwitchingTo(tabKey);
+    } else {
+      switchTab(tabKey);
+    }
+  }
+
   function save(tabKey: string) {
     saveTab.mutate(
       { tab: tabKey, texts: changedTexts },
@@ -73,14 +95,7 @@ export function CopyEditor() {
 
   return (
     <>
-      <CopyTabs
-        tabs={tabs}
-        selected={tab.tab}
-        onSelect={(tabKey) => {
-          setSelectedTab(tabKey);
-          discard();
-        }}
-      />
+      <CopyTabs tabs={tabs} selected={tab.tab} onSelect={chooseTab} />
       <section
         role="tabpanel"
         aria-label={tab.name}
@@ -107,6 +122,28 @@ export function CopyEditor() {
       </section>
       {saveTab.isSuccess ? (
         <SavedNote>Saved. It shows on the next page load.</SavedNote>
+      ) : null}
+      {switchingTo !== null ? (
+        <ConfirmDialog
+          open
+          title="Switch tabs and lose your changes?"
+          body="Your edits on this tab since the last save aren’t kept."
+          cancelLabel="Keep editing"
+          confirmLabel="Switch tab"
+          onConfirm={() => switchTab(switchingTo)}
+          onCancel={() => setSwitchingTo(null)}
+        />
+      ) : null}
+      {leaving.leavingTo !== null ? (
+        <ConfirmDialog
+          open
+          title="Leave and lose your changes?"
+          body="Your edits on this tab since the last save aren’t kept."
+          cancelLabel="Keep editing"
+          confirmLabel="Leave"
+          onConfirm={leaving.leave}
+          onCancel={leaving.stay}
+        />
       ) : null}
     </>
   );

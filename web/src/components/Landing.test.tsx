@@ -2,10 +2,15 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { Landing } from "@/components/Landing";
-import { markedCopy, seedCopy, withoutMarkedCopy } from "@/test/copy";
+import {
+  markedCopy,
+  seedCopy,
+  wordsNotFromCopy,
+  withoutMarkedCopy,
+} from "@/test/copy";
 
 describe("Landing", () => {
-  it("shows only Copy text in every section; icons aside, it has no words of its own", () => {
+  it("shows only Copy text in every section, header and footer included; icons aside, it has no words of its own", () => {
     const { container } = render(<Landing copy={markedCopy()} />);
 
     const sections = container.querySelectorAll("section");
@@ -17,6 +22,7 @@ describe("Landing", () => {
         .forEach((icon) => icon.remove());
       expect(withoutMarkedCopy(words.textContent ?? "")).toBe("");
     }
+    expect(wordsNotFromCopy(container)).toEqual([]);
     expect(screen.getByRole("heading", { level: 1 }).textContent?.trim()).toBe(
       "⟦landing.hero.heading_first_line⟧ ⟦landing.hero.heading_second_line⟧",
     );
@@ -75,5 +81,15 @@ describe("Landing", () => {
       "/#faq",
     );
     expect(footer.getByText(/© 2026 Zeph/)).toBeInTheDocument();
+  });
+
+  it("shows an Admin's changed footer copyright", () => {
+    const copy = { ...seedCopy(), "shared.footer.copyright": "© 2027 Zeph" };
+
+    render(<Landing copy={copy} />);
+
+    expect(
+      within(screen.getByRole("contentinfo")).getByText("© 2027 Zeph"),
+    ).toBeInTheDocument();
   });
 });

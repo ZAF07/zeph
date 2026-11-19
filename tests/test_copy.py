@@ -81,17 +81,25 @@ def test_signed_out_visitors_read_every_slot_from_the_seed(
     assert response.json() == {"texts": seed_texts()}
 
 
-def test_admin_sees_the_landing_tab_with_slots_in_page_order(
+def test_admin_sees_each_tab_with_slots_in_page_order(
     client: TestClient, auth_verifier: FakeAuthVerifier
 ) -> None:
     headers = owner_headers(client, auth_verifier)
 
     tabs = client.get("/api/admin/copy", headers=headers).json()["tabs"]
 
-    assert [(tab["tab"], tab["name"]) for tab in tabs] == [("landing", "Landing")]
-    seed = yaml.safe_load(COPY_SEED_FILE.read_text())[0]["slots"]
+    assert [(tab["tab"], tab["name"]) for tab in tabs] == [
+        ("landing", "Landing"),
+        ("pricing", "Pricing"),
+        ("how_it_works", "How it works"),
+        ("shared", "Shared"),
+    ]
+    seed = yaml.safe_load(COPY_SEED_FILE.read_text())
+    for tab, seed_tab in zip(tabs, seed, strict=True):
+        assert [slot["key"] for slot in tab["slots"]] == [
+            slot["key"] for slot in seed_tab["slots"]
+        ]
     slots = tabs[0]["slots"]
-    assert [slot["key"] for slot in slots] == [slot["key"] for slot in seed]
     heading = slots[3]
     del heading["updated_at"]
     assert heading == {
@@ -134,6 +142,34 @@ def test_a_tab_save_applies_every_change_and_shows_on_the_next_read(
     public = client.get("/api/copy").json()["texts"]
     assert public["landing.hero.heading_first_line"] == "Think Slower,"
     assert public["landing.hero.sign_up_button"] == "Start Free"
+
+
+def test_the_shared_tab_saves_on_its_own_and_turns_away_a_pricing_slot(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+
+    turned_away = client.put(
+        "/api/admin/copy/shared",
+        json={
+            "texts": {
+                "shared.footer.copyright": "© 2027 Zeph",
+                "pricing.plus.button": "Try Plus",
+            }
+        },
+        headers=headers,
+    )
+    saved = client.put(
+        "/api/admin/copy/shared",
+        json={"texts": {"shared.footer.copyright": "© 2027 Zeph"}},
+        headers=headers,
+    )
+
+    assert turned_away.status_code == 422
+    assert saved.status_code == 200
+    public = client.get("/api/copy").json()["texts"]
+    assert public["shared.footer.copyright"] == "© 2027 Zeph"
+    assert public["pricing.plus.button"] == "Start Plus"
 
 
 def test_each_bad_text_turns_away_the_whole_save_with_a_reason_on_its_slot(

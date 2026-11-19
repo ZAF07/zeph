@@ -32,3 +32,24 @@ export function markedCopy(): Copy {
 export function withoutMarkedCopy(text: string): string {
   return text.replace(/⟦[^⟧]*⟧/g, "").trim();
 }
+
+/**
+ * Says what words on a rendered page did not come from marked Copy: its
+ * text, icons aside, and every label read out by screen readers. Bare
+ * numbers, such as step numbers, are not words.
+ *
+ * @param container - The rendered page.
+ * @returns Each piece of text not from Copy; empty when every word is Copy.
+ */
+export function wordsNotFromCopy(container: HTMLElement): string[] {
+  const words = container.cloneNode(true) as HTMLElement;
+  words
+    .querySelectorAll("[aria-hidden='true']")
+    .forEach((icon) => icon.remove());
+  const labels = Array.from(words.querySelectorAll("[aria-label]")).map(
+    (element) => element.getAttribute("aria-label") ?? "",
+  );
+  return [words.textContent ?? "", ...labels]
+    .map((text) => withoutMarkedCopy(text).replace(/\d/g, "").trim())
+    .filter((text) => text !== "");
+}

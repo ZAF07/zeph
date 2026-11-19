@@ -15,19 +15,19 @@ import { type Copy, readCopy } from "@/lib/copy";
  */
 const plans = [
   {
-    slotPrefix: "landing.pricing.free",
+    slotPrefix: "pricing.free",
     features: 3,
     badge: false,
     primary: false,
   },
   {
-    slotPrefix: "landing.pricing.plus",
+    slotPrefix: "pricing.plus",
     features: 4,
     badge: true,
     primary: true,
   },
   {
-    slotPrefix: "landing.pricing.pro",
+    slotPrefix: "pricing.pro",
     features: 4,
     badge: false,
     primary: false,
@@ -51,7 +51,7 @@ function planDetails(
     badge: plan.badge ? text("badge") : undefined,
     blurb: text("blurb"),
     price: text("price"),
-    perMonth: readCopy(copy, "landing.pricing.per_month"),
+    perMonth: readCopy(copy, "pricing.per_month"),
     features: Array.from({ length: plan.features }, (_, index) =>
       text(`feature_${index + 1}`),
     ),
@@ -61,7 +61,8 @@ function planDetails(
 }
 
 /**
- * Landing's pricing section: the intro and the three plans.
+ * Landing's pricing section, also the Pricing page's body: the intro and
+ * the three plans, worded by the Pricing slots.
  *
  * @param props - `copy` is the website's Copy.
  * @returns The section.
@@ -73,15 +74,15 @@ export function LandingPricing({ copy }: { copy: Copy }) {
       className={`${siteColumn} ${splitSection} pt-14 pb-24`}
     >
       <SectionIntro
-        eyebrow={readCopy(copy, "landing.pricing.eyebrow")}
+        eyebrow={readCopy(copy, "pricing.eyebrow")}
         title={
           <>
-            {readCopy(copy, "landing.pricing.heading_first_line")}
+            {readCopy(copy, "pricing.heading_first_line")}
             <br />
-            {readCopy(copy, "landing.pricing.heading_second_line")}
+            {readCopy(copy, "pricing.heading_second_line")}
           </>
         }
-        body={readCopy(copy, "landing.pricing.lead")}
+        body={readCopy(copy, "pricing.lead")}
         className={splitIntro}
       />
       <div className={splitContent}>
