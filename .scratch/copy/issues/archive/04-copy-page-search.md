@@ -48,4 +48,8 @@ A search box on the Copy page finds slots by their current text across every tab
 ## Completion
 
 - Completed: 2026-11-19
-- Commit: <filled in after merge>
+- Commit: merge `cd96e12` into main — "Merge Copy issue 04: search on the Copy page finds slots in every tab by their text and jumps to the one picked, asking first when unsaved edits would be lost"
+  - Branch `copy-04-page-search`:
+    - `4a98272` Copy 04: search across tabs finds slots by their text and jumps to the one picked, asking first when unsaved edits would be lost
+    - `e4cc021` Copy 04: review cleanups (one switch request, one landing step, test restores scrollIntoView)
+    - `f8c701a` Copy 04: evidence recorded, issue completed and archived, screenshots
