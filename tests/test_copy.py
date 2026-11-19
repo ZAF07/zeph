@@ -95,6 +95,7 @@ def test_admin_sees_each_tab_with_slots_in_page_order(
         ("auth", "Sign in and sign up"),
         ("onboarding", "Onboarding"),
         ("home", "Home"),
+        ("memories", "Memories"),
         ("connect_telegram", "Connect Telegram"),
         ("shared", "Shared"),
     ]

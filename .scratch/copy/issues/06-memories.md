@@ -30,3 +30,6 @@ Not part of this issue: the Memory explanation, Photo Viewing explanation and th
 ## Comments
 
 - 2026-11-19 — From issue 05: `ChangedInChatCaption` takes an optional `text` (with a `{day}` placeholder); `Memories` still uses its default words in code. Pass a Memories slot and, once 07 has done the same, drop the default. The Dashboard menu's "Memories" item is Shared's `shared.dashboard.memories`; Copy reaches Dashboard pages as props read on the server (`DashboardFrame`, `/`).
+- 2026-11-19 — Started on branch `copy-06-memories` (worktree `ai-chat-companion-copy-06`).
+  - The Memories page has no text that changes with a number today. The count goes in the "Delete all memories?" dialog body ("Zeph will forget the 1 memory…" / "…all {count} memories…"); the dialog is not in the references, so the pixel test is unaffected.
+  - One/many slots sit side by side on the Copy page when their keys end `_one` and `_many` with the same start (web only; the Telegram link card's expiry pair gets it too).

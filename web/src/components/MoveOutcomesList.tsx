@@ -9,14 +9,15 @@ import { MemoryCard } from "@/components/MemoryCard";
 import { MemoryDetailLine } from "@/components/MemoryDetailLine";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type { MoveOutcome } from "@/lib/api-client";
+import { type Copy, fillPlaceholders, readCopy } from "@/lib/copy";
 import { formatShortDay } from "@/lib/dates";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
-const resultLabels: Record<MoveOutcome["result"], string> = {
-  helped: "Helped",
-  didnt_help: "Didn’t help",
-  mixed: "Mixed",
+const resultSlots: Record<MoveOutcome["result"], string> = {
+  helped: "memories.helps.helped",
+  didnt_help: "memories.helps.didnt_help",
+  mixed: "memories.helps.mixed",
 };
 
 /**
@@ -24,15 +25,18 @@ const resultLabels: Record<MoveOutcome["result"], string> = {
  * of help, whether it helped, when it was used, how the User felt, why and
  * the day; each can be deleted, so Zeph never uses it again.
  *
- * @param props - `outcomes` are the User's Move Outcomes, newest first, and
- *   `timeZone` is the User's time zone.
+ * @param props - `outcomes` are the User's Move Outcomes, newest first,
+ *   `copy` is the Memories page's Copy, and `timeZone` is the User's time
+ *   zone.
  * @returns The tab's content.
  */
 export function MoveOutcomesList({
   outcomes,
+  copy,
   timeZone,
 }: {
   outcomes: MoveOutcome[];
+  copy: Copy;
   timeZone?: string;
 }) {
   const apiClient = useApiClient();
@@ -50,13 +54,13 @@ export function MoveOutcomesList({
   return (
     <>
       <MemoriesPanelHeading
-        title="What helps you"
-        body="What Zeph learned about the kinds of help that work for you, and when. Delete one and Zeph won't use it again."
+        title={readCopy(copy, "memories.helps.heading")}
+        body={readCopy(copy, "memories.helps.lead")}
       />
 
       {deleteOutcome.isError ? (
         <SaveFailedNote>
-          We couldn’t delete that. Please try again.
+          {readCopy(copy, "memories.delete_failed")}
         </SaveFailedNote>
       ) : null}
 
@@ -67,7 +71,10 @@ export function MoveOutcomesList({
             return (
               <li key={outcome.id}>
                 <MemoryCard
-                  deleteLabel={`Delete what helps: ${outcome.move}, ${day}`}
+                  deleteLabel={fillPlaceholders(
+                    readCopy(copy, "memories.helps.delete"),
+                    { help: outcome.move, day },
+                  )}
                   isDeleting={deleteOutcome.isPending}
                   onDelete={() => deleteOutcome.mutate(outcome.id)}
                 >
@@ -83,16 +90,22 @@ export function MoveOutcomesList({
                             : outlinedPill
                         }
                       >
-                        {resultLabels[outcome.result]}
+                        {readCopy(copy, resultSlots[outcome.result])}
                       </span>
                     </div>
-                    <MemoryDetailLine label="When">
+                    <MemoryDetailLine
+                      label={readCopy(copy, "memories.helps.when")}
+                    >
                       {outcome.situation}
                     </MemoryDetailLine>
-                    <MemoryDetailLine label="Feeling">
+                    <MemoryDetailLine
+                      label={readCopy(copy, "memories.helps.feeling")}
+                    >
                       {outcome.feeling}
                     </MemoryDetailLine>
-                    <MemoryDetailLine label="Why">
+                    <MemoryDetailLine
+                      label={readCopy(copy, "memories.helps.why")}
+                    >
                       {outcome.why}
                     </MemoryDetailLine>
                     <span className="text-[12px] text-soft">{day}</span>
@@ -104,8 +117,8 @@ export function MoveOutcomesList({
         </ul>
       ) : (
         <EmptyState
-          title="Nothing here yet"
-          body="When Zeph helps you in a chat, what it learned appears here a little while after the Conversation ends."
+          title={readCopy(copy, "memories.helps.empty_title")}
+          body={readCopy(copy, "memories.helps.empty_body")}
         />
       )}
     </>

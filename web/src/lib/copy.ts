@@ -32,6 +32,27 @@ export function readCopy(copy: Copy, key: string): string {
 }
 
 /**
+ * Reads text that changes with a number, such as "1 memory" or "3
+ * memories": the slot ending `_one` for 1 and the slot ending `_many`
+ * otherwise, with its `{count}` placeholder filled.
+ *
+ * @param copy - The Copy.
+ * @param keyStart - The two slots' key without the ending, e.g.
+ *   `memories.items.delete_all.confirm_body`.
+ * @param count - The number.
+ * @returns The picked slot's text with the count filled in.
+ * @throws MissingCopyError if there is no such slot.
+ */
+export function readCountCopy(
+  copy: Copy,
+  keyStart: string,
+  count: number,
+): string {
+  const ending = count === 1 ? "one" : "many";
+  return fillPlaceholders(readCopy(copy, `${keyStart}_${ending}`), { count });
+}
+
+/**
  * Fills a Copy text's `{name}` placeholders with live values. The text is
  * plain: nothing in it is read as markdown, links or HTML.
  *

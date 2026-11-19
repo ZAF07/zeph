@@ -1,4 +1,5 @@
 import type { MemoryItem } from "@/lib/api-client";
+import { type Copy, fillPlaceholders, readCopy } from "@/lib/copy";
 import { formatShortDay } from "@/lib/dates";
 
 /**
@@ -6,27 +7,39 @@ import { formatShortDay } from "@/lib/dates";
  * 2 Oct".
  *
  * @param item - The Memory Item.
+ * @param copy - The Memories page's Copy.
  * @param timeZone - The User's time zone.
  * @returns The source line.
  */
-export function memorySourceLabel(item: MemoryItem, timeZone?: string): string {
-  const origin =
-    item.source === "onboarding" ? "From onboarding" : "From a conversation";
-  return `${origin} · ${formatShortDay(item.updated_at, timeZone)}`;
+export function memorySourceLabel(
+  item: MemoryItem,
+  copy: Copy,
+  timeZone?: string,
+): string {
+  const slot =
+    item.source === "onboarding"
+      ? "memories.items.from_onboarding"
+      : "memories.items.from_conversation";
+  return fillPlaceholders(readCopy(copy, slot), {
+    day: formatShortDay(item.updated_at, timeZone),
+  });
 }
 
-/** The tabs of the Memories page, in the order they are drawn. */
+/**
+ * The tabs of the Memories page, in the order they are drawn. Each tab's
+ * name is the `memories.tabs.<tab>` Copy slot.
+ */
 export const memoriesTabs = [
-  { id: "memories", label: "Memories" },
-  { id: "about", label: "About you" },
-  { id: "threads", label: "What's going on" },
-  { id: "helps", label: "What helps you" },
-  { id: "summaries", label: "Conversation Summaries" },
-  { id: "photos", label: "Photos" },
+  "memories",
+  "about",
+  "threads",
+  "helps",
+  "summaries",
+  "photos",
 ] as const;
 
 /** One tab of the Memories page. */
-export type MemoriesTab = (typeof memoriesTabs)[number]["id"];
+export type MemoriesTab = (typeof memoriesTabs)[number];
 
 /**
  * Picks the Memories tab named by a `?tab=` value.
@@ -35,8 +48,8 @@ export type MemoriesTab = (typeof memoriesTabs)[number]["id"];
  * @returns That tab, or the Memories tab when the value names no tab.
  */
 export function memoriesTabFromQuery(value: string | null): MemoriesTab {
-  const tab = memoriesTabs.find((option) => option.id === value);
-  return tab?.id ?? "memories";
+  const tab = memoriesTabs.find((option) => option === value);
+  return tab ?? "memories";
 }
 
 /**
