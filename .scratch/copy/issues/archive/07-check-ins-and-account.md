@@ -58,5 +58,10 @@ Not part of this issue:
 ## Completion
 
 - Completed: 2026-11-19
-- Commit: <to be filled in after the merge>
+- Commit: merge `1e4e1f9` into main — "Merge Copy issue 07: Check-ins and Account read every word from Copy (Check-ins and Account tabs, every state and dialog); frequency names and location labels keep one home in Onboarding; ChangedInChatCaption has no default text"
+  - Branch `copy-07-check-ins-account`:
+    - `70b73da` Copy 07: Check-ins and Account read every word from Copy (Check-ins and Account tabs)
+    - `beca491` Copy 07: Account seed keeps the reference's straight apostrophes; ProfileForm's Copy helper named for its tab (review)
+    - `f516255` Copy 07: test the one-day retention slot
+    - `daa12d9` Copy 07: evidence recorded, issue completed and archived, screenshots; CONTEXT gives the location labels one home in Onboarding; handover note on 08
 
