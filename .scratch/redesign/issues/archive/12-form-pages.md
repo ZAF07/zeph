@@ -142,4 +142,8 @@ That 0.05% is the "Sample data" pill, the character count and the textarea's res
 ## Completion
 
 - Completed: 2026-11-19
-- Commit: <to be filled in after merge>
+- Commit: merge `1259f27` into main — "Merge redesign issue 12: form pages — Persona as the form template (editor, field rows, save bar with its four states) and Prompts & models, Safety, Platform settings and Features built from its parts; saving works as before, each page keeps its own words; Helplines table reskinned with tokens"
+  - Branch `redesign-12-form-pages`:
+    - `cb65ace` Redesign 12: form pages in the new look — Persona (form template: editor, field rows, save bar) and Prompts & models, Safety, Platform settings and Features from its parts
+    - `58d3717` Redesign 12: code-review fixes — pages keep their own save-failed and saved wording, one chevron icon, describedById, more save bar and field row tests
+    - `11af4e9` Redesign 12: evidence recorded, issue completed and archived, screenshots at both widths
