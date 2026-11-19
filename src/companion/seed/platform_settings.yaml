@@ -316,6 +316,16 @@ memory_processing_prompt: |-
   the person shared about themselves: not small talk, not what the Companion
   (Zeph) said, not passing moods. Each fact is one short sentence in a Memory
   Category.
+  Each thing learned has one home: a single fact about them is a Memory
+  Item, kept here; a story that goes on across Conversations is a Life
+  Thread (a job hunt, a falling-out), kept elsewhere; and what keeps showing
+  up across their stories is left for Patterns, kept elsewhere too. So keep
+  the facts a story rests on ("they are job hunting", "their sister is
+  Mei"), not the story itself, and never keep a pattern as a Memory Item.
+  - Keep what they want to do, change or work towards in the Goals category
+    when they show it plainly, even if they never say "my goal is": "I
+    really need to stop scrolling at night" or "I want to be fit by summer"
+    is a Goal. Leave out goals Zeph would only be guessing at.
   - When a fact is new, add it.
   - When a fact has changed (they changed jobs, a plan moved), update the
     existing item instead of adding a new one, so nothing contradicts.
@@ -781,6 +791,18 @@ life_thread_keeping_prompt: |-
   Leave out small talk and one-off moments that won't matter later. Write
   dates as days, never "yesterday" or "next week".
 
+  When they make a commitment they agreed to ("I'll call mum tonight", "I'm
+  sending the application on Friday"), add it to its Thread's story with
+  the day it was due, starting a Thread if none fits; once they say how it
+  went, add that too. Something Zeph only suggested is not a commitment
+  unless they agreed to do it.
+
+  Each thing learned has one home: a single fact about them is a Memory
+  Item, kept elsewhere; a story that goes on across Conversations is a Life
+  Thread, kept here; and what keeps showing up across their stories is left
+  for Patterns, kept elsewhere too. Don't start a Thread for a single fact
+  or for something that keeps showing up across their stories.
+
   For each Thread marked "brought up in this Conversation", say how they
   took it: "engaged" if they talked about it, "brushed_off" if they changed
   the subject or gave a short answer, "asked_to_drop" if they asked Zeph not
@@ -855,6 +877,11 @@ curiosity_keeping_prompt: |-
     Memory Item ("memory_item") or Life Thread ("thread") it comes from, if
     one. Usually none or one per Conversation; never one about something
     already asked recently or already waiting.
+  - A commitment they agreed to in this Conversation ("I'll call mum
+    tonight"), never one Zeph only suggested: a follow-up on how it went
+    ("did you get to call your mum?"), with not_before at least the day
+    after it was due and its Life Thread's number, if one. Write one for
+    each new commitment, on top of the usual one or so.
   - A next Move is a kind of help Zeph meant to give later in the
     Conversation (e.g. "Plan steps, once they've picked a host") but the
     Conversation ended first. If it's still worth following up, write it as

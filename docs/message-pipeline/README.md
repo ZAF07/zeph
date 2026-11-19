@@ -128,12 +128,14 @@ After the quiet gap (Admin-set), these run in order, each using what the earlier
 - **Why:** Message Retention deletes the raw messages (30 days today), so the Summary is what's left for every later look back and for Patterns.
 - **How:** one model call, rewriting the day's Summary from all of that day's messages each time. It is written to stand in for the messages: the facts (who, what, numbers, decisions, what Zeph advised and how the User answered) and the feeling (how they felt and why, what it meant to them, how their mood moved and what moved it), not a vague list of topics. Threads, Patterns and the rest learn from the Conversation that just ended, so nothing is learned twice.
 - *Built (19 Nov 2026): Day Summaries are kept in `day_summaries`, one per User and day. The call is given the day's earlier Conversations (for the Summary only) and the one that just ended (for Memory Items and photos too). Migration 0064 joined the old same-day Summaries without a model rewrite. The Dashboard's Copy still calls the tab "Conversation Summaries".*
+- *Built (19 Nov 2026): the prompt keeps goals the User shows plainly in Goals, not only ones said word for word, and says which home each thing learned has.*
 
 ### b. Life Threads
 
 - **What:** updates the stories this Conversation added to, and starts new ones.
 - **Why:** Threads let Zeph follow someone's life across Conversations, and Patterns are built on them.
 - **How:** one model call with the Threads this Conversation may touch.
+- *Built (19 Nov 2026): a commitment the User agreed to (never one Zeph only suggested) goes into its Thread's story with the day it was due, and later how it went. The prompt says which home each thing learned has.*
 
 ### c. Patterns *(new)*
 
@@ -146,6 +148,7 @@ After the quiet gap (Admin-set), these run in order, each using what the earlier
 - **What:** questions to ask later: follow-ups (including how a commitment went, once its day has passed), gaps, look-backs, an unmade next Move.
 - **Why:** this is how Zeph gets to know someone and follows up like a friend.
 - **How:** one model call. Never made to check a Pattern: offering the Read is the check.
+- *Built (19 Nov 2026): each new commitment gets a follow-up Curiosity, not before the day after it was due, on top of the usual one or so.*
 
 ### e. Move Outcomes
 
