@@ -1,13 +1,19 @@
+import { CopyLoadFailed } from "@/components/CopyLoadFailed";
 import { PageHeader } from "@/components/PageHeader";
 import { TelegramConnectionCard } from "@/components/TelegramConnectionCard";
+import { pickCopy } from "@/lib/copy";
+import { loadCopy } from "@/lib/server-copy";
 
 /**
  * The Connect Telegram page: one tap opens Zeph in Telegram with a one-time
  * link. A phone has no QR code, so its line talks only about the button.
+ * The card's words come from Copy, read on the server; only its slots go
+ * to the browser.
  *
- * @returns The page.
+ * @returns The page, or the couldn't-load block when Copy can't be read.
  */
-export default function ConnectTelegramPage() {
+export default async function ConnectTelegramPage() {
+  const copy = await loadCopy();
   return (
     <>
       <PageHeader
@@ -25,7 +31,13 @@ export default function ConnectTelegramPage() {
           </>
         }
       />
-      <TelegramConnectionCard />
+      {copy ? (
+        <TelegramConnectionCard
+          copy={pickCopy(copy, ["connect_telegram.card."])}
+        />
+      ) : (
+        <CopyLoadFailed />
+      )}
     </>
   );
 }

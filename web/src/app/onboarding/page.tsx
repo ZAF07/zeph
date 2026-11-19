@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { OnboardingFlow } from "@/components/OnboardingFlow";
 import { SiteLoadFailed } from "@/components/SiteLoadFailed";
-import { pageMetadata } from "@/lib/copy";
+import { pageMetadata, pickCopy } from "@/lib/copy";
 import { hasDesignFlag } from "@/lib/design-flags";
 import { loadCopy } from "@/lib/server-copy";
 
@@ -22,7 +22,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /**
  * The onboarding page a new User sees after sign-up, before the Dashboard,
- * worded by Copy read on the server. In design-fixture mode,
+ * worded by Copy read on the server; only its own slots go to the
+ * browser. In design-fixture mode,
  * `?design=all-steps` stacks every step for the pixel test.
  *
  * @param props - `searchParams` is the page's query string.
@@ -44,7 +45,12 @@ export default async function OnboardingPage({
   return (
     <main>
       <OnboardingFlow
-        copy={copy}
+        copy={pickCopy(copy, [
+          "onboarding.",
+          "connect_telegram.card.",
+          "shared.wordmark",
+          "shared.header.home_link_label",
+        ])}
         showAllSteps={hasDesignFlag(query, "all-steps")}
       />
     </main>

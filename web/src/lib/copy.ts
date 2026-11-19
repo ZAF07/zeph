@@ -87,3 +87,19 @@ export function fillPlaceholderParts<Part>(
       return isPlaceholder && Object.hasOwn(parts, name) ? parts[name] : piece;
     });
 }
+
+/**
+ * Picks the slots a client component needs, so the whole Copy isn't sent
+ * to the browser.
+ *
+ * @param copy - The Copy.
+ * @param prefixes - Key starts to keep, e.g. `onboarding.` or a whole key.
+ * @returns Only the slots whose keys start with one of the prefixes.
+ */
+export function pickCopy(copy: Copy, prefixes: string[]): Copy {
+  return Object.fromEntries(
+    Object.entries(copy).filter(([key]) =>
+      prefixes.some((prefix) => key.startsWith(prefix)),
+    ),
+  );
+}

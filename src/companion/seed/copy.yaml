@@ -664,6 +664,10 @@
       name: "Couldn’t load: message"
       max_length: 200
       text: Something went wrong on our side. Please try again in a moment.
+    - key: onboarding.load_failed.retry
+      name: "Couldn’t load: try again button"
+      max_length: 30
+      text: Try again
     - key: onboarding.progress.label
       name: "Progress bar: name read out by screen readers"
       max_length: 40
@@ -867,6 +871,108 @@
       name: "Telegram: skip link"
       max_length: 30
       text: Skip for now
+
+- tab: connect_telegram
+  name: Connect Telegram
+  slots:
+    - key: connect_telegram.card.loading
+      name: "Link card: loading message, read out by screen readers"
+      max_length: 60
+      text: Loading your Telegram link
+    - key: connect_telegram.card.qr_label
+      name: "Link card: QR code, name read out by screen readers"
+      max_length: 80
+      text: QR code that opens Zeph in Telegram
+    - key: connect_telegram.card.open_button
+      name: "Link card: open button"
+      max_length: 30
+      text: Open in Telegram
+    - key: connect_telegram.card.message_bot
+      name: "Link card: line above the /start code"
+      max_length: 80
+      placeholders: [bot]
+      text: "Or message {bot} and send:"
+    - key: connect_telegram.card.expires_one
+      name: "Link card: expiry, one minute left"
+      max_length: 60
+      placeholders: [minutes]
+      text: Works once · expires in {minutes} minute
+    - key: connect_telegram.card.expires_many
+      name: "Link card: expiry, several minutes left"
+      max_length: 60
+      placeholders: [minutes]
+      text: Works once · expires in {minutes} minutes
+    - key: connect_telegram.card.waiting_title
+      name: "Waiting: title"
+      max_length: 80
+      text: Waiting for you to say hello in Telegram…
+    - key: connect_telegram.card.waiting_body
+      name: "Waiting: message"
+      max_length: 200
+      text: Once you press Start in Telegram, this page will update on its own.
+    - key: connect_telegram.card.pressed_start
+      name: "Waiting: I’ve pressed Start button"
+      max_length: 30
+      text: I’ve pressed Start
+    - key: connect_telegram.card.show_code
+      name: "Waiting: show the code button"
+      max_length: 30
+      text: Show the code again
+    - key: connect_telegram.card.connected_title
+      name: "Connected: title"
+      max_length: 80
+      text: Zeph just said hello in Telegram
+    - key: connect_telegram.card.connected_as
+      name: "Connected: who it’s connected as"
+      max_length: 80
+      placeholders: [username]
+      text: Connected as @{username}.
+    - key: connect_telegram.card.connected_no_username
+      name: "Connected: when the Telegram account has no username"
+      max_length: 80
+      text: Connected.
+    - key: connect_telegram.card.connected_body
+      name: "Connected: message"
+      max_length: 200
+      text: Reply whenever you’re ready, there’s no rush.
+    - key: connect_telegram.card.dashboard_link
+      name: "Connected: Dashboard button"
+      max_length: 30
+      text: Go to your Dashboard
+    - key: connect_telegram.card.expired_title
+      name: "Link expired: title"
+      max_length: 80
+      text: This link has expired or was already used
+    - key: connect_telegram.card.expired_body
+      name: "Link expired: message"
+      max_length: 200
+      text: For your security each link works once and only for a short while.
+    - key: connect_telegram.card.elsewhere_title
+      name: "Linked to another account: title"
+      max_length: 80
+      text: That Telegram account is linked to another Zeph account
+    - key: connect_telegram.card.elsewhere_body
+      name: "Linked to another account: message"
+      max_length: 200
+      text: >-
+        Sign in to that account and disconnect Telegram there first, or use a
+        different Telegram account.
+    - key: connect_telegram.card.new_link
+      name: "Link expired or linked elsewhere: new link button"
+      max_length: 30
+      text: Get a new link
+    - key: connect_telegram.card.create_failed_title
+      name: "Couldn’t create a link: title"
+      max_length: 80
+      text: We couldn’t create your link
+    - key: connect_telegram.card.create_failed_body
+      name: "Couldn’t create a link: message"
+      max_length: 200
+      text: Something went wrong on our side. Please try again in a moment.
+    - key: connect_telegram.card.create_failed_retry
+      name: "Couldn’t create a link: try again button"
+      max_length: 30
+      text: Try again
 
 - tab: shared
   name: Shared

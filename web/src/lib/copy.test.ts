@@ -5,6 +5,7 @@ import {
   fillPlaceholders,
   MissingCopyError,
   pageMetadata,
+  pickCopy,
   readCopy,
 } from "@/lib/copy";
 
@@ -99,5 +100,23 @@ describe("fillPlaceholderParts", () => {
 
   it("leaves a placeholder it has no part for as written", () => {
     expect(fillPlaceholderParts("See {nmae}", {})).toEqual(["See ", "{nmae}"]);
+  });
+});
+
+describe("pickCopy", () => {
+  it("keeps only the slots whose keys start with one of the prefixes", () => {
+    const copy = {
+      "onboarding.hello.heading": "Hello.",
+      "onboarding.hello.intro": "I’m Zeph.",
+      "shared.wordmark": "Zeph",
+      "shared.footer.line": "On Telegram.",
+      "landing.hero.eyebrow": "Your AI companion",
+    };
+
+    expect(pickCopy(copy, ["onboarding.", "shared.wordmark"])).toEqual({
+      "onboarding.hello.heading": "Hello.",
+      "onboarding.hello.intro": "I’m Zeph.",
+      "shared.wordmark": "Zeph",
+    });
   });
 });

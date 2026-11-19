@@ -5,6 +5,7 @@ import type { Copy } from "@/lib/copy";
 import { seedCopy } from "@/test/copy";
 
 const loadCopy = vi.fn<() => Promise<Copy | null>>();
+const flowCopy = vi.fn<(copy: Copy) => void>();
 
 vi.mock("@/lib/server-copy", () => ({ loadCopy }));
 
@@ -13,9 +14,10 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/components/OnboardingFlow", () => ({
-  OnboardingFlow: ({ copy }: { copy: Copy }) => (
-    <h1>{copy["onboarding.hello.heading"]}</h1>
-  ),
+  OnboardingFlow: ({ copy }: { copy: Copy }) => {
+    flowCopy(copy);
+    return <h1>{copy["onboarding.hello.heading"]}</h1>;
+  },
 }));
 
 const { default: OnboardingPage, generateMetadata } =
@@ -42,6 +44,16 @@ describe("the /onboarding page", () => {
     expect(
       screen.getByRole("heading", { name: "Hi. I’m Zeph." }),
     ).toBeInTheDocument();
+  });
+
+  it("sends the browser only the slots onboarding shows", async () => {
+    render(await renderPage());
+
+    const keys = Object.keys(flowCopy.mock.lastCall?.[0] ?? {});
+    expect(keys).toContain("onboarding.intentions.heading");
+    expect(keys).toContain("connect_telegram.card.open_button");
+    expect(keys).toContain("shared.wordmark");
+    expect(keys.some((key) => key.startsWith("landing."))).toBe(false);
   });
 
   it("takes its tab title and description from Copy", async () => {

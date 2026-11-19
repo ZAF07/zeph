@@ -359,7 +359,7 @@ describe("OnboardingFlow", () => {
     expect(screen.getByText("Filled in from your browser")).toBeInTheDocument();
   });
 
-  it("shows only Copy text on every step, apart from Platform Settings and the Telegram card", async () => {
+  it("shows only Copy text on every step, apart from Platform Settings", async () => {
     apiClient.getPlatformContent.mockResolvedValue({
       ...content,
       ai_notice: "⟦platform ai notice⟧",
@@ -375,8 +375,8 @@ describe("OnboardingFlow", () => {
     const { container } = renderWithQueries(
       <OnboardingFlow copy={markedCopy()} showAllSteps />,
     );
-    const telegramLink = await screen.findByRole("link", {
-      name: /Open in Telegram/,
+    await screen.findByRole("link", {
+      name: /⟦connect_telegram.card.open_button⟧/,
     });
 
     const steps = container.querySelectorAll("section");
@@ -386,10 +386,6 @@ describe("OnboardingFlow", () => {
       words
         .querySelectorAll("option:not([disabled])")
         .forEach((country) => country.remove());
-      words
-        .querySelector(`a[href='${telegramLink.getAttribute("href")}']`)
-        ?.closest(".rounded-tile")
-        ?.remove();
       expect(wordsNotFromCopy(words)).toEqual([]);
     }
     expect(

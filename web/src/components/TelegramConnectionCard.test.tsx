@@ -8,6 +8,7 @@ import type {
   ConnectionToken,
   TelegramConnectionStatus,
 } from "@/lib/api-client";
+import { markedCopy, seedCopy, wordsNotFromCopy } from "@/test/copy";
 import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
@@ -55,7 +56,7 @@ describe("TelegramConnectionCard", () => {
   it("shows the link ready: QR code, /start code and Open in Telegram", async () => {
     apiClient.getTelegramConnection.mockResolvedValue(notConnected());
 
-    renderWithQueries(<TelegramConnectionCard />);
+    renderWithQueries(<TelegramConnectionCard copy={seedCopy()} />);
 
     const openLink = await screen.findByRole("link", {
       name: "Open in Telegram",
@@ -74,7 +75,7 @@ describe("TelegramConnectionCard", () => {
   it("shows the shared loading panel while the link loads", () => {
     apiClient.getTelegramConnection.mockReturnValue(new Promise(() => {}));
 
-    renderWithQueries(<TelegramConnectionCard />);
+    renderWithQueries(<TelegramConnectionCard copy={seedCopy()} />);
 
     expect(
       screen.getByRole("status", { name: "Loading your Telegram link" }),
@@ -85,7 +86,7 @@ describe("TelegramConnectionCard", () => {
     const user = userEvent.setup();
     apiClient.getTelegramConnection.mockResolvedValue(notConnected());
 
-    renderWithQueries(<TelegramConnectionCard />);
+    renderWithQueries(<TelegramConnectionCard copy={seedCopy()} />);
     await user.click(
       await screen.findByRole("link", { name: "Open in Telegram" }),
     );
@@ -111,7 +112,7 @@ describe("TelegramConnectionCard", () => {
   it("draws connected with the username and Go to your Dashboard", async () => {
     apiClient.getTelegramConnection.mockResolvedValue(connected);
 
-    renderWithQueries(<TelegramConnectionCard />);
+    renderWithQueries(<TelegramConnectionCard copy={seedCopy()} />);
 
     const title = await screen.findByText("Zeph just said hello in Telegram");
     expect(title).toHaveClass("text-cream");
@@ -129,7 +130,7 @@ describe("TelegramConnectionCard", () => {
     const user = userEvent.setup();
     apiClient.getTelegramConnection.mockResolvedValueOnce(notConnected());
 
-    renderWithQueries(<TelegramConnectionCard />);
+    renderWithQueries(<TelegramConnectionCard copy={seedCopy()} />);
     await screen.findByText("/start 7Q2K-ZEPH");
     apiClient.getTelegramConnection.mockResolvedValue(
       notConnected(connectionToken({ status: "expired" })),
@@ -163,7 +164,7 @@ describe("TelegramConnectionCard", () => {
       ),
     );
 
-    renderWithQueries(<TelegramConnectionCard compact />);
+    renderWithQueries(<TelegramConnectionCard copy={seedCopy()} compact />);
 
     const openLink = await screen.findByRole("link", {
       name: "Open in Telegram",
@@ -194,7 +195,7 @@ describe("TelegramConnectionCard", () => {
       connectionToken({ token: "NEW1-CODE" }),
     );
 
-    renderWithQueries(<TelegramConnectionCard />);
+    renderWithQueries(<TelegramConnectionCard copy={seedCopy()} />);
 
     expect(await screen.findByText("/start NEW1-CODE")).toBeInTheDocument();
   });
@@ -203,7 +204,7 @@ describe("TelegramConnectionCard", () => {
     const user = userEvent.setup();
     apiClient.getTelegramConnection.mockResolvedValueOnce(notConnected());
 
-    renderWithQueries(<TelegramConnectionCard />);
+    renderWithQueries(<TelegramConnectionCard copy={seedCopy()} />);
     await user.click(
       await screen.findByRole("link", { name: "Open in Telegram" }),
     );
@@ -227,7 +228,7 @@ describe("TelegramConnectionCard", () => {
     const user = userEvent.setup();
     apiClient.getTelegramConnection.mockResolvedValue(notConnected());
 
-    renderWithQueries(<TelegramConnectionCard />);
+    renderWithQueries(<TelegramConnectionCard copy={seedCopy()} />);
     await user.click(
       await screen.findByRole("link", { name: "Open in Telegram" }),
     );
@@ -242,7 +243,7 @@ describe("TelegramConnectionCard", () => {
     const user = userEvent.setup();
     apiClient.getTelegramConnection.mockResolvedValueOnce(notConnected());
 
-    renderWithQueries(<TelegramConnectionCard />);
+    renderWithQueries(<TelegramConnectionCard copy={seedCopy()} />);
     await screen.findByText("/start 7Q2K-ZEPH");
 
     apiClient.getTelegramConnection.mockResolvedValue(
@@ -270,7 +271,7 @@ describe("TelegramConnectionCard", () => {
       notConnected(connectionToken({ status: "connected_elsewhere" })),
     );
 
-    renderWithQueries(<TelegramConnectionCard />);
+    renderWithQueries(<TelegramConnectionCard copy={seedCopy()} />);
 
     expect(
       await screen.findByText(
@@ -287,7 +288,7 @@ describe("TelegramConnectionCard", () => {
     apiClient.getTelegramConnection.mockResolvedValue(notConnected(null));
     apiClient.createConnectionToken.mockRejectedValueOnce(new Error("down"));
 
-    renderWithQueries(<TelegramConnectionCard />);
+    renderWithQueries(<TelegramConnectionCard copy={seedCopy()} />);
 
     expect(
       await screen.findByRole("heading", {
@@ -304,9 +305,119 @@ describe("TelegramConnectionCard", () => {
   it("shows connected straight away when Telegram is already connected", async () => {
     apiClient.getTelegramConnection.mockResolvedValue(connected);
 
-    renderWithQueries(<TelegramConnectionCard />);
+    renderWithQueries(<TelegramConnectionCard copy={seedCopy()} />);
 
     expect(await screen.findByText(/Connected as @maya_l/)).toBeInTheDocument();
     expect(apiClient.createConnectionToken).not.toHaveBeenCalled();
+  });
+
+  it("says minute, not minutes, when one minute is left", async () => {
+    apiClient.getTelegramConnection.mockResolvedValue(
+      notConnected(
+        connectionToken({
+          expires_at: new Date(Date.now() + 30000).toISOString(),
+        }),
+      ),
+    );
+
+    renderWithQueries(<TelegramConnectionCard copy={seedCopy()} compact />);
+
+    expect(
+      await screen.findByText("Works once · expires in 1 minute"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows an Admin's wording with the bot name kept in place", async () => {
+    apiClient.getTelegramConnection.mockResolvedValue(notConnected());
+
+    renderWithQueries(
+      <TelegramConnectionCard
+        copy={{
+          ...seedCopy(),
+          "connect_telegram.card.message_bot": "Or send {bot} this:",
+        }}
+      />,
+    );
+
+    expect(await screen.findByText(/Or send/)).toHaveTextContent(
+      "Or send @zeph_bot this:",
+    );
+  });
+
+  it.each([
+    { state: "ready", status: () => notConnected(), compact: false },
+    { state: "compact ready", status: () => notConnected(), compact: true },
+    { state: "connected", status: () => connected, compact: false },
+    {
+      state: "connected without a username",
+      status: () => ({
+        ...connected,
+        connection: { ...connected.connection!, telegram_username: null },
+      }),
+      compact: false,
+    },
+    {
+      state: "linked to another account",
+      status: () =>
+        notConnected(connectionToken({ status: "connected_elsewhere" })),
+      compact: false,
+    },
+  ])(
+    "shows only Copy text when $state, screen-reader labels included",
+    async ({ status, compact }) => {
+      apiClient.getTelegramConnection.mockResolvedValue(status());
+
+      const { container } = renderWithQueries(
+        <TelegramConnectionCard copy={markedCopy()} compact={compact} />,
+      );
+      await screen.findAllByText(/⟦connect_telegram\.card\./);
+
+      const words = container.cloneNode(true) as HTMLElement;
+      words.querySelector("code")?.remove();
+      expect(wordsNotFromCopy(words)).toEqual([]);
+    },
+  );
+
+  it("shows only Copy text while waiting, when expired and when a link can't be made", async () => {
+    const user = userEvent.setup();
+    apiClient.getTelegramConnection.mockResolvedValueOnce(notConnected());
+
+    const { container } = renderWithQueries(
+      <TelegramConnectionCard copy={markedCopy()} />,
+    );
+    await user.click(
+      await screen.findByRole("link", {
+        name: "⟦connect_telegram.card.open_button⟧",
+      }),
+    );
+    expect(wordsNotFromCopy(container)).toEqual([]);
+
+    apiClient.getTelegramConnection.mockResolvedValue(
+      notConnected(connectionToken({ status: "expired" })),
+    );
+    await user.click(
+      screen.getByRole("button", {
+        name: "⟦connect_telegram.card.pressed_start⟧",
+      }),
+    );
+    await screen.findByText("⟦connect_telegram.card.expired_title⟧");
+    expect(wordsNotFromCopy(container)).toEqual([]);
+
+    apiClient.createConnectionToken.mockRejectedValueOnce(new Error("down"));
+    await user.click(
+      screen.getByRole("button", { name: "⟦connect_telegram.card.new_link⟧" }),
+    );
+    await screen.findByText("⟦connect_telegram.card.create_failed_title⟧");
+    expect(wordsNotFromCopy(container)).toEqual([]);
+  });
+
+  it("names the loading panel from Copy", () => {
+    apiClient.getTelegramConnection.mockReturnValue(new Promise(() => {}));
+
+    renderWithQueries(<TelegramConnectionCard copy={markedCopy()} />);
+
+    expect(
+      screen.getByRole("status", { name: "⟦connect_telegram.card.loading⟧" }),
+    ).toBeInTheDocument();
   });
 });

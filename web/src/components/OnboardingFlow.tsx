@@ -103,7 +103,7 @@ function startingAnswers(me: Me, checkIns: CheckIns): Answers {
  * are saved when they leave the Memory step. A User who already finished
  * onboarding goes to the Dashboard. Every word is Copy, apart from the AI
  * notice, the reason choices and the User Memory explanation, which are
- * Platform Settings, and the Telegram card, which is Connect Telegram's.
+ * Platform Settings. The Telegram card's words are Connect Telegram's Copy.
  *
  * @param props - `copy` is the website's Copy; `showAllSteps` stacks every
  *   step for the design sheet
@@ -160,6 +160,7 @@ export function OnboardingFlow({
         <LoadFailed
           title={onboardingCopy("load_failed.title")}
           body={onboardingCopy("load_failed.body")}
+          retryLabel={onboardingCopy("load_failed.retry")}
           onRetry={() => {
             void meQuery.refetch();
             void contentQuery.refetch();
@@ -458,7 +459,7 @@ export function OnboardingFlow({
       <>
         <h1 className={stepHeading}>{onboardingCopy("telegram.heading")}</h1>
         <p className={stepIntro}>{onboardingCopy("telegram.intro")}</p>
-        <TelegramConnectionCard compact />
+        <TelegramConnectionCard copy={copy} compact />
       </>
     );
   }
