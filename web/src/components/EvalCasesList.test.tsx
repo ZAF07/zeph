@@ -103,6 +103,24 @@ describe("EvalCasesList", () => {
     );
   });
 
+  it("sends one archive call however often Archive is pressed while saving", async () => {
+    apiClient.archiveEvalCase.mockReturnValue(new Promise(() => {}));
+    renderWithQueries(<EvalCasesList evalName="persona" />);
+
+    const [first] = await caseRows();
+    await userEvent.click(
+      within(first).getByRole("button", { name: "Archive" }),
+    );
+    const confirm = within(screen.getByRole("alertdialog")).getByRole(
+      "button",
+      { name: "Archive" },
+    );
+    await userEvent.click(confirm);
+    await userEvent.click(confirm);
+
+    expect(apiClient.archiveEvalCase).toHaveBeenCalledTimes(1);
+  });
+
   it("archives a case only after confirming", async () => {
     apiClient.archiveEvalCase.mockResolvedValue({
       ...smallTalkCase,

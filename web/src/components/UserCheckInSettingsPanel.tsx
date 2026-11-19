@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { secondaryButton } from "@/components/button-styles";
 import { CheckInFrequencyPicker } from "@/components/CheckInFrequencyPicker";
+import { dialogSurface } from "@/components/dialog-styles";
 import { QuietHoursFields } from "@/components/QuietHoursFields";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type {
@@ -96,7 +97,7 @@ export function UserCheckInSettingsPanel({
         role="dialog"
         aria-modal="true"
         aria-labelledby="user-check-ins-heading"
-        className="flex max-h-[min(90vh,720px)] w-full max-w-[640px] flex-col gap-4 overflow-y-auto rounded-banner border border-line bg-bg-deep px-7 py-[26px] text-text shadow-[0_24px_60px_rgba(0,0,0,.45)]"
+        className={`flex max-h-[min(90vh,720px)] w-full max-w-[640px] flex-col gap-4 overflow-y-auto px-7 py-[26px] ${dialogSurface}`}
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-1">

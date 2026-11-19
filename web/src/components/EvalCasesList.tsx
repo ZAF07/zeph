@@ -17,32 +17,17 @@ import { TableEmpty } from "@/components/TableEmpty";
 import { TableLoading } from "@/components/TableLoading";
 import type { EvalCase, EvalName } from "@/lib/api-client";
 import { formatSavedAt } from "@/lib/dates";
-import { evalDetails, evalOrder } from "@/lib/evals";
+import {
+  evalCaseEditHref,
+  evalCasesHref,
+  evalDetails,
+  evalOrder,
+} from "@/lib/evals";
 import { queryKeys, refreshEvalCases } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
-/**
- * The address of an Eval Case's editor.
- *
- * @param evalCase - The case.
- * @returns The address.
- */
-function editHrefOf(evalCase: EvalCase): string {
-  return `/admin/evals/cases/${evalCase.eval}/edit/${evalCase.key}`;
-}
-
-/**
- * The address of one Eval's cases.
- *
- * @param evalName - The Eval.
- * @returns The address.
- */
-function casesHrefOf(evalName: EvalName): string {
-  return `/admin/evals/cases/${evalName}`;
-}
-
 const evalLinks = evalOrder.map((name) => ({
-  href: casesHrefOf(name),
+  href: evalCasesHref(name),
   label: evalDetails[name].label,
 }));
 
@@ -79,7 +64,7 @@ export function EvalCasesList({ evalName }: { evalName: EvalName }) {
       isMain: true,
       cell: (evalCase) => (
         <Link
-          href={editHrefOf(evalCase)}
+          href={evalCaseEditHref(evalCase)}
           className="break-all text-text underline"
         >
           {evalCase.key}
@@ -113,7 +98,7 @@ export function EvalCasesList({ evalName }: { evalName: EvalName }) {
       heading: "Actions",
       cell: (evalCase) => (
         <span className="inline-flex gap-4">
-          <Link href={editHrefOf(evalCase)} className={rowActionButton}>
+          <Link href={evalCaseEditHref(evalCase)} className={rowActionButton}>
             {evalCase.archived ? "View" : "Edit"}
           </Link>
           <button
@@ -143,9 +128,9 @@ export function EvalCasesList({ evalName }: { evalName: EvalName }) {
         <FilterPillLinks
           label="Evals"
           links={evalLinks}
-          currentHref={casesHrefOf(evalName)}
+          currentHref={evalCasesHref(evalName)}
         />
-        <Link href={`${casesHrefOf(evalName)}/new`} className={primaryButton}>
+        <Link href={`${evalCasesHref(evalName)}/new`} className={primaryButton}>
           Add case
         </Link>
       </div>
@@ -194,7 +179,11 @@ export function EvalCasesList({ evalName }: { evalName: EvalName }) {
           body="New runs leave it out; past runs still show it. Archived cases can’t be edited."
           cancelLabel="Keep it"
           confirmLabel="Archive"
-          onConfirm={() => archiveMutation.mutate(archiving.key)}
+          onConfirm={() => {
+            if (!archiveMutation.isPending) {
+              archiveMutation.mutate(archiving.key);
+            }
+          }}
           onCancel={() => setArchiving(null)}
         />
       ) : null}

@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 
 import { primaryButton, secondaryButton } from "@/components/button-styles";
+import { dialogSurface } from "@/components/dialog-styles";
 import { fieldBox } from "@/components/field-styles";
 import type { EvalCase } from "@/lib/api-client";
 import { savingErrors } from "@/lib/eval-forms";
+import { evalCaseEditHref } from "@/lib/evals";
 import { refreshEvalCases } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
@@ -39,7 +41,7 @@ export function EvalCaseDuplicateDialog({
       apiClient.duplicateEvalCase(evalCase.key, newKey),
     onSuccess: (copy) => {
       refreshEvalCases(queryClient);
-      router.push(`/admin/evals/cases/${copy.eval}/edit/${copy.key}`);
+      router.push(evalCaseEditHref(copy));
     },
   });
   const errors = savingErrors(duplicateMutation.error);
@@ -65,7 +67,7 @@ export function EvalCaseDuplicateDialog({
         event.preventDefault();
         onClose();
       }}
-      className="m-auto w-[calc(100%-32px)] max-w-[460px] rounded-banner border border-line bg-bg-deep text-text shadow-[0_24px_60px_rgba(0,0,0,.45)]"
+      className={`m-auto w-[calc(100%-32px)] max-w-[460px] ${dialogSurface}`}
     >
       <form onSubmit={duplicate} className="flex flex-col gap-3 px-7 py-[26px]">
         <h2 className="m-0 text-[20px] font-normal text-cream">

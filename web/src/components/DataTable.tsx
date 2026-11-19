@@ -58,9 +58,7 @@ export function DataTable<Row>({
                 key={rowKey(row)}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
                 className={`${index > 0 ? "border-t border-line" : ""} ${
-                  onRowClick
-                    ? "cursor-pointer hover:bg-[rgba(255,255,255,.04)]"
-                    : ""
+                  onRowClick ? "cursor-pointer" : ""
                 }`}
               >
                 {columns.map((column) => (

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import { dangerButton, secondaryButton } from "@/components/button-styles";
+import { dialogSurface } from "@/components/dialog-styles";
 
 /**
  * Asks before something that can't be undone. The safe choice comes first,
@@ -63,7 +64,7 @@ export function ConfirmDialog({
         event.preventDefault();
         onCancel();
       }}
-      className={`${modal ? "m-auto w-[calc(100%-32px)]" : "static m-0 w-full"} max-w-[460px] rounded-banner border border-line bg-bg-deep text-text shadow-[0_24px_60px_rgba(0,0,0,.45)]`}
+      className={`${modal ? "m-auto w-[calc(100%-32px)]" : "static m-0 w-full"} max-w-[460px] ${dialogSurface}`}
     >
       <div className="flex flex-col gap-3 px-7 py-[26px]">
         <h2 className="m-0 text-[20px] font-normal text-cream">{title}</h2>
