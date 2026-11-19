@@ -44,7 +44,9 @@ describe("PersonaEditor", () => {
     );
     expect(screen.getByText("13 characters")).toBeVisible();
     expect(screen.getByText(/Last saved .* by Maya Lin/)).toBeVisible();
-    expect(screen.getByText(/The honesty rules must stay/)).toBeVisible();
+    expect(
+      screen.getByText("Changes apply to the next message after saving."),
+    ).toBeVisible();
   });
 
   it("saves an edited Persona", async () => {
@@ -95,12 +97,22 @@ describe("PersonaEditor", () => {
     await user.type(editor, " Be kind.");
     await user.click(screen.getByRole("button", { name: "Save Persona" }));
 
-    expect(
-      await screen.findByText(
-        "Couldn’t save the Persona. Zeph keeps using the last saved version.",
-      ),
-    ).toBeVisible();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Couldn’t save. Your text is still here.",
+    );
     expect(editor).toHaveValue("You are Zeph. Be kind.");
+
+    apiClient.updateAdminSettings.mockResolvedValue({
+      persona: {
+        value: "You are Zeph. Be kind.",
+        updated_at: "2026-11-11T09:00:00Z",
+        updated_by: "Maya Lin",
+      },
+    });
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(
+      await screen.findByText("Saved. Zeph uses it from the next message."),
+    ).toBeVisible();
   });
 
   it("offers Try again when the Persona cannot be loaded", async () => {

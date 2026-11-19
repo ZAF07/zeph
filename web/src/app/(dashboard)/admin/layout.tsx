@@ -3,16 +3,12 @@ import type { ReactNode } from "react";
 import { AdminGate } from "@/components/AdminGate";
 
 /**
- * The column the admin pages sit in: wider than the User pages, for tables
- * and editors. Only Admins see the pages.
+ * The admin pages, which sit straight in the Dashboard's main column as the
+ * admin references draw them. Only Admins see the pages.
  *
  * @param props - `children` is the admin page.
- * @returns The page in its column.
+ * @returns The page, for Admins only.
  */
 export default function AdminLayout({ children }: { children: ReactNode }) {
-  return (
-    <div className="mx-auto flex max-w-[1120px] flex-col gap-8 text-sm">
-      <AdminGate>{children}</AdminGate>
-    </div>
-  );
+  return <AdminGate>{children}</AdminGate>;
 }

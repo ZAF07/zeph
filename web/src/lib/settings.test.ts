@@ -35,7 +35,7 @@ describe("textSetting", () => {
 describe("lastSavedNote", () => {
   it("names the newest save among the given settings and who made it", () => {
     expect(lastSavedNote(settings, ["persona", "response_prompt"], "UTC")).toBe(
-      "Last saved 9 Nov, 08:05 by Ren Okafor",
+      "Last saved 9 Nov 2026, 8:05 AM by Ren Okafor",
     );
   });
 

@@ -151,11 +151,10 @@ describe("PromptsAndModels", () => {
     await user.type(card.getByLabelText("Prompt"), " Be warm.");
     await user.click(card.getByRole("button", { name: "Save" }));
 
-    expect(
-      await card.findByText(
-        "Couldn’t save. The last saved prompt, model and thinking stay in use.",
-      ),
-    ).toBeVisible();
+    expect(await card.findByRole("alert")).toHaveTextContent(
+      "Couldn’t save. The last saved prompt, model and thinking stay in use.",
+    );
+    expect(card.getByRole("button", { name: "Try again" })).toBeEnabled();
   });
 
   it("shows a service's extra prompts and saves them with its prompt and model", async () => {

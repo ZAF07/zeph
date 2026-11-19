@@ -1,5 +1,5 @@
 import type { AdminSettings } from "@/lib/api-client";
-import { formatSavedAt } from "@/lib/dates";
+import { formatLastSavedAt } from "@/lib/dates";
 
 /**
  * Reads a setting's value as text.
@@ -31,7 +31,7 @@ export function onOffSetting(settings: AdminSettings, key: string): boolean {
  * @param keys - The settings to look at.
  * @param timeZone - The time zone to show the time in; the browser's by
  *   default.
- * @returns A note like "Last saved 8 Nov, 14:20 by Maya Lin".
+ * @returns A note like "Last saved 8 Nov 2026, 2:20 PM by Maya Lin".
  */
 export function lastSavedNote(
   settings: AdminSettings,
@@ -46,5 +46,5 @@ export function lastSavedNote(
   if (!newest) {
     return "Using the starting values";
   }
-  return `Last saved ${formatSavedAt(newest.updated_at, timeZone)} by ${newest.updated_by}`;
+  return `Last saved ${formatLastSavedAt(newest.updated_at, timeZone)} by ${newest.updated_by}`;
 }

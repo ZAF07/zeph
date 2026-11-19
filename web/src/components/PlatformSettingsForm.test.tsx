@@ -102,7 +102,7 @@ describe("PlatformSettingsForm", () => {
     expect(screen.getByLabelText(/Memory isn’t available” note/)).toHaveValue(
       "**Memory isn’t available.** Still used.",
     );
-    expect(screen.getByText("Using the starting values")).toBeVisible();
+    expect(screen.getAllByText("Using the starting values")[0]).toBeVisible();
   });
 
   it("saves only the settings that changed", async () => {
@@ -118,7 +118,7 @@ describe("PlatformSettingsForm", () => {
       conversation_quiet_gap_minutes: 45,
     });
     expect(await screen.findByText(/Last saved .* by Maya Lin/)).toBeVisible();
-    expect(screen.getByText("Saved")).toBeVisible();
+    expect(screen.getByText("Saved.")).toBeVisible();
   });
 
   it("shows and saves the sticker adding quiet gap", async () => {
@@ -512,11 +512,12 @@ describe("PlatformSettingsForm", () => {
     await user.type(await screen.findByLabelText(/^AI notice/), " Extra.");
     await user.click(screen.getByRole("button", { name: "Save settings" }));
 
-    expect(
-      await screen.findByText(
-        "Couldn’t save. The platform keeps running on the last saved values.",
-      ),
-    ).toBeVisible();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Couldn’t save. The platform keeps running on the last saved values.",
+    );
+    expect(screen.getByLabelText(/^AI notice/)).toHaveValue(
+      "I'm an AI. Extra.",
+    );
   });
 
   it("offers Try again when settings cannot be loaded", async () => {
