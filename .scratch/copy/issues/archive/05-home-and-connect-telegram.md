@@ -57,5 +57,9 @@ Not part of this issue:
 ## Completion
 
 - Completed: 2026-11-19
-- Commit: <filled in after merge>
+- Commit: merge `43580aa` into main — "Merge Copy issue 05: Home, Connect Telegram and the Dashboard menu read every word from Copy (Home tab, Connect Telegram page slots, Dashboard menu and frame in Shared); Check-in frequency names keep one home in Onboarding; Dashboard pages get only the slots they show"
+  - Branch `copy-05-home-and-connect-telegram`:
+    - `22b59bb` Copy 05: Home, Connect Telegram and the Dashboard menu read every word from Copy (Home tab, Connect Telegram page slots, Dashboard menu in Shared)
+    - `64c9085` Copy 05: review fixes — fillCopy helper; Home reads onboarding's Check-in frequency names (one home); SidebarRail reads Copy directly
+    - `b121cdb` Copy 05: evidence recorded, issue completed and archived, screenshots; CONTEXT names the frequency names' and Dashboard menu's one home; handover notes on 06, 07 and 08
 
