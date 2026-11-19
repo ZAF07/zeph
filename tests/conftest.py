@@ -96,13 +96,15 @@ def throwaway_postgres() -> PostgresContainer:
     """A test Postgres with pgvector that leaves nothing on disk.
 
     Its data lives in memory (tmpfs at the data folder), so Docker makes no
-    volume for it, and nothing is left behind even if a run is killed.
+    volume for it, and nothing is left behind even if a run is killed. The
+    tmpfs is capped at 2 GB (a full run peaks near 650 MB), so a runaway
+    fails with "no space" rather than using up the Docker VM's memory.
 
     Returns:
         The container, not started yet.
     """
     postgres = PostgresContainer("pgvector/pgvector:pg16", driver="psycopg")
-    return postgres.with_tmpfs_mount("/var/lib/postgresql/data")
+    return postgres.with_tmpfs_mount("/var/lib/postgresql/data", "size=2g")
 
 
 def shared_postgres_url(config: pytest.Config) -> str:

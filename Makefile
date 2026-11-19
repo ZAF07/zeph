@@ -53,7 +53,7 @@ worktree-setup:
 worktree-teardown:
 	$(REQUIRE_WORKTREE)
 	$(WORKTREE_COMPOSE) down --volumes --remove-orphans --rmi local
-	docker builder prune --force --filter until=48h
+	docker builder prune --all --force --filter until=48h
 
 ## Replace this worktree's database with a copy of the main stack's (both stacks running).
 ## Telegram links are removed from the copy so this stack's Check-ins never reach real Users.
