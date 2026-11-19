@@ -56,7 +56,7 @@ Refs: `AdminUsers`, `AdminCheckInLog`, `M-AdminCheckInLog`.
   - Users panel: no User open until a row's Manage is pressed (so AdminUsers can't PASS as drawn; checked by parts instead).
 - 2026-11-19 — Chosen by me (following issue 09's decision): the orange builder notes and the state samples under them are left out of the Check-in Log page. The four states are tested per state in component tests.
 
-- 2026-11-19 — Evidence (after rebasing on `origin/main` at `2fd47ce`).
+- 2026-11-19 — Evidence (gathered on `origin/main` at `2fd47ce`; re-run after rebasing on `b75cb21`, which brought issue 12: checks 104 files / 645 tests passed, the three refs gave the same numbers, and AdminPersona stayed at issue 12's 1.10%).
 
 **Pixel test** (`NEXT_PUBLIC_DESIGN_FIXTURES=1 pnpm dev --port 3010`, `BASE_URL=http://localhost:3010`, sessions from `design-sessions.sh`), as shipped:
 ```
@@ -99,6 +99,8 @@ Why, and the parts compared on their own with the same pixelmatch settings:
 - `choose-api-client.test.ts`: the "no fixture yet" example is now `getModelCallTrace`, since `listAdminUsers` has a fixture.
 
 **Code review** (two sub-agents, standards and spec): no hard standards violations. Fixed: one `displayNameOf` / `roleLabel` helper (`lib/users.ts`), and direct tests for `DataTable` (with `TableCards`), `FilterPills` and `SelectFilter`. Answered, not changed: the Users table stays hand-built beside `DataTable` because its reference draws a different table (titled card, highlighted row, To build header); the period stays a string because selects give strings; `minWidthClass` and `labelShown` match the two drawn variants. Spec points (Ignore Threshold text, switch meaning, no close, undrawn lines, shared changes) are listed above for Zaf.
+
+- 2026-11-19 — After rebasing on issue 12: it made the same `AdminPageHeader` and admin layout changes, so those merged cleanly; the dates test kept both new functions. The period select now uses issue 12's `ChevronDownIcon`. Not changed: the Users panel switches keep the shared `Switch` (the reference draws plain rows, not issue 12's field-row box). Note for Zaf: issue 12's `formatLastSavedAt` still writes "Sept" in September, while `formatDay` now writes "Sep".
 
 ## Completion
 
