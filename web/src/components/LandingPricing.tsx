@@ -14,9 +14,24 @@ import { type Copy, readCopy } from "@/lib/copy";
  * primary one. Billing is still to build, so every button signs up.
  */
 const plans = [
-  { slot: "landing.pricing.free", features: 3, badge: false, primary: false },
-  { slot: "landing.pricing.plus", features: 4, badge: true, primary: true },
-  { slot: "landing.pricing.pro", features: 4, badge: false, primary: false },
+  {
+    slotPrefix: "landing.pricing.free",
+    features: 3,
+    badge: false,
+    primary: false,
+  },
+  {
+    slotPrefix: "landing.pricing.plus",
+    features: 4,
+    badge: true,
+    primary: true,
+  },
+  {
+    slotPrefix: "landing.pricing.pro",
+    features: 4,
+    badge: false,
+    primary: false,
+  },
 ];
 
 /**
@@ -30,7 +45,7 @@ function planDetails(
   copy: Copy,
   plan: (typeof plans)[number],
 ): LandingPlanDetails {
-  const text = (part: string) => readCopy(copy, `${plan.slot}.${part}`);
+  const text = (part: string) => readCopy(copy, `${plan.slotPrefix}.${part}`);
   return {
     name: text("name"),
     badge: plan.badge ? text("badge") : undefined,
@@ -72,7 +87,7 @@ export function LandingPricing({ copy }: { copy: Copy }) {
       <div className={splitContent}>
         <div className="flex flex-wrap gap-y-9">
           {plans.map((plan) => (
-            <LandingPlan key={plan.slot} plan={planDetails(copy, plan)} />
+            <LandingPlan key={plan.slotPrefix} plan={planDetails(copy, plan)} />
           ))}
         </div>
       </div>
