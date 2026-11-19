@@ -38,13 +38,13 @@ export type PlanSample = {
   billingHistory: BillingHistoryEntry[];
 };
 
-const includes = [
+const sampleIncludes = [
   "[WHAT THIS PLAN INCLUDES]",
   "[WHAT THIS PLAN INCLUDES]",
   "[WHAT THIS PLAN INCLUDES]",
 ];
 
-const payment: BillingHistoryEntry = {
+const samplePayment: BillingHistoryEntry = {
   date: "[DATE]",
   plan: "[PLAN NAME]",
   amount: "[AMOUNT]",
@@ -59,11 +59,26 @@ export const planSample: PlanSample = {
   dailyLimit: "[DAILY LIMIT]",
   messagesUsedPercent: 38,
   choices: [
-    { name: "[PLAN NAME]", price: "[PRICE]", includes, isCurrent: false },
-    { name: "[PLAN NAME]", price: "[PRICE]", includes, isCurrent: true },
-    { name: "[PLAN NAME]", price: "[PRICE]", includes, isCurrent: false },
+    {
+      name: "[PLAN NAME]",
+      price: "[PRICE]",
+      includes: sampleIncludes,
+      isCurrent: false,
+    },
+    {
+      name: "[PLAN NAME]",
+      price: "[PRICE]",
+      includes: sampleIncludes,
+      isCurrent: true,
+    },
+    {
+      name: "[PLAN NAME]",
+      price: "[PRICE]",
+      includes: sampleIncludes,
+      isCurrent: false,
+    },
   ],
   paymentProvider: "[PAYMENT PROVIDER]",
   card: "[CARD BRAND] ending [LAST 4]",
-  billingHistory: [payment, payment, payment],
+  billingHistory: [samplePayment, samplePayment, samplePayment],
 };

@@ -14,7 +14,7 @@ export function OverviewCountTile({ count }: { count: OverviewCount }) {
     <div className="box-border min-w-0 flex-[1_1_170px] rounded-card border border-line bg-panel px-[22px] py-5">
       <div className="flex items-center text-[13px] text-soft">
         {count.label}
-        {count.toBuild ? <ToBuildTag /> : null}
+        {count.isToBuild ? <ToBuildTag /> : null}
       </div>
       <div className="mt-1.5 mb-0.5 text-[32px] leading-[1.1] font-normal text-cream">
         {count.value}

@@ -1,10 +1,11 @@
 import Link from "next/link";
 
+import { AdminPageHeader } from "@/components/AdminPageHeader";
+import { CardFooterLink } from "@/components/CardFooterLink";
 import { cardLink, filledPill, outlinedPill } from "@/components/card-styles";
 import { CardRow } from "@/components/CardRow";
 import { DetailRow } from "@/components/DetailRow";
 import { HomeCard } from "@/components/HomeCard";
-import { AdminPageHeader } from "@/components/AdminPageHeader";
 import { MessagesChart } from "@/components/MessagesChart";
 import { OverviewCountTile } from "@/components/OverviewCountTile";
 import { ToBuildTag } from "@/components/ToBuildTag";
@@ -76,11 +77,7 @@ export function AdminOverview({ overview }: { overview: OverviewSample }) {
               </span>
             </DetailRow>
           ))}
-          <div className="border-t border-line">
-            <Link href="/admin/features" className={cardLink}>
-              Open Features
-            </Link>
-          </div>
+          <CardFooterLink href="/admin/features" label="Open Features" />
         </HomeCard>
       </div>
       <div className="flex flex-wrap items-start gap-6">
@@ -108,11 +105,7 @@ export function AdminOverview({ overview }: { overview: OverviewSample }) {
               {line.value}
             </DetailRow>
           ))}
-          <div className="border-t border-line">
-            <Link href="/admin/knowledge" className={cardLink}>
-              Open Knowledge
-            </Link>
-          </div>
+          <CardFooterLink href="/admin/knowledge" label="Open Knowledge" />
         </HomeCard>
       </div>
     </>

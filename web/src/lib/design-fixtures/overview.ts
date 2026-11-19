@@ -12,7 +12,7 @@ export type OverviewCount = {
   label: string;
   value: string;
   caption: string;
-  toBuild: boolean;
+  isToBuild: boolean;
 };
 
 /** One thing in the Overview's "Needs attention" list, and where to fix it. */
@@ -26,7 +26,7 @@ export type AttentionItem = {
 export type FeatureSummary = { name: string; isOn: boolean };
 
 /** One day's bar in the Overview's messages chart, as a share of its height. */
-export type MessagesDay = { day: string; heightPercent: number };
+export type MessagesDay = { weekday: string; heightPercent: number };
 
 /** One line of the Overview's Knowledge summary. */
 export type KnowledgeLine = { label: string; value: string };
@@ -51,31 +51,31 @@ export const overviewSample: OverviewSample = {
       label: "Users",
       value: "128",
       caption: "96 connected to Telegram",
-      toBuild: false,
+      isToBuild: false,
     },
     {
       label: "Messages today",
       value: "1,840",
       caption: "limit 60 per user per day",
-      toBuild: false,
+      isToBuild: false,
     },
     {
       label: "Check-ins today",
       value: "212",
       caption: "41 more skipped to give space",
-      toBuild: false,
+      isToBuild: false,
     },
     {
       label: "Safeguard events",
       value: "2",
       caption: "in the last 7 days",
-      toBuild: false,
+      isToBuild: false,
     },
     {
       label: "Paying subscribers",
       value: "[N]",
       caption: "[BREAKDOWN BY PLAN]",
-      toBuild: true,
+      isToBuild: true,
     },
   ],
   needsAttention: [
@@ -106,13 +106,13 @@ export const overviewSample: OverviewSample = {
     { name: "Knowledge", isOn: false },
   ],
   messagesByDay: [
-    { day: "Wed", heightPercent: 62 },
-    { day: "Thu", heightPercent: 70 },
-    { day: "Fri", heightPercent: 58 },
-    { day: "Sat", heightPercent: 44 },
-    { day: "Sun", heightPercent: 48 },
-    { day: "Mon", heightPercent: 81 },
-    { day: "Tue", heightPercent: 76 },
+    { weekday: "Wed", heightPercent: 62 },
+    { weekday: "Thu", heightPercent: 70 },
+    { weekday: "Fri", heightPercent: 58 },
+    { weekday: "Sat", heightPercent: 44 },
+    { weekday: "Sun", heightPercent: 48 },
+    { weekday: "Mon", heightPercent: 81 },
+    { weekday: "Tue", heightPercent: 76 },
   ],
   knowledge: [
     { label: "Ready", value: "5 documents" },

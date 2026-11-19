@@ -36,13 +36,12 @@ describe("PlanDetails", () => {
   it("lists each plan's inclusions", () => {
     render(<PlanDetails plan={planSample} />);
 
-    const choices = screen.getAllByRole("heading", { level: 3 });
-    expect(choices).toHaveLength(3);
-    const firstChoice = choices[0].closest("div.flex-col");
-    expect(firstChoice).not.toBeNull();
-    expect(
-      within(firstChoice as HTMLElement).getAllByRole("listitem"),
-    ).toHaveLength(3);
+    expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(3);
+    const lists = screen.getAllByRole("list");
+    expect(lists).toHaveLength(3);
+    for (const list of lists) {
+      expect(within(list).getAllByRole("listitem")).toHaveLength(3);
+    }
   });
 
   it("offers a Cancel plan button", () => {

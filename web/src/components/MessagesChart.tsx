@@ -12,7 +12,7 @@ export function MessagesChart({ days }: { days: MessagesDay[] }) {
     <div className="flex h-[150px] items-end gap-2.5">
       {days.map((day) => (
         <div
-          key={day.day}
+          key={day.weekday}
           className="flex h-full flex-1 flex-col items-center justify-end gap-2"
         >
           <span
@@ -20,7 +20,7 @@ export function MessagesChart({ days }: { days: MessagesDay[] }) {
             className="w-full max-w-10 rounded-t-[6px] bg-zeph"
             style={{ height: `${day.heightPercent}%` }}
           />
-          <span className="text-[12px] text-soft">{day.day}</span>
+          <span className="text-[12px] text-soft">{day.weekday}</span>
         </div>
       ))}
     </div>
