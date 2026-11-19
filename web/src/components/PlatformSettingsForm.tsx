@@ -408,8 +408,7 @@ export function PlatformSettingsForm() {
     return <LoadingPanel shape="card" label="Loading settings" />;
   }
 
-  const savedSettings = settings;
-  const saved = savedDrafts(savedSettings);
+  const saved = savedDrafts(settings);
   const values = drafts ?? saved;
   const changedKeys = allKeys.filter((key) => values[key] !== saved[key]);
   const isValid =
@@ -437,14 +436,18 @@ export function PlatformSettingsForm() {
           id={field.key}
           value={values[field.key] ?? ""}
           unit={field.unit}
-          describedBy={field.note ? noteId : undefined}
+          describedById={field.note ? noteId : undefined}
           onChange={(value) => edit(field.key, value)}
         />
       </FieldRow>
     );
   }
 
-  function numberSection(heading: string, fields: NumberField[]) {
+  function numberSection(
+    heading: string,
+    fields: NumberField[],
+    loadedSettings: AdminSettings,
+  ) {
     return (
       <section
         key={heading}
@@ -454,7 +457,7 @@ export function PlatformSettingsForm() {
         <FormSectionHeading title={heading} />
         <FieldRows
           footnote={lastSavedNote(
-            savedSettings,
+            loadedSettings,
             fields.map((field) =>
               checkInGapKeys.includes(field.key) ? checkInGapsKey : field.key,
             ),
@@ -491,9 +494,9 @@ export function PlatformSettingsForm() {
   return (
     <>
       {numberSections.map((section) =>
-        numberSection(section.heading, section.fields),
+        numberSection(section.heading, section.fields, settings),
       )}
-      {numberSection("Web search", [webSearchLimitField])}
+      {numberSection("Web search", [webSearchLimitField], settings)}
 
       <section aria-label="Wording" className="flex flex-col gap-3">
         <FormSectionHeading
@@ -524,7 +527,10 @@ export function PlatformSettingsForm() {
         sticky
         isDirty={isDirty}
         isSaving={saveSettings.isPending}
-        failedMessage={saveFailedMessage(saveSettings.error)}
+        failedMessage={saveFailedMessage(
+          saveSettings.error,
+          "Couldn’t save. The platform keeps running on the last saved values.",
+        )}
         canSave={isDirty && isValid}
         saveLabel="Save settings"
         onDiscard={() => {
@@ -533,9 +539,7 @@ export function PlatformSettingsForm() {
         }}
         onSave={saveChanges}
       />
-      {saveSettings.isSuccess ? (
-        <SavedNote>Saved. Zeph uses it from the next message.</SavedNote>
-      ) : null}
+      {saveSettings.isSuccess ? <SavedNote>Saved.</SavedNote> : null}
     </>
   );
 }

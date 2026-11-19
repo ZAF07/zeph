@@ -84,7 +84,10 @@ export function CrisisReplyEditor() {
           placement="inside"
           isDirty={isDirty}
           isSaving={saveSettings.isPending}
-          failedMessage={saveFailedMessage(saveSettings.error)}
+          failedMessage={saveFailedMessage(
+            saveSettings.error,
+            "Couldn’t save. Zeph keeps using the last saved Crisis Reply.",
+          )}
           canSave={isDirty && value.trim() !== ""}
           saveLabel="Save Crisis Reply"
           onDiscard={() => {
@@ -94,9 +97,7 @@ export function CrisisReplyEditor() {
           onSave={saveCrisisReply}
         />
       </FormEditor>
-      {saveSettings.isSuccess ? (
-        <SavedNote>Saved. Zeph uses it from the next message.</SavedNote>
-      ) : null}
+      {saveSettings.isSuccess ? <SavedNote>Saved.</SavedNote> : null}
     </section>
   );
 }

@@ -1,3 +1,4 @@
+import { ChevronDownIcon } from "@/components/ChevronDownIcon";
 import { fieldBox } from "@/components/field-styles";
 
 /**
@@ -37,19 +38,7 @@ export function FieldSelect({
           </option>
         ))}
       </select>
-      <svg
-        aria-hidden="true"
-        width="12"
-        height="8"
-        viewBox="0 0 12 8"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        className="pointer-events-none absolute right-3.5 text-soft"
-      >
-        <path d="M1 1.5l5 5 5-5" />
-      </svg>
+      <ChevronDownIcon className="pointer-events-none absolute right-3.5 text-soft" />
     </span>
   );
 }

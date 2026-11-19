@@ -82,8 +82,15 @@ describe("SaveBar", () => {
     renderSaveBar({ isDirty: true, isSaving: true });
 
     expect(screen.getByText("Unsaved changes")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Discard" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled();
+    for (const name of ["Discard", "Saving…"]) {
+      const button = screen.getByRole("button", { name });
+      expect(button).toBeDisabled();
+      expect(button).toHaveClass(
+        "disabled:border-line-strong",
+        "disabled:bg-transparent",
+        "disabled:text-mute",
+      );
+    }
   });
 
   it("draws 'Save failed': the coral alert, Discard and Try again", async () => {

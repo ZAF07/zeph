@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { ChevronDownIcon } from "@/components/ChevronDownIcon";
 import { ExtraPromptField } from "@/components/ExtraPromptField";
 import { FieldRow } from "@/components/FieldRow";
 import { FieldRows } from "@/components/FieldRows";
@@ -174,19 +175,7 @@ export function CoreServiceCard({
         >
           <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-6 py-3 text-[15px] text-text [&::-webkit-details-marker]:hidden">
             {group.name}
-            <svg
-              aria-hidden="true"
-              width="12"
-              height="8"
-              viewBox="0 0 12 8"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              className="-rotate-90 text-soft transition-transform duration-150 ease-in-out group-open:rotate-0 motion-reduce:transition-none"
-            >
-              <path d="M1 1.5l5 5 5-5" />
-            </svg>
+            <ChevronDownIcon className="-rotate-90 text-soft transition-transform duration-150 ease-in-out group-open:rotate-0 motion-reduce:transition-none" />
           </summary>
           <div className="flex flex-col gap-3 px-6 pb-4">
             {group.prompts.map(extraPromptField)}
@@ -197,15 +186,16 @@ export function CoreServiceCard({
         placement="alone"
         isDirty={isDirty}
         isSaving={saveSettings.isPending}
-        failedMessage={saveFailedMessage(saveSettings.error)}
+        failedMessage={saveFailedMessage(
+          saveSettings.error,
+          "Couldn’t save. The last saved prompt, model and thinking stay in use.",
+        )}
         canSave={isDirty && allFilled}
         saveLabel="Save"
         onDiscard={discard}
         onSave={save}
       />
-      {saveSettings.isSuccess ? (
-        <SavedNote>Saved. Zeph uses it from the next message.</SavedNote>
-      ) : null}
+      {saveSettings.isSuccess ? <SavedNote>Saved.</SavedNote> : null}
     </section>
   );
 }

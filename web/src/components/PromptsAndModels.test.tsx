@@ -152,7 +152,7 @@ describe("PromptsAndModels", () => {
     await user.click(card.getByRole("button", { name: "Save" }));
 
     expect(await card.findByRole("alert")).toHaveTextContent(
-      "Couldn’t save. Your text is still here.",
+      "Couldn’t save. The last saved prompt, model and thinking stay in use.",
     );
     expect(card.getByRole("button", { name: "Try again" })).toBeEnabled();
   });

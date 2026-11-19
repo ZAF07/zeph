@@ -118,9 +118,7 @@ describe("PlatformSettingsForm", () => {
       conversation_quiet_gap_minutes: 45,
     });
     expect(await screen.findByText(/Last saved .* by Maya Lin/)).toBeVisible();
-    expect(
-      screen.getByText("Saved. Zeph uses it from the next message."),
-    ).toBeVisible();
+    expect(screen.getByText("Saved.")).toBeVisible();
   });
 
   it("shows and saves the sticker adding quiet gap", async () => {
@@ -515,7 +513,7 @@ describe("PlatformSettingsForm", () => {
     await user.click(screen.getByRole("button", { name: "Save settings" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Couldn’t save. Your text is still here.",
+      "Couldn’t save. The platform keeps running on the last saved values.",
     );
     expect(screen.getByLabelText(/^AI notice/)).toHaveValue(
       "I'm an AI. Extra.",

@@ -17,7 +17,13 @@ describe("saveFailedMessage", () => {
     expect(saveFailedMessage(refused)).toBe("Keep {helplines}.");
   });
 
-  it("gives the design's words for any other failure", () => {
+  it("gives the page's own words for any other failure", () => {
+    expect(saveFailedMessage(new Error("down"), "Couldn’t save.")).toBe(
+      "Couldn’t save.",
+    );
+  });
+
+  it("gives the design's words by default", () => {
     expect(saveFailedMessage(new Error("down"))).toBe(SAVE_FAILED_MESSAGE);
     expect(saveFailedMessage(new ApiError(500, "/admin/settings"))).toBe(
       "Couldn’t save. Your text is still here.",
