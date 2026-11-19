@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -9,11 +9,23 @@ import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
   listCheckInLog: vi.fn<ApiClient["listCheckInLog"]>(),
+  getAdminSettings: vi.fn<ApiClient["getAdminSettings"]>(),
 };
 
 vi.mock("@/lib/use-api-client", () => ({
   useApiClient: () => apiClient,
 }));
+
+/** The settings with only the Ignore Threshold, as the log reads it. */
+function settingsWithIgnoreThreshold(value: number) {
+  return {
+    check_in_ignore_threshold: {
+      value,
+      updated_at: "2026-11-01T09:00:00Z",
+      updated_by: null,
+    },
+  };
+}
 
 const entries: CheckInLogEntry[] = [
   {
@@ -75,6 +87,9 @@ describe("CheckInLog", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     apiClient.listCheckInLog.mockResolvedValue(entries);
+    apiClient.getAdminSettings.mockResolvedValue(
+      settingsWithIgnoreThreshold(3),
+    );
   });
 
   it("lists sends, woven in or not, skips with reasons and ignore-rule pauses, never message text", async () => {
@@ -112,6 +127,38 @@ describe("CheckInLog", () => {
     expect(firstCells).toEqual(
       entries.map((entry) => formatLoggedAt(entry.decided_at)),
     );
+  });
+
+  it("names the Ignore Threshold set by the Admins on paused rows", async () => {
+    apiClient.getAdminSettings.mockResolvedValue(
+      settingsWithIgnoreThreshold(5),
+    );
+    renderWithQueries(<CheckInLog />);
+
+    await screen.findByRole("table");
+    expect(
+      table().getByText("Five in a row went unanswered"),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the loading rows until the settings have loaded too", async () => {
+    apiClient.getAdminSettings.mockReturnValue(new Promise(() => {}));
+    renderWithQueries(<CheckInLog />);
+
+    expect(
+      await screen.findByRole("status", { name: "Loading log" }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(apiClient.listCheckInLog).toHaveBeenCalled());
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  it("still shows the log when the settings can't load", async () => {
+    apiClient.getAdminSettings.mockRejectedValue(new Error("down"));
+    renderWithQueries(<CheckInLog />);
+
+    await screen.findByRole("table");
+    expect(table().getByText("Paused by ignore rule")).toBeInTheDocument();
+    expect(table().queryByText(/in a row went unanswered/)).toBeNull();
   });
 
   it("says which Admin asked for a Check in Now", async () => {

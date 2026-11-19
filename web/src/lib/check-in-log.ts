@@ -59,3 +59,34 @@ export function filterCheckInLog(
     return who.toLowerCase().includes(query);
   });
 }
+
+const numberWords = [
+  "Zero",
+  "One",
+  "Two",
+  "Three",
+  "Four",
+  "Five",
+  "Six",
+  "Seven",
+  "Eight",
+  "Nine",
+  "Ten",
+];
+
+/**
+ * Says why the ignore rule paused a User, as the Check-in log's skip reason
+ * column shows it: how many sent Check-ins in a row went unanswered.
+ *
+ * @param ignoreThreshold - The Ignore Threshold setting; null when it isn't
+ *   known (the settings didn't load).
+ * @returns A line like "Three in a row went unanswered", or "Paused by
+ *   ignore rule" when the threshold isn't known.
+ */
+export function pausedReasonText(ignoreThreshold: number | null): string {
+  if (ignoreThreshold === null) {
+    return "Paused by ignore rule";
+  }
+  const count = numberWords[ignoreThreshold] ?? String(ignoreThreshold);
+  return `${count} in a row went unanswered`;
+}
