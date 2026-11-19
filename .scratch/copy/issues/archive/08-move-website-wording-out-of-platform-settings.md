@@ -71,3 +71,12 @@ Stays as is: the onboarding reason choices and all chat wording (Platform Settin
    - The account was made a plain User, and `/admin/copy` sent it to `/`. On Memories, the Memory switch was turned off. The notice reads "Memory is resting. Nothing is deleted…" with "Turn memory on". The title is drawn in the bright text colour rgb(234, 242, 243), which is how the design draws a notice title ("bold" here means bright at weight 400, as in `States`).
    - Home (after the review fix) shows the same notice with no button, and Account shows it beside the switch. Account shows the Memory and Photo explanations and the Delete my data description from Copy. Home's footer shows its own notice, and the menu shows "Zeph is an AI, not a therapist or crisis service."
    - Screenshots: `user-memories-1280.png`, `user-memories-390.png`, `user-home-1280.png`, `user-home-390.png`, `user-account-1280.png`. No page errors.
+
+## Completion
+
+- Completed: 2026-11-19
+- Commit: merge `9ac9cf3` into main — "Merge Copy issue 08: website wording moves out of Platform Settings into Copy (AI notices, Memory and Photo explanations, Memory-off notes as title and body, Delete My Data description); Home and /me send the Memory flags and the web picks the note; Settings drops the fields; migration 0063 drops the old settings"
+  - Branch `copy-08-website-wording`:
+    - `377b6e4` Copy 08: website wording moves out of Platform Settings into Copy
+    - `d346842` Copy 08: Home draws the Memory-off note as the design's notice; tests share the moved keys; review tidy-ups
+    - `24f0fb3` Copy 08: evidence recorded, issue completed and archived, screenshots; CONTEXT gives the Memory explanation and Memory-off notes one home in Shared and makes the AI Notice Copy; handover note on 09
