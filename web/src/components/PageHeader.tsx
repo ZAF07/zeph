@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
  * The plain heading at the top of a Dashboard page with no illustration: a
  * small label, the page title and one line under it.
  *
- * @param props - `eyebrow` is the small label, `title` the page title and
- *   `lead` the line under it.
+ * @param props - `eyebrow` is the small label, `title` the page title (with a
+ *   "To build" tag when it has one) and `lead` the line under it.
  * @returns The header.
  */
 export function PageHeader({
@@ -14,7 +14,7 @@ export function PageHeader({
   lead,
 }: {
   eyebrow: string;
-  title: string;
+  title: ReactNode;
   lead: ReactNode;
 }) {
   return (
