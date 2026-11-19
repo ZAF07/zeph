@@ -28,7 +28,7 @@ describe("HowItWorks", () => {
     ).toHaveAttribute("href", "/sign-up");
     expect(screen.getByRole("link", { name: "See pricing" })).toHaveAttribute(
       "href",
-      "/#pricing",
+      "/pricing",
     );
   });
 });

@@ -163,7 +163,7 @@ export function HowItWorks() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <PillLink href="/sign-up" label="Get Started Free" primary />
-            <Link href="/#pricing" className={secondaryButton}>
+            <Link href="/pricing" className={secondaryButton}>
               See pricing
             </Link>
           </div>
