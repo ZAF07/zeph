@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { EvalCostsFields } from "@/components/EvalCostsFields";
 import { LoadFailed } from "@/components/LoadFailed";
+import { LoadingPanel } from "@/components/LoadingPanel";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
@@ -29,11 +30,7 @@ export function EvalCostsForm() {
         onRetry={() => void costsQuery.refetch()}
       />
     ) : (
-      <div
-        aria-busy="true"
-        aria-label="Loading Model Prices"
-        className="h-[320px] rounded-xl border border-line bg-subtle"
-      />
+      <LoadingPanel shape="card" label="Loading Model Prices" />
     );
   }
   return <EvalCostsFields costs={costs} />;

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 
 import { LoadFailed } from "@/components/LoadFailed";
+import { LoadingPanel } from "@/components/LoadingPanel";
 import { useMe } from "@/lib/queries";
 
 /**
@@ -39,9 +40,6 @@ export function AdminGate({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div
-      aria-busy="true"
-      className="h-[200px] rounded-card border border-line bg-subtle"
-    />
+    <LoadingPanel shape="card" label="Opening the admin area" />
   );
 }

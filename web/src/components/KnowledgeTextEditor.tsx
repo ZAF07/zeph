@@ -75,8 +75,8 @@ export function KnowledgeTextEditor({
   }
 
   return (
-    <div className="flex flex-col rounded-card border border-line bg-white focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-t-card border-b border-line bg-subtle px-2.5 py-2">
+    <div className="flex flex-col rounded-card border border-line bg-panel text-text focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-cream">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-2.5 py-1.5">
         <div
           role="toolbar"
           aria-label="Text tools"
@@ -126,7 +126,7 @@ export function KnowledgeTextEditor({
         <div
           role="group"
           aria-label="View"
-          className="inline-flex rounded-full border border-line-strong bg-white p-0.5"
+          className="inline-flex rounded-pill border border-line-strong p-0.5"
         >
           {views.map((option) => (
             <button
@@ -134,10 +134,10 @@ export function KnowledgeTextEditor({
               type="button"
               aria-pressed={view === option.view}
               onClick={() => setView(option.view)}
-              className={`${option.wideOnly ? "hidden lg:inline-flex" : "inline-flex"} min-h-8 cursor-pointer items-center rounded-full border-0 px-3.5 text-[13px] font-medium ${
+              className={`${option.wideOnly ? "hidden lg:inline-flex" : "inline-flex"} min-h-10 cursor-pointer items-center rounded-pill border-0 px-3.5 font-[inherit] text-[13px] ${
                 view === option.view
-                  ? "bg-ink text-white"
-                  : "bg-transparent text-ink-soft hover:text-ink"
+                  ? "bg-cream font-medium text-ink"
+                  : "bg-transparent font-light text-text hover:text-cream"
               }`}
             >
               {option.label}
@@ -171,7 +171,7 @@ export function KnowledgeTextEditor({
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-b-card border-t border-line bg-subtle px-4 py-2 text-caption text-ink-muted">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-line px-5 py-3 text-[12px] text-soft">
         <span>{describeLength(value)}</span>
         {statusNote ? <span>{statusNote}</span> : null}
       </div>

@@ -1,14 +1,14 @@
-/** Class names for form fields on the Foundations screen. */
+/** Class names for form fields, drawn as the card list's text field. */
 
 /** A text input or select. */
 export const inputField =
-  "min-h-[50px] w-full rounded-input border border-line-strong bg-white px-3.5 py-3 text-body text-ink";
+  "box-border min-h-[46px] w-full rounded-input border border-line-strong bg-bg-deep px-3.5 py-[11px] text-[15px] text-text placeholder:text-mute [color-scheme:dark] [&_option]:bg-bg-deep";
 
 /** A label stacked above its field. */
-export const fieldLabel = "flex min-w-0 flex-col gap-2 text-sm font-medium";
+export const fieldLabel = "flex min-w-0 flex-col gap-1.5 text-[13px] text-soft";
 
-/** A small grey line under a field. */
-export const fieldCaption = "m-0 text-caption font-normal text-ink-muted";
+/** A small line under a field. */
+export const fieldCaption = "m-0 text-[12px] font-normal text-soft";
 
 /** A tall text box for prompts and other long text, in a code font. */
-export const codeTextArea = `${inputField} resize-y font-mono text-[13.5px] leading-relaxed`;
+export const codeTextArea = `${inputField} resize-y font-mono text-[13.5px] leading-[1.6]`;

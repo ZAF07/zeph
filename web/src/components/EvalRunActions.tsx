@@ -91,8 +91,8 @@ export function EvalRunActions({ run }: { run: EvalRun }) {
         ) : null}
       </div>
       {canDelete && isConfirmingDelete ? (
-        <div className="flex flex-col gap-3 rounded-card bg-danger-tint p-5">
-          <p className="m-0 text-caption">
+        <div className="box-border flex flex-col gap-2.5 rounded-tile border border-danger px-5 py-4">
+          <p className="m-0 text-[13px] text-soft">
             This deletes the run with its Case Results and traces. It can’t be
             undone.
           </p>
@@ -117,7 +117,7 @@ export function EvalRunActions({ run }: { run: EvalRun }) {
         </div>
       ) : null}
       {failed ? (
-        <p role="alert" className="m-0 text-caption text-danger">
+        <p role="alert" className="m-0 text-[13px] text-danger">
           That didn’t work. Reload the page and try again.
         </p>
       ) : null}

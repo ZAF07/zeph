@@ -52,12 +52,12 @@ export function SettingOverrideField({
       : `Live: ${describeSettingValue(liveValue)}`;
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-line bg-white px-3.5 py-3">
+    <div className="flex flex-col gap-2 rounded-tile border border-line bg-bg-deep px-3.5 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-semibold">{label}</span>
+        <span className="text-[15px] text-text">{label}</span>
         <button
           type="button"
-          className="cursor-pointer border-0 bg-transparent p-0 text-caption text-danger"
+          className="min-h-11 cursor-pointer border-0 bg-transparent p-0 font-[inherit] text-[13px] text-danger underline"
           onClick={onRemove}
           aria-label={`Stop changing ${label}`}
         >

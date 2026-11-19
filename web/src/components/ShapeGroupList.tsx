@@ -36,7 +36,7 @@ export function ShapeGroupList({
   return (
     <section aria-label={field.label} className="flex min-w-0 flex-col gap-3">
       <div className="flex flex-col gap-1.5">
-        <h3 className="m-0 text-sm font-semibold">{field.label}</h3>
+        <h3 className="m-0 text-[15px] font-normal text-text">{field.label}</h3>
         <p className={fieldCaption}>{field.description}</p>
       </div>
       {entries.map((entry, index) => (
@@ -44,10 +44,10 @@ export function ShapeGroupList({
           key={index}
           role="group"
           aria-label={`${itemLabel} ${index + 1}`}
-          className="flex flex-col gap-4 rounded-xl border border-line bg-white p-4"
+          className="flex flex-col gap-4 rounded-tile border border-line bg-bg-deep p-4"
         >
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-semibold text-ink-soft">
+            <span className="text-[14px] text-soft">
               {itemLabel} {index + 1}
             </span>
             <button
@@ -62,7 +62,7 @@ export function ShapeGroupList({
             </button>
           </div>
           {errors[fieldPath(path, index)] ? (
-            <p role="alert" className="m-0 text-caption text-danger">
+            <p role="alert" className="m-0 text-[13px] text-danger">
               {errors[fieldPath(path, index)]}
             </p>
           ) : null}
@@ -77,7 +77,7 @@ export function ShapeGroupList({
         </div>
       ))}
       {error ? (
-        <p role="alert" className="m-0 text-caption text-danger">
+        <p role="alert" className="m-0 text-[13px] text-danger">
           {error}
         </p>
       ) : null}

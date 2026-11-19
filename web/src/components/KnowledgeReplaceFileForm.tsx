@@ -4,6 +4,8 @@ import { useState, type FormEvent } from "react";
 
 import { secondaryButton } from "@/components/button-styles";
 import { KnowledgeFileDrop } from "@/components/KnowledgeFileDrop";
+import { SavedNote } from "@/components/SavedNote";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { ApiError, type KnowledgeDocumentWithText } from "@/lib/api-client";
 
 type Flash = { text: string; isError: boolean };
@@ -76,13 +78,16 @@ export function KnowledgeReplaceFileForm({
     <form
       aria-labelledby="replace-file-heading"
       onSubmit={(event) => void submit(event)}
-      className="flex flex-col gap-4 rounded-card border border-line bg-white p-6"
+      className="flex flex-col gap-4 rounded-card border border-line bg-panel px-6 py-[22px]"
     >
       <div className="flex flex-col gap-1">
-        <h2 id="replace-file-heading" className="m-0 text-[17px] font-semibold">
+        <h2
+          id="replace-file-heading"
+          className="m-0 text-[17px] font-normal text-cream"
+        >
           Replace file
         </h2>
-        <p className="m-0 text-caption text-ink-muted">
+        <p className="m-0 text-[13px] text-soft">
           Swap in a better translation or a corrected version. The title,
           source, tradition and added date stay; the new file is read and
           re-indexed.
@@ -93,18 +98,8 @@ export function KnowledgeReplaceFileForm({
         inputKey={fileInputKey}
         onChoose={chooseFile}
       />
-      {flash ? (
-        <p
-          role={flash.isError ? "alert" : "status"}
-          className={`m-0 rounded-xl px-4 py-3.5 text-sm ${
-            flash.isError
-              ? "border border-danger-line bg-danger-tint text-danger-deep"
-              : "bg-blue-tint text-blue-deep"
-          }`}
-        >
-          {flash.text}
-        </p>
-      ) : null}
+      {flash?.isError ? <SaveFailedNote>{flash.text}</SaveFailedNote> : null}
+      {flash && !flash.isError ? <SavedNote>{flash.text}</SavedNote> : null}
       <button
         type="submit"
         className={`${secondaryButton} self-start`}

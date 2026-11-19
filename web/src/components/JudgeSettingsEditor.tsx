@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { JudgeSettingsForm } from "@/components/JudgeSettingsForm";
 import { LoadFailed } from "@/components/LoadFailed";
+import { LoadingPanel } from "@/components/LoadingPanel";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
@@ -28,11 +29,7 @@ export function JudgeSettingsEditor() {
         onRetry={() => void judgeQuery.refetch()}
       />
     ) : (
-      <div
-        aria-busy="true"
-        aria-label="Loading the Judge’s settings"
-        className="h-[420px] rounded-xl border border-line bg-subtle"
-      />
+      <LoadingPanel shape="card" label="Loading the Judge’s settings" />
     );
   }
   return <JudgeSettingsForm settings={settings} />;

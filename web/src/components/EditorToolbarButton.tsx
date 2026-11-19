@@ -32,7 +32,7 @@ export function EditorToolbarButton({
         disabled={disabled}
         onMouseDown={(event) => event.preventDefault()}
         onClick={onClick}
-        className="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg border border-transparent bg-transparent text-ink-soft hover:bg-hover hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+        className="inline-flex size-11 cursor-pointer items-center justify-center rounded-input border border-transparent bg-transparent text-soft hover:bg-bg-deep hover:text-cream disabled:cursor-not-allowed disabled:text-mute"
       >
         <svg
           width="18"
@@ -50,9 +50,9 @@ export function EditorToolbarButton({
       </button>
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute left-0 top-full z-[300] mt-1.5 hidden whitespace-nowrap rounded-md bg-ink px-2 py-1 text-xs text-white group-hover:block group-has-[:focus-visible]:block"
+        className="pointer-events-none absolute top-full left-0 z-[300] mt-1.5 hidden rounded-input border border-line bg-bg-deep px-2 py-1 text-[12px] whitespace-nowrap text-text group-hover:block group-has-[:focus-visible]:block"
       >
-        {label} <span className="text-on-black-soft">{shortcut}</span>
+        {label} <span className="text-soft">{shortcut}</span>
       </span>
     </span>
   );

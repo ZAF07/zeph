@@ -95,10 +95,13 @@ export function KnowledgeTextSection({
       className="flex flex-col gap-3"
     >
       <div className="flex flex-col gap-1">
-        <h2 id="document-text-heading" className="m-0 text-h3 font-semibold">
+        <h2
+          id="document-text-heading"
+          className="m-0 text-[17px] font-normal text-cream"
+        >
           Text
         </h2>
-        <p className="m-0 text-caption text-ink-muted">
+        <p className="m-0 text-[13px] text-soft">
           {knowledgeDocument.text === null && !isWaitingForFile
             ? "No text could be read from this file. Type or paste its text, then save to make it Ready."
             : "What Zeph draws on. Saving your changes re-indexes the document."}
@@ -119,11 +122,7 @@ export function KnowledgeTextSection({
             onSave={openReview}
             statusNote={
               <>
-                <span
-                  className={
-                    hasUnsavedChanges ? "font-medium text-orange-text" : ""
-                  }
-                >
+                <span className={hasUnsavedChanges ? "text-orange" : ""}>
                   {hasUnsavedChanges ? "Unsaved changes" : "Saved"}
                 </span>
                 {` · ${statusLabel}`}

@@ -23,16 +23,16 @@ export function SnapshotValueGroup({
   values: Record<string, unknown>;
 }) {
   return (
-    <details className="rounded-lg border border-line px-3.5 py-2.5">
-      <summary className="cursor-pointer text-caption font-medium">
+    <details className="rounded-tile border border-line px-3.5 py-2.5">
+      <summary className="cursor-pointer text-[13px] text-text">
         {title}
       </summary>
       <dl className="m-0 mt-2 flex flex-col gap-2">
         {Object.entries(values).map(([name, value]) => (
           <div key={name} className="flex flex-col gap-0.5">
-            <dt className="font-mono text-xs text-ink-muted">{name}</dt>
+            <dt className="font-mono text-[12px] text-soft">{name}</dt>
             <dd className="m-0">
-              <pre className="m-0 max-h-60 overflow-auto whitespace-pre-wrap rounded bg-subtle px-2.5 py-1.5 font-mono text-xs">
+              <pre className="m-0 max-h-60 overflow-auto rounded-input bg-bg-deep px-2.5 py-1.5 font-mono text-[12px] whitespace-pre-wrap">
                 {showValue(value)}
               </pre>
             </dd>

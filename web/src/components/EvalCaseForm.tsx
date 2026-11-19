@@ -67,7 +67,7 @@ export function EvalCaseForm({
   return (
     <form onSubmit={save} className="flex flex-col gap-5" noValidate>
       {isLocked ? (
-        <p className="m-0 rounded-xl bg-subtle px-4 py-3 text-sm">
+        <p className="m-0 rounded-note border border-line bg-panel px-[18px] py-3 text-[14px] text-text">
           This case is archived: new runs leave it out and it can’t be changed.
           Duplicate it to make a new one like it.
         </p>
@@ -75,9 +75,12 @@ export function EvalCaseForm({
       {existing ? null : (
         <section
           aria-label="Key"
-          className="flex flex-col gap-1.5 rounded-card border border-line bg-white p-6"
+          className="flex flex-col gap-1.5 rounded-card border border-line bg-panel px-6 py-[22px]"
         >
-          <label htmlFor="case-key" className="text-sm font-medium">
+          <label
+            htmlFor="case-key"
+            className="text-[17px] font-normal text-cream"
+          >
             Key
           </label>
           <p id="case-key-description" className={fieldCaption}>
@@ -94,7 +97,7 @@ export function EvalCaseForm({
             onChange={(event) => setCaseKey(event.target.value)}
           />
           {errors.fields.key ? (
-            <p role="alert" className="m-0 text-caption text-danger">
+            <p role="alert" className="m-0 text-[13px] text-danger">
               {errors.fields.key}
             </p>
           ) : null}
@@ -117,12 +120,12 @@ export function EvalCaseForm({
             {existing ? "Save case" : "Add case"}
           </button>
           {errors.summary ? (
-            <p role="alert" className="m-0 text-caption text-danger">
+            <p role="alert" className="m-0 text-[13px] text-danger">
               {errors.summary}
             </p>
           ) : null}
           {saveMutation.isSuccess && existing ? (
-            <p role="status" className="m-0 text-caption text-ink-muted">
+            <p role="status" className="m-0 text-[13px] text-soft">
               Saved. The next run uses it; past runs keep the case as it was.
             </p>
           ) : null}

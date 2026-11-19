@@ -34,9 +34,9 @@ export function EvalRunEstimateNote({
     <section
       aria-label="Estimate"
       aria-live="polite"
-      className="flex flex-col gap-1 rounded-xl border border-line bg-subtle px-[18px] py-3.5"
+      className="flex flex-col gap-1 rounded-card border border-line bg-panel px-[18px] py-3.5 text-[14px] text-text"
     >
-      <p className="m-0 font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted">
+      <p className="m-0 text-[11px] font-medium tracking-[1.5px] text-soft uppercase">
         Estimate
       </p>
       {estimate ? (
@@ -46,7 +46,7 @@ export function EvalRunEstimateNote({
             · {describeCost(estimate)}
           </p>
           {estimate.variants.length > 1 ? (
-            <ul className="m-0 flex list-none flex-col gap-0.5 p-0 text-caption text-ink-soft">
+            <ul className="m-0 flex list-none flex-col gap-0.5 p-0 text-[13px] text-soft">
               {estimate.variants.map((variant) => (
                 <li key={variant.letter}>
                   Variant {variant.letter}: about{" "}
@@ -56,7 +56,7 @@ export function EvalRunEstimateNote({
               ))}
             </ul>
           ) : null}
-          <p className="m-0 text-caption text-ink-muted">
+          <p className="m-0 text-[13px] text-soft">
             From each case’s last run, at DeepSeek’s peak price, so the real
             cost is usually the same or lower.
             {estimate.rough_case_count > 0
@@ -67,11 +67,11 @@ export function EvalRunEstimateNote({
           </p>
         </>
       ) : estimateQuery.isError ? (
-        <p className="m-0 text-caption text-ink-muted">
+        <p className="m-0 text-[13px] text-soft">
           Couldn’t work out an estimate. You can still start the run.
         </p>
       ) : (
-        <p className="m-0 text-caption text-ink-muted">Working it out…</p>
+        <p className="m-0 text-[13px] text-soft">Working it out…</p>
       )}
     </section>
   );

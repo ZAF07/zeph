@@ -74,7 +74,7 @@ export function EvalCostsFields({ costs }: { costs: EvalCosts }) {
   return (
     <form onSubmit={save} className="flex flex-col gap-6">
       <section className="flex flex-col gap-3">
-        <h2 className="m-0 text-[17px] font-semibold">Model Prices</h2>
+        <h2 className="m-0 text-[17px] font-normal text-cream">Model Prices</h2>
         <p className={fieldCaption}>
           SGD per 1,000,000 tokens the model reads (in) and writes (out). Use
           DeepSeek’s peak, cache-miss price so estimates are never too low.
@@ -82,15 +82,15 @@ export function EvalCostsFields({ costs }: { costs: EvalCosts }) {
           cost, marked “no price set”, and never stop a run. A run keeps the
           prices it started with.
         </p>
-        <div className="overflow-x-auto rounded-xl border border-line bg-white">
-          <table className="w-full min-w-[560px] border-collapse text-sm">
+        <div className="overflow-x-auto rounded-card border border-line bg-panel">
+          <table className="w-full min-w-[560px] border-collapse text-[14px] text-text">
             <thead>
               <tr>
                 {["Model", "SGD in per 1M", "SGD out per 1M"].map((heading) => (
                   <th
                     key={heading}
                     scope="col"
-                    className="border-b border-line bg-subtle px-[18px] py-3 text-left font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted"
+                    className="border-b border-line px-[18px] py-3 text-left text-[11px] font-medium tracking-[1.5px] whitespace-nowrap text-soft uppercase"
                   >
                     {heading}
                   </th>
@@ -117,7 +117,7 @@ export function EvalCostsFields({ costs }: { costs: EvalCosts }) {
                       />
                     )}
                     {row.sgdIn === "" && row.sgdOut === "" ? (
-                      <span className="ml-2 text-caption text-ink-muted">
+                      <span className="ml-2 text-[13px] text-soft">
                         no price set
                       </span>
                     ) : null}
@@ -163,7 +163,9 @@ export function EvalCostsFields({ costs }: { costs: EvalCosts }) {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="m-0 text-[17px] font-semibold">Eval run token limit</h2>
+        <h2 className="m-0 text-[17px] font-normal text-cream">
+          Eval run token limit
+        </h2>
         <label className={`${fieldLabel} max-w-[320px]`}>
           Most tokens one run may use
           <input
@@ -181,14 +183,14 @@ export function EvalCostsFields({ costs }: { costs: EvalCosts }) {
       </section>
 
       {error ? (
-        <p role="alert" className="m-0 text-caption text-danger">
+        <p role="alert" className="m-0 text-[13px] text-danger">
           {error instanceof ApiError && error.detail
             ? error.detail
             : "Couldn’t save. Try again."}
         </p>
       ) : null}
       {saveMutation.isSuccess ? (
-        <p role="status" className="m-0 text-caption text-ink-muted">
+        <p role="status" className="m-0 text-[13px] text-soft">
           Saved. New runs use these from now on.
         </p>
       ) : null}

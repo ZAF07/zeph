@@ -85,9 +85,9 @@ export function MakeLiveControl({
       ) : (
         <section
           aria-label={`Confirm making Variant ${letter} live`}
-          className="flex flex-col gap-3 rounded-lg border border-yellow bg-yellow-tint px-3.5 py-3"
+          className="flex flex-col gap-3 rounded-tile border border-orange px-5 py-4"
         >
-          <p className="m-0 text-caption text-yellow-deep">
+          <p className="m-0 text-[13px] text-orange">
             {changes.length === 1
               ? "This setting was changed live since the run started."
               : "These settings were changed live since the run started."}{" "}
@@ -97,16 +97,16 @@ export function MakeLiveControl({
           {changes.map((change) => (
             <label
               key={change.key}
-              className="flex cursor-pointer items-start gap-3 rounded-lg bg-white px-3 py-2.5"
+              className="flex cursor-pointer items-start gap-3 rounded-input border border-line bg-bg-deep px-3.5 py-2.5"
             >
               <input
                 type="checkbox"
-                className="mt-1 size-4"
+                className="mt-1 size-4 accent-cream"
                 checked={confirmed.includes(change.key)}
                 onChange={() => toggle(change.key)}
               />
-              <span className="flex min-w-0 flex-col gap-1 text-caption">
-                <span className="font-medium">
+              <span className="flex min-w-0 flex-col gap-1 text-[13px]">
+                <span className="text-cream">
                   Replace {labelOf(change.key)}
                 </span>
                 <SettingValueLine
@@ -142,7 +142,7 @@ export function MakeLiveControl({
         </section>
       )}
       {error ? (
-        <p role="alert" className="m-0 text-caption text-danger">
+        <p role="alert" className="m-0 text-[13px] text-danger">
           {error instanceof ApiError && error.detail
             ? `Couldn’t make it live: ${error.detail}`
             : "Couldn’t make it live. Nothing was changed. Try again."}

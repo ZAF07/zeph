@@ -53,12 +53,12 @@ export function JudgeSettingsForm({ settings }: { settings: JudgeSettings }) {
           Save Judge
         </button>
         {errors.summary ? (
-          <p role="alert" className="m-0 text-caption text-danger">
+          <p role="alert" className="m-0 text-[13px] text-danger">
             {errors.summary}
           </p>
         ) : null}
         {saveMutation.isSuccess ? (
-          <p role="status" className="m-0 text-caption text-ink-muted">
+          <p role="status" className="m-0 text-[13px] text-soft">
             Saved. The next run uses it.
           </p>
         ) : null}

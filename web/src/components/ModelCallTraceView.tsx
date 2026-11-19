@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
 import { AdminPageHeader } from "@/components/AdminPageHeader";
+import { cardLink } from "@/components/card-styles";
 import { LoadFailed } from "@/components/LoadFailed";
+import { LoadingPanel } from "@/components/LoadingPanel";
+import { StatTiles } from "@/components/StatTiles";
 import { ModelCallCard } from "@/components/ModelCallCard";
 import { ApiError } from "@/lib/api-client";
 import { formatSavedAt } from "@/lib/dates";
@@ -36,7 +39,7 @@ export function ModelCallTraceView({ traceId }: { traceId: string }) {
     traceQuery.error instanceof ApiError && traceQuery.error.status === 404;
 
   const backLink = (
-    <Link href={logPath} className="w-fit text-sm font-medium">
+    <Link href={logPath} className={`${cardLink} w-fit`}>
       ← Model call log
     </Link>
   );
@@ -45,11 +48,7 @@ export function ModelCallTraceView({ traceId }: { traceId: string }) {
     return (
       <div className="flex flex-col gap-9">
         {backLink}
-        <div
-          aria-busy="true"
-          aria-label="Loading the trace"
-          className="h-[420px] rounded-xl border border-line bg-subtle"
-        />
+        <LoadingPanel shape="card" label="Loading the trace" />
       </div>
     );
   }
@@ -58,11 +57,11 @@ export function ModelCallTraceView({ traceId }: { traceId: string }) {
     return (
       <div className="flex flex-col gap-9">
         {backLink}
-        <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
-          <h1 className="m-0 text-[22px] font-medium tracking-[-0.02em]">
+        <div className="box-border rounded-card border border-dashed border-line-strong px-6 py-[22px]">
+          <h1 className="m-0 text-[16px] font-normal text-cream">
             This trace is gone
           </h1>
-          <p className="m-0 max-w-[34em] text-caption text-ink-muted">
+          <p className="mt-1.5 mb-0 text-[14px] text-soft">
             It was removed with the User’s messages, by Message Retention or
             when they deleted their data.
           </p>
@@ -102,17 +101,7 @@ export function ModelCallTraceView({ traceId }: { traceId: string }) {
         title={`${traceKindLabel(trace.kind)} for ${who}`}
         lead={`Started ${formatSavedAt(trace.started_at)}.`}
       />
-      <dl className="m-0 grid grid-cols-[repeat(auto-fit,minmax(min(180px,100%),1fr))] gap-3">
-        {totals.map((total) => (
-          <div
-            key={total.label}
-            className="flex flex-col gap-0.5 rounded-card border border-line bg-white px-[18px] py-4"
-          >
-            <dt className="text-caption text-ink-muted">{total.label}</dt>
-            <dd className="m-0 text-[22px] font-normal">{total.value}</dd>
-          </div>
-        ))}
-      </dl>
+      <StatTiles tiles={totals} />
       {trace.calls.map((call) => (
         <ModelCallCard key={call.id} call={call} />
       ))}

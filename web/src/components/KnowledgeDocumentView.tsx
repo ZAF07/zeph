@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { AdminPageHeader } from "@/components/AdminPageHeader";
+import { cardLink } from "@/components/card-styles";
+import { CardTag } from "@/components/CardTag";
 import {
   compactSecondaryButton,
   dangerButton,
@@ -14,6 +16,7 @@ import { KnowledgeReplaceFileForm } from "@/components/KnowledgeReplaceFileForm"
 import { KnowledgeStatusPill } from "@/components/KnowledgeStatusPill";
 import { KnowledgeTextSection } from "@/components/KnowledgeTextSection";
 import { LoadFailed } from "@/components/LoadFailed";
+import { LoadingPanel } from "@/components/LoadingPanel";
 import {
   ApiError,
   type KnowledgeDetailsChange,
@@ -121,7 +124,7 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
   }
 
   const backLink = (
-    <Link href={libraryPath} className="w-fit text-sm font-medium">
+    <Link href={libraryPath} className={`${cardLink} w-fit`}>
       ← Knowledge
     </Link>
   );
@@ -130,11 +133,7 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
     return (
       <div className="flex flex-col gap-9">
         {backLink}
-        <div
-          aria-busy="true"
-          aria-label="Loading the document"
-          className="h-[420px] rounded-xl border border-line bg-subtle"
-        />
+        <LoadingPanel shape="card" label="Loading the document" />
       </div>
     );
   }
@@ -143,14 +142,14 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
     return (
       <div className="flex flex-col gap-9">
         {backLink}
-        <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
-          <h1 className="m-0 text-[22px] font-medium tracking-[-0.02em]">
+        <div className="box-border flex flex-col items-start rounded-card border border-dashed border-line-strong px-6 py-[22px]">
+          <h1 className="m-0 text-[16px] font-normal text-cream">
             This document no longer exists
           </h1>
-          <p className="m-0 max-w-[34em] text-caption text-ink-muted">
+          <p className="mt-1.5 mb-0 text-[14px] text-soft">
             It may have been deleted by another Admin.
           </p>
-          <Link href={libraryPath} className="mt-2 text-sm font-medium">
+          <Link href={libraryPath} className={`${cardLink} mt-1`}>
             Back to Knowledge
           </Link>
         </div>
@@ -183,18 +182,14 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
         />
         <div className="flex flex-wrap items-center gap-2">
           <KnowledgeStatusPill status={knowledgeDocument.status} />
-          {knowledgeDocument.text_edited ? (
-            <span className="inline-flex w-fit items-center rounded-full border border-line-strong px-2.5 py-[3px] text-xs font-medium text-ink-soft">
-              Edited
-            </span>
-          ) : null}
+          {knowledgeDocument.text_edited ? <CardTag>Edited</CardTag> : null}
         </div>
       </div>
 
       {retryDocument.isError || deleteDocument.isError ? (
         <p
           role="status"
-          className="m-0 rounded-xl border border-danger-line bg-danger-tint px-4 py-3.5 text-sm text-danger-deep"
+          className="m-0 rounded-note border border-danger px-[18px] py-3 text-[14px] text-danger"
         >
           Couldn’t {retryDocument.isError ? "retry" : "delete"}{" "}
           {knowledgeDocument.title}. Please try again.
@@ -202,14 +197,14 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
       ) : null}
 
       {knowledgeDocument.status === "failed" ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger-line bg-danger-tint px-4 py-3.5">
-          <p className="m-0 text-sm text-danger-deep">
-            <span className="font-semibold">Failed: </span>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-note border border-danger px-[18px] py-3">
+          <p className="m-0 text-[14px] text-danger">
+            <span>Failed: </span>
             {knowledgeDocument.failure_reason ?? "Something went wrong."}
           </p>
           <button
             type="button"
-            className={`${compactSecondaryButton} bg-white`}
+            className={compactSecondaryButton}
             disabled={isBusy}
             onClick={() => {
               deleteDocument.reset();
@@ -246,7 +241,7 @@ export function KnowledgeDocumentView({ documentId }: { documentId: string }) {
         >
           Delete document
         </button>
-        <p className="m-0 text-caption text-ink-muted">
+        <p className="m-0 text-[13px] text-soft">
           Zeph stops drawing on it straight away. This can’t be undone.
         </p>
       </div>

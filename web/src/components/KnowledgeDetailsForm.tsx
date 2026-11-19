@@ -4,6 +4,8 @@ import { useState, type FormEvent } from "react";
 
 import { primaryButton } from "@/components/button-styles";
 import { fieldCaption, fieldLabel, inputField } from "@/components/form-styles";
+import { SavedNote } from "@/components/SavedNote";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import {
   ApiError,
   type KnowledgeDetailsChange,
@@ -113,11 +115,11 @@ export function KnowledgeDetailsForm({
     <form
       aria-labelledby="document-details-heading"
       onSubmit={(event) => void submit(event)}
-      className="flex flex-col gap-4 rounded-card border border-line bg-white p-6"
+      className="flex flex-col gap-4 rounded-card border border-line bg-panel px-6 py-[22px]"
     >
       <h2
         id="document-details-heading"
-        className="m-0 text-[17px] font-semibold"
+        className="m-0 text-[17px] font-normal text-cream"
       >
         Details
       </h2>
@@ -173,25 +175,17 @@ export function KnowledgeDetailsForm({
       <dl className="m-0 grid grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))] gap-x-3 gap-y-4">
         {fixedDetails.map((detail) => (
           <div key={detail.term} className="flex min-w-0 flex-col gap-1">
-            <dt className="font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted">
+            <dt className="text-[11px] font-medium tracking-[1.5px] text-soft uppercase">
               {detail.term}
             </dt>
-            <dd className="m-0 break-words text-[15px]">{detail.value}</dd>
+            <dd className="m-0 text-[15px] break-words text-text">
+              {detail.value}
+            </dd>
           </div>
         ))}
       </dl>
-      {flash ? (
-        <p
-          role={flash.isError ? "alert" : "status"}
-          className={`m-0 rounded-xl px-4 py-3.5 text-sm ${
-            flash.isError
-              ? "border border-danger-line bg-danger-tint text-danger-deep"
-              : "bg-blue-tint text-blue-deep"
-          }`}
-        >
-          {flash.text}
-        </p>
-      ) : null}
+      {flash?.isError ? <SaveFailedNote>{flash.text}</SaveFailedNote> : null}
+      {flash && !flash.isError ? <SavedNote>{flash.text}</SavedNote> : null}
       <button
         type="submit"
         className={`${primaryButton} self-start`}

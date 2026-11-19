@@ -27,8 +27,10 @@ export function ShapeFieldInput(props: ShapeFieldProps) {
 
   if (field.kind === "group") {
     return (
-      <fieldset className="m-0 flex min-w-0 flex-col gap-4 rounded-xl border border-line p-4">
-        <legend className="px-1 font-semibold">{field.label}</legend>
+      <fieldset className="m-0 flex min-w-0 flex-col gap-4 rounded-tile border border-line p-4">
+        <legend className="px-1 text-[15px] font-normal text-text">
+          {field.label}
+        </legend>
         <p className={fieldCaption}>{field.description}</p>
         <ShapeGroupFields
           fields={field.fields}
@@ -50,10 +52,10 @@ export function ShapeFieldInput(props: ShapeFieldProps) {
 
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
-      <label htmlFor={inputId} className="text-sm font-medium">
+      <label htmlFor={inputId} className="text-[15px] font-normal text-text">
         {field.label}
         {field.required || field.kind === "on_off" ? null : (
-          <span className="font-normal text-ink-muted"> · optional</span>
+          <span className="text-soft"> · optional</span>
         )}
       </label>
       <p id={descriptionId} className={fieldCaption}>
@@ -66,7 +68,7 @@ export function ShapeFieldInput(props: ShapeFieldProps) {
         invalid={error !== undefined}
       />
       {error ? (
-        <p role="alert" className="m-0 text-caption text-danger">
+        <p role="alert" className="m-0 text-[13px] text-danger">
           {error}
         </p>
       ) : null}

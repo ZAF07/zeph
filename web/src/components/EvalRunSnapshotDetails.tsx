@@ -27,26 +27,26 @@ export function EvalRunSnapshotDetails({ runId }: { runId: string }) {
 
   return (
     <details
-      className="rounded-xl border border-line bg-white px-[18px] py-3.5"
+      className="rounded-card border border-line bg-panel px-[18px] py-3.5 text-[14px] text-text"
       onToggle={(event) => setIsOpen(event.currentTarget.open)}
     >
-      <summary className="cursor-pointer font-medium">
+      <summary className="cursor-pointer text-[15px] text-text">
         What this run used
       </summary>
       <div className="mt-3 flex flex-col gap-2">
         {snapshot === undefined ? (
-          <p className="m-0 text-caption text-ink-muted">
+          <p className="m-0 text-[13px] text-soft">
             {snapshotQuery.isError ? "Couldn’t load it." : "Loading…"}
           </p>
         ) : snapshot.settings === null ||
           snapshot.judge === null ||
           snapshot.cases === null ? (
-          <p className="m-0 text-caption text-ink-muted">
+          <p className="m-0 text-[13px] text-soft">
             Kept once the runner starts this run.
           </p>
         ) : (
           <>
-            <p className="m-0 text-caption text-ink-muted">
+            <p className="m-0 text-[13px] text-soft">
               As they were when the run started. Later changes never change
               these.
             </p>

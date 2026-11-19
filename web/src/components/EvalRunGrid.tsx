@@ -15,6 +15,10 @@ import {
   triesPill,
 } from "@/lib/eval-run-grid";
 
+/** The look of a column head, as the admin table draws it. */
+const headClass =
+  "border-b border-line px-[18px] py-3 text-[11px] font-medium tracking-[1.5px] whitespace-nowrap text-soft uppercase";
+
 /**
  * A run's Case Results side by side: a row per case and a column per
  * Variant, each cell showing how its tries went with their tokens and time,
@@ -36,19 +40,15 @@ export function EvalRunGrid({ run }: { run: EvalRunDetails }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="overflow-x-auto rounded-xl border border-line bg-white">
-        <table className="w-full border-collapse text-left text-caption">
+      <div className="overflow-x-auto rounded-card border border-line bg-panel">
+        <table className="w-full border-collapse text-left text-[13px] text-text">
           <thead>
-            <tr className="border-b border-line">
-              <th scope="col" className="px-3.5 py-2.5 font-medium">
+            <tr>
+              <th scope="col" className={headClass}>
                 Case
               </th>
               {run.variants.map((variant) => (
-                <th
-                  key={variant.letter}
-                  scope="col"
-                  className="px-3.5 py-2.5 font-medium"
-                >
+                <th key={variant.letter} scope="col" className={headClass}>
                   Variant {variant.letter}
                 </th>
               ))}
@@ -56,11 +56,12 @@ export function EvalRunGrid({ run }: { run: EvalRunDetails }) {
           </thead>
           <tbody>
             {run.case_keys.map((caseKey) => (
-              <tr key={caseKey} className="border-b border-line">
-                <th scope="row" className="px-3.5 py-2.5 font-medium">
+              <tr key={caseKey} className="border-t border-line">
+                <th scope="row" className="px-[18px] py-2.5 font-normal">
                   <Link
                     href={`/admin/evals/history/${encodeURIComponent(caseKey)}`}
                     title="This case in recent runs"
+                    className="underline"
                   >
                     {caseKey}
                   </Link>
@@ -74,7 +75,7 @@ export function EvalRunGrid({ run }: { run: EvalRunDetails }) {
                   return (
                     <td key={variant.letter} className="px-2 py-1.5">
                       {tries.length === 0 ? (
-                        <span className="px-1.5 text-ink-muted">—</span>
+                        <span className="px-1.5 text-mute">—</span>
                       ) : (
                         <button
                           type="button"
@@ -87,14 +88,14 @@ export function EvalRunGrid({ run }: { run: EvalRunDetails }) {
                                 : { caseKey, letter: variant.letter },
                             )
                           }
-                          className={`flex w-full cursor-pointer flex-col items-start gap-1 rounded-lg border px-1.5 py-1.5 text-left ${
+                          className={`flex w-full cursor-pointer flex-col items-start gap-1 rounded-input border px-1.5 py-1.5 text-left font-[inherit] text-[13px] text-text ${
                             isPicked
-                              ? "border-ink bg-subtle"
-                              : "border-transparent bg-transparent hover:bg-subtle"
+                              ? "border-line-strong bg-zeph"
+                              : "border-transparent bg-transparent hover:bg-bg-deep"
                           }`}
                         >
                           <EvalPill {...triesPill(tries, run.repeats)} />
-                          <span className="whitespace-nowrap text-ink-muted">
+                          <span className="whitespace-nowrap text-soft">
                             {describeTriesUsage(tries)}
                           </span>
                         </button>
@@ -107,20 +108,23 @@ export function EvalRunGrid({ run }: { run: EvalRunDetails }) {
           </tbody>
           <tfoot>
             <tr>
-              <th scope="row" className="px-3.5 py-2.5 align-top font-medium">
+              <th
+                scope="row"
+                className="border-t border-line px-[18px] py-2.5 align-top font-normal"
+              >
                 Totals
               </th>
               {run.variant_totals.map((totals) => (
                 <td
                   key={totals.letter}
                   aria-label={`Variant ${totals.letter} totals`}
-                  className="px-3.5 py-2.5 align-top"
+                  className="border-t border-line px-[18px] py-2.5 align-top"
                 >
-                  <p className="m-0 font-medium">{describeTotals(totals)}</p>
-                  <p className="m-0 whitespace-nowrap text-ink-muted">
+                  <p className="m-0">{describeTotals(totals)}</p>
+                  <p className="m-0 whitespace-nowrap text-soft">
                     {formatTokens(totals.tokens_in, totals.tokens_out)}
                   </p>
-                  <p className="m-0 text-ink-muted">
+                  <p className="m-0 text-soft">
                     {formatDuration(totals.duration_ms)} ·{" "}
                     {describeCost(totals)}
                   </p>
@@ -135,7 +139,7 @@ export function EvalRunGrid({ run }: { run: EvalRunDetails }) {
           aria-label={`${picked.caseKey} on Variant ${picked.letter}`}
           className="flex flex-col gap-2.5"
         >
-          <h2 className="m-0 text-body font-semibold">
+          <h2 className="m-0 text-[17px] font-normal text-cream">
             {picked.caseKey} on Variant {picked.letter}
             {run.repeats > 1
               ? ` · ${pickedTries.length} of ${run.repeats} tries done`
@@ -157,7 +161,7 @@ export function EvalRunGrid({ run }: { run: EvalRunDetails }) {
           </ol>
         </section>
       ) : (
-        <p className="m-0 text-caption text-ink-muted">
+        <p className="m-0 text-[13px] text-soft">
           Pick a cell to see the Judge’s reasons and open each try’s full trace.
         </p>
       )}
