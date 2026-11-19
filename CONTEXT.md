@@ -21,8 +21,12 @@ The AI conversational partner a User talks to.
 _Avoid_: Bot, assistant, agent
 
 **Persona**:
-The Companion's voice and character — human in style, honest that it is an AI. Managed by Admins. In the MVP there is one Persona and Users never pick a style: the Companion adapts to how each User messages. After the MVP there will be several Personas (e.g. mindfulness, Buddhist philosophy, Japanese philosophy), and Users choose one from those their plan includes.
+The Companion's voice and character — human in style, honest that it is an AI. Managed by Admins. It has two parts that Admins tune apart: its voice (how it talks) and its Outlook. In the MVP there is one Persona and Users never pick a style: the Companion adapts to how each User messages. After the MVP there will be several Personas (e.g. mindfulness, Buddhist philosophy, Japanese philosophy), and Users choose one from those their plan includes.
 _Avoid_: System prompt, personality, character
+
+**Outlook**:
+The part of a Persona that says how the Companion sees people and situations and what it believes helps them grow, written by Admins. The Companion forms its honest read of what is really going on with a User from its Outlook, never from views of its own, so the same situation is read the same way every time and Admins decide who the Companion is. Each Persona has its own Outlook, so a Buddhist Persona and a Stoic one read the same situation differently.
+_Avoid_: Opinions, beliefs, worldview, philosophy
 
 **Platform Settings**:
 Everything Admins set that shapes how the Companion behaves for all Users: the Persona, each core service's prompt, model and whether the model thinks first, wording such as the Crisis Reply and the Limit Reply, and limits such as the Daily Message Limit or the Conversation quiet gap. A change an Admin saves applies from the next reply or Check-in; one already under way finishes with the Platform Settings it started with.
@@ -169,7 +173,7 @@ _Avoid_: Alert, incident, flag
 ### User Memory
 
 **User Memory**:
-Everything the Companion has retained about a specific User, made up of Memory Items, Conversation Summaries, Life Threads, Move Outcomes, their User Portrait and Shared Photos. The User can turn it off: then the Companion stops learning (nothing new is kept) but still uses what it already has, and nothing is deleted until the User deletes it. Users are told this plainly wherever they turn it off, and that Delete My Data is how to remove everything. It is also a Feature, and the Admin's switch has the final say: an Admin turning it off for a User has exactly the same effect and keeps the User's own choice for when it is back on. Whichever switch is off, the User can always see and delete their memories on the Dashboard.
+Everything the Companion has retained about a specific User, made up of Memory Items, Conversation Summaries, Life Threads, Patterns, Move Outcomes, their User Portrait and Shared Photos. The User can turn it off: then the Companion stops learning (nothing new is kept) but still uses what it already has, and nothing is deleted until the User deletes it. Users are told this plainly wherever they turn it off, and that Delete My Data is how to remove everything. It is also a Feature, and the Admin's switch has the final say: an Admin turning it off for a User has exactly the same effect and keeps the User's own choice for when it is back on. Whichever switch is off, the User can always see and delete their memories on the Dashboard.
 _Avoid_: Memory, profile, history, context
 
 **Memory Item**:
@@ -191,6 +195,10 @@ _Avoid_: Recap, transcript, log
 **Life Thread**:
 An ongoing story in a User's life followed across Conversations, which the User sees and can delete (on the Memories page, under "What's going on in your life", or by asking in chat), but not edit (e.g. a falling-out with their sister, a job hunt, a presentation on Thursday): a short running story with dates, the people or things in it, and whether it is open (unresolved or upcoming) or settled. Added to or started when a Conversation ends. A deleted Thread is gone at once and never comes back, even from a Conversation end already under way. The Companion is reminded of a Thread when the User mentions someone or something in it, or talks about something close to it, however long ago it was, and may bring it up the way a friend would. Open Threads matter more than settled ones. Each Thread remembers when the Companion last brought it up and how the User took it (engaged, brushed it off, asked to drop it), so it is never raised twice in one Conversation, waits a while after being brushed off, and is never raised again once they asked to drop it, unless they bring it up themselves. Admins set how close in meaning a Thread must be, how many can come to mind for one Message, and how long a brushed-off one waits.
 _Avoid_: Topic, storyline, episode, case
+
+**Pattern**:
+A recurring way a User thinks, feels or acts that shows up across different parts of their life (e.g. "when something grabs them, everything else goes quiet: eating, people, patience"), linked to the Life Threads and moments it showed up in and gaining evidence over time. The Companion is reminded of it whenever one of those Life Threads comes to mind, so it can see what links them and form its read from that. It is not a single fact (a Memory Item) nor one story (a Life Thread).
+_Avoid_: Trait, habit, theme, insight
 
 **User Portrait**:
 A short, living picture of a User: who they are, what's going on in their life now, themes they keep coming back to, what has helped them and what hasn't, where they stand on their Goals. It holds only what the Companion is fairly sure of; what it only suspects is kept as Curiosities, which Users don't see. Rewritten from their Memory Items, Life Threads, Move Outcomes and recent Conversation Summaries (never from the old Portrait) when a Conversation ends while User Memory works, and used for every reply. Users see it under "What I know about you" on the Memories page and can delete it, but not edit it; a deleted Portrait is gone until a later Conversation end with User Memory working. When they delete a Memory Item, Life Thread, Move Outcome or Conversation Summary, the Portrait is rewritten without it within a minute, even while User Memory is off (that only forgets); if it can't be rewritten, it is deleted instead, so a deleted thing is never used again. The same fact can still appear if it lives on in another memory the User kept. Admins see only whether a User has one.
