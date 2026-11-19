@@ -103,6 +103,8 @@ The three FAILs are issue 10's accepted numbers, unchanged. In fixture mode all 
 
 **Code review** (two sub-agents, standards and spec). No hard standards breaches. Fixed: Archive could be sent twice while saving (test red before, green after); the dialog surface was copied in three files (`dialog-styles.ts`); the case editor address was built in two places (`evalCasesHref`, `evalCaseEditHref` in `lib/evals`); the undrawn row hover was removed. Answered, not changed: the Schedule's select parts, hint line, panel and results restyle were covered by Zaf's "reuse closest drawn parts" answer (the question named them); Download CSV stays secondary; the Model call caption (above); `StatusPill` keeps `filled` so issue 10's callers don't change; periods stay strings because selects give strings (as in issue 10); `name ?? email` fallbacks keep each page's old words.
 
+- 2026-11-19 — After rebasing on `52dae55` (issue 13 merged): clean rebase; checks 108 files / 690 tests passed (lint, format and typecheck clean). Pixel test unchanged: Memories and its tabs ≤0.05% PASS, AdminUsers 2.84%, AdminCheckInLog 0.11%, M-AdminCheckInLog 6.32% (issue 10's accepted numbers), and issue 13's AdminCheckInKinds 0.08%, AdminCheckInKinds--all-folded 0.14%, M-AdminCheckInKinds 8.12% (the same numbers issue 13 recorded), so the shared changes here don't move its pages.
+
 ## Completion
 
 - Completed: 2026-11-19
