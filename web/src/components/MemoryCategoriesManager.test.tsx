@@ -98,6 +98,20 @@ describe("MemoryCategoriesManager", () => {
     expect(screen.queryByRole("button", { name: /Delete/ })).toBeNull();
   });
 
+  it("starts the archived list folded", async () => {
+    renderWithQueries(<MemoryCategoriesManager />);
+
+    const habits = within(
+      await screen.findByRole("region", { name: "Habits (old)" }),
+    );
+    expect(cardToggle(habits, "Habits")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    const goals = within(screen.getByRole("region", { name: "Goals" }));
+    expect(cardToggle(goals, "Goals")).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("shows no archived list when nothing is archived", async () => {
     apiClient.listMemoryCategories.mockResolvedValue([goals]);
 

@@ -177,6 +177,7 @@ export function MemoryCategoriesManager() {
         <CardList
           items={archived}
           count={<CardCount count={archived.length} words="archived" />}
+          startsFolded
           renderCard={(category, _index, folding) => (
             <ArchivedMemoryCategoryCard
               key={category.id}

@@ -82,7 +82,6 @@ describe("StickerLibrary", () => {
     expect(seedlingCard.queryByText("Needs a note")).toBeNull();
     const leafCard = await findCard("🍃");
     expect(leafCard.getByText("Needs a note")).toBeInTheDocument();
-    expect(leafCard.getByText("No note yet")).toBeInTheDocument();
   });
 
   it("shows the empty state when there are no stickers", async () => {
@@ -233,6 +232,19 @@ describe("StickerLibrary", () => {
 
     expect(apiClient.saveStickerNote).not.toHaveBeenCalled();
     expect(card.getByText("Unsaved changes")).toBeInTheDocument();
+  });
+
+  it("does not count spaces alone as a change", async () => {
+    renderWithQueries(<StickerLibrary />);
+    const card = await findCard("🌱");
+
+    await userEvent.type(
+      card.getByRole("textbox", { name: "When to use" }),
+      "  ",
+    );
+
+    expect(card.queryByText("Unsaved changes")).toBeNull();
+    expect(card.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
   it("shows when a note couldn't be saved", async () => {

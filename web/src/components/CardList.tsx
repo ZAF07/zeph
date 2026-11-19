@@ -11,11 +11,12 @@ export type CardFolding = { isOpen: boolean; onToggle: () => void };
 /**
  * The card-list template's list: the toolbar (count, Expand all, Collapse
  * all, Add), anything shown above the cards (such as the add box), then
- * the cards. The first card starts open.
+ * the cards. The first card starts open, unless the list starts folded.
  *
  * @param props - `items` are the things listed, in order; `count` is the
  *   toolbar's count line; `addLabel`, `onAdd` and `isAddDisabled` are the
  *   add button; `aboveList` goes between the toolbar and the cards;
+ *   `startsFolded` starts every card folded instead of the first open;
  *   `renderCard` draws one card from its item, place and folding.
  * @returns The toolbar and the cards.
  */
@@ -26,6 +27,7 @@ export function CardList<Item extends { id: string }>({
   onAdd,
   isAddDisabled = false,
   aboveList,
+  startsFolded = false,
   renderCard,
 }: {
   items: Item[];
@@ -34,9 +36,13 @@ export function CardList<Item extends { id: string }>({
   onAdd?: () => void;
   isAddDisabled?: boolean;
   aboveList?: ReactNode;
+  startsFolded?: boolean;
   renderCard: (item: Item, index: number, folding: CardFolding) => ReactNode;
 }) {
-  const openCards = useOpenCards(items.map((item) => item.id));
+  const openCards = useOpenCards(
+    items.map((item) => item.id),
+    startsFolded,
+  );
   return (
     <>
       <CardListToolbar

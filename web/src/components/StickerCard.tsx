@@ -50,13 +50,13 @@ export function StickerCard({
   const [note, setNote] = useState(sticker.note);
   const [isConfirmingRemove, setIsConfirmingRemove] = useState(false);
   const action = useCardAction();
-  const isDirty = note !== sticker.note;
+  const isDirty = note.trim() !== sticker.note;
   const title = stickerTitle(sticker);
 
   return (
     <FoldingCard
       title={title}
-      summary={sticker.note || "No note yet"}
+      summary={sticker.note}
       leading={<StickerPicture sticker={sticker} />}
       tags={sticker.note ? null : <CardTag tone="orange">Needs a note</CardTag>}
       isDirty={isDirty}

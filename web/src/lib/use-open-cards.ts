@@ -15,14 +15,16 @@ export type OpenCards = {
 
 /**
  * Tracks which cards of a card list are open. The first card starts open,
- * or none with `?design=all-folded` in fixture mode. Several can be open
- * at once.
+ * unless the list starts folded or `?design=all-folded` is set in fixture
+ * mode. Several can be open at once.
  *
  * @param ids - Every card's id, in order.
+ * @param startsFolded - Whether every card starts folded.
  * @returns The open cards and the ways to change them.
  */
-export function useOpenCards(ids: string[]): OpenCards {
-  const allFolded = hasDesignFlag(useSearchParams(), "all-folded");
+export function useOpenCards(ids: string[], startsFolded = false): OpenCards {
+  const forcedFolded = hasDesignFlag(useSearchParams(), "all-folded");
+  const allFolded = startsFolded || forcedFolded;
   const [openIds, setOpenIds] = useState<ReadonlySet<string>>(
     () => new Set(allFolded ? [] : ids.slice(0, 1)),
   );

@@ -15,6 +15,13 @@ import {
   knowledgeStatusLabels,
 } from "@/lib/knowledge-labels";
 
+/** The status tag's colours: orange while indexing, danger when it failed. */
+const statusTone = {
+  ready: "plain",
+  pending: "orange",
+  failed: "danger",
+} as const;
+
 /**
  * One Knowledge document as a card of the card list. The folded row shows
  * its title, source and tradition, its status and the day it was added.
@@ -54,7 +61,7 @@ export function KnowledgeDocumentCard({
       title={knowledgeDocument.title}
       summary={`${knowledgeDocument.source} · ${knowledgeDocument.tradition}`}
       tags={
-        <CardTag tone={isFailed ? "danger" : "plain"}>
+        <CardTag tone={statusTone[knowledgeDocument.status]}>
           {knowledgeStatusLabels[knowledgeDocument.status].label}
         </CardTag>
       }
@@ -101,6 +108,12 @@ export function KnowledgeDocumentCard({
           onRemove={() => setIsConfirmingDelete(true)}
           actions={
             <>
+              <Link
+                href={`/admin/knowledge/${knowledgeDocument.id}`}
+                className={secondaryButton}
+              >
+                Open document
+              </Link>
               {isFailed ? (
                 <button
                   type="button"
@@ -111,12 +124,6 @@ export function KnowledgeDocumentCard({
                   Retry
                 </button>
               ) : null}
-              <Link
-                href={`/admin/knowledge/${knowledgeDocument.id}`}
-                className={secondaryButton}
-              >
-                Open document
-              </Link>
             </>
           }
         />

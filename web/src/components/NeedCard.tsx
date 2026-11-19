@@ -9,7 +9,7 @@ import { CardTag } from "@/components/CardTag";
 import { FoldingCard } from "@/components/FoldingCard";
 import { NeedFields } from "@/components/NeedFields";
 import type { Move, MoveDirection, Need, NeedInput } from "@/lib/api-client";
-import { isNeedChanged, isNeedComplete } from "@/lib/need-draft";
+import { isNeedChanged, isNeedComplete, needInputOf } from "@/lib/need-draft";
 import { useCardAction } from "@/lib/use-card-action";
 
 /**
@@ -113,13 +113,7 @@ export function NeedCard({
           }}
           onSave={() =>
             void action.run(
-              () =>
-                onSave({
-                  name: draft.name,
-                  when_it_fits: draft.when_it_fits,
-                  how_to_reply: draft.how_to_reply,
-                  ruled_out_move_ids: draft.ruled_out_move_ids,
-                }),
+              () => onSave(needInputOf(draft)),
               "Couldn’t save the Need. Please try again.",
             )
           }
