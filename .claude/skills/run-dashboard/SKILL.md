@@ -85,7 +85,8 @@ data the run changed (e.g. edited Knowledge documents).
 
 In a worktree, when your work is done, also run `make worktree-teardown`. It
 stops the worktree's stack and deletes its containers, images, network and
-database, so stacks don't pile up on the machine. It refuses to run in the
+database, and clears Docker build cache older than 48 hours, so stacks and
+cache don't pile up on the machine. It refuses to run in the
 main folder.
 
 ## Design pixel test sessions

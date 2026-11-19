@@ -109,7 +109,7 @@ Every piece of work — feature, refactor, or bug — gets an issue file in `.sc
   4. Run the full test suite and build. Fix failures.
   5. git push -u origin HEAD
   6. Open a PR with `gh pr create --fill` (or tell me the branch is pushed).
-  7. Clean up what you started: `cleanup.sh` for any run-dashboard session, then `make worktree-teardown`, which stops the worktree's stack and deletes its containers, images, network and database. Leave nothing running.
+  7. Clean up what you started: `cleanup.sh` for any run-dashboard session, then `make worktree-teardown`, which stops the worktree's stack and deletes its containers, images, network and database, and clears Docker build cache older than 48 hours. Leave nothing running.
 - If asked to "update from main": repeat steps 2–4, then `git push --force-with-lease`.
 
 ---
