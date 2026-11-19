@@ -16,6 +16,10 @@ Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-
 
 Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+### Message pipeline
+
+How Zeph handles a message, from texts arriving to what is kept when a Conversation ends, is in `docs/message-pipeline/README.md`. Read it before planning or changing the reply path, Conversation-end steps or User Memory.
+
 ### UI design
 
 The Dashboard UI design lives in `web/design/`. Its `README.md` is the build contract: read it in full before any UI work. Pages are built against `web/design/reference/*.html` and checked with the pixel test (`web/design/compare.cjs`); see ADR 0018.
