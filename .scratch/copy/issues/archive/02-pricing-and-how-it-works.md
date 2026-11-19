@@ -49,4 +49,8 @@ This is the first time the Copy page has more than one tab, so it also gets the 
 ## Completion
 
 - Completed: 2026-11-19
-- Commit: <to be filled in after merge>
+- Commit: merge `b9af277` into main — "Merge Copy issue 02: Pricing, How it works and the marketing header and footer read every word from Copy (Pricing, How it works and Shared tabs; plans have one home in Pricing); Copy page asks before switching tabs or leaving with unsaved edits"
+  - Branch `copy-02-pricing-how-it-works`:
+    - `b0bea7d` Copy 02: Pricing, How it works and the marketing header and footer read every word from Copy
+    - `a6cb9d2` Copy 02: one pageMetadata helper for page titles; steps listed by slot key (review)
+    - `e825a40` Copy 02: evidence recorded, issue completed and archived, screenshots; CONTEXT says a Copy slot has one home
