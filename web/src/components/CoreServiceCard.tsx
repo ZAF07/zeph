@@ -2,33 +2,32 @@
 
 import { useState } from "react";
 
-import { secondaryButton } from "@/components/button-styles";
 import { ExtraPromptField } from "@/components/ExtraPromptField";
-import { fieldLabel, inputField } from "@/components/form-styles";
+import { FieldRow } from "@/components/FieldRow";
+import { FieldRows } from "@/components/FieldRows";
+import { FieldSelect } from "@/components/FieldSelect";
+import { FormEditor } from "@/components/FormEditor";
+import { FormSectionHeading } from "@/components/FormSectionHeading";
+import { SaveBar } from "@/components/SaveBar";
+import { SavedNote } from "@/components/SavedNote";
 import { Switch } from "@/components/Switch";
-import {
-  ApiError,
-  type AdminSettings,
-  type CoreService,
-  type ExtraPrompt,
-} from "@/lib/api-client";
+import type { AdminSettings, CoreService, ExtraPrompt } from "@/lib/api-client";
+import { saveFailedMessage } from "@/lib/save-failed-message";
 import { lastSavedNote, onOffSetting, textSetting } from "@/lib/settings";
 import { useSaveAdminSettings } from "@/lib/use-admin-settings";
 
-const SAVE_FAILED_MESSAGE =
-  "Couldn’t save. The last saved prompt, model and thinking stay in use.";
-
 /**
- * One core service's card: which model it uses and whether that model
- * thinks first, its prompt and any extra
- * prompts (like a tool description), saved together. Grouped extra prompts
+ * One core service's part of the page, from the form template: its heading,
+ * field rows for which model it uses and whether that model thinks first,
+ * editors for its prompt and any extra prompts (like a tool description),
+ * and one save bar that saves them together. Grouped extra prompts
  * sit in groups that are folded shut until clicked. The prompt is combined
  * with the Persona when the service runs. When the backend refuses a save,
- * the card shows its reason.
+ * the save bar shows its reason.
  *
  * @param props - `service` is the core service, `modelChoices` the models
  *   Admins can pick, and `settings` the saved settings.
- * @returns The card.
+ * @returns The service's part of the page.
  */
 export function CoreServiceCard({
   service,
@@ -66,13 +65,16 @@ export function CoreServiceCard({
     prompt,
     ...extraKeys.map((key) => extraPrompts[key]),
   ].every((text) => text?.trim());
-  const canSave = isDirty && allFilled && !saveSettings.isPending;
-  const { error } = saveSettings;
-  const failureMessage =
-    error instanceof ApiError && error.status === 422 && error.detail
-      ? error.detail
-      : SAVE_FAILED_MESSAGE;
   const headingId = `service-${service.prompt_key}`;
+  const modelId = `${headingId}-model`;
+
+  function discard() {
+    setModel(savedModel);
+    setThinking(savedThinking);
+    setPrompt(savedPrompt);
+    setExtraPrompts(savedExtraPrompts);
+    saveSettings.reset();
+  }
 
   function save() {
     saveSettings.mutate(
@@ -113,110 +115,97 @@ export function CoreServiceCard({
   }
 
   return (
-    <section
-      aria-labelledby={headingId}
-      className="flex flex-col rounded-card border border-line bg-white"
-    >
-      <div className="flex flex-col gap-1 px-5 pb-3 pt-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id={headingId} className="m-0 text-[17px] font-semibold">
-            {service.name}
-          </h2>
-          <span className="inline-flex items-center rounded-full bg-code px-2.5 py-[3px] text-xs font-medium text-ink-body">
-            {service.runs_when}
-          </span>
-        </div>
-        <p className="m-0 text-sm text-ink-soft">{service.description}</p>
+    <section aria-labelledby={headingId} className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <FormSectionHeading
+          id={headingId}
+          title={service.name}
+          caption={service.description}
+        />
+        <span className="max-w-full rounded-pill border border-line-strong px-2.5 py-0.5 text-[12px] font-normal text-soft">
+          {service.runs_when}
+        </span>
       </div>
-      <div className="flex flex-col gap-3 px-5 pb-4">
-        <div className="flex flex-wrap items-end gap-4">
-          <label className={`${fieldLabel} min-w-0 flex-1`}>
-            Model
-            <select
-              className={inputField}
-              value={model}
-              onChange={(event) => {
-                setModel(event.target.value);
-                saveSettings.reset();
-              }}
-            >
-              {modelChoices.map((choice) => (
-                <option key={choice} value={choice}>
-                  {choice}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="flex items-center gap-2.5 pb-1">
-            <span aria-hidden="true" className="text-sm font-semibold">
-              Thinking
-            </span>
-            <Switch
-              label="Thinking"
-              checked={thinking}
-              onChange={(isOn) => {
-                setThinking(isOn);
-                saveSettings.reset();
-              }}
-            />
-          </div>
-        </div>
-        <label className={fieldLabel}>
-          Prompt
-          <textarea
-            className={`${inputField} resize-y font-mono text-[13.5px] leading-relaxed`}
-            rows={8}
-            value={prompt}
-            onChange={(event) => {
-              setPrompt(event.target.value);
+      <FieldRows>
+        <FieldRow title="Model" htmlFor={modelId}>
+          <FieldSelect
+            id={modelId}
+            value={model}
+            options={modelChoices.map((choice) => ({
+              value: choice,
+              label: choice,
+            }))}
+            onChange={(choice) => {
+              setModel(choice);
               saveSettings.reset();
             }}
           />
-        </label>
-        {service.extra_prompts.map(extraPromptField)}
-        {service.extra_prompt_groups.map((group) => (
-          <details
-            key={group.name}
-            className="group rounded-input border border-line"
-          >
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-              {group.name}
-              <span
-                aria-hidden="true"
-                className="text-ink-muted transition-transform group-open:rotate-90"
-              >
-                ›
-              </span>
-            </summary>
-            <div className="flex flex-col gap-3 border-t border-line px-3.5 pb-3.5 pt-3">
-              {group.prompts.map(extraPromptField)}
-            </div>
-          </details>
-        ))}
-        {saveSettings.isError ? (
-          <p role="alert" className="m-0 text-sm text-danger-deep">
-            {failureMessage}
-          </p>
-        ) : null}
-      </div>
-      <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3">
-        <span className="text-caption text-ink-muted">
-          {lastSavedNote(settings, [
-            service.prompt_key,
-            service.model_key,
-            service.thinking_key,
-            ...extraKeys,
-          ])}
-        </span>
-        <button
-          type="button"
-          className={secondaryButton}
-          disabled={!canSave}
-          onClick={save}
+        </FieldRow>
+        <FieldRow title="Thinking">
+          <Switch
+            label="Thinking"
+            checked={thinking}
+            onChange={(isOn) => {
+              setThinking(isOn);
+              saveSettings.reset();
+            }}
+          />
+        </FieldRow>
+      </FieldRows>
+      <FormEditor
+        label="Prompt"
+        caption={lastSavedNote(settings, [
+          service.prompt_key,
+          service.model_key,
+          service.thinking_key,
+          ...extraKeys,
+        ])}
+        value={prompt}
+        onChange={(text) => {
+          setPrompt(text);
+          saveSettings.reset();
+        }}
+      />
+      {service.extra_prompts.map(extraPromptField)}
+      {service.extra_prompt_groups.map((group) => (
+        <details
+          key={group.name}
+          className="group rounded-card border border-line bg-panel"
         >
-          {saveSettings.isPending ? "Saving…" : "Save"}
-        </button>
-      </div>
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-6 py-3 text-[15px] text-text [&::-webkit-details-marker]:hidden">
+            {group.name}
+            <svg
+              aria-hidden="true"
+              width="12"
+              height="8"
+              viewBox="0 0 12 8"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              className="-rotate-90 text-soft transition-transform duration-150 ease-in-out group-open:rotate-0 motion-reduce:transition-none"
+            >
+              <path d="M1 1.5l5 5 5-5" />
+            </svg>
+          </summary>
+          <div className="flex flex-col gap-3 px-6 pb-4">
+            {group.prompts.map(extraPromptField)}
+          </div>
+        </details>
+      ))}
+      <SaveBar
+        placement="alone"
+        isDirty={isDirty}
+        isSaving={saveSettings.isPending}
+        failedMessage={saveFailedMessage(saveSettings.error)}
+        canSave={isDirty && allFilled}
+        saveLabel="Save"
+        onDiscard={discard}
+        onSave={save}
+      />
+      {saveSettings.isSuccess ? (
+        <SavedNote>Saved. Zeph uses it from the next message.</SavedNote>
+      ) : null}
     </section>
   );
 }

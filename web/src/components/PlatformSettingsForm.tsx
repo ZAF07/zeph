@@ -2,17 +2,22 @@
 
 import { useState } from "react";
 
-import { primaryButton, secondaryButton } from "@/components/button-styles";
-import { fieldLabel, inputField } from "@/components/form-styles";
+import { FieldNumber } from "@/components/FieldNumber";
+import { FieldRow } from "@/components/FieldRow";
+import { FieldRows } from "@/components/FieldRows";
+import { FormEditor } from "@/components/FormEditor";
+import { FormSectionHeading } from "@/components/FormSectionHeading";
 import { LoadFailed } from "@/components/LoadFailed";
-import { SaveFailedNote } from "@/components/SaveFailedNote";
-import {
-  ApiError,
-  type AdminSettings,
-  type CheckInFrequency,
-  type SettingValue,
+import { LoadingPanel } from "@/components/LoadingPanel";
+import { SaveBar } from "@/components/SaveBar";
+import { SavedNote } from "@/components/SavedNote";
+import type {
+  AdminSettings,
+  CheckInFrequency,
+  SettingValue,
 } from "@/lib/api-client";
 import { checkInFrequencyOptions } from "@/lib/check-ins";
+import { saveFailedMessage } from "@/lib/save-failed-message";
 import { lastSavedNote, textSetting } from "@/lib/settings";
 import {
   useAdminSettings,
@@ -336,9 +341,6 @@ const allKeys = [...numberKeys, ...textFields.map((field) => field.key)];
 
 const wholeNumber = /^\d+$/;
 
-const settingRow =
-  "flex flex-wrap items-center justify-between gap-x-5 gap-y-3 border-t border-line px-5 py-3.5";
-
 /**
  * Reads one field's saved value as text; a Check-in gap field reads its
  * frequency's hours.
@@ -382,7 +384,8 @@ function settingValue(key: string, value: string): SettingValue {
 
 /**
  * The admin Platform settings page's form: timings, Check-in gaps, message
- * retention, web search and shared wording, saved together with one button.
+ * retention, web search and shared wording, in the form template's field
+ * rows and editors, saved together with one save bar.
  *
  * @returns The form, or a loading block or error with Try again.
  */
@@ -402,60 +405,64 @@ export function PlatformSettingsForm() {
         />
       );
     }
-    return (
-      <div
-        aria-busy="true"
-        aria-label="Loading settings"
-        className="h-[360px] rounded-card border border-line bg-subtle"
-      />
-    );
+    return <LoadingPanel shape="card" label="Loading settings" />;
   }
 
-  const saved = savedDrafts(settings);
+  const savedSettings = settings;
+  const saved = savedDrafts(savedSettings);
   const values = drafts ?? saved;
   const changedKeys = allKeys.filter((key) => values[key] !== saved[key]);
   const isValid =
     numberKeys.every((key) => wholeNumber.test(values[key] ?? "")) &&
     textFields.every((field) => (values[field.key] ?? "").trim() !== "");
-  const canSave = changedKeys.length > 0 && isValid && !saveSettings.isPending;
-  const { error } = saveSettings;
-  const failureMessage =
-    error instanceof ApiError && error.status === 422 && error.detail
-      ? error.detail
-      : "Couldn’t save. The platform keeps running on the last saved values.";
+  const isDirty = changedKeys.length > 0;
 
   function numberRow(field: NumberField) {
+    const noteId = `${field.key}-note`;
     return (
-      <div key={field.key} className={settingRow}>
-        <span className="flex min-w-0 flex-[1_1_260px] flex-col gap-0.5">
-          <label htmlFor={field.key} className="font-semibold">
-            {field.label}
-          </label>
-          <span className="text-caption text-ink-muted">{field.caption}</span>
-        </span>
-        <span className="flex flex-col gap-1.5">
-          <span className="flex items-center gap-2">
-            <input
-              id={field.key}
-              className={`${inputField} w-[110px]`}
-              type="number"
-              inputMode="numeric"
-              aria-describedby={field.note ? `${field.key}-note` : undefined}
-              value={values[field.key] ?? ""}
-              onChange={(event) => edit(field.key, event.target.value)}
-            />
-            <span className="text-caption text-ink-muted">{field.unit}</span>
-          </span>
-          {field.note ? (
-            <span
-              id={`${field.key}-note`}
-              className="max-w-[220px] text-caption text-ink-muted"
-            >
+      <FieldRow
+        key={field.key}
+        title={field.label}
+        caption={field.caption}
+        htmlFor={field.key}
+        note={
+          field.note ? (
+            <div id={noteId} className="text-[12px] text-soft">
               {field.note}
-            </span>
-          ) : null}
-        </span>
-      </div>
+            </div>
+          ) : null
+        }
+      >
+        <FieldNumber
+          id={field.key}
+          value={values[field.key] ?? ""}
+          unit={field.unit}
+          describedBy={field.note ? noteId : undefined}
+          onChange={(value) => edit(field.key, value)}
+        />
+      </FieldRow>
+    );
+  }
+
+  function numberSection(heading: string, fields: NumberField[]) {
+    return (
+      <section
+        key={heading}
+        aria-label={heading}
+        className="flex flex-col gap-3"
+      >
+        <FormSectionHeading title={heading} />
+        <FieldRows
+          footnote={lastSavedNote(
+            savedSettings,
+            fields.map((field) =>
+              checkInGapKeys.includes(field.key) ? checkInGapsKey : field.key,
+            ),
+          )}
+        >
+          {fields.map(numberRow)}
+        </FieldRows>
+      </section>
     );
   }
 
@@ -482,92 +489,53 @@ export function PlatformSettingsForm() {
   }
 
   return (
-    <div className="flex flex-col gap-[30px]">
-      {numberSections.map((section) => (
-        <section
-          key={section.heading}
-          aria-label={section.heading}
-          className="flex flex-col rounded-card border border-line bg-white"
-        >
-          <h2 className="m-0 px-5 pb-2 pt-4 text-[17px] font-semibold">
-            {section.heading}
-          </h2>
-          {section.fields.map(numberRow)}
-        </section>
-      ))}
+    <>
+      {numberSections.map((section) =>
+        numberSection(section.heading, section.fields),
+      )}
+      {numberSection("Web search", [webSearchLimitField])}
 
-      <section
-        aria-label="Web search"
-        className="flex flex-col rounded-card border border-line bg-white"
-      >
-        <h2 className="m-0 px-5 pb-2 pt-4 text-[17px] font-semibold">
-          Web search
-        </h2>
-        {numberRow(webSearchLimitField)}
+      <section aria-label="Wording" className="flex flex-col gap-3">
+        <FormSectionHeading
+          title="Wording"
+          caption={lastSavedNote(
+            settings,
+            textFields.map((field) => field.key),
+          )}
+        />
+        {textFields.map((field) => (
+          <FormEditor
+            key={field.key}
+            label={field.label}
+            size="short"
+            caption={
+              <>
+                <span className="text-text">{field.label}</span> {field.caption}
+              </>
+            }
+            value={values[field.key] ?? ""}
+            onChange={(value) => edit(field.key, value)}
+          />
+        ))}
       </section>
 
-      <section
-        aria-label="Wording"
-        className="flex flex-col rounded-card border border-line bg-white"
-      >
-        <h2 className="m-0 px-5 pb-2 pt-4 text-[17px] font-semibold">
-          Wording
-        </h2>
-        <div className="flex flex-col gap-4 px-5 pb-5">
-          {textFields.map((field) => (
-            <label key={field.key} className={fieldLabel}>
-              <span>
-                {field.label}{" "}
-                <span className="text-caption font-normal text-ink-muted">
-                  {field.caption}
-                </span>
-              </span>
-              <textarea
-                className={`${inputField} resize-y leading-relaxed`}
-                rows={3}
-                value={values[field.key] ?? ""}
-                onChange={(event) => edit(field.key, event.target.value)}
-              />
-            </label>
-          ))}
-        </div>
-      </section>
-
-      {saveSettings.isError ? (
-        <SaveFailedNote>{failureMessage}</SaveFailedNote>
+      <SaveBar
+        placement="alone"
+        sticky
+        isDirty={isDirty}
+        isSaving={saveSettings.isPending}
+        failedMessage={saveFailedMessage(saveSettings.error)}
+        canSave={isDirty && isValid}
+        saveLabel="Save settings"
+        onDiscard={() => {
+          setDrafts(null);
+          saveSettings.reset();
+        }}
+        onSave={saveChanges}
+      />
+      {saveSettings.isSuccess ? (
+        <SavedNote>Saved. Zeph uses it from the next message.</SavedNote>
       ) : null}
-
-      <div className="sticky bottom-4 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-white px-4 py-3 shadow-[0_12px_24px_-16px_rgba(0,0,0,0.35)]">
-        <span className="text-caption text-ink-muted">
-          {lastSavedNote(settings, [...allKeys, checkInGapsKey])}
-          {saveSettings.isSuccess ? (
-            <span role="status" className="ml-2 text-blue-deep">
-              Saved
-            </span>
-          ) : null}
-        </span>
-        <span className="flex gap-2">
-          <button
-            type="button"
-            className={secondaryButton}
-            disabled={changedKeys.length === 0}
-            onClick={() => {
-              setDrafts(null);
-              saveSettings.reset();
-            }}
-          >
-            Discard
-          </button>
-          <button
-            type="button"
-            className={primaryButton}
-            disabled={!canSave}
-            onClick={saveChanges}
-          >
-            {saveSettings.isPending ? "Saving…" : "Save settings"}
-          </button>
-        </span>
-      </div>
-    </div>
+    </>
   );
 }

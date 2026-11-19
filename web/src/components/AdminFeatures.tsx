@@ -2,7 +2,10 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { FieldRow } from "@/components/FieldRow";
+import { FieldRows } from "@/components/FieldRows";
 import { LoadFailed } from "@/components/LoadFailed";
+import { LoadingPanel } from "@/components/LoadingPanel";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { Switch } from "@/components/Switch";
 import type { FeatureSwitch } from "@/lib/api-client";
@@ -11,8 +14,8 @@ import { queryKeys, reloadUserPages } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
 /**
- * The admin Features page's body: one row per Feature with what it does, its
- * switch for everyone and its last change. A switch saves as soon as it is
+ * The admin Features page's body: one field row per Feature with what it
+ * does, its last change and its switch for everyone. A switch saves as soon as it is
  * flipped, and the signed-in Admin's own pages load again, since the
  * Feature may have changed for them too.
  *
@@ -49,13 +52,7 @@ export function AdminFeatures() {
         />
       );
     }
-    return (
-      <div
-        aria-busy="true"
-        aria-label="Loading Features"
-        className="h-[120px] rounded-card border border-line bg-subtle"
-      />
-    );
+    return <LoadingPanel shape="card" label="Loading Features" />;
   }
 
   const failedFeature = switchForEveryone.isError
@@ -63,44 +60,34 @@ export function AdminFeatures() {
     : null;
 
   return (
-    <div className="flex flex-col gap-4">
+    <>
       {failedFeature ? (
         <SaveFailedNote>
           Couldn’t change {failedFeature.name}. It is still{" "}
           {failedFeature.on ? "on" : "off"}.
         </SaveFailedNote>
       ) : null}
-      <ul className="m-0 flex list-none flex-col rounded-card border border-line bg-white p-0">
-        {features.map((feature, index) => (
-          <li
+      <FieldRows>
+        {features.map((feature) => (
+          <FieldRow
             key={feature.feature}
-            className={`flex flex-wrap items-center justify-between gap-x-5 gap-y-3 px-5 py-4 ${
-              index > 0 ? "border-t border-line" : ""
-            }`}
-          >
-            <span className="flex min-w-0 flex-[1_1_260px] flex-col gap-0.5">
-              <span className="font-semibold">{feature.name}</span>
-              <span className="text-caption text-ink-muted">
-                {feature.description}
-              </span>
-              <span className="text-caption text-ink-muted">
+            title={feature.name}
+            caption={feature.description}
+            note={
+              <div className="text-[12px] text-soft">
                 {lastChangeNote(feature)}
-              </span>
-            </span>
-            <span className="flex items-center gap-3">
-              <span className="text-caption text-ink-muted" aria-hidden="true">
-                {feature.on ? "On" : "Off"} for everyone
-              </span>
-              <Switch
-                label={`${feature.name} for everyone`}
-                checked={feature.on}
-                disabled={switchForEveryone.isPending}
-                onChange={(on) => switchForEveryone.mutate({ feature, on })}
-              />
-            </span>
-          </li>
+              </div>
+            }
+          >
+            <Switch
+              label={`${feature.name} for everyone`}
+              checked={feature.on}
+              disabled={switchForEveryone.isPending}
+              onChange={(on) => switchForEveryone.mutate({ feature, on })}
+            />
+          </FieldRow>
         ))}
-      </ul>
-    </div>
+      </FieldRows>
+    </>
   );
 }

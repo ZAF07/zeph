@@ -3,10 +3,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { compactSecondaryButton } from "@/components/button-styles";
-import { inputField } from "@/components/form-styles";
+import { secondaryButton } from "@/components/button-styles";
+import { EmptyState } from "@/components/EmptyState";
+import { FieldSelect } from "@/components/FieldSelect";
+import { FormSectionHeading } from "@/components/FormSectionHeading";
 import { HelplineForm } from "@/components/HelplineForm";
 import { LoadFailed } from "@/components/LoadFailed";
+import { LoadingPanel } from "@/components/LoadingPanel";
+import { SavedNote } from "@/components/SavedNote";
+import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type {
   ApiClient,
   Helpline,
@@ -35,12 +40,12 @@ type FormSetup = {
 const headings = ["Country", "Name", "Number", "Hours", "Order"];
 
 const headCell =
-  "whitespace-nowrap border-b border-line bg-subtle px-[18px] py-3.5 text-left font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted";
+  "whitespace-nowrap border-b border-line px-[18px] py-3.5 text-left text-[11px] font-medium uppercase tracking-[1.5px] text-soft";
 
 const cell = "px-[18px] py-3.5";
 
 const iconButton =
-  "inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-line-strong bg-transparent text-ink disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex size-11 cursor-pointer items-center justify-center rounded-pill border border-line-strong bg-transparent text-text disabled:cursor-not-allowed disabled:text-mute";
 
 /**
  * Gives a Helpline's place within its country's list.
@@ -223,13 +228,7 @@ export function HelplinesManager() {
         />
       );
     }
-    return (
-      <div
-        aria-busy="true"
-        aria-label="Loading Helplines"
-        className="h-[320px] rounded-card border border-line bg-subtle"
-      />
-    );
+    return <LoadingPanel shape="card" label="Loading Helplines" />;
   }
 
   const { helplines, international_fallback: fallback } = helplinesQuery.data;
@@ -246,32 +245,29 @@ export function HelplinesManager() {
   return (
     <section
       aria-labelledby="helplines-heading"
-      className="flex flex-col gap-4 rounded-card border border-line bg-white p-5"
+      className="flex flex-col gap-3"
     >
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h2 id="helplines-heading" className="m-0 text-[17px] font-semibold">
-          Helplines
-        </h2>
+        <FormSectionHeading id="helplines-heading" title="Helplines" />
         <div className="flex flex-wrap items-end gap-2">
-          <div className="flex flex-col gap-1 text-caption text-ink-muted">
+          <div className="flex w-[240px] flex-col gap-1 text-[13px] text-soft">
             <label htmlFor="helpline-country-filter">Country</label>
-            <select
+            <FieldSelect
               id="helpline-country-filter"
-              className={`${inputField} min-h-10 w-auto py-2`}
               value={countryFilter}
-              onChange={(event) => setCountryFilter(event.target.value)}
-            >
-              <option value="all">All countries</option>
-              {countriesWithHelplines.map((country) => (
-                <option key={country} value={country}>
-                  {countryName(country)}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: "all", label: "All countries" },
+                ...countriesWithHelplines.map((country) => ({
+                  value: country,
+                  label: countryName(country),
+                })),
+              ]}
+              onChange={setCountryFilter}
+            />
           </div>
           <button
             type="button"
-            className={compactSecondaryButton}
+            className={secondaryButton}
             onClick={() => {
               setEditing({ kind: "add" });
               setFlash(null);
@@ -282,18 +278,8 @@ export function HelplinesManager() {
         </div>
       </div>
 
-      {flash ? (
-        <p
-          role="status"
-          className={`m-0 rounded-xl px-4 py-3.5 text-sm ${
-            flash.isError
-              ? "border border-danger-line bg-danger-tint text-danger-deep"
-              : "bg-blue-tint text-blue-deep"
-          }`}
-        >
-          {flash.text}
-        </p>
-      ) : null}
+      {flash?.isError ? <SaveFailedNote>{flash.text}</SaveFailedNote> : null}
+      {flash && !flash.isError ? <SavedNote>{flash.text}</SavedNote> : null}
 
       {form ? (
         <HelplineForm
@@ -313,17 +299,14 @@ export function HelplinesManager() {
       ) : null}
 
       {helplines.length === 0 ? (
-        <div className="flex flex-col gap-1 rounded-xl border border-dashed border-line-strong px-5 py-6">
-          <span className="font-semibold">No Helplines yet</span>
-          <p className="m-0 text-caption text-ink-muted">
-            Until you add some, every User gets the international fallback
-            below. Add at least an emergency number for each launch country.
-          </p>
-        </div>
+        <EmptyState
+          title="No Helplines yet"
+          body="Until you add some, every User gets the international fallback below. Add at least an emergency number for each launch country."
+        />
       ) : null}
 
-      <div className="overflow-x-auto rounded-xl border border-line">
-        <table className="w-full min-w-[760px] border-collapse text-sm">
+      <div className="relative overflow-x-auto rounded-card border border-line bg-panel">
+        <table className="w-full min-w-[760px] border-collapse text-[14px]">
           <thead>
             <tr>
               {headings.map((heading) => (
@@ -345,7 +328,7 @@ export function HelplinesManager() {
                   <td className={cell}>
                     {countryName(helpline.country ?? "")}
                   </td>
-                  <td className={`${cell} font-medium`}>{helpline.name}</td>
+                  <td className={`${cell} text-text`}>{helpline.name}</td>
                   <td className={`${cell} tabular-nums`}>{helpline.number}</td>
                   <td className={cell}>{helpline.hours ?? "—"}</td>
                   <td className={cell}>
@@ -375,7 +358,7 @@ export function HelplinesManager() {
                     <span className="inline-flex gap-1.5">
                       <button
                         type="button"
-                        className={compactSecondaryButton}
+                        className={secondaryButton}
                         disabled={isBusy}
                         onClick={() => {
                           setEditing({ kind: "edit", helpline });
@@ -398,16 +381,16 @@ export function HelplinesManager() {
                 </tr>
               );
             })}
-            <tr className="bg-subtle">
-              <td className={`${cell} font-medium`}>International fallback</td>
-              <td className={`${cell} font-medium`}>{fallback.name}</td>
+            <tr className="bg-bg-deep">
+              <td className={cell}>International fallback</td>
+              <td className={cell}>{fallback.name}</td>
               <td className={cell}>{fallback.number}</td>
               <td className={cell}>{fallback.hours ?? "—"}</td>
-              <td className={`${cell} text-ink-muted`}>Always last</td>
+              <td className={`${cell} text-soft`}>Always last</td>
               <td className={`${cell} text-right`}>
                 <button
                   type="button"
-                  className={compactSecondaryButton}
+                  className={secondaryButton}
                   aria-label="Edit international fallback"
                   onClick={() => {
                     setEditing({ kind: "fallback" });
@@ -421,7 +404,7 @@ export function HelplinesManager() {
           </tbody>
         </table>
       </div>
-      <p className="m-0 text-caption text-ink-muted">
+      <p className="m-0 text-[13px] text-soft">
         Shared with Users whose country has no Helplines. It can’t be removed.
       </p>
     </section>

@@ -3,7 +3,10 @@
 import { useState } from "react";
 
 import { primaryButton, secondaryButton } from "@/components/button-styles";
-import { fieldCaption, fieldLabel, inputField } from "@/components/form-styles";
+import { FieldRow } from "@/components/FieldRow";
+import { FieldRows } from "@/components/FieldRows";
+import { FieldSelect } from "@/components/FieldSelect";
+import { FieldText } from "@/components/FieldText";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { ApiError, type HelplineInput } from "@/lib/api-client";
 import { countryOptions } from "@/lib/countries";
@@ -75,69 +78,57 @@ export function HelplineForm({
   return (
     <form
       aria-label={title}
-      className="flex flex-col gap-4 rounded-xl border border-line bg-subtle p-4"
+      className="flex flex-col gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         void submit();
       }}
     >
-      <h3 className="m-0 text-[15px] font-semibold">{title}</h3>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
+      <h3 className="m-0 text-[15px] font-normal text-text">{title}</h3>
+      <FieldRows>
         {withCountry ? (
-          <div className={fieldLabel}>
-            <label htmlFor="helpline-country">Country</label>
-            <select
+          <FieldRow title="Country" htmlFor="helpline-country">
+            <FieldSelect
               id="helpline-country"
-              className={inputField}
               value={values.country}
-              onChange={(event) => edit("country", event.target.value)}
-            >
-              <option value="">Choose a country</option>
-              {countries.map((country) => (
-                <option key={country.code} value={country.code}>
-                  {country.name}
-                </option>
-              ))}
-            </select>
-          </div>
+              options={[
+                { value: "", label: "Choose a country" },
+                ...countries.map((country) => ({
+                  value: country.code,
+                  label: country.name,
+                })),
+              ]}
+              onChange={(value) => edit("country", value)}
+            />
+          </FieldRow>
         ) : null}
-        <div className={fieldLabel}>
-          <label htmlFor="helpline-name">Name</label>
-          <input
+        <FieldRow title="Name" htmlFor="helpline-name">
+          <FieldText
             id="helpline-name"
-            className={inputField}
             value={values.name}
-            onChange={(event) => edit("name", event.target.value)}
+            onChange={(value) => edit("name", value)}
           />
-        </div>
-        <div className={fieldLabel}>
-          <label htmlFor="helpline-number">Number</label>
-          <input
+        </FieldRow>
+        <FieldRow
+          title="Number"
+          caption="A phone number or web address."
+          htmlFor="helpline-number"
+        >
+          <FieldText
             id="helpline-number"
-            className={inputField}
-            aria-describedby="helpline-number-caption"
             value={values.number}
-            onChange={(event) => edit("number", event.target.value)}
+            onChange={(value) => edit("number", value)}
           />
-          <span id="helpline-number-caption" className={fieldCaption}>
-            A phone number or web address.
-          </span>
-        </div>
-        <div className={fieldLabel}>
-          <label htmlFor="helpline-hours">Hours</label>
-          <input
+        </FieldRow>
+        <FieldRow title="Hours" caption="Optional." htmlFor="helpline-hours">
+          <FieldText
             id="helpline-hours"
-            className={inputField}
-            aria-describedby="helpline-hours-caption"
             placeholder="e.g. 24 hours"
             value={values.hours}
-            onChange={(event) => edit("hours", event.target.value)}
+            onChange={(value) => edit("hours", value)}
           />
-          <span id="helpline-hours-caption" className={fieldCaption}>
-            Optional.
-          </span>
-        </div>
-      </div>
+        </FieldRow>
+      </FieldRows>
       {error ? <SaveFailedNote>{error}</SaveFailedNote> : null}
       <div className="flex flex-wrap justify-end gap-2">
         <button type="button" className={secondaryButton} onClick={onCancel}>

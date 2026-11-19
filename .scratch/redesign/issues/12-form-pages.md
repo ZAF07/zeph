@@ -49,3 +49,9 @@ Refs: `AdminPersona`.
 - [ ] `/code-review` run, and findings fixed or answered.
 
 ## Comments
+
+- 2026-11-19 — Decisions (Zaf, asked at start):
+  - AdminPersona: no "Sample data" pill and no orange builder notes or samples (as issues 09/10). Checked by parts: header and editor box pixel-checked against that part of the baseline; each save bar state tested against its drawn values. AdminPersona stays FAIL until its baseline is redrawn.
+  - The yellow "honesty rules must stay" note is dropped (not drawn).
+  - Features keeps saving each switch as soon as it's flipped: field rows with switches, no save bar. The "Changed … by …" line goes under the description; the visible "On for everyone" text is dropped (the switch keeps its label); a failed flip uses the shared error note.
+  - Undrawn parts: build from the nearest template parts and list every choice here. Prompts: per service a field-rows box (Model select, Thinking switch), prompt and extra prompts as editors, one save bar per service; folded groups use the card-list chevron. Platform settings: a field-rows box per section with a small heading, number inputs in the drawn value box plus unit, wording as editors, one save bar. Safety: Crisis Reply = editor + save bar; Helplines keep their table, reskinned with tokens only.

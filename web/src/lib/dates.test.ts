@@ -4,6 +4,7 @@ import {
   calendarDaysAgo,
   formatAddedDay,
   formatDay,
+  formatLastSavedAt,
   formatSavedAt,
   formatShortDay,
   formatWeekdayDay,
@@ -24,6 +25,20 @@ describe("formatDay", () => {
 describe("formatSavedAt", () => {
   it("writes the day and time something was saved", () => {
     expect(formatSavedAt("2026-11-08T14:20:00Z", "UTC")).toBe("8 Nov, 14:20");
+  });
+});
+
+describe("formatLastSavedAt", () => {
+  it("writes the day, year and 12-hour time a setting was last saved", () => {
+    expect(formatLastSavedAt("2026-11-12T21:14:00Z", "UTC")).toBe(
+      "12 Nov 2026, 9:14 PM",
+    );
+  });
+
+  it("writes morning times with AM and uses the given time zone", () => {
+    expect(formatLastSavedAt("2026-11-08T00:05:00Z", "Asia/Singapore")).toBe(
+      "8 Nov 2026, 8:05 AM",
+    );
   });
 });
 

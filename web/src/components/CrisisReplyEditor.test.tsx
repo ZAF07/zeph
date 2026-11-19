@@ -60,7 +60,9 @@ describe("CrisisReplyEditor", () => {
       crisis_reply: "I’m an AI. Please reach out:\n{helplines} I’m still here.",
     });
     expect(await screen.findByText(/Last saved .* by Maya Lin/)).toBeVisible();
-    expect(screen.getByText("Saved")).toBeVisible();
+    expect(
+      screen.getByText("Saved. Zeph uses it from the next message."),
+    ).toBeVisible();
   });
 
   it("shows why the backend refused the wording", async () => {

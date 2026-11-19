@@ -1,13 +1,14 @@
-import { fieldCaption, fieldLabel, inputField } from "@/components/form-styles";
+import { FormEditor } from "@/components/FormEditor";
 import type { ExtraPrompt } from "@/lib/api-client";
 
 /**
- * A text box for one extra prompt on a core service's card, with its label
- * and, when it has one, a hint under the label saying when it's used.
+ * One extra prompt on a core service, in the form template's short editor,
+ * with its name and, when it has one, a hint saying when it's used along
+ * the top.
  *
  * @param props - `prompt` is the extra prompt, `value` its current text and
  *   `onChange` is called with the new text.
- * @returns The field.
+ * @returns The editor.
  */
 export function ExtraPromptField({
   prompt,
@@ -18,27 +19,26 @@ export function ExtraPromptField({
   value: string;
   onChange: (text: string) => void;
 }) {
-  const fieldId = `extra-prompt-${prompt.key}`;
-  const hintId = `${fieldId}-hint`;
+  const hintId = `extra-prompt-${prompt.key}-hint`;
 
   return (
-    <div className={fieldLabel}>
-      <span className="flex flex-col gap-0.5">
-        <label htmlFor={fieldId}>{prompt.label}</label>
-        {prompt.hint ? (
-          <span id={hintId} className={fieldCaption}>
-            {prompt.hint}
-          </span>
-        ) : null}
-      </span>
-      <textarea
-        id={fieldId}
-        className={`${inputField} resize-y font-mono text-[13.5px] leading-relaxed`}
-        rows={4}
-        aria-describedby={prompt.hint ? hintId : undefined}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </div>
+    <FormEditor
+      label={prompt.label}
+      size="short"
+      describedById={prompt.hint ? hintId : undefined}
+      caption={
+        <>
+          <span className="text-text">{prompt.label}</span>
+          {prompt.hint ? (
+            <>
+              {" · "}
+              <span id={hintId}>{prompt.hint}</span>
+            </>
+          ) : null}
+        </>
+      }
+      value={value}
+      onChange={onChange}
+    />
   );
 }

@@ -10,13 +10,13 @@ import { HelplinesManager } from "@/components/HelplinesManager";
  */
 export default function AdminSafetyPage() {
   return (
-    <div className="flex flex-col gap-[30px]">
+    <>
       <AdminPageHeader
         title="Safety"
         lead="What Zeph says when Safeguard detects risk, and the Helplines it shares for each User’s country."
       />
       <CrisisReplyEditor />
       <HelplinesManager />
-    </div>
+    </>
   );
 }

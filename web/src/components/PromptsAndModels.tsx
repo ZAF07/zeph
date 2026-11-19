@@ -5,16 +5,17 @@ import { useQuery } from "@tanstack/react-query";
 import { CoreServiceCard } from "@/components/CoreServiceCard";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadFailed } from "@/components/LoadFailed";
+import { LoadingPanel } from "@/components/LoadingPanel";
 import { LockIcon } from "@/components/LockIcon";
 import { queryKeys } from "@/lib/queries";
 import { useAdminSettings } from "@/lib/use-admin-settings";
 import { useApiClient } from "@/lib/use-api-client";
 
 /**
- * The admin Prompts & models page: one card per core service, each with its
- * model and prompt.
+ * The admin Prompts & models page: one part per core service, each with its
+ * model and prompt, built from the form template.
  *
- * @returns The cards, or a loading, empty or error state.
+ * @returns The services, or a loading, empty or error state.
  */
 export function PromptsAndModels() {
   const apiClient = useApiClient();
@@ -39,13 +40,7 @@ export function PromptsAndModels() {
         />
       );
     }
-    return (
-      <div
-        aria-busy="true"
-        aria-label="Loading services"
-        className="h-[360px] rounded-card border border-line bg-subtle"
-      />
-    );
+    return <LoadingPanel shape="card" label="Loading services" />;
   }
 
   const { services, model_choices: modelChoices } = coreServices;
@@ -60,7 +55,7 @@ export function PromptsAndModels() {
 
   return (
     <>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(480px,100%),1fr))] gap-5">
+      <div className="flex flex-col gap-6">
         {services.map((service) => (
           <CoreServiceCard
             key={service.name}
@@ -70,8 +65,8 @@ export function PromptsAndModels() {
           />
         ))}
       </div>
-      <p className="m-0 text-caption text-ink-muted">
-        <span className="inline-flex items-center gap-1.5 text-xs font-medium">
+      <p className="m-0 text-[13px] text-soft">
+        <span className="inline-flex items-center gap-1.5 text-[12px] text-text">
           <LockIcon />
           No message content
         </span>{" "}

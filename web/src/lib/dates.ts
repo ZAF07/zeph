@@ -53,6 +53,33 @@ export function formatSavedAt(isoTimestamp: string, timeZone?: string): string {
 }
 
 /**
+ * Writes when a setting was last saved, like "12 Nov 2026, 9:14 PM", as the
+ * form pages show it.
+ *
+ * @param isoTimestamp - The moment, as the backend sends it.
+ * @param timeZone - The time zone to show it in; the browser's by default.
+ * @returns The day, month, year and 12-hour time.
+ */
+export function formatLastSavedAt(
+  isoTimestamp: string,
+  timeZone?: string,
+): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone,
+  }).formatToParts(new Date(isoTimestamp));
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((found) => found.type === type)?.value ?? "";
+  const dayPeriod = part("dayPeriod").toUpperCase();
+  return `${part("day")} ${part("month")} ${part("year")}, ${part("hour")}:${part("minute")} ${dayPeriod}`;
+}
+
+/**
  * Writes a short day like "2 Oct", as memory sources show it.
  *
  * @param isoTimestamp - The moment, as the backend sends it.

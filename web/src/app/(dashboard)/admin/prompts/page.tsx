@@ -8,12 +8,12 @@ import { PromptsAndModels } from "@/components/PromptsAndModels";
  */
 export default function AdminPromptsPage() {
   return (
-    <div className="flex flex-col gap-[30px]">
+    <>
       <AdminPageHeader
         title="Prompts & models"
         lead="One card per core service. Each prompt is combined with the Persona at runtime."
       />
       <PromptsAndModels />
-    </div>
+    </>
   );
 }
