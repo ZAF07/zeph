@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DashboardShell } from "@/components/DashboardShell";
 import type { ApiClient } from "@/lib/api-client";
+import type { Copy } from "@/lib/copy";
+import { markedCopy, seedCopy, wordsNotFromCopy } from "@/test/copy";
 import { userWithRole } from "@/test/fixtures";
 import { renderWithQueries } from "@/test/render-with-queries";
 
@@ -48,11 +50,12 @@ vi.mock("next/navigation", () => ({
  * Renders the shell around a stand-in page.
  *
  * @param initialMenuFolded - Whether the fold cookie says the sidebar is folded.
+ * @param copy - The menu's Copy.
  * @returns What Testing Library's `render` returns.
  */
-function renderShell(initialMenuFolded = false) {
+function renderShell(initialMenuFolded = false, copy: Copy = seedCopy()) {
   return renderWithQueries(
-    <DashboardShell initialMenuFolded={initialMenuFolded}>
+    <DashboardShell copy={copy} initialMenuFolded={initialMenuFolded}>
       <p>Page content</p>
     </DashboardShell>,
   );
@@ -294,7 +297,7 @@ describe("DashboardShell", () => {
     await user.click(screen.getByRole("button", { name: "Open the menu" }));
     navigation.pathname = "/memories";
     shell.rerender(
-      <DashboardShell initialMenuFolded={false}>
+      <DashboardShell copy={seedCopy()} initialMenuFolded={false}>
         <p>Page content</p>
       </DashboardShell>,
     );
@@ -370,4 +373,56 @@ describe("DashboardShell", () => {
     await screen.findByText("Maya");
     expect(screen.queryByRole("group", { name: "Admin" })).toBeNull();
   });
+
+  it("words the menu from an Admin's Copy", async () => {
+    renderShell(false, {
+      ...seedCopy(),
+      "shared.dashboard.memories": "What Zeph knows",
+      "shared.dashboard.sign_out": "Log out",
+    });
+
+    const sidebar = screen.getByRole("complementary");
+    expect(
+      within(sidebar).getByRole("link", { name: "What Zeph knows" }),
+    ).toHaveAttribute("href", "/memories");
+    expect(
+      within(sidebar).getByRole("button", { name: "Log out" }),
+    ).toBeInTheDocument();
+  });
+
+  it.each([
+    ["the sidebar", false, ""],
+    ["the folded rail", true, ""],
+    ["the open phone menu", false, "menu-open"],
+  ])(
+    "shows a User only Copy text in %s, apart from who they are and the AI notice",
+    async (_menu, folded, design) => {
+      designMode.on = design !== "";
+      navigation.search = design ? `design=${design}` : "";
+
+      const { container } = renderShell(folded, markedCopy());
+
+      if (!folded) {
+        await screen.findAllByText("maya@example.com");
+        await screen.findAllByText(
+          "Zeph is an AI, not a therapist or crisis service.",
+        );
+      }
+      const notCopy = [
+        "Maya",
+        "maya@example.com",
+        "Zeph is an AI, not a therapist or crisis service.",
+        "To build",
+        "Page content",
+      ];
+      const words = wordsNotFromCopy(container)
+        .map((text) =>
+          notCopy
+            .reduce((rest, word) => rest.replaceAll(word, ""), text)
+            .replace(/\s/g, ""),
+        )
+        .filter((text) => text !== "");
+      expect(words).toEqual([]);
+    },
+  );
 });

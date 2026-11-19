@@ -7,6 +7,7 @@ import { seedCopy } from "@/test/copy";
 
 const isSignedIn = vi.fn<() => Promise<boolean>>();
 const loadCopy = vi.fn<() => Promise<Copy | null>>();
+const homeCopy = vi.fn<(copy: Copy) => void>();
 
 vi.mock("@/lib/auth/server", () => ({ isSignedIn }));
 
@@ -23,7 +24,10 @@ vi.mock("@/components/DashboardFrame", () => ({
 }));
 
 vi.mock("@/components/DashboardHome", () => ({
-  DashboardHome: () => <p>Dashboard home</p>,
+  DashboardHome: ({ copy }: { copy: Copy }) => {
+    homeCopy(copy);
+    return <p>{copy["home.hero.eyebrow"]}</p>;
+  },
 }));
 
 const { default: RootPage, generateMetadata } = await import("@/app/page");
@@ -32,6 +36,7 @@ describe("the / page", () => {
   beforeEach(() => {
     isSignedIn.mockReset();
     loadCopy.mockReset();
+    homeCopy.mockReset();
     loadCopy.mockResolvedValue(seedCopy());
   });
 
@@ -76,26 +81,52 @@ describe("the / page", () => {
     });
   });
 
-  it("keeps the layout's title when Copy can't be read or someone is signed in", async () => {
-    isSignedIn.mockResolvedValue(false);
-    loadCopy.mockResolvedValue(null);
-    expect(await generateMetadata()).toEqual({});
+  it("takes Home's tab title and search description from Copy when signed in", async () => {
+    isSignedIn.mockResolvedValue(true);
+    loadCopy.mockResolvedValue({
+      ...seedCopy(),
+      "home.page_title": "Zeph — Your day",
+      "home.page_description": "Your Dashboard.",
+    });
 
+    expect(await generateMetadata()).toEqual({
+      title: "Zeph — Your day",
+      description: "Your Dashboard.",
+    });
+  });
+
+  it("keeps the layout's title when Copy can't be read", async () => {
+    loadCopy.mockResolvedValue(null);
+
+    isSignedIn.mockResolvedValue(false);
+    expect(await generateMetadata()).toEqual({});
     isSignedIn.mockResolvedValue(true);
     expect(await generateMetadata()).toEqual({});
   });
 
-  it("shows Home in the Dashboard frame when signed in", async () => {
+  it("shows Home in the Dashboard frame when signed in, giving it only Home's slots", async () => {
     isSignedIn.mockResolvedValue(true);
 
     render(await RootPage());
 
-    expect(screen.getByTestId("dashboard-frame")).toHaveTextContent(
-      "Dashboard home",
-    );
+    expect(screen.getByTestId("dashboard-frame")).toHaveTextContent("Home");
     expect(
       screen.queryByRole("heading", { name: /Think Deeper/ }),
     ).not.toBeInTheDocument();
-    expect(loadCopy).not.toHaveBeenCalled();
+    const keys = Object.keys(homeCopy.mock.lastCall?.[0] ?? {});
+    expect(keys.length).toBeGreaterThan(0);
+    expect(keys.every((key) => key.startsWith("home."))).toBe(true);
+  });
+
+  it("shows the error state, not Home, when signed in and Copy can't be read", async () => {
+    isSignedIn.mockResolvedValue(true);
+    loadCopy.mockResolvedValue(null);
+
+    render(await RootPage());
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Couldn’t load this page",
+    );
+    expect(homeCopy).not.toHaveBeenCalled();
   });
 });

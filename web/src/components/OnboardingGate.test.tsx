@@ -6,6 +6,7 @@ import { AdminGate } from "@/components/AdminGate";
 import { OnboardingGate } from "@/components/OnboardingGate";
 import { SidebarAccount } from "@/components/SidebarAccount";
 import type { ApiClient, Me } from "@/lib/api-client";
+import { markedCopy, seedCopy, wordsNotFromCopy } from "@/test/copy";
 import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
@@ -50,7 +51,9 @@ describe("OnboardingGate", () => {
   it("sends a User who has not finished onboarding to onboarding", async () => {
     apiClient.getMe.mockResolvedValue(user(null));
 
-    renderWithQueries(<OnboardingGate>Connect Telegram page</OnboardingGate>);
+    renderWithQueries(
+      <OnboardingGate copy={seedCopy()}>Connect Telegram page</OnboardingGate>,
+    );
 
     await vi.waitFor(() =>
       expect(router.replace).toHaveBeenCalledWith("/onboarding"),
@@ -61,7 +64,9 @@ describe("OnboardingGate", () => {
   it("shows the page to a User who has finished onboarding", async () => {
     apiClient.getMe.mockResolvedValue(user("2026-11-11T09:00:00Z"));
 
-    renderWithQueries(<OnboardingGate>Connect Telegram page</OnboardingGate>);
+    renderWithQueries(
+      <OnboardingGate copy={seedCopy()}>Connect Telegram page</OnboardingGate>,
+    );
 
     expect(
       await screen.findByText("Connect Telegram page"),
@@ -72,7 +77,9 @@ describe("OnboardingGate", () => {
   it("shows the loading panel while it checks", () => {
     apiClient.getMe.mockReturnValue(new Promise(() => {}));
 
-    renderWithQueries(<OnboardingGate>Connect Telegram page</OnboardingGate>);
+    renderWithQueries(
+      <OnboardingGate copy={seedCopy()}>Connect Telegram page</OnboardingGate>,
+    );
 
     expect(
       screen.getByRole("status", { name: "Loading your Dashboard" }),
@@ -84,7 +91,9 @@ describe("OnboardingGate", () => {
     apiClient.getMe
       .mockRejectedValueOnce(new Error("down"))
       .mockResolvedValue(user("2026-11-11T09:00:00Z"));
-    renderWithQueries(<OnboardingGate>Connect Telegram page</OnboardingGate>);
+    renderWithQueries(
+      <OnboardingGate copy={seedCopy()}>Connect Telegram page</OnboardingGate>,
+    );
 
     await userEvent.click(
       await screen.findByRole("button", { name: "Try again" }),
@@ -98,7 +107,9 @@ describe("OnboardingGate", () => {
   it("does not show the page when the check fails", async () => {
     apiClient.getMe.mockRejectedValue(new Error("down"));
 
-    renderWithQueries(<OnboardingGate>Connect Telegram page</OnboardingGate>);
+    renderWithQueries(
+      <OnboardingGate copy={seedCopy()}>Connect Telegram page</OnboardingGate>,
+    );
 
     expect(
       await screen.findByRole("button", { name: "Try again" }),
@@ -109,6 +120,27 @@ describe("OnboardingGate", () => {
     expect(screen.queryByText("Connect Telegram page")).not.toBeInTheDocument();
   });
 
+  it("words its loading and couldn't-load states from Copy only", async () => {
+    apiClient.getMe.mockRejectedValue(new Error("down"));
+
+    const { container } = renderWithQueries(
+      <OnboardingGate copy={markedCopy()}>
+        Connect Telegram page
+      </OnboardingGate>,
+    );
+
+    expect(
+      screen.getByRole("status", { name: "⟦shared.dashboard.loading⟧" }),
+    ).toBeInTheDocument();
+    expect(wordsNotFromCopy(container)).toEqual([]);
+    expect(
+      await screen.findByRole("button", {
+        name: "⟦shared.dashboard.load_failed.retry⟧",
+      }),
+    ).toBeInTheDocument();
+    expect(wordsNotFromCopy(container)).toEqual([]);
+  });
+
   it("loads the User once for the gates, the sidebar and the page", async () => {
     apiClient.getMe.mockResolvedValue({
       ...user("2026-11-11T09:00:00Z"),
@@ -117,8 +149,8 @@ describe("OnboardingGate", () => {
 
     renderWithQueries(
       <>
-        <SidebarAccount />
-        <OnboardingGate>
+        <SidebarAccount copy={seedCopy()} />
+        <OnboardingGate copy={seedCopy()}>
           <AdminGate>Admin page</AdminGate>
         </OnboardingGate>
       </>,

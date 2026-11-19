@@ -1,3 +1,4 @@
+import { fillPlaceholders } from "@/lib/copy";
 import { formatShortDay } from "@/lib/dates";
 
 /**
@@ -5,22 +6,26 @@ import { formatShortDay } from "@/lib/dates";
  * last changed by telling Zeph in chat.
  *
  * @param props - `changedAt` is when it was changed in chat, or undefined
- *   if it wasn't; `timeZone` is the User's, to pick the day.
+ *   if it wasn't; `timeZone` is the User's, to pick the day; `text` is the
+ *   line's wording from Copy, with a `{day}` placeholder, on pages that read
+ *   Copy.
  * @returns The caption, or nothing.
  */
 export function ChangedInChatCaption({
   changedAt,
   timeZone,
+  text = "Changed in chat · {day}",
 }: {
   changedAt: string | undefined;
   timeZone?: string;
+  text?: string;
 }) {
   if (!changedAt) {
     return null;
   }
   return (
     <span className="text-[12px] text-soft">
-      {`Changed in chat · ${formatShortDay(changedAt, timeZone)}`}
+      {fillPlaceholders(text, { day: formatShortDay(changedAt, timeZone) })}
     </span>
   );
 }

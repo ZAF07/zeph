@@ -3,7 +3,7 @@ import type {
   CheckInStatus,
   RecentCheckIn,
 } from "@/lib/api-client";
-import { dateParts, formatShortDay } from "@/lib/dates";
+import { dateParts, formatLongDay, formatShortDay } from "@/lib/dates";
 
 /** The frequencies a User can pick, in the order they are shown. */
 export const checkInFrequencyOptions: {
@@ -109,13 +109,7 @@ export function pauseEndText(
   if (pausedUntil === null) {
     return "until you resume";
   }
-  const part = dateParts(new Date(pausedUntil), {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone,
-  });
-  return `until ${part("weekday")}, ${part("day")} ${part("month")}`;
+  return `until ${formatLongDay(pausedUntil, timeZone)}`;
 }
 
 /**

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SidebarAccount } from "@/components/SidebarAccount";
 import type { ApiClient } from "@/lib/api-client";
+import { seedCopy } from "@/test/copy";
 import { userWithRole } from "@/test/fixtures";
 import { renderWithQueries } from "@/test/render-with-queries";
 
@@ -22,7 +23,7 @@ describe("SidebarAccount", () => {
   it("shows the User's name and email from /me", async () => {
     apiClient.getMe.mockResolvedValue(userWithRole("user"));
 
-    renderWithQueries(<SidebarAccount />);
+    renderWithQueries(<SidebarAccount copy={seedCopy()} />);
 
     expect(await screen.findByText("Maya")).toBeInTheDocument();
     expect(screen.getByText("maya@example.com")).toBeInTheDocument();
@@ -31,7 +32,7 @@ describe("SidebarAccount", () => {
   it("keeps the full name and email on hover, for when they are cut short", async () => {
     apiClient.getMe.mockResolvedValue(userWithRole("user"));
 
-    renderWithQueries(<SidebarAccount />);
+    renderWithQueries(<SidebarAccount copy={seedCopy()} />);
 
     expect(await screen.findByText("Maya")).toHaveAttribute("title", "Maya");
     expect(screen.getByText("maya@example.com")).toHaveAttribute(
@@ -46,7 +47,7 @@ describe("SidebarAccount", () => {
       name: null,
     });
 
-    renderWithQueries(<SidebarAccount />);
+    renderWithQueries(<SidebarAccount copy={seedCopy()} />);
 
     expect(await screen.findAllByText("maya@example.com")).toHaveLength(2);
   });
@@ -54,7 +55,7 @@ describe("SidebarAccount", () => {
   it("shows a placeholder while /me loads", () => {
     apiClient.getMe.mockReturnValue(new Promise(() => {}));
 
-    renderWithQueries(<SidebarAccount />);
+    renderWithQueries(<SidebarAccount copy={seedCopy()} />);
 
     expect(screen.getByText("Loading your account")).toBeInTheDocument();
     expect(screen.queryByText("Maya")).not.toBeInTheDocument();
@@ -63,7 +64,7 @@ describe("SidebarAccount", () => {
   it("shows Admin in place of the email for an Admin", async () => {
     apiClient.getMe.mockResolvedValue(userWithRole("admin"));
 
-    renderWithQueries(<SidebarAccount />);
+    renderWithQueries(<SidebarAccount copy={seedCopy()} />);
 
     expect(await screen.findByText("Admin")).toBeInTheDocument();
     expect(screen.queryByText("maya@example.com")).toBeNull();
@@ -72,7 +73,9 @@ describe("SidebarAccount", () => {
   it("puts the given action at the end of the row", async () => {
     apiClient.getMe.mockResolvedValue(userWithRole("user"));
 
-    renderWithQueries(<SidebarAccount action={<button>Sign out</button>} />);
+    renderWithQueries(
+      <SidebarAccount copy={seedCopy()} action={<button>Sign out</button>} />,
+    );
 
     expect(
       await screen.findByRole("button", { name: "Sign out" }),

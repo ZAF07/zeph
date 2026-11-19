@@ -7,6 +7,7 @@ import { PhoneBar } from "@/components/PhoneBar";
 import { PhoneMenu } from "@/components/PhoneMenu";
 import { Sidebar } from "@/components/Sidebar";
 import { SidebarRail } from "@/components/SidebarRail";
+import type { Copy } from "@/lib/copy";
 import { hasDesignFlag } from "@/lib/design-flags";
 import { useMenuFolded } from "@/lib/use-menu-folded";
 
@@ -20,13 +21,15 @@ const PHONE_MENU_ID = "phone-menu";
  * in it is chosen or the page changes, as with Back. `?design=menu-open`
  * opens it in design-fixture mode.
  *
- * @param props - `children` is the page; `initialMenuFolded` is whether the fold cookie says the sidebar is folded.
+ * @param props - `copy` is the menu's Copy; `children` is the page; `initialMenuFolded` is whether the fold cookie says the sidebar is folded.
  * @returns The page in its frame.
  */
 export function DashboardShell({
+  copy,
   children,
   initialMenuFolded,
 }: {
+  copy: Copy;
   children: ReactNode;
   initialMenuFolded: boolean;
 }) {
@@ -44,6 +47,7 @@ export function DashboardShell({
   return (
     <div className="flex min-h-screen flex-col min-[900px]:flex-row min-[900px]:flex-wrap">
       <PhoneBar
+        copy={copy}
         menuId={PHONE_MENU_ID}
         menuOpen={phoneMenuOpen}
         onMenuToggle={() => setPhoneMenuOpen(!phoneMenuOpen)}
@@ -51,6 +55,7 @@ export function DashboardShell({
       />
       {phoneMenuOpen ? (
         <PhoneMenu
+          copy={copy}
           id={PHONE_MENU_ID}
           onLinkChoose={() => setPhoneMenuOpen(false)}
         />
@@ -59,9 +64,9 @@ export function DashboardShell({
         className={`sticky top-0 box-border hidden h-screen max-w-full self-start overflow-y-auto border-r border-line bg-bg-deep min-[900px]:block [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-[3px] [&::-webkit-scrollbar-thumb]:bg-line ${sidebarWidth}`}
       >
         {menuFolded ? (
-          <SidebarRail onUnfold={() => setMenuFolded(false)} />
+          <SidebarRail copy={copy} onUnfold={() => setMenuFolded(false)} />
         ) : (
-          <Sidebar onFold={() => setMenuFolded(true)} />
+          <Sidebar copy={copy} onFold={() => setMenuFolded(true)} />
         )}
       </aside>
       <main className="box-border flex min-w-0 flex-1 flex-col gap-5 px-4 pt-5 pb-12 min-[900px]:flex-[999_1_640px] min-[900px]:gap-6 min-[900px]:px-8 min-[900px]:pt-7 min-[900px]:pb-14">

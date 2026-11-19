@@ -91,6 +91,23 @@ export function formatLastSavedAt(
 }
 
 /**
+ * Writes a day with its weekday, like "Thursday, 12 November".
+ *
+ * @param isoTimestamp - The moment, as the backend sends it.
+ * @param timeZone - The time zone to show it in; the browser's by default.
+ * @returns The weekday, day and month.
+ */
+export function formatLongDay(isoTimestamp: string, timeZone?: string): string {
+  const part = dateParts(new Date(isoTimestamp), {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone,
+  });
+  return `${part("weekday")}, ${part("day")} ${part("month")}`;
+}
+
+/**
  * Writes a short day like "2 Oct", as memory sources show it.
  *
  * @param isoTimestamp - The moment, as the backend sends it.

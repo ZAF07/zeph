@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DashboardHome } from "@/components/DashboardHome";
 import type { ApiClient, Home, HomeCheckIns } from "@/lib/api-client";
+import type { Copy } from "@/lib/copy";
+import { markedCopy, seedCopy, wordsNotFromCopy } from "@/test/copy";
 import { renderWithQueries } from "@/test/render-with-queries";
 
 const apiClient = {
@@ -72,6 +74,36 @@ function homeWith(overrides: Partial<Home> = {}): Home {
   };
 }
 
+/**
+ * Says what words on Home did not come from marked Copy, besides the
+ * User's own data and the wording that is still a Platform Setting.
+ *
+ * @param container - The rendered page.
+ * @param allowed - Words that are allowed not to be Copy.
+ * @returns Each piece of text not from Copy or the allowed words.
+ */
+function homeWordsNotFromCopy(
+  container: HTMLElement,
+  allowed: string[],
+): string[] {
+  return wordsNotFromCopy(container)
+    .map((text) =>
+      allowed
+        .reduce((rest, word) => rest.replaceAll(word, ""), text)
+        .replace(/\s/g, ""),
+    )
+    .filter((text) => text !== "");
+}
+
+/** The User's data and the Platform Settings words the Home fixture shows. */
+const notCopy = [
+  "Be present at dinner",
+  "Sister Jo is moving abroad",
+  "Relationships",
+  "Zeph is an AI, not a therapist or crisis service.",
+  "To build",
+];
+
 function section(name: string): HTMLElement {
   return screen.getByRole("region", { name });
 }
@@ -90,7 +122,7 @@ describe("DashboardHome", () => {
   it("greets the User, says when they last talked, and shows who Telegram is connected as", async () => {
     apiClient.getHome.mockResolvedValue(homeWith());
 
-    renderWithQueries(<DashboardHome />);
+    renderWithQueries(<DashboardHome copy={seedCopy()} />);
 
     expect(
       await screen.findByRole("heading", { name: "Good evening, Maya." }),
@@ -119,7 +151,7 @@ describe("DashboardHome", () => {
       homeWith({ telegram_connection: null, last_conversation_at: null }),
     );
 
-    renderWithQueries(<DashboardHome />);
+    renderWithQueries(<DashboardHome copy={seedCopy()} />);
 
     expect(
       await screen.findByText("Zeph can’t reach you yet."),
@@ -137,7 +169,7 @@ describe("DashboardHome", () => {
   it("shows Check-ins on, with quiet hours and the last Check-in sent", async () => {
     apiClient.getHome.mockResolvedValue(homeWith());
 
-    renderWithQueries(<DashboardHome />);
+    renderWithQueries(<DashboardHome copy={seedCopy()} />);
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     const checkIns = section("Check-ins");
@@ -168,7 +200,7 @@ describe("DashboardHome", () => {
       }),
     );
 
-    renderWithQueries(<DashboardHome />);
+    renderWithQueries(<DashboardHome copy={seedCopy()} />);
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     const checkIns = section("Check-ins");
@@ -190,7 +222,7 @@ describe("DashboardHome", () => {
       homeWith({ check_ins: checkInsWith({ enabled: false }) }),
     );
 
-    renderWithQueries(<DashboardHome />);
+    renderWithQueries(<DashboardHome copy={seedCopy()} />);
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     const checkIns = section("Check-ins");
@@ -206,7 +238,7 @@ describe("DashboardHome", () => {
       homeWith({ check_ins: checkInsWith({ available: false }) }),
     );
 
-    renderWithQueries(<DashboardHome />);
+    renderWithQueries(<DashboardHome copy={seedCopy()} />);
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     const checkIns = section("Check-ins");
@@ -220,7 +252,7 @@ describe("DashboardHome", () => {
   it("shows Goals and recent Memory Items, each linking to Memories", async () => {
     apiClient.getHome.mockResolvedValue(homeWith());
 
-    renderWithQueries(<DashboardHome />);
+    renderWithQueries(<DashboardHome copy={seedCopy()} />);
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     const goals = section("What you're working toward");
@@ -242,7 +274,7 @@ describe("DashboardHome", () => {
   it("shows the Plan card as to build, with the design's placeholders", async () => {
     apiClient.getHome.mockResolvedValue(homeWith());
 
-    renderWithQueries(<DashboardHome />);
+    renderWithQueries(<DashboardHome copy={seedCopy()} />);
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     const plan = section("Plan To build");
@@ -257,7 +289,7 @@ describe("DashboardHome", () => {
       homeWith({ goals: [], recently_remembered: [] }),
     );
 
-    renderWithQueries(<DashboardHome />);
+    renderWithQueries(<DashboardHome copy={seedCopy()} />);
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     expect(
@@ -278,7 +310,7 @@ describe("DashboardHome", () => {
       }),
     );
 
-    renderWithQueries(<DashboardHome />);
+    renderWithQueries(<DashboardHome copy={seedCopy()} />);
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     const note = screen.getByRole("status");
@@ -302,7 +334,7 @@ describe("DashboardHome", () => {
   it("says Memory is on while it is", async () => {
     apiClient.getHome.mockResolvedValue(homeWith());
 
-    renderWithQueries(<DashboardHome />);
+    renderWithQueries(<DashboardHome copy={seedCopy()} />);
 
     await screen.findByRole("heading", { name: "Good evening, Maya." });
     expect(screen.getByText("Memory is on.")).toBeInTheDocument();
@@ -312,7 +344,7 @@ describe("DashboardHome", () => {
   it("shows the AI notice and that Zeph doesn't count streaks", async () => {
     apiClient.getHome.mockResolvedValue(homeWith());
 
-    renderWithQueries(<DashboardHome />);
+    renderWithQueries(<DashboardHome copy={seedCopy()} />);
 
     expect(
       await screen.findByText(
@@ -328,7 +360,7 @@ describe("DashboardHome", () => {
     apiClient.getHome.mockRejectedValueOnce(new Error("down"));
     apiClient.getHome.mockResolvedValueOnce(homeWith());
 
-    renderWithQueries(<DashboardHome />);
+    renderWithQueries(<DashboardHome copy={seedCopy()} />);
 
     expect(
       await screen.findByText("We couldn’t load your Dashboard"),
@@ -337,5 +369,84 @@ describe("DashboardHome", () => {
     expect(
       await screen.findByRole("heading", { name: "Good evening, Maya." }),
     ).toBeInTheDocument();
+  });
+
+  it("words the page from an Admin's Copy, with live values filled in", async () => {
+    apiClient.getHome.mockResolvedValue(homeWith());
+    const copy: Copy = {
+      ...seedCopy(),
+      "home.hero.greeting_evening": "Hello again, {name}.",
+      "home.telegram.connected_as": "Linked to @{username}",
+      "home.goals.remembered": "Noted on {day}",
+    };
+
+    renderWithQueries(<DashboardHome copy={copy} />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Hello again, Maya." }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Linked to @maya_l")).toBeInTheDocument();
+    expect(screen.getByText("Noted on 2 Oct")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["Telegram connected with Check-ins on", homeWith()],
+    [
+      "Telegram not connected, nothing remembered, Check-ins paused",
+      homeWith({
+        telegram_connection: null,
+        last_conversation_at: null,
+        goals: [],
+        recently_remembered: [],
+        check_ins: checkInsWith({
+          paused: true,
+          paused_until: "2026-11-18T03:00:00Z",
+          pause_changed_in_chat_at: "2026-11-11T03:00:00Z",
+          last_sent: null,
+        }),
+      }),
+    ],
+    [
+      "Check-ins off",
+      homeWith({ check_ins: checkInsWith({ enabled: false }) }),
+    ],
+    [
+      "Check-ins not available",
+      homeWith({
+        telegram_connection: {
+          telegram_username: null,
+          connected_at: "2026-11-01T09:00:00Z",
+        },
+        check_ins: checkInsWith({ available: false }),
+      }),
+    ],
+  ])("shows only Copy text with %s", async (_state, home) => {
+    apiClient.getHome.mockResolvedValue(home);
+
+    const { container } = renderWithQueries(
+      <DashboardHome copy={markedCopy()} />,
+    );
+
+    await screen.findByRole("heading", {
+      name: "⟦home.hero.greeting_evening⟧",
+    });
+    expect(homeWordsNotFromCopy(container, notCopy)).toEqual([]);
+  });
+
+  it("shows only Copy text while loading and when Home can't load", async () => {
+    apiClient.getHome.mockRejectedValue(new Error("down"));
+
+    const { container } = renderWithQueries(
+      <DashboardHome copy={markedCopy()} />,
+    );
+
+    expect(
+      screen.getByRole("status", { name: "⟦home.loading⟧" }),
+    ).toBeInTheDocument();
+    expect(homeWordsNotFromCopy(container, [])).toEqual([]);
+    expect(
+      await screen.findByText("⟦home.load_failed.title⟧"),
+    ).toBeInTheDocument();
+    expect(homeWordsNotFromCopy(container, [])).toEqual([]);
   });
 });

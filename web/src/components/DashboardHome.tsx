@@ -14,6 +14,7 @@ import { PageHero } from "@/components/PageHero";
 import { PillLink } from "@/components/PillLink";
 import { RecentlyRemembered } from "@/components/RecentlyRemembered";
 import { currentTime } from "@/lib/clock";
+import { readCopy, type Copy } from "@/lib/copy";
 import { greeting, lastTalkedText } from "@/lib/home";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
@@ -24,11 +25,14 @@ const cardRow = "flex flex-wrap gap-6";
  * The Dashboard home: a greeting with when the User last talked with Zeph,
  * the Telegram and Check-ins cards, the Memory line, what the User is working
  * toward, what Zeph recently remembered, the Plan card (to build) and the AI
- * notice.
+ * notice. Every word is Copy, apart from the AI notice and the Memory note,
+ * which are Platform Settings.
  *
+ * @param props - `copy` is Home's Copy, read on the server.
  * @returns The page, loading panels, or an error with Try again.
  */
-export function DashboardHome() {
+export function DashboardHome({ copy }: { copy: Copy }) {
+  const text = (key: string) => readCopy(copy, `home.${key}`);
   const apiClient = useApiClient();
   const homeQuery = useQuery({
     queryKey: queryKeys.home,
@@ -42,8 +46,8 @@ export function DashboardHome() {
   if (homeQuery.isPending) {
     return (
       <>
-        <LoadingPanel shape="banner" label="Loading your Dashboard" />
-        <LoadingPanel shape="card" label="Loading your cards" />
+        <LoadingPanel shape="banner" label={text("loading")} />
+        <LoadingPanel shape="card" label={text("loading_cards")} />
       </>
     );
   }
@@ -51,8 +55,9 @@ export function DashboardHome() {
   if (!home) {
     return (
       <LoadFailed
-        title="We couldn’t load your Dashboard"
-        body="Something went wrong on our side. Zeph is still reachable in Telegram, and nothing you’ve shared is lost."
+        title={text("load_failed.title")}
+        body={text("load_failed.body")}
+        retryLabel={text("load_failed.retry")}
         onRetry={() => void homeQuery.refetch()}
       />
     );
@@ -62,14 +67,14 @@ export function DashboardHome() {
     <>
       <PageHero
         background="home"
-        eyebrow="Home"
-        title={greeting(home.name, now, timeZone)}
-        body={lastTalkedText(home.last_conversation_at, now, timeZone)}
+        eyebrow={text("hero.eyebrow")}
+        title={greeting(copy, home.name, now, timeZone)}
+        body={lastTalkedText(copy, home.last_conversation_at, now, timeZone)}
         actions={
           home.telegram_connection ? (
             <PillLink
               href={home.telegram_chat_url}
-              label="Talk to Zeph"
+              label={text("hero.talk_button")}
               primary
             />
           ) : null
@@ -77,12 +82,12 @@ export function DashboardHome() {
       />
       {home.telegram_connection ? null : (
         <AttentionCard
-          title="Zeph can’t reach you yet."
-          body="Conversations and check-ins happen in Telegram. Linking takes one tap."
+          title={text("not_connected.title")}
+          body={text("not_connected.body")}
           action={
             <PillLink
               href="/connect-telegram"
-              label="Connect Telegram"
+              label={text("not_connected.button")}
               primary
             />
           }
@@ -90,26 +95,26 @@ export function DashboardHome() {
       )}
       <div className={cardRow}>
         {home.telegram_connection ? (
-          <HomeTelegramCard connection={home.telegram_connection} />
+          <HomeTelegramCard copy={copy} connection={home.telegram_connection} />
         ) : null}
         <HomeCheckInsCard
+          copy={copy}
           checkIns={home.check_ins}
           now={now}
           timeZone={timeZone}
         />
       </div>
-      <HomeMemoryLine note={home.memory_note} />
+      <HomeMemoryLine copy={copy} note={home.memory_note} />
       <div className={`${cardRow} items-start`}>
-        <HomeGoals goals={home.goals} timeZone={timeZone} />
-        <RecentlyRemembered items={home.recently_remembered} />
+        <HomeGoals copy={copy} goals={home.goals} timeZone={timeZone} />
+        <RecentlyRemembered copy={copy} items={home.recently_remembered} />
       </div>
       <div className={cardRow}>
-        <HomePlanCard />
+        <HomePlanCard copy={copy} />
       </div>
       <footer className="flex flex-col gap-1.5 border-t border-line pt-5">
         <p className="m-0 max-w-[620px] text-[14px] text-soft">
-          Zeph doesn&apos;t count streaks or time spent. If you go quiet for a
-          while, that&apos;s fine. It&apos;ll be here when you&apos;re ready.
+          {text("footer.no_streaks")}
         </p>
         <p className="m-0 max-w-[620px] text-[12px] text-soft">
           {home.ai_notice}
