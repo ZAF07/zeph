@@ -79,4 +79,4 @@ PASS  M-HowItWorks  0.02% differs, height 3770 vs 3770
 ## Completion
 
 - Completed: 2026-11-19
-- Commit: <to be filled in after merge>
+- Commit: merge `e61ab0f` into main (branch `redesign-16-pricing-page`: `e1d4b93` public /pricing page and links, `d84ec46` code-review fix, `a4e9f51` evidence and archive)
