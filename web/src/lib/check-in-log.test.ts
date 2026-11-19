@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { CheckInLogEntry } from "@/lib/api-client";
-import { filterCheckInLog, summarizeCheckInLog } from "@/lib/check-in-log";
+import {
+  filterCheckInLog,
+  pausedReasonText,
+  summarizeCheckInLog,
+} from "@/lib/check-in-log";
 
 function entry(overrides: Partial<CheckInLogEntry>): CheckInLogEntry {
   return {
@@ -58,5 +62,21 @@ describe("Check-in log", () => {
     expect(
       filterCheckInLog(entries, "all", "REN@").map((item) => item.id),
     ).toEqual(["ren-sent"]);
+  });
+});
+
+describe("pausedReasonText", () => {
+  it("names the Ignore Threshold in words up to ten", () => {
+    expect(pausedReasonText(3)).toBe("Three in a row went unanswered");
+    expect(pausedReasonText(5)).toBe("Five in a row went unanswered");
+    expect(pausedReasonText(10)).toBe("Ten in a row went unanswered");
+  });
+
+  it("uses digits above ten", () => {
+    expect(pausedReasonText(12)).toBe("12 in a row went unanswered");
+  });
+
+  it("says the ignore rule paused it when the threshold isn't known", () => {
+    expect(pausedReasonText(null)).toBe("Paused by ignore rule");
   });
 });

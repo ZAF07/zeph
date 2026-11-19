@@ -15,6 +15,7 @@ import { TableEmpty } from "@/components/TableEmpty";
 import { TableLoading } from "@/components/TableLoading";
 import { TableNoMatches } from "@/components/TableNoMatches";
 import type {
+  AdminSettings,
   CheckInLogEntry,
   CheckInOutcome,
   CheckInStatus,
@@ -22,10 +23,12 @@ import type {
 import {
   type CheckInLogOutcomeFilter,
   filterCheckInLog,
+  pausedReasonText,
   summarizeCheckInLog,
 } from "@/lib/check-in-log";
 import { formatLoggedAt } from "@/lib/dates";
 import { queryKeys } from "@/lib/queries";
+import { useAdminSettings } from "@/lib/use-admin-settings";
 import { useApiClient } from "@/lib/use-api-client";
 
 const periods = [
@@ -56,13 +59,28 @@ const replyLabels: Record<CheckInStatus, string> = {
  * Says what the Check-in log shows in an entry's skip reason column.
  *
  * @param entry - The decision.
+ * @param ignoreThreshold - The Ignore Threshold setting; null when unknown.
  * @returns The skip reason, the ignore rule note, or a dash.
  */
-function reasonText(entry: CheckInLogEntry): string {
+function reasonText(
+  entry: CheckInLogEntry,
+  ignoreThreshold: number | null,
+): string {
   if (entry.outcome === "asked_about_fewer") {
-    return "Three in a row went unanswered";
+    return pausedReasonText(ignoreThreshold);
   }
   return entry.skip_reason ?? "—";
+}
+
+/**
+ * Reads the Ignore Threshold from the platform settings.
+ *
+ * @param settings - The settings, or undefined when they didn't load.
+ * @returns The threshold, or null when it isn't known.
+ */
+function ignoreThresholdOf(settings: AdminSettings | undefined): number | null {
+  const value = settings?.check_in_ignore_threshold?.value;
+  return typeof value === "number" ? value : null;
 }
 
 /**
@@ -88,45 +106,59 @@ function totalsOf(entries: CheckInLogEntry[]): StatTile[] {
   ];
 }
 
-const columns: TableColumn<CheckInLogEntry>[] = [
-  {
-    heading: "Time",
-    isMain: true,
-    cell: (entry) => formatLoggedAt(entry.decided_at),
-  },
-  {
-    heading: "User",
-    isMain: true,
-    cell: (entry) => entry.user_name ?? entry.user_email ?? "Unknown User",
-  },
-  {
-    heading: "Outcome",
-    cell: (entry) => (
-      <span className="inline-flex flex-col items-start gap-[3px]">
-        <StatusPill filled={entry.outcome === "sent"}>
-          {outcomeLabels[entry.outcome]}
-        </StatusPill>
-        {entry.requested_by ? (
-          <span className="text-[12px] text-soft">
-            Asked for by {entry.requested_by}
-          </span>
-        ) : null}
-        {entry.woven_in ? (
-          <span className="text-[12px] text-soft">Woven in</span>
-        ) : null}
-      </span>
-    ),
-  },
-  { heading: "Check-in Kind", cell: (entry) => entry.kind ?? "—" },
-  { heading: "Skip reason", cell: reasonText },
-  { heading: "Reply", cell: (entry) => replyLabels[entry.status] },
-];
+/**
+ * The Check-in log's columns, in the drawn order.
+ *
+ * @param ignoreThreshold - The Ignore Threshold setting; null when unknown.
+ * @returns The columns.
+ */
+function columnsFor(
+  ignoreThreshold: number | null,
+): TableColumn<CheckInLogEntry>[] {
+  return [
+    {
+      heading: "Time",
+      isMain: true,
+      cell: (entry) => formatLoggedAt(entry.decided_at),
+    },
+    {
+      heading: "User",
+      isMain: true,
+      cell: (entry) => entry.user_name ?? entry.user_email ?? "Unknown User",
+    },
+    {
+      heading: "Outcome",
+      cell: (entry) => (
+        <span className="inline-flex flex-col items-start gap-[3px]">
+          <StatusPill filled={entry.outcome === "sent"}>
+            {outcomeLabels[entry.outcome]}
+          </StatusPill>
+          {entry.requested_by ? (
+            <span className="text-[12px] text-soft">
+              Asked for by {entry.requested_by}
+            </span>
+          ) : null}
+          {entry.woven_in ? (
+            <span className="text-[12px] text-soft">Woven in</span>
+          ) : null}
+        </span>
+      ),
+    },
+    { heading: "Check-in Kind", cell: (entry) => entry.kind ?? "—" },
+    {
+      heading: "Skip reason",
+      cell: (entry) => reasonText(entry, ignoreThreshold),
+    },
+    { heading: "Reply", cell: (entry) => replyLabels[entry.status] },
+  ];
+}
 
 /**
  * The admin Check-in log: every decision the Check-ins service made — sent,
  * woven into a reply or not, skipped and why, or paused by the ignore rule —
  * with totals, and which Admin asked for one with Check in Now. Never the
- * message text. Built from the admin table template.
+ * message text. Paused rows name the Ignore Threshold from the platform
+ * settings. Built from the admin table template.
  *
  * @returns The totals, filters and table, or a loading, no-match, empty or
  *   error state in place of the table.
@@ -141,7 +173,10 @@ export function CheckInLog() {
     queryKey: queryKeys.checkInLog(Number(days)),
     queryFn: () => apiClient.listCheckInLog(Number(days)),
   });
-  const entries = logQuery.data;
+  const settingsQuery = useAdminSettings();
+  const isLoading =
+    !logQuery.isError && (logQuery.isPending || settingsQuery.isPending);
+  const entries = isLoading ? undefined : logQuery.data;
   const shown = entries ? filterCheckInLog(entries, outcome, userQuery) : [];
 
   return (
@@ -169,7 +204,7 @@ export function CheckInLog() {
         />
       </div>
 
-      {logQuery.isPending ? <TableLoading label="Loading log" /> : null}
+      {isLoading ? <TableLoading label="Loading log" /> : null}
 
       {!entries && logQuery.isError ? (
         <LoadFailed
@@ -192,7 +227,7 @@ export function CheckInLog() {
 
       {shown.length > 0 ? (
         <DataTable
-          columns={columns}
+          columns={columnsFor(ignoreThresholdOf(settingsQuery.data))}
           rows={shown}
           rowKey={(entry) => entry.id}
           noMessageContent
