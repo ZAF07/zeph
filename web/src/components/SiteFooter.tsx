@@ -28,7 +28,7 @@ const footerColumns: { title: string; links: SiteLink[] }[] = [
 ];
 
 /**
- * The footer on Landing and How It Works: the wordmark and a line, the
+ * The footer on the public pages: the wordmark and a line, the
  * Product, Follow and Legal links, the copyright and the AI notice.
  *
  * @returns The footer.
