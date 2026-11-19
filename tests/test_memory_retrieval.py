@@ -1,3 +1,4 @@
+from datetime import timedelta
 from typing import Any
 
 from fastapi.testclient import TestClient
@@ -97,6 +98,7 @@ def test_only_the_newest_conversation_summaries_reach_the_reply(
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
     for number in range(1, 5):
+        clock.advance(timedelta(days=1))
         have_conversation(
             client,
             chat_model,

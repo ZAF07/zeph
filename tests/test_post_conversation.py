@@ -95,9 +95,7 @@ def test_conversation_ends_after_the_quiet_gap_and_is_processed_once(
     scheduler.tick()
 
     assert len(chat_model.processing_calls) == 1
-    [summary] = client.get("/api/conversation-summaries", headers=headers).json()[
-        "summaries"
-    ]
+    [summary] = client.get("/api/day-summaries", headers=headers).json()["summaries"]
     assert summary["summary"] == "Shared that they started a new job in design."
     assert summary["mood"] == "excited, a bit nervous"
     assert memory_contents(client, headers) == {
@@ -201,7 +199,7 @@ def test_with_user_memory_off_nothing_is_saved_and_chat_still_works(
 
     assert chat_channel.texts_sent_to(5551001)[-1] == "sounds lovely"
     assert len(chat_model.processing_calls) == 1
-    summaries = client.get("/api/conversation-summaries", headers=headers).json()
+    summaries = client.get("/api/day-summaries", headers=headers).json()
     assert len(summaries["summaries"]) == 1
     assert memory_contents(client, headers) == {"What helps": ["Swims"]}
 
@@ -239,11 +237,8 @@ def test_a_message_after_a_conversation_ended_starts_a_new_one(
 
     assert chat_model.calls[1].history[-1].text == "back again"
     assert len(chat_model.calls[1].history) == 1
-    summaries = client.get("/api/conversation-summaries", headers=headers).json()
-    assert [entry["summary"] for entry in summaries["summaries"]] == [
-        "Came back.",
-        "Said hi.",
-    ]
+    summaries = client.get("/api/day-summaries", headers=headers).json()
+    assert [entry["summary"] for entry in summaries["summaries"]] == ["Came back."]
 
 
 def test_processing_that_fails_is_tried_again_on_the_next_tick(
@@ -266,14 +261,12 @@ def test_processing_that_fails_is_tried_again_on_the_next_tick(
         "hi",
         TimeoutError("DeepSeek timed out"),
     )
-    assert client.get("/api/conversation-summaries", headers=headers).json() == {
-        "summaries": []
-    }
+    assert client.get("/api/day-summaries", headers=headers).json() == {"summaries": []}
 
     chat_model.script_processing(processing_answer(summary="Said hi."))
     scheduler.tick()
 
-    summaries = client.get("/api/conversation-summaries", headers=headers).json()
+    summaries = client.get("/api/day-summaries", headers=headers).json()
     assert [entry["summary"] for entry in summaries["summaries"]] == ["Said hi."]
 
 
@@ -301,7 +294,7 @@ def test_an_unreadable_answer_is_asked_again_once(
     )
 
     assert len(chat_model.processing_calls) == 2
-    summaries = client.get("/api/conversation-summaries", headers=headers).json()
+    summaries = client.get("/api/day-summaries", headers=headers).json()
     assert [entry["summary"] for entry in summaries["summaries"]] == ["Said hi."]
 
 
@@ -431,8 +424,7 @@ def test_a_message_caught_by_the_tick_joins_a_new_conversation(
     assert "my boss yelled at me" not in first_processed.history[0].text
     assert "my boss yelled at me" in second_processed.history[0].text
     assert "oh no, what happened?" in second_processed.history[0].text
-    summaries = client.get("/api/conversation-summaries", headers=headers).json()
+    summaries = client.get("/api/day-summaries", headers=headers).json()
     assert [entry["summary"] for entry in summaries["summaries"]] == [
-        "Boss yelled at them.",
-        "Had a long day.",
+        "Boss yelled at them."
     ]

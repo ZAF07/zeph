@@ -314,9 +314,7 @@ def describe_message_for_understanding(
     category_lines = "\n".join(
         f"- {category.name}: {category.description}" for category in saved.pickable
     )
-    summary_lines = "\n".join(
-        summary_line(summary, snapshot.user.time_zone) for summary in saved.summaries
-    )
+    summary_lines = "\n".join(summary_line(summary) for summary in saved.summaries)
     earlier_lines = "\n".join(
         format_earlier_understanding(understanding) for understanding in earlier
     )
@@ -336,7 +334,7 @@ def describe_message_for_understanding(
         f"Their User Portrait:\n{saved.portrait or 'Not written yet.'}\n\n"
         f"Their Goals:\n{goal_lines or 'None saved.'}\n\n"
         f"Memory Categories with something saved:\n{category_lines or 'None yet.'}"
-        f"\n\nRecent Conversations, newest first:\n{summary_lines or 'None yet.'}"
+        f"\n\nRecent days, newest first:\n{summary_lines or 'None yet.'}"
         f"\n\nLife Threads this reminds you of, open ones first:\n"
         f"{describe_reminded_threads(reminded, snapshot.user.time_zone)}"
         f"\n\nThings you've been wondering about them, whose time has come "

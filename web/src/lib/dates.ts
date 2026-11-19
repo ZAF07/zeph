@@ -108,6 +108,17 @@ export function formatLongDay(isoTimestamp: string, timeZone?: string): string {
 }
 
 /**
+ * Writes a calendar day like "2 Oct", as Day Summaries show it. The day is
+ * already the User's own, so no time zone moves it.
+ *
+ * @param isoDate - The day, as the backend sends it, like "2026-10-02".
+ * @returns The day and month.
+ */
+export function formatShortCalendarDay(isoDate: string): string {
+  return formatShortDay(`${isoDate}T00:00:00Z`, "UTC");
+}
+
+/**
  * Writes a short day like "2 Oct", as memory sources show it.
  *
  * @param isoTimestamp - The moment, as the backend sends it.

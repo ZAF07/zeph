@@ -22,7 +22,7 @@ def delete_user_data(repositories: Repositories, user_id: UUID) -> None:
     """Delete a User's data in one transaction, keeping their account.
 
     Their Conversations and messages, Model Call Log entries, Memory Items,
-    Conversation Summaries, Shared Photos, Life Threads, Move Outcomes,
+    Day Summaries, Shared Photos, Life Threads, Move Outcomes,
     Curiosities, User Portrait, Personal Stickers, Check-in history,
     connection tokens and Telegram Connection go. Their profile, settings,
     Usage, Safeguard Events and Feature Switches stay.

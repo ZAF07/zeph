@@ -586,7 +586,7 @@ def test_a_failing_thread_keeper_still_saves_the_summary_and_is_not_retried(
     )
     scheduler.tick()
 
-    summaries = client.get("/api/conversation-summaries", headers=headers).json()
+    summaries = client.get("/api/day-summaries", headers=headers).json()
     assert [item["summary"] for item in summaries["summaries"]] == [
         "Fell out with Mei."
     ]

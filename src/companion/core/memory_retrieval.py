@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 from companion.core.models import (
-    ConversationSummary,
+    DaySummary,
     Feature,
     MemoryCategory,
     MemoryItem,
@@ -111,19 +111,18 @@ def format_time(moment: datetime, time_zone: str | None) -> str:
     return f"{local:%H:%M}"
 
 
-def summary_line(summary: ConversationSummary, time_zone: str | None) -> str:
-    """Write one Conversation Summary as the reply's memory section lists it.
+def summary_line(summary: DaySummary) -> str:
+    """Write one Day Summary as the reply's memory section lists it.
 
     Args:
-        summary: The Conversation Summary.
-        time_zone: The User's IANA time zone, for the day it was written.
+        summary: The Day Summary.
 
     Returns:
         E.g. "- 9 Nov 2026: Talked about a new job. They seemed excited.
         Suggested a walk; they said it helped."
     """
     line = (
-        f"- {format_day(summary.created_at, time_zone)}: {summary.summary} "
+        f"- {summary.day.day} {summary.day:%b %Y}: {summary.summary} "
         f"They seemed {summary.mood}."
     )
     return f"{line} {summary.offered}" if summary.offered else line
@@ -155,11 +154,11 @@ def format_items_by_category(
 def format_memory(
     categories: list[MemoryCategory],
     items: list[MemoryItem],
-    summaries: list[ConversationSummary],
+    summaries: list[DaySummary],
     time_zone: str | None,
     intro: str,
     shared_photos: Sequence[SharedPhoto] = (),
-    older_summaries: Sequence[ConversationSummary] = (),
+    older_summaries: Sequence[DaySummary] = (),
     portrait: str = "",
 ) -> str:
     """Write the User Memory part of the reply instructions.
@@ -168,10 +167,10 @@ def format_memory(
         intro: The Admin-set line that tells the model how to use memories.
         categories: The Memory Categories whose items go in, in order.
         items: The User's Memory Items.
-        summaries: The newest Conversation Summaries, newest first.
+        summaries: The newest Day Summaries, newest first.
         time_zone: The User's IANA time zone, for the days.
         shared_photos: The Shared Photos that matter for the message.
-        older_summaries: Older Conversation Summaries found by meaning,
+        older_summaries: Older Day Summaries found by meaning,
             closest first.
         portrait: The User Portrait; "" if they have none.
 
@@ -182,15 +181,11 @@ def format_memory(
     sections = [f"Who they are:\n{portrait}"] if portrait else []
     sections.extend(format_items_by_category(categories, items))
     if summaries:
-        summary_lines = [summary_line(summary, time_zone) for summary in summaries]
-        sections.append(
-            "Recent Conversations, newest first:\n" + "\n".join(summary_lines)
-        )
+        summary_lines = [summary_line(summary) for summary in summaries]
+        sections.append("Recent days, newest first:\n" + "\n".join(summary_lines))
     if older_summaries:
-        older_lines = [summary_line(summary, time_zone) for summary in older_summaries]
-        sections.append(
-            "Older Conversations that may matter:\n" + "\n".join(older_lines)
-        )
+        older_lines = [summary_line(summary) for summary in older_summaries]
+        sections.append("Older days that may matter:\n" + "\n".join(older_lines))
     if shared_photos:
         photo_lines = [shared_photo_line(photo, time_zone) for photo in shared_photos]
         sections.append(
@@ -208,7 +203,7 @@ class SavedMemory:
     Attributes:
         categories: The active Memory Categories, in order.
         items: The User's Memory Items.
-        summaries: The newest Conversation Summaries, newest first.
+        summaries: The newest Day Summaries, newest first.
         shared_photos: The User's Shared Photos; empty when Photo Viewing
             doesn't work for them.
         pickable: The categories the Understanding may pick: active ones
@@ -219,7 +214,7 @@ class SavedMemory:
 
     categories: list[MemoryCategory]
     items: list[MemoryItem]
-    summaries: list[ConversationSummary]
+    summaries: list[DaySummary]
     shared_photos: list[SharedPhoto]
     pickable: list[MemoryCategory]
     portrait: str = ""
@@ -314,7 +309,7 @@ class MemoryRetrieval:
 
         The User Portrait goes first. Memory Items from every "always include"
         category go in, plus those from the categories the Understanding
-        picked, plus the newest Conversation Summaries, plus older Summaries
+        picked, plus the newest Day Summaries, plus older Summaries
         found by meaning. All the User's Shared Photos go in when the
         Understanding picked "Shared Photos". A picked name that isn't one of
         the pickable categories is ignored.
@@ -367,7 +362,7 @@ class MemoryRetrieval:
         snapshot: UserSnapshot,
         saved: SavedMemory,
         look_up_past: Sequence[str],
-    ) -> list[ConversationSummary]:
+    ) -> list[DaySummary]:
         """Find the User's older Summaries closest in meaning to the phrases.
 
         Only the User's own Summaries are searched, leaving out the newest
@@ -396,5 +391,5 @@ class MemoryRetrieval:
                 leave_out=[summary.id for summary in saved.summaries],
             )
         except Exception:
-            logger.exception("Could not search older Conversation Summaries")
+            logger.exception("Could not search older Day Summaries")
             return []

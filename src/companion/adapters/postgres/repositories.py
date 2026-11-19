@@ -31,11 +31,11 @@ from companion.adapters.postgres.tables import (
     check_ins,
     connection_tokens,
     conversation_messages,
-    conversation_summaries,
     conversations,
     copy_slots,
     curiosities,
     daily_usage,
+    day_summaries,
     feature_switches,
     helplines,
     knowledge_documents,
@@ -81,7 +81,6 @@ from companion.core.models import (
     ConnectionToken,
     Conversation,
     ConversationMessage,
-    ConversationSummary,
     CopySeedSlot,
     CopySlot,
     Curiosity,
@@ -90,6 +89,7 @@ from companion.core.models import (
     CuriosityState,
     CuriosityToRaise,
     DailyUsage,
+    DaySummary,
     Feature,
     FeatureSwitch,
     HeldBack,
@@ -590,27 +590,25 @@ def _memory_item_values(item: MemoryItem) -> dict[str, Any]:
     }
 
 
-SUMMARY_COLUMNS = [
-    column for column in conversation_summaries.c if column.name != "embedding"
-]
+SUMMARY_COLUMNS = [column for column in day_summaries.c if column.name != "embedding"]
 
 
-def _to_summary(row: Row[Any]) -> ConversationSummary:
-    """Turn a `conversation_summaries` row into a ConversationSummary.
+def _to_summary(row: Row[Any]) -> DaySummary:
+    """Turn a `day_summaries` row into a DaySummary.
 
     Args:
         row: The database row.
 
     Returns:
-        The Conversation Summary.
+        The Day Summary.
     """
-    return ConversationSummary(
+    return DaySummary(
         id=row.id,
-        conversation_id=row.conversation_id,
         user_id=row.user_id,
+        day=row.day,
         summary=row.summary,
         mood=row.mood,
-        created_at=row.created_at,
+        written_at=row.written_at,
         offered=row.offered,
     )
 
@@ -1375,6 +1373,31 @@ class PostgresConversationRepository:
                 .order_by(conversation_messages.c.position)
             ).all()
         return [_to_message(row) for row in rows]
+
+    def list_started_between(
+        self, user_id: UUID, start: datetime, end: datetime
+    ) -> list[Conversation]:
+        """List a User's Conversations that started in a span of time.
+
+        Args:
+            user_id: The User's ID.
+            start: The earliest start, included.
+            end: The latest start, left out.
+
+        Returns:
+            The Conversations, oldest first.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(conversations)
+                .where(
+                    conversations.c.user_id == user_id,
+                    conversations.c.started_at >= start,
+                    conversations.c.started_at < end,
+                )
+                .order_by(conversations.c.started_at)
+            ).all()
+        return [_to_conversation(row) for row in rows]
 
     def end_quiet(self, quiet_since: datetime, ended_at: datetime) -> None:
         """End every open Conversation with no message since a given time.
@@ -3090,7 +3113,7 @@ class PostgresCuriosityRepository:
 
 
 class PostgresUserMemoryRepository:
-    """Stores Memory Items, Conversation Summaries and Shared Photos in Postgres."""
+    """Stores Memory Items, Day Summaries and Shared Photos in Postgres."""
 
     def __init__(self, database: Database) -> None:
         """Set up the repository.
@@ -3169,20 +3192,20 @@ class PostgresUserMemoryRepository:
 
     def list_summaries(
         self, user_id: UUID, limit: int | None = None
-    ) -> list[ConversationSummary]:
-        """List a User's Conversation Summaries, newest first.
+    ) -> list[DaySummary]:
+        """List a User's Day Summaries, newest day first.
 
         Args:
             user_id: The User's ID.
             limit: The most to return; None for all of them.
 
         Returns:
-            The Conversation Summaries.
+            The Day Summaries.
         """
         statement = (
             select(*SUMMARY_COLUMNS)
-            .where(conversation_summaries.c.user_id == user_id)
-            .order_by(conversation_summaries.c.created_at.desc())
+            .where(day_summaries.c.user_id == user_id)
+            .order_by(day_summaries.c.day.desc())
             .limit(limit)
         )
         with self._database.connect() as connection:
@@ -3196,8 +3219,8 @@ class PostgresUserMemoryRepository:
         min_closeness: float,
         limit: int,
         leave_out: Sequence[UUID],
-    ) -> list[ConversationSummary]:
-        """Find a User's Conversation Summaries closest in meaning to any search.
+    ) -> list[DaySummary]:
+        """Find a User's Day Summaries closest in meaning to any search.
 
         Closeness is cosine similarity. Summaries with no embedding are never
         found.
@@ -3217,16 +3240,16 @@ class PostgresUserMemoryRepository:
             return []
         distance = func.least(
             *(
-                conversation_summaries.c.embedding.cosine_distance(embedding)
+                day_summaries.c.embedding.cosine_distance(embedding)
                 for embedding in embeddings
             )
         )
         statement = (
             select(*SUMMARY_COLUMNS)
             .where(
-                conversation_summaries.c.user_id == user_id,
-                conversation_summaries.c.embedding.is_not(None),
-                conversation_summaries.c.id.not_in(leave_out),
+                day_summaries.c.user_id == user_id,
+                day_summaries.c.embedding.is_not(None),
+                day_summaries.c.id.not_in(leave_out),
                 distance <= 1 - min_closeness,
             )
             .order_by(distance)
@@ -3237,23 +3260,23 @@ class PostgresUserMemoryRepository:
         return [_to_summary(row) for row in rows]
 
     def delete_summary(self, user_id: UUID, summary_id: UUID) -> bool:
-        """Delete one of a User's Conversation Summaries.
+        """Delete one of a User's Day Summaries.
 
         Args:
             user_id: The User's ID.
-            summary_id: The Conversation Summary's ID.
+            summary_id: The Day Summary's ID.
 
         Returns:
             True if it was deleted; False if the User has no such summary.
         """
         with self._database.begin() as connection:
             deleted = connection.execute(
-                delete(conversation_summaries)
+                delete(day_summaries)
                 .where(
-                    conversation_summaries.c.user_id == user_id,
-                    conversation_summaries.c.id == summary_id,
+                    day_summaries.c.user_id == user_id,
+                    day_summaries.c.id == summary_id,
                 )
-                .returning(conversation_summaries.c.id)
+                .returning(day_summaries.c.id)
             ).first()
         return deleted is not None
 
@@ -3261,19 +3284,21 @@ class PostgresUserMemoryRepository:
         self,
         conversation_id: UUID,
         processed_at: datetime,
-        summary: ConversationSummary | None,
+        summary: DaySummary | None,
         changes: MemoryChanges,
         summary_embedding: list[float] | None = None,
     ) -> None:
         """Save what processing an ended Conversation produced, in one step.
 
         The Conversation is marked processed at the same time, so it is
-        never processed twice.
+        never processed twice. The Day Summary replaces the one already
+        kept for the User's day, keeping its ID.
 
         Args:
             conversation_id: The Conversation that was processed.
             processed_at: When processing finished.
-            summary: Its Conversation Summary; None when nothing is saved.
+            summary: The rewritten Day Summary of the day the Conversation
+                started; None when nothing is saved.
             changes: The changes to the User's Memory Items and the new
                 Shared Photos.
             summary_embedding: The Summary's embedding, so it can be found
@@ -3281,16 +3306,24 @@ class PostgresUserMemoryRepository:
         """
         with self._database.begin() as connection:
             if summary is not None:
+                rewritten = {
+                    "summary": summary.summary,
+                    "mood": summary.mood,
+                    "written_at": summary.written_at,
+                    "embedding": summary_embedding,
+                    "offered": summary.offered,
+                }
                 connection.execute(
-                    insert(conversation_summaries).values(
+                    insert(day_summaries)
+                    .values(
                         id=summary.id,
-                        conversation_id=summary.conversation_id,
                         user_id=summary.user_id,
-                        summary=summary.summary,
-                        mood=summary.mood,
-                        created_at=summary.created_at,
-                        embedding=summary_embedding,
-                        offered=summary.offered,
+                        day=summary.day,
+                        **rewritten,
+                    )
+                    .on_conflict_do_update(
+                        index_elements=[day_summaries.c.user_id, day_summaries.c.day],
+                        set_=rewritten,
                     )
                 )
             if changes.added:
@@ -3404,7 +3437,7 @@ class PostgresUserMemoryRepository:
         return deleted is not None
 
     def delete_for_user(self, user_id: UUID) -> None:
-        """Delete a User's Memory Items, Conversation Summaries and Shared Photos.
+        """Delete a User's Memory Items, Day Summaries and Shared Photos.
 
         Args:
             user_id: The User's ID.
@@ -3414,9 +3447,7 @@ class PostgresUserMemoryRepository:
                 delete(memory_items).where(memory_items.c.user_id == user_id)
             )
             connection.execute(
-                delete(conversation_summaries).where(
-                    conversation_summaries.c.user_id == user_id
-                )
+                delete(day_summaries).where(day_summaries.c.user_id == user_id)
             )
             connection.execute(
                 delete(shared_photos).where(shared_photos.c.user_id == user_id)

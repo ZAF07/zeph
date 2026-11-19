@@ -1,7 +1,7 @@
 import json
 import logging
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -15,7 +15,7 @@ from companion.core.models import (
     ChatRole,
     Conversation,
     ConversationMessage,
-    ConversationSummary,
+    DaySummary,
     Feature,
     MemoryCategory,
     MemoryChanges,
@@ -37,6 +37,7 @@ from companion.core.platform_settings import (
     MEMORY_PROCESSING_THINKING,
 )
 from companion.core.ports import Clock, Embedder, Repositories
+from companion.core.timing import day_span, users_today
 from companion.core.transcripts import to_transcript_lines
 from companion.core.usage import UsageRecordingChatModel
 from companion.core.user_portrait import PortraitWriter
@@ -52,8 +53,8 @@ class ProcessingAnswer:
     """What the post-conversation processing model said about a Conversation.
 
     Attributes:
-        summary: What was talked about.
-        mood: How the User seemed, as an arc when it moved.
+        summary: The day's Day Summary: what happened and how it felt.
+        mood: How the User seemed through the day, as an arc when it moved.
         offered: What the Companion offered and how it landed; "" if
             nothing.
         operations: The add, update and remove operations, as the model
@@ -80,6 +81,19 @@ class SentPhoto:
 
     photo: ChannelPhoto
     sent_at: datetime
+
+
+@dataclass(frozen=True)
+class EarlierConversation:
+    """A Conversation that started earlier on the same day, for its Day Summary.
+
+    Attributes:
+        started_at: When it started.
+        messages: Its messages, oldest first.
+    """
+
+    started_at: datetime
+    messages: list[ConversationMessage]
 
 
 @dataclass(frozen=True)
@@ -324,12 +338,36 @@ def describe_moods(understandings: list[Understanding], time_zone: str | None) -
     )
 
 
+def describe_earlier_conversations(
+    earlier: list[EarlierConversation], time_zone: str | None
+) -> str:
+    """Write the day's earlier Conversations, each under the time it started.
+
+    Args:
+        earlier: The day's earlier Conversations, oldest first.
+        time_zone: The User's IANA time zone, for the times.
+
+    Returns:
+        One block per Conversation, its start time ("From 09:10:") above
+        its transcript; "None." if there are none.
+    """
+    return (
+        "\n\n".join(
+            f"From {format_time(conversation.started_at, time_zone)}:\n"
+            f"{to_transcript_lines(conversation.messages)}"
+            for conversation in earlier
+        )
+        or "None."
+    )
+
+
 def describe_conversation(
     messages: list[ConversationMessage],
     categories: list[MemoryCategory],
     items_by_number: dict[int, MemoryItem],
     photos_by_number: dict[int, SentPhoto],
     moods: str,
+    earlier_today: str = "None.",
 ) -> str:
     """Write what the post-conversation processing model is given.
 
@@ -339,13 +377,15 @@ def describe_conversation(
         items_by_number: The User's current Memory Items, by number.
         photos_by_number: The photos the User sent that were viewed, by
             number.
-        moods: How the Companion read their mood at each Message, from
-            `describe_moods`.
+        moods: How the Companion read their mood at each Message that day,
+            from `describe_moods`.
+        earlier_today: The day's earlier Conversations, from
+            `describe_earlier_conversations`.
 
     Returns:
         The Memory Categories new items may go in, what is already
-        remembered, the photos the User sent, how they seemed through it,
-        and the Conversation.
+        remembered, the photos the User sent, how they seemed through the
+        day, the day's earlier Conversations and the one that just ended.
     """
     category_names = {category.id: category.name for category in categories}
     category_lines = "\n".join(
@@ -365,17 +405,22 @@ def describe_conversation(
         f"Memory Categories:\n{category_lines}\n\n"
         f"What is remembered now:\n{item_lines or 'Nothing yet.'}\n\n"
         f"Photos the person sent:\n{photo_lines or 'None.'}\n\n"
-        f"How Zeph read their mood at each message:\n{moods or 'Not read.'}\n\n"
-        f"The Conversation:\n{to_transcript_lines(messages)}"
+        f"How Zeph read their mood at each message today:\n"
+        f"{moods or 'Not read.'}\n\n"
+        f"Earlier today, for the Day Summary only:\n{earlier_today}\n\n"
+        f"The Conversation that just ended:\n{to_transcript_lines(messages)}"
     )
 
 
 class PostConversationProcessor:
-    """Sums up each ended Conversation and updates the User's User Memory.
+    """Rewrites the Day Summary when a Conversation ends and updates User Memory.
 
-    It changes their Memory Items, keeps the photos that matter to them as
-    Shared Photos, updates their Life Threads, keeps their Curiosities and
-    Move Outcomes and then rewrites their User Portrait. Each Summary records
+    The Day Summary of the day the Conversation started is rewritten from
+    all of that day's messages; everything else is learned from the
+    Conversation that ended only, so nothing is learned twice. It changes
+    their Memory Items, keeps the photos that matter to them as Shared
+    Photos, updates their Life Threads, keeps their Curiosities and Move
+    Outcomes and then rewrites their User Portrait. Each Day Summary records
     how their mood moved and what the Companion offered and how it landed,
     and is embedded, so it can be found by meaning however old it is.
     Separately from User Memory, it keeps the User's Personal Stickers.
@@ -430,15 +475,15 @@ class PostConversationProcessor:
         Personal Stickers are kept first, whatever User Memory says; if that
         fails, the failure is logged and processing goes on. Nothing more is
         saved when User Memory doesn't work for the User, and no photo is
-        kept when Photo Viewing doesn't. One model call gives the
-        summary, the operations and the photos to keep as Shared Photos; an
-        unreadable answer is asked again once, and if it is still unreadable
-        nothing is saved, so a bad answer is never retried forever. Once the
-        Conversation is marked processed, its Life Threads are kept, then its
-        Curiosities while the Curiosities Feature works, then its Move
-        Outcomes, and then the User Portrait is rewritten; if any of them
-        fails, the failure is logged and not tried again, so nothing is ever
-        added twice.
+        kept when Photo Viewing doesn't. One model call, given all of the
+        day's messages, gives the day's rewritten Day Summary, the operations
+        and the photos to keep as Shared Photos; an unreadable answer is asked
+        again once, and if it is still unreadable nothing is saved, so a bad
+        answer is never retried forever. Once the Conversation is marked
+        processed, its Life Threads are kept, then its Curiosities while the
+        Curiosities Feature works, then its Move Outcomes, and then the User
+        Portrait is rewritten; if any of them fails, the failure is logged and
+        not tried again, so nothing is ever added twice.
 
         Args:
             conversation: The ended Conversation.
@@ -468,14 +513,41 @@ class PostConversationProcessor:
             if snapshot.works(Feature.PHOTO_VIEWING)
             else {}
         )
-        moods = describe_moods(
-            self._repositories.understandings.list_for_conversation(conversation.id),
-            snapshot.user.time_zone,
+        time_zone = snapshot.user.time_zone
+        day = users_today(time_zone, conversation.started_at)
+        days_conversations = self._repositories.conversations.list_started_between(
+            user_id, *day_span(day, time_zone)
         )
+        understandings = self._repositories.understandings
+        moods = describe_moods(
+            [
+                understanding
+                for days_conversation in days_conversations
+                for understanding in understandings.list_for_conversation(
+                    days_conversation.id
+                )
+            ],
+            time_zone,
+        )
+        earlier = [
+            EarlierConversation(
+                started_at=days_conversation.started_at,
+                messages=self._repositories.conversations.list_messages(
+                    days_conversation.id
+                ),
+            )
+            for days_conversation in days_conversations
+            if days_conversation.id != conversation.id
+        ]
         answer = self._ask(
             snapshot,
             describe_conversation(
-                messages, categories, items_by_number, photos_by_number, moods
+                messages,
+                categories,
+                items_by_number,
+                photos_by_number,
+                moods,
+                describe_earlier_conversations(earlier, time_zone),
             ),
         )
         if answer is None:
@@ -487,6 +559,7 @@ class PostConversationProcessor:
             self._save_memory(
                 snapshot,
                 conversation,
+                day,
                 answer,
                 categories,
                 items_by_number,
@@ -502,16 +575,18 @@ class PostConversationProcessor:
         self,
         snapshot: UserSnapshot,
         conversation: Conversation,
+        day: date,
         answer: ProcessingAnswer,
         categories: list[MemoryCategory],
         items_by_number: dict[int, MemoryItem],
         photos_by_number: dict[int, SentPhoto],
     ) -> None:
-        """Save the Summary, Memory Item changes and Shared Photos; mark it processed.
+        """Save the Day Summary, Memory Item changes and Shared Photos; mark processed.
 
         Args:
             snapshot: The User whose Conversation it was.
             conversation: The ended Conversation.
+            day: The day it started, in the User's time zone.
             answer: What the model said about it.
             categories: Every Memory Category, archived ones included.
             items_by_number: The User's Memory Items, by the number shown.
@@ -539,13 +614,13 @@ class PostConversationProcessor:
                 answer.photos_to_keep, photos_by_number, user_id, conversation.id
             ),
         )
-        summary = ConversationSummary(
+        summary = DaySummary(
             id=uuid4(),
-            conversation_id=conversation.id,
             user_id=user_id,
+            day=day,
             summary=answer.summary,
             mood=answer.mood,
-            created_at=now,
+            written_at=now,
             offered=answer.offered,
         )
         self._repositories.user_memory.save_processed_conversation(
@@ -617,11 +692,11 @@ class PostConversationProcessor:
         except Exception:
             logger.exception("Could not keep Move Outcomes")
 
-    def _embed(self, summary: ConversationSummary) -> list[float] | None:
-        """Embed a Summary, logging a failure instead of raising.
+    def _embed(self, summary: DaySummary) -> list[float] | None:
+        """Embed a Day Summary, logging a failure instead of raising.
 
         Args:
-            summary: The Summary.
+            summary: The Day Summary.
 
         Returns:
             Its embedding; None if embedding failed, so the Summary is still
@@ -630,7 +705,7 @@ class PostConversationProcessor:
         try:
             [embedding] = self._embedder.embed_passages([summary.summary])
         except Exception:
-            logger.exception("Could not embed the Conversation Summary")
+            logger.exception("Could not embed the Day Summary")
             return None
         return embedding
 

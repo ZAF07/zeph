@@ -393,13 +393,14 @@ export type Home = {
   recently_remembered: RememberedItem[];
 };
 
-/** A short account of one Conversation, how the User seemed and what Zeph offered. */
-export type ConversationSummary = {
+/** An account of one of the User's days, how they seemed and what Zeph offered. */
+export type DaySummary = {
   id: string;
+  day: string;
   summary: string;
   mood: string;
   offered: string;
-  created_at: string;
+  written_at: string;
 };
 
 /** Zeph's short picture of the User: who they are and what helps them. */
@@ -1169,8 +1170,8 @@ export type ApiClient = {
   listMemoryGroups: () => Promise<MemoryGroup[]>;
   deleteMemoryItem: (id: string) => Promise<void>;
   deleteAllMemoryItems: () => Promise<void>;
-  listConversationSummaries: () => Promise<ConversationSummary[]>;
-  deleteConversationSummary: (id: string) => Promise<void>;
+  listDaySummaries: () => Promise<DaySummary[]>;
+  deleteDaySummary: (id: string) => Promise<void>;
   listLifeThreads: () => Promise<LifeThread[]>;
   deleteLifeThread: (id: string) => Promise<void>;
   listMoveOutcomes: () => Promise<MoveOutcome[]>;
@@ -1458,14 +1459,11 @@ export function createApiClient(
     deleteMemoryItem: (id) =>
       request<void>(`/api/memory-items/${id}`, "DELETE"),
     deleteAllMemoryItems: () => request<void>("/api/memory-items", "DELETE"),
-    listConversationSummaries: async () =>
-      (
-        await request<{ summaries: ConversationSummary[] }>(
-          "/api/conversation-summaries",
-        )
-      ).summaries,
-    deleteConversationSummary: (id) =>
-      request<void>(`/api/conversation-summaries/${id}`, "DELETE"),
+    listDaySummaries: async () =>
+      (await request<{ summaries: DaySummary[] }>("/api/day-summaries"))
+        .summaries,
+    deleteDaySummary: (id) =>
+      request<void>(`/api/day-summaries/${id}`, "DELETE"),
     listLifeThreads: async () =>
       (await request<{ threads: LifeThread[] }>("/api/life-threads")).threads,
     deleteLifeThread: (id) =>

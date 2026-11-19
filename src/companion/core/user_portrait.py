@@ -12,7 +12,7 @@ from companion.core.model_call_log import start_trace
 from companion.core.models import (
     ChatLine,
     ChatRole,
-    ConversationSummary,
+    DaySummary,
     LifeThread,
     MemoryCategory,
     MemoryItem,
@@ -43,7 +43,7 @@ def describe_user_memory(
     items: Sequence[MemoryItem],
     threads: Sequence[LifeThread],
     move_outcomes: Sequence[MoveOutcome],
-    summaries: Sequence[ConversationSummary],
+    summaries: Sequence[DaySummary],
     now: datetime,
     time_zone: str | None,
 ) -> str:
@@ -54,7 +54,7 @@ def describe_user_memory(
         items: The User's Memory Items.
         threads: The User's Life Threads, open first.
         move_outcomes: The User's Move Outcomes, newest first.
-        summaries: Their newest Conversation Summaries, newest first.
+        summaries: Their newest Day Summaries, newest first.
         now: The current time.
         time_zone: The User's IANA time zone, for the days.
 
@@ -69,14 +69,14 @@ def describe_user_memory(
     outcome_lines = "\n".join(
         f"- {describe_move_outcome(outcome, time_zone)}" for outcome in move_outcomes
     )
-    summary_lines = "\n".join(summary_line(summary, time_zone) for summary in summaries)
+    summary_lines = "\n".join(summary_line(summary) for summary in summaries)
     item_text = "\n\n".join(item_sections)
     return (
         f"Today: {format_day(now, time_zone)}\n\n"
         f"What Zeph remembers:\n{item_text or 'Nothing yet.'}\n\n"
         f"Life Threads:\n{thread_lines or 'None yet.'}\n\n"
         f"What has helped and what hasn't:\n{outcome_lines or 'Nothing yet.'}\n\n"
-        f"Recent Conversations, newest first:\n{summary_lines or 'None yet.'}"
+        f"Recent days, newest first:\n{summary_lines or 'None yet.'}"
     )
 
 
@@ -84,7 +84,7 @@ class PortraitWriter:
     """Writes each User's User Portrait from their User Memory.
 
     It is written from their Memory Items, Life Threads, Move Outcomes and
-    newest Conversation Summaries only, never from the old Portrait, so something
+    newest Day Summaries only, never from the old Portrait, so something
     they deleted is gone from the next one.
     """
 

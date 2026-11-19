@@ -183,7 +183,7 @@ def engine(database_url: str) -> Iterator[Engine]:
                 "TRUNCATE users, telegram_connections, connection_tokens, "
                 "conversations, conversation_messages, platform_settings, copy_slots, "
                 "helplines, safeguard_events, memory_categories, memory_items, "
-                "conversation_summaries, knowledge_documents, knowledge_chunks, "
+                "day_summaries, knowledge_documents, knowledge_chunks, "
                 "daily_usage, stickers, check_in_kinds, check_ins, "
                 "feature_switches, user_feature_switches, shared_photos, "
                 "personal_stickers, pending_auth_account_deletions, needs, moves, "

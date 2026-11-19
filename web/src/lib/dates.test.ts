@@ -7,6 +7,7 @@ import {
   formatLastSavedAt,
   formatLoggedAt,
   formatSavedAt,
+  formatShortCalendarDay,
   formatShortDay,
   formatWeekdayDay,
 } from "@/lib/dates";
@@ -50,6 +51,13 @@ describe("formatLastSavedAt", () => {
 describe("formatShortDay", () => {
   it("writes the day and month a memory came from", () => {
     expect(formatShortDay("2026-10-02T09:00:00Z", "UTC")).toBe("2 Oct");
+  });
+});
+
+describe("formatShortCalendarDay", () => {
+  it("writes a calendar day's day and month as it is, in any time zone", () => {
+    expect(formatShortCalendarDay("2026-11-11")).toBe("11 Nov");
+    expect(formatShortCalendarDay("2026-01-01")).toBe("1 Jan");
   });
 });
 

@@ -13,10 +13,10 @@ from companion.core.life_threads import name_keys
 from companion.core.models import (
     Conversation,
     ConversationMessage,
-    ConversationSummary,
     Curiosity,
     CuriosityChanges,
     CuriosityState,
+    DaySummary,
     LifeThread,
     LifeThreadToSave,
     MemoryChanges,
@@ -130,13 +130,13 @@ def give_made_up_memory(
         repositories.user_memory.save_processed_conversation(
             conversation_id,
             written_at,
-            ConversationSummary(
+            DaySummary(
                 id=uuid4(),
-                conversation_id=conversation_id,
                 user_id=user_id,
+                day=written_at.date(),
                 summary=summary.summary,
                 mood=summary.mood,
-                created_at=written_at,
+                written_at=written_at,
             ),
             MemoryChanges(added=[], updated=[], removed_ids=[]),
             summary_embedding=embedding,

@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from companion.core.models import Conversation
@@ -32,6 +32,23 @@ def users_today(time_zone: str | None, now: datetime) -> date:
         Today's date in their time zone, or in UTC if they have none.
     """
     return (now.astimezone(ZoneInfo(time_zone)) if time_zone else now).date()
+
+
+def day_span(day: date, time_zone: str | None) -> tuple[datetime, datetime]:
+    """Work out when a User's day starts and when the next one starts.
+
+    Args:
+        day: The day, in the User's time zone.
+        time_zone: The User's IANA time zone; UTC if they have none.
+
+    Returns:
+        The day's first moment and the next day's first moment.
+    """
+    zone = ZoneInfo(time_zone or "UTC")
+    return (
+        datetime.combine(day, time.min, tzinfo=zone),
+        datetime.combine(day + timedelta(days=1), time.min, tzinfo=zone),
+    )
 
 
 def local_now(time_zone: str | None, now: datetime) -> datetime:

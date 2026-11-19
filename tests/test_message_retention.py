@@ -82,7 +82,7 @@ def test_a_tick_deletes_messages_older_than_the_retention_period(
     scheduler.tick()
 
     assert message_contents(engine) == []
-    summaries = client.get("/api/conversation-summaries", headers=headers).json()
+    summaries = client.get("/api/day-summaries", headers=headers).json()
     assert [entry["summary"] for entry in summaries["summaries"]] == [
         "Shared that they started a new job."
     ]

@@ -1266,11 +1266,11 @@ class CheckInService:
 
         Args:
             user: The User.
-            platform_settings: Holds how many Conversation Summaries to give.
+            platform_settings: Holds how many Day Summaries to give.
 
         Returns:
             Their User Portrait, Memory Items by active Memory Category and
-            newest Conversation Summaries, even while User Memory is off; ""
+            newest Day Summaries, even while User Memory is off; ""
             if nothing is remembered.
         """
         user_memory = self._repositories.user_memory

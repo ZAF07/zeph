@@ -210,7 +210,7 @@ def test_a_failing_portrait_writer_keeps_the_summary_and_the_old_portrait(
     )
     scheduler.tick()
 
-    summaries = client.get("/api/conversation-summaries", headers=headers).json()
+    summaries = client.get("/api/day-summaries", headers=headers).json()
     assert summaries["summaries"][0]["summary"] == "Talked about another day."
     assert portrait_shown(client, headers)["text"] == PORTRAIT
     assert len(chat_model.portrait_calls) == 2
@@ -513,9 +513,9 @@ def test_the_summary_records_the_mood_arc_and_what_was_offered(
     send_message(client, chat_model, "hi")
 
     processing_input = chat_model.processing_calls[-1].history[0].text
-    [summary] = client.get("/api/conversation-summaries", headers=headers).json()[
-        "summaries"
-    ][:1]
+    [summary] = client.get("/api/day-summaries", headers=headers).json()["summaries"][
+        :1
+    ]
     assert "anxious (high)" in processing_input
     assert "calmer (low)" in processing_input
     assert summary["mood"] == "tired, then lighter"

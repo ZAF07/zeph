@@ -58,7 +58,7 @@ def set_up_user_with_every_kind_of_data(
 ) -> tuple[dict[str, str], str]:
     """Give a User messages, User Memory, a Check-in and a Telegram Connection.
 
-    Their User Memory holds a Memory Item, a Conversation Summary, a Shared
+    Their User Memory holds a Memory Item, a Day Summary, a Shared
     Photo, a Life Thread, a Move Outcome and a User Portrait, and they have
     a Personal Sticker and a Curiosity.
 
@@ -230,7 +230,7 @@ def test_delete_my_data_removes_every_kind_of_data_but_keeps_the_account(
     )
     assert message_count(engine) == 0
     assert memory_contents(client, headers) == {}
-    summaries = client.get("/api/conversation-summaries", headers=headers).json()
+    summaries = client.get("/api/day-summaries", headers=headers).json()
     assert summaries == {"summaries": []}
     photos = client.get("/api/shared-photos", headers=headers).json()
     assert photos == {"photos": []}

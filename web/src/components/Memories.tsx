@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
-import { ConversationSummariesList } from "@/components/ConversationSummariesList";
+import { DaySummariesList } from "@/components/DaySummariesList";
 import { LifeThreadsList } from "@/components/LifeThreadsList";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LoadingPanel } from "@/components/LoadingPanel";
@@ -31,7 +31,7 @@ import { useApiClient } from "@/lib/use-api-client";
 /**
  * The Memories page: what Zeph remembers, by Memory Category, its User
  * Portrait of the User, the Life Threads it follows, what helps them (Move
- * Outcomes), the Conversation Summaries and the Shared Photos, each
+ * Outcomes), the Day Summaries and the Shared Photos, each
  * deletable, with the User Memory switch. One tab shows at a time; the
  * address's `?tab=` picks it, and choosing a tab updates `?tab=` without
  * loading the page again. Every word is the Memories tab's Copy.
@@ -54,8 +54,8 @@ export function Memories({ copy }: { copy: Copy }) {
     queryFn: () => apiClient.listMemoryGroups(),
   });
   const summariesQuery = useQuery({
-    queryKey: queryKeys.conversationSummaries,
-    queryFn: () => apiClient.listConversationSummaries(),
+    queryKey: queryKeys.daySummaries,
+    queryFn: () => apiClient.listDaySummaries(),
   });
   const threadsQuery = useQuery({
     queryKey: queryKeys.lifeThreads,
@@ -218,11 +218,7 @@ export function Memories({ copy }: { copy: Copy }) {
             />
           ) : null}
           {summaries && tab === "summaries" ? (
-            <ConversationSummariesList
-              summaries={summaries}
-              copy={copy}
-              timeZone={timeZone}
-            />
+            <DaySummariesList summaries={summaries} copy={copy} />
           ) : null}
           {photos && tab === "photos" ? (
             <SharedPhotosList photos={photos} copy={copy} timeZone={timeZone} />

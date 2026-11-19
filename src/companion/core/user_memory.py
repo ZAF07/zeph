@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 from companion.core.errors import NotFoundError
 from companion.core.features import FeatureService
 from companion.core.models import (
-    ConversationSummary,
+    DaySummary,
     Feature,
     LifeThread,
     MemoryCategory,
@@ -30,10 +30,10 @@ class MemoryNotFoundError(NotFoundError):
     shown_message = "Memory not found"
 
 
-class ConversationSummaryNotFoundError(MemoryNotFoundError):
-    """Raised when a User has no Conversation Summary with that ID."""
+class DaySummaryNotFoundError(MemoryNotFoundError):
+    """Raised when a User has no Day Summary with that ID."""
 
-    shown_message = "Conversation Summary not found"
+    shown_message = "Day Summary not found"
 
 
 class LifeThreadNotFoundError(MemoryNotFoundError):
@@ -59,7 +59,7 @@ class UserMemoryService:
 
     While User Memory is off the Companion stops learning but keeps using what
     it has, so only saving is stopped here. Deleting a Memory Item, Life
-    Thread, Move Outcome or Conversation Summary asks for the User Portrait
+    Thread, Move Outcome or Day Summary asks for the User Portrait
     to be written again without it, whatever User Memory says, since that
     only forgets.
     """
@@ -124,30 +124,30 @@ class UserMemoryService:
         self._repositories.user_memory.delete_all_items(user_id)
         self._rewrite_portrait(user_id)
 
-    def list_summaries(self, user_id: UUID) -> list[ConversationSummary]:
-        """List a User's Conversation Summaries, newest first.
+    def list_summaries(self, user_id: UUID) -> list[DaySummary]:
+        """List a User's Day Summaries, newest first.
 
         Args:
             user_id: The User's ID.
 
         Returns:
-            The Conversation Summaries.
+            The Day Summaries.
         """
         return self._repositories.user_memory.list_summaries(user_id)
 
     def delete_summary(self, user_id: UUID, summary_id: UUID) -> None:
-        """Delete one of a User's Conversation Summaries.
+        """Delete one of a User's Day Summaries.
 
         Args:
             user_id: The User's ID.
-            summary_id: The Conversation Summary's ID.
+            summary_id: The Day Summary's ID.
 
         Raises:
-            ConversationSummaryNotFoundError: If the User has no such
-                Conversation Summary.
+            DaySummaryNotFoundError: If the User has no such
+                Day Summary.
         """
         if not self._repositories.user_memory.delete_summary(user_id, summary_id):
-            raise ConversationSummaryNotFoundError
+            raise DaySummaryNotFoundError
         self._rewrite_portrait(user_id)
 
     def list_threads(self, user_id: UUID) -> list[LifeThread]:
