@@ -1795,15 +1795,13 @@
         "key": "memories.items.delete_all.confirm_body_one",
         "name": "Delete all memories, asking first: one memory",
         "max_length": 200,
-        "placeholders": ["count"],
-        "text": "Zeph will forget the {count} memory it holds about you. Conversation Summaries and your account stay. This can’t be undone."
+        "text": "Zeph will forget the one memory it holds about you. Conversation Summaries and your account stay. This can’t be undone."
       },
       {
         "key": "memories.items.delete_all.confirm_body_many",
         "name": "Delete all memories, asking first: several memories",
         "max_length": 200,
-        "placeholders": ["count"],
-        "text": "Zeph will forget all {count} memories it holds about you. Conversation Summaries and your account stay. This can’t be undone."
+        "text": "Zeph will forget every memory it holds about you. Conversation Summaries and your account stay. This can’t be undone."
       },
       {
         "key": "memories.items.delete_all.keep",

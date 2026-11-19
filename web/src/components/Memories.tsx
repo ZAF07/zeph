@@ -39,7 +39,7 @@ import { useApiClient } from "@/lib/use-api-client";
  * @returns The page, a loading panel, or an error with Try again.
  */
 export function Memories({ copy }: { copy: Copy }) {
-  const words = (slot: string) => readCopy(copy, `memories.${slot}`);
+  const memoriesCopy = (slot: string) => readCopy(copy, `memories.${slot}`);
   const apiClient = useApiClient();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<MemoriesTab>(() =>
@@ -102,9 +102,9 @@ export function Memories({ copy }: { copy: Copy }) {
 
   const memoryOn = me?.user_memory_enabled ?? false;
   const memoryUnavailable = me !== undefined && !me.user_memory_available;
-  let switchLabel = words(memoryOn ? "switch.on" : "switch.paused");
+  let switchLabel = memoriesCopy(memoryOn ? "switch.on" : "switch.paused");
   if (memoryUnavailable) {
-    switchLabel = words("switch.not_available");
+    switchLabel = memoriesCopy("switch.not_available");
   }
 
   function changeMemory(enabled: boolean) {
@@ -125,9 +125,9 @@ export function Memories({ copy }: { copy: Copy }) {
     <>
       <PageHero
         background="memories"
-        eyebrow={words("hero.eyebrow")}
-        title={words("hero.heading")}
-        body={words("hero.lead")}
+        eyebrow={memoriesCopy("hero.eyebrow")}
+        title={memoriesCopy("hero.heading")}
+        body={memoriesCopy("hero.lead")}
         actions={
           me ? (
             <>
@@ -136,7 +136,7 @@ export function Memories({ copy }: { copy: Copy }) {
                   {switchLabel}
                 </span>
                 <Switch
-                  label={words("switch.label")}
+                  label={memoriesCopy("switch.label")}
                   checked={memoryOn}
                   disabled={updatePreferences.isPending || memoryUnavailable}
                   onChange={changeMemory}
@@ -145,7 +145,7 @@ export function Memories({ copy }: { copy: Copy }) {
               <ChangedInChatCaption
                 changedAt={me.changed_in_chat.user_memory}
                 timeZone={timeZone}
-                text={words("switch.changed_in_chat")}
+                text={memoriesCopy("switch.changed_in_chat")}
               />
             </>
           ) : null
@@ -153,7 +153,7 @@ export function Memories({ copy }: { copy: Copy }) {
       />
 
       {updatePreferences.isError ? (
-        <SaveFailedNote>{words("switch.save_failed")}</SaveFailedNote>
+        <SaveFailedNote>{memoriesCopy("switch.save_failed")}</SaveFailedNote>
       ) : null}
 
       {me ? (
@@ -162,23 +162,25 @@ export function Memories({ copy }: { copy: Copy }) {
           canTurnOn={!memoryUnavailable}
           isSaving={updatePreferences.isPending}
           onTurnOn={() => changeMemory(true)}
-          turnOnLabel={words("memory_off.turn_on")}
+          turnOnLabel={memoriesCopy("memory_off.turn_on")}
         />
       ) : null}
 
-      <p className="m-0 text-[13px] text-cream">{words("forget_that")}</p>
+      <p className="m-0 text-[13px] text-cream">
+        {memoriesCopy("forget_that")}
+      </p>
 
       <MemoriesTabs copy={copy} selected={tab} onSelect={chooseTab} />
 
       {!isLoaded && !loadFailed ? (
-        <LoadingPanel shape="card" label={words("loading")} />
+        <LoadingPanel shape="card" label={memoriesCopy("loading")} />
       ) : null}
 
       {loadFailed ? (
         <LoadFailed
-          title={words("load_failed.title")}
-          body={words("load_failed.body")}
-          retryLabel={words("load_failed.retry")}
+          title={memoriesCopy("load_failed.title")}
+          body={memoriesCopy("load_failed.body")}
+          retryLabel={memoriesCopy("load_failed.retry")}
           onRetry={() => {
             for (const query of queries) {
               void query.refetch();

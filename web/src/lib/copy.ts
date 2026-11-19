@@ -31,25 +31,20 @@ export function readCopy(copy: Copy, key: string): string {
   return text;
 }
 
+/** How the keys of a "one" and "many" slot pair end. */
+export const countSlotEndings = { one: "_one", many: "_many" } as const;
+
 /**
- * Reads text that changes with a number, such as "1 memory" or "3
- * memories": the slot ending `_one` for 1 and the slot ending `_many`
- * otherwise, with its `{count}` placeholder filled.
+ * Names the slot of a "one" and "many" pair to show for a number: the slot
+ * ending `_one` for 1 and the slot ending `_many` otherwise.
  *
- * @param copy - The Copy.
  * @param keyStart - The two slots' key without the ending, e.g.
- *   `memories.items.delete_all.confirm_body`.
+ *   `connect_telegram.card.expires`.
  * @param count - The number.
- * @returns The picked slot's text with the count filled in.
- * @throws MissingCopyError if there is no such slot.
+ * @returns The key of the slot to show.
  */
-export function readCountCopy(
-  copy: Copy,
-  keyStart: string,
-  count: number,
-): string {
-  const ending = count === 1 ? "one" : "many";
-  return fillPlaceholders(readCopy(copy, `${keyStart}_${ending}`), { count });
+export function countSlotKey(keyStart: string, count: number): string {
+  return `${keyStart}${count === 1 ? countSlotEndings.one : countSlotEndings.many}`;
 }
 
 /**

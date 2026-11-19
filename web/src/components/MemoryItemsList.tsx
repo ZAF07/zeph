@@ -12,9 +12,9 @@ import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type { MemoryGroup } from "@/lib/api-client";
 import {
   type Copy,
+  countSlotKey,
   fillPlaceholders,
   readCopy,
-  readCountCopy,
 } from "@/lib/copy";
 import { memorySourceLabel } from "@/lib/memories";
 import { queryKeys } from "@/lib/queries";
@@ -22,7 +22,7 @@ import { useApiClient } from "@/lib/use-api-client";
 
 /**
  * The Memories tab: Memory Items grouped by Memory Category, each deletable,
- * and "Delete all memories", which asks first and says how many it forgets.
+ * and "Delete all memories", which asks first, worded for one memory or several.
  *
  * @param props - `groups` are the User's Memory Items by category, `copy`
  *   is the Memories page's Copy, and `timeZone` is the User's time zone.
@@ -158,10 +158,9 @@ export function MemoryItemsList({
       <ConfirmDialog
         open={isConfirmingDeleteAll}
         title={readCopy(copy, "memories.items.delete_all.confirm_title")}
-        body={readCountCopy(
+        body={readCopy(
           copy,
-          "memories.items.delete_all.confirm_body",
-          memoryCount,
+          countSlotKey("memories.items.delete_all.confirm_body", memoryCount),
         )}
         cancelLabel={readCopy(copy, "memories.items.delete_all.keep")}
         confirmLabel={readCopy(copy, "memories.items.delete_all.confirm")}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  countSlotKey,
   fillCopy,
   fillPlaceholderParts,
   fillPlaceholders,
@@ -8,7 +9,6 @@ import {
   pageMetadata,
   pickCopy,
   readCopy,
-  readCountCopy,
 } from "@/lib/copy";
 
 describe("fillPlaceholders", () => {
@@ -139,27 +139,16 @@ describe("pickCopy", () => {
   });
 });
 
-describe("readCountCopy", () => {
-  const copy = {
-    "memories.confirm_body_one": "Forget the {count} memory.",
-    "memories.confirm_body_many": "Forget all {count} memories.",
-  };
-
-  it("picks the one slot for 1, with the count filled in", () => {
-    expect(readCountCopy(copy, "memories.confirm_body", 1)).toBe(
-      "Forget the 1 memory.",
+describe("countSlotKey", () => {
+  it("names the one slot for 1", () => {
+    expect(countSlotKey("memories.confirm_body", 1)).toBe(
+      "memories.confirm_body_one",
     );
   });
 
-  it.each([0, 2, 37])("picks the many slot for %i", (count) => {
-    expect(readCountCopy(copy, "memories.confirm_body", count)).toBe(
-      `Forget all ${count} memories.`,
-    );
-  });
-
-  it("fails naming the slot when the Copy has no such slot", () => {
-    expect(() => readCountCopy({}, "memories.confirm_body", 1)).toThrow(
-      new MissingCopyError("memories.confirm_body_one"),
+  it.each([0, 2, 37])("names the many slot for %i", (count) => {
+    expect(countSlotKey("memories.confirm_body", count)).toBe(
+      "memories.confirm_body_many",
     );
   });
 });

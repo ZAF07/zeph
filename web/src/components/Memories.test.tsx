@@ -329,7 +329,7 @@ describe("Memories", () => {
     );
     expect(
       dialog.getByText(
-        "Zeph will forget all 3 memories it holds about you. Conversation Summaries and your account stay. This can’t be undone.",
+        "Zeph will forget every memory it holds about you. Conversation Summaries and your account stay. This can’t be undone.",
       ),
     ).toBeVisible();
     await user.click(dialog.getByRole("button", { name: "Keep them" }));
@@ -1072,55 +1072,39 @@ describe("Memories", () => {
       expect(wordsNotFromCopy(container)).toEqual([]);
     });
 
-    it("says the delete all dialog forgets the 1 memory with one Memory Item", async () => {
+    it("words the delete all dialog for one memory with one Memory Item", async () => {
       const user = userEvent.setup();
       apiClient.listMemoryGroups.mockResolvedValue([
         { category: "Life details", items: [groups[0].items[0]] },
       ]);
-      renderWithQueries(
-        <Memories
-          copy={{
-            ...seedCopy(),
-            "memories.items.delete_all.confirm_body_one":
-              "Just {count} memory to forget.",
-            "memories.items.delete_all.confirm_body_many":
-              "{count} memories to forget.",
-          }}
-        />,
-      );
+      renderWithQueries(<Memories copy={markedCopy()} />);
 
       await user.click(
-        await screen.findByRole("button", { name: "Delete all memories" }),
+        await screen.findByRole("button", {
+          name: "⟦memories.items.delete_all.button⟧",
+        }),
       );
 
       expect(
         within(screen.getByRole("alertdialog")).getByText(
-          "Just 1 memory to forget.",
+          "⟦memories.items.delete_all.confirm_body_one⟧",
         ),
       ).toBeVisible();
     });
 
-    it("says the delete all dialog forgets several memories with the many slot", async () => {
+    it("words the delete all dialog for several memories with more than one", async () => {
       const user = userEvent.setup();
-      renderWithQueries(
-        <Memories
-          copy={{
-            ...seedCopy(),
-            "memories.items.delete_all.confirm_body_one":
-              "Just {count} memory to forget.",
-            "memories.items.delete_all.confirm_body_many":
-              "{count} memories to forget.",
-          }}
-        />,
-      );
+      renderWithQueries(<Memories copy={markedCopy()} />);
 
       await user.click(
-        await screen.findByRole("button", { name: "Delete all memories" }),
+        await screen.findByRole("button", {
+          name: "⟦memories.items.delete_all.button⟧",
+        }),
       );
 
       expect(
         within(screen.getByRole("alertdialog")).getByText(
-          "3 memories to forget.",
+          "⟦memories.items.delete_all.confirm_body_many⟧",
         ),
       ).toBeVisible();
     });

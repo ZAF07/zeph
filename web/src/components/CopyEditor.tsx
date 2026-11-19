@@ -37,9 +37,8 @@ function bringSlotIntoView(slotKey: string) {
  * The Copy page's editor: a tab per website page, the chosen tab's slots in
  * page order (a "one" and "many" pair side by side) and one save bar that
  * saves the tab's changes together. A save the backend turns away shows
- * each reason on its slot. A search finds
- * slots in every tab by their text and takes the Admin to the one picked.
- * Switching tabs or leaving the page with unsaved edits asks first.
+ * each reason on its slot. A search finds slots in every tab by their text
+ * and takes the Admin to the one picked. Switching tabs or leaving the page with unsaved edits asks first.
  *
  * @returns The editor, or a loading panel or error with Try again.
  */
@@ -165,7 +164,7 @@ export function CopyEditor() {
         {copySlotRows(tab.slots).map((row) => (
           <div
             key={row[0].key}
-            className="grid gap-3 min-[900px]:auto-cols-fr min-[900px]:grid-flow-col"
+            className="flex flex-wrap gap-3 [&>*]:flex-[1_1_360px]"
           >
             {row.map((slot) => (
               <CopySlotField

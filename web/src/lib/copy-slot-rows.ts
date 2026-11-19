@@ -1,7 +1,5 @@
 import type { CopySlot } from "@/lib/api-client";
-
-const oneEnding = "_one";
-const manyEnding = "_many";
+import { countSlotEndings } from "@/lib/copy";
 
 /**
  * Lays a Copy tab's slots out in rows, so text that changes with a number
@@ -17,8 +15,9 @@ export function copySlotRows(slots: CopySlot[]): CopySlot[][] {
   for (let index = 0; index < slots.length; index += 1) {
     const slot = slots[index];
     const next = slots[index + 1];
-    const manyKey = slot.key.endsWith(oneEnding)
-      ? `${slot.key.slice(0, -oneEnding.length)}${manyEnding}`
+    const { one, many } = countSlotEndings;
+    const manyKey = slot.key.endsWith(one)
+      ? `${slot.key.slice(0, -one.length)}${many}`
       : null;
     if (next && next.key === manyKey) {
       rows.push([slot, next]);
