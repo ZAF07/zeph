@@ -101,3 +101,11 @@ Live runs used real DeepSeek, the real embedder and Postgres inside the worktree
   - Move Outcomes still search the latest 3 texts.
   - The Conversation-end steps still find Threads from the whole Conversation, not from `life_threads_in_mind`.
 - No Eval was run (Evals cost money).
+
+## Completion
+
+- Completed: 2026-11-20
+- Commit: 0e27a5b "Merge message pipeline issue 12: wide recall" (merged into `main` locally and pushed), with:
+  - bbae9b8 "Message pipeline issue 12: wide recall"
+  - ef99387 "Message pipeline issue 12: review fixes"
+  - 76f33df "Message pipeline issue 12 done: archive issue with test, run, pixel and review evidence"
