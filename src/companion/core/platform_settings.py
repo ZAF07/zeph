@@ -243,6 +243,9 @@ OLDER_SUMMARIES_CLOSENESS_PERCENT = Setting(
     "older_summaries_closeness_percent", read_whole_number
 )
 LIFE_THREADS_PER_REPLY = Setting("life_threads_per_reply", read_whole_number)
+LIFE_THREADS_TEXTS_TO_SEARCH = Setting(
+    "life_threads_texts_to_search", read_whole_number
+)
 LIFE_THREADS_CLOSENESS_PERCENT = Setting(
     "life_threads_closeness_percent", read_whole_number
 )
@@ -1124,13 +1127,25 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     ),
     EditableSetting(
         LIFE_THREADS_PER_REPLY.key,
-        "Most Life Threads per reply",
+        "Most Life Threads in mind",
         SettingKind.WHOLE_NUMBER,
         minimum=0,
-        maximum=10,
+        maximum=30,
         hint=(
-            "How many of the User’s Life Threads Recall brings to mind before each "
-            "reply, open ones first."
+            "How many Life Threads the Reply Plan can have in mind at once: those "
+            "the message brings to mind first, then earlier ones in the "
+            "Conversation. Set high; it is only there to protect cost."
+        ),
+    ),
+    EditableSetting(
+        LIFE_THREADS_TEXTS_TO_SEARCH.key,
+        "Texts searched for Life Threads",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=30,
+        hint=(
+            "How many of the User’s latest texts Recall searches Life Threads on, "
+            "together with what the Understanding says they mean."
         ),
     ),
     EditableSetting(
@@ -1140,9 +1155,9 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         minimum=0,
         maximum=100,
         hint=(
-            "How close in meaning a Thread’s story must be to the User’s last few "
-            "texts for Recall to bring it to mind. A Thread naming someone or "
-            "something they mention always counts."
+            "How close in meaning a Thread’s story must be to what the User means "
+            "and their latest texts for Recall to bring it to mind. A Thread naming "
+            "someone or something they mention always counts."
         ),
     ),
     EditableSetting(

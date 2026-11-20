@@ -29,6 +29,7 @@ from companion.core.platform_settings import (
     LIFE_THREAD_KEEPING_THINKING,
     LIFE_THREADS_CLOSENESS_PERCENT,
     LIFE_THREADS_PER_REPLY,
+    LIFE_THREADS_TEXTS_TO_SEARCH,
 )
 from companion.core.ports import Clock, Embedder, Repositories
 from companion.core.transcripts import to_transcript_lines
@@ -146,16 +147,41 @@ def incoming_texts(messages: Sequence[ConversationMessage]) -> list[str]:
     ]
 
 
-def recent_incoming_texts(messages: Sequence[ConversationMessage]) -> list[str]:
+def recent_incoming_texts(
+    messages: Sequence[ConversationMessage], count: int = RECENT_TEXTS_TO_SEARCH
+) -> list[str]:
     """List the last few texts the User sent, which searches by meaning use.
 
     Args:
         messages: The Conversation's messages, oldest first.
+        count: How many of their latest texts to list.
 
     Returns:
-        Their last few texts, oldest first.
+        Their last `count` texts, oldest first; none if `count` is 0.
     """
-    return incoming_texts(messages)[-RECENT_TEXTS_TO_SEARCH:]
+    return incoming_texts(messages)[-count:] if count > 0 else []
+
+
+def threads_in_mind(
+    found: Sequence[LifeThread], earlier: Sequence[LifeThread], limit: int
+) -> list[LifeThread]:
+    """List the Threads in mind for a reply, at most the Admin-set number.
+
+    The Threads this message found come first, then those that came to mind
+    earlier in the Conversation, the first to come to mind first, each once.
+
+    Args:
+        found: The Threads this message found, in search order.
+        earlier: The Threads in mind in the Conversation, the first to come
+            to mind first; may include ones in `found`.
+        limit: The most Threads in mind at once.
+
+    Returns:
+        The Threads, at most `limit` of them.
+    """
+    found_ids = {thread.id for thread in found}
+    earlier_only = [thread for thread in earlier if thread.id not in found_ids]
+    return [*found, *earlier_only][: max(limit, 0)]
 
 
 def hold_back_reason(
@@ -254,11 +280,11 @@ def format_threads_for_reply(
 ) -> str:
     """Write the reply's section on the Life Threads that matter here.
 
-    With a form, the Threads it touches or brings up go in with their
-    stories, then how to bring each up; the ones to leave alone are left
-    out, for `format_threads_left_alone`. Without one, because the
-    Reply Plan failed, every reminded Thread that isn't held back goes in
-    with its story and nothing is brought up.
+    Only the Threads the Reply Plan picked go in: those it touches or
+    brings up, with their stories, then how to bring each up; the ones to
+    leave alone are left out, for `format_threads_left_alone`. Without a
+    form, because the Reply Plan failed, no Thread goes in, so a wide
+    memory never crowds the reply.
 
     Args:
         reminded: The Threads the Companion was reminded of.
@@ -269,22 +295,20 @@ def format_threads_for_reply(
         The section; "" if there is nothing to tell.
     """
     if form is None:
-        mattering = [item.thread for item in reminded if not item.hold_back]
-        bring_up_lines: list[str] = []
-    else:
-        left_alone_ids = {item.thread_id for item in form.left_alone}
-        mattering_titles = set(form.threads_touched) | {
-            item.title for item in form.bring_up
-        }
-        mattering = [
-            item.thread
-            for item in reminded
-            if item.thread.title in mattering_titles
-            and item.thread.id not in left_alone_ids
-        ]
-        bring_up_lines = [
-            f"- {item.title}: {BRING_UP_WORDS[item.how]}." for item in form.bring_up
-        ]
+        return ""
+    left_alone_ids = {item.thread_id for item in form.left_alone}
+    mattering_titles = set(form.threads_touched) | {
+        item.title for item in form.bring_up
+    }
+    mattering = [
+        item.thread
+        for item in reminded
+        if item.thread.title in mattering_titles
+        and item.thread.id not in left_alone_ids
+    ]
+    bring_up_lines = [
+        f"- {item.title}: {BRING_UP_WORDS[item.how]}." for item in form.bring_up
+    ]
     sections = []
     if mattering:
         sections.append(
@@ -322,13 +346,14 @@ def find_threads_in(
     snapshot: UserSnapshot,
     texts: Sequence[str],
     limit: int,
+    meaning: str = "",
 ) -> list[LifeThread]:
     """Find the User's Threads that some of their texts name or are close to.
 
     A Thread counts if the texts name someone or something in it, or if its
-    story is at least as close in meaning as the Admin-set bar. If the texts
-    can't be embedded, the failure is logged and Threads are found by name
-    only.
+    story is at least as close in meaning as the Admin-set bar to the texts
+    and what they mean. If they can't be embedded, the failure is logged and
+    Threads are found by name only.
 
     Args:
         repositories: Where Life Threads are stored.
@@ -336,12 +361,15 @@ def find_threads_in(
         snapshot: The User whose Threads are searched.
         texts: Their texts, oldest first.
         limit: The most Threads to return.
+        meaning: What the Understanding says they mean, searched on with the
+            texts; "" for the texts alone.
 
     Returns:
         The Threads, open first, then those named, then the closest.
     """
+    search = "\n".join([meaning, *texts] if meaning else texts)
     try:
-        embedding: list[float] | None = embedder.embed_query("\n".join(texts))
+        embedding: list[float] | None = embedder.embed_query(search)
     except Exception:
         logger.exception("Could not embed the texts to find Life Threads by")
         embedding = None
@@ -358,8 +386,10 @@ class ThreadReminder:
     """Reminds the Companion of the User's Life Threads before each reply.
 
     No model call: one search finds the User's Threads that name someone or
-    something in their last few texts, or whose story is close in meaning
-    to them, however old.
+    something in their latest texts, or whose story is close in meaning to
+    those texts and what the Understanding says they mean, however old.
+    Threads that came to mind earlier in the Conversation stay in mind until
+    it ends.
     """
 
     def __init__(
@@ -369,7 +399,7 @@ class ThreadReminder:
 
         Args:
             repositories: Where Conversations and Life Threads are stored.
-            embedder: Embeds the User's last few texts.
+            embedder: Embeds what the User means and their latest texts.
             clock: Tells the current time.
         """
         self._repositories = repositories
@@ -377,32 +407,54 @@ class ThreadReminder:
         self._clock = clock
 
     def remind(
-        self, snapshot: UserSnapshot, conversation_id: UUID
+        self, snapshot: UserSnapshot, conversation_id: UUID, meaning: str
     ) -> list[RemindedThread]:
         """Find the User's Threads that the Message reminds the Companion of.
 
-        Open Threads come first. Only those named, or at least as close in
-        meaning as the Admin-set bar, count, up to the Admin-set number.
-        Each says why it must not be brought up now, if it mustn't. If the
-        texts can't be embedded, Threads are found by name only.
+        The search uses what the User means and the Admin-set number of
+        their latest texts. Only Threads named, or at least as close in
+        meaning as the Admin-set bar, come to mind, open ones first. Every
+        one found is kept in mind for the rest of the Conversation. Threads
+        that came to mind earlier follow, as `threads_in_mind` orders and
+        caps them at the Admin-set number. Each says why it must not be
+        brought up now, if it mustn't. If the search can't be embedded,
+        Threads are found by name only.
 
         Args:
             snapshot: The User being answered.
             conversation_id: The Conversation the Message is in.
+            meaning: What the Understanding says the User means; "" if it
+                failed.
 
         Returns:
             The Threads, numbered from 1.
         """
         settings = snapshot.settings
+        life_thread_repository = self._repositories.life_threads
         limit = settings.get(LIFE_THREADS_PER_REPLY)
         messages = self._repositories.conversations.list_messages(conversation_id)
-        recent_texts = recent_incoming_texts(messages)
-        if limit < 1 or not recent_texts:
-            return []
-        threads = find_threads_in(
-            self._repositories, self._embedder, snapshot, recent_texts, limit
+        recent_texts = recent_incoming_texts(
+            messages, settings.get(LIFE_THREADS_TEXTS_TO_SEARCH)
+        )
+        found = (
+            find_threads_in(
+                self._repositories,
+                self._embedder,
+                snapshot,
+                recent_texts,
+                limit,
+                meaning,
+            )
+            if limit > 0 and recent_texts
+            else []
         )
         now = self._clock.now()
+        life_thread_repository.keep_in_mind(
+            conversation_id, [thread.id for thread in found], now
+        )
+        threads = threads_in_mind(
+            found, life_thread_repository.list_in_mind(conversation_id), limit
+        )
         wait = settings.get(LIFE_THREAD_BRUSHED_OFF_WAIT)
         return [
             RemindedThread(

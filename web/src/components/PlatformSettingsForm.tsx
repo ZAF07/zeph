@@ -102,8 +102,13 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
       },
       {
         key: "life_threads_per_reply",
-        label: "Most Life Threads per reply",
+        label: "Most Life Threads in mind",
         unit: "threads",
+      },
+      {
+        key: "life_threads_texts_to_search",
+        label: "Texts searched for Life Threads",
+        unit: "texts",
       },
       {
         key: "life_threads_closeness_percent",

@@ -12,6 +12,7 @@ from tests.fakes import (
     FakeScheduler,
     ScriptedChatModel,
     reply_plan_answer,
+    understanding_answer,
 )
 from tests.telegram_helpers import (
     OWNER_TELEGRAM_USER_ID,
@@ -168,6 +169,9 @@ def test_a_message_close_in_meaning_to_a_story_brings_it_and_a_weak_match_does_n
         ],
     )
 
+    chat_model.script_understanding(
+        understanding_answer(means="Their knee hurts on long runs again.")
+    )
     close = reply_plan_sees(client, chat_model, "knee pain on long runs")
     clock.advance(timedelta(days=2))
     weak = reply_plan_sees(client, chat_model, "the knee is fine")
@@ -198,6 +202,7 @@ def test_open_threads_come_before_settled_ones_up_to_the_admin_set_number(
     start_mei_thread(client, chat_model, clock, scheduler, seeded_settings)
 
     both = reply_plan_sees(client, chat_model, "I saw Mei today")
+    clock.advance(timedelta(days=1))
     set_settings(client, auth_verifier, {"life_threads_per_reply": 1})
     one = reply_plan_sees(client, chat_model, "Mei called again")
 
@@ -229,6 +234,7 @@ def test_the_admin_sets_how_close_a_story_must_be(
 
     set_settings(client, auth_verifier, {"life_threads_closeness_percent": 20})
     loose = reply_plan_sees(client, chat_model, "the knee is fine")
+    clock.advance(timedelta(days=1))
     set_settings(client, auth_verifier, {"life_threads_closeness_percent": 100})
     strict = reply_plan_sees(client, chat_model, "knee pain again")
 
@@ -521,27 +527,6 @@ def test_only_the_users_own_threads_are_found(
     seen = reply_plan_sees(client, chat_model, "Mei's wedding is next week")
 
     assert "Falling-out with Mei" not in seen
-
-
-def test_a_failed_reply_plan_still_gives_the_reply_the_threads_not_held_back(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-    scheduler: FakeScheduler,
-    seeded_settings: dict[str, Any],
-) -> None:
-    connect_telegram(client, auth_verifier, chat_channel)
-    start_mei_thread(client, chat_model, clock, scheduler, seeded_settings)
-    clock.advance(timedelta(days=30))
-
-    chat_model.script_reply_plan(RuntimeError("model is down"))
-    instructions = reply_instructions(client, chat_model, "Mei's wedding is soon")
-
-    assert MEI_STORY in instructions
-    assert "Bring up" not in instructions
-    assert chat_channel.texts_sent_to(5551001)[-1] == "mm, tell me more"
 
 
 def test_a_failed_understanding_still_lets_the_reply_plan_bring_up_a_thread(

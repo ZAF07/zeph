@@ -129,7 +129,9 @@ class ReplyService:
             snapshot, recent, saved_memory.portrait
         )
         attempt.raise_if_dropped()
-        reminded = self._thread_reminder.remind(snapshot, message.conversation_id)
+        reminded = self._thread_reminder.remind(
+            snapshot, message.conversation_id, understanding.form.means
+        )
         due = self._curiosity_raiser.due(snapshot, message.conversation_id)
         move_outcomes = self._move_outcome_finder.find(
             snapshot, message.conversation_id
