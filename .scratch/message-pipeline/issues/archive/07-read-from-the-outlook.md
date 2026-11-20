@@ -90,6 +90,13 @@ Read `web/design/README.md` in full first, including "Message-pipeline additions
 - **Caveat:** no Eval was run (Evals cost money). The live runs above used real DeepSeek calls.
 
 
+### Note: how "never the same Read twice" is kept (20 Nov 2026)
+
+- It is kept by the prompt, not by code. Each Reply Plan is shown the earlier Reads in the Conversation, each marked "said" or "not said", and its instructions say never to give the same Read twice in a Conversation.
+- Why not code: two Reads can say the same thing in different words, so an exact text match would almost never catch a real repeat.
+- The risk: it relies on the model following the rule, so a repeat could slip through now and then. In the live runs each Read built on the last rather than repeating it, but that was only a few messages.
+- If repeats show up in practice, add a check in code, e.g. a second model call asking "is this the same as an earlier Read?" before the Read reaches the Reply.
+
 ## Completion
 
 - Completed: 2026-11-20
