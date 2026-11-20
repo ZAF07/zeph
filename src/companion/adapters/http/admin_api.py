@@ -106,6 +106,7 @@ class AdminUserResponse(BaseModel):
     life_thread_count: int
     move_outcome_count: int
     has_portrait: bool
+    confirmed_pattern_count: int
 
 
 class HeldBackResponse(BaseModel):
@@ -282,6 +283,14 @@ class ExtraPromptResponse(BaseModel):
     hint: str
 
 
+class LimitResponse(BaseModel):
+    """A whole-number setting limiting what a core service is given."""
+
+    key: str
+    label: str
+    hint: str
+
+
 class ExtraPromptGroupResponse(BaseModel):
     """A named group of text settings shown with a core service's prompt."""
 
@@ -300,6 +309,7 @@ class CoreServiceResponse(BaseModel):
     thinking_key: str
     extra_prompts: list[ExtraPromptResponse]
     extra_prompt_groups: list[ExtraPromptGroupResponse]
+    limits: list[LimitResponse]
 
 
 class CoreServicesResponse(BaseModel):
@@ -1223,6 +1233,19 @@ def to_extra_prompt_response(key: str) -> ExtraPromptResponse:
     return ExtraPromptResponse(key=key, label=setting.label, hint=setting.hint)
 
 
+def to_limit_response(key: str) -> LimitResponse:
+    """Describe a whole-number setting shown on a core service's card.
+
+    Args:
+        key: The setting's key.
+
+    Returns:
+        The setting's key, label and hint.
+    """
+    setting = EDITABLE_SETTINGS_BY_KEY[key]
+    return LimitResponse(key=key, label=setting.label, hint=setting.hint)
+
+
 def to_feature_response(switch: FeatureSwitch) -> FeatureResponse:
     """Describe a Feature's switch for everyone for the admin area.
 
@@ -1283,6 +1306,7 @@ def to_admin_user_response(overview: UserOverview) -> AdminUserResponse:
         messages_sent=overview.messages_sent,
         life_thread_count=overview.life_thread_count,
         move_outcome_count=overview.move_outcome_count,
+        confirmed_pattern_count=overview.confirmed_pattern_count,
         has_portrait=overview.has_portrait,
     )
 
@@ -1546,6 +1570,7 @@ def build_admin_api_router(
                         )
                         for group in service.extra_prompt_groups
                     ],
+                    limits=[to_limit_response(key) for key in service.limit_keys],
                 )
                 for service in CORE_SERVICES
             ],

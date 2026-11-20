@@ -51,6 +51,7 @@ from companion.core.model_call_log import ModelCallLog
 from companion.core.move_outcomes import MoveOutcomeFinder, MoveOutcomeKeeper
 from companion.core.moves import MoveService
 from companion.core.needs import NeedService
+from companion.core.patterns import PatternKeeper
 from companion.core.personal_stickers import (
     PersonalStickerKeeper,
     PersonalStickerService,
@@ -351,6 +352,12 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 clock=dependencies.clock,
             ),
             life_thread_keeper=LifeThreadKeeper(
+                repositories=dependencies.repositories,
+                chat_model=chat_model,
+                embedder=dependencies.embedder,
+                clock=dependencies.clock,
+            ),
+            pattern_keeper=PatternKeeper(
                 repositories=dependencies.repositories,
                 chat_model=chat_model,
                 embedder=dependencies.embedder,

@@ -1,6 +1,6 @@
 # 08 — Patterns kept at Conversation end
 
-Status: ready-for-agent
+Status: in-progress
 Lane: B
 Blocked by: 06
 
@@ -52,3 +52,11 @@ Read `web/design/README.md` in full first, including "Message-pipeline additions
 - 06 — Every Admin field explains itself (`.scratch/message-pipeline/issues/06-admin-field-hints.md`)
 
 ## Comments
+
+### Plan (20 Nov 2026, branch `message-pipeline-08-patterns-kept`)
+
+- **Storage** (migration 0066): `patterns` (pattern text, state, started/updated, last offered at + reaction, embedding) and `pattern_evidence` (day, Thread, line). Evidence cascades with its Pattern and its Thread; a Pattern's linked Threads are the Threads in its evidence, so deleting a Thread drops its evidence, and a Pattern left with none is deleted in the same transaction.
+- **Keeping** (`core/patterns.py`, `PatternKeeper`): runs after Life Threads, only when that step touched a Thread (`LifeThreadKeeper.keep_from` now returns the Threads it started or changed). Given: touched Threads, other Threads closest in meaning (no bar, up to `pattern_keeping_threads`), all the User's Patterns, and the days behind the evidence of Patterns linked to those Threads (newest first, up to `pattern_keeping_days`): that day's messages if any are still kept, else its Day Summary.
+- **Code rules over the answer:** a new Pattern needs evidence from 2+ different shown Threads; evidence must name a shown Thread; confirm/close only with a reaction (agreed, pushed back, brushed off) judged from this Conversation; closed Patterns are never changed.
+- **Admin:** five settings with hints (prompt, model, thinking, two limits); core services get `limit_keys`, drawn as limit rows on the card; Users panel shows Confirmed Patterns; Model Call Log step `patterns` ("Pattern keeping").
+- Delete My Data / Account Deletion delete Patterns.

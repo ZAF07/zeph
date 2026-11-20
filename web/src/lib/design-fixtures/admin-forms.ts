@@ -64,7 +64,17 @@ function drawnSetting(
   };
 }
 
-/** The prompts, models and thinking switches drawn in `AdminPrompts.html`. */
+/** Pattern keeping's two limit rows, as `AdminPrompts.html` draws them. */
+const patternThreadsLimit = {
+  label: "Closest Threads to include",
+  hint: "How many of the User’s other Threads, closest in meaning, Pattern keeping is given.",
+};
+const patternDaysLimit = {
+  label: "Days of evidence to include",
+  hint: "How many days behind the evidence Pattern keeping reads, as messages or Day Summaries.",
+};
+
+/** The prompts, models, thinking switches and limits drawn in `AdminPrompts.html`. */
 const promptSettings: AdminSettings = {
   understanding_prompt: drawnSetting(
     "Read the Message. Say what the User said and what they mean.\nSplit feelings and wants into said, read and unclear.\nDo not choose how to reply.",
@@ -92,6 +102,8 @@ const promptSettings: AdminSettings = {
   ),
   pattern_keeping_model: drawnSetting("deepseek-reasoner", modelHint),
   pattern_keeping_thinking: drawnSetting(true, thinkingHint),
+  pattern_keeping_threads: drawnSetting(8, patternThreadsLimit.hint),
+  pattern_keeping_days: drawnSetting(14, patternDaysLimit.hint),
 };
 
 /** The four core services drawn in `AdminPrompts.html`, in its order. */
@@ -107,6 +119,7 @@ const coreServices: CoreServices = {
       thinking_key: "understanding_thinking",
       extra_prompts: [],
       extra_prompt_groups: [],
+      limits: [],
     },
     {
       name: "Reply Plan",
@@ -118,6 +131,7 @@ const coreServices: CoreServices = {
       thinking_key: "reply_plan_thinking",
       extra_prompts: [],
       extra_prompt_groups: [{ name: "Fallback wording", prompts: [] }],
+      limits: [],
     },
     {
       name: "Reply",
@@ -129,6 +143,7 @@ const coreServices: CoreServices = {
       thinking_key: "response_thinking",
       extra_prompts: [],
       extra_prompt_groups: [],
+      limits: [],
     },
     {
       name: "Pattern keeping",
@@ -140,6 +155,10 @@ const coreServices: CoreServices = {
       thinking_key: "pattern_keeping_thinking",
       extra_prompts: [],
       extra_prompt_groups: [],
+      limits: [
+        { key: "pattern_keeping_threads", ...patternThreadsLimit },
+        { key: "pattern_keeping_days", ...patternDaysLimit },
+      ],
     },
   ],
   model_choices: ["deepseek-chat", "deepseek-reasoner"],

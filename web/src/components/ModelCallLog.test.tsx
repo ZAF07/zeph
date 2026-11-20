@@ -28,6 +28,7 @@ const users: AdminUser[] = [
     life_thread_count: 0,
     move_outcome_count: 0,
     has_portrait: false,
+    confirmed_pattern_count: 0,
   },
 ];
 

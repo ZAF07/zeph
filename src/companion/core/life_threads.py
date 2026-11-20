@@ -634,7 +634,7 @@ class LifeThreadKeeper:
         snapshot: UserSnapshot,
         conversation_id: UUID,
         messages: list[ConversationMessage],
-    ) -> None:
+    ) -> list[LifeThread]:
         """Update the User's Threads from an ended Conversation.
 
         The model sees the Threads the whole Conversation reminds the
@@ -647,11 +647,15 @@ class LifeThreadKeeper:
                 for them.
             conversation_id: The ended Conversation.
             messages: Its messages, oldest first.
+
+        Returns:
+            The Threads it started or changed, which the Conversation
+            touched; none if nothing changed.
         """
         threads = self._repositories.life_threads
         texts = incoming_texts(messages)
         if not texts:
-            return
+            return []
         raised = threads.list_raised_in(conversation_id)
         raised_ids = {thread.id for thread in raised}
         reminded = find_threads_in(
@@ -672,7 +676,7 @@ class LifeThreadKeeper:
         )
         if entries is None:
             logger.warning("Life Thread keeping gave no readable answer")
-            return
+            return []
         planned = plan_thread_changes(entries, known, raised_ids, snapshot.user.id, now)
         threads.save_many(
             added=[
@@ -686,6 +690,7 @@ class LifeThreadKeeper:
                 if thread.id in known_threads
             ],
         )
+        return planned
 
     def _to_save(self, thread: LifeThread) -> LifeThreadToSave:
         """Add a Thread's name keys and embedding, so it can be found.

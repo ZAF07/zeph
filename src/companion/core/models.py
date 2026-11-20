@@ -336,6 +336,7 @@ class UserOverview:
         has_portrait: Whether they have a User Portrait.
         move_outcome_count: How many Move Outcomes the Companion keeps for
             them.
+        confirmed_pattern_count: How many of their Patterns they agreed with.
     """
 
     user: User
@@ -345,6 +346,7 @@ class UserOverview:
     life_thread_count: int
     has_portrait: bool
     move_outcome_count: int
+    confirmed_pattern_count: int
 
 
 @dataclass(frozen=True)
@@ -1035,6 +1037,92 @@ class LifeThreadToSave:
 
     thread: LifeThread
     name_keys: tuple[str, ...]
+    embedding: list[float] | None
+
+
+class PatternState(StrEnum):
+    """Whether a Pattern is only suspected, agreed with by the User, or rejected."""
+
+    SUSPECTED = "suspected"
+    CONFIRMED = "confirmed"
+    CLOSED = "closed"
+
+
+class PatternReaction(StrEnum):
+    """How the User took a view the Companion offered from a Pattern."""
+
+    AGREED = "agreed"
+    PUSHED_BACK = "pushed_back"
+    BRUSHED_OFF = "brushed_off"
+
+
+@dataclass(frozen=True)
+class PatternEvidence:
+    """One time a Pattern showed up in a User's life.
+
+    Attributes:
+        id: Our ID for the evidence.
+        day: The day it happened, in the User's time zone.
+        thread_id: The Life Thread it showed up in.
+        thread_title: That Thread's title, e.g. "Mum's visit".
+        line: What happened, written to make sense on its own.
+    """
+
+    id: UUID
+    day: date
+    thread_id: UUID
+    thread_title: str
+    line: str
+
+
+@dataclass(frozen=True)
+class Pattern:
+    """A recurring way a User thinks, feels, acts or chooses across their life.
+
+    Its linked Life Threads are the Threads its evidence shows up in, so a
+    deleted Thread takes its evidence with it.
+
+    Attributes:
+        id: Our ID for the Pattern.
+        user_id: The User it is about.
+        pattern: The pattern in a sentence or two.
+        state: Suspected, confirmed or closed.
+        evidence: Each time it showed up, oldest first.
+        started_at: When it was first kept.
+        updated_at: When it last changed.
+        last_offered_at: When the Companion last offered a view from it;
+            None if never.
+        last_reaction: How the User took that view; None if never offered.
+    """
+
+    id: UUID
+    user_id: UUID
+    pattern: str
+    state: PatternState
+    evidence: tuple[PatternEvidence, ...]
+    started_at: datetime
+    updated_at: datetime
+    last_offered_at: datetime | None = None
+    last_reaction: PatternReaction | None = None
+
+    @property
+    def thread_ids(self) -> set[UUID]:
+        """The IDs of the Life Threads its evidence shows up in."""
+        return {item.thread_id for item in self.evidence}
+
+
+@dataclass(frozen=True)
+class PatternToSave:
+    """A new or changed Pattern, with what it is found by.
+
+    Attributes:
+        pattern: The Pattern, with all its evidence; evidence already kept
+            is left as it is.
+        embedding: The pattern embedded, so it can be found by meaning;
+            None to keep the one it has, or have none.
+    """
+
+    pattern: Pattern
     embedding: list[float] | None
 
 
@@ -2120,6 +2208,7 @@ class ModelStep(StrEnum):
     LIFE_THREADS = "life_threads"
     CURIOSITIES = "curiosities"
     MOVE_OUTCOMES = "move_outcomes"
+    PATTERNS = "patterns"
     PORTRAIT = "portrait"
     PERSONAL_STICKERS = "personal_stickers"
 

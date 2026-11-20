@@ -17,6 +17,7 @@ from companion.core.models import (
     ConversationMessage,
     DaySummary,
     Feature,
+    LifeThread,
     MemoryCategory,
     MemoryChanges,
     MemoryItem,
@@ -30,6 +31,7 @@ from companion.core.models import (
     UserSnapshot,
 )
 from companion.core.move_outcomes import MoveOutcomeKeeper
+from companion.core.patterns import PatternKeeper
 from companion.core.personal_stickers import PersonalStickerKeeper
 from companion.core.platform_settings import (
     MEMORY_PROCESSING_MODEL,
@@ -419,8 +421,8 @@ class PostConversationProcessor:
     all of that day's messages; everything else is learned from the
     Conversation that ended only, so nothing is learned twice. It changes
     their Memory Items, keeps the photos that matter to them as Shared
-    Photos, updates their Life Threads, keeps their Curiosities and Move
-    Outcomes and then rewrites their User Portrait. Each Day Summary records
+    Photos, updates their Life Threads and Patterns, keeps their Curiosities
+    and Move Outcomes and then rewrites their User Portrait. Each Day Summary records
     how their mood moved and what the Companion offered and how it landed,
     and is embedded, so it can be found by meaning however old it is.
     Separately from User Memory, it keeps the User's Personal Stickers.
@@ -433,6 +435,7 @@ class PostConversationProcessor:
         chat_model: UsageRecordingChatModel,
         personal_sticker_keeper: PersonalStickerKeeper,
         life_thread_keeper: LifeThreadKeeper,
+        pattern_keeper: PatternKeeper,
         curiosity_keeper: CuriosityKeeper,
         move_outcome_keeper: MoveOutcomeKeeper,
         portrait_writer: PortraitWriter,
@@ -451,6 +454,8 @@ class PostConversationProcessor:
             personal_sticker_keeper: Keeps the stickers the User sent whose
                 meaning was clear.
             life_thread_keeper: Starts and adds to the User's Life Threads.
+            pattern_keeper: Starts, adds to, confirms and closes the User's
+                Patterns.
             curiosity_keeper: Writes, updates and closes the User's
                 Curiosities.
             move_outcome_keeper: Keeps what was learned about each Move made.
@@ -463,6 +468,7 @@ class PostConversationProcessor:
         self._chat_model = chat_model
         self._personal_sticker_keeper = personal_sticker_keeper
         self._life_thread_keeper = life_thread_keeper
+        self._pattern_keeper = pattern_keeper
         self._curiosity_keeper = curiosity_keeper
         self._move_outcome_keeper = move_outcome_keeper
         self._portrait_writer = portrait_writer
@@ -480,7 +486,8 @@ class PostConversationProcessor:
         and the photos to keep as Shared Photos; an unreadable answer is asked
         again once, and if it is still unreadable nothing is saved, so a bad
         answer is never retried forever. Once the Conversation is marked
-        processed, its Life Threads are kept, then its Curiosities while the
+        processed, its Life Threads are kept, then its Patterns from the
+        Threads it touched, then its Curiosities while the
         Curiosities Feature works, then its Move Outcomes, and then the User
         Portrait is rewritten; if any of them fails, the failure is logged and
         not tried again, so nothing is ever added twice.
@@ -541,7 +548,8 @@ class PostConversationProcessor:
                 items_by_number,
                 photos_by_number,
             )
-        self._keep_life_threads(snapshot, conversation.id, messages)
+        touched = self._keep_life_threads(snapshot, conversation.id, messages)
+        self._keep_patterns(snapshot, conversation.id, messages, touched)
         if snapshot.works(Feature.CURIOSITIES):
             self._keep_curiosities(snapshot, conversation.id, messages)
         self._keep_move_outcomes(snapshot, conversation.id, messages)
@@ -657,18 +665,44 @@ class PostConversationProcessor:
         snapshot: UserSnapshot,
         conversation_id: UUID,
         messages: list[ConversationMessage],
-    ) -> None:
+    ) -> list[LifeThread]:
         """Keep the User's Life Threads, logging a failure instead of raising.
 
         Args:
             snapshot: The User whose Conversation it was.
             conversation_id: The ended Conversation.
             messages: Its messages, oldest first.
+
+        Returns:
+            The Threads the Conversation touched; none if keeping failed.
         """
         try:
-            self._life_thread_keeper.keep_from(snapshot, conversation_id, messages)
+            return self._life_thread_keeper.keep_from(
+                snapshot, conversation_id, messages
+            )
         except Exception:
             logger.exception("Could not keep Life Threads")
+            return []
+
+    def _keep_patterns(
+        self,
+        snapshot: UserSnapshot,
+        conversation_id: UUID,
+        messages: list[ConversationMessage],
+        touched: list[LifeThread],
+    ) -> None:
+        """Keep the User's Patterns, logging a failure instead of raising.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            conversation_id: The ended Conversation.
+            messages: Its messages, oldest first.
+            touched: The Life Threads the Conversation touched.
+        """
+        try:
+            self._pattern_keeper.keep_from(snapshot, conversation_id, messages, touched)
+        except Exception:
+            logger.exception("Could not keep Patterns")
 
     def _write_portrait(self, snapshot: UserSnapshot) -> None:
         """Rewrite the User's Portrait, logging a failure instead of raising.

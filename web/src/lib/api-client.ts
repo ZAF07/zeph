@@ -169,6 +169,7 @@ export type AdminUser = {
   life_thread_count: number;
   move_outcome_count: number;
   has_portrait: boolean;
+  confirmed_pattern_count: number;
 };
 
 /** A User's role after a change. */
@@ -262,6 +263,13 @@ export type ExtraPromptGroup = {
   prompts: ExtraPrompt[];
 };
 
+/** A whole-number setting limiting what a core service is given. */
+export type ServiceLimit = {
+  key: string;
+  label: string;
+  hint: string;
+};
+
 /**
  * A core service whose prompt, model and thinking Admins can change.
  * `thinking_key` is the on/off setting for whether its model thinks first.
@@ -275,6 +283,7 @@ export type CoreService = {
   thinking_key: string;
   extra_prompts: ExtraPrompt[];
   extra_prompt_groups: ExtraPromptGroup[];
+  limits: ServiceLimit[];
 };
 
 /** The core services and the models Admins can pick for them. */
@@ -612,6 +621,7 @@ export type ModelStep =
   | "life_threads"
   | "curiosities"
   | "move_outcomes"
+  | "patterns"
   | "portrait"
   | "personal_stickers";
 

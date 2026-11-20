@@ -6,6 +6,7 @@ import { ChevronDownIcon } from "@/components/ChevronDownIcon";
 import { EditorLabel } from "@/components/EditorLabel";
 import { ExtraPromptField } from "@/components/ExtraPromptField";
 import { FieldRow } from "@/components/FieldRow";
+import { FieldNumber } from "@/components/FieldNumber";
 import { FieldRows } from "@/components/FieldRows";
 import { FieldSelect } from "@/components/FieldSelect";
 import { FormEditor } from "@/components/FormEditor";
@@ -20,8 +21,8 @@ import { useSaveAdminSettings } from "@/lib/use-admin-settings";
 
 /**
  * One core service's part of the page, from the form template: its heading,
- * field rows for which model it uses and whether that model thinks first,
- * a hint under each, editors for its prompt and any extra prompts (like a
+ * field rows for which model it uses, whether that model thinks first and
+ * any limits on what it is given, a hint under each, editors for its prompt and any extra prompts (like a
  * tool description) each with its name and hint above it,
  * and one save bar that saves them together. Grouped extra prompts
  * sit in groups that are folded shut until clicked. The prompt is combined
@@ -58,15 +59,22 @@ export function CoreServiceCard({
   );
   const [extraPrompts, setExtraPrompts] =
     useState<Record<string, string>>(savedExtraPrompts);
+  const limitKeys = service.limits.map(({ key }) => key);
+  const savedLimits = Object.fromEntries(
+    limitKeys.map((key) => [key, textSetting(settings, key)]),
+  );
+  const [limits, setLimits] = useState<Record<string, string>>(savedLimits);
 
   const isDirty =
     model !== savedModel ||
     thinking !== savedThinking ||
     prompt !== savedPrompt ||
-    extraKeys.some((key) => extraPrompts[key] !== savedExtraPrompts[key]);
+    extraKeys.some((key) => extraPrompts[key] !== savedExtraPrompts[key]) ||
+    limitKeys.some((key) => limits[key] !== savedLimits[key]);
   const allFilled = [
     prompt,
     ...extraKeys.map((key) => extraPrompts[key]),
+    ...limitKeys.map((key) => limits[key]),
   ].every((text) => text?.trim());
   const headingId = `service-${service.prompt_key}`;
   const modelId = `${headingId}-model`;
@@ -77,6 +85,7 @@ export function CoreServiceCard({
     setThinking(savedThinking);
     setPrompt(savedPrompt);
     setExtraPrompts(savedExtraPrompts);
+    setLimits(savedLimits);
     saveSettings.reset();
   }
 
@@ -87,6 +96,9 @@ export function CoreServiceCard({
         [service.model_key]: model,
         [service.thinking_key]: thinking,
         ...extraPrompts,
+        ...Object.fromEntries(
+          limitKeys.map((key) => [key, Number(limits[key])]),
+        ),
       },
       {
         onSuccess: () => {
@@ -163,6 +175,27 @@ export function CoreServiceCard({
             }}
           />
         </FieldRow>
+        {service.limits.map((limit) => {
+          const limitId = `${headingId}-${limit.key}`;
+          return (
+            <FieldRow
+              key={limit.key}
+              title={limit.label}
+              caption={limit.hint}
+              htmlFor={limitId}
+            >
+              <FieldNumber
+                id={limitId}
+                value={limits[limit.key] ?? ""}
+                unit=""
+                onChange={(value) => {
+                  setLimits({ ...limits, [limit.key]: value });
+                  saveSettings.reset();
+                }}
+              />
+            </FieldRow>
+          );
+        })}
       </FieldRows>
       <EditorLabel
         label="Prompt"
@@ -177,6 +210,7 @@ export function CoreServiceCard({
           service.model_key,
           service.thinking_key,
           ...extraKeys,
+          ...limitKeys,
         ])}
         value={prompt}
         onChange={(text) => {

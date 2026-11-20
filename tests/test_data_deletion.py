@@ -59,8 +59,8 @@ def set_up_user_with_every_kind_of_data(
     """Give a User messages, User Memory, a Check-in and a Telegram Connection.
 
     Their User Memory holds a Memory Item, a Day Summary, a Shared
-    Photo, a Life Thread, a Move Outcome and a User Portrait, and they have
-    a Personal Sticker and a Curiosity.
+    Photo, two Life Threads, a Pattern, a Move Outcome and a User Portrait,
+    and they have a Personal Sticker and a Curiosity.
 
     Returns:
         Their Dashboard API headers and their User ID.
@@ -84,7 +84,23 @@ def set_up_user_with_every_kind_of_data(
         json.dumps(
             {
                 "threads": [
-                    {"title": "New job", "story": "Started.", "people": ["design"]}
+                    {"title": "New job", "story": "Started.", "people": ["design"]},
+                    {"title": "New desk", "story": "Bought.", "people": ["desk"]},
+                ]
+            }
+        )
+    )
+    chat_model.script_pattern_keeping(
+        json.dumps(
+            {
+                "patterns": [
+                    {
+                        "pattern": "Throws themselves into a fresh start.",
+                        "evidence": [
+                            {"thread": 1, "line": "Started a new job at once."},
+                            {"thread": 2, "line": "Set up a new desk the same day."},
+                        ],
+                    }
                 ]
             }
         )

@@ -57,6 +57,8 @@ from companion.core.models import (
     Need,
     NeedDetails,
     NextDueTimeChange,
+    Pattern,
+    PatternToSave,
     PersonalSticker,
     PhotoImage,
     PlatformSettings,
@@ -1176,6 +1178,75 @@ class LifeThreadRepository(Protocol):
         """
         ...
 
+    def find_closest(
+        self,
+        user_id: UUID,
+        embedding: list[float],
+        leave_out: Sequence[UUID],
+        limit: int,
+    ) -> list[LifeThread]:
+        """Find a User's Threads closest in meaning, however old, open or settled.
+
+        Threads with no embedding are never found.
+
+        Args:
+            user_id: The User's ID; only their Threads are searched.
+            embedding: What the Threads are compared with.
+            leave_out: Threads not to return, e.g. ones already given.
+            limit: The most to return.
+
+        Returns:
+            The closest Threads, closest first.
+        """
+        ...
+
+
+class PatternRepository(Protocol):
+    """Stores each User's Patterns with their evidence, found by meaning."""
+
+    def list_for_user(self, user_id: UUID) -> list[Pattern]:
+        """List a User's Patterns, oldest started first, with their evidence.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Patterns, each with its evidence oldest first.
+        """
+        ...
+
+    def save_many(
+        self, added: Sequence[PatternToSave], changed: Sequence[PatternToSave]
+    ) -> None:
+        """Add new Patterns and save changed ones, in one step.
+
+        Evidence not kept yet is added, unless its Life Thread was deleted
+        meanwhile; evidence already kept is left as it is. A Pattern left
+        with no evidence is deleted. A changed Pattern saved with no
+        embedding keeps the one it had.
+
+        Args:
+            added: The new Patterns.
+            changed: The changed Patterns.
+        """
+        ...
+
+    def delete_without_evidence(self, user_id: UUID) -> None:
+        """Delete a User's Patterns that have no evidence left.
+
+        Args:
+            user_id: The User's ID.
+        """
+        ...
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete every one of a User's Patterns.
+
+        Args:
+            user_id: The User's ID.
+        """
+        ...
+
 
 class MoveOutcomeRepository(Protocol):
     """Stores each User's Move Outcomes, found by meaning."""
@@ -1466,6 +1537,20 @@ class UserMemoryRepository(Protocol):
 
         Returns:
             The Day Summaries.
+        """
+        ...
+
+    def list_summaries_for_days(
+        self, user_id: UUID, days: Sequence[date]
+    ) -> list[DaySummary]:
+        """List a User's Day Summaries of some days.
+
+        Args:
+            user_id: The User's ID.
+            days: The days, in the User's time zone.
+
+        Returns:
+            The Summaries those days have, newest day first.
         """
         ...
 
@@ -2689,6 +2774,7 @@ class Repositories:
     reply_plans: ReplyPlanRepository
     user_memory: UserMemoryRepository
     life_threads: LifeThreadRepository
+    patterns: PatternRepository
     curiosities: CuriosityRepository
     move_outcomes: MoveOutcomeRepository
     user_portraits: UserPortraitRepository
