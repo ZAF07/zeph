@@ -120,6 +120,17 @@ Asked the user, who chose option 1 from the note above: a small checker model ca
   - The understanding eval's `woven_in` now means "the Reply Plan chose a Check-in".
   - The check runs before the reply is sent, so a reply offered a Check-in waits for one small call (about 0.7 s live).
 
+### Other decisions and things to know (20 Nov 2026)
+
+- **The checker ignores the Check-in thinking switch.** It always runs without thinking, on whatever the Check-in model is set to. Admins can change the model on the Check-ins card but can't turn thinking on for the check. Its prompt is fixed in code, not an Admin setting, because the design says nothing replaces the woven-in prompt.
+- **Check-ins card text changed** (no reference draws this card). Runs when: "Scheduler tick, for Users who are due; after a reply offered a Woven-in Check-in". The description now says the Reply Plan weighs a Check-in that comes due mid-Conversation, and this model, without thinking, then checks whether the reply brought it up.
+- **The log's Check-in shape changed meaning.** `check_in_shape` now holds the check's `kind` and `brought_up`, replacing the old decision's `kinds_offered`, `woven_in` and `kind`. Old rows from the retired model aren't migrated: they read as no shape, so old traces show the step without its facts. The Reply Plan shape's two new fields read as 0 and none on old rows.
+- **Reply Plan prompt reloaded for everyone.** Migration 0071 drops the stored `reply_plan_prompt` even where an Admin edited it, as 0070 did, so the new `check_in` field loads from the seed. Any Admin edit to that prompt is lost.
+- **No ADR.** The checker is a real trade-off but easy to swap later (it's one call in `WovenCheckIns.was_brought_up`), so it fails the "hard to reverse" test. The decision lives here and in the pipeline README.
+- **If the checker proves wrong in practice:** it fails safe. A wrong "no" means the Check-in stays due and may come again; a wrong "yes" means one is logged that the User didn't really get. Watch the "Check-in" step's "Brought up" fact in Admins' own traces.
+- **Migration heads-up for other lanes.** 0071 is now the newest migration on `main`. The `mp-11` worktree (issue 11), still in progress, must put any migration after 0071 when it rebases.
+- **How it was run and cleaned up.** The main stack wasn't running, so `make db-copy` wasn't possible; the live runs used a fresh worktree database with SQL-made test Users. The branch was merged locally (no `gh`), never pushed on its own, then deleted along with the worktree and its Docker stack.
+
 ## Completion
 
 - Completed: 2026-11-20
