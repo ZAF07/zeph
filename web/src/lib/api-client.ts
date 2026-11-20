@@ -703,6 +703,8 @@ export type ReplyPlanShape = {
   read_said: boolean;
   check_in_kinds_offered: number;
   check_in_kind: string | null;
+  pattern_used: boolean;
+  pattern_offered: boolean;
 };
 
 /** The shape of a check on whether a reply brought up its Woven-in Check-in. */

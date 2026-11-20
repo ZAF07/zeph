@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  describePatternUse,
   describeSteps,
   formatDuration,
   formatTokens,
@@ -66,8 +67,11 @@ describe("model call labels", () => {
       read_said: false,
       check_in_kinds_offered: 0,
       check_in_kind: null,
+      pattern_used: false,
+      pattern_offered: false,
     });
     expect(facts).toContainEqual({ label: "Need picked", value: "Ask more" });
+    expect(facts).toContainEqual({ label: "Pattern", value: "None" });
     expect(facts).toContainEqual({ label: "Threads brought up", value: "0" });
     expect(facts).toContainEqual({ label: "Lead Move", value: "None" });
     expect(facts).toContainEqual({ label: "Supporting Move", value: "None" });
@@ -99,6 +103,8 @@ describe("model call labels", () => {
       read_said: true,
       check_in_kinds_offered: 2,
       check_in_kind: "A follow-up",
+      pattern_used: true,
+      pattern_offered: true,
     });
     expect(facts).toContainEqual({ label: "Lead Move", value: "Research" });
     expect(facts).toContainEqual({
@@ -110,11 +116,60 @@ describe("model call labels", () => {
       label: "Threads brought up",
       value: "1 (1 lead, 0 weave)",
     });
-    expect(facts.slice(-4)).toEqual([
+    expect(facts.slice(-5)).toEqual([
       { label: "Read formed", value: "Yes" },
       { label: "Read said", value: "Yes" },
+      { label: "Pattern", value: "Offered" },
       { label: "Check-in Kinds offered", value: "2" },
       { label: "Check-in Kind chosen", value: "A follow-up" },
     ]);
+  });
+});
+
+describe("describePatternUse", () => {
+  const shape = {
+    need: "Be heard",
+    lead_move: null,
+    support_move: null,
+    next_move: null,
+    threads_reminded: 0,
+    threads_led_with: 0,
+    threads_woven_in: 0,
+    threads_left_alone: 0,
+    threads_held_back: 0,
+    read_formed: true,
+    read_said: false,
+    check_in_kinds_offered: 0,
+    check_in_kind: null,
+  };
+
+  it("says None when the Read used no Pattern", () => {
+    expect(
+      describePatternUse({
+        ...shape,
+        pattern_used: false,
+        pattern_offered: false,
+      }),
+    ).toBe("None");
+  });
+
+  it("says a Pattern was used but not offered", () => {
+    expect(
+      describePatternUse({
+        ...shape,
+        pattern_used: true,
+        pattern_offered: false,
+      }),
+    ).toBe("Used, not offered");
+  });
+
+  it("says a Pattern was offered", () => {
+    expect(
+      describePatternUse({
+        ...shape,
+        pattern_used: true,
+        pattern_offered: true,
+      }),
+    ).toBe("Offered");
   });
 });

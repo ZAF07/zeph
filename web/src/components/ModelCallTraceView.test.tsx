@@ -96,6 +96,8 @@ const plainUsersTrace: ModelCallTraceDetails = {
         read_said: false,
         check_in_kinds_offered: 4,
         check_in_kind: "A follow-up",
+        pattern_used: true,
+        pattern_offered: false,
       },
     },
     {
@@ -237,6 +239,7 @@ describe("ModelCallTraceView", () => {
     expect(factValue(replyPlan, "Threads held back")).toBe("1");
     expect(factValue(replyPlan, "Read formed")).toBe("Yes");
     expect(factValue(replyPlan, "Read said")).toBe("No");
+    expect(factValue(replyPlan, "Pattern")).toBe("Used, not offered");
     expect(factValue(replyPlan, "Check-in Kinds offered")).toBe("4");
     expect(factValue(replyPlan, "Check-in Kind chosen")).toBe("A follow-up");
     expect(
@@ -280,6 +283,32 @@ describe("ModelCallTraceView", () => {
       within(reply).getByText("They guide ships home."),
     ).toBeInTheDocument();
     expect(within(reply).getByText("They want facts.")).toBeInTheDocument();
+  });
+
+  it("says when the trace started with its year and a 12-hour time", async () => {
+    apiClient.getModelCallTrace.mockResolvedValue(plainUsersTrace);
+
+    renderWithQueries(<ModelCallTraceView traceId="t1" />);
+
+    expect(
+      await screen.findByText(/^Started 14 Nov 2026, \d{1,2}:30 (AM|PM)\.$/),
+    ).toBeVisible();
+  });
+
+  it("labels the trace Sample data only in design-fixture mode", async () => {
+    apiClient.getModelCallTrace.mockResolvedValue(plainUsersTrace);
+
+    const { unmount } = renderWithQueries(
+      <ModelCallTraceView traceId="t1" designFixtures />,
+    );
+    expect(await screen.findByText("Sample data")).toBeVisible();
+    unmount();
+
+    renderWithQueries(
+      <ModelCallTraceView traceId="t1" designFixtures={false} />,
+    );
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.queryByText("Sample data")).not.toBeInTheDocument();
   });
 
   it("says when the trace no longer exists", async () => {

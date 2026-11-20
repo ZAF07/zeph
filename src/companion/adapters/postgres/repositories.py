@@ -50,6 +50,7 @@ from companion.adapters.postgres.tables import (
     needs,
     pattern_evidence,
     patterns,
+    patterns_in_mind,
     pending_auth_account_deletions,
     personal_stickers,
     platform_settings,
@@ -139,6 +140,7 @@ from companion.core.models import (
     OfferedTool,
     Pattern,
     PatternEvidence,
+    PatternPicked,
     PatternReaction,
     PatternState,
     PatternToSave,
@@ -2378,8 +2380,8 @@ def _reply_plan_form_values(form: ReplyPlanForm) -> dict[str, Any]:
         form: The form.
 
     Returns:
-        The form, with each Thread's, Curiosity's and Knowledge document's ID
-        as text.
+        The form, with each Thread's, Curiosity's, Knowledge document's and
+        Pattern's ID as text.
     """
     values = asdict(form)
     for field_name in ("bring_up", "left_alone"):
@@ -2395,6 +2397,15 @@ def _reply_plan_form_values(form: ReplyPlanForm) -> dict[str, Any]:
             {**item, "document_id": str(item["document_id"])}
             for item in values["knowledge"]["documents"]
         ]
+    values["patterns_used"] = [
+        {**item, "pattern_id": str(item["pattern_id"])}
+        for item in values["patterns_used"]
+    ]
+    if values["pattern_offered"] is not None:
+        values["pattern_offered"] = {
+            **values["pattern_offered"],
+            "pattern_id": str(values["pattern_offered"]["pattern_id"]),
+        }
     return values
 
 
@@ -2424,8 +2435,8 @@ def _to_knowledge_lookup(stored: dict[str, Any] | None) -> KnowledgeLookup | Non
 def _to_reply_plan_form(stored: dict[str, Any]) -> ReplyPlanForm:
     """Turn a saved form back into a Reply Plan form.
 
-    A form saved before Reply Plans formed a Read, or weighed a Check-in,
-    reads as having none.
+    A form saved before Reply Plans formed a Read, weighed a Check-in or
+    used Patterns, reads as having none.
 
     Args:
         stored: The form as saved.
@@ -2479,6 +2490,28 @@ def _to_reply_plan_form(stored: dict[str, Any]) -> ReplyPlanForm:
         read=stored.get("read", ""),
         say_read=stored.get("say_read", False),
         check_in=_to_chosen_check_in(stored.get("check_in")),
+        patterns_used=tuple(
+            _to_pattern_picked(item) for item in stored.get("patterns_used", [])
+        ),
+        pattern_offered=(
+            _to_pattern_picked(stored["pattern_offered"])
+            if stored.get("pattern_offered")
+            else None
+        ),
+    )
+
+
+def _to_pattern_picked(stored: dict[str, Any]) -> PatternPicked:
+    """Turn a saved Pattern the Reply Plan picked back into one.
+
+    Args:
+        stored: The Pattern as saved.
+
+    Returns:
+        The Pattern picked.
+    """
+    return PatternPicked(
+        pattern_id=UUID(stored["pattern_id"]), pattern=stored["pattern"]
     )
 
 
@@ -3022,6 +3055,84 @@ class PostgresPatternRepository:
             ),
             [patterns.c.confirmed_at.desc(), patterns.c.id],
         )
+
+    def find_close_ids(
+        self, user_id: UUID, embedding: list[float], min_closeness: float
+    ) -> list[UUID]:
+        """Find the User's Patterns at least as close in meaning as asked.
+
+        Patterns with no embedding are never found.
+
+        Args:
+            user_id: The User's ID; only their Patterns are searched.
+            embedding: What the Patterns are compared with.
+            min_closeness: How close in meaning a Pattern must be, from 0 to 1.
+
+        Returns:
+            The Patterns' IDs, closest first.
+        """
+        distance = patterns.c.embedding.cosine_distance(embedding)
+        with self._database.connect() as connection:
+            return list(
+                connection.execute(
+                    select(patterns.c.id)
+                    .where(
+                        patterns.c.user_id == user_id,
+                        patterns.c.embedding.is_not(None),
+                        distance <= 1 - min_closeness,
+                    )
+                    .order_by(distance, patterns.c.started_at)
+                ).scalars()
+            )
+
+    def keep_in_mind(
+        self, conversation_id: UUID, pattern_ids: Sequence[UUID], at: datetime
+    ) -> None:
+        """Note that Patterns came to mind in a Conversation, so they stay in mind.
+
+        A Pattern already in mind keeps when it first came to mind.
+
+        Args:
+            conversation_id: The Conversation's ID.
+            pattern_ids: The Patterns' IDs.
+            at: When they came to mind.
+        """
+        if not pattern_ids:
+            return
+        with self._database.begin() as connection:
+            connection.execute(
+                insert(patterns_in_mind)
+                .values(
+                    [
+                        {
+                            "conversation_id": conversation_id,
+                            "pattern_id": pattern_id,
+                            "came_to_mind_at": at,
+                        }
+                        for pattern_id in pattern_ids
+                    ]
+                )
+                .on_conflict_do_nothing()
+            )
+
+    def list_in_mind_ids(self, conversation_id: UUID) -> list[UUID]:
+        """List the Patterns that came to mind in a Conversation.
+
+        Args:
+            conversation_id: The Conversation's ID.
+
+        Returns:
+            The Patterns' IDs, the first to come to mind first.
+        """
+        with self._database.connect() as connection:
+            return list(
+                connection.execute(
+                    select(patterns_in_mind.c.pattern_id)
+                    .join(patterns)
+                    .where(patterns_in_mind.c.conversation_id == conversation_id)
+                    .order_by(patterns_in_mind.c.came_to_mind_at, patterns.c.started_at)
+                ).scalars()
+            )
 
     def _list(
         self,
@@ -5909,6 +6020,8 @@ def _to_reply_plan_shape(values: dict[str, Any]) -> ReplyPlanShape:
         read_formed=values.get("read_formed", False),
         read_said=values.get("read_said", False),
         check_in_kinds_offered=values.get("check_in_kinds_offered", 0),
+        pattern_used=values.get("pattern_used", False),
+        pattern_offered=values.get("pattern_offered", False),
         check_in_kind=values.get("check_in_kind"),
     )
 

@@ -1443,6 +1443,19 @@ class ChosenCheckIn:
 
 
 @dataclass(frozen=True)
+class PatternPicked:
+    """A Pattern in mind the Reply Plan built its Read on, or offered.
+
+    Attributes:
+        pattern_id: The Pattern's ID.
+        pattern: The pattern in a sentence or two, when it was picked.
+    """
+
+    pattern_id: UUID
+    pattern: str
+
+
+@dataclass(frozen=True)
 class ReplyPlanForm:
     """The form the Reply Plan model fills in: what the reply does.
 
@@ -1475,6 +1488,11 @@ class ReplyPlanForm:
         say_read: Whether the reply gives the Read now; never when there is
             no Read.
         check_in: The due Check-in to offer the reply; None for none.
+        patterns_used: The Patterns in mind the Read is built on; an offered
+            one is among them.
+        pattern_offered: The Pattern the reply offers as Zeph's view, with
+            the Read; None for none, and always None when the Read isn't
+            said.
     """
 
     need: str
@@ -1497,6 +1515,8 @@ class ReplyPlanForm:
     read: str = ""
     say_read: bool = False
     check_in: ChosenCheckIn | None = None
+    patterns_used: tuple[PatternPicked, ...] = ()
+    pattern_offered: PatternPicked | None = None
 
 
 @dataclass(frozen=True)
@@ -2336,6 +2356,8 @@ class ReplyPlanShape:
             0 when no Check-in was due.
         check_in_kind: The Check-in Kind it chose to weave in, by name;
             None for none.
+        pattern_used: Whether its Read was built on a Pattern in mind.
+        pattern_offered: Whether the reply was to offer a Pattern.
     """
 
     need: str
@@ -2351,6 +2373,8 @@ class ReplyPlanShape:
     read_said: bool = False
     check_in_kinds_offered: int = 0
     check_in_kind: str | None = None
+    pattern_used: bool = False
+    pattern_offered: bool = False
 
 
 @dataclass(frozen=True)

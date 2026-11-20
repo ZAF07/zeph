@@ -461,7 +461,9 @@ reply_plan_prompt: |-
   Outcomes, with their days), their User Portrait, their Goals, the Memory
   Categories Zeph has saved something in, their recent Conversations, the
   Life Threads (ongoing stories in their life) this message reminds Zeph of,
-  the things Zeph has been wondering about them (Curiosities) whose time has
+  the Patterns in mind (what Zeph has noticed keeps showing up across their
+  life; a suspected one is only Zeph's guess), the things Zeph has been
+  wondering about them (Curiosities) whose time has
   come, the Knowledge documents Zeph can draw on with when each helps, the
   Check-in Kinds Zeph may weave in when a Check-in with them is due (they
   asked Zeph to check in now and then), the earlier Reply Plans in this
@@ -481,7 +483,8 @@ reply_plan_prompt: |-
     push across the Conversation instead of changing course every message.
   - read: your honest Read of what is really going on for them, in one or
     two sentences, formed from the Outlook, how Zeph understood them and
-    what you know of them (memory, Life Threads, earlier Reply Plans). Go
+    what you know of them (memory, Life Threads, Patterns, earlier Reply
+    Plans). Go
     beneath what they said to what it is about. Always form one, even when
     it won't be said yet. It is Zeph's view: offer it as a view,
     never as fact.
@@ -495,6 +498,14 @@ reply_plan_prompt: |-
     When they ask for your view ("what do you think?", "what's going on with
     me?"), give your deepest Read at once, not advice already given and not
     another question. Otherwise false.
+  - patterns_used: the numbers of the Patterns in mind your Read is built
+    on. Use one when this message looks like another time it shows up, so
+    your Read can join dots they haven't joined yet. Empty if none fits.
+  - offer_pattern: the number of one Pattern to offer with the Read, as what
+    Zeph notices ("here's what I notice…"), never as fact. Only when
+    say_read is true and your Read rests on it. Offering it is how Zeph
+    learns whether it fits them: their reaction confirms or closes it. Null
+    otherwise.
   - need: the one Need that fits best, its name exactly as written. If it
     isn't clear, pick the fallback Need.
   - guidance: one sentence on what would fit this moment.
@@ -579,6 +590,8 @@ reply_plan_prompt: |-
     "where_we_are": "...",
     "read": "...",
     "say_read": true | false,
+    "patterns_used": [<number>],
+    "offer_pattern": <number> | null,
     "need": "<Need name>",
     "guidance": "...",
     "lead_move": "<Move name>" | null,
@@ -668,6 +681,11 @@ move_outcomes_closeness_percent: 65
 # many days before bringing it up again. A Thread they asked to drop is never
 # brought up again unless they raise it.
 life_thread_brushed_off_wait_days: 14
+
+# After the User pushes back on a Pattern Zeph offered as its view, and the
+# Pattern isn't closed, it waits this many days before it comes to mind in a
+# reply again. A closed Pattern never comes to mind.
+pattern_pushed_back_wait_days: 30
 
 # Curiosities: things Zeph wants to ask a User later, written when a
 # Conversation ends. The Understanding sees the waiting ones whose "not before"

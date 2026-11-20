@@ -2,11 +2,17 @@ import json
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
-from companion.core.life_threads import describe_thread, incoming_texts, read_text
+from companion.core.life_threads import (
+    RemindedThread,
+    describe_thread,
+    incoming_texts,
+    read_text,
+    recent_incoming_texts,
+)
 from companion.core.memory_retrieval import format_calendar_day, format_day
 from companion.core.models import (
     ChatLine,
@@ -23,11 +29,14 @@ from companion.core.models import (
     UserSnapshot,
 )
 from companion.core.platform_settings import (
+    LIFE_THREADS_CLOSENESS_PERCENT,
+    LIFE_THREADS_TEXTS_TO_SEARCH,
     PATTERN_KEEPING_DAYS,
     PATTERN_KEEPING_MODEL,
     PATTERN_KEEPING_PROMPT,
     PATTERN_KEEPING_THINKING,
     PATTERN_KEEPING_THREADS,
+    PATTERN_PUSHED_BACK_WAIT,
 )
 from companion.core.ports import Clock, Embedder, Repositories
 from companion.core.timing import day_span, users_today
@@ -37,6 +46,10 @@ from companion.core.usage import UsageRecordingChatModel
 logger = logging.getLogger(__name__)
 
 FEWEST_THREADS_TO_START_A_PATTERN = 2
+MOST_PATTERNS_IN_MIND = 10
+OFFERED_HERE_WORDS = (
+    "offered to them in this Conversation: judge how they took it from the Conversation"
+)
 STATE_WORDS = {
     PatternState.SUSPECTED: "suspected",
     PatternState.CONFIRMED: "confirmed",
@@ -79,18 +92,37 @@ class DayBehindEvidence:
     summary: DaySummary | None
 
 
-def describe_pattern(pattern: Pattern, time_zone: str | None) -> str:
+@dataclass(frozen=True)
+class RemindedPattern:
+    """A Pattern that came to mind for a reply, numbered for the Reply Plan.
+
+    Attributes:
+        number: Its number in the list the model is shown, from 1.
+        pattern: The Pattern.
+    """
+
+    number: int
+    pattern: Pattern
+
+
+def describe_pattern(
+    pattern: Pattern, time_zone: str | None, offered_here: bool = False
+) -> str:
     """Write a Pattern, its state, when it was last offered and its evidence.
 
     Args:
         pattern: The Pattern.
         time_zone: The User's IANA time zone, for the days.
+        offered_here: Whether a Reply Plan in the Conversation being kept
+            offered it to the User.
 
     Returns:
         E.g. "(suspected; last offered 3 Nov 2026, they pushed back) When
         something grabs them... Evidence:" then one "- " line per piece.
     """
     notes = [STATE_WORDS[pattern.state]]
+    if offered_here:
+        notes.append(OFFERED_HERE_WORDS)
     if pattern.last_offered_at is not None:
         reaction = (
             REACTION_WORDS[pattern.last_reaction]
@@ -105,6 +137,53 @@ def describe_pattern(pattern: Pattern, time_zone: str | None) -> str:
         for item in pattern.evidence
     )
     return f"({'; '.join(notes)}) {pattern.pattern} Evidence:\n{evidence_lines}"
+
+
+def may_come_to_mind(
+    pattern: Pattern, now: datetime, pushed_back_wait: timedelta
+) -> bool:
+    """Say whether a Pattern may come to mind for a reply.
+
+    A closed Pattern never does. One the User pushed back on waits the
+    Admin-set time after it was offered.
+
+    Args:
+        pattern: The Pattern.
+        now: The current time.
+        pushed_back_wait: How long to wait after they pushed back.
+
+    Returns:
+        True if it may come to mind.
+    """
+    if pattern.state == PatternState.CLOSED:
+        return False
+    return not (
+        pattern.last_reaction == PatternReaction.PUSHED_BACK
+        and pattern.last_offered_at is not None
+        and now < pattern.last_offered_at + pushed_back_wait
+    )
+
+
+def describe_patterns_in_mind(
+    reminded: Sequence[RemindedPattern], time_zone: str | None
+) -> str:
+    """Write the Patterns in mind as the Reply Plan model reads them.
+
+    Args:
+        reminded: The Patterns, numbered.
+        time_zone: The User's IANA time zone, for the days.
+
+    Returns:
+        One block per Pattern, with its state, when it was last offered and
+        how they took it, and its evidence; "None." if there are none.
+    """
+    return (
+        "\n".join(
+            f"[{item.number}] {describe_pattern(item.pattern, time_zone)}"
+            for item in reminded
+        )
+        or "None."
+    )
 
 
 def describe_numbered_threads(
@@ -158,6 +237,7 @@ def describe_patterns_to_keep(
     conversation_day: date,
     now: datetime,
     time_zone: str | None,
+    offered_ids: set[UUID] | None = None,
 ) -> str:
     """Write what the Pattern keeping model is given.
 
@@ -170,13 +250,17 @@ def describe_patterns_to_keep(
         conversation_day: The day the Conversation started.
         now: The current time.
         time_zone: The User's IANA time zone, for the days.
+        offered_ids: The IDs of the Patterns the Conversation's Reply Plans
+            offered to the User.
 
     Returns:
-        Today's date, the Threads, the Patterns, the days behind their
-        evidence and the Conversation under the day it started.
+        Today's date, the Threads, the Patterns (each offered one marked),
+        the days behind their evidence and the Conversation under the day
+        it started.
     """
+    offered = offered_ids or set()
     pattern_lines = "\n".join(
-        f"[{number}] {describe_pattern(pattern, time_zone)}"
+        f"[{number}] {describe_pattern(pattern, time_zone, pattern.id in offered)}"
         for number, pattern in known.items()
     )
     touched_lines = describe_numbered_threads(touched, time_zone)
@@ -408,6 +492,126 @@ def plan_pattern_changes(
     return PlannedPatterns(added=added, changed=changed)
 
 
+class PatternReminder:
+    """Brings the User's Patterns to mind before each reply.
+
+    No model call. A Pattern comes to mind through its linked Life Threads,
+    when one of them is in mind, and directly when what the User means and
+    their latest texts are close to it in meaning, so one can surface in a
+    brand-new situation. Patterns that came to mind earlier in the
+    Conversation stay in mind until it ends.
+    """
+
+    def __init__(
+        self, repositories: Repositories, embedder: Embedder, clock: Clock
+    ) -> None:
+        """Set up the reminder.
+
+        Args:
+            repositories: Where Conversations and Patterns are stored.
+            embedder: Embeds what the User means and their latest texts.
+            clock: Tells the current time.
+        """
+        self._repositories = repositories
+        self._embedder = embedder
+        self._clock = clock
+
+    def remind(
+        self,
+        snapshot: UserSnapshot,
+        conversation_id: UUID,
+        meaning: str,
+        threads: Sequence[RemindedThread],
+    ) -> list[RemindedPattern]:
+        """Find the User's Patterns that come to mind for the Message.
+
+        Those close in meaning come first, then those linked to a Thread in
+        mind, then those that came to mind earlier in the Conversation, at
+        most `MOST_PATTERNS_IN_MIND`. The search uses what the User means
+        and their latest texts, as many as Life Threads are searched on,
+        with the Life Thread closeness bar. A closed Pattern never comes to
+        mind, and one they pushed back on waits the Admin-set time. Each one
+        found is kept in mind for the rest of the Conversation. If the
+        search can't be embedded, Patterns come only through their Threads.
+
+        Args:
+            snapshot: The User being answered.
+            conversation_id: The Conversation the Message is in.
+            meaning: What the Understanding says the User means; "" if it
+                failed.
+            threads: The Life Threads in mind for the Message.
+
+        Returns:
+            The Patterns, numbered from 1.
+        """
+        now = self._clock.now()
+        wait = snapshot.settings.get(PATTERN_PUSHED_BACK_WAIT)
+        pattern_repository = self._repositories.patterns
+        allowed = {
+            pattern.id: pattern
+            for pattern in pattern_repository.list_for_user(snapshot.user.id)
+            if may_come_to_mind(pattern, now, wait)
+        }
+        if not allowed:
+            return []
+        thread_ids = {item.thread.id for item in threads}
+        linked_ids = [
+            pattern.id
+            for pattern in allowed.values()
+            if pattern.thread_ids & thread_ids
+        ]
+        close_ids = [
+            pattern_id
+            for pattern_id in self._find_close_ids(snapshot, conversation_id, meaning)
+            if pattern_id in allowed
+        ]
+        found_ids = list(dict.fromkeys([*close_ids, *linked_ids]))
+        pattern_repository.keep_in_mind(conversation_id, found_ids, now)
+        in_mind_ids = dict.fromkeys(
+            [*found_ids, *pattern_repository.list_in_mind_ids(conversation_id)]
+        )
+        in_mind = [
+            allowed[pattern_id] for pattern_id in in_mind_ids if pattern_id in allowed
+        ]
+        return [
+            RemindedPattern(number=number, pattern=pattern)
+            for number, pattern in enumerate(in_mind[:MOST_PATTERNS_IN_MIND], start=1)
+        ]
+
+    def _find_close_ids(
+        self, snapshot: UserSnapshot, conversation_id: UUID, meaning: str
+    ) -> list[UUID]:
+        """Find the User's Patterns close in meaning to the Message.
+
+        Args:
+            snapshot: The User being answered.
+            conversation_id: The Conversation the Message is in.
+            meaning: What the Understanding says the User means.
+
+        Returns:
+            The Patterns' IDs, closest first; none if there is nothing to
+            search on or it can't be embedded.
+        """
+        settings = snapshot.settings
+        texts = recent_incoming_texts(
+            self._repositories.conversations.list_messages(conversation_id),
+            settings.get(LIFE_THREADS_TEXTS_TO_SEARCH),
+        )
+        search = "\n".join(part for part in [meaning, *texts] if part)
+        if not search:
+            return []
+        try:
+            embedding = self._embedder.embed_query(search)
+        except Exception:
+            logger.exception("Could not embed the texts to find Patterns by")
+            return []
+        return self._repositories.patterns.find_close_ids(
+            snapshot.user.id,
+            embedding,
+            settings.get(LIFE_THREADS_CLOSENESS_PERCENT) / 100,
+        )
+
+
 class PatternKeeper:
     """Keeps a User's Patterns when a Conversation ends, after its Life Threads.
 
@@ -447,11 +651,11 @@ class PatternKeeper:
         Runs whenever the User wrote something, so a view they took is
         always judged. The model sees the Threads the Conversation touched,
         the User's other Threads closest in meaning to those and to their
-        texts, however old (up to the Admin-set number), all their Patterns,
-        and the days
-        behind the evidence of the Patterns linked to those Threads (up to
-        the Admin-set number). An unreadable answer is asked again once; if
-        it is still unreadable nothing changes.
+        texts, however old (up to the Admin-set number), all their Patterns
+        (those a Reply Plan offered in the Conversation marked as offered),
+        and the days behind the evidence of the Patterns linked to those
+        Threads (up to the Admin-set number). An unreadable answer is asked
+        again once; if it is still unreadable nothing changes.
 
         Args:
             snapshot: The User whose Conversation it was; User Memory works
@@ -485,6 +689,13 @@ class PatternKeeper:
             {thread.id for thread in threads.values()},
             settings.get(PATTERN_KEEPING_DAYS),
         )
+        offered_ids = {
+            reply_plan.form.pattern_offered.pattern_id
+            for reply_plan in self._repositories.reply_plans.list_for_conversation(
+                conversation_id
+            )
+            if reply_plan.form.pattern_offered is not None
+        }
         entries = self._ask(
             snapshot,
             describe_patterns_to_keep(
@@ -496,6 +707,7 @@ class PatternKeeper:
                 conversation_day,
                 now,
                 time_zone,
+                offered_ids,
             ),
         )
         if entries is None:

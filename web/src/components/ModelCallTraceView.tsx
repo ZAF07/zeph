@@ -9,8 +9,9 @@ import { LoadFailed } from "@/components/LoadFailed";
 import { LoadingPanel } from "@/components/LoadingPanel";
 import { StatTiles } from "@/components/StatTiles";
 import { ModelCallCard } from "@/components/ModelCallCard";
+import { env } from "@/env";
 import { ApiError } from "@/lib/api-client";
-import { formatSavedAt } from "@/lib/dates";
+import { formatLastSavedAt } from "@/lib/dates";
 import {
   formatDuration,
   formatTokens,
@@ -25,10 +26,18 @@ const logPath = "/admin/model-calls";
  * One Model Call Log trace: what it was for, who and when, its totals, then
  * every model call in it, in order.
  *
- * @param props - `traceId` is the trace to show.
+ * @param props - `traceId` is the trace to show; `designFixtures` says
+ *   whether design-fixture mode is on, where the drawn trace is labelled
+ *   "Sample data".
  * @returns The page body, or a loading, not-found or error state.
  */
-export function ModelCallTraceView({ traceId }: { traceId: string }) {
+export function ModelCallTraceView({
+  traceId,
+  designFixtures = env.designFixtures,
+}: {
+  traceId: string;
+  designFixtures?: boolean;
+}) {
   const apiClient = useApiClient();
   const traceQuery = useQuery({
     queryKey: queryKeys.modelCallTrace(traceId),
@@ -100,7 +109,14 @@ export function ModelCallTraceView({ traceId }: { traceId: string }) {
       {backLink}
       <AdminPageHeader
         title={`${traceKindLabel(trace.kind)} for ${who}`}
-        lead={`Started ${formatSavedAt(trace.started_at)}.`}
+        lead={`Started ${formatLastSavedAt(trace.started_at)}.`}
+        aside={
+          designFixtures ? (
+            <span className="rounded-pill border border-line-strong px-3 py-1 text-[12px] text-soft">
+              Sample data
+            </span>
+          ) : undefined
+        }
       />
       <StatTiles tiles={totals} />
       {trace.calls.map((call) => (

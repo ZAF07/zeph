@@ -10,6 +10,8 @@ const outfit = Outfit({
   variable: "--font-outfit",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600"],
+  fallback: ["system-ui", "sans-serif"],
+  adjustFontFallback: false,
 });
 
 export const metadata: Metadata = {
