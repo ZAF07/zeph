@@ -82,4 +82,7 @@ Live runs used real DeepSeek and Postgres inside the worktree's backend containe
 ## Completion
 
 - Completed: 2026-11-20
-- Commit: <filled in after merge>
+- Commit: 83e03ee "Merge message pipeline issue 11: every reply sees the Recent Messages and the Reply Plan can read a past day" (merged into `main` locally and pushed), with:
+  - 0c9b0a0 "Message pipeline issue 11: Recent Messages and the past-day tool"
+  - f37d230 "Message pipeline issue 11: review fixes"
+  - 20f4727 "Message pipeline issue 11 done: archive issue with test, run, pixel and review evidence"
