@@ -1213,10 +1213,6 @@ check_in_prompt: |-
   Keep it light and easy to answer or ignore. Don't ask more than one question,
   don't mention that this is a Check-in, and only mention things you were told.
 
-# Woven-in Check-ins. When a User's Check-in comes due while they are chatting,
-# the Check-in model above decides, with the Persona and this prompt, whether
-# Zeph's reply should weave it in now. It is never asked while the User is
-# struggling or paused.
 # After this many sent Check-ins in a row get no reply, the Companion sends the
 # message below once and pauses the User's Check-ins until they resume.
 check_in_ignore_threshold: 3

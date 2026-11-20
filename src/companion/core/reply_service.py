@@ -3,7 +3,7 @@ from companion.core.curiosities import CuriosityRaiser
 from companion.core.knowledge_retrieval import KnowledgeRetrieval
 from companion.core.life_threads import ThreadReminder
 from companion.core.memory_retrieval import MemoryRetrieval
-from companion.core.models import CheckIn, MessageToAnswer, UserSnapshot
+from companion.core.models import MessageToAnswer, UserSnapshot
 from companion.core.move_outcomes import MoveOutcomeFinder
 from companion.core.reply_attempt import ReplyAttempt
 from companion.core.reply_gate import ReplyGate, Stopped
@@ -12,7 +12,6 @@ from companion.core.reply_tools import ReplyOffer
 from companion.core.response_composition import ResponseComposer
 from companion.core.understanding import UnderstandingService
 from companion.core.woven_check_ins import (
-    WovenCheckIn,
     WovenCheckIns,
     format_woven_check_in_for_reply,
 )
@@ -145,13 +144,9 @@ class ReplyService:
             understanding.form.look_up_past,
         )
         knowledge = self._knowledge_retrieval.recall(snapshot, plan.knowledge)
-        woven = planned.check_in
-        saved_check_in = (
-            self._woven_check_ins.save(snapshot, woven) if woven is not None else None
-        )
         offered = (
-            (woven, saved_check_in)
-            if woven is not None and saved_check_in is not None
+            self._woven_check_ins.save(snapshot, planned.check_in)
+            if planned.check_in is not None
             else None
         )
         try:
@@ -165,7 +160,7 @@ class ReplyService:
                 optional_offers=(
                     [
                         ReplyOffer(
-                            instructions=format_woven_check_in_for_reply(offered[0])
+                            instructions=format_woven_check_in_for_reply(offered.woven)
                         )
                     ]
                     if offered is not None
@@ -177,9 +172,9 @@ class ReplyService:
                 ),
             )
             if offered is not None and not self._woven_check_ins.was_brought_up(
-                snapshot, offered[0], reply.parts
+                snapshot, offered.woven, reply.parts
             ):
-                self._take_back(snapshot, *offered)
+                self._woven_check_ins.take_back(snapshot, offered)
                 offered = None
             self._conversations.deliver_reply(
                 message.user_id,
@@ -195,19 +190,7 @@ class ReplyService:
             raise
         except Exception:
             if offered is not None:
-                self._take_back(snapshot, *offered)
+                self._woven_check_ins.take_back(snapshot, offered)
             raise
         self._thread_reminder.mark_raised(message.conversation_id, plan.bring_up)
         self._curiosity_raiser.mark_raised(message.conversation_id, plan.curiosities)
-
-    def _take_back(
-        self, snapshot: UserSnapshot, woven: WovenCheckIn, check_in: CheckIn
-    ) -> None:
-        """Take back the Woven-in Check-in offered to a reply, so it stays due.
-
-        Args:
-            snapshot: The User being answered, as read for the reply.
-            woven: The Check-in offered to the reply.
-            check_in: Its saved row.
-        """
-        self._woven_check_ins.take_back(snapshot, woven, check_in)

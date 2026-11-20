@@ -733,12 +733,15 @@ def woven_check_in_from_plan(
 
     Returns:
         The Check-in, for the User's Due Time and any Check in Now waiting;
-        None when the plan chose none or the User has no Due Time.
+        None when the plan chose none, its Kind is no longer offered or the
+        User has no Due Time.
     """
     settings = snapshot.user.check_ins
     if form.check_in is None or settings.next_due_at is None:
         return None
-    [kind] = [kind for kind in kinds if kind.name == form.check_in.kind]
+    kind = next((kind for kind in kinds if kind.name == form.check_in.kind), None)
+    if kind is None:
+        return None
     return WovenCheckIn(
         kind=kind,
         note=form.check_in.note,

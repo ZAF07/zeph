@@ -218,8 +218,7 @@ def test_the_reply_plan_is_given_the_due_check_in_kinds_and_no_check_in_model_ru
 
     send_to_webhook(client, telegram_text_update("now making a big salad"))
 
-    [plan_call] = chat_model.reply_plan_calls[-1:]
-    [line] = plan_call.history
+    [line] = chat_model.reply_plan_calls[-1].history
     assert CHECK_IN_DUE in line.text
     assert "A casual hello" in line.text
     assert "A follow-up" in line.text
@@ -227,7 +226,7 @@ def test_the_reply_plan_is_given_the_due_check_in_kinds_and_no_check_in_model_ru
     assert "Something I've been wondering" not in line.text
     assert "now making a big salad" in line.text
     assert chat_model.brought_up_check_calls == []
-    assert "reply" == chat_model.call_order[-1]
+    assert chat_model.call_order[-1] == "reply"
 
 
 def assert_no_check_in_offered(

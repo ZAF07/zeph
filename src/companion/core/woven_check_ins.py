@@ -106,6 +106,33 @@ def kinds_to_weave_in(kinds: Sequence[CheckInKind]) -> list[CheckInKind]:
     ]
 
 
+@dataclass(frozen=True)
+class SavedWovenCheckIn:
+    """A Woven-in Check-in offered to a reply, with the row saved for it.
+
+    Attributes:
+        woven: The Check-in the reply was offered.
+        check_in: The Check-in as saved before the reply, to take back if
+            the reply leaves it out or fails.
+    """
+
+    woven: WovenCheckIn
+    check_in: CheckIn
+
+
+def describe_woven_check_in(woven: WovenCheckIn) -> str:
+    """Write one line on a Woven-in Check-in: its Kind and what to bring up.
+
+    Args:
+        woven: The Check-in.
+
+    Returns:
+        E.g. "A follow-up: On something you shared. What to bring up: Ask
+        how the interview went."
+    """
+    return f"{woven.kind.name}: {woven.kind.description} What to bring up: {woven.note}"
+
+
 def format_woven_check_in_for_reply(woven: WovenCheckIn) -> str:
     """Write the reply's section on the due Check-in, as an optional extra.
 
@@ -119,9 +146,7 @@ def format_woven_check_in_for_reply(woven: WovenCheckIn) -> str:
         "A Check-in with them is due. Bring it up only if it fits what they "
         "need right now, once, the way a friend drifts onto a side topic, "
         "without saying it is a Check-in; if it doesn't fit, leave it out and "
-        "it will wait:\n"
-        f"- {woven.kind.name}: {woven.kind.description} "
-        f"What to bring up: {woven.note}"
+        f"it will wait:\n- {describe_woven_check_in(woven)}"
     )
 
 
@@ -138,11 +163,7 @@ def describe_reply_for_brought_up_check(
         The Check-in's Kind, description and note, then the reply.
     """
     reply = "\n".join(reply_parts)
-    return (
-        f"The Check-in: {woven.kind.name}: {woven.kind.description} "
-        f"What to bring up: {woven.note}\n\n"
-        f"The reply:\n{reply}"
-    )
+    return f"The Check-in: {describe_woven_check_in(woven)}\n\nThe reply:\n{reply}"
 
 
 def read_brought_up_answer(answer: str) -> bool:
@@ -249,7 +270,9 @@ class WovenCheckIns:
         )
         return brought_up
 
-    def save(self, snapshot: UserSnapshot, woven: WovenCheckIn) -> CheckIn | None:
+    def save(
+        self, snapshot: UserSnapshot, woven: WovenCheckIn
+    ) -> SavedWovenCheckIn | None:
         """Save the Woven-in Check-in and move the Due Time on, before the reply goes.
 
         The next Due Time follows the same rules as a sent Check-in: one
@@ -263,7 +286,7 @@ class WovenCheckIns:
             woven: The Check-in to weave in.
 
         Returns:
-            The saved Check-in; None if it wasn't saved.
+            The Check-in with its saved row; None if it wasn't saved.
         """
         settings = snapshot.user.check_ins
         now = self._clock.now()
@@ -292,11 +315,9 @@ class WovenCheckIns:
         except Exception:
             logger.exception("Could not save a Woven-in Check-in; not woven in")
             return None
-        return check_in if saved else None
+        return SavedWovenCheckIn(woven, check_in) if saved else None
 
-    def take_back(
-        self, snapshot: UserSnapshot, woven: WovenCheckIn, check_in: CheckIn
-    ) -> None:
+    def take_back(self, snapshot: UserSnapshot, saved: SavedWovenCheckIn) -> None:
         """Take back a saved Woven-in Check-in whose reply was never sent.
 
         The User stays due at the Due Time read for the reply, and a Check
@@ -306,20 +327,19 @@ class WovenCheckIns:
         Args:
             snapshot: The User being answered, as read for the reply, whose
                 Due Time was due.
-            woven: The Check-in that was to be woven in.
-            check_in: The saved Check-in.
+            saved: The Check-in that was to be woven in, with its saved row.
         """
         settings = snapshot.user.check_ins
         if settings.next_due_at is None:
             return
         try:
             self._repositories.check_ins.undo_add(
-                check_in,
+                saved.check_in,
                 settings.next_due_at,
                 end_pause=False,
                 skipped=None,
                 held_back_due_at=settings.held_back_due_at,
-                check_in_now=woven.check_in_now,
+                check_in_now=saved.woven.check_in_now,
             )
         except Exception:
             logger.exception("Could not take back a Woven-in Check-in; it is missed")
