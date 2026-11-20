@@ -221,7 +221,8 @@ def test_with_no_documents_chosen_the_reply_gets_no_knowledge(
     assert seeded_settings["reply_knowledge_intro"] not in instructions
     assert BREATH_TEXT not in instructions
     assert set(embedder.queries[searches_before:]) == {
-        "my attention keeps drifting, the breath helps"
+        "my attention keeps drifting, the breath helps",
+        "They're just saying hi.\nmy attention keeps drifting, the breath helps",
     }
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["mm, yes"]
 

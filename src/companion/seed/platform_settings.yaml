@@ -632,17 +632,23 @@ older_summaries_per_reply: 3
 # real matches score about 70 to 80 and unrelated ones up to about 65.
 older_summaries_closeness_percent: 68
 
-# Life Threads. Before each reply, the User's last few texts are matched
-# against their Threads: by a person or thing named in a Thread, or by
-# meaning. Open Threads come first. At most this many go to the
-# Understanding, which picks what to bring up or leave alone.
-life_threads_per_reply: 3
+# Life Threads. Before each reply, what the Understanding says the User means
+# and their latest texts are matched against their Threads: by a person or
+# thing named in a Thread, or by meaning. Open Threads come first. At most
+# this many come to mind for one message, a high cap only there to protect
+# cost. Threads that came to mind earlier in the Conversation stay in mind
+# until it ends. The Reply Plan sees them all and picks what the reply uses.
+life_threads_per_reply: 10
+
+# How many of the User's latest texts Threads are searched on, with what the
+# Understanding says they mean.
+life_threads_texts_to_search: 8
 
 # How close in meaning (cosine similarity, as a percent) a Thread's story must
-# be to the User's last few texts to remind the Companion of it. With the
-# bge-small embedder, short messages about a Thread score about 65 to 72 and
-# unrelated ones up to about 55. A Thread that names someone or something in
-# the texts counts whatever its closeness.
+# be to what the User means and their latest texts to remind the Companion of
+# it. With the bge-small embedder, short messages about a Thread score about
+# 65 to 72 and unrelated ones up to about 55. A Thread that names someone or
+# something in the texts counts whatever its closeness.
 life_threads_closeness_percent: 62
 
 # Move Outcomes. Before each Understanding, the User's last few texts are

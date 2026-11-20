@@ -208,7 +208,10 @@ def test_an_empty_look_up_past_searches_nothing(
     instructions = ask_with_look_up_past(client, chat_model, [])
 
     assert INTERVIEW_SUMMARY not in instructions
-    assert set(embedder.queries) == {"how did that go, did I tell you?"}
+    assert set(embedder.queries) == {
+        "how did that go, did I tell you?",
+        "They're just saying hi.\nhow did that go, did I tell you?",
+    }
 
 
 def test_only_the_users_own_summaries_are_searched(

@@ -59,7 +59,11 @@ const settings: AdminSettings = {
   recent_messages_cap: seeded(400),
   older_summaries_per_reply: seeded(3),
   older_summaries_closeness_percent: seeded(68),
-  life_threads_per_reply: seeded(3),
+  life_threads_per_reply: seeded(10),
+  life_threads_texts_to_search: seeded(
+    8,
+    "How many of the User’s latest texts Recall searches Life Threads on.",
+  ),
   life_threads_closeness_percent: seeded(68),
   life_thread_brushed_off_wait_days: seeded(14),
   move_outcomes_per_understanding: seeded(3),
@@ -252,18 +256,30 @@ describe("PlatformSettingsForm", () => {
     });
   });
 
-  it("shows and saves the Life Thread number, closeness bar and wait", async () => {
+  it("shows and saves the Life Thread number, texts, closeness bar and wait", async () => {
     const user = userEvent.setup();
     renderWithQueries(<PlatformSettingsForm />);
-    const most = await screen.findByLabelText("Most Life Threads per reply");
+    const most = await screen.findByLabelText("Most Life Threads per message");
+    const texts = screen.getByLabelText("Texts searched for Life Threads");
     const bar = screen.getByLabelText("Life Thread closeness bar");
     const wait = screen.getByLabelText("Wait after a brushed-off Life Thread");
-    expect(most).toHaveValue(3);
+    expect(most).toHaveValue(10);
+    expect(texts).toHaveValue(8);
     expect(bar).toHaveValue(68);
     expect(wait).toHaveValue(14);
+    expect(
+      screen.getByText(
+        "How many of the User’s latest texts Recall searches Life Threads on.",
+      ),
+    ).toBeVisible();
+    expect(screen.getByRole("region", { name: "Memory" })).toContainElement(
+      texts,
+    );
 
     await user.clear(most);
-    await user.type(most, "2");
+    await user.type(most, "20");
+    await user.clear(texts);
+    await user.type(texts, "12");
     await user.clear(bar);
     await user.type(bar, "70");
     await user.clear(wait);
@@ -271,7 +287,8 @@ describe("PlatformSettingsForm", () => {
     await user.click(screen.getByRole("button", { name: "Save settings" }));
 
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
-      life_threads_per_reply: 2,
+      life_threads_per_reply: 20,
+      life_threads_texts_to_search: 12,
       life_threads_closeness_percent: 70,
       life_thread_brushed_off_wait_days: 21,
     });

@@ -300,7 +300,9 @@ def describe_message_for_reply_plan(
         earlier: This Conversation's earlier Reply Plans, oldest first.
         recent: The Recent Messages: every message from the last hours,
             across Conversations, ending with the Message being answered.
-        reminded: The Life Threads the Message reminds the Companion of.
+        reminded: The Life Threads in mind: those the Message reminds the
+            Companion of, then those that came to mind earlier in the
+            Conversation.
         due: The Curiosities it may bring up.
         knowledge_documents: The Knowledge documents it may choose from, by
             number.
@@ -367,7 +369,8 @@ def describe_message_for_reply_plan(
         f"Their Goals:\n{goal_lines or 'None saved.'}\n\n"
         f"Memory Categories with something saved:\n{category_lines or 'None yet.'}"
         f"\n\nRecent days, newest first:\n{summary_lines or 'None yet.'}"
-        f"\n\nLife Threads this reminds you of, open ones first:\n"
+        f"\n\nLife Threads in mind: those this message reminds you of, open "
+        f"ones first, then those from earlier in this Conversation:\n"
         f"{describe_reminded_threads(reminded, snapshot.user.time_zone)}"
         f"\n\nThings you've been wondering about them, whose time has come "
         f"{describe_due_curiosities(due, snapshot.user.time_zone)}"
@@ -1065,16 +1068,17 @@ class ReplyPlanService:
         too, and not saved as made, when the reply asks why or raises a
         Curiosity: only one question per reply. An unreadable form or a
         failed call falls back to the fallback Need with no Moves and no
-        Memory Categories, so the reply still goes, with every reminded Life
-        Thread that isn't held back but no Thread or Curiosity brought up,
-        and no Check-in.
+        Memory Categories, so the reply still goes, with no Life Thread,
+        no Curiosity brought up and no Check-in.
 
         Args:
             snapshot: The User being answered.
             understanding: The Message's Understanding, just made.
             recent: The Recent Messages, ending with the Message.
             saved: The User's saved memory, read for this reply.
-            reminded: The Life Threads the Message reminds the Companion of.
+            reminded: The Life Threads in mind: those the Message reminds the
+                Companion of, then those that came to mind earlier in the
+                Conversation.
             due: The Curiosities it may bring up.
             move_outcomes: The User's past Move Outcomes closest to the
                 Message, closest first.

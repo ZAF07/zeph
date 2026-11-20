@@ -398,6 +398,25 @@ life_threads = Table(
     Index("life_threads_name_keys", "name_keys", postgresql_using="gin"),
 )
 
+life_threads_in_mind = Table(
+    "life_threads_in_mind",
+    metadata,
+    Column(
+        "conversation_id",
+        Uuid,
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "life_thread_id",
+        Uuid,
+        ForeignKey("life_threads.id", ondelete="CASCADE"),
+        primary_key=True,
+        index=True,
+    ),
+    Column("came_to_mind_at", DateTime(timezone=True), nullable=False),
+)
+
 user_portraits = Table(
     "user_portraits",
     metadata,

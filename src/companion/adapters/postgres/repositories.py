@@ -40,6 +40,7 @@ from companion.adapters.postgres.tables import (
     helplines,
     knowledge_documents,
     life_threads,
+    life_threads_in_mind,
     memory_categories,
     memory_items,
     model_calls,
@@ -2714,6 +2715,59 @@ class PostgresLifeThreadRepository:
                 select(*LIFE_THREAD_COLUMNS)
                 .where(life_threads.c.last_raised_conversation_id == conversation_id)
                 .order_by(life_threads.c.started_at)
+            ).all()
+        return [_to_life_thread(row) for row in rows]
+
+    def keep_in_mind(
+        self, conversation_id: UUID, thread_ids: Sequence[UUID], at: datetime
+    ) -> None:
+        """Note that Threads came to mind in a Conversation, so they stay in mind.
+
+        A Thread already in mind keeps when it first came to mind.
+
+        Args:
+            conversation_id: The Conversation's ID.
+            thread_ids: The Threads' IDs.
+            at: When they came to mind.
+        """
+        if not thread_ids:
+            return
+        with self._database.begin() as connection:
+            connection.execute(
+                insert(life_threads_in_mind)
+                .values(
+                    [
+                        {
+                            "conversation_id": conversation_id,
+                            "life_thread_id": thread_id,
+                            "came_to_mind_at": at,
+                        }
+                        for thread_id in thread_ids
+                    ]
+                )
+                .on_conflict_do_nothing()
+            )
+
+    def list_in_mind(self, conversation_id: UUID) -> list[LifeThread]:
+        """List the Threads that came to mind in a Conversation.
+
+        Args:
+            conversation_id: The Conversation's ID.
+
+        Returns:
+            The Threads, the first to come to mind first.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(*LIFE_THREAD_COLUMNS)
+                .join(
+                    life_threads_in_mind,
+                    life_threads_in_mind.c.life_thread_id == life_threads.c.id,
+                )
+                .where(life_threads_in_mind.c.conversation_id == conversation_id)
+                .order_by(
+                    life_threads_in_mind.c.came_to_mind_at, life_threads.c.started_at
+                )
             ).all()
         return [_to_life_thread(row) for row in rows]
 

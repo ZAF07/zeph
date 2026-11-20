@@ -1133,6 +1133,31 @@ class LifeThreadRepository(Protocol):
         """
         ...
 
+    def keep_in_mind(
+        self, conversation_id: UUID, thread_ids: Sequence[UUID], at: datetime
+    ) -> None:
+        """Note that Threads came to mind in a Conversation, so they stay in mind.
+
+        A Thread already in mind keeps when it first came to mind.
+
+        Args:
+            conversation_id: The Conversation's ID.
+            thread_ids: The Threads' IDs.
+            at: When they came to mind.
+        """
+        ...
+
+    def list_in_mind(self, conversation_id: UUID) -> list[LifeThread]:
+        """List the Threads that came to mind in a Conversation.
+
+        Args:
+            conversation_id: The Conversation's ID.
+
+        Returns:
+            The Threads, the first to come to mind first.
+        """
+        ...
+
     def save_many(
         self,
         added: Sequence[LifeThreadToSave],
