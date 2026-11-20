@@ -23,20 +23,21 @@ from companion.core.models import (
 from companion.core.platform_settings import CONVERSATION_QUIET_GAP
 from companion.core.ports import Repositories
 
-DAY = date(2026, 11, 19)
+MADE_UP_DAY = date(2026, 11, 19)
 NO_SUMMARY = "No Day Summary was written."
 
 
-def sent_at(message: DaySummaryMessage) -> datetime:
+def calendar_time(message: DaySummaryMessage) -> datetime:
     """Place a message of the made-up day on the calendar.
 
     Args:
         message: The message.
 
     Returns:
-        Its time on the case's day, in UTC, which is also the User's zone.
+        Its time on the made-up day, in UTC; the made-up User has no time
+        zone, so UTC is theirs too.
     """
-    return datetime.combine(DAY, message.sent_at, UTC)
+    return datetime.combine(MADE_UP_DAY, message.sent_at, UTC)
 
 
 def split_into_conversations(
@@ -56,7 +57,8 @@ def split_into_conversations(
     for message in messages:
         if (
             conversations
-            and sent_at(message) - sent_at(conversations[-1][-1]) < quiet_gap
+            and calendar_time(message) - calendar_time(conversations[-1][-1])
+            < quiet_gap
         ):
             conversations[-1].append(message)
         else:
@@ -82,8 +84,8 @@ def save_day(
             Conversation(
                 id=conversation_id,
                 user_id=user_id,
-                started_at=sent_at(messages[0]),
-                last_message_at=sent_at(messages[-1]),
+                started_at=calendar_time(messages[0]),
+                last_message_at=calendar_time(messages[-1]),
             )
         )
         for message in messages:
@@ -98,7 +100,7 @@ def save_day(
                     ),
                     kind=MessageKind.TEXT,
                     content=message.text,
-                    sent_at=sent_at(message),
+                    sent_at=calendar_time(message),
                 )
             )
 
@@ -154,10 +156,10 @@ def check_day_summary_case(
     repositories = companion.repositories
     quiet_gap = repositories.platform_settings.load().get(CONVERSATION_QUIET_GAP)
     save_day(repositories, user_id, split_into_conversations(case.messages, quiet_gap))
-    companion.move_clock(sent_at(case.messages[-1]) + quiet_gap - companion.now())
+    companion.move_clock(calendar_time(case.messages[-1]) + quiet_gap - companion.now())
     companion.write_day_summary()
 
-    summaries = repositories.user_memory.list_summaries_for_days(user_id, [DAY])
+    summaries = repositories.user_memory.list_summaries(user_id, limit=1)
     summary = summary_line(summaries[0]).removeprefix("- ") if summaries else ""
     questions = [question.question for question in case.questions]
     if summary:

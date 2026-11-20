@@ -1,8 +1,7 @@
 "use client";
 
-import { ShapeGroupFields } from "@/components/ShapeGroupFields";
-import { ShapeGroupList } from "@/components/ShapeGroupList";
-import type { FormShape, FormValues, ShapeSection } from "@/lib/api-client";
+import { SectionFields } from "@/components/SectionFields";
+import type { FormShape, FormValues } from "@/lib/api-client";
 
 /**
  * A case or Judge form's sections, each a panel with its heading, its hint
@@ -54,46 +53,5 @@ export function ShapeFormSections({
         </section>
       ))}
     </>
-  );
-}
-
-function SectionFields({
-  section,
-  value,
-  errors,
-  disabled,
-  onChange,
-}: {
-  section: ShapeSection;
-  value: FormValues;
-  errors: Record<string, string>;
-  disabled: boolean;
-  onChange: (value: FormValues) => void;
-}) {
-  const [onlyField] = section.fields;
-  if (section.fields.length === 1 && onlyField.kind === "group_list") {
-    return (
-      <ShapeGroupList
-        field={onlyField}
-        value={value[onlyField.name]}
-        path={onlyField.name}
-        errors={errors}
-        disabled={disabled}
-        bare
-        onChange={(listValue) =>
-          onChange({ ...value, [onlyField.name]: listValue })
-        }
-      />
-    );
-  }
-  return (
-    <ShapeGroupFields
-      fields={section.fields}
-      value={value}
-      path=""
-      errors={errors}
-      disabled={disabled}
-      onChange={onChange}
-    />
   );
 }

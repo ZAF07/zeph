@@ -33,14 +33,14 @@ export function ShapeFieldControl({
     "aria-invalid": invalid,
   };
   const text = typeof value === "string" ? value : "";
-  const box = inEntry ? entryInputField : inputField;
+  const inputClassName = inEntry ? entryInputField : inputField;
 
   if (field.kind === "long_text") {
     return (
       <textarea
         {...shared}
         rows={1}
-        className={`${box} field-sizing-content min-h-[72px] resize-y`}
+        className={`${inputClassName} field-sizing-content min-h-[72px] resize-y`}
         value={text}
         onChange={(event) => onChange(event.target.value)}
       />
@@ -53,7 +53,7 @@ export function ShapeFieldControl({
         type="number"
         step={1}
         min={field.minimum ?? undefined}
-        className={`${box} max-w-[180px]`}
+        className={`${inputClassName} max-w-[180px]`}
         value={typeof value === "number" ? value : ""}
         onChange={(event) =>
           onChange(
@@ -81,7 +81,7 @@ export function ShapeFieldControl({
       <span className="relative flex min-w-0 items-center">
         <select
           {...shared}
-          className={`${box} cursor-pointer appearance-none pr-9`}
+          className={`${inputClassName} cursor-pointer appearance-none pr-9`}
           value={chosen === -1 ? "" : String(chosen)}
           onChange={(event) =>
             onChange(
@@ -109,7 +109,7 @@ export function ShapeFieldControl({
       <input
         {...shared}
         type="datetime-local"
-        className={`${box} max-w-[260px]`}
+        className={`${inputClassName} max-w-[260px]`}
         value={text.slice(0, 16)}
         onChange={(event) =>
           onChange(event.target.value ? `${event.target.value}:00` : null)
@@ -131,7 +131,7 @@ export function ShapeFieldControl({
     <input
       {...shared}
       type="text"
-      className={box}
+      className={inputClassName}
       value={text}
       onChange={(event) => onChange(event.target.value)}
     />

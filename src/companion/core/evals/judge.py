@@ -407,22 +407,47 @@ def numbered_lines(entries: Sequence[str]) -> str:
     return "\n".join(f"{number}. {entry}" for number, entry in enumerate(entries, 1))
 
 
-def by_question_number(answer: str, key: str) -> dict[int, dict[str, Any]]:
-    """Read the Judge's JSON list of per-question entries, by question number.
+def ask_about_questions(
+    chat_model: ChatModel,
+    judge: JudgeSettings,
+    instructions: str,
+    summary: str,
+    entries: Sequence[str],
+    key: str,
+) -> tuple[dict[int, dict[str, Any]] | None, str]:
+    """Ask the Judge about a Day Summary's questions and read its JSON list.
 
     Args:
-        answer: The Judge's answer.
-        key: The list's name in the JSON, e.g. "answers".
+        chat_model: The model that judges.
+        judge: The Judge's model and thinking.
+        instructions: The prompt for this call.
+        summary: The Day Summary.
+        entries: One entry per question, in order.
+        key: The list's name in the JSON answer, e.g. "answers".
 
     Returns:
-        Each entry by its question number, from 1.
-
-    Raises:
-        ValueError: If the answer isn't JSON.
-        KeyError: If the list is missing.
-        TypeError: If an entry isn't shaped as asked.
+        Each entry of the answer by its question number, from 1, or None if
+        the answer can't be read; and the answer as given.
     """
-    return {int(entry["question"]): entry for entry in read_json_answer(answer)[key]}
+    answer = chat_model.generate(
+        model=judge.model,
+        thinking=judge.thinking,
+        instructions=instructions,
+        history=[
+            ChatLine(
+                role=ChatRole.USER,
+                text=f"Day Summary:\n{summary}\n\n"
+                f"Questions:\n{numbered_lines(entries)}",
+            )
+        ],
+    )
+    try:
+        return {
+            int(entry["question"]): entry
+            for entry in read_json_answer(answer.text)[key]
+        }, answer.text
+    except (ValueError, KeyError, TypeError):
+        return None, answer.text
 
 
 def judge_day_summary_answers(
@@ -445,27 +470,20 @@ def judge_day_summary_answers(
         One answer per question, in order; a question it skipped, or every
         question when the answer can't be read, gets a line saying so.
     """
-    answer = chat_model.generate(
-        model=judge.model,
-        thinking=judge.thinking,
-        instructions=judge.day_summary_answer_instructions,
-        history=[
-            ChatLine(
-                role=ChatRole.USER,
-                text=f"Day Summary:\n{summary}\n\n"
-                f"Questions:\n{numbered_lines(questions)}",
-            )
-        ],
+    given, answer = ask_about_questions(
+        chat_model,
+        judge,
+        judge.day_summary_answer_instructions,
+        summary,
+        questions,
+        "answers",
     )
-    try:
-        given = by_question_number(answer.text, "answers")
-        return [
-            str(given[number]["answer"]) if number in given else "No answer given."
-            for number in range(1, len(questions) + 1)
-        ]
-    except (ValueError, KeyError, TypeError):
-        unreadable = f"The judge's answer could not be read: {answer.text}"
-        return [unreadable for _ in questions]
+    if given is None:
+        return [f"The judge's answer could not be read: {answer}" for _ in questions]
+    return [
+        str(given[number].get("answer", "")) if number in given else "No answer given."
+        for number in range(1, len(questions) + 1)
+    ]
 
 
 def judge_day_summary_marks(
@@ -487,33 +505,26 @@ def judge_day_summary_marks(
         One mark per question, in order; a question it skipped, or every
         question when the answer can't be read, misses.
     """
-    entries = [
-        f"{question}\n   Expected: {expected}\n   Answer from the Summary: {given}"
-        for question, expected, given in answered
-    ]
-    answer = chat_model.generate(
-        model=judge.model,
-        thinking=judge.thinking,
-        instructions=judge.day_summary_marking_instructions,
-        history=[
-            ChatLine(
-                role=ChatRole.USER,
-                text=f"Day Summary:\n{summary}\n\n"
-                f"Questions:\n{numbered_lines(entries)}",
-            )
+    given, answer = ask_about_questions(
+        chat_model,
+        judge,
+        judge.day_summary_marking_instructions,
+        summary,
+        [
+            f"{question}\n   Expected: {expected}\n   Answer from the Summary: {reply}"
+            for question, expected, reply in answered
         ],
+        "marks",
     )
-    try:
-        given_marks = by_question_number(answer.text, "marks")
-        return [
-            AnswerMark(
-                matched=given_marks[number]["match"] is True,
-                reason=str(given_marks[number]["reason"]),
-            )
-            if number in given_marks
-            else AnswerMark(False, "The judge gave no mark.")
-            for number in range(1, len(answered) + 1)
-        ]
-    except (ValueError, KeyError, TypeError):
-        unreadable = f"The judge's answer could not be read: {answer.text}"
+    if given is None:
+        unreadable = f"The judge's answer could not be read: {answer}"
         return [AnswerMark(False, unreadable) for _ in answered]
+    return [
+        AnswerMark(
+            matched=given[number].get("match") is True,
+            reason=str(given[number].get("reason", "")),
+        )
+        if number in given
+        else AnswerMark(False, "The judge gave no mark.")
+        for number in range(1, len(answered) + 1)
+    ]
