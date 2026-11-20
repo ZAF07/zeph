@@ -1239,6 +1239,19 @@ class PatternRepository(Protocol):
         """
         ...
 
+    def delete_confirmed(self, user_id: UUID, pattern_id: UUID) -> bool:
+        """Delete one of a User's confirmed Patterns, with its evidence.
+
+        Args:
+            user_id: The User's ID.
+            pattern_id: The Pattern's ID.
+
+        Returns:
+            True if it was deleted; False if the User has no such confirmed
+            Pattern.
+        """
+        ...
+
     def delete_for_user(self, user_id: UUID) -> None:
         """Delete every one of a User's Patterns.
 

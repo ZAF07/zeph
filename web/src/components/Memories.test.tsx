@@ -9,6 +9,7 @@ import type {
   LifeThread,
   MemoryGroup,
   MoveOutcome,
+  Pattern,
   SharedPhoto,
   UserPortrait,
 } from "@/lib/api-client";
@@ -29,6 +30,8 @@ const apiClient = {
   deleteSharedPhoto: vi.fn<ApiClient["deleteSharedPhoto"]>(),
   listLifeThreads: vi.fn<ApiClient["listLifeThreads"]>(),
   deleteLifeThread: vi.fn<ApiClient["deleteLifeThread"]>(),
+  listPatterns: vi.fn<ApiClient["listPatterns"]>(),
+  deletePattern: vi.fn<ApiClient["deletePattern"]>(),
   listMoveOutcomes: vi.fn<ApiClient["listMoveOutcomes"]>(),
   deleteMoveOutcome: vi.fn<ApiClient["deleteMoveOutcome"]>(),
   getUserPortrait: vi.fn<ApiClient["getUserPortrait"]>(),
@@ -140,6 +143,38 @@ const moveOutcomes: MoveOutcome[] = [
   },
 ];
 
+const patterns: Pattern[] = [
+  {
+    id: "pattern-1",
+    pattern: "Treats rest as something to be earned.",
+    agreed_at: "2026-11-12T09:00:00Z",
+    evidence: [
+      {
+        day: "2026-11-12",
+        thread: "Pushing hard at work",
+        line: "Worked through the weekend.",
+      },
+      {
+        day: "2026-11-02",
+        thread: "Time with their father",
+        line: "Felt guilty about taking an afternoon off.",
+      },
+    ],
+  },
+  {
+    id: "pattern-2",
+    pattern: "Names the worst version of a plan first.",
+    agreed_at: "2026-11-09T09:00:00Z",
+    evidence: [
+      {
+        day: "2026-10-28",
+        thread: "The new job",
+        line: "Listed the ways the job could go wrong.",
+      },
+    ],
+  },
+];
+
 const portrait: UserPortrait = {
   text: "Maya is a designer weighing a new role. Walks help; pep talks don’t.",
   updated_at: "2026-11-13T09:00:00Z",
@@ -180,6 +215,8 @@ describe("Memories", () => {
     apiClient.deleteSharedPhoto.mockResolvedValue(undefined);
     apiClient.listLifeThreads.mockResolvedValue(lifeThreads);
     apiClient.deleteLifeThread.mockResolvedValue(undefined);
+    apiClient.listPatterns.mockResolvedValue(patterns);
+    apiClient.deletePattern.mockResolvedValue(undefined);
     apiClient.listMoveOutcomes.mockResolvedValue(moveOutcomes);
     apiClient.deleteMoveOutcome.mockResolvedValue(undefined);
     apiClient.getUserPortrait.mockResolvedValue(portrait);
@@ -225,6 +262,7 @@ describe("Memories", () => {
   it.each([
     ["about", "About you", "What I know about you"],
     ["threads", "What's going on", "What's going on in your life"],
+    ["patterns", "Patterns", "Patterns"],
     ["helps", "What helps you", "What helps you"],
     ["summaries", "Conversation Summaries", "Conversation Summaries"],
     ["photos", "Photos", "Photos"],
@@ -568,6 +606,106 @@ describe("Memories", () => {
     expect(apiClient.deleteLifeThread).toHaveBeenCalledWith("thread-2");
   });
 
+  it("shows each Pattern with the day the User agreed and what it is based on", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<Memories copy={seedCopy()} />);
+
+    await user.click(await screen.findByRole("tab", { name: "Patterns" }));
+
+    expect(screen.getByRole("heading", { name: "Patterns" })).toBeVisible();
+    const [earnsRest, worstFirst] = screen.getAllByRole("listitem");
+    expect(
+      within(earnsRest).getByText("Treats rest as something to be earned."),
+    ).toBeVisible();
+    expect(
+      within(earnsRest).getByText("You agreed with this on 12 Nov"),
+    ).toBeVisible();
+    expect(within(earnsRest).getByText("What it is based on")).toBeVisible();
+    expect(
+      within(earnsRest).getByText("12 Nov · Pushing hard at work"),
+    ).toBeVisible();
+    expect(
+      within(earnsRest).getByText("Worked through the weekend."),
+    ).toBeVisible();
+    expect(
+      within(earnsRest).getByText("2 Nov · Time with their father"),
+    ).toBeVisible();
+    expect(
+      within(worstFirst).getByText("You agreed with this on 9 Nov"),
+    ).toBeVisible();
+    expect(within(worstFirst).getByText("28 Oct · The new job")).toBeVisible();
+  });
+
+  it("deletes a Pattern", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<Memories copy={seedCopy()} />);
+    await user.click(await screen.findByRole("tab", { name: "Patterns" }));
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Delete pattern: Treats rest as something to be earned.",
+      }),
+    );
+
+    expect(apiClient.deletePattern).toHaveBeenCalledWith("pattern-1");
+    expect(
+      screen.queryByText("Treats rest as something to be earned."),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Names the worst version of a plan first."),
+    ).toBeVisible();
+  });
+
+  it("keeps a Pattern and explains when deleting it fails", async () => {
+    apiClient.deletePattern.mockRejectedValue(new Error("down"));
+    const user = userEvent.setup();
+    renderWithQueries(<Memories copy={seedCopy()} />);
+    await user.click(await screen.findByRole("tab", { name: "Patterns" }));
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Delete pattern: Treats rest as something to be earned.",
+      }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn’t delete that. Please try again.",
+    );
+    expect(
+      screen.getByText("Treats rest as something to be earned."),
+    ).toBeVisible();
+  });
+
+  it("explains when no Pattern is confirmed yet", async () => {
+    apiClient.listPatterns.mockResolvedValue([]);
+    const user = userEvent.setup();
+    renderWithQueries(<Memories copy={seedCopy()} />);
+
+    await user.click(await screen.findByRole("tab", { name: "Patterns" }));
+
+    expect(screen.getByText("No patterns yet")).toBeVisible();
+    expect(
+      screen.getByText(
+        "When Zeph notices the same thing across different parts of your life, and you agree with it, it appears here with what it is based on.",
+      ),
+    ).toBeVisible();
+  });
+
+  it("still shows and deletes Patterns when User Memory is off", async () => {
+    apiClient.getMe.mockResolvedValue({ ...maya, user_memory_enabled: false });
+    const user = userEvent.setup();
+    renderWithQueries(<Memories copy={seedCopy()} />);
+    await user.click(await screen.findByRole("tab", { name: "Patterns" }));
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Delete pattern: Names the worst version of a plan first.",
+      }),
+    );
+
+    expect(apiClient.deletePattern).toHaveBeenCalledWith("pattern-2");
+  });
+
   it("shows what helps: each Move Outcome's situation, feeling, result, why and date", async () => {
     const user = userEvent.setup();
     renderWithQueries(<Memories copy={seedCopy()} />);
@@ -864,6 +1002,7 @@ describe("Memories", () => {
       "memories",
       "about",
       "threads",
+      "patterns",
       "helps",
       "summaries",
       "photos",
@@ -902,6 +1041,17 @@ describe("Memories", () => {
           ...thread,
           title: "⟦data⟧",
           story: "⟦data⟧",
+        })),
+      );
+      apiClient.listPatterns.mockResolvedValue(
+        patterns.map((pattern) => ({
+          ...pattern,
+          pattern: "⟦data⟧",
+          evidence: pattern.evidence.map((item) => ({
+            ...item,
+            thread: "⟦data⟧",
+            line: "⟦data⟧",
+          })),
         })),
       );
       apiClient.listMoveOutcomes.mockResolvedValue(
@@ -973,6 +1123,7 @@ describe("Memories", () => {
       apiClient.listMemoryGroups.mockResolvedValue([]);
       apiClient.getUserPortrait.mockResolvedValue(null);
       apiClient.listLifeThreads.mockResolvedValue([]);
+      apiClient.listPatterns.mockResolvedValue([]);
       apiClient.listMoveOutcomes.mockResolvedValue([]);
       apiClient.listDaySummaries.mockResolvedValue([]);
       apiClient.listSharedPhotos.mockResolvedValue([]);

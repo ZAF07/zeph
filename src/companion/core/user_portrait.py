@@ -18,6 +18,8 @@ from companion.core.models import (
     MemoryItem,
     ModelStep,
     MoveOutcome,
+    Pattern,
+    PatternState,
     PlatformSettings,
     TraceKind,
     UserPortrait,
@@ -42,6 +44,7 @@ def describe_user_memory(
     categories: Sequence[MemoryCategory],
     items: Sequence[MemoryItem],
     threads: Sequence[LifeThread],
+    confirmed_patterns: Sequence[Pattern],
     move_outcomes: Sequence[MoveOutcome],
     summaries: Sequence[DaySummary],
     now: datetime,
@@ -53,19 +56,23 @@ def describe_user_memory(
         categories: Every Memory Category, archived ones included.
         items: The User's Memory Items.
         threads: The User's Life Threads, open first.
+        confirmed_patterns: The Patterns the User agreed with; never
+            suspected or closed ones, since the User reads the Portrait.
         move_outcomes: The User's Move Outcomes, newest first.
         summaries: Their newest Day Summaries, newest first.
         now: The current time.
         time_zone: The User's IANA time zone, for the days.
 
     Returns:
-        Today's date, the Memory Items by category, the Life Threads, what
-        has helped and what hasn't, and the recent Conversations.
+        Today's date, the Memory Items by category, the Life Threads, the
+        Patterns they agreed with, what has helped and what hasn't, and the
+        recent days.
     """
     item_sections = format_items_by_category(categories, items)
     thread_lines = "\n".join(
         f"- {describe_thread(thread, time_zone)}" for thread in threads
     )
+    pattern_lines = "\n".join(f"- {pattern.pattern}" for pattern in confirmed_patterns)
     outcome_lines = "\n".join(
         f"- {describe_move_outcome(outcome, time_zone)}" for outcome in move_outcomes
     )
@@ -75,6 +82,7 @@ def describe_user_memory(
         f"Today: {format_day(now, time_zone)}\n\n"
         f"What Zeph remembers:\n{item_text or 'Nothing yet.'}\n\n"
         f"Life Threads:\n{thread_lines or 'None yet.'}\n\n"
+        f"Patterns they agreed with:\n{pattern_lines or 'None yet.'}\n\n"
         f"What has helped and what hasn't:\n{outcome_lines or 'Nothing yet.'}\n\n"
         f"Recent days, newest first:\n{summary_lines or 'None yet.'}"
     )
@@ -83,9 +91,9 @@ def describe_user_memory(
 class PortraitWriter:
     """Writes each User's User Portrait from their User Memory.
 
-    It is written from their Memory Items, Life Threads, Move Outcomes and
-    newest Day Summaries only, never from the old Portrait, so something
-    they deleted is gone from the next one.
+    It is written from their Memory Items, Life Threads, confirmed Patterns,
+    Move Outcomes and newest Day Summaries only, never from the old Portrait,
+    so something they deleted is gone from the next one.
     """
 
     def __init__(
@@ -175,6 +183,11 @@ class PortraitWriter:
             self._repositories.memory_categories.list_all(),
             self._repositories.user_memory.list_items(user_id),
             self._repositories.life_threads.list_for_user(user_id),
+            [
+                pattern
+                for pattern in self._repositories.patterns.list_for_user(user_id)
+                if pattern.state == PatternState.CONFIRMED
+            ],
             self._repositories.move_outcomes.list_for_user(user_id),
             self._repositories.user_memory.list_summaries(
                 user_id, limit=SUMMARIES_FOR_PORTRAIT

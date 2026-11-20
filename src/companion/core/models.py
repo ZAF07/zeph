@@ -1093,6 +1093,8 @@ class Pattern:
         last_offered_at: When the Companion last offered a view from it;
             None if never.
         last_reaction: How the User took that view; None if never offered.
+        confirmed_at: When the User agreed with it, so it became confirmed;
+            None while it is not confirmed.
     """
 
     id: UUID
@@ -1104,6 +1106,7 @@ class Pattern:
     updated_at: datetime
     last_offered_at: datetime | None = None
     last_reaction: PatternReaction | None = None
+    confirmed_at: datetime | None = None
 
     @property
     def thread_ids(self) -> set[UUID]:

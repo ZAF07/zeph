@@ -2865,6 +2865,7 @@ def _to_pattern(row: Row[Any], evidence: Sequence[PatternEvidence]) -> Pattern:
         last_reaction=(
             PatternReaction(row.last_reaction) if row.last_reaction else None
         ),
+        confirmed_at=row.confirmed_at,
     )
 
 
@@ -2956,6 +2957,7 @@ class PostgresPatternRepository:
                                 "last_reaction": _stored_reaction(
                                     to_save.pattern.last_reaction
                                 ),
+                                "confirmed_at": to_save.pattern.confirmed_at,
                                 "embedding": to_save.embedding,
                             }
                             for to_save in added
@@ -2972,6 +2974,7 @@ class PostgresPatternRepository:
                         updated_at=bindparam("new_updated_at"),
                         last_offered_at=bindparam("new_last_offered_at"),
                         last_reaction=bindparam("new_last_reaction"),
+                        confirmed_at=bindparam("new_confirmed_at"),
                         embedding=func.coalesce(
                             bindparam("new_embedding", type_=patterns.c.embedding.type),
                             patterns.c.embedding,
@@ -2987,6 +2990,7 @@ class PostgresPatternRepository:
                             "new_last_reaction": _stored_reaction(
                                 to_save.pattern.last_reaction
                             ),
+                            "new_confirmed_at": to_save.pattern.confirmed_at,
                             "new_embedding": to_save.embedding,
                         }
                         for to_save in changed
@@ -3041,6 +3045,29 @@ class PostgresPatternRepository:
         """
         with self._database.begin() as connection:
             _delete_patterns_without_evidence(connection, user_id)
+
+    def delete_confirmed(self, user_id: UUID, pattern_id: UUID) -> bool:
+        """Delete one of a User's confirmed Patterns, with its evidence.
+
+        Args:
+            user_id: The User's ID.
+            pattern_id: The Pattern's ID.
+
+        Returns:
+            True if it was deleted; False if the User has no such confirmed
+            Pattern.
+        """
+        with self._database.begin() as connection:
+            deleted = connection.execute(
+                delete(patterns)
+                .where(
+                    patterns.c.user_id == user_id,
+                    patterns.c.id == pattern_id,
+                    patterns.c.state == PatternState.CONFIRMED.value,
+                )
+                .returning(patterns.c.id)
+            ).first()
+        return deleted is not None
 
     def delete_for_user(self, user_id: UUID) -> None:
         """Delete every one of a User's Patterns.

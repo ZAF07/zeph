@@ -4,6 +4,7 @@ import type {
   LifeThread,
   MemoryGroup,
   MoveOutcome,
+  Pattern,
   SharedPhoto,
   UserPortrait,
 } from "@/lib/api-client";
@@ -87,6 +88,50 @@ const lifeThreads: LifeThread[] = [
   },
 ];
 
+/** Alex's two Patterns, as drawn in `Memories--tab-patterns.html`. */
+const patterns: Pattern[] = [
+  {
+    id: "design-pattern-1",
+    pattern:
+      "Treats rest as something to be earned, and feels he is falling behind whenever he stops.",
+    agreed_at: "2026-11-12T20:00:00+08:00",
+    evidence: [
+      {
+        day: "2026-11-12",
+        thread: "Pushing hard at work",
+        line: "Worked through the weekend so that nobody could say he had slowed down.",
+      },
+      {
+        day: "2026-11-09",
+        thread: "The van idea",
+        line: "Called a few months of travelling reckless before anyone else could.",
+      },
+      {
+        day: "2026-11-02",
+        thread: "Time with his father",
+        line: "Felt guilty about taking an afternoon off to visit.",
+      },
+    ],
+  },
+  {
+    id: "design-pattern-2",
+    pattern: "Names the worst version of a plan first, before anyone else can.",
+    agreed_at: "2026-11-09T20:00:00+08:00",
+    evidence: [
+      {
+        day: "2026-11-09",
+        thread: "The van idea",
+        line: "Asked whether the trip was just an escape before saying what he hoped to find.",
+      },
+      {
+        day: "2026-10-28",
+        thread: "The new job",
+        line: "Listed the ways the job could go wrong in the first week.",
+      },
+    ],
+  },
+];
+
 /** Alex's Move Outcomes, as drawn in `Memories--tab-helps.html`. */
 const moveOutcomes: MoveOutcome[] = [
   {
@@ -135,6 +180,7 @@ export const memoriesFixtures: Partial<ApiClient> = {
   listMemoryGroups: async () => memoryGroups,
   getUserPortrait: async () => portrait,
   listLifeThreads: async () => lifeThreads,
+  listPatterns: async () => patterns,
   listMoveOutcomes: async () => moveOutcomes,
   listDaySummaries: async () => summaries,
   listSharedPhotos: async () => sharedPhotos,

@@ -70,6 +70,12 @@ export function StatesSheet() {
             action={<PillLink href="#" label="Talk to Zeph" />}
           />
         </StatesSheetSample>
+        <StatesSheetSample label="Patterns, none confirmed">
+          <EmptyState
+            title="No patterns yet"
+            body="When Zeph notices the same thing across different parts of your life, and you agree with it, it appears here with what it is based on."
+          />
+        </StatesSheetSample>
         <StatesSheetSample label="Check-ins, none sent">
           <EmptyState
             title="No check-ins yet"

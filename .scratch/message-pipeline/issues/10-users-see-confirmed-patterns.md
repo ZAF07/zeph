@@ -1,6 +1,6 @@
 # 10 — Users see their confirmed Patterns
 
-Status: ready-for-agent
+Status: in-progress
 Lane: B
 Blocked by: 08
 
@@ -47,3 +47,10 @@ Read `web/design/README.md` in full first, including "Message-pipeline additions
 - 08 — Patterns kept at Conversation end (`.scratch/message-pipeline/issues/08-patterns-kept.md`)
 
 ## Comments
+
+### Plan (20 Nov 2026, branch `message-pipeline-10-confirmed-patterns`)
+
+- **When agreed:** Patterns have no "confirmed at" today (`last_offered_at` moves again if a confirmed Pattern is offered later). Add `patterns.confirmed_at`, set when the keeping step confirms one. Migration 0069 adds it (confirmed rows take their `last_offered_at`), and reloads the unedited `portrait_prompt` and `memories.hero.lead` from the seed.
+- **API:** `GET /api/patterns` returns the User's confirmed Patterns, newest agreed first, each with its evidence newest first (day, Thread title, line). `DELETE /api/patterns/{id}` deletes a confirmed one (404 for suspected, closed or someone else's) and asks for the Portrait rewrite, like other deletions. Neither depends on User Memory being on.
+- **Portrait:** `describe_user_memory` gets a "Patterns they agreed with" section, fed confirmed Patterns only; the prompt names it.
+- **Dashboard:** `patterns` tab between `threads` and `helps`; `PatternsList` built from the existing Memories parts; Copy slots `memories.tabs.patterns`, `memories.patterns.{heading,lead,agreed,based_on,evidence_when,delete,empty_title,empty_body}`; hero line gets "the patterns it has noticed" only (16 is not in yet). Fixtures: Alex's two drawn Patterns.

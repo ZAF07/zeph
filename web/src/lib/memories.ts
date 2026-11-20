@@ -33,6 +33,7 @@ export const memoriesTabs = [
   "memories",
   "about",
   "threads",
+  "patterns",
   "helps",
   "summaries",
   "photos",

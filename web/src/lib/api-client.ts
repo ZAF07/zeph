@@ -443,6 +443,24 @@ export type MoveOutcome = {
   made_at: string;
 };
 
+/** One time a Pattern showed up: the day, its Life Thread and what happened. */
+export type PatternEvidence = {
+  day: string;
+  thread: string;
+  line: string;
+};
+
+/**
+ * A Pattern the User agreed with: what keeps showing up across their life,
+ * when they agreed and what it is based on, newest day first.
+ */
+export type Pattern = {
+  id: string;
+  pattern: string;
+  agreed_at: string;
+  evidence: PatternEvidence[];
+};
+
 /** A photo that matters to the User, kept in their User Memory. */
 export type SharedPhoto = {
   id: string;
@@ -1195,6 +1213,8 @@ export type ApiClient = {
   deleteDaySummary: (id: string) => Promise<void>;
   listLifeThreads: () => Promise<LifeThread[]>;
   deleteLifeThread: (id: string) => Promise<void>;
+  listPatterns: () => Promise<Pattern[]>;
+  deletePattern: (id: string) => Promise<void>;
   listMoveOutcomes: () => Promise<MoveOutcome[]>;
   deleteMoveOutcome: (id: string) => Promise<void>;
   getUserPortrait: () => Promise<UserPortrait | null>;
@@ -1489,6 +1509,9 @@ export function createApiClient(
       (await request<{ threads: LifeThread[] }>("/api/life-threads")).threads,
     deleteLifeThread: (id) =>
       request<void>(`/api/life-threads/${id}`, "DELETE"),
+    listPatterns: async () =>
+      (await request<{ patterns: Pattern[] }>("/api/patterns")).patterns,
+    deletePattern: (id) => request<void>(`/api/patterns/${id}`, "DELETE"),
     listMoveOutcomes: async () =>
       (await request<{ move_outcomes: MoveOutcome[] }>("/api/move-outcomes"))
         .move_outcomes,

@@ -1198,8 +1198,9 @@
       max_length: 300
       text: >-
         What Zeph remembers, what it knows about you, what's going on in your
-        life, what helps you, short summaries of past Conversations and the
-        photos it kept. Delete anything you'd rather it forgot.
+        life, what helps you, the patterns it has noticed, short summaries of
+        past Conversations and the photos it kept. Delete anything you'd
+        rather it forgot.
     - key: memories.switch.on
       name: "Memory switch: words while on"
       max_length: 30
@@ -1249,6 +1250,10 @@
       name: "Tabs: What's going on"
       max_length: 30
       text: What's going on
+    - key: memories.tabs.patterns
+      name: "Tabs: Patterns"
+      max_length: 30
+      text: Patterns
     - key: memories.tabs.helps
       name: "Tabs: What helps you"
       max_length: 30
@@ -1416,6 +1421,46 @@
       text: >-
         When you tell Zeph about something ongoing, it appears here a little
         while after the Conversation ends.
+    - key: memories.patterns.heading
+      name: "Patterns tab: heading"
+      max_length: 60
+      text: Patterns
+    - key: memories.patterns.lead
+      name: "Patterns tab: line under the heading"
+      max_length: 300
+      text: >-
+        Things Zeph has noticed across different parts of your life, that you
+        agreed with when it said them. Each one shows the days it is based on.
+        Delete one and Zeph stops using it.
+    - key: memories.patterns.agreed
+      name: "Patterns tab: when you agreed"
+      max_length: 60
+      placeholders: [day]
+      text: You agreed with this on {day}
+    - key: memories.patterns.based_on
+      name: "Patterns tab: label above the evidence"
+      max_length: 40
+      text: What it is based on
+    - key: memories.patterns.evidence_when
+      name: "Patterns tab: day and Thread of each piece of evidence"
+      max_length: 40
+      placeholders: [day, thread]
+      text: "{day} · {thread}"
+    - key: memories.patterns.delete
+      name: "Patterns tab: delete button, read out by screen readers"
+      max_length: 80
+      placeholders: [pattern]
+      text: "Delete pattern: {pattern}"
+    - key: memories.patterns.empty_title
+      name: "Patterns tab: nothing yet, title"
+      max_length: 80
+      text: No patterns yet
+    - key: memories.patterns.empty_body
+      name: "Patterns tab: nothing yet, message"
+      max_length: 200
+      text: >-
+        When Zeph notices the same thing across different parts of your life,
+        and you agree with it, it appears here with what it is based on.
     - key: memories.helps.heading
       name: "What helps you tab: heading"
       max_length: 60
