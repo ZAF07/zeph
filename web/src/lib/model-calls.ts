@@ -136,12 +136,26 @@ export function understandingShapeFacts(
 }
 
 /**
+ * Says whether a Reply Plan built its Read on a Pattern and offered it.
+ *
+ * @param shape - The Reply Plan's shape.
+ * @returns "Offered", "Used, not offered" or "None".
+ */
+export function describePatternUse(shape: ReplyPlanShape): string {
+  if (shape.pattern_offered) {
+    return "Offered";
+  }
+  return shape.pattern_used ? "Used, not offered" : "None";
+}
+
+/**
  * Lists the facts of a Reply Plan's shape, as labels and values.
  *
  * @param shape - The Reply Plan's shape.
  * @returns E.g. "Need picked: Be heard", "Lead Move: Calm", "Threads brought
- * up: 2 (1 lead, 1 weave)", "Read formed: Yes", "Read said: No", "Check-in
- * Kinds offered: 2", "Check-in Kind chosen: None".
+ * up: 2 (1 lead, 1 weave)", "Read formed: Yes", "Read said: No", "Pattern:
+ * Used, not offered", "Check-in Kinds offered: 2", "Check-in Kind chosen:
+ * None".
  */
 export function replyPlanShapeFacts(
   shape: ReplyPlanShape,
@@ -164,6 +178,7 @@ export function replyPlanShapeFacts(
     { label: "Threads held back", value: String(shape.threads_held_back) },
     { label: "Read formed", value: shape.read_formed ? "Yes" : "No" },
     { label: "Read said", value: shape.read_said ? "Yes" : "No" },
+    { label: "Pattern", value: describePatternUse(shape) },
     {
       label: "Check-in Kinds offered",
       value: String(shape.check_in_kinds_offered),

@@ -122,6 +122,8 @@ const calls: ModelCall[] = [
       read_said: false,
       check_in_kinds_offered: 2,
       check_in_kind: null,
+      pattern_used: true,
+      pattern_offered: false,
     },
   }),
   drawnCall({

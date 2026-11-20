@@ -494,6 +494,8 @@ def reply_plan_answer(
     read: str = "",
     say_read: object = False,
     check_in: object = None,
+    patterns_used: Sequence[object] = (),
+    offer_pattern: object = None,
 ) -> str:
     """Build the form the Reply Plan model answers with.
 
@@ -526,6 +528,10 @@ def reply_plan_answer(
         check_in: The Check-in to weave in, e.g. {"kind": "A follow-up",
             "note": "..."}, or anything else a model might write there; None
             for none.
+        patterns_used: The numbers of the Patterns in mind the Read is built
+            on, or anything else a model might write there.
+        offer_pattern: The number of the Pattern the reply offers, or
+            anything else a model might write there; None for none.
 
     Returns:
         The form as JSON.
@@ -554,6 +560,8 @@ def reply_plan_answer(
         "knowledge": knowledge,
         "send_photo": send_photo,
         "check_in": check_in,
+        "patterns_used": list(patterns_used),
+        "offer_pattern": offer_pattern,
     }
     if ask_why is not None:
         answer["ask_why"] = ask_why

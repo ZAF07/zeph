@@ -52,7 +52,7 @@ from companion.core.move_outcomes import MoveOutcomeFinder, MoveOutcomeKeeper
 from companion.core.moves import MoveService
 from companion.core.needs import NeedService
 from companion.core.past_day import PastDayTool
-from companion.core.patterns import PatternKeeper
+from companion.core.patterns import PatternKeeper, PatternReminder
 from companion.core.personal_stickers import (
     PersonalStickerKeeper,
     PersonalStickerService,
@@ -258,6 +258,11 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         reply_gate=reply_gate,
         conversations=conversation_service,
         thread_reminder=ThreadReminder(
+            repositories=dependencies.repositories,
+            embedder=dependencies.embedder,
+            clock=dependencies.clock,
+        ),
+        pattern_reminder=PatternReminder(
             repositories=dependencies.repositories,
             embedder=dependencies.embedder,
             clock=dependencies.clock,

@@ -599,7 +599,7 @@ class UnderstandingShapeResponse(BaseModel):
 
 
 class ReplyPlanShapeResponse(BaseModel):
-    """The shape of a Reply Plan: the Need, Move names, counts and Read facts.
+    """The shape of a Reply Plan: the Need, Move names, counts, Read and Pattern facts.
 
     Never any words.
     """
@@ -617,6 +617,8 @@ class ReplyPlanShapeResponse(BaseModel):
     read_said: bool
     check_in_kinds_offered: int
     check_in_kind: str | None
+    pattern_used: bool
+    pattern_offered: bool
 
 
 class CheckInShapeResponse(BaseModel):
@@ -1143,6 +1145,8 @@ def to_reply_plan_shape_response(shape: ReplyPlanShape) -> ReplyPlanShapeRespons
         read_said=shape.read_said,
         check_in_kinds_offered=shape.check_in_kinds_offered,
         check_in_kind=shape.check_in_kind,
+        pattern_used=shape.pattern_used,
+        pattern_offered=shape.pattern_offered,
     )
 
 

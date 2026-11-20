@@ -5,6 +5,7 @@ from companion.core.life_threads import ThreadReminder
 from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.models import MessageToAnswer, UserSnapshot
 from companion.core.move_outcomes import MoveOutcomeFinder
+from companion.core.patterns import PatternReminder
 from companion.core.recent_messages import RecentMessagesReader
 from companion.core.reply_attempt import ReplyAttempt
 from companion.core.reply_gate import ReplyGate, Stopped
@@ -27,8 +28,9 @@ class ReplyService:
     Conversations), which the Understanding, Reply Plan and reply all see;
     then the Understanding reads what the User said, means, feels and
     wants, deciding nothing; then the Companion is reminded of the User's
-    Life Threads the Message touches, lists the Curiosities whose day has
-    come and finds the User's past Move Outcomes closest to the Message;
+    Life Threads the Message touches and the Patterns linked to them or
+    close to it, lists the Curiosities whose day has come and finds the
+    User's past Move Outcomes closest to the Message;
     then the Reply Plan
     decides what the User needs and which Moves to make, which User Memory
     matters, which Threads and Curiosities to bring up, which Knowledge
@@ -57,6 +59,7 @@ class ReplyService:
         response_composer: ResponseComposer,
         woven_check_ins: WovenCheckIns,
         recent_messages: RecentMessagesReader,
+        pattern_reminder: PatternReminder,
     ) -> None:
         """Set up the service.
 
@@ -79,6 +82,8 @@ class ReplyService:
             woven_check_ins: Says which Check-in Kinds the Reply Plan may
                 weave in, and saves, checks and takes back the one it chose.
             recent_messages: Reads the messages every step of the reply sees.
+            pattern_reminder: Finds the Patterns that come to mind for each
+                Message.
         """
         self._reply_gate = reply_gate
         self._conversations = conversations
@@ -92,6 +97,7 @@ class ReplyService:
         self._response_composer = response_composer
         self._woven_check_ins = woven_check_ins
         self._recent_messages = recent_messages
+        self._pattern_reminder = pattern_reminder
 
     def handle(
         self, message: MessageToAnswer, snapshot: UserSnapshot, attempt: ReplyAttempt
@@ -132,6 +138,9 @@ class ReplyService:
         reminded = self._thread_reminder.remind(
             snapshot, message.conversation_id, understanding.form.means
         )
+        patterns = self._pattern_reminder.remind(
+            snapshot, message.conversation_id, understanding.form.means, reminded
+        )
         due = self._curiosity_raiser.due(snapshot, message.conversation_id)
         move_outcomes = self._move_outcome_finder.find(
             snapshot, message.conversation_id
@@ -145,6 +154,7 @@ class ReplyService:
             due,
             move_outcomes,
             self._woven_check_ins.kinds_to_offer(snapshot, understanding.form),
+            patterns,
         )
         plan = planned.reply_plan.form
         attempt.raise_if_dropped()

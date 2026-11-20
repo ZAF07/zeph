@@ -96,6 +96,8 @@ const plainUsersTrace: ModelCallTraceDetails = {
         read_said: false,
         check_in_kinds_offered: 4,
         check_in_kind: "A follow-up",
+        pattern_used: true,
+        pattern_offered: false,
       },
     },
     {
@@ -237,6 +239,7 @@ describe("ModelCallTraceView", () => {
     expect(factValue(replyPlan, "Threads held back")).toBe("1");
     expect(factValue(replyPlan, "Read formed")).toBe("Yes");
     expect(factValue(replyPlan, "Read said")).toBe("No");
+    expect(factValue(replyPlan, "Pattern")).toBe("Used, not offered");
     expect(factValue(replyPlan, "Check-in Kinds offered")).toBe("4");
     expect(factValue(replyPlan, "Check-in Kind chosen")).toBe("A follow-up");
     expect(

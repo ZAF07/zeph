@@ -277,6 +277,7 @@ PATTERN_KEEPING_THINKING = Setting("pattern_keeping_thinking", read_on_off)
 PATTERN_KEEPING_PROMPT = Setting("pattern_keeping_prompt", read_text)
 PATTERN_KEEPING_THREADS = Setting("pattern_keeping_threads", read_whole_number)
 PATTERN_KEEPING_DAYS = Setting("pattern_keeping_days", read_whole_number)
+PATTERN_PUSHED_BACK_WAIT = Setting("pattern_pushed_back_wait_days", read_days)
 PORTRAIT_MODEL = Setting("portrait_model", read_text)
 PORTRAIT_THINKING = Setting("portrait_thinking", read_on_off)
 PORTRAIT_PROMPT = Setting("portrait_prompt", read_text)
@@ -1192,6 +1193,18 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         hint=(
             "Days before the Reply Plan may bring up a Life Thread again after the "
             "User brushed it off. One they asked to drop is never brought up again."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_PUSHED_BACK_WAIT.key,
+        "Wait after a pushed-back Pattern",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=365,
+        hint=(
+            "Days before a Pattern the User pushed back on comes to mind for the "
+            "Reply Plan again, so Zeph doesn't offer the same view too soon. A "
+            "closed Pattern never comes back."
         ),
     ),
     EditableSetting(

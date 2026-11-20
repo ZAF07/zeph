@@ -544,6 +544,25 @@ pattern_evidence = Table(
     Column("line", Text, nullable=False),
 )
 
+patterns_in_mind = Table(
+    "patterns_in_mind",
+    metadata,
+    Column(
+        "conversation_id",
+        Uuid,
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "pattern_id",
+        Uuid,
+        ForeignKey("patterns.id", ondelete="CASCADE"),
+        primary_key=True,
+        index=True,
+    ),
+    Column("came_to_mind_at", DateTime(timezone=True), nullable=False),
+)
+
 shared_photos = Table(
     "shared_photos",
     metadata,

@@ -1269,6 +1269,48 @@ class PatternRepository(Protocol):
         """
         ...
 
+    def find_close_ids(
+        self, user_id: UUID, embedding: list[float], min_closeness: float
+    ) -> list[UUID]:
+        """Find the User's Patterns at least as close in meaning as asked.
+
+        Patterns with no embedding are never found.
+
+        Args:
+            user_id: The User's ID; only their Patterns are searched.
+            embedding: What the Patterns are compared with.
+            min_closeness: How close in meaning a Pattern must be, from 0 to 1.
+
+        Returns:
+            The Patterns' IDs, closest first.
+        """
+        ...
+
+    def keep_in_mind(
+        self, conversation_id: UUID, pattern_ids: Sequence[UUID], at: datetime
+    ) -> None:
+        """Note that Patterns came to mind in a Conversation, so they stay in mind.
+
+        A Pattern already in mind keeps when it first came to mind.
+
+        Args:
+            conversation_id: The Conversation's ID.
+            pattern_ids: The Patterns' IDs.
+            at: When they came to mind.
+        """
+        ...
+
+    def list_in_mind_ids(self, conversation_id: UUID) -> list[UUID]:
+        """List the Patterns that came to mind in a Conversation.
+
+        Args:
+            conversation_id: The Conversation's ID.
+
+        Returns:
+            The Patterns' IDs, the first to come to mind first.
+        """
+        ...
+
     def save_many(
         self, added: Sequence[PatternToSave], changed: Sequence[PatternToSave]
     ) -> None:

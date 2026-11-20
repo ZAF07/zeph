@@ -36,6 +36,7 @@ from companion.core.models import (
     Move,
     MoveOutcome,
     Need,
+    PatternPicked,
     ReplyPlan,
     ReplyPlanForm,
     ReplyPlanShape,
@@ -47,6 +48,7 @@ from companion.core.models import (
 )
 from companion.core.move_outcomes import describe_move_outcome
 from companion.core.past_day import PastDayTool
+from companion.core.patterns import RemindedPattern, describe_patterns_in_mind
 from companion.core.platform_settings import (
     HOME_GOALS_MEMORY_CATEGORY,
     PERSONA_OUTLOOK,
@@ -288,6 +290,7 @@ def describe_message_for_reply_plan(
     move_outcomes: Sequence[MoveOutcome],
     check_in_kinds: Sequence[CheckInKind] = (),
     last_conversation_where: str = "",
+    patterns: Sequence[RemindedPattern] = (),
 ) -> str:
     """Write what the Reply Plan model is given about the Message.
 
@@ -313,14 +316,16 @@ def describe_message_for_reply_plan(
         last_conversation_where: Where the previous Conversation among the
             Recent Messages was when its last Reply Plan was made; "" if
             none.
+        patterns: The Patterns in mind, numbered.
 
     Returns:
         The time, the Understanding, Needs, Moves and which each Need
         allows, past Move Outcomes with their days, User Portrait, Goals,
-        Memory Categories, recent Conversations, reminded Life Threads, due
-        Curiosities, Knowledge documents, the due Check-in's Kinds when one
-        is due, where the previous Conversation was, earlier Reply Plans,
-        earlier messages across Conversations and latest message.
+        Memory Categories, recent Conversations, reminded Life Threads, the
+        Patterns in mind, due Curiosities, Knowledge documents, the due
+        Check-in's Kinds when one is due, where the previous Conversation
+        was, earlier Reply Plans, earlier messages across Conversations and
+        latest message.
     """
     fallback = fallback_need(needs)
     need_lines = "\n".join(f"- {need.name}: {need.when_it_fits}" for need in needs)
@@ -372,6 +377,9 @@ def describe_message_for_reply_plan(
         f"\n\nLife Threads in mind: those this message reminds you of, open "
         f"ones first, then those from earlier in this Conversation:\n"
         f"{describe_reminded_threads(reminded, snapshot.user.time_zone)}"
+        f"\n\nPatterns in mind: what you've noticed keeps showing up across "
+        f"their life. A suspected one is only your guess:\n"
+        f"{describe_patterns_in_mind(patterns, snapshot.user.time_zone)}"
         f"\n\nThings you've been wondering about them, whose time has come "
         f"{describe_due_curiosities(due, snapshot.user.time_zone)}"
         f"\n\nKnowledge documents, with when each helps:\n"
@@ -506,6 +514,31 @@ def read_left_alone(
             title=item.thread.title,
             reason=read_form_text(entry.get("reason")),
         )
+    return tuple(chosen.values())
+
+
+def read_patterns_picked(
+    value: Any, by_number: dict[int, RemindedPattern]
+) -> tuple[PatternPicked, ...]:
+    """Read the Patterns in mind a list of numbers in the form names.
+
+    Args:
+        value: The field's value: a list of Pattern numbers.
+        by_number: The Patterns in mind, by number.
+
+    Returns:
+        The Patterns, each once; unknown numbers are skipped.
+    """
+    if not isinstance(value, list):
+        return ()
+    chosen: dict[UUID, PatternPicked] = {}
+    for listed in value:
+        number = read_number(listed)
+        item = None if number is None else by_number.get(number)
+        if item is not None:
+            chosen[item.pattern.id] = PatternPicked(
+                pattern_id=item.pattern.id, pattern=item.pattern.pattern
+            )
     return tuple(chosen.values())
 
 
@@ -649,6 +682,7 @@ def read_reply_plan_form(
     due: DueCuriosities,
     knowledge_documents: dict[int, KnowledgeDocument],
     check_in_kinds: Sequence[CheckInKind] = (),
+    patterns: Sequence[RemindedPattern] = (),
 ) -> ReplyPlanForm | None:
     """Read the Reply Plan model's JSON form.
 
@@ -660,6 +694,8 @@ def read_reply_plan_form(
     list. A missing or odd "send_photo" reads as allowed, and a missing or
     odd "ask_why" as not said. The Read is said only when there is one and
     "say_read" is true. A Check-in is chosen only from the Kinds offered.
+    Patterns are named by their numbers in the Patterns in mind; one is
+    offered only when the Read is said, and an offered one counts as used.
 
     Args:
         answer: The model's answer.
@@ -669,6 +705,7 @@ def read_reply_plan_form(
             by number.
         check_in_kinds: The Check-in Kinds it was offered; empty when no
             Check-in was due.
+        patterns: The Patterns in mind the model was shown, numbered.
 
     Returns:
         The form, or None if it has no JSON object naming a Need.
@@ -687,7 +724,15 @@ def read_reply_plan_form(
         return None
     ask_why = parsed.get("ask_why")
     read = read_form_text(parsed.get("read"))
+    say_read = bool(read) and parsed.get("say_read") is True
     by_number = {item.number: item for item in reminded}
+    patterns_by_number = {item.number: item for item in patterns}
+    offered = (
+        read_patterns_picked([parsed.get("offer_pattern")], patterns_by_number)
+        if say_read
+        else ()
+    )
+    used = read_patterns_picked(parsed.get("patterns_used"), patterns_by_number)
     form = ReplyPlanForm(
         need=need,
         guidance=read_form_text(parsed.get("guidance")),
@@ -707,8 +752,10 @@ def read_reply_plan_form(
         ask_why=ask_why if isinstance(ask_why, bool) else None,
         where_we_are=read_form_text(parsed.get("where_we_are")),
         read=read,
-        say_read=bool(read) and parsed.get("say_read") is True,
+        say_read=say_read,
         check_in=read_check_in_choice(parsed.get("check_in"), check_in_kinds),
+        patterns_used=tuple(dict.fromkeys([*used, *offered])),
+        pattern_offered=offered[0] if offered else None,
     )
     return keep_held_back_threads_alone(form, reminded)
 
@@ -918,7 +965,8 @@ def format_reply_guidance(
 
     Returns:
         The Threads to leave alone as a boundary; the Need and how to reply,
-        the Read when the plan says to give it now, the lead and supporting
+        the Read when the plan says to give it now with the Pattern it
+        offers, if any, the lead and supporting
         Moves and how to make them, the guidance, the mood, the note and the
         Threads to bring up as the plan; the Curiosities, as an optional
         extra; and the past days it read, with what the reply remembers.
@@ -928,6 +976,13 @@ def format_reply_guidance(
         lines.append(
             "Your Read of what is really going on, to give in this reply as your "
             f"view, never as fact: {plan.read}"
+        )
+    if plan.pattern_offered:
+        lines.append(
+            "It comes from something you've noticed keeps showing up in their "
+            f"life: {plan.pattern_offered.pattern} Offer it as what you notice "
+            '("here\'s what I notice…"), never as fact, and let them say '
+            "whether it fits."
         )
     if picked.lead:
         lines.append(f"Lead with: {picked.lead.name}. {picked.lead.how_to_do_it}")
@@ -978,8 +1033,9 @@ def describe_reply_plan_shape(
     Returns:
         The Need, the lead, supporting and next Moves' names, how many Life
         Threads were reminded, brought up, left alone and held back,
-        whether a Read was formed and said, and how many Check-in Kinds
-        were offered and which it chose; never any words.
+        whether a Read was formed and said, how many Check-in Kinds were
+        offered and which it chose, and whether a Pattern was used and
+        offered; never any words.
     """
     ways = [item.how for item in form.bring_up]
     held_back = [item for item in reminded if item.hold_back]
@@ -997,6 +1053,8 @@ def describe_reply_plan_shape(
         read_said=form.say_read,
         check_in_kinds_offered=check_in_kinds_offered,
         check_in_kind=form.check_in.kind if form.check_in else None,
+        pattern_used=bool(form.patterns_used),
+        pattern_offered=form.pattern_offered is not None,
     )
 
 
@@ -1010,7 +1068,8 @@ class ReplyPlanService:
     whose needed Feature doesn't work for the User right now, and any that
     asks a question and was made in the previous reply), which Move it means
     to make next and why, which Memory Categories and Knowledge matter,
-    which Life Threads and Curiosities to bring up or leave alone, whether a
+    which Life Threads and Curiosities to bring up or leave alone, which
+    Patterns in mind its Read is built on and whether to offer one, whether a
     Shared Photo may be sent, whether to ask why and, when a Check-in is
     due, whether one of its Kinds fits this reply. It sees this
     Conversation's earlier Reply Plans with where the Conversation was, the
@@ -1055,6 +1114,7 @@ class ReplyPlanService:
         due: DueCuriosities,
         move_outcomes: Sequence[MoveOutcome],
         check_in_kinds: Sequence[CheckInKind] = (),
+        patterns: Sequence[RemindedPattern] = (),
     ) -> PlannedReply:
         """Make and save the Reply Plan of the Conversation's newest Message.
 
@@ -1084,6 +1144,7 @@ class ReplyPlanService:
                 Message, closest first.
             check_in_kinds: The Check-in Kinds it may weave in, when code
                 allows a due Check-in; empty when none is.
+            patterns: The Patterns in mind, numbered.
 
         Returns:
             The saved Reply Plan, what it adds to the reply and the
@@ -1118,12 +1179,14 @@ class ReplyPlanService:
                 move_outcomes,
                 check_in_kinds,
                 self._last_conversation_where(recent),
+                patterns,
             ),
             reminded,
             due,
             knowledge_documents,
             check_in_kinds,
             past_days.append,
+            patterns,
         )
         if model_form is None:
             need = fallback_need(needs)
@@ -1244,6 +1307,7 @@ class ReplyPlanService:
         knowledge_documents: dict[int, KnowledgeDocument],
         check_in_kinds: Sequence[CheckInKind],
         on_past_day_read: Callable[[str], None],
+        patterns: Sequence[RemindedPattern] = (),
     ) -> ReplyPlanForm | None:
         """Ask the model to fill in the form, with the Outlook before the prompt.
 
@@ -1259,6 +1323,7 @@ class ReplyPlanService:
             check_in_kinds: The Check-in Kinds it was offered.
             on_past_day_read: Called with what each call of the past-day
                 tool read.
+            patterns: The Patterns in mind it was shown, numbered.
 
         Returns:
             The form; None if the call failed or the answer can't be read.
@@ -1281,7 +1346,7 @@ class ReplyPlanService:
             logger.exception("The Reply Plan call failed; using the fallback Need")
             return None
         form = read_reply_plan_form(
-            answer, reminded, due, knowledge_documents, check_in_kinds
+            answer, reminded, due, knowledge_documents, check_in_kinds, patterns
         )
         if form is None:
             logger.warning(

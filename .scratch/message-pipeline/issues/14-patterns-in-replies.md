@@ -43,3 +43,11 @@ Read `web/design/README.md` in full first, including "Message-pipeline additions
 - 12 — Wide recall (`.scratch/message-pipeline/issues/12-wide-recall.md`)
 
 ## Comments
+
+### Plan (20 Nov 2026, branch `message-pipeline-14-patterns-in-replies`)
+
+- **Recall** (`PatternReminder` in `core/patterns.py`, plain code, after `ThreadReminder`): Patterns linked to the Threads in mind, plus Patterns close in meaning to what the Understanding says the User means and their latest texts (same text window and closeness bar as Threads). Found ones are kept in a new `patterns_in_mind` table (migration 0073) and stay in mind for the Conversation. Closed ones never come in; a pushed-back one waits `pattern_pushed_back_wait_days` (new field row with hint, Memory section).
+- **Reply Plan:** sees the Patterns in mind, numbered, with their state, evidence and last reaction. Its form gets `patterns_used` (numbers) and `offer_pattern` (number or null). An offer counts only when the Read is said (07's rules) and always counts as used too. Saved in the form, so keeping can read it. Migration 0073 also reloads `reply_plan_prompt` from the seed.
+- **Reply:** an offered Pattern goes in at level 3 with the Read, as what Zeph notices, never as fact. A used-but-not-offered one doesn't reach the Reply.
+- **Keeping:** the Pattern keeping call's input marks a Pattern "offered to them in this Conversation" when one of that Conversation's Reply Plans offered it.
+- **Model Call Log:** the Reply Plan shape gets `pattern_used` and `pattern_offered`; the trace's "Pattern" fact reads None / Used, not offered / Offered (Zaf chose "Offered" for the value that isn't drawn).

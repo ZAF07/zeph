@@ -121,6 +121,11 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
         unit: "days",
       },
       {
+        key: "pattern_pushed_back_wait_days",
+        label: "Wait after a pushed-back Pattern",
+        unit: "days",
+      },
+      {
         key: "move_outcomes_per_understanding",
         label: "Most Move Outcomes per Understanding",
         unit: "outcomes",
