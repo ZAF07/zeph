@@ -60,4 +60,4 @@ An ordinary field row with a hint in the Memory section of Platform settings, ne
 ## Completion
 
 - Completed: 2026-11-20
-- Commit: to be filled in after merge
+- Commit: `ac763ea` (merge into `main`: "Merge message pipeline issue 18: a closeness bar of its own for Patterns"). Branch commits: `948b488` (the change), `53d6194` (archive and evidence)
