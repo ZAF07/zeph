@@ -1,6 +1,6 @@
 import json
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 from uuid import UUID, uuid4
@@ -26,7 +26,6 @@ from companion.core.models import (
     CheckInKind,
     ChosenCheckIn,
     ChosenKnowledgeDocument,
-    ConversationMessage,
     CuriosityToRaise,
     Feature,
     KnowledgeDocument,
@@ -47,6 +46,7 @@ from companion.core.models import (
     UserSnapshot,
 )
 from companion.core.move_outcomes import describe_move_outcome
+from companion.core.past_day import PastDayTool
 from companion.core.platform_settings import (
     HOME_GOALS_MEMORY_CATEGORY,
     PERSONA_OUTLOOK,
@@ -56,8 +56,8 @@ from companion.core.platform_settings import (
     REPLY_PLAN_THINKING,
 )
 from companion.core.ports import Clock, Repositories
+from companion.core.recent_messages import RecentMessages, describe_recent_messages
 from companion.core.reply_tools import ReplyGuidance
-from companion.core.transcripts import split_off_latest_message, to_transcript_lines
 from companion.core.understanding import (
     describe_understanding,
     format_local_time,
@@ -281,12 +281,13 @@ def describe_message_for_reply_plan(
     moves: Sequence[Move],
     saved: SavedMemory,
     earlier: Sequence[ReplyPlan],
-    messages: list[ConversationMessage],
+    recent: RecentMessages,
     reminded: Sequence[RemindedThread],
     due: DueCuriosities,
     knowledge_documents: dict[int, KnowledgeDocument],
     move_outcomes: Sequence[MoveOutcome],
     check_in_kinds: Sequence[CheckInKind] = (),
+    last_conversation_where: str = "",
 ) -> str:
     """Write what the Reply Plan model is given about the Message.
 
@@ -297,8 +298,8 @@ def describe_message_for_reply_plan(
         moves: Every Move the reply may make, in order.
         saved: The User's saved memory, read for this reply.
         earlier: This Conversation's earlier Reply Plans, oldest first.
-        messages: The Conversation so far, oldest first; the User's messages
-            at the end are the Message being answered.
+        recent: The Recent Messages: every message from the last hours,
+            across Conversations, ending with the Message being answered.
         reminded: The Life Threads the Message reminds the Companion of.
         due: The Curiosities it may bring up.
         knowledge_documents: The Knowledge documents it may choose from, by
@@ -307,13 +308,17 @@ def describe_message_for_reply_plan(
             closest first.
         check_in_kinds: The Check-in Kinds it may weave in when a Check-in
             is due; empty when none is.
+        last_conversation_where: Where the previous Conversation among the
+            Recent Messages was when its last Reply Plan was made; "" if
+            none.
 
     Returns:
         The time, the Understanding, Needs, Moves and which each Need
         allows, past Move Outcomes with their days, User Portrait, Goals,
         Memory Categories, recent Conversations, reminded Life Threads, due
         Curiosities, Knowledge documents, the due Check-in's Kinds when one
-        is due, earlier Reply Plans, earlier Conversation and latest message.
+        is due, where the previous Conversation was, earlier Reply Plans,
+        earlier messages across Conversations and latest message.
     """
     fallback = fallback_need(needs)
     need_lines = "\n".join(f"- {need.name}: {need.when_it_fits}" for need in needs)
@@ -342,7 +347,12 @@ def describe_message_for_reply_plan(
         if check_in_kinds
         else ""
     )
-    earlier_messages, latest_text = split_off_latest_message(messages)
+    last_conversation_line = (
+        f"Where the previous Conversation was when it ended: "
+        f"{last_conversation_where}\n\n"
+        if last_conversation_where
+        else ""
+    )
     return (
         f"Time where they are: {format_local_time(snapshot.local_now)}\n\n"
         f"How you understood their latest message:\n"
@@ -364,11 +374,10 @@ def describe_message_for_reply_plan(
         f"\n\nKnowledge documents, with when each helps:\n"
         f"{knowledge_lines or 'None.'}"
         f"{check_in_section}"
-        f"\n\nEarlier Reply Plans in this Conversation, oldest first:\n"
+        f"\n\n{last_conversation_line}"
+        f"Earlier Reply Plans in this Conversation, oldest first:\n"
         f"{earlier_lines or 'None yet.'}\n\n"
-        f"Earlier in the Conversation:\n"
-        f"{to_transcript_lines(earlier_messages) or 'Nothing yet.'}\n\n"
-        f"Latest message:\nPerson: {latest_text}"
+        f"{describe_recent_messages(recent, snapshot.user.time_zone)}"
     )
 
 
@@ -887,6 +896,7 @@ def format_reply_guidance(
     threads_section: str,
     left_alone_section: str,
     curiosities_section: str,
+    past_days: Sequence[str] = (),
 ) -> ReplyGuidance:
     """Write what the Reply Plan adds to the reply's instructions.
 
@@ -901,13 +911,14 @@ def format_reply_guidance(
             "" if none matter.
         left_alone_section: The Life Threads to leave alone; "" if none.
         curiosities_section: The Curiosities to bring up; "" if none.
+        past_days: What each call of the past-day tool read, in order.
 
     Returns:
         The Threads to leave alone as a boundary; the Need and how to reply,
         the Read when the plan says to give it now, the lead and supporting
         Moves and how to make them, the guidance, the mood, the note and the
-        Threads to bring up as the plan; and the Curiosities, as an optional
-        extra.
+        Threads to bring up as the plan; the Curiosities, as an optional
+        extra; and the past days it read, with what the reply remembers.
     """
     lines = [f"What they need from you right now: {need.name}.", need.how_to_reply]
     if plan.say_read:
@@ -932,8 +943,16 @@ def format_reply_guidance(
     reply_plan = "\n".join(lines)
     if threads_section:
         reply_plan += f"\n\n{threads_section}"
+    past_days_section = (
+        "Past days you looked up for this reply:\n\n" + "\n\n".join(past_days)
+        if past_days
+        else ""
+    )
     return ReplyGuidance(
-        boundaries=left_alone_section, plan=reply_plan, curiosities=curiosities_section
+        boundaries=left_alone_section,
+        plan=reply_plan,
+        curiosities=curiosities_section,
+        past_days=past_days_section,
     )
 
 
@@ -993,7 +1012,10 @@ class ReplyPlanService:
     due, whether one of its Kinds fits this reply. It sees this
     Conversation's earlier Reply Plans with where the Conversation was, the
     Reads formed and their Moves, so it knows whether it already asked why,
-    gave a Read and which Move it had in mind next.
+    gave a Read and which Move it had in mind next. It sees the Recent Messages
+    (every message from the last hours, across Conversations) and where the
+    previous Conversation in it was when it ended, and may call the past-day
+    tool to read an older day's messages word for word.
     """
 
     def __init__(
@@ -1002,6 +1024,7 @@ class ReplyPlanService:
         chat_model: UsageRecordingChatModel,
         model_call_log: ModelCallLog,
         clock: Clock,
+        past_day: PastDayTool,
     ) -> None:
         """Set up the service.
 
@@ -1011,16 +1034,19 @@ class ReplyPlanService:
             chat_model: Fills in the form and records the tokens used.
             model_call_log: Records the shape of each Reply Plan.
             clock: Tells the current time.
+            past_day: Lets the model read a past day's messages.
         """
         self._repositories = repositories
         self._chat_model = chat_model
         self._model_call_log = model_call_log
         self._clock = clock
+        self._past_day = past_day
 
     def plan(
         self,
         snapshot: UserSnapshot,
         understanding: Understanding,
+        recent: RecentMessages,
         saved: SavedMemory,
         reminded: Sequence[RemindedThread],
         due: DueCuriosities,
@@ -1046,6 +1072,7 @@ class ReplyPlanService:
         Args:
             snapshot: The User being answered.
             understanding: The Message's Understanding, just made.
+            recent: The Recent Messages, ending with the Message.
             saved: The User's saved memory, read for this reply.
             reminded: The Life Threads the Message reminds the Companion of.
             due: The Curiosities it may bring up.
@@ -1058,8 +1085,7 @@ class ReplyPlanService:
             The saved Reply Plan, what it adds to the reply and the
             Check-in it chose.
         """
-        conversation_id = understanding.conversation_id
-        messages = self._repositories.conversations.list_messages(conversation_id)
+        conversation_id = recent.conversation_id
         needs = self._repositories.needs.list_all()
         earlier = self._repositories.reply_plans.list_for_conversation(conversation_id)
         moves = moves_without_repeat_questions(
@@ -1071,6 +1097,7 @@ class ReplyPlanService:
         knowledge_documents = number_knowledge_documents(
             self._knowledge_documents(snapshot)
         )
+        past_days: list[str] = []
         model_form = self._ask(
             snapshot,
             describe_message_for_reply_plan(
@@ -1080,17 +1107,19 @@ class ReplyPlanService:
                 moves,
                 saved,
                 earlier,
-                messages,
+                recent,
                 reminded,
                 due,
                 knowledge_documents,
                 move_outcomes,
                 check_in_kinds,
+                self._last_conversation_where(recent),
             ),
             reminded,
             due,
             knowledge_documents,
             check_in_kinds,
+            past_days.append,
         )
         if model_form is None:
             need = fallback_need(needs)
@@ -1107,7 +1136,7 @@ class ReplyPlanService:
             id=uuid4(),
             user_id=snapshot.user.id,
             conversation_id=conversation_id,
-            message_id=newest_incoming_message_id(messages),
+            message_id=newest_incoming_message_id(recent.messages),
             form=form,
             need=need.name,
             asked_why=asked_why,
@@ -1137,11 +1166,35 @@ class ReplyPlanService:
                 format_threads_for_reply(reminded, model_form, snapshot.user.time_zone),
                 format_threads_left_alone(model_form),
                 format_curiosities_for_reply(form.curiosities),
+                past_days,
             ),
             asks_a_question=asks_another_question or picked.asks_a_question,
             may_send_photo=may_send_photo(understanding.form, form),
             check_in=woven_check_in_from_plan(snapshot, form, check_in_kinds),
         )
+
+    def _last_conversation_where(self, recent: RecentMessages) -> str:
+        """Find where the previous Conversation among the Recent Messages ended up.
+
+        Args:
+            recent: The Recent Messages.
+
+        Returns:
+            The where-we-are line of the previous Conversation's last Reply
+            Plan; "" if no earlier Conversation is among them, or it has no
+            Reply Plan.
+        """
+        earlier_conversation_ids = [
+            message.conversation_id
+            for message in recent.messages
+            if message.conversation_id != recent.conversation_id
+        ]
+        if not earlier_conversation_ids:
+            return ""
+        reply_plans = self._repositories.reply_plans.list_for_conversation(
+            earlier_conversation_ids[-1]
+        )
+        return reply_plans[-1].form.where_we_are if reply_plans else ""
 
     def _working_features(self, snapshot: UserSnapshot) -> set[Feature]:
         """List the Features that work for the User right now.
@@ -1186,8 +1239,11 @@ class ReplyPlanService:
         due: DueCuriosities,
         knowledge_documents: dict[int, KnowledgeDocument],
         check_in_kinds: Sequence[CheckInKind],
+        on_past_day_read: Callable[[str], None],
     ) -> ReplyPlanForm | None:
         """Ask the model to fill in the form, with the Outlook before the prompt.
+
+        The model may call the past-day tool before it answers.
 
         Args:
             snapshot: The User being answered.
@@ -1197,6 +1253,8 @@ class ReplyPlanService:
             knowledge_documents: The Knowledge documents it was shown, by
                 number.
             check_in_kinds: The Check-in Kinds it was offered.
+            on_past_day_read: Called with what each call of the past-day
+                tool read.
 
         Returns:
             The form; None if the call failed or the answer can't be read.
@@ -1213,6 +1271,7 @@ class ReplyPlanService:
                     f"{settings.get(REPLY_PLAN_PROMPT)}"
                 ),
                 history=[ChatLine(role=ChatRole.USER, text=description)],
+                tools=[self._past_day.tool_for(snapshot, on_past_day_read)],
             )
         except Exception:
             logger.exception("The Reply Plan call failed; using the fallback Need")

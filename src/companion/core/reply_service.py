@@ -5,6 +5,7 @@ from companion.core.life_threads import ThreadReminder
 from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.models import MessageToAnswer, UserSnapshot
 from companion.core.move_outcomes import MoveOutcomeFinder
+from companion.core.recent_messages import RecentMessagesReader
 from companion.core.reply_attempt import ReplyAttempt
 from companion.core.reply_gate import ReplyGate, Stopped
 from companion.core.reply_plan import ReplyPlanService
@@ -22,10 +23,13 @@ class ReplyService:
 
     The steps run in this order (ADR-0021): the ReplyGate applies the house
     rules left once the Message's texts are saved and checked, then the
-    Understanding reads what the User said, means, feels and wants, deciding
-    nothing; then the Companion is reminded of the User's Life Threads the
-    Message touches, lists the Curiosities whose day has come and finds the
-    User's past Move Outcomes closest to the Message; then the Reply Plan
+    Recent Messages are read (every message from the last hours, across
+    Conversations), which the Understanding, Reply Plan and reply all see;
+    then the Understanding reads what the User said, means, feels and
+    wants, deciding nothing; then the Companion is reminded of the User's
+    Life Threads the Message touches, lists the Curiosities whose day has
+    come and finds the User's past Move Outcomes closest to the Message;
+    then the Reply Plan
     decides what the User needs and which Moves to make, which User Memory
     matters, which Threads and Curiosities to bring up, which Knowledge
     documents fit and, when code allows a due Check-in, whether one of its
@@ -52,6 +56,7 @@ class ReplyService:
         knowledge_retrieval: KnowledgeRetrieval,
         response_composer: ResponseComposer,
         woven_check_ins: WovenCheckIns,
+        recent_messages: RecentMessagesReader,
     ) -> None:
         """Set up the service.
 
@@ -73,6 +78,7 @@ class ReplyService:
             response_composer: Writes the Companion's reply.
             woven_check_ins: Says which Check-in Kinds the Reply Plan may
                 weave in, and saves, checks and takes back the one it chose.
+            recent_messages: Reads the messages every step of the reply sees.
         """
         self._reply_gate = reply_gate
         self._conversations = conversations
@@ -85,6 +91,7 @@ class ReplyService:
         self._knowledge_retrieval = knowledge_retrieval
         self._response_composer = response_composer
         self._woven_check_ins = woven_check_ins
+        self._recent_messages = recent_messages
 
     def handle(
         self, message: MessageToAnswer, snapshot: UserSnapshot, attempt: ReplyAttempt
@@ -117,8 +124,9 @@ class ReplyService:
         if isinstance(gate_result, Stopped):
             return
         saved_memory = self._memory_retrieval.read(snapshot)
+        recent = self._recent_messages.read(snapshot, message.conversation_id)
         understanding = self._understanding.understand(
-            snapshot, message.conversation_id, saved_memory.portrait
+            snapshot, recent, saved_memory.portrait
         )
         attempt.raise_if_dropped()
         reminded = self._thread_reminder.remind(snapshot, message.conversation_id)
@@ -129,6 +137,7 @@ class ReplyService:
         planned = self._reply_plan.plan(
             snapshot,
             understanding,
+            recent,
             saved_memory,
             reminded,
             due,
@@ -152,7 +161,7 @@ class ReplyService:
         try:
             attempt.raise_if_dropped()
             reply = self._response_composer.compose(
-                message.conversation_id,
+                recent,
                 snapshot,
                 memory.text,
                 knowledge,

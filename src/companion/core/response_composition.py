@@ -22,6 +22,7 @@ from companion.core.platform_settings import (
     RESPONSE_THINKING,
 )
 from companion.core.ports import Repositories
+from companion.core.recent_messages import RecentMessages, describe_stand_ins
 from companion.core.reply_tools import (
     NO_GUIDANCE,
     ReplyContext,
@@ -191,7 +192,7 @@ class ResponseComposer:
 
     def compose(
         self,
-        conversation_id: UUID,
+        recent: RecentMessages,
         snapshot: UserSnapshot,
         memory: str = "",
         knowledge: str = "",
@@ -207,14 +208,17 @@ class ResponseComposer:
         and the User's boundaries, what they just asked, what the
         Understanding found they need, what the Companion remembers, and
         last the optional extras the reply may leave out. The model gets
-        every earlier message in the Conversation. Each tool provider offers
+        every message in the Recent Messages, across Conversations, and the Day
+        Summaries standing in for any left out go with what it remembers.
+        Each tool provider offers
         its tools and instructions, and a sticker or Shared Photo a tool
         picks is sent with the reply, after any fixed text a tool asked to
         close the reply with. When a Feature doesn't work for the User, the
         instructions say so, so the reply can tell them plainly.
 
         Args:
-            conversation_id: The Conversation to reply in.
+            recent: The Recent Messages: the Conversation to reply in and every
+                message from the last hours, across Conversations.
             snapshot: The User being replied to, as read when the reply started.
             memory: The User Memory that matters for this message; "" if none.
             knowledge: The Knowledge passages that may fit; "" if none.
@@ -235,7 +239,8 @@ class ResponseComposer:
         """
         settings = snapshot.settings
         context = ReplyContext(
-            conversation_id=conversation_id, shared_photo_ids=tuple(shared_photo_ids)
+            conversation_id=recent.conversation_id,
+            shared_photo_ids=tuple(shared_photo_ids),
         )
         offers = [
             provider.offer(snapshot, context) for provider in self._tool_providers
@@ -251,7 +256,15 @@ class ResponseComposer:
                 ),
             ),
             guidance=guidance.plan,
-            memory=memory,
+            memory="\n\n".join(
+                part
+                for part in (
+                    memory,
+                    describe_stand_ins(recent.stand_ins),
+                    guidance.past_days,
+                )
+                if part
+            ),
             optional_extras=(
                 *(offer.instructions for offer in optional_offers),
                 guidance.curiosities,
@@ -259,9 +272,7 @@ class ResponseComposer:
             ),
         )
         offers += optional_offers
-        history = to_chat_history(
-            self._repositories.conversations.list_messages(conversation_id)
-        )
+        history = to_chat_history(recent.messages)
         reply = self._chat_model.generate(
             snapshot=snapshot,
             step=ModelStep.REPLY,

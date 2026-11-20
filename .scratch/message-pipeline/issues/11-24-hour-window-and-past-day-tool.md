@@ -1,6 +1,6 @@
 # 11 — Every reply sees the last 24 hours, and can read a past day
 
-Status: ready-for-agent
+Status: in-progress
 Lane: A or B
 Blocked by: 05
 
@@ -46,3 +46,10 @@ Read `web/design/README.md` in full first, including "Message-pipeline additions
 - 05 — The Reply Plan takes over deciding; the Understanding only reads (`.scratch/message-pipeline/issues/05-reply-plan-takes-over-deciding.md`)
 
 ## Comments
+
+### Plan (20 Nov 2026, branch `mp-11-24h-window-past-day`)
+
+- New `core/reply_window.py`: `ReplyWindowReader.read(snapshot, conversation_id)` loads every message the User and Zeph sent in the last `reply_window_hours` (one query across Conversations, new repository method `list_user_messages_between`). Past `reply_window_message_cap` messages, the oldest are left out and the Day Summaries of their days stand in.
+- `ReplyService` reads the window once and hands it to the Understanding, the Reply Plan and the Reply. Transcripts mark where a later Conversation started. The Reply Plan also sees the previous Conversation's last where-we-are line. Earlier Understandings and Reply Plans stay per Conversation.
+- The Reply Plan is offered a `past_day` tool (`core/past_day.py`): a date → that day's messages (User's time zone), or none beyond Message Retention with a note to use the Day Summary and not claim exact words. The tool call lands in the Model Call Log as other tool calls do.
+- Two settings, seeded from YAML (no migration needed): `reply_window_hours` (24) and `reply_window_message_cap`, with hints, as field rows in the "Conversations" section of the Platform settings page.

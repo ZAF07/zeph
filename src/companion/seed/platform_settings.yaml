@@ -62,6 +62,13 @@ onboarding_reason_choices:
 # A message after this many quiet minutes starts a new Conversation.
 conversation_quiet_gap_minutes: 15
 
+# Every reply (the Understanding, the Reply Plan and the Reply) sees every
+# message from this many hours, across Conversations, word for word. On a
+# very heavy day, the oldest messages past recent_messages_cap are left
+# out and their Day Summary stands in.
+recent_messages_hours: 24
+recent_messages_cap: 400
+
 # How many seconds the Companion waits after a User's last text, photo or
 # album photo before answering everything they sent as one Message. Long
 # enough to type the next thought, so a thought split over texts gets one

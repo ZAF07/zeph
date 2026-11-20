@@ -51,6 +51,7 @@ from companion.core.model_call_log import ModelCallLog
 from companion.core.move_outcomes import MoveOutcomeFinder, MoveOutcomeKeeper
 from companion.core.moves import MoveService
 from companion.core.needs import NeedService
+from companion.core.past_day import PastDayTool
 from companion.core.patterns import PatternKeeper
 from companion.core.personal_stickers import (
     PersonalStickerKeeper,
@@ -74,6 +75,7 @@ from companion.core.ports import (
     WebSearch,
 )
 from companion.core.post_conversation import PostConversationProcessor
+from companion.core.recent_messages import RecentMessagesReader
 from companion.core.reply_gate import ReplyGate
 from companion.core.reply_plan import ReplyPlanService
 from companion.core.reply_service import ReplyService
@@ -277,6 +279,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             chat_model=chat_model,
             model_call_log=model_call_log,
             clock=dependencies.clock,
+            past_day=PastDayTool(repositories=dependencies.repositories),
         ),
         memory_retrieval=MemoryRetrieval(
             repositories=dependencies.repositories, embedder=dependencies.embedder
@@ -313,6 +316,9 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             chat_model=chat_model,
             model_call_log=model_call_log,
             clock=dependencies.clock,
+        ),
+        recent_messages=RecentMessagesReader(
+            repositories=dependencies.repositories, clock=dependencies.clock
         ),
     )
     incoming_message_handler = IncomingMessageHandler(

@@ -20,6 +20,7 @@ from sqlalchemy import (
     func,
     or_,
     select,
+    true,
     tuple_,
     update,
 )
@@ -1394,6 +1395,38 @@ class PostgresConversationRepository:
             rows = connection.execute(
                 select(conversation_messages)
                 .where(conversation_messages.c.conversation_id == conversation_id)
+                .order_by(conversation_messages.c.position)
+            ).all()
+        return [_to_message(row) for row in rows]
+
+    def list_user_messages_between(
+        self, user_id: UUID, start: datetime, end: datetime | None = None
+    ) -> list[ConversationMessage]:
+        """List every message a User and the Companion sent in a span of time.
+
+        Only Conversations with a message since the start are searched.
+
+        Args:
+            user_id: The User's ID.
+            start: The earliest time sent, included.
+            end: The latest time sent, left out; None for no end.
+
+        Returns:
+            The messages, in the order they were saved.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(conversation_messages)
+                .join(
+                    conversations,
+                    conversations.c.id == conversation_messages.c.conversation_id,
+                )
+                .where(
+                    conversations.c.user_id == user_id,
+                    conversations.c.last_message_at >= start,
+                    conversation_messages.c.sent_at >= start,
+                    true() if end is None else conversation_messages.c.sent_at < end,
+                )
                 .order_by(conversation_messages.c.position)
             ).all()
         return [_to_message(row) for row in rows]

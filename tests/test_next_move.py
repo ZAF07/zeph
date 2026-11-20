@@ -24,7 +24,7 @@ def earlier_reply_plans_seen(chat_model: ScriptedChatModel) -> str:
     """The earlier Reply Plans the newest Reply Plan call was shown."""
     asked = chat_model.reply_plan_calls[-1].history[0].text
     after = asked.split("Earlier Reply Plans in this Conversation")[1]
-    return after.split("Earlier in the Conversation")[0]
+    return after.split("Earlier messages, across Conversations")[0]
 
 
 def test_the_next_move_and_why_are_stored_and_shown_to_the_next_reply_plan(

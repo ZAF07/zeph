@@ -430,7 +430,8 @@ def test_only_the_first_message_after_a_check_in_counts_as_its_reply(
     chat_model.script("oh what about?")
     send_to_webhook(client, telegram_text_update("random thought"))
 
-    assert [line.text for line in chat_model.calls[-1].history] == ["random thought"]
+    assert chat_model.calls[-1].history[-1].text == "random thought"
+    assert "--- New Conversation" in chat_model.understanding_calls[-1].history[0].text
 
 
 def test_a_message_long_after_an_ignored_check_in_is_not_its_reply(

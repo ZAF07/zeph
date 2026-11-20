@@ -195,6 +195,8 @@ CONVERSATION_QUIET_GAP = Setting("conversation_quiet_gap_minutes", read_minutes)
 MESSAGE_WAIT_SECONDS = Setting("message_wait_seconds", read_whole_number)
 TYPING_REPEAT_SECONDS = Setting("typing_repeat_seconds", read_whole_number)
 MESSAGE_RETENTION_DAYS = Setting("message_retention_days", read_whole_number)
+RECENT_MESSAGES_HOURS = Setting("recent_messages_hours", read_whole_number)
+RECENT_MESSAGES_CAP = Setting("recent_messages_cap", read_whole_number)
 TYPING_SECONDS_PER_CHARACTER = Setting("typing_seconds_per_character", read_number)
 MIN_TYPING_SECONDS = Setting("min_typing_seconds", read_number)
 MAX_TYPING_SECONDS = Setting("max_typing_seconds", read_number)
@@ -1242,6 +1244,30 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         hint=(
             "Seconds Zeph waits after a User’s last text or photo before the reply "
             "starts, so it answers everything they sent in one reply."
+        ),
+    ),
+    EditableSetting(
+        RECENT_MESSAGES_HOURS.key,
+        "Recent messages",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=72,
+        hint=(
+            "Hours of messages, across Conversations, that the Understanding, Reply "
+            "Plan and Reply see word for word. More hours remember more and cost "
+            "more per Message."
+        ),
+    ),
+    EditableSetting(
+        RECENT_MESSAGES_CAP.key,
+        "Recent messages cap",
+        SettingKind.WHOLE_NUMBER,
+        minimum=4,
+        maximum=2000,
+        hint=(
+            "On a very heavy day, the oldest messages past this many are left out "
+            "of the Recent Messages and their Day Summary stands in, to keep the cost "
+            "fixed."
         ),
     ),
     EditableSetting(

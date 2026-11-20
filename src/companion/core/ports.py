@@ -783,6 +783,24 @@ class ConversationRepository(Protocol):
         """
         ...
 
+    def list_user_messages_between(
+        self, user_id: UUID, start: datetime, end: datetime | None = None
+    ) -> list[ConversationMessage]:
+        """List every message a User and the Companion sent in a span of time.
+
+        Messages from every one of the User's Conversations are listed
+        together, in one query.
+
+        Args:
+            user_id: The User's ID.
+            start: The earliest time sent, included.
+            end: The latest time sent, left out; None for no end.
+
+        Returns:
+            The messages, in the order they were saved.
+        """
+        ...
+
     def list_started_between(
         self, user_id: UUID, start: datetime, end: datetime
     ) -> list[Conversation]:
