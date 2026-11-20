@@ -319,7 +319,6 @@ PERSONAL_STICKERS_LIMIT = Setting("personal_stickers_limit", read_whole_number)
 CHECK_IN_MODEL = Setting("check_in_model", read_text)
 CHECK_IN_THINKING = Setting("check_in_thinking", read_on_off)
 CHECK_IN_PROMPT = Setting("check_in_prompt", read_text)
-WOVEN_CHECK_IN_PROMPT = Setting("woven_check_in_prompt", read_text)
 CHECK_IN_IGNORE_THRESHOLD = Setting("check_in_ignore_threshold", read_whole_number)
 CHECK_IN_FEWER_MESSAGE = Setting("check_in_fewer_message", read_text)
 CHECK_IN_GAPS = Setting("check_in_hours_between", read_check_in_gaps)
@@ -473,8 +472,8 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         "Voice",
         SettingKind.TEXT,
         hint=(
-            "How Zeph speaks: its tone, values and boundaries. Put in front of the "
-            "instructions of the Reply and both Check-in prompts, every time they run."
+            "How Zeph speaks: its tone, values and boundaries. The Reply reads this "
+            "before every message, and so does a Check-in sent on its own."
         ),
     ),
     EditableSetting(
@@ -1055,16 +1054,6 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         ),
     ),
     EditableSetting(
-        WOVEN_CHECK_IN_PROMPT.key,
-        "Woven-in Check-in prompt",
-        SettingKind.TEXT,
-        hint=(
-            "Tells the woven-in Check-in step whether the reply should weave in a "
-            "Check-in that came due mid-Conversation. Runs before a reply while one is "
-            "due."
-        ),
-    ),
-    EditableSetting(
         CHECK_IN_MODEL.key,
         "Check-in model",
         SettingKind.MODEL,
@@ -1374,8 +1363,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         runs_when="Every Message · after the Understanding",
         description=(
             "Decides what the reply should do: the Need, the Moves, which "
-            "Threads and Curiosities to bring up, and which memories and "
-            "Knowledge it uses."
+            "Threads to bring up, whether a Check-in fits, and Zeph’s Read."
         ),
         prompt_key=REPLY_PLAN_PROMPT.key,
         model_key=REPLY_PLAN_MODEL.key,
@@ -1534,22 +1522,20 @@ CORE_SERVICES: tuple[CoreService, ...] = (
     CoreService(
         name="Check-ins",
         runs_when=(
-            "Scheduler tick, for Users who are due; each reply, when one is "
-            "due mid-Conversation"
+            "Scheduler tick, for Users who are due; after a reply offered a "
+            "Woven-in Check-in"
         ),
         description=(
             "Decides whether to reach out to a User who opted in, which "
             "Check-in Kind to use and what to say, or to skip and give space, "
-            "from their recent Day Summaries and Memory Items. When "
-            "one comes due mid-Conversation, the woven-in Check-in prompt "
-            "decides instead whether the reply weaves it in, from the "
-            "Conversation and how Zeph read the newest Message; never while "
-            "the User is struggling or paused."
+            "from their recent Day Summaries and Memory Items. When one "
+            "comes due mid-Conversation, the Reply Plan weighs it instead; "
+            "this model, without thinking, then checks whether the reply "
+            "brought it up, so it is logged only when sent."
         ),
         prompt_key=CHECK_IN_PROMPT.key,
         model_key=CHECK_IN_MODEL.key,
         thinking_key=CHECK_IN_THINKING.key,
-        extra_prompt_keys=(WOVEN_CHECK_IN_PROMPT.key,),
     ),
     CoreService(
         name="Pattern keeping",

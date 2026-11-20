@@ -96,19 +96,18 @@ export function describeSteps(steps: ModelStep[]): string {
 }
 
 /**
- * Lists the facts of a woven-in Check-in decision's shape, as labels and values.
+ * Lists the facts of a check on whether a reply brought up its Woven-in
+ * Check-in, as labels and values.
  *
- * @param shape - The decision's shape.
- * @returns E.g. "Kinds offered: 4", "Decision: Weave in", "Kind chosen: A
- * follow-up".
+ * @param shape - The check's shape.
+ * @returns E.g. "Check-in Kind: A follow-up", "Brought up: Yes".
  */
 export function checkInShapeFacts(
   shape: CheckInShape,
 ): { label: string; value: string }[] {
   return [
-    { label: "Kinds offered", value: String(shape.kinds_offered) },
-    { label: "Decision", value: shape.woven_in ? "Weave in" : "Not now" },
-    { label: "Kind chosen", value: shape.kind ?? "—" },
+    { label: "Check-in Kind", value: shape.kind },
+    { label: "Brought up", value: shape.brought_up ? "Yes" : "No" },
   ];
 }
 
@@ -141,7 +140,8 @@ export function understandingShapeFacts(
  *
  * @param shape - The Reply Plan's shape.
  * @returns E.g. "Need picked: Be heard", "Lead Move: Calm", "Threads brought
- * up: 2 (1 lead, 1 weave)", "Read formed: Yes", "Read said: No".
+ * up: 2 (1 lead, 1 weave)", "Read formed: Yes", "Read said: No", "Check-in
+ * Kinds offered: 2", "Check-in Kind chosen: None".
  */
 export function replyPlanShapeFacts(
   shape: ReplyPlanShape,
@@ -164,5 +164,10 @@ export function replyPlanShapeFacts(
     { label: "Threads held back", value: String(shape.threads_held_back) },
     { label: "Read formed", value: shape.read_formed ? "Yes" : "No" },
     { label: "Read said", value: shape.read_said ? "Yes" : "No" },
+    {
+      label: "Check-in Kinds offered",
+      value: String(shape.check_in_kinds_offered),
+    },
+    { label: "Check-in Kind chosen", value: shape.check_in_kind ?? "None" },
   ];
 }

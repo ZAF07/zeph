@@ -222,6 +222,8 @@ def test_a_plain_users_understanding_and_reply_plan_show_shapes_and_never_words(
         "threads_held_back": 0,
         "read_formed": False,
         "read_said": False,
+        "check_in_kinds_offered": 0,
+        "check_in_kind": None,
     }
     assert reply_plan["understanding_shape"] is None
     for words in (

@@ -615,14 +615,15 @@ class ReplyPlanShapeResponse(BaseModel):
     threads_held_back: int
     read_formed: bool
     read_said: bool
+    check_in_kinds_offered: int
+    check_in_kind: str | None
 
 
 class CheckInShapeResponse(BaseModel):
-    """The shape of a woven-in Check-in decision: counts and the Kind, never words."""
+    """The shape of a brought-up check on a Woven-in Check-in, never words."""
 
-    kinds_offered: int
-    woven_in: bool
-    kind: str | None
+    kind: str
+    brought_up: bool
 
 
 class ModelCallResponse(BaseModel):
@@ -1140,6 +1141,8 @@ def to_reply_plan_shape_response(shape: ReplyPlanShape) -> ReplyPlanShapeRespons
         threads_held_back=shape.threads_held_back,
         read_formed=shape.read_formed,
         read_said=shape.read_said,
+        check_in_kinds_offered=shape.check_in_kinds_offered,
+        check_in_kind=shape.check_in_kind,
     )
 
 
@@ -1173,9 +1176,8 @@ def to_model_call_response(call: ModelCall) -> ModelCallResponse:
         ),
         check_in_shape=(
             CheckInShapeResponse(
-                kinds_offered=call.check_in_shape.kinds_offered,
-                woven_in=call.check_in_shape.woven_in,
                 kind=call.check_in_shape.kind,
+                brought_up=call.check_in_shape.brought_up,
             )
             if call.check_in_shape
             else None

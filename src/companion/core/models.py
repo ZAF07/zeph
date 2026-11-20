@@ -1430,6 +1430,19 @@ class Understanding:
 
 
 @dataclass(frozen=True)
+class ChosenCheckIn:
+    """A due Check-in the Reply Plan chose to offer the reply.
+
+    Attributes:
+        kind: The Check-in Kind, by name, exactly as Admins wrote it.
+        note: One line on what to bring up.
+    """
+
+    kind: str
+    note: str
+
+
+@dataclass(frozen=True)
 class ReplyPlanForm:
     """The form the Reply Plan model fills in: what the reply does.
 
@@ -1461,6 +1474,7 @@ class ReplyPlanForm:
             none.
         say_read: Whether the reply gives the Read now; never when there is
             no Read.
+        check_in: The due Check-in to offer the reply; None for none.
     """
 
     need: str
@@ -1482,6 +1496,7 @@ class ReplyPlanForm:
     where_we_are: str = ""
     read: str = ""
     say_read: bool = False
+    check_in: ChosenCheckIn | None = None
 
 
 @dataclass(frozen=True)
@@ -2317,6 +2332,10 @@ class ReplyPlanShape:
             name; None for none.
         read_formed: Whether it formed a Read.
         read_said: Whether the reply was to give the Read now.
+        check_in_kinds_offered: How many Check-in Kinds it could weave in;
+            0 when no Check-in was due.
+        check_in_kind: The Check-in Kind it chose to weave in, by name;
+            None for none.
     """
 
     need: str
@@ -2330,21 +2349,21 @@ class ReplyPlanShape:
     next_move: str | None = None
     read_formed: bool = False
     read_said: bool = False
+    check_in_kinds_offered: int = 0
+    check_in_kind: str | None = None
 
 
 @dataclass(frozen=True)
 class CheckInShape:
-    """The shape of a woven-in Check-in decision, kept for every User. Never any words.
+    """The shape of a brought-up check on a Woven-in Check-in. Never any words.
 
     Attributes:
-        kinds_offered: How many Check-in Kinds it could choose from.
-        woven_in: Whether it chose to weave one in.
-        kind: The Kind it chose, by name; None for "not now".
+        kind: The Check-in Kind the reply was offered, by name.
+        brought_up: Whether the check found the reply brought it up.
     """
 
-    kinds_offered: int
-    woven_in: bool
-    kind: str | None
+    kind: str
+    brought_up: bool
 
 
 @dataclass(frozen=True)
@@ -2369,8 +2388,8 @@ class ModelCall:
             the full-content level.
         understanding_shape: The shape of the Understanding it made, kept for
             every User; None for other steps.
-        check_in_shape: The shape of the woven-in Check-in decision it made,
-            kept for every User; None for other calls.
+        check_in_shape: The shape of the brought-up check it made on a
+            Woven-in Check-in, kept for every User; None for other calls.
         reply_plan_shape: The shape of the Reply Plan it made, kept for
             every User; None for other steps.
     """

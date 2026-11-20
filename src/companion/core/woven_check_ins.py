@@ -1,21 +1,10 @@
-import json
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from companion.core.check_in_decision import next_due_after_decision
-from companion.core.check_ins import (
-    CHECK_INS_TOLD_TO_MODEL,
-    MEMORY_INTRO,
-    RecentCheckIn,
-    check_in_statuses,
-    describe_recent_check_ins,
-)
-from companion.core.life_threads import RemindedThread
-from companion.core.memory_retrieval import SavedMemory, format_memory
 from companion.core.model_call_log import ModelCallLog
 from companion.core.models import (
     ChatLine,
@@ -25,42 +14,28 @@ from companion.core.models import (
     CheckInNowRequest,
     CheckInOutcome,
     CheckInShape,
-    ConversationMessage,
     Feature,
-    MessageDirection,
     ModelStep,
-    ReplyPlanForm,
     UnderstandingForm,
     UserSnapshot,
 )
-from companion.core.platform_settings import (
-    CHECK_IN_GAPS,
-    CHECK_IN_MODEL,
-    CHECK_IN_REPLY_WINDOW,
-    CHECK_IN_THINKING,
-    PERSONA,
-    WOVEN_CHECK_IN_PROMPT,
-)
-from companion.core.ports import ChatTool, Clock, Repositories
-from companion.core.reply_tools import ReplyOffer
+from companion.core.platform_settings import CHECK_IN_GAPS, CHECK_IN_MODEL
+from companion.core.ports import Clock, Repositories
 from companion.core.usage import UsageRecordingChatModel
 
 logger = logging.getLogger(__name__)
 
-BRING_UP_CHECK_IN_TOOL = "bring_up_check_in"
-BRING_UP_CHECK_IN_DESCRIPTION = (
-    "Call this first, before writing, whenever your reply will bring up the "
-    "due Check-in. Don't call it if you leave the Check-in out."
-)
-BRING_UP_CHECK_IN_ANSWER = (
-    "Noted. Now write your reply and bring it up naturally, once, the way a "
-    "friend drifts onto a side topic, without saying it is a Check-in."
+BROUGHT_UP_CHECK_PROMPT = (
+    "You check whether a reply brought up a Check-in. You are given the "
+    "Check-in (its Kind and what to bring up) and the reply as it will be "
+    "sent. Answer yes if the reply brings it up in any way, even briefly or "
+    "in other words. Answer no if it leaves it out. Answer with only yes or no."
 )
 
 
 @dataclass(frozen=True)
 class WovenCheckIn:
-    """A due Check-in the Check-in model chose to weave into this reply.
+    """A due Check-in the Reply Plan chose to offer this reply.
 
     Attributes:
         kind: The Check-in Kind to weave in.
@@ -93,7 +68,7 @@ def may_weave_check_in(
         now: The current time.
 
     Returns:
-        True if the woven-in Check-in call may be made.
+        True if the Reply Plan may be offered Check-in Kinds.
     """
     settings = snapshot.user.check_ins
     if (
@@ -131,142 +106,6 @@ def kinds_to_weave_in(kinds: Sequence[CheckInKind]) -> list[CheckInKind]:
     ]
 
 
-def describe_conversation_for_check_in(messages: Sequence[ConversationMessage]) -> str:
-    """Write the current Conversation for the Check-in model.
-
-    Args:
-        messages: The Conversation's messages, oldest first.
-
-    Returns:
-        One line per message, saying who sent it.
-    """
-    return "\n".join(
-        f"{'You' if message.direction == MessageDirection.OUTGOING else 'Them'}: "
-        f"{message.content}"
-        for message in messages
-    )
-
-
-def describe_reading_and_plan_for_check_in(
-    understanding: UnderstandingForm,
-    plan: ReplyPlanForm,
-    reminded: Sequence[RemindedThread],
-    reply_asks_a_question: bool,
-) -> str:
-    """Write how the Companion read the newest Message and plans to answer it.
-
-    Args:
-        understanding: This Message's Understanding.
-        plan: This Message's Reply Plan.
-        reminded: The Life Threads the Message reminded the Companion of.
-        reply_asks_a_question: Whether the reply already asks them a
-            question: through a Move that asks one, asking why or a
-            Curiosity.
-
-    Returns:
-        The Need, mood, guidance, Life Threads reminded of, brought up and
-        left alone, Curiosities to bring up, and whether the reply already
-        asks a question.
-    """
-    lines = [
-        f"What they need from you right now: {plan.need}.",
-        f"How they seem: {understanding.mood or 'unclear'} "
-        f"({understanding.intensity.value}).",
-    ]
-    if plan.guidance:
-        lines.append(plan.guidance)
-    if reminded:
-        titles = ", ".join(item.thread.title for item in reminded)
-        lines.append(f"It reminded you of: {titles}.")
-    if plan.bring_up:
-        titles = ", ".join(item.title for item in plan.bring_up)
-        lines.append(f"Your reply will bring up: {titles}.")
-    if plan.left_alone:
-        left = "; ".join(f"{item.title} ({item.reason})" for item in plan.left_alone)
-        lines.append(f"You chose to leave alone: {left}.")
-    if plan.curiosities:
-        questions = " ".join(item.question for item in plan.curiosities)
-        lines.append(f"Your reply will also ask: {questions}")
-    if reply_asks_a_question:
-        lines.append("Your reply already asks them a question.")
-    return "\n".join(lines)
-
-
-def describe_woven_check_in(
-    snapshot: UserSnapshot,
-    kinds: Sequence[CheckInKind],
-    recent: str,
-    memory: str,
-    conversation: str,
-    understanding: str,
-) -> str:
-    """Write what the Check-in model is told to decide on a woven-in Check-in.
-
-    Args:
-        snapshot: The User being answered, with their local time.
-        kinds: The Check-in Kinds it may choose from.
-        recent: The User's recent Check-ins, as lines.
-        memory: What is remembered about the User; "" if nothing.
-        conversation: The current Conversation, as lines.
-        understanding: How the Companion read the newest Message.
-
-    Returns:
-        The Kinds, what to call the User, their local time, recent
-        Check-ins, what is remembered, the Conversation and the
-        Understanding.
-    """
-    kind_lines = "\n".join(f"- {kind.name}: {kind.description}" for kind in kinds)
-    return (
-        f"Check-in Kinds you may choose from:\n{kind_lines}\n\n"
-        f"What to call them: {snapshot.user.name or 'unknown'}\n"
-        f"Their local time: {snapshot.local_now.strftime('%A, %H:%M')}\n\n"
-        f"Recent Check-ins, newest first:\n{recent}\n\n"
-        f"{memory or 'Nothing remembered about them.'}\n\n"
-        f"This Conversation so far, oldest first:\n{conversation}\n\n"
-        f"How you read their newest message:\n{understanding}"
-    )
-
-
-def read_woven_check_in_answer(
-    answer: str,
-    kinds: Sequence[CheckInKind],
-    due_at: datetime,
-    check_in_now: CheckInNowRequest | None,
-) -> WovenCheckIn | None:
-    """Read the Check-in model's "weave in" or "not now" answer.
-
-    Text around the JSON object, such as a code fence, is ignored. The Kind
-    is matched by name, in any case, and must be one it was offered.
-
-    Args:
-        answer: The model's answer.
-        kinds: The Check-in Kinds it could choose from.
-        due_at: The User's Due Time as read for the reply.
-        check_in_now: The Admin's Check in Now waiting; None for none.
-
-    Returns:
-        The Check-in to weave in; None for "not now", an unknown Kind, an
-        empty note or an answer that can't be read.
-    """
-    start, end = answer.find("{"), answer.rfind("}")
-    try:
-        parsed = json.loads(answer[start : end + 1]) if 0 <= start < end else None
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(parsed, dict) or parsed.get("decision") != "weave_in":
-        return None
-    kind_name, note = parsed.get("kind"), parsed.get("note")
-    if not isinstance(kind_name, str) or not isinstance(note, str) or not note.strip():
-        return None
-    kinds_by_name = {kind.name.lower(): kind for kind in kinds}
-    kind = kinds_by_name.get(kind_name.strip().lower())
-    if kind is None:
-        return None
-    return WovenCheckIn(
-        kind=kind, note=note.strip(), due_at=due_at, check_in_now=check_in_now
-    )
-
-
 def format_woven_check_in_for_reply(woven: WovenCheckIn) -> str:
     """Write the reply's section on the due Check-in, as an optional extra.
 
@@ -274,73 +113,59 @@ def format_woven_check_in_for_reply(woven: WovenCheckIn) -> str:
         woven: The Check-in the reply may bring up.
 
     Returns:
-        The section, which says the reply may leave it out and must call
-        the bring_up_check_in tool first if it brings it up.
+        The section, which says the reply may leave it out.
     """
     return (
         "A Check-in with them is due. Bring it up only if it fits what they "
-        "need right now; if it doesn't, leave it out and it will wait. If you "
-        f"bring it up, call {BRING_UP_CHECK_IN_TOOL} first, before writing:\n"
+        "need right now, once, the way a friend drifts onto a side topic, "
+        "without saying it is a Check-in; if it doesn't fit, leave it out and "
+        "it will wait:\n"
         f"- {woven.kind.name}: {woven.kind.description} "
         f"What to bring up: {woven.note}"
     )
 
 
-class WovenCheckInOffer:
-    """Offers a reply the due Check-in as an optional extra, and notes its use.
+def describe_reply_for_brought_up_check(
+    woven: WovenCheckIn, reply_parts: Sequence[str]
+) -> str:
+    """Write what the brought-up check is given: the Check-in and the reply.
 
-    Attributes:
-        woven: The Check-in the reply may bring up.
-        check_in: The Check-in as saved before the reply, to take back if
-            the reply leaves it out or fails.
-        offer: The section and the bring_up_check_in tool for the reply.
-        was_brought_up: Whether the reply called the tool, so brought it up.
+    Args:
+        woven: The Check-in the reply was offered.
+        reply_parts: The reply's texts, in order.
+
+    Returns:
+        The Check-in's Kind, description and note, then the reply.
     """
+    reply = "\n".join(reply_parts)
+    return (
+        f"The Check-in: {woven.kind.name}: {woven.kind.description} "
+        f"What to bring up: {woven.note}\n\n"
+        f"The reply:\n{reply}"
+    )
 
-    def __init__(self, woven: WovenCheckIn, check_in: CheckIn) -> None:
-        """Make the offer for one reply.
 
-        Args:
-            woven: The Check-in the reply may bring up.
-            check_in: The Check-in as saved before the reply.
-        """
-        self.woven = woven
-        self.check_in = check_in
-        self.was_brought_up = False
-        self.offer = ReplyOffer(
-            tools=[
-                ChatTool(
-                    name=BRING_UP_CHECK_IN_TOOL,
-                    description=BRING_UP_CHECK_IN_DESCRIPTION,
-                    parameters={"type": "object", "properties": {}},
-                    run=self._bring_up,
-                )
-            ],
-            instructions=format_woven_check_in_for_reply(woven),
-        )
+def read_brought_up_answer(answer: str) -> bool:
+    """Read the brought-up check's yes or no.
 
-    def _bring_up(self, arguments: dict[str, Any]) -> str:
-        """Note that the reply brings the Check-in up.
+    Args:
+        answer: The model's answer.
 
-        Args:
-            arguments: The model's arguments; none are needed.
-
-        Returns:
-            What the model is told back.
-        """
-        self.was_brought_up = True
-        return BRING_UP_CHECK_IN_ANSWER
+    Returns:
+        True only for an answer that starts with "yes", in any case.
+    """
+    return answer.strip().lower().startswith("yes")
 
 
 class WovenCheckIns:
     """Lets a reply weave in a Check-in that comes due mid-Conversation.
 
-    After the Reply Plan, the Check-in model decides whether this reply
-    is offered the Check-in and which Kind, or leaves it for later. The
-    reply gets it as an optional extra it may leave out. One offered is
-    saved before the reply goes, and taken back if the reply fails or
-    leaves it out, so it is never sent twice and is only logged when it was
-    sent.
+    Code decides whether one may be offered, and lists the Kinds the Reply
+    Plan weighs. One the Reply Plan chose is saved before the reply goes
+    and reaches the reply as an optional extra. Once the reply is written,
+    a small model call checks whether it brought the Check-in up; one it
+    left out, or whose reply fails, is taken back, so it is only logged
+    when it was sent and never sent twice.
     """
 
     def __init__(
@@ -353,10 +178,11 @@ class WovenCheckIns:
         """Set up the service.
 
         Args:
-            repositories: Where Check-ins, Conversations and settings are
+            repositories: Where Check-ins, Check-in Kinds and Users are
                 stored.
-            chat_model: Makes the decision and records the tokens used.
-            model_call_log: Records the shape of each decision.
+            chat_model: Makes the brought-up check and records the tokens
+                used.
+            model_call_log: Records the shape of each check.
             clock: Tells the current time.
         """
         self._repositories = repositories
@@ -364,84 +190,64 @@ class WovenCheckIns:
         self._model_call_log = model_call_log
         self._clock = clock
 
-    def decide(
-        self,
-        snapshot: UserSnapshot,
-        conversation_id: UUID,
-        understanding: UnderstandingForm,
-        plan: ReplyPlanForm,
-        saved: SavedMemory,
-        reminded: Sequence[RemindedThread],
-        reply_asks_a_question: bool,
-    ) -> WovenCheckIn | None:
-        """Ask the Check-in model whether this reply weaves in the due Check-in.
-
-        No call is made unless `may_weave_check_in` allows it and a Kind may
-        be woven in. Its shape goes into the Model Call Log. It never raises:
-        a failed call or an answer that can't be used means "not now".
+    def kinds_to_offer(
+        self, snapshot: UserSnapshot, understanding: UnderstandingForm
+    ) -> list[CheckInKind]:
+        """List the Check-in Kinds the Reply Plan may weave in, if one is due.
 
         Args:
             snapshot: The User being answered.
-            conversation_id: The Conversation the Message is in.
             understanding: This Message's Understanding.
-            plan: This Message's Reply Plan.
-            saved: The User's saved memory, read for this reply.
-            reminded: The Life Threads the Message reminded the Companion of.
-            reply_asks_a_question: Whether the reply already asks them a
-                question, so the model is told.
 
         Returns:
-            The Check-in to weave in; None for "not now" or no call.
+            The Kinds without fixed behaviour; none unless
+            `may_weave_check_in` allows it and the User has a Due Time.
         """
-        due_at = snapshot.user.check_ins.next_due_at
-        if due_at is None or not may_weave_check_in(
+        if snapshot.user.check_ins.next_due_at is None or not may_weave_check_in(
             snapshot, understanding, self._clock.now()
         ):
-            return None
-        kinds = kinds_to_weave_in(self._repositories.check_ins.list_kinds())
-        if not kinds:
-            return None
-        settings = snapshot.settings
+            return []
+        return kinds_to_weave_in(self._repositories.check_ins.list_kinds())
+
+    def was_brought_up(
+        self, snapshot: UserSnapshot, woven: WovenCheckIn, reply_parts: Sequence[str]
+    ) -> bool:
+        """Ask a small model call whether the reply brought the Check-in up.
+
+        It uses the Check-in model without thinking, and its shape goes
+        into the Model Call Log. It never raises: a failed call counts as
+        left out, so the Check-in is only logged when it is known to be sent.
+
+        Args:
+            snapshot: The User being answered.
+            woven: The Check-in the reply was offered.
+            reply_parts: The reply's texts, in order.
+
+        Returns:
+            True if the reply brought it up.
+        """
         try:
             answer = self._chat_model.generate(
                 snapshot=snapshot,
                 step=ModelStep.CHECK_IN,
-                model=settings.get(CHECK_IN_MODEL),
-                thinking=settings.get(CHECK_IN_THINKING),
-                instructions=(
-                    f"{settings.get(PERSONA)}\n\n{settings.get(WOVEN_CHECK_IN_PROMPT)}"
-                ),
+                model=snapshot.settings.get(CHECK_IN_MODEL),
+                thinking=False,
+                instructions=BROUGHT_UP_CHECK_PROMPT,
                 history=[
                     ChatLine(
                         role=ChatRole.USER,
-                        text=self._describe(
-                            snapshot,
-                            conversation_id,
-                            kinds,
-                            understanding,
-                            plan,
-                            saved,
-                            reminded,
-                            reply_asks_a_question,
-                        ),
+                        text=describe_reply_for_brought_up_check(woven, reply_parts),
                     )
                 ],
             )
         except Exception:
-            logger.exception("The woven-in Check-in call failed; not now")
-            return None
-        woven = read_woven_check_in_answer(
-            answer, kinds, due_at, snapshot.user.check_ins.check_in_now
-        )
+            logger.exception("The brought-up check failed; taking the Check-in back")
+            return False
+        brought_up = read_brought_up_answer(answer)
         self._model_call_log.record_check_in_shape(
-            snapshot,
-            CheckInShape(
-                kinds_offered=len(kinds),
-                woven_in=woven is not None,
-                kind=woven.kind.name if woven is not None else None,
-            ),
+            snapshot, CheckInShape(kind=woven.kind.name, brought_up=brought_up)
         )
-        return woven
+        return brought_up
 
     def save(self, snapshot: UserSnapshot, woven: WovenCheckIn) -> CheckIn | None:
         """Save the Woven-in Check-in and move the Due Time on, before the reply goes.
@@ -517,63 +323,3 @@ class WovenCheckIns:
             )
         except Exception:
             logger.exception("Could not take back a Woven-in Check-in; it is missed")
-
-    def _describe(
-        self,
-        snapshot: UserSnapshot,
-        conversation_id: UUID,
-        kinds: Sequence[CheckInKind],
-        understanding: UnderstandingForm,
-        plan: ReplyPlanForm,
-        saved: SavedMemory,
-        reminded: Sequence[RemindedThread],
-        reply_asks_a_question: bool,
-    ) -> str:
-        """Gather and write what the Check-in model is told.
-
-        Args:
-            snapshot: The User being answered.
-            conversation_id: The Conversation the Message is in.
-            kinds: The Check-in Kinds it may choose from.
-            understanding: This Message's Understanding.
-            plan: This Message's Reply Plan.
-            saved: The User's saved memory, read for this reply.
-            reminded: The Life Threads the Message reminded the Companion of.
-            reply_asks_a_question: Whether the reply already asks them a
-                question.
-
-        Returns:
-            The description.
-        """
-        user = snapshot.user
-        recent = self._repositories.check_ins.list_recent(
-            user.id, CHECK_INS_TOLD_TO_MODEL
-        )
-        statuses = check_in_statuses(
-            recent, self._clock.now(), snapshot.settings.get(CHECK_IN_REPLY_WINDOW)
-        )
-        return describe_woven_check_in(
-            snapshot,
-            kinds,
-            describe_recent_check_ins(
-                [
-                    RecentCheckIn(check_in=check_in, status=status)
-                    for check_in, status in zip(recent, statuses, strict=True)
-                ],
-                user.time_zone,
-            ),
-            format_memory(
-                saved.categories,
-                saved.items,
-                saved.summaries,
-                user.time_zone,
-                MEMORY_INTRO,
-                portrait=saved.portrait,
-            ),
-            describe_conversation_for_check_in(
-                self._repositories.conversations.list_messages(conversation_id)
-            ),
-            describe_reading_and_plan_for_check_in(
-                understanding, plan, reminded, reply_asks_a_question
-            ),
-        )

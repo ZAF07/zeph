@@ -9,21 +9,14 @@ from tests.fakes import (
     FakeClock,
     FakeScheduler,
     ScriptedChatModel,
-    reply_plan_answer,
-    understanding_answer,
 )
 from tests.telegram_helpers import (
     connect_telegram,
     owner_headers,
-    send_to_webhook,
-    telegram_text_update,
 )
-from tests.test_check_in_sending import set_up_user_with_check_ins
 from tests.test_curiosities import presentation_is_due
 from tests.test_moves import how_to_do_it, reply_to, saved_moves
-from tests.test_woven_in_check_ins import open_a_conversation_until_due
 
-ALREADY_ASKS = "Your reply already asks them a question."
 ASK_WHY = {"intensity": "high", "cause_known": False, "mood": "furious"}
 RAISE_CURIOSITY = {"bring_up": [{"curiosity": 1, "how": "lead"}]}
 UPSET_CAUSE_UNKNOWN = {"intensity": "medium", "cause_known": False, "mood": "upset"}
@@ -246,85 +239,9 @@ def test_the_reply_plan_can_rule_out_asking_why_when_the_mood_stands_out(
     assert saved_asked_why(engine) == [False]
 
 
-def woven_call_told(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-    understanding: dict[str, Any] | None = None,
-    **plan: Any,
-) -> str:
-    """Reach a due Check-in, then send a Message with the given answers.
-
-    Args:
-        client: The backend's test client.
-        auth_verifier: The fake sign-in verifier.
-        chat_channel: The fake Telegram channel.
-        chat_model: The scripted chat model.
-        clock: The fake clock.
-        understanding: The Understanding's form fields; the defaults if none.
-        **plan: The Reply Plan's form fields.
-
-    Returns:
-        What the Woven-in Check-in model was given.
-    """
-    set_up_user_with_check_ins(client, auth_verifier, chat_channel)
-    tick_asks_a_question(client, owner_headers(client, auth_verifier), "Suggest")
-    open_a_conversation_until_due(client, chat_model, chat_channel, clock)
-    chat_model.script_understanding(understanding_answer(**(understanding or {})))
-    chat_model.script_reply_plan(reply_plan_answer(**plan))
-    chat_model.script("ok")
-    send_to_webhook(client, telegram_text_update("now making a big salad"))
-    [woven_call] = chat_model.woven_check_in_calls
-    return woven_call.history[0].text
-
-
-def test_the_woven_in_check_in_is_told_when_a_move_in_the_reply_asks(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-) -> None:
-    told = woven_call_told(
-        client, auth_verifier, chat_channel, chat_model, clock, lead_move="Suggest"
-    )
-
-    assert ALREADY_ASKS in told
-
-
-def test_the_woven_in_check_in_is_told_when_the_reply_asks_why(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-) -> None:
-    told = woven_call_told(
-        client, auth_verifier, chat_channel, chat_model, clock, understanding=ASK_WHY
-    )
-
-    assert ALREADY_ASKS in told
-
-
-def test_the_woven_in_check_in_is_not_told_so_when_the_reply_asks_nothing(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-) -> None:
-    told = woven_call_told(
-        client, auth_verifier, chat_channel, chat_model, clock, lead_move="Research"
-    )
-
-    assert ALREADY_ASKS not in told
-
-
-def test_the_woven_in_check_in_prompt_says_to_ask_no_second_question(
+def test_the_reply_plan_prompt_leaves_out_a_check_in_when_the_reply_asks(
     seeded_settings: dict[str, Any],
 ) -> None:
-    prompt = seeded_settings["woven_check_in_prompt"]
+    prompt = seeded_settings["reply_plan_prompt"]
 
-    assert "already asks them a question" in prompt
+    assert "when the reply already asks a question" in prompt
