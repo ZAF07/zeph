@@ -32,7 +32,7 @@ export const evalDetails: Record<EvalName, { label: string; checks: string }> =
     understanding: {
       label: "Understanding",
       checks:
-        "Each Message’s Understanding picks the right Need, Moves, Life Threads, Curiosities and Knowledge.",
+        "Each Message’s Understanding reads it right, and its Reply Plan picks the right Read, Need, Moves, Life Threads, Curiosities and Knowledge. Each check names its step.",
     },
     move_outcome: {
       label: "Move Outcome",

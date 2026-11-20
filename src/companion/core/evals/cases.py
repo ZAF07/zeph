@@ -362,11 +362,20 @@ class EarlierLine:
 
 @dataclass(frozen=True)
 class UnderstandingExpectations:
-    """What one Message's Understanding and reply should do.
+    """What one Message's Understanding, Recall and Reply Plan should do.
 
-    Each field left empty, or None, isn't checked.
+    Each field left empty, or None, isn't checked. Code decides which step
+    owns each one (see `check_steps`).
 
     Attributes:
+        struggling: Whether the Understanding must read them as struggling.
+        cause_known: Whether the Understanding must know why they feel so.
+        looks_up_past: Whether the Understanding must ask to look up the past.
+        feelings_said: Whether the Understanding must keep feelings they said
+            in their own words; False means it keeps none as said.
+        wants_said: The same for what they want from Zeph.
+        read_formed: Whether the Reply Plan must form a Read.
+        read_said: Whether the Reply Plan must have the reply say its Read.
         need: The Needs that may be picked.
         found: Life Threads, by title, the Companion must be reminded of.
         raised: Life Threads, by title, it must bring up.
@@ -383,6 +392,13 @@ class UnderstandingExpectations:
         rules: The IDs of the rules the Judge checks the reply against.
     """
 
+    struggling: bool | None = None
+    cause_known: bool | None = None
+    looks_up_past: bool | None = None
+    feelings_said: bool | None = None
+    wants_said: bool | None = None
+    read_formed: bool | None = None
+    read_said: bool | None = None
     need: list[str] = field(default_factory=list)
     found: list[str] = field(default_factory=list)
     raised: list[str] = field(default_factory=list)
@@ -413,7 +429,7 @@ class UnderstandingMessage:
 
     Attributes:
         text: What it says.
-        expect: What its Understanding and reply should do.
+        expect: What its Understanding, Recall and Reply Plan should do.
     """
 
     text: str
@@ -829,6 +845,13 @@ def to_understanding_message(entry: dict[str, Any]) -> UnderstandingMessage:
     return UnderstandingMessage(
         text=entry["text"],
         expect=UnderstandingExpectations(
+            struggling=expect.get("struggling"),
+            cause_known=expect.get("cause_known"),
+            looks_up_past=expect.get("looks_up_past"),
+            feelings_said=expect.get("feelings_said"),
+            wants_said=expect.get("wants_said"),
+            read_formed=expect.get("read_formed"),
+            read_said=expect.get("read_said"),
             need=expect.get("need") or [],
             found=expect.get("found") or [],
             raised=expect.get("raised") or [],

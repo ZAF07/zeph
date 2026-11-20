@@ -1053,83 +1053,122 @@ UNDERSTANDING_MEMORY_FIELD = ShapeField(
 UNDERSTANDING_EXPECT_FIELD = ShapeField(
     "expect",
     "What to expect",
-    "What this Message's Understanding and reply should do. Anything left "
-    "empty isn't checked.",
+    "What this Message's Understanding, Recall and Reply Plan should do. "
+    "Each check is marked with the step that owns it. Anything left empty "
+    "isn't checked.",
     FieldKind.GROUP,
     fields=[
-        text_list_field(
-            "need",
-            "Expected Need",
-            "The Needs the Companion may pick for this Message, by name, e.g. "
-            "Be heard. The case fails if it picks another.",
-            "Need",
+        yes_no_unchecked_field(
+            "struggling",
+            "Struggling",
+            "Understanding: whether it must read them as struggling (upset, "
+            "scared, grieving or hurting).",
+        ),
+        yes_no_unchecked_field(
+            "cause_known",
+            "Knows why",
+            "Understanding: whether it must know why they feel as they do.",
+        ),
+        yes_no_unchecked_field(
+            "looks_up_past",
+            "Looks up the past",
+            "Understanding: whether it must ask to look up older days.",
+        ),
+        yes_no_unchecked_field(
+            "feelings_said",
+            "Feelings said",
+            "Understanding: Yes, it must keep feelings they put in words as "
+            "said. No, they put none in words, so none may be kept as said.",
+        ),
+        yes_no_unchecked_field(
+            "wants_said",
+            "Wants said",
+            "Understanding: the same for what they want from Zeph.",
         ),
         text_list_field(
             "found",
             "Reminded of",
-            "Life Threads, by title, the Companion must be reminded of.",
+            "Recall: Life Threads, by title, the Companion must be reminded of.",
             "Thread title",
+        ),
+        yes_no_unchecked_field(
+            "read_formed",
+            "Forms a Read",
+            "Reply Plan: whether it must form a Read of what is really going on.",
+        ),
+        yes_no_unchecked_field(
+            "read_said",
+            "Says the Read",
+            "Reply Plan: whether the reply must say the Read now.",
+        ),
+        text_list_field(
+            "need",
+            "Expected Need",
+            "Reply Plan: the Needs it may pick for this Message, by name, e.g. "
+            "Be heard. The case fails if it picks another.",
+            "Need",
         ),
         text_list_field(
             "raised",
             "Brings up",
-            "Life Threads, by title, it must bring up.",
+            "Reply Plan: Life Threads, by title, it must bring up.",
             "Thread title",
         ),
         text_list_field(
             "not_raised",
             "Leaves alone",
-            "Life Threads, by title, it must not bring up.",
+            "Reply Plan: Life Threads, by title, it must not bring up.",
             "Thread title",
         ),
         text_list_field(
             "lead_move",
             "Lead Move",
-            "The Moves the reply may lead with, by name, e.g. Research. The "
-            "case fails if it leads with another, or with none.",
+            "Reply Plan: the Moves the reply may lead with, by name, e.g. "
+            "Research. The case fails if it leads with another, or with none.",
             "Move",
         ),
         text_list_field(
             "support_move",
             "Supporting Move",
-            "The Moves that may support the lead, by name, e.g. Suggest. The "
-            "case fails if another supports it, or none does.",
+            "Reply Plan: the Moves that may support the lead, by name, e.g. "
+            "Suggest. The case fails if another supports it, or none does.",
             "Move",
         ),
         yes_no_unchecked_field(
             "no_move",
             "Makes no Move",
-            "Yes: the reply must make no Move, just respond. No: it must lead "
-            "with a Move. Leave the Moves above empty when this is Yes.",
+            "Reply Plan: Yes, the reply must make no Move, just respond. No, it "
+            "must lead with a Move. Leave the Moves above empty when this is "
+            "Yes.",
         ),
         text_list_field(
             "next_move",
             "Next Move in mind",
-            "The Moves Zeph may have in mind to make later in the Conversation, "
-            "by name, e.g. Research. The case fails if it has another in mind, "
-            "or none.",
+            "Reply Plan: the Moves Zeph may have in mind to make later in the "
+            "Conversation, by name, e.g. Research. The case fails if it has "
+            "another in mind, or none.",
             "Move",
         ),
         yes_no_unchecked_field(
             "curiosity_raised",
             "Brings up a Curiosity",
-            "Whether it must bring up a waiting Curiosity.",
+            "Reply Plan: whether it must bring up a waiting Curiosity.",
         ),
         yes_no_unchecked_field(
             "asked_why",
             "Asks why",
-            "Whether the reply must gently ask why they feel as they do.",
+            "Reply Plan: whether the reply must gently ask why they feel as they do.",
         ),
         yes_no_unchecked_field(
             "knowledge",
             "Searches Knowledge",
-            "Whether it must choose Knowledge Documents to search.",
+            "Reply Plan: whether it must choose Knowledge Documents to search.",
         ),
         yes_no_unchecked_field(
             "woven_in",
             "Weaves in the Check-in",
-            "Whether the reply must weave in the due Check-in. Needs “A "
-            "Check-in is due” on.",
+            "Reply Plan: whether the reply must weave in the due Check-in. "
+            "Needs “A Check-in is due” on.",
         ),
         text_list_field(
             "rules",
@@ -1239,7 +1278,7 @@ UNDERSTANDING_SHAPE = FormShape(
                     "messages",
                     "Messages",
                     "Each Message the User sends, in order, with what its "
-                    "Understanding and reply should do.",
+                    "Understanding, Reply Plan and reply should do.",
                     "Message",
                     [
                         long_text_field("text", "Text", "What the User writes."),

@@ -1,7 +1,11 @@
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from companion.core.evals.cases import UnderstandingExpectations
+
+UNDERSTANDING_STEP = "Understanding"
+RECALL_STEP = "Recall"
+REPLY_PLAN_STEP = "Reply Plan"
 
 
 @dataclass(frozen=True)
@@ -9,7 +13,7 @@ class ObservedUnderstanding:
     """What one Message's Understanding and Reply Plan did, as the eval saw it.
 
     Attributes:
-        need: The Need it picked.
+        need: The Need the Reply Plan picked.
         reply_plan_input: What the Reply Plan model was given, from the
             Model Call Log; the Life Threads the Companion was reminded of
             are in it.
@@ -25,6 +29,15 @@ class ObservedUnderstanding:
         lead_move: The Move the reply led with; None for none.
         support_move: The Move that supported it; None for none.
         next_move: The Move it had in mind to make next; None for none.
+        struggling: Whether the Understanding read the User as struggling.
+        cause_known: Whether the Understanding knew why they feel that way.
+        looked_up_past: Whether the Understanding asked to look up the past.
+        feelings_said: Whether the Understanding kept feelings the User said
+            in their own words.
+        wants_said: Whether the Understanding kept wants the User said in
+            their own words.
+        read_formed: Whether the Reply Plan formed a Read.
+        read_said: Whether the Reply Plan had the reply say its Read.
     """
 
     need: str
@@ -38,6 +51,13 @@ class ObservedUnderstanding:
     lead_move: str | None = None
     support_move: str | None = None
     next_move: str | None = None
+    struggling: bool = False
+    cause_known: bool = False
+    looked_up_past: bool = False
+    feelings_said: bool = False
+    wants_said: bool = False
+    read_formed: bool = False
+    read_said: bool = False
 
 
 @dataclass(frozen=True)
@@ -53,6 +73,28 @@ class CheckResult:
     name: str
     passed: bool
     detail: str
+
+
+def check_yes_no(
+    name: str, expected: bool, observed: bool, yes_detail: str, no_detail: str
+) -> CheckResult:
+    """Check something was so, or wasn't, as expected.
+
+    Args:
+        name: What is checked, e.g. "struggling".
+        expected: Whether it must be so.
+        observed: Whether it was.
+        yes_detail: What happened when it was so.
+        no_detail: What happened when it wasn't.
+
+    Returns:
+        The check's outcome, e.g. "not struggling, expected: struggling".
+    """
+    detail = yes_detail if observed else no_detail
+    if observed == expected:
+        return CheckResult(name, True, detail)
+    wanted = yes_detail if expected else no_detail
+    return CheckResult(name, False, f"{detail}, expected: {wanted}")
 
 
 def check_need(allowed: list[str], need: str) -> CheckResult:
@@ -279,26 +321,137 @@ def check_woven_in(expected: bool, woven_in: bool) -> CheckResult:
     return CheckResult("woven in", woven_in == expected, detail)
 
 
-def check_understanding(
-    expect: UnderstandingExpectations, observed: ObservedUnderstanding
-) -> list[CheckResult]:
-    """Check one Message's Understanding against what it should have done.
-
-    A Life Thread counts as found when its title is in what the
-    Understanding model was given; the cases file keeps titles out of the
-    rest of the memory, so only being reminded puts it there.
+def mark_with_step(step: str, results: list[CheckResult]) -> list[CheckResult]:
+    """Mark checks with the step that owns them.
 
     Args:
-        expect: What it should have done; empty fields aren't checked.
-        observed: What it did.
+        step: The step, e.g. "Reply Plan".
+        results: Its checks.
 
     Returns:
-        One outcome per check, in a fixed order: the Need, the lead,
-        supporting, no and next Move, each Thread to be found, brought up and left
-        alone, then the Curiosity, asking why, Knowledge and the woven-in
-        Check-in.
+        The checks, each named e.g. "Reply Plan · need".
+    """
+    return [replace(result, name=f"{step} · {result.name}") for result in results]
+
+
+def check_understanding_step(
+    expect: UnderstandingExpectations, observed: ObservedUnderstanding
+) -> list[CheckResult]:
+    """Check what the Understanding read: struggling, cause, look-ups, said.
+
+    Args:
+        expect: What it should have read; None fields aren't checked.
+        observed: What it read.
+
+    Returns:
+        One outcome per check: struggling, cause known, looked up the past,
+        feelings said, then wants said.
+    """
+    flags = [
+        (
+            "struggling",
+            expect.struggling,
+            observed.struggling,
+            "struggling",
+            "not struggling",
+        ),
+        (
+            "cause known",
+            expect.cause_known,
+            observed.cause_known,
+            "knew why they feel this way",
+            "didn't know why they feel this way",
+        ),
+        (
+            "looks up the past",
+            expect.looks_up_past,
+            observed.looked_up_past,
+            "looked up the past",
+            "looked up nothing",
+        ),
+        (
+            "feelings said",
+            expect.feelings_said,
+            observed.feelings_said,
+            "kept feelings said in their words",
+            "kept no feelings as said",
+        ),
+        (
+            "wants said",
+            expect.wants_said,
+            observed.wants_said,
+            "kept wants said in their words",
+            "kept no wants as said",
+        ),
+    ]
+    return [
+        check_yes_no(name, expected, seen, yes_detail, no_detail)
+        for name, expected, seen, yes_detail, no_detail in flags
+        if expected is not None
+    ]
+
+
+def check_recall(
+    expect: UnderstandingExpectations, observed: ObservedUnderstanding
+) -> list[CheckResult]:
+    """Check Recall reminded the Companion of each Life Thread expected.
+
+    A Life Thread counts as found when its title is in what the Reply Plan
+    model was given; the cases file keeps titles out of the rest of the
+    memory, so only being reminded puts it there.
+
+    Args:
+        expect: The Threads to be found.
+        observed: What the Reply Plan was given.
+
+    Returns:
+        One outcome per Thread.
+    """
+    return check_each_thread(
+        "found",
+        expect.found,
+        lambda title: title in observed.reply_plan_input,
+        "was reminded of {title}",
+        "wasn't reminded of {title}",
+    )
+
+
+def check_reply_plan(
+    expect: UnderstandingExpectations, observed: ObservedUnderstanding
+) -> list[CheckResult]:
+    """Check what the Reply Plan decided.
+
+    Args:
+        expect: What it should have decided; empty fields aren't checked.
+        observed: What it decided.
+
+    Returns:
+        One outcome per check, in a fixed order: the Read formed and said,
+        the Need, the lead, supporting, no and next Move, each Thread to be
+        brought up and left alone, then the Curiosity, asking why, Knowledge
+        and the woven-in Check-in.
     """
     checks = []
+    if expect.read_formed is not None:
+        checks.append(
+            check_yes_no(
+                "read formed",
+                expect.read_formed,
+                observed.read_formed,
+                "formed a Read",
+                "formed no Read",
+            )
+        )
+    if expect.read_said is not None:
+        checks.append(
+            check_yes_no(
+                "read said",
+                expect.read_said,
+                observed.read_said,
+                "said the Read",
+                "held the Read back",
+            )
+        )
     if expect.need:
         checks.append(check_need(expect.need, observed.need))
     if expect.lead_move:
@@ -327,13 +480,6 @@ def check_understanding(
         )
     if expect.next_move:
         checks.append(check_next_move(expect.next_move, observed.next_move))
-    checks += check_each_thread(
-        "found",
-        expect.found,
-        lambda title: title in observed.reply_plan_input,
-        "was reminded of {title}",
-        "wasn't reminded of {title}",
-    )
     checks += check_each_thread(
         "raised",
         expect.raised,
@@ -365,3 +511,27 @@ def check_understanding(
     if expect.woven_in is not None:
         checks.append(check_woven_in(expect.woven_in, observed.woven_in))
     return checks
+
+
+def check_steps(
+    expect: UnderstandingExpectations, observed: ObservedUnderstanding
+) -> list[CheckResult]:
+    """Check one Message on each step that owns an expectation.
+
+    The Understanding owns what it reads, Recall owns the Life Threads found
+    and the Reply Plan owns what the reply does, so a failed check says
+    which step went wrong.
+
+    Args:
+        expect: What the Message should do; empty fields aren't checked.
+        observed: What its steps did.
+
+    Returns:
+        The Understanding's checks, then Recall's, then the Reply Plan's,
+        each named after its step, e.g. "Reply Plan · need".
+    """
+    return [
+        *mark_with_step(UNDERSTANDING_STEP, check_understanding_step(expect, observed)),
+        *mark_with_step(RECALL_STEP, check_recall(expect, observed)),
+        *mark_with_step(REPLY_PLAN_STEP, check_reply_plan(expect, observed)),
+    ]

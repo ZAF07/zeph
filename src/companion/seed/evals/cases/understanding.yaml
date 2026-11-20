@@ -1,14 +1,14 @@
 # Understanding eval. Each case gives the person a made-up User Memory and,
 # optionally, messages already in an open Conversation. Then its Messages are
 # sent one by one through the Telegram webhook, and each Message's
-# Understanding (and, for rules, Zeph's reply) is checked.
+# Understanding, Recall and Reply Plan (and, for rules, Zeph's reply) are
+# checked.
 #
-# Since the Reply Plan took over deciding (issue 05, ADR-0021), these cases
-# check the Understanding and the Reply Plan together: the Need, Moves,
-# Threads, Curiosities, asking why and Knowledge come from the Reply Plan,
-# and "found" looks in the Reply Plan's input. They were written for one
-# combined call and may fail until issue 13 splits them into an
-# Understanding Eval and a Reply Plan Eval; don't rewrite them before then.
+# Each check is marked with the step that owns it, so a failed case says
+# which job went wrong: the Understanding (what it reads), Recall (the Life
+# Threads found, from what the Reply Plan is given) or the Reply Plan (what
+# the reply does). The expectations stay in one list; code decides which
+# step owns each one (issue 13, ADR-0021).
 #
 # `now` is when the first Message is sent (UTC, which is also the person's
 # time zone). 2026-11-13 is a Friday. A case can set its own `now`.
@@ -47,10 +47,22 @@
 # check_in_due: true   the person has Check-ins on, with one due an hour
 #                      before the first Message, so a reply may weave it in
 #
-# messages: [{text, expect}]. Everything in expect is optional:
-#   need: [<Need>, ...]          the Needs that may be picked
+# messages: [{text, expect}]. Everything in expect is optional.
+#  Understanding:
+#   struggling: true|false       it reads them as struggling
+#   cause_known: true|false      it knows why they feel as they do
+#   looks_up_past: true|false    it asks to look up older days
+#   feelings_said: true|false    true: it keeps feelings they put in words
+#                                as said; false: none are kept as said
+#                                (guesses belong under read or unclear)
+#   wants_said: true|false       the same for what they want from Zeph
+#  Recall:
 #   found: [<Thread title>]      the Companion is reminded of it
-#   raised: [<Thread title>]     the Understanding brings it up
+#  Reply Plan:
+#   read_formed: true|false      it forms a Read
+#   read_said: true|false        the reply says the Read now
+#   need: [<Need>, ...]          the Needs that may be picked
+#   raised: [<Thread title>]     it brings the Thread up
 #   not_raised: [<Thread title>] it doesn't
 #   curiosity_raised: true|false
 #   asked_why: true|false        the reply is told to gently ask why
@@ -62,6 +74,7 @@
 #   no_move: true|false          true: no Move, just respond; false: a lead
 #                                Move. Leave the Move lists empty when true.
 #   next_move: [<Move>, ...]     the Moves Zeph may have in mind to make next
+#  Reply:
 #   rules: [<rule id>]           the Judge checks Zeph's reply against these
 #
 # web_search: false   Web Search doesn't work for the person, so Research is
@@ -603,3 +616,51 @@ cases:
           need: [Be heard]
           asked_why: false
           rules: [no_why_question]
+
+  - id: scared-before-the-exam
+    memory: *maya
+    messages:
+      - text: >-
+          my ward manager exam is tomorrow and I'm honestly terrified, I
+          can't sleep. what if I blank on everything
+        expect:
+          struggling: true
+          cause_known: true
+          feelings_said: true
+          read_formed: true
+          read_said: false
+
+  - id: feeling-not-put-in-words
+    memory: *maya
+    messages:
+      - text: my sister didn't reply to my message again. third time this week
+        expect:
+          feelings_said: false
+          wants_said: false
+
+  - id: looks-back-at-an-old-trip
+    memory: *maya
+    messages:
+      - text: >-
+          remember that trip to Japan I told you about months ago? I'm
+          thinking of going back
+        expect:
+          looks_up_past: true
+          struggling: false
+
+  - id: asks-for-zeph-view
+    memory: *arjun
+    earlier:
+      - person: >-
+          launch slipped again. third time. I keep finding one more thing to
+          polish before I let anyone see it
+      - zeph: that's a frustrating loop to be stuck in
+      - person: >-
+          and every time someone asks when it's out I just change the subject
+      - zeph: yeah, that sounds tiring to carry around
+    messages:
+      - text: what do you think is going on with me?
+        expect:
+          wants_said: true
+          read_formed: true
+          read_said: true
