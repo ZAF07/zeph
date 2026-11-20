@@ -1078,8 +1078,7 @@ UNDERSTANDING_EXPECT_FIELD = ShapeField(
             "feelings_said",
             "Feelings said",
             "Understanding: Yes, it must keep feelings they put in words as "
-            "said. No, they said none, so any feeling must be kept as read or "
-            "unclear.",
+            "said. No, they put none in words, so none may be kept as said.",
         ),
         yes_no_unchecked_field(
             "wants_said",

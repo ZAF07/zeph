@@ -54,6 +54,7 @@
 #   looks_up_past: true|false    it asks to look up older days
 #   feelings_said: true|false    true: it keeps feelings they put in words
 #                                as said; false: none are kept as said
+#                                (guesses belong under read or unclear)
 #   wants_said: true|false       the same for what they want from Zeph
 #  Recall:
 #   found: [<Thread title>]      the Companion is reminded of it

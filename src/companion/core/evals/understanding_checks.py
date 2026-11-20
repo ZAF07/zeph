@@ -52,7 +52,7 @@ class ObservedUnderstanding:
     support_move: str | None = None
     next_move: str | None = None
     struggling: bool = False
-    cause_known: bool = True
+    cause_known: bool = False
     looked_up_past: bool = False
     feelings_said: bool = False
     wants_said: bool = False
@@ -321,7 +321,7 @@ def check_woven_in(expected: bool, woven_in: bool) -> CheckResult:
     return CheckResult("woven in", woven_in == expected, detail)
 
 
-def on_step(step: str, results: list[CheckResult]) -> list[CheckResult]:
+def mark_with_step(step: str, results: list[CheckResult]) -> list[CheckResult]:
     """Mark checks with the step that owns them.
 
     Args:
@@ -531,7 +531,7 @@ def check_steps(
         each named after its step, e.g. "Reply Plan · need".
     """
     return [
-        *on_step(UNDERSTANDING_STEP, check_understanding_step(expect, observed)),
-        *on_step(RECALL_STEP, check_recall(expect, observed)),
-        *on_step(REPLY_PLAN_STEP, check_reply_plan(expect, observed)),
+        *mark_with_step(UNDERSTANDING_STEP, check_understanding_step(expect, observed)),
+        *mark_with_step(RECALL_STEP, check_recall(expect, observed)),
+        *mark_with_step(REPLY_PLAN_STEP, check_reply_plan(expect, observed)),
     ]

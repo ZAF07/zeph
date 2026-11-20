@@ -146,8 +146,9 @@ def describe_what_was_done(
     Returns:
         What they did.
     """
-    read = understanding.form
+    understanding_form = understanding.form
     form = reply_plan.form
+    read_formed = bool(form.read.strip())
     return ObservedUnderstanding(
         need=reply_plan.need,
         reply_plan_input=reply_plan_input,
@@ -164,13 +165,13 @@ def describe_what_was_done(
         lead_move=reply_plan.lead_move,
         support_move=reply_plan.support_move,
         next_move=reply_plan.next_move,
-        struggling=read.struggling,
-        cause_known=read.cause_known,
-        looked_up_past=bool(read.look_up_past),
-        feelings_said=bool(read.feelings.said.strip()),
-        wants_said=bool(read.wants.said.strip()),
-        read_formed=bool(form.read.strip()),
-        read_said=bool(form.read.strip()) and form.say_read,
+        struggling=understanding_form.struggling,
+        cause_known=understanding_form.cause_known,
+        looked_up_past=bool(understanding_form.look_up_past),
+        feelings_said=bool(understanding_form.feelings.said.strip()),
+        wants_said=bool(understanding_form.wants.said.strip()),
+        read_formed=read_formed,
+        read_said=read_formed and form.say_read,
     )
 
 
