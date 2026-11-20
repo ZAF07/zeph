@@ -90,4 +90,8 @@ For example: `Reply Plan · need: picked Be heard, expected Advice`.
 ## Completion
 
 - Completed: 2026-11-20
-- Commit: <filled in after merge>
+- Commit: c0aae22 "Merge message pipeline issue 13: Understanding Eval checks marked by the step that owns them" (merged into `main` locally and pushed), with:
+  - ddc3726 "Message pipeline issue 13: Understanding Eval checks marked by the step that owns them"
+  - 0520574 "Issue 13 review fixes: clearer names, Read worked out once, honest Feelings said hint"
+  - db07784 "Message pipeline issue 13 done: archive issue with test, run and review evidence; Recall in the glossary"
+  - 64d0dc3 "Issue 13: rebase evidence"
