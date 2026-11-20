@@ -66,6 +66,10 @@ const settings: AdminSettings = {
   ),
   life_threads_closeness_percent: seeded(68),
   life_thread_brushed_off_wait_days: seeded(14),
+  pattern_closeness_percent: seeded(
+    52,
+    "How close in meaning a Pattern must be for Recall to bring it to mind with no Thread.",
+  ),
   pattern_pushed_back_wait_days: seeded(
     30,
     "Days before a Pattern the User pushed back on comes to mind for the Reply Plan again.",
@@ -320,6 +324,29 @@ describe("PlatformSettingsForm", () => {
 
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       pattern_pushed_back_wait_days: 45,
+    });
+  });
+
+  it("shows and saves the Pattern closeness bar, with its hint", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const bar = await screen.findByLabelText("Pattern closeness bar");
+    expect(bar).toHaveValue(52);
+    expect(
+      screen.getByText(
+        "How close in meaning a Pattern must be for Recall to bring it to mind with no Thread.",
+      ),
+    ).toBeVisible();
+    expect(screen.getByRole("region", { name: "Memory" })).toContainElement(
+      bar,
+    );
+
+    await user.clear(bar);
+    await user.type(bar, "58");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      pattern_closeness_percent: 58,
     });
   });
 

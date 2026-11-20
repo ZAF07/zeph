@@ -278,6 +278,7 @@ PATTERN_KEEPING_PROMPT = Setting("pattern_keeping_prompt", read_text)
 PATTERN_KEEPING_THREADS = Setting("pattern_keeping_threads", read_whole_number)
 PATTERN_KEEPING_DAYS = Setting("pattern_keeping_days", read_whole_number)
 PATTERN_PUSHED_BACK_WAIT = Setting("pattern_pushed_back_wait_days", read_days)
+PATTERN_CLOSENESS_PERCENT = Setting("pattern_closeness_percent", read_whole_number)
 PORTRAIT_MODEL = Setting("portrait_model", read_text)
 PORTRAIT_THINKING = Setting("portrait_thinking", read_on_off)
 PORTRAIT_PROMPT = Setting("portrait_prompt", read_text)
@@ -1156,9 +1157,9 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         minimum=0,
         maximum=100,
         hint=(
-            "How close in meaning a Thread’s story, or a Pattern, must be to what "
-            "the User means and their latest texts for Recall to bring it to mind. "
-            "A Thread naming someone or something they mention always counts."
+            "How close in meaning a Thread’s story must be to what the User means "
+            "and their latest texts for Recall to bring it to mind. A Thread naming "
+            "someone or something they mention always counts."
         ),
     ),
     EditableSetting(
@@ -1193,6 +1194,19 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         hint=(
             "Days before the Reply Plan may bring up a Life Thread again after the "
             "User brushed it off. One they asked to drop is never brought up again."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_CLOSENESS_PERCENT.key,
+        "Pattern closeness bar",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=100,
+        hint=(
+            "How close in meaning a Pattern must be to what the User means and "
+            "their latest texts for Recall to bring it to mind with no Thread. "
+            "Fits score about 47–66 and small talk up to about 61, so a low bar "
+            "brings in some noise."
         ),
     ),
     EditableSetting(

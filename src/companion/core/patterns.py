@@ -29,8 +29,8 @@ from companion.core.models import (
     UserSnapshot,
 )
 from companion.core.platform_settings import (
-    LIFE_THREADS_CLOSENESS_PERCENT,
     LIFE_THREADS_TEXTS_TO_SEARCH,
+    PATTERN_CLOSENESS_PERCENT,
     PATTERN_KEEPING_DAYS,
     PATTERN_KEEPING_MODEL,
     PATTERN_KEEPING_PROMPT,
@@ -608,7 +608,7 @@ class PatternReminder:
         return self._repositories.patterns.find_close_ids(
             snapshot.user.id,
             embedding,
-            settings.get(LIFE_THREADS_CLOSENESS_PERCENT) / 100,
+            settings.get(PATTERN_CLOSENESS_PERCENT) / 100,
         )
 
 
