@@ -94,6 +94,8 @@ const plainUsersTrace: ModelCallTraceDetails = {
         threads_held_back: 1,
         read_formed: true,
         read_said: false,
+        check_in_kinds_offered: 4,
+        check_in_kind: "A follow-up",
       },
     },
     {
@@ -109,7 +111,7 @@ const plainUsersTrace: ModelCallTraceDetails = {
       tools_called: [],
       content: null,
       understanding_shape: null,
-      check_in_shape: { kinds_offered: 4, woven_in: true, kind: "A follow-up" },
+      check_in_shape: { kind: "A follow-up", brought_up: true },
       reply_plan_shape: null,
     },
     {
@@ -235,6 +237,8 @@ describe("ModelCallTraceView", () => {
     expect(factValue(replyPlan, "Threads held back")).toBe("1");
     expect(factValue(replyPlan, "Read formed")).toBe("Yes");
     expect(factValue(replyPlan, "Read said")).toBe("No");
+    expect(factValue(replyPlan, "Check-in Kinds offered")).toBe("4");
+    expect(factValue(replyPlan, "Check-in Kind chosen")).toBe("A follow-up");
     expect(
       within(replyPlan).queryByText("Mood intensity"),
     ).not.toBeInTheDocument();
@@ -242,7 +246,7 @@ describe("ModelCallTraceView", () => {
     expect(within(reply).queryByText("Need picked")).not.toBeInTheDocument();
   });
 
-  it("shows the shape of a woven-in Check-in decision", async () => {
+  it("shows whether the reply brought up its Woven-in Check-in", async () => {
     apiClient.getModelCallTrace.mockResolvedValue(plainUsersTrace);
 
     renderWithQueries(<ModelCallTraceView traceId="t1" />);
@@ -250,11 +254,10 @@ describe("ModelCallTraceView", () => {
     const checkIn = await screen.findByRole("article", { name: "Check-in" });
     const factValue = (label: string) =>
       within(checkIn).getByText(label).nextElementSibling?.textContent;
-    expect(factValue("Kinds offered")).toBe("4");
-    expect(factValue("Decision")).toBe("Weave in");
-    expect(factValue("Kind chosen")).toBe("A follow-up");
+    expect(factValue("Check-in Kind")).toBe("A follow-up");
+    expect(factValue("Brought up")).toBe("Yes");
     const reply = screen.getByRole("article", { name: "Reply" });
-    expect(within(reply).queryByText("Kinds offered")).not.toBeInTheDocument();
+    expect(within(reply).queryByText("Brought up")).not.toBeInTheDocument();
   });
 
   it("shows full content for an Admin's own chat, tool calls included", async () => {

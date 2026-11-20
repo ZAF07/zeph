@@ -20,7 +20,7 @@ class ObservedUnderstanding:
             to search; empty when none.
         knowledge_in_reply: The Knowledge documents whose passages reached
             the reply's instructions.
-        woven_in: Whether the Check-in model chose to weave the due Check-in
+        woven_in: Whether the Reply Plan chose to weave the due Check-in
             into the reply.
         lead_move: The Move the reply led with; None for none.
         support_move: The Move that supported it; None for none.
@@ -268,7 +268,7 @@ def check_woven_in(expected: bool, woven_in: bool) -> CheckResult:
 
     Args:
         expected: Whether it must be woven in.
-        woven_in: Whether the Check-in model chose to weave it in.
+        woven_in: Whether the Reply Plan chose to weave it in.
 
     Returns:
         The check's outcome.

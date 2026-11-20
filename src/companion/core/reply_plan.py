@@ -23,6 +23,8 @@ from companion.core.models import (
     BringUpWay,
     ChatLine,
     ChatRole,
+    CheckInKind,
+    ChosenCheckIn,
     ChosenKnowledgeDocument,
     ConversationMessage,
     CuriosityToRaise,
@@ -65,6 +67,7 @@ from companion.core.understanding import (
 )
 from companion.core.usage import UsageRecordingChatModel
 from companion.core.web_search import web_search_limit_used_up
+from companion.core.woven_check_ins import WovenCheckIn
 
 logger = logging.getLogger(__name__)
 
@@ -120,12 +123,15 @@ class PlannedReply:
             through a Move that asks one, asking why or a Curiosity.
         may_send_photo: Whether the reply may send one of the User's Shared
             Photos.
+        check_in: The due Check-in it chose to offer the reply; None for
+            none.
     """
 
     reply_plan: ReplyPlan
     reply_guidance: ReplyGuidance
     asks_a_question: bool = False
     may_send_photo: bool = True
+    check_in: WovenCheckIn | None = None
 
 
 def format_earlier_reply_plan(reply_plan: ReplyPlan) -> str:
@@ -280,6 +286,7 @@ def describe_message_for_reply_plan(
     due: DueCuriosities,
     knowledge_documents: dict[int, KnowledgeDocument],
     move_outcomes: Sequence[MoveOutcome],
+    check_in_kinds: Sequence[CheckInKind] = (),
 ) -> str:
     """Write what the Reply Plan model is given about the Message.
 
@@ -298,13 +305,15 @@ def describe_message_for_reply_plan(
             number.
         move_outcomes: The User's past Move Outcomes closest to the Message,
             closest first.
+        check_in_kinds: The Check-in Kinds it may weave in when a Check-in
+            is due; empty when none is.
 
     Returns:
         The time, the Understanding, Needs, Moves and which each Need
         allows, past Move Outcomes with their days, User Portrait, Goals,
         Memory Categories, recent Conversations, reminded Life Threads, due
-        Curiosities, Knowledge documents, earlier Reply Plans, earlier
-        Conversation and latest message.
+        Curiosities, Knowledge documents, the due Check-in's Kinds when one
+        is due, earlier Reply Plans, earlier Conversation and latest message.
     """
     fallback = fallback_need(needs)
     need_lines = "\n".join(f"- {need.name}: {need.when_it_fits}" for need in needs)
@@ -327,6 +336,12 @@ def describe_message_for_reply_plan(
         format_knowledge_document(number, document)
         for number, document in knowledge_documents.items()
     )
+    check_in_section = (
+        "\n\nA Check-in with them is due. Check-in Kinds you may weave in:\n"
+        + "\n".join(f"- {kind.name}: {kind.description}" for kind in check_in_kinds)
+        if check_in_kinds
+        else ""
+    )
     earlier_messages, latest_text = split_off_latest_message(messages)
     return (
         f"Time where they are: {format_local_time(snapshot.local_now)}\n\n"
@@ -348,6 +363,7 @@ def describe_message_for_reply_plan(
         f"{describe_due_curiosities(due, snapshot.user.time_zone)}"
         f"\n\nKnowledge documents, with when each helps:\n"
         f"{knowledge_lines or 'None.'}"
+        f"{check_in_section}"
         f"\n\nEarlier Reply Plans in this Conversation, oldest first:\n"
         f"{earlier_lines or 'None yet.'}\n\n"
         f"Earlier in the Conversation:\n"
@@ -591,11 +607,36 @@ def read_knowledge_lookup(
     return KnowledgeLookup(documents=tuple(documents.values()), search=search.strip())
 
 
+def read_check_in_choice(
+    value: Any, kinds: Sequence[CheckInKind]
+) -> ChosenCheckIn | None:
+    """Read the form's `check_in` field: the Kind to weave in and a note.
+
+    Args:
+        value: The field's value, e.g. {"kind": "A follow-up", "note": "Ask
+            how the board presentation went."}.
+        kinds: The Check-in Kinds the model was offered.
+
+    Returns:
+        The choice, with the Kind's name as Admins wrote it; None when it
+        names no offered Kind, in any case, or gives no note.
+    """
+    if not isinstance(value, dict):
+        return None
+    kind_name, note = value.get("kind"), read_form_text(value.get("note"))
+    if not isinstance(kind_name, str) or not note:
+        return None
+    kinds_by_name = {kind.name.lower(): kind for kind in kinds}
+    kind = kinds_by_name.get(kind_name.strip().lower())
+    return ChosenCheckIn(kind=kind.name, note=note) if kind else None
+
+
 def read_reply_plan_form(
     answer: str,
     reminded: Sequence[RemindedThread],
     due: DueCuriosities,
     knowledge_documents: dict[int, KnowledgeDocument],
+    check_in_kinds: Sequence[CheckInKind] = (),
 ) -> ReplyPlanForm | None:
     """Read the Reply Plan model's JSON form.
 
@@ -606,7 +647,7 @@ def read_reply_plan_form(
     raise. Knowledge documents are named by their numbers in the Knowledge
     list. A missing or odd "send_photo" reads as allowed, and a missing or
     odd "ask_why" as not said. The Read is said only when there is one and
-    "say_read" is true.
+    "say_read" is true. A Check-in is chosen only from the Kinds offered.
 
     Args:
         answer: The model's answer.
@@ -614,6 +655,8 @@ def read_reply_plan_form(
         due: The Curiosities the model was shown, numbered.
         knowledge_documents: The Knowledge documents the model was shown,
             by number.
+        check_in_kinds: The Check-in Kinds it was offered; empty when no
+            Check-in was due.
 
     Returns:
         The form, or None if it has no JSON object naming a Need.
@@ -653,6 +696,7 @@ def read_reply_plan_form(
         where_we_are=read_form_text(parsed.get("where_we_are")),
         read=read,
         say_read=bool(read) and parsed.get("say_read") is True,
+        check_in=read_check_in_choice(parsed.get("check_in"), check_in_kinds),
     )
     return keep_held_back_threads_alone(form, reminded)
 
@@ -674,6 +718,35 @@ def may_send_photo(understanding: UnderstandingForm, plan: ReplyPlanForm) -> boo
     """
     return plan.photo_fits and (
         not understanding.struggling or understanding.asked_for_photo
+    )
+
+
+def woven_check_in_from_plan(
+    snapshot: UserSnapshot, form: ReplyPlanForm, kinds: Sequence[CheckInKind]
+) -> WovenCheckIn | None:
+    """Make the Woven-in Check-in the Reply Plan chose, ready to save.
+
+    Args:
+        snapshot: The User being answered, as read for the reply.
+        form: This Message's Reply Plan form.
+        kinds: The Check-in Kinds it was offered.
+
+    Returns:
+        The Check-in, for the User's Due Time and any Check in Now waiting;
+        None when the plan chose none, its Kind is no longer offered or the
+        User has no Due Time.
+    """
+    settings = snapshot.user.check_ins
+    if form.check_in is None or settings.next_due_at is None:
+        return None
+    kind = next((kind for kind in kinds if kind.name == form.check_in.kind), None)
+    if kind is None:
+        return None
+    return WovenCheckIn(
+        kind=kind,
+        note=form.check_in.note,
+        due_at=settings.next_due_at,
+        check_in_now=settings.check_in_now,
     )
 
 
@@ -869,6 +942,7 @@ def describe_reply_plan_shape(
     picked: PickedMoves,
     form: ReplyPlanForm,
     reminded: Sequence[RemindedThread],
+    check_in_kinds_offered: int = 0,
 ) -> ReplyPlanShape:
     """Describe the shape of a Reply Plan for the Model Call Log.
 
@@ -877,11 +951,13 @@ def describe_reply_plan_shape(
         picked: The Moves the reply makes.
         form: The form the reply follows.
         reminded: The Life Threads the Message reminded the Companion of.
+        check_in_kinds_offered: How many Check-in Kinds it could weave in.
 
     Returns:
         The Need, the lead, supporting and next Moves' names, how many Life
-        Threads were reminded, brought up, left alone and held back, and
-        whether a Read was formed and said; never any words.
+        Threads were reminded, brought up, left alone and held back,
+        whether a Read was formed and said, and how many Check-in Kinds
+        were offered and which it chose; never any words.
     """
     ways = [item.how for item in form.bring_up]
     held_back = [item for item in reminded if item.hold_back]
@@ -897,6 +973,8 @@ def describe_reply_plan_shape(
         next_move=picked.next_name,
         read_formed=bool(form.read),
         read_said=form.say_read,
+        check_in_kinds_offered=check_in_kinds_offered,
+        check_in_kind=form.check_in.kind if form.check_in else None,
     )
 
 
@@ -911,7 +989,8 @@ class ReplyPlanService:
     asks a question and was made in the previous reply), which Move it means
     to make next and why, which Memory Categories and Knowledge matter,
     which Life Threads and Curiosities to bring up or leave alone, whether a
-    Shared Photo may be sent and whether to ask why. It sees this
+    Shared Photo may be sent, whether to ask why and, when a Check-in is
+    due, whether one of its Kinds fits this reply. It sees this
     Conversation's earlier Reply Plans with where the Conversation was, the
     Reads formed and their Moves, so it knows whether it already asked why,
     gave a Read and which Move it had in mind next.
@@ -946,6 +1025,7 @@ class ReplyPlanService:
         reminded: Sequence[RemindedThread],
         due: DueCuriosities,
         move_outcomes: Sequence[MoveOutcome],
+        check_in_kinds: Sequence[CheckInKind] = (),
     ) -> PlannedReply:
         """Make and save the Reply Plan of the Conversation's newest Message.
 
@@ -960,7 +1040,8 @@ class ReplyPlanService:
         Curiosity: only one question per reply. An unreadable form or a
         failed call falls back to the fallback Need with no Moves and no
         Memory Categories, so the reply still goes, with every reminded Life
-        Thread that isn't held back but no Thread or Curiosity brought up.
+        Thread that isn't held back but no Thread or Curiosity brought up,
+        and no Check-in.
 
         Args:
             snapshot: The User being answered.
@@ -970,9 +1051,12 @@ class ReplyPlanService:
             due: The Curiosities it may bring up.
             move_outcomes: The User's past Move Outcomes closest to the
                 Message, closest first.
+            check_in_kinds: The Check-in Kinds it may weave in, when code
+                allows a due Check-in; empty when none is.
 
         Returns:
-            The saved Reply Plan and what it adds to the reply.
+            The saved Reply Plan, what it adds to the reply and the
+            Check-in it chose.
         """
         conversation_id = understanding.conversation_id
         messages = self._repositories.conversations.list_messages(conversation_id)
@@ -1001,10 +1085,12 @@ class ReplyPlanService:
                 due,
                 knowledge_documents,
                 move_outcomes,
+                check_in_kinds,
             ),
             reminded,
             due,
             knowledge_documents,
+            check_in_kinds,
         )
         if model_form is None:
             need = fallback_need(needs)
@@ -1034,7 +1120,10 @@ class ReplyPlanService:
         )
         self._repositories.reply_plans.add(reply_plan)
         self._model_call_log.record_reply_plan_shape(
-            snapshot, describe_reply_plan_shape(need, picked, form, reminded)
+            snapshot,
+            describe_reply_plan_shape(
+                need, picked, form, reminded, len(check_in_kinds)
+            ),
         )
         ask_why_note = snapshot.settings.get(REPLY_ASK_WHY_NOTE) if asked_why else ""
         return PlannedReply(
@@ -1051,6 +1140,7 @@ class ReplyPlanService:
             ),
             asks_a_question=asks_another_question or picked.asks_a_question,
             may_send_photo=may_send_photo(understanding.form, form),
+            check_in=woven_check_in_from_plan(snapshot, form, check_in_kinds),
         )
 
     def _working_features(self, snapshot: UserSnapshot) -> set[Feature]:
@@ -1095,6 +1185,7 @@ class ReplyPlanService:
         reminded: Sequence[RemindedThread],
         due: DueCuriosities,
         knowledge_documents: dict[int, KnowledgeDocument],
+        check_in_kinds: Sequence[CheckInKind],
     ) -> ReplyPlanForm | None:
         """Ask the model to fill in the form, with the Outlook before the prompt.
 
@@ -1105,6 +1196,7 @@ class ReplyPlanService:
             due: The Curiosities it was shown, numbered.
             knowledge_documents: The Knowledge documents it was shown, by
                 number.
+            check_in_kinds: The Check-in Kinds it was offered.
 
         Returns:
             The form; None if the call failed or the answer can't be read.
@@ -1125,7 +1217,9 @@ class ReplyPlanService:
         except Exception:
             logger.exception("The Reply Plan call failed; using the fallback Need")
             return None
-        form = read_reply_plan_form(answer, reminded, due, knowledge_documents)
+        form = read_reply_plan_form(
+            answer, reminded, due, knowledge_documents, check_in_kinds
+        )
         if form is None:
             logger.warning(
                 "The Reply Plan form couldn't be read; using the fallback Need"

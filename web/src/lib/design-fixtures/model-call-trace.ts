@@ -120,6 +120,8 @@ const calls: ModelCall[] = [
       threads_held_back: 1,
       read_formed: true,
       read_said: false,
+      check_in_kinds_offered: 2,
+      check_in_kind: null,
     },
   }),
   drawnCall({

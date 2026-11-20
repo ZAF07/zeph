@@ -22,6 +22,7 @@ from companion.core.models import (
 )
 from companion.core.ports import ChatTool
 from companion.core.typing_keeper import TYPING_WAIT_PREFIX
+from companion.core.woven_check_ins import BROUGHT_UP_CHECK_PROMPT
 
 TOKENS_IN_PER_CALL = 120
 TOKENS_OUT_PER_CALL = 30
@@ -492,6 +493,7 @@ def reply_plan_answer(
     where_we_are: str = "",
     read: str = "",
     say_read: object = False,
+    check_in: object = None,
 ) -> str:
     """Build the form the Reply Plan model answers with.
 
@@ -521,6 +523,9 @@ def reply_plan_answer(
         read: Zeph's Read of what is really going on; "" for none.
         say_read: Whether the reply gives the Read now, or anything else a
             model might write there.
+        check_in: The Check-in to weave in, e.g. {"kind": "A follow-up",
+            "note": "..."}, or anything else a model might write there; None
+            for none.
 
     Returns:
         The form as JSON.
@@ -548,6 +553,7 @@ def reply_plan_answer(
         "left_alone": list(left_alone),
         "knowledge": knowledge,
         "send_photo": send_photo,
+        "check_in": check_in,
     }
     if ask_why is not None:
         answer["ask_why"] = ask_why
@@ -562,13 +568,13 @@ class ScriptedChatModel:
 
     Safeguard, memory processing, Understanding, Reply Plan, Life Thread keeping,
     Curiosity keeping, Move Outcome keeping, Portrait writing, Personal
-    Sticker keeping, woven-in Check-in and Knowledge "when it helps"
+    Sticker keeping, brought-up check and Knowledge "when it helps"
     drafting calls are told apart by their instructions and kept apart from
     reply calls, each with its own script. The Safeguard defaults to "none",
     the Understanding to `understanding_answer()`, the Reply Plan to
     `reply_plan_answer()`, Life Thread, Pattern, Curiosity and Move Outcome
-    keeping to none kept, Portrait writing to an empty
-    answer (no Portrait), a woven-in Check-in to "not now" and drafting to
+    keeping to none kept, Portrait writing to an empty answer (no
+    Portrait), the brought-up check to "no" and drafting to
     `DEFAULT_WHEN_IT_HELPS`, so tests about replies don't have to script
     them too. Set
     `before_next_reply` to run something once while the next reply is being
@@ -589,7 +595,6 @@ class ScriptedChatModel:
         knowledge_when_it_helps_prompt: str = "",
         portrait_prompt: str = "",
         curiosity_keeping_prompt: str = "",
-        woven_check_in_prompt: str = "",
         move_outcome_keeping_prompt: str = "",
         pattern_keeping_prompt: str = "",
     ) -> None:
@@ -613,8 +618,6 @@ class ScriptedChatModel:
                 call.
             curiosity_keeping_prompt: The instructions that mark a Curiosity
                 keeping call.
-            woven_check_in_prompt: The prompt that marks a woven-in Check-in
-                call, which comes after the Persona.
             move_outcome_keeping_prompt: The instructions that mark a Move
                 Outcome keeping call.
             pattern_keeping_prompt: The instructions that mark a Pattern
@@ -630,7 +633,7 @@ class ScriptedChatModel:
         self._when_it_helps_answers: list[str | Exception] = []
         self._portrait_answers: list[str | Exception] = []
         self._curiosity_keeping_answers: list[str | Exception] = []
-        self._woven_check_in_answers: list[str | Exception] = []
+        self._brought_up_check_answers: list[str | Exception] = []
         self._move_outcome_keeping_answers: list[str | Exception] = []
         self._pattern_keeping_answers: list[str | Exception] = []
         self.safeguard_prompt = safeguard_prompt
@@ -642,7 +645,6 @@ class ScriptedChatModel:
         self.knowledge_when_it_helps_prompt = knowledge_when_it_helps_prompt
         self.curiosity_keeping_prompt = curiosity_keeping_prompt
         self.portrait_prompt = portrait_prompt
-        self.woven_check_in_prompt = woven_check_in_prompt
         self.move_outcome_keeping_prompt = move_outcome_keeping_prompt
         self.pattern_keeping_prompt = pattern_keeping_prompt
         self.calls: list[ChatModelCall] = []
@@ -655,7 +657,7 @@ class ScriptedChatModel:
         self.when_it_helps_calls: list[ChatModelCall] = []
         self.portrait_calls: list[ChatModelCall] = []
         self.curiosity_keeping_calls: list[ChatModelCall] = []
-        self.woven_check_in_calls: list[ChatModelCall] = []
+        self.brought_up_check_calls: list[ChatModelCall] = []
         self.move_outcome_keeping_calls: list[ChatModelCall] = []
         self.pattern_keeping_calls: list[ChatModelCall] = []
         self.call_order: list[str] = []
@@ -757,14 +759,14 @@ class ScriptedChatModel:
         """
         self._pattern_keeping_answers.extend(answers)
 
-    def script_woven_check_in(self, *answers: str | Exception) -> None:
-        """Queue woven-in Check-in answers, one per call.
+    def script_brought_up_check(self, *answers: str | Exception) -> None:
+        """Queue answers to whether a reply brought up its Check-in, one per call.
 
         Args:
-            answers: The JSON answers; an exception is raised instead of
+            answers: "yes" or "no"; an exception is raised instead of
                 returned, to act like a failing model.
         """
-        self._woven_check_in_answers.extend(answers)
+        self._brought_up_check_answers.extend(answers)
 
     def script_sticker_keeping(self, *answers: str | Exception) -> None:
         """Queue Personal Sticker keeping answers, one per call.
@@ -917,13 +919,13 @@ class ScriptedChatModel:
                 if self._when_it_helps_answers
                 else DEFAULT_WHEN_IT_HELPS
             )
-        elif self.woven_check_in_prompt and self.woven_check_in_prompt in instructions:
-            self.woven_check_in_calls.append(call)
-            self.call_order.append("woven_check_in")
+        elif instructions == BROUGHT_UP_CHECK_PROMPT:
+            self.brought_up_check_calls.append(call)
+            self.call_order.append("brought_up_check")
             answer = (
-                self._woven_check_in_answers.pop(0)
-                if self._woven_check_in_answers
-                else json.dumps({"decision": "not_now"})
+                self._brought_up_check_answers.pop(0)
+                if self._brought_up_check_answers
+                else "no"
             )
         else:
             self.calls.append(call)

@@ -456,10 +456,11 @@ reply_plan_prompt: |-
   Life Threads (ongoing stories in their life) this message reminds Zeph of,
   the things Zeph has been wondering about them (Curiosities) whose time has
   come, the Knowledge documents Zeph can draw on with when each helps, the
-  earlier Reply Plans in this Conversation (with where the Conversation
-  was, the Read Zeph formed and whether it said it, the Moves Zeph made and
-  the Move it had in mind next), and the Conversation so far, ending with
-  their latest message. Above these instructions is Zeph's Outlook: how it
+  Check-in Kinds Zeph may weave in when a Check-in with them is due (they
+  asked Zeph to check in now and then), the earlier Reply Plans in this
+  Conversation (with where the Conversation was, the Read Zeph formed and
+  whether it said it, the Moves Zeph made and the Move it had in mind
+  next), and the Conversation so far, ending with their latest message. Above these instructions is Zeph's Outlook: how it
   sees people and what helps them grow.
 
   Act on what they said, not on guesses: something only guessed or unclear
@@ -554,6 +555,17 @@ reply_plan_prompt: |-
   - ask_why: true if the reply should gently ask why they feel as they do:
     their feeling stands out and Zeph doesn't know why. False when the
     cause is known, they are venting, or an earlier reply just asked.
+  - check_in: only when you are told a Check-in is due. Weigh it against
+    everything else this reply could do: weave one in only when it truly
+    fits what you are talking about, or the Conversation has reached an
+    easy pause where a side topic is welcome, the way a friend drifts onto
+    one. Then give the Kind, its name exactly as written, and a note: one
+    line on what to bring up. Use null when they are in the middle of
+    telling you something, venting, asked something that needs your full
+    answer, seem upset or busy, when the reply already asks a question, or
+    when it would repeat something already asked or left alone. When
+    unsure, use null: it will go out on its own later. Null when no
+    Check-in is due.
 
   Answer with JSON only, in exactly this shape:
   {
@@ -575,7 +587,8 @@ reply_plan_prompt: |-
     "left_alone": [{"thread": <number>, "reason": "..."}],
     "knowledge": {"documents": [<number>], "search": "<search phrase>"} | null,
     "send_photo": true | false,
-    "ask_why": true | false
+    "ask_why": true | false,
+    "check_in": {"kind": "<Check-in Kind name>", "note": "..."} | null
   }
 
 # Added to the reply's instructions when the Reply Plan says to ask why the
@@ -1199,36 +1212,6 @@ check_in_prompt: |-
   The message is one short text: no names, labels, quotes or notes around it.
   Keep it light and easy to answer or ignore. Don't ask more than one question,
   don't mention that this is a Check-in, and only mention things you were told.
-
-# Woven-in Check-ins. When a User's Check-in comes due while they are chatting,
-# the Check-in model above decides, with the Persona and this prompt, whether
-# Zeph's reply should weave it in now. It is never asked while the User is
-# struggling or paused.
-woven_check_in_prompt: |-
-  Now you are deciding whether your next reply in this chat should also weave
-  in a Check-in: the kind of side topic a friend drifts onto while talking,
-  such as asking how something is going. The person asked you to check in now
-  and then, and one is due. They are already talking to you, so it would come
-  inside your reply, not as a message of its own.
-
-  You are told the Check-in Kinds you may choose from, their local time, your
-  recent Check-ins with them, what you remember about them, this
-  Conversation so far and how you read their newest message. Weave one in
-  only when it fits naturally with what is being talked about, or the
-  conversation has reached an easy pause where a side topic is welcome. Say
-  "not now" when they are in the middle of telling you something, asked you
-  something that needs your full answer, seem upset or busy, or when it
-  would repeat something you already asked or chose to leave alone in this
-  Conversation. When unsure, say "not now": it will go out on its own later.
-
-  If you're told your reply already asks them a question, prefer "not now",
-  or weave one in only as a passing remark with no question of its own: a
-  reply asks at most one question.
-
-  Answer with only a JSON object, no other text. To weave one in:
-  {"decision": "weave_in", "kind": "<one Kind's exact name>", "note": "<one line on what to bring up>"}
-  Otherwise:
-  {"decision": "not_now"}
 
 # After this many sent Check-ins in a row get no reply, the Companion sends the
 # message below once and pauses the User's Check-ins until they resume.

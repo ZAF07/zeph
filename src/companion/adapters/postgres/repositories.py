@@ -80,6 +80,7 @@ from companion.core.models import (
     CheckInOutcome,
     CheckInSettings,
     CheckInShape,
+    ChosenCheckIn,
     ChosenKnowledgeDocument,
     ConnectionToken,
     Conversation,
@@ -2388,7 +2389,8 @@ def _to_knowledge_lookup(stored: dict[str, Any] | None) -> KnowledgeLookup | Non
 def _to_reply_plan_form(stored: dict[str, Any]) -> ReplyPlanForm:
     """Turn a saved form back into a Reply Plan form.
 
-    A form saved before Reply Plans formed a Read reads as having none.
+    A form saved before Reply Plans formed a Read, or weighed a Check-in,
+    reads as having none.
 
     Args:
         stored: The form as saved.
@@ -2441,7 +2443,22 @@ def _to_reply_plan_form(stored: dict[str, Any]) -> ReplyPlanForm:
         where_we_are=stored.get("where_we_are", ""),
         read=stored.get("read", ""),
         say_read=stored.get("say_read", False),
+        check_in=_to_chosen_check_in(stored.get("check_in")),
     )
+
+
+def _to_chosen_check_in(stored: dict[str, Any] | None) -> ChosenCheckIn | None:
+    """Turn a saved Check-in choice back into one.
+
+    Args:
+        stored: The choice as saved; None if none was chosen.
+
+    Returns:
+        The choice; None if none was saved.
+    """
+    if stored is None:
+        return None
+    return ChosenCheckIn(kind=stored["kind"], note=stored["note"])
 
 
 class PostgresMemoryCategoryRepository:
@@ -5782,7 +5799,8 @@ def _to_understanding_shape(values: dict[str, Any]) -> UnderstandingShape:
 def _to_reply_plan_shape(values: dict[str, Any]) -> ReplyPlanShape:
     """Read a Reply Plan call's stored shape.
 
-    A shape saved before Reply Plans formed a Read reads as forming none.
+    A shape saved before Reply Plans formed a Read, or weighed a Check-in,
+    reads as forming none and being offered none.
 
     Args:
         values: The stored JSON.
@@ -5802,23 +5820,24 @@ def _to_reply_plan_shape(values: dict[str, Any]) -> ReplyPlanShape:
         next_move=values["next_move"],
         read_formed=values.get("read_formed", False),
         read_said=values.get("read_said", False),
+        check_in_kinds_offered=values.get("check_in_kinds_offered", 0),
+        check_in_kind=values.get("check_in_kind"),
     )
 
 
-def _to_check_in_shape(values: dict[str, Any]) -> CheckInShape:
-    """Read a woven-in Check-in call's stored shape.
+def _to_check_in_shape(values: dict[str, Any]) -> CheckInShape | None:
+    """Read a brought-up check's stored shape.
 
     Args:
         values: The stored JSON.
 
     Returns:
-        The shape.
+        The shape; None for one saved by the old woven-in Check-in model,
+        which decided rather than checked.
     """
-    return CheckInShape(
-        kinds_offered=values["kinds_offered"],
-        woven_in=values["woven_in"],
-        kind=values["kind"],
-    )
+    if "brought_up" not in values:
+        return None
+    return CheckInShape(kind=values["kind"], brought_up=values["brought_up"])
 
 
 def to_model_call(row: Row[Any]) -> ModelCall:

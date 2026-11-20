@@ -15,13 +15,11 @@ from companion.core.response_composition import (
     PRIORITY_ORDER,
     write_instructions,
 )
-from companion.core.woven_check_ins import BRING_UP_CHECK_IN_TOOL
 from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
     FakeClock,
     ScriptedChatModel,
-    ToolCall,
 )
 from tests.telegram_helpers import send_to_webhook, telegram_text_update
 from tests.test_check_in_sending import ONE_DAY, set_up_user_with_check_ins
@@ -31,7 +29,7 @@ from tests.test_reply_tools import (
     build_composer,
     snapshot_for,
 )
-from tests.test_woven_in_check_ins import NOTE, weave_answer
+from tests.test_woven_in_check_ins import NOTE, weave_plan
 
 QUESTION = "honestly what do you think I should do about the job?"
 
@@ -147,8 +145,8 @@ def test_a_direct_question_is_answered_before_any_optional_extra(
     chat_model.script("oh no, what happened?")
     send_to_webhook(client, telegram_text_update("work was a lot today"))
     clock.advance(timedelta(minutes=5))
-    chat_model.script_woven_check_in(weave_answer())
-    chat_model.script(ToolCall(BRING_UP_CHECK_IN_TOOL, {}), "here's my honest read")
+    chat_model.script_reply_plan(weave_plan())
+    chat_model.script("here's my honest read")
 
     send_to_webhook(client, telegram_text_update(QUESTION))
 

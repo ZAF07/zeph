@@ -701,13 +701,14 @@ export type ReplyPlanShape = {
   threads_held_back: number;
   read_formed: boolean;
   read_said: boolean;
+  check_in_kinds_offered: number;
+  check_in_kind: string | null;
 };
 
-/** The shape of a woven-in Check-in decision: counts and the Kind, never any words. */
+/** The shape of a check on whether a reply brought up its Woven-in Check-in. */
 export type CheckInShape = {
-  kinds_offered: number;
-  woven_in: boolean;
-  kind: string | null;
+  kind: string;
+  brought_up: boolean;
 };
 
 /** One model call in a trace; `content` is null unless it was kept. */

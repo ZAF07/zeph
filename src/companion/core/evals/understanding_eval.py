@@ -154,10 +154,7 @@ def describe_what_was_done(
             else []
         ),
         knowledge_in_reply=knowledge_in_reply(calls),
-        woven_in=any(
-            call.check_in_shape is not None and call.check_in_shape.woven_in
-            for call in calls
-        ),
+        woven_in=form.check_in is not None,
         lead_move=reply_plan.lead_move,
         support_move=reply_plan.support_move,
         next_move=reply_plan.next_move,

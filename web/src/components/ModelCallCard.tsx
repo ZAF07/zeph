@@ -16,7 +16,7 @@ import {
 /**
  * One model call in a trace: its step, model, tokens, time taken, the tools
  * it called, its error and the shape of its Understanding, Reply Plan or
- * woven-in Check-in decision, then its content when it was kept.
+ * brought-up check on a Woven-in Check-in, then its content when it was kept.
  *
  * @param props - `call` is the model call.
  * @returns The call's card.

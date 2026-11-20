@@ -24,7 +24,6 @@ from companion.adapters.postgres.repositories import (
 from companion.core.evals.models import EvalCase, EvalName, EvalRunState
 from companion.core.evals.runner import EvalRunner
 from companion.core.models import Feature
-from companion.core.woven_check_ins import BRING_UP_CHECK_IN_TOOL
 from companion.eval_terminal import build_eval_run_service, start_and_watch_run
 from companion.main import SEED_DIR
 from tests.conftest import shared_postgres_url
@@ -305,20 +304,13 @@ def test_an_understanding_case_checks_whether_the_due_check_in_was_woven_in(
     add_cases(engine, woven_in_case)
     admin = owner_headers(client, auth_verifier)
     run = start_run(client, admin, EvalName.UNDERSTANDING)
-    chat_model.script_woven_check_in(
-        json.dumps(
-            {
-                "decision": "weave_in",
-                "kind": "A follow-up",
-                "note": "Ask how the presentation went.",
-            }
+    chat_model.script_reply_plan(
+        reply_plan_answer(
+            check_in={"kind": "A follow-up", "note": "Ask how the presentation went."}
         )
     )
-    chat_model.script(
-        ToolCall(BRING_UP_CHECK_IN_TOOL, {}),
-        "sounds cosy! how did the presentation go?",
-        "so glad!",
-    )
+    chat_model.script_brought_up_check("yes")
+    chat_model.script("sounds cosy! how did the presentation go?", "so glad!")
 
     runner.work_next_run()
 
@@ -327,7 +319,9 @@ def test_an_understanding_case_checks_whether_the_due_check_in_was_woven_in(
     assert [
         check["detail"] for check in result["checks"] if check["name"] == "woven in"
     ] == ["wove in the due Check-in", "said not now"]
-    assert len(chat_model.woven_check_in_calls) == 1
+    [first_plan, second_plan] = chat_model.reply_plan_calls
+    assert "A Check-in with them is due." in first_plan.history[0].text
+    assert "A Check-in with them is due." not in second_plan.history[0].text
 
 
 def test_a_run_keeps_its_snapshot_of_settings_judge_and_cases(

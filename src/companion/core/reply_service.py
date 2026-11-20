@@ -1,5 +1,3 @@
-from concurrent.futures import ThreadPoolExecutor
-
 from companion.core.conversations import ConversationService, ReplyPartlySentError
 from companion.core.curiosities import CuriosityRaiser
 from companion.core.knowledge_retrieval import KnowledgeRetrieval
@@ -10,9 +8,13 @@ from companion.core.move_outcomes import MoveOutcomeFinder
 from companion.core.reply_attempt import ReplyAttempt
 from companion.core.reply_gate import ReplyGate, Stopped
 from companion.core.reply_plan import ReplyPlanService
+from companion.core.reply_tools import ReplyOffer
 from companion.core.response_composition import ResponseComposer
 from companion.core.understanding import UnderstandingService
-from companion.core.woven_check_ins import WovenCheckInOffer, WovenCheckIns
+from companion.core.woven_check_ins import (
+    WovenCheckIns,
+    format_woven_check_in_for_reply,
+)
 
 
 class ReplyService:
@@ -25,13 +27,14 @@ class ReplyService:
     Message touches, lists the Curiosities whose day has come and finds the
     User's past Move Outcomes closest to the Message; then the Reply Plan
     decides what the User needs and which Moves to make, which User Memory
-    matters, which Threads and Curiosities to bring up and which Knowledge
-    documents fit; then that memory, any older Conversations the
-    Understanding asked to look up and passages from the Knowledge documents
-    the Reply Plan chose are recalled, while the Check-in model decides
-    whether to offer the reply a Check-in that is due; then the reply is
-    composed, in its strict priority order, and delivered, and the Threads
-    and Curiosities it brought up are marked raised. A struggling User is
+    matters, which Threads and Curiosities to bring up, which Knowledge
+    documents fit and, when code allows a due Check-in, whether one of its
+    Kinds fits; then that memory, any older Conversations the Understanding
+    asked to look up and passages from the Knowledge documents the Reply
+    Plan chose are recalled; then the reply is composed, in its strict
+    priority order, a small check asks whether it brought up the Check-in
+    it was offered, and it is delivered, and the Threads and Curiosities it
+    brought up are marked raised. A struggling User is
     offered none of their Shared Photos back unless they asked for one.
     Every step reads the User from the same snapshot.
     """
@@ -68,7 +71,8 @@ class ReplyService:
             knowledge_retrieval: Finds passages in the Knowledge documents the
                 Reply Plan chose.
             response_composer: Writes the Companion's reply.
-            woven_check_ins: Lets the reply weave in a Check-in that is due.
+            woven_check_ins: Says which Check-in Kinds the Reply Plan may
+                weave in, and saves, checks and takes back the one it chose.
         """
         self._reply_gate = reply_gate
         self._conversations = conversations
@@ -91,11 +95,11 @@ class ReplyService:
         rules are skipped when an earlier try at the Message passed them. A
         failing step raises, so the caller can send its fallback message; so
         does a try a new text dropped before any of it was sent. A due
-        Check-in is offered to the reply as an optional extra. One the reply
-        leaves out, or offered to a reply that fails or is dropped before any
-        of it is sent, is taken back, so it stays due; once part of a reply
-        that brought it up is sent, it counts as sent and is never woven in
-        again.
+        Check-in the Reply Plan chose is offered to the reply as an optional
+        extra. One the brought-up check finds the reply left out, or offered
+        to a reply that fails or is dropped before any of it is sent, is
+        taken back, so it stays due; once part of a reply that brought it up
+        is sent, it counts as sent and is never woven in again.
 
         Args:
             message: The Message to answer, its texts already saved and
@@ -123,35 +127,26 @@ class ReplyService:
             snapshot, message.conversation_id
         )
         planned = self._reply_plan.plan(
-            snapshot, understanding, saved_memory, reminded, due, move_outcomes
+            snapshot,
+            understanding,
+            saved_memory,
+            reminded,
+            due,
+            move_outcomes,
+            self._woven_check_ins.kinds_to_offer(snapshot, understanding.form),
         )
         plan = planned.reply_plan.form
         attempt.raise_if_dropped()
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            deciding = executor.submit(
-                self._woven_check_ins.decide,
-                snapshot,
-                message.conversation_id,
-                understanding.form,
-                plan,
-                saved_memory,
-                reminded,
-                planned.asks_a_question,
-            )
-            memory = self._memory_retrieval.recall(
-                snapshot,
-                saved_memory,
-                plan.memory_categories,
-                understanding.form.look_up_past,
-            )
-            knowledge = self._knowledge_retrieval.recall(snapshot, plan.knowledge)
-            woven = deciding.result()
-        woven_check_in = (
-            self._woven_check_ins.save(snapshot, woven) if woven is not None else None
+        memory = self._memory_retrieval.recall(
+            snapshot,
+            saved_memory,
+            plan.memory_categories,
+            understanding.form.look_up_past,
         )
-        check_in_offer = (
-            WovenCheckInOffer(woven, woven_check_in)
-            if woven is not None and woven_check_in is not None
+        knowledge = self._knowledge_retrieval.recall(snapshot, plan.knowledge)
+        offered = (
+            self._woven_check_ins.save(snapshot, planned.check_in)
+            if planned.check_in is not None
             else None
         )
         try:
@@ -163,16 +158,24 @@ class ReplyService:
                 knowledge,
                 guidance=planned.reply_guidance,
                 optional_offers=(
-                    [check_in_offer.offer] if check_in_offer is not None else []
+                    [
+                        ReplyOffer(
+                            instructions=format_woven_check_in_for_reply(offered.woven)
+                        )
+                    ]
+                    if offered is not None
+                    else []
                 ),
                 data_deletion_note=gate_result.data_deletion_note,
                 shared_photo_ids=(
                     memory.shared_photo_ids if planned.may_send_photo else ()
                 ),
             )
-            if check_in_offer is not None and not check_in_offer.was_brought_up:
-                self._take_back(snapshot, check_in_offer)
-                check_in_offer = None
+            if offered is not None and not self._woven_check_ins.was_brought_up(
+                snapshot, offered.woven, reply.parts
+            ):
+                self._woven_check_ins.take_back(snapshot, offered)
+                offered = None
             self._conversations.deliver_reply(
                 message.user_id,
                 message.conversation_id,
@@ -186,17 +189,8 @@ class ReplyService:
         except ReplyPartlySentError:
             raise
         except Exception:
-            if check_in_offer is not None:
-                self._take_back(snapshot, check_in_offer)
+            if offered is not None:
+                self._woven_check_ins.take_back(snapshot, offered)
             raise
         self._thread_reminder.mark_raised(message.conversation_id, plan.bring_up)
         self._curiosity_raiser.mark_raised(message.conversation_id, plan.curiosities)
-
-    def _take_back(self, snapshot: UserSnapshot, offer: WovenCheckInOffer) -> None:
-        """Take back the Woven-in Check-in offered to a reply, so it stays due.
-
-        Args:
-            snapshot: The User being answered, as read for the reply.
-            offer: The Check-in offered to the reply, with its saved row.
-        """
-        self._woven_check_ins.take_back(snapshot, offer.woven, offer.check_in)
