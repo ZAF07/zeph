@@ -29,7 +29,7 @@ The part of a Persona that says how the Companion sees people and situations and
 _Avoid_: Opinions, beliefs, worldview, philosophy
 
 **Platform Settings**:
-Everything Admins set that shapes how the Companion behaves for all Users: the Persona, each core service's prompt, model and whether the model thinks first, wording such as the Crisis Reply and the Limit Reply, and limits such as the Daily Message Limit or the Conversation quiet gap. A change an Admin saves applies from the next reply or Check-in; one already under way finishes with the Platform Settings it started with.
+Everything Admins set that shapes how the Companion behaves for all Users: the Persona, each core service's prompt, model and whether the model thinks first, wording such as the Crisis Reply and the Limit Reply, and limits such as the Daily Message Limit or the Conversation quiet gap. A change an Admin saves applies from the next reply or Check-in; one already under way finishes with the Platform Settings it started with. Each one comes with a hint Admins see beside it: what it is, what it serves, and which step reads it and when.
 _Avoid_: Config, system settings, admin config
 
 **Copy**:

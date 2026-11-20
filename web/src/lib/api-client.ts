@@ -232,8 +232,13 @@ export type UserFeatures = {
 export type SettingValue =
   string | number | boolean | Partial<Record<CheckInFrequency, number>>;
 
-/** A platform setting's value and when, and by whom, it was last saved. */
+/**
+ * A platform setting's name, its hint (what it is, what it serves and which
+ * step reads it), its value and when, and by whom, it was last saved.
+ */
 export type AdminSetting = {
+  label: string;
+  hint: string;
   value: SettingValue;
   updated_at: string;
   updated_by: string | null;
@@ -244,12 +249,12 @@ export type AdminSettings = Record<string, AdminSetting>;
 
 /**
  * A text setting shown with a core service's prompt, e.g. a tool description.
- * `hint` says when it is used; null when it needs none.
+ * `hint` says what it is for and when it is used.
  */
 export type ExtraPrompt = {
   key: string;
   label: string;
-  hint: string | null;
+  hint: string;
 };
 
 /** A named group of extra prompts on a core service's card. */
@@ -891,7 +896,7 @@ export type OverridableSetting = {
   minimum: number;
   maximum: number;
   max_length: number;
-  hint: string | null;
+  hint: string;
   value: unknown;
 };
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { EditorLabel } from "@/components/EditorLabel";
 import { FormEditor } from "@/components/FormEditor";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LoadingPanel } from "@/components/LoadingPanel";
@@ -15,7 +16,8 @@ import {
 } from "@/lib/use-admin-settings";
 
 /**
- * The admin Persona page's editor: the Persona text with its save bar.
+ * The admin Persona page's editor: the Persona's name and hint, then its
+ * text with its save bar.
  *
  * @returns The editor, or a loading panel or error with Try again.
  */
@@ -48,9 +50,15 @@ export function PersonaEditor() {
 
   return (
     <>
+      <EditorLabel
+        label="Persona"
+        hint={settings.persona?.hint ?? ""}
+        hintId="persona-hint"
+      />
       <FormEditor
         label="Persona text"
         caption={lastSavedNote(settings, ["persona"])}
+        describedById="persona-hint"
         value={text}
         onChange={(value) => {
           setDraft(value);

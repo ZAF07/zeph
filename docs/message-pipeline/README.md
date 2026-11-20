@@ -214,7 +214,7 @@ Note the Persona: today it is in front of the calls that speak to the User and *
 
 Every field an Admin can edit for the pipeline (the Persona's voice and Outlook, each prompt, model and thinking switch, each limit, and each Need's, Move's and Check-in Kind's fields) shows a short hint under its label: **what it is, what it serves, and how it is used** (which step reads it, and when). One or two sentences, not a manual. For example, under the Outlook: *"How Zeph sees people and what helps them grow. Zeph forms its Read of each User from this before every reply. Plain prose."*
 
-*Today: the hint mechanism exists (an optional `hint` per setting and a description per core service in `core/platform_settings.py`), but 64 of the 76 editable settings have no hint, including the Persona and every prompt.*
+*Built (20 Nov 2026): every editable setting has a hint (`hint` is required on `EditableSetting` in `core/platform_settings.py`, and a test fails if one is empty or longer than two sentences), and the Admin settings API sends it with each setting. The Platform settings page shows it under each field's name; the Persona and each core service's prompt, model and thinking switch show it on a small "i" beside the field, so their pages keep their drawn layout. The Needs, Moves and Check-in Kinds pages show a hint under each field. Hints describe the pipeline as built today; settings added later bring their own.*
 
 ## Still to settle
 

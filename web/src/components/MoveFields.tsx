@@ -37,13 +37,14 @@ export function MoveFields({
     <>
       <CardTextField
         label="Name"
+        hint="The Understanding sees this name with “when it fits” and picks Moves before each reply."
         placeholder="e.g. Research"
         value={value.name}
         onChange={(name) => onChange({ ...value, name })}
       />
       <CardTextField
         label="When it fits"
-        hint="Zeph reads this to pick a Move."
+        hint="The Understanding reads this before each reply to pick the Moves that help right now."
         value={value.when_it_fits}
         multiline
         onChange={(whenItFits) =>
@@ -52,7 +53,7 @@ export function MoveFields({
       />
       <CardTextField
         label="How to do it"
-        hint="Goes into the reply when picked."
+        hint="Goes into the Reply’s instructions when the Understanding picks this Move."
         value={value.how_to_do_it}
         multiline
         onChange={(howToDoIt) =>
@@ -62,7 +63,7 @@ export function MoveFields({
       <ul className="m-0 list-none p-0">
         <FieldRow
           title="Needs a Feature"
-          caption="Never offered when it doesn’t work for the User."
+          caption="Never offered to the Understanding when that Feature doesn’t work for the User."
           htmlFor={`${fieldId}-feature`}
         >
           <FieldSelect
@@ -80,7 +81,7 @@ export function MoveFields({
         </FieldRow>
         <FieldRow
           title="Asks a question"
-          caption="Never made twice in a row, or with another question."
+          caption="Never offered to the Understanding right after a reply that made it, or with another question."
           htmlFor={`${fieldId}-asks`}
         >
           <CardCheckbox

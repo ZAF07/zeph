@@ -39,16 +39,22 @@ const coreServices: CoreServices = {
 
 const settings: AdminSettings = {
   response_prompt: {
+    label: "",
+    hint: "",
     value: "Reply briefly.",
     updated_at: "2026-11-01T00:00:00Z",
     updated_by: null,
   },
   response_model: {
+    label: "",
+    hint: "",
     value: "deepseek-flash",
     updated_at: "2026-11-01T00:00:00Z",
     updated_by: null,
   },
   response_thinking: {
+    label: "",
+    hint: "",
     value: false,
     updated_at: "2026-11-01T00:00:00Z",
     updated_by: null,
@@ -62,21 +68,54 @@ describe("PromptsAndModels", () => {
     apiClient.getAdminSettings.mockResolvedValue(settings);
     apiClient.updateAdminSettings.mockImplementation(async (values) => ({
       response_prompt: {
+        label: "",
+        hint: "",
         value: String(values.response_prompt),
         updated_at: "2026-11-11T09:00:00Z",
         updated_by: "Maya Lin",
       },
       response_model: {
+        label: "",
+        hint: "",
         value: String(values.response_model),
         updated_at: "2026-11-11T09:00:00Z",
         updated_by: "Maya Lin",
       },
       response_thinking: {
+        label: "",
+        hint: "",
         value: values.response_thinking === true,
         updated_at: "2026-11-11T09:00:00Z",
         updated_by: "Maya Lin",
       },
     }));
+  });
+
+  it("shows a hint under the model and thinking switch, and above the prompt", async () => {
+    apiClient.getAdminSettings.mockResolvedValue({
+      response_prompt: {
+        ...settings.response_prompt!,
+        hint: "The Reply’s own instructions.",
+      },
+      response_model: {
+        ...settings.response_model!,
+        hint: "The model the Reply uses.",
+      },
+      response_thinking: {
+        ...settings.response_thinking!,
+        hint: "Whether the Reply thinks first.",
+      },
+    });
+    renderWithQueries(<PromptsAndModels />);
+
+    const card = within(
+      await screen.findByRole("region", { name: "Response composition" }),
+    );
+    expect(card.getByLabelText("Prompt")).toHaveAccessibleDescription(
+      "The Reply’s own instructions.",
+    );
+    expect(card.getByText("The model the Reply uses.")).toBeVisible();
+    expect(card.getByText("Whether the Reply thinks first.")).toBeVisible();
   });
 
   it("shows a card per core service with its model, thinking and prompt", async () => {
@@ -93,7 +132,9 @@ describe("PromptsAndModels", () => {
         .getAllByRole("option")
         .map((option) => option.textContent),
     ).toEqual(["deepseek-flash", "deepseek-v4-pro"]);
-    expect(card.getByRole("switch", { name: "Thinking" })).not.toBeChecked();
+    expect(
+      card.getByRole("switch", { name: "Thinking for Response composition" }),
+    ).not.toBeChecked();
     expect(card.getByLabelText("Prompt")).toHaveValue("Reply briefly.");
     expect(card.getByText("Using the starting values")).toBeVisible();
   });
@@ -126,8 +167,12 @@ describe("PromptsAndModels", () => {
       await screen.findByRole("region", { name: "Response composition" }),
     );
 
-    await user.click(card.getByRole("switch", { name: "Thinking" }));
-    expect(card.getByRole("switch", { name: "Thinking" })).toBeChecked();
+    await user.click(
+      card.getByRole("switch", { name: "Thinking for Response composition" }),
+    );
+    expect(
+      card.getByRole("switch", { name: "Thinking for Response composition" }),
+    ).toBeChecked();
     await user.click(card.getByRole("button", { name: "Save" }));
 
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
@@ -136,7 +181,9 @@ describe("PromptsAndModels", () => {
       response_thinking: true,
     });
     expect(await card.findByText(/Last saved .* by Maya Lin/)).toBeVisible();
-    expect(card.getByRole("switch", { name: "Thinking" })).toBeChecked();
+    expect(
+      card.getByRole("switch", { name: "Thinking for Response composition" }),
+    ).toBeChecked();
     expect(card.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
@@ -171,7 +218,7 @@ describe("PromptsAndModels", () => {
             {
               key: "ask_about_photo_tool_description",
               label: "ask_about_photo tool description",
-              hint: null,
+              hint: "",
             },
           ],
           extra_prompt_groups: [],
@@ -181,16 +228,22 @@ describe("PromptsAndModels", () => {
     });
     apiClient.getAdminSettings.mockResolvedValue({
       photo_description_prompt: {
+        label: "",
+        hint: "",
         value: "Describe the photo.",
         updated_at: "2026-11-01T00:00:00Z",
         updated_by: null,
       },
       photo_model: {
+        label: "",
+        hint: "",
         value: "deepseek-flash",
         updated_at: "2026-11-01T00:00:00Z",
         updated_by: null,
       },
       ask_about_photo_tool_description: {
+        label: "",
+        hint: "",
         value: "Look again only when needed.",
         updated_at: "2026-11-01T00:00:00Z",
         updated_by: null,
@@ -256,7 +309,7 @@ describe("PromptsAndModels", () => {
                   {
                     key: "web_search_tool_description",
                     label: "web_search tool description",
-                    hint: null,
+                    hint: "",
                   },
                   {
                     key: "reply_web_search_instructions",
@@ -283,16 +336,22 @@ describe("PromptsAndModels", () => {
       apiClient.getAdminSettings.mockResolvedValue({
         ...settings,
         web_search_tool_description: {
+          label: "",
+          hint: "",
           value: "Search the web.",
           updated_at: "2026-11-01T00:00:00Z",
           updated_by: null,
         },
         reply_web_search_instructions: {
+          label: "",
+          hint: "",
           value: "Say where it came from.",
           updated_at: "2026-11-01T00:00:00Z",
           updated_by: null,
         },
         reply_memory_intro: {
+          label: "",
+          hint: "",
           value: "What you remember:",
           updated_at: "2026-11-01T00:00:00Z",
           updated_by: null,

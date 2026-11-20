@@ -16,7 +16,7 @@ const choices: OverrideChoices = {
       minimum: 0,
       maximum: 0,
       max_length: 20000,
-      hint: null,
+      hint: "",
       value: true,
     },
   ],

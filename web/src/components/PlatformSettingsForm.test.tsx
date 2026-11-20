@@ -20,8 +20,14 @@ vi.mock("@/lib/use-api-client", () => ({
   useApiClient: () => apiClient,
 }));
 
-function seeded(value: SettingValue) {
-  return { value, updated_at: "2026-11-01T00:00:00Z", updated_by: null };
+function seeded(value: SettingValue, hint = "") {
+  return {
+    label: "",
+    hint,
+    value,
+    updated_at: "2026-11-01T00:00:00Z",
+    updated_by: null,
+  };
 }
 
 const settings: AdminSettings = {
@@ -37,8 +43,14 @@ const settings: AdminSettings = {
     a_few_times_a_day: 6,
   }),
   check_in_fewer_message: seeded("Would you like fewer check-ins?"),
-  daily_message_limit: seeded(200),
-  daily_limit_reply: seeded("I'm wiped for today, talk tomorrow?"),
+  daily_message_limit: seeded(
+    200,
+    "Messages a User can send per day before the Reply gate stops replying.",
+  ),
+  daily_limit_reply: seeded(
+    "I'm wiped for today, talk tomorrow?",
+    "Sent in Telegram by the Reply gate when a User hits the daily limit.",
+  ),
   message_retention_days: seeded(30),
   older_summaries_per_reply: seeded(3),
   older_summaries_closeness_percent: seeded(68),
@@ -69,6 +81,8 @@ describe("PlatformSettingsForm", () => {
     apiClient.updateAdminSettings.mockImplementation(async (values) => ({
       ...settings,
       conversation_quiet_gap_minutes: {
+        label: "",
+        hint: "",
         value: Number(values.conversation_quiet_gap_minutes ?? 60),
         updated_at: "2026-11-11T09:00:00Z",
         updated_by: "Maya Lin",
@@ -188,7 +202,14 @@ describe("PlatformSettingsForm", () => {
     const limit = await screen.findByLabelText("Daily message limit");
     expect(limit).toHaveValue(200);
     expect(
-      screen.getByText("Per User. Safety replies never count toward it."),
+      screen.getByText(
+        "Messages a User can send per day before the Reply gate stops replying.",
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        "Sent in Telegram by the Reply gate when a User hits the daily limit.",
+      ),
     ).toBeVisible();
     const reply = screen.getByLabelText(/Limit-reached reply/);
     expect(reply).toHaveValue("I'm wiped for today, talk tomorrow?");

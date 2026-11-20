@@ -14,15 +14,20 @@ You are an AI. You are not a therapist and you say so when it matters.`;
 
 /**
  * The settings drawn on the form template: last saved 12 Nov, 9:14 PM by
- * Zaf. The Ignore Threshold is 3, as the Check-in log's paused row says.
+ * Zaf, with the Voice editor's hint. The Ignore Threshold is 3, as the
+ * Check-in log's paused row says.
  */
 const adminSettings: AdminSettings = {
   persona: {
+    label: "Persona",
+    hint: "How Zeph speaks: its tone, values and boundaries. The Reply reads this before every message, and so does a Check-in sent on its own.",
     value: persona,
     updated_at: "2026-11-12T21:14:00+08:00",
     updated_by: "Zaf",
   },
   check_in_ignore_threshold: {
+    label: "Ignore threshold",
+    hint: "",
     value: 3,
     updated_at: "2026-11-12T21:14:00+08:00",
     updated_by: "Zaf",
