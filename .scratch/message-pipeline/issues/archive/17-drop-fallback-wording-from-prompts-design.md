@@ -30,3 +30,11 @@ The `AdminPrompts` design draws a "Fallback wording" group on the Reply Plan car
 - **Fixture:** the Reply Plan service in `admin-forms.ts` now has `extra_prompt_groups: []`.
 - **Pixel test** (`compare.cjs AdminPrompts`, fixture mode): 0.81% before rebasing. After rebasing on issue 08 (which drew Pattern keeping's limit rows) it is **0.19%**, under the 0.5% limit. It still prints FAIL, only on height (3361 vs 3520px), because the reference ends with annotation samples the app doesn't draw on any template page (see 06). The diff around the Reply Plan card is clean where the row was, and the Reply card below lines up. Pixels that still differ: the drawn "unsaved" Reply Plan save bar, the model dropdown font and the drawn character counts (see 06).
 - **Checks:** `pnpm lint`, `pnpm format:check` and `pnpm typecheck` clean; `pnpm test` 873 passed (after the rebase).
+
+## Completion
+
+- Completed: 2026-11-20
+- Commits on branch `prompts-drop-fallback-wording`:
+  - 9992a0e "Prompts design: drop the empty Fallback wording group from the Reply Plan card (issue 17)"
+  - 8e122ba "Issue 17 evidence updated for the rebase on issue 08"
+- Merged into main in ad961f0 "Merge issue 17: the Prompts design drops the empty Fallback wording group from the Reply Plan card; the fallback is the fallback Need, edited on the Needs page"
