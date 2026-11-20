@@ -7,8 +7,8 @@ The Reply Plan prompt reloads from the seed on next start, even where an
 Admin edited it, because the old one never asks for a Read. The Outlook is a
 new setting, so the seed adds it on next start.
 
-Revision ID: 0068
-Revises: 0067
+Revision ID: 0069
+Revises: 0068
 Create Date: 2026-11-20
 """
 
@@ -17,8 +17,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0068"
-down_revision: str | None = "0067"
+revision: str = "0069"
+down_revision: str | None = "0068"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
