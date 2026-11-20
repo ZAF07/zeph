@@ -58,7 +58,7 @@ Read `web/design/README.md` in full first, including "Message-pipeline additions
 - **Model Call Log:** `ReplyPlanShape` gains `read_formed` and `read_said` (JSON, old rows read as false). The Read's text shows only in an Admin's own Content, as today.
 - **Web:** Persona page gets Voice and Outlook tabs (`?tab=outlook`), each with its own editor and save bar, drafts kept per tab. Trace facts gain "Read formed" and "Read said". Fixtures as drawn.
 
-### Evidence (20 Nov 2026, after rebasing on `origin/main` 2f7af62)
+### Evidence (20 Nov 2026, after rebasing on `origin/main` c490dba)
 
 - **Outlook is an Admin setting with a hint, seeded, used from the next reply:** `persona_outlook` in `core/platform_settings.py` (label "Outlook", hint) and the seed. Tests: `test_the_outlook_is_an_admin_setting_with_a_hint`, `test_a_changed_outlook_is_used_from_the_next_reply`, `test_a_plain_user_cannot_change_the_outlook`. In the running app, a marker line written into the Outlook between messages showed up in the very next Reply Plan's instructions (no restart). In the browser as an Admin, the Outlook saved from its tab and was still there after a reload of `?tab=outlook`.
 - **Outlook reaches the Reply Plan only; the voice still reaches the Reply:** `test_only_the_reply_plan_gets_the_outlook_and_the_reply_keeps_the_voice` (the Reply Plan's instructions are the Outlook, two newlines, then the prompt; the Reply, Understanding and Safeguard don't get it). The Check-in tests now also check that the Check-in on its own and the woven-in Check-in don't get it. Live run: "Outlook marker in instructions" was True for every Reply Plan and False for every Safeguard, Understanding and Reply call.
@@ -77,7 +77,7 @@ Read `web/design/README.md` in full first, including "Message-pipeline additions
   - `FAIL  AdminPersona  0.71%`. The header lead, tabs, Voice label and hint, editor box and save bar line up. Still different: the drawn "Unsaved changes" and Saved state of the Voice sample, the drawn character count, and the "Sample data" pill. No issue owns these (the same parts were recorded in 06).
   - `FAIL  AdminModelCallTrace  0.64%` (0.66% before this issue). "Read formed Yes / Read said No" line up exactly in the Reply Plan card. Still different: "Pattern" (14), "Check-in Kinds offered" and "Check-in Kind chosen" (09), which move the Reply card down; owned by no issue: the "Sample data" pill and the year in "Started 19 Nov 2026".
   - The Persona tabs needed `box-content`. The design draws them as links (44px plus a 2px underline), where the Memories tabs are buttons (44px all told).
-- **Checks** (after the rebase): `uv run pytest` 1418 passed; `ruff check` "All checks passed!"; `ruff format --check` "544 files already formatted"; `mypy src` "Success: no issues found in 198 source files". `pnpm lint`, `pnpm format:check` ("All matched files use Prettier code style!") and `pnpm typecheck` clean; `pnpm test` 880 passed in 131 files.
+- **Checks** (after the rebase): `uv run pytest` 1428 passed; `ruff check` "All checks passed!"; `ruff format --check` "546 files already formatted"; `mypy src` "Success: no issues found in 199 source files". `pnpm lint`, `pnpm format:check` ("All matched files use Prettier code style!") and `pnpm typecheck` clean; `pnpm test` 886 passed in 131 files.
 - **`/code-review`:**
   - Standards found no hard breaches. Fixed: `persona.ts` got its own test; the tabs are a `Record` with a typed setting key (no fallback that can't happen); one place owns "say only when there is a Read"; a docstring and a seed comment rewrapped.
   - Left as judgement calls: the Persona tab helpers mirror the Memories ones (sharing them would touch Memories); the voice keeps the stored key `persona`.
@@ -86,5 +86,6 @@ Read `web/design/README.md` in full first, including "Message-pipeline additions
   - The real Outlook hint is two sentences ("How Zeph sees people and what helps them grow, in plain prose. Zeph forms its Read of each User from this before every reply."), because 06's test caps hints at two sentences. The design fixture keeps the drawn three-sentence wording, so the live page's hint differs slightly from the drawing.
   - The voice hint likewise says "both Check-in prompts" (the woven-in Check-in model still gets the voice until 09) instead of the drawn "a Check-in sent on its own".
   - "Never the same Read twice" is held by the prompt plus the earlier Reads (said / not said) given to each Reply Plan, not by code.
+- **Final re-check on the merged-ready code (0070):** a fresh worktree database migrated to 0070; the pixel figures were the same; one live "what do you think is going on with me?" from an Admin formed and said a Read at level 3 with the Outlook only in the Reply Plan; the Persona tabs check passed in the browser.
 - **Caveat:** no Eval was run (Evals cost money). The live runs above used real DeepSeek calls.
 
