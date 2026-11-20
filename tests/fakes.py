@@ -489,6 +489,9 @@ def reply_plan_answer(
     next_move_why: object = None,
     send_photo: object = True,
     ask_why: object = None,
+    where_we_are: str = "",
+    read: str = "",
+    say_read: object = False,
 ) -> str:
     """Build the form the Reply Plan model answers with.
 
@@ -514,6 +517,10 @@ def reply_plan_answer(
         send_photo: Whether a Shared Photo may be sent, or anything else a
             model might write there.
         ask_why: Whether to ask why; None leaves it out of the answer.
+        where_we_are: One line on where the Conversation is now.
+        read: Zeph's Read of what is really going on; "" for none.
+        say_read: Whether the reply gives the Read now, or anything else a
+            model might write there.
 
     Returns:
         The form as JSON.
@@ -524,6 +531,9 @@ def reply_plan_answer(
         else None
     )
     answer: dict[str, Any] = {
+        "where_we_are": where_we_are,
+        "read": read,
+        "say_read": say_read,
         "need": need,
         "guidance": guidance,
         "lead_move": lead_move,
@@ -591,7 +601,8 @@ class ScriptedChatModel:
                 post-conversation processing call.
             understanding_prompt: The instructions that mark an
                 Understanding call.
-            reply_plan_prompt: The instructions that mark a Reply Plan call.
+            reply_plan_prompt: The prompt that ends a Reply Plan call's
+                instructions, after the Outlook.
             sticker_keeping_prompt: The instructions that mark a Personal
                 Sticker keeping call.
             thread_keeping_prompt: The instructions that mark a Life Thread
@@ -861,7 +872,7 @@ class ScriptedChatModel:
                 if self._understanding_answers
                 else understanding_answer()
             )
-        elif self.reply_plan_prompt and instructions == self.reply_plan_prompt:
+        elif self.reply_plan_prompt and instructions.endswith(self.reply_plan_prompt):
             self.reply_plan_calls.append(call)
             self.call_order.append("reply_plan")
             answer = (

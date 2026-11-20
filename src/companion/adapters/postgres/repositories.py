@@ -2388,6 +2388,8 @@ def _to_knowledge_lookup(stored: dict[str, Any] | None) -> KnowledgeLookup | Non
 def _to_reply_plan_form(stored: dict[str, Any]) -> ReplyPlanForm:
     """Turn a saved form back into a Reply Plan form.
 
+    A form saved before Reply Plans formed a Read reads as having none.
+
     Args:
         stored: The form as saved.
 
@@ -2436,6 +2438,9 @@ def _to_reply_plan_form(stored: dict[str, Any]) -> ReplyPlanForm:
         knowledge=_to_knowledge_lookup(stored["knowledge"]),
         photo_fits=stored["photo_fits"],
         ask_why=stored["ask_why"],
+        where_we_are=stored.get("where_we_are", ""),
+        read=stored.get("read", ""),
+        say_read=stored.get("say_read", False),
     )
 
 
@@ -5777,6 +5782,8 @@ def _to_understanding_shape(values: dict[str, Any]) -> UnderstandingShape:
 def _to_reply_plan_shape(values: dict[str, Any]) -> ReplyPlanShape:
     """Read a Reply Plan call's stored shape.
 
+    A shape saved before Reply Plans formed a Read reads as forming none.
+
     Args:
         values: The stored JSON.
 
@@ -5793,6 +5800,8 @@ def _to_reply_plan_shape(values: dict[str, Any]) -> ReplyPlanShape:
         lead_move=values["lead_move"],
         support_move=values["support_move"],
         next_move=values["next_move"],
+        read_formed=values.get("read_formed", False),
+        read_said=values.get("read_said", False),
     )
 
 

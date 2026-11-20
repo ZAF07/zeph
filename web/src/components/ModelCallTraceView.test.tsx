@@ -92,6 +92,8 @@ const plainUsersTrace: ModelCallTraceDetails = {
         threads_woven_in: 1,
         threads_left_alone: 1,
         threads_held_back: 1,
+        read_formed: true,
+        read_said: false,
       },
     },
     {
@@ -231,6 +233,8 @@ describe("ModelCallTraceView", () => {
     );
     expect(factValue(replyPlan, "Threads left alone")).toBe("1");
     expect(factValue(replyPlan, "Threads held back")).toBe("1");
+    expect(factValue(replyPlan, "Read formed")).toBe("Yes");
+    expect(factValue(replyPlan, "Read said")).toBe("No");
     expect(
       within(replyPlan).queryByText("Mood intensity"),
     ).not.toBeInTheDocument();

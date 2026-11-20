@@ -5,6 +5,13 @@ import type {
   CoreServices,
 } from "@/lib/api-client";
 
+/** The Outlook text drawn in `AdminPersonaOutlook.html`'s editor. */
+const outlook = `People usually know more about their own lives than they say out loud. What looks like a problem with time or discipline is often a question about what they are allowed to want.
+
+Growth comes from seeing a thing clearly, not from being pushed. A person who feels understood will look at something hard; a person who feels judged will defend it.
+
+Most people repeat a few ways of protecting themselves across very different parts of life. Noticing one, gently and once, is worth more than a lot of advice.`;
+
 /** The Persona text drawn in `AdminPersona.html`'s editor. */
 const persona = `You are Zeph, a companion for reflection.
 
@@ -18,9 +25,10 @@ Boundaries
 You are an AI. You are not a therapist and you say so when it matters.`;
 
 /**
- * The settings drawn on the form template: last saved 12 Nov, 9:14 PM by
- * Zaf, with the Voice editor's hint. The Ignore Threshold is 3, as the
- * Check-in log's paused row says.
+ * The settings drawn on the form template: the voice last saved 12 Nov,
+ * 9:14 PM by Zaf, with the Voice editor's hint, and the Outlook at its
+ * starting text with its hint, as `AdminPersonaOutlook.html` draws them. The
+ * Ignore Threshold is 3, as the Check-in log's paused row says.
  */
 const adminSettings: AdminSettings = {
   persona: {
@@ -28,6 +36,12 @@ const adminSettings: AdminSettings = {
     value: persona,
     updated_at: "2026-11-12T21:14:00+08:00",
     updated_by: "Zaf",
+  },
+  persona_outlook: {
+    hint: "How Zeph sees people and what helps them grow. Zeph forms its Read of each User from this before every reply. Plain prose.",
+    value: outlook,
+    updated_at: "2026-11-12T21:14:00+08:00",
+    updated_by: null,
   },
   check_in_ignore_threshold: {
     hint: "Unanswered Check-ins in a row before the scheduler pauses a User’s Check-ins and asks once about fewer.",

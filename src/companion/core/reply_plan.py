@@ -47,6 +47,7 @@ from companion.core.models import (
 from companion.core.move_outcomes import describe_move_outcome
 from companion.core.platform_settings import (
     HOME_GOALS_MEMORY_CATEGORY,
+    PERSONA_OUTLOOK,
     REPLY_ASK_WHY_NOTE,
     REPLY_PLAN_MODEL,
     REPLY_PLAN_PROMPT,
@@ -134,18 +135,26 @@ def format_earlier_reply_plan(reply_plan: ReplyPlan) -> str:
         reply_plan: The earlier Reply Plan.
 
     Returns:
-        E.g. "- Need: Be heard; lead Move: Mirror; supporting Move: none;
-        asked why: no. Let them vent. Next Move in mind: Plan steps, once
-        they've let it out."
+        E.g. "- Where we were: venting, just started. Read (not said): It's
+        less the work than the proving. Need: Be heard; lead Move: Mirror;
+        supporting Move: none; asked why: no. Let them vent. Next Move in
+        mind: Plan steps, once they've let it out."
     """
     asked_why = "yes" if reply_plan.asked_why else "no"
-    parts = [
-        f"- Need: {reply_plan.need}; lead Move: {reply_plan.lead_move or 'none'}; "
+    form = reply_plan.form
+    parts = ["-"]
+    if form.where_we_are:
+        parts.append(f"Where we were: {form.where_we_are}.")
+    if form.read:
+        said = "said" if form.say_read else "not said"
+        parts.append(f"Read ({said}): {form.read}")
+    parts.append(
+        f"Need: {reply_plan.need}; lead Move: {reply_plan.lead_move or 'none'}; "
         f"supporting Move: {reply_plan.support_move or 'none'}; "
         f"asked why: {asked_why}."
-    ]
-    if reply_plan.form.guidance:
-        parts.append(reply_plan.form.guidance)
+    )
+    if form.guidance:
+        parts.append(form.guidance)
     if reply_plan.next_move:
         why = f", {reply_plan.next_move_why}" if reply_plan.next_move_why else ""
         parts.append(f"Next Move in mind: {reply_plan.next_move}{why}.")
@@ -596,7 +605,8 @@ def read_reply_plan_form(
     due list, and no more are brought up than the Conversation may still
     raise. Knowledge documents are named by their numbers in the Knowledge
     list. A missing or odd "send_photo" reads as allowed, and a missing or
-    odd "ask_why" as not said.
+    odd "ask_why" as not said. The Read is said only when there is one and
+    "say_read" is true.
 
     Args:
         answer: The model's answer.
@@ -621,6 +631,7 @@ def read_reply_plan_form(
     if not need:
         return None
     ask_why = parsed.get("ask_why")
+    read = read_form_text(parsed.get("read"))
     by_number = {item.number: item for item in reminded}
     form = ReplyPlanForm(
         need=need,
@@ -639,6 +650,9 @@ def read_reply_plan_form(
         knowledge=read_knowledge_lookup(parsed.get("knowledge"), knowledge_documents),
         photo_fits=parsed.get("send_photo") is not False,
         ask_why=ask_why if isinstance(ask_why, bool) else None,
+        where_we_are=read_form_text(parsed.get("where_we_are")),
+        read=read,
+        say_read=bool(read) and parsed.get("say_read") is True,
     )
     return keep_held_back_threads_alone(form, reminded)
 
@@ -817,11 +831,17 @@ def format_reply_guidance(
 
     Returns:
         The Threads to leave alone as a boundary; the Need and how to reply,
-        the lead and supporting Moves and how to make them, the guidance,
-        the mood, the note and the Threads to bring up as the plan; and the
-        Curiosities, as an optional extra.
+        the Read when the plan says to give it now, the lead and supporting
+        Moves and how to make them, the guidance, the mood, the note and the
+        Threads to bring up as the plan; and the Curiosities, as an optional
+        extra.
     """
     lines = [f"What they need from you right now: {need.name}.", need.how_to_reply]
+    if plan.say_read:
+        lines.append(
+            "Your Read of what is really going on, to give in this reply as your "
+            f"view, never as fact: {plan.read}"
+        )
     if picked.lead:
         lines.append(f"Lead with: {picked.lead.name}. {picked.lead.how_to_do_it}")
     if picked.support:
@@ -859,9 +879,9 @@ def describe_reply_plan_shape(
         reminded: The Life Threads the Message reminded the Companion of.
 
     Returns:
-        The Need, the lead, supporting and next Moves' names, and how many
-        Life Threads were reminded, brought up, left alone and held back;
-        never any words.
+        The Need, the lead, supporting and next Moves' names, how many Life
+        Threads were reminded, brought up, left alone and held back, and
+        whether a Read was formed and said; never any words.
     """
     ways = [item.how for item in form.bring_up]
     held_back = [item for item in reminded if item.hold_back]
@@ -875,21 +895,26 @@ def describe_reply_plan_shape(
         lead_move=picked.lead_name,
         support_move=picked.support_name,
         next_move=picked.next_name,
+        read_formed=bool(form.read),
+        read_said=form.say_read,
     )
 
 
 class ReplyPlanService:
     """Makes the Reply Plan of each Message, after the Understanding.
 
-    One model call decides what the reply does: which Need fits, which Moves
-    the reply makes from those the Need allows (leaving out any whose needed
-    Feature doesn't work for the User right now, and any that asks a
-    question and was made in the previous reply), which Move it means to
-    make next and why, which Memory Categories and Knowledge matter, which
-    Life Threads and Curiosities to bring up or leave alone, whether a
+    One model call, given the Persona's Outlook in front of its prompt,
+    decides what the reply does: where the Conversation is now, Zeph's Read
+    of what is really going on and whether to say it now, which Need fits,
+    which Moves the reply makes from those the Need allows (leaving out any
+    whose needed Feature doesn't work for the User right now, and any that
+    asks a question and was made in the previous reply), which Move it means
+    to make next and why, which Memory Categories and Knowledge matter,
+    which Life Threads and Curiosities to bring up or leave alone, whether a
     Shared Photo may be sent and whether to ask why. It sees this
-    Conversation's earlier Reply Plans with their Moves, so it knows whether
-    it already asked why and which Move it had in mind next.
+    Conversation's earlier Reply Plans with where the Conversation was, the
+    Reads formed and their Moves, so it knows whether it already asked why,
+    gave a Read and which Move it had in mind next.
     """
 
     def __init__(
@@ -1071,7 +1096,7 @@ class ReplyPlanService:
         due: DueCuriosities,
         knowledge_documents: dict[int, KnowledgeDocument],
     ) -> ReplyPlanForm | None:
-        """Ask the model to fill in the form.
+        """Ask the model to fill in the form, with the Outlook before the prompt.
 
         Args:
             snapshot: The User being answered.
@@ -1091,7 +1116,10 @@ class ReplyPlanService:
                 step=ModelStep.REPLY_PLAN,
                 model=settings.get(REPLY_PLAN_MODEL),
                 thinking=settings.get(REPLY_PLAN_THINKING),
-                instructions=settings.get(REPLY_PLAN_PROMPT),
+                instructions=(
+                    f"{settings.get(PERSONA_OUTLOOK)}\n\n"
+                    f"{settings.get(REPLY_PLAN_PROMPT)}"
+                ),
                 history=[ChatLine(role=ChatRole.USER, text=description)],
             )
         except Exception:

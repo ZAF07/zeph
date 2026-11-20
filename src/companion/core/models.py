@@ -1455,6 +1455,12 @@ class ReplyPlanForm:
             Photos.
         ask_why: Whether the reply should gently ask why they feel as they
             do; None when the model didn't say.
+        where_we_are: One line on where the Conversation is now, e.g.
+            "venting, nearly spent"; "" for none.
+        read: Zeph's Read of what is really going on, as its view; "" for
+            none.
+        say_read: Whether the reply gives the Read now; never when there is
+            no Read.
     """
 
     need: str
@@ -1473,6 +1479,9 @@ class ReplyPlanForm:
     knowledge: KnowledgeLookup | None = None
     photo_fits: bool = True
     ask_why: bool | None = None
+    where_we_are: str = ""
+    read: str = ""
+    say_read: bool = False
 
 
 @dataclass(frozen=True)
@@ -2290,7 +2299,7 @@ class ReplyPlanShape:
     """The shape of a Reply Plan, kept for every User. Never any words.
 
     When the Reply Plan call failed or couldn't be read, it is the fallback
-    the reply followed: the fallback Need and no Moves.
+    the reply followed: the fallback Need, no Moves and no Read.
 
     Attributes:
         need: The Need the reply followed, by name.
@@ -2306,6 +2315,8 @@ class ReplyPlanShape:
         support_move: The Move that supported it, by name; None for none.
         next_move: The Move it meant to make later in the Conversation, by
             name; None for none.
+        read_formed: Whether it formed a Read.
+        read_said: Whether the reply was to give the Read now.
     """
 
     need: str
@@ -2317,6 +2328,8 @@ class ReplyPlanShape:
     lead_move: str | None = None
     support_move: str | None = None
     next_move: str | None = None
+    read_formed: bool = False
+    read_said: bool = False
 
 
 @dataclass(frozen=True)

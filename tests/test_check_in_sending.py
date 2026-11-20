@@ -114,6 +114,7 @@ def test_a_due_user_gets_a_casual_hello_written_by_the_check_in_model(
     assert call.model == seeded_settings["check_in_model"]
     assert seeded_settings["check_in_prompt"] in call.instructions
     assert seeded_settings["persona"] in call.instructions
+    assert seeded_settings["persona_outlook"] not in call.instructions
     [line] = call.history
     assert "A casual hello" in line.text
     assert "Maya" in line.text

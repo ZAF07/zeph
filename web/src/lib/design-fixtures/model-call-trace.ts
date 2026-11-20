@@ -118,6 +118,8 @@ const calls: ModelCall[] = [
       threads_woven_in: 0,
       threads_left_alone: 3,
       threads_held_back: 1,
+      read_formed: true,
+      read_said: false,
     },
   }),
   drawnCall({
