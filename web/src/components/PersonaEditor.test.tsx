@@ -17,6 +17,7 @@ vi.mock("@/lib/use-api-client", () => ({
 
 const settings: AdminSettings = {
   persona: {
+    hint: "",
     value: "You are Zeph.",
     updated_at: "2026-11-08T14:20:00Z",
     updated_by: "Maya Lin",
@@ -29,6 +30,7 @@ describe("PersonaEditor", () => {
     apiClient.getAdminSettings.mockResolvedValue(settings);
     apiClient.updateAdminSettings.mockImplementation(async (values) => ({
       persona: {
+        hint: "",
         value: String(values.persona),
         updated_at: "2026-11-11T09:00:00Z",
         updated_by: "Maya Lin",
@@ -47,6 +49,26 @@ describe("PersonaEditor", () => {
     expect(
       screen.getByText("Changes apply to the next message after saving."),
     ).toBeVisible();
+  });
+
+  it("shows the Persona's name and hint above its editor", async () => {
+    apiClient.getAdminSettings.mockResolvedValue({
+      persona: {
+        ...settings.persona!,
+        hint: "Who Zeph is. Put in front of the Reply’s instructions.",
+      },
+    });
+    renderWithQueries(<PersonaEditor />);
+
+    const editor = await screen.findByLabelText("Persona text");
+    expect(
+      screen.getByText(
+        "Who Zeph is. Put in front of the Reply’s instructions.",
+      ),
+    ).toBeVisible();
+    expect(editor).toHaveAccessibleDescription(
+      "Who Zeph is. Put in front of the Reply’s instructions.",
+    );
   });
 
   it("saves an edited Persona", async () => {
@@ -104,6 +126,7 @@ describe("PersonaEditor", () => {
 
     apiClient.updateAdminSettings.mockResolvedValue({
       persona: {
+        hint: "",
         value: "You are Zeph. Be kind.",
         updated_at: "2026-11-11T09:00:00Z",
         updated_by: "Maya Lin",

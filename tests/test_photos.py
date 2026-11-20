@@ -551,18 +551,13 @@ def test_an_edited_tool_description_is_offered_and_shows_on_the_photo_viewing_ca
         for service in services["services"]
         if service["name"] == "Photo viewing"
     ]
-    assert photo_viewing["extra_prompts"] == [
-        {
-            "key": "ask_about_photo_tool_description",
-            "label": "ask_about_photo tool description",
-            "hint": None,
-        },
-        {
-            "key": "send_photo_tool_description",
-            "label": "send_photo tool description",
-            "hint": None,
-        },
+    assert [
+        (prompt["key"], prompt["label"]) for prompt in photo_viewing["extra_prompts"]
+    ] == [
+        ("ask_about_photo_tool_description", "ask_about_photo tool description"),
+        ("send_photo_tool_description", "send_photo tool description"),
     ]
+    assert all(prompt["hint"] for prompt in photo_viewing["extra_prompts"])
 
 
 def test_an_album_gets_one_reply_that_covers_every_photo_with_the_caption(

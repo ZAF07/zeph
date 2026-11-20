@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { EditorLabel } from "@/components/EditorLabel";
 import { FieldNumber } from "@/components/FieldNumber";
 import { FieldRow } from "@/components/FieldRow";
 import { FieldRows } from "@/components/FieldRows";
@@ -27,7 +28,6 @@ import {
 type NumberField = {
   key: string;
   label: string;
-  caption: string;
   unit: string;
   note?: string;
 };
@@ -35,7 +35,6 @@ type NumberField = {
 type TextField = {
   key: string;
   label: string;
-  caption: string;
 };
 
 const checkInGapsKey = "check_in_hours_between";
@@ -46,7 +45,6 @@ const checkInGapFields: (NumberField & { frequency: CheckInFrequency })[] =
     key: `${checkInGapsKey}.${option.value}`,
     frequency: option.value,
     label: `Gap for “${option.label}”`,
-    caption: "Fewest hours between two Check-ins for a User who picked it.",
     unit: "hours",
   }));
 
@@ -60,27 +58,21 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
       {
         key: "conversation_quiet_gap_minutes",
         label: "Conversation quiet gap",
-        caption: "Minutes of silence before a Conversation ends.",
         unit: "min",
       },
       {
         key: "message_wait_seconds",
         label: "Message wait",
-        caption:
-          "Seconds Zeph waits after a User’s last text or photo, then answers everything they sent in one reply.",
         unit: "sec",
       },
       {
         key: "typing_repeat_seconds",
         label: "Typing repeat",
-        caption:
-          "Telegram hides “typing” after about 5 seconds, so while a reply is being written Zeph shows it again this often, until the reply starts.",
         unit: "sec",
       },
       {
         key: "daily_message_limit",
         label: "Daily message limit",
-        caption: "Per User. Safety replies never count toward it.",
         unit: "msgs",
       },
     ],
@@ -91,50 +83,36 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
       {
         key: "older_summaries_per_reply",
         label: "Most older Conversations per reply",
-        caption:
-          "When Zeph looks up the past, how many older Conversation Summaries it may add, beyond the newest ones.",
         unit: "summaries",
       },
       {
         key: "older_summaries_closeness_percent",
         label: "Older Conversation closeness bar",
-        caption:
-          "How close in meaning an older Summary must be to what Zeph looks up. Real matches score about 70–80; unrelated ones up to about 65.",
         unit: "%",
       },
       {
         key: "life_threads_per_reply",
         label: "Most Life Threads per reply",
-        caption:
-          "How many of the User’s Life Threads a message can remind Zeph of. Open ones come first.",
         unit: "threads",
       },
       {
         key: "life_threads_closeness_percent",
         label: "Life Thread closeness bar",
-        caption:
-          "How close in meaning a Thread’s story must be to the User’s last few messages. A Thread naming someone or something they mention always counts.",
         unit: "%",
       },
       {
         key: "life_thread_brushed_off_wait_days",
         label: "Wait after a brushed-off Life Thread",
-        caption:
-          "How long Zeph waits before bringing up a Thread again after the User brushed it off. One they asked to drop is never brought up again.",
         unit: "days",
       },
       {
         key: "move_outcomes_per_understanding",
         label: "Most Move Outcomes per Understanding",
-        caption:
-          "How many of the User’s past Move Outcomes, closest first, Zeph sees before each reply, so it picks help that has worked for them in moments like this.",
         unit: "outcomes",
       },
       {
         key: "move_outcomes_closeness_percent",
         label: "Move Outcome closeness bar",
-        caption:
-          "How close in meaning a Move Outcome’s situation and feeling must be to the User’s last few messages. Real matches score about 75–85; unrelated ones up to about 62.",
         unit: "%",
       },
     ],
@@ -145,22 +123,16 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
       {
         key: "curiosities_per_conversation",
         label: "Most Curiosities raised per Conversation",
-        caption:
-          "How many of the things Zeph has been wondering about it may bring up in one Conversation. 0 means none.",
         unit: "per chat",
       },
       {
         key: "curiosities_waiting_limit",
         label: "Most Curiosities waiting at once",
-        caption:
-          "When a Conversation’s end makes more, Zeph closes the oldest waiting ones.",
         unit: "waiting",
       },
       {
         key: "curiosity_check_ins_per_week",
         label: "Most Curiosity Check-ins per week",
-        caption:
-          "How many “Something I’ve been wondering” Check-ins a User can get in any 7 days. 0 means none.",
         unit: "per week",
       },
     ],
@@ -171,8 +143,6 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
       {
         key: "knowledge_closeness_percent",
         label: "Knowledge closeness bar",
-        caption:
-          "How close in meaning a passage must be to what Zeph searches for, inside the documents it chose. Fitting passages score about 65–75; unrelated ones about 50.",
         unit: "%",
       },
     ],
@@ -183,8 +153,6 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
       {
         key: "check_in_ignore_threshold",
         label: "Ignore threshold",
-        caption:
-          "Unanswered Check-ins in a row before Zeph pauses and asks once about fewer.",
         unit: "in a row",
       },
       ...checkInGapFields,
@@ -196,15 +164,11 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
       {
         key: "photo_retry_count",
         label: "Photo retries",
-        caption:
-          "Extra tries when a photo fails to download or be looked at, before Zeph says it didn’t come through.",
         unit: "tries",
       },
       {
         key: "photo_album_max_photos",
         label: "Most photos per album",
-        caption:
-          "Photos Zeph looks at in one album. It mentions any it didn’t look at.",
         unit: "photos",
       },
     ],
@@ -215,15 +179,11 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
       {
         key: "personal_stickers_limit",
         label: "Most Personal Stickers per User",
-        caption:
-          "Stickers Zeph keeps from one User. When it would keep more, it drops the one used longest ago.",
         unit: "stickers",
       },
       {
         key: "sticker_adding_quiet_gap_minutes",
         label: "Sticker adding quiet gap",
-        caption:
-          "Minutes without a sticker before adding stickers in chat ends and Zeph says what was added.",
         unit: "min",
       },
     ],
@@ -234,8 +194,6 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
       {
         key: "message_retention_days",
         label: "Message retention",
-        caption:
-          "Messages are deleted after this many days. Shown to Users on Account & privacy.",
         unit: "days",
         note: "Shortening applies to existing messages within a minute.",
       },
@@ -247,7 +205,6 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
 const webSearchLimitField: NumberField = {
   key: "web_search_daily_limit",
   label: "Per-user daily web search limit",
-  caption: "Searches and page reads per User, reset at their midnight.",
   unit: "per day",
 };
 
@@ -256,40 +213,30 @@ const textFields: TextField[] = [
   {
     key: "memory_off_chat_line",
     label: "“Memory off” line in chat",
-    caption:
-      "— always sent as its own message after the reply when a User turns memory off in chat",
   },
   {
     key: "data_deleted_reply",
     label: "“Data deleted” reply",
-    caption: "— sent in Telegram once a User’s data is deleted in chat",
   },
   {
     key: "check_in_fewer_message",
     label: "“Would you like fewer?” message",
-    caption: "— sent once when a User reaches the ignore threshold",
   },
   {
     key: "daily_limit_reply",
     label: "Limit-reached reply",
-    caption: "— sent in Telegram when a User hits the daily limit",
   },
   {
     key: "onboarding_unfinished_reply",
     label: "“Finish onboarding first” reply",
-    caption:
-      "— sent in Telegram when someone uses a connection link before finishing onboarding; keep {dashboard_url}",
   },
   {
     key: "photo_not_viewed_note",
     label: "“Didn’t come through” note",
-    caption: "— tells Zeph to say honestly that a photo couldn’t be viewed",
   },
   {
     key: "photo_viewing_off_note",
     label: "“Photo Viewing off” note",
-    caption:
-      "— tells Zeph to say plainly it didn’t look at a photo while Photo Viewing is off",
   },
 ];
 
@@ -303,6 +250,17 @@ const numberKeys = [
 const allKeys = [...numberKeys, ...textFields.map((field) => field.key)];
 
 const wholeNumber = /^\d+$/;
+
+/**
+ * Names the saved setting a field belongs to: each Check-in gap field
+ * belongs to the one Check-in gaps setting.
+ *
+ * @param key - The field's key.
+ * @returns The setting's key.
+ */
+function settingKeyFor(key: string): string {
+  return checkInGapKeys.includes(key) ? checkInGapsKey : key;
+}
 
 /**
  * Reads one field's saved value as text; a Check-in gap field reads its
@@ -379,13 +337,17 @@ export function PlatformSettingsForm() {
     textFields.every((field) => (values[field.key] ?? "").trim() !== "");
   const isDirty = changedKeys.length > 0;
 
-  function numberRow(field: NumberField) {
+  function hintFor(key: string, loadedSettings: AdminSettings): string {
+    return loadedSettings[settingKeyFor(key)]?.hint ?? "";
+  }
+
+  function numberRow(field: NumberField, loadedSettings: AdminSettings) {
     const noteId = `${field.key}-note`;
     return (
       <FieldRow
         key={field.key}
         title={field.label}
-        caption={field.caption}
+        caption={hintFor(field.key, loadedSettings)}
         htmlFor={field.key}
         note={
           field.note ? (
@@ -421,12 +383,10 @@ export function PlatformSettingsForm() {
         <FieldRows
           footnote={lastSavedNote(
             loadedSettings,
-            fields.map((field) =>
-              checkInGapKeys.includes(field.key) ? checkInGapsKey : field.key,
-            ),
+            fields.map((field) => settingKeyFor(field.key)),
           )}
         >
-          {fields.map(numberRow)}
+          {fields.map((field) => numberRow(field, loadedSettings))}
         </FieldRows>
       </section>
     );
@@ -462,27 +422,27 @@ export function PlatformSettingsForm() {
       {numberSection("Web search", [webSearchLimitField], settings)}
 
       <section aria-label="Wording" className="flex flex-col gap-3">
-        <FormSectionHeading
-          title="Wording"
-          caption={lastSavedNote(
-            settings,
-            textFields.map((field) => field.key),
-          )}
-        />
-        {textFields.map((field) => (
-          <FormEditor
-            key={field.key}
-            label={field.label}
-            size="short"
-            caption={
-              <>
-                <span className="text-text">{field.label}</span> {field.caption}
-              </>
-            }
-            value={values[field.key] ?? ""}
-            onChange={(value) => edit(field.key, value)}
-          />
-        ))}
+        <FormSectionHeading title="Wording" />
+        {textFields.map((field) => {
+          const hintId = `${field.key}-hint`;
+          return (
+            <div key={field.key} className="flex flex-col gap-3">
+              <EditorLabel
+                label={field.label}
+                hint={hintFor(field.key, settings)}
+                hintId={hintId}
+              />
+              <FormEditor
+                label={field.label}
+                size="short"
+                describedById={hintId}
+                caption={lastSavedNote(settings, [field.key])}
+                value={values[field.key] ?? ""}
+                onChange={(value) => edit(field.key, value)}
+              />
+            </div>
+          );
+        })}
       </section>
 
       <SaveBar

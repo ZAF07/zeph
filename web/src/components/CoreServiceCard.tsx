@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { ChevronDownIcon } from "@/components/ChevronDownIcon";
+import { EditorLabel } from "@/components/EditorLabel";
 import { ExtraPromptField } from "@/components/ExtraPromptField";
 import { FieldRow } from "@/components/FieldRow";
 import { FieldRows } from "@/components/FieldRows";
@@ -20,7 +21,8 @@ import { useSaveAdminSettings } from "@/lib/use-admin-settings";
 /**
  * One core service's part of the page, from the form template: its heading,
  * field rows for which model it uses and whether that model thinks first,
- * editors for its prompt and any extra prompts (like a tool description),
+ * a hint under each, editors for its prompt and any extra prompts (like a
+ * tool description) each with its name and hint above it,
  * and one save bar that saves them together. Grouped extra prompts
  * sit in groups that are folded shut until clicked. The prompt is combined
  * with the Persona when the service runs. When the backend refuses a save,
@@ -68,6 +70,7 @@ export function CoreServiceCard({
   ].every((text) => text?.trim());
   const headingId = `service-${service.prompt_key}`;
   const modelId = `${headingId}-model`;
+  const promptHintId = `${headingId}-prompt-hint`;
 
   function discard() {
     setModel(savedModel);
@@ -106,6 +109,7 @@ export function CoreServiceCard({
       <ExtraPromptField
         key={extraPrompt.key}
         prompt={extraPrompt}
+        savedNote={lastSavedNote(settings, [extraPrompt.key])}
         value={extraPrompts[extraPrompt.key] ?? ""}
         onChange={(text) => {
           setExtraPrompts({ ...extraPrompts, [extraPrompt.key]: text });
@@ -128,7 +132,11 @@ export function CoreServiceCard({
         </span>
       </div>
       <FieldRows>
-        <FieldRow title="Model" htmlFor={modelId}>
+        <FieldRow
+          title="Model"
+          caption={settings[service.model_key]?.hint}
+          htmlFor={modelId}
+        >
           <FieldSelect
             id={modelId}
             value={model}
@@ -142,9 +150,12 @@ export function CoreServiceCard({
             }}
           />
         </FieldRow>
-        <FieldRow title="Thinking">
+        <FieldRow
+          title="Thinking"
+          caption={settings[service.thinking_key]?.hint}
+        >
           <Switch
-            label="Thinking"
+            label={`Thinking for ${service.name}`}
             checked={thinking}
             onChange={(isOn) => {
               setThinking(isOn);
@@ -153,8 +164,14 @@ export function CoreServiceCard({
           />
         </FieldRow>
       </FieldRows>
+      <EditorLabel
+        label="Prompt"
+        hint={settings[service.prompt_key]?.hint ?? ""}
+        hintId={promptHintId}
+      />
       <FormEditor
         label="Prompt"
+        describedById={promptHintId}
         caption={lastSavedNote(settings, [
           service.prompt_key,
           service.model_key,

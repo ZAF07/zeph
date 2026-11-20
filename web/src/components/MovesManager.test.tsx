@@ -103,6 +103,21 @@ describe("MovesManager", () => {
     ).toEqual(["Calm", "Push", "Research"]);
   });
 
+  it("says under each field what it is for and which step reads it", async () => {
+    renderWithQueries(<MovesManager />);
+
+    const card = await findCard("Research");
+    for (const hint of [
+      "The Understanding sees this name with “when it fits” and picks Moves before each reply.",
+      "The Understanding reads this before each reply to pick the Moves that help right now.",
+      "Goes into the Reply’s instructions when the Understanding picks this Move.",
+      "Never offered to the Understanding when that Feature doesn’t work for the User.",
+      "Never offered to the Understanding right after a reply that made it, or with another question.",
+    ]) {
+      expect(card.getByText(hint)).toBeVisible();
+    }
+  });
+
   it("saves an edited Move with the Feature it needs", async () => {
     apiClient.updateMove.mockResolvedValue(push);
     const user = userEvent.setup();

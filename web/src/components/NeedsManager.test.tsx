@@ -99,6 +99,20 @@ describe("NeedsManager", () => {
     ).toEqual(["Be heard", "Advice", "Ask more"]);
   });
 
+  it("says under each field what it is for and which step reads it", async () => {
+    renderWithQueries(<NeedsManager />);
+
+    const card = await findCard("Be heard");
+    for (const hint of [
+      "The Understanding sees this name with “when it fits” and picks one Need before each reply.",
+      "The Understanding reads this before each reply to pick the Need that fits what the User needs right now.",
+      "Goes into the Reply’s instructions when the Understanding picks this Need.",
+      "Never offered to the Understanding with this Need.",
+    ]) {
+      expect(card.getByText(hint)).toBeVisible();
+    }
+  });
+
   it("marks the fallback Need and offers no Remove for it", async () => {
     renderWithQueries(<NeedsManager />);
 

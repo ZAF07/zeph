@@ -20,6 +20,7 @@ vi.mock("@/lib/use-api-client", () => ({
 function settingsWithIgnoreThreshold(value: number) {
   return {
     check_in_ignore_threshold: {
+      hint: "",
       value,
       updated_at: "2026-11-01T09:00:00Z",
       updated_by: null,

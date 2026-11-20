@@ -39,13 +39,14 @@ export function NeedFields({
     <>
       <CardTextField
         label="Name"
+        hint="The Understanding sees this name with “when it fits” and picks one Need before each reply."
         placeholder="e.g. Be heard"
         value={value.name}
         onChange={(name) => onChange({ ...value, name })}
       />
       <CardTextField
         label="When it fits"
-        hint="Zeph reads this to pick a Need."
+        hint="The Understanding reads this before each reply to pick the Need that fits what the User needs right now."
         value={value.when_it_fits}
         multiline
         onChange={(whenItFits) =>
@@ -54,7 +55,7 @@ export function NeedFields({
       />
       <CardTextField
         label="How to reply"
-        hint="Goes into the reply when picked."
+        hint="Goes into the Reply’s instructions when the Understanding picks this Need."
         value={value.how_to_reply}
         multiline
         onChange={(howToReply) =>
@@ -64,7 +65,7 @@ export function NeedFields({
       <ul className="m-0 list-none p-0">
         <FieldRow
           title="Ruled-out Moves"
-          caption="Never picked with this Need."
+          caption="Never offered to the Understanding with this Need."
         >
           {moves.length === 0 ? (
             <span className="text-[13px] text-soft">No Moves yet.</span>

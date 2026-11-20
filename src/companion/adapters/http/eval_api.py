@@ -203,7 +203,7 @@ class OverridableSettingResponse(BaseModel):
     minimum: int
     maximum: int
     max_length: int
-    hint: str | None
+    hint: str
     value: Any
 
 

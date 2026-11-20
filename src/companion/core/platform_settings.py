@@ -388,24 +388,24 @@ class EditableSetting:
         key: The setting's key.
         label: The setting's name, as Admins see it.
         kind: What kind of value it holds.
+        hint: One or two sentences shown under its label: what it is, what
+            it serves, and which step reads it and when.
         minimum: The smallest allowed whole number, or number of hours for
             each frequency.
         maximum: The largest allowed whole number, or number of hours for
             each frequency.
         max_length: The longest allowed text.
         required_placeholders: The placeholders the text must keep.
-        hint: One line on when the setting is used, shown under its label;
-            None if it needs none.
     """
 
     key: str
     label: str
     kind: SettingKind
+    hint: str
     minimum: int = 0
     maximum: int = 0
     max_length: int = 20_000
     required_placeholders: tuple[RequiredPlaceholder, ...] = ()
-    hint: str | None = None
 
 
 @dataclass(frozen=True)
@@ -448,11 +448,45 @@ class CoreService:
     extra_prompt_groups: tuple[ExtraPromptGroup, ...] = ()
 
 
+MODEL_HINT = (
+    "Which model this step calls. A larger model is slower and costs more per Message."
+)
+THINKING_HINT = (
+    "Lets the model reason before it answers. Slower, and better on steps that decide."
+)
+
 EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
-    EditableSetting(PERSONA.key, "Persona", SettingKind.TEXT),
-    EditableSetting(SAFEGUARD_PROMPT.key, "Safeguard prompt", SettingKind.TEXT),
-    EditableSetting(SAFEGUARD_MODEL.key, "Safeguard model", SettingKind.MODEL),
-    EditableSetting(SAFEGUARD_THINKING.key, "Safeguard thinking", SettingKind.ON_OFF),
+    EditableSetting(
+        PERSONA.key,
+        "Persona",
+        SettingKind.TEXT,
+        hint=(
+            "Who Zeph is and how it talks: voice, values and boundaries. Put in front "
+            "of the instructions of the Reply and both Check-in prompts, every time "
+            "they run."
+        ),
+    ),
+    EditableSetting(
+        SAFEGUARD_PROMPT.key,
+        "Safeguard prompt",
+        SettingKind.TEXT,
+        hint=(
+            "Tells the Safeguard what counts as a crisis. The Safeguard reads each "
+            "text as it arrives, before any reply is written."
+        ),
+    ),
+    EditableSetting(
+        SAFEGUARD_MODEL.key,
+        "Safeguard model",
+        SettingKind.MODEL,
+        hint=MODEL_HINT,
+    ),
+    EditableSetting(
+        SAFEGUARD_THINKING.key,
+        "Safeguard thinking",
+        SettingKind.ON_OFF,
+        hint=THINKING_HINT,
+    ),
     EditableSetting(
         CRISIS_REPLY.key,
         "Crisis Reply",
@@ -461,33 +495,61 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         required_placeholders=(
             RequiredPlaceholder(HELPLINES_PLACEHOLDER, "where the Helplines go"),
         ),
+        hint=(
+            "Sent at once, instead of a normal reply, when the Safeguard finds a "
+            "crisis. {helplines} becomes the Helplines for the User’s country."
+        ),
     ),
     EditableSetting(
-        RESPONSE_PROMPT.key, "Response composition prompt", SettingKind.TEXT
+        RESPONSE_PROMPT.key,
+        "Response composition prompt",
+        SettingKind.TEXT,
+        hint=(
+            "The Reply’s own instructions for writing Zeph’s texts. Combined with the "
+            "Persona and the priority order on every reply."
+        ),
     ),
     EditableSetting(
-        RESPONSE_MODEL.key, "Response composition model", SettingKind.MODEL
+        RESPONSE_MODEL.key,
+        "Response composition model",
+        SettingKind.MODEL,
+        hint=MODEL_HINT,
     ),
     EditableSetting(
-        RESPONSE_THINKING.key, "Response composition thinking", SettingKind.ON_OFF
+        RESPONSE_THINKING.key,
+        "Response composition thinking",
+        SettingKind.ON_OFF,
+        hint=THINKING_HINT,
     ),
     EditableSetting(
         STICKER_TOOL_DESCRIPTION.key,
         "send_sticker tool description",
         SettingKind.TEXT,
         max_length=4_000,
+        hint=(
+            "Tells the Reply when to use the send_sticker tool. Offered on every reply "
+            "while Stickers works for the User."
+        ),
     ),
     EditableSetting(
         WEB_SEARCH_TOOL_DESCRIPTION.key,
         "web_search tool description",
         SettingKind.TEXT,
         max_length=4_000,
+        hint=(
+            "Tells the Reply when to use the web_search tool. Offered on every reply "
+            "while Web Search works for the User."
+        ),
     ),
     EditableSetting(
         PAGE_FETCH_TOOL_DESCRIPTION.key,
         "fetch_page tool description",
         SettingKind.TEXT,
         max_length=4_000,
+        hint=(
+            "Tells the Reply when to use the fetch_page tool to read a web page. "
+            "Offered together with web_search."
+        ),
     ),
     EditableSetting(
         REPLY_WEB_SEARCH_INSTRUCTIONS.key,
@@ -502,8 +564,8 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.TEXT,
         max_length=2_000,
         hint=(
-            "Used instead of the web search instructions once the User has "
-            "reached their Web Search Limit for the day."
+            "Used instead of the web search instructions once the User has reached "
+            "their Web Search Limit for the day."
         ),
     ),
     EditableSetting(
@@ -519,8 +581,8 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.TEXT,
         max_length=4_000,
         hint=(
-            "Added to the reply instructions, so the reply can change the "
-            "User’s settings when they ask in chat."
+            "Added to the reply instructions, so the reply can change the User’s "
+            "settings when they ask in chat."
         ),
     ),
     EditableSetting(
@@ -529,8 +591,8 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.TEXT,
         max_length=4_000,
         hint=(
-            "Used instead of the Settings in Chat instructions when Settings "
-            "in Chat doesn’t work for the User."
+            "Used instead of the Settings in Chat instructions when Settings in Chat "
+            "doesn’t work for the User."
         ),
     ),
     EditableSetting(
@@ -539,8 +601,8 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.TEXT,
         max_length=2_000,
         hint=(
-            "What the reply is told once the User asks in chat to delete their "
-            "data, so it can explain and ask for the confirmation word."
+            "What the reply is told once the User asks in chat to delete their data, "
+            "so it can explain and ask for the confirmation word."
         ),
         required_placeholders=(
             RequiredPlaceholder(CONFIRMATION_WORD_PLACEHOLDER, "the confirmation word"),
@@ -552,8 +614,8 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.TEXT,
         max_length=2_000,
         hint=(
-            "Added when the User’s message cancelled their request to delete "
-            "their data."
+            "Added when the User’s message cancelled their request to delete their "
+            "data."
         ),
     ),
     EditableSetting(
@@ -562,8 +624,8 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.TEXT,
         max_length=2_000,
         hint=(
-            "Added instead when the User sent the confirmation word together "
-            "with other texts in one Message, so it didn’t count."
+            "Added instead when the User sent the confirmation word together with "
+            "other texts in one Message, so it didn’t count."
         ),
     ),
     EditableSetting(
@@ -593,29 +655,52 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
             RequiredPlaceholder(DASHBOARD_URL_PLACEHOLDER, "the link to the Dashboard"),
         ),
         hint=(
-            "Added when a Feature doesn’t work for the User. {features} becomes "
-            "those Features’ names and {dashboard_url} the Dashboard’s address."
+            "Added when a Feature doesn’t work for the User. {features} becomes those "
+            "Features’ names and {dashboard_url} the Dashboard’s address."
         ),
     ),
     EditableSetting(
         MEMORY_PROCESSING_PROMPT.key,
         "Post-conversation processing prompt",
         SettingKind.TEXT,
+        hint=(
+            "Tells the first Conversation-end step how to rewrite the day’s Day "
+            "Summary and mood, change Memory Items and keep Shared Photos. Runs when a "
+            "Conversation ends after the quiet gap."
+        ),
     ),
     EditableSetting(
         MEMORY_PROCESSING_MODEL.key,
         "Post-conversation processing model",
         SettingKind.MODEL,
+        hint=MODEL_HINT,
     ),
     EditableSetting(
         MEMORY_PROCESSING_THINKING.key,
         "Post-conversation processing thinking",
         SettingKind.ON_OFF,
+        hint=THINKING_HINT,
     ),
-    EditableSetting(UNDERSTANDING_PROMPT.key, "Understanding prompt", SettingKind.TEXT),
-    EditableSetting(UNDERSTANDING_MODEL.key, "Understanding model", SettingKind.MODEL),
     EditableSetting(
-        UNDERSTANDING_THINKING.key, "Understanding thinking", SettingKind.ON_OFF
+        UNDERSTANDING_PROMPT.key,
+        "Understanding prompt",
+        SettingKind.TEXT,
+        hint=(
+            "Tells the Understanding how to read each Message and pick the Need, "
+            "Moves, memories and Life Threads for the reply. Runs before every reply."
+        ),
+    ),
+    EditableSetting(
+        UNDERSTANDING_MODEL.key,
+        "Understanding model",
+        SettingKind.MODEL,
+        hint=MODEL_HINT,
+    ),
+    EditableSetting(
+        UNDERSTANDING_THINKING.key,
+        "Understanding thinking",
+        SettingKind.ON_OFF,
+        hint=THINKING_HINT,
     ),
     EditableSetting(
         REPLY_ASK_WHY_NOTE.key,
@@ -623,8 +708,8 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.TEXT,
         max_length=2_000,
         hint=(
-            "Added when the User’s mood stands out and Zeph doesn’t know why, "
-            "unless the previous reply already asked."
+            "Added when the User’s mood stands out and Zeph doesn’t know why, unless "
+            "the previous reply already asked."
         ),
     ),
     EditableSetting(
@@ -632,35 +717,73 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         "Shared Photos description for the Understanding",
         SettingKind.TEXT,
         max_length=2_000,
+        hint=(
+            "Describes the User’s Shared Photos to the Understanding, which picks them "
+            "like a Memory Category before each reply. When picked, the Reply can send "
+            "one back."
+        ),
     ),
     EditableSetting(
-        PHOTO_DESCRIPTION_PROMPT.key, "Photo description prompt", SettingKind.TEXT
+        PHOTO_DESCRIPTION_PROMPT.key,
+        "Photo description prompt",
+        SettingKind.TEXT,
+        hint=(
+            "Tells Photo viewing how to describe each photo a User sends. Runs on "
+            "every photo, before the Safeguard."
+        ),
     ),
-    EditableSetting(PHOTO_MODEL.key, "Photo viewing model", SettingKind.MODEL),
-    EditableSetting(PHOTO_THINKING.key, "Photo viewing thinking", SettingKind.ON_OFF),
+    EditableSetting(
+        PHOTO_MODEL.key,
+        "Photo viewing model",
+        SettingKind.MODEL,
+        hint=MODEL_HINT,
+    ),
+    EditableSetting(
+        PHOTO_THINKING.key,
+        "Photo viewing thinking",
+        SettingKind.ON_OFF,
+        hint=THINKING_HINT,
+    ),
     EditableSetting(
         ASK_ABOUT_PHOTO_TOOL_DESCRIPTION.key,
         "ask_about_photo tool description",
         SettingKind.TEXT,
         max_length=4_000,
+        hint=(
+            "Tells the Reply when to use the ask_about_photo tool to look at a photo "
+            "again with a question. Offered when the Conversation has a viewed photo."
+        ),
     ),
     EditableSetting(
         SEND_PHOTO_TOOL_DESCRIPTION.key,
         "send_photo tool description",
         SettingKind.TEXT,
         max_length=4_000,
+        hint=(
+            "Tells the Reply when to use the send_photo tool to send back one of the "
+            "User’s Shared Photos. Offered when the Understanding picked Shared "
+            "Photos."
+        ),
     ),
     EditableSetting(
         PHOTO_NOT_VIEWED_NOTE.key,
         "“Didn’t come through” note",
         SettingKind.TEXT,
         max_length=2_000,
+        hint=(
+            "Added to the Message the Safeguard and the Reply read when a photo "
+            "couldn’t be downloaded or looked at, so Zeph says so honestly."
+        ),
     ),
     EditableSetting(
         PHOTO_VIEWING_OFF_NOTE.key,
         "“Photo Viewing off” note",
         SettingKind.TEXT,
         max_length=2_000,
+        hint=(
+            "Added to the Message the Reply reads while Photo Viewing is off for the "
+            "User, so Zeph says plainly it didn’t look at the photo."
+        ),
     ),
     EditableSetting(
         PHOTO_RETRY_COUNT.key,
@@ -668,6 +791,10 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=0,
         maximum=5,
+        hint=(
+            "Extra tries Photo viewing makes when a photo fails to download or be "
+            "looked at, before Zeph says it didn’t come through."
+        ),
     ),
     EditableSetting(
         PHOTO_ALBUM_MAX_PHOTOS.key,
@@ -675,92 +802,141 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=10,
+        hint=(
+            "How many photos in one album Photo viewing looks at. The Reply mentions "
+            "any it didn’t look at."
+        ),
     ),
     EditableSetting(
         LIFE_THREAD_KEEPING_PROMPT.key,
         "Life Thread keeping prompt",
         SettingKind.TEXT,
+        hint=(
+            "Tells Life Thread keeping how to start and add to the User’s Life "
+            "Threads, with the commitments they agreed to. Runs when a Conversation "
+            "ends, after the Day Summary."
+        ),
     ),
     EditableSetting(
         LIFE_THREAD_KEEPING_MODEL.key,
         "Life Thread keeping model",
         SettingKind.MODEL,
+        hint=MODEL_HINT,
     ),
     EditableSetting(
         LIFE_THREAD_KEEPING_THINKING.key,
         "Life Thread keeping thinking",
         SettingKind.ON_OFF,
+        hint=THINKING_HINT,
     ),
     EditableSetting(
         PORTRAIT_PROMPT.key,
         "User Portrait prompt",
         SettingKind.TEXT,
+        hint=(
+            "Tells the User Portrait step how to write a short picture of the User, "
+            "which every Understanding and reply sees. Runs last when a Conversation "
+            "ends, and after the User deletes something."
+        ),
     ),
     EditableSetting(
         PORTRAIT_MODEL.key,
         "User Portrait model",
         SettingKind.MODEL,
+        hint=MODEL_HINT,
     ),
     EditableSetting(
-        PORTRAIT_THINKING.key, "User Portrait thinking", SettingKind.ON_OFF
+        PORTRAIT_THINKING.key,
+        "User Portrait thinking",
+        SettingKind.ON_OFF,
+        hint=THINKING_HINT,
     ),
     EditableSetting(
         CURIOSITY_KEEPING_PROMPT.key,
         "Curiosity keeping prompt",
         SettingKind.TEXT,
+        hint=(
+            "Tells Curiosity keeping what Zeph should ask the User later, including "
+            "how a commitment went. Runs when a Conversation ends, after Life Thread "
+            "keeping."
+        ),
     ),
     EditableSetting(
         CURIOSITY_KEEPING_MODEL.key,
         "Curiosity keeping model",
         SettingKind.MODEL,
+        hint=MODEL_HINT,
     ),
     EditableSetting(
-        CURIOSITY_KEEPING_THINKING.key, "Curiosity keeping thinking", SettingKind.ON_OFF
+        CURIOSITY_KEEPING_THINKING.key,
+        "Curiosity keeping thinking",
+        SettingKind.ON_OFF,
+        hint=THINKING_HINT,
     ),
     EditableSetting(
         MOVE_OUTCOME_KEEPING_PROMPT.key,
         "Move Outcome keeping prompt",
         SettingKind.TEXT,
+        hint=(
+            "Tells Move Outcome keeping how to write whether each Move Zeph made "
+            "helped, and why. Runs when a Conversation ends in which a Move was made."
+        ),
     ),
     EditableSetting(
         MOVE_OUTCOME_KEEPING_MODEL.key,
         "Move Outcome keeping model",
         SettingKind.MODEL,
+        hint=MODEL_HINT,
     ),
     EditableSetting(
         MOVE_OUTCOME_KEEPING_THINKING.key,
         "Move Outcome keeping thinking",
         SettingKind.ON_OFF,
+        hint=THINKING_HINT,
     ),
     EditableSetting(
         PERSONAL_STICKER_KEEPING_PROMPT.key,
         "Personal Sticker keeping prompt",
         SettingKind.TEXT,
+        hint=(
+            "Tells Personal Sticker keeping which of the User’s stickers to keep and "
+            "when to use each. Runs when a Conversation ends in which the User sent "
+            "stickers."
+        ),
     ),
     EditableSetting(
         PERSONAL_STICKER_KEEPING_MODEL.key,
         "Personal Sticker keeping model",
         SettingKind.MODEL,
+        hint=MODEL_HINT,
     ),
     EditableSetting(
         PERSONAL_STICKER_KEEPING_THINKING.key,
         "Personal Sticker keeping thinking",
         SettingKind.ON_OFF,
+        hint=THINKING_HINT,
     ),
     EditableSetting(
         KNOWLEDGE_WHEN_IT_HELPS_PROMPT.key,
         "Knowledge “when it helps” prompt",
         SettingKind.TEXT,
+        hint=(
+            "Tells the drafting step how to write a Knowledge document’s “when it "
+            "helps”, which the Understanding reads to pick documents. Runs when a "
+            "document is made ready without one."
+        ),
     ),
     EditableSetting(
         KNOWLEDGE_WHEN_IT_HELPS_MODEL.key,
         "Knowledge “when it helps” model",
         SettingKind.MODEL,
+        hint=MODEL_HINT,
     ),
     EditableSetting(
         KNOWLEDGE_WHEN_IT_HELPS_THINKING.key,
         "Knowledge “when it helps” thinking",
         SettingKind.ON_OFF,
+        hint=THINKING_HINT,
     ),
     EditableSetting(
         PERSONAL_STICKERS_LIMIT.key,
@@ -768,6 +944,10 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=200,
+        hint=(
+            "Most stickers Personal Sticker keeping keeps from one User. When it would "
+            "keep more, it drops the one used longest ago."
+        ),
     ),
     EditableSetting(
         STICKER_ADDING_QUIET_GAP.key,
@@ -775,19 +955,53 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=60,
+        hint=(
+            "Minutes without a sticker before adding stickers in chat ends and the "
+            "Reply says what was added."
+        ),
     ),
-    EditableSetting(CHECK_IN_PROMPT.key, "Check-in prompt", SettingKind.TEXT),
     EditableSetting(
-        WOVEN_CHECK_IN_PROMPT.key, "Woven-in Check-in prompt", SettingKind.TEXT
+        CHECK_IN_PROMPT.key,
+        "Check-in prompt",
+        SettingKind.TEXT,
+        hint=(
+            "Tells the Check-ins step whether to reach out, with which Check-in Kind "
+            "and what to say, or to give space. Runs on the scheduler tick for Users "
+            "who are due."
+        ),
     ),
-    EditableSetting(CHECK_IN_MODEL.key, "Check-in model", SettingKind.MODEL),
-    EditableSetting(CHECK_IN_THINKING.key, "Check-in thinking", SettingKind.ON_OFF),
+    EditableSetting(
+        WOVEN_CHECK_IN_PROMPT.key,
+        "Woven-in Check-in prompt",
+        SettingKind.TEXT,
+        hint=(
+            "Tells the woven-in Check-in step whether the reply should weave in a "
+            "Check-in that came due mid-Conversation. Runs before a reply while one is "
+            "due."
+        ),
+    ),
+    EditableSetting(
+        CHECK_IN_MODEL.key,
+        "Check-in model",
+        SettingKind.MODEL,
+        hint=MODEL_HINT,
+    ),
+    EditableSetting(
+        CHECK_IN_THINKING.key,
+        "Check-in thinking",
+        SettingKind.ON_OFF,
+        hint=THINKING_HINT,
+    ),
     EditableSetting(
         CHECK_IN_GAPS.key,
         "Check-in gaps",
         SettingKind.HOURS_BY_FREQUENCY,
         minimum=1,
         maximum=720,
+        hint=(
+            "Fewest hours between two Check-ins, for each frequency a User can pick. "
+            "The scheduler checks it before a User is due."
+        ),
     ),
     EditableSetting(
         CHECK_IN_IGNORE_THRESHOLD.key,
@@ -795,12 +1009,20 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=10,
+        hint=(
+            "Unanswered Check-ins in a row before the scheduler pauses a User’s "
+            "Check-ins and asks once about fewer."
+        ),
     ),
     EditableSetting(
         CHECK_IN_FEWER_MESSAGE.key,
         "“Would you like fewer?” message",
         SettingKind.TEXT,
         max_length=1_000,
+        hint=(
+            "Sent once by the Check-ins scheduler when a User reaches the ignore "
+            "threshold, asking whether they’d like fewer Check-ins."
+        ),
     ),
     EditableSetting(
         OLDER_SUMMARIES_PER_REPLY.key,
@@ -808,6 +1030,10 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=0,
         maximum=10,
+        hint=(
+            "When the Understanding asks to look up the past, how many older Day "
+            "Summaries Recall may add beyond the newest ones."
+        ),
     ),
     EditableSetting(
         OLDER_SUMMARIES_CLOSENESS_PERCENT.key,
@@ -815,6 +1041,11 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=0,
         maximum=100,
+        hint=(
+            "How close in meaning an older Day Summary must be to what the "
+            "Understanding looks up for Recall to add it. Real matches score about "
+            "70–80; unrelated ones up to about 65."
+        ),
     ),
     EditableSetting(
         LIFE_THREADS_PER_REPLY.key,
@@ -822,6 +1053,10 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=0,
         maximum=10,
+        hint=(
+            "How many of the User’s Life Threads Recall brings to mind before each "
+            "reply, open ones first."
+        ),
     ),
     EditableSetting(
         LIFE_THREADS_CLOSENESS_PERCENT.key,
@@ -829,6 +1064,11 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=0,
         maximum=100,
+        hint=(
+            "How close in meaning a Thread’s story must be to the User’s last few "
+            "texts for Recall to bring it to mind. A Thread naming someone or "
+            "something they mention always counts."
+        ),
     ),
     EditableSetting(
         MOVE_OUTCOMES_PER_UNDERSTANDING.key,
@@ -836,6 +1076,10 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=0,
         maximum=10,
+        hint=(
+            "How many of the User’s past Move Outcomes, closest first, the "
+            "Understanding sees before each reply."
+        ),
     ),
     EditableSetting(
         MOVE_OUTCOMES_CLOSENESS_PERCENT.key,
@@ -843,6 +1087,11 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=0,
         maximum=100,
+        hint=(
+            "How close in meaning a Move Outcome must be to the User’s last few texts "
+            "for the Understanding to see it. Real matches score about 75–85; "
+            "unrelated ones up to about 62."
+        ),
     ),
     EditableSetting(
         LIFE_THREAD_BRUSHED_OFF_WAIT.key,
@@ -850,6 +1099,10 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=365,
+        hint=(
+            "Days before the Understanding may bring up a Life Thread again after the "
+            "User brushed it off. One they asked to drop is never brought up again."
+        ),
     ),
     EditableSetting(
         CURIOSITIES_PER_CONVERSATION.key,
@@ -857,6 +1110,10 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=0,
         maximum=5,
+        hint=(
+            "How many Curiosities can be raised in one Conversation; until then, due "
+            "ones are offered to the Understanding before each reply. 0 means none."
+        ),
     ),
     EditableSetting(
         CURIOSITIES_WAITING_LIMIT.key,
@@ -864,6 +1121,10 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=50,
+        hint=(
+            "Most Curiosities waiting at once. When a Conversation’s end makes more, "
+            "Curiosity keeping closes the oldest."
+        ),
     ),
     EditableSetting(
         CURIOSITY_CHECK_INS_PER_WEEK.key,
@@ -871,6 +1132,10 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=0,
         maximum=7,
+        hint=(
+            "How many “Something I’ve been wondering” Check-ins the Check-ins step may "
+            "send a User in any 7 days; 0 means none."
+        ),
     ),
     EditableSetting(
         KNOWLEDGE_CLOSENESS_PERCENT.key,
@@ -878,6 +1143,11 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=0,
         maximum=100,
+        hint=(
+            "How close in meaning a passage must be, inside the Knowledge documents "
+            "the Understanding chose, for the Reply to get it. Fitting passages score "
+            "about 65–75; unrelated ones about 50."
+        ),
     ),
     EditableSetting(
         CONVERSATION_QUIET_GAP.key,
@@ -885,6 +1155,10 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=5,
         maximum=1440,
+        hint=(
+            "Minutes of silence before a Conversation ends and the Conversation-end "
+            "steps run."
+        ),
     ),
     EditableSetting(
         MESSAGE_WAIT_SECONDS.key,
@@ -892,6 +1166,10 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=30,
+        hint=(
+            "Seconds Zeph waits after a User’s last text or photo before the reply "
+            "starts, so it answers everything they sent in one reply."
+        ),
     ),
     EditableSetting(
         TYPING_REPEAT_SECONDS.key,
@@ -899,6 +1177,10 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=5,
+        hint=(
+            "How often the Reply shows “typing” again while it is being written, since "
+            "Telegram hides it after about 5 seconds."
+        ),
     ),
     EditableSetting(
         DAILY_MESSAGE_LIMIT.key,
@@ -906,12 +1188,20 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=10_000,
+        hint=(
+            "Messages a User can send per day before the Reply gate stops replying and "
+            "sends the Limit-reached reply. Safety replies never count toward it."
+        ),
     ),
     EditableSetting(
         DAILY_LIMIT_REPLY.key,
         "Limit-reached reply",
         SettingKind.TEXT,
         max_length=1_000,
+        hint=(
+            "Sent in Telegram by the Reply gate when a User hits the daily message "
+            "limit."
+        ),
     ),
     EditableSetting(
         ONBOARDING_UNFINISHED_REPLY.key,
@@ -921,6 +1211,11 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         required_placeholders=(
             RequiredPlaceholder(DASHBOARD_URL_PLACEHOLDER, "the link to the Dashboard"),
         ),
+        hint=(
+            "Sent by the Telegram connection step when someone uses a connection link "
+            "before finishing onboarding. {dashboard_url} becomes the Dashboard’s "
+            "address."
+        ),
     ),
     EditableSetting(
         MESSAGE_RETENTION_DAYS.key,
@@ -928,6 +1223,10 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=1,
         maximum=365,
+        hint=(
+            "Days messages are kept before the Message Retention clean-up deletes "
+            "them; Day Summaries stay. Shown to Users on Account & privacy."
+        ),
     ),
     EditableSetting(
         WEB_SEARCH_DAILY_LIMIT.key,
@@ -935,18 +1234,31 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.WHOLE_NUMBER,
         minimum=0,
         maximum=1000,
+        hint=(
+            "Web searches and page reads the Reply may make for one User per day, "
+            "reset at their midnight. After that the Web Search Limit reached note is "
+            "used instead."
+        ),
     ),
     EditableSetting(
         MEMORY_OFF_CHAT_LINE.key,
         "“Memory off” line in chat",
         SettingKind.TEXT,
         max_length=1_000,
+        hint=(
+            "Sent by Settings in Chat as its own message after the reply, when a User "
+            "turns memory off in chat."
+        ),
     ),
     EditableSetting(
         DATA_DELETED_REPLY.key,
         "“Data deleted” reply",
         SettingKind.TEXT,
         max_length=1_000,
+        hint=(
+            "Sent by Delete My Data in chat once the User’s data is deleted, after "
+            "they sent the confirmation word."
+        ),
     ),
 )
 

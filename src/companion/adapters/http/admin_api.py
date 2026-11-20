@@ -202,8 +202,9 @@ class AdminUserListResponse(BaseModel):
 
 
 class SettingResponse(BaseModel):
-    """A platform setting's value and when it was last saved."""
+    """A platform setting's hint, value and when it was last saved."""
 
+    hint: str
     value: Any
     updated_at: datetime
     updated_by: str | None
@@ -277,7 +278,7 @@ class ExtraPromptResponse(BaseModel):
 
     key: str
     label: str
-    hint: str | None
+    hint: str
 
 
 class ExtraPromptGroupResponse(BaseModel):
@@ -1161,10 +1162,10 @@ def to_model_call_trace_details_response(
 
 
 def to_settings_response(settings: list[StoredSetting]) -> SettingsResponse:
-    """Describe settings for the admin area.
+    """Describe settings for the admin area, each with its hint.
 
     Args:
-        settings: The settings.
+        settings: The editable settings.
 
     Returns:
         The response body.
@@ -1172,6 +1173,7 @@ def to_settings_response(settings: list[StoredSetting]) -> SettingsResponse:
     return SettingsResponse(
         settings={
             setting.key: SettingResponse(
+                hint=EDITABLE_SETTINGS_BY_KEY[setting.key].hint,
                 value=setting.value,
                 updated_at=setting.updated_at,
                 updated_by=setting.updated_by_name,

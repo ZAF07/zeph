@@ -6,6 +6,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
+from companion.core.platform_settings import (
+    EDITABLE_SETTINGS,
+    EDITABLE_SETTINGS_BY_KEY,
+)
 from tests.conftest import DASHBOARD_URL
 from tests.fakes import (
     ChatModelCall,
@@ -58,6 +62,43 @@ def test_admin_sees_each_editable_setting_with_its_seeded_value(
     assert "welcome_message" not in settings
 
 
+def count_sentences(text: str) -> int:
+    """Count the sentences in a hint.
+
+    Args:
+        text: The hint.
+
+    Returns:
+        How many sentences it has.
+    """
+    return len(re.findall(r"[.!?](?:\s|$)", text.strip()))
+
+
+def test_every_editable_setting_comes_with_a_short_hint(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+
+    settings = client.get("/api/admin/settings", headers=headers).json()["settings"]
+
+    assert {key for key in settings} == {setting.key for setting in EDITABLE_SETTINGS}
+    for key, setting in settings.items():
+        assert setting["hint"].strip(), f"{key} has no hint"
+        assert count_sentences(setting["hint"]) <= 2, f"{key}'s hint is too long"
+
+
+def test_each_setting_is_listed_with_its_own_hint(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+
+    settings = client.get("/api/admin/settings", headers=headers).json()["settings"]
+
+    assert settings["daily_message_limit"]["hint"] == (
+        EDITABLE_SETTINGS_BY_KEY["daily_message_limit"].hint
+    )
+
+
 def test_saved_settings_record_when_and_by_whom(
     client: TestClient, auth_verifier: FakeAuthVerifier, clock: FakeClock
 ) -> None:
@@ -72,11 +113,9 @@ def test_saved_settings_record_when_and_by_whom(
 
     assert response.status_code == 200
     persona = response.json()["settings"]["persona"]
-    assert persona == {
-        "value": "You are Zeph, edited.",
-        "updated_at": "2026-11-11T10:00:00Z",
-        "updated_by": "owner@example.com",
-    }
+    assert persona["value"] == "You are Zeph, edited."
+    assert persona["updated_at"] == "2026-11-11T10:00:00Z"
+    assert persona["updated_by"] == "owner@example.com"
     reloaded = client.get("/api/admin/settings", headers=headers).json()
     assert reloaded["settings"]["persona"] == persona
 
@@ -533,7 +572,7 @@ def test_reply_notes_carry_a_hint_saying_when_they_are_used(
 
     assert prompts["reply_memory_intro"]["hint"]
     assert prompts["reply_features_unavailable_note"]["hint"]
-    assert prompts["web_search_tool_description"]["hint"] is None
+    assert prompts["web_search_tool_description"]["hint"]
     assert all(prompt["label"] for prompt in prompts.values())
 
 
