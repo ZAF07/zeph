@@ -20,7 +20,6 @@ from sqlalchemy import (
     func,
     or_,
     select,
-    true,
     tuple_,
     update,
 )
@@ -1414,21 +1413,23 @@ class PostgresConversationRepository:
         Returns:
             The messages, in the order they were saved.
         """
+        query = (
+            select(conversation_messages)
+            .join(
+                conversations,
+                conversations.c.id == conversation_messages.c.conversation_id,
+            )
+            .where(
+                conversations.c.user_id == user_id,
+                conversations.c.last_message_at >= start,
+                conversation_messages.c.sent_at >= start,
+            )
+            .order_by(conversation_messages.c.position)
+        )
+        if end is not None:
+            query = query.where(conversation_messages.c.sent_at < end)
         with self._database.connect() as connection:
-            rows = connection.execute(
-                select(conversation_messages)
-                .join(
-                    conversations,
-                    conversations.c.id == conversation_messages.c.conversation_id,
-                )
-                .where(
-                    conversations.c.user_id == user_id,
-                    conversations.c.last_message_at >= start,
-                    conversation_messages.c.sent_at >= start,
-                    true() if end is None else conversation_messages.c.sent_at < end,
-                )
-                .order_by(conversation_messages.c.position)
-            ).all()
+            rows = connection.execute(query).all()
         return [_to_message(row) for row in rows]
 
     def list_started_between(

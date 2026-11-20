@@ -3,7 +3,7 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from companion.core.past_day import read_past_day
+from companion.core.past_day import parse_day_argument
 from companion.core.recent_messages import leave_out_past_cap
 from companion.core.response_composition import MEMORY_HEADING
 from tests.fakes import (
@@ -344,11 +344,42 @@ def test_the_window_settings_are_admin_editable_with_hints(
 
 
 def test_the_past_day_tool_reads_only_dates_written_as_year_month_day() -> None:
-    assert read_past_day("2026-11-12") == date(2026, 11, 12)
+    assert parse_day_argument("2026-11-12") == date(2026, 11, 12)
     for odd in ("12 Nov", "", None, 20261112, "2026-13-01"):
-        assert read_past_day(odd) is None
+        assert parse_day_argument(odd) is None
 
 
 def test_past_the_cap_only_the_newest_messages_are_kept() -> None:
     assert leave_out_past_cap([1, 2, 3, 4, 5], 3) == ([3, 4, 5], [1, 2])
     assert leave_out_past_cap([1, 2], 3) == ([1, 2], [])
+
+
+def test_texts_left_unanswered_in_the_last_conversation_are_not_the_latest_message(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script(RuntimeError("the model is down"))
+    send_to_webhook(client, telegram_text_update(EARLIER_TEXT))
+    clock.advance(timedelta(minutes=20))
+    chat_model.script_processing(processing_answer())
+    scheduler.tick()
+    chat_model.script("oh no!")
+
+    send_to_webhook(client, telegram_text_update(TEXT_LATER))
+
+    understanding, reply_plan, reply = newest_reply_steps(chat_model)
+    for call in (understanding, reply_plan):
+        earlier, latest = given_text(call).split("Latest message:")
+        assert EARLIER_TEXT in earlier
+        assert "--- New Conversation" in earlier
+        assert EARLIER_TEXT not in latest
+    assert [line.text for line in reply.history if line.role.value == "user"] == [
+        EARLIER_TEXT,
+        TEXT_LATER,
+    ]

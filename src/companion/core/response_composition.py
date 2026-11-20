@@ -22,7 +22,11 @@ from companion.core.platform_settings import (
     RESPONSE_THINKING,
 )
 from companion.core.ports import Repositories
-from companion.core.recent_messages import RecentMessages, describe_stand_ins
+from companion.core.recent_messages import (
+    RecentMessages,
+    describe_stand_ins,
+    starts_new_conversation,
+)
 from companion.core.reply_tools import (
     NO_GUIDANCE,
     ReplyContext,
@@ -143,8 +147,8 @@ def write_instructions(
 def to_chat_history(messages: list[ConversationMessage]) -> list[ChatLine]:
     """Turn a Conversation's saved messages into history for the chat model.
 
-    The User's messages in a row are one Message, so they become one line
-    with each text on its own line.
+    The User's messages in a row in one Conversation are one Message, so
+    they become one line with each text on its own line.
 
     Args:
         messages: The messages, oldest first.
@@ -153,15 +157,21 @@ def to_chat_history(messages: list[ConversationMessage]) -> list[ChatLine]:
         One line per Message or Companion message, saying who said it.
     """
     history: list[ChatLine] = []
+    previous: ConversationMessage | None = None
     for message in messages:
         if message.direction == MessageDirection.OUTGOING:
             history.append(ChatLine(role=ChatRole.COMPANION, text=message.content))
-        elif history and history[-1].role == ChatRole.USER:
+        elif (
+            previous is not None
+            and previous.direction == MessageDirection.INCOMING
+            and not starts_new_conversation(previous, message)
+        ):
             history[-1] = ChatLine(
                 role=ChatRole.USER, text=f"{history[-1].text}\n{message.content}"
             )
         else:
             history.append(ChatLine(role=ChatRole.USER, text=message.content))
+        previous = message
     return history
 
 
@@ -245,6 +255,12 @@ class ResponseComposer:
         offers = [
             provider.offer(snapshot, context) for provider in self._tool_providers
         ]
+        remembered_parts = (
+            memory,
+            describe_stand_ins(recent.stand_ins),
+            guidance.past_days,
+        )
+        remembered = "\n\n".join(part for part in remembered_parts if part)
         instructions = write_instructions(
             voice=settings.get(PERSONA),
             response_prompt=settings.get(RESPONSE_PROMPT),
@@ -256,15 +272,7 @@ class ResponseComposer:
                 ),
             ),
             guidance=guidance.plan,
-            memory="\n\n".join(
-                part
-                for part in (
-                    memory,
-                    describe_stand_ins(recent.stand_ins),
-                    guidance.past_days,
-                )
-                if part
-            ),
+            memory=remembered,
             optional_extras=(
                 *(offer.instructions for offer in optional_offers),
                 guidance.curiosities,

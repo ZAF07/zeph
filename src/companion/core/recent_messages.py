@@ -4,17 +4,19 @@ from datetime import timedelta
 from uuid import UUID
 
 from companion.core.memory_retrieval import format_day, format_time, summary_line
-from companion.core.models import ConversationMessage, DaySummary, UserSnapshot
+from companion.core.models import (
+    ConversationMessage,
+    DaySummary,
+    MessageDirection,
+    UserSnapshot,
+)
 from companion.core.platform_settings import (
     RECENT_MESSAGES_CAP,
     RECENT_MESSAGES_HOURS,
 )
 from companion.core.ports import Clock, Repositories
 from companion.core.timing import users_today
-from companion.core.transcripts import (
-    split_off_latest_message,
-    to_transcript_lines,
-)
+from companion.core.transcripts import to_transcript_lines
 
 
 @dataclass(frozen=True)
@@ -51,6 +53,50 @@ def leave_out_past_cap(
     return messages[left_out:], messages[:left_out]
 
 
+def starts_new_conversation(
+    previous: ConversationMessage, message: ConversationMessage
+) -> bool:
+    """Say whether a message is the first of a later Conversation.
+
+    Args:
+        previous: The message before it.
+        message: The message.
+
+    Returns:
+        True if the two are in different Conversations.
+    """
+    return message.conversation_id != previous.conversation_id
+
+
+def split_off_latest_message(
+    recent: RecentMessages,
+) -> tuple[list[ConversationMessage], list[ConversationMessage]]:
+    """Split the Recent Messages into what came before the latest Message and it.
+
+    The latest Message is the User's texts in a row at the end of the
+    Conversation being replied in; texts left unanswered at the end of an
+    earlier Conversation are not part of it.
+
+    Args:
+        recent: The Recent Messages.
+
+    Returns:
+        The earlier messages and the latest Message's texts, each oldest
+        first.
+    """
+    messages = recent.messages
+    latest_start = len(messages)
+    while latest_start > 0:
+        message = messages[latest_start - 1]
+        if (
+            message.direction != MessageDirection.INCOMING
+            or message.conversation_id != recent.conversation_id
+        ):
+            break
+        latest_start -= 1
+    return messages[:latest_start], messages[latest_start:]
+
+
 def new_conversation_line(message: ConversationMessage, time_zone: str | None) -> str:
     """Write the line that marks where a later Conversation started.
 
@@ -84,7 +130,7 @@ def to_recent_transcript(
     """
     lines = []
     for number, message in enumerate(messages):
-        if number and message.conversation_id != messages[number - 1].conversation_id:
+        if number and starts_new_conversation(messages[number - 1], message):
             lines.append(new_conversation_line(message, time_zone))
         lines.append(to_transcript_lines([message]))
     return "\n".join(lines)
@@ -117,15 +163,12 @@ def describe_recent_messages(recent: RecentMessages, time_zone: str | None) -> s
         across Conversations, then the latest Message, with a line before it
         when it started a new Conversation.
     """
-    earlier, latest_text = split_off_latest_message(recent.messages)
+    earlier, latest = split_off_latest_message(recent)
     transcript = to_recent_transcript(earlier, time_zone) or "Nothing yet."
-    latest = recent.messages[len(earlier) :]
-    starts_new_conversation = bool(
-        earlier and latest and latest[0].conversation_id != earlier[-1].conversation_id
-    )
+    latest_text = "\n".join(message.content for message in latest)
     latest_heading = (
         f"{new_conversation_line(latest[0], time_zone)}\nLatest message:"
-        if starts_new_conversation
+        if earlier and latest and starts_new_conversation(earlier[-1], latest[0])
         else "Latest message:"
     )
     parts = [

@@ -2,7 +2,6 @@ from collections.abc import Callable
 from datetime import date, timedelta
 from typing import Any
 
-from companion.core.memory_retrieval import format_calendar_day
 from companion.core.models import UserSnapshot
 from companion.core.platform_settings import MESSAGE_RETENTION_DAYS
 from companion.core.ports import ChatTool, Repositories
@@ -25,14 +24,14 @@ PAST_DAY_PARAMETERS: dict[str, Any] = {
     },
     "required": ["date"],
 }
-DATE_NEEDED = "Reading a past day needs its date as YYYY-MM-DD."
-NO_EXACT_WORDS = (
+DATE_NEEDED_NOTE = "Reading a past day needs its date as YYYY-MM-DD."
+NO_EXACT_WORDS_NOTE = (
     "Answer from that day's Day Summary, if there is one, and don't claim to "
     "know their exact words."
 )
 
 
-def read_past_day(value: Any) -> date | None:
+def parse_day_argument(value: Any) -> date | None:
     """Read the day the model asked for.
 
     Args:
@@ -85,12 +84,12 @@ class PastDayTool:
                 a day past Message Retention, with a note to answer from the
                 Day Summary without claiming exact words.
             """
-            day = read_past_day(arguments.get("date"))
+            day = parse_day_argument(arguments.get("date"))
             if day is None:
-                return DATE_NEEDED
-            read = self.read_day(snapshot, day)
-            on_read(read)
-            return read
+                return DATE_NEEDED_NOTE
+            day_transcript = self.read_day(snapshot, day)
+            on_read(day_transcript)
+            return day_transcript
 
         return ChatTool(
             name=PAST_DAY_TOOL_NAME,
@@ -103,7 +102,8 @@ class PastDayTool:
         """Write the User's messages from one day, as the Reply Plan reads them.
 
         A day wholly older than `message_retention_days` has no messages,
-        even before the clean-up has deleted them.
+        even before the clean-up has deleted them. On the day retention
+        reaches into, the start of the day may be gone, and it says so.
 
         Args:
             snapshot: The User being answered.
@@ -113,18 +113,25 @@ class PastDayTool:
             How many messages there were and their transcript, or that there
             are none.
         """
-        short_day = format_calendar_day(day).rsplit(" ", 1)[0]
+        short_day = f"{day.day} {day:%b}"
         retention = timedelta(days=snapshot.settings.get(MESSAGE_RETENTION_DAYS))
         time_zone = snapshot.user.time_zone
         if day < snapshot.today - retention:
             return (
                 f"No messages from {short_day}: messages are only kept for "
-                f"{retention.days} days. {NO_EXACT_WORDS}"
+                f"{retention.days} days. {NO_EXACT_WORDS_NOTE}"
             )
         messages = self._repositories.conversations.list_user_messages_between(
             snapshot.user.id, *day_span(day, time_zone)
         )
         if not messages:
-            return f"No messages from {short_day}. {NO_EXACT_WORDS}"
-        count = "1 message" if len(messages) == 1 else f"{len(messages)} messages"
-        return f"{count} from {short_day}:\n{to_recent_transcript(messages, time_zone)}"
+            return f"No messages from {short_day}. {NO_EXACT_WORDS_NOTE}"
+        how_many = "1 message" if len(messages) == 1 else f"{len(messages)} messages"
+        transcript = to_recent_transcript(messages, time_zone)
+        partly_deleted = (
+            f"\n\nMessages are only kept for {retention.days} days, so the "
+            f"start of {short_day} may already be gone."
+            if day == snapshot.today - retention
+            else ""
+        )
+        return f"{how_many} from {short_day}:\n{transcript}{partly_deleted}"
