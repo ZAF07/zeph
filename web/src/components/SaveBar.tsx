@@ -17,7 +17,8 @@ const placementClass = {
  *   null; `canSave` is whether the edits may be saved; `saveLabel` names the
  *   Save button; `placement` puts the bar on its own panel or at the foot of
  *   a box; `sticky` keeps it in view at the bottom while the page scrolls;
- *   `onDiscard` and `onSave` are the buttons' actions.
+ *   `idleNote` is the line shown while nothing changed; `onDiscard` and
+ *   `onSave` are the buttons' actions.
  * @returns The bar.
  */
 export function SaveBar({
@@ -28,6 +29,7 @@ export function SaveBar({
   saveLabel,
   placement,
   sticky = false,
+  idleNote = "Changes apply to the next message after saving.",
   onDiscard,
   onSave,
 }: {
@@ -38,6 +40,7 @@ export function SaveBar({
   saveLabel: string;
   placement: "alone" | "inside";
   sticky?: boolean;
+  idleNote?: string;
   onDiscard: () => void;
   onSave: () => void;
 }) {
@@ -49,11 +52,7 @@ export function SaveBar({
     saveText = "Try again";
   }
 
-  let state = (
-    <span className="text-[13px] text-soft">
-      Changes apply to the next message after saving.
-    </span>
-  );
+  let state = <span className="text-[13px] text-soft">{idleNote}</span>;
   if (hasFailed) {
     state = (
       <span role="alert" className="text-[13px] text-danger">

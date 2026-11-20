@@ -62,12 +62,16 @@ describe("model call labels", () => {
       threads_woven_in: 0,
       threads_left_alone: 0,
       threads_held_back: 0,
+      read_formed: false,
+      read_said: false,
     });
     expect(facts).toContainEqual({ label: "Need picked", value: "Ask more" });
     expect(facts).toContainEqual({ label: "Threads brought up", value: "0" });
     expect(facts).toContainEqual({ label: "Lead Move", value: "None" });
     expect(facts).toContainEqual({ label: "Supporting Move", value: "None" });
     expect(facts).toContainEqual({ label: "Next Move", value: "None" });
+    expect(facts).toContainEqual({ label: "Read formed", value: "No" });
+    expect(facts).toContainEqual({ label: "Read said", value: "No" });
   });
 
   it("names the lead, supporting and next Moves a Reply Plan picked", () => {
@@ -81,6 +85,8 @@ describe("model call labels", () => {
       threads_woven_in: 0,
       threads_left_alone: 3,
       threads_held_back: 1,
+      read_formed: true,
+      read_said: true,
     });
     expect(facts).toContainEqual({ label: "Lead Move", value: "Research" });
     expect(facts).toContainEqual({
@@ -92,5 +98,9 @@ describe("model call labels", () => {
       label: "Threads brought up",
       value: "1 (1 lead, 0 weave)",
     });
+    expect(facts.slice(-2)).toEqual([
+      { label: "Read formed", value: "Yes" },
+      { label: "Read said", value: "Yes" },
+    ]);
   });
 });

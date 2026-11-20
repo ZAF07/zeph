@@ -141,7 +141,7 @@ export function understandingShapeFacts(
  *
  * @param shape - The Reply Plan's shape.
  * @returns E.g. "Need picked: Be heard", "Lead Move: Calm", "Threads brought
- * up: 2 (1 lead, 1 weave)".
+ * up: 2 (1 lead, 1 weave)", "Read formed: Yes", "Read said: No".
  */
 export function replyPlanShapeFacts(
   shape: ReplyPlanShape,
@@ -162,5 +162,7 @@ export function replyPlanShapeFacts(
     },
     { label: "Threads left alone", value: String(shape.threads_left_alone) },
     { label: "Threads held back", value: String(shape.threads_held_back) },
+    { label: "Read formed", value: shape.read_formed ? "Yes" : "No" },
+    { label: "Read said", value: shape.read_said ? "Yes" : "No" },
   ];
 }

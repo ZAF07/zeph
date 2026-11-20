@@ -646,7 +646,7 @@ def test_a_changed_reply_plan_prompt_and_thinking_are_used_for_the_next_message(
     send_to_webhook(client, telegram_text_update("hello"))
 
     [reply_plan_call] = chat_model.reply_plan_calls
-    assert reply_plan_call.instructions == "Decide what helps them most."
+    assert reply_plan_call.instructions.endswith("\n\nDecide what helps them most.")
     assert reply_plan_call.model == seeded_settings["reply_plan_model"]
     assert reply_plan_call.thinking is False
 

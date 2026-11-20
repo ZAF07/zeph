@@ -599,7 +599,10 @@ class UnderstandingShapeResponse(BaseModel):
 
 
 class ReplyPlanShapeResponse(BaseModel):
-    """The shape of a Reply Plan: the Need, Move names and counts, never words."""
+    """The shape of a Reply Plan: the Need, Move names, counts and Read facts.
+
+    Never any words.
+    """
 
     need: str
     lead_move: str | None
@@ -610,6 +613,8 @@ class ReplyPlanShapeResponse(BaseModel):
     threads_woven_in: int
     threads_left_alone: int
     threads_held_back: int
+    read_formed: bool
+    read_said: bool
 
 
 class CheckInShapeResponse(BaseModel):
@@ -1133,6 +1138,8 @@ def to_reply_plan_shape_response(shape: ReplyPlanShape) -> ReplyPlanShapeRespons
         threads_woven_in=shape.threads_woven_in,
         threads_left_alone=shape.threads_left_alone,
         threads_held_back=shape.threads_held_back,
+        read_formed=shape.read_formed,
+        read_said=shape.read_said,
     )
 
 

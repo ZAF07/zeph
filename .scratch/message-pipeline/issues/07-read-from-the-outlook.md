@@ -1,6 +1,6 @@
 # 07 — Zeph forms a Read from the Outlook
 
-Status: ready-for-agent
+Status: in-progress
 Lane: A
 Blocked by: 05
 
@@ -49,3 +49,12 @@ Read `web/design/README.md` in full first, including "Message-pipeline additions
 - 05 — The Reply Plan takes over deciding; the Understanding only reads (`.scratch/message-pipeline/issues/05-reply-plan-takes-over-deciding.md`)
 
 ## Comments
+
+### Plan (20 Nov 2026, branch `message-pipeline-07-read`)
+
+- **Outlook setting:** new `persona_outlook` Platform Setting (label "Outlook", hint as drawn), seeded with the drawn starting text. The `persona` setting becomes the voice (label "Voice"). The Reply Plan's instructions are the Outlook, then `reply_plan_prompt`. No other call gets the Outlook; the Reply and Check-ins keep the voice.
+- **Read and where we are:** `ReplyPlanForm` gains `where_we_are`, `read` and `say_read` (stored in the existing `form` JSON, so no new column; old rows read as no Read). `say_read` counts only when there is a Read. A Read to be said goes into the Reply's level 3 (plan) section as Zeph's view, never as fact; one not to be said doesn't reach the Reply. Earlier Reply Plans in the Conversation are written for the next one with their where-we-are line, Read and whether it was said, so it doesn't repeat a Read.
+- **Prompt:** `reply_plan_prompt` asks for the where-we-are line and the Read first, states the three conditions (room, worth saying, not a repeat) and the when-asked rule. Migration 0068 deletes the stored `reply_plan_prompt` so the new seed loads (platform not live; 0067 did the same for the Understanding).
+- **Model Call Log:** `ReplyPlanShape` gains `read_formed` and `read_said` (JSON, old rows read as false). The Read's text shows only in an Admin's own Content, as today.
+- **Web:** Persona page gets Voice and Outlook tabs (`?tab=outlook`), each with its own editor and save bar, drafts kept per tab. Trace facts gain "Read formed" and "Read said". Fixtures as drawn.
+

@@ -685,7 +685,10 @@ export type UnderstandingShape = {
   past_look_ups: number;
 };
 
-/** The shape of a Reply Plan: the Need, Move names and counts, never any words. */
+/**
+ * The shape of a Reply Plan: the Need, Move names, counts and whether a Read
+ * was formed and said, never any words.
+ */
 export type ReplyPlanShape = {
   need: string;
   lead_move: string | null;
@@ -696,6 +699,8 @@ export type ReplyPlanShape = {
   threads_woven_in: number;
   threads_left_alone: number;
   threads_held_back: number;
+  read_formed: boolean;
+  read_said: boolean;
 };
 
 /** The shape of a woven-in Check-in decision: counts and the Kind, never any words. */

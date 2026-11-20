@@ -202,6 +202,7 @@ AVAILABLE_MODELS = Setting("available_models", read_text_list)
 RESPONSE_MODEL = Setting("response_model", read_text)
 RESPONSE_THINKING = Setting("response_thinking", read_on_off)
 PERSONA = Setting("persona", read_text)
+PERSONA_OUTLOOK = Setting("persona_outlook", read_text)
 RESPONSE_PROMPT = Setting("response_prompt", read_text)
 PHOTO_MODEL = Setting("photo_model", read_text)
 PHOTO_THINKING = Setting("photo_thinking", read_on_off)
@@ -469,12 +470,20 @@ THINKING_HINT = (
 EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     EditableSetting(
         PERSONA.key,
-        "Persona",
+        "Voice",
         SettingKind.TEXT,
         hint=(
-            "Who Zeph is and how it talks: voice, values and boundaries. Put in front "
-            "of the instructions of the Reply and both Check-in prompts, every time "
-            "they run."
+            "How Zeph speaks: its tone, values and boundaries. Put in front of the "
+            "instructions of the Reply and both Check-in prompts, every time they run."
+        ),
+    ),
+    EditableSetting(
+        PERSONA_OUTLOOK.key,
+        "Outlook",
+        SettingKind.TEXT,
+        hint=(
+            "How Zeph sees people and what helps them grow, in plain prose. Zeph "
+            "forms its Read of each User from this before every reply."
         ),
     ),
     EditableSetting(
