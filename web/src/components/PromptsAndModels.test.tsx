@@ -32,6 +32,7 @@ const coreServices: CoreServices = {
       thinking_key: "response_thinking",
       extra_prompts: [],
       extra_prompt_groups: [],
+      limits: [],
     },
   ],
   model_choices: ["deepseek-flash", "deepseek-v4-pro"],
@@ -154,6 +155,56 @@ describe("PromptsAndModels", () => {
     expect(card.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
+  it("shows each limit with its hint and saves a changed one with the service", async () => {
+    const user = userEvent.setup();
+    apiClient.getCoreServices.mockResolvedValue({
+      ...coreServices,
+      services: [
+        {
+          ...coreServices.services[0]!,
+          limits: [
+            {
+              key: "pattern_keeping_days",
+              label: "Days of evidence to include",
+              hint: "How many days behind the evidence Pattern keeping reads.",
+            },
+          ],
+        },
+      ],
+    });
+    apiClient.getAdminSettings.mockResolvedValue({
+      ...settings,
+      pattern_keeping_days: {
+        hint: "How many days behind the evidence Pattern keeping reads.",
+        value: 14,
+        updated_at: "2026-11-01T00:00:00Z",
+        updated_by: null,
+      },
+    });
+    renderWithQueries(<PromptsAndModels />);
+    const card = within(
+      await screen.findByRole("region", { name: "Response composition" }),
+    );
+
+    const days = card.getByLabelText("Days of evidence to include");
+    expect(days).toHaveValue(14);
+    expect(
+      card.getByText(
+        "How many days behind the evidence Pattern keeping reads.",
+      ),
+    ).toBeVisible();
+    await user.clear(days);
+    await user.type(days, "20");
+    await user.click(card.getByRole("button", { name: "Save" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      response_prompt: "Reply briefly.",
+      response_model: "deepseek-flash",
+      response_thinking: false,
+      pattern_keeping_days: 20,
+    });
+  });
+
   it("saves thinking switched on for a service", async () => {
     const user = userEvent.setup();
     renderWithQueries(<PromptsAndModels />);
@@ -216,6 +267,7 @@ describe("PromptsAndModels", () => {
             },
           ],
           extra_prompt_groups: [],
+          limits: [],
         },
       ],
       model_choices: ["deepseek-flash"],

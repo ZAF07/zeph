@@ -47,6 +47,8 @@ from companion.adapters.postgres.tables import (
     moves,
     need_ruled_out_moves,
     needs,
+    pattern_evidence,
+    patterns,
     pending_auth_account_deletions,
     personal_stickers,
     platform_settings,
@@ -133,6 +135,11 @@ from companion.core.models import (
     NeedDetails,
     NextDueTimeChange,
     OfferedTool,
+    Pattern,
+    PatternEvidence,
+    PatternReaction,
+    PatternState,
+    PatternToSave,
     PersonalSticker,
     PlatformSettings,
     ReplyPlan,
@@ -854,6 +861,15 @@ class PostgresUserRepository:
             .where(move_outcomes.c.user_id == users.c.id)
             .scalar_subquery()
         )
+        confirmed_pattern_count = (
+            select(func.count())
+            .select_from(patterns)
+            .where(
+                patterns.c.user_id == users.c.id,
+                patterns.c.state == PatternState.CONFIRMED.value,
+            )
+            .scalar_subquery()
+        )
         has_portrait = (
             select(user_portraits.c.user_id)
             .where(
@@ -875,6 +891,7 @@ class PostgresUserRepository:
             life_thread_count.label("life_thread_count"),
             has_portrait.label("has_portrait"),
             move_outcome_count.label("move_outcome_count"),
+            confirmed_pattern_count.label("confirmed_pattern_count"),
         ).order_by(users.c.created_at.desc())
         with self._database.connect() as connection:
             rows = connection.execute(statement).all()
@@ -887,6 +904,7 @@ class PostgresUserRepository:
                 life_thread_count=row.life_thread_count,
                 has_portrait=row.has_portrait,
                 move_outcome_count=row.move_outcome_count,
+                confirmed_pattern_count=row.confirmed_pattern_count,
             )
             for row in rows
         ]
@@ -2784,6 +2802,284 @@ class PostgresLifeThreadRepository:
                 delete(life_threads).where(life_threads.c.user_id == user_id)
             )
 
+    def find_closest(
+        self,
+        user_id: UUID,
+        embedding: list[float],
+        leave_out: Sequence[UUID],
+        limit: int,
+    ) -> list[LifeThread]:
+        """Find a User's Threads closest in meaning, however old, open or settled.
+
+        Threads with no embedding are never found.
+
+        Args:
+            user_id: The User's ID; only their Threads are searched.
+            embedding: What the Threads are compared with.
+            leave_out: Threads not to return, e.g. ones already given.
+            limit: The most to return.
+
+        Returns:
+            The closest Threads, closest first.
+        """
+        if limit < 1:
+            return []
+        distance = life_threads.c.embedding.cosine_distance(embedding)
+        statement = (
+            select(*LIFE_THREAD_COLUMNS)
+            .where(
+                life_threads.c.user_id == user_id,
+                life_threads.c.embedding.is_not(None),
+                life_threads.c.id.not_in(list(leave_out)),
+            )
+            .order_by(distance, life_threads.c.started_at)
+            .limit(limit)
+        )
+        with self._database.connect() as connection:
+            rows = connection.execute(statement).all()
+        return [_to_life_thread(row) for row in rows]
+
+
+PATTERN_COLUMNS = [column for column in patterns.c if column.name != "embedding"]
+
+
+def _to_pattern(row: Row[Any], evidence: Sequence[PatternEvidence]) -> Pattern:
+    """Turn a `patterns` row and its evidence into a Pattern.
+
+    Args:
+        row: The row.
+        evidence: Its evidence, oldest first.
+
+    Returns:
+        The Pattern.
+    """
+    return Pattern(
+        id=row.id,
+        user_id=row.user_id,
+        pattern=row.pattern,
+        state=PatternState(row.state),
+        evidence=tuple(evidence),
+        started_at=row.started_at,
+        updated_at=row.updated_at,
+        last_offered_at=row.last_offered_at,
+        last_reaction=(
+            PatternReaction(row.last_reaction) if row.last_reaction else None
+        ),
+    )
+
+
+class PostgresPatternRepository:
+    """Stores Patterns in Postgres, each with its evidence and embedding."""
+
+    def __init__(self, database: Database) -> None:
+        """Set up the repository.
+
+        Args:
+            database: Where to run queries: the engine, or one transaction.
+        """
+        self._database = database
+
+    def list_for_user(self, user_id: UUID) -> list[Pattern]:
+        """List a User's Patterns, oldest started first, with their evidence.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Patterns, each with its evidence oldest first.
+        """
+        with self._database.connect() as connection:
+            pattern_rows = connection.execute(
+                select(*PATTERN_COLUMNS)
+                .where(patterns.c.user_id == user_id)
+                .order_by(patterns.c.started_at, patterns.c.id)
+            ).all()
+            evidence_rows = connection.execute(
+                select(
+                    pattern_evidence.c.id,
+                    pattern_evidence.c.pattern_id,
+                    pattern_evidence.c.day,
+                    pattern_evidence.c.life_thread_id,
+                    pattern_evidence.c.line,
+                    life_threads.c.title,
+                )
+                .join(patterns)
+                .join(life_threads)
+                .where(patterns.c.user_id == user_id)
+                .order_by(pattern_evidence.c.day, pattern_evidence.c.position)
+            ).all()
+        evidence_by_pattern: dict[UUID, list[PatternEvidence]] = {}
+        for row in evidence_rows:
+            evidence_by_pattern.setdefault(row.pattern_id, []).append(
+                PatternEvidence(
+                    id=row.id,
+                    day=row.day,
+                    thread_id=row.life_thread_id,
+                    thread_title=row.title,
+                    line=row.line,
+                )
+            )
+        return [
+            _to_pattern(row, evidence_by_pattern.get(row.id, []))
+            for row in pattern_rows
+        ]
+
+    def save_many(
+        self, added: Sequence[PatternToSave], changed: Sequence[PatternToSave]
+    ) -> None:
+        """Add new Patterns and save changed ones, in one step.
+
+        Evidence not kept yet is added, unless its Life Thread or Pattern was
+        deleted meanwhile; evidence already kept is left as it is. A Pattern left
+        with no evidence is deleted. A changed Pattern saved with no
+        embedding keeps the one it had.
+
+        Args:
+            added: The new Patterns.
+            changed: The changed Patterns.
+        """
+        if not added and not changed:
+            return
+        with self._database.begin() as connection:
+            if added:
+                connection.execute(
+                    insert(patterns).values(
+                        [
+                            {
+                                "id": to_save.pattern.id,
+                                "user_id": to_save.pattern.user_id,
+                                "pattern": to_save.pattern.pattern,
+                                "state": to_save.pattern.state.value,
+                                "started_at": to_save.pattern.started_at,
+                                "updated_at": to_save.pattern.updated_at,
+                                "last_offered_at": to_save.pattern.last_offered_at,
+                                "last_reaction": _stored_reaction(
+                                    to_save.pattern.last_reaction
+                                ),
+                                "embedding": to_save.embedding,
+                            }
+                            for to_save in added
+                        ]
+                    )
+                )
+            if changed:
+                connection.execute(
+                    update(patterns)
+                    .where(patterns.c.id == bindparam("pattern_id"))
+                    .values(
+                        pattern=bindparam("new_pattern"),
+                        state=bindparam("new_state"),
+                        updated_at=bindparam("new_updated_at"),
+                        last_offered_at=bindparam("new_last_offered_at"),
+                        last_reaction=bindparam("new_last_reaction"),
+                        embedding=func.coalesce(
+                            bindparam("new_embedding", type_=patterns.c.embedding.type),
+                            patterns.c.embedding,
+                        ),
+                    ),
+                    [
+                        {
+                            "pattern_id": to_save.pattern.id,
+                            "new_pattern": to_save.pattern.pattern,
+                            "new_state": to_save.pattern.state.value,
+                            "new_updated_at": to_save.pattern.updated_at,
+                            "new_last_offered_at": to_save.pattern.last_offered_at,
+                            "new_last_reaction": _stored_reaction(
+                                to_save.pattern.last_reaction
+                            ),
+                            "new_embedding": to_save.embedding,
+                        }
+                        for to_save in changed
+                    ],
+                )
+            saved = [*added, *changed]
+            evidence = [
+                (to_save.pattern.id, item)
+                for to_save in saved
+                for item in to_save.pattern.evidence
+            ]
+            existing_thread_ids = set(
+                connection.execute(
+                    select(life_threads.c.id).where(
+                        life_threads.c.id.in_({item.thread_id for _, item in evidence})
+                    )
+                ).scalars()
+            )
+            existing_pattern_ids = set(
+                connection.execute(
+                    select(patterns.c.id).where(
+                        patterns.c.id.in_({pattern_id for pattern_id, _ in evidence})
+                    )
+                ).scalars()
+            )
+            evidence_to_add = [
+                {
+                    "id": item.id,
+                    "pattern_id": pattern_id,
+                    "life_thread_id": item.thread_id,
+                    "day": item.day,
+                    "line": item.line,
+                }
+                for pattern_id, item in evidence
+                if item.thread_id in existing_thread_ids
+                and pattern_id in existing_pattern_ids
+            ]
+            if evidence_to_add:
+                connection.execute(
+                    insert(pattern_evidence)
+                    .values(evidence_to_add)
+                    .on_conflict_do_nothing()
+                )
+            for user_id in {to_save.pattern.user_id for to_save in saved}:
+                _delete_patterns_without_evidence(connection, user_id)
+
+    def delete_without_evidence(self, user_id: UUID) -> None:
+        """Delete a User's Patterns that have no evidence left.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            _delete_patterns_without_evidence(connection, user_id)
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete every one of a User's Patterns.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(delete(patterns).where(patterns.c.user_id == user_id))
+
+
+def _stored_reaction(reaction: PatternReaction | None) -> str | None:
+    """Write a Pattern's last reaction the way it is stored.
+
+    Args:
+        reaction: The reaction; None if never offered.
+
+    Returns:
+        Its value, e.g. "pushed_back"; None if there is none.
+    """
+    return reaction.value if reaction else None
+
+
+def _delete_patterns_without_evidence(connection: Connection, user_id: UUID) -> None:
+    """Delete a User's Patterns that have no evidence left.
+
+    Args:
+        connection: The connection, inside a transaction.
+        user_id: The User's ID.
+    """
+    has_evidence = (
+        select(pattern_evidence.c.id)
+        .where(pattern_evidence.c.pattern_id == patterns.c.id)
+        .exists()
+    )
+    connection.execute(
+        delete(patterns).where(patterns.c.user_id == user_id, ~has_evidence)
+    )
+
 
 class PostgresUserPortraitRepository:
     """Stores User Portraits in Postgres, one row per User.
@@ -3311,6 +3607,29 @@ class PostgresUserMemoryRepository:
             .where(day_summaries.c.user_id == user_id)
             .order_by(day_summaries.c.day.desc())
             .limit(limit)
+        )
+        with self._database.connect() as connection:
+            rows = connection.execute(statement).all()
+        return [_to_summary(row) for row in rows]
+
+    def list_summaries_for_days(
+        self, user_id: UUID, days: Sequence[date]
+    ) -> list[DaySummary]:
+        """List a User's Day Summaries of some days.
+
+        Args:
+            user_id: The User's ID.
+            days: The days, in the User's time zone.
+
+        Returns:
+            The Summaries those days have, newest day first.
+        """
+        if not days:
+            return []
+        statement = (
+            select(*SUMMARY_COLUMNS)
+            .where(day_summaries.c.user_id == user_id, day_summaries.c.day.in_(days))
+            .order_by(day_summaries.c.day.desc())
         )
         with self._database.connect() as connection:
             rows = connection.execute(statement).all()
@@ -5904,6 +6223,7 @@ def _build_repositories(
         reply_plans=PostgresReplyPlanRepository(database),
         user_memory=PostgresUserMemoryRepository(database),
         life_threads=PostgresLifeThreadRepository(database),
+        patterns=PostgresPatternRepository(database),
         curiosities=PostgresCuriosityRepository(database),
         move_outcomes=PostgresMoveOutcomeRepository(database),
         user_portraits=PostgresUserPortraitRepository(database),

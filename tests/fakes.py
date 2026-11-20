@@ -556,8 +556,8 @@ class ScriptedChatModel:
     drafting calls are told apart by their instructions and kept apart from
     reply calls, each with its own script. The Safeguard defaults to "none",
     the Understanding to `understanding_answer()`, the Reply Plan to
-    `reply_plan_answer()`, Life Thread, Curiosity
-    and Move Outcome keeping to none kept, Portrait writing to an empty
+    `reply_plan_answer()`, Life Thread, Pattern, Curiosity and Move Outcome
+    keeping to none kept, Portrait writing to an empty
     answer (no Portrait), a woven-in Check-in to "not now" and drafting to
     `DEFAULT_WHEN_IT_HELPS`, so tests about replies don't have to script
     them too. Set
@@ -581,6 +581,7 @@ class ScriptedChatModel:
         curiosity_keeping_prompt: str = "",
         woven_check_in_prompt: str = "",
         move_outcome_keeping_prompt: str = "",
+        pattern_keeping_prompt: str = "",
     ) -> None:
         """Start with no replies scripted, no calls and no delay.
 
@@ -605,6 +606,8 @@ class ScriptedChatModel:
                 call, which comes after the Persona.
             move_outcome_keeping_prompt: The instructions that mark a Move
                 Outcome keeping call.
+            pattern_keeping_prompt: The instructions that mark a Pattern
+                keeping call.
         """
         self._replies: list[str | Exception | ToolCall] = []
         self._safeguard_answers: list[str | Exception] = []
@@ -618,6 +621,7 @@ class ScriptedChatModel:
         self._curiosity_keeping_answers: list[str | Exception] = []
         self._woven_check_in_answers: list[str | Exception] = []
         self._move_outcome_keeping_answers: list[str | Exception] = []
+        self._pattern_keeping_answers: list[str | Exception] = []
         self.safeguard_prompt = safeguard_prompt
         self.memory_processing_prompt = memory_processing_prompt
         self.understanding_prompt = understanding_prompt
@@ -629,6 +633,7 @@ class ScriptedChatModel:
         self.portrait_prompt = portrait_prompt
         self.woven_check_in_prompt = woven_check_in_prompt
         self.move_outcome_keeping_prompt = move_outcome_keeping_prompt
+        self.pattern_keeping_prompt = pattern_keeping_prompt
         self.calls: list[ChatModelCall] = []
         self.safeguard_calls: list[ChatModelCall] = []
         self.processing_calls: list[ChatModelCall] = []
@@ -641,6 +646,7 @@ class ScriptedChatModel:
         self.curiosity_keeping_calls: list[ChatModelCall] = []
         self.woven_check_in_calls: list[ChatModelCall] = []
         self.move_outcome_keeping_calls: list[ChatModelCall] = []
+        self.pattern_keeping_calls: list[ChatModelCall] = []
         self.call_order: list[str] = []
         self.delay_seconds = 0.0
         self.before_next_reply: Callable[[], None] | None = None
@@ -731,6 +737,15 @@ class ScriptedChatModel:
         """
         self._move_outcome_keeping_answers.extend(answers)
 
+    def script_pattern_keeping(self, *answers: str | Exception) -> None:
+        """Queue Pattern keeping answers, one per call.
+
+        Args:
+            answers: The JSON answers; an exception is raised instead of
+                returned, to act like a failing model.
+        """
+        self._pattern_keeping_answers.extend(answers)
+
     def script_woven_check_in(self, *answers: str | Exception) -> None:
         """Queue woven-in Check-in answers, one per call.
 
@@ -820,6 +835,16 @@ class ScriptedChatModel:
                 self._move_outcome_keeping_answers.pop(0)
                 if self._move_outcome_keeping_answers
                 else json.dumps({"move_outcomes": []})
+            )
+        elif (
+            self.pattern_keeping_prompt and instructions == self.pattern_keeping_prompt
+        ):
+            self.pattern_keeping_calls.append(call)
+            self.call_order.append("pattern_keeping")
+            answer = (
+                self._pattern_keeping_answers.pop(0)
+                if self._pattern_keeping_answers
+                else json.dumps({"patterns": []})
             )
         elif (
             self.memory_processing_prompt

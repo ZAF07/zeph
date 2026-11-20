@@ -70,6 +70,10 @@ export function UserManagePanel({ user }: { user: AdminUser }) {
 
   const holds = [
     { label: "Life threads", value: String(user.life_thread_count) },
+    {
+      label: "Confirmed Patterns",
+      value: String(user.confirmed_pattern_count),
+    },
     { label: "Move outcomes", value: String(user.move_outcome_count) },
     { label: "Portrait", value: user.has_portrait ? "Written" : "Not written" },
   ];

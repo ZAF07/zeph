@@ -15,6 +15,7 @@ describe("model call labels", () => {
     expect(modelStepLabel("understanding")).toBe("Understanding");
     expect(modelStepLabel("life_threads")).toBe("Life Threads");
     expect(modelStepLabel("move_outcomes")).toBe("Move Outcomes");
+    expect(modelStepLabel("patterns")).toBe("Pattern keeping");
     expect(traceKindLabel("conversation_end")).toBe("Conversation end");
     expect(modelStepLabel("portrait")).toBe("User Portrait");
     expect(traceKindLabel("portrait_rewrite")).toBe("Portrait rewrite");

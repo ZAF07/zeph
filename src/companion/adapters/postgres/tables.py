@@ -481,6 +481,49 @@ move_outcomes = Table(
     Column("embedding", Vector(EMBEDDING_SIZE)),
 )
 
+patterns = Table(
+    "patterns",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("pattern", Text, nullable=False),
+    Column("state", Text, nullable=False),
+    Column("started_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("last_offered_at", DateTime(timezone=True)),
+    Column("last_reaction", Text),
+    Column("embedding", Vector(EMBEDDING_SIZE)),
+)
+
+pattern_evidence = Table(
+    "pattern_evidence",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("position", BigInteger, Identity(), nullable=False, unique=True),
+    Column(
+        "pattern_id",
+        Uuid,
+        ForeignKey("patterns.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column(
+        "life_thread_id",
+        Uuid,
+        ForeignKey("life_threads.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("day", Date, nullable=False),
+    Column("line", Text, nullable=False),
+)
+
 shared_photos = Table(
     "shared_photos",
     metadata,

@@ -30,6 +30,7 @@ const maya: AdminUser = {
   life_thread_count: 7,
   move_outcome_count: 3,
   has_portrait: true,
+  confirmed_pattern_count: 2,
 };
 
 const ren: AdminUser = {
@@ -44,6 +45,7 @@ const ren: AdminUser = {
   life_thread_count: 0,
   move_outcome_count: 0,
   has_portrait: false,
+  confirmed_pattern_count: 0,
 };
 
 function rowFor(name: string): HTMLElement {
@@ -141,6 +143,9 @@ describe("AdminUsers", () => {
       panel.getByText("maya@example.com · signed up 2 Oct 2026"),
     ).toBeInTheDocument();
     expect(panel.getByText("Life threads").nextSibling).toHaveTextContent("7");
+    expect(panel.getByText("Confirmed Patterns").nextSibling).toHaveTextContent(
+      "2",
+    );
     expect(panel.getByText("Move outcomes").nextSibling).toHaveTextContent("3");
     expect(panel.getByText("Portrait").nextSibling).toHaveTextContent(
       "Written",

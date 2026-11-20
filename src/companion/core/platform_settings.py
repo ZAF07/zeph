@@ -266,6 +266,11 @@ CURIOSITY_KEEPING_PROMPT = Setting("curiosity_keeping_prompt", read_text)
 MOVE_OUTCOME_KEEPING_MODEL = Setting("move_outcome_keeping_model", read_text)
 MOVE_OUTCOME_KEEPING_THINKING = Setting("move_outcome_keeping_thinking", read_on_off)
 MOVE_OUTCOME_KEEPING_PROMPT = Setting("move_outcome_keeping_prompt", read_text)
+PATTERN_KEEPING_MODEL = Setting("pattern_keeping_model", read_text)
+PATTERN_KEEPING_THINKING = Setting("pattern_keeping_thinking", read_on_off)
+PATTERN_KEEPING_PROMPT = Setting("pattern_keeping_prompt", read_text)
+PATTERN_KEEPING_THREADS = Setting("pattern_keeping_threads", read_whole_number)
+PATTERN_KEEPING_DAYS = Setting("pattern_keeping_days", read_whole_number)
 PORTRAIT_MODEL = Setting("portrait_model", read_text)
 PORTRAIT_THINKING = Setting("portrait_thinking", read_on_off)
 PORTRAIT_PROMPT = Setting("portrait_prompt", read_text)
@@ -439,6 +444,8 @@ class CoreService:
             a tool description it uses.
         extra_prompt_groups: Other text settings shown with its prompt in
             named groups.
+        limit_keys: Whole-number settings that limit what it is given,
+            shown with its model and thinking switch.
     """
 
     name: str
@@ -449,6 +456,7 @@ class CoreService:
     thinking_key: str
     extra_prompt_keys: tuple[str, ...] = ()
     extra_prompt_groups: tuple[ExtraPromptGroup, ...] = ()
+    limit_keys: tuple[str, ...] = ()
 
 
 MODEL_HINT = (
@@ -917,6 +925,49 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         "Move Outcome keeping thinking",
         SettingKind.ON_OFF,
         hint=THINKING_HINT,
+    ),
+    EditableSetting(
+        PATTERN_KEEPING_PROMPT.key,
+        "Pattern keeping prompt",
+        SettingKind.TEXT,
+        hint=(
+            "What counts as a Pattern. It runs once a Conversation ends, after Life "
+            "Threads are kept."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_KEEPING_MODEL.key,
+        "Pattern keeping model",
+        SettingKind.MODEL,
+        hint=MODEL_HINT,
+    ),
+    EditableSetting(
+        PATTERN_KEEPING_THINKING.key,
+        "Pattern keeping thinking",
+        SettingKind.ON_OFF,
+        hint=THINKING_HINT,
+    ),
+    EditableSetting(
+        PATTERN_KEEPING_THREADS.key,
+        "Closest Threads to include",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=50,
+        hint=(
+            "How many of the User’s other Threads, closest in meaning, Pattern "
+            "keeping is given."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_KEEPING_DAYS.key,
+        "Days of evidence to include",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=60,
+        hint=(
+            "How many days behind the evidence Pattern keeping reads, as messages "
+            "or Day Summaries."
+        ),
     ),
     EditableSetting(
         PERSONAL_STICKER_KEEPING_PROMPT.key,
@@ -1490,6 +1541,18 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         model_key=CHECK_IN_MODEL.key,
         thinking_key=CHECK_IN_THINKING.key,
         extra_prompt_keys=(WOVEN_CHECK_IN_PROMPT.key,),
+    ),
+    CoreService(
+        name="Pattern keeping",
+        runs_when="Conversation end · after Life Threads",
+        description=(
+            "Looks across Life Threads for the same way of thinking, feeling or "
+            "acting, and keeps it as a Pattern."
+        ),
+        prompt_key=PATTERN_KEEPING_PROMPT.key,
+        model_key=PATTERN_KEEPING_MODEL.key,
+        thinking_key=PATTERN_KEEPING_THINKING.key,
+        limit_keys=(PATTERN_KEEPING_THREADS.key, PATTERN_KEEPING_DAYS.key),
     ),
 )
 

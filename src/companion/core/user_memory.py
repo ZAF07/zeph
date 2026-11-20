@@ -164,6 +164,9 @@ class UserMemoryService:
     def delete_thread(self, user_id: UUID, thread_id: UUID) -> None:
         """Delete one of a User's Life Threads, so it is never brought up again.
 
+        Its evidence in Patterns goes with it, and so does a Pattern left
+        with no evidence.
+
         Args:
             user_id: The User's ID.
             thread_id: The Life Thread's ID.
@@ -171,8 +174,11 @@ class UserMemoryService:
         Raises:
             LifeThreadNotFoundError: If the User has no such Life Thread.
         """
-        if not self._repositories.life_threads.delete(user_id, thread_id):
-            raise LifeThreadNotFoundError
+        with self._repositories.transaction() as transaction:
+            in_transaction = transaction.repositories
+            if not in_transaction.life_threads.delete(user_id, thread_id):
+                raise LifeThreadNotFoundError
+            in_transaction.patterns.delete_without_evidence(user_id)
         self._rewrite_portrait(user_id)
 
     def list_move_outcomes(self, user_id: UUID) -> list[MoveOutcome]:
