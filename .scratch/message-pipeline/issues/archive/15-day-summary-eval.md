@@ -66,5 +66,5 @@ Review (`/code-review`): fixed one hard violation (a second component in `ShapeF
 ## Completion
 
 - Completed: 2026-11-20
-- Commit: <to be filled in after the merge>
+- Commit: `424b003` — Merge message pipeline issue 15: Day Summary Eval. A case is a made-up day of messages (From, Time, Text) and questions with expected answers. The day is saved split into Conversations at the quiet gap and the real Day Summary step alone (DayMemoryWriter, split out of the Conversation-end processor) writes its Summary with the live or overridden memory processing prompt, model and thinking. The Judge answers every question from the Summary alone, never shown the messages or the expected answers, then marks each Match or Miss with a reason; a case passes only if every answer matches. Two new Judge prompts, seeded without a migration. Three starting cases. A run's result shows the Summary and each question. Every Eval case form takes the drawn look (back link, one-list sections drawn in the panel, short fields side by side, hints only when given, a time-of-day field kind); ADR-0014 amended. No migration
 
