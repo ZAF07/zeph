@@ -12,6 +12,7 @@ from companion.core.models import (
     MemoryItem,
     MemorySource,
     MoveOutcome,
+    Pattern,
     User,
     UserPortrait,
 )
@@ -48,6 +49,12 @@ class MoveOutcomeNotFoundError(MemoryNotFoundError):
     shown_message = "Move Outcome not found"
 
 
+class PatternNotFoundError(MemoryNotFoundError):
+    """Raised when a User has no confirmed Pattern with that ID."""
+
+    shown_message = "Pattern not found"
+
+
 class UserPortraitNotFoundError(MemoryNotFoundError):
     """Raised when a User has no User Portrait."""
 
@@ -59,7 +66,7 @@ class UserMemoryService:
 
     While User Memory is off the Companion stops learning but keeps using what
     it has, so only saving is stopped here. Deleting a Memory Item, Life
-    Thread, Move Outcome or Day Summary asks for the User Portrait
+    Thread, Pattern, Move Outcome or Day Summary asks for the User Portrait
     to be written again without it, whatever User Memory says, since that
     only forgets.
     """
@@ -179,6 +186,33 @@ class UserMemoryService:
             if not in_transaction.life_threads.delete(user_id, thread_id):
                 raise LifeThreadNotFoundError
             in_transaction.patterns.delete_without_evidence(user_id)
+        self._rewrite_portrait(user_id)
+
+    def list_confirmed_patterns(self, user_id: UUID) -> list[Pattern]:
+        """List the Patterns a User agreed with, newest agreed first.
+
+        Suspected and closed Patterns are never shown to the User.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The confirmed Patterns, each with its evidence oldest first.
+        """
+        return self._repositories.patterns.list_confirmed(user_id)
+
+    def delete_pattern(self, user_id: UUID, pattern_id: UUID) -> None:
+        """Delete one of a User's confirmed Patterns, so it is never used again.
+
+        Args:
+            user_id: The User's ID.
+            pattern_id: The Pattern's ID.
+
+        Raises:
+            PatternNotFoundError: If the User has no such confirmed Pattern.
+        """
+        if not self._repositories.patterns.delete_confirmed(user_id, pattern_id):
+            raise PatternNotFoundError
         self._rewrite_portrait(user_id)
 
     def list_move_outcomes(self, user_id: UUID) -> list[MoveOutcome]:

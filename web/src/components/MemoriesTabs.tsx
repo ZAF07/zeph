@@ -3,7 +3,7 @@ import { type Copy, readCopy } from "@/lib/copy";
 import { type MemoriesTab, memoriesTabs } from "@/lib/memories";
 
 /**
- * The Memories page's row of six tabs. From 900px up it wraps; on a phone it
+ * The Memories page's row of seven tabs. From 900px up it wraps; on a phone it
  * scrolls sideways and never wraps.
  *
  * @param props - `copy` holds the tab names, `selected` is the tab shown,

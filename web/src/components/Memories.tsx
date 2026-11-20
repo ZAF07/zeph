@@ -14,6 +14,7 @@ import { MemoryItemsList } from "@/components/MemoryItemsList";
 import { MemoryOffNotice } from "@/components/MemoryOffNotice";
 import { MoveOutcomesList } from "@/components/MoveOutcomesList";
 import { PageHero } from "@/components/PageHero";
+import { PatternsList } from "@/components/PatternsList";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { SharedPhotosList } from "@/components/SharedPhotosList";
 import { Switch } from "@/components/Switch";
@@ -30,9 +31,9 @@ import { useApiClient } from "@/lib/use-api-client";
 
 /**
  * The Memories page: what Zeph remembers, by Memory Category, its User
- * Portrait of the User, the Life Threads it follows, what helps them (Move
- * Outcomes), the Day Summaries and the Shared Photos, each
- * deletable, with the User Memory switch. One tab shows at a time; the
+ * Portrait of the User, the Life Threads it follows, the Patterns they
+ * agreed with, what helps them (Move Outcomes), the Day Summaries and the
+ * Shared Photos, each deletable, with the User Memory switch. One tab shows at a time; the
  * address's `?tab=` picks it, and choosing a tab updates `?tab=` without
  * loading the page again. Every word is the Memories tab's Copy.
  *
@@ -61,6 +62,10 @@ export function Memories({ copy }: { copy: Copy }) {
     queryKey: queryKeys.lifeThreads,
     queryFn: () => apiClient.listLifeThreads(),
   });
+  const patternsQuery = useQuery({
+    queryKey: queryKeys.patterns,
+    queryFn: () => apiClient.listPatterns(),
+  });
   const outcomesQuery = useQuery({
     queryKey: queryKeys.moveOutcomes,
     queryFn: () => apiClient.listMoveOutcomes(),
@@ -78,6 +83,7 @@ export function Memories({ copy }: { copy: Copy }) {
     groupsQuery,
     portraitQuery,
     threadsQuery,
+    patternsQuery,
     outcomesQuery,
     summariesQuery,
     photosQuery,
@@ -86,6 +92,7 @@ export function Memories({ copy }: { copy: Copy }) {
   const me = meQuery.data;
   const groups = groupsQuery.data;
   const threads = threadsQuery.data;
+  const patterns = patternsQuery.data;
   const outcomes = outcomesQuery.data;
   const summaries = summariesQuery.data;
   const photos = photosQuery.data;
@@ -95,6 +102,7 @@ export function Memories({ copy }: { copy: Copy }) {
     groups &&
     portrait !== undefined &&
     threads &&
+    patterns &&
     outcomes &&
     summaries &&
     photos,
@@ -209,6 +217,9 @@ export function Memories({ copy }: { copy: Copy }) {
               copy={copy}
               timeZone={timeZone}
             />
+          ) : null}
+          {patterns && tab === "patterns" ? (
+            <PatternsList patterns={patterns} copy={copy} timeZone={timeZone} />
           ) : null}
           {outcomes && tab === "helps" ? (
             <MoveOutcomesList

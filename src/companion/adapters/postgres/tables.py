@@ -498,6 +498,7 @@ patterns = Table(
     Column("updated_at", DateTime(timezone=True), nullable=False),
     Column("last_offered_at", DateTime(timezone=True)),
     Column("last_reaction", Text),
+    Column("confirmed_at", DateTime(timezone=True)),
     Column("embedding", Vector(EMBEDDING_SIZE)),
 )
 

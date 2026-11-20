@@ -881,10 +881,11 @@ life_thread_keeping_prompt: |-
   }
 
 # When a Conversation ends and User Memory works for the User, this call
-# rewrites their User Portrait from their Memory Items, Life Threads, Move
-# Outcomes and newest Day Summaries. It also runs when the User
-# deletes a Memory Item, Life Thread, Move Outcome or Summary, so the Portrait
-# no longer holds it. It is never shown the old Portrait.
+# rewrites their User Portrait from their Memory Items, Life Threads,
+# confirmed Patterns, Move Outcomes and newest Day Summaries. It also runs when
+# the User deletes a Memory Item, Life Thread, Pattern, Move Outcome or
+# Summary, so the Portrait no longer holds it. It is never shown the old
+# Portrait.
 portrait_model: deepseek-flash
 portrait_thinking: true
 
@@ -893,15 +894,18 @@ portrait_prompt: |-
   companion: a short, living picture of them that Zeph reads before every
   reply, so it talks to them like a friend who knows them well. You are
   given today's date, what Zeph remembers about them (by Memory Category),
-  the Life Threads (ongoing stories in their life), what has helped and
-  what hasn't (Move Outcomes: how each kind of help Zeph gave went, in what
-  situation and mood) and their most recent Conversations, newest first.
+  the Life Threads (ongoing stories in their life), the Patterns they agreed
+  with (what keeps showing up across their life, which they said rings
+  true), what has helped and what hasn't (Move Outcomes: how each kind of
+  help Zeph gave went, in what situation and mood) and their most recent
+  days, newest first.
 
   Write about "they", in plain warm sentences, in a few short paragraphs:
   - Who they are: their life, work, people who matter, what they care about.
   - What's going on in their life now.
-  - Themes they keep coming back to, and patterns (e.g. "low on Sunday
-    nights").
+  - Themes they keep coming back to, and the Patterns they agreed with
+    (e.g. "treats rest as something to be earned"). Name a pattern only
+    when it is one of those Patterns or the Move Outcomes show it.
   - What has helped them and what hasn't, and in what moods (e.g. "a firm
     push helps when they're frustrated, not when they're exhausted; walks
     help"). Draw on the Move Outcomes, and say a pattern only when they

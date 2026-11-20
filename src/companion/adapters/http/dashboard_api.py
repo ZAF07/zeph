@@ -27,6 +27,7 @@ from companion.core.models import (
     MoveResult,
     MoveRole,
     OnboardingAnswers,
+    Pattern,
     PauseLength,
     PersonalSticker,
     PreferenceChanges,
@@ -292,6 +293,29 @@ class MoveOutcomesResponse(BaseModel):
     move_outcomes: list[MoveOutcomeResponse]
 
 
+class PatternEvidenceResponse(BaseModel):
+    """One time a Pattern showed up: the day, its Life Thread and what happened."""
+
+    day: date
+    thread: str
+    line: str
+
+
+class PatternResponse(BaseModel):
+    """A Pattern the User agreed with, when they agreed and what it is based on."""
+
+    id: str
+    pattern: str
+    agreed_at: datetime
+    evidence: list[PatternEvidenceResponse]
+
+
+class PatternsResponse(BaseModel):
+    """A User's confirmed Patterns, newest agreed first."""
+
+    patterns: list[PatternResponse]
+
+
 class UserPortraitResponse(BaseModel):
     """A User's User Portrait and when it was last written."""
 
@@ -370,6 +394,29 @@ def to_life_thread_response(thread: LifeThread) -> LifeThreadResponse:
         story=thread.story,
         is_open=thread.is_open,
         updated_at=thread.updated_at,
+    )
+
+
+def to_pattern_response(pattern: Pattern) -> PatternResponse:
+    """Describe a confirmed Pattern for the Dashboard.
+
+    Args:
+        pattern: The confirmed Pattern.
+
+    Returns:
+        The pattern, when the User agreed with it, and its evidence newest
+        day first.
+    """
+    return PatternResponse(
+        id=str(pattern.id),
+        pattern=pattern.pattern,
+        agreed_at=pattern.confirmed_at or pattern.updated_at,
+        evidence=[
+            PatternEvidenceResponse(
+                day=item.day, thread=item.thread_title, line=item.line
+            )
+            for item in reversed(pattern.evidence)
+        ],
     )
 
 
@@ -1056,6 +1103,44 @@ def build_dashboard_api_router(
             CoreError: 404 if the User has no such Life Thread.
         """
         user_memory_service.delete_thread(user.id, thread_id)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @router.get("/patterns")
+    def list_patterns(
+        user: Annotated[User, Depends(current_user)],
+    ) -> PatternsResponse:
+        """Return the Patterns the User agreed with, newest agreed first.
+
+        Args:
+            user: The signed-in User.
+
+        Returns:
+            The confirmed Patterns, each with its evidence.
+        """
+        return PatternsResponse(
+            patterns=[
+                to_pattern_response(pattern)
+                for pattern in user_memory_service.list_confirmed_patterns(user.id)
+            ]
+        )
+
+    @router.delete("/patterns/{pattern_id}", status_code=status.HTTP_204_NO_CONTENT)
+    def delete_pattern(
+        user: Annotated[User, Depends(current_user)], pattern_id: UUID
+    ) -> Response:
+        """Delete one of the User's confirmed Patterns.
+
+        Args:
+            user: The signed-in User.
+            pattern_id: The Pattern's ID.
+
+        Returns:
+            An empty response.
+
+        Raises:
+            CoreError: 404 if the User has no such confirmed Pattern.
+        """
+        user_memory_service.delete_pattern(user.id, pattern_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @router.get("/move-outcomes")

@@ -1215,6 +1215,17 @@ class PatternRepository(Protocol):
         """
         ...
 
+    def list_confirmed(self, user_id: UUID) -> list[Pattern]:
+        """List the Patterns a User agreed with, newest agreed first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The confirmed Patterns, each with its evidence oldest first.
+        """
+        ...
+
     def save_many(
         self, added: Sequence[PatternToSave], changed: Sequence[PatternToSave]
     ) -> None:
@@ -1236,6 +1247,19 @@ class PatternRepository(Protocol):
 
         Args:
             user_id: The User's ID.
+        """
+        ...
+
+    def delete_confirmed(self, user_id: UUID, pattern_id: UUID) -> bool:
+        """Delete one of a User's confirmed Patterns, with its evidence.
+
+        Args:
+            user_id: The User's ID.
+            pattern_id: The Pattern's ID.
+
+        Returns:
+            True if it was deleted; False if the User has no such confirmed
+            Pattern.
         """
         ...
 

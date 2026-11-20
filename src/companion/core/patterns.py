@@ -290,7 +290,8 @@ def apply_reaction(entry: dict[str, Any], pattern: Pattern, now: datetime) -> Pa
 
     Returns:
         The Pattern with when it was offered, how they took it and its new
-        state; unchanged if the model gave no reaction.
+        state (and when it was first confirmed); unchanged if the model gave
+        no reaction.
     """
     reaction = entry.get("reaction")
     if reaction not in {value.value for value in PatternReaction}:
@@ -303,9 +304,11 @@ def apply_reaction(entry: dict[str, Any], pattern: Pattern, now: datetime) -> Pa
         PatternReaction.PUSHED_BACK: PatternState.CLOSED,
     }
     allowed_state = state_allowed_by_reaction.get(PatternReaction(reaction))
-    if allowed_state is not None and entry.get("state") == allowed_state.value:
-        return replace(reacted, state=allowed_state)
-    return reacted
+    if allowed_state is None or entry.get("state") != allowed_state.value:
+        return reacted
+    if allowed_state == PatternState.CONFIRMED and pattern.confirmed_at is None:
+        return replace(reacted, state=allowed_state, confirmed_at=now)
+    return replace(reacted, state=allowed_state)
 
 
 def change_known_pattern(

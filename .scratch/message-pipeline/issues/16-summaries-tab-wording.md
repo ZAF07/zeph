@@ -50,3 +50,7 @@ The owner chose the wording on 20 Nov 2026 and the reference files already show 
 - [ ] Verified in the running app with `/run`, evidence recorded under `## Comments`
 
 ## Comments
+
+### Note from issue 10 (20 Nov 2026)
+
+Issue 10 is merged. The Patterns tab is in, and `memories.hero.lead` now reads "…what helps you, the patterns it has noticed, short summaries of past Conversations and the photos it kept. Delete anything you'd rather it forgot." Set it to the drawn text in full. Migration 0069 already reloaded the lead once (from the text before 10), so a migration here should match 10's text as the old seed. After 16, `node design/compare.cjs Memories M-Memories Memories--tab-patterns M-Memories--tab-patterns` should all PASS: with 16's hero line and "Day Summaries" tab name put into the fixtures, the Patterns tab gave 0.01% at both widths. `States` has no route in `routes.json`; issue 10 checked it with a scratch copy of `compare.cjs` pointing at `/design-preview/states` (0.03%).
