@@ -1,20 +1,23 @@
 /** The Persona page's two tabs: its voice and its Outlook. */
 export type PersonaTab = "voice" | "outlook";
 
+/** The Platform Setting each Persona tab edits. */
+export type PersonaSettingKey = "persona" | "persona_outlook";
+
 /** What each Persona tab edits, and the words around its editor. */
 export type PersonaTabDetails = {
   tab: PersonaTab;
   name: string;
-  settingKey: string;
+  settingKey: PersonaSettingKey;
   editorLabel: string;
   saveLabel: string;
   savedNote: string;
   idleNote: string;
 };
 
-/** The Persona tabs, in the order they are shown. */
-export const personaTabs: PersonaTabDetails[] = [
-  {
+/** The Persona tabs, by tab. */
+const personaTabsByTab: Record<PersonaTab, PersonaTabDetails> = {
+  voice: {
     tab: "voice",
     name: "Voice",
     settingKey: "persona",
@@ -23,7 +26,7 @@ export const personaTabs: PersonaTabDetails[] = [
     savedNote: "Saved. Zeph uses it from the next message.",
     idleNote: "Changes apply to the next message after saving.",
   },
-  {
+  outlook: {
     tab: "outlook",
     name: "Outlook",
     settingKey: "persona_outlook",
@@ -32,6 +35,12 @@ export const personaTabs: PersonaTabDetails[] = [
     savedNote: "Saved. Zeph uses it from the next reply.",
     idleNote: "Changes apply to the next reply after saving.",
   },
+};
+
+/** The Persona tabs, in the order they are shown. */
+export const personaTabs: PersonaTabDetails[] = [
+  personaTabsByTab.voice,
+  personaTabsByTab.outlook,
 ];
 
 /**
@@ -41,7 +50,7 @@ export const personaTabs: PersonaTabDetails[] = [
  * @returns Its setting key and the words around its editor.
  */
 export function personaTabDetails(tab: PersonaTab): PersonaTabDetails {
-  return personaTabs.find((option) => option.tab === tab) ?? personaTabs[0];
+  return personaTabsByTab[tab];
 }
 
 /**

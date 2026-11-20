@@ -153,8 +153,8 @@ def format_earlier_reply_plan(reply_plan: ReplyPlan) -> str:
         f"supporting Move: {reply_plan.support_move or 'none'}; "
         f"asked why: {asked_why}."
     )
-    if reply_plan.form.guidance:
-        parts.append(reply_plan.form.guidance)
+    if form.guidance:
+        parts.append(form.guidance)
     if reply_plan.next_move:
         why = f", {reply_plan.next_move_why}" if reply_plan.next_move_why else ""
         parts.append(f"Next Move in mind: {reply_plan.next_move}{why}.")
@@ -837,7 +837,7 @@ def format_reply_guidance(
         extra.
     """
     lines = [f"What they need from you right now: {need.name}.", need.how_to_reply]
-    if plan.read and plan.say_read:
+    if plan.say_read:
         lines.append(
             "Your Read of what is really going on, to give in this reply as your "
             f"view, never as fact: {plan.read}"
@@ -906,12 +906,11 @@ class ReplyPlanService:
     One model call, given the Persona's Outlook in front of its prompt,
     decides what the reply does: where the Conversation is now, Zeph's Read
     of what is really going on and whether to say it now, which Need fits,
-    which Moves
-    the reply makes from those the Need allows (leaving out any whose needed
-    Feature doesn't work for the User right now, and any that asks a
-    question and was made in the previous reply), which Move it means to
-    make next and why, which Memory Categories and Knowledge matter, which
-    Life Threads and Curiosities to bring up or leave alone, whether a
+    which Moves the reply makes from those the Need allows (leaving out any
+    whose needed Feature doesn't work for the User right now, and any that
+    asks a question and was made in the previous reply), which Move it means
+    to make next and why, which Memory Categories and Knowledge matter,
+    which Life Threads and Curiosities to bring up or leave alone, whether a
     Shared Photo may be sent and whether to ask why. It sees this
     Conversation's earlier Reply Plans with where the Conversation was, the
     Reads formed and their Moves, so it knows whether it already asked why,

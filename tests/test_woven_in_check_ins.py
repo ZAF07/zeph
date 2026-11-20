@@ -103,6 +103,7 @@ def test_a_check_in_due_mid_conversation_is_woven_into_the_reply_and_logged(
     assert woven_call.model == seeded_settings["check_in_model"]
     assert woven_call.thinking == seeded_settings["check_in_thinking"]
     assert seeded_settings["persona"] in woven_call.instructions
+    assert seeded_settings["persona_outlook"] not in woven_call.instructions
     reply_instructions = chat_model.calls[-1].instructions
     assert FOLLOW_UP_DESCRIPTION in reply_instructions
     assert NOTE in reply_instructions

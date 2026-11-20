@@ -437,9 +437,10 @@ understanding_prompt: |-
   }
 
 # After the Understanding, the Reply Plan call decides what the reply does:
-# where the Conversation is, Zeph's Read and whether to say it, the Need, the Moves, which Life Threads and Curiosities to bring up or
-# leave alone, which memories and Knowledge it uses, whether a Shared Photo
-# may be sent and whether to ask why. The reply follows it.
+# where the Conversation is, Zeph's Read and whether to say it, the Need,
+# the Moves, which Life Threads and Curiosities to bring up or leave alone,
+# which memories and Knowledge it uses, whether a Shared Photo may be sent
+# and whether to ask why. The reply follows it.
 reply_plan_model: deepseek-flash
 reply_plan_thinking: true
 
