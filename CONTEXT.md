@@ -77,7 +77,7 @@ A one-time, short-lived code from the Dashboard that a User sends to the Compani
 _Avoid_: Link code, invite, pairing code
 
 **Conversation**:
-A run of messages between a User and the Companion that ends after a quiet gap (set by an Admin) with no message from either side. Once ended it never reopens: the next message starts a new Conversation, even one that arrives just as it ends. A reply to a Check-in also starts one, beginning with that Check-in. A Conversation bounds Check-ins, per-Conversation limits and learning, but not what the Companion sees: every reply sees all messages from the last 24 hours (Admin-set) across Conversations, word for word, so the User can pick up where they left off; on a very heavy day the oldest part is replaced by the Day Summary to cap cost.
+A run of messages between a User and the Companion that ends after a quiet gap (set by an Admin) with no message from either side. Once ended it never reopens: the next message starts a new Conversation, even one that arrives just as it ends. A reply to a Check-in also starts one, beginning with that Check-in. A Conversation bounds Check-ins, per-Conversation limits and learning, but not what the Companion sees: every reply sees the Recent Messages, so the User can pick up where they left off.
 _Avoid_: Session, thread, chat
 
 **Check-in**:
@@ -227,7 +227,7 @@ The Companion's honest view of what is really going on with a User, formed befor
 _Avoid_: Opinion, insight, take, analysis
 
 **Reply Plan**:
-What a reply is built from, decided after the Understanding and before the reply is written: the Read, the Need, the lead, supporting and next Moves, and what the reply uses from everything that came to mind (which Life Threads to bring up or leave alone and why, a Pattern, a Curiosity, Knowledge, a Shared Photo, and whether a Woven-in Check-in fits at all). Everything optional is weighed here against what the User needs right now; nothing reaches the reply as a separate order. It also says in a line where the Conversation is now (e.g. "venting, nearly spent", "asking for a view"); each Reply Plan sees the earlier ones in the Conversation, so the Companion knows when to hold and when to push rather than starting fresh with every Message. When their mood stands out and the Understanding doesn't know why, the plan may have the reply gently ask, in the Companion's own voice, but never while they're venting and never twice in a row. When a Day Summary isn't detailed enough, the Reply Plan can read a past day's messages word for word, while Message Retention still keeps them. Users don't see Reply Plans; what is learned from them (their User Portrait, Life Threads, Patterns) is theirs to see and delete. Removed with the messages it was made for.
+What a reply is built from, decided after the Understanding and before the reply is written: the Read, the Need, the lead, supporting and next Moves, and what the reply uses from everything that came to mind (which Life Threads to bring up or leave alone and why, a Pattern, a Curiosity, Knowledge, a Shared Photo, and whether a Woven-in Check-in fits at all). Everything optional is weighed here against what the User needs right now; nothing reaches the reply as a separate order. It also says in a line where the Conversation is now (e.g. "venting, nearly spent", "asking for a view"); each Reply Plan sees the earlier ones in the Conversation, so the Companion knows when to hold and when to push rather than starting fresh with every Message. When their mood stands out and the Understanding doesn't know why, the plan may have the reply gently ask, in the Companion's own voice, but never while they're venting and never twice in a row. When a Day Summary isn't detailed enough, the Reply Plan can read a past day's messages word for word, while Message Retention still keeps them; what it read goes to the reply with what the Companion remembers. Past retention there are none, and the Companion answers from the Day Summary without claiming the User's exact words. Users don't see Reply Plans; what is learned from them (their User Portrait, Life Threads, Patterns) is theirs to see and delete. Removed with the messages it was made for.
 _Avoid_: Strategy, decision, intent
 
 **Curiosity**:
@@ -273,6 +273,10 @@ What each User used on each of their days, as counts only: messages, chat model 
 _Avoid_: Billing, costs, activity log
 
 ### Privacy
+
+**Recent Messages**:
+Every message between a User and the Companion from the last 24 hours (Admin-set), across Conversations and across midnight, word for word. The Understanding, the Reply Plan and the Reply all see them, so "as I was saying…" works after a break; a later Conversation among them is marked with when it started, and the Reply Plan also sees where the previous one was when it ended. On a very heavy day the oldest messages past an Admin-set cap are left out and their Day Summary stands in, to cap cost. Not to be confused with a Check-in's reply window.
+_Avoid_: Reply window, history, context window
 
 **Message Retention**:
 How long a User's raw messages are kept, set by Admins in days. Older messages are deleted automatically; Day Summaries, Memory Items and Shared Photos stay until the User deletes them.

@@ -45,6 +45,7 @@ from companion.core.platform_settings import (
     WEB_SEARCH_DAILY_LIMIT,
 )
 from companion.core.ports import ChatTool, Repositories
+from companion.core.recent_messages import RecentMessages
 from companion.core.reply_tools import Attachment, ReplyContext, ReplyOffer
 from companion.core.response_composition import EmptyReplyError, ResponseComposer
 from companion.core.sticker_adding import ADDING_TOOL, StickerAdding
@@ -227,7 +228,7 @@ def test_the_composer_offers_every_providers_tools_and_instructions_in_order(
     shared_photo_ids = [uuid4()]
 
     reply = composer.compose(
-        conversation_id,
+        RecentMessages(conversation_id, []),
         snapshot,
         memory="They like tea.",
         knowledge="Breathing helps.",
@@ -266,7 +267,7 @@ def test_what_a_providers_tool_picks_is_sent_as_the_sticker_or_shared_photo(
         ],
     )
 
-    reply = composer.compose(uuid4(), snapshot_for(user))
+    reply = composer.compose(RecentMessages(uuid4(), []), snapshot_for(user))
 
     assert reply.parts == ["Look at Miso"]
     assert reply.sticker == sticker
@@ -286,7 +287,7 @@ def test_a_reply_with_only_a_pick_is_sent_but_one_with_nothing_is_empty(
         [FakeProvider(picking_offer("pick_sticker", sticker))],
     )
 
-    reply = composer.compose(uuid4(), snapshot_for(user))
+    reply = composer.compose(RecentMessages(uuid4(), []), snapshot_for(user))
     assert reply.parts == []
     assert reply.sticker == sticker
 
@@ -294,7 +295,7 @@ def test_a_reply_with_only_a_pick_is_sent_but_one_with_nothing_is_empty(
         repositories, chat_model, [FakeProvider(ReplyOffer())]
     )
     with pytest.raises(EmptyReplyError):
-        nothing_picked.compose(uuid4(), snapshot_for(user))
+        nothing_picked.compose(RecentMessages(uuid4(), []), snapshot_for(user))
 
 
 def test_web_search_offers_its_tools_until_the_daily_limit(

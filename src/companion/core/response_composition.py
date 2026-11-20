@@ -22,6 +22,11 @@ from companion.core.platform_settings import (
     RESPONSE_THINKING,
 )
 from companion.core.ports import Repositories
+from companion.core.recent_messages import (
+    RecentMessages,
+    describe_stand_ins,
+    starts_new_conversation,
+)
 from companion.core.reply_tools import (
     NO_GUIDANCE,
     ReplyContext,
@@ -142,8 +147,8 @@ def write_instructions(
 def to_chat_history(messages: list[ConversationMessage]) -> list[ChatLine]:
     """Turn a Conversation's saved messages into history for the chat model.
 
-    The User's messages in a row are one Message, so they become one line
-    with each text on its own line.
+    The User's messages in a row in one Conversation are one Message, so
+    they become one line with each text on its own line.
 
     Args:
         messages: The messages, oldest first.
@@ -152,15 +157,21 @@ def to_chat_history(messages: list[ConversationMessage]) -> list[ChatLine]:
         One line per Message or Companion message, saying who said it.
     """
     history: list[ChatLine] = []
+    previous: ConversationMessage | None = None
     for message in messages:
         if message.direction == MessageDirection.OUTGOING:
             history.append(ChatLine(role=ChatRole.COMPANION, text=message.content))
-        elif history and history[-1].role == ChatRole.USER:
+        elif (
+            previous is not None
+            and previous.direction == MessageDirection.INCOMING
+            and not starts_new_conversation(previous, message)
+        ):
             history[-1] = ChatLine(
                 role=ChatRole.USER, text=f"{history[-1].text}\n{message.content}"
             )
         else:
             history.append(ChatLine(role=ChatRole.USER, text=message.content))
+        previous = message
     return history
 
 
@@ -191,7 +202,7 @@ class ResponseComposer:
 
     def compose(
         self,
-        conversation_id: UUID,
+        recent: RecentMessages,
         snapshot: UserSnapshot,
         memory: str = "",
         knowledge: str = "",
@@ -207,14 +218,17 @@ class ResponseComposer:
         and the User's boundaries, what they just asked, what the
         Understanding found they need, what the Companion remembers, and
         last the optional extras the reply may leave out. The model gets
-        every earlier message in the Conversation. Each tool provider offers
+        every message in the Recent Messages, across Conversations, and the Day
+        Summaries standing in for any left out go with what it remembers.
+        Each tool provider offers
         its tools and instructions, and a sticker or Shared Photo a tool
         picks is sent with the reply, after any fixed text a tool asked to
         close the reply with. When a Feature doesn't work for the User, the
         instructions say so, so the reply can tell them plainly.
 
         Args:
-            conversation_id: The Conversation to reply in.
+            recent: The Recent Messages: the Conversation to reply in and every
+                message from the last hours, across Conversations.
             snapshot: The User being replied to, as read when the reply started.
             memory: The User Memory that matters for this message; "" if none.
             knowledge: The Knowledge passages that may fit; "" if none.
@@ -235,11 +249,18 @@ class ResponseComposer:
         """
         settings = snapshot.settings
         context = ReplyContext(
-            conversation_id=conversation_id, shared_photo_ids=tuple(shared_photo_ids)
+            conversation_id=recent.conversation_id,
+            shared_photo_ids=tuple(shared_photo_ids),
         )
         offers = [
             provider.offer(snapshot, context) for provider in self._tool_providers
         ]
+        remembered_parts = (
+            memory,
+            describe_stand_ins(recent.stand_ins),
+            guidance.past_days,
+        )
+        remembered = "\n\n".join(part for part in remembered_parts if part)
         instructions = write_instructions(
             voice=settings.get(PERSONA),
             response_prompt=settings.get(RESPONSE_PROMPT),
@@ -251,7 +272,7 @@ class ResponseComposer:
                 ),
             ),
             guidance=guidance.plan,
-            memory=memory,
+            memory=remembered,
             optional_extras=(
                 *(offer.instructions for offer in optional_offers),
                 guidance.curiosities,
@@ -259,9 +280,7 @@ class ResponseComposer:
             ),
         )
         offers += optional_offers
-        history = to_chat_history(
-            self._repositories.conversations.list_messages(conversation_id)
-        )
+        history = to_chat_history(recent.messages)
         reply = self._chat_model.generate(
             snapshot=snapshot,
             step=ModelStep.REPLY,

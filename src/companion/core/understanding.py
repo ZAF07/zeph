@@ -26,7 +26,7 @@ from companion.core.platform_settings import (
     UNDERSTANDING_THINKING,
 )
 from companion.core.ports import Clock, Repositories
-from companion.core.transcripts import split_off_latest_message, to_transcript_lines
+from companion.core.recent_messages import RecentMessages, describe_recent_messages
 from companion.core.usage import UsageRecordingChatModel
 
 logger = logging.getLogger(__name__)
@@ -119,7 +119,7 @@ def describe_message_for_understanding(
     snapshot: UserSnapshot,
     portrait: str | None,
     earlier: Sequence[Understanding],
-    messages: list[ConversationMessage],
+    recent: RecentMessages,
 ) -> str:
     """Write what the Understanding model is given about the Message.
 
@@ -130,25 +130,22 @@ def describe_message_for_understanding(
         snapshot: The User being answered.
         portrait: The User Portrait; None if it isn't written yet.
         earlier: This Conversation's earlier Understandings, oldest first.
-        messages: The Conversation so far, oldest first; the User's messages
-            at the end are the Message being answered.
+        recent: The Recent Messages: every message from the last hours,
+            across Conversations.
 
     Returns:
-        The time, User Portrait, earlier Understandings, earlier
-        Conversation and latest message.
+        The time, User Portrait, earlier Understandings, earlier messages
+        across Conversations and latest message.
     """
     earlier_lines = "\n".join(
         format_earlier_understanding(understanding) for understanding in earlier
     )
-    earlier_messages, latest_text = split_off_latest_message(messages)
     return (
         f"Time where they are: {format_local_time(snapshot.local_now)}\n\n"
         f"Their User Portrait:\n{portrait or 'Not written yet.'}\n\n"
         f"Earlier Understandings in this Conversation, oldest first:\n"
         f"{earlier_lines or 'None yet.'}\n\n"
-        f"Earlier in the Conversation:\n"
-        f"{to_transcript_lines(earlier_messages) or 'Nothing yet.'}\n\n"
-        f"Latest message:\nPerson: {latest_text}"
+        f"{describe_recent_messages(recent, snapshot.user.time_zone)}"
     )
 
 
@@ -296,8 +293,9 @@ class UnderstandingService:
     keeping what they said apart from what is guessed and what is unclear),
     how strongly they feel it and whether the Companion knows why, whether
     they are struggling or asked for a photo, and what past to look up. It
-    sees the User Portrait and this Conversation's earlier Understandings,
-    so it knows how their mood is moving.
+    sees the User Portrait, this Conversation's earlier Understandings, so
+    it knows how their mood is moving, and the Recent Messages: every message
+    from the last hours, across Conversations.
     """
 
     def __init__(
@@ -321,7 +319,7 @@ class UnderstandingService:
         self._clock = clock
 
     def understand(
-        self, snapshot: UserSnapshot, conversation_id: UUID, portrait: str | None
+        self, snapshot: UserSnapshot, recent: RecentMessages, portrait: str | None
     ) -> Understanding:
         """Make and save the Understanding of the Conversation's newest Message.
 
@@ -331,26 +329,26 @@ class UnderstandingService:
 
         Args:
             snapshot: The User being answered.
-            conversation_id: The Conversation the Message is in.
+            recent: The Recent Messages, ending with the Message.
             portrait: The User Portrait; None if it isn't written yet.
 
         Returns:
             The saved Understanding.
         """
-        messages = self._repositories.conversations.list_messages(conversation_id)
+        conversation_id = recent.conversation_id
         earlier = self._repositories.understandings.list_for_conversation(
             conversation_id
         )
         model_form = self._ask(
             snapshot,
-            describe_message_for_understanding(snapshot, portrait, earlier, messages),
+            describe_message_for_understanding(snapshot, portrait, earlier, recent),
         )
         form = model_form if model_form is not None else fallback_form()
         understanding = Understanding(
             id=uuid4(),
             user_id=snapshot.user.id,
             conversation_id=conversation_id,
-            message_id=newest_incoming_message_id(messages),
+            message_id=newest_incoming_message_id(recent.messages),
             form=form,
             made_at=self._clock.now(),
             is_fallback=model_form is None,

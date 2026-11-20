@@ -175,7 +175,7 @@ def test_a_shorter_quiet_gap_starts_a_new_conversation_sooner(
     [maya] = [user for user in users if user["email"] == "user_maya@example.com"]
     assert maya["conversation_count"] == 2
     assert chat_model.calls[1].history[-1].text == "second"
-    assert len(chat_model.calls[1].history) == 1
+    assert "--- New Conversation" in chat_model.understanding_calls[-1].history[0].text
 
 
 @pytest.mark.parametrize(

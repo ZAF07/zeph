@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
 from companion.adapters.postgres.repositories import build_postgres_repositories
+from companion.core.recent_messages import RecentMessages
 from companion.core.reply_tools import ReplyGuidance, ReplyOffer
 from companion.core.response_composition import (
     ANSWER_THE_QUESTION,
@@ -103,7 +104,7 @@ def test_the_composer_puts_each_input_at_its_level(engine: Engine) -> None:
     )
 
     composer.compose(
-        user.id,
+        RecentMessages(user.id, []),
         snapshot_for(user),
         memory="They work at a bank.",
         knowledge="Breathing helps.",

@@ -52,6 +52,11 @@ const settings: AdminSettings = {
     "Sent in Telegram by the Reply gate when a User hits the daily limit.",
   ),
   message_retention_days: seeded(30),
+  recent_messages_hours: seeded(
+    24,
+    "Hours of messages, across Conversations, that every reply sees.",
+  ),
+  recent_messages_cap: seeded(400),
   older_summaries_per_reply: seeded(3),
   older_summaries_closeness_percent: seeded(68),
   life_threads_per_reply: seeded(3),
@@ -392,6 +397,34 @@ describe("PlatformSettingsForm", () => {
 
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       message_wait_seconds: 6,
+    });
+  });
+
+  it("shows and saves the Recent Messages in its Conversations section", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const hours = await screen.findByLabelText("Recent messages");
+    const cap = screen.getByLabelText("Recent messages cap");
+    expect(hours).toHaveValue(24);
+    expect(cap).toHaveValue(400);
+    expect(
+      screen.getByText(
+        "Hours of messages, across Conversations, that every reply sees.",
+      ),
+    ).toBeVisible();
+    const conversations = screen.getByRole("region", { name: "Conversations" });
+    expect(conversations).toContainElement(hours);
+    expect(conversations).toContainElement(cap);
+
+    await user.clear(hours);
+    await user.type(hours, "12");
+    await user.clear(cap);
+    await user.type(cap, "300");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      recent_messages_hours: 12,
+      recent_messages_cap: 300,
     });
   });
 

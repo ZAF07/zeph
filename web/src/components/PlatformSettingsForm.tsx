@@ -75,6 +75,16 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
         label: "Daily message limit",
         unit: "msgs",
       },
+      {
+        key: "recent_messages_hours",
+        label: "Recent messages",
+        unit: "hours",
+      },
+      {
+        key: "recent_messages_cap",
+        label: "Recent messages cap",
+        unit: "msgs",
+      },
     ],
   },
   {

@@ -236,7 +236,7 @@ def test_a_message_after_a_conversation_ended_starts_a_new_one(
     )
 
     assert chat_model.calls[1].history[-1].text == "back again"
-    assert len(chat_model.calls[1].history) == 1
+    assert "--- New Conversation" in chat_model.understanding_calls[-1].history[0].text
     summaries = client.get("/api/day-summaries", headers=headers).json()
     assert [entry["summary"] for entry in summaries["summaries"]] == ["Came back."]
 

@@ -154,9 +154,10 @@ def test_message_after_the_quiet_gap_starts_a_new_conversation(
     clock.advance(quiet_gap + timedelta(minutes=1))
     send_to_webhook(client, telegram_text_update("good morning"))
 
-    assert chat_model.calls[1].history == [
-        ChatLine(role=ChatRole.USER, text="good morning")
-    ]
+    assert chat_model.calls[1].history[-1] == ChatLine(
+        role=ChatRole.USER, text="good morning"
+    )
+    assert "--- New Conversation" in chat_model.understanding_calls[-1].history[0].text
     with engine.connect() as connection:
         message_counts = connection.execute(
             text(

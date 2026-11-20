@@ -627,7 +627,7 @@ class ScriptedChatModel:
         self._safeguard_answers: list[str | Exception] = []
         self._processing_answers: list[str | Exception] = []
         self._understanding_answers: list[str | Exception] = []
-        self._reply_plan_answers: list[str | Exception] = []
+        self._reply_plan_answers: list[str | Exception | ToolCall] = []
         self._sticker_keeping_answers: list[str | Exception] = []
         self._thread_keeping_answers: list[str | Exception] = []
         self._when_it_helps_answers: list[str | Exception] = []
@@ -705,12 +705,14 @@ class ScriptedChatModel:
         """
         self._understanding_answers.extend(answers)
 
-    def script_reply_plan(self, *answers: str | Exception) -> None:
+    def script_reply_plan(self, *answers: str | Exception | ToolCall) -> None:
         """Queue Reply Plan answers, one per call.
 
         Args:
             answers: The forms, e.g. from `reply_plan_answer()`; an exception
-                is raised instead of returned, to act like a failing model.
+                is raised instead of returned, to act like a failing model. A
+                tool call is run with the offered tool before the next answer
+                is returned.
         """
         self._reply_plan_answers.extend(answers)
 
@@ -882,6 +884,12 @@ class ScriptedChatModel:
                 if self._reply_plan_answers
                 else reply_plan_answer()
             )
+            while isinstance(answer, ToolCall):
+                [tool] = [tool for tool in tools if tool.name == answer.name]
+                result = tool.run(answer.arguments)
+                call.tool_results.append(result)
+                tool_calls.append(ToolCallRecord(answer.name, answer.arguments, result))
+                answer = self._reply_plan_answers.pop(0)
         elif self.thread_keeping_prompt and instructions == self.thread_keeping_prompt:
             self.thread_keeping_calls.append(call)
             self.call_order.append("thread_keeping")
