@@ -87,6 +87,23 @@ For example: `Reply Plan · need: picked Be heard, expected Advice`.
   - `check_asked_why` and `check_woven_in` could reuse `check_yes_no`, but that would change their wording, so they were kept.
 - **Unrelated stale text:** the Needs and Moves field hints still say "when the Understanding picks this Need/Move".
 
+### Open for the owner: decisions and caveats
+
+**Decisions you may want to reverse**
+1. **One Eval, not two.** Story 67 asks for "separate Evals". What exists is one Understanding Eval where every check is named after its step ("Understanding ·", "Recall ·", "Reply Plan ·"). Two separate Evals would replay each conversation twice and double the cost. If you want two Eval kinds on the Dashboard (run and scored apart), that is new work.
+2. **A third step, Recall.** The issue named only the Understanding and the Reply Plan. "found" (was the Companion reminded of a Life Thread) is marked **Recall**, because neither model does it: Recall is plain code between the two. Recall is now a term in `CONTEXT.md`. If you'd rather it count as Understanding or Reply Plan, it is a one-line change in `check_steps`.
+3. **Expectations stay one flat list.** Code decides which step owns each field, instead of the case file grouping them under `understanding:` and `reply_plan:`. That needed no migration and left edited cases untouched. The case form shows the step at the start of each hint instead.
+4. **"Feelings said" and "Wants said" check only the `said` slot.** Yes means something is kept as said. No means nothing is kept as said. Whether a guess landed under `read` or under `unclear` is not checked.
+5. **Four new seed cases:** `scared-before-the-exam`, `feeling-not-put-in-words`, `looks-back-at-an-old-trip`, `asks-for-zeph-view`. Two of them (`feeling-not-put-in-words`, `looks-back-at-an-old-trip`) go a little beyond the issue. Archive them on the Dashboard if you don't want them.
+
+**Caveats**
+1. **Not run on the real model.** Every check was verified with the fake model and a stand-in. The old seed file said the existing cases "may fail until issue 13". Nobody has checked how they do now, or how the 4 new cases do. Run a real Understanding Eval (it costs money) and adjust the cases that fail for the wrong reason.
+2. **Check names changed.** Old runs say `need`; new runs say `Reply Plan · need`. Nothing in the code compares names across runs (the history page compares outcomes), but side-by-side reading of an old run and a new one shows different names.
+3. **Which Understanding and Reply Plan get checked.** Each Message is checked against the newest Understanding and Reply Plan in the Conversation, not one matched to that Message. If a Message somehow saved none, the previous Message's would be checked. It doesn't happen today, because a failed call still saves a fallback.
+4. **Read said = Read formed and say_read.** A plan that says "say it" with an empty Read counts as not said.
+5. **Small cleanup left.** `check_asked_why` and `check_woven_in` could reuse the new `check_yes_no`, but their failure wording would change, so they were left alone.
+6. **Stale text elsewhere.** The Needs and Moves field hints on the Dashboard still say "when the Understanding picks this Need/Move". The Reply Plan picks them now. This is outside this issue.
+
 ## Completion
 
 - Completed: 2026-11-20
