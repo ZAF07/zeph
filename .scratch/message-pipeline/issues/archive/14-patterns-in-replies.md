@@ -101,4 +101,8 @@ Live runs used the real app (`create_app` through the Evals `InProcessCompanion`
 ## Completion
 
 - Completed: 2026-11-20
-- Commit: <to be filled in after merge>
+- Commit: 0db0f64 "Merge message pipeline issue 14: Patterns come to mind in replies" (merged into `main` locally and pushed), with:
+  - 72ff690 "Message pipeline issue 14: Patterns come to mind in replies"
+  - d314463 "Message pipeline issue 14: review fixes"
+  - 268c3c5 "Message pipeline issue 14: trace header matches the design"
+  - d39b129 "Message pipeline issue 14 done: archive issue with test, run, pixel and review evidence; redesign issue 19 filed"
