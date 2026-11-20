@@ -84,4 +84,8 @@ Read `web/design/README.md` in full first, including "Message-pipeline additions
 ## Completion
 
 - Completed: 2026-11-20
-- Commit: implementation 999fd79, review fixes 0940229 (archive and merge commits recorded below once made)
+- Commits on branch `message-pipeline-05-reply-plan`:
+  - 999fd79 "Message pipeline issue 05: the Reply Plan takes over deciding; the Understanding only reads"
+  - 0940229 "Message pipeline issue 05 review fixes: a failed Reply Plan never asks why, the Check-in helper is named for both forms it describes, two split hints joined"
+  - d435c5c "Message pipeline issue 05 done: archive issue with test, run, pixel and review evidence"
+- Merged into main in 6204605 "Merge message pipeline issue 05: the Reply Plan takes over deciding and the Understanding only reads (ADR-0021). …"
