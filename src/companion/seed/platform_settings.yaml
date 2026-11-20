@@ -687,6 +687,14 @@ life_thread_brushed_off_wait_days: 14
 # reply again. A closed Pattern never comes to mind.
 pattern_pushed_back_wait_days: 30
 
+# How close in meaning (cosine similarity, as a percent) a Pattern must be to
+# what the User means and their latest texts to come to mind with no Thread.
+# Patterns are worded in general terms, so they score lower than Threads: with
+# the bge-small embedder, messages that fit a Pattern score about 47 to 66 and
+# small talk up to about 61. A Pattern linked to a Thread in mind comes to mind
+# whatever its closeness.
+pattern_closeness_percent: 52
+
 # Curiosities: things Zeph wants to ask a User later, written when a
 # Conversation ends. The Understanding sees the waiting ones whose "not before"
 # day has come and may bring one up; at most this many are raised in one

@@ -159,6 +159,38 @@ def test_a_message_far_from_every_pattern_and_thread_brings_no_pattern(
     assert GOES_QUIET not in seen
 
 
+def test_direct_pattern_recall_follows_the_pattern_bar_not_the_thread_bar(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    have_goes_quiet_pattern(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+    )
+    set_settings(
+        client,
+        auth_verifier,
+        {"life_threads_closeness_percent": 100, "pattern_closeness_percent": 20},
+    )
+    loose = reply_plan_sees(client, chat_model, CLOSE_TO_GOES_QUIET)
+    clock.advance(timedelta(days=1))
+    set_settings(client, auth_verifier, {"pattern_closeness_percent": 100})
+    strict = reply_plan_sees(client, chat_model, CLOSE_TO_GOES_QUIET)
+
+    assert GOES_QUIET in loose
+    assert GOES_QUIET not in strict
+
+
 def test_a_pattern_in_mind_stays_in_mind_for_the_conversation(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
@@ -431,6 +463,30 @@ def test_the_push_back_wait_is_admin_editable_with_a_hint(
         == EDITABLE_SETTINGS_BY_KEY["pattern_pushed_back_wait_days"].hint
     )
     assert "pushed back" in setting["hint"]
+
+
+def test_the_pattern_bar_is_admin_editable_with_a_hint_and_seeded_at_52(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    seeded_settings: dict[str, Any],
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+
+    response = client.patch(
+        "/api/admin/settings",
+        json={"values": {"pattern_closeness_percent": 58}},
+        headers=headers,
+    )
+
+    assert seeded_settings["pattern_closeness_percent"] == 52
+    assert response.status_code == 200
+    setting_key = "pattern_closeness_percent"
+    thread_bar_key = "life_threads_closeness_percent"
+    setting = response.json()["settings"][setting_key]
+    assert setting["value"] == 58
+    assert setting["hint"] == EDITABLE_SETTINGS_BY_KEY[setting_key].hint
+    assert "Pattern" in setting["hint"]
+    assert "Pattern" not in EDITABLE_SETTINGS_BY_KEY[thread_bar_key].hint
 
 
 def patterns_in_replies_migration() -> ModuleType:
