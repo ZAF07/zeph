@@ -180,6 +180,29 @@ def test_a_text_sent_while_a_reply_is_written_starts_it_over_with_every_text(
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["second reply"]
 
 
+def test_an_album_photo_sent_while_a_reply_is_written_starts_it_over(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    timer: FakeTimer,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script("first reply", "what a view")
+    album_photo = telegram_photo_update(
+        file_unique_id="photo-1", album_id="album-1", message_id=11
+    )
+    chat_model.before_next_reply = lambda: post_to_webhook(client, album_photo)
+
+    send_to_webhook(client, telegram_text_update("look where i am"))
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == []
+    timer.end_message_waits()
+
+    _, second_call = chat_model.calls
+    assert second_call.history[-1].text.startswith("look where i am\n[photo:")
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["what a view"]
+
+
 def test_a_message_started_over_counts_once_toward_the_daily_limit(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,

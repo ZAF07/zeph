@@ -101,12 +101,11 @@ class ReplyService:
             ReplyDroppedError: If a new text dropped the try before any of
                 the reply was sent.
         """
-        if attempt.data_deletion_note is None:
-            gate_result = self._reply_gate.check(message, snapshot)
-            if isinstance(gate_result, Stopped):
-                return
-            attempt.data_deletion_note = gate_result.data_deletion_note
-        attempt.raise_if_dropped()
+        gate_result = attempt.apply_house_rules(
+            lambda: self._reply_gate.check(message, snapshot)
+        )
+        if isinstance(gate_result, Stopped):
+            return
         saved_memory = self._memory_retrieval.read(snapshot)
         reminded = self._thread_reminder.remind(snapshot, message.conversation_id)
         due = self._curiosity_raiser.due(snapshot, message.conversation_id)
@@ -157,7 +156,7 @@ class ReplyService:
                 optional_offers=(
                     [check_in_offer.offer] if check_in_offer is not None else []
                 ),
-                data_deletion_note=attempt.data_deletion_note,
+                data_deletion_note=gate_result.data_deletion_note,
                 shared_photo_ids=(
                     memory.shared_photo_ids if may_send_photo(form) else ()
                 ),

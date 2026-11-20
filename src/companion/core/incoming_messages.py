@@ -28,7 +28,7 @@ from companion.core.platform_settings import (
 )
 from companion.core.ports import ChatChannel, Repositories, Timer
 from companion.core.reply_attempt import ReplyAttempt, ReplyDroppedError
-from companion.core.reply_gate import ReplyGate, Stopped
+from companion.core.reply_gate import ReplyGate, ReplyNeeded, Stopped
 from companion.core.reply_service import ReplyService
 from companion.core.sticker_adding import StickerAdding
 from companion.core.stickers import sticker_message_text
@@ -124,7 +124,7 @@ class PendingMessage:
             User pauses.
         trace: The Model Call Log trace every model call for it goes in,
             from the first text's Safeguard check to the reply.
-        data_deletion_note: What the house rules told a dropped reply to it;
+        house_rules: What the house rules said to a dropped reply to it;
             None until a reply passes them.
     """
 
@@ -135,7 +135,7 @@ class PendingMessage:
     trace: ModelCallTrace = field(
         default_factory=lambda: start_trace(TraceKind.MESSAGE)
     )
-    data_deletion_note: str | None = None
+    house_rules: ReplyNeeded | None = None
 
     def add_screened(self, conversation_id: UUID, text: str) -> None:
         """Add a text that passed the Safeguard.
@@ -159,7 +159,10 @@ class IncomingMessageHandler:
     time. A text that arrives while a reply is being written, before any of
     it is sent, drops that reply, and the Message is answered again with
     every text once the User pauses; once part of a reply is sent, a new
-    text starts the next Message. From the first text until something is
+    text starts the next Message. The texts waiting to be answered, and the
+    reply being written, are only read and changed under one guard, since
+    texts are checked while a reply is written. From the first text until
+    something is
     sent back, typing is shown again every `typing_repeat_seconds`, so the
     chat never looks dead.
     """
@@ -284,12 +287,12 @@ class IncomingMessageHandler:
             user_id: The User who sent it.
             message: The photo or file message, with its Album ID.
         """
+        self._start_over_reply_being_written(user_id)
         with self._pending_messages_guard:
             pending = self._pending_messages.setdefault(
                 user_id, PendingMessage(chat_id=message.chat_id)
             )
             pending.album_items.append(message)
-        self._start_over_reply_being_written(user_id)
         self._restart_wait(user_id, self._repositories.platform_settings.load())
 
     def _screen_text(self, user_id: UUID, message: IncomingMessage) -> None:
@@ -391,7 +394,7 @@ class IncomingMessageHandler:
                 return None
             attempt = ReplyAttempt(
                 on_sending=lambda: self._forget_answered_message(user_id, pending),
-                data_deletion_note=pending.data_deletion_note,
+                house_rules=pending.house_rules,
             )
             self._replies_being_written[user_id] = attempt
             return pending, attempt
@@ -423,12 +426,12 @@ class IncomingMessageHandler:
         Returns:
             True if a new text dropped the try.
         """
-        was_dropped = attempt.finish()
         with self._pending_messages_guard:
+            was_dropped = attempt.finish()
             del self._replies_being_written[user_id]
-            pending.data_deletion_note = attempt.data_deletion_note
-        if not was_dropped:
-            self._forget_answered_message(user_id, pending)
+            pending.house_rules = attempt.house_rules
+            if not was_dropped and self._pending_messages.get(user_id) is pending:
+                del self._pending_messages[user_id]
         return was_dropped
 
     def _is_checking_a_text(self, user_id: UUID) -> bool:
@@ -464,7 +467,8 @@ class IncomingMessageHandler:
         drops the reply before any of it is sent, nothing more is sent: the
         new text restarts the wait, and the Message is answered again then.
         If the reply fails the User gets a short fallback reply instead of
-        silence. Typing is kept up until something is sent, and stops once
+        silence, unless a new text dropped it meanwhile, since it is then
+        answered again. Typing is kept up until something is sent, and stops once
         the answer ends, unless the reply was dropped.
 
         Args:
@@ -483,7 +487,7 @@ class IncomingMessageHandler:
             )
             failed = False
             try:
-                self._answer(user_id, pending, attempt, settings)
+                self._try_answer(user_id, pending, attempt, settings)
             except ReplyDroppedError:
                 logger.info("A new text started a User's reply over")
             except Exception:
@@ -498,7 +502,7 @@ class IncomingMessageHandler:
                 )
             self._typing_keeper.stop(pending.chat_id)
 
-    def _answer(
+    def _try_answer(
         self,
         user_id: UUID,
         pending: PendingMessage,
@@ -508,9 +512,9 @@ class IncomingMessageHandler:
         """Try once to answer the User's Message.
 
         Any Albums are described and checked for crisis first, each once,
-        even if the try is dropped; a crisis gets the Crisis Reply and the
-        Message isn't answered normally. An Album with no photos and no
-        caption gets the unsupported reply.
+        even if the try is dropped; a crisis gets the Crisis Reply and drops
+        the rest of the Message, so it isn't answered normally. An Album with
+        no photos and no caption gets the unsupported reply.
 
         Args:
             user_id: The User who paused.
@@ -533,6 +537,7 @@ class IncomingMessageHandler:
             result = self._reply_gate.screen(album_text, snapshot)
             self._remove_album_items(pending, items)
             if isinstance(result, Stopped):
+                self._drop_pending_message(user_id)
                 return
             with self._pending_messages_guard:
                 pending.add_screened(result.conversation_id, album_text.text)
@@ -563,7 +568,9 @@ class IncomingMessageHandler:
         """
         with self._pending_messages_guard:
             pending.album_items = [
-                item for item in pending.album_items if item not in items
+                item
+                for item in pending.album_items
+                if not any(item is screened for screened in items)
             ]
 
     def _album_text_to_screen(
