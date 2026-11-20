@@ -130,7 +130,7 @@ const coreServices: CoreServices = {
       model_key: "reply_plan_model",
       thinking_key: "reply_plan_thinking",
       extra_prompts: [],
-      extra_prompt_groups: [{ name: "Fallback wording", prompts: [] }],
+      extra_prompt_groups: [],
       limits: [],
     },
     {
