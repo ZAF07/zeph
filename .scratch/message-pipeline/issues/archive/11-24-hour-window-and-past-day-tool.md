@@ -79,6 +79,38 @@ Live runs used real DeepSeek and Postgres inside the worktree's backend containe
   - The concept was renamed **Recent Messages** (`recent_messages_hours`, `recent_messages_cap`) from the issue's "24-hour window", to avoid the existing "reply window".
   - No Eval was run (Evals cost money).
 
+### Decisions and things to know
+
+- **Name:** "Recent Messages", not "24-hour window" or "reply window". "Reply window" already means how long a reply to a Check-in counts (`check_in_reply_window_hours`). Settings: `recent_messages_hours` (24, allowed 1–72) and `recent_messages_cap` (400, allowed 4–2000). The labels on Platform settings (`/admin/settings`, Conversations section) are "Recent messages" and "Recent messages cap".
+- **The cap is a message count over the whole Recent Messages,** not per day. It keeps the newest N messages. A cut can fall in the middle of a Message. The Day Summaries of the left-out messages' days stand in, using each message's own day in the User's time zone.
+- **What each step gets:**
+  - The Understanding and Reply Plan read the Recent Messages as a transcript, with a "--- New Conversation, 20 Nov 2026 14:02 ---" line before each later Conversation, including before the latest Message when it starts one.
+  - The Reply gets them as chat turns with no such line.
+  - The Day Summaries standing in go to the Understanding and Reply Plan above the transcript, and to the Reply in its level 4 memory section.
+  - Earlier Understandings and earlier Reply Plans still come from the current Conversation only. The previous Conversation reaches the Reply Plan only through its last where-we-are line.
+- **Chat turns:** a User's texts in a row in the same Conversation are still one turn. Texts in two different Conversations are now separate turns, even with no Zeph reply between them (e.g. texts left unanswered when the reply failed). So the Reply can get two user turns in a row.
+- **The latest Message** is only the User's trailing texts in the current Conversation. Unanswered texts at the end of an earlier Conversation show as earlier messages.
+- **The past-day tool's text is fixed in code** (`core/past_day.py`: the description, the "date needed" note, the "no exact words" note, the boundary-day note). None of it is Admin-editable. `reply_plan_prompt` was not changed (no prompt migration): the model learns about the tool only from its description. If Admins should tune it, it would need Platform Settings with hints.
+- **Hand-over to the Reply:** everything the tool returned (messages, or "none") goes to the Reply's level 4 section under "Past days you looked up for this reply". It isn't capped. The PRD said the Reply gets "only what the plan picked"; I chose a code hand-over because the model didn't reliably carry the details in its guidance.
+- **The tool can be called more than once per Reply Plan.** Live, asked about 11 Oct, it also re-read 15 Nov. Every read goes to the Reply.
+- **The retention rule is by date:** a day wholly older than `message_retention_days` returns none, even if the clean-up hasn't deleted its messages yet. On the boundary day it returns what's left and says the start of the day may be gone.
+- **A wrong reply lingers for 24 hours.** In a live run, Zeph's earlier wrong "I don't have the 15th" (from before the hand-over fix) stayed in the Recent Messages and made the next reply hedge, even though the right messages were in front of it. That's the cost of a longer memory: a mistake stays in view for a day too.
+- **DeepSeek with thinking on plus a tool call** worked on the Reply Plan in every live run. There was no problem with the reasoning content between tool rounds.
+- **Code changes others will notice:**
+  - `ResponseComposer.compose` now takes the `RecentMessages` instead of a Conversation ID.
+  - `UnderstandingService.understand` and `ReplyPlanService.plan` take them too.
+  - `ReplyService` reads them once per reply (`RecentMessagesReader`).
+  - `ReplyPlanService` needs a `PastDayTool`.
+  - `ReplyGuidance` has a new `past_days` field.
+  - New port method `ConversationRepository.list_user_messages_between`, one query across Conversations, ordered by the global message position.
+- **Existing tests changed:**
+  - Four tests had proved "a new Conversation started" by the Reply seeing only its own messages: `test_message_after_the_quiet_gap_starts_a_new_conversation`, `test_a_shorter_quiet_gap_starts_a_new_conversation_sooner`, `test_a_message_after_a_conversation_ended_starts_a_new_one` and `test_only_the_first_message_after_a_check_in_counts_as_its_reply`. They now check the "--- New Conversation" line in the Understanding's input instead.
+  - `test_next_move.py` splits on the new "Earlier messages, across Conversations" heading.
+  - The composer tests pass `RecentMessages`.
+  - The fake chat model's Reply Plan script now accepts tool calls.
+- **Rebase:** issue 09 landed on `main` while this was in progress. The conflicts were in `reply_plan.py` (Check-in Kinds and the previous where-we-are line, both kept), `reply_service.py` and the pipeline README (both sides' notes kept). Everything was re-run on the rebased code, live checks included.
+- **The worktree's database still held the old setting keys** (`reply_window_*`) from before the rename; they were never on `main`. The worktree and its database are now torn down.
+
 ## Completion
 
 - Completed: 2026-11-20
