@@ -15,5 +15,6 @@ We chose this because nearly all the work waits on the model or Telegram, so one
 
 - **A restart or deploy drops messages not yet answered**, and the User gets no reply to them. If Users report lost messages or the platform gets slow, look here first.
 - Live replies come before tick work. A large tick makes Check-ins late, not double.
-- Running a second backend process is still unsafe: the reply lock, the queue, sticker adding mode, typing and the scheduler all live in memory.
+- Running a second backend process is still unsafe: the reply locks, the queue, sticker adding mode, typing and the scheduler all live in memory.
+- Each User has two in-memory locks: one checks their texts one at a time, the other writes their replies one at a time. A text is checked even while a reply is being written, and can drop that reply until any of it is sent (message pipeline issue 03).
 - `make load-test` (fake model and Telegram; real Postgres and embedder) is how we check that the sizing holds.

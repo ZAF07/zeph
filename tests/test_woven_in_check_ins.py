@@ -17,6 +17,7 @@ from tests.fakes import (
     FakeChatChannel,
     FakeClock,
     FakeScheduler,
+    FakeTimer,
     ScriptedChatModel,
     ToolCall,
     understanding_answer,
@@ -24,6 +25,7 @@ from tests.fakes import (
 from tests.telegram_helpers import (
     TELEGRAM_CHAT_ID,
     owner_headers,
+    post_to_webhook,
     send_to_webhook,
     telegram_text_update,
 )
@@ -480,6 +482,32 @@ def test_a_reply_that_fails_to_send_logs_no_check_in_and_it_stays_due(
 
     send_to_webhook(client, telegram_text_update("now making a big salad"))
 
+    assert recent_check_ins(client, headers) == []
+    assert next_due_at(engine, maya_id(client, headers)) == due_at
+
+
+def test_a_woven_in_check_in_for_a_reply_started_over_is_taken_back_and_stays_due(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    timer: FakeTimer,
+    engine: Engine,
+) -> None:
+    headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
+    due_at = next_due_at(engine, maya_id(client, headers))
+    open_a_conversation_until_due(client, chat_model, chat_channel, clock)
+    chat_model.script_woven_check_in(weave_answer())
+    chat_model.script(BRING_UP, "how did the board presentation go?", "yum, enjoy")
+    chat_model.before_next_reply = lambda: post_to_webhook(
+        client, telegram_text_update("with some pasta")
+    )
+
+    send_to_webhook(client, telegram_text_update("now making a big salad"))
+    timer.end_message_waits()
+
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["yum, enjoy"]
     assert recent_check_ins(client, headers) == []
     assert next_due_at(engine, maya_id(client, headers)) == due_at
 
