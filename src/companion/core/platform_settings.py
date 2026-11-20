@@ -1127,14 +1127,14 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     ),
     EditableSetting(
         LIFE_THREADS_PER_REPLY.key,
-        "Most Life Threads per message",
+        "Most Life Threads in mind",
         SettingKind.WHOLE_NUMBER,
         minimum=0,
         maximum=30,
         hint=(
-            "How many Life Threads past the closeness bar Recall may bring to mind "
-            "for one message, open ones first; only there to protect cost. Threads "
-            "that came to mind earlier stay in mind until the Conversation ends."
+            "How many Life Threads the Reply Plan can have in mind at once: those "
+            "the message brings to mind first, then earlier ones in the "
+            "Conversation. Set high; it is only there to protect cost."
         ),
     ),
     EditableSetting(

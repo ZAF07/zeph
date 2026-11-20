@@ -102,7 +102,7 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
       },
       {
         key: "life_threads_per_reply",
-        label: "Most Life Threads per message",
+        label: "Most Life Threads in mind",
         unit: "threads",
       },
       {

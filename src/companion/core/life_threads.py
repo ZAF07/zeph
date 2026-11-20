@@ -157,9 +157,31 @@ def recent_incoming_texts(
         count: How many of their latest texts to list.
 
     Returns:
-        Their last `count` texts, oldest first.
+        Their last `count` texts, oldest first; none if `count` is 0.
     """
     return incoming_texts(messages)[-count:] if count > 0 else []
+
+
+def threads_in_mind(
+    found: Sequence[LifeThread], earlier: Sequence[LifeThread], limit: int
+) -> list[LifeThread]:
+    """List the Threads in mind for a reply, at most the Admin-set number.
+
+    The Threads this message found come first, then those that came to mind
+    earlier in the Conversation, the first to come to mind first, each once.
+
+    Args:
+        found: The Threads this message found, in search order.
+        earlier: The Threads in mind in the Conversation, the first to come
+            to mind first; may include ones in `found`.
+        limit: The most Threads in mind at once.
+
+    Returns:
+        The Threads, at most `limit` of them.
+    """
+    found_ids = {thread.id for thread in found}
+    earlier_only = [thread for thread in earlier if thread.id not in found_ids]
+    return [*found, *earlier_only][: max(limit, 0)]
 
 
 def hold_back_reason(
@@ -391,11 +413,11 @@ class ThreadReminder:
 
         The search uses what the User means and the Admin-set number of
         their latest texts. Only Threads named, or at least as close in
-        meaning as the Admin-set bar, come to mind, open ones first, up to
-        the Admin-set number. Threads that came to mind earlier in the
-        Conversation follow, the first to come to mind first, and every one
-        found is kept in mind for later messages. Each says why it must not
-        be brought up now, if it mustn't. If the search can't be embedded,
+        meaning as the Admin-set bar, come to mind, open ones first. Every
+        one found is kept in mind for the rest of the Conversation. Threads
+        that came to mind earlier follow, as `threads_in_mind` orders and
+        caps them at the Admin-set number. Each says why it must not be
+        brought up now, if it mustn't. If the search can't be embedded,
         Threads are found by name only.
 
         Args:
@@ -408,7 +430,7 @@ class ThreadReminder:
             The Threads, numbered from 1.
         """
         settings = snapshot.settings
-        store = self._repositories.life_threads
+        life_thread_repository = self._repositories.life_threads
         limit = settings.get(LIFE_THREADS_PER_REPLY)
         messages = self._repositories.conversations.list_messages(conversation_id)
         recent_texts = recent_incoming_texts(
@@ -427,12 +449,11 @@ class ThreadReminder:
             else []
         )
         now = self._clock.now()
-        store.keep_in_mind(conversation_id, [thread.id for thread in found], now)
-        threads = list(
-            {
-                thread.id: thread
-                for thread in [*found, *store.list_in_mind(conversation_id)]
-            }.values()
+        life_thread_repository.keep_in_mind(
+            conversation_id, [thread.id for thread in found], now
+        )
+        threads = threads_in_mind(
+            found, life_thread_repository.list_in_mind(conversation_id), limit
         )
         wait = settings.get(LIFE_THREAD_BRUSHED_OFF_WAIT)
         return [

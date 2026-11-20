@@ -234,3 +234,42 @@ def test_a_failed_reply_plan_gives_the_reply_no_threads(
     assert MEI_STORY not in instructions
     assert "Bring up" not in instructions
     assert chat_channel.texts_sent_to(5551001)[-1] == "mm, tell me more"
+
+
+def test_the_cap_limits_the_threads_in_mind_at_once_keeping_this_messages_first(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    end_conversation(
+        client,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        "so much going on",
+        [
+            new_thread(title="Mei story", story="Story Mei.", people=("Mei",)),
+            new_thread(title="Tom story", story="Story Tom.", people=("Tom",)),
+            new_thread(title="Sam story", story="Story Sam.", people=("Sam",)),
+        ],
+    )
+    clock.advance(timedelta(days=3))
+    set_settings(
+        client,
+        auth_verifier,
+        {"life_threads_per_reply": 2, "life_threads_texts_to_search": 1},
+    )
+
+    reply_plan_sees(client, chat_model, "Mei called")
+    reply_plan_sees(client, chat_model, "Tom called")
+    seen = reply_plan_sees(client, chat_model, "Sam called")
+
+    assert "[1] Sam story" in seen
+    assert "[2] Mei story" in seen
+    assert "Tom story" not in seen

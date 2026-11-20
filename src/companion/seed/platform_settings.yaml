@@ -634,10 +634,11 @@ older_summaries_closeness_percent: 68
 
 # Life Threads. Before each reply, what the Understanding says the User means
 # and their latest texts are matched against their Threads: by a person or
-# thing named in a Thread, or by meaning. Open Threads come first. At most
-# this many come to mind for one message, a high cap only there to protect
-# cost. Threads that came to mind earlier in the Conversation stay in mind
-# until it ends. The Reply Plan sees them all and picks what the reply uses.
+# thing named in a Thread, or by meaning. Open Threads come first. Threads
+# that came to mind earlier in the Conversation stay in mind until it ends,
+# after the ones this message found. At most this many are in mind at once, a
+# high cap only there to protect cost. The Reply Plan sees them all and picks
+# what the reply uses.
 life_threads_per_reply: 10
 
 # How many of the User's latest texts Threads are searched on, with what the

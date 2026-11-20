@@ -259,7 +259,7 @@ describe("PlatformSettingsForm", () => {
   it("shows and saves the Life Thread number, texts, closeness bar and wait", async () => {
     const user = userEvent.setup();
     renderWithQueries(<PlatformSettingsForm />);
-    const most = await screen.findByLabelText("Most Life Threads per message");
+    const most = await screen.findByLabelText("Most Life Threads in mind");
     const texts = screen.getByLabelText("Texts searched for Life Threads");
     const bar = screen.getByLabelText("Life Thread closeness bar");
     const wait = screen.getByLabelText("Wait after a brushed-off Life Thread");
