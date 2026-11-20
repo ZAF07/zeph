@@ -76,4 +76,5 @@ Read `web/design/README.md` in full first, including "Message-pipeline additions
 ## Completion
 
 - Completed: 2026-11-20
-- Commit: <filled in after merge>
+- Commit: 4ac8e8a — Merge message pipeline issue 06: every Admin field explains itself; each editable setting has a required hint (what it is, what it serves, which step reads it) sent by the settings API and shown under each field's name, with editors getting their name and hint above them as drawn; Needs and Moves hints name the step; Crisis Reply shows its hint; Prompts & models design fixture
+- Branch commits: 51b02ff (hints), 474b523 (review fixes), 2b01cb1 (Prompts fixture), f6ba78e (evidence and archive)
