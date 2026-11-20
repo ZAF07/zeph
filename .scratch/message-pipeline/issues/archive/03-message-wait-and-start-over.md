@@ -75,4 +75,5 @@ User stories covered: 1, 2, 3, 8.
 ## Completion
 
 - Completed: 2026-11-20
-- Commit: to be filled in after the merge
+- Commit: e099a96 "Merge message pipeline issue 03: the Message wait is 15 seconds by default (migration 0066 reloads it only where still at the old seed); a text that arrives while a reply is written, before any of it is sent, drops that reply and the Message is answered again with every text, its Woven-in Check-in taken back and counted once toward the Daily Message Limit; texts are checked by the Safeguard at once, even mid-reply; a text after part of a reply was sent starts the next Message"
+- Branch commits: 2a5f245 (wait and start over), 327b9c7 (review fixes), 0f1fcc8 (archive), 9619107 (evidence after rebase)
