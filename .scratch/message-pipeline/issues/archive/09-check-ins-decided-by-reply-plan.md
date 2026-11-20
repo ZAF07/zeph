@@ -119,3 +119,12 @@ Asked the user, who chose option 1 from the note above: a small checker model ca
   - The checker shows as a "Check-in" step inside a Message trace, which the design doesn't draw (it follows from the user's choice). The step filter "Check-in" now also finds those Message traces.
   - The understanding eval's `woven_in` now means "the Reply Plan chose a Check-in".
   - The check runs before the reply is sent, so a reply offered a Check-in waits for one small call (about 0.7 s live).
+
+## Completion
+
+- Completed: 2026-11-20
+- Commits on branch `mp-09-check-ins-by-reply-plan`:
+  - 018b728 "Message pipeline issue 09: the Reply Plan weighs a due Woven-in Check-in. Code still decides whether one may be offered (not struggling, not paused unless Check in Now); only then the Reply Plan gets the Check-in Kinds and may choose one with a note. The separate Check-in model call and woven_check_in_prompt are gone (migration 0071 removes it and reloads reply_plan_prompt). The Reply gets the chosen one as an optional extra with no tool; a small yes/no check on the Check-in model then says whether the reply brought it up, and one left out is taken back. The trace shows Check-in Kinds offered and chosen, and the check's Kind and Brought up"
+  - 9895a1f "Message pipeline issue 09 review fixes: the offered Check-in and its saved row travel as one SavedWovenCheckIn, a Kind no longer offered can't crash the Reply Plan, one function writes the Check-in line, the stale seed comment is gone, two test lines tidied"
+  - 59c656e "Message pipeline issue 09 done: archive issue with test, run, pixel and review evidence"
+- Merged into main in c0c0353 "Merge message pipeline issue 09: Woven-in Check-ins are decided by the Reply Plan. …"
