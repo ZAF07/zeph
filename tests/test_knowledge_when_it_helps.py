@@ -20,7 +20,7 @@ from tests.fakes import (
     FakeChatChannel,
     FakeEmbedder,
     ScriptedChatModel,
-    understanding_answer,
+    reply_plan_answer,
 )
 from tests.knowledge_helpers import list_documents, upload_document
 from tests.telegram_helpers import (
@@ -30,7 +30,7 @@ from tests.telegram_helpers import (
     send_to_webhook,
     telegram_text_update,
 )
-from tests.test_understanding import saved_understandings
+from tests.test_understanding import saved_reply_plans
 
 BREATH_TEXT = (
     "Breathing in, notice the breath entering. Breathing out, notice the breath "
@@ -64,12 +64,12 @@ def upload_ready(
 
 
 def reply_instructions(
-    client: TestClient, chat_model: ScriptedChatModel, text: str, understanding: str
+    client: TestClient, chat_model: ScriptedChatModel, text: str, reply_plan: str
 ) -> str:
-    """Send a message the Understanding reads as given; return the reply's prompt."""
+    """Send a message the Reply Plan plans as given; return the reply's prompt."""
     chat_model.calls.clear()
-    chat_model.understanding_calls.clear()
-    chat_model.script_understanding(understanding)
+    chat_model.reply_plan_calls.clear()
+    chat_model.script_reply_plan(reply_plan)
     chat_model.script("mm, yes")
     assert send_to_webhook(client, telegram_text_update(text)) == 200
     [reply_call] = chat_model.calls
@@ -77,8 +77,8 @@ def reply_instructions(
 
 
 def listed_number(chat_model: ScriptedChatModel, title: str) -> int:
-    """Find the number the last Understanding call listed a document under."""
-    [asked] = chat_model.understanding_calls[-1].history
+    """Find the number the last Reply Plan call listed a document under."""
+    [asked] = chat_model.reply_plan_calls[-1].history
     found = re.search(rf"^\[(\d+)\] “{re.escape(title)}”", asked.text, re.MULTILINE)
     assert found, asked.text
     return int(found.group(1))
@@ -151,7 +151,7 @@ def test_reindexing_keeps_a_description_and_drafts_a_missing_one(
     assert len(chat_model.when_it_helps_calls) == 2
 
 
-def test_an_admin_edits_when_it_helps_and_the_next_understanding_sees_it(
+def test_an_admin_edits_when_it_helps_and_the_next_reply_plan_sees_it(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -166,20 +166,20 @@ def test_an_admin_edits_when_it_helps_and_the_next_understanding_sees_it(
         json={"when_it_helps": "  When they can't sleep for worry.  "},
         headers=admin,
     )
-    reply_instructions(client, chat_model, "hello", understanding_answer())
+    reply_instructions(client, chat_model, "hello", reply_plan_answer())
 
     assert response.status_code == 200, response.text
     assert response.json()["when_it_helps"] == "When they can't sleep for worry."
     assert response.json()["title"] == "On the breath"
-    [understanding_call] = chat_model.understanding_calls
-    [asked] = understanding_call.history
+    [reply_plan_call] = chat_model.reply_plan_calls
+    [asked] = reply_plan_call.history
     assert (
         "[1] “On the breath” (Owner’s notes, Mindfulness): "
         "When they can't sleep for worry."
     ) in asked.text
 
 
-def test_the_understanding_sees_only_ready_documents(
+def test_the_reply_plan_sees_only_ready_documents(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -190,10 +190,10 @@ def test_the_understanding_sees_only_ready_documents(
     upload_document(client, admin, "scan.pdf", b"%PDF-1.4 broken", title="Scan")
     connect_telegram(client, auth_verifier, chat_channel)
 
-    reply_instructions(client, chat_model, "hello", understanding_answer())
+    reply_instructions(client, chat_model, "hello", reply_plan_answer())
 
-    [understanding_call] = chat_model.understanding_calls
-    [asked] = understanding_call.history
+    [reply_plan_call] = chat_model.reply_plan_calls
+    [asked] = reply_plan_call.history
     assert "“On the breath”" in asked.text
     assert "Scan" not in asked.text
 
@@ -215,7 +215,7 @@ def test_with_no_documents_chosen_the_reply_gets_no_knowledge(
         client,
         chat_model,
         "my attention keeps drifting, the breath helps",
-        understanding_answer(need="Be heard"),
+        reply_plan_answer(need="Be heard"),
     )
 
     assert seeded_settings["reply_knowledge_intro"] not in instructions
@@ -241,13 +241,13 @@ def test_passages_come_only_from_the_chosen_documents(
     upload_ready(client, admin, "Taxes", TAX_TEXT)
     connect_telegram(client, auth_verifier, chat_channel)
     set_settings(client, admin, {"knowledge_closeness_percent": 0})
-    reply_instructions(client, chat_model, "hello", understanding_answer())
+    reply_instructions(client, chat_model, "hello", reply_plan_answer())
 
     instructions = reply_instructions(
         client,
         chat_model,
         "yeah, exactly",
-        understanding_answer(
+        reply_plan_answer(
             need="Think it through",
             knowledge_documents=[listed_number(chat_model, "On grief")],
             knowledge_search=BREATH_SEARCH,
@@ -263,7 +263,7 @@ def test_passages_come_only_from_the_chosen_documents(
     assert TAX_TEXT not in instructions
 
 
-def test_the_understanding_picks_documents_by_their_listed_number(
+def test_the_reply_plan_picks_documents_by_their_listed_number(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -277,14 +277,14 @@ def test_the_understanding_picks_documents_by_their_listed_number(
     upload_ready(client, admin, "Taxes", TAX_TEXT)
     connect_telegram(client, auth_verifier, chat_channel)
     set_settings(client, admin, {"knowledge_closeness_percent": 0})
-    reply_instructions(client, chat_model, "hello", understanding_answer())
+    reply_instructions(client, chat_model, "hello", reply_plan_answer())
     grief_number = listed_number(chat_model, "On grief")
 
     instructions = reply_instructions(
         client,
         chat_model,
         "it keeps coming in waves",
-        understanding_answer(
+        reply_plan_answer(
             knowledge_documents=[grief_number], knowledge_search=BREATH_SEARCH
         ),
     )
@@ -294,14 +294,14 @@ def test_the_understanding_picks_documents_by_their_listed_number(
     )
     assert BREATH_TEXT not in instructions
     assert TAX_TEXT not in instructions
-    chosen = saved_understandings(engine)[-1]["form"]["knowledge"]
+    chosen = saved_reply_plans(engine)[-1]["form"]["knowledge"]
     assert chosen == {
         "documents": [{"document_id": grief["id"], "title": "On grief"}],
         "search": BREATH_SEARCH,
     }
 
 
-def test_a_chosen_document_is_kept_when_the_next_message_is_understood(
+def test_a_chosen_document_is_kept_when_the_next_message_is_planned(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -311,9 +311,7 @@ def test_a_chosen_document_is_kept_when_the_next_message_is_understood(
     upload_ready(client, admin, "On grief", GRIEF_TEXT)
     connect_telegram(client, auth_verifier, chat_channel)
     set_settings(client, admin, {"knowledge_closeness_percent": 0})
-    chosen = understanding_answer(
-        knowledge_documents=[1], knowledge_search=BREATH_SEARCH
-    )
+    chosen = reply_plan_answer(knowledge_documents=[1], knowledge_search=BREATH_SEARCH)
 
     first = reply_instructions(client, chat_model, "it comes in waves", chosen)
     second = reply_instructions(client, chat_model, "still waves", chosen)
@@ -354,16 +352,14 @@ def test_a_number_not_in_the_list_or_a_title_picks_nothing(
         client,
         chat_model,
         "it keeps coming in waves",
-        understanding_answer(
-            knowledge_documents=[picked], knowledge_search=BREATH_SEARCH
-        ),
+        reply_plan_answer(knowledge_documents=[picked], knowledge_search=BREATH_SEARCH),
     )
 
     assert seeded_settings["reply_knowledge_intro"] not in instructions
     assert GRIEF_TEXT not in instructions
     assert BREATH_SEARCH not in embedder.queries
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["mm, yes"]
-    assert saved_understandings(engine)[-1]["form"]["knowledge"] is None
+    assert saved_reply_plans(engine)[-1]["form"]["knowledge"] is None
 
 
 def test_a_weak_match_in_a_chosen_document_adds_nothing(
@@ -381,7 +377,7 @@ def test_a_weak_match_in_a_chosen_document_adds_nothing(
         client,
         chat_model,
         "the breath helps",
-        understanding_answer(knowledge_documents=[1], knowledge_search=BREATH_SEARCH),
+        reply_plan_answer(knowledge_documents=[1], knowledge_search=BREATH_SEARCH),
     )
 
     assert seeded_settings["reply_knowledge_intro"] not in instructions
@@ -398,9 +394,7 @@ def test_the_admin_sets_the_knowledge_closeness_bar(
     admin = owner_headers(client, auth_verifier)
     upload_ready(client, admin, "On grief", GRIEF_TEXT)
     connect_telegram(client, auth_verifier, chat_channel)
-    chosen = understanding_answer(
-        knowledge_documents=[1], knowledge_search=BREATH_SEARCH
-    )
+    chosen = reply_plan_answer(knowledge_documents=[1], knowledge_search=BREATH_SEARCH)
 
     set_settings(client, admin, {"knowledge_closeness_percent": 99})
     strict = reply_instructions(client, chat_model, "the breath", chosen)
@@ -428,13 +422,13 @@ def test_an_unknown_document_number_or_a_missing_phrase_searches_nothing(
         client,
         chat_model,
         "the breath",
-        understanding_answer(knowledge_documents=[2], knowledge_search=BREATH_SEARCH),
+        reply_plan_answer(knowledge_documents=[2], knowledge_search=BREATH_SEARCH),
     )
     no_phrase = reply_instructions(
         client,
         chat_model,
         "the breath",
-        understanding_answer(knowledge_documents=[1]),
+        reply_plan_answer(knowledge_documents=[1]),
     )
 
     assert seeded_settings["reply_knowledge_intro"] not in unknown
@@ -442,7 +436,7 @@ def test_an_unknown_document_number_or_a_missing_phrase_searches_nothing(
     assert BREATH_SEARCH not in embedder.queries[searches_before:]
 
 
-def test_an_existing_install_gets_the_prompt_that_picks_knowledge_by_number(
+def test_an_existing_install_gets_the_reply_plan_prompt_that_picks_knowledge_by_number(
     engine: Engine, database_url: str, seeded_settings: dict[str, Any]
 ) -> None:
     config = Config()
@@ -464,10 +458,14 @@ def test_an_existing_install_gets_the_prompt_that_picks_knowledge_by_number(
     seed_platform_settings(engine, SEED_FILE)
 
     with engine.connect() as connection:
-        prompt = connection.execute(
-            text(
-                "SELECT value FROM platform_settings WHERE key = 'understanding_prompt'"
-            )
-        ).scalar_one()
-    assert prompt == seeded_settings["understanding_prompt"]
-    assert '"knowledge": {"documents": [<number>]' in prompt
+        prompts = dict(
+            connection.execute(
+                text(
+                    "SELECT key, value FROM platform_settings "
+                    "WHERE key IN ('understanding_prompt', 'reply_plan_prompt')"
+                )
+            ).all()
+        )
+    assert prompts["understanding_prompt"] == seeded_settings["understanding_prompt"]
+    assert prompts["reply_plan_prompt"] == seeded_settings["reply_plan_prompt"]
+    assert '"knowledge": {"documents": [<number>]' in prompts["reply_plan_prompt"]

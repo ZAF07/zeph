@@ -30,8 +30,8 @@ from companion.core.models import (
     LifeThread,
     MemoryItem,
     ModelStep,
+    ReplyPlan,
     ThreadReaction,
-    Understanding,
     UserSnapshot,
 )
 from companion.core.platform_settings import (
@@ -72,7 +72,7 @@ class NumberedCuriosity:
 
 @dataclass(frozen=True)
 class DueCuriosities:
-    """The Curiosities the Understanding may bring up in a reply.
+    """The Curiosities the Reply Plan may bring up in a reply.
 
     Attributes:
         offered: The waiting Curiosities whose day has come, numbered; none
@@ -159,7 +159,7 @@ def describe_guess(guess: str | None, how_sure: HowSure | None) -> str:
 
 
 def describe_due_curiosities(due: DueCuriosities, time_zone: str | None) -> str:
-    """Write the due Curiosities as the Understanding model reads them.
+    """Write the due Curiosities as the Reply Plan model reads them.
 
     Args:
         due: The Curiosities it may bring up, and how many it still may.
@@ -187,7 +187,7 @@ def format_curiosities_for_reply(chosen: Sequence[CuriosityToRaise]) -> str:
     """Write the reply's section on the Curiosities to bring up.
 
     Args:
-        chosen: The Curiosities the Understanding chose, and how.
+        chosen: The Curiosities the Reply Plan chose, and how.
 
     Returns:
         The section, with each one's guess to check if it holds one; "" if
@@ -207,7 +207,7 @@ def format_curiosities_for_reply(chosen: Sequence[CuriosityToRaise]) -> str:
 
 
 class CuriosityRaiser:
-    """Offers the Understanding the Curiosities whose day has come.
+    """Offers the Reply Plan the Curiosities whose day has come.
 
     No model call: it lists the User's waiting Curiosities whose "not
     before" day has come in their time zone, until the Conversation has
@@ -226,7 +226,7 @@ class CuriosityRaiser:
         self._clock = clock
 
     def due(self, snapshot: UserSnapshot, conversation_id: UUID) -> DueCuriosities:
-        """List the Curiosities the Understanding may bring up now.
+        """List the Curiosities the Reply Plan may bring up now.
 
         Args:
             snapshot: The User being answered.
@@ -260,7 +260,7 @@ class CuriosityRaiser:
 
         Args:
             conversation_id: The Conversation the reply was sent in.
-            raised: The Curiosities the Understanding chose to bring up.
+            raised: The Curiosities the Reply Plan chose to bring up.
         """
         self._repositories.curiosities.mark_raised(
             [item.curiosity_id for item in raised], conversation_id, self._clock.now()
@@ -546,24 +546,22 @@ def describe_curiosity(curiosity: Curiosity, raised_here: set[UUID]) -> str:
     return f"({state}) {curiosity.question} Why: {curiosity.why}{guess}"
 
 
-def describe_unmade_next_move(understandings: Sequence[Understanding]) -> str:
+def describe_unmade_next_move(reply_plans: Sequence[ReplyPlan]) -> str:
     """Write the next Move the Companion still had in mind when it ended.
 
-    Only the newest Understanding's next Move counts: an earlier one was
-    either made or dropped by a later Understanding. A fallback
-    Understanding neither makes nor drops one, so it is skipped.
+    Only the newest Reply Plan's next Move counts: an earlier one was either
+    made or dropped by a later Reply Plan. A fallback Reply Plan neither
+    makes nor drops one, so it is skipped.
 
     Args:
-        understandings: The Conversation's Understandings, oldest first.
+        reply_plans: The Conversation's Reply Plans, oldest first.
 
     Returns:
         E.g. "Plan steps, once they've picked a host."; "None." if the newest
-        Understanding that wasn't the fallback held no next Move.
+        Reply Plan that wasn't the fallback held no next Move.
     """
     made_by_the_model = [
-        understanding
-        for understanding in understandings
-        if not understanding.is_fallback
+        reply_plan for reply_plan in reply_plans if not reply_plan.is_fallback
     ]
     newest = made_by_the_model[-1] if made_by_the_model else None
     if newest is None or not newest.next_move:
@@ -722,7 +720,7 @@ class CuriosityKeeper:
             for category in self._repositories.memory_categories.list_all()
         }
         unmade_next_move = describe_unmade_next_move(
-            self._repositories.understandings.list_for_conversation(conversation_id)
+            self._repositories.reply_plans.list_for_conversation(conversation_id)
         )
         entries = self._ask(
             snapshot,

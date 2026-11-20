@@ -1,6 +1,6 @@
 # 05 — The Reply Plan takes over deciding; the Understanding only reads
 
-Status: ready-for-agent
+Status: in-progress
 Lane: A
 Blocked by: 03
 
@@ -52,3 +52,12 @@ Read `web/design/README.md` in full first, including "Message-pipeline additions
 - 03 — A Message waits for the User to finish, and starts over (`.scratch/message-pipeline/issues/03-message-wait-and-start-over.md`)
 
 ## Comments
+
+### Plan (20 Nov 2026, branch `message-pipeline-05-reply-plan`)
+
+- **Models:** `UnderstandingForm` narrows to reading only: `said`, `means`, `feelings` and `wants` (each said / read / unclear), `mood`, `intensity`, `cause_known`, `struggling`, `asked_for_photo`, `look_up_past`. New `ReplyPlanForm` (the model's answer: Need, guidance, Moves with why, Threads touched / to bring up / to leave alone, Curiosities, Knowledge, memory categories, photo, ask why) and `ReplyPlan` (saved: the Need, Moves and asked-why the reply followed). `UnderstandingShape` keeps intensity, cause known, struggling, past look-ups; new `ReplyPlanShape` takes the Need, Moves and Thread counts. `ModelStep.REPLY_PLAN`.
+- **Storage:** one migration adds `reply_plans` (same keys and cascades as `understandings`), drops the decision columns from `understandings`, adds `reply_plan_shape` to both Model Call Log tables, and resets `understanding_prompt` to the new seed (the old one asks the Understanding to pick Needs and Moves). Old Understanding rows read tolerantly; no backfill (platform not live).
+- **Services:** `UnderstandingService.understand` gets only the Portrait, earlier Understandings and the Conversation. New `core/reply_plan.py` takes the deciding code from `understanding.py` (Moves that ask a question, ask-why, raise limits, hold-backs, fallback Need, Features) with its own prompt/model/thinking. The plan decides "ask why" and the photo; code keeps the old limits on both. `ReplyService`: gate → Understanding → reminders/due/outcomes → Reply Plan → memory + Knowledge + Woven-in Check-in → Reply. Move Outcomes, the unmade next Move and Woven-in Check-ins read the Reply Plan.
+- **Settings:** `reply_plan_prompt`, `reply_plan_model`, `reply_plan_thinking` (on) with hints; the Reply Plan core service sits after Understanding and before Reply; the Shared Photos description moves to it.
+- **Evals:** the Understanding Eval runs both steps and reads its checks from both; cases are marked as checking both until 13.
+- **Web:** `reply_plan` step, `ReplyPlanShape`, `replyPlanShapeFacts`; Understanding facts narrowed; a design fixture for `/admin/model-calls/design-trace`.

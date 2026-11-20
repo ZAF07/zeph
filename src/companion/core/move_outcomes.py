@@ -20,6 +20,7 @@ from companion.core.models import (
     MoveOutcomeToSave,
     MoveResult,
     MoveRole,
+    ReplyPlan,
     Understanding,
     UserSnapshot,
 )
@@ -58,36 +59,40 @@ class MoveMade:
     first_made_at: datetime
 
 
-def list_moves_made(understandings: Sequence[Understanding]) -> list[MoveMade]:
-    """List the Moves a Conversation's Understandings made, each once.
+def list_moves_made(reply_plans: Sequence[ReplyPlan]) -> list[MoveMade]:
+    """List the Moves a Conversation's Reply Plans made, each once.
 
     The same Move in the same role is listed once, at the first time it was
     made; names are matched ignoring case.
 
     Args:
-        understandings: The Conversation's Understandings, oldest first.
+        reply_plans: The Conversation's Reply Plans, oldest first.
 
     Returns:
         The Moves made, in the order first made, lead before support.
     """
     made: dict[tuple[str, MoveRole], MoveMade] = {}
-    for understanding in understandings:
+    for reply_plan in reply_plans:
         for name, role in (
-            (understanding.lead_move, MoveRole.LEAD),
-            (understanding.support_move, MoveRole.SUPPORT),
+            (reply_plan.lead_move, MoveRole.LEAD),
+            (reply_plan.support_move, MoveRole.SUPPORT),
         ):
             if name and (name.lower(), role) not in made:
                 made[(name.lower(), role)] = MoveMade(
-                    name=name, role=role, first_made_at=understanding.made_at
+                    name=name, role=role, first_made_at=reply_plan.made_at
                 )
     return list(made.values())
 
 
-def describe_understanding(understanding: Understanding, time_zone: str | None) -> str:
-    """Write how Zeph read one message, as the keeping model is shown it.
+def describe_reply_plan(
+    reply_plan: ReplyPlan, understanding: Understanding | None, time_zone: str | None
+) -> str:
+    """Write how Zeph read and answered one message, as the keeping model sees it.
 
     Args:
-        understanding: The message's Understanding.
+        reply_plan: The message's Reply Plan.
+        understanding: The message's Understanding, for the mood; None if
+            there is none.
         time_zone: The User's IANA time zone, for the time.
 
     Returns:
@@ -97,20 +102,25 @@ def describe_understanding(understanding: Understanding, time_zone: str | None) 
     moves = ", ".join(
         f"{role} {name}"
         for role, name in (
-            ("lead", understanding.lead_move),
-            ("support", understanding.support_move),
+            ("lead", reply_plan.lead_move),
+            ("support", reply_plan.support_move),
         )
         if name
     )
+    mood = (
+        f"{understanding.form.mood or 'unclear'} ({understanding.form.intensity.value})"
+        if understanding
+        else "unclear"
+    )
     return (
-        f"- {format_time(understanding.made_at, time_zone)}: {understanding.need}; "
-        f"{moves or 'no Move'}; mood {understanding.form.mood or 'unclear'} "
-        f"({understanding.form.intensity.value})"
+        f"- {format_time(reply_plan.made_at, time_zone)}: {reply_plan.need}; "
+        f"{moves or 'no Move'}; mood {mood}"
     )
 
 
 def describe_moves_to_judge(
     moves_by_number: dict[int, MoveMade],
+    reply_plans: Sequence[ReplyPlan],
     understandings: Sequence[Understanding],
     messages: list[ConversationMessage],
     now: datetime,
@@ -120,7 +130,9 @@ def describe_moves_to_judge(
 
     Args:
         moves_by_number: The Moves made, by the number the model is shown.
-        understandings: The Conversation's Understandings, oldest first.
+        reply_plans: The Conversation's Reply Plans, oldest first.
+        understandings: The Conversation's Understandings, each matched to
+            its Reply Plan by message.
         messages: The Conversation's messages, oldest first.
         now: The current time.
         time_zone: The User's IANA time zone, for the days and times.
@@ -134,9 +146,16 @@ def describe_moves_to_judge(
         f"{format_time(move.first_made_at, time_zone)}"
         for number, move in moves_by_number.items()
     )
+    understanding_by_message = {
+        understanding.message_id: understanding for understanding in understandings
+    }
     read_lines = "\n".join(
-        describe_understanding(understanding, time_zone)
-        for understanding in understandings
+        describe_reply_plan(
+            reply_plan,
+            understanding_by_message.get(reply_plan.message_id),
+            time_zone,
+        )
+        for reply_plan in reply_plans
     )
     return (
         f"Today: {format_day(now, time_zone)}\n\n"
@@ -275,7 +294,8 @@ class MoveOutcomeKeeper:
         """Set up the keeper.
 
         Args:
-            repositories: Where Understandings and Move Outcomes are stored.
+            repositories: Where Reply Plans, Understandings and Move Outcomes are
+                stored.
             chat_model: Writes the Move Outcomes and records the tokens used.
             embedder: Embeds each new Move Outcome.
             clock: Tells the current time.
@@ -303,17 +323,20 @@ class MoveOutcomeKeeper:
             conversation_id: The ended Conversation.
             messages: Its messages, oldest first.
         """
-        understandings = self._repositories.understandings.list_for_conversation(
+        reply_plans = self._repositories.reply_plans.list_for_conversation(
             conversation_id
         )
-        moves_by_number = dict(enumerate(list_moves_made(understandings), start=1))
+        moves_by_number = dict(enumerate(list_moves_made(reply_plans), start=1))
         if not moves_by_number:
             return
         entries = self._ask(
             snapshot,
             describe_moves_to_judge(
                 moves_by_number,
-                understandings,
+                reply_plans,
+                self._repositories.understandings.list_for_conversation(
+                    conversation_id
+                ),
                 messages,
                 self._clock.now(),
                 snapshot.user.time_zone,

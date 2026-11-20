@@ -15,7 +15,7 @@ from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
     ScriptedChatModel,
-    understanding_answer,
+    reply_plan_answer,
 )
 from tests.telegram_helpers import (
     auth_headers,
@@ -24,7 +24,7 @@ from tests.telegram_helpers import (
     send_to_webhook,
     telegram_text_update,
 )
-from tests.test_understanding import FALLBACK_NEED, saved_understandings, seeded_needs
+from tests.test_understanding import FALLBACK_NEED, saved_reply_plans, seeded_needs
 
 MISSING_ID = "00000000-0000-0000-0000-000000000000"
 
@@ -313,7 +313,7 @@ def test_an_edited_how_to_reply_reaches_the_next_reply(
         },
         headers=admin,
     )
-    chat_model.script_understanding(understanding_answer(need="Advice"))
+    chat_model.script_reply_plan(reply_plan_answer(need="Advice"))
     chat_model.script("try this")
 
     send_to_webhook(client, telegram_text_update("what should I do?"))
@@ -325,7 +325,7 @@ def test_an_edited_how_to_reply_reaches_the_next_reply(
     )
 
 
-def test_a_deleted_need_is_not_offered_and_saved_understandings_keep_its_name(
+def test_a_deleted_need_is_not_offered_and_saved_reply_plans_keep_its_name(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -334,7 +334,7 @@ def test_a_deleted_need_is_not_offered_and_saved_understandings_keep_its_name(
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
     admin = owner_headers(client, auth_verifier)
-    chat_model.script_understanding(understanding_answer(need="Advice"))
+    chat_model.script_reply_plan(reply_plan_answer(need="Advice"))
     chat_model.script("try this")
     send_to_webhook(client, telegram_text_update("what should I do?"))
 
@@ -345,7 +345,7 @@ def test_a_deleted_need_is_not_offered_and_saved_understandings_keep_its_name(
     chat_model.script("hmm")
     send_to_webhook(client, telegram_text_update("and now?"))
 
-    asked = chat_model.understanding_calls[-1].history[0].text
+    asked = chat_model.reply_plan_calls[-1].history[0].text
     assert "- Advice:" not in asked
     assert "- Be heard:" in asked
-    assert [saved["need"] for saved in saved_understandings(engine)][0] == "Advice"
+    assert [saved["need"] for saved in saved_reply_plans(engine)][0] == "Advice"

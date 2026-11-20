@@ -10,7 +10,7 @@ from tests.fakes import (
     FakeEmbedder,
     FakeScheduler,
     ScriptedChatModel,
-    understanding_answer,
+    reply_plan_answer,
 )
 from tests.telegram_helpers import (
     OWNER_TELEGRAM_USER_ID,
@@ -47,8 +47,8 @@ def keep_outcomes(
 
     Its end keeps the given Move Outcomes, numbered 1 for Push and 2 for Calm.
     """
-    chat_model.script_understanding(
-        understanding_answer(need="Accountability", lead_move="Push")
+    chat_model.script_reply_plan(
+        reply_plan_answer(need="Accountability", lead_move="Push")
     )
     chat_model.script("come on, one more")
     update = (
@@ -57,9 +57,7 @@ def keep_outcomes(
         else telegram_text_update("still going")
     )
     send_to_webhook(client, update)
-    chat_model.script_understanding(
-        understanding_answer(need="Be heard", lead_move="Calm")
-    )
+    chat_model.script_reply_plan(reply_plan_answer(need="Be heard", lead_move="Calm"))
     chat_model.script("breathe")
     send_to_webhook(client, update)
     end_the_conversation(chat_model, clock, scheduler, seeded_settings, outcomes)
@@ -84,16 +82,16 @@ def calm_while_grieving() -> dict[str, Any]:
     )
 
 
-def understanding_sees(
+def reply_plan_sees(
     client: TestClient, chat_model: ScriptedChatModel, text: str
 ) -> str:
-    """Send a message and return what its Understanding was given."""
+    """Send a message and return what its Reply Plan was given."""
     chat_model.script("mm, I hear you")
     send_to_webhook(client, telegram_text_update(text))
-    return chat_model.understanding_calls[-1].history[0].text
+    return chat_model.reply_plan_calls[-1].history[0].text
 
 
-def test_close_outcomes_reach_the_understanding_with_their_dates(
+def test_close_outcomes_reach_the_reply_plan_with_their_dates(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -113,7 +111,7 @@ def test_close_outcomes_reach_the_understanding_with_their_dates(
     )
     set_settings(client, auth_verifier, {"move_outcomes_closeness_percent": 30})
 
-    seen = understanding_sees(
+    seen = reply_plan_sees(
         client, chat_model, "so exhausted, running on empty, still have my task list"
     )
 
@@ -121,9 +119,12 @@ def test_close_outcomes_reach_the_understanding_with_their_dates(
     assert EXHAUSTED_SITUATION in seen
     assert EXHAUSTED_WHY in seen
     assert GRIEF_SITUATION not in seen
+    assert EXHAUSTED_SITUATION not in (
+        chat_model.understanding_calls[-1].history[0].text
+    )
 
 
-def test_only_the_users_own_outcomes_reach_the_understanding(
+def test_only_the_users_own_outcomes_reach_the_reply_plan(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -146,7 +147,7 @@ def test_only_the_users_own_outcomes_reach_the_understanding(
     connect_telegram(client, auth_verifier, chat_channel)
     set_settings(client, auth_verifier, {"move_outcomes_closeness_percent": 0})
 
-    seen = understanding_sees(client, chat_model, "so exhausted, running on empty")
+    seen = reply_plan_sees(client, chat_model, "so exhausted, running on empty")
 
     assert EXHAUSTED_SITUATION not in seen
 
@@ -175,15 +176,15 @@ def test_the_admin_sets_how_many_reach_it_and_how_close_they_must_be(
         auth_verifier,
         {"move_outcomes_per_understanding": 1, "move_outcomes_closeness_percent": 0},
     )
-    one_only = understanding_sees(client, chat_model, "exhausted and running on empty")
+    one_only = reply_plan_sees(client, chat_model, "exhausted and running on empty")
     set_settings(client, auth_verifier, {"move_outcomes_per_understanding": 0})
-    none_wanted = understanding_sees(client, chat_model, "exhausted again")
+    none_wanted = reply_plan_sees(client, chat_model, "exhausted again")
     set_settings(
         client,
         auth_verifier,
         {"move_outcomes_per_understanding": 3, "move_outcomes_closeness_percent": 100},
     )
-    too_strict = understanding_sees(client, chat_model, "exhausted, empty")
+    too_strict = reply_plan_sees(client, chat_model, "exhausted, empty")
 
     assert EXHAUSTED_SITUATION in one_only
     assert GRIEF_SITUATION not in one_only
@@ -191,7 +192,7 @@ def test_the_admin_sets_how_many_reach_it_and_how_close_they_must_be(
     assert EXHAUSTED_SITUATION not in too_strict
 
 
-def test_outcomes_still_reach_the_understanding_with_user_memory_off(
+def test_outcomes_still_reach_the_reply_plan_with_user_memory_off(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -216,7 +217,7 @@ def test_outcomes_still_reach_the_understanding_with_user_memory_off(
     )
     set_settings(client, auth_verifier, {"move_outcomes_closeness_percent": 30})
 
-    seen = understanding_sees(client, chat_model, "so exhausted, running on empty")
+    seen = reply_plan_sees(client, chat_model, "so exhausted, running on empty")
 
     assert EXHAUSTED_SITUATION in seen
 
@@ -242,7 +243,7 @@ def test_the_reply_still_goes_when_outcomes_cannot_be_searched(
     )
     embedder.failure = RuntimeError("embedder down")
 
-    seen = understanding_sees(client, chat_model, "so exhausted, running on empty")
+    seen = reply_plan_sees(client, chat_model, "so exhausted, running on empty")
 
     assert EXHAUSTED_SITUATION not in seen
     assert chat_channel.sent[-1].text == "mm, I hear you"

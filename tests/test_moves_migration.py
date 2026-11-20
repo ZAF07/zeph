@@ -189,7 +189,7 @@ def test_the_next_move_migration_reloads_the_understanding_prompt(
             )
         ).all()
         next_moves = connection.execute(
-            text("SELECT next_move, next_move_why FROM understandings")
+            text("SELECT next_move, next_move_why FROM reply_plans")
         ).all()
     assert prompt == []
     assert next_moves == []

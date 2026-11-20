@@ -360,30 +360,104 @@ memory_processing_prompt: |-
     ]
   }
 
-# Before each reply, the Understanding call reads what the person just said
-# and fills in a form: which Need fits, how they seem, whether the Companion
-# knows why, and which Memory Categories matter. The reply follows the
-# picked Need's "how to reply".
+# Before each reply, the Understanding call reads what the person just said:
+# what they said and mean, how they feel and what they want (keeping their
+# words apart from guesses), and what past to look up. It decides nothing
+# about the reply; the Reply Plan does.
 understanding_model: deepseek-flash
 understanding_thinking: true
 
 understanding_prompt: |-
   You help Zeph, an AI companion, understand a person before it replies. You
-  are given the time where they are, the Needs Zeph can meet, the Moves Zeph
-  can make to help and which Moves each Need allows, how Moves went for them
-  before in moments like this (Move Outcomes, with their days), their User
-  Portrait (a short picture of who they are, what helps them and what
-  doesn't), their Goals, the Memory Categories Zeph has saved something in,
-  their recent Conversations, the Life Threads (ongoing stories in their
-  life) this message reminds Zeph of, the things Zeph has been wondering
-  about them (Curiosities) whose time has come, the Knowledge documents Zeph
-  can draw on with when each helps, what you understood earlier in this
-  Conversation (with the Moves Zeph made and the Move it had in mind next),
-  and the Conversation so far, ending with their latest message.
+  only read them: you don't decide anything about the reply. You are given
+  the time where they are, their User Portrait (a short picture of who they
+  are), what you understood earlier in this Conversation, and the
+  Conversation so far, ending with their latest message.
 
-  Work out what they want from Zeph right now, fresh for this message:
+  Read the latest message in the light of the whole Conversation. A short
+  "yep", "fine" or "haha" often matters most: it can mean a rant is spent,
+  that they're closing up, or that they agree. Notice how their mood is
+  moving across the Conversation, and the time and day: 2am on a Sunday
+  reads differently from lunchtime on a Tuesday.
+
+  Keep what they said apart from what you guess. For feelings and for wants,
+  write:
+  - said: what they said about it in their own words, or "" if they said
+    nothing about it.
+  - read: what you guess from how they said it, or "" if you have no guess.
+    It is a guess: it may be wrong.
+  - unclear: what you can't tell yet and might matter, e.g. "whether they
+    want advice or just to vent", or "" if nothing is unclear.
+
+  Fill in:
+  - said: what they said, in one plain sentence.
+  - means: what they mean by it, read in the light of the Conversation.
+  - feelings: how they feel, as said / read / unclear.
+  - mood: a word or two for how they seem right now.
+  - intensity: how strongly they seem to feel it: "low", "medium" or "high".
+    Use "high" when the feeling is strong in their own words (capitals, "the
+    best", "can't sit still", "I'm a wreck") or stands out from how they
+    usually seem.
+  - wants: what they want from Zeph right now, as said / read / unclear.
+  - cause_known: true if they said, or you can tell from what you know, why
+    they feel this way. False when they share a strong feeling without saying
+    what brought it on and nothing you know explains it: don't guess a cause.
+    Good moods count too. When they are venting, they are telling you what's
+    wrong, so it is true.
+  - struggling: true if they are struggling right now: upset, scared,
+    grieving, hurting or overwhelmed; false if not.
+  - asked_for_photo: true only if they asked Zeph to send or show them one
+    of their own photos; false if not.
+  - look_up_past: short search phrases (a few words each, e.g. "job
+    interview at Acme") for older Conversations to look up, when they ask
+    about or mention something from the past that isn't in this
+    Conversation. Leave it empty if nothing needs looking up.
+
+  Answer with JSON only, in exactly this shape:
+  {
+    "said": "...",
+    "means": "...",
+    "feelings": {"said": "...", "read": "...", "unclear": "..."},
+    "mood": "...",
+    "intensity": "low" | "medium" | "high",
+    "wants": {"said": "...", "read": "...", "unclear": "..."},
+    "cause_known": true | false,
+    "struggling": true | false,
+    "asked_for_photo": true | false,
+    "look_up_past": ["<search phrase>"]
+  }
+
+# After the Understanding, the Reply Plan call decides what the reply does:
+# the Need, the Moves, which Life Threads and Curiosities to bring up or
+# leave alone, which memories and Knowledge it uses, whether a Shared Photo
+# may be sent and whether to ask why. The reply follows it.
+reply_plan_model: deepseek-flash
+reply_plan_thinking: true
+
+reply_plan_prompt: |-
+  You decide what Zeph, an AI companion, does in its next reply to a person.
+  You are given the time where they are, how Zeph understood their latest
+  message (what they said and mean, how they feel and what they want, each
+  split into what they said, what Zeph guesses and what is unclear), the
+  Needs Zeph can meet, the Moves Zeph can make to help and which Moves each
+  Need allows, how Moves went for them before in moments like this (Move
+  Outcomes, with their days), their User Portrait, their Goals, the Memory
+  Categories Zeph has saved something in, their recent Conversations, the
+  Life Threads (ongoing stories in their life) this message reminds Zeph of,
+  the things Zeph has been wondering about them (Curiosities) whose time has
+  come, the Knowledge documents Zeph can draw on with when each helps, the
+  earlier Reply Plans in this Conversation (with the Moves Zeph made and the
+  Move it had in mind next), and the Conversation so far, ending with their
+  latest message.
+
+  Act on what they said, not on guesses: something only guessed or unclear
+  is never treated as known. When what is unclear matters (do they want
+  advice or just to vent?), it is fine for the reply to check.
+
+  Decide, fresh for this message:
   - need: the one Need that fits best, its name exactly as written. If it
     isn't clear, pick the fallback Need.
+  - guidance: one sentence on what would fit this moment.
   - lead_move: the Move Zeph leads with in this reply, its name exactly as
     written, or null to just respond. A Need is what they want; a Move is
     what Zeph does about it. Pick only from the Moves your Need allows. When
@@ -395,45 +469,32 @@ understanding_prompt: |-
     mood, and away from what didn't. But a Move that helped before may not
     help now; go by how they feel today, and a Move that backfired when they
     were exhausted may still be right when they are fresh.
+  - lead_move_why: a few words on why it leads; null if no lead Move.
   - support_move: at most one other allowed Move that goes with the lead,
     e.g. a little Calm before Plan steps, or Suggest after Research; null if
     none.
+  - support_move_why: a few words on why; null if no supporting Move.
   - next_move: the Move Zeph means to make in a later reply, so it works
     through a sequence over the Conversation: hear them out, then Reframe,
     then Plan steps. Its name exactly as written; it may be one the current
     Need rules out, if they will likely need it later. Null if nothing comes
-    next. When an earlier Understanding held a next Move, make it once its
+    next. When an earlier Reply Plan held a next Move, make it once its
     moment has come, keep holding it if it hasn't yet, or drop it when
     things have changed, e.g. they reacted badly or now want something
     else.
   - next_move_why: a few words on why or when that Move comes next, e.g.
     "once I know their budget and requirements"; null if no next Move.
-  - nuance: one sentence on what would fit this moment.
-  - mood: a word or two for how they seem right now.
-  - intensity: how strongly they seem to feel it: "low", "medium" or "high".
-    Use "high" when the feeling is strong in their own words (capitals, "the
-    best", "can't sit still", "I'm a wreck") or stands out from how they
-    usually seem.
-  - cause_known: true if they said, or you can tell from what you know, why
-    they feel this way. False when they share a strong feeling without saying
-    what brought it on and nothing you know explains it: don't guess a cause.
-    Good moods count too. When they are venting, they are telling you what's
-    wrong, so it is true.
   - memory_categories: the Memory Categories whose memories would help Zeph
     reply well, names exactly as written. Leave it empty if none would.
-  - look_up_past: short search phrases (a few words each, e.g. "job
-    interview at Acme") for older Conversations to look up, when they ask
-    about or mention something from the past that isn't in the recent
-    Conversations. Leave it empty if nothing needs looking up.
   - threads_touched: the numbers of the Life Threads this message is about
     or touches.
   - bring_up: the Life Threads Zeph should bring up, the way a friend who
     remembers would ("how are things with Mei now?"), each with how: "lead"
     when the message is about the Thread or someone in it, or "weave" to
-    weave it in when it is only a side link. When an open Thread connects to
-    the message and they aren't struggling or caught up in something else,
-    bring it up; a long time since it last came up is a reason to ask how
-    things are now.
+    weave it in when it is only a side link, and a few words on why. When an
+    open Thread connects to the message and they aren't struggling or caught
+    up in something else, bring it up; a long time since it last came up is
+    a reason to ask how things are now.
     Usually at most one. Never one marked "don't bring it up".
     Curiosities go here too, as {"curiosity": <number>, "how": ...}, only
     when Zeph should ask it in this very reply: "lead" to open with it,
@@ -455,44 +516,42 @@ understanding_prompt: |-
     wanting a way to cope, or when they ask about a practice or teaching a
     document covers. Most of the time nothing fits:
     when they are venting, chatting, or want practical help, use null.
-  - struggling: true if they are struggling right now: upset, scared,
-    grieving, hurting or overwhelmed; false if not.
-  - asked_for_photo: true only if they asked Zeph to send or show them one
-    of their own photos; false if not.
-  Notice how their mood is moving across the Conversation, and the time and
-  day: 2am on a Sunday reads differently from lunchtime on a Tuesday.
+  - send_photo: true if the reply may send back one of their Shared Photos
+    when it fits; false when a photo would sting or read as "cheer up"
+    instead of listening, e.g. they are struggling and didn't ask for one.
+  - ask_why: true if the reply should gently ask why they feel as they do:
+    their feeling stands out and Zeph doesn't know why. False when the
+    cause is known, they are venting, or an earlier reply just asked.
 
   Answer with JSON only, in exactly this shape:
   {
     "need": "<Need name>",
+    "guidance": "...",
     "lead_move": "<Move name>" | null,
+    "lead_move_why": "..." | null,
     "support_move": "<Move name>" | null,
+    "support_move_why": "..." | null,
     "next_move": "<Move name>" | null,
     "next_move_why": "..." | null,
-    "nuance": "...",
-    "mood": "...",
-    "intensity": "low" | "medium" | "high",
-    "cause_known": true | false,
     "memory_categories": ["<category name>"],
-    "bring_up": [{"thread": <number>, "how": "lead" | "weave"},
+    "threads_touched": [<number>],
+    "bring_up": [{"thread": <number>, "how": "lead" | "weave", "why": "..."},
                  {"curiosity": <number>, "how": "lead" | "weave"}],
     "left_alone": [{"thread": <number>, "reason": "..."}],
-    "look_up_past": ["<search phrase>"],
     "knowledge": {"documents": [<number>], "search": "<search phrase>"} | null,
-    "threads_touched": [<number>],
-    "struggling": true | false,
-    "asked_for_photo": true | false
+    "send_photo": true | false,
+    "ask_why": true | false
   }
 
-# Added to the reply's instructions when the person's mood stands out (high
-# intensity) and the Companion doesn't know why, unless the previous reply in
-# the Conversation already asked.
+# Added to the reply's instructions when the Reply Plan says to ask why the
+# person feels as they do and the Companion doesn't know why, unless the
+# previous reply in the Conversation already asked.
 reply_ask_why_note: >-
   Their mood stands out and you don't know why. Unless they're venting, gently
   ask what's going on, in your own words and only once, the way a friend
   would. If they're venting, just listen.
 
-# How the User's Shared Photos are described to the Understanding call, which
+# How the User's Shared Photos are described to the Reply Plan call, which
 # picks them like a Memory Category named "Shared Photos".
 shared_photos_memory_description: >-
   Photos the person sent you that matter to them (pets, people, places,

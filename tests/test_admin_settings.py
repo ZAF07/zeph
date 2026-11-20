@@ -341,9 +341,10 @@ def test_core_services_list_their_prompt_and_model_settings(
 
     assert [service["name"] for service in response["services"]] == [
         "Safeguard",
+        "Understanding",
+        "Reply Plan",
         "Response composition",
         "Post-conversation processing",
-        "Understanding",
         "Photo viewing",
         "Life Thread keeping",
         "Curiosity keeping",
@@ -353,7 +354,7 @@ def test_core_services_list_their_prompt_and_model_settings(
         "Knowledge “when it helps”",
         "Check-ins",
     ]
-    service = response["services"][1]
+    service = response["services"][3]
     assert service["prompt_key"] == "response_prompt"
     assert service["model_key"] == "response_model"
     assert service["thinking_key"] == "response_thinking"
@@ -527,7 +528,7 @@ RESPONSE_COMPOSITION_NOTE_GROUPS = {
         "reply_data_deletion_word_not_alone_note",
     ],
     "Memory and Knowledge": ["reply_memory_intro", "reply_knowledge_intro"],
-    "Understanding": ["reply_ask_why_note"],
+    "Reply Plan": ["reply_ask_why_note"],
     "Features": ["reply_features_unavailable_note"],
     "Stickers": ["sticker_tool_description"],
 }
@@ -583,17 +584,18 @@ def test_other_core_services_keep_their_extra_prompts_in_a_flat_list(
     services = core_services_by_name(client, headers)
 
     photo_viewing = services["Photo viewing"]
-    understanding = services["Understanding"]
+    reply_plan = services["Reply Plan"]
 
     assert photo_viewing["extra_prompt_groups"] == []
     assert [prompt["key"] for prompt in photo_viewing["extra_prompts"]] == [
         "ask_about_photo_tool_description",
         "send_photo_tool_description",
     ]
-    assert understanding["extra_prompt_groups"] == []
-    assert [prompt["key"] for prompt in understanding["extra_prompts"]] == [
+    assert reply_plan["extra_prompt_groups"] == []
+    assert [prompt["key"] for prompt in reply_plan["extra_prompts"]] == [
         "shared_photos_memory_description"
     ]
+    assert services["Understanding"]["extra_prompts"] == []
 
 
 def test_every_reply_note_is_editable_with_its_seeded_value(

@@ -12,24 +12,22 @@ from tests.test_moves import reply_to
 
 
 def saved_next_moves(engine: Engine) -> list[tuple[str | None, str | None]]:
-    """The next Move and why of every saved Understanding, oldest first."""
+    """The next Move and why of every saved Reply Plan, oldest first."""
     with engine.connect() as connection:
         rows = connection.execute(
-            text(
-                "SELECT next_move, next_move_why FROM understandings ORDER BY position"
-            )
+            text("SELECT next_move, next_move_why FROM reply_plans ORDER BY position")
         ).all()
     return [(row.next_move, row.next_move_why) for row in rows]
 
 
-def earlier_understandings_seen(chat_model: ScriptedChatModel) -> str:
-    """The earlier Understandings the newest Understanding call was shown."""
-    asked = chat_model.understanding_calls[-1].history[0].text
-    after = asked.split("Earlier Understandings in this Conversation")[1]
+def earlier_reply_plans_seen(chat_model: ScriptedChatModel) -> str:
+    """The earlier Reply Plans the newest Reply Plan call was shown."""
+    asked = chat_model.reply_plan_calls[-1].history[0].text
+    after = asked.split("Earlier Reply Plans in this Conversation")[1]
     return after.split("Earlier in the Conversation")[0]
 
 
-def test_the_next_move_and_why_are_stored_and_shown_to_the_next_understanding(
+def test_the_next_move_and_why_are_stored_and_shown_to_the_next_reply_plan(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -55,7 +53,7 @@ def test_the_next_move_and_why_are_stored_and_shown_to_the_next_understanding(
         lead_move="Research",
     )
 
-    earlier = earlier_understandings_seen(chat_model)
+    earlier = earlier_reply_plans_seen(chat_model)
     assert "Research" in earlier
     assert "once I know their budget and needs" in earlier
     assert saved_next_moves(engine) == [
@@ -64,7 +62,7 @@ def test_the_next_move_and_why_are_stored_and_shown_to_the_next_understanding(
     ]
 
 
-def test_earlier_lead_and_supporting_moves_are_shown_to_later_understandings(
+def test_earlier_lead_and_supporting_moves_are_shown_to_later_reply_plans(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -82,7 +80,7 @@ def test_earlier_lead_and_supporting_moves_are_shown_to_later_understandings(
     )
     reply_to(client, chat_model, "ok I'm a bit calmer", need="Think it through")
 
-    earlier = earlier_understandings_seen(chat_model)
+    earlier = earlier_reply_plans_seen(chat_model)
     assert "Calm" in earlier
     assert "Mirror" in earlier
 
@@ -170,7 +168,7 @@ def test_a_next_move_that_cant_be_made_for_the_user_is_dropped(
     assert saved_next_moves(engine) == [(None, None)]
 
 
-def test_the_fallback_understanding_holds_no_next_move(
+def test_the_fallback_reply_plan_holds_no_next_move(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -178,7 +176,7 @@ def test_the_fallback_understanding_holds_no_next_move(
     engine: Engine,
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
-    chat_model.script_understanding('maybe "next_move": "Push" later')
+    chat_model.script_reply_plan('maybe "next_move": "Push" later')
     chat_model.script("tell me more")
 
     send_to_webhook(client, telegram_text_update("guess what"))

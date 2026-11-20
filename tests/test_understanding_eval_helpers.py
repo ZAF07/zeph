@@ -38,7 +38,7 @@ def read_cases(tmp_path: Path, text: str) -> list[UnderstandingCase]:
 
 NOTHING_RAISED = ObservedUnderstanding(
     need="Be heard",
-    understanding_input="Life Threads this reminds you of:\n[1] Falling-out with Mei",
+    reply_plan_input="Life Threads this reminds you of:\n[1] Falling-out with Mei",
     raised_threads=[],
     raised_curiosities=0,
     asked_why=False,

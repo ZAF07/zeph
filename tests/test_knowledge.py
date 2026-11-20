@@ -15,7 +15,7 @@ from tests.fakes import (
     FakeClock,
     FakeEmbedder,
     ScriptedChatModel,
-    understanding_answer,
+    reply_plan_answer,
 )
 from tests.knowledge_helpers import (
     blank_pdf,
@@ -62,12 +62,12 @@ def reply_instructions(
 ) -> str:
     """Send a Telegram message and return the instructions its reply was given.
 
-    The Understanding chooses the Knowledge documents listed under the given
+    The Reply Plan chooses the Knowledge documents listed under the given
     numbers and searches them with the message.
     """
     chat_model.calls.clear()
-    chat_model.script_understanding(
-        understanding_answer(knowledge_documents=documents, knowledge_search=text)
+    chat_model.script_reply_plan(
+        reply_plan_answer(knowledge_documents=documents, knowledge_search=text)
     )
     chat_model.script("mm, yes")
     assert send_to_webhook(client, telegram_text_update(text)) == 200

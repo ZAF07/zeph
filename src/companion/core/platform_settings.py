@@ -224,6 +224,9 @@ MEMORY_PROCESSING_PROMPT = Setting("memory_processing_prompt", read_text)
 UNDERSTANDING_MODEL = Setting("understanding_model", read_text)
 UNDERSTANDING_THINKING = Setting("understanding_thinking", read_on_off)
 UNDERSTANDING_PROMPT = Setting("understanding_prompt", read_text)
+REPLY_PLAN_MODEL = Setting("reply_plan_model", read_text)
+REPLY_PLAN_THINKING = Setting("reply_plan_thinking", read_on_off)
+REPLY_PLAN_PROMPT = Setting("reply_plan_prompt", read_text)
 REPLY_ASK_WHY_NOTE = Setting("reply_ask_why_note", read_text)
 SHARED_PHOTOS_MEMORY_DESCRIPTION = Setting(
     "shared_photos_memory_description", read_text
@@ -686,8 +689,8 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         "Understanding prompt",
         SettingKind.TEXT,
         hint=(
-            "Tells the Understanding how to read each Message and pick the Need, "
-            "Moves, memories and Life Threads for the reply. Runs before every reply."
+            "What the Understanding is told to read. It runs first on every Message, "
+            "and its answer goes to the Reply Plan."
         ),
     ),
     EditableSetting(
@@ -703,22 +706,43 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         hint=THINKING_HINT,
     ),
     EditableSetting(
+        REPLY_PLAN_PROMPT.key,
+        "Reply Plan prompt",
+        SettingKind.TEXT,
+        hint=(
+            "How the Reply Plan weighs what a reply could do. It runs after the "
+            "Understanding, and the Reply follows what it picks."
+        ),
+    ),
+    EditableSetting(
+        REPLY_PLAN_MODEL.key,
+        "Reply Plan model",
+        SettingKind.MODEL,
+        hint=MODEL_HINT,
+    ),
+    EditableSetting(
+        REPLY_PLAN_THINKING.key,
+        "Reply Plan thinking",
+        SettingKind.ON_OFF,
+        hint=THINKING_HINT,
+    ),
+    EditableSetting(
         REPLY_ASK_WHY_NOTE.key,
         "“Gently ask why” note",
         SettingKind.TEXT,
         max_length=2_000,
         hint=(
-            "Added when the User’s mood stands out and Zeph doesn’t know why, unless "
-            "the previous reply already asked."
+            "Added when the Reply Plan says to gently ask why the User feels as they "
+            "do and Zeph doesn’t know why, unless the previous reply already asked."
         ),
     ),
     EditableSetting(
         SHARED_PHOTOS_MEMORY_DESCRIPTION.key,
-        "Shared Photos description for the Understanding",
+        "Shared Photos description for the Reply Plan",
         SettingKind.TEXT,
         max_length=2_000,
         hint=(
-            "Describes the User’s Shared Photos to the Understanding, which picks them "
+            "Describes the User’s Shared Photos to the Reply Plan, which picks them "
             "like a Memory Category before each reply. When picked, the Reply can send "
             "one back."
         ),
@@ -761,7 +785,7 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         max_length=4_000,
         hint=(
             "Tells the Reply when to use the send_photo tool to send back one of the "
-            "User’s Shared Photos. Offered when the Understanding picked Shared "
+            "User’s Shared Photos. Offered when the Reply Plan picked Shared "
             "Photos."
         ),
     ),
@@ -835,7 +859,8 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.TEXT,
         hint=(
             "Tells the User Portrait step how to write a short picture of the User, "
-            "which every Understanding and reply sees. Runs last when a Conversation "
+            "which every Understanding, Reply Plan and reply sees. Runs last when a "
+            "Conversation "
             "ends, and after the User deletes something."
         ),
     ),
@@ -922,7 +947,7 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.TEXT,
         hint=(
             "Tells the drafting step how to write a Knowledge document’s “when it "
-            "helps”, which the Understanding reads to pick documents. Runs when a "
+            "helps”, which the Reply Plan reads to pick documents. Runs when a "
             "document is made ready without one."
         ),
     ),
@@ -1072,13 +1097,13 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     ),
     EditableSetting(
         MOVE_OUTCOMES_PER_UNDERSTANDING.key,
-        "Most Move Outcomes per Understanding",
+        "Most Move Outcomes per Reply Plan",
         SettingKind.WHOLE_NUMBER,
         minimum=0,
         maximum=10,
         hint=(
             "How many of the User’s past Move Outcomes, closest first, the "
-            "Understanding sees before each reply."
+            "Reply Plan sees before each reply."
         ),
     ),
     EditableSetting(
@@ -1089,7 +1114,7 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         maximum=100,
         hint=(
             "How close in meaning a Move Outcome must be to the User’s last few texts "
-            "for the Understanding to see it. Real matches score about 75–85; "
+            "for the Reply Plan to see it. Real matches score about 75–85; "
             "unrelated ones up to about 62."
         ),
     ),
@@ -1100,7 +1125,7 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         minimum=1,
         maximum=365,
         hint=(
-            "Days before the Understanding may bring up a Life Thread again after the "
+            "Days before the Reply Plan may bring up a Life Thread again after the "
             "User brushed it off. One they asked to drop is never brought up again."
         ),
     ),
@@ -1112,7 +1137,7 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         maximum=5,
         hint=(
             "How many Curiosities can be raised in one Conversation; until then, due "
-            "ones are offered to the Understanding before each reply. 0 means none."
+            "ones are offered to the Reply Plan before each reply. 0 means none."
         ),
     ),
     EditableSetting(
@@ -1145,7 +1170,7 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         maximum=100,
         hint=(
             "How close in meaning a passage must be, inside the Knowledge documents "
-            "the Understanding chose, for the Reply to get it. Fitting passages score "
+            "the Reply Plan chose, for the Reply to get it. Fitting passages score "
             "about 65–75; unrelated ones about 50."
         ),
     ),
@@ -1275,6 +1300,30 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         thinking_key=SAFEGUARD_THINKING.key,
     ),
     CoreService(
+        name="Understanding",
+        runs_when="Every Message · first",
+        description=(
+            "Reads each Message: what the User said and means, how they feel, "
+            "and what they want. It reads only and decides nothing."
+        ),
+        prompt_key=UNDERSTANDING_PROMPT.key,
+        model_key=UNDERSTANDING_MODEL.key,
+        thinking_key=UNDERSTANDING_THINKING.key,
+    ),
+    CoreService(
+        name="Reply Plan",
+        runs_when="Every Message · after the Understanding",
+        description=(
+            "Decides what the reply should do: the Need, the Moves, which "
+            "Threads and Curiosities to bring up, and which memories and "
+            "Knowledge it uses."
+        ),
+        prompt_key=REPLY_PLAN_PROMPT.key,
+        model_key=REPLY_PLAN_MODEL.key,
+        thinking_key=REPLY_PLAN_THINKING.key,
+        extra_prompt_keys=(SHARED_PHOTOS_MEMORY_DESCRIPTION.key,),
+    ),
+    CoreService(
         name="Response composition",
         runs_when="Every reply",
         description=(
@@ -1309,7 +1358,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
                 "Memory and Knowledge",
                 (REPLY_MEMORY_INTRO.key, REPLY_KNOWLEDGE_INTRO.key),
             ),
-            ExtraPromptGroup("Understanding", (REPLY_ASK_WHY_NOTE.key,)),
+            ExtraPromptGroup("Reply Plan", (REPLY_ASK_WHY_NOTE.key,)),
             ExtraPromptGroup("Features", (REPLY_FEATURES_UNAVAILABLE_NOTE.key,)),
             ExtraPromptGroup("Stickers", (STICKER_TOOL_DESCRIPTION.key,)),
         ),
@@ -1324,23 +1373,6 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         prompt_key=MEMORY_PROCESSING_PROMPT.key,
         model_key=MEMORY_PROCESSING_MODEL.key,
         thinking_key=MEMORY_PROCESSING_THINKING.key,
-    ),
-    CoreService(
-        name="Understanding",
-        runs_when="Every reply, before it is written",
-        description=(
-            "Reads what the User just said and picks the Need that fits, how "
-            "they seem and whether Zeph knows why, and the Memory Categories "
-            "that matter. It sees the Life Threads the message reminds Zeph "
-            "of and picks which to bring up or leave alone, and may bring up "
-            "one of the Curiosities whose day has come. The reply follows "
-            "the Need’s “how to reply” and gets only those memories plus the "
-            "always-included ones."
-        ),
-        prompt_key=UNDERSTANDING_PROMPT.key,
-        model_key=UNDERSTANDING_MODEL.key,
-        thinking_key=UNDERSTANDING_THINKING.key,
-        extra_prompt_keys=(SHARED_PHOTOS_MEMORY_DESCRIPTION.key,),
     ),
     CoreService(
         name="Photo viewing",
@@ -1392,7 +1424,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         description=(
             "Writes what Zeph learned about each Move it made: the situation, "
             "how the User felt, whether it helped, didn’t or was mixed, and "
-            "why. Runs only when the Conversation’s Understandings made a "
+            "why. Runs only when the Conversation’s Reply Plans made a "
             "Move. Users see these under “What helps you”."
         ),
         prompt_key=MOVE_OUTCOME_KEEPING_PROMPT.key,
@@ -1407,7 +1439,8 @@ CORE_SERVICES: tuple[CoreService, ...] = (
             "Threads, Move Outcomes and newest Day Summaries: who "
             "they are, what’s going on now, recurring themes, what helps and "
             "what doesn’t, and where they stand on their Goals. Every "
-            "Understanding and reply sees it. When the User deletes a Memory "
+            "Understanding, Reply Plan and reply sees it. When the User deletes a "
+            "Memory "
             "Item, Life Thread, Move Outcome or Summary, it is written again "
             "without it."
         ),
@@ -1432,7 +1465,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         runs_when="When a Knowledge document is made ready without one",
         description=(
             "Drafts a Knowledge document’s “when it helps” description from "
-            "its details and text. The Understanding reads these to decide "
+            "its details and text. The Reply Plan reads these to decide "
             "whether any document fits. Admins can rewrite it on the "
             "document’s page."
         ),

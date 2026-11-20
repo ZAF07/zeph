@@ -45,6 +45,7 @@ describe("CaseResultTraceView", () => {
           },
           understanding_shape: null,
           check_in_shape: null,
+          reply_plan_shape: null,
         },
       ],
     });

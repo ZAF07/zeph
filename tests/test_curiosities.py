@@ -11,7 +11,7 @@ from tests.fakes import (
     FakeClock,
     FakeScheduler,
     ScriptedChatModel,
-    understanding_answer,
+    reply_plan_answer,
 )
 from tests.telegram_helpers import (
     auth_headers,
@@ -96,13 +96,13 @@ def end_current_conversation(
     scheduler.tick()
 
 
-def understanding_sees(
+def reply_plan_sees(
     client: TestClient, chat_model: ScriptedChatModel, text: str
 ) -> str:
-    """Send a message and return what its Understanding was given."""
+    """Send a message and return what its Reply Plan was given."""
     chat_model.script("mm, tell me more")
     send_to_webhook(client, telegram_text_update(text))
-    return chat_model.understanding_calls[-1].history[0].text
+    return chat_model.reply_plan_calls[-1].history[0].text
 
 
 def reply_instructions(
@@ -115,9 +115,9 @@ def reply_instructions(
 
 
 def bring_up_curiosity(chat_model: ScriptedChatModel, *numbers: int) -> None:
-    """Script the next Understanding to bring up the given Curiosities."""
-    chat_model.script_understanding(
-        understanding_answer(
+    """Script the next Reply Plan to bring up the given Curiosities."""
+    chat_model.script_reply_plan(
+        reply_plan_answer(
             bring_up=[{"curiosity": number, "how": "lead"} for number in numbers]
         )
     )
@@ -176,9 +176,9 @@ def test_a_conversation_end_saves_a_curiosity_offered_once_its_day_has_come(
     keeper_saw = chat_model.curiosity_keeping_calls[-1].history[0].text
 
     clock.advance(timedelta(days=1))
-    thursday = understanding_sees(client, chat_model, "morning!")
+    thursday = reply_plan_sees(client, chat_model, "morning!")
     clock.advance(timedelta(days=1))
-    friday = understanding_sees(client, chat_model, "hey you")
+    friday = reply_plan_sees(client, chat_model, "hey you")
 
     assert "Today: Wednesday 11 Nov 2026" in keeper_saw
     assert "big presentation to the board on Thursday" in keeper_saw
@@ -204,7 +204,7 @@ def test_a_curiosity_brought_up_reaches_the_reply_and_is_marked_raised(
     bring_up_curiosity(chat_model, 1)
     instructions = reply_instructions(client, chat_model, "hey you")
     [curiosity] = stored_curiosities(engine)
-    next_message = understanding_sees(client, chat_model, "busy day today")
+    next_message = reply_plan_sees(client, chat_model, "busy day today")
 
     assert "Something you've been wondering about them" in instructions
     assert (
@@ -228,8 +228,8 @@ def test_a_curiosity_woven_in_is_still_asked_in_this_reply(
     connect_telegram(client, auth_verifier, chat_channel)
     presentation_is_due(client, chat_model, clock, scheduler, seeded_settings)
 
-    chat_model.script_understanding(
-        understanding_answer(bring_up=[{"curiosity": 1, "how": "weave"}])
+    chat_model.script_reply_plan(
+        reply_plan_answer(bring_up=[{"curiosity": 1, "how": "weave"}])
     )
     instructions = reply_instructions(client, chat_model, "work was long today")
 
@@ -264,11 +264,11 @@ def test_no_curiosity_is_offered_once_the_admin_set_number_was_raised(
     set_settings(client, auth_verifier, {"curiosities_per_conversation": 2})
 
     bring_up_curiosity(chat_model, 1)
-    first = understanding_sees(client, chat_model, "hey you")
-    second = understanding_sees(client, chat_model, "so anyway")
+    first = reply_plan_sees(client, chat_model, "hey you")
+    second = reply_plan_sees(client, chat_model, "so anyway")
     bring_up_curiosity(chat_model, 1, 2)
     reply_instructions(client, chat_model, "what's new with you")
-    third = understanding_sees(client, chat_model, "ok")
+    third = reply_plan_sees(client, chat_model, "ok")
     raised = [row for row in stored_curiosities(engine) if row["state"] == "raised"]
 
     assert "raised 0 of at most 2 in this Conversation" in first
@@ -496,7 +496,7 @@ def test_with_curiosities_off_for_everyone_none_are_made_or_offered_or_deleted(
 
     bring_up_curiosity(chat_model, 1)
     instructions = reply_instructions(client, chat_model, "hey you")
-    seen = chat_model.understanding_calls[-1].history[0].text
+    seen = chat_model.reply_plan_calls[-1].history[0].text
     end_current_conversation(
         chat_model, clock, scheduler, seeded_settings, [new_curiosity(ask="New?")]
     )
@@ -525,12 +525,12 @@ def test_with_curiosities_off_for_one_user_none_are_offered_to_them(
     user_id = maya_id(client, auth_verifier)
 
     switch_for_user(client, admin, user_id, "curiosities", "off")
-    off = understanding_sees(client, chat_model, "hey you")
+    off = reply_plan_sees(client, chat_model, "hey you")
     end_current_conversation(
         chat_model, clock, scheduler, seeded_settings, [new_curiosity(ask="New?")]
     )
     switch_for_user(client, admin, user_id, "curiosities", "default")
-    back_on = understanding_sees(client, chat_model, "hey again")
+    back_on = reply_plan_sees(client, chat_model, "hey again")
 
     assert PRESENTATION not in off
     assert len(chat_model.curiosity_keeping_calls) == 1

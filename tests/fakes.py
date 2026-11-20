@@ -430,35 +430,72 @@ class FakeTimer:
 
 
 def understanding_answer(
-    need: str = "Just chatting",
-    memory_categories: Sequence[str] = (),
     mood: str = "relaxed",
     intensity: str = "low",
     cause_known: bool = True,
-    nuance: str = "Just saying hi.",
     look_up_past: Sequence[str] = (),
+    struggling: bool = False,
+    asked_for_photo: bool = False,
+    said: str = "They said hi.",
+    means: str = "They're just saying hi.",
+    feelings: dict[str, str] | None = None,
+    wants: dict[str, str] | None = None,
+) -> str:
+    """Build the form the Understanding model answers with.
+
+    Args:
+        mood: How the User seems.
+        intensity: How strongly: "low", "medium" or "high".
+        cause_known: Whether the Companion knows why they feel that way.
+        look_up_past: Phrases to search older Day Summaries with.
+        struggling: Whether the User is struggling.
+        asked_for_photo: Whether they asked to see one of their photos.
+        said: What they said.
+        means: What they mean.
+        feelings: How they feel, as {"said", "read", "unclear"}; none said.
+        wants: What they want, the same way; none said.
+
+    Returns:
+        The form as JSON.
+    """
+    return json.dumps(
+        {
+            "said": said,
+            "means": means,
+            "feelings": feelings or {"said": "", "read": "", "unclear": ""},
+            "mood": mood,
+            "intensity": intensity,
+            "wants": wants or {"said": "", "read": "", "unclear": ""},
+            "cause_known": cause_known,
+            "struggling": struggling,
+            "asked_for_photo": asked_for_photo,
+            "look_up_past": list(look_up_past),
+        }
+    )
+
+
+def reply_plan_answer(
+    need: str = "Just chatting",
+    memory_categories: Sequence[str] = (),
+    guidance: str = "Just saying hi.",
     bring_up: Sequence[dict[str, Any]] = (),
     left_alone: Sequence[dict[str, Any]] = (),
     threads_touched: Sequence[int] = (),
     knowledge_documents: Sequence[object] = (),
     knowledge_search: str = "",
-    struggling: bool = False,
-    asked_for_photo: bool = False,
     lead_move: object = None,
     support_move: object = None,
     next_move: object = None,
     next_move_why: object = None,
+    send_photo: object = True,
+    ask_why: object = None,
 ) -> str:
-    """Build the form the Understanding model answers with.
+    """Build the form the Reply Plan model answers with.
 
     Args:
         need: The Need's name.
         memory_categories: The Memory Categories whose items matter.
-        mood: How the User seems.
-        intensity: How strongly: "low", "medium" or "high".
-        cause_known: Whether the Companion knows why they feel that way.
-        nuance: One sentence on what fits.
-        look_up_past: Phrases to search older Day Summaries with.
+        guidance: One sentence on what fits.
         bring_up: The Life Threads to bring up, e.g. {"thread": 1, "how":
             "lead"}.
         left_alone: The Life Threads to leave alone, e.g. {"thread": 1,
@@ -468,14 +505,15 @@ def understanding_answer(
             to search, or anything else a model might write there; none
             means no Knowledge.
         knowledge_search: The phrase to search them with.
-        struggling: Whether the User is struggling.
-        asked_for_photo: Whether they asked to see one of their photos.
         lead_move: The lead Move's name, or anything else a model might
             write there; None for no Move.
         support_move: The supporting Move's name, the same way.
         next_move: The next Move's name, the same way.
         next_move_why: Why that Move comes next, or anything else a model
             might write there; None for no reason.
+        send_photo: Whether a Shared Photo may be sent, or anything else a
+            model might write there.
+        ask_why: Whether to ask why; None leaves it out of the answer.
 
     Returns:
         The form as JSON.
@@ -485,27 +523,25 @@ def understanding_answer(
         if knowledge_documents
         else None
     )
-    return json.dumps(
-        {
-            "need": need,
-            "lead_move": lead_move,
-            "support_move": support_move,
-            "next_move": next_move,
-            "next_move_why": next_move_why,
-            "nuance": nuance,
-            "mood": mood,
-            "intensity": intensity,
-            "cause_known": cause_known,
-            "memory_categories": list(memory_categories),
-            "bring_up": list(bring_up),
-            "left_alone": list(left_alone),
-            "look_up_past": list(look_up_past),
-            "knowledge": knowledge,
-            "threads_touched": list(threads_touched),
-            "struggling": struggling,
-            "asked_for_photo": asked_for_photo,
-        }
-    )
+    answer: dict[str, Any] = {
+        "need": need,
+        "guidance": guidance,
+        "lead_move": lead_move,
+        "lead_move_why": None,
+        "support_move": support_move,
+        "support_move_why": None,
+        "next_move": next_move,
+        "next_move_why": next_move_why,
+        "memory_categories": list(memory_categories),
+        "threads_touched": list(threads_touched),
+        "bring_up": list(bring_up),
+        "left_alone": list(left_alone),
+        "knowledge": knowledge,
+        "send_photo": send_photo,
+    }
+    if ask_why is not None:
+        answer["ask_why"] = ask_why
+    return json.dumps(answer)
 
 
 DEFAULT_WHEN_IT_HELPS = "When someone wants a calm, steady practice."
@@ -514,12 +550,13 @@ DEFAULT_WHEN_IT_HELPS = "When someone wants a calm, steady practice."
 class ScriptedChatModel:
     """Chat model that returns pre-written replies and records each call.
 
-    Safeguard, memory processing, Understanding, Life Thread keeping,
+    Safeguard, memory processing, Understanding, Reply Plan, Life Thread keeping,
     Curiosity keeping, Move Outcome keeping, Portrait writing, Personal
     Sticker keeping, woven-in Check-in and Knowledge "when it helps"
     drafting calls are told apart by their instructions and kept apart from
     reply calls, each with its own script. The Safeguard defaults to "none",
-    the Understanding to `understanding_answer()`, Life Thread, Curiosity
+    the Understanding to `understanding_answer()`, the Reply Plan to
+    `reply_plan_answer()`, Life Thread, Curiosity
     and Move Outcome keeping to none kept, Portrait writing to an empty
     answer (no Portrait), a woven-in Check-in to "not now" and drafting to
     `DEFAULT_WHEN_IT_HELPS`, so tests about replies don't have to script
@@ -536,6 +573,7 @@ class ScriptedChatModel:
         safeguard_prompt: str = "",
         memory_processing_prompt: str = "",
         understanding_prompt: str = "",
+        reply_plan_prompt: str = "",
         sticker_keeping_prompt: str = "",
         thread_keeping_prompt: str = "",
         knowledge_when_it_helps_prompt: str = "",
@@ -552,6 +590,7 @@ class ScriptedChatModel:
                 post-conversation processing call.
             understanding_prompt: The instructions that mark an
                 Understanding call.
+            reply_plan_prompt: The instructions that mark a Reply Plan call.
             sticker_keeping_prompt: The instructions that mark a Personal
                 Sticker keeping call.
             thread_keeping_prompt: The instructions that mark a Life Thread
@@ -571,6 +610,7 @@ class ScriptedChatModel:
         self._safeguard_answers: list[str | Exception] = []
         self._processing_answers: list[str | Exception] = []
         self._understanding_answers: list[str | Exception] = []
+        self._reply_plan_answers: list[str | Exception] = []
         self._sticker_keeping_answers: list[str | Exception] = []
         self._thread_keeping_answers: list[str | Exception] = []
         self._when_it_helps_answers: list[str | Exception] = []
@@ -581,6 +621,7 @@ class ScriptedChatModel:
         self.safeguard_prompt = safeguard_prompt
         self.memory_processing_prompt = memory_processing_prompt
         self.understanding_prompt = understanding_prompt
+        self.reply_plan_prompt = reply_plan_prompt
         self.sticker_keeping_prompt = sticker_keeping_prompt
         self.thread_keeping_prompt = thread_keeping_prompt
         self.knowledge_when_it_helps_prompt = knowledge_when_it_helps_prompt
@@ -592,6 +633,7 @@ class ScriptedChatModel:
         self.safeguard_calls: list[ChatModelCall] = []
         self.processing_calls: list[ChatModelCall] = []
         self.understanding_calls: list[ChatModelCall] = []
+        self.reply_plan_calls: list[ChatModelCall] = []
         self.sticker_keeping_calls: list[ChatModelCall] = []
         self.thread_keeping_calls: list[ChatModelCall] = []
         self.when_it_helps_calls: list[ChatModelCall] = []
@@ -643,6 +685,15 @@ class ScriptedChatModel:
                 failing model.
         """
         self._understanding_answers.extend(answers)
+
+    def script_reply_plan(self, *answers: str | Exception) -> None:
+        """Queue Reply Plan answers, one per call.
+
+        Args:
+            answers: The forms, e.g. from `reply_plan_answer()`; an exception
+                is raised instead of returned, to act like a failing model.
+        """
+        self._reply_plan_answers.extend(answers)
 
     def script_thread_keeping(self, *answers: str | Exception) -> None:
         """Queue Life Thread keeping answers, one per call.
@@ -784,6 +835,14 @@ class ScriptedChatModel:
                 self._understanding_answers.pop(0)
                 if self._understanding_answers
                 else understanding_answer()
+            )
+        elif self.reply_plan_prompt and instructions == self.reply_plan_prompt:
+            self.reply_plan_calls.append(call)
+            self.call_order.append("reply_plan")
+            answer = (
+                self._reply_plan_answers.pop(0)
+                if self._reply_plan_answers
+                else reply_plan_answer()
             )
         elif self.thread_keeping_prompt and instructions == self.thread_keeping_prompt:
             self.thread_keeping_calls.append(call)

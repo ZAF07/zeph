@@ -25,6 +25,7 @@ from tests.fakes import (
     FakeWebSearch,
     ScriptedChatModel,
     ToolCall,
+    reply_plan_answer,
     understanding_answer,
 )
 from tests.telegram_helpers import (
@@ -101,8 +102,8 @@ def test_a_plain_users_message_makes_a_trace_with_no_content(
     assert trace["has_content"] is False
     opened = open_trace(client, admin, trace["trace_id"])
     steps = [call["step"] for call in opened["calls"]]
-    assert steps == ["safeguard", "understanding", "reply"]
-    assert [call["thinking"] for call in opened["calls"]] == [True, True, False]
+    assert steps == ["safeguard", "understanding", "reply_plan", "reply"]
+    assert [call["thinking"] for call in opened["calls"]] == [True, True, True, False]
     reply = opened["calls"][-1]
     assert reply["model"]
     assert reply["tokens_in"] > 0
@@ -114,7 +115,7 @@ def test_a_plain_users_message_makes_a_trace_with_no_content(
     assert all(call["content"] is None for call in opened["calls"])
     assert "lighthouse" not in str(opened)
     stored = stored_model_calls(engine)
-    assert len(stored) == 3
+    assert len(stored) == 4
     assert not any("lighthouse" in row for row in stored)
 
 
@@ -147,18 +148,18 @@ def test_an_admins_own_message_keeps_full_content_with_tool_calls(
     assert content["response"] == "that sounds lovely"
 
 
-def newest_understanding_call(
-    client: TestClient, headers: dict[str, str]
+def newest_call(
+    client: TestClient, headers: dict[str, str], step: str
 ) -> dict[str, Any]:
-    """Open the newest Message trace and return its Understanding call."""
+    """Open the newest Message trace and return its call for one step."""
     newest = next(
         trace for trace in list_traces(client, headers) if trace["kind"] == "message"
     )
     calls = open_trace(client, headers, newest["trace_id"])["calls"]
-    return next(call for call in calls if call["step"] == "understanding")
+    return next(call for call in calls if call["step"] == step)
 
 
-def test_a_plain_users_understanding_shows_its_shape_and_never_its_words(
+def test_a_plain_users_understanding_and_reply_plan_show_shapes_and_never_words(
     client: TestClient,
     engine: Engine,
     auth_verifier: FakeAuthVerifier,
@@ -173,12 +174,18 @@ def test_a_plain_users_understanding_shows_its_shape_and_never_its_words(
     clock.advance(timedelta(days=30))
     chat_model.script_understanding(
         understanding_answer(
-            need="Be heard",
             mood="furious",
             intensity="high",
             cause_known=False,
-            nuance="They are fuming about the lighthouse.",
+            struggling=True,
+            means="They are fuming about the lighthouse.",
             look_up_past=["sister wedding", "mum's care"],
+        )
+    )
+    chat_model.script_reply_plan(
+        reply_plan_answer(
+            need="Be heard",
+            guidance="Let them rage about the lighthouse.",
             bring_up=[{"thread": 1, "how": "lead"}],
             threads_touched=[1],
             lead_move="Calm",
@@ -192,22 +199,29 @@ def test_a_plain_users_understanding_shows_its_shape_and_never_its_words(
     send_to_webhook(client, telegram_text_update("Mei's wedding is next week"))
 
     admin = owner_headers(client, auth_verifier)
-    understanding = newest_understanding_call(client, admin)
+    understanding = newest_call(client, admin, "understanding")
+    reply_plan = newest_call(client, admin, "reply_plan")
     assert understanding["content"] is None
+    assert reply_plan["content"] is None
     assert understanding["understanding_shape"] == {
+        "intensity": "high",
+        "cause_known": False,
+        "struggling": True,
+        "past_look_ups": 2,
+    }
+    assert understanding["reply_plan_shape"] is None
+    assert reply_plan["reply_plan_shape"] == {
         "need": "Be heard",
         "lead_move": "Calm",
         "support_move": "Mirror",
         "next_move": "Reframe",
-        "intensity": "high",
-        "cause_known": False,
         "threads_reminded": 1,
         "threads_led_with": 1,
         "threads_woven_in": 0,
         "threads_left_alone": 0,
         "threads_held_back": 0,
-        "past_look_ups": 2,
     }
+    assert reply_plan["understanding_shape"] is None
     for words in (
         "furious",
         "lighthouse",
@@ -216,6 +230,7 @@ def test_a_plain_users_understanding_shows_its_shape_and_never_its_words(
         MEI_STORY,
     ):
         assert words not in str(understanding)
+        assert words not in str(reply_plan)
         assert not any(words in row for row in stored_model_calls(engine))
 
 
@@ -231,17 +246,17 @@ def test_a_held_back_thread_shows_as_held_back_and_left_alone_when_chosen(
     connect_telegram(client, auth_verifier, chat_channel)
     start_mei_thread(client, chat_model, clock, scheduler, seeded_settings)
     clock.advance(timedelta(days=30))
-    bring_up_mei = understanding_answer(bring_up=[{"thread": 1, "how": "weave"}])
-    chat_model.script_understanding(bring_up_mei, bring_up_mei, understanding_answer())
+    bring_up_mei = reply_plan_answer(bring_up=[{"thread": 1, "how": "weave"}])
+    chat_model.script_reply_plan(bring_up_mei, bring_up_mei, reply_plan_answer())
     chat_model.script("mm", "mm", "mm")
 
     send_to_webhook(client, telegram_text_update("Mei's wedding is next week"))
     admin = owner_headers(client, auth_verifier)
-    first = newest_understanding_call(client, admin)["understanding_shape"]
+    first = newest_call(client, admin, "reply_plan")["reply_plan_shape"]
     send_to_webhook(client, telegram_text_update("Mei wants me there"))
-    second = newest_understanding_call(client, admin)["understanding_shape"]
+    second = newest_call(client, admin, "reply_plan")["reply_plan_shape"]
     send_to_webhook(client, telegram_text_update("Mei is getting married"))
-    third = newest_understanding_call(client, admin)["understanding_shape"]
+    third = newest_call(client, admin, "reply_plan")["reply_plan_shape"]
 
     assert (first["threads_woven_in"], first["threads_held_back"]) == (1, 0)
     assert second["threads_reminded"] == 1
@@ -251,32 +266,30 @@ def test_a_held_back_thread_shows_as_held_back_and_left_alone_when_chosen(
     assert (third["threads_held_back"], third["threads_left_alone"]) == (1, 0)
 
 
-def test_an_admins_own_understanding_shows_its_shape_with_its_content(
+def test_an_admins_own_understanding_and_reply_plan_show_shapes_with_content(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
     chat_model: ScriptedChatModel,
 ) -> None:
     admin = connect_owner_telegram(client, auth_verifier, chat_channel)
-    chat_model.script_understanding(
-        understanding_answer(need="Be heard", intensity="medium")
-    )
+    chat_model.script_understanding(understanding_answer(intensity="medium"))
+    chat_model.script_reply_plan(reply_plan_answer(need="Be heard"))
     chat_model.script("that sounds lovely")
 
     send_to_webhook(client, telegram_text_update(SECRET_WORDS, OWNER_TELEGRAM_USER_ID))
 
-    understanding = newest_understanding_call(client, admin)
+    understanding = newest_call(client, admin, "understanding")
+    reply_plan = newest_call(client, admin, "reply_plan")
     assert understanding["content"] is not None
+    assert SECRET_WORDS in reply_plan["content"]["history"][0]["text"]
     shape = understanding["understanding_shape"]
-    assert (shape["need"], shape["intensity"], shape["cause_known"]) == (
-        "Be heard",
-        "medium",
-        True,
-    )
-    assert shape["threads_reminded"] == 0
+    assert (shape["intensity"], shape["cause_known"]) == ("medium", True)
+    assert reply_plan["reply_plan_shape"]["need"] == "Be heard"
+    assert reply_plan["reply_plan_shape"]["threads_reminded"] == 0
 
 
-def test_a_failed_understanding_shows_the_fallback_need_it_used(
+def test_a_failed_understanding_shows_the_fallback_it_used(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -289,13 +302,36 @@ def test_a_failed_understanding_shows_the_fallback_need_it_used(
     send_to_webhook(client, telegram_text_update(SECRET_WORDS))
 
     admin = owner_headers(client, auth_verifier)
-    understanding = newest_understanding_call(client, admin)
+    understanding = newest_call(client, admin, "understanding")
     assert understanding["error"] == "RuntimeError"
-    shape = understanding["understanding_shape"]
-    assert (shape["need"], shape["intensity"], shape["cause_known"]) == (
+    assert understanding["understanding_shape"] == {
+        "intensity": "low",
+        "cause_known": True,
+        "struggling": False,
+        "past_look_ups": 0,
+    }
+
+
+def test_a_failed_reply_plan_shows_the_fallback_need_it_used(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script_reply_plan(RuntimeError("model is down"))
+    chat_model.script("mm, tell me more")
+
+    send_to_webhook(client, telegram_text_update(SECRET_WORDS))
+
+    admin = owner_headers(client, auth_verifier)
+    reply_plan = newest_call(client, admin, "reply_plan")
+    assert reply_plan["error"] == "RuntimeError"
+    shape = reply_plan["reply_plan_shape"]
+    assert (shape["need"], shape["lead_move"], shape["support_move"]) == (
         "Ask more",
-        "low",
-        True,
+        None,
+        None,
     )
 
 
@@ -315,7 +351,13 @@ def test_texts_sent_in_a_row_make_one_trace_for_their_message(
 
     admin = owner_headers(client, auth_verifier)
     [trace] = list_traces(client, admin)
-    assert trace["steps"] == ["safeguard", "safeguard", "understanding", "reply"]
+    assert trace["steps"] == [
+        "safeguard",
+        "safeguard",
+        "understanding",
+        "reply_plan",
+        "reply",
+    ]
 
 
 def test_a_failing_model_call_shows_its_error(

@@ -9,28 +9,31 @@ from companion.core.models import MessageToAnswer, UserSnapshot
 from companion.core.move_outcomes import MoveOutcomeFinder
 from companion.core.reply_attempt import ReplyAttempt
 from companion.core.reply_gate import ReplyGate, Stopped
+from companion.core.reply_plan import ReplyPlanService
 from companion.core.response_composition import ResponseComposer
-from companion.core.understanding import UnderstandingService, may_send_photo
+from companion.core.understanding import UnderstandingService
 from companion.core.woven_check_ins import WovenCheckInOffer, WovenCheckIns
 
 
 class ReplyService:
     """Answers a connected User's Message, one step after another (ADR-0009).
 
-    The steps run in this order: the ReplyGate applies the house rules left
-    once the Message's texts are saved and checked, then the Companion is
-    reminded of the User's Life Threads the Message touches and lists the
-    Curiosities whose day has come and finds the User's past Move Outcomes
-    closest to the Message, then the Understanding works out what the User
-    needs and which Moves to make, which User Memory matters, which Threads
-    and Curiosities to bring up and which Knowledge documents fit, then that
-    memory, any older Conversations it asked to look up and passages from
-    the Knowledge documents it chose are recalled, while the Check-in model
-    decides whether to offer the reply a Check-in that is due, then the
-    reply is composed, in its strict priority order, and delivered, and the
-    Threads and Curiosities it brought up are marked raised. A struggling
-    User is offered none of their Shared Photos back unless they asked for
-    one. Every step reads the User from the same snapshot.
+    The steps run in this order (ADR-0021): the ReplyGate applies the house
+    rules left once the Message's texts are saved and checked, then the
+    Understanding reads what the User said, means, feels and wants, deciding
+    nothing; then the Companion is reminded of the User's Life Threads the
+    Message touches, lists the Curiosities whose day has come and finds the
+    User's past Move Outcomes closest to the Message; then the Reply Plan
+    decides what the User needs and which Moves to make, which User Memory
+    matters, which Threads and Curiosities to bring up and which Knowledge
+    documents fit; then that memory, any older Conversations the
+    Understanding asked to look up and passages from the Knowledge documents
+    the Reply Plan chose are recalled, while the Check-in model decides
+    whether to offer the reply a Check-in that is due; then the reply is
+    composed, in its strict priority order, and delivered, and the Threads
+    and Curiosities it brought up are marked raised. A struggling User is
+    offered none of their Shared Photos back unless they asked for one.
+    Every step reads the User from the same snapshot.
     """
 
     def __init__(
@@ -41,6 +44,7 @@ class ReplyService:
         curiosity_raiser: CuriosityRaiser,
         move_outcome_finder: MoveOutcomeFinder,
         understanding: UnderstandingService,
+        reply_plan: ReplyPlanService,
         memory_retrieval: MemoryRetrieval,
         knowledge_retrieval: KnowledgeRetrieval,
         response_composer: ResponseComposer,
@@ -57,11 +61,12 @@ class ReplyService:
                 marks those brought up.
             move_outcome_finder: Finds the User's past Move Outcomes that fit
                 each Message.
-            understanding: Works out what the User needs before each reply.
+            understanding: Reads each Message before the reply is planned.
+            reply_plan: Decides what each reply does.
             memory_retrieval: Reads the User Memory and picks out what the
-                Understanding chose.
+                Reply Plan chose.
             knowledge_retrieval: Finds passages in the Knowledge documents the
-                Understanding chose.
+                Reply Plan chose.
             response_composer: Writes the Companion's reply.
             woven_check_ins: Lets the reply weave in a Check-in that is due.
         """
@@ -71,6 +76,7 @@ class ReplyService:
         self._curiosity_raiser = curiosity_raiser
         self._move_outcome_finder = move_outcome_finder
         self._understanding = understanding
+        self._reply_plan = reply_plan
         self._memory_retrieval = memory_retrieval
         self._knowledge_retrieval = knowledge_retrieval
         self._response_composer = response_composer
@@ -107,35 +113,38 @@ class ReplyService:
         if isinstance(gate_result, Stopped):
             return
         saved_memory = self._memory_retrieval.read(snapshot)
+        understanding = self._understanding.understand(
+            snapshot, message.conversation_id, saved_memory.portrait
+        )
+        attempt.raise_if_dropped()
         reminded = self._thread_reminder.remind(snapshot, message.conversation_id)
         due = self._curiosity_raiser.due(snapshot, message.conversation_id)
         move_outcomes = self._move_outcome_finder.find(
             snapshot, message.conversation_id
         )
-        understood = self._understanding.understand(
-            snapshot,
-            message.conversation_id,
-            saved_memory,
-            reminded,
-            due,
-            move_outcomes,
+        planned = self._reply_plan.plan(
+            snapshot, understanding, saved_memory, reminded, due, move_outcomes
         )
-        form = understood.understanding.form
+        plan = planned.reply_plan.form
         attempt.raise_if_dropped()
         with ThreadPoolExecutor(max_workers=1) as executor:
             deciding = executor.submit(
                 self._woven_check_ins.decide,
                 snapshot,
                 message.conversation_id,
-                form,
+                understanding.form,
+                plan,
                 saved_memory,
                 reminded,
-                understood.asks_a_question,
+                planned.asks_a_question,
             )
             memory = self._memory_retrieval.recall(
-                snapshot, saved_memory, form.memory_categories, form.look_up_past
+                snapshot,
+                saved_memory,
+                plan.memory_categories,
+                understanding.form.look_up_past,
             )
-            knowledge = self._knowledge_retrieval.recall(snapshot, form.knowledge)
+            knowledge = self._knowledge_retrieval.recall(snapshot, plan.knowledge)
             woven = deciding.result()
         woven_check_in = (
             self._woven_check_ins.save(snapshot, woven) if woven is not None else None
@@ -152,13 +161,13 @@ class ReplyService:
                 snapshot,
                 memory.text,
                 knowledge,
-                guidance=understood.reply_guidance,
+                guidance=planned.reply_guidance,
                 optional_offers=(
                     [check_in_offer.offer] if check_in_offer is not None else []
                 ),
                 data_deletion_note=gate_result.data_deletion_note,
                 shared_photo_ids=(
-                    memory.shared_photo_ids if may_send_photo(form) else ()
+                    memory.shared_photo_ids if planned.may_send_photo else ()
                 ),
             )
             if check_in_offer is not None and not check_in_offer.was_brought_up:
@@ -180,8 +189,8 @@ class ReplyService:
             if check_in_offer is not None:
                 self._take_back(snapshot, check_in_offer)
             raise
-        self._thread_reminder.mark_raised(message.conversation_id, form.bring_up)
-        self._curiosity_raiser.mark_raised(message.conversation_id, form.curiosities)
+        self._thread_reminder.mark_raised(message.conversation_id, plan.bring_up)
+        self._curiosity_raiser.mark_raised(message.conversation_id, plan.curiosities)
 
     def _take_back(self, snapshot: UserSnapshot, offer: WovenCheckInOffer) -> None:
         """Take back the Woven-in Check-in offered to a reply, so it stays due.

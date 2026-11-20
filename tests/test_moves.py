@@ -9,6 +9,7 @@ from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
     ScriptedChatModel,
+    reply_plan_answer,
     understanding_answer,
 )
 from tests.telegram_helpers import (
@@ -51,10 +52,10 @@ def when_it_fits(move: str) -> str:
 
 
 def saved_moves(engine: Engine) -> list[tuple[str | None, str | None]]:
-    """The lead and supporting Moves of every saved Understanding, oldest first."""
+    """The lead and supporting Moves of every saved Reply Plan, oldest first."""
     with engine.connect() as connection:
         rows = connection.execute(
-            text("SELECT lead_move, support_move FROM understandings ORDER BY position")
+            text("SELECT lead_move, support_move FROM reply_plans ORDER BY position")
         ).all()
     return [(row.lead_move, row.support_move) for row in rows]
 
@@ -79,14 +80,23 @@ def reply_to(
     client: TestClient,
     chat_model: ScriptedChatModel,
     message: str,
-    **answer: Any,
+    understanding: dict[str, Any] | None = None,
+    **plan: Any,
 ) -> str:
-    """Send a Message whose Understanding answers with the given form fields.
+    """Send a Message with the given Understanding and Reply Plan answers.
+
+    Args:
+        client: The backend's test client.
+        chat_model: The scripted chat model.
+        message: The Message's text.
+        understanding: The Understanding's form fields; the defaults if none.
+        **plan: The Reply Plan's form fields.
 
     Returns:
         The reply call's instructions.
     """
-    chat_model.script_understanding(understanding_answer(**answer))
+    chat_model.script_understanding(understanding_answer(**(understanding or {})))
+    chat_model.script_reply_plan(reply_plan_answer(**plan))
     chat_model.script("ok")
     send_to_webhook(client, telegram_text_update(message))
     return chat_model.calls[-1].instructions
@@ -136,7 +146,7 @@ def test_a_fresh_install_has_get_curious_asking_a_question(engine: Engine) -> No
     }
 
 
-def test_the_understanding_is_shown_the_moves_and_which_each_need_allows(
+def test_the_reply_plan_is_shown_the_moves_and_which_each_need_allows(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -146,7 +156,7 @@ def test_the_understanding_is_shown_the_moves_and_which_each_need_allows(
 
     reply_to(client, chat_model, "hello there")
 
-    asked = chat_model.understanding_calls[-1].history[0].text
+    asked = chat_model.reply_plan_calls[-1].history[0].text
     for name, move in seeded_moves().items():
         assert f"- {name}: {move['when_it_fits'].strip()}" in asked
     allowed = asked.split("Moves each Need allows:")[1]
@@ -319,7 +329,7 @@ def test_an_unknown_need_falls_back_with_only_the_moves_the_fallback_allows(
     assert saved_moves(engine) == [(None, None)]
 
 
-def test_the_fallback_understanding_has_no_moves(
+def test_the_fallback_reply_plan_has_no_moves(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -327,7 +337,7 @@ def test_the_fallback_understanding_has_no_moves(
     engine: Engine,
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
-    chat_model.script_understanding('I think they want "lead_move": "Push"')
+    chat_model.script_reply_plan('I think they want "lead_move": "Push"')
     chat_model.script("tell me more")
 
     send_to_webhook(client, telegram_text_update("guess what"))
@@ -358,7 +368,7 @@ def test_with_web_search_off_research_is_never_offered_and_the_reply_says_so(
         support_move="Suggest",
     )
 
-    asked = chat_model.understanding_calls[-1].history[0].text
+    asked = chat_model.reply_plan_calls[-1].history[0].text
     assert "- Research:" not in asked
     assert (
         "- Advice: Calm, Ground, Reframe, Mirror, Suggest, Plan steps, Push, "
@@ -396,7 +406,7 @@ def test_with_the_web_search_limit_used_up_research_is_never_offered(
         lead_move="Research",
     )
 
-    assert "- Research:" not in chat_model.understanding_calls[-1].history[0].text
+    assert "- Research:" not in chat_model.reply_plan_calls[-1].history[0].text
     assert how_to_do_it("Research") not in instructions
     assert seeded_settings["reply_web_search_limit_note"] in instructions
     assert saved_moves(engine) == [(None, None)]
@@ -419,5 +429,5 @@ def test_a_move_needing_a_feature_that_works_is_offered(
         lead_move="Research",
     )
 
-    assert "- Research:" in chat_model.understanding_calls[-1].history[0].text
+    assert "- Research:" in chat_model.reply_plan_calls[-1].history[0].text
     assert saved_moves(engine) == [("Research", None)]

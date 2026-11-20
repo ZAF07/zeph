@@ -12,7 +12,7 @@ from tests.fakes import (
     FakeEmbedder,
     FakeScheduler,
     ScriptedChatModel,
-    understanding_answer,
+    reply_plan_answer,
 )
 from tests.telegram_helpers import (
     auth_headers,
@@ -59,8 +59,8 @@ def send_with_moves(
     message: str = STUCK,
     **answer: Any,
 ) -> None:
-    """Send a Message whose Understanding picks the given Need and Moves."""
-    chat_model.script_understanding(understanding_answer(**answer))
+    """Send a Message whose Reply Plan picks the given Need and Moves."""
+    chat_model.script_reply_plan(reply_plan_answer(**answer))
     chat_model.script("ok, let's pin it down")
     send_to_webhook(client, telegram_text_update(message))
 

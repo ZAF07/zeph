@@ -60,6 +60,8 @@ from companion.core.models import (
     PersonalSticker,
     PhotoImage,
     PlatformSettings,
+    ReplyPlan,
+    ReplyPlanShape,
     RiskType,
     SafeguardEvent,
     SafeguardEventOverview,
@@ -1046,6 +1048,29 @@ class UnderstandingRepository(Protocol):
         ...
 
 
+class ReplyPlanRepository(Protocol):
+    """Stores the Reply Plan made for each answered Message."""
+
+    def add(self, reply_plan: ReplyPlan) -> None:
+        """Save a Reply Plan.
+
+        Args:
+            reply_plan: The Reply Plan to save.
+        """
+        ...
+
+    def list_for_conversation(self, conversation_id: UUID) -> list[ReplyPlan]:
+        """List a Conversation's Reply Plans, oldest first.
+
+        Args:
+            conversation_id: The Conversation's ID.
+
+        Returns:
+            The Reply Plans.
+        """
+        ...
+
+
 class LifeThreadRepository(Protocol):
     """Stores each User's Life Threads, found by name or by meaning."""
 
@@ -1781,6 +1806,15 @@ class ModelCallRepository(Protocol):
         Args:
             trace_id: The trace's ID.
             shape: The Understanding's shape.
+        """
+        ...
+
+    def set_reply_plan_shape(self, trace_id: UUID, shape: ReplyPlanShape) -> None:
+        """Save the Reply Plan's shape on a trace's newest Reply Plan call.
+
+        Args:
+            trace_id: The trace's ID.
+            shape: The Reply Plan's shape.
         """
         ...
 
@@ -2652,6 +2686,7 @@ class Repositories:
     needs: NeedRepository
     moves: MoveRepository
     understandings: UnderstandingRepository
+    reply_plans: ReplyPlanRepository
     user_memory: UserMemoryRepository
     life_threads: LifeThreadRepository
     curiosities: CuriosityRepository
