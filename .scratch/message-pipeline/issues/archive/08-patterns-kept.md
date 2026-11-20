@@ -97,4 +97,5 @@ Changed while building (see Evidence): keeping runs at every Conversation end, n
 ## Completion
 
 - Completed: 2026-11-20
-- Commit: <merge commit, filled in after merging>
+- Commit: b81b0ff — Merge message pipeline issue 08: Patterns kept at Conversation end (ADR-0020). After Life Threads, a Pattern keeping step (own prompt, model, thinking and two limits, each with a hint) is given the Threads the Conversation touched and those closest in meaning however old, every Pattern and the days behind their evidence (messages while kept, Day Summaries after). It adds evidence, starts suspected Patterns across two or more Threads, and confirms (agreed) or closes (pushed back) one by how the User took a view offered; closed ones never change. Stored in patterns and pattern_evidence (migration 0068, which also reloads the unedited Curiosity prompt so no Curiosity checks a Pattern). Delete My Data, Account Deletion and deleting a Thread's last evidence remove Patterns; Admins see the confirmed count, the Pattern keeping step in the Model Call Log, and limit rows on Prompts & models
+- Branch commits: 104e6db (Patterns kept), daeada7 (review fixes), 6ba3a35 (evidence and archive), 3046db2 (migration 0068 after issue 05)
