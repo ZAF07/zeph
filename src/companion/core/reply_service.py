@@ -7,6 +7,7 @@ from companion.core.life_threads import ThreadReminder
 from companion.core.memory_retrieval import MemoryRetrieval
 from companion.core.models import MessageToAnswer, UserSnapshot
 from companion.core.move_outcomes import MoveOutcomeFinder
+from companion.core.reply_attempt import ReplyAttempt
 from companion.core.reply_gate import ReplyGate, Stopped
 from companion.core.response_composition import ResponseComposer
 from companion.core.understanding import UnderstandingService, may_send_photo
@@ -75,24 +76,37 @@ class ReplyService:
         self._response_composer = response_composer
         self._woven_check_ins = woven_check_ins
 
-    def handle(self, message: MessageToAnswer, snapshot: UserSnapshot) -> None:
+    def handle(
+        self, message: MessageToAnswer, snapshot: UserSnapshot, attempt: ReplyAttempt
+    ) -> None:
         """Answer one screened Message: apply the house rules, then reply if needed.
 
-        When the ReplyGate stops the reply nothing is composed. A failing
-        step raises, so the caller can send its fallback message. A due
+        When the ReplyGate stops the reply nothing is composed. The house
+        rules are skipped when an earlier try at the Message passed them. A
+        failing step raises, so the caller can send its fallback message; so
+        does a try a new text dropped before any of it was sent. A due
         Check-in is offered to the reply as an optional extra. One the reply
-        leaves out, or offered to a reply that fails before any of it is
-        sent, is taken back, so it stays due; once part of a reply that
-        brought it up is sent, it counts as sent and is never woven in again.
+        leaves out, or offered to a reply that fails or is dropped before any
+        of it is sent, is taken back, so it stays due; once part of a reply
+        that brought it up is sent, it counts as sent and is never woven in
+        again.
 
         Args:
             message: The Message to answer, its texts already saved and
                 checked by the Safeguard.
             snapshot: The User who sent it, read once as the reply starts.
+            attempt: This try at the Message, which a new text may drop.
+
+        Raises:
+            ReplyDroppedError: If a new text dropped the try before any of
+                the reply was sent.
         """
-        gate_result = self._reply_gate.check(message, snapshot)
-        if isinstance(gate_result, Stopped):
-            return
+        if attempt.data_deletion_note is None:
+            gate_result = self._reply_gate.check(message, snapshot)
+            if isinstance(gate_result, Stopped):
+                return
+            attempt.data_deletion_note = gate_result.data_deletion_note
+        attempt.raise_if_dropped()
         saved_memory = self._memory_retrieval.read(snapshot)
         reminded = self._thread_reminder.remind(snapshot, message.conversation_id)
         due = self._curiosity_raiser.due(snapshot, message.conversation_id)
@@ -108,6 +122,7 @@ class ReplyService:
             move_outcomes,
         )
         form = understood.understanding.form
+        attempt.raise_if_dropped()
         with ThreadPoolExecutor(max_workers=1) as executor:
             deciding = executor.submit(
                 self._woven_check_ins.decide,
@@ -132,6 +147,7 @@ class ReplyService:
             else None
         )
         try:
+            attempt.raise_if_dropped()
             reply = self._response_composer.compose(
                 message.conversation_id,
                 snapshot,
@@ -141,7 +157,7 @@ class ReplyService:
                 optional_offers=(
                     [check_in_offer.offer] if check_in_offer is not None else []
                 ),
-                data_deletion_note=gate_result.data_deletion_note,
+                data_deletion_note=attempt.data_deletion_note,
                 shared_photo_ids=(
                     memory.shared_photo_ids if may_send_photo(form) else ()
                 ),
@@ -157,6 +173,7 @@ class ReplyService:
                 snapshot.settings,
                 reply.sticker.id if reply.sticker else None,
                 reply.shared_photo.id if reply.shared_photo else None,
+                before_sending=attempt.start_sending,
             )
         except ReplyPartlySentError:
             raise

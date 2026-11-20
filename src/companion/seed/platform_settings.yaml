@@ -63,8 +63,10 @@ onboarding_reason_choices:
 conversation_quiet_gap_minutes: 15
 
 # How many seconds the Companion waits after a User's last text, photo or
-# album photo before answering everything they sent as one Message.
-message_wait_seconds: 4
+# album photo before answering everything they sent as one Message. Long
+# enough to type the next thought, so a thought split over texts gets one
+# reply.
+message_wait_seconds: 15
 
 # The chat channel hides typing after about 5 seconds, so while a reply is
 # being worked on the Companion shows typing again every this many seconds,

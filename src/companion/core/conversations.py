@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Callable
 from datetime import datetime
 from uuid import UUID, uuid4
 
@@ -134,6 +135,7 @@ class ConversationService:
         settings: PlatformSettings,
         sticker_id: UUID | None = None,
         shared_photo_id: UUID | None = None,
+        before_sending: Callable[[], None] = lambda: None,
     ) -> None:
         """Send the Companion's reply, one short message at a time.
 
@@ -155,6 +157,9 @@ class ConversationService:
             sticker_id: The sticker to send after them, from the Sticker
                 Library or the User's Personal Stickers.
             shared_photo_id: The User's Shared Photo to send back after them.
+            before_sending: Run just before each message, photo or sticker
+                is sent; it may raise to stop the reply before any of it
+                goes out.
 
         Raises:
             ReplyPartlySentError: If a later message failed after the first
@@ -163,6 +168,7 @@ class ConversationService:
         for number, part in enumerate(reply_parts):
             self._chat_channel.show_typing(chat_id)
             self._clock.sleep(typing_pause_seconds(part, settings))
+            before_sending()
             try:
                 self._chat_channel.send_text(chat_id, part)
             except Exception as error:
@@ -171,9 +177,11 @@ class ConversationService:
                 raise
             self._save(conversation_id, MessageDirection.OUTGOING, part)
         if shared_photo_id is not None:
+            before_sending()
             self._send_shared_photo(user_id, conversation_id, chat_id, shared_photo_id)
         sticker = self._find_sticker(user_id, sticker_id) if sticker_id else None
         if sticker is not None:
+            before_sending()
             self._chat_channel.send_sticker(chat_id, sticker.file_id)
             if isinstance(sticker, PersonalSticker):
                 self._repositories.personal_stickers.mark_used(

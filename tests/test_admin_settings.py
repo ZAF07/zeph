@@ -389,14 +389,14 @@ def test_the_photo_settings_are_editable_with_their_seeded_values(
     assert photo_viewing["model_key"] == "photo_model"
 
 
-def test_the_message_wait_is_editable_with_a_seeded_value_of_a_few_seconds(
+def test_the_message_wait_is_editable_with_a_seeded_value_of_fifteen_seconds(
     client: TestClient, auth_verifier: FakeAuthVerifier
 ) -> None:
     headers = owner_headers(client, auth_verifier)
 
     settings = client.get("/api/admin/settings", headers=headers).json()["settings"]
 
-    assert settings["message_wait_seconds"]["value"] == 4
+    assert settings["message_wait_seconds"]["value"] == 15
 
 
 @pytest.mark.parametrize("key", MOVED_TO_COPY)

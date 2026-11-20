@@ -1,6 +1,6 @@
-import threading
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 
 from companion.core.incoming_messages import MESSAGE_WAIT_PREFIX
@@ -159,7 +159,7 @@ def test_a_text_and_an_album_sent_together_get_one_reply(
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["what a view"]
 
 
-def test_a_text_sent_while_a_reply_is_written_starts_a_new_message_answered_after(
+def test_a_text_sent_while_a_reply_is_written_starts_it_over_with_every_text(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -168,24 +168,91 @@ def test_a_text_sent_while_a_reply_is_written_starts_a_new_message_answered_afte
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
     chat_model.script("first reply", "second reply")
-    late_text = threading.Thread(target=post_texts, args=(client, "two"))
-    chat_model.before_next_reply = late_text.start
+    chat_model.before_next_reply = lambda: post_texts(client, "two")
 
     send_to_webhook(client, telegram_text_update("one"))
-    late_text.join()
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == []
+    timer.end_message_waits()
+
+    dropped_call, second_call = chat_model.calls
+    assert dropped_call.history[-1].text == "one"
+    assert second_call.history[-1].text == "one\ntwo"
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["second reply"]
+
+
+def test_a_message_started_over_counts_once_toward_the_daily_limit(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    timer: FakeTimer,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script("first reply", "second reply")
+    chat_model.before_next_reply = lambda: post_texts(client, "two")
+
+    send_to_webhook(client, telegram_text_update("one"))
+    timer.end_message_waits()
+
+    [row] = [row for row in usage_rows(client, admin) if row["message_count"]]
+    assert row["message_count"] == 1
+
+
+def test_a_text_sent_after_part_of_a_reply_went_out_starts_the_next_message(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    timer: FakeTimer,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script("first part\n\nsecond part", "next reply")
+    send_text = chat_channel.send_text
+
+    def send_then_text_back(chat_id: int, text: str) -> None:
+        send_text(chat_id, text)
+        if text == "first part":
+            post_texts(client, "two")
+
+    monkeypatch.setattr(chat_channel, "send_text", send_then_text_back)
+
+    send_to_webhook(client, telegram_text_update("one"))
     timer.end_message_waits()
 
     first_call, second_call = chat_model.calls
     assert first_call.history[-1].text == "one"
-    assert [line.text for line in second_call.history] == [
-        "one",
-        "first reply",
-        "two",
-    ]
+    assert any("two" in line.text for line in second_call.history)
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
-        "first reply",
-        "second reply",
+        "first part",
+        "second part",
+        "next reply",
     ]
+
+
+def test_a_crisis_text_sent_while_a_reply_is_written_gets_only_the_crisis_reply(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    timer: FakeTimer,
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    use_simple_crisis_reply(client, admin)
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script("first reply")
+    chat_model.script_safeguard("none", "suicide_or_self_harm")
+    chat_model.before_next_reply = lambda: post_texts(
+        client, "i don't want to be here anymore"
+    )
+
+    send_to_webhook(client, telegram_text_update("hey"))
+    timer.end_message_waits()
+
+    [crisis_reply] = chat_channel.texts_sent_to(TELEGRAM_CHAT_ID)
+    assert crisis_reply.startswith("I'm an AI. Please reach out:")
+    assert len(chat_model.calls) == 1
 
 
 def test_a_text_that_fails_to_be_checked_drops_the_rest_of_the_message(

@@ -27,6 +27,7 @@ from companion.core.platform_settings import (
     UNSUPPORTED_MESSAGE_REPLY,
 )
 from companion.core.ports import ChatChannel, Repositories, Timer
+from companion.core.reply_attempt import ReplyAttempt, ReplyDroppedError
 from companion.core.reply_gate import ReplyGate, Stopped
 from companion.core.reply_service import ReplyService
 from companion.core.sticker_adding import StickerAdding
@@ -123,6 +124,8 @@ class PendingMessage:
             User pauses.
         trace: The Model Call Log trace every model call for it goes in,
             from the first text's Safeguard check to the reply.
+        data_deletion_note: What the house rules told a dropped reply to it;
+            None until a reply passes them.
     """
 
     chat_id: int
@@ -132,6 +135,7 @@ class PendingMessage:
     trace: ModelCallTrace = field(
         default_factory=lambda: start_trace(TraceKind.MESSAGE)
     )
+    data_deletion_note: str | None = None
 
     def add_screened(self, conversation_id: UUID, text: str) -> None:
         """Add a text that passed the Safeguard.
@@ -150,10 +154,14 @@ class IncomingMessageHandler:
     A connected User's texts are gathered into one Message until they pause
     for `message_wait_seconds`, then answered together with one reply. Each
     text is saved and checked by the Safeguard as it arrives, so a crisis
-    is never held back by the wait. A User's turns run one at a time, so a
-    text that arrives while a reply is being written starts a new Message.
-    From the first text until something is sent back, typing is shown again
-    every `typing_repeat_seconds`, so the chat never looks dead.
+    is never held back by the wait or by a reply being written. A User's
+    texts are checked one at a time, and their replies are written one at a
+    time. A text that arrives while a reply is being written, before any of
+    it is sent, drops that reply, and the Message is answered again with
+    every text once the User pauses; once part of a reply is sent, a new
+    text starts the next Message. From the first text until something is
+    sent back, typing is shown again every `typing_repeat_seconds`, so the
+    chat never looks dead.
     """
 
     def __init__(
@@ -198,12 +206,16 @@ class IncomingMessageHandler:
         self._chat_channel = chat_channel
         self._typing_keeper = typing_keeper
         self._dashboard_url = dashboard_url
-        self._turn_locks: defaultdict[UUID, threading.Lock] = defaultdict(
+        self._screen_locks: defaultdict[UUID, threading.Lock] = defaultdict(
             threading.Lock
         )
-        self._turn_locks_guard = threading.Lock()
+        self._answer_locks: defaultdict[UUID, threading.Lock] = defaultdict(
+            threading.Lock
+        )
+        self._locks_guard = threading.Lock()
         self._pending_messages: dict[UUID, PendingMessage] = {}
         self._texts_being_checked: Counter[UUID] = Counter()
+        self._replies_being_written: dict[UUID, ReplyAttempt] = {}
         self._pending_messages_guard = threading.Lock()
 
     def handle(self, message: IncomingMessage) -> None:
@@ -265,6 +277,9 @@ class IncomingMessageHandler:
     def _hold_album_item(self, user_id: UUID, message: IncomingMessage) -> None:
         """Add an Album's photo or file to the User's Message and restart the wait.
 
+        A reply being written to the Message, none of it sent yet, starts
+        over with the photo or file in it.
+
         Args:
             user_id: The User who sent it.
             message: The photo or file message, with its Album ID.
@@ -274,15 +289,18 @@ class IncomingMessageHandler:
                 user_id, PendingMessage(chat_id=message.chat_id)
             )
             pending.album_items.append(message)
+        self._start_over_reply_being_written(user_id)
         self._restart_wait(user_id, self._repositories.platform_settings.load())
 
     def _screen_text(self, user_id: UUID, message: IncomingMessage) -> None:
         """Save a text and check it for crisis now, then restart the wait.
 
-        While the text is being checked, the wait ending doesn't answer the
-        Message, so a slow check never splits it. A crisis gets the Crisis
-        Reply straight away and drops the rest of the User's Message, so it
-        isn't answered normally. A check that fails gets the fallback reply
+        A reply being written to the Message, none of it sent yet, starts
+        over with this text in it. While the text is being checked, the wait
+        ending doesn't answer the Message, so a slow check never splits it.
+        A crisis gets the Crisis Reply straight away and drops the rest of
+        the User's Message, so it isn't answered normally, and a reply being
+        written to it. A check that fails gets the fallback reply
         and drops the rest of the Message too.
 
         Args:
@@ -291,8 +309,9 @@ class IncomingMessageHandler:
         """
         with self._pending_messages_guard:
             self._texts_being_checked[user_id] += 1
+        self._start_over_reply_being_written(user_id)
         try:
-            with self._turn_lock_for(user_id):
+            with self._lock_for(self._screen_locks, user_id):
                 settings = self._repositories.platform_settings.load()
                 self._typing_keeper.keep_up(
                     message.chat_id, settings.get(TYPING_REPEAT_SECONDS)
@@ -336,20 +355,81 @@ class IncomingMessageHandler:
         with self._pending_messages_guard:
             self._pending_messages.pop(user_id, None)
 
-    def _take_pending_message(self, user_id: UUID) -> PendingMessage | None:
-        """Take the User's Message to answer, unless a text of theirs is being checked.
+    def _start_over_reply_being_written(self, user_id: UUID) -> None:
+        """Drop the User's reply being written, if none of it is sent yet.
+
+        Its Message stays waiting, so it is answered again with every text
+        once the User pauses.
+
+        Args:
+            user_id: The User.
+        """
+        with self._pending_messages_guard:
+            attempt = self._replies_being_written.get(user_id)
+        if attempt is not None:
+            attempt.drop()
+
+    def _start_reply(self, user_id: UUID) -> tuple[PendingMessage, ReplyAttempt] | None:
+        """Start a try at answering the User's Message, unless a text is being checked.
+
+        The Message stays waiting until the reply starts being sent, so a
+        text that drops the try joins it.
 
         Args:
             user_id: The User.
 
         Returns:
-            The Message, or None if there is none or a text is still being
-            checked; that text restarts the wait once checked.
+            The Message and the try at answering it, or None if there is no
+            Message or a text is still being checked; that text restarts the
+            wait once checked.
         """
         with self._pending_messages_guard:
             if self._texts_being_checked[user_id]:
                 return None
-            return self._pending_messages.pop(user_id, None)
+            pending = self._pending_messages.get(user_id)
+            if pending is None:
+                return None
+            attempt = ReplyAttempt(
+                on_sending=lambda: self._forget_answered_message(user_id, pending),
+                data_deletion_note=pending.data_deletion_note,
+            )
+            self._replies_being_written[user_id] = attempt
+            return pending, attempt
+
+    def _forget_answered_message(self, user_id: UUID, pending: PendingMessage) -> None:
+        """Stop the User's answered Message from waiting, so new texts start the next.
+
+        Args:
+            user_id: The User.
+            pending: The Message that was answered.
+        """
+        with self._pending_messages_guard:
+            if self._pending_messages.get(user_id) is pending:
+                del self._pending_messages[user_id]
+
+    def _end_reply(
+        self, user_id: UUID, pending: PendingMessage, attempt: ReplyAttempt
+    ) -> bool:
+        """End a try at answering the User's Message.
+
+        A Message whose try wasn't dropped stops waiting. A dropped one keeps
+        waiting, with what the house rules said, to be answered again.
+
+        Args:
+            user_id: The User.
+            pending: The Message the try answered.
+            attempt: The try.
+
+        Returns:
+            True if a new text dropped the try.
+        """
+        was_dropped = attempt.finish()
+        with self._pending_messages_guard:
+            del self._replies_being_written[user_id]
+            pending.data_deletion_note = attempt.data_deletion_note
+        if not was_dropped:
+            self._forget_answered_message(user_id, pending)
+        return was_dropped
 
     def _is_checking_a_text(self, user_id: UUID) -> bool:
         """Tell whether a text from the User is waiting for or being checked.
@@ -379,57 +459,112 @@ class IncomingMessageHandler:
     def _answer_message(self, user_id: UUID) -> None:
         """Answer everything the User sent before pausing with one reply.
 
-        Any Albums are described and checked for crisis first; a crisis gets
-        the Crisis Reply and the Message isn't answered normally. An Album
-        with no photos and no caption gets the unsupported reply. The
-        platform settings and the User are read once, inside their turn, and
-        that snapshot is used for the whole reply. If the reply fails the
-        User gets a short fallback reply instead of silence. Typing is kept
-        up until something is sent, and always stops once the answer ends.
+        The platform settings and the User are read once, when the reply
+        starts, and that snapshot is used for the whole reply. If a new text
+        drops the reply before any of it is sent, nothing more is sent: the
+        new text restarts the wait, and the Message is answered again then.
+        If the reply fails the User gets a short fallback reply instead of
+        silence. Typing is kept up until something is sent, and stops once
+        the answer ends, unless the reply was dropped.
 
         Args:
             user_id: The User who paused.
         """
         if self._is_checking_a_text(user_id):
             return
-        with self._turn_lock_for(user_id):
-            pending = self._take_pending_message(user_id)
-            if pending is None:
+        with self._lock_for(self._answer_locks, user_id):
+            started = self._start_reply(user_id)
+            if started is None:
                 return
+            pending, attempt = started
             settings = self._repositories.platform_settings.load()
             self._typing_keeper.keep_up(
                 pending.chat_id, settings.get(TYPING_REPEAT_SECONDS)
             )
+            failed = False
             try:
-                snapshot = self._user_snapshots.load(user_id, settings, pending.trace)
-                for album_items in group_albums(pending.album_items):
-                    album_text = self._album_text_to_screen(
-                        snapshot, pending.chat_id, album_items
-                    )
-                    if album_text is None:
-                        continue
-                    result = self._reply_gate.screen(album_text, snapshot)
-                    if isinstance(result, Stopped):
-                        return
-                    pending.add_screened(result.conversation_id, album_text.text)
-                if pending.conversation_id is None:
-                    return
-                self._reply_service.handle(
-                    MessageToAnswer(
-                        user_id=user_id,
-                        chat_id=pending.chat_id,
-                        conversation_id=pending.conversation_id,
-                        text="\n".join(pending.texts),
-                    ),
-                    snapshot,
-                )
+                self._answer(user_id, pending, attempt, settings)
+            except ReplyDroppedError:
+                logger.info("A new text started a User's reply over")
             except Exception:
                 logger.exception("Could not answer a Message from a User")
+                failed = True
+            was_dropped = self._end_reply(user_id, pending, attempt)
+            if was_dropped:
+                return
+            if failed:
                 self._chat_channel.send_text(
                     pending.chat_id, settings.get(REPLY_FAILED_MESSAGE)
                 )
-            finally:
-                self._typing_keeper.stop(pending.chat_id)
+            self._typing_keeper.stop(pending.chat_id)
+
+    def _answer(
+        self,
+        user_id: UUID,
+        pending: PendingMessage,
+        attempt: ReplyAttempt,
+        settings: PlatformSettings,
+    ) -> None:
+        """Try once to answer the User's Message.
+
+        Any Albums are described and checked for crisis first, each once,
+        even if the try is dropped; a crisis gets the Crisis Reply and the
+        Message isn't answered normally. An Album with no photos and no
+        caption gets the unsupported reply.
+
+        Args:
+            user_id: The User who paused.
+            pending: Their Message.
+            attempt: This try at answering it.
+            settings: The platform settings, read once for the reply.
+
+        Raises:
+            ReplyDroppedError: If a new text dropped the try before any of
+                the reply was sent.
+        """
+        snapshot = self._user_snapshots.load(user_id, settings, pending.trace)
+        with self._pending_messages_guard:
+            album_items = list(pending.album_items)
+        for items in group_albums(album_items):
+            album_text = self._album_text_to_screen(snapshot, pending.chat_id, items)
+            if album_text is None:
+                self._remove_album_items(pending, items)
+                continue
+            result = self._reply_gate.screen(album_text, snapshot)
+            self._remove_album_items(pending, items)
+            if isinstance(result, Stopped):
+                return
+            with self._pending_messages_guard:
+                pending.add_screened(result.conversation_id, album_text.text)
+        with self._pending_messages_guard:
+            conversation_id = pending.conversation_id
+            text = "\n".join(pending.texts)
+        if conversation_id is None:
+            return
+        self._reply_service.handle(
+            MessageToAnswer(
+                user_id=user_id,
+                chat_id=pending.chat_id,
+                conversation_id=conversation_id,
+                text=text,
+            ),
+            snapshot,
+            attempt,
+        )
+
+    def _remove_album_items(
+        self, pending: PendingMessage, items: Sequence[IncomingMessage]
+    ) -> None:
+        """Take an Album's items out of a Message once they are screened.
+
+        Args:
+            pending: The Message.
+            items: The Album's items.
+        """
+        with self._pending_messages_guard:
+            pending.album_items = [
+                item for item in pending.album_items if item not in items
+            ]
 
     def _album_text_to_screen(
         self,
@@ -520,14 +655,19 @@ class IncomingMessageHandler:
             safeguard_text=photo_message.safeguard_text,
         )
 
-    def _turn_lock_for(self, user_id: UUID) -> threading.Lock:
-        """Get the lock that keeps one User's turns from overlapping.
+    def _lock_for(
+        self, locks: defaultdict[UUID, threading.Lock], user_id: UUID
+    ) -> threading.Lock:
+        """Get one User's lock from a set of per-User locks.
 
         Args:
+            locks: The checking locks, which keep a User's texts checked one
+                at a time, or the answering locks, which keep their replies
+                written one at a time.
             user_id: The User.
 
         Returns:
             That User's lock.
         """
-        with self._turn_locks_guard:
-            return self._turn_locks[user_id]
+        with self._locks_guard:
+            return locks[user_id]
