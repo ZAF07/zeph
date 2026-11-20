@@ -516,7 +516,7 @@ def test_evidence_is_dated_to_the_day_the_conversation_started(
 def patterns_migration() -> ModuleType:
     """Load the Patterns migration module."""
     return importlib.import_module(
-        "companion.adapters.postgres.migrations.versions.0066_patterns"
+        "companion.adapters.postgres.migrations.versions.0067_patterns"
     )
 
 
@@ -556,7 +556,7 @@ def test_the_curiosity_keeping_prompt_never_makes_a_curiosity_to_check_a_pattern
 def test_the_migration_reloads_the_curiosity_prompt_still_matching_the_old_seed(
     engine: Engine, database_url: str
 ) -> None:
-    downgrade_to(database_url, "0065")
+    downgrade_to(database_url, "0066")
     try:
         store_curiosity_prompt(
             engine, patterns_migration().OLD_CURIOSITY_KEEPING_PROMPT
@@ -570,7 +570,7 @@ def test_the_migration_reloads_the_curiosity_prompt_still_matching_the_old_seed(
 def test_the_migration_keeps_a_curiosity_prompt_an_admin_edited(
     engine: Engine, database_url: str
 ) -> None:
-    downgrade_to(database_url, "0065")
+    downgrade_to(database_url, "0066")
     try:
         store_curiosity_prompt(engine, "Admin's own Curiosity prompt.")
     finally:
