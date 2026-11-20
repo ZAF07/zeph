@@ -47,7 +47,9 @@ logger = logging.getLogger(__name__)
 
 FEWEST_THREADS_TO_START_A_PATTERN = 2
 MOST_PATTERNS_IN_MIND = 10
-OFFERED_HERE_WORDS = "offered to them in this Conversation"
+OFFERED_HERE_WORDS = (
+    "offered to them in this Conversation: judge how they took it from the Conversation"
+)
 STATE_WORDS = {
     PatternState.SUSPECTED: "suspected",
     PatternState.CONFIRMED: "confirmed",

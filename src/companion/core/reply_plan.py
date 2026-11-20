@@ -517,10 +517,29 @@ def read_left_alone(
     return tuple(chosen.values())
 
 
+def read_pattern_picked(
+    value: Any, by_number: dict[int, RemindedPattern]
+) -> PatternPicked | None:
+    """Find the Pattern in mind a number in the form names.
+
+    Args:
+        value: The number, as the model wrote it.
+        by_number: The Patterns in mind, by number.
+
+    Returns:
+        The Pattern; None if the value isn't one of their numbers.
+    """
+    number = read_number(value)
+    item = None if number is None else by_number.get(number)
+    if item is None:
+        return None
+    return PatternPicked(pattern_id=item.pattern.id, pattern=item.pattern.pattern)
+
+
 def read_patterns_picked(
     value: Any, by_number: dict[int, RemindedPattern]
 ) -> tuple[PatternPicked, ...]:
-    """Read the Patterns in mind a list of numbers in the form names.
+    """Find the Patterns in mind a list of numbers in the form names.
 
     Args:
         value: The field's value: a list of Pattern numbers.
@@ -531,15 +550,8 @@ def read_patterns_picked(
     """
     if not isinstance(value, list):
         return ()
-    chosen: dict[UUID, PatternPicked] = {}
-    for listed in value:
-        number = read_number(listed)
-        item = None if number is None else by_number.get(number)
-        if item is not None:
-            chosen[item.pattern.id] = PatternPicked(
-                pattern_id=item.pattern.id, pattern=item.pattern.pattern
-            )
-    return tuple(chosen.values())
+    found = (read_pattern_picked(number, by_number) for number in value)
+    return tuple(dict.fromkeys(item for item in found if item))
 
 
 def read_curiosities_to_raise(
@@ -728,9 +740,9 @@ def read_reply_plan_form(
     by_number = {item.number: item for item in reminded}
     patterns_by_number = {item.number: item for item in patterns}
     offered = (
-        read_patterns_picked([parsed.get("offer_pattern")], patterns_by_number)
+        read_pattern_picked(parsed.get("offer_pattern"), patterns_by_number)
         if say_read
-        else ()
+        else None
     )
     used = read_patterns_picked(parsed.get("patterns_used"), patterns_by_number)
     form = ReplyPlanForm(
@@ -754,8 +766,8 @@ def read_reply_plan_form(
         read=read,
         say_read=say_read,
         check_in=read_check_in_choice(parsed.get("check_in"), check_in_kinds),
-        patterns_used=tuple(dict.fromkeys([*used, *offered])),
-        pattern_offered=offered[0] if offered else None,
+        patterns_used=tuple(dict.fromkeys([*used, *([offered] if offered else [])])),
+        pattern_offered=offered,
     )
     return keep_held_back_threads_alone(form, reminded)
 

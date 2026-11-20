@@ -1145,8 +1145,8 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         minimum=1,
         maximum=30,
         hint=(
-            "How many of the User’s latest texts Recall searches Life Threads on, "
-            "together with what the Understanding says they mean."
+            "How many of the User’s latest texts Recall searches Life Threads and "
+            "Patterns on, together with what the Understanding says they mean."
         ),
     ),
     EditableSetting(
@@ -1156,9 +1156,9 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         minimum=0,
         maximum=100,
         hint=(
-            "How close in meaning a Thread’s story must be to what the User means "
-            "and their latest texts for Recall to bring it to mind. A Thread naming "
-            "someone or something they mention always counts."
+            "How close in meaning a Thread’s story, or a Pattern, must be to what "
+            "the User means and their latest texts for Recall to bring it to mind. "
+            "A Thread naming someone or something they mention always counts."
         ),
     ),
     EditableSetting(

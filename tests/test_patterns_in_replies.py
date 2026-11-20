@@ -366,7 +366,8 @@ def test_the_next_conversation_ends_keeping_call_sees_the_pattern_was_offered(
         chat_model, clock, scheduler, seeded_settings
     )
 
-    assert f"[1] (suspected; {OFFERED_HERE}) {GOES_QUIET}" in keeping_sees
+    assert f"[1] (suspected; {OFFERED_HERE}: judge how they took it" in keeping_sees
+    assert GOES_QUIET in keeping_sees
 
 
 def test_the_model_call_log_shows_whether_a_pattern_was_used_or_offered(
@@ -390,6 +391,8 @@ def test_the_model_call_log_shows_whether_a_pattern_was_used_or_offered(
     admin = owner_headers(client, auth_verifier)
 
     def shape_after(answer: str) -> dict[str, Any]:
+        """Send a message naming mum with this Reply Plan answer and return
+        its Reply Plan shape from the Model Call Log."""
         chat_model.script_reply_plan(answer)
         chat_model.script("mm, tell me more")
         send_to_webhook(client, telegram_text_update(NAMES_MUM))
