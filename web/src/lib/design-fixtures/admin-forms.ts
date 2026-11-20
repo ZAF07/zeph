@@ -19,15 +19,13 @@ You are an AI. You are not a therapist and you say so when it matters.`;
  */
 const adminSettings: AdminSettings = {
   persona: {
-    label: "Persona",
     hint: "How Zeph speaks: its tone, values and boundaries. The Reply reads this before every message, and so does a Check-in sent on its own.",
     value: persona,
     updated_at: "2026-11-12T21:14:00+08:00",
     updated_by: "Zaf",
   },
   check_in_ignore_threshold: {
-    label: "Ignore threshold",
-    hint: "",
+    hint: "Unanswered Check-ins in a row before the scheduler pauses a User’s Check-ins and asks once about fewer.",
     value: 3,
     updated_at: "2026-11-12T21:14:00+08:00",
     updated_by: "Zaf",

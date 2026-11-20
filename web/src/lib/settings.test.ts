@@ -5,21 +5,18 @@ import { lastSavedNote, textSetting } from "@/lib/settings";
 
 const settings: AdminSettings = {
   persona: {
-    label: "",
     hint: "",
     value: "You are Zeph.",
     updated_at: "2026-11-08T14:20:00Z",
     updated_by: "Maya Lin",
   },
   response_prompt: {
-    label: "",
     hint: "",
     value: "Reply briefly.",
     updated_at: "2026-11-09T08:05:00Z",
     updated_by: "Ren Okafor",
   },
   conversation_quiet_gap_minutes: {
-    label: "",
     hint: "",
     value: 60,
     updated_at: "2026-11-01T00:00:00Z",

@@ -87,15 +87,13 @@ def test_every_editable_setting_comes_with_a_short_hint(
         assert count_sentences(setting["hint"]) <= 2, f"{key}'s hint is too long"
 
 
-def test_each_setting_is_listed_with_its_label(
+def test_each_setting_is_listed_with_its_own_hint(
     client: TestClient, auth_verifier: FakeAuthVerifier
 ) -> None:
     headers = owner_headers(client, auth_verifier)
 
     settings = client.get("/api/admin/settings", headers=headers).json()["settings"]
 
-    assert settings["persona"]["label"] == "Persona"
-    assert settings["daily_message_limit"]["label"] == "Daily message limit"
     assert settings["daily_message_limit"]["hint"] == (
         EDITABLE_SETTINGS_BY_KEY["daily_message_limit"].hint
     )

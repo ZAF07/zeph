@@ -252,6 +252,17 @@ const allKeys = [...numberKeys, ...textFields.map((field) => field.key)];
 const wholeNumber = /^\d+$/;
 
 /**
+ * Names the saved setting a field belongs to: each Check-in gap field
+ * belongs to the one Check-in gaps setting.
+ *
+ * @param key - The field's key.
+ * @returns The setting's key.
+ */
+function settingKeyFor(key: string): string {
+  return checkInGapKeys.includes(key) ? checkInGapsKey : key;
+}
+
+/**
  * Reads one field's saved value as text; a Check-in gap field reads its
  * frequency's hours.
  *
@@ -326,9 +337,8 @@ export function PlatformSettingsForm() {
     textFields.every((field) => (values[field.key] ?? "").trim() !== "");
   const isDirty = changedKeys.length > 0;
 
-  function hint(key: string, loadedSettings: AdminSettings): string {
-    const settingKey = checkInGapKeys.includes(key) ? checkInGapsKey : key;
-    return loadedSettings[settingKey]?.hint ?? "";
+  function hintFor(key: string, loadedSettings: AdminSettings): string {
+    return loadedSettings[settingKeyFor(key)]?.hint ?? "";
   }
 
   function numberRow(field: NumberField, loadedSettings: AdminSettings) {
@@ -337,7 +347,7 @@ export function PlatformSettingsForm() {
       <FieldRow
         key={field.key}
         title={field.label}
-        caption={hint(field.key, loadedSettings)}
+        caption={hintFor(field.key, loadedSettings)}
         htmlFor={field.key}
         note={
           field.note ? (
@@ -373,9 +383,7 @@ export function PlatformSettingsForm() {
         <FieldRows
           footnote={lastSavedNote(
             loadedSettings,
-            fields.map((field) =>
-              checkInGapKeys.includes(field.key) ? checkInGapsKey : field.key,
-            ),
+            fields.map((field) => settingKeyFor(field.key)),
           )}
         >
           {fields.map((field) => numberRow(field, loadedSettings))}
@@ -415,23 +423,26 @@ export function PlatformSettingsForm() {
 
       <section aria-label="Wording" className="flex flex-col gap-3">
         <FormSectionHeading title="Wording" />
-        {textFields.map((field) => (
-          <div key={field.key} className="flex flex-col gap-3">
-            <EditorLabel
-              label={field.label}
-              hint={hint(field.key, settings)}
-              hintId={`${field.key}-hint`}
-            />
-            <FormEditor
-              label={field.label}
-              size="short"
-              describedById={`${field.key}-hint`}
-              caption={lastSavedNote(settings, [field.key])}
-              value={values[field.key] ?? ""}
-              onChange={(value) => edit(field.key, value)}
-            />
-          </div>
-        ))}
+        {textFields.map((field) => {
+          const hintId = `${field.key}-hint`;
+          return (
+            <div key={field.key} className="flex flex-col gap-3">
+              <EditorLabel
+                label={field.label}
+                hint={hintFor(field.key, settings)}
+                hintId={hintId}
+              />
+              <FormEditor
+                label={field.label}
+                size="short"
+                describedById={hintId}
+                caption={lastSavedNote(settings, [field.key])}
+                value={values[field.key] ?? ""}
+                onChange={(value) => edit(field.key, value)}
+              />
+            </div>
+          );
+        })}
       </section>
 
       <SaveBar

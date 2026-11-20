@@ -17,7 +17,6 @@ vi.mock("@/lib/use-api-client", () => ({
 
 const settings: AdminSettings = {
   persona: {
-    label: "",
     hint: "",
     value: "You are Zeph.",
     updated_at: "2026-11-08T14:20:00Z",
@@ -31,7 +30,6 @@ describe("PersonaEditor", () => {
     apiClient.getAdminSettings.mockResolvedValue(settings);
     apiClient.updateAdminSettings.mockImplementation(async (values) => ({
       persona: {
-        label: "",
         hint: "",
         value: String(values.persona),
         updated_at: "2026-11-11T09:00:00Z",
@@ -57,7 +55,6 @@ describe("PersonaEditor", () => {
     apiClient.getAdminSettings.mockResolvedValue({
       persona: {
         ...settings.persona!,
-        label: "Persona",
         hint: "Who Zeph is. Put in front of the Reply’s instructions.",
       },
     });
@@ -129,7 +126,6 @@ describe("PersonaEditor", () => {
 
     apiClient.updateAdminSettings.mockResolvedValue({
       persona: {
-        label: "",
         hint: "",
         value: "You are Zeph. Be kind.",
         updated_at: "2026-11-11T09:00:00Z",

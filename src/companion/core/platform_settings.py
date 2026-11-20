@@ -448,6 +448,13 @@ class CoreService:
     extra_prompt_groups: tuple[ExtraPromptGroup, ...] = ()
 
 
+MODEL_HINT = (
+    "Which model this step calls. A larger model is slower and costs more per Message."
+)
+THINKING_HINT = (
+    "Lets the model reason before it answers. Slower, and better on steps that decide."
+)
+
 EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     EditableSetting(
         PERSONA.key,
@@ -465,26 +472,20 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.TEXT,
         hint=(
             "Tells the Safeguard what counts as a crisis. The Safeguard reads each "
-            "text as it arrives, before anything else."
+            "text as it arrives, before any reply is written."
         ),
     ),
     EditableSetting(
         SAFEGUARD_MODEL.key,
         "Safeguard model",
         SettingKind.MODEL,
-        hint=(
-            "Which model this step calls. A larger model is slower and costs more "
-            "per Message."
-        ),
+        hint=MODEL_HINT,
     ),
     EditableSetting(
         SAFEGUARD_THINKING.key,
         "Safeguard thinking",
         SettingKind.ON_OFF,
-        hint=(
-            "Lets the model reason before it answers. Slower, and better on steps "
-            "that decide."
-        ),
+        hint=THINKING_HINT,
     ),
     EditableSetting(
         CRISIS_REPLY.key,
@@ -512,19 +513,13 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         RESPONSE_MODEL.key,
         "Response composition model",
         SettingKind.MODEL,
-        hint=(
-            "Which model this step calls. A larger model is slower and costs more "
-            "per Message."
-        ),
+        hint=MODEL_HINT,
     ),
     EditableSetting(
         RESPONSE_THINKING.key,
         "Response composition thinking",
         SettingKind.ON_OFF,
-        hint=(
-            "Lets the model reason before it answers. Slower, and better on steps "
-            "that decide."
-        ),
+        hint=THINKING_HINT,
     ),
     EditableSetting(
         STICKER_TOOL_DESCRIPTION.key,
@@ -678,19 +673,13 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         MEMORY_PROCESSING_MODEL.key,
         "Post-conversation processing model",
         SettingKind.MODEL,
-        hint=(
-            "Which model this step calls. A larger model is slower and costs more "
-            "per Message."
-        ),
+        hint=MODEL_HINT,
     ),
     EditableSetting(
         MEMORY_PROCESSING_THINKING.key,
         "Post-conversation processing thinking",
         SettingKind.ON_OFF,
-        hint=(
-            "Lets the model reason before it answers. Slower, and better on steps "
-            "that decide."
-        ),
+        hint=THINKING_HINT,
     ),
     EditableSetting(
         UNDERSTANDING_PROMPT.key,
@@ -705,19 +694,13 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         UNDERSTANDING_MODEL.key,
         "Understanding model",
         SettingKind.MODEL,
-        hint=(
-            "Which model this step calls. A larger model is slower and costs more "
-            "per Message."
-        ),
+        hint=MODEL_HINT,
     ),
     EditableSetting(
         UNDERSTANDING_THINKING.key,
         "Understanding thinking",
         SettingKind.ON_OFF,
-        hint=(
-            "Lets the model reason before it answers. Slower, and better on steps "
-            "that decide."
-        ),
+        hint=THINKING_HINT,
     ),
     EditableSetting(
         REPLY_ASK_WHY_NOTE.key,
@@ -753,19 +736,13 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         PHOTO_MODEL.key,
         "Photo viewing model",
         SettingKind.MODEL,
-        hint=(
-            "Which model this step calls. A larger model is slower and costs more "
-            "per Message."
-        ),
+        hint=MODEL_HINT,
     ),
     EditableSetting(
         PHOTO_THINKING.key,
         "Photo viewing thinking",
         SettingKind.ON_OFF,
-        hint=(
-            "Lets the model reason before it answers. Slower, and better on steps "
-            "that decide."
-        ),
+        hint=THINKING_HINT,
     ),
     EditableSetting(
         ASK_ABOUT_PHOTO_TOOL_DESCRIPTION.key,
@@ -844,19 +821,13 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         LIFE_THREAD_KEEPING_MODEL.key,
         "Life Thread keeping model",
         SettingKind.MODEL,
-        hint=(
-            "Which model this step calls. A larger model is slower and costs more "
-            "per Message."
-        ),
+        hint=MODEL_HINT,
     ),
     EditableSetting(
         LIFE_THREAD_KEEPING_THINKING.key,
         "Life Thread keeping thinking",
         SettingKind.ON_OFF,
-        hint=(
-            "Lets the model reason before it answers. Slower, and better on steps "
-            "that decide."
-        ),
+        hint=THINKING_HINT,
     ),
     EditableSetting(
         PORTRAIT_PROMPT.key,
@@ -872,19 +843,13 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         PORTRAIT_MODEL.key,
         "User Portrait model",
         SettingKind.MODEL,
-        hint=(
-            "Which model this step calls. A larger model is slower and costs more "
-            "per Message."
-        ),
+        hint=MODEL_HINT,
     ),
     EditableSetting(
         PORTRAIT_THINKING.key,
         "User Portrait thinking",
         SettingKind.ON_OFF,
-        hint=(
-            "Lets the model reason before it answers. Slower, and better on steps "
-            "that decide."
-        ),
+        hint=THINKING_HINT,
     ),
     EditableSetting(
         CURIOSITY_KEEPING_PROMPT.key,
@@ -900,19 +865,13 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         CURIOSITY_KEEPING_MODEL.key,
         "Curiosity keeping model",
         SettingKind.MODEL,
-        hint=(
-            "Which model this step calls. A larger model is slower and costs more "
-            "per Message."
-        ),
+        hint=MODEL_HINT,
     ),
     EditableSetting(
         CURIOSITY_KEEPING_THINKING.key,
         "Curiosity keeping thinking",
         SettingKind.ON_OFF,
-        hint=(
-            "Lets the model reason before it answers. Slower, and better on steps "
-            "that decide."
-        ),
+        hint=THINKING_HINT,
     ),
     EditableSetting(
         MOVE_OUTCOME_KEEPING_PROMPT.key,
@@ -927,19 +886,13 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         MOVE_OUTCOME_KEEPING_MODEL.key,
         "Move Outcome keeping model",
         SettingKind.MODEL,
-        hint=(
-            "Which model this step calls. A larger model is slower and costs more "
-            "per Message."
-        ),
+        hint=MODEL_HINT,
     ),
     EditableSetting(
         MOVE_OUTCOME_KEEPING_THINKING.key,
         "Move Outcome keeping thinking",
         SettingKind.ON_OFF,
-        hint=(
-            "Lets the model reason before it answers. Slower, and better on steps "
-            "that decide."
-        ),
+        hint=THINKING_HINT,
     ),
     EditableSetting(
         PERSONAL_STICKER_KEEPING_PROMPT.key,
@@ -955,19 +908,13 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         PERSONAL_STICKER_KEEPING_MODEL.key,
         "Personal Sticker keeping model",
         SettingKind.MODEL,
-        hint=(
-            "Which model this step calls. A larger model is slower and costs more "
-            "per Message."
-        ),
+        hint=MODEL_HINT,
     ),
     EditableSetting(
         PERSONAL_STICKER_KEEPING_THINKING.key,
         "Personal Sticker keeping thinking",
         SettingKind.ON_OFF,
-        hint=(
-            "Lets the model reason before it answers. Slower, and better on steps "
-            "that decide."
-        ),
+        hint=THINKING_HINT,
     ),
     EditableSetting(
         KNOWLEDGE_WHEN_IT_HELPS_PROMPT.key,
@@ -983,19 +930,13 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         KNOWLEDGE_WHEN_IT_HELPS_MODEL.key,
         "Knowledge “when it helps” model",
         SettingKind.MODEL,
-        hint=(
-            "Which model this step calls. A larger model is slower and costs more "
-            "per Message."
-        ),
+        hint=MODEL_HINT,
     ),
     EditableSetting(
         KNOWLEDGE_WHEN_IT_HELPS_THINKING.key,
         "Knowledge “when it helps” thinking",
         SettingKind.ON_OFF,
-        hint=(
-            "Lets the model reason before it answers. Slower, and better on steps "
-            "that decide."
-        ),
+        hint=THINKING_HINT,
     ),
     EditableSetting(
         PERSONAL_STICKERS_LIMIT.key,
@@ -1043,19 +984,13 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         CHECK_IN_MODEL.key,
         "Check-in model",
         SettingKind.MODEL,
-        hint=(
-            "Which model this step calls. A larger model is slower and costs more "
-            "per Message."
-        ),
+        hint=MODEL_HINT,
     ),
     EditableSetting(
         CHECK_IN_THINKING.key,
         "Check-in thinking",
         SettingKind.ON_OFF,
-        hint=(
-            "Lets the model reason before it answers. Slower, and better on steps "
-            "that decide."
-        ),
+        hint=THINKING_HINT,
     ),
     EditableSetting(
         CHECK_IN_GAPS.key,
@@ -1085,8 +1020,8 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.TEXT,
         max_length=1_000,
         hint=(
-            "Sent once in Telegram when a User reaches the ignore threshold, asking "
-            "whether they’d like fewer Check-ins."
+            "Sent once by the Check-ins scheduler when a User reaches the ignore "
+            "threshold, asking whether they’d like fewer Check-ins."
         ),
     ),
     EditableSetting(
@@ -1176,8 +1111,8 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         minimum=0,
         maximum=5,
         hint=(
-            "How many Curiosities the Understanding may bring up in one Conversation; "
-            "0 means none."
+            "How many Curiosities can be raised in one Conversation; until then, due "
+            "ones are offered to the Understanding before each reply. 0 means none."
         ),
     ),
     EditableSetting(
@@ -1243,7 +1178,7 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         minimum=1,
         maximum=5,
         hint=(
-            "How often Zeph shows “typing” again while a reply is being written, since "
+            "How often the Reply shows “typing” again while it is being written, since "
             "Telegram hides it after about 5 seconds."
         ),
     ),
@@ -1277,8 +1212,9 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
             RequiredPlaceholder(DASHBOARD_URL_PLACEHOLDER, "the link to the Dashboard"),
         ),
         hint=(
-            "Sent in Telegram when someone uses a connection link before finishing "
-            "onboarding. {dashboard_url} becomes the Dashboard’s address."
+            "Sent by the Telegram connection step when someone uses a connection link "
+            "before finishing onboarding. {dashboard_url} becomes the Dashboard’s "
+            "address."
         ),
     ),
     EditableSetting(
@@ -1288,8 +1224,8 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         minimum=1,
         maximum=365,
         hint=(
-            "Days messages are kept before they are deleted; Day Summaries stay. Shown "
-            "to Users on Account & privacy."
+            "Days messages are kept before the Message Retention clean-up deletes "
+            "them; Day Summaries stay. Shown to Users on Account & privacy."
         ),
     ),
     EditableSetting(
@@ -1310,8 +1246,8 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.TEXT,
         max_length=1_000,
         hint=(
-            "Sent as its own message after the reply when a User turns memory off in "
-            "chat."
+            "Sent by Settings in Chat as its own message after the reply, when a User "
+            "turns memory off in chat."
         ),
     ),
     EditableSetting(
@@ -1319,7 +1255,10 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         "“Data deleted” reply",
         SettingKind.TEXT,
         max_length=1_000,
-        hint="Sent in Telegram once a User’s data is deleted in chat.",
+        hint=(
+            "Sent by Delete My Data in chat once the User’s data is deleted, after "
+            "they sent the confirmation word."
+        ),
     ),
 )
 

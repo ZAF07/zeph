@@ -62,13 +62,7 @@ export function CrisisReplyEditor() {
       <FormSectionHeading
         id="crisis-reply-heading"
         title="Crisis Reply"
-        caption={
-          <>
-            Sent immediately when Safeguard flags risk, instead of a normal
-            reply. <code className="font-mono">{"{helplines}"}</code> is
-            replaced with the User’s country list.
-          </>
-        }
+        caption={settings[crisisReplyKey]?.hint}
       />
       <FormEditor
         label="Crisis Reply wording"

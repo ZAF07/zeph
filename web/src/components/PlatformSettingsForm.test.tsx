@@ -81,7 +81,6 @@ describe("PlatformSettingsForm", () => {
     apiClient.updateAdminSettings.mockImplementation(async (values) => ({
       ...settings,
       conversation_quiet_gap_minutes: {
-        label: "",
         hint: "",
         value: Number(values.conversation_quiet_gap_minutes ?? 60),
         updated_at: "2026-11-11T09:00:00Z",

@@ -17,8 +17,7 @@ vi.mock("@/lib/use-api-client", () => ({
 
 const settings: AdminSettings = {
   crisis_reply: {
-    label: "",
-    hint: "",
+    hint: "Sent at once when the Safeguard finds a crisis.",
     value: "I’m an AI. Please reach out:\n{helplines}",
     updated_at: "2026-11-01T00:00:00Z",
     updated_by: null,
@@ -31,13 +30,22 @@ describe("CrisisReplyEditor", () => {
     apiClient.getAdminSettings.mockResolvedValue(settings);
     apiClient.updateAdminSettings.mockImplementation(async (values) => ({
       crisis_reply: {
-        label: "",
         hint: "",
         value: String(values.crisis_reply),
         updated_at: "2026-11-11T09:00:00Z",
         updated_by: "Maya Lin",
       },
     }));
+  });
+
+  it("shows the Crisis Reply's hint under its heading", async () => {
+    renderWithQueries(<CrisisReplyEditor />);
+
+    expect(
+      await screen.findByText(
+        "Sent at once when the Safeguard finds a crisis.",
+      ),
+    ).toBeVisible();
   });
 
   it("shows the saved Crisis Reply wording", async () => {

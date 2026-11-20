@@ -233,11 +233,10 @@ export type SettingValue =
   string | number | boolean | Partial<Record<CheckInFrequency, number>>;
 
 /**
- * A platform setting's name, its hint (what it is, what it serves and which
- * step reads it), its value and when, and by whom, it was last saved.
+ * A platform setting's hint (what it is, what it serves and which step reads
+ * it), its value and when, and by whom, it was last saved.
  */
 export type AdminSetting = {
-  label: string;
   hint: string;
   value: SettingValue;
   updated_at: string;

@@ -39,21 +39,18 @@ const coreServices: CoreServices = {
 
 const settings: AdminSettings = {
   response_prompt: {
-    label: "",
     hint: "",
     value: "Reply briefly.",
     updated_at: "2026-11-01T00:00:00Z",
     updated_by: null,
   },
   response_model: {
-    label: "",
     hint: "",
     value: "deepseek-flash",
     updated_at: "2026-11-01T00:00:00Z",
     updated_by: null,
   },
   response_thinking: {
-    label: "",
     hint: "",
     value: false,
     updated_at: "2026-11-01T00:00:00Z",
@@ -68,21 +65,18 @@ describe("PromptsAndModels", () => {
     apiClient.getAdminSettings.mockResolvedValue(settings);
     apiClient.updateAdminSettings.mockImplementation(async (values) => ({
       response_prompt: {
-        label: "",
         hint: "",
         value: String(values.response_prompt),
         updated_at: "2026-11-11T09:00:00Z",
         updated_by: "Maya Lin",
       },
       response_model: {
-        label: "",
         hint: "",
         value: String(values.response_model),
         updated_at: "2026-11-11T09:00:00Z",
         updated_by: "Maya Lin",
       },
       response_thinking: {
-        label: "",
         hint: "",
         value: values.response_thinking === true,
         updated_at: "2026-11-11T09:00:00Z",
@@ -228,21 +222,18 @@ describe("PromptsAndModels", () => {
     });
     apiClient.getAdminSettings.mockResolvedValue({
       photo_description_prompt: {
-        label: "",
         hint: "",
         value: "Describe the photo.",
         updated_at: "2026-11-01T00:00:00Z",
         updated_by: null,
       },
       photo_model: {
-        label: "",
         hint: "",
         value: "deepseek-flash",
         updated_at: "2026-11-01T00:00:00Z",
         updated_by: null,
       },
       ask_about_photo_tool_description: {
-        label: "",
         hint: "",
         value: "Look again only when needed.",
         updated_at: "2026-11-01T00:00:00Z",
@@ -336,21 +327,18 @@ describe("PromptsAndModels", () => {
       apiClient.getAdminSettings.mockResolvedValue({
         ...settings,
         web_search_tool_description: {
-          label: "",
           hint: "",
           value: "Search the web.",
           updated_at: "2026-11-01T00:00:00Z",
           updated_by: null,
         },
         reply_web_search_instructions: {
-          label: "",
           hint: "",
           value: "Say where it came from.",
           updated_at: "2026-11-01T00:00:00Z",
           updated_by: null,
         },
         reply_memory_intro: {
-          label: "",
           hint: "",
           value: "What you remember:",
           updated_at: "2026-11-01T00:00:00Z",

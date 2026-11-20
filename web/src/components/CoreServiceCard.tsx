@@ -70,6 +70,7 @@ export function CoreServiceCard({
   ].every((text) => text?.trim());
   const headingId = `service-${service.prompt_key}`;
   const modelId = `${headingId}-model`;
+  const promptHintId = `${headingId}-prompt-hint`;
 
   function discard() {
     setModel(savedModel);
@@ -166,11 +167,11 @@ export function CoreServiceCard({
       <EditorLabel
         label="Prompt"
         hint={settings[service.prompt_key]?.hint ?? ""}
-        hintId={`${headingId}-prompt-hint`}
+        hintId={promptHintId}
       />
       <FormEditor
         label="Prompt"
-        describedById={`${headingId}-prompt-hint`}
+        describedById={promptHintId}
         caption={lastSavedNote(settings, [
           service.prompt_key,
           service.model_key,

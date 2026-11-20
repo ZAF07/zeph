@@ -202,9 +202,8 @@ class AdminUserListResponse(BaseModel):
 
 
 class SettingResponse(BaseModel):
-    """A platform setting's name, hint, value and when it was last saved."""
+    """A platform setting's hint, value and when it was last saved."""
 
-    label: str
     hint: str
     value: Any
     updated_at: datetime
@@ -1163,7 +1162,7 @@ def to_model_call_trace_details_response(
 
 
 def to_settings_response(settings: list[StoredSetting]) -> SettingsResponse:
-    """Describe settings for the admin area, each with its name and hint.
+    """Describe settings for the admin area, each with its hint.
 
     Args:
         settings: The editable settings.
@@ -1174,7 +1173,6 @@ def to_settings_response(settings: list[StoredSetting]) -> SettingsResponse:
     return SettingsResponse(
         settings={
             setting.key: SettingResponse(
-                label=EDITABLE_SETTINGS_BY_KEY[setting.key].label,
                 hint=EDITABLE_SETTINGS_BY_KEY[setting.key].hint,
                 value=setting.value,
                 updated_at=setting.updated_at,
