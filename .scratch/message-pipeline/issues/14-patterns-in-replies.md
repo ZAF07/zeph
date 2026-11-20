@@ -14,6 +14,14 @@ Patterns reach the Reply Plan through Recall: through their linked Threads when 
 
 User stories covered: 24, 60.
 
+## Design
+
+Read `web/design/README.md` in full first, including "Message-pipeline additions (20 Nov 2026)".
+
+- The push-back wait is an ordinary field row with a hint, as in the "Field rows" sample in `AdminPersona`. No new parts.
+- **Model call trace** (reference `AdminModelCallTrace`): the Reply Plan step has a "Pattern" fact. The drawn values are "None" and "Used, not offered"; the value for an offered Pattern isn't drawn, so ask Zaf for it before building.
+- **Shared reference.** `AdminModelCallTrace` also draws 05, 07, 09 and 11. Build your part. The full PASS is due on whichever of those issues lands last; until then, record under Comments which parts still differ and which issue owns them.
+
 ## Acceptance criteria
 
 - [ ] A Pattern linked to a reminded Thread reaches the Reply Plan's input
@@ -24,7 +32,9 @@ User stories covered: 24, 60.
 - [ ] The Model Call Log shows whether a Pattern was used or offered
 - [ ] Any new migration sits after the latest one on `main` when rebasing (the other lane adds migrations too): one migration head only
 - [ ] `CONTEXT.md` and `docs/message-pipeline/README.md` still describe what was built (update the "Today" notes that this changes)
+- [ ] The new field row matches the field-row sample in `AdminPersona`; the Pattern fact matches `AdminModelCallTrace` (full PASS if this is the last issue on it, otherwise the remaining differences are recorded under Comments)
 - [ ] Checks pass: `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy src`
+- [ ] Web checks pass: `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`
 - [ ] Verified in the running app with `/run`, evidence recorded under `## Comments`
 
 ## Blocked by

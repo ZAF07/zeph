@@ -21,6 +21,13 @@ Hold-back rules (raised once per Conversation, brushed-off wait, asked to drop) 
 
 User stories covered: 37, 38, 57.
 
+## Design
+
+Read `web/design/README.md` in full first, including "Message-pipeline additions (20 Nov 2026)".
+
+- The text window and the Thread cap are ordinary field rows with hints, as in the "Field rows" sample in `AdminPersona`. No new parts.
+- The trace's Reply Plan step already draws "Life Threads reminded", "Threads brought up", "Threads left alone" and "Threads held back" (`AdminModelCallTrace`, set up in 05). Nothing new to draw here.
+
 ## Acceptance criteria
 
 - [ ] A Thread reminded by message 2 is still in the Reply Plan's input at message 20 of the same Conversation
@@ -30,7 +37,9 @@ User stories covered: 37, 38, 57.
 - [ ] The window and cap are Admin-editable with hints
 - [ ] Any new migration sits after the latest one on `main` when rebasing (the other lane adds migrations too): one migration head only
 - [ ] `CONTEXT.md` and `docs/message-pipeline/README.md` still describe what was built (update the "Today" notes that this changes)
+- [ ] The new field rows match the field-row sample in `AdminPersona`
 - [ ] Checks pass: `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy src`
+- [ ] Web checks pass, if web code changed: `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`
 - [ ] Verified in the running app with `/run`, evidence recorded under `## Comments`
 
 ## Blocked by

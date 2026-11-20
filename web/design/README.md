@@ -42,13 +42,16 @@ Translate inline styles to Tailwind classes using the tokens, with arbitrary val
 | `Onboarding` | `/onboarding` | The file stacks all six steps, separated by dashed lines, so each is visible. The app shows one at a time, as now. `?design=all-steps` renders them stacked for the test. |
 | `ConnectTelegram` | `/connect-telegram` | Main card plus its other states. |
 | `Dashboard` | `/` signed in | Home. |
-| `Memories` + five `Memories--tab-*` | `/memories`, `?tab=` | Six tabs, one visible at a time. |
+| `Memories` + six `Memories--tab-*` | `/memories`, `?tab=` | Seven tabs, one visible at a time: Memories, About you, What's going on, Patterns, What helps you, Day Summaries, Photos. `M-Memories--tab-patterns` is the Patterns tab on a phone. |
 | `CheckIns`, `Account` | `/check-ins`, `/account` | |
 | `Plan` | `/plan` | To build. UI only. |
 | `Admin` | `/admin` | To build. Overview, replaces the redirect to Users. |
 | `AdminUsers` | `/admin/users` | |
 | `AdminCheckInLog` | `/admin/check-in-log` | Also the **table template**. |
-| `AdminPersona` | `/admin/persona` | Also the **form template**. |
+| `AdminPersona`, `AdminPersonaOutlook` | `/admin/persona`, `?tab=outlook` | Voice and Outlook tabs. `AdminPersona` is also the **form template**. |
+| `AdminPrompts` | `/admin/prompts` | Prompts & models. One section per core service. |
+| `AdminModelCallTrace` | `/admin/model-calls/design-trace` | One trace from the Model call log. |
+| `AdminEvalDaySummaryCase` | `/admin/evals/cases/day_summary/new` | The Day Summary Eval case form, and how a result reads. |
 | `AdminCheckInKinds` | `/admin/check-in-kinds` | Also the **card-list template**. |
 | `States` | none | Sheet of empty, loading, error, saved and confirm parts used by every page. |
 
@@ -224,6 +227,32 @@ All in `src/components/`. Read a component's TSDoc before using it.
 | Card lists (card-list template) | `NewCardBox`, `CardList`, `CardListToolbar`, `FoldingCard`, `CardSaveBar`, `CardRemoveConfirm`, `CardListLoading` |
 | Shared states | `LoadingPanel`, `LoadFailed`, `EmptyState`, `SavedNote`, `SaveFailedNote`, `ConfirmDialog` |
 | Tags | `ToBuildTag`, `UnsavedTag` |
+
+## Message-pipeline additions (20 Nov 2026)
+
+The design changed for the issues in `.scratch/message-pipeline/issues`. Build each issue's UI against the files below. The test is the same: `node design/compare.cjs <Ref>` must print PASS.
+
+| Issue | What changed in the design | Reference files |
+|---|---|---|
+| 05, 09 | Reply Plan is a core service with its own section. The woven-in Check-in prompt is gone. The trace shows Understanding and Reply Plan as separate steps, with the facts each one owns. | `AdminPrompts`, `AdminModelCallTrace` |
+| 06 | Every editable field has a hint under its label: 13px, soft, at most two sentences. An editor gets a label and hint above it. | `AdminPrompts`, `AdminPersona`, `AdminCheckInKinds` |
+| 07 | Persona has two tabs, Voice and Outlook, each with its own editor and save bar. The trace records "Read formed" and "Read said", and an Admin's own trace shows the Read in Content. | `AdminPersona`, `AdminPersonaOutlook`, `AdminModelCallTrace` |
+| 08 | The user panel on Users lists "Confirmed Patterns". Pattern keeping is a core service with two limit rows. | `AdminUsers`, `AdminPrompts` |
+| 10 | Memories has a Patterns tab: each confirmed Pattern, when the User agreed, what it is based on, and a delete button. | `Memories--tab-patterns`, `M-Memories--tab-patterns`, `States` (empty state) |
+| 11, 12, 14 | New limits are ordinary field rows with hints. No new parts. | field rows in `AdminPersona` |
+| 14 | The trace has a "Pattern" fact. | `AdminModelCallTrace` |
+| 15 | Day Summary case form: Key, The day, Questions. A result shows the Summary written, then each question with Expected, the Judge's answer, Match or Miss, and the Judge's reason. | `AdminEvalDaySummaryCase` |
+| 16 | "Conversation Summaries" is now "Day Summaries" everywhere: tab, heading, intro, hero line, and the delete texts. | every `Memories*` file, `Account`, `M-Account`, `States` |
+
+**Copy.** The wording in these files is the wording to seed. For issue 10 the Copy slots are the Patterns heading, the line under it, the empty state title and body in `States`, and the delete button's label. For issue 16 take the tab name, heading, intro and delete texts from the reference files.
+
+**Prompts & models.** `AdminPrompts` is the page as it is built today plus three additions: a hint under Model, Thinking and every limit; a Prompt label with its hint above each editor; and the two new services. Do not restyle anything else on a service card.
+
+**Tabs.** The Persona tabs work like the Memories tabs: clicking swaps the editor and sets `?tab=outlook`. Unsaved text in one tab is kept when switching to the other.
+
+**Fixtures.** Fixture mode must show exactly what is drawn. Prompts & models lists four services, in this order: Understanding, Reply Plan, Reply, Pattern keeping. The trace at `/admin/model-calls/design-trace` is the one drawn, an Admin's own, with all Content closed. The new Day Summary case form opens filled in as drawn. Alex has the two Patterns drawn. The annotation rows and the samples under them are rendered in fixture mode, as on the other template pages.
+
+**Baselines.** After any change to `reference/`, Zaf runs `node design/shoot.cjs` on his own machine to rebuild `baseline/`. Baselines made on another machine render type differently and will not pass.
 
 ## Build order (the redesign, finished)
 

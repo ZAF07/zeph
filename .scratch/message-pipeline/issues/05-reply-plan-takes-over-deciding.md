@@ -22,6 +22,15 @@ Split today's Understanding call in two (ADR-0021). No Read yet: replies should 
 
 User stories covered: 4, 5, 6, 7, 54, 62.
 
+## Design
+
+Read `web/design/README.md` in full first, including "Message-pipeline additions (20 Nov 2026)".
+
+- **Prompts & models** (`/admin/prompts`, reference `AdminPrompts`): Reply Plan is a core service with its own card, after Understanding and before Reply, with Model, Thinking, Prompt and Fallback wording. Keep today's card look; only add what the reference adds.
+- **Model call trace** (`/admin/model-calls/[traceId]`, reference `AdminModelCallTrace`, fixture at `/admin/model-calls/design-trace`): Understanding and Reply Plan are separate steps. Understanding keeps Mood intensity, Cause known, Struggling, Past look-ups. Reply Plan takes Need picked, the Moves and the Thread counts (`web/src/lib/model-calls.ts`).
+- Fixture mode must show exactly what is drawn (README "Fixtures").
+- **Shared references.** `AdminPrompts` also draws 06, 08 and 09; `AdminModelCallTrace` also draws 07, 09, 11 and 14. Build your part. The full PASS is due on whichever of those issues lands last; until then, record under Comments which parts still differ and which issue owns them.
+
 ## Acceptance criteria
 
 - [ ] Each Message makes an Understanding call whose instructions and input contain no Needs, Moves or Threads to pick, then a Reply Plan call that gets them
@@ -33,7 +42,9 @@ User stories covered: 4, 5, 6, 7, 54, 62.
 - [ ] Move Outcomes and the unmade next Move still work from the Reply Plan's Moves
 - [ ] Any new migration sits after the latest one on `main` when rebasing (the other lane adds migrations too): one migration head only
 - [ ] `CONTEXT.md` and `docs/message-pipeline/README.md` still describe what was built (update the "Today" notes that this changes)
+- [ ] The Reply Plan card and the trace's two steps match `AdminPrompts` and `AdminModelCallTrace` (`node design/compare.cjs AdminPrompts AdminModelCallTrace`); full PASS if this is the last issue on them, otherwise the remaining differences are recorded under Comments
 - [ ] Checks pass: `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy src`
+- [ ] Web checks pass: `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`
 - [ ] Verified in the running app with `/run`, evidence recorded under `## Comments`
 
 ## Blocked by

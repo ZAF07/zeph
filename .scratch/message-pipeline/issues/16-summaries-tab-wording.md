@@ -29,13 +29,23 @@ Deterministic. Open the Dashboard → Memories → the "Conversation Summaries" 
 - Design references in `web/design/reference/` that show the old wording: `Memories.html`, `M-Memories.html`, `Memories--tab-summaries.html`, `Memories--tab-about.html`, `Memories--tab-helps.html`, `Memories--tab-photos.html`, `Memories--tab-threads.html`, `Account.html`, `M-Account.html` and `States.html`. They must change together with the Copy so `web/design/compare.cjs` still passes.
 - Tests that assert the old text: `web/src/components/Memories.test.tsx`.
 
+## Design
+
+Read `web/design/README.md` in full first, including "Message-pipeline additions (20 Nov 2026)".
+
+The owner chose the wording on 20 Nov 2026 and the reference files already show it: tab "Day Summaries", heading, intro, hero line, empty state and the delete texts ("Day Summaries and your account stay. This can't be undone."). Take every string from the reference files, not from this issue.
+
+- References: every `Memories*` file, `M-Memories`, `Account`, `M-Account`, `States`.
+- **Hero line:** one Copy slot shared with 10. It also mentions "the patterns it has noticed". If 10 is already in, set it to the drawn text; if not, leave out the patterns part and 10 adds it.
+- **Shared references.** Every `Memories*` file and `States` also draw 10's Patterns tab and empty state. The full PASS on those is due on whichever of 10 and 16 lands last; until then, record under Comments which parts still differ. `Account` and `M-Account` are yours alone.
+
 ## Acceptance criteria
 
-- [ ] The owner has chosen the new wording (tab title, heading, intro, empty state, and the delete texts that name it)
-- [ ] The Copy seed and a migration reloading those slots use it; the design references are updated to match
+- [x] The owner has chosen the new wording (tab title, heading, intro, empty state, and the delete texts that name it): it is in the reference files (20 Nov 2026)
+- [ ] The Copy seed and a migration reloading those slots use the wording from the reference files
 - [ ] The bug no longer reproduces: the Memories tab and Account page show the new wording
 - [ ] Tests cover the new wording (`Memories.test.tsx`, any Copy migration test)
-- [ ] The pixel test passes (`web/design/compare.cjs`)
+- [ ] `node design/compare.cjs Account M-Account` prints PASS; `Memories`, `M-Memories` and `States` pass in full if 10 is already in, otherwise the remaining differences are recorded under Comments
 - [ ] Checks pass: `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy src`, `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`
 - [ ] Verified in the running app with `/run`, evidence recorded under `## Comments`
 

@@ -18,6 +18,14 @@ Can be picked up by either lane once 05 is in.
 
 User stories covered: 33, 34, 35, 36, 58.
 
+## Design
+
+Read `web/design/README.md` in full first, including "Message-pipeline additions (20 Nov 2026)".
+
+- The window hours and the heavy-day cap are ordinary field rows with hints, as in the "Field rows" sample in `AdminPersona`. No new parts.
+- **Model call trace** (reference `AdminModelCallTrace`): the Reply Plan step lists `past_day` under "Tools called", and an Admin's own trace shows the call and its result ("14 messages from 12 Nov") in Content.
+- **Shared reference.** `AdminModelCallTrace` also draws 05, 07, 09 and 14. Build your part. The full PASS is due on whichever of those issues lands last; until then, record under Comments which parts still differ and which issue owns them.
+
 ## Acceptance criteria
 
 - [ ] A reply in a new Conversation 20 minutes after the last one is given the previous Conversation's messages
@@ -28,7 +36,9 @@ User stories covered: 33, 34, 35, 36, 58.
 - [ ] The window hours and cap are Admin-editable with hints
 - [ ] Any new migration sits after the latest one on `main` when rebasing (the other lane adds migrations too): one migration head only
 - [ ] `CONTEXT.md` and `docs/message-pipeline/README.md` still describe what was built (update the "Today" notes that this changes)
+- [ ] The new field rows match the field-row sample in `AdminPersona`; the `past_day` call in the trace matches `AdminModelCallTrace` (full PASS if this is the last issue on it, otherwise the remaining differences are recorded under Comments)
 - [ ] Checks pass: `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy src`
+- [ ] Web checks pass, if web code changed: `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`
 - [ ] Verified in the running app with `/run`, evidence recorded under `## Comments`
 
 ## Blocked by

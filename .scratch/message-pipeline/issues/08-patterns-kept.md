@@ -20,6 +20,15 @@ New User Memory (ADR-0020). Nothing User-facing yet (10 shows them; 14 uses them
 
 User stories covered: 23, 25, 26, 27, 30, 32, 55, 59, 65.
 
+## Design
+
+Read `web/design/README.md` in full first, including "Message-pipeline additions (20 Nov 2026)".
+
+- **Users** (`/admin/users`, reference `AdminUsers`): the user panel lists "Confirmed Patterns" (a count only).
+- **Prompts & models** (reference `AdminPrompts`): Pattern keeping is a core service, last in the list, with two limit rows, each with a hint.
+- Fixture mode: Prompts & models lists four services in this order: Understanding, Reply Plan, Reply, Pattern keeping.
+- **Shared references.** `AdminPrompts` also draws 05, 06 and 09. Build your part. The full PASS is due on whichever of those issues lands last; until then, record under Comments which parts still differ and which issue owns them. `AdminUsers` is yours alone.
+
 ## Acceptance criteria
 
 - [ ] A Conversation touching two Threads that show the same way of acting leaves a suspected Pattern with evidence from both, when the scripted keeping answer says so
@@ -32,7 +41,10 @@ User stories covered: 23, 25, 26, 27, 30, 32, 55, 59, 65.
 - [ ] The Model Call Log shows the Pattern keeping step
 - [ ] Any new migration sits after the latest one on `main` when rebasing (the other lane adds migrations too): one migration head only
 - [ ] `CONTEXT.md` and `docs/message-pipeline/README.md` still describe what was built (update the "Today" notes that this changes)
+- [ ] `node design/compare.cjs AdminUsers` prints PASS
+- [ ] The Pattern keeping card matches `AdminPrompts`; full PASS if this is the last issue on it, otherwise the remaining differences are recorded under Comments
 - [ ] Checks pass: `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy src`
+- [ ] Web checks pass: `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`
 - [ ] Verified in the running app with `/run`, evidence recorded under `## Comments`
 
 ## Blocked by

@@ -16,6 +16,15 @@ The `hint` mechanism exists today but 64 of 76 settings have none. Hints describ
 
 User stories covered: 61.
 
+## Design
+
+Read `web/design/README.md` in full first, including "Message-pipeline additions (20 Nov 2026)".
+
+- Every editable field has a hint under its label: 13px, soft, at most two sentences. An editor (prompt, Persona text) gets a label and hint above it.
+- References: `AdminPrompts` (hint under Model, Thinking and every limit; a Prompt label and hint above each editor), `AdminPersona`, `AdminCheckInKinds`. Do not restyle anything else on a service card.
+- Needs and Moves have no reference file: use the same hint style as `AdminCheckInKinds`.
+- **Shared references.** `AdminPrompts` also draws 05, 08 and 09; `AdminPersona` also draws 07's tabs. Build your part. The full PASS is due on whichever of those issues lands last; until then, record under Comments which parts still differ and which issue owns them. `AdminCheckInKinds` is yours alone.
+
 ## Acceptance criteria
 
 - [ ] Every editable setting returned by the Admin settings API has a non-empty hint
@@ -23,6 +32,8 @@ User stories covered: 61.
 - [ ] Hints are at most two sentences and name the step that reads the setting
 - [ ] A test fails if a new editable setting is added without a hint
 - [ ] `CONTEXT.md` and `docs/message-pipeline/README.md` still describe what was built (update the "Today" notes that this changes)
+- [ ] `node design/compare.cjs AdminCheckInKinds` prints PASS (both widths, and `--all-folded`)
+- [ ] Hints on `AdminPrompts` and `AdminPersona` match the reference (`node design/compare.cjs AdminPrompts AdminPersona`); full PASS if this is the last issue on them, otherwise the remaining differences are recorded under Comments
 - [ ] Checks pass: `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy src`
 - [ ] Web checks pass: `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`
 - [ ] Verified in the running app with `/run`, evidence recorded under `## Comments`

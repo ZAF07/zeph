@@ -19,6 +19,14 @@ The heart of the review: Zeph stops only mirroring.
 
 User stories covered: 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 22, 51, 52, 53, 63.
 
+## Design
+
+Read `web/design/README.md` in full first, including "Message-pipeline additions (20 Nov 2026)".
+
+- **Persona** (`/admin/persona`): two tabs, Voice (reference `AdminPersona`) and Outlook (reference `AdminPersonaOutlook`, `?tab=outlook`), each with its own editor and save bar. Tabs work like the Memories tabs: clicking swaps the editor and sets `?tab=outlook`. Unsaved text in one tab is kept when switching to the other.
+- **Model call trace** (reference `AdminModelCallTrace`): the Reply Plan step records "Read formed" and "Read said"; an Admin's own trace shows the Read and the where-we-are line in Content. Another User's trace shows only the two facts.
+- **Shared references.** `AdminPersona` also draws 06's hints; `AdminModelCallTrace` also draws 05, 09, 11 and 14. Build your part. The full PASS is due on whichever of those issues lands last; until then, record under Comments which parts still differ and which issue owns them. `AdminPersonaOutlook` is yours alone.
+
 ## Acceptance criteria
 
 - [ ] The Outlook is an Admin-editable setting with a hint, seeded, and a change applies from the next reply
@@ -29,7 +37,11 @@ User stories covered: 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 22, 51, 52, 53, 63.
 - [ ] The Model Call Log records whether a Read was formed and said; an Admin's own trace shows its text
 - [ ] Any new migration sits after the latest one on `main` when rebasing (the other lane adds migrations too): one migration head only
 - [ ] `CONTEXT.md` and `docs/message-pipeline/README.md` still describe what was built (update the "Today" notes that this changes)
+- [ ] Switching Persona tabs keeps unsaved text in the other tab (component test)
+- [ ] `node design/compare.cjs AdminPersonaOutlook` prints PASS
+- [ ] The tabs and the Read facts match `AdminPersona` and `AdminModelCallTrace`; full PASS if this is the last issue on them, otherwise the remaining differences are recorded under Comments
 - [ ] Checks pass: `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy src`
+- [ ] Web checks pass: `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`
 - [ ] Verified in the running app with `/run`, evidence recorded under `## Comments`
 
 ## Blocked by

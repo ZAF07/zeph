@@ -16,6 +16,14 @@ Evals cost money: build and test with the fake model; don't run a real Eval Run 
 
 User stories covered: 66, 69.
 
+## Design
+
+Read `web/design/README.md` in full first, including "Message-pipeline additions (20 Nov 2026)".
+
+- **Case form** (`/admin/evals/cases/day_summary/new`, reference `AdminEvalDaySummaryCase`): Key, The day (messages with From, Time, Text; Remove and "Add a message"), Questions (Question and Expected answer; Remove and "Add a question"), then "Add case". Editing a saved case drops the Key panel and the button reads "Save case".
+- **A result on a run:** the Summary written, then each question with Expected, the Judge's answer, Match or Miss, and the Judge's reason, as in "How a result reads, on a run".
+- **Fixtures:** the new case form opens filled in as drawn.
+
 ## Acceptance criteria
 
 - [ ] Day Summary cases can be created, edited, duplicated and archived on the Dashboard
@@ -23,6 +31,7 @@ User stories covered: 66, 69.
 - [ ] A case fails when any answer misses, with the Judge's reason shown
 - [ ] Starting cases are seeded
 - [ ] Eval runner, case and Dashboard tests pass with the fake model
+- [ ] `node design/compare.cjs AdminEvalDaySummaryCase` prints PASS, and a run's result page reads as the drawn sample
 - [ ] Any new migration sits after the latest one on `main` when rebasing (the other lane adds migrations too): one migration head only
 - [ ] `CONTEXT.md` and `docs/message-pipeline/README.md` still describe what was built (update the "Today" notes that this changes)
 - [ ] Checks pass: `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy src`

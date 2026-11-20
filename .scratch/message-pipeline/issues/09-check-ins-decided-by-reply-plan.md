@@ -16,6 +16,14 @@ Everything else about Woven-in Check-ins works as today: saved, logged as sent w
 
 User stories covered: 19, 20, 64.
 
+## Design
+
+Read `web/design/README.md` in full first, including "Message-pipeline additions (20 Nov 2026)".
+
+- **Prompts & models** (reference `AdminPrompts`): the woven-in Check-in prompt is gone; nothing replaces it.
+- **Model call trace** (reference `AdminModelCallTrace`): there is no Woven-in Check-in step. The Reply Plan step shows "Check-in Kinds offered" and "Check-in Kind chosen".
+- **Shared references.** `AdminPrompts` also draws 05, 06 and 08; `AdminModelCallTrace` also draws 05, 07, 11 and 14. Build your part. The full PASS is due on whichever of those issues lands last; until then, record under Comments which parts still differ and which issue owns them.
+
 ## Acceptance criteria
 
 - [ ] No separate woven-in Check-in model call is made; the Reply Plan's input holds the due Kinds when one is due and nothing when none is
@@ -26,7 +34,9 @@ User stories covered: 19, 20, 64.
 - [ ] Existing Woven-in Check-in tests pass, rewritten for the Reply Plan where they scripted the old model
 - [ ] Any new migration sits after the latest one on `main` when rebasing (the other lane adds migrations too): one migration head only
 - [ ] `CONTEXT.md` and `docs/message-pipeline/README.md` still describe what was built (update the "Today" notes that this changes)
+- [ ] Prompts & models and the trace match `AdminPrompts` and `AdminModelCallTrace`; full PASS if this is the last issue on them, otherwise the remaining differences are recorded under Comments
 - [ ] Checks pass: `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy src`
+- [ ] Web checks pass: `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`
 - [ ] Verified in the running app with `/run`, evidence recorded under `## Comments`
 
 ## Blocked by
