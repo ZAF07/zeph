@@ -6,7 +6,7 @@ from datetime import date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from companion.core.life_threads import describe_thread, read_text
+from companion.core.life_threads import describe_thread, incoming_texts, read_text
 from companion.core.memory_retrieval import format_calendar_day, format_day
 from companion.core.models import (
     ChatLine,
@@ -280,7 +280,8 @@ def read_evidence(
 def apply_reaction(entry: dict[str, Any], pattern: Pattern, now: datetime) -> Pattern:
     """Record how the User took a view offered from a Pattern in this Conversation.
 
-    Only with a reaction may the Pattern be confirmed or closed.
+    It is confirmed only when they agreed, and closed only when they pushed
+    back; brushing it off changes neither.
 
     Args:
         entry: The Pattern, as the model wrote it.
@@ -297,9 +298,13 @@ def apply_reaction(entry: dict[str, Any], pattern: Pattern, now: datetime) -> Pa
     reacted = replace(
         pattern, last_offered_at=now, last_reaction=PatternReaction(reaction)
     )
-    state = entry.get("state")
-    if state in {PatternState.CONFIRMED.value, PatternState.CLOSED.value}:
-        return replace(reacted, state=PatternState(state))
+    state_allowed_by_reaction = {
+        PatternReaction.AGREED: PatternState.CONFIRMED,
+        PatternReaction.PUSHED_BACK: PatternState.CLOSED,
+    }
+    allowed_state = state_allowed_by_reaction.get(PatternReaction(reaction))
+    if allowed_state is not None and entry.get("state") == allowed_state.value:
+        return replace(reacted, state=allowed_state)
     return reacted
 
 
@@ -436,9 +441,11 @@ class PatternKeeper:
     ) -> None:
         """Update the User's Patterns from an ended Conversation.
 
-        Runs only when the Conversation touched a Life Thread. The model sees
-        those Threads, the User's other Threads closest in meaning, however
-        old (up to the Admin-set number), all their Patterns, and the days
+        Runs whenever the User wrote something, so a view they took is
+        always judged. The model sees the Threads the Conversation touched,
+        the User's other Threads closest in meaning to those and to their
+        texts, however old (up to the Admin-set number), all their Patterns,
+        and the days
         behind the evidence of the Patterns linked to those Threads (up to
         the Admin-set number). An unreadable answer is asked again once; if
         it is still unreadable nothing changes.
@@ -448,19 +455,21 @@ class PatternKeeper:
                 for them.
             conversation_id: The ended Conversation.
             messages: Its messages, oldest first.
-            touched: The Life Threads the Conversation started or changed.
+            touched: The Life Threads the Conversation started, changed or
+                brought up.
         """
-        if not touched or not messages:
+        texts = incoming_texts(messages)
+        if not texts:
             return
         settings = snapshot.settings
         user_id = snapshot.user.id
         time_zone = snapshot.user.time_zone
         closest = self._find_closest_threads(
-            user_id, touched, settings.get(PATTERN_KEEPING_THREADS)
+            user_id, touched, texts, settings.get(PATTERN_KEEPING_THREADS)
         )
-        threads = dict(enumerate([*touched, *closest], start=1))
-        touched_by_number = dict(list(threads.items())[: len(touched)])
-        closest_by_number = dict(list(threads.items())[len(touched) :])
+        touched_by_number = dict(enumerate(touched, start=1))
+        closest_by_number = dict(enumerate(closest, start=len(touched) + 1))
+        threads = touched_by_number | closest_by_number
         known = dict(
             enumerate(self._repositories.patterns.list_for_user(user_id), start=1)
         )
@@ -501,27 +510,34 @@ class PatternKeeper:
         )
 
     def _find_closest_threads(
-        self, user_id: UUID, touched: Sequence[LifeThread], limit: int
+        self,
+        user_id: UUID,
+        touched: Sequence[LifeThread],
+        texts: Sequence[str],
+        limit: int,
     ) -> list[LifeThread]:
-        """Find the User's other Threads closest in meaning to the touched ones.
+        """Find the User's other Threads closest in meaning to the Conversation.
 
         Args:
             user_id: The User's ID.
             touched: The Threads the Conversation touched.
+            texts: The texts the User sent in it.
             limit: The most to find.
 
         Returns:
-            The closest Threads, closest first; none if the touched Threads
-            can't be embedded.
+            The closest Threads, closest first; none if they can't be
+            embedded.
         """
         if limit < 1:
             return []
         try:
             embedding = self._embedder.embed_query(
-                "\n".join(f"{thread.title}. {thread.story}" for thread in touched)
+                "\n".join(
+                    [*(f"{thread.title}. {thread.story}" for thread in touched), *texts]
+                )
             )
         except Exception:
-            logger.exception("Could not embed the touched Life Threads")
+            logger.exception("Could not embed the Conversation's Threads and texts")
             return []
         return self._repositories.life_threads.find_closest(
             user_id, embedding, [thread.id for thread in touched], limit

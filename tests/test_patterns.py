@@ -577,3 +577,64 @@ def test_the_migration_keeps_a_curiosity_prompt_an_admin_edited(
         migrate(database_url)
 
     assert stored_curiosity_prompt(engine) == "Admin's own Curiosity prompt."
+
+
+def test_a_pattern_is_confirmed_even_when_no_thread_changed_in_the_conversation(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    start_goes_quiet_pattern(client, chat_model, clock, scheduler, seeded_settings)
+    clock.advance(timedelta(days=1))
+    chat_model.script_pattern_keeping(
+        pattern_keeping_answer(
+            [{"pattern": 1, "reaction": "agreed", "state": "confirmed"}]
+        )
+    )
+
+    end_conversation(
+        client,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        "yes, that is me: when the app grabs me everything else goes quiet",
+        [],
+    )
+
+    [pattern] = patterns_of(client.engine, maya_id(client, auth_verifier))
+    assert pattern.state == PatternState.CONFIRMED
+    seen = chat_model.pattern_keeping_calls[-1].history[0].text
+    closest = seen.split("Their other Life Threads closest in meaning:\n")[1]
+    assert "Side project (" in closest.split("Patterns kept so far:")[0]
+
+
+def test_a_brushed_off_view_never_closes_a_pattern(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    start_goes_quiet_pattern(client, chat_model, clock, scheduler, seeded_settings)
+
+    end_with_pattern_answer(
+        client,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        {"pattern": 1, "reaction": "brushed_off", "state": "closed"},
+    )
+
+    [pattern] = patterns_of(client.engine, maya_id(client, auth_verifier))
+    assert pattern.state == PatternState.SUSPECTED
+    assert pattern.last_reaction == PatternReaction.BRUSHED_OFF

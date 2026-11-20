@@ -1072,11 +1072,11 @@ pattern_keeping_prompt: |-
   - Add evidence to a Pattern that showed up again.
   - Start a suspected Pattern, only when the same way shows up in two or
     more different Threads you were given, with evidence from each.
-  - Confirm or close a Pattern, new or kept, only when Zeph offered a view
-    from it in this Conversation: say how they took it, "agreed", "pushed_back" or
-    "brushed_off". Confirm it when they agreed it is them; close it when
-    they rejected it outright. Pushing back or brushing it off is not
-    enough to close it.
+  - When Zeph offered a view from a Pattern, new or kept, in this
+    Conversation, say how they took it: "agreed", "pushed_back" or
+    "brushed_off". Confirm it ("confirmed") only when they agreed it is
+    them. Close it ("closed") only when they pushed back by rejecting it
+    outright; a softer push back or brushing it off leaves it as it is.
   Never change a closed Pattern, and never start one that repeats a Pattern
   already kept. Each piece of evidence names its Thread, the day it
   happened (YYYY-MM-DD; for what happened in this Conversation, the day it

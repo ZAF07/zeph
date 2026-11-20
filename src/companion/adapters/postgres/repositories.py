@@ -10,18 +10,14 @@ from psycopg.errors import UniqueViolation
 from sqlalchemy import (
     ColumnElement,
     Connection,
-    Date,
     Engine,
     Row,
     Select,
-    Text,
-    Uuid,
     and_,
     bindparam,
     case,
     delete,
     func,
-    literal,
     or_,
     select,
     tuple_,
@@ -2933,8 +2929,8 @@ class PostgresPatternRepository:
     ) -> None:
         """Add new Patterns and save changed ones, in one step.
 
-        Evidence not kept yet is added, unless its Life Thread was deleted
-        meanwhile; evidence already kept is left as it is. A Pattern left
+        Evidence not kept yet is added, unless its Life Thread or Pattern was
+        deleted meanwhile; evidence already kept is left as it is. A Pattern left
         with no evidence is deleted. A changed Pattern saved with no
         embedding keeps the one it had.
 
@@ -2957,7 +2953,9 @@ class PostgresPatternRepository:
                                 "started_at": to_save.pattern.started_at,
                                 "updated_at": to_save.pattern.updated_at,
                                 "last_offered_at": to_save.pattern.last_offered_at,
-                                "last_reaction": to_save.pattern.last_reaction,
+                                "last_reaction": _stored_reaction(
+                                    to_save.pattern.last_reaction
+                                ),
                                 "embedding": to_save.embedding,
                             }
                             for to_save in added
@@ -2986,34 +2984,52 @@ class PostgresPatternRepository:
                             "new_state": to_save.pattern.state.value,
                             "new_updated_at": to_save.pattern.updated_at,
                             "new_last_offered_at": to_save.pattern.last_offered_at,
-                            "new_last_reaction": to_save.pattern.last_reaction,
+                            "new_last_reaction": _stored_reaction(
+                                to_save.pattern.last_reaction
+                            ),
                             "new_embedding": to_save.embedding,
                         }
                         for to_save in changed
                     ],
                 )
             saved = [*added, *changed]
-            for to_save in saved:
-                for item in to_save.pattern.evidence:
-                    connection.execute(
-                        insert(pattern_evidence)
-                        .from_select(
-                            ["id", "pattern_id", "life_thread_id", "day", "line"],
-                            select(
-                                literal(item.id, Uuid),
-                                literal(to_save.pattern.id, Uuid),
-                                life_threads.c.id,
-                                literal(item.day, Date),
-                                literal(item.line, Text),
-                            ).where(
-                                life_threads.c.id == item.thread_id,
-                                select(patterns.c.id)
-                                .where(patterns.c.id == to_save.pattern.id)
-                                .exists(),
-                            ),
-                        )
-                        .on_conflict_do_nothing()
+            evidence = [
+                (to_save.pattern.id, item)
+                for to_save in saved
+                for item in to_save.pattern.evidence
+            ]
+            existing_thread_ids = set(
+                connection.execute(
+                    select(life_threads.c.id).where(
+                        life_threads.c.id.in_({item.thread_id for _, item in evidence})
                     )
+                ).scalars()
+            )
+            existing_pattern_ids = set(
+                connection.execute(
+                    select(patterns.c.id).where(
+                        patterns.c.id.in_({pattern_id for pattern_id, _ in evidence})
+                    )
+                ).scalars()
+            )
+            evidence_to_add = [
+                {
+                    "id": item.id,
+                    "pattern_id": pattern_id,
+                    "life_thread_id": item.thread_id,
+                    "day": item.day,
+                    "line": item.line,
+                }
+                for pattern_id, item in evidence
+                if item.thread_id in existing_thread_ids
+                and pattern_id in existing_pattern_ids
+            ]
+            if evidence_to_add:
+                connection.execute(
+                    insert(pattern_evidence)
+                    .values(evidence_to_add)
+                    .on_conflict_do_nothing()
+                )
             for user_id in {to_save.pattern.user_id for to_save in saved}:
                 _delete_patterns_without_evidence(connection, user_id)
 
@@ -3034,6 +3050,18 @@ class PostgresPatternRepository:
         """
         with self._database.begin() as connection:
             connection.execute(delete(patterns).where(patterns.c.user_id == user_id))
+
+
+def _stored_reaction(reaction: PatternReaction | None) -> str | None:
+    """Write a Pattern's last reaction the way it is stored.
+
+    Args:
+        reaction: The reaction; None if never offered.
+
+    Returns:
+        Its value, e.g. "pushed_back"; None if there is none.
+    """
+    return reaction.value if reaction else None
 
 
 def _delete_patterns_without_evidence(connection: Connection, user_id: UUID) -> None:

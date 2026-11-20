@@ -22,9 +22,9 @@ import { useSaveAdminSettings } from "@/lib/use-admin-settings";
 /**
  * One core service's part of the page, from the form template: its heading,
  * field rows for which model it uses, whether that model thinks first and
- * any limits on what it is given, a hint under each, editors for its prompt and any extra prompts (like a
- * tool description) each with its name and hint above it,
- * and one save bar that saves them together. Grouped extra prompts
+ * any limits on what it is given, a hint under each, editors for its prompt
+ * and any extra prompts (like a tool description) each with its name and
+ * hint above it, and one save bar that saves them together. Grouped extra prompts
  * sit in groups that are folded shut until clicked. The prompt is combined
  * with the Persona when the service runs. When the backend refuses a save,
  * the save bar shows its reason.
@@ -187,7 +187,6 @@ export function CoreServiceCard({
               <FieldNumber
                 id={limitId}
                 value={limits[limit.key] ?? ""}
-                unit=""
                 onChange={(value) => {
                   setLimits({ ...limits, [limit.key]: value });
                   saveSettings.reset();

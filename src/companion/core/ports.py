@@ -1220,8 +1220,8 @@ class PatternRepository(Protocol):
     ) -> None:
         """Add new Patterns and save changed ones, in one step.
 
-        Evidence not kept yet is added, unless its Life Thread was deleted
-        meanwhile; evidence already kept is left as it is. A Pattern left
+        Evidence not kept yet is added, unless its Life Thread or Pattern was
+        deleted meanwhile; evidence already kept is left as it is. A Pattern left
         with no evidence is deleted. A changed Pattern saved with no
         embedding keeps the one it had.
 
