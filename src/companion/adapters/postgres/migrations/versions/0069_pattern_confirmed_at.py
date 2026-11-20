@@ -3,12 +3,12 @@
 Adds `patterns.confirmed_at`: when a Pattern became confirmed. The last
 time a view was offered isn't enough, since a confirmed Pattern can be
 offered again. Confirmed Patterns already kept take their last offered time,
-which is when they were confirmed. The User Portrait prompt now names the
-Patterns the User agreed with, and the Memories hero line names the patterns
-Zeph has noticed: each reloads from the seed on next start only where it
-still matches the old seed word for word, so an Admin's edits stay. The old
-texts are written out here, so later seed changes don't change what this
-migration does.
+which is when they were confirmed (or when they last changed, if none). The
+User Portrait prompt now names the Patterns the User agreed with, and the
+Memories hero line names the patterns Zeph has noticed: each reloads from the
+seed on next start only where it still matches the old seed word for word, so
+an Admin's edits stay. The old texts are written out here, so later seed
+changes don't change what this migration does.
 
 Revision ID: 0069
 Revises: 0068
@@ -62,7 +62,7 @@ def upgrade() -> None:
     connection = op.get_bind()
     connection.execute(
         sa.text(
-            "UPDATE patterns SET confirmed_at = last_offered_at "
+            "UPDATE patterns SET confirmed_at = COALESCE(last_offered_at, updated_at) "
             "WHERE state = 'confirmed'"
         )
     )

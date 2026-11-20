@@ -32,6 +32,8 @@ from tests.test_patterns import (
     MUM,
     PROJECT,
     end_with_pattern_answer,
+    evidence,
+    pattern_keeping_answer,
     patterns_of,
     start_goes_quiet_pattern,
 )
@@ -71,7 +73,7 @@ def keep_pattern(
     user_id: str,
     pattern_text: str,
     state: PatternState,
-    evidence: list[tuple[date, UUID, str]],
+    evidence_lines: list[tuple[date, UUID, str]],
     confirmed_at: datetime | None = None,
 ) -> UUID:
     """Save a Pattern with the given state and evidence straight to the database."""
@@ -85,7 +87,7 @@ def keep_pattern(
             PatternEvidence(
                 id=uuid4(), day=day, thread_id=thread_id, thread_title="", line=line
             )
-            for day, thread_id, line in evidence
+            for day, thread_id, line in evidence_lines
         ),
         started_at=now,
         updated_at=now,
@@ -219,6 +221,51 @@ def test_agreeing_with_a_pattern_records_the_day_and_a_later_reaction_keeps_it(
     assert datetime.fromisoformat(shown["agreed_at"]) == agreed_at
 
 
+def test_a_new_pattern_agreed_with_at_once_is_dated_and_agreeing_again_keeps_the_day(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    user_id = maya_id(client, auth_verifier)
+    chat_model.script_pattern_keeping(
+        pattern_keeping_answer(
+            [
+                {
+                    "pattern": GOES_QUIET,
+                    "evidence": [
+                        evidence(1, "Skipped meals for days while on the app."),
+                        evidence(2, "Snapped at mum because the app had them."),
+                    ],
+                    "reaction": "agreed",
+                    "state": "confirmed",
+                }
+            ]
+        )
+    )
+    keep_threads(client, chat_model, clock, scheduler, seeded_settings)
+    [started_confirmed] = patterns_of(client.engine, user_id)
+    agreed_at = started_confirmed.confirmed_at
+
+    end_with_pattern_answer(
+        client,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        {"pattern": 1, "reaction": "agreed", "state": "confirmed"},
+    )
+
+    assert agreed_at is not None
+    [pattern] = patterns_of(client.engine, user_id)
+    assert pattern.last_offered_at == clock.now()
+    assert pattern.confirmed_at == agreed_at < clock.now()
+
+
 def test_deleting_a_pattern_removes_it_and_rewrites_the_portrait_without_it(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
@@ -280,19 +327,19 @@ def test_a_user_cannot_delete_a_suspected_or_another_users_pattern(
     user_id = maya_id(client, auth_verifier)
     keep_threads(client, chat_model, clock, scheduler, seeded_settings)
     threads = threads_by_title(client.engine, user_id)
-    evidence = [
+    shared_evidence = [
         (date(2026, 11, 2), threads["Side project"], "Skipped meals."),
         (date(2026, 11, 3), threads["Mum's visit"], "Snapped at mum."),
     ]
     suspected_id = keep_pattern(
-        client.engine, user_id, HIDDEN, PatternState.SUSPECTED, evidence
+        client.engine, user_id, HIDDEN, PatternState.SUSPECTED, shared_evidence
     )
     confirmed_id = keep_pattern(
         client.engine,
         user_id,
         GOES_QUIET,
         PatternState.CONFIRMED,
-        evidence,
+        shared_evidence,
         confirmed_at=datetime(2026, 11, 3, 20, 0),
     )
     stranger = auth_headers(auth_verifier, "user_stranger")
@@ -355,7 +402,7 @@ def test_the_portrait_is_written_from_confirmed_patterns_only(
     user_id = maya_id(client, auth_verifier)
     keep_threads(client, chat_model, clock, scheduler, seeded_settings)
     threads = threads_by_title(client.engine, user_id)
-    evidence = [
+    shared_evidence = [
         (date(2026, 11, 2), threads["Side project"], "Skipped meals."),
         (date(2026, 11, 3), threads["Mum's visit"], "Snapped at mum."),
     ]
@@ -364,11 +411,13 @@ def test_the_portrait_is_written_from_confirmed_patterns_only(
         user_id,
         GOES_QUIET,
         PatternState.CONFIRMED,
-        evidence,
+        shared_evidence,
         confirmed_at=datetime(2026, 11, 3, 20, 0),
     )
-    keep_pattern(client.engine, user_id, HIDDEN, PatternState.SUSPECTED, evidence)
-    keep_pattern(client.engine, user_id, CLOSED, PatternState.CLOSED, evidence)
+    keep_pattern(
+        client.engine, user_id, HIDDEN, PatternState.SUSPECTED, shared_evidence
+    )
+    keep_pattern(client.engine, user_id, CLOSED, PatternState.CLOSED, shared_evidence)
     clock.advance(timedelta(days=1))
 
     end_conversation_with_portrait(

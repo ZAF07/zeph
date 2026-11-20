@@ -1215,6 +1215,17 @@ class PatternRepository(Protocol):
         """
         ...
 
+    def list_confirmed(self, user_id: UUID) -> list[Pattern]:
+        """List the Patterns a User agreed with, newest agreed first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The confirmed Patterns, each with its evidence oldest first.
+        """
+        ...
+
     def save_many(
         self, added: Sequence[PatternToSave], changed: Sequence[PatternToSave]
     ) -> None:

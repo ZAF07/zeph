@@ -2889,11 +2889,49 @@ class PostgresPatternRepository:
         Returns:
             The Patterns, each with its evidence oldest first.
         """
+        return self._list(
+            user_id,
+            patterns.c.user_id == user_id,
+            [patterns.c.started_at, patterns.c.id],
+        )
+
+    def list_confirmed(self, user_id: UUID) -> list[Pattern]:
+        """List the Patterns a User agreed with, newest agreed first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The confirmed Patterns, each with its evidence oldest first.
+        """
+        return self._list(
+            user_id,
+            and_(
+                patterns.c.user_id == user_id,
+                patterns.c.state == PatternState.CONFIRMED.value,
+            ),
+            [patterns.c.confirmed_at.desc(), patterns.c.id],
+        )
+
+    def _list(
+        self,
+        user_id: UUID,
+        which: ColumnElement[bool],
+        order: Sequence[ColumnElement[Any]],
+    ) -> list[Pattern]:
+        """List the User's Patterns that match, in the given order, with evidence.
+
+        Args:
+            user_id: The User's ID.
+            which: Which of their Patterns to list.
+            order: The order to list them in.
+
+        Returns:
+            The Patterns, each with its evidence oldest first.
+        """
         with self._database.connect() as connection:
             pattern_rows = connection.execute(
-                select(*PATTERN_COLUMNS)
-                .where(patterns.c.user_id == user_id)
-                .order_by(patterns.c.started_at, patterns.c.id)
+                select(*PATTERN_COLUMNS).where(which).order_by(*order)
             ).all()
             evidence_rows = connection.execute(
                 select(
@@ -2906,7 +2944,7 @@ class PostgresPatternRepository:
                 )
                 .join(patterns)
                 .join(life_threads)
-                .where(patterns.c.user_id == user_id)
+                .where(which)
                 .order_by(pattern_evidence.c.day, pattern_evidence.c.position)
             ).all()
         evidence_by_pattern: dict[UUID, list[PatternEvidence]] = {}

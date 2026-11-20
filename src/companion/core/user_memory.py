@@ -13,7 +13,6 @@ from companion.core.models import (
     MemorySource,
     MoveOutcome,
     Pattern,
-    PatternState,
     User,
     UserPortrait,
 )
@@ -200,16 +199,7 @@ class UserMemoryService:
         Returns:
             The confirmed Patterns, each with its evidence oldest first.
         """
-        confirmed = [
-            pattern
-            for pattern in self._repositories.patterns.list_for_user(user_id)
-            if pattern.state == PatternState.CONFIRMED
-        ]
-        return sorted(
-            confirmed,
-            key=lambda pattern: pattern.confirmed_at or pattern.updated_at,
-            reverse=True,
-        )
+        return self._repositories.patterns.list_confirmed(user_id)
 
     def delete_pattern(self, user_id: UUID, pattern_id: UUID) -> None:
         """Delete one of a User's confirmed Patterns, so it is never used again.

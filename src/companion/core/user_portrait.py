@@ -19,7 +19,6 @@ from companion.core.models import (
     ModelStep,
     MoveOutcome,
     Pattern,
-    PatternState,
     PlatformSettings,
     TraceKind,
     UserPortrait,
@@ -183,11 +182,7 @@ class PortraitWriter:
             self._repositories.memory_categories.list_all(),
             self._repositories.user_memory.list_items(user_id),
             self._repositories.life_threads.list_for_user(user_id),
-            [
-                pattern
-                for pattern in self._repositories.patterns.list_for_user(user_id)
-                if pattern.state == PatternState.CONFIRMED
-            ],
+            self._repositories.patterns.list_confirmed(user_id),
             self._repositories.move_outcomes.list_for_user(user_id),
             self._repositories.user_memory.list_summaries(
                 user_id, limit=SUMMARIES_FOR_PORTRAIT

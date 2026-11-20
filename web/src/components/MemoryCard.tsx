@@ -29,9 +29,11 @@ export function MemoryCard({
   children: ReactNode;
   below?: ReactNode;
 }) {
-  let padding = compact ? "py-4" : "py-[18px]";
+  let padding = "py-[18px]";
   if (below) {
     padding = "pt-4 pb-2";
+  } else if (compact) {
+    padding = "py-4";
   }
   return (
     <div
