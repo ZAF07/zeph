@@ -9,8 +9,8 @@ start only where it still matches the old seed word for word, so an Admin's
 edits stay. The old text is written out here, so later seed changes don't
 change what this migration does.
 
-Revision ID: 0067
-Revises: 0066
+Revision ID: 0068
+Revises: 0067
 Create Date: 2026-11-20
 """
 
@@ -20,8 +20,8 @@ import sqlalchemy as sa
 from alembic import op
 from pgvector.sqlalchemy import Vector
 
-revision: str = "0067"
-down_revision: str | None = "0066"
+revision: str = "0068"
+down_revision: str | None = "0067"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
