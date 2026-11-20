@@ -73,4 +73,5 @@ Read `web/design/README.md` in full first, including "Message-pipeline additions
 ## Completion
 
 - Completed: 2026-11-20
-- Commit: <to be filled in after the merge>
+- Commit: `f6ea9f3` — Merge message pipeline issue 10: Users see their confirmed Patterns. The Memories page has a Patterns tab (between What's going on and What helps you) with each Pattern the User agreed with, the day they agreed and what it is based on (day, Thread and line), each deletable; suspected and closed ones never show. GET and DELETE /api/patterns work whether User Memory is on or off; deleting rewrites the Portrait. The Portrait is written from confirmed Patterns only (listed in SQL, newest agreed first). patterns.confirmed_at records when a Pattern was agreed (migration 0069, which also reloads the unedited Portrait prompt and Memories hero line). Copy slots for the tab; the Patterns empty state on the States sheet; design fixtures for Alex's two Patterns
+- Branch commits: `6d24db3` (implementation), `0587fb9` (review fixes and docs), `e1dbafa` (evidence and archive)
