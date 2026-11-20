@@ -33,19 +33,27 @@ There are seven:
   out. No judge is needed: the description is checked for the text.
 - **Understanding**: each case gives a made-up User a User Memory (Portrait,
   Goals, Summaries, Life Threads, Curiosities, Knowledge documents, Move
-  Outcomes) and maybe some earlier messages, then sends Messages. Each Message's saved
-  Understanding is checked: the Need picked, the lead and supporting Moves
-  (or that it made no Move), the next Move it has in mind, whether a Life Thread was found
-  (reminded) and brought up or left alone, whether a Curiosity was raised,
-  whether the reply was told to gently ask why, whether Knowledge was
-  chosen and, in cases with a Check-in due, whether it was woven into the
-  reply or left for later. The judge checks the reply where the case asks (a rant gets no
-  fixing, an old story is raised naturally, a gentle probe, the reply
-  actually did its Move, e.g. named real hosts under budget). A case can
-  turn Web Search off for its User, and give made-up web pages its searches
-  find, so Research is tested without searching the real web. It also checks
-  every model call kept its full content in the Model Call Log, and reports
-  the time and tokens of each Understanding call.
+  Outcomes) and maybe some earlier messages, then sends Messages. Each check
+  is marked with the step that owns it, so a failed case says which job went
+  wrong. The **Understanding** is checked on what it read: whether the User
+  is struggling, whether it knows why they feel as they do, whether it asked
+  to look up older days, and whether it kept feelings and wants they put in
+  words as said (and nothing as said when they didn't). **Recall** is checked
+  on whether a Life Thread was found (reminded). The **Reply Plan** is checked
+  on what it decided: whether it formed a Read and had the reply say it, the
+  Need picked, the lead and supporting Moves (or that it made no Move), the
+  next Move it has in mind, Life Threads brought up or left alone, whether a
+  Curiosity was raised, whether the reply was told to gently ask why,
+  whether Knowledge was chosen and, in cases with a Check-in due, whether it
+  was woven into the reply or left for later. The judge checks the reply
+  where the case asks (a rant gets no fixing, an old story is raised
+  naturally, a gentle probe, the reply actually did its Move, e.g. named
+  real hosts under budget). A case can turn Web Search off for its User, and
+  give made-up web pages its searches find, so Research is tested without
+  searching the real web. It also checks every model call kept its full
+  content in the Model Call Log, and reports the time and tokens of each
+  Understanding call. A Variant can override the Understanding prompt, the
+  Reply Plan prompt and the Persona's Outlook, among other settings.
 - **Move Outcome**: each case gives a made-up User a finished Conversation:
   its messages and, for each of the User's messages, the Need, the lead and
   supporting Moves and the mood. They are saved as if they had happened, and
@@ -185,12 +193,13 @@ time, the Judge's reason for each rule, and for a failed case what happened.
   not to use it).
 - **Understanding**: the first lines give the Understanding calls' count,
   average and slowest time, and average tokens. Then each Message shows its
-  own time and tokens, each check (e.g. `FAIL need: picked Think it
-  through, expected Advice`) and each judge rule with its reason. A failed
-  case also prints what the Understanding model was given and what it
-  answered, so you can see why. "wasn't reminded of" means the Thread didn't
-  reach the Understanding at all (a closeness bar or names); "didn't bring
-  up" means it was shown but the model chose not to.
+  own time and tokens, each check marked with its step (e.g. `FAIL Reply
+  Plan · need: picked Think it through, expected Advice`) and each judge
+  rule with its reason. A failed case also prints what the Understanding and
+  Reply Plan models were given and what they answered, so you can see why.
+  "Recall · found ... wasn't reminded of" means the Thread didn't reach the
+  Reply Plan at all (a closeness bar or names); "Reply Plan · raised ...
+  didn't bring up" means it was shown but the model chose not to.
 - **Settings**: each case shows PASS or FAIL with the tools it should have
   called and the tools it did call. A failed case also prints Zeph's reply.
 - **Photo descriptions**: a failed case shows what leaked and the
@@ -268,10 +277,10 @@ backend rewrites it into the form's shape when it reads it.
 - `understanding.yaml`: add a case with its `memory`, optional `earlier`
   messages and `messages`, each with what to `expect`; the file's top lists
   every field. Keep a Life Thread's title out of the rest of the memory,
-  since "found" looks for the title in what the Understanding was given.
+  since "found" looks for the title in what the Reply Plan was given.
   Moves are named as on the Moves page; a case that expects Research needs
   `web_results`, or its searches find nothing. Made-up `move_outcomes` reach
-  the Understanding only when close enough to the Message (the Move Outcome
+  the Reply Plan only when close enough to the Message (the Move Outcome
   closeness bar in Platform Settings), so write their situation and feeling
   near the Message's words.
 

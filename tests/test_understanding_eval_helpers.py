@@ -18,7 +18,7 @@ from companion.core.evals.models import CaseOutcome, Check, EvalName
 from companion.core.evals.understanding_checks import (
     CheckResult,
     ObservedUnderstanding,
-    check_understanding,
+    check_steps,
 )
 from companion.core.models import MoveResult, MoveRole
 from tests.test_eval_helpers import case_result, from_file, seeded
@@ -70,6 +70,18 @@ def test_the_understanding_cases_cover_every_check_the_issue_asks_for() -> None:
         for message in case.messages
         if message.expect.woven_in is not None
     )
+    for flag in (
+        "struggling",
+        "cause_known",
+        "looks_up_past",
+        "feelings_said",
+        "wants_said",
+        "read_formed",
+        "read_said",
+    ):
+        assert any(getattr(expect, flag) is not None for expect in expectations)
+    assert any(expect.read_said is True for expect in expectations)
+    assert any(expect.read_said is False for expect in expectations)
     threads = [thread for case in cases for thread in case.memory.threads]
     assert any(thread.raised_in_this_conversation for thread in threads)
     assert any(thread.reaction == "brushed_off" for thread in threads)
@@ -119,6 +131,15 @@ def test_a_case_is_read_with_its_memory_earlier_lines_and_messages(
           knowledge: false
           woven_in: false
           rules: [no_fixing]
+      - text: what do you think is going on with me?
+        expect:
+          struggling: true
+          cause_known: false
+          looks_up_past: true
+          feelings_said: false
+          wants_said: true
+          read_formed: true
+          read_said: true
 """,
     )
 
@@ -149,6 +170,15 @@ def test_a_case_is_read_with_its_memory_earlier_lines_and_messages(
         knowledge=False,
         woven_in=False,
         rules=["no_fixing"],
+    )
+    assert case.messages[1].expect == UnderstandingExpectations(
+        struggling=True,
+        cause_known=False,
+        looks_up_past=True,
+        feelings_said=False,
+        wants_said=True,
+        read_formed=True,
+        read_said=True,
     )
 
 
@@ -209,7 +239,7 @@ def test_every_expectation_met_passes_each_check() -> None:
         knowledge=True,
     )
 
-    checks = check_understanding(
+    checks = check_steps(
         expect,
         replace(
             NOTHING_RAISED,
@@ -222,13 +252,13 @@ def test_every_expectation_met_passes_each_check() -> None:
     )
 
     assert checks == [
-        CheckResult("need", True, "picked Be heard"),
-        CheckResult("found", True, "was reminded of Falling-out with Mei"),
-        CheckResult("raised", True, "brought up Falling-out with Mei"),
-        CheckResult("curiosity", True, "brought up 1 Curiosity"),
-        CheckResult("asked why", True, "asked why"),
+        CheckResult("Recall · found", True, "was reminded of Falling-out with Mei"),
+        CheckResult("Reply Plan · need", True, "picked Be heard"),
+        CheckResult("Reply Plan · raised", True, "brought up Falling-out with Mei"),
+        CheckResult("Reply Plan · curiosity", True, "brought up 1 Curiosity"),
+        CheckResult("Reply Plan · asked why", True, "asked why"),
         CheckResult(
-            "knowledge",
+            "Reply Plan · knowledge",
             True,
             "chose On the breath; passages from On the breath reached the reply",
         ),
@@ -245,7 +275,7 @@ def test_each_missed_expectation_fails_its_check_and_says_what_happened() -> Non
         knowledge=False,
     )
 
-    checks = check_understanding(
+    checks = check_steps(
         expect,
         replace(
             NOTHING_RAISED,
@@ -258,31 +288,122 @@ def test_each_missed_expectation_fails_its_check_and_says_what_happened() -> Non
     )
 
     assert checks == [
-        CheckResult("need", False, "picked Advice, expected Be heard"),
-        CheckResult("found", False, "wasn't reminded of Moving to Perth"),
-        CheckResult("not raised", False, "brought up Falling-out with Mei"),
-        CheckResult("curiosity", False, "brought up 2 Curiosities, expected none"),
-        CheckResult("asked why", False, "asked why, expected not to"),
-        CheckResult("knowledge", False, "chose On the breath, expected none"),
+        CheckResult("Recall · found", False, "wasn't reminded of Moving to Perth"),
+        CheckResult("Reply Plan · need", False, "picked Advice, expected Be heard"),
+        CheckResult(
+            "Reply Plan · not raised", False, "brought up Falling-out with Mei"
+        ),
+        CheckResult(
+            "Reply Plan · curiosity", False, "brought up 2 Curiosities, expected none"
+        ),
+        CheckResult("Reply Plan · asked why", False, "asked why, expected not to"),
+        CheckResult(
+            "Reply Plan · knowledge", False, "chose On the breath, expected none"
+        ),
+    ]
+
+
+def test_each_expectation_is_checked_on_the_step_that_owns_it() -> None:
+    expect = UnderstandingExpectations(
+        struggling=True,
+        cause_known=False,
+        looks_up_past=True,
+        feelings_said=False,
+        wants_said=True,
+        found=["Falling-out with Mei"],
+        read_formed=True,
+        read_said=False,
+        need=["Be heard"],
+    )
+    observed = replace(
+        NOTHING_RAISED,
+        struggling=True,
+        cause_known=False,
+        looked_up_past=True,
+        wants_said=True,
+        read_formed=True,
+    )
+
+    assert check_steps(expect, observed) == [
+        CheckResult("Understanding · struggling", True, "struggling"),
+        CheckResult(
+            "Understanding · cause known", True, "didn't know why they feel this way"
+        ),
+        CheckResult("Understanding · looks up the past", True, "looked up the past"),
+        CheckResult("Understanding · feelings said", True, "kept no feelings as said"),
+        CheckResult(
+            "Understanding · wants said", True, "kept wants said in their words"
+        ),
+        CheckResult("Recall · found", True, "was reminded of Falling-out with Mei"),
+        CheckResult("Reply Plan · read formed", True, "formed a Read"),
+        CheckResult("Reply Plan · read said", True, "held the Read back"),
+        CheckResult("Reply Plan · need", True, "picked Be heard"),
+    ]
+
+
+def test_a_missed_understanding_or_read_says_what_was_expected() -> None:
+    expect = UnderstandingExpectations(
+        struggling=False,
+        cause_known=True,
+        looks_up_past=False,
+        feelings_said=True,
+        read_formed=True,
+        read_said=True,
+    )
+    observed = replace(
+        NOTHING_RAISED, struggling=True, cause_known=False, looked_up_past=True
+    )
+
+    assert check_steps(expect, observed) == [
+        CheckResult(
+            "Understanding · struggling", False, "struggling, expected: not struggling"
+        ),
+        CheckResult(
+            "Understanding · cause known",
+            False,
+            "didn't know why they feel this way, expected: knew why they feel this way",
+        ),
+        CheckResult(
+            "Understanding · looks up the past",
+            False,
+            "looked up the past, expected: looked up nothing",
+        ),
+        CheckResult(
+            "Understanding · feelings said",
+            False,
+            "kept no feelings as said, expected: kept feelings said in their words",
+        ),
+        CheckResult(
+            "Reply Plan · read formed", False, "formed no Read, expected: formed a Read"
+        ),
+        CheckResult(
+            "Reply Plan · read said",
+            False,
+            "held the Read back, expected: said the Read",
+        ),
     ]
 
 
 def test_expectations_left_out_are_not_checked() -> None:
-    assert check_understanding(UnderstandingExpectations(), NOTHING_RAISED) == []
+    assert check_steps(UnderstandingExpectations(), NOTHING_RAISED) == []
 
 
 def test_a_woven_in_check_in_is_checked_against_what_was_expected() -> None:
     woven = replace(NOTHING_RAISED, woven_in=True)
 
-    assert check_understanding(UnderstandingExpectations(woven_in=True), woven) == [
-        CheckResult("woven in", True, "wove in the due Check-in")
+    assert check_steps(UnderstandingExpectations(woven_in=True), woven) == [
+        CheckResult("Reply Plan · woven in", True, "wove in the due Check-in")
     ]
-    assert check_understanding(UnderstandingExpectations(woven_in=False), woven) == [
-        CheckResult("woven in", False, "wove in the due Check-in, expected not now")
+    assert check_steps(UnderstandingExpectations(woven_in=False), woven) == [
+        CheckResult(
+            "Reply Plan · woven in", False, "wove in the due Check-in, expected not now"
+        )
     ]
-    assert check_understanding(
-        UnderstandingExpectations(woven_in=True), NOTHING_RAISED
-    ) == [CheckResult("woven in", False, "said not now, expected it woven in")]
+    assert check_steps(UnderstandingExpectations(woven_in=True), NOTHING_RAISED) == [
+        CheckResult(
+            "Reply Plan · woven in", False, "said not now, expected it woven in"
+        )
+    ]
 
 
 def test_a_case_expecting_a_woven_in_check_in_needs_one_due(tmp_path: Path) -> None:
@@ -302,13 +423,15 @@ def test_a_thread_left_alone_passes_and_a_missing_curiosity_fails() -> None:
         knowledge=True,
     )
 
-    checks = check_understanding(expect, NOTHING_RAISED)
+    checks = check_steps(expect, NOTHING_RAISED)
 
     assert checks == [
-        CheckResult("raised", False, "didn't bring up Falling-out with Mei"),
-        CheckResult("not raised", True, "left Falling-out with Mei alone"),
-        CheckResult("curiosity", False, "brought up no Curiosity"),
-        CheckResult("knowledge", False, "chose no document"),
+        CheckResult(
+            "Reply Plan · raised", False, "didn't bring up Falling-out with Mei"
+        ),
+        CheckResult("Reply Plan · not raised", True, "left Falling-out with Mei alone"),
+        CheckResult("Reply Plan · curiosity", False, "brought up no Curiosity"),
+        CheckResult("Reply Plan · knowledge", False, "chose no document"),
     ]
 
 
@@ -380,12 +503,14 @@ def test_a_message_with_no_understanding_call_shows_no_calls() -> None:
 def test_knowledge_chosen_but_not_reaching_the_reply_fails() -> None:
     expect = UnderstandingExpectations(knowledge=True)
 
-    [check] = check_understanding(
+    [check] = check_steps(
         expect, replace(NOTHING_RAISED, knowledge_documents=["On the breath"])
     )
 
     assert check == CheckResult(
-        "knowledge", False, "chose On the breath, but no passage reached the reply"
+        "Reply Plan · knowledge",
+        False,
+        "chose On the breath, but no passage reached the reply",
     )
 
 
@@ -460,48 +585,56 @@ def test_the_moves_made_are_checked_ignoring_case() -> None:
         lead_move=["research", "Push"], support_move=["Suggest"], no_move=False
     )
 
-    assert check_understanding(expect, moved) == [
-        CheckResult("lead move", True, "led with Research"),
-        CheckResult("supporting move", True, "supported with Suggest"),
-        CheckResult("no move", True, "led with Research"),
+    assert check_steps(expect, moved) == [
+        CheckResult("Reply Plan · lead move", True, "led with Research"),
+        CheckResult("Reply Plan · supporting move", True, "supported with Suggest"),
+        CheckResult("Reply Plan · no move", True, "led with Research"),
     ]
 
 
 def test_the_wrong_moves_or_a_move_when_none_was_expected_fail() -> None:
     pushed = replace(NOTHING_RAISED, lead_move="Push")
 
-    assert check_understanding(
+    assert check_steps(
         UnderstandingExpectations(
             lead_move=["Research"], support_move=["Suggest"], no_move=True
         ),
         pushed,
     ) == [
-        CheckResult("lead move", False, "led with Push, expected Research"),
         CheckResult(
-            "supporting move", False, "had no supporting Move, expected Suggest"
+            "Reply Plan · lead move", False, "led with Push, expected Research"
         ),
-        CheckResult("no move", False, "led with Push, expected no Move"),
+        CheckResult(
+            "Reply Plan · supporting move",
+            False,
+            "had no supporting Move, expected Suggest",
+        ),
+        CheckResult("Reply Plan · no move", False, "led with Push, expected no Move"),
     ]
-    assert check_understanding(
+    assert check_steps(
         UnderstandingExpectations(lead_move=["Research", "Suggest"], no_move=False),
         NOTHING_RAISED,
     ) == [
-        CheckResult("lead move", False, "made no Move, expected Research or Suggest"),
-        CheckResult("no move", False, "made no Move, expected one"),
+        CheckResult(
+            "Reply Plan · lead move",
+            False,
+            "made no Move, expected Research or Suggest",
+        ),
+        CheckResult("Reply Plan · no move", False, "made no Move, expected one"),
     ]
-    assert check_understanding(
+    assert check_steps(
         UnderstandingExpectations(no_move=True),
         replace(NOTHING_RAISED, support_move="Calm"),
     ) == [
         CheckResult(
-            "no move",
+            "Reply Plan · no move",
             False,
             "made no lead Move (supported with Calm), expected no Move",
         )
     ]
-    assert check_understanding(
-        UnderstandingExpectations(no_move=True), NOTHING_RAISED
-    ) == [CheckResult("no move", True, "made no Move")]
+    assert check_steps(UnderstandingExpectations(no_move=True), NOTHING_RAISED) == [
+        CheckResult("Reply Plan · no move", True, "made no Move")
+    ]
 
 
 def test_the_understanding_cases_check_moves_and_web_search() -> None:
@@ -528,15 +661,19 @@ def test_the_understanding_cases_check_moves_and_web_search() -> None:
 def test_a_supporting_move_without_a_lead_is_not_a_lead() -> None:
     supported_only = replace(NOTHING_RAISED, support_move="Calm")
 
-    assert check_understanding(
+    assert check_steps(
         UnderstandingExpectations(lead_move=["Calm"], no_move=False),
         supported_only,
     ) == [
         CheckResult(
-            "lead move", False, "made no lead Move (supported with Calm), expected Calm"
+            "Reply Plan · lead move",
+            False,
+            "made no lead Move (supported with Calm), expected Calm",
         ),
         CheckResult(
-            "no move", False, "made no lead Move (supported with Calm), expected one"
+            "Reply Plan · no move",
+            False,
+            "made no lead Move (supported with Calm), expected one",
         ),
     ]
 
@@ -575,14 +712,20 @@ def test_a_next_move_and_made_up_move_outcomes_are_read(tmp_path: Path) -> None:
 def test_the_next_move_in_mind_is_checked_ignoring_case() -> None:
     expect = UnderstandingExpectations(next_move=["research"])
 
-    assert check_understanding(
-        expect, replace(NOTHING_RAISED, next_move="Research")
-    ) == [CheckResult("next move", True, "has Research in mind next")]
-    assert check_understanding(expect, replace(NOTHING_RAISED, next_move="Push")) == [
-        CheckResult("next move", False, "has Push in mind next, expected research")
+    assert check_steps(expect, replace(NOTHING_RAISED, next_move="Research")) == [
+        CheckResult("Reply Plan · next move", True, "has Research in mind next")
     ]
-    assert check_understanding(expect, NOTHING_RAISED) == [
-        CheckResult("next move", False, "has no next Move in mind, expected research")
+    assert check_steps(expect, replace(NOTHING_RAISED, next_move="Push")) == [
+        CheckResult(
+            "Reply Plan · next move", False, "has Push in mind next, expected research"
+        )
+    ]
+    assert check_steps(expect, NOTHING_RAISED) == [
+        CheckResult(
+            "Reply Plan · next move",
+            False,
+            "has no next Move in mind, expected research",
+        )
     ]
 
 

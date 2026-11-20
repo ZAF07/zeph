@@ -46,6 +46,7 @@ from tests.fakes import (
     ScriptedChatModel,
     ToolCall,
     reply_plan_answer,
+    understanding_answer,
 )
 from tests.telegram_helpers import owner_headers
 from tests.test_moves import stored_rule_outs
@@ -271,7 +272,7 @@ def test_settings_photo_and_understanding_cases_are_checked(
     understanding = results["just-saying-hi"]
     assert understanding["outcome"] == "pass", understanding
     assert understanding["checks"][0] == {
-        "name": "need",
+        "name": "Reply Plan · need",
         "passed": True,
         "detail": "picked Just chatting",
         "group": "hi there",
@@ -317,11 +318,88 @@ def test_an_understanding_case_checks_whether_the_due_check_in_was_woven_in(
     result = results_by_key(open_run(client, admin, run["id"]))["woven-in"]
     assert result["outcome"] == "pass", result
     assert [
-        check["detail"] for check in result["checks"] if check["name"] == "woven in"
+        check["detail"]
+        for check in result["checks"]
+        if check["name"] == "Reply Plan · woven in"
     ] == ["wove in the due Check-in", "said not now"]
     [first_plan, second_plan] = chat_model.reply_plan_calls
     assert "A Check-in with them is due." in first_plan.history[0].text
     assert "A Check-in with them is due." not in second_plan.history[0].text
+
+
+def test_an_understanding_case_marks_each_check_with_the_step_that_owns_it(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    expect = {
+        "struggling": True,
+        "cause_known": True,
+        "feelings_said": True,
+        "read_formed": True,
+        "read_said": False,
+        "need": ["Be heard"],
+    }
+    steps_case = EvalCase(
+        key="read-held-back",
+        eval=EvalName.UNDERSTANDING,
+        content={
+            "now": "2026-11-13T18:30:00",
+            "messages": [
+                {"text": "my boss yelled at me, I'm so upset", "expect": expect},
+                {"text": "what do you think is going on?", "expect": expect},
+            ],
+            "rules": [],
+        },
+    )
+    add_cases(engine, steps_case)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.UNDERSTANDING)
+    upset = understanding_answer(
+        mood="upset",
+        struggling=True,
+        feelings={"said": "upset", "read": "", "unclear": ""},
+    )
+    chat_model.script_understanding(upset, understanding_answer())
+    chat_model.script_reply_plan(
+        reply_plan_answer(need="Be heard", read="They feel small at work."),
+        reply_plan_answer(
+            need="Be heard", read="They feel small at work.", say_read=True
+        ),
+    )
+    chat_model.script("that sounds awful", "honestly? I think you feel small there")
+
+    runner.work_next_run()
+
+    result = results_by_key(open_run(client, admin, run["id"]))["read-held-back"]
+    assert result["outcome"] == "fail", result
+    first, second = (
+        [
+            (check["name"], check["passed"])
+            for check in result["checks"]
+            if check["group"] == text
+        ]
+        for text in (
+            "my boss yelled at me, I'm so upset",
+            "what do you think is going on?",
+        )
+    )
+    assert first == [
+        ("Understanding · struggling", True),
+        ("Understanding · cause known", True),
+        ("Understanding · feelings said", True),
+        ("Reply Plan · read formed", True),
+        ("Reply Plan · read said", True),
+        ("Reply Plan · need", True),
+        ("full content", True),
+    ]
+    assert [name for name, passed in second if not passed] == [
+        "Understanding · struggling",
+        "Understanding · feelings said",
+        "Reply Plan · read said",
+    ]
 
 
 def test_a_run_keeps_its_snapshot_of_settings_judge_and_cases(
@@ -1106,6 +1184,31 @@ def test_a_need_override_reaches_only_its_variant_and_live_needs_stay(
     assert PostgresNeedRepository(engine).list_all() == live_needs
 
 
+def test_reply_plan_prompt_and_outlook_overrides_reach_only_their_variant(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, UNDERSTANDING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    overrides = {
+        "reply_plan_prompt": "Plan like a pineapple.\n" + chat_model.reply_plan_prompt,
+        "persona_outlook": "People grow like mangoes, slowly.",
+    }
+    start_run(client, admin, EvalName.UNDERSTANDING, variants=[{}, overrides])
+    chat_model.script("Hi!", "Hi!")
+
+    runner.work_next_run()
+
+    reply_plan_a, reply_plan_b = chat_model.reply_plan_calls
+    assert "pineapple" not in reply_plan_a.instructions
+    assert "mangoes" not in reply_plan_a.instructions
+    assert "Plan like a pineapple." in reply_plan_b.instructions
+    assert "People grow like mangoes, slowly." in reply_plan_b.instructions
+
+
 def test_re_run_failed_keeps_the_variants_and_repeats(
     client: TestClient,
     engine: Engine,
@@ -1723,9 +1826,9 @@ def test_an_understanding_case_checks_the_moves_and_searches_its_web_results(
         for check in result["checks"]
         if "move" in check["name"]
     ] == [
-        ("lead move", "led with Research"),
-        ("supporting move", "supported with Suggest"),
-        ("no move", "led with Research"),
+        ("Reply Plan · lead move", "led with Research"),
+        ("Reply Plan · supporting move", "supported with Suggest"),
+        ("Reply Plan · no move", "led with Research"),
     ]
     [reply] = [call for call in chat_model.calls if call.tool_results]
     search_result, page = reply.tool_results
@@ -1835,8 +1938,8 @@ def test_an_understanding_case_gives_its_move_outcomes_and_checks_the_next_move(
         for check in result["checks"]
         if "move" in check["name"]
     ] == [
-        ("lead move", "led with Calm"),
-        ("next move", "has Plan steps in mind next"),
+        ("Reply Plan · lead move", "led with Calm"),
+        ("Reply Plan · next move", "has Plan steps in mind next"),
     ]
     [reply_plan] = chat_model.reply_plan_calls
     seen = reply_plan.history[0].text
