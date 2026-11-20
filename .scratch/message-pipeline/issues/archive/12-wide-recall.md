@@ -102,6 +102,65 @@ Live runs used real DeepSeek, the real embedder and Postgres inside the worktree
   - The Conversation-end steps still find Threads from the whole Conversation, not from `life_threads_in_mind`.
 - No Eval was run (Evals cost money).
 
+### Coming back to this issue
+
+**Where the code is**
+
+- `src/companion/core/life_threads.py`:
+  - `ThreadReminder.remind(snapshot, conversation_id, meaning)` runs the search, saves what it found as in mind, and reads back everything in mind.
+  - `threads_in_mind(found, earlier, limit)` is the pure helper for the order and the cap.
+  - `find_threads_in(..., meaning="")` builds the search text: the meaning, then the texts.
+  - `recent_incoming_texts(messages, count)` gives the text window.
+  - `format_threads_for_reply` returns "" when there is no Reply Plan form.
+- `src/companion/core/reply_service.py` passes `understanding.form.means` to `remind`.
+- `src/companion/core/reply_plan.py` has the heading "Life Threads in mind: …" in `describe_message_for_reply_plan`.
+- Port: `LifeThreadRepository.keep_in_mind` and `list_in_mind` in `core/ports.py`. Postgres: `adapters/postgres/repositories.py`. Table: `life_threads_in_mind` in `tables.py`, with key (`conversation_id`, `life_thread_id`) and `came_to_mind_at`. Rows are deleted with their Conversation or their Thread.
+- Settings:
+  - `LIFE_THREADS_TEXTS_TO_SEARCH` and the `EditableSetting`s are in `core/platform_settings.py`.
+  - The seed values (`life_threads_per_reply: 10`, `life_threads_texts_to_search: 8`) are in `seed/platform_settings.yaml`.
+  - The Dashboard row is in `web/src/components/PlatformSettingsForm.tsx`. That page lists its keys by hand, so a new setting needs a row added there.
+- Tests:
+  - `tests/test_wide_recall.py` holds every acceptance criterion.
+  - `tests/test_life_threads_in_mind_migration.py` covers the cap reload.
+  - `tests/test_life_threads.py` has the older Thread tests, some changed.
+
+**How to check it again in the running app**
+
+The live run followed the issue 11 recipe (see its archived Comments, and the worktree memory note on fake Telegram chats):
+
+1. Stop the worktree's backend.
+2. Run a script with `docker compose run --rm -T backend python -`. It calls `create_app` with the real builders from `companion.main`, a recording chat channel, a hand-ticked scheduler, and a timer that runs work at once but skips `typing_wait_key(chat_id)`.
+3. Insert the User and their `telegram_connections` row with SQL.
+4. Insert Life Threads with SQL. Embed each with `embedder.embed_passages([f"{title}. {story}"])` and store `name_keys` from `name_keys(people)`.
+5. Post updates to `/telegram/webhook` through a `TestClient`.
+
+What to look at:
+
+- The Reply Plan's input is in `model_calls.content -> history[0].text` (the User must be an Admin for content to be kept).
+- The Reply's instructions are in `content -> instructions`.
+- The counts are in `model_calls.reply_plan_shape` (`threads_reminded`, `threads_left_alone`, …).
+- What is in mind is in the `life_threads_in_mind` table.
+- To prove a Thread came from being kept in mind and not from this message's search, call `find_reminded` directly with this message's meaning (`understandings.form->>'means'`) and its last 8 texts. The Understanding's meaning often names the earlier topic ("stepping away from the mum-visit…"), so a later message can find the same Thread again on its own.
+- To fill a long Conversation cheaply, insert messages into `conversation_messages` and move `conversations.last_message_at` forward, instead of sending each one through the model.
+- To start a new Conversation, move the open Conversation's times back and set `ended_at` and `processed_at`.
+
+**Open follow-ups (no issue filed for them)**
+
+- `reply_plan_prompt` still says "the Life Threads this message reminds Zeph of". It would need a prompt migration to say "in mind".
+- Move Outcomes still search on the latest 3 texts (`RECENT_TEXTS_TO_SEARCH` in `life_threads.py`, used by `move_outcomes.py`).
+- At Conversation end, Life Thread keeping, Pattern keeping and Curiosity keeping find Threads from the whole Conversation's texts and from Threads brought up. They don't read `life_threads_in_mind`, so a Thread that only came to mind through the meaning is not shown to them.
+- Patterns coming to mind and staying in mind belongs to issue 14. It could use the same idea: a table per Conversation and a cap on the whole set.
+- No Eval case checks a Thread staying in mind across a long Conversation. The Understanding Eval's `found` checks only the message itself.
+
+**Things that can catch you out**
+
+- In tests, the fake embedder counts shared words. The fake Understanding's default meaning ("They're just saying hi.") is now part of the Thread search and makes matches weaker. A test that expects a close match by meaning should script `understanding_answer(means=...)` with matching words.
+- A test that changes a Thread setting partway through one Conversation will still see Threads kept in mind from before. Advance the clock a day so the next message starts a new Conversation.
+- With the real bge-small embedder, a short message about a Thread scored 0.632 on its words alone (bar 0.62) and 0.689 with the meaning. Joining 8 texts can water down a single strong text. If Threads stop coming to mind, look at `life_threads_texts_to_search` before the closeness bar.
+- The cap's key is still `life_threads_per_reply`, even though it now means "in mind at once".
+
+**State left behind:** the worktree, its Docker stack and database, the branch and the Clerk test users are all deleted. The live-run script was in a session scratchpad and is gone, so rebuild it from the recipe above.
+
 ## Completion
 
 - Completed: 2026-11-20
