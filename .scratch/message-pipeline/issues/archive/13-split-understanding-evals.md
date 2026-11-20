@@ -63,10 +63,10 @@ For example: `Reply Plan · need: picked Be heard, expected Advice`.
    - The run page lists "Variant B · live settings with 2 changed: Outlook, Reply Plan prompt".
    - Test: `test_reply_plan_prompt_and_outlook_overrides_reach_only_their_variant`.
 4. **Fake-model tests.** `tests/test_understanding_eval_helpers.py`, `tests/test_eval_runner.py` and `tests/test_eval_cases.py`: 121 passed.
-5. **Migrations.** None added; the one head is still 0071 (`main` had not moved at rebase time).
+5. **Migrations.** None added. Rebased onto `main` after issue 12 merged, so the one head is 0072 (issue 12's).
 6. **Docs.** `CONTEXT.md` (Eval), the "Built" note under step 6 in `docs/message-pipeline/README.md`, `evals/README.md`, the seed file's header, and the Eval's Dashboard subtitle (`web/src/lib/evals.ts`) are all updated.
 7. **Checks.**
-   - `uv run pytest`: 1446 passed before the review fixes. The final run's result is in Completion.
+   - `uv run pytest`: 1446 passed on the final code, and 1456 passed after rebasing onto issue 12.
    - `uv run ruff check .`: all checks passed. `uv run ruff format --check .`: 550 files already formatted. `uv run mypy src`: no issues in 202 files.
    - Web: lint, Prettier, tsc, and Vitest (887 tests) all pass.
 8. **/run on the worktree stack (ports 3020/8020), signed in as Admin.**
@@ -76,6 +76,7 @@ For example: `Reply Plan · need: picked Be heard, expected Advice`.
    - Run `09de5cd8`: new cases on Variants A and B. Run `dc7308a7`: existing cases. Both Finished.
    - The Case Result cards showed each check with its step: `FAIL Understanding · struggling: not struggling, expected: struggling`, `PASS Understanding · wants said: kept wants said in their words`.
    - After the review fixes, a rebuild showed the corrected "Feelings said" hint.
+   - After the rebase onto issue 12 (wide recall), run `8c01e487` on the rebuilt stack showed `PASS Recall · found: was reminded of Falling-out with Mei` (`reminded-of-sister`) and the Read checks on `asks-for-zeph-view`.
 
 **Review** (`/code-review`, two axes):
 - **Fixed:** clearer names (`mark_with_step`, `understanding_form`); the Read is worked out once; `cause_known` defaults to False like the other flags; the "Feelings said" hint no longer promises a read/unclear check.
@@ -85,3 +86,8 @@ For example: `Reply Plan · need: picked Be heard, expected Advice`.
   - The Understanding and Reply Plan are read as the newest in the Conversation, as before, not matched to the Message.
   - `check_asked_why` and `check_woven_in` could reuse `check_yes_no`, but that would change their wording, so they were kept.
 - **Unrelated stale text:** the Needs and Moves field hints still say "when the Understanding picks this Need/Move".
+
+## Completion
+
+- Completed: 2026-11-20
+- Commit: <filled in after merge>
