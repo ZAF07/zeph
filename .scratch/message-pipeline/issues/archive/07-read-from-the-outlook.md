@@ -89,3 +89,15 @@ Read `web/design/README.md` in full first, including "Message-pipeline additions
 - **Final re-check on the merged-ready code (0070):** a fresh worktree database migrated to 0070; the pixel figures were the same; one live "what do you think is going on with me?" from an Admin formed and said a Read at level 3 with the Outlook only in the Reply Plan; the Persona tabs check passed in the browser.
 - **Caveat:** no Eval was run (Evals cost money). The live runs above used real DeepSeek calls.
 
+
+## Completion
+
+- Completed: 2026-11-20
+- Commits on branch `message-pipeline-07-read`:
+  - aa56fc2 "Message pipeline issue 07: Zeph forms a Read from the Outlook"
+  - f076591 "Message pipeline issue 07 review fixes: Check-in calls are checked to get no Outlook, persona tabs are a typed record with a tested helper, one rule owns saying a Read, two wraps fixed"
+  - 6166676 "Message pipeline issue 07: migration renumbered to 0069 after issue 08's 0068; the README names 0066 for the Message wait again"
+  - d54550d "Message pipeline issue 07 done: archive issue with test, run, pixel and review evidence"
+  - 2d39470 "Message pipeline issue 07: migration renumbered to 0070 after issue 10's 0069"
+  - 9c6a783 "Message pipeline issue 07: evidence updated for the rebase on issue 10"
+- Merged into main in 750661b "Merge message pipeline issue 07: Zeph forms a Read from the Outlook. …"
