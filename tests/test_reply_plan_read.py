@@ -294,7 +294,7 @@ def test_a_failed_reply_plan_forms_no_read(
 def test_an_existing_install_gets_the_reply_plan_prompt_that_asks_for_a_read(
     engine: Engine, database_url: str, seeded_settings: dict[str, Any]
 ) -> None:
-    downgrade_to(database_url, "0068")
+    downgrade_to(database_url, "0069")
     try:
         with engine.begin() as connection:
             connection.execute(
