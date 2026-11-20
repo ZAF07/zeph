@@ -649,3 +649,26 @@ def test_a_changed_reply_plan_prompt_and_thinking_are_used_for_the_next_message(
     assert reply_plan_call.instructions == "Decide what helps them most."
     assert reply_plan_call.model == seeded_settings["reply_plan_model"]
     assert reply_plan_call.thinking is False
+
+
+def test_a_failed_reply_plan_never_asks_why_even_when_the_mood_stands_out(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    seeded_settings: dict[str, Any],
+    engine: Engine,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script_understanding(
+        understanding_answer(mood="low", intensity="high", cause_known=False)
+    )
+    chat_model.script_reply_plan(TimeoutError("DeepSeek timed out"))
+    chat_model.script("I'm here")
+
+    send_to_webhook(client, telegram_text_update("meh"))
+
+    [reply_call] = chat_model.calls
+    assert seeded_settings["reply_ask_why_note"] not in reply_call.instructions
+    [saved] = saved_reply_plans(engine)
+    assert (saved["is_fallback"], saved["asked_why"]) == (True, False)

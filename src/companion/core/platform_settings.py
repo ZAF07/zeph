@@ -859,9 +859,8 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         SettingKind.TEXT,
         hint=(
             "Tells the User Portrait step how to write a short picture of the User, "
-            "which every Understanding, Reply Plan and reply sees. Runs last when a "
-            "Conversation "
-            "ends, and after the User deletes something."
+            "which every Understanding, Reply Plan and reply sees. Runs last when "
+            "a Conversation ends, and after the User deletes something."
         ),
     ),
     EditableSetting(
@@ -1439,10 +1438,9 @@ CORE_SERVICES: tuple[CoreService, ...] = (
             "Threads, Move Outcomes and newest Day Summaries: who "
             "they are, what’s going on now, recurring themes, what helps and "
             "what doesn’t, and where they stand on their Goals. Every "
-            "Understanding, Reply Plan and reply sees it. When the User deletes a "
-            "Memory "
-            "Item, Life Thread, Move Outcome or Summary, it is written again "
-            "without it."
+            "Understanding, Reply Plan and reply sees it. When the User deletes "
+            "a Memory Item, Life Thread, Move Outcome or Summary, it is written "
+            "again without it."
         ),
         prompt_key=PORTRAIT_PROMPT.key,
         model_key=PORTRAIT_MODEL.key,

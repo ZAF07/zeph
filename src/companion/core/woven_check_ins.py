@@ -147,7 +147,7 @@ def describe_conversation_for_check_in(messages: Sequence[ConversationMessage]) 
     )
 
 
-def describe_understanding_for_check_in(
+def describe_reading_and_plan_for_check_in(
     understanding: UnderstandingForm,
     plan: ReplyPlanForm,
     reminded: Sequence[RemindedThread],
@@ -573,7 +573,7 @@ class WovenCheckIns:
             describe_conversation_for_check_in(
                 self._repositories.conversations.list_messages(conversation_id)
             ),
-            describe_understanding_for_check_in(
+            describe_reading_and_plan_for_check_in(
                 understanding, plan, reminded, reply_asks_a_question
             ),
         )

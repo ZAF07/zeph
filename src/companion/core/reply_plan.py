@@ -670,9 +670,10 @@ def fallback_form(fallback: Need) -> ReplyPlanForm:
         fallback: The fallback Need.
 
     Returns:
-        A form with the fallback Need, no Moves and no Memory Categories.
+        A form with the fallback Need, no Moves, no Memory Categories, and
+        no asking why, as the old combined call's fallback never asked.
     """
-    return ReplyPlanForm(need=fallback.name)
+    return ReplyPlanForm(need=fallback.name, ask_why=False)
 
 
 def fallback_need(needs: Sequence[Need]) -> Need:
