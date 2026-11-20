@@ -74,8 +74,8 @@ describe("chooseApiClient", () => {
       "",
     );
 
-    await expect(client.getModelCallTrace("trace-1")).rejects.toThrow(
-      "No design fixture for getModelCallTrace yet",
+    await expect(client.getEvalCosts()).rejects.toThrow(
+      "No design fixture for getEvalCosts yet",
     );
   });
 

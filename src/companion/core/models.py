@@ -1047,22 +1047,24 @@ class BringUpWay(StrEnum):
 
 @dataclass(frozen=True)
 class ThreadToBringUp:
-    """A Life Thread the Understanding chose to bring up, and how.
+    """A Life Thread the Reply Plan chose to bring up, and how.
 
     Attributes:
         thread_id: The Thread's ID.
         title: Its title when it was chosen.
         how: Lead with it, or weave it in.
+        why: Why it is brought up; "" when no reason was given.
     """
 
     thread_id: UUID
     title: str
     how: BringUpWay
+    why: str = ""
 
 
 @dataclass(frozen=True)
 class ThreadLeftAlone:
-    """A Life Thread the Understanding chose to leave alone, and why.
+    """A Life Thread the Reply Plan chose to leave alone, and why.
 
     Attributes:
         thread_id: The Thread's ID.
@@ -1221,7 +1223,7 @@ class MoveOutcomeToSave:
 
 @dataclass(frozen=True)
 class CuriosityToRaise:
-    """A Curiosity the Understanding chose to bring up, and how.
+    """A Curiosity the Reply Plan chose to bring up, and how.
 
     Attributes:
         curiosity_id: The Curiosity's ID.
@@ -1242,7 +1244,7 @@ class CuriosityToRaise:
 
 @dataclass(frozen=True)
 class ChosenKnowledgeDocument:
-    """A Knowledge document the Understanding chose to search.
+    """A Knowledge document the Reply Plan chose to search.
 
     Attributes:
         document_id: The document's ID.
@@ -1255,7 +1257,7 @@ class ChosenKnowledgeDocument:
 
 @dataclass(frozen=True)
 class KnowledgeLookup:
-    """The Knowledge the Understanding chose to search for a reply.
+    """The Knowledge the Reply Plan chose to search for a reply.
 
     Attributes:
         documents: The Knowledge documents to search.
@@ -1267,53 +1269,49 @@ class KnowledgeLookup:
 
 
 @dataclass(frozen=True)
-class UnderstandingForm:
-    """The form the Understanding model fills in before each reply.
+class SaidReadUnclear:
+    """Something about the User, keeping their words apart from Zeph's guesses.
 
     Attributes:
-        need: The picked Need's name.
-        nuance: One sentence on what fits this moment.
-        lead_move: The lead Move's name, as the model wrote it; "" for none.
-        support_move: The supporting Move's name, as the model wrote it; ""
-            for none.
-        next_move: The Move it means to make later in the Conversation, as
-            the model wrote it; "" for none.
-        next_move_why: Why, or when, that Move comes next, e.g. "once I know
-            their requirements"; "" for none.
-        mood: How the User seems, e.g. "frustrated".
+        said: What they said about it, in their own words; "" for nothing.
+        read: What Zeph guesses from how they said it; "" for no guess.
+        unclear: What isn't clear yet; "" for nothing.
+    """
+
+    said: str = ""
+    read: str = ""
+    unclear: str = ""
+
+
+@dataclass(frozen=True)
+class UnderstandingForm:
+    """The form the Understanding model fills in before each reply. It only reads.
+
+    Attributes:
+        said: What the User said, in a sentence.
+        means: What they mean by it, read in the light of the Conversation.
+        feelings: How they feel: said, read and unclear.
+        mood: A word or two for how they seem, e.g. "frustrated".
         intensity: How strongly they seem to feel it.
+        wants: What they want from Zeph: said, read and unclear.
         cause_known: Whether the Companion knows why they feel that way.
-        memory_categories: The Memory Categories whose items matter, by name.
-        bring_up: The Life Threads to bring up, and how.
-        left_alone: The Life Threads to leave alone, and why.
         look_up_past: Phrases to search older Summaries with.
-        knowledge: The Knowledge to search; None when no Knowledge fits.
-        threads_touched: The titles of the Life Threads the Message touches.
-        curiosities: The Curiosities to bring up, and how.
         struggling: Whether the User is struggling: upset, scared, grieving
             or hurting.
         asked_for_photo: Whether they asked to see one of their Shared
             Photos.
     """
 
-    need: str
-    nuance: str
     mood: str
     intensity: MoodIntensity
     cause_known: bool
-    memory_categories: tuple[str, ...] = ()
-    bring_up: tuple[ThreadToBringUp, ...] = ()
-    left_alone: tuple[ThreadLeftAlone, ...] = ()
+    said: str = ""
+    means: str = ""
+    feelings: SaidReadUnclear = SaidReadUnclear()
+    wants: SaidReadUnclear = SaidReadUnclear()
     look_up_past: tuple[str, ...] = ()
-    knowledge: KnowledgeLookup | None = None
-    threads_touched: tuple[str, ...] = ()
-    curiosities: tuple[CuriosityToRaise, ...] = ()
     struggling: bool = False
     asked_for_photo: bool = False
-    lead_move: str = ""
-    support_move: str = ""
-    next_move: str = ""
-    next_move_why: str = ""
 
 
 @dataclass(frozen=True)
@@ -1325,7 +1323,77 @@ class Understanding:
         user_id: The User who sent the Message.
         conversation_id: The Conversation the Message is in.
         message_id: The Message's newest text, which it is removed with.
-        form: What the Understanding model decided.
+        form: What the Understanding model read.
+        made_at: When it was made.
+        is_fallback: Whether this is the fallback Understanding, made
+            because the Understanding model failed or couldn't be read.
+    """
+
+    id: UUID
+    user_id: UUID
+    conversation_id: UUID
+    message_id: UUID
+    form: UnderstandingForm
+    made_at: datetime
+    is_fallback: bool = False
+
+
+@dataclass(frozen=True)
+class ReplyPlanForm:
+    """The form the Reply Plan model fills in: what the reply does.
+
+    Attributes:
+        need: The picked Need's name.
+        guidance: One sentence on what fits this moment.
+        lead_move: The lead Move's name, as the model wrote it; "" for none.
+        lead_move_why: Why the reply leads with it; "" for none.
+        support_move: The supporting Move's name, as the model wrote it; ""
+            for none.
+        support_move_why: Why it supports the lead; "" for none.
+        next_move: The Move it means to make later in the Conversation, as
+            the model wrote it; "" for none.
+        next_move_why: Why, or when, that Move comes next, e.g. "once I know
+            their requirements"; "" for none.
+        memory_categories: The Memory Categories whose items matter, by name.
+        threads_touched: The titles of the Life Threads the Message touches.
+        bring_up: The Life Threads to bring up, and how.
+        left_alone: The Life Threads to leave alone, and why.
+        curiosities: The Curiosities to bring up, and how.
+        knowledge: The Knowledge to search; None when no Knowledge fits.
+        photo_fits: Whether the reply may send one of the User's Shared
+            Photos.
+        ask_why: Whether the reply should gently ask why they feel as they
+            do; None when the model didn't say.
+    """
+
+    need: str
+    guidance: str = ""
+    lead_move: str = ""
+    lead_move_why: str = ""
+    support_move: str = ""
+    support_move_why: str = ""
+    next_move: str = ""
+    next_move_why: str = ""
+    memory_categories: tuple[str, ...] = ()
+    threads_touched: tuple[str, ...] = ()
+    bring_up: tuple[ThreadToBringUp, ...] = ()
+    left_alone: tuple[ThreadLeftAlone, ...] = ()
+    curiosities: tuple[CuriosityToRaise, ...] = ()
+    knowledge: KnowledgeLookup | None = None
+    photo_fits: bool = True
+    ask_why: bool | None = None
+
+
+@dataclass(frozen=True)
+class ReplyPlan:
+    """What the Companion decided one reply does, made after the Understanding.
+
+    Attributes:
+        id: Our ID for the Reply Plan.
+        user_id: The User who sent the Message.
+        conversation_id: The Conversation the Message is in.
+        message_id: The Message's newest text, which it is removed with.
+        form: What the Reply Plan model decided.
         need: The Need the reply followed, by name.
         asked_why: Whether the reply was asked to gently ask why they feel
             the way they do.
@@ -1336,15 +1404,15 @@ class Understanding:
             name; None for none.
         next_move_why: Why, or when, that Move comes next; None when there
             is no next Move or no reason was given.
-        is_fallback: Whether this is the fallback Understanding, made
-            because the Understanding model failed or couldn't be read.
+        is_fallback: Whether this is the fallback Reply Plan, made because
+            the Reply Plan model failed or couldn't be read.
     """
 
     id: UUID
     user_id: UUID
     conversation_id: UUID
     message_id: UUID
-    form: UnderstandingForm
+    form: ReplyPlanForm
     need: str
     asked_why: bool
     made_at: datetime
@@ -2044,6 +2112,7 @@ class ModelStep(StrEnum):
 
     SAFEGUARD = "safeguard"
     UNDERSTANDING = "understanding"
+    REPLY_PLAN = "reply_plan"
     REPLY = "reply"
     PHOTO = "photo"
     CHECK_IN = "check_in"
@@ -2109,12 +2178,30 @@ class UnderstandingShape:
     """The shape of an Understanding, kept for every User. Never any words.
 
     When the Understanding call failed or couldn't be read, it is the
-    fallback the reply followed: the fallback Need, low, cause known.
+    fallback the reply followed: low, cause known, not struggling.
+
+    Attributes:
+        intensity: How strongly the User seemed to feel their mood.
+        cause_known: Whether the Companion knew why they felt that way.
+        struggling: Whether they seemed to be struggling.
+        past_look_ups: How many phrases older Summaries were searched with.
+    """
+
+    intensity: MoodIntensity
+    cause_known: bool
+    struggling: bool
+    past_look_ups: int
+
+
+@dataclass(frozen=True)
+class ReplyPlanShape:
+    """The shape of a Reply Plan, kept for every User. Never any words.
+
+    When the Reply Plan call failed or couldn't be read, it is the fallback
+    the reply followed: the fallback Need and no Moves.
 
     Attributes:
         need: The Need the reply followed, by name.
-        intensity: How strongly the User seemed to feel their mood.
-        cause_known: Whether the Companion knew why they felt that way.
         threads_reminded: How many Life Threads the Message reminded it of.
         threads_led_with: How many Threads the reply was to lead with.
         threads_woven_in: How many Threads the reply was to weave in.
@@ -2123,7 +2210,6 @@ class UnderstandingShape:
             to bring it up or to leave it alone.
         threads_held_back: How many reminded Threads were held back, whatever
             the model chose.
-        past_look_ups: How many phrases older Summaries were searched with.
         lead_move: The Move the reply led with, by name; None for none.
         support_move: The Move that supported it, by name; None for none.
         next_move: The Move it meant to make later in the Conversation, by
@@ -2131,14 +2217,11 @@ class UnderstandingShape:
     """
 
     need: str
-    intensity: MoodIntensity
-    cause_known: bool
     threads_reminded: int
     threads_led_with: int
     threads_woven_in: int
     threads_left_alone: int
     threads_held_back: int
-    past_look_ups: int
     lead_move: str | None = None
     support_move: str | None = None
     next_move: str | None = None
@@ -2183,6 +2266,8 @@ class ModelCall:
             every User; None for other steps.
         check_in_shape: The shape of the woven-in Check-in decision it made,
             kept for every User; None for other calls.
+        reply_plan_shape: The shape of the Reply Plan it made, kept for
+            every User; None for other steps.
     """
 
     id: UUID
@@ -2200,6 +2285,7 @@ class ModelCall:
     content: ModelCallContent | None
     understanding_shape: UnderstandingShape | None
     check_in_shape: CheckInShape | None = None
+    reply_plan_shape: ReplyPlanShape | None = None
 
 
 @dataclass(frozen=True)

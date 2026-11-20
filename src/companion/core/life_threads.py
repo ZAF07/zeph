@@ -17,9 +17,9 @@ from companion.core.models import (
     LifeThreadToSave,
     MessageDirection,
     ModelStep,
+    ReplyPlanForm,
     ThreadReaction,
     ThreadToBringUp,
-    UnderstandingForm,
     UserSnapshot,
 )
 from companion.core.platform_settings import (
@@ -217,7 +217,7 @@ def describe_thread(thread: LifeThread, time_zone: str | None) -> str:
 def describe_reminded_threads(
     reminded: Sequence[RemindedThread], time_zone: str | None
 ) -> str:
-    """Write the reminded Threads as the Understanding model reads them.
+    """Write the reminded Threads as the Reply Plan model reads them.
 
     Args:
         reminded: The Threads, numbered.
@@ -249,7 +249,7 @@ def describe_reminded_threads(
 
 def format_threads_for_reply(
     reminded: Sequence[RemindedThread],
-    form: UnderstandingForm | None,
+    form: ReplyPlanForm | None,
     time_zone: str | None,
 ) -> str:
     """Write the reply's section on the Life Threads that matter here.
@@ -257,12 +257,12 @@ def format_threads_for_reply(
     With a form, the Threads it touches or brings up go in with their
     stories, then how to bring each up; the ones to leave alone are left
     out, for `format_threads_left_alone`. Without one, because the
-    Understanding failed, every reminded Thread that isn't held back goes in
+    Reply Plan failed, every reminded Thread that isn't held back goes in
     with its story and nothing is brought up.
 
     Args:
         reminded: The Threads the Companion was reminded of.
-        form: The Understanding's form; None if it couldn't be made.
+        form: The Reply Plan's form; None if it couldn't be made.
         time_zone: The User's IANA time zone, for the days.
 
     Returns:
@@ -301,11 +301,11 @@ def format_threads_for_reply(
     return "\n\n".join(sections)
 
 
-def format_threads_left_alone(form: UnderstandingForm | None) -> str:
+def format_threads_left_alone(form: ReplyPlanForm | None) -> str:
     """Write the reply's section on the Life Threads to leave alone.
 
     Args:
-        form: The Understanding's form; None if it couldn't be made.
+        form: The Reply Plan's form; None if it couldn't be made.
 
     Returns:
         The Threads to leave alone, each with why; "" if there are none.
@@ -422,7 +422,7 @@ class ThreadReminder:
 
         Args:
             conversation_id: The Conversation the reply was sent in.
-            brought_up: The Threads the Understanding chose to bring up.
+            brought_up: The Threads the Reply Plan chose to bring up.
         """
         self._repositories.life_threads.mark_raised(
             [item.thread_id for item in brought_up], conversation_id, self._clock.now()

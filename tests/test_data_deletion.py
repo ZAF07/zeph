@@ -17,7 +17,7 @@ from tests.fakes import (
     FakeClock,
     FakeScheduler,
     ScriptedChatModel,
-    understanding_answer,
+    reply_plan_answer,
 )
 from tests.telegram_helpers import (
     OWNER_AUTH_ID,
@@ -71,8 +71,8 @@ def set_up_user_with_every_kind_of_data(
         json={"on": True},
         headers=owner_headers(client, auth_verifier),
     )
-    chat_model.script_understanding(
-        understanding_answer(need="Accountability", lead_move="Push")
+    chat_model.script_reply_plan(
+        reply_plan_answer(need="Accountability", lead_move="Push")
     )
     chat_model.script("what a lovely desk", "haha")
     send_to_webhook(client, telegram_photo_update(caption="my new desk"))

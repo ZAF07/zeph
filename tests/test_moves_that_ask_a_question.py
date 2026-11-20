@@ -1,7 +1,7 @@
 from typing import Any
 
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
 from tests.fakes import (
     FakeAuthVerifier,
@@ -9,6 +9,7 @@ from tests.fakes import (
     FakeClock,
     FakeScheduler,
     ScriptedChatModel,
+    reply_plan_answer,
     understanding_answer,
 )
 from tests.telegram_helpers import (
@@ -25,6 +26,16 @@ from tests.test_woven_in_check_ins import open_a_conversation_until_due
 ALREADY_ASKS = "Your reply already asks them a question."
 ASK_WHY = {"intensity": "high", "cause_known": False, "mood": "furious"}
 RAISE_CURIOSITY = {"bring_up": [{"curiosity": 1, "how": "lead"}]}
+UPSET_CAUSE_UNKNOWN = {"intensity": "medium", "cause_known": False, "mood": "upset"}
+
+
+def saved_asked_why(engine: Engine) -> list[bool]:
+    """Whether each saved Reply Plan asked why, oldest first."""
+    with engine.connect() as connection:
+        rows = connection.execute(
+            text("SELECT asked_why FROM reply_plans ORDER BY position")
+        ).all()
+    return [row.asked_why for row in rows]
 
 
 def tick_asks_a_question(
@@ -42,8 +53,8 @@ def tick_asks_a_question(
 
 
 def offered_moves(chat_model: ScriptedChatModel) -> str:
-    """The Moves the last Understanding was offered, one per line."""
-    asked = chat_model.understanding_calls[-1].history[0].text
+    """The Moves the last Reply Plan was offered, one per line."""
+    asked = chat_model.reply_plan_calls[-1].history[0].text
     return asked.split("Moves:\n")[1].split("\n\n")[0]
 
 
@@ -101,7 +112,7 @@ def test_a_move_that_asks_is_dropped_when_the_reply_asks_why(
     tick_asks_a_question(client, owner_headers(client, auth_verifier), "Suggest")
 
     instructions = reply_to(
-        client, chat_model, "ugh, today", lead_move="Suggest", **ASK_WHY
+        client, chat_model, "ugh, today", lead_move="Suggest", understanding=ASK_WHY
     )
 
     assert "you don't know why" in instructions
@@ -149,7 +160,7 @@ def test_a_dropped_lead_move_that_asks_does_not_let_the_support_move_up(
         need="Advice",
         lead_move="Suggest",
         support_move="Plan steps",
-        **ASK_WHY,
+        understanding=ASK_WHY,
     )
 
     assert "Lead with:" not in instructions
@@ -169,11 +180,70 @@ def test_a_move_that_doesnt_ask_is_kept_when_the_reply_asks_why(
     connect_telegram(client, auth_verifier, chat_channel)
 
     instructions = reply_to(
-        client, chat_model, "ugh, today", lead_move="Suggest", **ASK_WHY
+        client, chat_model, "ugh, today", lead_move="Suggest", understanding=ASK_WHY
     )
 
     assert how_to_do_it("Suggest") in instructions
     assert saved_moves(engine) == [("Suggest", None)]
+
+
+def test_the_reply_plan_can_ask_why_when_the_mood_does_not_stand_out(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    engine: Engine,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+
+    instructions = reply_to(
+        client,
+        chat_model,
+        "meh, today was a lot",
+        understanding=UPSET_CAUSE_UNKNOWN,
+        ask_why=True,
+    )
+
+    assert "you don't know why" in instructions
+    assert saved_asked_why(engine) == [True]
+
+
+def test_the_reply_plan_never_asks_why_when_the_cause_is_known(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    engine: Engine,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+
+    instructions = reply_to(
+        client,
+        chat_model,
+        "furious, my landlord kept my deposit",
+        understanding={**ASK_WHY, "cause_known": True},
+        ask_why=True,
+    )
+
+    assert "you don't know why" not in instructions
+    assert saved_asked_why(engine) == [False]
+
+
+def test_the_reply_plan_can_rule_out_asking_why_when_the_mood_stands_out(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    engine: Engine,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+
+    instructions = reply_to(
+        client, chat_model, "ugh, today", understanding=ASK_WHY, ask_why=False
+    )
+
+    assert "you don't know why" not in instructions
+    assert saved_asked_why(engine) == [False]
 
 
 def woven_call_told(
@@ -182,9 +252,19 @@ def woven_call_told(
     chat_channel: FakeChatChannel,
     chat_model: ScriptedChatModel,
     clock: FakeClock,
-    **answer: Any,
+    understanding: dict[str, Any] | None = None,
+    **plan: Any,
 ) -> str:
-    """Reach a due Check-in, then send a Message with the given Understanding.
+    """Reach a due Check-in, then send a Message with the given answers.
+
+    Args:
+        client: The backend's test client.
+        auth_verifier: The fake sign-in verifier.
+        chat_channel: The fake Telegram channel.
+        chat_model: The scripted chat model.
+        clock: The fake clock.
+        understanding: The Understanding's form fields; the defaults if none.
+        **plan: The Reply Plan's form fields.
 
     Returns:
         What the Woven-in Check-in model was given.
@@ -192,7 +272,8 @@ def woven_call_told(
     set_up_user_with_check_ins(client, auth_verifier, chat_channel)
     tick_asks_a_question(client, owner_headers(client, auth_verifier), "Suggest")
     open_a_conversation_until_due(client, chat_model, chat_channel, clock)
-    chat_model.script_understanding(understanding_answer(**answer))
+    chat_model.script_understanding(understanding_answer(**(understanding or {})))
+    chat_model.script_reply_plan(reply_plan_answer(**plan))
     chat_model.script("ok")
     send_to_webhook(client, telegram_text_update("now making a big salad"))
     [woven_call] = chat_model.woven_check_in_calls
@@ -221,7 +302,7 @@ def test_the_woven_in_check_in_is_told_when_the_reply_asks_why(
     clock: FakeClock,
 ) -> None:
     told = woven_call_told(
-        client, auth_verifier, chat_channel, chat_model, clock, **ASK_WHY
+        client, auth_verifier, chat_channel, chat_model, clock, understanding=ASK_WHY
     )
 
     assert ALREADY_ASKS in told

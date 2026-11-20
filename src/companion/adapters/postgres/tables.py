@@ -278,6 +278,37 @@ understandings = Table(
         index=True,
     ),
     Column("form", JSONB, nullable=False),
+    Column("is_fallback", Boolean, nullable=False, server_default="false"),
+    Column("made_at", DateTime(timezone=True), nullable=False),
+)
+
+reply_plans = Table(
+    "reply_plans",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("position", BigInteger, Identity(), nullable=False, unique=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column(
+        "conversation_id",
+        Uuid,
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column(
+        "message_id",
+        Uuid,
+        ForeignKey("conversation_messages.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("form", JSONB, nullable=False),
     Column("need", Text, nullable=False),
     Column("lead_move", Text),
     Column("support_move", Text),
@@ -662,6 +693,7 @@ model_calls = Table(
     Column("content", JSONB(none_as_null=True)),
     Column("understanding_shape", JSONB(none_as_null=True)),
     Column("check_in_shape", JSONB(none_as_null=True)),
+    Column("reply_plan_shape", JSONB(none_as_null=True)),
 )
 
 eval_cases = Table(
@@ -794,4 +826,5 @@ eval_model_calls = Table(
     Column("content", JSONB(none_as_null=True)),
     Column("understanding_shape", JSONB(none_as_null=True)),
     Column("check_in_shape", JSONB(none_as_null=True)),
+    Column("reply_plan_shape", JSONB(none_as_null=True)),
 )

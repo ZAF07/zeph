@@ -25,6 +25,8 @@ from companion.core.models import (
     MoodIntensity,
     MoveOutcome,
     MoveResult,
+    ReplyPlan,
+    ReplyPlanForm,
     Understanding,
     UnderstandingForm,
 )
@@ -51,7 +53,7 @@ def understanding_of(
     """Build the Understanding Zeph made of one of the User's messages.
 
     Args:
-        message: The message, with its Need, Moves and mood.
+        message: The message, with its mood.
         user_id: The User's ID.
         conversation_id: The Conversation it is in.
         message_id: The saved message's ID.
@@ -66,11 +68,38 @@ def understanding_of(
         conversation_id=conversation_id,
         message_id=message_id,
         form=UnderstandingForm(
+            mood=message.mood, intensity=MoodIntensity.MEDIUM, cause_known=False
+        ),
+        made_at=made_at,
+    )
+
+
+def reply_plan_of(
+    message: MoveOutcomeMessage,
+    user_id: UUID,
+    conversation_id: UUID,
+    message_id: UUID,
+    made_at: datetime,
+) -> ReplyPlan:
+    """Build the Reply Plan Zeph made for one of the User's messages.
+
+    Args:
+        message: The message, with its Need and Moves.
+        user_id: The User's ID.
+        conversation_id: The Conversation it is in.
+        message_id: The saved message's ID.
+        made_at: When the message was sent.
+
+    Returns:
+        The Reply Plan.
+    """
+    return ReplyPlan(
+        id=uuid4(),
+        user_id=user_id,
+        conversation_id=conversation_id,
+        message_id=message_id,
+        form=ReplyPlanForm(
             need=message.need,
-            nuance="",
-            mood=message.mood,
-            intensity=MoodIntensity.MEDIUM,
-            cause_known=False,
             lead_move=message.lead_move,
             support_move=message.support_move,
         ),
@@ -88,12 +117,13 @@ def save_finished_conversation(
     messages: Sequence[MoveOutcomeMessage],
     started_at: datetime,
 ) -> UUID:
-    """Save a finished Conversation and an Understanding of each User message.
+    """Save a finished Conversation, with an Understanding and Reply Plan per message.
 
     The messages are a minute apart, from `started_at`.
 
     Args:
-        repositories: Where Conversations and Understandings are stored.
+        repositories: Where Conversations, Understandings and Reply Plans are
+            stored.
         user_id: The User's ID.
         messages: The Conversation, oldest first.
         started_at: When the first message was sent.
@@ -126,6 +156,9 @@ def save_finished_conversation(
         if message.from_person:
             repositories.understandings.add(
                 understanding_of(message, user_id, conversation.id, saved.id, sent_at)
+            )
+            repositories.reply_plans.add(
+                reply_plan_of(message, user_id, conversation.id, saved.id, sent_at)
             )
     return conversation.id
 

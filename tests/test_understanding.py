@@ -13,6 +13,7 @@ from tests.fakes import (
     FakeClock,
     FakeScheduler,
     ScriptedChatModel,
+    reply_plan_answer,
     understanding_answer,
 )
 from tests.telegram_helpers import (
@@ -28,6 +29,17 @@ from tests.test_message_retention import retention
 from tests.test_post_conversation import have_conversation, processing_answer
 
 FALLBACK_NEED = "Ask more"
+DECIDING_FIELDS = (
+    '"need"',
+    "lead_move",
+    "support_move",
+    "next_move",
+    "bring_up",
+    "left_alone",
+    "threads_touched",
+    "memory_categories",
+    "knowledge",
+)
 
 
 def seeded_needs() -> dict[str, dict[str, Any]]:
@@ -55,8 +67,22 @@ def saved_understandings(engine: Engine) -> list[dict[str, Any]]:
             dict(row)
             for row in connection.execute(
                 text(
-                    "SELECT need, form, asked_why, message_id "
+                    "SELECT form, is_fallback, message_id "
                     "FROM understandings ORDER BY position"
+                )
+            ).mappings()
+        ]
+
+
+def saved_reply_plans(engine: Engine) -> list[dict[str, Any]]:
+    """Every saved Reply Plan, oldest first."""
+    with engine.connect() as connection:
+        return [
+            dict(row)
+            for row in connection.execute(
+                text(
+                    "SELECT need, form, asked_why, is_fallback, message_id "
+                    "FROM reply_plans ORDER BY position"
                 )
             ).mappings()
         ]
@@ -82,7 +108,20 @@ def test_seeded_needs_have_ask_more_as_the_only_fallback() -> None:
         assert need["how_to_reply"].strip()
 
 
-def test_every_message_gets_an_understanding_before_the_reply(
+def test_the_seeded_understanding_prompt_asks_for_no_decisions(
+    seeded_settings: dict[str, Any],
+) -> None:
+    prompt = seeded_settings["understanding_prompt"]
+
+    for field in DECIDING_FIELDS:
+        assert field not in prompt
+    for field in ('"said"', '"means"', '"feelings"', '"wants"', '"unclear"'):
+        assert field in prompt
+    for field in DECIDING_FIELDS:
+        assert field in seeded_settings["reply_plan_prompt"]
+
+
+def test_every_message_gets_an_understanding_then_a_reply_plan_before_the_reply(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -99,18 +138,77 @@ def test_every_message_gets_an_understanding_before_the_reply(
 
     send_to_webhook(client, telegram_text_update("hello there"))
 
-    assert chat_model.call_order == ["safeguard", "understanding", "reply"]
+    assert chat_model.call_order == [
+        "safeguard",
+        "understanding",
+        "reply_plan",
+        "reply",
+    ]
     [understanding_call] = chat_model.understanding_calls
+    [reply_plan_call] = chat_model.reply_plan_calls
     assert understanding_call.model == seeded_settings["understanding_model"]
-    asked = understanding_call.history[0].text
-    assert "hello there" in asked
+    assert reply_plan_call.model == seeded_settings["reply_plan_model"]
+    assert reply_plan_call.thinking is True
+    read = understanding_call.history[0].text
+    planned = reply_plan_call.history[0].text
+    assert "hello there" in read
+    assert "Wednesday 11 Nov 2026, 17:00" in read
+    for heading in ("Needs:", "Moves:", "Life Threads", "Knowledge", "Goals"):
+        assert heading not in read
     for name, need in seeded_needs().items():
-        assert f"- {name}: {need['when_it_fits'].strip()}" in asked
-    assert "Wednesday 11 Nov 2026, 17:00" in asked
+        assert need["when_it_fits"].strip() not in read
+        assert f"- {name}: {need['when_it_fits'].strip()}" in planned
+    assert "hello there" in planned
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["hey you"]
 
 
-def test_the_reply_follows_the_picked_needs_how_to_reply(
+def test_said_read_and_unclear_stay_apart_and_reach_the_reply_plan(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    engine: Engine,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script_understanding(
+        understanding_answer(
+            said="Their PM overruled them again.",
+            means="They feel unheard at work.",
+            feelings={
+                "said": "annoyed",
+                "read": "hurt underneath.",
+                "unclear": "",
+            },
+            wants={
+                "said": "",
+                "read": "to vent",
+                "unclear": "whether they want advice",
+            },
+        )
+    )
+    chat_model.script("that sounds rough")
+
+    send_to_webhook(client, telegram_text_update("PM overruled me AGAIN"))
+
+    [reply_plan_call] = chat_model.reply_plan_calls
+    planned = reply_plan_call.history[0].text
+    assert "They said: Their PM overruled them again." in planned
+    assert "They mean: They feel unheard at work." in planned
+    assert "Feelings: said: annoyed; read (a guess): hurt underneath." in planned
+    assert (
+        "What they want: read (a guess): to vent; "
+        "unclear: whether they want advice." in planned
+    )
+    [saved] = saved_understandings(engine)
+    assert saved["form"]["feelings"] == {
+        "said": "annoyed",
+        "read": "hurt underneath.",
+        "unclear": "",
+    }
+    assert saved["form"]["wants"]["unclear"] == "whether they want advice"
+
+
+def test_the_reply_follows_the_reply_plans_need(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -118,11 +216,11 @@ def test_the_reply_follows_the_picked_needs_how_to_reply(
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
     chat_model.script_understanding(
-        understanding_answer(
-            need="Advice",
-            nuance="They want a concrete plan for the interview.",
-            mood="nervous",
-            intensity="medium",
+        understanding_answer(mood="nervous", intensity="medium")
+    )
+    chat_model.script_reply_plan(
+        reply_plan_answer(
+            need="Advice", guidance="They want a concrete plan for the interview."
         )
     )
     chat_model.script("here's a plan")
@@ -133,10 +231,10 @@ def test_the_reply_follows_the_picked_needs_how_to_reply(
     assert how_to_reply("Advice").strip() in reply_call.instructions
     assert how_to_reply("Be heard").strip() not in reply_call.instructions
     assert "They want a concrete plan for the interview." in reply_call.instructions
-    assert "nervous" in reply_call.instructions
+    assert "nervous (medium)" in reply_call.instructions
 
 
-def test_the_understanding_sees_the_users_goals(
+def test_the_reply_plan_sees_the_users_goals_and_the_understanding_does_not(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -160,15 +258,18 @@ def test_the_understanding_sees_the_users_goals(
         ),
     )
     chat_model.understanding_calls.clear()
+    chat_model.reply_plan_calls.clear()
     chat_model.script("nice")
 
     send_to_webhook(client, telegram_text_update("skipped my run today"))
 
     [understanding_call] = chat_model.understanding_calls
-    assert "Run a marathon" in understanding_call.history[0].text
+    [reply_plan_call] = chat_model.reply_plan_calls
+    assert "Run a marathon" not in understanding_call.history[0].text
+    assert "Run a marathon" in reply_plan_call.history[0].text
 
 
-def test_the_next_understanding_in_the_conversation_sees_the_earlier_ones(
+def test_the_next_understanding_and_reply_plan_see_the_earlier_ones(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -176,18 +277,26 @@ def test_the_next_understanding_in_the_conversation_sees_the_earlier_ones(
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
     chat_model.script_understanding(
-        understanding_answer(need="Be heard", mood="furious", intensity="high"),
-        understanding_answer(need="Think it through", mood="calmer"),
+        understanding_answer(mood="furious", intensity="high"),
+        understanding_answer(mood="calmer"),
+    )
+    chat_model.script_reply_plan(
+        reply_plan_answer(need="Be heard", guidance="Let them vent first."),
+        reply_plan_answer(need="Think it through"),
     )
     chat_model.script("that sounds awful", "what do you think?")
 
     send_to_webhook(client, telegram_text_update("my boss yelled at me"))
     send_to_webhook(client, telegram_text_update("I'm calmer now"))
 
-    first, second = chat_model.understanding_calls
-    assert "furious" not in first.history[0].text
-    assert "Be heard" in second.history[0].text.split("Earlier Understandings")[1]
-    assert "furious (high)" in second.history[0].text
+    first_read, second_read = chat_model.understanding_calls
+    first_plan, second_plan = chat_model.reply_plan_calls
+    assert "furious" not in first_read.history[0].text
+    assert "furious (high)" in second_read.history[0].text
+    earlier_plans = second_plan.history[0].text.split("Earlier Reply Plans")[1]
+    assert "Need: Be heard" in earlier_plans
+    assert "Let them vent first." in earlier_plans
+    assert "Be heard" not in first_plan.history[0].text.split("Earlier Reply Plans")[1]
 
 
 def test_a_standout_mood_with_an_unknown_cause_asks_the_reply_to_gently_ask_why(
@@ -208,7 +317,7 @@ def test_a_standout_mood_with_an_unknown_cause_asks_the_reply_to_gently_ask_why(
 
     [reply_call] = chat_model.calls
     assert seeded_settings["reply_ask_why_note"] in reply_call.instructions
-    [saved] = saved_understandings(engine)
+    [saved] = saved_reply_plans(engine)
     assert saved["asked_why"] is True
 
 
@@ -243,6 +352,11 @@ def test_the_gentle_ask_is_not_made_twice_in_a_row(
     connect_telegram(client, auth_verifier, chat_channel)
     standout = understanding_answer(mood="low", intensity="high", cause_known=False)
     chat_model.script_understanding(standout, standout, standout)
+    chat_model.script_reply_plan(
+        reply_plan_answer(ask_why=True),
+        reply_plan_answer(ask_why=True),
+        reply_plan_answer(ask_why=True),
+    )
     chat_model.script("you ok?", "I'm here", "what's up?")
 
     for text_sent in ("meh", "dunno", "whatever"):
@@ -264,9 +378,8 @@ def test_an_unknown_need_falls_back_to_the_fallback_need(
     engine: Engine,
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
-    chat_model.script_understanding(
-        understanding_answer(need="Cheerleading", mood="excited")
-    )
+    chat_model.script_understanding(understanding_answer(mood="excited"))
+    chat_model.script_reply_plan(reply_plan_answer(need="Cheerleading"))
     chat_model.script("tell me more")
 
     send_to_webhook(client, telegram_text_update("guess what"))
@@ -274,11 +387,11 @@ def test_an_unknown_need_falls_back_to_the_fallback_need(
     [reply_call] = chat_model.calls
     assert how_to_reply(FALLBACK_NEED).strip() in reply_call.instructions
     assert "excited" in reply_call.instructions
-    [saved] = saved_understandings(engine)
+    [saved] = saved_reply_plans(engine)
     assert saved["need"] == FALLBACK_NEED
 
 
-def test_an_unreadable_form_falls_back_to_the_fallback_need(
+def test_an_unreadable_reply_plan_falls_back_to_the_fallback_need(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -286,7 +399,7 @@ def test_an_unreadable_form_falls_back_to_the_fallback_need(
     engine: Engine,
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
-    chat_model.script_understanding("I think they want advice")
+    chat_model.script_reply_plan("I think they want advice")
     chat_model.script("tell me more")
 
     send_to_webhook(client, telegram_text_update("guess what"))
@@ -294,11 +407,34 @@ def test_an_unreadable_form_falls_back_to_the_fallback_need(
     [reply_call] = chat_model.calls
     assert how_to_reply(FALLBACK_NEED).strip() in reply_call.instructions
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["tell me more"]
-    [saved] = saved_understandings(engine)
-    assert saved["need"] == FALLBACK_NEED
+    [saved] = saved_reply_plans(engine)
+    assert (saved["need"], saved["is_fallback"]) == (FALLBACK_NEED, True)
 
 
-def test_a_failed_understanding_still_replies_with_the_fallback_and_shows_in_the_log(
+def test_an_unreadable_understanding_falls_back_and_the_reply_plan_still_decides(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    engine: Engine,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script_understanding("they seem fine")
+    chat_model.script_reply_plan(reply_plan_answer(need="Advice"))
+    chat_model.script("try this")
+
+    send_to_webhook(client, telegram_text_update("what should I do?"))
+
+    [reply_call] = chat_model.calls
+    assert how_to_reply("Advice").strip() in reply_call.instructions
+    [understanding] = saved_understandings(engine)
+    assert understanding["is_fallback"] is True
+    assert understanding["form"]["cause_known"] is True
+    [reply_plan] = saved_reply_plans(engine)
+    assert (reply_plan["need"], reply_plan["is_fallback"]) == ("Advice", False)
+
+
+def test_a_failed_reply_plan_still_replies_with_the_fallback_and_shows_in_the_log(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -309,7 +445,7 @@ def test_a_failed_understanding_still_replies_with_the_fallback_and_shows_in_the
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
     remember_some_things(client, chat_model, clock, scheduler, seeded_settings)
-    chat_model.script_understanding(TimeoutError("DeepSeek timed out"))
+    chat_model.script_reply_plan(TimeoutError("DeepSeek timed out"))
     chat_model.script("hey")
 
     send_to_webhook(client, telegram_text_update("my sister called"))
@@ -331,12 +467,46 @@ def test_a_failed_understanding_still_replies_with_the_fallback_and_shows_in_the
     ).json()["calls"]
     assert [(call["step"], call["error"]) for call in calls] == [
         ("safeguard", None),
+        ("understanding", None),
+        ("reply_plan", "TimeoutError"),
+        ("reply", None),
+    ]
+    assert calls[2]["reply_plan_shape"]["need"] == FALLBACK_NEED
+
+
+def test_a_failed_understanding_still_replies_and_shows_in_the_log(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script_understanding(TimeoutError("DeepSeek timed out"))
+    chat_model.script("hey")
+
+    send_to_webhook(client, telegram_text_update("my sister called"))
+
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["hey"]
+    [reply_plan_call] = chat_model.reply_plan_calls
+    assert "Mood: unclear (low)." in reply_plan_call.history[0].text
+    admin = owner_headers(client, auth_verifier)
+    [failed_trace] = client.get(
+        "/api/admin/model-calls",
+        params={"errors_only": True},
+        headers=admin,
+    ).json()["traces"]
+    calls = client.get(
+        f"/api/admin/model-calls/{failed_trace['trace_id']}", headers=admin
+    ).json()["calls"]
+    assert [(call["step"], call["error"]) for call in calls] == [
+        ("safeguard", None),
         ("understanding", "TimeoutError"),
+        ("reply_plan", None),
         ("reply", None),
     ]
 
 
-def test_each_understanding_is_saved_with_its_message_and_the_need_by_name(
+def test_each_understanding_and_reply_plan_is_saved_with_its_message(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -345,20 +515,24 @@ def test_each_understanding_is_saved_with_its_message_and_the_need_by_name(
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
     chat_model.script_understanding(
-        understanding_answer(need="Advice", mood="unsure", intensity="medium")
+        understanding_answer(mood="unsure", intensity="medium")
     )
+    chat_model.script_reply_plan(reply_plan_answer(need="Advice"))
     chat_model.script("try this")
 
     send_to_webhook(client, telegram_text_update("what should I do?"))
 
-    [saved] = saved_understandings(engine)
-    assert saved["need"] == "Advice"
-    assert saved["form"]["mood"] == "unsure"
-    assert saved["form"]["intensity"] == "medium"
+    [understanding] = saved_understandings(engine)
+    [reply_plan] = saved_reply_plans(engine)
+    assert understanding["form"]["mood"] == "unsure"
+    assert understanding["form"]["intensity"] == "medium"
+    assert "need" not in understanding["form"]
+    assert reply_plan["need"] == "Advice"
+    assert understanding["message_id"] == reply_plan["message_id"]
     with engine.connect() as connection:
         message = connection.execute(
             text("SELECT content FROM conversation_messages WHERE id = :id"),
-            {"id": saved["message_id"]},
+            {"id": understanding["message_id"]},
         ).scalar_one()
     assert message == "what should I do?"
 
@@ -392,7 +566,7 @@ def test_struggling_and_asked_for_photo_are_saved_and_odd_values_read_as_false(
     )
 
 
-def test_message_retention_removes_understandings_with_their_messages(
+def test_message_retention_removes_understandings_and_reply_plans_with_messages(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -406,12 +580,14 @@ def test_message_retention_removes_understandings_with_their_messages(
     chat_model.script("hi")
     send_to_webhook(client, telegram_text_update("hello"))
     assert len(saved_understandings(engine)) == 1
+    assert len(saved_reply_plans(engine)) == 1
 
     clock.advance(retention(seeded_settings) + timedelta(minutes=1))
     chat_model.script_processing(processing_answer())
     scheduler.tick()
 
     assert saved_understandings(engine) == []
+    assert saved_reply_plans(engine) == []
 
 
 def test_a_changed_understanding_prompt_and_thinking_are_used_for_the_next_message(
@@ -443,3 +619,56 @@ def test_a_changed_understanding_prompt_and_thinking_are_used_for_the_next_messa
     assert understanding_call.instructions == "Read the person closely."
     assert understanding_call.model == seeded_settings["understanding_model"]
     assert understanding_call.thinking is other_thinking
+
+
+def test_a_changed_reply_plan_prompt_and_thinking_are_used_for_the_next_message(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    response = client.patch(
+        "/api/admin/settings",
+        json={
+            "values": {
+                "reply_plan_prompt": "Decide what helps them most.",
+                "reply_plan_thinking": False,
+            }
+        },
+        headers=owner_headers(client, auth_verifier),
+    )
+    assert response.status_code == 200
+    chat_model.reply_plan_prompt = "Decide what helps them most."
+    chat_model.script("hey")
+
+    send_to_webhook(client, telegram_text_update("hello"))
+
+    [reply_plan_call] = chat_model.reply_plan_calls
+    assert reply_plan_call.instructions == "Decide what helps them most."
+    assert reply_plan_call.model == seeded_settings["reply_plan_model"]
+    assert reply_plan_call.thinking is False
+
+
+def test_a_failed_reply_plan_never_asks_why_even_when_the_mood_stands_out(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    seeded_settings: dict[str, Any],
+    engine: Engine,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script_understanding(
+        understanding_answer(mood="low", intensity="high", cause_known=False)
+    )
+    chat_model.script_reply_plan(TimeoutError("DeepSeek timed out"))
+    chat_model.script("I'm here")
+
+    send_to_webhook(client, telegram_text_update("meh"))
+
+    [reply_call] = chat_model.calls
+    assert seeded_settings["reply_ask_why_note"] not in reply_call.instructions
+    [saved] = saved_reply_plans(engine)
+    assert (saved["is_fallback"], saved["asked_why"]) == (True, False)

@@ -17,6 +17,7 @@ from companion.core.models import (
     ModelCallTraceOverview,
     ModelStep,
     OfferedTool,
+    ReplyPlanShape,
     TraceKind,
     UnderstandingShape,
     UserRole,
@@ -177,6 +178,26 @@ class ModelCallLog:
             )
         except Exception:
             logger.exception("Could not save an Understanding's shape")
+
+    def record_reply_plan_shape(
+        self, snapshot: UserSnapshot, shape: ReplyPlanShape
+    ) -> None:
+        """Record the shape of the Reply Plan its trace's call just made.
+
+        The shape lands on the trace's newest Reply Plan call, so it must
+        come after that call is recorded. Saving never raises: a failure is
+        logged and the reply goes on.
+
+        Args:
+            snapshot: The User the Reply Plan was for, with its trace.
+            shape: The Reply Plan's shape.
+        """
+        try:
+            self._repositories.model_calls.set_reply_plan_shape(
+                snapshot.trace.id, shape
+            )
+        except Exception:
+            logger.exception("Could not save a Reply Plan's shape")
 
     def record_check_in_shape(
         self, snapshot: UserSnapshot, shape: CheckInShape

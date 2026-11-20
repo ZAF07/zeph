@@ -9,7 +9,7 @@ from tests.fakes import (
     FakeClock,
     FakeScheduler,
     ScriptedChatModel,
-    understanding_answer,
+    reply_plan_answer,
 )
 from tests.telegram_helpers import (
     TELEGRAM_CHAT_ID,
@@ -50,7 +50,7 @@ def remember_some_things(
         ),
     )
     chat_model.calls.clear()
-    chat_model.understanding_calls.clear()
+    chat_model.reply_plan_calls.clear()
 
 
 def test_reply_gets_picked_and_always_include_memories_and_recent_summaries(
@@ -64,15 +64,13 @@ def test_reply_gets_picked_and_always_include_memories_and_recent_summaries(
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
     remember_some_things(client, chat_model, clock, scheduler, seeded_settings)
-    chat_model.script_understanding(
-        understanding_answer(memory_categories=["Relationships"])
-    )
+    chat_model.script_reply_plan(reply_plan_answer(memory_categories=["Relationships"]))
     chat_model.script("aw, Jo")
 
     send_to_webhook(client, telegram_text_update("my sister called"))
 
-    [understanding_call] = chat_model.understanding_calls
-    asked = understanding_call.history[0].text
+    [reply_plan_call] = chat_model.reply_plan_calls
+    asked = reply_plan_call.history[0].text
     assert "my sister called" in asked
     assert "- Relationships:" in asked
     assert "- Life details:" in asked
@@ -133,21 +131,19 @@ def test_with_user_memory_off_replies_still_use_existing_memory(
     remember_some_things(client, chat_model, clock, scheduler, seeded_settings)
     headers = auth_headers(auth_verifier, "user_maya")
     client.patch("/api/me", json={"user_memory_enabled": False}, headers=headers)
-    chat_model.script_understanding(
-        understanding_answer(memory_categories=["Relationships"])
-    )
+    chat_model.script_reply_plan(reply_plan_answer(memory_categories=["Relationships"]))
     chat_model.script("aw, Jo")
 
     send_to_webhook(client, telegram_text_update("my sister called"))
 
-    assert len(chat_model.understanding_calls) == 1
+    assert len(chat_model.reply_plan_calls) == 1
     [reply_call] = chat_model.calls
     assert "Sister Jo" in reply_call.instructions
     assert "Likes Stoicism" in reply_call.instructions
     assert "Talked about work and family." in reply_call.instructions
 
 
-def test_reply_still_gets_always_include_memories_when_the_understanding_fails(
+def test_reply_still_gets_always_include_memories_when_the_reply_plan_fails(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -158,7 +154,7 @@ def test_reply_still_gets_always_include_memories_when_the_understanding_fails(
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
     remember_some_things(client, chat_model, clock, scheduler, seeded_settings)
-    chat_model.script_understanding(TimeoutError("DeepSeek timed out"))
+    chat_model.script_reply_plan(TimeoutError("DeepSeek timed out"))
     chat_model.script("hey")
 
     send_to_webhook(client, telegram_text_update("my sister called"))
@@ -180,8 +176,8 @@ def test_a_new_user_with_nothing_remembered_is_offered_no_memory_categories(
 
     send_to_webhook(client, telegram_text_update("hello"))
 
-    [understanding_call] = chat_model.understanding_calls
+    [reply_plan_call] = chat_model.reply_plan_calls
     assert "Memory Categories with something saved:\nNone yet." in (
-        understanding_call.history[0].text
+        reply_plan_call.history[0].text
     )
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["hey"]

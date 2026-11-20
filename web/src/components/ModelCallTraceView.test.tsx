@@ -24,7 +24,7 @@ const plainUsersTrace: ModelCallTraceDetails = {
   user_name: "Maya Lin",
   user_email: "maya@example.com",
   started_at: "2026-11-14T10:30:00Z",
-  steps: ["safeguard", "understanding", "reply"],
+  steps: ["safeguard", "understanding", "reply_plan", "reply"],
   tokens_in: 1200,
   tokens_out: 80,
   duration_ms: 2400,
@@ -45,6 +45,7 @@ const plainUsersTrace: ModelCallTraceDetails = {
       content: null,
       understanding_shape: null,
       check_in_shape: null,
+      reply_plan_shape: null,
     },
     {
       id: "c4",
@@ -59,20 +60,39 @@ const plainUsersTrace: ModelCallTraceDetails = {
       tools_called: [],
       content: null,
       understanding_shape: {
+        intensity: "high",
+        cause_known: false,
+        struggling: true,
+        past_look_ups: 2,
+      },
+      check_in_shape: null,
+      reply_plan_shape: null,
+    },
+    {
+      id: "c6",
+      step: "reply_plan",
+      model: "deepseek-flash",
+      thinking: true,
+      started_at: "2026-11-14T10:30:00Z",
+      duration_ms: 900,
+      tokens_in: 1600,
+      tokens_out: 120,
+      error: null,
+      tools_called: [],
+      content: null,
+      understanding_shape: null,
+      check_in_shape: null,
+      reply_plan_shape: {
         need: "Be heard",
         lead_move: "Calm",
         support_move: null,
         next_move: null,
-        intensity: "high",
-        cause_known: false,
         threads_reminded: 3,
         threads_led_with: 1,
         threads_woven_in: 1,
         threads_left_alone: 1,
         threads_held_back: 1,
-        past_look_ups: 2,
       },
-      check_in_shape: null,
     },
     {
       id: "c5",
@@ -88,6 +108,7 @@ const plainUsersTrace: ModelCallTraceDetails = {
       content: null,
       understanding_shape: null,
       check_in_shape: { kinds_offered: 4, woven_in: true, kind: "A follow-up" },
+      reply_plan_shape: null,
     },
     {
       id: "c2",
@@ -103,6 +124,7 @@ const plainUsersTrace: ModelCallTraceDetails = {
       content: null,
       understanding_shape: null,
       check_in_shape: null,
+      reply_plan_shape: null,
     },
   ],
 };
@@ -146,6 +168,7 @@ const adminsTrace: ModelCallTraceDetails = {
       },
       understanding_shape: null,
       check_in_shape: null,
+      reply_plan_shape: null,
     },
   ],
 };
@@ -174,12 +197,14 @@ describe("ModelCallTraceView", () => {
     expect(within(reply).getByText("web_search")).toBeInTheDocument();
     expect(within(reply).getByText("TimeoutError")).toBeInTheDocument();
     expect(screen.getAllByText("No content kept for this User")).toHaveLength(
-      4,
+      5,
     );
+    const safeguard = screen.getByRole("article", { name: "Safeguard" });
+    expect(within(safeguard).getByText("None")).toBeInTheDocument();
     expect(screen.queryByText("Instructions")).not.toBeInTheDocument();
   });
 
-  it("shows the shape of the Understanding's decision", async () => {
+  it("shows the Understanding and the Reply Plan as separate steps, each with its own facts", async () => {
     apiClient.getModelCallTrace.mockResolvedValue(plainUsersTrace);
 
     renderWithQueries(<ModelCallTraceView traceId="t1" />);
@@ -187,16 +212,28 @@ describe("ModelCallTraceView", () => {
     const understanding = await screen.findByRole("article", {
       name: "Understanding",
     });
-    const factValue = (label: string) =>
-      within(understanding).getByText(label).nextElementSibling?.textContent;
-    expect(factValue("Need picked")).toBe("Be heard");
-    expect(factValue("Mood intensity")).toBe("High");
-    expect(factValue("Cause known")).toBe("No");
-    expect(factValue("Life Threads reminded")).toBe("3");
-    expect(factValue("Threads brought up")).toBe("2 (1 lead, 1 weave)");
-    expect(factValue("Threads left alone")).toBe("1");
-    expect(factValue("Threads held back")).toBe("1");
-    expect(factValue("Past look-ups")).toBe("2");
+    const replyPlan = screen.getByRole("article", { name: "Reply Plan" });
+    const factValue = (card: HTMLElement, label: string) =>
+      within(card).getByText(label).nextElementSibling?.textContent;
+    expect(factValue(understanding, "Mood intensity")).toBe("Strong");
+    expect(factValue(understanding, "Cause known")).toBe("No");
+    expect(factValue(understanding, "Struggling")).toBe("Yes");
+    expect(factValue(understanding, "Past look-ups")).toBe("2");
+    expect(
+      within(understanding).queryByText("Need picked"),
+    ).not.toBeInTheDocument();
+    expect(factValue(replyPlan, "Need picked")).toBe("Be heard");
+    expect(factValue(replyPlan, "Lead Move")).toBe("Calm");
+    expect(factValue(replyPlan, "Supporting Move")).toBe("None");
+    expect(factValue(replyPlan, "Life Threads reminded")).toBe("3");
+    expect(factValue(replyPlan, "Threads brought up")).toBe(
+      "2 (1 lead, 1 weave)",
+    );
+    expect(factValue(replyPlan, "Threads left alone")).toBe("1");
+    expect(factValue(replyPlan, "Threads held back")).toBe("1");
+    expect(
+      within(replyPlan).queryByText("Mood intensity"),
+    ).not.toBeInTheDocument();
     const reply = screen.getByRole("article", { name: "Reply" });
     expect(within(reply).queryByText("Need picked")).not.toBeInTheDocument();
   });

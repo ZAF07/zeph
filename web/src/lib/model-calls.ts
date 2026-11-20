@@ -1,6 +1,7 @@
 import type {
   CheckInShape,
   ModelStep,
+  ReplyPlanShape,
   TraceKind,
   UnderstandingShape,
 } from "@/lib/api-client";
@@ -9,6 +10,7 @@ import type {
 export const modelSteps: { id: ModelStep; label: string }[] = [
   { id: "safeguard", label: "Safeguard" },
   { id: "understanding", label: "Understanding" },
+  { id: "reply_plan", label: "Reply Plan" },
   { id: "photo", label: "Photo" },
   { id: "reply", label: "Reply" },
   { id: "check_in", label: "Check-in" },
@@ -112,18 +114,36 @@ export function checkInShapeFacts(
 const intensityLabels: Record<UnderstandingShape["intensity"], string> = {
   low: "Low",
   medium: "Medium",
-  high: "High",
+  high: "Strong",
 };
 
 /**
  * Lists the facts of an Understanding's shape, as labels and values.
  *
  * @param shape - The Understanding's shape.
- * @returns E.g. "Need picked: Be heard", "Lead Move: Calm", "Threads brought
- * up: 2 (1 lead, 1 weave)".
+ * @returns E.g. "Mood intensity: Strong", "Cause known: Yes", "Struggling:
+ * No", "Past look-ups: 1".
  */
 export function understandingShapeFacts(
   shape: UnderstandingShape,
+): { label: string; value: string }[] {
+  return [
+    { label: "Mood intensity", value: intensityLabels[shape.intensity] },
+    { label: "Cause known", value: shape.cause_known ? "Yes" : "No" },
+    { label: "Struggling", value: shape.struggling ? "Yes" : "No" },
+    { label: "Past look-ups", value: String(shape.past_look_ups) },
+  ];
+}
+
+/**
+ * Lists the facts of a Reply Plan's shape, as labels and values.
+ *
+ * @param shape - The Reply Plan's shape.
+ * @returns E.g. "Need picked: Be heard", "Lead Move: Calm", "Threads brought
+ * up: 2 (1 lead, 1 weave)".
+ */
+export function replyPlanShapeFacts(
+  shape: ReplyPlanShape,
 ): { label: string; value: string }[] {
   const broughtUp = shape.threads_led_with + shape.threads_woven_in;
   return [
@@ -131,8 +151,6 @@ export function understandingShapeFacts(
     { label: "Lead Move", value: shape.lead_move ?? "None" },
     { label: "Supporting Move", value: shape.support_move ?? "None" },
     { label: "Next Move", value: shape.next_move ?? "None" },
-    { label: "Mood intensity", value: intensityLabels[shape.intensity] },
-    { label: "Cause known", value: shape.cause_known ? "Yes" : "No" },
     { label: "Life Threads reminded", value: String(shape.threads_reminded) },
     {
       label: "Threads brought up",
@@ -143,6 +161,5 @@ export function understandingShapeFacts(
     },
     { label: "Threads left alone", value: String(shape.threads_left_alone) },
     { label: "Threads held back", value: String(shape.threads_held_back) },
-    { label: "Past look-ups", value: String(shape.past_look_ups) },
   ];
 }

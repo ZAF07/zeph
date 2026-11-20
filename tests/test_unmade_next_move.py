@@ -30,7 +30,7 @@ DEPLOY_STEPS = "Did they get the app deployed on the host they picked?"
 
 
 def hold_plan_steps(client: TestClient, chat_model: ScriptedChatModel) -> None:
-    """Send a Message whose Understanding holds Plan steps in mind for later."""
+    """Send a Message whose Reply Plan holds Plan steps in mind for later."""
     reply_to(
         client,
         chat_model,
@@ -167,7 +167,7 @@ def test_with_user_memory_off_no_unmade_next_move_is_passed(
     assert stored_curiosities(engine) == []
 
 
-def test_a_fallback_last_understanding_still_passes_the_earlier_next_move(
+def test_a_fallback_last_reply_plan_still_passes_the_earlier_next_move(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -179,7 +179,7 @@ def test_a_fallback_last_understanding_still_passes_the_earlier_next_move(
     connect_telegram(client, auth_verifier, chat_channel)
 
     hold_plan_steps(client, chat_model)
-    chat_model.script_understanding(RuntimeError("model down"))
+    chat_model.script_reply_plan(RuntimeError("model down"))
     chat_model.script("ok")
     send_to_webhook(client, telegram_text_update("ok railway it is"))
     end_current_conversation(chat_model, clock, scheduler, seeded_settings, [])
@@ -202,7 +202,7 @@ def test_a_next_move_dropped_before_a_fallback_is_not_passed(
 
     hold_plan_steps(client, chat_model)
     reply_to(client, chat_model, "honestly I just need to vent", need="Be heard")
-    chat_model.script_understanding("not a form")
+    chat_model.script_reply_plan("not a form")
     chat_model.script("ok")
     send_to_webhook(client, telegram_text_update("anyway"))
     end_current_conversation(chat_model, clock, scheduler, seeded_settings, [])
@@ -210,7 +210,7 @@ def test_a_next_move_dropped_before_a_fallback_is_not_passed(
     assert unmade_next_move_seen(chat_model) == "None."
 
 
-def test_understandings_store_whether_they_were_the_fallback(
+def test_reply_plans_store_whether_they_were_the_fallback(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -220,13 +220,13 @@ def test_understandings_store_whether_they_were_the_fallback(
     connect_telegram(client, auth_verifier, chat_channel)
 
     hold_plan_steps(client, chat_model)
-    chat_model.script_understanding("not a form")
+    chat_model.script_reply_plan("not a form")
     chat_model.script("ok")
     send_to_webhook(client, telegram_text_update("anyway"))
 
     with engine.connect() as connection:
         stored = connection.execute(
-            text("SELECT is_fallback FROM understandings ORDER BY position")
+            text("SELECT is_fallback FROM reply_plans ORDER BY position")
         ).scalars()
         assert list(stored) == [False, True]
 
@@ -250,7 +250,7 @@ def test_a_next_move_made_before_a_fallback_is_not_passed(
         need="Advice",
         lead_move="Plan steps",
     )
-    chat_model.script_understanding(RuntimeError("model down"))
+    chat_model.script_reply_plan(RuntimeError("model down"))
     chat_model.script("ok")
     send_to_webhook(client, telegram_text_update("thanks!"))
     end_current_conversation(chat_model, clock, scheduler, seeded_settings, [])

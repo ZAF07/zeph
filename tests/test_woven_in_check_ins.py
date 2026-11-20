@@ -20,6 +20,7 @@ from tests.fakes import (
     FakeTimer,
     ScriptedChatModel,
     ToolCall,
+    reply_plan_answer,
     understanding_answer,
 )
 from tests.telegram_helpers import (
@@ -169,7 +170,7 @@ def test_a_check_in_the_reply_leaves_out_is_not_logged_and_stays_due(
     assert (entry["outcome"], entry["woven_in"]) == ("sent", True)
 
 
-def test_the_woven_in_call_is_given_the_conversation_understanding_and_portrait(
+def test_the_woven_in_call_is_given_the_conversation_understanding_plan_and_portrait(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -186,8 +187,9 @@ def test_the_woven_in_call_is_given_the_conversation_understanding_and_portrait(
         )
     )
     open_a_conversation_until_due(client, chat_model, chat_channel, clock)
-    chat_model.script_understanding(
-        understanding_answer(mood="cheerful and chatty", nuance="Light catch-up.")
+    chat_model.script_understanding(understanding_answer(mood="cheerful and chatty"))
+    chat_model.script_reply_plan(
+        reply_plan_answer(need="Just chatting", guidance="Light catch-up.")
     )
     chat_model.script("sounds tasty!")
 
@@ -199,6 +201,8 @@ def test_the_woven_in_call_is_given_the_conversation_understanding_and_portrait(
     assert "now making a big salad" in line.text
     assert "oh nice!" in line.text
     assert "cheerful and chatty" in line.text
+    assert "What they need from you right now: Just chatting." in line.text
+    assert "Light catch-up." in line.text
     assert "Maya is a nurse who unwinds by baking on weekends." in line.text
     assert "A casual hello" in line.text
     assert "A follow-up" in line.text

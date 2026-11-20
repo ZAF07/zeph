@@ -9,7 +9,7 @@ from tests.fakes import (
     FakeClock,
     FakeScheduler,
     ScriptedChatModel,
-    understanding_answer,
+    reply_plan_answer,
 )
 from tests.telegram_helpers import (
     auth_headers,
@@ -285,8 +285,8 @@ def test_onboarding_memories_reach_the_first_reply(
     headers = auth_headers(auth_verifier, "user_maya")
     client.put("/api/onboarding", json=onboarding_answers(), headers=headers)
     connect_telegram(client, auth_verifier, chat_channel)
-    chat_model.script_understanding(
-        understanding_answer(memory_categories=["Life details", "Goals"])
+    chat_model.script_reply_plan(
+        reply_plan_answer(memory_categories=["Life details", "Goals"])
     )
     chat_model.script("hi Maya")
 

@@ -33,7 +33,7 @@ from companion.core.models import (
     CheckInFrequency,
     ModelCall,
     ModelStep,
-    Understanding,
+    ReplyPlan,
 )
 from companion.core.ports import ChatModel, Repositories
 
@@ -114,26 +114,40 @@ def knowledge_in_reply(calls: Sequence[ModelCall]) -> list[str]:
     return list(dict.fromkeys(KNOWLEDGE_PASSAGE_SOURCE.findall(instructions)))
 
 
-def describe_what_was_done(
-    understanding: Understanding, understanding_input: str, calls: Sequence[ModelCall]
-) -> ObservedUnderstanding:
-    """Describe what a saved Understanding and the reply after it did.
+def history_text(call: ModelCall | None) -> str:
+    """Write what a logged model call was given, as one text.
 
     Args:
-        understanding: The Message's saved Understanding.
-        understanding_input: What the Understanding model was given.
+        call: The call; None if none was logged.
+
+    Returns:
+        Its history lines; "" when it has no content kept.
+    """
+    if call is None or call.content is None:
+        return ""
+    return "\n".join(line.text for line in call.content.history)
+
+
+def describe_what_was_done(
+    reply_plan: ReplyPlan, reply_plan_input: str, calls: Sequence[ModelCall]
+) -> ObservedUnderstanding:
+    """Describe what a saved Reply Plan and the reply after it did.
+
+    Args:
+        reply_plan: The Message's saved Reply Plan.
+        reply_plan_input: What the Reply Plan model was given.
         calls: The Message's model calls.
 
     Returns:
         What they did.
     """
-    form = understanding.form
+    form = reply_plan.form
     return ObservedUnderstanding(
-        need=understanding.need,
-        understanding_input=understanding_input,
+        need=reply_plan.need,
+        reply_plan_input=reply_plan_input,
         raised_threads=[item.title for item in form.bring_up],
         raised_curiosities=len(form.curiosities),
-        asked_why=understanding.asked_why,
+        asked_why=reply_plan.asked_why,
         knowledge_documents=(
             [chosen.title for chosen in form.knowledge.documents]
             if form.knowledge
@@ -144,9 +158,9 @@ def describe_what_was_done(
             call.check_in_shape is not None and call.check_in_shape.woven_in
             for call in calls
         ),
-        lead_move=understanding.lead_move,
-        support_move=understanding.support_move,
-        next_move=understanding.next_move,
+        lead_move=reply_plan.lead_move,
+        support_move=reply_plan.support_move,
+        next_move=reply_plan.next_move,
     )
 
 
@@ -256,18 +270,22 @@ def check_message(
     case: UnderstandingCase,
     message: UnderstandingMessage,
     calls: Sequence[ModelCall],
-    understanding: Understanding | None,
+    reply_plan: ReplyPlan | None,
     transcript: str,
     judge_chat_model: ChatModel,
     judge: JudgeSettings,
 ) -> CheckedMessage:
-    """Check one Message's Understanding and reply, and judge the reply.
+    """Check one Message's Understanding, Reply Plan and reply, and judge the reply.
+
+    Until the Understanding and Reply Plan get Evals of their own (issue
+    13), the checks read the Need, Moves and what was brought up from the
+    Reply Plan.
 
     Args:
         case: The case, for its rules.
         message: The Message and what it should do.
         calls: Its model calls, from the Model Call Log.
-        understanding: Its saved Understanding; None if none was saved.
+        reply_plan: Its saved Reply Plan; None if none was saved.
         transcript: The Conversation so far, for the Judge.
         judge_chat_model: The model that judges.
         judge: The Judge's model, thinking and prompts.
@@ -278,16 +296,15 @@ def check_message(
     understanding_calls = [
         call for call in calls if call.step == ModelStep.UNDERSTANDING
     ]
-    if not understanding_calls or understanding is None:
+    reply_plan_calls = [call for call in calls if call.step == ModelStep.REPLY_PLAN]
+    if not understanding_calls or reply_plan is None:
         return CheckedMessage(message.text, [], None)
     understanding_call = understanding_calls[-1]
-    content = understanding_call.content
-    understanding_input = (
-        "\n".join(line.text for line in content.history) if content else ""
-    )
+    reply_plan_call = reply_plan_calls[-1] if reply_plan_calls else None
+    reply_plan_input = history_text(reply_plan_call)
     results = check_understanding(
         message.expect,
-        describe_what_was_done(understanding, understanding_input, calls),
+        describe_what_was_done(reply_plan, reply_plan_input, calls),
     )
     results.append(full_content_check(calls))
     rules = {rule: case.rules[rule] for rule in message.expect.rules}
@@ -318,31 +335,47 @@ def check_message(
         checked.call,
         [
             f"The Understanding of “{message.text}” was given:",
-            understanding_input,
+            history_text(understanding_call),
             "It answered:",
-            content.response if content else "(no content kept)",
+            answer_text(understanding_call),
+            "The Reply Plan was given:",
+            reply_plan_input,
+            "It answered:",
+            answer_text(reply_plan_call),
             "",
         ],
     )
 
 
-def latest_understanding(
-    repositories: Repositories, user_id: UUID
-) -> Understanding | None:
-    """Read the newest Understanding in the User's latest Conversation.
+def answer_text(call: ModelCall | None) -> str:
+    """Write what a logged model call answered.
 
     Args:
-        repositories: Where Conversations and Understandings are stored.
+        call: The call; None if none was logged.
+
+    Returns:
+        Its answer; a note when no content was kept.
+    """
+    if call is None or call.content is None:
+        return "(no content kept)"
+    return call.content.response
+
+
+def latest_reply_plan(repositories: Repositories, user_id: UUID) -> ReplyPlan | None:
+    """Read the newest Reply Plan in the User's latest Conversation.
+
+    Args:
+        repositories: Where Conversations and Reply Plans are stored.
         user_id: The User's ID.
 
     Returns:
-        The Understanding; None if there is none.
+        The Reply Plan; None if there is none.
     """
     conversation = repositories.conversations.get_latest_for_user(user_id)
     if conversation is None:
         return None
-    understandings = repositories.understandings.list_for_conversation(conversation.id)
-    return understandings[-1] if understandings else None
+    reply_plans = repositories.reply_plans.list_for_conversation(conversation.id)
+    return reply_plans[-1] if reply_plans else None
 
 
 def message_facts(checked: CheckedMessage) -> dict[str, Any]:
@@ -421,7 +454,7 @@ def check_understanding_case(
                 case,
                 message,
                 calls_in_new_traces(repositories, user_id, seen_trace_ids),
-                latest_understanding(repositories, user_id),
+                latest_reply_plan(repositories, user_id),
                 "\n".join(transcript_lines),
                 companion.judge_chat_model,
                 judge,

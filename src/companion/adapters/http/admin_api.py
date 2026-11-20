@@ -68,6 +68,7 @@ from companion.core.models import (
     Need,
     NeedDetails,
     PauseLength,
+    ReplyPlanShape,
     RiskType,
     SafeguardEventOverview,
     StoredSetting,
@@ -579,20 +580,26 @@ class ModelCallContentResponse(BaseModel):
 
 
 class UnderstandingShapeResponse(BaseModel):
-    """The shape of an Understanding: the Need, Move names and counts, never words."""
+    """The shape of an Understanding: intensity, flags and counts, never words."""
+
+    intensity: MoodIntensity
+    cause_known: bool
+    struggling: bool
+    past_look_ups: int
+
+
+class ReplyPlanShapeResponse(BaseModel):
+    """The shape of a Reply Plan: the Need, Move names and counts, never words."""
 
     need: str
     lead_move: str | None
     support_move: str | None
     next_move: str | None
-    intensity: MoodIntensity
-    cause_known: bool
     threads_reminded: int
     threads_led_with: int
     threads_woven_in: int
     threads_left_alone: int
     threads_held_back: int
-    past_look_ups: int
 
 
 class CheckInShapeResponse(BaseModel):
@@ -619,6 +626,7 @@ class ModelCallResponse(BaseModel):
     content: ModelCallContentResponse | None
     understanding_shape: UnderstandingShapeResponse | None
     check_in_shape: CheckInShapeResponse | None
+    reply_plan_shape: ReplyPlanShapeResponse | None
 
 
 class ModelCallTraceResponse(BaseModel):
@@ -1089,18 +1097,32 @@ def to_understanding_shape_response(
         The response body.
     """
     return UnderstandingShapeResponse(
+        intensity=shape.intensity,
+        cause_known=shape.cause_known,
+        struggling=shape.struggling,
+        past_look_ups=shape.past_look_ups,
+    )
+
+
+def to_reply_plan_shape_response(shape: ReplyPlanShape) -> ReplyPlanShapeResponse:
+    """Describe a Reply Plan's shape for the admin area.
+
+    Args:
+        shape: The shape.
+
+    Returns:
+        The response body.
+    """
+    return ReplyPlanShapeResponse(
         need=shape.need,
         lead_move=shape.lead_move,
         support_move=shape.support_move,
         next_move=shape.next_move,
-        intensity=shape.intensity,
-        cause_known=shape.cause_known,
         threads_reminded=shape.threads_reminded,
         threads_led_with=shape.threads_led_with,
         threads_woven_in=shape.threads_woven_in,
         threads_left_alone=shape.threads_left_alone,
         threads_held_back=shape.threads_held_back,
-        past_look_ups=shape.past_look_ups,
     )
 
 
@@ -1139,6 +1161,11 @@ def to_model_call_response(call: ModelCall) -> ModelCallResponse:
                 kind=call.check_in_shape.kind,
             )
             if call.check_in_shape
+            else None
+        ),
+        reply_plan_shape=(
+            to_reply_plan_shape_response(call.reply_plan_shape)
+            if call.reply_plan_shape
             else None
         ),
     )

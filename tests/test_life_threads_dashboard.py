@@ -25,9 +25,9 @@ from tests.test_life_threads import (
     MEI_STORY,
     end_conversation,
     new_thread,
+    reply_plan_sees,
     start_mei_thread,
     thread_keeping_answer,
-    understanding_sees,
 )
 from tests.test_post_conversation import (
     have_conversation,
@@ -100,7 +100,7 @@ def test_a_deleted_thread_is_gone_and_never_reminded_again(
 
     deleted = client.delete(f"/api/life-threads/{thread['id']}", headers=headers)
     deleted_again = client.delete(f"/api/life-threads/{thread['id']}", headers=headers)
-    seen = understanding_sees(client, chat_model, "Mei's wedding is next week!")
+    seen = reply_plan_sees(client, chat_model, "Mei's wedding is next week!")
 
     assert deleted.status_code == 204
     assert deleted_again.status_code == 404
@@ -227,7 +227,7 @@ def test_forgetting_a_thread_in_chat(
         ToolCall("forget_memory", {"number": int(number)}),
         "Done, I've forgotten that.",
     )
-    seen = understanding_sees(client, chat_model, "Mei's wedding is next week!")
+    seen = reply_plan_sees(client, chat_model, "Mei's wedding is next week!")
 
     assert MEI_STORY in listed
     assert "Falling-out with Mei" in call.tool_results[1]

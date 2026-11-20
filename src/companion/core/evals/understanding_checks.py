@@ -6,13 +6,13 @@ from companion.core.evals.cases import UnderstandingExpectations
 
 @dataclass(frozen=True)
 class ObservedUnderstanding:
-    """What one Message's Understanding did, as the eval saw it.
+    """What one Message's Understanding and Reply Plan did, as the eval saw it.
 
     Attributes:
         need: The Need it picked.
-        understanding_input: What the Understanding model was given, from
-            the Model Call Log; the Life Threads the Companion was reminded
-            of are in it.
+        reply_plan_input: What the Reply Plan model was given, from the
+            Model Call Log; the Life Threads the Companion was reminded of
+            are in it.
         raised_threads: The titles of the Life Threads it brought up.
         raised_curiosities: How many Curiosities it brought up.
         asked_why: Whether the reply was asked to gently ask why.
@@ -28,7 +28,7 @@ class ObservedUnderstanding:
     """
 
     need: str
-    understanding_input: str
+    reply_plan_input: str
     raised_threads: list[str]
     raised_curiosities: int
     asked_why: bool
@@ -330,7 +330,7 @@ def check_understanding(
     checks += check_each_thread(
         "found",
         expect.found,
-        lambda title: title in observed.understanding_input,
+        lambda title: title in observed.reply_plan_input,
         "was reminded of {title}",
         "wasn't reminded of {title}",
     )

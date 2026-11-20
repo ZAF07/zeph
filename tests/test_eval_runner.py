@@ -46,7 +46,7 @@ from tests.fakes import (
     FakePhotoViewer,
     ScriptedChatModel,
     ToolCall,
-    understanding_answer,
+    reply_plan_answer,
 )
 from tests.telegram_helpers import owner_headers
 from tests.test_moves import stored_rule_outs
@@ -1106,11 +1106,9 @@ def test_a_need_override_reaches_only_its_variant_and_live_needs_stay(
 
     runner.work_next_run()
 
-    understanding_a, understanding_b = chat_model.understanding_calls
-    assert "pineapple" not in str(understanding_a)
-    assert "Just chatting: Only when they say the word pineapple." in str(
-        understanding_b
-    )
+    reply_plan_a, reply_plan_b = chat_model.reply_plan_calls
+    assert "pineapple" not in str(reply_plan_a)
+    assert "Just chatting: Only when they say the word pineapple." in str(reply_plan_b)
     assert PostgresNeedRepository(engine).list_all() == live_needs
 
 
@@ -1711,8 +1709,8 @@ def test_an_understanding_case_checks_the_moves_and_searches_its_web_results(
     add_cases(engine, research_case)
     admin = owner_headers(client, auth_verifier)
     run = start_run(client, admin, EvalName.UNDERSTANDING)
-    chat_model.script_understanding(
-        understanding_answer(
+    chat_model.script_reply_plan(
+        reply_plan_answer(
             need="Accountability", lead_move="Research", support_move="Suggest"
         )
     )
@@ -1767,8 +1765,8 @@ def test_with_web_search_off_an_understanding_case_cannot_research(
     add_cases(engine, no_search_case)
     admin = owner_headers(client, auth_verifier)
     run = start_run(client, admin, EvalName.UNDERSTANDING)
-    chat_model.script_understanding(
-        understanding_answer(need="Accountability", lead_move="Research")
+    chat_model.script_reply_plan(
+        reply_plan_answer(need="Accountability", lead_move="Research")
     )
     chat_model.script("I can't look things up for you, sorry.")
 
@@ -1776,8 +1774,8 @@ def test_with_web_search_off_an_understanding_case_cannot_research(
 
     result = results_by_key(open_run(client, admin, run["id"]))["no-search"]
     assert result["outcome"] == "pass", result
-    [understanding] = chat_model.understanding_calls
-    assert "- Research:" not in str(understanding)
+    [reply_plan] = chat_model.reply_plan_calls
+    assert "- Research:" not in str(reply_plan)
     reply = chat_model.calls[-1]
     assert "web_search" not in [tool.name for tool in reply.tools]
 
@@ -1824,8 +1822,8 @@ def test_an_understanding_case_gives_its_move_outcomes_and_checks_the_next_move(
     add_cases(engine, exhausted_case)
     admin = owner_headers(client, auth_verifier)
     run = start_run(client, admin, EvalName.UNDERSTANDING)
-    chat_model.script_understanding(
-        understanding_answer(
+    chat_model.script_reply_plan(
+        reply_plan_answer(
             need="Be heard",
             lead_move="Calm",
             next_move="Plan steps",
@@ -1846,8 +1844,8 @@ def test_an_understanding_case_gives_its_move_outcomes_and_checks_the_next_move(
         ("lead move", "led with Calm"),
         ("next move", "has Plan steps in mind next"),
     ]
-    [understanding] = chat_model.understanding_calls
-    seen = understanding.history[0].text
+    [reply_plan] = chat_model.reply_plan_calls
+    seen = reply_plan.history[0].text
     assert "11 Nov 2026: Push (lead) didn't help." in seen
     assert "They had nothing left to give." in seen
 
@@ -1877,9 +1875,9 @@ def test_a_move_override_reaches_only_its_variant_and_live_moves_stay(
 
     runner.work_next_run()
 
-    understanding_a, understanding_b = chat_model.understanding_calls
-    assert "pineapple" not in str(understanding_a)
-    assert "- Suggest: Only when they say the word pineapple." in str(understanding_b)
+    reply_plan_a, reply_plan_b = chat_model.reply_plan_calls
+    assert "pineapple" not in str(reply_plan_a)
+    assert "- Suggest: Only when they say the word pineapple." in str(reply_plan_b)
     assert PostgresMoveRepository(engine).list_all() == live_moves
 
 
@@ -1926,16 +1924,16 @@ def test_a_run_uses_the_live_moves_and_each_needs_live_rule_outs(
     assert added.status_code == 201, added.text
     rule_out_live(client, admin, "Just chatting", "Research")
     start_run(client, admin, EvalName.UNDERSTANDING)
-    chat_model.script_understanding(
-        understanding_answer(need="Just chatting", lead_move="Offer tea")
+    chat_model.script_reply_plan(
+        reply_plan_answer(need="Just chatting", lead_move="Offer tea")
     )
     chat_model.script("Tea time!")
 
     runner.work_next_run()
 
-    [understanding] = chat_model.understanding_calls
-    assert "- Offer tea: They are cold and tired." in str(understanding)
-    assert "- Just chatting: Suggest, Get curious, Offer tea" in str(understanding)
+    [reply_plan] = chat_model.reply_plan_calls
+    assert "- Offer tea: They are cold and tired." in str(reply_plan)
+    assert "- Just chatting: Suggest, Get curious, Offer tea" in str(reply_plan)
 
 
 def test_make_live_saves_a_move_override_and_keeps_its_needed_feature(

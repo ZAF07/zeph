@@ -50,6 +50,7 @@ from companion.adapters.postgres.tables import (
     pending_auth_account_deletions,
     personal_stickers,
     platform_settings,
+    reply_plans,
     safeguard_events,
     shared_photos,
     stickers,
@@ -134,9 +135,13 @@ from companion.core.models import (
     OfferedTool,
     PersonalSticker,
     PlatformSettings,
+    ReplyPlan,
+    ReplyPlanForm,
+    ReplyPlanShape,
     RiskType,
     SafeguardEvent,
     SafeguardEventOverview,
+    SaidReadUnclear,
     SharedPhoto,
     StoredSetting,
     TelegramConnection,
@@ -2159,14 +2164,8 @@ class PostgresUnderstandingRepository:
                     user_id=understanding.user_id,
                     conversation_id=understanding.conversation_id,
                     message_id=understanding.message_id,
-                    form=_understanding_form_values(understanding.form),
-                    need=understanding.need,
-                    lead_move=understanding.lead_move,
-                    support_move=understanding.support_move,
-                    next_move=understanding.next_move,
-                    next_move_why=understanding.next_move_why,
+                    form=asdict(understanding.form),
                     is_fallback=understanding.is_fallback,
-                    asked_why=understanding.asked_why,
                     made_at=understanding.made_at,
                 )
             )
@@ -2193,6 +2192,118 @@ class PostgresUnderstandingRepository:
                 conversation_id=row.conversation_id,
                 message_id=row.message_id,
                 form=_to_understanding_form(row.form),
+                made_at=row.made_at,
+                is_fallback=row.is_fallback,
+            )
+            for row in rows
+        ]
+
+
+def _to_said_read_unclear(stored: Any) -> SaidReadUnclear:
+    """Turn a saved said / read / unclear part back into one.
+
+    Args:
+        stored: The part as saved; missing in forms saved before it was
+            asked for.
+
+    Returns:
+        The part; empty when it wasn't saved.
+    """
+    if not isinstance(stored, dict):
+        return SaidReadUnclear()
+    return SaidReadUnclear(
+        said=stored.get("said", ""),
+        read=stored.get("read", ""),
+        unclear=stored.get("unclear", ""),
+    )
+
+
+def _to_understanding_form(stored: dict[str, Any]) -> UnderstandingForm:
+    """Turn a saved form back into an Understanding form.
+
+    Forms saved before the Understanding only read (ADR-0021) also hold the
+    Need and Moves it once picked; those are ignored. They have no "said",
+    "means", feelings or wants, which read as empty, and those saved before
+    "struggling" and "asked_for_photo" were asked for read them as false.
+
+    Args:
+        stored: The form as saved.
+
+    Returns:
+        The form.
+    """
+    return UnderstandingForm(
+        said=stored.get("said", ""),
+        means=stored.get("means", ""),
+        feelings=_to_said_read_unclear(stored.get("feelings")),
+        mood=stored["mood"],
+        intensity=MoodIntensity(stored["intensity"]),
+        wants=_to_said_read_unclear(stored.get("wants")),
+        cause_known=stored["cause_known"],
+        look_up_past=tuple(stored.get("look_up_past", [])),
+        struggling=stored.get("struggling", False),
+        asked_for_photo=stored.get("asked_for_photo", False),
+    )
+
+
+class PostgresReplyPlanRepository:
+    """Stores Reply Plans in Postgres, each with its Message."""
+
+    def __init__(self, database: Database) -> None:
+        """Set up the repository.
+
+        Args:
+            database: Where to run queries: the engine, or one transaction.
+        """
+        self._database = database
+
+    def add(self, reply_plan: ReplyPlan) -> None:
+        """Save a Reply Plan.
+
+        Args:
+            reply_plan: The Reply Plan to save.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                insert(reply_plans).values(
+                    id=reply_plan.id,
+                    user_id=reply_plan.user_id,
+                    conversation_id=reply_plan.conversation_id,
+                    message_id=reply_plan.message_id,
+                    form=_reply_plan_form_values(reply_plan.form),
+                    need=reply_plan.need,
+                    lead_move=reply_plan.lead_move,
+                    support_move=reply_plan.support_move,
+                    next_move=reply_plan.next_move,
+                    next_move_why=reply_plan.next_move_why,
+                    is_fallback=reply_plan.is_fallback,
+                    asked_why=reply_plan.asked_why,
+                    made_at=reply_plan.made_at,
+                )
+            )
+
+    def list_for_conversation(self, conversation_id: UUID) -> list[ReplyPlan]:
+        """List a Conversation's Reply Plans, oldest first.
+
+        Args:
+            conversation_id: The Conversation's ID.
+
+        Returns:
+            The Reply Plans.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(reply_plans)
+                .where(reply_plans.c.conversation_id == conversation_id)
+                .order_by(reply_plans.c.position)
+            ).all()
+        return [
+            ReplyPlan(
+                id=row.id,
+                user_id=row.user_id,
+                conversation_id=row.conversation_id,
+                message_id=row.message_id,
+                form=_to_reply_plan_form(row.form),
                 need=row.need,
                 asked_why=row.asked_why,
                 made_at=row.made_at,
@@ -2206,8 +2317,8 @@ class PostgresUnderstandingRepository:
         ]
 
 
-def _understanding_form_values(form: UnderstandingForm) -> dict[str, Any]:
-    """Turn an Understanding form into JSON to save.
+def _reply_plan_form_values(form: ReplyPlanForm) -> dict[str, Any]:
+    """Turn a Reply Plan form into JSON to save.
 
     Args:
         form: The form.
@@ -2236,9 +2347,6 @@ def _understanding_form_values(form: UnderstandingForm) -> dict[str, Any]:
 def _to_knowledge_lookup(stored: dict[str, Any] | None) -> KnowledgeLookup | None:
     """Turn a saved Knowledge lookup back into one.
 
-    Lookups saved before documents were chosen by number named them by
-    title only; those names are skipped.
-
     Args:
         stored: The lookup as saved; None if no Knowledge was chosen.
 
@@ -2259,11 +2367,8 @@ def _to_knowledge_lookup(stored: dict[str, Any] | None) -> KnowledgeLookup | Non
     return KnowledgeLookup(documents=documents, search=stored["search"])
 
 
-def _to_understanding_form(stored: dict[str, Any]) -> UnderstandingForm:
-    """Turn a saved form back into an Understanding form.
-
-    Forms saved before "struggling" and "asked_for_photo" were asked for
-    read them as false, and those saved before Moves read as naming none.
+def _to_reply_plan_form(stored: dict[str, Any]) -> ReplyPlanForm:
+    """Turn a saved form back into a Reply Plan form.
 
     Args:
         stored: The form as saved.
@@ -2271,18 +2376,23 @@ def _to_understanding_form(stored: dict[str, Any]) -> UnderstandingForm:
     Returns:
         The form.
     """
-    return UnderstandingForm(
+    return ReplyPlanForm(
         need=stored["need"],
-        nuance=stored["nuance"],
-        mood=stored["mood"],
-        intensity=MoodIntensity(stored["intensity"]),
-        cause_known=stored["cause_known"],
+        guidance=stored["guidance"],
+        lead_move=stored["lead_move"],
+        lead_move_why=stored["lead_move_why"],
+        support_move=stored["support_move"],
+        support_move_why=stored["support_move_why"],
+        next_move=stored["next_move"],
+        next_move_why=stored["next_move_why"],
         memory_categories=tuple(stored["memory_categories"]),
+        threads_touched=tuple(stored["threads_touched"]),
         bring_up=tuple(
             ThreadToBringUp(
                 thread_id=UUID(item["thread_id"]),
                 title=item["title"],
                 how=BringUpWay(item["how"]),
+                why=item["why"],
             )
             for item in stored["bring_up"]
         ),
@@ -2294,26 +2404,20 @@ def _to_understanding_form(stored: dict[str, Any]) -> UnderstandingForm:
             )
             for item in stored["left_alone"]
         ),
-        look_up_past=tuple(stored["look_up_past"]),
-        knowledge=_to_knowledge_lookup(stored["knowledge"]),
-        threads_touched=tuple(stored["threads_touched"]),
         curiosities=tuple(
             CuriosityToRaise(
                 curiosity_id=UUID(item["curiosity_id"]),
                 question=item["question"],
                 why=item["why"],
                 how=BringUpWay(item["how"]),
-                guess=item.get("guess"),
-                how_sure=HowSure(item["how_sure"]) if item.get("how_sure") else None,
+                guess=item["guess"],
+                how_sure=HowSure(item["how_sure"]) if item["how_sure"] else None,
             )
-            for item in stored.get("curiosities", [])
+            for item in stored["curiosities"]
         ),
-        struggling=stored.get("struggling", False),
-        asked_for_photo=stored.get("asked_for_photo", False),
-        lead_move=stored.get("lead_move", ""),
-        support_move=stored.get("support_move", ""),
-        next_move=stored.get("next_move", ""),
-        next_move_why=stored.get("next_move_why", ""),
+        knowledge=_to_knowledge_lookup(stored["knowledge"]),
+        photo_fits=stored["photo_fits"],
+        ask_why=stored["ask_why"],
     )
 
 
@@ -5268,8 +5372,9 @@ def _to_model_call_content(values: dict[str, Any]) -> ModelCallContent:
 def _to_understanding_shape(values: dict[str, Any]) -> UnderstandingShape:
     """Read an Understanding call's stored shape.
 
-    Shapes stored before Moves, or before the next Move, read as naming
-    none.
+    Shapes stored before the Understanding only read (ADR-0021) also hold
+    the Need, Moves and Thread counts, which are ignored, and read as not
+    struggling.
 
     Args:
         values: The stored JSON.
@@ -5278,18 +5383,32 @@ def _to_understanding_shape(values: dict[str, Any]) -> UnderstandingShape:
         The shape.
     """
     return UnderstandingShape(
-        need=values["need"],
         intensity=MoodIntensity(values["intensity"]),
         cause_known=values["cause_known"],
+        struggling=values.get("struggling", False),
+        past_look_ups=values["past_look_ups"],
+    )
+
+
+def _to_reply_plan_shape(values: dict[str, Any]) -> ReplyPlanShape:
+    """Read a Reply Plan call's stored shape.
+
+    Args:
+        values: The stored JSON.
+
+    Returns:
+        The shape.
+    """
+    return ReplyPlanShape(
+        need=values["need"],
         threads_reminded=values["threads_reminded"],
         threads_led_with=values["threads_led_with"],
         threads_woven_in=values["threads_woven_in"],
         threads_left_alone=values["threads_left_alone"],
         threads_held_back=values["threads_held_back"],
-        past_look_ups=values["past_look_ups"],
-        lead_move=values.get("lead_move"),
-        support_move=values.get("support_move"),
-        next_move=values.get("next_move"),
+        lead_move=values["lead_move"],
+        support_move=values["support_move"],
+        next_move=values["next_move"],
     )
 
 
@@ -5340,6 +5459,9 @@ def to_model_call(row: Row[Any]) -> ModelCall:
         check_in_shape=(
             _to_check_in_shape(row.check_in_shape) if row.check_in_shape else None
         ),
+        reply_plan_shape=(
+            _to_reply_plan_shape(row.reply_plan_shape) if row.reply_plan_shape else None
+        ),
     )
 
 
@@ -5385,6 +5507,9 @@ class PostgresModelCallRepository:
                     check_in_shape=(
                         asdict(call.check_in_shape) if call.check_in_shape else None
                     ),
+                    reply_plan_shape=(
+                        asdict(call.reply_plan_shape) if call.reply_plan_shape else None
+                    ),
                 )
             )
 
@@ -5412,6 +5537,30 @@ class PostgresModelCallRepository:
                 update(model_calls)
                 .where(model_calls.c.id == newest_understanding_call)
                 .values(understanding_shape=asdict(shape))
+            )
+
+    def set_reply_plan_shape(self, trace_id: UUID, shape: ReplyPlanShape) -> None:
+        """Save the Reply Plan's shape on a trace's newest Reply Plan call.
+
+        Args:
+            trace_id: The trace's ID.
+            shape: The Reply Plan's shape.
+        """
+        newest_reply_plan_call = (
+            select(model_calls.c.id)
+            .where(
+                model_calls.c.trace_id == trace_id,
+                model_calls.c.step == ModelStep.REPLY_PLAN.value,
+            )
+            .order_by(model_calls.c.position.desc())
+            .limit(1)
+            .scalar_subquery()
+        )
+        with self._database.begin() as connection:
+            connection.execute(
+                update(model_calls)
+                .where(model_calls.c.id == newest_reply_plan_call)
+                .values(reply_plan_shape=asdict(shape))
             )
 
     def set_check_in_shape(self, trace_id: UUID, shape: CheckInShape) -> None:
@@ -5752,6 +5901,7 @@ def _build_repositories(
         needs=PostgresNeedRepository(database),
         moves=PostgresMoveRepository(database),
         understandings=PostgresUnderstandingRepository(database),
+        reply_plans=PostgresReplyPlanRepository(database),
         user_memory=PostgresUserMemoryRepository(database),
         life_threads=PostgresLifeThreadRepository(database),
         curiosities=PostgresCuriosityRepository(database),

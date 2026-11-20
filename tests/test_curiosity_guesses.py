@@ -18,8 +18,8 @@ from tests.test_curiosities import (
     end_conversation,
     new_curiosity,
     reply_instructions,
+    reply_plan_sees,
     stored_curiosities,
-    understanding_sees,
 )
 from tests.test_curiosity_check_in import (
     check_in_model_saw,
@@ -133,7 +133,7 @@ def test_an_answered_waiting_guess_is_closed_by_the_keeping_step(
     assert row["state"] == "closed"
 
 
-def test_a_due_guess_is_shown_to_the_understanding_as_a_guess_to_check_gently(
+def test_a_due_guess_is_shown_to_the_reply_plan_as_a_guess_to_check_gently(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -145,7 +145,7 @@ def test_a_due_guess_is_shown_to_the_understanding_as_a_guess_to_check_gently(
     connect_telegram(client, auth_verifier, chat_channel)
     mum_guess_is_waiting(client, chat_model, clock, scheduler, seeded_settings)
 
-    seen = understanding_sees(client, chat_model, "talked to mum last night")
+    seen = reply_plan_sees(client, chat_model, "talked to mum last night")
 
     assert f"[1] {MUM} Why: {MUM_WHY} Sensitivity: low. {MUM_GUESS_SHOWN}" in seen
 

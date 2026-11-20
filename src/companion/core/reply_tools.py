@@ -49,7 +49,7 @@ class ReplyOffer:
 
 @dataclass(frozen=True)
 class ReplyGuidance:
-    """What the Understanding adds to the reply's instructions, by priority.
+    """What the Reply Plan adds to the reply's instructions, by priority.
 
     Attributes:
         boundaries: The Life Threads to leave alone, each with why; "" if

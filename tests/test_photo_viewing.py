@@ -23,7 +23,7 @@ from tests.fakes import (
     FakeTimer,
     ScriptedChatModel,
     ToolCall,
-    understanding_answer,
+    reply_plan_answer,
 )
 from tests.telegram_helpers import (
     TELEGRAM_CHAT_ID,
@@ -243,9 +243,7 @@ def test_shared_photos_are_not_used_while_photo_viewing_is_off_and_come_back_on(
 ) -> None:
     headers = connect_maya_with_a_shared_cat(client, auth_verifier, chat_channel)
     client.patch("/api/me", json={"photo_viewing_enabled": False}, headers=headers)
-    chat_model.script_understanding(
-        understanding_answer(memory_categories=["Shared Photos"])
-    )
+    chat_model.script_reply_plan(reply_plan_answer(memory_categories=["Shared Photos"]))
 
     off = reply_call(client, chat_model, "Miso!", "hi")
 
@@ -253,14 +251,12 @@ def test_shared_photos_are_not_used_while_photo_viewing_is_off_and_come_back_on(
     assert send_photo_tools(off) == []
     assert all(
         "Shared Photos" not in call.history[-1].text
-        for call in chat_model.understanding_calls
+        for call in chat_model.reply_plan_calls
     )
     assert [photo["description"] for photo in shared_photos(client, headers)] == [CAT]
 
     client.patch("/api/me", json={"photo_viewing_enabled": True}, headers=headers)
-    chat_model.script_understanding(
-        understanding_answer(memory_categories=["Shared Photos"])
-    )
+    chat_model.script_reply_plan(reply_plan_answer(memory_categories=["Shared Photos"]))
 
     on = reply_call(client, chat_model, "Miso!", "hi")
 

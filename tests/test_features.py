@@ -17,7 +17,7 @@ from tests.fakes import (
     FakeScheduler,
     ScriptedChatModel,
     ToolCall,
-    understanding_answer,
+    reply_plan_answer,
 )
 from tests.knowledge_helpers import upload_document
 from tests.telegram_helpers import (
@@ -610,9 +610,9 @@ def test_with_stickers_off_admins_still_add_stickers_in_chat(
 
 
 def choose_breath_passage(chat_model: ScriptedChatModel) -> None:
-    """Have the next Understanding choose the breath document."""
-    chat_model.script_understanding(
-        understanding_answer(
+    """Have the next Reply Plan choose the breath document."""
+    chat_model.script_reply_plan(
+        reply_plan_answer(
             knowledge_documents=[1],
             knowledge_search="notice the breath entering",
         )
@@ -754,15 +754,15 @@ def test_with_user_memory_off_by_an_admin_memory_is_still_used_and_the_choice_is
     note = unavailable_note(seeded_settings, USER_MEMORY_IN_REPLY_NOTE)
 
     switch_for_user(client, admin, user_id, "user_memory", "off")
-    chat_model.understanding_calls.clear()
+    chat_model.reply_plan_calls.clear()
     off = reply_call(client, chat_model, "my sister called")
-    understandings_while_off = list(chat_model.understanding_calls)
+    reply_plans_while_off = list(chat_model.reply_plan_calls)
     me_while_off = client.get("/api/me", headers=maya).json()
     memories_while_off = memory_contents(client, maya)
     switch_for_user(client, admin, user_id, "user_memory", "default")
     back_on = reply_call(client, chat_model, "my sister called")
 
-    assert len(understandings_while_off) == 1
+    assert len(reply_plans_while_off) == 1
     assert "Talked about work and family." in off.instructions
     assert note in off.instructions
     assert unavailable_note(seeded_settings, "User Memory") not in off.instructions

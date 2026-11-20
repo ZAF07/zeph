@@ -15,7 +15,7 @@ from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
     ScriptedChatModel,
-    understanding_answer,
+    reply_plan_answer,
 )
 from tests.telegram_helpers import (
     auth_headers,
@@ -332,7 +332,7 @@ def test_a_needs_ruled_out_moves_are_shown_and_saved(
     assert stored_rule_outs(engine)["Advice"] == {"Calm", "Push"}
 
 
-def test_a_changed_rule_out_changes_the_moves_the_next_understanding_is_shown(
+def test_a_changed_rule_out_changes_the_moves_the_next_reply_plan_is_shown(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -347,14 +347,12 @@ def test_a_changed_rule_out_changes_the_moves_the_next_understanding_is_shown(
         json=need_body(advice, [move_named(client, admin, "Push")["id"]]),
         headers=admin,
     )
-    chat_model.script_understanding(
-        understanding_answer(need="Advice", lead_move="Push")
-    )
+    chat_model.script_reply_plan(reply_plan_answer(need="Advice", lead_move="Push"))
     chat_model.script("ok")
 
     send_to_webhook(client, telegram_text_update("what should I do?"))
 
-    asked = chat_model.understanding_calls[-1].history[0].text
+    asked = chat_model.reply_plan_calls[-1].history[0].text
     assert "- Advice: Calm, Ground, Reframe, Mirror, Suggest, Plan steps, Research" in (
         asked
     )
@@ -380,15 +378,15 @@ def test_an_edited_move_reaches_the_next_reply(
         },
         headers=admin,
     )
-    chat_model.script_understanding(
-        understanding_answer(need="Advice", lead_move="Offer ideas")
+    chat_model.script_reply_plan(
+        reply_plan_answer(need="Advice", lead_move="Offer ideas")
     )
     chat_model.script("try this")
 
     send_to_webhook(client, telegram_text_update("what should I do?"))
 
     assert "- Offer ideas: They want ideas." in (
-        chat_model.understanding_calls[-1].history[0].text
+        chat_model.reply_plan_calls[-1].history[0].text
     )
     reply_call = chat_model.calls[-1]
     assert "Lead with: Offer ideas. Give exactly two ideas and stop." in (
@@ -396,7 +394,7 @@ def test_an_edited_move_reaches_the_next_reply(
     )
 
 
-def test_a_deleted_move_is_not_offered_and_saved_understandings_keep_its_name(
+def test_a_deleted_move_is_not_offered_and_saved_reply_plans_keep_its_name(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -405,19 +403,15 @@ def test_a_deleted_move_is_not_offered_and_saved_understandings_keep_its_name(
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
     admin = owner_headers(client, auth_verifier)
-    chat_model.script_understanding(
-        understanding_answer(need="Advice", lead_move="Suggest")
-    )
+    chat_model.script_reply_plan(reply_plan_answer(need="Advice", lead_move="Suggest"))
     chat_model.script("try this")
     send_to_webhook(client, telegram_text_update("what should I do?"))
 
     suggest_id = move_named(client, admin, "Suggest")["id"]
     client.delete(f"/api/admin/moves/{suggest_id}", headers=admin)
-    chat_model.script_understanding(
-        understanding_answer(need="Advice", lead_move="Suggest")
-    )
+    chat_model.script_reply_plan(reply_plan_answer(need="Advice", lead_move="Suggest"))
     chat_model.script("hmm")
     send_to_webhook(client, telegram_text_update("and now?"))
 
-    assert "- Suggest:" not in chat_model.understanding_calls[-1].history[0].text
+    assert "- Suggest:" not in chat_model.reply_plan_calls[-1].history[0].text
     assert saved_moves(engine) == [("Suggest", None), (None, None)]

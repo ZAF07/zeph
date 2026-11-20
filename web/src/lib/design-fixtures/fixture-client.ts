@@ -8,6 +8,7 @@ import { checkInsFixtures } from "@/lib/design-fixtures/check-ins";
 import { copyFixtures } from "@/lib/design-fixtures/copy";
 import { homeFixtures } from "@/lib/design-fixtures/home";
 import { memoriesFixtures } from "@/lib/design-fixtures/memories";
+import { modelCallTraceFixtures } from "@/lib/design-fixtures/model-call-trace";
 import { onboardingFixtures } from "@/lib/design-fixtures/onboarding";
 import { overviewFixtures } from "@/lib/design-fixtures/overview";
 import { planFixtures } from "@/lib/design-fixtures/plan";
@@ -82,6 +83,7 @@ export function createFixtureClient(designAs: DesignAs): ApiClient {
     ...onboardingFixtures(globalThis.location?.search ?? ""),
     ...adminUsersFixtures,
     ...adminTablesFixtures,
+    ...modelCallTraceFixtures,
     ...adminFormsFixtures,
     ...adminCardsFixtures,
     ...planFixtures,

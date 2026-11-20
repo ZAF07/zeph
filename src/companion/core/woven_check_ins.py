@@ -29,6 +29,7 @@ from companion.core.models import (
     Feature,
     MessageDirection,
     ModelStep,
+    ReplyPlanForm,
     UnderstandingForm,
     UserSnapshot,
 )
@@ -146,42 +147,45 @@ def describe_conversation_for_check_in(messages: Sequence[ConversationMessage]) 
     )
 
 
-def describe_understanding_for_check_in(
-    form: UnderstandingForm,
+def describe_reading_and_plan_for_check_in(
+    understanding: UnderstandingForm,
+    plan: ReplyPlanForm,
     reminded: Sequence[RemindedThread],
     reply_asks_a_question: bool,
 ) -> str:
-    """Write how the Companion read the newest Message, for the Check-in model.
+    """Write how the Companion read the newest Message and plans to answer it.
 
     Args:
-        form: This Message's Understanding.
+        understanding: This Message's Understanding.
+        plan: This Message's Reply Plan.
         reminded: The Life Threads the Message reminded the Companion of.
         reply_asks_a_question: Whether the reply already asks them a
             question: through a Move that asks one, asking why or a
             Curiosity.
 
     Returns:
-        The Need, mood, nuance, Life Threads reminded of, brought up and left
-        alone, Curiosities to bring up, and whether the reply already asks
-        a question.
+        The Need, mood, guidance, Life Threads reminded of, brought up and
+        left alone, Curiosities to bring up, and whether the reply already
+        asks a question.
     """
     lines = [
-        f"What they need from you right now: {form.need}.",
-        f"How they seem: {form.mood or 'unclear'} ({form.intensity.value}).",
+        f"What they need from you right now: {plan.need}.",
+        f"How they seem: {understanding.mood or 'unclear'} "
+        f"({understanding.intensity.value}).",
     ]
-    if form.nuance:
-        lines.append(form.nuance)
+    if plan.guidance:
+        lines.append(plan.guidance)
     if reminded:
         titles = ", ".join(item.thread.title for item in reminded)
         lines.append(f"It reminded you of: {titles}.")
-    if form.bring_up:
-        titles = ", ".join(item.title for item in form.bring_up)
+    if plan.bring_up:
+        titles = ", ".join(item.title for item in plan.bring_up)
         lines.append(f"Your reply will bring up: {titles}.")
-    if form.left_alone:
-        left = "; ".join(f"{item.title} ({item.reason})" for item in form.left_alone)
+    if plan.left_alone:
+        left = "; ".join(f"{item.title} ({item.reason})" for item in plan.left_alone)
         lines.append(f"You chose to leave alone: {left}.")
-    if form.curiosities:
-        questions = " ".join(item.question for item in form.curiosities)
+    if plan.curiosities:
+        questions = " ".join(item.question for item in plan.curiosities)
         lines.append(f"Your reply will also ask: {questions}")
     if reply_asks_a_question:
         lines.append("Your reply already asks them a question.")
@@ -331,7 +335,7 @@ class WovenCheckInOffer:
 class WovenCheckIns:
     """Lets a reply weave in a Check-in that comes due mid-Conversation.
 
-    After the Understanding, the Check-in model decides whether this reply
+    After the Reply Plan, the Check-in model decides whether this reply
     is offered the Check-in and which Kind, or leaves it for later. The
     reply gets it as an optional extra it may leave out. One offered is
     saved before the reply goes, and taken back if the reply fails or
@@ -364,7 +368,8 @@ class WovenCheckIns:
         self,
         snapshot: UserSnapshot,
         conversation_id: UUID,
-        form: UnderstandingForm,
+        understanding: UnderstandingForm,
+        plan: ReplyPlanForm,
         saved: SavedMemory,
         reminded: Sequence[RemindedThread],
         reply_asks_a_question: bool,
@@ -378,7 +383,8 @@ class WovenCheckIns:
         Args:
             snapshot: The User being answered.
             conversation_id: The Conversation the Message is in.
-            form: This Message's Understanding.
+            understanding: This Message's Understanding.
+            plan: This Message's Reply Plan.
             saved: The User's saved memory, read for this reply.
             reminded: The Life Threads the Message reminded the Companion of.
             reply_asks_a_question: Whether the reply already asks them a
@@ -388,7 +394,9 @@ class WovenCheckIns:
             The Check-in to weave in; None for "not now" or no call.
         """
         due_at = snapshot.user.check_ins.next_due_at
-        if due_at is None or not may_weave_check_in(snapshot, form, self._clock.now()):
+        if due_at is None or not may_weave_check_in(
+            snapshot, understanding, self._clock.now()
+        ):
             return None
         kinds = kinds_to_weave_in(self._repositories.check_ins.list_kinds())
         if not kinds:
@@ -410,7 +418,8 @@ class WovenCheckIns:
                             snapshot,
                             conversation_id,
                             kinds,
-                            form,
+                            understanding,
+                            plan,
                             saved,
                             reminded,
                             reply_asks_a_question,
@@ -514,7 +523,8 @@ class WovenCheckIns:
         snapshot: UserSnapshot,
         conversation_id: UUID,
         kinds: Sequence[CheckInKind],
-        form: UnderstandingForm,
+        understanding: UnderstandingForm,
+        plan: ReplyPlanForm,
         saved: SavedMemory,
         reminded: Sequence[RemindedThread],
         reply_asks_a_question: bool,
@@ -525,7 +535,8 @@ class WovenCheckIns:
             snapshot: The User being answered.
             conversation_id: The Conversation the Message is in.
             kinds: The Check-in Kinds it may choose from.
-            form: This Message's Understanding.
+            understanding: This Message's Understanding.
+            plan: This Message's Reply Plan.
             saved: The User's saved memory, read for this reply.
             reminded: The Life Threads the Message reminded the Companion of.
             reply_asks_a_question: Whether the reply already asks them a
@@ -562,5 +573,7 @@ class WovenCheckIns:
             describe_conversation_for_check_in(
                 self._repositories.conversations.list_messages(conversation_id)
             ),
-            describe_understanding_for_check_in(form, reminded, reply_asks_a_question),
+            describe_reading_and_plan_for_check_in(
+                understanding, plan, reminded, reply_asks_a_question
+            ),
         )

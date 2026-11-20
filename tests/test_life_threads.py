@@ -11,7 +11,7 @@ from tests.fakes import (
     FakeEmbedder,
     FakeScheduler,
     ScriptedChatModel,
-    understanding_answer,
+    reply_plan_answer,
 )
 from tests.telegram_helpers import (
     OWNER_TELEGRAM_USER_ID,
@@ -71,13 +71,13 @@ def end_conversation(
     )
 
 
-def understanding_sees(
+def reply_plan_sees(
     client: TestClient, chat_model: ScriptedChatModel, text: str
 ) -> str:
-    """Send a message and return what its Understanding was given."""
+    """Send a message and return what its Reply Plan was given."""
     chat_model.script("mm, tell me more")
     send_to_webhook(client, telegram_text_update(text))
-    return chat_model.understanding_calls[-1].history[0].text
+    return chat_model.reply_plan_calls[-1].history[0].text
 
 
 def test_a_conversation_end_starts_a_thread_and_naming_someone_in_it_brings_it_back(
@@ -101,16 +101,16 @@ def test_a_conversation_end_starts_a_thread_and_naming_someone_in_it_brings_it_b
     )
     clock.advance(timedelta(days=270))
 
-    seen = understanding_sees(client, chat_model, "Mei's wedding is next week!")
+    seen = reply_plan_sees(client, chat_model, "Mei's wedding is next week!")
 
     assert "[1] Falling-out with Mei (open" in seen
     assert MEI_STORY in seen
 
 
 def bring_up_thread_one(chat_model: ScriptedChatModel, how: str = "lead") -> None:
-    """Script the next Understanding to bring up the first reminded Thread."""
-    chat_model.script_understanding(
-        understanding_answer(bring_up=[{"thread": 1, "how": how}], threads_touched=[1])
+    """Script the next Reply Plan to bring up the first reminded Thread."""
+    chat_model.script_reply_plan(
+        reply_plan_answer(bring_up=[{"thread": 1, "how": how}], threads_touched=[1])
     )
 
 
@@ -168,9 +168,9 @@ def test_a_message_close_in_meaning_to_a_story_brings_it_and_a_weak_match_does_n
         ],
     )
 
-    close = understanding_sees(client, chat_model, "knee pain on long runs")
+    close = reply_plan_sees(client, chat_model, "knee pain on long runs")
     clock.advance(timedelta(days=2))
-    weak = understanding_sees(client, chat_model, "the knee is fine")
+    weak = reply_plan_sees(client, chat_model, "the knee is fine")
 
     assert "Marathon training" in close
     assert "Marathon training" not in weak
@@ -197,9 +197,9 @@ def test_open_threads_come_before_settled_ones_up_to_the_admin_set_number(
     )
     start_mei_thread(client, chat_model, clock, scheduler, seeded_settings)
 
-    both = understanding_sees(client, chat_model, "I saw Mei today")
+    both = reply_plan_sees(client, chat_model, "I saw Mei today")
     set_settings(client, auth_verifier, {"life_threads_per_reply": 1})
-    one = understanding_sees(client, chat_model, "Mei called again")
+    one = reply_plan_sees(client, chat_model, "Mei called again")
 
     assert "[1] Falling-out with Mei (open" in both
     assert "[2] Moving flat with Mei (settled" in both
@@ -228,9 +228,9 @@ def test_the_admin_sets_how_close_a_story_must_be(
     )
 
     set_settings(client, auth_verifier, {"life_threads_closeness_percent": 20})
-    loose = understanding_sees(client, chat_model, "the knee is fine")
+    loose = reply_plan_sees(client, chat_model, "the knee is fine")
     set_settings(client, auth_verifier, {"life_threads_closeness_percent": 100})
-    strict = understanding_sees(client, chat_model, "knee pain again")
+    strict = reply_plan_sees(client, chat_model, "knee pain again")
 
     assert "Marathon training" in loose
     assert "Marathon training" not in strict
@@ -271,8 +271,8 @@ def test_a_thread_left_alone_reaches_the_reply_without_its_story(
     connect_telegram(client, auth_verifier, chat_channel)
     start_mei_thread(client, chat_model, clock, scheduler, seeded_settings)
 
-    chat_model.script_understanding(
-        understanding_answer(
+    chat_model.script_reply_plan(
+        reply_plan_answer(
             left_alone=[{"thread": 1, "reason": "they're grieving their dog"}],
             threads_touched=[1],
         )
@@ -299,7 +299,7 @@ def test_a_thread_raised_earlier_in_the_conversation_is_not_raised_again(
     reply_instructions(client, chat_model, "my sister's wedding is next week")
 
     bring_up_thread_one(chat_model)
-    seen_again = understanding_sees(client, chat_model, "Mei wants me there")
+    seen_again = reply_plan_sees(client, chat_model, "Mei wants me there")
     second_reply = chat_model.calls[-1].instructions
 
     assert (
@@ -353,11 +353,11 @@ def test_a_brushed_off_thread_waits_the_admin_set_time_before_it_can_come_back(
     )
 
     clock.advance(timedelta(days=3))
-    too_soon = understanding_sees(client, chat_model, "Mei texted me")
+    too_soon = reply_plan_sees(client, chat_model, "Mei texted me")
     clock.advance(timedelta(days=12))
-    after_the_wait = understanding_sees(client, chat_model, "Mei texted me again")
+    after_the_wait = reply_plan_sees(client, chat_model, "Mei texted me again")
     set_settings(client, auth_verifier, {"life_thread_brushed_off_wait_days": 30})
-    longer_wait = understanding_sees(client, chat_model, "Mei called")
+    longer_wait = reply_plan_sees(client, chat_model, "Mei called")
 
     assert "they brushed it off. Don't bring it up: they brushed it off" in too_soon
     assert "Don't bring it up" not in after_the_wait
@@ -382,7 +382,7 @@ def test_a_thread_they_asked_to_drop_is_never_offered_again(
     clock.advance(timedelta(days=400))
 
     bring_up_thread_one(chat_model)
-    seen = understanding_sees(client, chat_model, "Mei had a baby")
+    seen = reply_plan_sees(client, chat_model, "Mei had a baby")
     instructions = chat_model.calls[-1].instructions
 
     assert "Don't bring it up: they asked you to drop it" in seen
@@ -426,7 +426,7 @@ def test_conversation_end_updates_a_thread_and_shows_the_keeper_what_was_raised(
     )
     keeper_saw = chat_model.thread_keeping_calls[-1].history[0].text
 
-    seen = understanding_sees(client, chat_model, "the wedding photos came")
+    seen = reply_plan_sees(client, chat_model, "the wedding photos came")
 
     assert "[1] Falling-out with Mei (open" in keeper_saw
     assert "Brought up in this Conversation." in keeper_saw
@@ -459,7 +459,7 @@ def test_with_user_memory_off_no_thread_is_kept_but_saved_ones_are_still_used(
         "Starting a new job at Acme",
         [new_thread(title="New job at Acme", story="Starts Monday.", people=("Acme",))],
     )
-    seen = understanding_sees(client, chat_model, "Mei and Acme both called")
+    seen = reply_plan_sees(client, chat_model, "Mei and Acme both called")
 
     assert len(chat_model.thread_keeping_calls) == 1
     assert "Falling-out with Mei" in seen
@@ -518,12 +518,33 @@ def test_only_the_users_own_threads_are_found(
     scheduler.tick()
     connect_telegram(client, auth_verifier, chat_channel)
 
-    seen = understanding_sees(client, chat_model, "Mei's wedding is next week")
+    seen = reply_plan_sees(client, chat_model, "Mei's wedding is next week")
 
     assert "Falling-out with Mei" not in seen
 
 
-def test_a_failed_understanding_still_gives_the_reply_the_threads_not_held_back(
+def test_a_failed_reply_plan_still_gives_the_reply_the_threads_not_held_back(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    start_mei_thread(client, chat_model, clock, scheduler, seeded_settings)
+    clock.advance(timedelta(days=30))
+
+    chat_model.script_reply_plan(RuntimeError("model is down"))
+    instructions = reply_instructions(client, chat_model, "Mei's wedding is soon")
+
+    assert MEI_STORY in instructions
+    assert "Bring up" not in instructions
+    assert chat_channel.texts_sent_to(5551001)[-1] == "mm, tell me more"
+
+
+def test_a_failed_understanding_still_lets_the_reply_plan_bring_up_a_thread(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -537,11 +558,11 @@ def test_a_failed_understanding_still_gives_the_reply_the_threads_not_held_back(
     clock.advance(timedelta(days=30))
 
     chat_model.script_understanding(RuntimeError("model is down"))
+    bring_up_thread_one(chat_model)
     instructions = reply_instructions(client, chat_model, "Mei's wedding is soon")
 
     assert MEI_STORY in instructions
-    assert "Bring up" not in instructions
-    assert chat_channel.texts_sent_to(5551001)[-1] == "mm, tell me more"
+    assert "- Falling-out with Mei: lead with it." in instructions
 
 
 def test_threads_are_still_found_by_name_when_embedding_fails(
@@ -558,7 +579,7 @@ def test_threads_are_still_found_by_name_when_embedding_fails(
     start_mei_thread(client, chat_model, clock, scheduler, seeded_settings)
     embedder.failure = RuntimeError("embedding model is down")
 
-    seen = understanding_sees(client, chat_model, "my sister's wedding is soon")
+    seen = reply_plan_sees(client, chat_model, "my sister's wedding is soon")
 
     assert "Falling-out with Mei" in seen
 
@@ -613,11 +634,11 @@ def test_a_person_written_with_a_note_in_brackets_is_found_by_either_word(
         [new_thread(people=("Mei (sister)", "Aunt Rosa"))],
     )
 
-    by_relation = understanding_sees(client, chat_model, "my sister's wedding")
+    by_relation = reply_plan_sees(client, chat_model, "my sister's wedding")
     clock.advance(quiet_gap(seeded_settings) * 2)
-    by_full_name = understanding_sees(client, chat_model, "aunt rosa is coming")
+    by_full_name = reply_plan_sees(client, chat_model, "aunt rosa is coming")
     clock.advance(quiet_gap(seeded_settings) * 2)
-    by_part_of_a_name = understanding_sees(client, chat_model, "Rosa is coming")
+    by_part_of_a_name = reply_plan_sees(client, chat_model, "Rosa is coming")
 
     assert "Falling-out with Mei" in by_relation
     assert "Falling-out with Mei" in by_full_name
@@ -644,6 +665,6 @@ def test_raising_a_brushed_off_thread_again_with_user_memory_off_keeps_the_wait(
     raise_and_react(client, chat_model, clock, scheduler, seeded_settings, "engaged")
 
     clock.advance(timedelta(days=3))
-    seen = understanding_sees(client, chat_model, "Mei texted me")
+    seen = reply_plan_sees(client, chat_model, "Mei texted me")
 
     assert "Don't bring it up: they brushed it off" in seen

@@ -1,5 +1,8 @@
-/** One total above an admin table: what is counted and its value. */
-export type StatTile = { label: string; value: string };
+/**
+ * One total above an admin table: what is counted and its value. A wide
+ * tile takes twice the room, for a value that runs long.
+ */
+export type StatTile = { label: string; value: string; wide?: boolean };
 
 /**
  * The row of totals above an admin table, as the table template draws it,
@@ -16,7 +19,7 @@ export function StatTiles({ tiles }: { tiles: StatTile[] }) {
         {tiles.map((tile) => (
           <div
             key={tile.label}
-            className="box-border min-w-0 flex-[1_1_150px] rounded-tile border border-line bg-panel px-5 py-4"
+            className={`box-border min-w-0 ${tile.wide ? "flex-[2_1_280px]" : "flex-[1_1_150px]"} rounded-tile border border-line bg-panel px-5 py-4`}
           >
             <dt className="text-[13px] text-soft">{tile.label}</dt>
             <dd className="m-0 mt-1 text-[26px] leading-[1.1] font-normal text-cream">

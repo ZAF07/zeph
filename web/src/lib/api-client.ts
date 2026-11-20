@@ -604,6 +604,7 @@ export type TraceKind =
 export type ModelStep =
   | "safeguard"
   | "understanding"
+  | "reply_plan"
   | "reply"
   | "photo"
   | "check_in"
@@ -648,20 +649,25 @@ export type ModelCallContent = {
   reasoning: string | null;
 };
 
-/** The shape of an Understanding: the Need, Move names and counts, never any words. */
+/** The shape of an Understanding: intensity, flags and counts, never any words. */
 export type UnderstandingShape = {
+  intensity: "low" | "medium" | "high";
+  cause_known: boolean;
+  struggling: boolean;
+  past_look_ups: number;
+};
+
+/** The shape of a Reply Plan: the Need, Move names and counts, never any words. */
+export type ReplyPlanShape = {
   need: string;
   lead_move: string | null;
   support_move: string | null;
   next_move: string | null;
-  intensity: "low" | "medium" | "high";
-  cause_known: boolean;
   threads_reminded: number;
   threads_led_with: number;
   threads_woven_in: number;
   threads_left_alone: number;
   threads_held_back: number;
-  past_look_ups: number;
 };
 
 /** The shape of a woven-in Check-in decision: counts and the Kind, never any words. */
@@ -686,6 +692,7 @@ export type ModelCall = {
   content: ModelCallContent | null;
   understanding_shape: UnderstandingShape | null;
   check_in_shape: CheckInShape | null;
+  reply_plan_shape: ReplyPlanShape | null;
 };
 
 /** One Model Call Log trace with every call in it, in order. */

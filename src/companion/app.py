@@ -74,6 +74,7 @@ from companion.core.ports import (
 )
 from companion.core.post_conversation import PostConversationProcessor
 from companion.core.reply_gate import ReplyGate
+from companion.core.reply_plan import ReplyPlanService
 from companion.core.reply_service import ReplyService
 from companion.core.response_composition import ResponseComposer
 from companion.core.safeguard import Safeguard
@@ -265,6 +266,12 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             repositories=dependencies.repositories, embedder=dependencies.embedder
         ),
         understanding=UnderstandingService(
+            repositories=dependencies.repositories,
+            chat_model=chat_model,
+            model_call_log=model_call_log,
+            clock=dependencies.clock,
+        ),
+        reply_plan=ReplyPlanService(
             repositories=dependencies.repositories,
             chat_model=chat_model,
             model_call_log=model_call_log,

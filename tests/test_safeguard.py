@@ -66,9 +66,11 @@ def test_safeguard_checks_every_message_before_the_reply_is_written(
     assert chat_model.call_order == [
         "safeguard",
         "understanding",
+        "reply_plan",
         "reply",
         "safeguard",
         "understanding",
+        "reply_plan",
         "reply",
     ]
     first, second = chat_model.safeguard_calls

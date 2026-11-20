@@ -88,6 +88,7 @@ export function ModelCallTraceView({ traceId }: { traceId: string }) {
     {
       label: "Tokens",
       value: formatTokens(trace.tokens_in, trace.tokens_out),
+      wide: true,
     },
     { label: "Time taken", value: formatDuration(trace.duration_ms) },
     { label: "Model calls", value: String(trace.calls.length) },
@@ -95,7 +96,7 @@ export function ModelCallTraceView({ traceId }: { traceId: string }) {
   ];
 
   return (
-    <div className="flex flex-col gap-[22px]">
+    <div className="flex flex-col gap-6">
       {backLink}
       <AdminPageHeader
         title={`${traceKindLabel(trace.kind)} for ${who}`}

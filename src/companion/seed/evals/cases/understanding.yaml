@@ -3,6 +3,13 @@
 # sent one by one through the Telegram webhook, and each Message's
 # Understanding (and, for rules, Zeph's reply) is checked.
 #
+# Since the Reply Plan took over deciding (issue 05, ADR-0021), these cases
+# check the Understanding and the Reply Plan together: the Need, Moves,
+# Threads, Curiosities, asking why and Knowledge come from the Reply Plan,
+# and "found" looks in the Reply Plan's input. They were written for one
+# combined call and may fail until issue 13 splits them into an
+# Understanding Eval and a Reply Plan Eval; don't rewrite them before then.
+#
 # `now` is when the first Message is sent (UTC, which is also the person's
 # time zone). 2026-11-13 is a Friday. A case can set its own `now`.
 #
