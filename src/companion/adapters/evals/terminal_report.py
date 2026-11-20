@@ -18,6 +18,7 @@ EVAL_TITLES = {
     EvalName.PHOTO_DESCRIPTIONS: "Photo descriptions",
     EvalName.UNDERSTANDING: "Understanding",
     EvalName.MOVE_OUTCOME: "Move Outcome",
+    EvalName.DAY_SUMMARY: "Day Summary",
 }
 OUTCOME_MARKS = {
     CaseOutcome.PASS: "PASS",
@@ -242,6 +243,7 @@ SCORES: dict[EvalName, Callable[[Sequence[CaseResult]], str]] = {
     EvalName.PHOTO_DESCRIPTIONS: cases_score("Photo descriptions"),
     EvalName.UNDERSTANDING: checks_score("Understanding", "checks and rules passed"),
     EvalName.MOVE_OUTCOME: checks_score("Move Outcome", "checks and rules passed"),
+    EvalName.DAY_SUMMARY: checks_score("Day Summary", "questions matched"),
 }
 
 

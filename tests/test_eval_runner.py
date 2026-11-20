@@ -51,6 +51,7 @@ from tests.fakes import (
 from tests.telegram_helpers import owner_headers
 from tests.test_moves import stored_rule_outs
 from tests.test_moves_that_ask_a_question import tick_asks_a_question
+from tests.test_post_conversation import processing_answer
 from tests.test_understanding import seeded_needs
 
 PERSONA_CASE = EvalCase(
@@ -2180,3 +2181,254 @@ def test_a_move_deleted_before_the_run_starts_makes_its_variant_an_error(
     assert variant_a["outcome"] == "pass"
     assert variant_b["outcome"] == "error"
     assert "Move deleted before the run started" in variant_b["error"]
+
+
+GUILT_DAY_CASE = EvalCase(
+    key="guilt-and-job-worry",
+    eval=EvalName.DAY_SUMMARY,
+    content={
+        "messages": [
+            {
+                "who": "person",
+                "time": "9:10 AM",
+                "text": "I snapped at my sister again this morning.",
+            },
+            {"who": "zeph", "time": "9:12 AM", "text": "What happened just before?"},
+            {
+                "who": "person",
+                "time": "8:30 PM",
+                "text": "I sent her a sorry text and she replied with a heart.",
+            },
+        ],
+        "questions": [
+            {
+                "question": "What did the User feel guilty about?",
+                "expected": "Snapping at their sister in the morning.",
+            },
+            {
+                "question": "What did Zeph offer, and how did it land?",
+                "expected": "A question about what happened just before.",
+            },
+        ],
+    },
+)
+
+
+def day_summary_answers(*answers: str) -> str:
+    """Build the Judge's answers to a Day Summary case's questions, in order."""
+    return json.dumps(
+        {
+            "answers": [
+                {"question": number, "answer": answer}
+                for number, answer in enumerate(answers, 1)
+            ]
+        }
+    )
+
+
+def day_summary_marks(*marks: tuple[bool, str]) -> str:
+    """Build the Judge's marks on a Day Summary case's answers, in order."""
+    return json.dumps(
+        {
+            "marks": [
+                {"question": number, "match": matched, "reason": reason}
+                for number, (matched, reason) in enumerate(marks, 1)
+            ]
+        }
+    )
+
+
+def test_a_day_summary_case_writes_the_whole_day_s_summary_and_the_judge_reads_only_it(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, GUILT_DAY_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.DAY_SUMMARY)
+    chat_model.script_processing(
+        processing_answer(
+            summary="Felt guilty about snapping at their sister.",
+            mood="guilty, then lighter",
+            offered="Asked what came before; they opened up.",
+        )
+    )
+    chat_model.script(
+        day_summary_answers("Snapping at their sister.", "Asked what came before."),
+        day_summary_marks(
+            (True, "The Summary says so."), (True, "The Summary says what Zeph asked.")
+        ),
+    )
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "pass", result
+    assert [(check["name"], check["passed"]) for check in result["checks"]] == [
+        ("What did the User feel guilty about?", True),
+        ("What did Zeph offer, and how did it land?", True),
+    ]
+    [processing_call] = chat_model.processing_calls
+    shown = processing_call.history[0].text
+    assert "I snapped at my sister again this morning." in shown
+    assert "I sent her a sorry text and she replied with a heart." in shown
+    answers_call, marks_call = [
+        call for call in chat_model.calls if "Day Summary:" in call.history[0].text
+    ]
+    asked = answers_call.history[0].text
+    written = (
+        "19 Nov 2026: Felt guilty about snapping at their sister. They seemed "
+        "guilty, then lighter. Asked what came before; they opened up."
+    )
+    assert written in asked
+    assert "1. What did the User feel guilty about?" in asked
+    assert "Snapping at their sister in the morning." not in asked
+    assert "I snapped at my sister" not in asked
+    assert "Expected: Snapping at their sister in the morning." in (
+        marks_call.history[0].text
+    )
+    assert "Answer from the Summary: Snapping at their sister." in (
+        marks_call.history[0].text
+    )
+    assert result["day_summary"] == {
+        "summary": written,
+        "answers": [
+            {
+                "question": "What did the User feel guilty about?",
+                "expected": "Snapping at their sister in the morning.",
+                "answer": "Snapping at their sister.",
+                "matched": True,
+                "reason": "The Summary says so.",
+            },
+            {
+                "question": "What did Zeph offer, and how did it land?",
+                "expected": "A question about what happened just before.",
+                "answer": "Asked what came before.",
+                "matched": True,
+                "reason": "The Summary says what Zeph asked.",
+            },
+        ],
+    }
+    trace = client.get(
+        f"/api/admin/eval-runs/{run['id']}/results/{result['id']}", headers=admin
+    ).json()
+    assert [call["step"] for call in trace["calls"]] == ["conversation_end"]
+
+
+def test_a_day_summary_case_fails_when_any_answer_misses_with_the_judge_s_reason(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, GUILT_DAY_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.DAY_SUMMARY)
+    chat_model.script_processing(processing_answer(summary="Snapped at their sister."))
+    chat_model.script(
+        day_summary_answers("Snapping at their sister.", "It doesn't say."),
+        day_summary_marks(
+            (True, "Stated directly."),
+            (False, "Leaves out what Zeph offered."),
+        ),
+    )
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "fail"
+    assert [(check["passed"], check["detail"]) for check in result["checks"]] == [
+        (True, "Stated directly."),
+        (False, "Leaves out what Zeph offered."),
+    ]
+    assert result["day_summary"]["answers"][1]["answer"] == "It doesn't say."
+    assert "Snapped at their sister." in "\n".join(result["notes"])
+
+
+def test_a_day_summary_case_with_no_summary_written_misses_every_question_unjudged(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, GUILT_DAY_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.DAY_SUMMARY)
+    chat_model.script_processing("not json", "still not json")
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "fail"
+    assert [(check["passed"], check["detail"]) for check in result["checks"]] == [
+        (False, "No Day Summary was written.")
+    ] * 2
+    assert result["day_summary"]["summary"] == ""
+    assert not [
+        call for call in chat_model.calls if "Day Summary:" in call.history[0].text
+    ]
+
+
+def test_a_judge_answer_that_can_t_be_read_misses_every_question(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, GUILT_DAY_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.DAY_SUMMARY)
+    chat_model.script_processing(processing_answer(summary="Snapped at their sister."))
+    chat_model.script(
+        day_summary_answers("Snapping at their sister.", "It doesn't say."),
+        "I think they all match",
+    )
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "fail"
+    assert all(not check["passed"] for check in result["checks"])
+    assert "could not be read" in result["checks"][0]["detail"]
+
+
+def test_a_memory_processing_override_reaches_only_its_variant(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, GUILT_DAY_CASE)
+    admin = owner_headers(client, auth_verifier)
+    live_before = PostgresPlatformSettingsRepository(engine).load().values
+    start_run(
+        client,
+        admin,
+        EvalName.DAY_SUMMARY,
+        variants=[{}, {"memory_processing_prompt": "Write the day warmly."}],
+    )
+    chat_model.script_processing(processing_answer())
+    chat_model.script(
+        day_summary_answers("a", "b"),
+        day_summary_marks((True, "ok"), (True, "ok")),
+        processing_answer(),
+        day_summary_answers("a", "b"),
+        day_summary_marks((True, "ok"), (True, "ok")),
+    )
+
+    runner.work_next_run()
+
+    assert len(chat_model.processing_calls) == 1
+    [variant_call] = [
+        call
+        for call in chat_model.calls
+        if call.instructions == "Write the day warmly."
+    ]
+    assert "I snapped at my sister again this morning." in variant_call.history[0].text
+    assert PostgresPlatformSettingsRepository(engine).load().values == live_before

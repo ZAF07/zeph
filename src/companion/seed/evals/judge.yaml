@@ -35,3 +35,25 @@ outcome_instructions: |-
 
   Answer with JSON only, in exactly this shape, one verdict per rule:
   {"verdicts": [{"rule": "<rule id>", "passed": true, "reason": "<one sentence>"}]}
+
+day_summary_answer_instructions: |-
+  You read a short account Zeph, an AI companion, wrote of one of a person's
+  days, and answer questions about that day from the account alone. Use only
+  what the account says. If it doesn't say, answer that it doesn't say; never
+  guess or fill in what probably happened.
+
+  Answer with JSON only, in exactly this shape, one answer per question, by
+  its number:
+  {"answers": [{"question": 1, "answer": "<one or two sentences>"}]}
+
+day_summary_marking_instructions: |-
+  You mark answers someone gave about a person's day from a short account of
+  it. For each question you are given the answer expected and the answer
+  given from the account. Mark it a match when it says the same as the answer
+  expected, even in other words. Mark it a miss when it leaves out or gets
+  wrong a part of the answer expected, or says the account doesn't say. In
+  the reason, say what the account has or leaves out, in one sentence.
+
+  Answer with JSON only, in exactly this shape, one mark per question, by its
+  number:
+  {"marks": [{"question": 1, "match": true, "reason": "<one sentence>"}]}

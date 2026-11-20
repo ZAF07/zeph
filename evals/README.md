@@ -4,7 +4,7 @@ The evals measure how the Companion behaves with the real LLM. They are not
 tests: they cost money and their results vary a little from run to run. They
 never run in `make check`.
 
-There are seven:
+There are eight:
 
 - **Safeguard**: about 30 labelled messages (clear crises, subtle crises and
   false alarms like "this traffic is killing me"), and photos of test images
@@ -65,6 +65,16 @@ There are seven:
   (e.g. "says the User wanted options, not questions", or "never labels the
   User lazy"). Other Move Outcomes kept are listed but don't fail the case.
   A case makes one keeping call plus the judge, so it is cheap.
+- **Day Summary**: each case is a made-up day of messages (From, Time,
+  Text) and questions with the answers expected, about the facts, the
+  feelings and what Zeph offered and how it landed. The day is saved split
+  into Conversations where it went quiet, and the real Day Summary step
+  alone writes its Summary with the memory processing prompt, model and
+  thinking in the Platform Settings (a Variant can override them). The judge
+  answers every question from the Summary alone, never seeing the messages
+  or the expected answers, then marks each answer Match or Miss against the
+  answer expected, with a reason. A case passes only if every answer
+  matches. A case makes one processing call and two judge calls.
 
 ## Where they run
 
@@ -108,7 +118,7 @@ From the terminal, with the stack running (`make up`, or `make restart` in a
 worktree, which runs its own stack and Eval database):
 
 ```sh
-make eval                                # all seven Evals
+make eval                                # all eight Evals
 make eval EVALS=safeguard                # one Eval
 make eval EVALS=persona,understanding    # several
 make eval CASES=reminded-of-sister       # single cases, by key
@@ -253,7 +263,7 @@ the test images in `src/companion/seed/evals/images/`. On start-up the
 backend adds every case whose key (its `id`) isn't in the database yet, with
 its images. It never changes a case already there, edited or archived, so
 editing a seed file doesn't change an existing case, and keys must be unique
-across all seven files. Each file explains its own format at the top; the
+across all eight files. Each file explains its own format at the top; the
 backend rewrites it into the form's shape when it reads it.
 
 - `safeguard.yaml`: add an `id`, a `kind` (`clear_crisis`, `subtle_crisis` or
@@ -283,6 +293,9 @@ backend rewrites it into the form's shape when it reads it.
   the Reply Plan only when close enough to the Message (the Move Outcome
   closeness bar in Platform Settings), so write their situation and feeling
   near the Message's words.
+- `day_summary.yaml`: add an `id`, the day's `messages` (each `who`, `time`
+  and `text`, in order; write times with AM or PM, since YAML reads a bare
+  21:10 as a number) and `questions` (each `question` and `expected`).
 
 Test images are small and made for the purpose (rendered text and shapes, no
 real people or real card numbers). Keep new ones small, too.

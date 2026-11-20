@@ -27,6 +27,7 @@ ROUGH_TOKENS_PER_CASE: dict[EvalName, ModelTokens] = {
     EvalName.PHOTO_DESCRIPTIONS: ModelTokens(1_500, 200),
     EvalName.UNDERSTANDING: ModelTokens(12_000, 1_500),
     EvalName.MOVE_OUTCOME: ModelTokens(3_000, 600),
+    EvalName.DAY_SUMMARY: ModelTokens(4_000, 900),
 }
 
 

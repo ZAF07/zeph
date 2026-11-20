@@ -1,10 +1,10 @@
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time
 from enum import StrEnum
 from typing import Any
 
-from companion.core.evals.case_shapes import InvalidFormError
+from companion.core.evals.case_shapes import InvalidFormError, read_time_of_day
 from companion.core.models import (
     CuriositySensitivity,
     HowSure,
@@ -1246,3 +1246,98 @@ def read_move_outcome_case(key: str, content: dict[str, Any]) -> MoveOutcomeCase
             f"{key} can't be checked: " + "; ".join(problems.values()), problems
         )
     return case
+
+
+@dataclass(frozen=True)
+class DaySummaryMessage:
+    """One message of a Day Summary case's made-up day.
+
+    Attributes:
+        from_person: True if the User sent it; False if Zeph did.
+        sent_at: The time of day it was sent.
+        text: What it says.
+    """
+
+    from_person: bool
+    sent_at: time
+    text: str
+
+
+@dataclass(frozen=True)
+class DaySummaryQuestion:
+    """A question the Day Summary must answer, and the answer expected.
+
+    Attributes:
+        question: What the Judge is asked, e.g. "What did the User feel
+            guilty about?".
+        expected: The answer it should give from the Summary.
+    """
+
+    question: str
+    expected: str
+
+
+@dataclass(frozen=True)
+class DaySummaryCase:
+    """A made-up day of messages and what its Day Summary must answer.
+
+    Attributes:
+        id: The case's key.
+        messages: The day's messages, in order.
+        questions: The questions, in order.
+    """
+
+    id: str
+    messages: list[DaySummaryMessage]
+    questions: list[DaySummaryQuestion]
+
+
+def read_day_summary_case(key: str, content: dict[str, Any]) -> DaySummaryCase:
+    """Read a Day Summary case and check its times can be used.
+
+    Args:
+        key: The case's key.
+        content: `messages` (each `{who, time, text}`, `who` being "person"
+            or "zeph") and `questions` (each `{question, expected}`).
+
+    Returns:
+        The case.
+
+    Raises:
+        InvalidEvalCaseError: If a message's time can't be read, or comes
+            before the message above it.
+    """
+    problems: dict[str, str] = {}
+    messages: list[DaySummaryMessage] = []
+    for number, entry in enumerate(content["messages"]):
+        sent_at = read_time_of_day(entry["time"])
+        if sent_at is None:
+            raise InvalidEvalCaseError(
+                f"{key} can't be checked: a time can't be read",
+                {f"messages.{number}.time": "Write a time like 9:10 AM or 21:10."},
+            )
+        if messages and sent_at < messages[-1].sent_at:
+            problems[f"messages.{number}.time"] = (
+                "Comes before the message above it; the day goes in order."
+            )
+        messages.append(
+            DaySummaryMessage(
+                from_person=entry["who"] == "person",
+                sent_at=sent_at,
+                text=entry["text"],
+            )
+        )
+    if problems:
+        raise InvalidEvalCaseError(
+            f"{key} can't be checked: " + "; ".join(problems.values()), problems
+        )
+    return DaySummaryCase(
+        id=key,
+        messages=messages,
+        questions=[
+            DaySummaryQuestion(
+                question=entry["question"].strip(), expected=entry["expected"].strip()
+            )
+            for entry in content["questions"]
+        ],
+    )

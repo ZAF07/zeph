@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { EvalCaseForm } from "@/components/EvalCaseForm";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LoadingPanel } from "@/components/LoadingPanel";
-import type { EvalName } from "@/lib/api-client";
+import type { EvalName, FormValues } from "@/lib/api-client";
 import { queryKeys } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
 
@@ -14,15 +14,18 @@ import { useApiClient } from "@/lib/use-api-client";
  * the case, then shows the form.
  *
  * @param props - `evalName` is the case's Eval; `caseKey` is the case to
- *   edit, or undefined to add a new one.
+ *   edit, or undefined to add a new one; `draft` fills a new case's form in,
+ *   as design-fixture mode draws it.
  * @returns The form, or a loading or error state.
  */
 export function EvalCaseEditor({
   evalName,
   caseKey,
+  draft,
 }: {
   evalName: EvalName;
   caseKey?: string;
+  draft?: { key: string; content: FormValues };
 }) {
   const apiClient = useApiClient();
   const shapesQuery = useQuery({
@@ -62,6 +65,7 @@ export function EvalCaseEditor({
       evalName={evalName}
       shape={shape}
       existing={existing}
+      draft={draft}
     />
   );
 }

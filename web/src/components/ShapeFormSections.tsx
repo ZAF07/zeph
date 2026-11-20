@@ -1,12 +1,13 @@
 "use client";
 
-import { ShapeGroupFields } from "@/components/ShapeGroupFields";
+import { SectionFields } from "@/components/SectionFields";
 import type { FormShape, FormValues } from "@/lib/api-client";
 
 /**
- * A case or Judge form's sections, each with its heading, what it is for
+ * A case or Judge form's sections, each a panel with its heading, its hint
  * and its fields. The backend's shape draws it, so it shows every field the
- * backend checks, explained.
+ * backend checks. A section that is one list draws the list's entries
+ * straight in the panel, as the Day Summary case's "The day" does.
  *
  * @param props - `shape` describes the form, `value` holds its values,
  *   `errors` are the backend's messages by field path, `disabled` locks it
@@ -32,18 +33,19 @@ export function ShapeFormSections({
         <section
           key={section.title}
           aria-label={section.title}
-          className="flex flex-col gap-5 rounded-card border border-line bg-panel px-6 py-[22px]"
+          className="box-border flex flex-col gap-[14px] rounded-card border border-line bg-panel px-6 py-[22px]"
         >
-          <header className="flex flex-col gap-1">
+          <div>
             <h2 className="m-0 text-[17px] font-normal text-cream">
               {section.title}
             </h2>
-            <p className="m-0 text-[13px] text-soft">{section.description}</p>
-          </header>
-          <ShapeGroupFields
-            fields={section.fields}
+            <p className="mt-1 mb-0 max-w-[640px] text-[13px] text-soft">
+              {section.description}
+            </p>
+          </div>
+          <SectionFields
+            section={section}
             value={value}
-            path=""
             errors={errors}
             disabled={disabled}
             onChange={onChange}

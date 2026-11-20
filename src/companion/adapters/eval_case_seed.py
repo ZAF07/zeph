@@ -16,6 +16,7 @@ CASE_FILES = {
     EvalName.PHOTO_DESCRIPTIONS: "photo_descriptions.yaml",
     EvalName.UNDERSTANDING: "understanding.yaml",
     EvalName.MOVE_OUTCOME: "move_outcome.yaml",
+    EvalName.DAY_SUMMARY: "day_summary.yaml",
 }
 
 

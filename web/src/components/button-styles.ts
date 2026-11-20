@@ -34,3 +34,7 @@ export const confirmDangerButton = dangerButton;
 /** An icon-only delete button inside a card or list row. */
 export const deleteIconButton =
   "inline-flex size-11 flex-none cursor-pointer items-center justify-center rounded-input border-0 bg-transparent p-0 text-soft disabled:cursor-not-allowed disabled:opacity-60";
+
+/** The small Remove and Add buttons of a case form's list entries. */
+export const entryButton =
+  "inline-flex min-h-9 cursor-pointer items-center justify-center rounded-pill border border-line-strong bg-transparent px-3.5 text-[13px] whitespace-nowrap text-text disabled:cursor-not-allowed disabled:text-mute";

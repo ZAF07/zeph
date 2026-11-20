@@ -1,8 +1,16 @@
 "use client";
 
-import { compactSecondaryButton } from "@/components/button-styles";
-import { fieldCaption, inputField } from "@/components/form-styles";
-import { fieldPath, type ShapeFieldProps } from "@/lib/eval-forms";
+import { entryButton } from "@/components/button-styles";
+import {
+  entryInputField,
+  fieldHint,
+  inputField,
+} from "@/components/form-styles";
+import {
+  addEntryLabel,
+  fieldPath,
+  type ShapeFieldProps,
+} from "@/lib/eval-forms";
 
 /**
  * A list of short texts, such as a Message's expected Needs: one line per
@@ -18,6 +26,7 @@ export function ShapeTextList({
   errors,
   disabled,
   onChange,
+  inEntry = false,
 }: ShapeFieldProps) {
   const entries = Array.isArray(value)
     ? value.map((entry) => (typeof entry === "string" ? entry : ""))
@@ -28,13 +37,13 @@ export function ShapeTextList({
   return (
     <section aria-label={field.label} className="flex min-w-0 flex-col gap-2">
       <div className="flex flex-col gap-1.5">
-        <h3 className="m-0 text-[15px] font-normal text-text">
+        <h3 className="m-0 text-[13px] font-normal text-soft">
           {field.label}
-          {field.required ? null : (
-            <span className="text-soft"> · optional</span>
-          )}
+          {field.required ? null : " · optional"}
         </h3>
-        <p className={fieldCaption}>{field.description}</p>
+        {field.description ? (
+          <p className={fieldHint}>{field.description}</p>
+        ) : null}
       </div>
       {entries.map((entry, index) => (
         <div key={index} className="flex flex-col gap-1">
@@ -42,7 +51,7 @@ export function ShapeTextList({
             <input
               type="text"
               aria-label={`${itemLabel} ${index + 1}`}
-              className={inputField}
+              className={inEntry ? entryInputField : inputField}
               value={entry}
               disabled={disabled}
               onChange={(event) =>
@@ -55,7 +64,7 @@ export function ShapeTextList({
             />
             <button
               type="button"
-              className={compactSecondaryButton}
+              className={entryButton}
               disabled={disabled}
               aria-label={`Remove ${itemLabel.toLowerCase()} ${index + 1}`}
               onClick={() =>
@@ -80,11 +89,11 @@ export function ShapeTextList({
       <div>
         <button
           type="button"
-          className={compactSecondaryButton}
+          className={entryButton}
           disabled={disabled}
           onClick={() => onChange([...entries, ""])}
         >
-          Add {itemLabel.toLowerCase()}
+          {addEntryLabel(itemLabel)}
         </button>
       </div>
     </section>

@@ -833,7 +833,7 @@ export type Sticker = {
   added_at: string;
 };
 
-/** One of the seven Evals. */
+/** One of the eight Evals. */
 export type EvalName =
   | "safeguard"
   | "persona"
@@ -841,7 +841,8 @@ export type EvalName =
   | "settings"
   | "photo_descriptions"
   | "understanding"
-  | "move_outcome";
+  | "move_outcome"
+  | "day_summary";
 
 /** An Eval and the cases a new run of it would run. */
 export type EvalSummary = { eval: EvalName; case_keys: string[] };
@@ -1035,6 +1036,22 @@ export type CaseResult = {
   tokens_out: number;
   duration_ms: number;
   finished_at: string;
+  day_summary?: DaySummaryResult | null;
+};
+
+/** One question of a Day Summary case, answered from the Summary and marked. */
+export type DaySummaryAnswer = {
+  question: string;
+  expected: string;
+  answer: string;
+  matched: boolean;
+  reason: string;
+};
+
+/** The Day Summary a Day Summary case wrote, and each question's answer. */
+export type DaySummaryResult = {
+  summary: string;
+  answers: DaySummaryAnswer[];
 };
 
 /** How one Variant's finished cases went, added up. */
@@ -1067,6 +1084,7 @@ export type FieldKind =
   | "on_off"
   | "choice"
   | "date_time"
+  | "time_of_day"
   | "image"
   | "text_list"
   | "group"
