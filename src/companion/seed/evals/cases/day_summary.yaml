@@ -1,0 +1,126 @@
+# Day Summary eval. Each case is one made-up day of messages between a User
+# and Zeph (`who` is `person` or `zeph`), with the time each was sent, e.g.
+# "9:10 AM", in order. Write times with AM or PM: YAML reads a bare 21:10 as
+# a number. The day is saved as if it had happened, split into Conversations
+# wherever the gap is at least the Conversation quiet gap, and the real Day
+# Summary step writes the day's Summary with the memory processing prompt.
+#
+# The Judge then answers each question from the Summary alone, never seeing
+# the messages or the expected answers, and marks each answer against
+# `expected`. A case passes only if every answer matches.
+
+- id: guilt-and-job-worry
+  messages:
+    - who: person
+      time: "9:10 AM"
+      text: I snapped at my sister again this morning and I feel awful about it.
+    - who: zeph
+      time: "9:12 AM"
+      text: That sounds heavy. What was going on just before you snapped?
+    - who: person
+      time: "9:15 AM"
+      text: >-
+        Honestly I barely slept. They announced a restructuring at work
+        yesterday and I keep thinking my job is next.
+    - who: zeph
+      time: "9:16 AM"
+      text: >-
+        So the snap came out of a night of worrying about your job, not out of
+        anything she did. That's a lot to carry into breakfast.
+    - who: person
+      time: "9:20 AM"
+      text: yeah. she didn't deserve that.
+    - who: person
+      time: "8:30 PM"
+      text: Still thinking about this morning with my sister.
+    - who: zeph
+      time: "8:31 PM"
+      text: >-
+        Would it help to send her a short message? Something like "sorry I was
+        short with you this morning, work has me rattled."
+    - who: person
+      time: "8:40 PM"
+      text: I sent it. She replied with a heart and said she gets it. I feel lighter.
+  questions:
+    - question: What did the User feel guilty about?
+      expected: Snapping at their sister in the morning.
+    - question: What was behind the User's short temper?
+      expected: Worry about losing their job after a restructuring was announced at work, and a sleepless night.
+    - question: What did Zeph offer, and how did it land?
+      expected: >-
+        Zeph asked what happened just before, and the User opened up about their
+        job worry. Later Zeph suggested a short apology message; the User sent
+        it, their sister replied kindly and the User felt lighter.
+    - question: How did the User's mood move through the day?
+      expected: From guilty and anxious in the morning to lighter and relieved in the evening.
+
+- id: first-10k-and-sore-knee
+  messages:
+    - who: person
+      time: "7:45 AM"
+      text: I just ran my first 10K!! 58 minutes!
+    - who: zeph
+      time: "7:46 AM"
+      text: That's huge! How does it feel?
+    - who: person
+      time: "7:50 AM"
+      text: >-
+        So proud. But my left knee is a bit sore and I'm scared I've hurt it,
+        the race is in three weeks.
+    - who: zeph
+      time: "7:51 AM"
+      text: >-
+        Being proud and worried at once makes sense. A rest day tomorrow and
+        some ice tonight might settle it, and if it still hurts in a few days
+        it's worth seeing a physio.
+    - who: person
+      time: "7:55 AM"
+      text: ok, I'll take tomorrow off and ice it. thanks
+  questions:
+    - question: What did the User achieve?
+      expected: They ran their first 10K, in 58 minutes.
+    - question: What was the User worried about, and why did it matter?
+      expected: A sore left knee, because they have a race in three weeks.
+    - question: How did the User feel?
+      expected: Proud of the run, and worried about the knee.
+    - question: What did Zeph offer, and how did it land?
+      expected: >-
+        A rest day, icing the knee and a physio if it still hurt; the User
+        agreed to take the next day off and ice it.
+
+- id: breathing-brushed-off
+  messages:
+    - who: person
+      time: "2:05 PM"
+      text: >-
+        It's 33 degrees in my flat and the landlord STILL hasn't fixed the
+        aircon. Three weeks now.
+    - who: zeph
+      time: "2:06 PM"
+      text: That sounds miserable. Want to try a slow breathing exercise together?
+    - who: person
+      time: "2:07 PM"
+      text: I don't need breathing, I need the aircon fixed.
+    - who: zeph
+      time: "2:08 PM"
+      text: >-
+        Fair. Want help writing the landlord a firm message with a date to
+        fix it by?
+    - who: person
+      time: "2:15 PM"
+      text: >-
+        Yes. Ok that draft is good, I said if it's not fixed by Friday I'll
+        get it repaired myself and take it off the rent. Sent.
+    - who: person
+      time: "2:16 PM"
+      text: Feels better to have done something.
+  questions:
+    - question: What was the problem the User had?
+      expected: Their flat's aircon had been broken for three weeks in the heat and the landlord hadn't fixed it.
+    - question: What did Zeph offer first, and how did it land?
+      expected: A breathing exercise; the User brushed it off, irritated, saying they needed the aircon fixed.
+    - question: What helped instead?
+      expected: >-
+        Writing the landlord a firm message with a Friday deadline, saying
+        they'd get it repaired and take it off the rent; the User sent it and
+        felt better for doing something.

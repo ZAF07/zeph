@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { primaryButton } from "@/components/button-styles";
-import { fieldCaption, inputField } from "@/components/form-styles";
+import { keyInputField } from "@/components/form-styles";
 import { SavedNote } from "@/components/SavedNote";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { ShapeFormSections } from "@/components/ShapeFormSections";
@@ -25,26 +25,30 @@ import { useApiClient } from "@/lib/use-api-client";
  * message beside each field that is wrong. An archived case is shown but
  * can't be changed.
  *
- * @param props - `evalName` is its Eval, `shape` its case shape and
- *   `existing` the case being edited, or undefined for a new one.
+ * @param props - `evalName` is its Eval, `shape` its case shape,
+ *   `existing` the case being edited, or undefined for a new one, and
+ *   `draft` the key and content a new case's form starts with.
  * @returns The form.
  */
 export function EvalCaseForm({
   evalName,
   shape,
   existing,
+  draft,
 }: {
   evalName: EvalName;
   shape: FormShape;
   existing?: EvalCase;
+  draft?: { key: string; content: FormValues };
 }) {
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
   const router = useRouter();
-  const [caseKey, setCaseKey] = useState(existing?.key ?? "");
-  const [values, setValues] = useState<FormValues>(
-    existing ? { ...emptyForm(shape), ...existing.content } : emptyForm(shape),
-  );
+  const [caseKey, setCaseKey] = useState(existing?.key ?? draft?.key ?? "");
+  const [values, setValues] = useState<FormValues>({
+    ...emptyForm(shape),
+    ...(existing?.content ?? draft?.content),
+  });
   const saveMutation = useMutation({
     mutationFn: () =>
       existing
@@ -67,7 +71,7 @@ export function EvalCaseForm({
   }
 
   return (
-    <form onSubmit={save} className="flex flex-col gap-5" noValidate>
+    <form onSubmit={save} className="flex flex-col gap-6" noValidate>
       {isLocked ? (
         <p className="m-0 rounded-note border border-line bg-panel px-[18px] py-3 text-[14px] text-text">
           This case is archived: new runs leave it out and it can’t be changed.
@@ -77,24 +81,26 @@ export function EvalCaseForm({
       {existing ? null : (
         <section
           aria-label="Key"
-          className="flex flex-col gap-1.5 rounded-card border border-line bg-panel px-6 py-[22px]"
+          className="box-border flex flex-col gap-[14px] rounded-card border border-line bg-panel px-6 py-[22px]"
         >
-          <label
-            htmlFor="case-key"
-            className="text-[17px] font-normal text-cream"
-          >
-            Key
-          </label>
-          <p id="case-key-description" className={fieldCaption}>
-            The case’s stable name, e.g. reminded-of-sister. Runs and the
-            terminal pick the case by it, so it can’t change later. Lowercase
-            letters, numbers and hyphens; unique across all Evals.
-          </p>
+          <div>
+            <h2 className="m-0 text-[17px] font-normal text-cream">
+              <label htmlFor="case-key">Key</label>
+            </h2>
+            <p
+              id="case-key-description"
+              className="mt-1 mb-0 max-w-[640px] text-[13px] text-soft"
+            >
+              The case’s stable name, e.g. guilt-and-job-worry. Runs and the
+              terminal pick the case by it, so it can’t change later. Lowercase
+              letters, numbers and hyphens; unique across all Evals.
+            </p>
+          </div>
           <input
             id="case-key"
             aria-describedby="case-key-description"
             aria-invalid={errors.fields.key !== undefined}
-            className={`${inputField} max-w-[420px] font-mono`}
+            className={keyInputField}
             value={caseKey}
             onChange={(event) => setCaseKey(event.target.value)}
           />

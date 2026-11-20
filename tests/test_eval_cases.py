@@ -93,6 +93,22 @@ VALID_CONTENT: dict[EvalName, dict[str, Any]] = {
         ],
         "rules": [],
     },
+    EvalName.DAY_SUMMARY: {
+        "messages": [
+            {
+                "who": "person",
+                "time": "9:10 AM",
+                "text": "I snapped at my sister again this morning.",
+            },
+            {"who": "zeph", "time": "9:12 AM", "text": "What happened just before?"},
+        ],
+        "questions": [
+            {
+                "question": "What did the User feel guilty about?",
+                "expected": "Snapping at their sister in the morning.",
+            }
+        ],
+    },
 }
 
 
@@ -104,6 +120,14 @@ EDITS: dict[EvalName, dict[str, Any]] = {
     EvalName.PHOTO_DESCRIPTIONS: {"must_leave_out": ["4929", "hunter2"]},
     EvalName.UNDERSTANDING: {"now": "2026-11-14T09:00:00"},
     EvalName.MOVE_OUTCOME: {"now": "2026-11-15T09:00:00"},
+    EvalName.DAY_SUMMARY: {
+        "questions": [
+            {
+                "question": "Who did the User snap at?",
+                "expected": "Their sister.",
+            }
+        ]
+    },
 }
 
 
@@ -211,7 +235,28 @@ def test_every_field_of_every_case_shape_and_the_judge_has_a_description(
         for section in shape["sections"]:
             assert section["title"] and section["description"]
             for field in walk_fields(section["fields"]):
-                assert field["label"] and field["description"], field
+                assert field["label"], field
+            for field in section["fields"]:
+                assert field["description"], field
+
+
+def test_a_field_inside_a_list_entry_may_go_without_a_hint(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+
+    shapes = client.get("/api/admin/eval-case-shapes", headers=admin).json()["shapes"]
+
+    [the_day, questions] = shapes["day_summary"]["sections"]
+    [messages] = the_day["fields"]
+    assert [(field["label"], field["kind"]) for field in messages["fields"]] == [
+        ("From", "choice"),
+        ("Time", "time_of_day"),
+        ("Text", "long_text"),
+    ]
+    assert {field["description"] for field in messages["fields"]} == {""}
+    assert messages["item_label"] == "Message"
+    assert questions["fields"][0]["item_label"] == "Question"
     understanding = [
         section["title"] for section in shapes["understanding"]["sections"]
     ]
@@ -358,6 +403,23 @@ def test_an_invalid_save_is_refused_with_a_message_per_field(
             },
             "outcomes.0.rules",
             "No such rule below: no_such",
+        ),
+        (
+            EvalName.DAY_SUMMARY,
+            {"messages": [{"who": "person", "time": "teatime", "text": "hi"}]},
+            "messages.0.time",
+            "Write a time like 9:10 AM or 21:10.",
+        ),
+        (
+            EvalName.DAY_SUMMARY,
+            {
+                "messages": [
+                    {"who": "person", "time": "9:10 PM", "text": "hi"},
+                    {"who": "zeph", "time": "9:12 AM", "text": "hey"},
+                ]
+            },
+            "messages.1.time",
+            "Comes before the message above it",
         ),
     ],
 )

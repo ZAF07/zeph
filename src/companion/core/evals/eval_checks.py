@@ -2,6 +2,7 @@ from collections.abc import Callable
 from typing import Any
 
 from companion.core.evals.cases import (
+    read_day_summary_case,
     read_knowledge_case,
     read_move_outcome_case,
     read_persona_case,
@@ -10,6 +11,7 @@ from companion.core.evals.cases import (
     read_settings_case,
     read_understanding_case,
 )
+from companion.core.evals.day_summary_eval import check_day_summary_case
 from companion.core.evals.judge import JudgeSettings
 from companion.core.evals.knowledge_eval import check_knowledge_case
 from companion.core.evals.models import (
@@ -106,6 +108,7 @@ CHECKERS: dict[EvalName, CaseChecker] = {
     EvalName.MOVE_OUTCOME: judged_checker(
         read_move_outcome_case, check_move_outcome_case
     ),
+    EvalName.DAY_SUMMARY: judged_checker(read_day_summary_case, check_day_summary_case),
 }
 
 READERS: dict[EvalName, Callable[[str, dict[str, Any]], object]] = {
@@ -116,6 +119,7 @@ READERS: dict[EvalName, Callable[[str, dict[str, Any]], object]] = {
     EvalName.PHOTO_DESCRIPTIONS: read_photo_description_case,
     EvalName.UNDERSTANDING: read_understanding_case,
     EvalName.MOVE_OUTCOME: read_move_outcome_case,
+    EvalName.DAY_SUMMARY: read_day_summary_case,
 }
 
 

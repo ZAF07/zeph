@@ -1,9 +1,10 @@
 "use client";
 
-import { compactSecondaryButton } from "@/components/button-styles";
-import { fieldCaption } from "@/components/form-styles";
+import { entryButton } from "@/components/button-styles";
+import { fieldHint } from "@/components/form-styles";
 import { ShapeGroupFields } from "@/components/ShapeGroupFields";
 import {
+  addEntryLabel,
   emptyGroup,
   fieldPath,
   isFormValues,
@@ -12,9 +13,12 @@ import {
 
 /**
  * A list whose every entry is a group of fields, such as a case's Messages
- * or rules: each entry in its own box, with buttons to add and remove one.
+ * or rules: each entry in its own inset box with its Remove button, and an
+ * Add button under the last one. When the list is its section's only field,
+ * the section's heading stands for it and the list draws no heading.
  *
- * @param props - The list field's props; its `value` is the list.
+ * @param props - The list field's props, its `value` being the list, plus
+ *   `bare` to leave out the list's own heading.
  * @returns The list.
  */
 export function ShapeGroupList({
@@ -24,7 +28,8 @@ export function ShapeGroupList({
   errors,
   disabled,
   onChange,
-}: ShapeFieldProps) {
+  bare = false,
+}: ShapeFieldProps & { bare?: boolean }) {
   const entries = Array.isArray(value) ? value : [];
   const itemLabel = field.item_label || "Entry";
   const error = errors[path];
@@ -34,11 +39,20 @@ export function ShapeGroupList({
   }
 
   return (
-    <section aria-label={field.label} className="flex min-w-0 flex-col gap-3">
-      <div className="flex flex-col gap-1.5">
-        <h3 className="m-0 text-[15px] font-normal text-text">{field.label}</h3>
-        <p className={fieldCaption}>{field.description}</p>
-      </div>
+    <section
+      aria-label={field.label}
+      className="flex min-w-0 flex-col gap-[14px]"
+    >
+      {bare ? null : (
+        <div className="flex flex-col gap-1">
+          <h3 className="m-0 text-[13px] font-normal text-soft">
+            {field.label}
+          </h3>
+          {field.description ? (
+            <p className={fieldHint}>{field.description}</p>
+          ) : null}
+        </div>
+      )}
       {entries.map((entry, index) => (
         <div
           key={index}
@@ -52,7 +66,7 @@ export function ShapeGroupList({
             </span>
             <button
               type="button"
-              className={compactSecondaryButton}
+              className={entryButton}
               disabled={disabled}
               onClick={() =>
                 onChange(entries.filter((_other, at) => at !== index))
@@ -72,6 +86,7 @@ export function ShapeGroupList({
             path={fieldPath(path, index)}
             errors={errors}
             disabled={disabled}
+            inEntry
             onChange={(next) => change(index, next)}
           />
         </div>
@@ -84,11 +99,11 @@ export function ShapeGroupList({
       <div>
         <button
           type="button"
-          className={compactSecondaryButton}
+          className={entryButton}
           disabled={disabled}
           onClick={() => onChange([...entries, emptyGroup(field.fields)])}
         >
-          Add {itemLabel.toLowerCase()}
+          {addEntryLabel(itemLabel)}
         </button>
       </div>
     </section>

@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AdminPageHeader } from "@/components/AdminPageHeader";
-import { EvalAreaTabs } from "@/components/EvalAreaTabs";
+import { cardLink } from "@/components/card-styles";
 import { EvalCaseEditor } from "@/components/EvalCaseEditor";
 import { evalDetails, toEvalName } from "@/lib/evals";
 
@@ -24,13 +25,18 @@ export default async function AdminEditEvalCasePage({
   }
   const caseKey = decodeURIComponent(key);
   return (
-    <div className="flex flex-col gap-[22px]">
+    <>
+      <Link
+        href={`/admin/evals/cases/${evalName}`}
+        className={`${cardLink} w-fit`}
+      >
+        ← {evalDetails[evalName].label} cases
+      </Link>
       <AdminPageHeader
         title={caseKey}
         lead={`A ${evalDetails[evalName].label} case. ${evalDetails[evalName].checks}`}
       />
-      <EvalAreaTabs />
       <EvalCaseEditor evalName={evalName} caseKey={caseKey} />
-    </div>
+    </>
   );
 }

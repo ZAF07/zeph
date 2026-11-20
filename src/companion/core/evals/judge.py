@@ -31,6 +31,10 @@ class JudgeSettings:
             Knowledge Document a reply draws on.
         outcome_instructions: Its prompt for checking a kept Move Outcome
             against rules.
+        day_summary_answer_instructions: Its prompt for answering questions
+            about a day from its Day Summary alone.
+        day_summary_marking_instructions: Its prompt for marking those
+            answers against the answers expected.
     """
 
     model: str
@@ -38,6 +42,8 @@ class JudgeSettings:
     persona_instructions: str
     version_instructions: str
     outcome_instructions: str
+    day_summary_answer_instructions: str
+    day_summary_marking_instructions: str
 
     @classmethod
     def from_values(cls, values: Mapping[str, Any]) -> "JudgeSettings":
@@ -55,6 +61,8 @@ class JudgeSettings:
             persona_instructions=values["persona_instructions"],
             version_instructions=values["version_instructions"],
             outcome_instructions=values["outcome_instructions"],
+            day_summary_answer_instructions=values["day_summary_answer_instructions"],
+            day_summary_marking_instructions=values["day_summary_marking_instructions"],
         )
 
 
@@ -71,9 +79,9 @@ def judge_shape(model_choices: Sequence[str]) -> FormShape:
         [
             ShapeSection(
                 "Model",
-                "The model that marks Persona, Knowledge, Understanding and "
-                "Move Outcome cases. Every Variant in a run is marked by the "
-                "same Judge.",
+                "The model that marks Persona, Knowledge, Understanding, "
+                "Move Outcome and Day Summary cases. Every Variant in a run is "
+                "marked by the same Judge.",
                 [
                     ShapeField(
                         "model",
@@ -122,6 +130,22 @@ def judge_shape(model_choices: Sequence[str]) -> FormShape:
                         'It must ask for JSON like {"verdicts": [{"rule", '
                         '"passed", "reason"}]}, or every rule fails as '
                         "unreadable.",
+                    ),
+                    long_text_field(
+                        "day_summary_answer_instructions",
+                        "Day Summary answers prompt",
+                        "How the Judge answers a case's questions from the Day "
+                        "Summary alone (Day Summary). It must ask for JSON like "
+                        '{"answers": [{"question", "answer"}]}, or every '
+                        "question misses as unreadable.",
+                    ),
+                    long_text_field(
+                        "day_summary_marking_instructions",
+                        "Day Summary marking prompt",
+                        "How the Judge marks each of those answers against the "
+                        "answer expected (Day Summary). It must ask for JSON "
+                        'like {"marks": [{"question", "match", "reason"}]}, or '
+                        "every question misses as unreadable.",
                     ),
                 ],
             ),
@@ -355,3 +379,141 @@ def judge_move_outcome_rules(
         f"Move Outcome kept:\n{outcome}",
         rules,
     )
+
+
+@dataclass(frozen=True)
+class AnswerMark:
+    """The Judge's mark on one answer it gave from a Day Summary.
+
+    Attributes:
+        matched: Whether the answer matches the answer expected.
+        reason: Why, in one sentence.
+    """
+
+    matched: bool
+    reason: str
+
+
+def numbered_lines(entries: Sequence[str]) -> str:
+    """Number entries for the Judge, one per line.
+
+    Args:
+        entries: The entries, in order.
+
+    Returns:
+        E.g. "1. What did they feel?" and "2. What did Zeph offer?", on
+        lines of their own.
+    """
+    return "\n".join(f"{number}. {entry}" for number, entry in enumerate(entries, 1))
+
+
+def by_question_number(answer: str, key: str) -> dict[int, dict[str, Any]]:
+    """Read the Judge's JSON list of per-question entries, by question number.
+
+    Args:
+        answer: The Judge's answer.
+        key: The list's name in the JSON, e.g. "answers".
+
+    Returns:
+        Each entry by its question number, from 1.
+
+    Raises:
+        ValueError: If the answer isn't JSON.
+        KeyError: If the list is missing.
+        TypeError: If an entry isn't shaped as asked.
+    """
+    return {int(entry["question"]): entry for entry in read_json_answer(answer)[key]}
+
+
+def judge_day_summary_answers(
+    chat_model: ChatModel,
+    judge: JudgeSettings,
+    summary: str,
+    questions: Sequence[str],
+) -> list[str]:
+    """Ask the Judge to answer questions about a day from its Day Summary alone.
+
+    It is never shown the answers expected, so it can't lean on them.
+
+    Args:
+        chat_model: The model that judges.
+        judge: The Judge's model, thinking and prompts.
+        summary: The Day Summary written.
+        questions: The questions, in order.
+
+    Returns:
+        One answer per question, in order; a question it skipped, or every
+        question when the answer can't be read, gets a line saying so.
+    """
+    answer = chat_model.generate(
+        model=judge.model,
+        thinking=judge.thinking,
+        instructions=judge.day_summary_answer_instructions,
+        history=[
+            ChatLine(
+                role=ChatRole.USER,
+                text=f"Day Summary:\n{summary}\n\n"
+                f"Questions:\n{numbered_lines(questions)}",
+            )
+        ],
+    )
+    try:
+        given = by_question_number(answer.text, "answers")
+        return [
+            str(given[number]["answer"]) if number in given else "No answer given."
+            for number in range(1, len(questions) + 1)
+        ]
+    except (ValueError, KeyError, TypeError):
+        unreadable = f"The judge's answer could not be read: {answer.text}"
+        return [unreadable for _ in questions]
+
+
+def judge_day_summary_marks(
+    chat_model: ChatModel,
+    judge: JudgeSettings,
+    summary: str,
+    answered: Sequence[tuple[str, str, str]],
+) -> list[AnswerMark]:
+    """Ask the Judge whether each answer it gave matches the answer expected.
+
+    Args:
+        chat_model: The model that judges.
+        judge: The Judge's model, thinking and prompts.
+        summary: The Day Summary the answers came from.
+        answered: Each question, its expected answer and the Judge's answer,
+            in order.
+
+    Returns:
+        One mark per question, in order; a question it skipped, or every
+        question when the answer can't be read, misses.
+    """
+    entries = [
+        f"{question}\n   Expected: {expected}\n   Answer from the Summary: {given}"
+        for question, expected, given in answered
+    ]
+    answer = chat_model.generate(
+        model=judge.model,
+        thinking=judge.thinking,
+        instructions=judge.day_summary_marking_instructions,
+        history=[
+            ChatLine(
+                role=ChatRole.USER,
+                text=f"Day Summary:\n{summary}\n\n"
+                f"Questions:\n{numbered_lines(entries)}",
+            )
+        ],
+    )
+    try:
+        given_marks = by_question_number(answer.text, "marks")
+        return [
+            AnswerMark(
+                matched=given_marks[number]["match"] is True,
+                reason=str(given_marks[number]["reason"]),
+            )
+            if number in given_marks
+            else AnswerMark(False, "The judge gave no mark.")
+            for number in range(1, len(answered) + 1)
+        ]
+    except (ValueError, KeyError, TypeError):
+        unreadable = f"The judge's answer could not be read: {answer.text}"
+        return [AnswerMark(False, unreadable) for _ in answered]

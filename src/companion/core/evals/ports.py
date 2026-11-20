@@ -260,6 +260,20 @@ class EvalCompanion(Protocol):
         """
         ...
 
+    def write_day_summary(self) -> None:
+        """Run the Conversation-end Day Summary step alone, on the latest Conversation.
+
+        It rewrites the Day Summary of the day the made-up User's latest
+        Conversation started, from all of that day's messages, as it does
+        after the quiet gap, in its own Conversation-end trace, with the Eval
+        database's Platform Settings. No other Conversation-end step runs.
+
+        Raises:
+            EvalSetupError: If no User is connected, User Memory doesn't work
+                for them, or they have no Conversation.
+        """
+        ...
+
     def close(self) -> None:
         """Stop the app."""
         ...

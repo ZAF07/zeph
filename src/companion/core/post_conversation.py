@@ -414,104 +414,56 @@ def describe_conversation(
     )
 
 
-class PostConversationProcessor:
-    """Rewrites the Day Summary when a Conversation ends and updates User Memory.
+class DayMemoryWriter:
+    """Rewrites the Day Summary of an ended Conversation's day and its User Memory.
 
-    The Day Summary of the day the Conversation started is rewritten from
-    all of that day's messages; everything else is learned from the
-    Conversation that ended only, so nothing is learned twice. It changes
-    their Memory Items, keeps the photos that matter to them as Shared
-    Photos, updates their Life Threads and Patterns, keeps their Curiosities
-    and Move Outcomes and then rewrites their User Portrait. Each Day Summary records
-    how their mood moved and what the Companion offered and how it landed,
-    and is embedded, so it can be found by meaning however old it is.
-    Separately from User Memory, it keeps the User's Personal Stickers.
+    This is the first Conversation-end step: one model call, given all of
+    the day's messages, rewrites the Day Summary and gives the Memory Item
+    changes and the photos to keep as Shared Photos, all learned from the
+    Conversation that ended.
     """
 
     def __init__(
         self,
         repositories: Repositories,
-        user_snapshots: UserSnapshotLoader,
         chat_model: UsageRecordingChatModel,
-        personal_sticker_keeper: PersonalStickerKeeper,
-        life_thread_keeper: LifeThreadKeeper,
-        pattern_keeper: PatternKeeper,
-        curiosity_keeper: CuriosityKeeper,
-        move_outcome_keeper: MoveOutcomeKeeper,
-        portrait_writer: PortraitWriter,
         embedder: Embedder,
         clock: Clock,
     ) -> None:
-        """Set up the processor.
+        """Set up the writer.
 
         Args:
             repositories: Where Conversations, User Memory and settings are
                 stored.
-            user_snapshots: Reads the User and their Features once per
-                Conversation.
             chat_model: Writes the summary and the Memory Item operations,
                 and records the tokens used.
-            personal_sticker_keeper: Keeps the stickers the User sent whose
-                meaning was clear.
-            life_thread_keeper: Starts and adds to the User's Life Threads.
-            pattern_keeper: Starts, adds to, confirms and closes the User's
-                Patterns.
-            curiosity_keeper: Writes, updates and closes the User's
-                Curiosities.
-            move_outcome_keeper: Keeps what was learned about each Move made.
-            portrait_writer: Rewrites the User's Portrait.
             embedder: Embeds each Summary, so it can be found by meaning.
             clock: Tells the current time.
         """
         self._repositories = repositories
-        self._user_snapshots = user_snapshots
         self._chat_model = chat_model
-        self._personal_sticker_keeper = personal_sticker_keeper
-        self._life_thread_keeper = life_thread_keeper
-        self._pattern_keeper = pattern_keeper
-        self._curiosity_keeper = curiosity_keeper
-        self._move_outcome_keeper = move_outcome_keeper
-        self._portrait_writer = portrait_writer
         self._embedder = embedder
         self._clock = clock
 
-    def process(self, conversation: Conversation, settings: PlatformSettings) -> None:
-        """Process one ended Conversation and mark it processed.
+    def write(
+        self,
+        snapshot: UserSnapshot,
+        conversation: Conversation,
+        messages: list[ConversationMessage],
+    ) -> None:
+        """Write the Day Summary, Memory Item changes and Shared Photos; mark processed.
 
-        Personal Stickers are kept first, whatever User Memory says; if that
-        fails, the failure is logged and processing goes on. Nothing more is
-        saved when User Memory doesn't work for the User, and no photo is
-        kept when Photo Viewing doesn't. One model call, given all of the
-        day's messages, gives the day's rewritten Day Summary, the operations
-        and the photos to keep as Shared Photos; an unreadable answer is asked
-        again once, and if it is still unreadable nothing is saved, so a bad
-        answer is never retried forever. Once the Conversation is marked
-        processed, its Life Threads are kept, then its Patterns from the
-        Threads it touched, then its Curiosities while the
-        Curiosities Feature works, then its Move Outcomes, and then the User
-        Portrait is rewritten; if any of them fails, the failure is logged and
-        not tried again, so nothing is ever added twice.
+        No photo is kept when Photo Viewing doesn't work for the User. An
+        unreadable answer is asked again once, and if it is still unreadable
+        nothing is saved, but the Conversation is still marked processed.
 
         Args:
+            snapshot: The User whose Conversation it was; User Memory works
+                for them.
             conversation: The ended Conversation.
-            settings: The platform settings, read once for the tick.
-
-        Raises:
-            Exception: Whatever the chat model raises; the Conversation stays
-                unprocessed so the next tick tries again.
+            messages: Its messages, oldest first.
         """
         user_memory = self._repositories.user_memory
-        snapshot = self._user_snapshots.find(
-            conversation.user_id, settings, start_trace(TraceKind.CONVERSATION_END)
-        )
-        messages = self._repositories.conversations.list_messages(conversation.id)
-        if snapshot is not None:
-            self._keep_personal_stickers(snapshot, messages)
-        if snapshot is None or not snapshot.works(Feature.USER_MEMORY) or not messages:
-            user_memory.save_processed_conversation(
-                conversation.id, self._clock.now(), None, NO_CHANGES
-            )
-            return
         categories = self._repositories.memory_categories.list_all()
         user_id = snapshot.user.id
         items_by_number = dict(enumerate(user_memory.list_items(user_id), start=1))
@@ -538,22 +490,16 @@ class PostConversationProcessor:
             user_memory.save_processed_conversation(
                 conversation.id, self._clock.now(), None, NO_CHANGES
             )
-        else:
-            self._save_memory(
-                snapshot,
-                conversation,
-                day,
-                answer,
-                categories,
-                items_by_number,
-                photos_by_number,
-            )
-        touched = self._keep_life_threads(snapshot, conversation.id, messages)
-        self._keep_patterns(snapshot, conversation.id, messages, touched)
-        if snapshot.works(Feature.CURIOSITIES):
-            self._keep_curiosities(snapshot, conversation.id, messages)
-        self._keep_move_outcomes(snapshot, conversation.id, messages)
-        self._write_portrait(snapshot)
+            return
+        self._save_memory(
+            snapshot,
+            conversation,
+            day,
+            answer,
+            categories,
+            items_by_number,
+            photos_by_number,
+        )
 
     def _describe_day_so_far(
         self, snapshot: UserSnapshot, conversation: Conversation, day: date
@@ -660,6 +606,155 @@ class PostConversationProcessor:
             conversation.id, now, summary, changes, self._embed(summary)
         )
 
+    def _embed(self, summary: DaySummary) -> list[float] | None:
+        """Embed a Day Summary, logging a failure instead of raising.
+
+        Args:
+            summary: The Day Summary.
+
+        Returns:
+            Its embedding; None if embedding failed, so the Summary is still
+            saved but only found as one of the newest.
+        """
+        try:
+            [embedding] = self._embedder.embed_passages([summary.summary])
+        except Exception:
+            logger.exception("Could not embed the Day Summary")
+            return None
+        return embedding
+
+    def _ask(self, snapshot: UserSnapshot, description: str) -> ProcessingAnswer | None:
+        """Ask the model about the Conversation, once more if it can't be read.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            description: The categories, current memory and Conversation.
+
+        Returns:
+            The answer, or None if both answers were unreadable.
+        """
+        settings = snapshot.settings
+        for _ in range(2):
+            answer = self._chat_model.generate(
+                snapshot=snapshot,
+                step=ModelStep.CONVERSATION_END,
+                model=settings.get(MEMORY_PROCESSING_MODEL),
+                thinking=settings.get(MEMORY_PROCESSING_THINKING),
+                instructions=settings.get(MEMORY_PROCESSING_PROMPT),
+                history=[ChatLine(role=ChatRole.USER, text=description)],
+            )
+            processing_answer = read_processing_answer(answer)
+            if processing_answer is not None:
+                return processing_answer
+        return None
+
+
+class PostConversationProcessor:
+    """Rewrites the Day Summary when a Conversation ends and updates User Memory.
+
+    The Day Summary of the day the Conversation started is rewritten from
+    all of that day's messages; everything else is learned from the
+    Conversation that ended only, so nothing is learned twice. It changes
+    their Memory Items, keeps the photos that matter to them as Shared
+    Photos, updates their Life Threads and Patterns, keeps their Curiosities
+    and Move Outcomes and then rewrites their User Portrait. Each Day Summary records
+    how their mood moved and what the Companion offered and how it landed,
+    and is embedded, so it can be found by meaning however old it is.
+    Separately from User Memory, it keeps the User's Personal Stickers.
+    """
+
+    def __init__(
+        self,
+        repositories: Repositories,
+        user_snapshots: UserSnapshotLoader,
+        chat_model: UsageRecordingChatModel,
+        personal_sticker_keeper: PersonalStickerKeeper,
+        life_thread_keeper: LifeThreadKeeper,
+        pattern_keeper: PatternKeeper,
+        curiosity_keeper: CuriosityKeeper,
+        move_outcome_keeper: MoveOutcomeKeeper,
+        portrait_writer: PortraitWriter,
+        embedder: Embedder,
+        clock: Clock,
+    ) -> None:
+        """Set up the processor.
+
+        Args:
+            repositories: Where Conversations, User Memory and settings are
+                stored.
+            user_snapshots: Reads the User and their Features once per
+                Conversation.
+            chat_model: Writes the summary and the Memory Item operations,
+                and records the tokens used.
+            personal_sticker_keeper: Keeps the stickers the User sent whose
+                meaning was clear.
+            life_thread_keeper: Starts and adds to the User's Life Threads.
+            pattern_keeper: Starts, adds to, confirms and closes the User's
+                Patterns.
+            curiosity_keeper: Writes, updates and closes the User's
+                Curiosities.
+            move_outcome_keeper: Keeps what was learned about each Move made.
+            portrait_writer: Rewrites the User's Portrait.
+            embedder: Embeds each Summary, so it can be found by meaning.
+            clock: Tells the current time.
+        """
+        self._repositories = repositories
+        self._user_snapshots = user_snapshots
+        self._personal_sticker_keeper = personal_sticker_keeper
+        self._life_thread_keeper = life_thread_keeper
+        self._pattern_keeper = pattern_keeper
+        self._curiosity_keeper = curiosity_keeper
+        self._move_outcome_keeper = move_outcome_keeper
+        self._portrait_writer = portrait_writer
+        self._clock = clock
+        self._day_memory_writer = DayMemoryWriter(
+            repositories, chat_model, embedder, clock
+        )
+
+    def process(self, conversation: Conversation, settings: PlatformSettings) -> None:
+        """Process one ended Conversation and mark it processed.
+
+        Personal Stickers are kept first, whatever User Memory says; if that
+        fails, the failure is logged and processing goes on. Nothing more is
+        saved when User Memory doesn't work for the User, and no photo is
+        kept when Photo Viewing doesn't. One model call, given all of the
+        day's messages, gives the day's rewritten Day Summary, the operations
+        and the photos to keep as Shared Photos; an unreadable answer is asked
+        again once, and if it is still unreadable nothing is saved, so a bad
+        answer is never retried forever. Once the Conversation is marked
+        processed, its Life Threads are kept, then its Patterns from the
+        Threads it touched, then its Curiosities while the
+        Curiosities Feature works, then its Move Outcomes, and then the User
+        Portrait is rewritten; if any of them fails, the failure is logged and
+        not tried again, so nothing is ever added twice.
+
+        Args:
+            conversation: The ended Conversation.
+            settings: The platform settings, read once for the tick.
+
+        Raises:
+            Exception: Whatever the chat model raises; the Conversation stays
+                unprocessed so the next tick tries again.
+        """
+        snapshot = self._user_snapshots.find(
+            conversation.user_id, settings, start_trace(TraceKind.CONVERSATION_END)
+        )
+        messages = self._repositories.conversations.list_messages(conversation.id)
+        if snapshot is not None:
+            self._keep_personal_stickers(snapshot, messages)
+        if snapshot is None or not snapshot.works(Feature.USER_MEMORY) or not messages:
+            self._repositories.user_memory.save_processed_conversation(
+                conversation.id, self._clock.now(), None, NO_CHANGES
+            )
+            return
+        self._day_memory_writer.write(snapshot, conversation, messages)
+        touched = self._keep_life_threads(snapshot, conversation.id, messages)
+        self._keep_patterns(snapshot, conversation.id, messages, touched)
+        if snapshot.works(Feature.CURIOSITIES):
+            self._keep_curiosities(snapshot, conversation.id, messages)
+        self._keep_move_outcomes(snapshot, conversation.id, messages)
+        self._write_portrait(snapshot)
+
     def _keep_life_threads(
         self,
         snapshot: UserSnapshot,
@@ -751,23 +846,6 @@ class PostConversationProcessor:
         except Exception:
             logger.exception("Could not keep Move Outcomes")
 
-    def _embed(self, summary: DaySummary) -> list[float] | None:
-        """Embed a Day Summary, logging a failure instead of raising.
-
-        Args:
-            summary: The Day Summary.
-
-        Returns:
-            Its embedding; None if embedding failed, so the Summary is still
-            saved but only found as one of the newest.
-        """
-        try:
-            [embedding] = self._embedder.embed_passages([summary.summary])
-        except Exception:
-            logger.exception("Could not embed the Day Summary")
-            return None
-        return embedding
-
     def _keep_personal_stickers(
         self, snapshot: UserSnapshot, messages: list[ConversationMessage]
     ) -> None:
@@ -781,28 +859,3 @@ class PostConversationProcessor:
             self._personal_sticker_keeper.keep_from(snapshot, messages)
         except Exception:
             logger.exception("Could not keep Personal Stickers")
-
-    def _ask(self, snapshot: UserSnapshot, description: str) -> ProcessingAnswer | None:
-        """Ask the model about the Conversation, once more if it can't be read.
-
-        Args:
-            snapshot: The User whose Conversation it was.
-            description: The categories, current memory and Conversation.
-
-        Returns:
-            The answer, or None if both answers were unreadable.
-        """
-        settings = snapshot.settings
-        for _ in range(2):
-            answer = self._chat_model.generate(
-                snapshot=snapshot,
-                step=ModelStep.CONVERSATION_END,
-                model=settings.get(MEMORY_PROCESSING_MODEL),
-                thinking=settings.get(MEMORY_PROCESSING_THINKING),
-                instructions=settings.get(MEMORY_PROCESSING_PROMPT),
-                history=[ChatLine(role=ChatRole.USER, text=description)],
-            )
-            processing_answer = read_processing_answer(answer)
-            if processing_answer is not None:
-                return processing_answer
-        return None

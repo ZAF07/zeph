@@ -169,8 +169,25 @@ class CheckResponse(BaseModel):
     group: str
 
 
+class DaySummaryAnswerResponse(BaseModel):
+    """One question of a Day Summary case, answered from the Summary and marked."""
+
+    question: str
+    expected: str
+    answer: str
+    matched: bool
+    reason: str
+
+
+class DaySummaryResultResponse(BaseModel):
+    """The Day Summary a Day Summary case wrote, and each question's answer."""
+
+    summary: str
+    answers: list[DaySummaryAnswerResponse]
+
+
 class CaseResultResponse(BaseModel):
-    """One case's result in a run."""
+    """One case's result in a run; `day_summary` only for a checked Day Summary case."""
 
     id: str
     variant: str
@@ -185,6 +202,7 @@ class CaseResultResponse(BaseModel):
     tokens_out: int
     duration_ms: int
     finished_at: datetime
+    day_summary: DaySummaryResultResponse | None = None
 
 
 class EvalRunDetailsResponse(EvalRunResponse):
@@ -492,6 +510,25 @@ def to_variant_totals_response(totals: VariantTotals) -> VariantTotalsResponse:
     )
 
 
+def to_day_summary_result(result: CaseResult) -> DaySummaryResultResponse | None:
+    """Read what a Day Summary case wrote and answered from its result's facts.
+
+    Args:
+        result: The Case Result.
+
+    Returns:
+        The Summary and each answer; None for another Eval's case, or a Day
+        Summary case that couldn't be checked.
+    """
+    facts = result.result.facts
+    if result.eval != EvalName.DAY_SUMMARY or "summary" not in facts:
+        return None
+    return DaySummaryResultResponse(
+        summary=facts["summary"],
+        answers=[DaySummaryAnswerResponse(**answer) for answer in facts["answers"]],
+    )
+
+
 def to_case_result_response(result: CaseResult) -> CaseResultResponse:
     """Turn a Case Result into its API shape.
 
@@ -523,6 +560,7 @@ def to_case_result_response(result: CaseResult) -> CaseResultResponse:
         tokens_out=result.tokens_out,
         duration_ms=result.duration_ms,
         finished_at=result.finished_at,
+        day_summary=to_day_summary_result(result),
     )
 
 

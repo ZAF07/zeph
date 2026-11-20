@@ -1,5 +1,6 @@
+import { ChevronDownIcon } from "@/components/ChevronDownIcon";
 import { EvalImageField } from "@/components/EvalImageField";
-import { inputField } from "@/components/form-styles";
+import { entryInputField, inputField } from "@/components/form-styles";
 import { Switch } from "@/components/Switch";
 import type { ShapeFieldProps } from "@/lib/eval-forms";
 
@@ -7,7 +8,8 @@ import type { ShapeFieldProps } from "@/lib/eval-forms";
  * The input for a single-value field, by its kind.
  *
  * @param props - The field's props, plus `inputId` for its label,
- *   `describedBy` for its description and `invalid` when it has an error.
+ *   `describedBy` for its hint, if it has one, and `invalid` when it has an
+ *   error.
  * @returns The input.
  */
 export function ShapeFieldControl({
@@ -15,12 +17,13 @@ export function ShapeFieldControl({
   value,
   disabled,
   onChange,
+  inEntry = false,
   inputId,
   describedBy,
   invalid,
 }: ShapeFieldProps & {
   inputId: string;
-  describedBy: string;
+  describedBy: string | undefined;
   invalid: boolean;
 }) {
   const shared = {
@@ -30,13 +33,14 @@ export function ShapeFieldControl({
     "aria-invalid": invalid,
   };
   const text = typeof value === "string" ? value : "";
+  const box = inEntry ? entryInputField : inputField;
 
   if (field.kind === "long_text") {
     return (
       <textarea
         {...shared}
-        rows={4}
-        className={`${inputField} resize-y`}
+        rows={1}
+        className={`${box} field-sizing-content min-h-[72px] resize-y`}
         value={text}
         onChange={(event) => onChange(event.target.value)}
       />
@@ -49,7 +53,7 @@ export function ShapeFieldControl({
         type="number"
         step={1}
         min={field.minimum ?? undefined}
-        className={`${inputField} max-w-[180px]`}
+        className={`${box} max-w-[180px]`}
         value={typeof value === "number" ? value : ""}
         onChange={(event) =>
           onChange(
@@ -74,27 +78,30 @@ export function ShapeFieldControl({
   if (field.kind === "choice") {
     const chosen = field.options.findIndex((option) => option.value === value);
     return (
-      <select
-        {...shared}
-        className={`${inputField} max-w-[320px]`}
-        value={chosen === -1 ? "" : String(chosen)}
-        onChange={(event) =>
-          onChange(
-            event.target.value === ""
-              ? null
-              : field.options[Number(event.target.value)].value,
-          )
-        }
-      >
-        <option value="" disabled={field.required}>
-          {field.required ? "Pick one" : "Not checked"}
-        </option>
-        {field.options.map((option, index) => (
-          <option key={String(option.value)} value={String(index)}>
-            {option.label}
+      <span className="relative flex min-w-0 items-center">
+        <select
+          {...shared}
+          className={`${box} cursor-pointer appearance-none pr-9`}
+          value={chosen === -1 ? "" : String(chosen)}
+          onChange={(event) =>
+            onChange(
+              event.target.value === ""
+                ? null
+                : field.options[Number(event.target.value)].value,
+            )
+          }
+        >
+          <option value="" disabled={field.required}>
+            {field.required ? "Pick one" : "Not checked"}
           </option>
-        ))}
-      </select>
+          {field.options.map((option, index) => (
+            <option key={String(option.value)} value={String(index)}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDownIcon className="pointer-events-none absolute right-3.5 text-soft" />
+      </span>
     );
   }
   if (field.kind === "date_time") {
@@ -102,7 +109,7 @@ export function ShapeFieldControl({
       <input
         {...shared}
         type="datetime-local"
-        className={`${inputField} max-w-[260px]`}
+        className={`${box} max-w-[260px]`}
         value={text.slice(0, 16)}
         onChange={(event) =>
           onChange(event.target.value ? `${event.target.value}:00` : null)
@@ -124,7 +131,7 @@ export function ShapeFieldControl({
     <input
       {...shared}
       type="text"
-      className={inputField}
+      className={box}
       value={text}
       onChange={(event) => onChange(event.target.value)}
     />

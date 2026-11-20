@@ -34,9 +34,10 @@ from companion.core.evals.cases import EvalWebResult
 from companion.core.evals.models import EvalImage, ModelTokens, Replies
 from companion.core.evals.ports import EvalSetupError
 from companion.core.model_call_log import ModelCallLog, start_trace
-from companion.core.models import Feature, PhotoImage, TraceKind
+from companion.core.models import Feature, PhotoImage, TraceKind, UserSnapshot
 from companion.core.move_outcomes import MoveOutcomeKeeper
 from companion.core.ports import ChatModel, Embedder, PhotoViewer, Repositories
+from companion.core.post_conversation import DayMemoryWriter
 from companion.core.usage import UsageLimiter, UsageRecordingChatModel
 from companion.core.user_snapshot import UserSnapshotLoader
 
@@ -612,35 +613,85 @@ class InProcessCompanion:
             EvalSetupError: If no User is connected, or User Memory doesn't
                 work for them.
         """
+        snapshot = self._conversation_end_snapshot()
+        keeper = MoveOutcomeKeeper(
+            self._repositories,
+            self._conversation_end_chat_model(),
+            self._embedder,
+            self._clock,
+        )
+        keeper.keep_from(
+            snapshot,
+            conversation_id,
+            self._repositories.conversations.list_messages(conversation_id),
+        )
+
+    def write_day_summary(self) -> None:
+        """Run the Conversation-end Day Summary step alone, on the latest Conversation.
+
+        It is built the way the app builds it for the quiet gap, with the
+        Model Call Log keeping full content, and runs in its own
+        Conversation-end trace.
+
+        Raises:
+            EvalSetupError: If no User is connected, User Memory doesn't work
+                for them, or they have no Conversation.
+        """
+        snapshot = self._conversation_end_snapshot()
+        conversations = self._repositories.conversations
+        conversation = conversations.get_latest_for_user(snapshot.user.id)
+        if conversation is None:
+            raise EvalSetupError("The made-up User has no Conversation")
+        writer = DayMemoryWriter(
+            self._repositories,
+            self._conversation_end_chat_model(),
+            self._embedder,
+            self._clock,
+        )
+        writer.write(
+            snapshot, conversation, conversations.list_messages(conversation.id)
+        )
+
+    def _conversation_end_snapshot(self) -> UserSnapshot:
+        """Read the made-up User as a Conversation-end step reads them.
+
+        Returns:
+            The User, their Features and the Eval database's Platform
+            Settings, in a new Conversation-end trace.
+
+        Raises:
+            EvalSetupError: If no User is connected, or User Memory doesn't
+                work for them.
+        """
         if self._user_id is None:
             raise EvalSetupError("Connect the made-up User first")
-        repositories = self._repositories
-        snapshot = UserSnapshotLoader(repositories, self._clock).load(
+        snapshot = UserSnapshotLoader(self._repositories, self._clock).load(
             self._user_id,
-            repositories.platform_settings.load(),
+            self._repositories.platform_settings.load(),
             start_trace(TraceKind.CONVERSATION_END),
         )
         if not snapshot.works(Feature.USER_MEMORY):
             raise EvalSetupError("User Memory doesn't work for the made-up User")
-        chat_model = UsageRecordingChatModel(
+        return snapshot
+
+    def _conversation_end_chat_model(self) -> UsageRecordingChatModel:
+        """Build the chat model a Conversation-end step uses.
+
+        Returns:
+            The counted chat model, recording usage and keeping each call's
+            full content in the Model Call Log.
+        """
+        return UsageRecordingChatModel(
             self._chat_model,
             self._photo_viewer,
-            UsageLimiter(repositories, self._clock),
+            UsageLimiter(self._repositories, self._clock),
             ModelCallLog(
-                repositories,
+                self._repositories,
                 self._clock,
                 content_for_everyone=True,
                 developer_logs=False,
             ),
             self._clock,
-        )
-        keeper = MoveOutcomeKeeper(
-            repositories, chat_model, self._embedder, self._clock
-        )
-        keeper.keep_from(
-            snapshot,
-            conversation_id,
-            repositories.conversations.list_messages(conversation_id),
         )
 
     def close(self) -> None:

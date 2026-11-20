@@ -39,6 +39,11 @@ export const evalDetails: Record<EvalName, { label: string; checks: string }> =
       checks:
         "A finished Conversation leaves the right Move Outcomes, with fair reasons that don’t judge the User.",
     },
+    day_summary: {
+      label: "Day Summary",
+      checks:
+        "Writes a Day Summary from a made-up day with the live memory processing prompt. The Judge then answers each question from the Summary alone, and the case passes only if every answer matches.",
+    },
   };
 
 /** Every Eval, in the order shown. */

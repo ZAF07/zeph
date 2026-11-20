@@ -5,7 +5,10 @@ import {
   type ShapeField,
 } from "@/lib/api-client";
 
-/** The props every field of a shape-driven form takes. */
+/**
+ * The props every field of a shape-driven form takes. `inEntry` is true for
+ * a field inside a list entry, whose input takes the panel colour.
+ */
 export type ShapeFieldProps = {
   field: ShapeField;
   value: unknown;
@@ -13,7 +16,38 @@ export type ShapeFieldProps = {
   errors: Record<string, string>;
   disabled: boolean;
   onChange: (value: unknown) => void;
+  inEntry?: boolean;
 };
+
+const shortFieldKinds = new Set<ShapeField["kind"]>([
+  "choice",
+  "whole_number",
+  "date_time",
+  "time_of_day",
+]);
+
+/**
+ * Says whether a field's value is short enough to sit beside others in a
+ * row, as a message's From and Time do.
+ *
+ * @param field - The field.
+ * @returns True for a choice, number, date or time.
+ */
+export function isShortField(field: ShapeField): boolean {
+  return shortFieldKinds.has(field.kind);
+}
+
+/**
+ * Names the button that adds an entry to a list, e.g. "Add a message" or
+ * "Add an earlier line".
+ *
+ * @param itemLabel - What one entry is called, e.g. "Message".
+ * @returns The button's text.
+ */
+export function addEntryLabel(itemLabel: string): string {
+  const item = itemLabel.toLowerCase();
+  return `Add ${/^[aeiou]/.test(item) ? "an" : "a"} ${item}`;
+}
 
 /**
  * Gives the value a new, empty field starts with.

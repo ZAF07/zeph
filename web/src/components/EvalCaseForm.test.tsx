@@ -3,7 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EvalCaseForm } from "@/components/EvalCaseForm";
-import { ApiError, type ApiClient } from "@/lib/api-client";
+import { ApiError, type ApiClient, type FormShape } from "@/lib/api-client";
+import {
+  dayCaseDraft,
+  evalDaySummaryFixtures,
+} from "@/lib/design-fixtures/eval-day-summary";
 import { personaShape, smallTalkCase } from "@/test/eval-cases";
 import { renderWithQueries } from "@/test/render-with-queries";
 
@@ -63,7 +67,9 @@ describe("EvalCaseForm", () => {
       />,
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Add message" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Add a message" }),
+    );
     const second = screen.getByRole("group", { name: "Message 2" });
     await userEvent.type(within(second).getByRole("textbox"), "and you?");
     await userEvent.click(
@@ -96,7 +102,9 @@ describe("EvalCaseForm", () => {
     renderWithQueries(<EvalCaseForm evalName="persona" shape={personaShape} />);
 
     await userEvent.type(screen.getByRole("textbox", { name: "Key" }), "plan");
-    await userEvent.click(screen.getByRole("button", { name: "Add message" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Add a message" }),
+    );
     await userEvent.click(screen.getByRole("button", { name: "Add case" }));
 
     const alerts = await screen.findAllByRole("alert");
@@ -138,5 +146,71 @@ describe("EvalCaseForm", () => {
     expect(
       screen.queryByRole("button", { name: "Save case" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("draws a one-list section's entries straight in the panel, as the Day Summary form", async () => {
+    const shapes = await evalDaySummaryFixtures.listEvalCaseShapes?.();
+    const shape: FormShape = shapes?.day_summary ?? { sections: [] };
+    apiClient.addEvalCase.mockResolvedValue({
+      ...smallTalkCase,
+      key: dayCaseDraft.key,
+    });
+    renderWithQueries(
+      <EvalCaseForm
+        evalName="day_summary"
+        shape={shape}
+        draft={dayCaseDraft}
+      />,
+    );
+
+    const theDay = screen.getByRole("region", { name: "The day" });
+    expect(
+      within(theDay).queryByRole("heading", { name: "Messages" }),
+    ).not.toBeInTheDocument();
+    const first = within(theDay).getByRole("group", { name: "Message 1" });
+    expect(within(first).getByRole("combobox", { name: "From" })).toHaveValue(
+      "0",
+    );
+    expect(within(first).getByRole("textbox", { name: "Time" })).toHaveValue(
+      "9:10 AM",
+    );
+    expect(
+      within(first).getByRole("textbox", { name: "Text" }),
+    ).not.toHaveAttribute("aria-describedby");
+    expect(screen.getByRole("textbox", { name: "Key" })).toHaveValue(
+      "guilt-and-job-worry",
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Remove question 2" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Add a question" }),
+    );
+    const added = screen.getByRole("group", { name: "Question 2" });
+    await userEvent.type(
+      within(added).getByRole("textbox", { name: "Question" }),
+      "Who did they snap at?",
+    );
+    await userEvent.type(
+      within(added).getByRole("textbox", { name: "Expected answer" }),
+      "Their sister.",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Add case" }));
+
+    expect(apiClient.addEvalCase).toHaveBeenCalledWith(
+      "guilt-and-job-worry",
+      "day_summary",
+      {
+        messages: dayCaseDraft.content.messages,
+        questions: [
+          {
+            question: "What did the User feel guilty about?",
+            expected: "Snapping at their sister in the morning.",
+          },
+          { question: "Who did they snap at?", expected: "Their sister." },
+        ],
+      },
+    );
   });
 });

@@ -1,11 +1,13 @@
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, time
 from enum import StrEnum
 from typing import Any
 
 from companion.core.errors import InvalidError
 from companion.core.evals.models import EvalName
+
+TIME_FORMATS = ("%I:%M %p", "%I:%M%p", "%H:%M")
 
 
 class InvalidFormError(InvalidError):
@@ -45,6 +47,7 @@ class FieldKind(StrEnum):
     ON_OFF = "on_off"
     CHOICE = "choice"
     DATE_TIME = "date_time"
+    TIME_OF_DAY = "time_of_day"
     IMAGE = "image"
     TEXT_LIST = "text_list"
     GROUP = "group"
@@ -232,6 +235,8 @@ def _missing_message(shape_field: ShapeField) -> str:
         return "Pick one."
     if shape_field.kind == FieldKind.WHOLE_NUMBER:
         return "Needs a number."
+    if shape_field.kind == FieldKind.TIME_OF_DAY:
+        return "Needs a time."
     return "Needs some text."
 
 
@@ -268,7 +273,27 @@ def _value_problem(shape_field: ShapeField, value: Any) -> str:
             return ""
         labels = ", ".join(option.label for option in shape_field.options)
         return f"Pick one of: {labels}."
+    if kind == FieldKind.TIME_OF_DAY:
+        readable = isinstance(value, str) and read_time_of_day(value) is not None
+        return "" if readable else "Write a time like 9:10 AM or 21:10."
     return _date_time_problem(value)
+
+
+def read_time_of_day(text: str) -> time | None:
+    """Read a time of day as an Admin writes it.
+
+    Args:
+        text: E.g. "9:10 AM", "9:10pm" or "21:10".
+
+    Returns:
+        The time; None if it can't be read.
+    """
+    for time_format in TIME_FORMATS:
+        try:
+            return datetime.strptime(text.strip().upper(), time_format).time()
+        except ValueError:
+            continue
+    return None
 
 
 def _date_time_problem(value: Any) -> str:
@@ -1418,6 +1443,70 @@ MOVE_OUTCOME_SHAPE = FormShape(
     ]
 )
 
+DAY_SUMMARY_SHAPE = FormShape(
+    [
+        ShapeSection(
+            "The day",
+            "The messages of one made-up day, in order. The memory processing "
+            "step reads these to write the Day Summary.",
+            [
+                group_list_field(
+                    "messages",
+                    "Messages",
+                    "What the User and Zeph said that day, in order. Messages "
+                    "further apart than the Conversation quiet gap fall in "
+                    "separate Conversations, as they would on a real day.",
+                    "Message",
+                    [
+                        ShapeField(
+                            "who",
+                            "From",
+                            "",
+                            FieldKind.CHOICE,
+                            required=True,
+                            options=[
+                                ChoiceOption("person", "User"),
+                                ChoiceOption("zeph", "Zeph"),
+                            ],
+                            default="person",
+                        ),
+                        ShapeField(
+                            "time",
+                            "Time",
+                            "",
+                            FieldKind.TIME_OF_DAY,
+                            required=True,
+                            default="",
+                        ),
+                        long_text_field("text", "Text", ""),
+                    ],
+                    required=True,
+                ),
+            ],
+        ),
+        ShapeSection(
+            "Questions",
+            "What the Summary must be able to answer: the facts, the feelings, "
+            "and what Zeph offered and how it landed. The Judge sees only the "
+            "Summary, never the messages.",
+            [
+                group_list_field(
+                    "questions",
+                    "Questions",
+                    "Each question and the answer the Summary should give. The "
+                    "case passes only if every answer matches.",
+                    "Question",
+                    [
+                        text_field("question", "Question", ""),
+                        text_field("expected", "Expected answer", ""),
+                    ],
+                    required=True,
+                ),
+            ],
+        ),
+    ]
+)
+
 CASE_SHAPES: dict[EvalName, FormShape] = {
     EvalName.SAFEGUARD: SAFEGUARD_SHAPE,
     EvalName.PERSONA: PERSONA_SHAPE,
@@ -1426,4 +1515,5 @@ CASE_SHAPES: dict[EvalName, FormShape] = {
     EvalName.PHOTO_DESCRIPTIONS: PHOTO_DESCRIPTIONS_SHAPE,
     EvalName.UNDERSTANDING: UNDERSTANDING_SHAPE,
     EvalName.MOVE_OUTCOME: MOVE_OUTCOME_SHAPE,
+    EvalName.DAY_SUMMARY: DAY_SUMMARY_SHAPE,
 }

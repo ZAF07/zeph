@@ -2,7 +2,7 @@
 
 import { useId } from "react";
 
-import { fieldCaption } from "@/components/form-styles";
+import { fieldHint } from "@/components/form-styles";
 import { ShapeFieldControl } from "@/components/ShapeFieldControl";
 import { ShapeGroupFields } from "@/components/ShapeGroupFields";
 import { ShapeGroupList } from "@/components/ShapeGroupList";
@@ -11,12 +11,13 @@ import { isFormValues, type ShapeFieldProps } from "@/lib/eval-forms";
 
 /**
  * One field of a case or Judge form, drawn from the backend's description
- * of it: its label, what it means and what changing it affects, the input
- * for its kind and the backend's message when a save was refused.
+ * of it: its label, its hint when it has one, the input for its kind and
+ * the backend's message when a save was refused.
  *
  * @param props - `field` describes it, `value` is its value, `path` is
  *   where it sits (e.g. `messages.0.text`), `errors` are the backend's
- *   messages by path, `disabled` locks it and `onChange` gets a new value.
+ *   messages by path, `disabled` locks it, `inEntry` is true inside a list
+ *   entry and `onChange` gets a new value.
  * @returns The field.
  */
 export function ShapeFieldInput(props: ShapeFieldProps) {
@@ -28,16 +29,17 @@ export function ShapeFieldInput(props: ShapeFieldProps) {
   if (field.kind === "group") {
     return (
       <fieldset className="m-0 flex min-w-0 flex-col gap-4 rounded-tile border border-line p-4">
-        <legend className="px-1 text-[15px] font-normal text-text">
-          {field.label}
-        </legend>
-        <p className={fieldCaption}>{field.description}</p>
+        <legend className="px-1 text-[13px] text-soft">{field.label}</legend>
+        {field.description ? (
+          <p className={fieldHint}>{field.description}</p>
+        ) : null}
         <ShapeGroupFields
           fields={field.fields}
           value={isFormValues(value) ? value : {}}
           path={path}
           errors={errors}
           disabled={disabled}
+          inEntry={props.inEntry}
           onChange={props.onChange}
         />
       </fieldset>
@@ -52,19 +54,19 @@ export function ShapeFieldInput(props: ShapeFieldProps) {
 
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
-      <label htmlFor={inputId} className="text-[15px] font-normal text-text">
+      <label htmlFor={inputId} className="text-[13px] text-soft">
         {field.label}
-        {field.required || field.kind === "on_off" ? null : (
-          <span className="text-soft"> · optional</span>
-        )}
+        {field.required || field.kind === "on_off" ? null : " · optional"}
       </label>
-      <p id={descriptionId} className={fieldCaption}>
-        {field.description}
-      </p>
+      {field.description ? (
+        <p id={descriptionId} className={fieldHint}>
+          {field.description}
+        </p>
+      ) : null}
       <ShapeFieldControl
         {...props}
         inputId={inputId}
-        describedBy={descriptionId}
+        describedBy={field.description ? descriptionId : undefined}
         invalid={error !== undefined}
       />
       {error ? (
