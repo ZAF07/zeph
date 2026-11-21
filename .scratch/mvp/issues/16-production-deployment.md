@@ -40,3 +40,8 @@ A short deployment guide covers first setup, updating by hand, and backups.
 ## Blocked by
 
 - `.scratch/mvp/issues/archive/01-walking-skeleton.md`
+
+## Comments
+
+- 2026-11-21: No real domain yet (final product name not chosen). Start on a free DuckDNS subdomain; Caddy still gets a Let's Encrypt certificate for it. The domain lives only in `.env` (Caddy site address, `NEXT_PUBLIC_API_URL`), so switching later is: update `.env`, `docker compose up -d --build`, re-register the Telegram webhook. Clerk stays on its development instance until the real domain exists (a Clerk production instance needs DNS records on a domain we own). Off-server backups go to Cloudflare R2.
+- 2026-11-21: Server OS: Debian 13 or Ubuntu 24.04, both fine. On Debian, install and enable `unattended-upgrades` for automatic security updates.
