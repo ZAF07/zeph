@@ -1,4 +1,4 @@
-# 31 — CI/CD: deploy on push to main
+# 31 — CI/CD: deploy on push to production
 
 Status: ready-for-agent
 
@@ -8,7 +8,7 @@ Status: ready-for-agent
 
 ## What to build
 
-A GitHub Actions workflow that runs on every push to `main`:
+A GitHub Actions workflow that runs on every push to the `production` branch. `main` stays the everyday branch; going live means merging `main` into `production`.
 
 1. **Checks:** run `make check`. If any check fails, nothing is deployed.
 2. **Deploy:** SSH into the VPS as the `deploy` user, then in the repo run `git pull` and `docker compose up -d --build`. The server builds the images itself, so build-time values like `NEXT_PUBLIC_API_URL` come from the server's own `.env`. Migrations run on backend start (`prestart`).
@@ -20,14 +20,18 @@ Each deploy brings a few seconds of downtime while containers restart. That is f
 
 ## Acceptance criteria
 
-- [ ] A push to `main` runs `make check`; a failing check stops the run before deploy
+- [ ] A push to `production` runs `make check`; a failing check stops the run before deploy
 - [ ] When checks pass, the workflow deploys over SSH with `git pull` and `docker compose up -d --build`
 - [ ] The workflow fails if the live `/health` check doesn't answer after deploy
 - [ ] GitHub secrets hold only the SSH key, host and user; no app secrets in GitHub or the repo
 - [ ] Only one deploy runs at a time (a newer push waits or cancels the older run)
 - [ ] The deployment guide explains the workflow, the GitHub secrets to set, and how to roll back (deploy an older commit)
-- [ ] Verified live: push a small visible change to `main` and see it on the production Dashboard
+- [ ] Verified live: merge a small visible change into `production` and see it on the production Dashboard
 
 ## Blocked by
 
 - `.scratch/mvp/issues/16-production-deployment.md`
+
+## Comments
+
+- 2026-11-21: Deploys trigger on the `production` branch, not `main`. `main` is the everyday branch; merging `main` into `production` is how a change goes live. The server clones only `production`.

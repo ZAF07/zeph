@@ -8,7 +8,7 @@ Status: ready-for-agent
 
 ## What to build
 
-Run the MVP on one OVHcloud VPS (VPS-2: 4 vCores, 8 GB RAM) using the same Docker Compose file and images as local (ADR-0005). Only `.env` differs. This issue is the manual first setup; automatic deploys on push to main come in `.scratch/mvp/issues/31-ci-cd-deploy-on-push.md`.
+Run the MVP on one OVHcloud VPS (VPS-2: 4 vCores, 8 GB RAM) using the same Docker Compose file and images as local (ADR-0005). Only `.env` differs. This issue is the manual first setup; automatic deploys on push to the `production` branch come in `.scratch/mvp/issues/31-ci-cd-deploy-on-push.md`.
 
 - **Caddy** runs as a Compose service under a `prod` profile, in front of the Dashboard and backend, with automatic HTTPS.
 - **Profiles are switched on in `.env`** through `COMPOSE_PROFILES`, so a plain `docker compose up` does the right thing everywhere:
@@ -16,7 +16,7 @@ Run the MVP on one OVHcloud VPS (VPS-2: 4 vCores, 8 GB RAM) using the same Docke
   - prod `.env`: `COMPOSE_PROFILES=prod` (Caddy runs, no eval-runner)
 - **Only Caddy is reachable from the internet** (ports 80 and 443). Postgres, backend and web publish their ports on a host address set in `.env` (`127.0.0.1` in prod). Docker bypasses `ufw`, so a firewall alone does not protect them.
 - **`NEXT_PUBLIC_API_URL`** in the prod `.env` is the production domain. It is baked into the Dashboard at build time.
-- **Server setup:** Docker Engine installed, a `deploy` user that can run Docker, the repo cloned, swap enabled, and the domain pointed at the server's IP.
+- **Server setup:** Docker Engine installed, a `deploy` user that can run Docker, the repo cloned on the `production` branch only (`git clone -b production --single-branch`), swap enabled, and the domain pointed at the server's IP.
 - **Backups:** a nightly `pg_dump` cron job, with the dump copied off the server.
 
 A short deployment guide covers first setup, updating by hand, and backups.
