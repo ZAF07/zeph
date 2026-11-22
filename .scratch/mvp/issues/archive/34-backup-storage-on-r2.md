@@ -71,3 +71,4 @@ Last acceptance criteria cannot be checked until `.scratch/mvp/issues/16-product
 `b7a6e23d11f297334ece35edb98aedb507a85dac` - partially completed issue
 `7429bf2` - Production deployment: Caddy under prod profile, eval-runner under eval, ports on 127.0.0.1, restart policies, nightly R2 backup script and deployment guide (issue 16)
 `cddc852` - Deployment guide: one cron command that replaces the backup job
+`6696274` - Archive issues 16 and 34: production deployment and nightly R2 backup done

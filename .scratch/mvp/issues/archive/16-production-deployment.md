@@ -67,3 +67,4 @@ A short deployment guide covers first setup, updating by hand, and backups.
 - `cddc852` - Deployment guide: one cron command that replaces the backup job
 - `802b6b1` - Issue 16: live-server checks for HTTPS, ports, API domain and webhook
 - `afd0c59` - Issue 16: live sign-up confirmed
+- `6696274` - Archive issues 16 and 34: production deployment and nightly R2 backup done
