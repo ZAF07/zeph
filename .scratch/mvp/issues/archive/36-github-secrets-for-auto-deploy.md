@@ -36,3 +36,7 @@ Give GitHub Actions its own key to log into the VPS, so pushes to `production` c
 ## Blocked by
 
 - `.scratch/mvp/issues/archive/32-set-up-the-vps.md`
+
+## Commits:
+
+d338ef2463aff69774530d675afe19beb923dbdb, 1d6aaef6430232cfa5f362f721794d4e916d0434
