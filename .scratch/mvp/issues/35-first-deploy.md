@@ -32,12 +32,13 @@ Put Zeph live for the first time, by hand.
    cd ~/zeph
    ```
    Why single-branch: the server can only ever pull `production`, so nothing from `main` goes live by mistake.
-4. **Write the prod `.env`:** `cp .env.example .env`, then fill it in by hand following the deployment guide from issue 16. The domain-related values (using your DuckDNS name):
+4. **Write the prod `.env`:** `cp .env.example .env`, then fill it in by hand following `docs/DEPLOYMENT_GUIDE.md` (step 5). The domain-related values (using your DuckDNS name):
    ```
    COMPOSE_PROFILES=prod
+   PORT_BIND_ADDRESS=127.0.0.1
    PRODUCTION_DOMAIN=zeph-beta.duckdns.org
    WEBHOOK_BASE_URL=https://zeph-beta.duckdns.org
-   NEXT_PUBLIC_API_URL=<as the guide says>
+   NEXT_PUBLIC_API_URL=https://zeph-beta.duckdns.org
    DASHBOARD_URL=https://zeph-beta.duckdns.org
    ```
    Use new, strong values for `POSTGRES_PASSWORD` and `TELEGRAM_WEBHOOK_SECRET` (`openssl rand -hex 32`). Leave `NGROK_*` empty. Clerk: development keys for now (see issue 33).

@@ -128,8 +128,8 @@ def build_worktree_env(main_env_text: str, ports: Ports, project_name: str) -> s
     """Build a worktree's `.env` from the main folder's.
 
     Keeps every secret, and replaces the keys that must differ per stack:
-    ports, the addresses built from them, the Compose project, the ngrok
-    profile and Telegram webhook registration.
+    ports, the addresses built from them, the Compose project, the profiles
+    (the eval-runner but no ngrok) and Telegram webhook registration.
 
     Args:
         main_env_text: The main folder's `.env` contents.
@@ -141,7 +141,7 @@ def build_worktree_env(main_env_text: str, ports: Ports, project_name: str) -> s
     """
     worktree_values = {
         "COMPOSE_PROJECT_NAME": project_name,
-        "COMPOSE_PROFILES": "",
+        "COMPOSE_PROFILES": "eval",
         "WEB_PORT": str(ports.web),
         "BACKEND_PORT": str(ports.backend),
         "POSTGRES_PORT": str(ports.postgres),

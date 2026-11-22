@@ -1,0 +1,16 @@
+# Production HTTPS in front of the app (issue 16). The domain comes from
+# PRODUCTION_DOMAIN in .env; Caddy gets and renews its certificate itself.
+# The backend's routes (/api, /telegram, /health) and the Dashboard share one
+# domain, so NEXT_PUBLIC_API_URL and WEBHOOK_BASE_URL are both https://<domain>.
+{$PRODUCTION_DOMAIN} {
+	encode zstd gzip
+
+	@backend path /api/* /telegram/* /health
+	handle @backend {
+		reverse_proxy backend:8000
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}

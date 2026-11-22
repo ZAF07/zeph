@@ -48,13 +48,13 @@ def test_worktree_env_keeps_secrets_and_sets_its_own_ports_and_project() -> None
     assert read_env_value(env, "COMPOSE_PROJECT_NAME") == "zeph-photos-04"
 
 
-def test_worktree_env_turns_off_telegram_webhook_and_ngrok() -> None:
+def test_worktree_env_turns_off_telegram_webhook_and_ngrok_but_keeps_evals() -> None:
     env = build_worktree_env(
         MAIN_ENV, Ports(web=3010, backend=8010, postgres=5442), "zeph"
     )
 
     assert read_env_value(env, "TELEGRAM_WEBHOOK_REGISTER") == "false"
-    assert read_env_value(env, "COMPOSE_PROFILES") == ""
+    assert read_env_value(env, "COMPOSE_PROFILES") == "eval"
 
 
 def test_worktree_env_sets_each_key_only_once() -> None:
