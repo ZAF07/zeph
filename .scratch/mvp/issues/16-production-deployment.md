@@ -26,16 +26,16 @@ A short deployment guide covers first setup, updating by hand, and backups.
 
 ## Acceptance criteria
 
-- [ ] The same Compose services and images run in production; only `.env` differs
-- [ ] `COMPOSE_PROFILES` in `.env` controls which services run: the eval-runner only with `eval`, Caddy only with `prod`; plain `docker compose up` locally still starts the eval-runner
+- [x] The same Compose services and images run in production; only `.env` differs
+- [x] `COMPOSE_PROFILES` in `.env` controls which services run: the eval-runner only with `eval`, Caddy only with `prod`; plain `docker compose up` locally still starts the eval-runner
 - [ ] Caddy serves the Dashboard and backend over HTTPS with automatic certificates
 - [ ] From outside the server, only ports 80 and 443 answer; Postgres (5432), backend and web ports do not (checked with `nc` from another machine)
 - [ ] The live Dashboard calls the production API domain, not localhost
 - [ ] The Telegram webhook is registered to the production domain and verified with the secret token
 - [ ] Postgres data is on a persistent volume, with a documented backup and restore command; the nightly backup is copied to `r2:zeph-backups`
 - [ ] Every long-running service has `restart: unless-stopped`; after `sudo reboot` the app comes back without a manual `docker compose up`
-- [ ] A deployment guide covers first setup (the server steps from issue 32, DuckDNS, R2 and rclone, clone, prod `.env`), updating by hand (`git pull` then `docker compose up -d --build`, automated later by issue 31), and backups
-- [ ] The deployment guide links `docs/RESET_TELEGRAM_TOKEN_GUIDE.md`: reset the bot token when it leaks or might have (BotFather revoke → update `.env` → `make restart`), not on a schedule
+- [x] A deployment guide covers first setup (the server steps from issue 32, DuckDNS, R2 and rclone, clone, prod `.env`), updating by hand (`git pull` then `docker compose up -d --build`, automated later by issue 31), and backups
+- [x] The deployment guide links `docs/RESET_TELEGRAM_TOKEN_GUIDE.md`: reset the bot token when it leaks or might have (BotFather revoke → update `.env` → `make restart`), not on a schedule
 - [ ] Verified on the live server: sign up, connect Telegram, receive the welcome message
 
 ## Blocked by
@@ -47,3 +47,5 @@ A short deployment guide covers first setup, updating by hand, and backups.
 - 2026-11-21: No real domain yet (final product name not chosen). Start on a free DuckDNS subdomain; Caddy still gets a Let's Encrypt certificate for it. The domain lives only in `.env` (Caddy site address, `NEXT_PUBLIC_API_URL`), so switching later is: update `.env`, `docker compose up -d --build`, re-register the Telegram webhook. Clerk stays on its development instance until the real domain exists (a Clerk production instance needs DNS records on a domain we own). Off-server backups go to Cloudflare R2.
 - 2026-11-21: Server OS: Debian 13 or Ubuntu 24.04, both fine. On Debian, install and enable `unattended-upgrades` for automatic security updates.
 - 2026-11-22: The hands-on server work is split into human issues: 32 (VPS setup), 33 (DuckDNS), 34 (R2 backups), 35 (first deploy). This issue builds the repo side (Caddy service, `Caddyfile`, bind addresses, backup script, deployment guide). The live-server criteria here are checked through issue 35. The Caddyfile reads the domain from `PRODUCTION_DOMAIN`.
+- 2026-11-22: Repo side done and merged: Caddy service and `Caddyfile` (prod profile; `/api/*`, `/telegram/*`, `/health` to the backend, the rest to the Dashboard, one domain), eval-runner under the `eval` profile, Postgres/backend/web ports on `PORT_BIND_ADDRESS` (default `127.0.0.1`), `restart: unless-stopped` on every service, `scripts/backup.sh`, `docs/DEPLOYMENT_GUIDE.md`. Checked in a running worktree stack with `COMPOSE_PROFILES=eval,prod PRODUCTION_DOMAIN=localhost`: `docker compose config --services` gives the right services per profile; through Caddy `/health` 200, `/api/me` 401, `/telegram/webhook` 401 (bad secret), `/` the Dashboard, http redirects to https; from the LAN address only 443 answered (3010/5442/8010 closed); every container's restart policy is `unless-stopped`; `scripts/backup.sh` made a real `pg_dump`, and the guide's restore command brought back a dropped table (exit 0). `make check` green (1491 Python, 899 web tests).
+  Still open, all live-server checks done through issue 35: Let's Encrypt certificate, `nc` from outside, live Dashboard calling the prod domain, `getWebhookInfo`, reboot, live sign-up. The nightly backup cron needs `sudo apt install -y make cron` on the VPS first (neither is installed), then the crontab line from the guide (issue 34 step 8).
