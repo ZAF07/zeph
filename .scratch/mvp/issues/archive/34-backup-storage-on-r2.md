@@ -1,6 +1,6 @@
 # 34 — Backup storage on Cloudflare R2
 
-Status: ready-for-agent
+Status: completed
 
 ## Parent
 
@@ -49,17 +49,25 @@ Why R2: free at this size (10 GB), and downloading a backup to restore it costs 
 - [x] Bucket exists with a 30-day delete rule
 - [x] The API token only reaches `zeph-backups`
 - [x] `rclone ls r2:zeph-backups` works on the VPS as `deploy`
-- [ ] Nightly backup cron installed and one backup seen in the bucket the next day
+- [x] Nightly backup cron installed and one backup seen in the bucket the next day
 
 ## Blocked by
 
 - `.scratch/mvp/issues/archive/32-set-up-the-vps.md`
-- `.scratch/mvp/issues/16-production-deployment.md` (step 8 only)
+- `.scratch/mvp/issues/archive/16-production-deployment.md` (step 8 only)
 
 ## Comments:
 
 Last acceptance criteria cannot be checked until `.scratch/mvp/issues/16-production-deployment.md` is complete. It needs to add the backup cron job. Plese come back to this when `.scratch/mvp/issues/16-production-deployment.md` has added the backup cron job.
 
+- 2026-11-22: Step 8 done. Issue 16 added `scripts/backup.sh` and the cron line in `docs/DEPLOYMENT_GUIDE.md`. The owner installed `make` and `cron`, then installed the job as `deploy`. A test run (set a minute ahead) put a dump in `r2:zeph-backups`; the job is back on 19:30 UTC (03:30 at UTC+8).
+
+## Completion
+
+- Completed: 2026-11-22
+
 ## Commits:
 
 `b7a6e23d11f297334ece35edb98aedb507a85dac` - partially completed issue
+`7429bf2` - Production deployment: Caddy under prod profile, eval-runner under eval, ports on 127.0.0.1, restart policies, nightly R2 backup script and deployment guide (issue 16)
+`cddc852` - Deployment guide: one cron command that replaces the backup job
