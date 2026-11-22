@@ -7,12 +7,14 @@ BACKUP_SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "backup.sh"
 
 
 def write_stub(bin_dir: Path, name: str, body: str) -> None:
+    """Put a fake command on the path that records its arguments, then runs body."""
     stub = bin_dir / name
     stub.write_text(f'#!/bin/sh\necho "$@" >> {bin_dir}/{name}.calls\n{body}\n')
     stub.chmod(0o755)
 
 
 def run_backup(tmp_path: Path, docker_body: str) -> subprocess.CompletedProcess[str]:
+    """Run the backup script with fake docker and rclone commands."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
     write_stub(bin_dir, "docker", docker_body)
@@ -29,7 +31,8 @@ def run_backup(tmp_path: Path, docker_body: str) -> subprocess.CompletedProcess[
     )
 
 
-def calls(tmp_path: Path, name: str) -> list[str]:
+def recorded_calls(tmp_path: Path, name: str) -> list[str]:
+    """Return the arguments each call to a fake command was given."""
     calls_file = tmp_path / "bin" / f"{name}.calls"
     return calls_file.read_text().splitlines() if calls_file.exists() else []
 
@@ -41,15 +44,15 @@ def test_backup_dumps_postgres_and_copies_the_dump_to_r2(tmp_path: Path) -> None
     dumps = list((tmp_path / "backups").glob("zeph-*.dump"))
     assert len(dumps) == 1
     assert dumps[0].read_text() == "dump-bytes\n"
-    assert "pg_dump" in calls(tmp_path, "docker")[0]
-    assert calls(tmp_path, "rclone") == [f"copy {dumps[0]} r2:zeph-backups"]
+    assert "pg_dump" in recorded_calls(tmp_path, "docker")[0]
+    assert recorded_calls(tmp_path, "rclone") == [f"copy {dumps[0]} r2:zeph-backups"]
 
 
 def test_failed_dump_uploads_nothing_and_leaves_no_file(tmp_path: Path) -> None:
     result = run_backup(tmp_path, "echo half-a-dump; exit 1")
 
     assert result.returncode != 0
-    assert calls(tmp_path, "rclone") == []
+    assert recorded_calls(tmp_path, "rclone") == []
     assert list((tmp_path / "backups").iterdir()) == []
 
 

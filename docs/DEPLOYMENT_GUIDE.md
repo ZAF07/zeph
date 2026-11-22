@@ -21,9 +21,9 @@ Do these once, in order.
 
 2. **Domain.** Follow `.scratch/mvp/issues/archive/33-free-domain-on-duckdns.md`, so the DuckDNS name points at the server.
 
-3. **Backup storage.** Follow `.scratch/mvp/issues/34-backup-storage-on-r2.md`: the `zeph-backups` R2 bucket with a 30-day delete rule, and an `r2` rclone remote for `deploy`. Install rclone from rclone.org, not with `apt`: Debian's rclone is too old for R2 and fails uploads with `501 Not Implemented`.
+3. **Backup storage.** Follow `.scratch/mvp/issues/archive/34-backup-storage-on-r2.md`: the `zeph-backups` R2 bucket with a 30-day delete rule, and an `r2` rclone remote for `deploy`. Install rclone from rclone.org, not with `apt`: Debian's rclone is too old for R2 and fails uploads with `501 Not Implemented`.
 
-4. **Clone.** As `deploy`, clone only the `production` branch to `~/zeph` (details, including the read-only deploy key, in `.scratch/mvp/issues/35-first-deploy.md`):
+4. **Clone.** As `deploy`, clone only the `production` branch to `~/zeph` (issue 35 has the details, including the read-only deploy key):
 
    ```
    git clone -b production --single-branch git@github.com:ZAF07/zeph.git ~/zeph
@@ -47,6 +47,7 @@ Do these once, in order.
    - Clerk: the development keys for now. A Clerk production instance needs DNS records on a domain we own, which DuckDNS can't give.
    - `NEXT_PUBLIC_API_URL` is baked into the Dashboard when it is built. If you change it, rebuild (`docker compose up -d --build`).
    - `.env` never goes into git. App secrets live only in this file.
+   - If `PRODUCTION_DOMAIN` is empty, Caddy won't start. Check `docker compose logs caddy` if the site doesn't load.
 
 6. **Start.** In `~/zeph`:
 
@@ -118,6 +119,8 @@ docker compose stop backend web
 docker compose exec -T postgres sh -c 'pg_restore --clean --if-exists --no-owner -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < ~/backups/zeph-<time>.dump
 docker compose start backend web
 ```
+
+`pg_restore` may print warnings such as "does not exist, skipping"; they are harmless. It worked if it ends without `errors ignored on restore`, and `curl https://<domain>/health` answers once the backend is back.
 
 ## Telegram bot token
 

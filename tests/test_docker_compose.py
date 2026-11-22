@@ -5,6 +5,7 @@ import yaml
 
 COMPOSE_FILE = Path(__file__).resolve().parent.parent / "docker-compose.yml"
 SERVICES: dict[str, Any] = yaml.safe_load(COMPOSE_FILE.read_text())["services"]
+APP_SERVICES = ("postgres", "backend", "web")
 
 
 def test_eval_runner_runs_only_with_the_eval_profile() -> None:
@@ -20,7 +21,7 @@ def test_ngrok_runs_only_with_the_local_profile() -> None:
 
 
 def test_app_services_run_whatever_the_profiles() -> None:
-    for name in ("postgres", "backend", "web"):
+    for name in APP_SERVICES:
         assert "profiles" not in SERVICES[name]
 
 
@@ -30,7 +31,7 @@ def test_every_service_restarts_unless_stopped() -> None:
 
 
 def test_only_caddy_publishes_ports_on_every_host_address() -> None:
-    for name in ("postgres", "backend", "web"):
+    for name in APP_SERVICES:
         for port in SERVICES[name]["ports"]:
             assert port.startswith("${PORT_BIND_ADDRESS:-127.0.0.1}:"), name
 

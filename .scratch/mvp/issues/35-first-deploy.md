@@ -49,6 +49,15 @@ Put Zeph live for the first time, by hand.
    - open `https://zeph-beta.duckdns.org` in the browser: padlock shows, Dashboard loads
    - the Telegram webhook registers itself on backend start from `WEBHOOK_BASE_URL`; check with `curl https://api.telegram.org/bot<token>/getWebhookInfo`
 7. **Live test:** sign up, connect Telegram, get the welcome message.
+8. **Seed with the local database** (platform settings, prompts and the rest, dumped from the main local stack on 2026-11-22). This **replaces everything** in the prod database, including the account made in step 7, so do it after the live test. As `deploy`, in `~/zeph`:
+   ```
+   ls ~/seed/   # seed-local-2026-11-22T055241Z.dump; also in r2:zeph-backups/seed/ until R2 deletes it after 30 days
+   docker compose stop backend web
+   docker compose exec -T postgres sh -c 'pg_restore --clean --if-exists --no-owner -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < ~/seed/seed-local-2026-11-22T055241Z.dump
+   docker compose start backend web
+   ```
+   Check: sign in on the Dashboard and the Admin pages show your local platform settings and prompts. Warnings like "does not exist, skipping" are fine.
+   The dump includes your Telegram link, so from now on prod sends you Check-ins. Before restarting the local main stack, set `TELEGRAM_WEBHOOK_REGISTER=false` in its `.env`, or a local start moves the bot's webhook back to ngrok.
 
 ## Acceptance criteria
 
@@ -57,6 +66,7 @@ Put Zeph live for the first time, by hand.
 - [ ] Dashboard loads over HTTPS on the DuckDNS name
 - [ ] `getWebhookInfo` shows the DuckDNS URL and no errors
 - [ ] Sign up, connect Telegram, welcome message received
+- [ ] Prod database seeded from the local dump; Admin pages show the local platform settings and prompts
 
 ## Blocked by
 
