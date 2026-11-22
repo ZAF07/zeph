@@ -61,12 +61,12 @@ Put Zeph live for the first time, by hand.
 
 ## Acceptance criteria
 
-- [ ] `production` branch exists on GitHub
-- [ ] Repo cloned on the VPS with only `production`
-- [ ] Dashboard loads over HTTPS on the DuckDNS name
-- [ ] `getWebhookInfo` shows the DuckDNS URL and no errors
-- [ ] Sign up, connect Telegram, welcome message received
-- [ ] Prod database seeded from the local dump; Admin pages show the local platform settings and prompts
+- [x] `production` branch exists on GitHub
+- [x] Repo cloned on the VPS with only `production`
+- [x] Dashboard loads over HTTPS on the DuckDNS name
+- [x] `getWebhookInfo` shows the DuckDNS URL and no errors
+- [x] Sign up, connect Telegram, welcome message received
+- [x] Prod database seeded from the local dump; Admin pages show the local platform settings and prompts
 
 ## Blocked by
 
