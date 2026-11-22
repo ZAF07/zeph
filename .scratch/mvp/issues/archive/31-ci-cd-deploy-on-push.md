@@ -55,3 +55,8 @@ Each deploy brings a few seconds of downtime while containers restart. That is f
 
 ## Commits:
 
+`afcce32` - Deploy on push to production: checks, SSH deploy, live health check (issue 31)
+`594fb6a` - Deploy workflow review fixes: deploy the checked commit, merge-safe rollback, real domain zeph-dev (issue 31)
+`84640bc`, `d7f4637`, `00fbc0f` - temporary live-check marker page; removed by `71f5332`, `23169a8`, `ea14ce1`
+`4be653b`, `c46a8e7`, `c7ba53b` - live-check commits on `production` only (failing check, its revert, empty commit for the wait test)
+`3e41855` - Archive issue 31: deploy on push verified live; ADR-0023; issue 34 cron checked
