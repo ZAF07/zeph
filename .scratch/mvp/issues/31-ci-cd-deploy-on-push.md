@@ -1,6 +1,6 @@
 # 31 — CI/CD: deploy on push to production
 
-Status: ready-for-agent
+Status: in-progress
 
 ## Parent
 
@@ -37,3 +37,4 @@ Each deploy brings a few seconds of downtime while containers restart. That is f
 ## Comments
 
 - 2026-11-21: Deploys trigger on the `production` branch, not `main`. `main` is the everyday branch; merging `main` into `production` is how a change goes live. The server clones only `production`.
+- 2026-11-22: Built `.github/workflows/deploy.yml` (check job runs `make check`; deploy job `needs: check`, SSHs in with `StrictHostKeyChecking=yes` and the `SSH_KNOWN_HOSTS` secret, runs `git pull --ff-only && docker compose up -d --build`, then polls `$PRODUCTION_URL/health` 30 times, 5 s apart). `concurrency: deploy-production` with `cancel-in-progress: false`, so a newer push waits instead of cancelling a deploy halfway. The health URL is a workflow `env`, not a secret: the domain is public and already in the docs. Rollback is a `git revert` pushed to `production` (fast way: `git reset --hard` on the server). Locked by `tests/test_deploy_workflow.py`; `actionlint` passes.

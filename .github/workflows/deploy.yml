@@ -1,0 +1,67 @@
+# Deploy on every push to production: checks, then pull and rebuild on the VPS, then the live health check.
+# See docs/DEPLOYMENT_GUIDE.md, "Deploying on push".
+name: Deploy
+
+on:
+  push:
+    branches: [production]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  PRODUCTION_URL: https://zeph-beta.duckdns.org
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Install packages
+        run: |
+          uv sync
+          cd web && pnpm install --frozen-lockfile
+      - name: Run checks
+        run: make check
+
+  deploy:
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Set up SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Pull and rebuild on the server
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST" \
+            'cd ~/zeph && git pull --ff-only && docker compose up -d --build'
+      - name: Check the live backend answers
+        run: |
+          for attempt in $(seq 1 30); do
+            curl -fsS --max-time 10 "$PRODUCTION_URL/health" && exit 0
+            echo "Health check $attempt/30 failed; trying again in 5 seconds."
+            sleep 5
+          done
+          echo "The live backend did not answer $PRODUCTION_URL/health after deploy."
+          exit 1

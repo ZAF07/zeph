@@ -77,16 +77,56 @@ Do these once, in order.
 
 Every service has `restart: unless-stopped`, so after `sudo reboot` or a Docker upgrade the app comes back by itself. Check once with `sudo reboot`, wait a minute, then `docker compose ps`.
 
+## Deploying on push
+
+`main` is the everyday branch. A change goes live by merging `main` into `production` and pushing:
+
+```
+git checkout production && git pull
+git merge main
+git push origin production
+```
+
+Every push to `production` runs `.github/workflows/deploy.yml` (repo → **Actions → Deploy**):
+
+1. **Checks:** `make check`. If any check fails, nothing is deployed.
+2. **Deploy:** logs into the server as `deploy` over SSH and, in `~/zeph`, runs `git pull --ff-only` and `docker compose up -d --build`. The server builds the images itself, so build-time values like `NEXT_PUBLIC_API_URL` come from its own `.env`. Migrations run when the backend starts.
+3. **Health check:** calls `https://zeph-beta.duckdns.org/health` for up to about 2.5 minutes. If it never answers, the run fails.
+
+Only one deploy runs at a time. A push made while a deploy is running waits for it to finish. Each deploy brings a few seconds of downtime while containers restart.
+
+If the build fails on the server, the running containers stay up on the old version.
+
+**GitHub secrets** (repo → **Settings → Secrets and variables → Actions**). Issue 36 has how to make them:
+
+- `SSH_KEY`: the private key GitHub logs in with (`~/.ssh/zeph_github_actions`)
+- `SSH_HOST`: the server's IP
+- `SSH_USER`: `deploy`
+- `SSH_KNOWN_HOSTS`: the server's host key (`ssh-keyscan -t ed25519 <server IP>`), so the workflow checks it is talking to the real server
+
+Only these four. App secrets stay in the server's `.env`, never in GitHub or the repo.
+
+**Roll back** to an older version:
+
+- **Usual way:** undo the bad change on `production` with `git revert <bad commit>`, then `git push origin production`. It deploys like any other push, checks included. Then merge `production` back into `main` so `main` has the undo too.
+- **Fast way, when it can't wait for the checks:** as `deploy`, in `~/zeph`:
+
+  ```
+  git log --oneline           # find the last good commit
+  git reset --hard <good commit>
+  docker compose up -d --build
+  ```
+
+  Then revert the bad change on `production` as above, so the next deploy doesn't put it back.
+
 ## Updating by hand
 
-As `deploy`, in `~/zeph`:
+When GitHub Actions is down, run the same two steps as `deploy`, in `~/zeph`:
 
 ```
-git pull
+git pull --ff-only
 docker compose up -d --build
 ```
-
-Changes go live by merging `main` into `production`. Issue 31 will run these two steps automatically on every push to `production`.
 
 After changing only `.env`, run `make restart`: it rebuilds and recreates the containers so they read `.env` again. Plain `docker compose restart` does not.
 
@@ -137,4 +177,5 @@ The domain lives only in `.env`. To move to a new one:
 
 1. Point the new domain's DNS at the server.
 2. In `.env`, update `PRODUCTION_DOMAIN`, `WEBHOOK_BASE_URL`, `NEXT_PUBLIC_API_URL` and `DASHBOARD_URL`.
-3. Run `docker compose up -d --build`. Caddy gets a certificate for the new name, and the backend registers the Telegram webhook at the new address when it starts.
+3. In `.github/workflows/deploy.yml`, update `PRODUCTION_URL` so the health check calls the new domain.
+4. Run `docker compose up -d --build`. Caddy gets a certificate for the new name, and the backend registers the Telegram webhook at the new address when it starts.
