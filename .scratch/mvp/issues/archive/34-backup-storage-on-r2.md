@@ -61,6 +61,7 @@ Why R2: free at this size (10 GB), and downloading a backup to restore it costs 
 Last acceptance criteria cannot be checked until `.scratch/mvp/issues/16-production-deployment.md` is complete. It needs to add the backup cron job. Plese come back to this when `.scratch/mvp/issues/16-production-deployment.md` has added the backup cron job.
 
 - 2026-11-22: Step 8 done. Issue 16 added `scripts/backup.sh` and the cron line in `docs/DEPLOYMENT_GUIDE.md`. The owner installed `make` and `cron`, then installed the job as `deploy`. A test run (set a minute ahead) put a dump in `r2:zeph-backups`; the job is back on 19:30 UTC (03:30 at UTC+8).
+- 2026-11-22: Checked on the VPS during issue 31: `crontab -l` as `deploy` shows `30 19 * * * $HOME/zeph/scripts/backup.sh >> $HOME/backup.log 2>&1`, `~/backup.log` ends with `backed up zeph-2026-11-22T092201Z.dump`, and `rclone lsl r2:zeph-backups` lists that dump. Nothing left to do here.
 
 ## Completion
 
