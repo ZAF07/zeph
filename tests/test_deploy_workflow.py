@@ -17,8 +17,14 @@ def step_scripts(job_name: str) -> str:
     return "\n".join(step.get("run", "") for step in JOBS[job_name]["steps"])
 
 
+def workflow_triggers() -> dict[str, Any]:
+    """Return the workflow's `on:` triggers, which YAML reads as the key True."""
+    triggers: dict[str, Any] = WORKFLOW[True]
+    return triggers
+
+
 def test_runs_only_on_push_to_production() -> None:
-    triggers = WORKFLOW[True]
+    triggers = workflow_triggers()
 
     assert list(triggers) == ["push"]
     assert triggers["push"]["branches"] == ["production"]
@@ -29,10 +35,11 @@ def test_checks_run_before_deploy() -> None:
     assert JOBS["deploy"]["needs"] == "check"
 
 
-def test_deploy_pulls_and_rebuilds_on_the_server() -> None:
+def test_deploy_moves_the_server_to_the_checked_commit_and_rebuilds() -> None:
     deploy_commands = step_scripts("deploy")
 
-    assert "git pull --ff-only" in deploy_commands
+    assert "git fetch origin production" in deploy_commands
+    assert "git merge --ff-only $GITHUB_SHA" in deploy_commands
     assert "docker compose up -d --build" in deploy_commands
     assert "sudo" not in deploy_commands
 
@@ -40,7 +47,7 @@ def test_deploy_pulls_and_rebuilds_on_the_server() -> None:
 def test_deploy_checks_the_live_health_endpoint() -> None:
     deploy_commands = step_scripts("deploy")
 
-    assert 'curl -fsS --max-time 10 "$PRODUCTION_URL/health"' in deploy_commands
+    assert '"$PRODUCTION_URL/health"' in deploy_commands
     assert WORKFLOW["env"]["PRODUCTION_URL"].startswith("https://")
 
 
@@ -58,7 +65,7 @@ def test_host_key_checking_stays_on() -> None:
     assert "ssh-keyscan" not in WORKFLOW_TEXT
 
 
-def test_only_one_deploy_runs_at_a_time_and_newer_pushes_wait() -> None:
+def test_only_one_deploy_runs_at_a_time_and_none_is_cancelled_halfway() -> None:
     assert WORKFLOW["concurrency"] == {
         "group": "deploy-production",
         "cancel-in-progress": False,

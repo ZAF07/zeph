@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PRODUCTION_URL: https://zeph-beta.duckdns.org
+  PRODUCTION_URL: https://zeph-dev.duckdns.org
 
 jobs:
   check:
@@ -55,7 +55,7 @@ jobs:
           SSH_USER: ${{ secrets.SSH_USER }}
         run: |
           ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST" \
-            'cd ~/zeph && git pull --ff-only && docker compose up -d --build'
+            "cd ~/zeph && git fetch origin production && git merge --ff-only $GITHUB_SHA && docker compose up -d --build"
       - name: Check the live backend answers
         run: |
           for attempt in $(seq 1 30); do

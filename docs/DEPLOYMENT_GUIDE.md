@@ -34,10 +34,10 @@ Do these once, in order.
    ```
    COMPOSE_PROFILES=prod
    PORT_BIND_ADDRESS=127.0.0.1
-   PRODUCTION_DOMAIN=zeph-beta.duckdns.org
-   WEBHOOK_BASE_URL=https://zeph-beta.duckdns.org
-   NEXT_PUBLIC_API_URL=https://zeph-beta.duckdns.org
-   DASHBOARD_URL=https://zeph-beta.duckdns.org
+   PRODUCTION_DOMAIN=zeph-dev.duckdns.org
+   WEBHOOK_BASE_URL=https://zeph-dev.duckdns.org
+   NEXT_PUBLIC_API_URL=https://zeph-dev.duckdns.org
+   DASHBOARD_URL=https://zeph-dev.duckdns.org
    MODEL_CALL_DEVELOPER_LOGS=false
    NGROK_AUTHTOKEN=
    NGROK_DOMAIN=
@@ -60,13 +60,13 @@ Do these once, in order.
 7. **Check.**
 
    - `docker compose ps`: postgres, backend, web and caddy are up; no ngrok or eval-runner.
-   - `curl https://zeph-beta.duckdns.org/health` prints `{"status":"ok"}`.
-   - Open `https://zeph-beta.duckdns.org`: the padlock shows and the Dashboard loads.
+   - `curl https://zeph-dev.duckdns.org/health` prints `{"status":"ok"}`.
+   - Open `https://zeph-dev.duckdns.org`: the padlock shows and the Dashboard loads.
    - `curl https://api.telegram.org/bot<token>/getWebhookInfo` shows the DuckDNS URL and no `last_error_message`.
    - From your laptop, only 80 and 443 answer:
 
      ```
-     for port in 80 443 3000 5432 8000; do nc -z -w 3 zeph-beta.duckdns.org $port && echo "$port open" || echo "$port closed"; done
+     for port in 80 443 3000 5432 8000; do nc -z -w 3 zeph-dev.duckdns.org $port && echo "$port open" || echo "$port closed"; done
      ```
 
      Expected: 80 and 443 open; 3000, 5432 and 8000 closed.
@@ -90,14 +90,14 @@ git push origin production
 Every push to `production` runs `.github/workflows/deploy.yml` (repo → **Actions → Deploy**):
 
 1. **Checks:** `make check`. If any check fails, nothing is deployed.
-2. **Deploy:** logs into the server as `deploy` over SSH and, in `~/zeph`, runs `git pull --ff-only` and `docker compose up -d --build`. The server builds the images itself, so build-time values like `NEXT_PUBLIC_API_URL` come from its own `.env`. Migrations run when the backend starts.
-3. **Health check:** calls `https://zeph-beta.duckdns.org/health` for up to about 2.5 minutes. If it never answers, the run fails.
+2. **Deploy:** logs into the server as `deploy` over SSH and, in `~/zeph`, moves `production` forward to the commit that passed the checks (`git fetch` and `git merge --ff-only`), then runs `docker compose up -d --build`. The server builds the images itself, so build-time values like `NEXT_PUBLIC_API_URL` come from its own `.env`. Migrations run when the backend starts.
+3. **Health check:** calls `/health` on the live domain (`PRODUCTION_URL` in the workflow) for up to about 2.5 minutes. If it never answers, the run fails.
 
-Only one deploy runs at a time. A push made while a deploy is running waits for it to finish. Each deploy brings a few seconds of downtime while containers restart.
+Only one deploy runs at a time. A push made while a deploy is running waits for it to finish. If several pushes wait, only the newest one deploys; the ones in between are skipped. Each deploy brings a few seconds of downtime while containers restart.
 
 If the build fails on the server, the running containers stay up on the old version.
 
-**GitHub secrets** (repo → **Settings → Secrets and variables → Actions**). Issue 36 has how to make them:
+**GitHub secrets** (repo → **Settings → Secrets and variables → Actions**). Issue 36 shows how to make them:
 
 - `SSH_KEY`: the private key GitHub logs in with (`~/.ssh/zeph_github_actions`)
 - `SSH_HOST`: the server's IP
@@ -108,7 +108,16 @@ Only these four. App secrets stay in the server's `.env`, never in GitHub or the
 
 **Roll back** to an older version:
 
-- **Usual way:** undo the bad change on `production` with `git revert <bad commit>`, then `git push origin production`. It deploys like any other push, checks included. Then merge `production` back into `main` so `main` has the undo too.
+- **Usual way:** undo the bad change on `main`, then send it live like any other change:
+
+  ```
+  git checkout main && git pull
+  git revert <bad commit>
+  git push origin main
+  git checkout production && git pull && git merge main && git push origin production
+  ```
+
+  It deploys like any other push, checks included. To bring the change back later, `git revert` the revert commit on `main`.
 - **Fast way, when it can't wait for the checks:** as `deploy`, in `~/zeph`:
 
   ```
@@ -117,7 +126,7 @@ Only these four. App secrets stay in the server's `.env`, never in GitHub or the
   docker compose up -d --build
   ```
 
-  Then revert the bad change on `production` as above, so the next deploy doesn't put it back.
+  Then undo the bad change on `main` the usual way, so the next deploy doesn't put it back.
 
 ## Updating by hand
 
@@ -173,7 +182,7 @@ Production keeps the real Telegram bot; local development uses its own bot, so t
 
 ## Changing the domain
 
-The domain lives only in `.env`. To move to a new one:
+The domain lives in `.env` and in `PRODUCTION_URL` in `.github/workflows/deploy.yml`. To move to a new one:
 
 1. Point the new domain's DNS at the server.
 2. In `.env`, update `PRODUCTION_DOMAIN`, `WEBHOOK_BASE_URL`, `NEXT_PUBLIC_API_URL` and `DASHBOARD_URL`.
