@@ -126,6 +126,10 @@ docker compose start backend web
 
 Reset the bot token when it leaks or might have, not on a schedule. Steps: [RESET_TELEGRAM_TOKEN_GUIDE.md](RESET_TELEGRAM_TOKEN_GUIDE.md) (BotFather revoke → update `.env` → `make restart`).
 
+## Local and production bots
+
+Production keeps the real Telegram bot; local development uses its own bot, so the two stacks never take the webhook from each other. See [LOCAL_TELEGRAM_BOT_GUIDE.md](LOCAL_TELEGRAM_BOT_GUIDE.md) (ADR-0022).
+
 ## Changing the domain
 
 The domain lives only in `.env`. To move to a new one:
