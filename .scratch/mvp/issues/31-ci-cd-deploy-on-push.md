@@ -31,6 +31,8 @@ Each deploy brings a few seconds of downtime while containers restart. That is f
 ## Blocked by
 
 - `.scratch/mvp/issues/16-production-deployment.md`
+- `.scratch/mvp/issues/35-first-deploy.md`
+- `.scratch/mvp/issues/36-github-secrets-for-auto-deploy.md`
 
 ## Comments
 

@@ -12,8 +12,8 @@ Run the MVP on one OVHcloud VPS (VPS-2: 4 vCores, 8 GB RAM) using the same Docke
 
 - **Caddy** runs as a Compose service under a `prod` profile, in front of the Dashboard and backend, with automatic HTTPS.
 - **Profiles are switched on in `.env`** through `COMPOSE_PROFILES`, so a plain `docker compose up` does the right thing everywhere:
-  - local `.env`: `COMPOSE_PROFILES=eval` (the eval-runner runs, no Caddy)
-  - prod `.env`: `COMPOSE_PROFILES=prod` (Caddy runs, no eval-runner)
+  - local `.env`: `COMPOSE_PROFILES=local,eval` (ngrok and the eval-runner run, no Caddy)
+  - prod `.env`: `COMPOSE_PROFILES=prod` (Caddy runs, no ngrok, no eval-runner)
 - **Only Caddy is reachable from the internet** (ports 80 and 443). Postgres, backend and web publish their ports on a host address set in `.env` (`127.0.0.1` in prod). Docker bypasses `ufw`, so a firewall alone does not protect them.
 - **`NEXT_PUBLIC_API_URL`** in the prod `.env` is the production domain. It is baked into the Dashboard at build time.
 - **Server setup:** Docker Engine installed, a `deploy` user that can run Docker, the repo cloned on the `production` branch only (`git clone -b production --single-branch`), swap enabled, and the domain pointed at the server's IP.
@@ -45,3 +45,4 @@ A short deployment guide covers first setup, updating by hand, and backups.
 
 - 2026-11-21: No real domain yet (final product name not chosen). Start on a free DuckDNS subdomain; Caddy still gets a Let's Encrypt certificate for it. The domain lives only in `.env` (Caddy site address, `NEXT_PUBLIC_API_URL`), so switching later is: update `.env`, `docker compose up -d --build`, re-register the Telegram webhook. Clerk stays on its development instance until the real domain exists (a Clerk production instance needs DNS records on a domain we own). Off-server backups go to Cloudflare R2.
 - 2026-11-21: Server OS: Debian 13 or Ubuntu 24.04, both fine. On Debian, install and enable `unattended-upgrades` for automatic security updates.
+- 2026-11-22: The hands-on server work is split into human issues: 32 (VPS setup), 33 (DuckDNS), 34 (R2 backups), 35 (first deploy). This issue builds the repo side (Caddy service, `Caddyfile`, bind addresses, backup script, deployment guide). The live-server criteria here are checked through issue 35. The Caddyfile reads the domain from `PRODUCTION_DOMAIN`.
