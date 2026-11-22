@@ -53,7 +53,7 @@ Why R2: free at this size (10 GB), and downloading a backup to restore it costs 
 
 ## Comments:
 
-Last acceptance criteria cannot be checked until `.scratch/mvp/issues/16-production-deployment.md` is complete. Plese come back to this when `.scratch/mvp/issues/16-production-deployment.md` is complete.
+Last acceptance criteria cannot be checked until `.scratch/mvp/issues/16-production-deployment.md` is complete. It needs to add the backup cron job. Plese come back to this when `.scratch/mvp/issues/16-production-deployment.md` has added the backup cron job.
 
 ## Commits:
 
