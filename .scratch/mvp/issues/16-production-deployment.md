@@ -36,7 +36,7 @@ A short deployment guide covers first setup, updating by hand, and backups.
 - [ ] Every long-running service has `restart: unless-stopped`; after `sudo reboot` the app comes back without a manual `docker compose up`
 - [x] A deployment guide covers first setup (the server steps from issue 32, DuckDNS, R2 and rclone, clone, prod `.env`), updating by hand (`git pull` then `docker compose up -d --build`, automated later by issue 31), and backups
 - [x] The deployment guide links `docs/RESET_TELEGRAM_TOKEN_GUIDE.md`: reset the bot token when it leaks or might have (BotFather revoke → update `.env` → `make restart`), not on a schedule
-- [ ] Verified on the live server: sign up, connect Telegram, receive the welcome message
+- [x] Verified on the live server: sign up, connect Telegram, receive the welcome message
 
 ## Blocked by
 
@@ -51,3 +51,4 @@ A short deployment guide covers first setup, updating by hand, and backups.
   Still open, all live-server checks done through issue 35: Let's Encrypt certificate, `nc` from outside, live Dashboard calling the prod domain, `getWebhookInfo`, reboot, live sign-up. The nightly backup cron needs `sudo apt install -y make cron` on the VPS first (neither is installed), then the crontab line from the guide (issue 34 step 8).
 - 2026-11-22: Live checks from a laptop against `https://zeph-dev.duckdns.org` (the DuckDNS name; issue 35's `zeph-beta` was an example): certificate issued by Let's Encrypt (CN=YE1) for `zeph-dev.duckdns.org`, valid to 2027-02-20; `/health` gives `{"status":"ok"}`; http redirects 308 to https; Dashboard 200. `nc` from the laptop: 80 and 443 open; 3000, 5432, 8000 and 2019 closed. The live Dashboard's JS holds `https://zeph-dev.duckdns.org` and no `localhost:8xxx`. `getWebhookInfo`: url `https://zeph-dev.duckdns.org/telegram/webhook`, no `last_error_message`, 0 pending; a POST to the webhook with no secret or a wrong one gets 401.
   Still open: the first nightly backup in `r2:zeph-backups` (cron installed for 19:30 UTC), `sudo reboot` brings the app back, and the live sign-up / connect Telegram / welcome message.
+- 2026-11-22: Live sign-up confirmed by the owner: signed in on the live Dashboard, and a second User (a friend) signed up and is using Zeph through Telegram. Still open: the first nightly backup in `r2:zeph-backups`, and `sudo reboot` brings the app back.
