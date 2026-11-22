@@ -94,20 +94,13 @@ After changing only `.env`, run `make restart`: it rebuilds and recreates the co
 
 `scripts/backup.sh` dumps the database with `pg_dump` into `~/backups` and copies the dump to `r2:zeph-backups` with `rclone copy`. Local dumps are deleted after 7 days; the R2 bucket deletes its copies after 30 days. The database itself lives on the `postgres-data` Docker volume, which survives restarts, rebuilds and reboots.
 
-**Install the nightly job** (once, as `deploy`). It runs at 19:30 server time (UTC), which is 03:30 at UTC+8, when the app is quietest:
+**Install the nightly job** (as `deploy`). It runs at 19:30 server time (UTC), which is 03:30 at UTC+8, when the app is quietest:
 
 ```
-(crontab -l 2>/dev/null; echo '30 19 * * * $HOME/zeph/scripts/backup.sh >> $HOME/backup.log 2>&1') | crontab -
-crontab -l
+(crontab -l 2>/dev/null | grep -v 'scripts/backup.sh'; echo '30 19 * * * $HOME/zeph/scripts/backup.sh >> $HOME/backup.log 2>&1') | crontab - && crontab -l
 ```
 
-Running it twice adds the job twice. To fix that, run `crontab -e` and delete the extra line.
-
-To move an existing job from 03:30 UTC to 19:30 UTC:
-
-```
-crontab -l | sed 's/^30 3 \* \* \*/30 19 * * */' | crontab - && crontab -l
-```
+It removes any existing backup job first, so running it again just replaces the job.
 
 **Run a backup now**, and see it in the bucket:
 
