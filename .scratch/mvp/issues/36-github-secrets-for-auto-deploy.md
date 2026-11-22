@@ -25,13 +25,13 @@ Give GitHub Actions its own key to log into the VPS, so pushes to `production` c
    - `SSH_HOST`: the VPS IP
    - `SSH_USER`: `deploy`
    - `SSH_KNOWN_HOSTS`: the server's host key, from `ssh-keyscan -t ed25519 <server IP>`
-   Why the host key: the workflow checks it is talking to your server, not something pretending to be it.
+     Why the host key: the workflow checks it is talking to your server, not something pretending to be it.
 4. Only these four. No app secrets go in GitHub; they stay in the server's `.env`.
 
 ## Acceptance criteria
 
-- [ ] The GitHub key logs in as `deploy`
-- [ ] The four secrets exist in the repo, and nothing else
+- [x] The GitHub key logs in as `deploy`
+- [x] The four secrets exist in the repo, and nothing else
 
 ## Blocked by
 
