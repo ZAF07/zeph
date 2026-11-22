@@ -27,3 +27,7 @@ Limit: a Clerk _production_ instance needs DNS records on a domain you own, whic
 ## Blocked by
 
 - `.scratch/mvp/issues/32-set-up-the-vps.md`
+
+## Commits:
+
+58ac79a
