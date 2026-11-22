@@ -1,6 +1,6 @@
 # 32 — Set up the VPS
 
-Status: ready-for-human
+Status: completed
 
 ## Parent
 
@@ -91,3 +91,7 @@ Why: building the Dashboard uses a lot of memory for a short time while Postgres
 ## Blocked by
 
 None
+
+## Commits
+
+0654d4b
