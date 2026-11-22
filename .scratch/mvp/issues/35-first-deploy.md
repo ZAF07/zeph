@@ -60,5 +60,5 @@ Put Zeph live for the first time, by hand.
 ## Blocked by
 
 - `.scratch/mvp/issues/16-production-deployment.md`
-- `.scratch/mvp/issues/32-set-up-the-vps.md`
-- `.scratch/mvp/issues/33-free-domain-on-duckdns.md`
+- `.scratch/mvp/issues/archive/32-set-up-the-vps.md`
+- `.scratch/mvp/issues/archive/33-free-domain-on-duckdns.md`

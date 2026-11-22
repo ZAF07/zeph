@@ -8,7 +8,7 @@ Status: ready-for-agent
 
 ## What to build
 
-Run the MVP on one OVHcloud VPS (VPS-2: 4 vCores, 8 GB RAM) using the same Docker Compose file and images as local (ADR-0005). Only `.env` differs. This issue is the manual first setup; automatic deploys on push to the `production` branch come in `.scratch/mvp/issues/31-ci-cd-deploy-on-push.md`.
+Run the MVP on one HostHatch VPS (NVMe 16 GB: 4 AMD EPYC cores of which 2 dedicated, 16 GB RAM, 75 GB NVMe; Debian 13) using the same Docker Compose file and images as local (ADR-0005). Only `.env` differs. This issue is the manual first setup; automatic deploys on push to the `production` branch come in `.scratch/mvp/issues/31-ci-cd-deploy-on-push.md`.
 
 - **Caddy** runs as a Compose service under a `prod` profile, in front of the Dashboard and backend, with automatic HTTPS.
 - **Profiles are switched on in `.env`** through `COMPOSE_PROFILES`, so a plain `docker compose up` does the right thing everywhere:
@@ -16,8 +16,9 @@ Run the MVP on one OVHcloud VPS (VPS-2: 4 vCores, 8 GB RAM) using the same Docke
   - prod `.env`: `COMPOSE_PROFILES=prod` (Caddy runs, no ngrok, no eval-runner)
 - **Only Caddy is reachable from the internet** (ports 80 and 443). Postgres, backend and web publish their ports on a host address set in `.env` (`127.0.0.1` in prod). Docker bypasses `ufw`, so a firewall alone does not protect them.
 - **`NEXT_PUBLIC_API_URL`** in the prod `.env` is the production domain. It is baked into the Dashboard at build time.
-- **Server setup:** Docker Engine installed, a `deploy` user that can run Docker, the repo cloned on the `production` branch only (`git clone -b production --single-branch`), swap enabled, and the domain pointed at the server's IP.
-- **Backups:** a nightly `pg_dump` cron job, with the dump copied off the server.
+- **Server setup** is done (`.scratch/mvp/issues/archive/32-set-up-the-vps.md`): Docker Engine, an admin user `zaf` (sudo), a `deploy` user (Docker only, no sudo), key-only SSH with root login off, `ufw` allowing 22/80/443, 4 GB swap. The DuckDNS name points at the server (`.scratch/mvp/issues/archive/33-free-domain-on-duckdns.md`). The repo is cloned as `deploy` at `~/zeph`, on the `production` branch only (`git clone -b production --single-branch`), in issue 35.
+- **Restart policy:** every long-running service has `restart: unless-stopped`, so the app comes back by itself after a reboot or a Docker upgrade.
+- **Backups:** a nightly `pg_dump` cron job for `deploy`, with the dump copied off the server to Cloudflare R2 with `rclone copy` to `r2:zeph-backups` (remote and bucket already set up in issue 34; the bucket deletes files older than 30 days). rclone is the current release from rclone.org: Debian's packaged rclone is too old for R2 (`501 Not Implemented` on upload).
 
 A short deployment guide covers first setup, updating by hand, and backups.
 
@@ -31,9 +32,9 @@ A short deployment guide covers first setup, updating by hand, and backups.
 - [ ] From outside the server, only ports 80 and 443 answer; Postgres (5432), backend and web ports do not (checked with `nc` from another machine)
 - [ ] The live Dashboard calls the production API domain, not localhost
 - [ ] The Telegram webhook is registered to the production domain and verified with the secret token
-- [ ] Postgres data is on a persistent volume, with a documented backup and restore command; the nightly backup is copied off the server
-- [ ] A `deploy` user can run Docker and the repo is cloned on the server (needed by issue 31)
-- [ ] A deployment guide covers first setup (Docker Engine, `deploy` user, swap, domain, clone, prod `.env`), updating by hand (`git pull` then `docker compose up -d --build`, automated later by issue 31), and backups
+- [ ] Postgres data is on a persistent volume, with a documented backup and restore command; the nightly backup is copied to `r2:zeph-backups`
+- [ ] Every long-running service has `restart: unless-stopped`; after `sudo reboot` the app comes back without a manual `docker compose up`
+- [ ] A deployment guide covers first setup (the server steps from issue 32, DuckDNS, R2 and rclone, clone, prod `.env`), updating by hand (`git pull` then `docker compose up -d --build`, automated later by issue 31), and backups
 - [ ] The deployment guide links `docs/RESET_TELEGRAM_TOKEN_GUIDE.md`: reset the bot token when it leaks or might have (BotFather revoke → update `.env` → `make restart`), not on a schedule
 - [ ] Verified on the live server: sign up, connect Telegram, receive the welcome message
 

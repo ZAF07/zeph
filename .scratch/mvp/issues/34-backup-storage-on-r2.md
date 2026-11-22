@@ -23,13 +23,18 @@ Why R2: free at this size (10 GB), and downloading a backup to restore it costs 
 
 **On the VPS (as `deploy`):**
 
-5. Install rclone: `sudo apt install -y rclone`.
+5. Install the current rclone (as `zaf`; Debian's packaged rclone is too old for R2 and fails uploads with `501 Not Implemented`):
+   ```
+   sudo apt install -y unzip
+   curl -fsSL https://rclone.org/install.sh | sudo bash
+   ```
 6. Run `rclone config` and add a remote:
    - name: `r2`
    - storage: `s3`, provider: `Cloudflare`
    - access key and secret from step 4
    - endpoint from step 4
    - leave the rest as default
+   - then: `rclone config update r2 no_check_bucket true` (the token can only reach this bucket, so rclone must not try to check or create buckets)
 7. Check it works:
    ```
    echo test > /tmp/test.txt
@@ -48,7 +53,7 @@ Why R2: free at this size (10 GB), and downloading a backup to restore it costs 
 
 ## Blocked by
 
-- `.scratch/mvp/issues/32-set-up-the-vps.md`
+- `.scratch/mvp/issues/archive/32-set-up-the-vps.md`
 - `.scratch/mvp/issues/16-production-deployment.md` (step 8 only)
 
 ## Comments:
