@@ -53,7 +53,7 @@ Everything a User sends the Companion before pausing: one text, several texts in
 _Avoid_: Burst, batch, text (a text is one piece of a Message)
 
 **Replied-to Text**:
-An earlier text a User points at when they reply to it in the chat (in Telegram, by swiping on it), whether the Companion sent it or the User did, however old. The Companion reads the User's text in the light of it: who sent it, when, and what it said, or only the part the User highlighted. It also brings back what was being talked about then, so a reply to an old text can pick up an old story. It is what the chat shows, not what the Companion saved, so it still works after Message Retention has deleted the original.
+An earlier text a User points at when they reply to it in the chat (in Telegram, by swiping on it), whether the Companion sent it or the User did, however old. The Companion reads the User's text in the light of it: who sent it, when, and what it said, or only the part the User highlighted. A replied-to photo is looked at again, as a new photo is, so Photo Viewing's rules apply to it. It also brings back what was being talked about then, so a reply to an old text can pick up an old story. It is what the chat shows, not what the Companion saved, so it still works after Message Retention has deleted the original.
 _Avoid_: Quote, reply thread, swipe reply
 
 **Album**:

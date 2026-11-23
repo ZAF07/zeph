@@ -512,7 +512,8 @@ def _replied_to_json(replied_to: RepliedToText | None) -> dict[str, str] | None:
         replied_to: The Replied-to Text, if any.
 
     Returns:
-        Its fields, with when it was sent as an ISO time; None if there is none.
+        Its fields, with when it was sent as an ISO time and without the
+        photo it holds; None if there is none.
     """
     if replied_to is None:
         return None
@@ -521,6 +522,7 @@ def _replied_to_json(replied_to: RepliedToText | None) -> dict[str, str] | None:
         "sent_at": replied_to.sent_at.isoformat(),
         "kind": replied_to.kind.value,
         "text": replied_to.text,
+        "photo_note": replied_to.photo_note,
     }
 
 
@@ -538,6 +540,7 @@ def _to_replied_to(stored: dict[str, str]) -> RepliedToText:
         sent_at=datetime.fromisoformat(stored["sent_at"]),
         kind=MessageKind(stored["kind"]),
         text=stored["text"],
+        photo_note=stored.get("photo_note", ""),
     )
 
 

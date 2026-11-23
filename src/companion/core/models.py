@@ -545,12 +545,19 @@ class RepliedToText:
         kind: Whether it is a text, a sticker, a photo, or something else.
         text: The part the User highlighted, if any, otherwise its text,
             caption or sticker emoji, cut short; "" if it has none.
+        photo: The photo it holds, to be looked at; None if it holds none.
+            Never saved.
+        photo_note: The photo as the Companion reads it once looked at, e.g.
+            "[photo: what it shows]", or "[photo you didn't look at. …]"
+            with Photo Viewing off; "" if it wasn't looked at.
     """
 
     sender: RepliedToSender
     sent_at: datetime
     kind: MessageKind
     text: str
+    photo: ChannelPhoto | None = None
+    photo_note: str = ""
 
 
 @dataclass(frozen=True)
@@ -684,6 +691,10 @@ class TextToScreen:
             reads each photo's description. None when it is the same.
         sticker: The sticker, for a sticker message.
         replied_to: The earlier text it replies to, if any.
+        safeguard_replied_to: The earlier text as the Safeguard reads it
+            when that differs from `replied_to`: with Photo Viewing off, the
+            Safeguard still reads a replied-to photo's description. None
+            when it is the same.
         chat_message_id: The chat channel's ID for it, or an Album's first
             item; None if not known.
     """
@@ -696,6 +707,7 @@ class TextToScreen:
     safeguard_text: str | None = None
     sticker: ChannelSticker | None = None
     replied_to: RepliedToText | None = None
+    safeguard_replied_to: RepliedToText | None = None
     chat_message_id: int | None = None
 
 

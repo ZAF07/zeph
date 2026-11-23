@@ -2,7 +2,7 @@ import logging
 import threading
 from collections import Counter
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from uuid import UUID
 
@@ -429,7 +429,9 @@ class IncomingMessageHandler:
             trace = self._pending_message(user_id, message.chat_id).trace
         try:
             snapshot = self._user_snapshots.load(user_id, settings, trace)
-            text = self._text_to_screen(snapshot, message)
+            text = self._read_replied_to_photo(
+                snapshot, self._text_to_screen(snapshot, message)
+            )
             result = self._reply_gate.screen(text, snapshot)
         except Exception:
             logger.exception("Could not check a text from a User")
@@ -687,6 +689,7 @@ class IncomingMessageHandler:
             if album_text is None:
                 self._remove_album_items(pending, items)
                 continue
+            album_text = self._read_replied_to_photo(snapshot, album_text)
             result = self._reply_gate.screen(album_text, snapshot)
             self._remove_album_items(pending, items)
             if isinstance(result, Stopped):
@@ -833,4 +836,27 @@ class IncomingMessageHandler:
             safeguard_text=photo_message.safeguard_text,
             replied_to=replied_to,
             chat_message_id=chat_message_id,
+        )
+
+    def _read_replied_to_photo(
+        self, snapshot: UserSnapshot, text: TextToScreen
+    ) -> TextToScreen:
+        """Look at the photo a text replies to, if it replies to one.
+
+        Args:
+            snapshot: The User who sent the text.
+            text: The text to screen.
+
+        Returns:
+            The text, its Replied-to Text holding the photo's description,
+            or with Photo Viewing off, its Safeguard's Replied-to Text
+            holding it; unchanged when it replies to no photo.
+        """
+        if text.replied_to is None:
+            return text
+        reading = self._photo_service.read_replied_to(snapshot, text.replied_to)
+        return replace(
+            text,
+            replied_to=reading.replied_to,
+            safeguard_replied_to=reading.safeguard_replied_to,
         )
