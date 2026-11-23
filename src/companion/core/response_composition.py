@@ -34,6 +34,7 @@ from companion.core.reply_tools import (
     ReplyOffer,
     ReplyToolProvider,
 )
+from companion.core.transcripts import THE_COMPANIONS, readable_content
 from companion.core.usage import UsageRecordingChatModel
 
 BLANK_LINE = re.compile(r"\n\s*\n")
@@ -144,14 +145,23 @@ def write_instructions(
     return "\n\n".join(part for part in parts if part)
 
 
-def to_chat_history(messages: list[ConversationMessage]) -> list[ChatLine]:
+def to_chat_history(
+    messages: list[ConversationMessage],
+    time_zone: str | None = None,
+    companions: str = THE_COMPANIONS,
+) -> list[ChatLine]:
     """Turn a Conversation's saved messages into history for the chat model.
 
     The User's messages in a row in one Conversation are one Message, so
-    they become one line with each text on its own line.
+    they become one line with each text on its own line, a text's
+    Replied-to Text noted before it.
 
     Args:
         messages: The messages, oldest first.
+        time_zone: The User's IANA time zone, for when a Replied-to Text was
+            sent; UTC if not given.
+        companions: How a Replied-to Text names the Companion's, e.g.
+            "your" when the Companion itself reads the history.
 
     Returns:
         One line per Message or Companion message, saying who said it.
@@ -159,18 +169,19 @@ def to_chat_history(messages: list[ConversationMessage]) -> list[ChatLine]:
     history: list[ChatLine] = []
     previous: ConversationMessage | None = None
     for message in messages:
+        content = readable_content(message, time_zone, companions)
         if message.direction == MessageDirection.OUTGOING:
-            history.append(ChatLine(role=ChatRole.COMPANION, text=message.content))
+            history.append(ChatLine(role=ChatRole.COMPANION, text=content))
         elif (
             previous is not None
             and previous.direction == MessageDirection.INCOMING
             and not starts_new_conversation(previous, message)
         ):
             history[-1] = ChatLine(
-                role=ChatRole.USER, text=f"{history[-1].text}\n{message.content}"
+                role=ChatRole.USER, text=f"{history[-1].text}\n{content}"
             )
         else:
-            history.append(ChatLine(role=ChatRole.USER, text=message.content))
+            history.append(ChatLine(role=ChatRole.USER, text=content))
         previous = message
     return history
 
@@ -280,7 +291,9 @@ class ResponseComposer:
             ),
         )
         offers += optional_offers
-        history = to_chat_history(recent.messages)
+        history = to_chat_history(
+            recent.messages, snapshot.user.time_zone, companions="your"
+        )
         reply = self._chat_model.generate(
             snapshot=snapshot,
             step=ModelStep.REPLY,

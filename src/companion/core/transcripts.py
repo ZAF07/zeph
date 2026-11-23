@@ -1,21 +1,87 @@
-from companion.core.models import ConversationMessage, MessageDirection
+from companion.core.memory_retrieval import format_day
+from companion.core.models import (
+    ConversationMessage,
+    MessageDirection,
+    MessageKind,
+    RepliedToSender,
+    RepliedToText,
+)
+
+THE_COMPANIONS = "the Companion's"
+REPLIED_TO_KIND_NAMES = {
+    MessageKind.TEXT: "text",
+    MessageKind.STICKER: "sticker",
+    MessageKind.PHOTO: "photo",
+    MessageKind.UNSUPPORTED: "message",
+}
 
 
-def to_transcript_lines(messages: list[ConversationMessage]) -> str:
+def replied_to_note(
+    replied_to: RepliedToText, time_zone: str | None, companions: str
+) -> str:
+    """Write what a User's text replies to, to go before the text.
+
+    Args:
+        replied_to: The Replied-to Text.
+        time_zone: The User's IANA time zone; UTC if they have none.
+        companions: How to say the Companion's, e.g. "the Companion's" in a
+            transcript or "your" in the Reply's own chat history.
+
+    Returns:
+        E.g. '(replying to the Companion's text from 3 Nov 2026, "have you
+        told your mum?")', or "their own" for the User's own text.
+    """
+    owner = (
+        companions if replied_to.sender == RepliedToSender.COMPANION else "their own"
+    )
+    kind = REPLIED_TO_KIND_NAMES[replied_to.kind]
+    day = format_day(replied_to.sent_at, time_zone)
+    said = f', "{replied_to.text}"' if replied_to.text else ""
+    return f"(replying to {owner} {kind} from {day}{said})"
+
+
+def readable_content(
+    message: ConversationMessage,
+    time_zone: str | None = None,
+    companions: str = THE_COMPANIONS,
+) -> str:
+    """Write a saved message's content with what it replies to, if anything.
+
+    Args:
+        message: The saved message.
+        time_zone: The User's IANA time zone; UTC if they have none.
+        companions: How to say the Companion's; see `replied_to_note`.
+
+    Returns:
+        The content, after a note on the Replied-to Text when it has one.
+    """
+    if message.replied_to is None:
+        return message.content
+    note = replied_to_note(message.replied_to, time_zone, companions)
+    return f"{note} {message.content}"
+
+
+def to_transcript_lines(
+    messages: list[ConversationMessage], time_zone: str | None = None
+) -> str:
     """Write messages as transcript lines for a model to read, not answer.
 
     Args:
         messages: The messages, oldest first.
+        time_zone: The User's IANA time zone, for when a Replied-to Text was
+            sent; UTC if not given.
 
     Returns:
-        One "Person: ..." or "Companion: ..." line per message.
+        One "Person: ..." or "Companion: ..." line per message, a text's
+        Replied-to Text noted before it.
     """
     speakers = {
         MessageDirection.INCOMING: "Person",
         MessageDirection.OUTGOING: "Companion",
     }
     return "\n".join(
-        f"{speakers[message.direction]}: {message.content}" for message in messages
+        f"{speakers[message.direction]}: {readable_content(message, time_zone)}"
+        for message in messages
     )
 
 

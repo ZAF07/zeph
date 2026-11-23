@@ -47,6 +47,7 @@ WAVE = ChannelSticker(
     set_name="CalmCreatures",
     preview_file_id="thumb-wave",
 )
+REPLIED_TO_WAVE = '(replying to their own sticker from 11 Nov 2025, "🌊")'
 
 
 def owner_text(text: str) -> dict[str, Any]:
@@ -365,7 +366,7 @@ def test_add_this_from_a_user_who_isnt_an_admin_is_just_chat(
 
     send_to_webhook(client, telegram_reply_to_sticker_update("add this", WAVE))
 
-    assert chat_model.calls[-1].history[-1].text == "add this"
+    assert chat_model.calls[-1].history[-1].text == (f"{REPLIED_TO_WAVE} add this")
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["Add it where? 😄"]
     assert list_stickers(client, owner_headers(client, auth_verifier)) == []
 
@@ -386,7 +387,9 @@ def test_other_replies_to_a_sticker_are_just_chat_for_admins(
         ),
     )
 
-    assert chat_model.calls[-1].history[-1].text == "this one is so cute"
+    assert chat_model.calls[-1].history[-1].text == (
+        f"{REPLIED_TO_WAVE} this one is so cute"
+    )
     assert list_stickers(client, admin) == []
 
 

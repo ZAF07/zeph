@@ -14,6 +14,7 @@ from companion.core.models import (
     MessageKind,
     PersonalSticker,
     PlatformSettings,
+    RepliedToText,
 )
 from companion.core.photos import sent_shared_photo_text
 from companion.core.platform_settings import (
@@ -78,6 +79,7 @@ class ConversationService:
         kind: MessageKind = MessageKind.TEXT,
         photos: tuple[ChannelPhoto, ...] = (),
         sticker: ChannelSticker | None = None,
+        replied_to: RepliedToText | None = None,
     ) -> UUID:
         """Save a User's message and show that the Companion is typing.
 
@@ -97,6 +99,7 @@ class ConversationService:
             kind: What kind of message it is.
             photos: The photos it came with, kept as chat channel IDs.
             sticker: The sticker, for a sticker message.
+            replied_to: The earlier text it replies to, if any.
 
         Returns:
             The ID of the Conversation the message was added to.
@@ -114,6 +117,7 @@ class ConversationService:
                     sent_at=self._clock.now(),
                     photos=photos,
                     sticker=sticker,
+                    replied_to=replied_to,
                 )
             )
         now = self._clock.now()

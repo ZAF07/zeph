@@ -13,6 +13,7 @@ from companion.core.models import (
     MessageToAnswer,
     ModelCallTrace,
     PlatformSettings,
+    RepliedToText,
     TextToScreen,
     TraceKind,
     UserSnapshot,
@@ -667,8 +668,11 @@ class IncomingMessageHandler:
         """
         photos = [item.photo for item in album_items if item.photo]
         caption = album_caption(album_items)
+        replied_to = album_items[0].replied_to
         if photos:
-            return self._photo_text_to_screen(snapshot, chat_id, photos, caption)
+            return self._photo_text_to_screen(
+                snapshot, chat_id, photos, caption, replied_to
+            )
         if not any(item.text.strip() for item in album_items):
             self._chat_channel.send_text(
                 chat_id, snapshot.settings.get(UNSUPPORTED_MESSAGE_REPLY)
@@ -679,6 +683,7 @@ class IncomingMessageHandler:
             chat_id=chat_id,
             text=caption,
             kind=MessageKind.UNSUPPORTED,
+            replied_to=replied_to,
         )
 
     def _text_to_screen(
@@ -700,9 +705,14 @@ class IncomingMessageHandler:
                 text=readable_text(message),
                 kind=message.kind,
                 sticker=message.sticker,
+                replied_to=message.replied_to,
             )
         return self._photo_text_to_screen(
-            snapshot, message.chat_id, [message.photo], message.text
+            snapshot,
+            message.chat_id,
+            [message.photo],
+            message.text,
+            message.replied_to,
         )
 
     def _photo_text_to_screen(
@@ -711,6 +721,7 @@ class IncomingMessageHandler:
         chat_id: int,
         photos: Sequence[ChannelPhoto],
         caption: str,
+        replied_to: RepliedToText | None,
     ) -> TextToScreen:
         """Describe a User's photos and turn them into one text of their Message.
 
@@ -719,6 +730,7 @@ class IncomingMessageHandler:
             chat_id: The chat to reply in.
             photos: The photo, or an Album's photos.
             caption: The caption; "" if none.
+            replied_to: The earlier text they reply to, if any.
 
         Returns:
             The text to screen, which holds each photo's description, or,
@@ -732,4 +744,5 @@ class IncomingMessageHandler:
             kind=MessageKind.PHOTO,
             photos=photo_message.photos,
             safeguard_text=photo_message.safeguard_text,
+            replied_to=replied_to,
         )
