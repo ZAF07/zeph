@@ -1,6 +1,6 @@
 # 04 — Messages waiting their turn don't hold a thread
 
-Status: ready-for-agent
+Status: in-progress
 
 ## Parent
 
@@ -46,3 +46,9 @@ Each User's chat work goes on that User's queue, which runs on a fixed message p
 None - can start immediately. The last load-test criterion needs issue 03 merged first.
 
 ## Comments
+
+- 2026-11-23, plan: since this issue was written, message pipeline issue 03 changed the handler: a text is checked even while a reply is written, and can drop it until any of it is sent (ADR-0018 consequences). So "a text sent during a reply is checked after that reply" no longer matches today's code. To keep today's behaviour, the queue takes a key, and each User has two lines on it: their texts to check (keyed by Telegram sender, so `/start`, sticker adding and everything else a sender sends run in order there too) and their replies to write. Each line runs one piece at a time, in order, like the two locks it replaces. A heavy texter holds at most two threads. The webhook calls the handler directly; the handler only adds to the queue.
+
+- 2026-11-23, built: port `UserWorkQueue` (`core/ports.py`), adapter `ThreadPoolUserWorkQueue` (`adapters/user_work_queue.py`; one turn in the pool per key at a time, so a heavy texter can't keep a thread from others), `FakeUserWorkQueue` (`tests/fakes.py`; runs at once, keeps per-key order, can hold work), `InlineUserWorkQueue` for Evals. Setting `MESSAGE_POOL_SIZE` (default 50) in `config.py`, `.env.example` and passed through `docker-compose.yml` (one line, needed so it can be tuned). The webhook calls the handler directly; no more `BackgroundTasks`. The timer only adds "answer" to the User's replies line.
+- 2026-11-23, checks: `ruff check`, `ruff format --check` (574 files), `mypy src` (206 files, no issues), `pytest` 1508 passed. Contract test `test_user_work_queues_run_each_keys_work_in_order_one_at_a_time` passes for the thread pool and the fake (`pytest -m contract -k user_work_queues`).
+- 2026-11-23, `/run` in the worktree stack (`ai-chat-companion-scaling-04`, backend 8020, web 3020): the real backend (`build_production_app`, real `ThreadPoolUserWorkQueue`, `ThreadTimer`, Postgres, DeepSeek) with only the Telegram chat channel swapped for one that logs sends (a made-up chat can't receive real Telegram sends). Test User inserted with SQL. Posted to `http://127.0.0.1:8020/telegram/webhook` with curl: one text at 11:28:01, then 5 texts the moment the first reply's first part went out (11:28:38). Every webhook post returned 200 in 3–25 ms. Saved in order: the first text, reply part 1, then "wait", "actually it got worse", "he emailed the whole team after", "i feel so small", "what should i do", each saved as it came, while reply part 2 was still going out. After the pause: one reply of 5 parts answering all of it. Model calls: 6 safeguard (one per text), 2 understanding, 2 reply plan, 2 reply; Daily usage counted 2 Messages. Replies ran on `user-work_0`. No tracebacks in the backend log. Dashboard: `/` 200 in 0.08s, `/sign-in` 200 in 0.03s, `/api/me` 401 in 0.02s while the stack ran. Signed-in Dashboard API timing under load is checked by `make load-test`.

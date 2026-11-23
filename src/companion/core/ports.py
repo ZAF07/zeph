@@ -131,6 +131,25 @@ class Timer(Protocol):
         ...
 
 
+class UserWorkQueue(Protocol):
+    """Runs Users' chat work in the background, each User's in order.
+
+    Work added under the same key runs one piece at a time, in the order it
+    was added. Work under different keys runs side by side, up to the
+    queue's limit of pieces running at once. A piece that fails is logged,
+    and later work under its key still runs.
+    """
+
+    def add(self, key: str, work: Callable[[], None]) -> None:
+        """Add a piece of work to the end of a key's line, and return at once.
+
+        Args:
+            key: Names one line of a User's work, e.g. their texts to check.
+            work: What to run when its turn comes.
+        """
+        ...
+
+
 class MessageRefusedError(Exception):
     """Raised when the chat channel clearly refused a message, so it never arrived."""
 

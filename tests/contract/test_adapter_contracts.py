@@ -1,4 +1,5 @@
 import os
+import threading
 from pathlib import Path
 
 import jwt
@@ -13,8 +14,10 @@ from companion.adapters.fastembed.embedder import FastEmbedEmbedder
 from companion.adapters.postgres.tables import EMBEDDING_SIZE
 from companion.adapters.tavily.web_search import TavilyWebSearch
 from companion.adapters.telegram.chat_channel import TelegramChatChannel
+from companion.adapters.user_work_queue import ThreadPoolUserWorkQueue
 from companion.core.models import ChatLine, ChatRole, PhotoImage
-from companion.core.ports import ChatTool
+from companion.core.ports import ChatTool, UserWorkQueue
+from tests.fakes import FakeUserWorkQueue
 
 pytestmark = pytest.mark.contract
 
@@ -159,3 +162,29 @@ def test_fastembed_embeddings_have_the_size_the_vector_store_keeps() -> None:
 
     assert [len(vector) for vector in passages] == [EMBEDDING_SIZE, EMBEDDING_SIZE]
     assert len(query) == EMBEDDING_SIZE
+
+
+@pytest.mark.parametrize(
+    "work_queue",
+    [ThreadPoolUserWorkQueue(max_running=4), FakeUserWorkQueue()],
+    ids=["thread_pool", "fake"],
+)
+def test_user_work_queues_run_each_keys_work_in_order_one_at_a_time(
+    work_queue: UserWorkQueue,
+) -> None:
+    runs: list[str] = []
+    done = threading.Event()
+    other_user_done = threading.Event()
+
+    def first() -> None:
+        work_queue.add("user-1", lambda: runs.append("added while first ran"))
+        runs.append("first")
+
+    work_queue.add("user-1", first)
+    work_queue.add("user-1", lambda: runs.append("second"))
+    work_queue.add("user-2", other_user_done.set)
+    work_queue.add("user-1", done.set)
+
+    assert done.wait(timeout=2)
+    assert other_user_done.wait(timeout=2)
+    assert runs == ["first", "added while first ran", "second"]

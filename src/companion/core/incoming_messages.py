@@ -1,6 +1,6 @@
 import logging
 import threading
-from collections import Counter, defaultdict
+from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from uuid import UUID
@@ -26,7 +26,7 @@ from companion.core.platform_settings import (
     UNKNOWN_TELEGRAM_USER_REPLY,
     UNSUPPORTED_MESSAGE_REPLY,
 )
-from companion.core.ports import ChatChannel, Repositories, Timer
+from companion.core.ports import ChatChannel, Repositories, Timer, UserWorkQueue
 from companion.core.reply_attempt import ReplyAttempt, ReplyDroppedError
 from companion.core.reply_gate import ReplyGate, ReplyNeeded, Stopped
 from companion.core.reply_service import ReplyService
@@ -39,6 +39,8 @@ from companion.core.user_snapshot import UserSnapshotLoader
 logger = logging.getLogger(__name__)
 
 MESSAGE_WAIT_PREFIX = "message:"
+TEXTS_LINE_PREFIX = "texts:"
+REPLIES_LINE_PREFIX = "replies:"
 
 
 def message_wait_key(user_id: UUID) -> str:
@@ -51,6 +53,30 @@ def message_wait_key(user_id: UUID) -> str:
         The timer key for that User's Message wait.
     """
     return f"{MESSAGE_WAIT_PREFIX}{user_id}"
+
+
+def texts_line_key(sender_id: int) -> str:
+    """Name the line of work that handles what one sender sends, in order.
+
+    Args:
+        sender_id: The sender's chat channel ID.
+
+    Returns:
+        The work queue key for that sender's messages.
+    """
+    return f"{TEXTS_LINE_PREFIX}{sender_id}"
+
+
+def replies_line_key(user_id: UUID) -> str:
+    """Name the line of work that writes one User's replies, in order.
+
+    Args:
+        user_id: The User.
+
+    Returns:
+        The work queue key for that User's replies.
+    """
+    return f"{REPLIES_LINE_PREFIX}{user_id}"
 
 
 def readable_text(message: IncomingMessage) -> str:
@@ -154,17 +180,17 @@ class IncomingMessageHandler:
     A connected User's texts are gathered into one Message until they pause
     for `message_wait_seconds`, then answered together with one reply. Each
     text is saved and checked by the Safeguard as it arrives, so a crisis
-    is never held back by the wait or by a reply being written. A User's
-    texts are checked one at a time, and their replies are written one at a
-    time. A text that arrives while a reply is being written, before any of
-    it is sent, drops that reply, and the Message is answered again with
-    every text once the User pauses; once part of a reply is sent, a new
-    text starts the next Message. The texts waiting to be answered, and the
-    reply being written, are only read and changed under one guard, since
-    texts are checked while a reply is written. From the first text until
-    something is
-    sent back, typing is shown again every `typing_repeat_seconds`, so the
-    chat never looks dead.
+    is never held back by the wait or by a reply being written. The work
+    runs on the User work queue, never on the caller's thread: a sender's
+    messages are handled one at a time, in order, on one line, and a User's
+    replies are written one at a time on another. A text that arrives while
+    a reply is being written, before any of it is sent, drops that reply,
+    and the Message is answered again with every text once the User pauses;
+    once part of a reply is sent, a new text starts the next Message. The
+    texts waiting to be answered, and the reply being written, are only
+    read and changed under one guard, since texts are checked while a reply
+    is written. From the first text until something is sent back, typing is
+    shown again every `typing_repeat_seconds`, so the chat never looks dead.
     """
 
     def __init__(
@@ -179,6 +205,7 @@ class IncomingMessageHandler:
         photo_service: PhotoService,
         user_snapshots: UserSnapshotLoader,
         timer: Timer,
+        work_queue: UserWorkQueue,
         dashboard_url: str,
     ) -> None:
         """Set up the handler.
@@ -196,6 +223,8 @@ class IncomingMessageHandler:
             photo_service: Describes the photos Users send.
             user_snapshots: Reads the User once at the start of each turn.
             timer: Waits for the User to pause before answering their Message.
+            work_queue: Runs each sender's messages, and each User's replies,
+                in order, apart from the caller's thread.
             dashboard_url: The Dashboard's address, put into some replies.
         """
         self._telegram_connections = telegram_connections
@@ -203,26 +232,30 @@ class IncomingMessageHandler:
         self._photo_service = photo_service
         self._user_snapshots = user_snapshots
         self._timer = timer
+        self._work_queue = work_queue
         self._repositories = repositories
         self._reply_gate = reply_gate
         self._reply_service = reply_service
         self._chat_channel = chat_channel
         self._typing_keeper = typing_keeper
         self._dashboard_url = dashboard_url
-        self._screen_locks: defaultdict[UUID, threading.Lock] = defaultdict(
-            threading.Lock
-        )
-        self._answer_locks: defaultdict[UUID, threading.Lock] = defaultdict(
-            threading.Lock
-        )
-        self._locks_guard = threading.Lock()
         self._pending_messages: dict[UUID, PendingMessage] = {}
         self._texts_being_checked: Counter[UUID] = Counter()
         self._replies_being_written: dict[UUID, ReplyAttempt] = {}
         self._pending_messages_guard = threading.Lock()
 
     def handle(self, message: IncomingMessage) -> None:
-        """Handle one incoming message.
+        """Add an incoming message to its sender's line of work, and return at once.
+
+        Args:
+            message: The incoming message.
+        """
+        self._work_queue.add(
+            texts_line_key(message.sender_id), lambda: self._receive(message)
+        )
+
+    def _receive(self, message: IncomingMessage) -> None:
+        """Handle one incoming message, on its sender's line of work.
 
         `/start <token>` makes a Telegram Connection. Anyone else without a
         Telegram Connection is pointed to the Dashboard to sign up. A sticker
@@ -314,34 +347,33 @@ class IncomingMessageHandler:
             self._texts_being_checked[user_id] += 1
         self._start_over_reply_being_written(user_id)
         try:
-            with self._lock_for(self._screen_locks, user_id):
-                settings = self._repositories.platform_settings.load()
-                self._typing_keeper.keep_up(
-                    message.chat_id, settings.get(TYPING_REPEAT_SECONDS)
+            settings = self._repositories.platform_settings.load()
+            self._typing_keeper.keep_up(
+                message.chat_id, settings.get(TYPING_REPEAT_SECONDS)
+            )
+            with self._pending_messages_guard:
+                trace = self._pending_messages.setdefault(
+                    user_id, PendingMessage(chat_id=message.chat_id)
+                ).trace
+            try:
+                snapshot = self._user_snapshots.load(user_id, settings, trace)
+                text = self._text_to_screen(snapshot, message)
+                result = self._reply_gate.screen(text, snapshot)
+            except Exception:
+                logger.exception("Could not check a text from a User")
+                self._drop_pending_message(user_id)
+                self._chat_channel.send_text(
+                    message.chat_id, settings.get(REPLY_FAILED_MESSAGE)
                 )
-                with self._pending_messages_guard:
-                    trace = self._pending_messages.setdefault(
-                        user_id, PendingMessage(chat_id=message.chat_id)
-                    ).trace
-                try:
-                    snapshot = self._user_snapshots.load(user_id, settings, trace)
-                    text = self._text_to_screen(snapshot, message)
-                    result = self._reply_gate.screen(text, snapshot)
-                except Exception:
-                    logger.exception("Could not check a text from a User")
-                    self._drop_pending_message(user_id)
-                    self._chat_channel.send_text(
-                        message.chat_id, settings.get(REPLY_FAILED_MESSAGE)
-                    )
-                    return
-                if isinstance(result, Stopped):
-                    self._drop_pending_message(user_id)
-                    return
-                with self._pending_messages_guard:
-                    pending = self._pending_messages.setdefault(
-                        user_id, PendingMessage(chat_id=message.chat_id)
-                    )
-                    pending.add_screened(result.conversation_id, text.text)
+                return
+            if isinstance(result, Stopped):
+                self._drop_pending_message(user_id)
+                return
+            with self._pending_messages_guard:
+                pending = self._pending_messages.setdefault(
+                    user_id, PendingMessage(chat_id=message.chat_id)
+                )
+                pending.add_screened(result.conversation_id, text.text)
         finally:
             with self._pending_messages_guard:
                 self._texts_being_checked[user_id] -= 1
@@ -449,6 +481,9 @@ class IncomingMessageHandler:
     def _restart_wait(self, user_id: UUID, settings: PlatformSettings) -> None:
         """Start the wait for the User to pause, restarting any wait under way.
 
+        When the wait ends, answering the Message is added to the User's
+        line of replies.
+
         Args:
             user_id: The User.
             settings: The platform settings, which say how long to wait.
@@ -456,7 +491,9 @@ class IncomingMessageHandler:
         self._timer.start(
             message_wait_key(user_id),
             settings.get(MESSAGE_WAIT_SECONDS),
-            lambda: self._answer_message(user_id),
+            lambda: self._work_queue.add(
+                replies_line_key(user_id), lambda: self._answer_message(user_id)
+            ),
         )
 
     def _answer_message(self, user_id: UUID) -> None:
@@ -476,31 +513,30 @@ class IncomingMessageHandler:
         """
         if self._is_checking_a_text(user_id):
             return
-        with self._lock_for(self._answer_locks, user_id):
-            started = self._start_reply(user_id)
-            if started is None:
-                return
-            pending, attempt = started
-            settings = self._repositories.platform_settings.load()
-            self._typing_keeper.keep_up(
-                pending.chat_id, settings.get(TYPING_REPEAT_SECONDS)
+        started = self._start_reply(user_id)
+        if started is None:
+            return
+        pending, attempt = started
+        settings = self._repositories.platform_settings.load()
+        self._typing_keeper.keep_up(
+            pending.chat_id, settings.get(TYPING_REPEAT_SECONDS)
+        )
+        failed = False
+        try:
+            self._try_answer(user_id, pending, attempt, settings)
+        except ReplyDroppedError:
+            logger.info("A new text started a User's reply over")
+        except Exception:
+            logger.exception("Could not answer a Message from a User")
+            failed = True
+        was_dropped = self._end_reply(user_id, pending, attempt)
+        if was_dropped:
+            return
+        if failed:
+            self._chat_channel.send_text(
+                pending.chat_id, settings.get(REPLY_FAILED_MESSAGE)
             )
-            failed = False
-            try:
-                self._try_answer(user_id, pending, attempt, settings)
-            except ReplyDroppedError:
-                logger.info("A new text started a User's reply over")
-            except Exception:
-                logger.exception("Could not answer a Message from a User")
-                failed = True
-            was_dropped = self._end_reply(user_id, pending, attempt)
-            if was_dropped:
-                return
-            if failed:
-                self._chat_channel.send_text(
-                    pending.chat_id, settings.get(REPLY_FAILED_MESSAGE)
-                )
-            self._typing_keeper.stop(pending.chat_id)
+        self._typing_keeper.stop(pending.chat_id)
 
     def _try_answer(
         self,
@@ -661,20 +697,3 @@ class IncomingMessageHandler:
             photos=photo_message.photos,
             safeguard_text=photo_message.safeguard_text,
         )
-
-    def _lock_for(
-        self, locks: defaultdict[UUID, threading.Lock], user_id: UUID
-    ) -> threading.Lock:
-        """Get one User's lock from a set of per-User locks.
-
-        Args:
-            locks: The checking locks, which keep a User's texts checked one
-                at a time, or the answering locks, which keep their replies
-                written one at a time.
-            user_id: The User.
-
-        Returns:
-            That User's lock.
-        """
-        with self._locks_guard:
-            return locks[user_id]

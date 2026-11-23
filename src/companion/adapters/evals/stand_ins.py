@@ -217,6 +217,23 @@ class ManualTimer:
             self._waiting.pop(key)()
 
 
+class InlineUserWorkQueue:
+    """User work queue for Evals: runs work right away, on the caller's thread.
+
+    An Eval sends one text at a time, so its texts are checked and answered
+    in order before the Eval moves on.
+    """
+
+    def add(self, key: str, work: Callable[[], None]) -> None:
+        """Run the work now.
+
+        Args:
+            key: Names one line of a User's work.
+            work: What to run.
+        """
+        work()
+
+
 class IdleScheduler:
     """Scheduler for Evals: never ticks, so no Check-in runs on the Eval database."""
 

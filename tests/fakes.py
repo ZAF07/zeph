@@ -430,6 +430,52 @@ class FakeTimer:
             self._waiting.pop(key)()
 
 
+class FakeUserWorkQueue:
+    """User work queue that runs work right away, on the caller's thread.
+
+    Work added under a key whose work is running waits until that work is
+    done, so each key's work still runs one piece at a time, in order. A
+    failure is raised, so tests see it. A test can hold all work instead,
+    to see what happens before it runs.
+    """
+
+    def __init__(self) -> None:
+        """Start with nothing waiting, running work as it is added."""
+        self.holding = False
+        self._held: list[tuple[str, Callable[[], None]]] = []
+        self._waiting: dict[str, list[Callable[[], None]]] = {}
+
+    def add(self, key: str, work: Callable[[], None]) -> None:
+        """Run the work now, unless the key's work is running or work is held.
+
+        Args:
+            key: Names one line of a User's work.
+            work: What to run.
+        """
+        if self.holding:
+            self._held.append((key, work))
+            return
+        line = self._waiting.get(key)
+        if line is not None:
+            line.append(work)
+            return
+        line = self._waiting[key] = [work]
+        try:
+            while line:
+                line[0]()
+                line.pop(0)
+        finally:
+            del self._waiting[key]
+
+    def run_held(self) -> None:
+        """Stop holding work and run all held work, in the order it was added."""
+        self.holding = False
+        held = list(self._held)
+        self._held.clear()
+        for key, work in held:
+            self.add(key, work)
+
+
 def understanding_answer(
     mood: str = "relaxed",
     intensity: str = "low",

@@ -35,6 +35,7 @@ from companion.adapters.scheduler import InProcessScheduler
 from companion.adapters.tavily.web_search import TavilyWebSearch
 from companion.adapters.telegram.chat_channel import TelegramChatChannel
 from companion.adapters.timer import ThreadTimer
+from companion.adapters.user_work_queue import ThreadPoolUserWorkQueue
 from companion.app import AppDependencies, create_app
 from companion.config import Settings, load_settings
 from companion.core.model_call_log import logger as model_call_logger
@@ -394,6 +395,7 @@ def build_production_app() -> FastAPI:
         clock=build_clock(settings),
         scheduler=build_scheduler(settings),
         timer=ThreadTimer(),
+        work_queue=ThreadPoolUserWorkQueue(settings.message_pool_size),
         telegram_webhook_secret=settings.telegram_webhook_secret,
         telegram_bot_username=settings.telegram_bot_username,
         dashboard_url=settings.dashboard_url,
