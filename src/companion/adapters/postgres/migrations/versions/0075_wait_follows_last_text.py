@@ -7,8 +7,8 @@ settings are added from the seed on next start too. The old value is
 written out here, so later seed changes don't change what this migration
 does.
 
-Revision ID: 0074
-Revises: 0073
+Revision ID: 0075
+Revises: 0074
 Create Date: 2026-11-23
 """
 
@@ -17,8 +17,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0074"
-down_revision: str | None = "0073"
+revision: str = "0075"
+down_revision: str | None = "0074"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

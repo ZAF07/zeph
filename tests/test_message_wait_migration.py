@@ -26,7 +26,7 @@ def message_wait_migration() -> ModuleType:
 def wait_follows_last_text_migration() -> ModuleType:
     """Load the migration that makes the wait follow how the last text reads."""
     return importlib.import_module(
-        "companion.adapters.postgres.migrations.versions.0074_wait_follows_last_text"
+        "companion.adapters.postgres.migrations.versions.0075_wait_follows_last_text"
     )
 
 
@@ -100,7 +100,7 @@ def test_the_migration_keeps_a_message_wait_an_admin_changed(
 def test_the_wait_migration_moves_an_unchanged_message_wait_to_six_seconds(
     engine: Engine, database_url: str
 ) -> None:
-    downgrade_to(database_url, "0073")
+    downgrade_to(database_url, "0074")
     try:
         remove_new_wait_settings(engine)
         store_message_wait(
@@ -122,7 +122,7 @@ def test_the_wait_migration_moves_an_unchanged_message_wait_to_six_seconds(
 def test_the_wait_migration_keeps_a_message_wait_an_admin_changed(
     engine: Engine, database_url: str
 ) -> None:
-    downgrade_to(database_url, "0073")
+    downgrade_to(database_url, "0074")
     try:
         store_message_wait(engine, 9)
     finally:
