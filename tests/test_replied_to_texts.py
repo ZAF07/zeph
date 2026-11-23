@@ -409,3 +409,25 @@ def test_texts_with_no_replied_to_words_are_searched_as_today(
     searches = [query for query in embedder.queries if "anyway" in query]
     assert searches
     assert all(query.endswith("anyway\nand this") for query in searches)
+
+
+def test_the_reply_is_told_not_to_describe_a_replied_to_photo_it_cant_see(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    photo = [{"file_id": "file-cat", "file_unique_id": "cat", "width": 9}]
+    chat_model.script("aw")
+
+    send_to_webhook(
+        client,
+        telegram_reply_update(
+            "so cute", {"photo": photo, "caption": "my cat"}, from_companion=False
+        ),
+    )
+
+    reply = newest_reply_steps(chat_model)[-1]
+    assert "photo or sticker you can't see" in reply.instructions
+    assert "Go by its caption and what they say, or ask" in reply.instructions

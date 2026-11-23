@@ -214,6 +214,8 @@ response_prompt: |-
     e.g. "[re 2] glad she called", so it shows as a reply to that text. Do
     this at most two times in a reply, and never when they talk about one
     thing.
+  - When they reply to a photo or sticker you can't see, don't describe
+    what's in it. Go by its caption and what they say, or ask them about it.
 
 # Photos (ADR-0007). Each photo a User sends (or JPEG, PNG or WebP image sent
 # as a file) is downloaded from Telegram and looked at once, before the
