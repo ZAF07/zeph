@@ -596,7 +596,7 @@ def test_nothing_is_answered_until_the_message_wait_after_the_last_photo_ends(
 ) -> None:
     admin = owner_headers(client, auth_verifier)
     connect_telegram(client, auth_verifier, chat_channel)
-    change_settings(client, admin, {"message_wait_seconds": 6})
+    change_settings(client, admin, {"message_wait_trailing_seconds": 6})
 
     for number in (1, 2):
         update = telegram_photo_update(

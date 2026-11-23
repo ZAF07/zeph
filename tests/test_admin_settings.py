@@ -194,8 +194,17 @@ def test_a_shorter_quiet_gap_starts_a_new_conversation_sooner(
         {"message_retention_days": 0},
         {"message_retention_days": 366},
         {"photo_retry_count": 6},
-        {"message_wait_seconds": 0},
-        {"message_wait_seconds": 31},
+        {"message_wait_seconds": -1},
+        {"message_wait_seconds": 61},
+        {"message_wait_finished_seconds": -1},
+        {"message_wait_finished_seconds": 61},
+        {"message_wait_trailing_seconds": 61},
+        {"message_wait_long_text_words": 0},
+        {"message_wait_long_text_words": 101},
+        {"message_wait_trailing_words": []},
+        {"message_wait_trailing_words": ["  ", ""]},
+        {"message_wait_trailing_words": "and, so"},
+        {"message_wait_trailing_words": ["and", 3]},
         {"photo_album_max_photos": 0},
         {"photo_album_max_photos": 11},
         {"photo_model": "not-a-model"},
@@ -391,14 +400,36 @@ def test_the_photo_settings_are_editable_with_their_seeded_values(
     assert photo_viewing["model_key"] == "photo_model"
 
 
-def test_the_message_wait_is_editable_with_a_seeded_value_of_fifteen_seconds(
+def test_the_message_waits_are_editable_with_their_seeded_values(
     client: TestClient, auth_verifier: FakeAuthVerifier
 ) -> None:
     headers = owner_headers(client, auth_verifier)
 
     settings = client.get("/api/admin/settings", headers=headers).json()["settings"]
 
-    assert settings["message_wait_seconds"]["value"] == 15
+    assert settings["message_wait_finished_seconds"]["value"] == 2
+    assert settings["message_wait_trailing_seconds"]["value"] == 12
+    assert settings["message_wait_seconds"]["value"] == 6
+    assert settings["message_wait_long_text_words"]["value"] == 15
+    assert {"and", "so", "wait", "ok so", "lol", "hmm"} <= set(
+        settings["message_wait_trailing_words"]["value"]
+    )
+
+
+def test_the_trailing_words_are_saved_trimmed_and_lower_cased(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+
+    response = client.patch(
+        "/api/admin/settings",
+        json={"values": {"message_wait_trailing_words": ["  And ", "OK so", " "]}},
+        headers=headers,
+    )
+
+    assert response.status_code == 200, response.text
+    saved = response.json()["settings"]["message_wait_trailing_words"]["value"]
+    assert saved == ["and", "ok so"]
 
 
 @pytest.mark.parametrize("key", MOVED_TO_COPY)

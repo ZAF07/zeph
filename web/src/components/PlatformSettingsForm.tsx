@@ -50,10 +50,21 @@ const checkInGapFields: (NumberField & { frequency: CheckInFrequency })[] =
 
 const checkInGapKeys = checkInGapFields.map((field) => field.key);
 
-/** The number settings on this page, grouped by section. */
-const numberSections: { heading: string; fields: NumberField[] }[] = [
+/** The trailing words, edited as one comma-separated text. */
+const trailingWordsField: TextField = {
+  key: "message_wait_trailing_words",
+  label: "Trailing words",
+};
+
+/** The number settings on this page, grouped by section, with any editors below them. */
+const numberSections: {
+  heading: string;
+  fields: NumberField[];
+  editors?: TextField[];
+}[] = [
   {
     heading: "Conversations",
+    editors: [trailingWordsField],
     fields: [
       {
         key: "conversation_quiet_gap_minutes",
@@ -61,9 +72,24 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
         unit: "min",
       },
       {
-        key: "message_wait_seconds",
-        label: "Message wait",
+        key: "message_wait_finished_seconds",
+        label: "Wait after a finished text",
         unit: "sec",
+      },
+      {
+        key: "message_wait_trailing_seconds",
+        label: "Wait after a trailing text",
+        unit: "sec",
+      },
+      {
+        key: "message_wait_seconds",
+        label: "Wait after any other text",
+        unit: "sec",
+      },
+      {
+        key: "message_wait_long_text_words",
+        label: "Long text",
+        unit: "words",
       },
       {
         key: "typing_repeat_seconds",
@@ -272,7 +298,11 @@ const numberKeys = [
   webSearchLimitField.key,
 ];
 
-const allKeys = [...numberKeys, ...textFields.map((field) => field.key)];
+const allKeys = [
+  ...numberKeys,
+  ...textFields.map((field) => field.key),
+  trailingWordsField.key,
+];
 
 const wholeNumber = /^\d+$/;
 
@@ -296,12 +326,19 @@ function settingKeyFor(key: string): string {
  * @returns The value as text, or "" if it is missing.
  */
 function savedText(settings: AdminSettings, key: string): string {
+  const value = settings[key]?.value;
+  if (Array.isArray(value)) {
+    return value.join(", ");
+  }
   const gapField = checkInGapFields.find((field) => field.key === key);
   if (!gapField) {
     return textSetting(settings, key);
   }
   const gaps = settings[checkInGapsKey]?.value;
-  const hours = typeof gaps === "object" ? gaps[gapField.frequency] : undefined;
+  const hours =
+    typeof gaps === "object" && !Array.isArray(gaps)
+      ? gaps[gapField.frequency]
+      : undefined;
   return hours === undefined ? "" : String(hours);
 }
 
@@ -325,7 +362,23 @@ function savedDrafts(settings: AdminSettings): Record<string, string> {
  * @returns A number, or the text itself.
  */
 function settingValue(key: string, value: string): SettingValue {
+  if (key === trailingWordsField.key) {
+    return wordList(value);
+  }
   return numberKeys.includes(key) ? Number(value) : value;
+}
+
+/**
+ * Splits comma-separated words into a list, leaving out blank ones.
+ *
+ * @param value - The typed text, e.g. "and, ok so".
+ * @returns The words, trimmed.
+ */
+function wordList(value: string): string[] {
+  return value
+    .split(",")
+    .map((word) => word.trim())
+    .filter((word) => word !== "");
 }
 
 /**
@@ -359,7 +412,8 @@ export function PlatformSettingsForm() {
   const changedKeys = allKeys.filter((key) => values[key] !== saved[key]);
   const isValid =
     numberKeys.every((key) => wholeNumber.test(values[key] ?? "")) &&
-    textFields.every((field) => (values[field.key] ?? "").trim() !== "");
+    textFields.every((field) => (values[field.key] ?? "").trim() !== "") &&
+    wordList(values[trailingWordsField.key] ?? "").length > 0;
   const isDirty = changedKeys.length > 0;
 
   function hintFor(key: string, loadedSettings: AdminSettings): string {
@@ -393,10 +447,32 @@ export function PlatformSettingsForm() {
     );
   }
 
+  function textEditor(field: TextField, loadedSettings: AdminSettings) {
+    const hintId = `${field.key}-hint`;
+    return (
+      <div key={field.key} className="flex flex-col gap-3">
+        <EditorLabel
+          label={field.label}
+          hint={hintFor(field.key, loadedSettings)}
+          hintId={hintId}
+        />
+        <FormEditor
+          label={field.label}
+          size="short"
+          describedById={hintId}
+          caption={lastSavedNote(loadedSettings, [field.key])}
+          value={values[field.key] ?? ""}
+          onChange={(value) => edit(field.key, value)}
+        />
+      </div>
+    );
+  }
+
   function numberSection(
     heading: string,
     fields: NumberField[],
     loadedSettings: AdminSettings,
+    editors: TextField[] = [],
   ) {
     return (
       <section
@@ -413,6 +489,7 @@ export function PlatformSettingsForm() {
         >
           {fields.map((field) => numberRow(field, loadedSettings))}
         </FieldRows>
+        {editors.map((field) => textEditor(field, loadedSettings))}
       </section>
     );
   }
@@ -442,32 +519,18 @@ export function PlatformSettingsForm() {
   return (
     <>
       {numberSections.map((section) =>
-        numberSection(section.heading, section.fields, settings),
+        numberSection(
+          section.heading,
+          section.fields,
+          settings,
+          section.editors,
+        ),
       )}
       {numberSection("Web search", [webSearchLimitField], settings)}
 
       <section aria-label="Wording" className="flex flex-col gap-3">
         <FormSectionHeading title="Wording" />
-        {textFields.map((field) => {
-          const hintId = `${field.key}-hint`;
-          return (
-            <div key={field.key} className="flex flex-col gap-3">
-              <EditorLabel
-                label={field.label}
-                hint={hintFor(field.key, settings)}
-                hintId={hintId}
-              />
-              <FormEditor
-                label={field.label}
-                size="short"
-                describedById={hintId}
-                caption={lastSavedNote(settings, [field.key])}
-                value={values[field.key] ?? ""}
-                onChange={(value) => edit(field.key, value)}
-              />
-            </div>
-          );
-        })}
+        {textFields.map((field) => textEditor(field, settings))}
       </section>
 
       <SaveBar
