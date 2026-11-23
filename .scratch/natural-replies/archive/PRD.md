@@ -144,4 +144,4 @@ Zeph makes Users wait too long, and it misses what they point at.
 ## Completion
 
 - Completed: 2026-11-23, all five issues verified and archived in `.scratch/natural-replies/issues/archive/`.
-- Commits: 01 d710295, 02 a279e3f, 03 <filled in after merge>, 04 05d0766, 05 edbb74c (merges; each issue's Completion lists its work commits).
+- Commits: 01 d710295, 02 a279e3f, 03 247ed18, 04 05d0766, 05 edbb74c (merges; each issue's Completion lists its work commits).

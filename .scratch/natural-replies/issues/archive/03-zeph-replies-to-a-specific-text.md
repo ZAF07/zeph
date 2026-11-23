@@ -60,4 +60,4 @@ Decisions and caveats:
 ## Completion
 
 - Completed: 2026-11-23
-- Commit: <filled in after merge>
+- Commit: 247ed18 (merge "Merge natural-replies-03-reply-to-text: Zeph replies to a specific text"; work in 05d2b01 "Natural replies 03: Zeph replies to a specific text", 14b5846 "Natural replies 03: review fixes (a marker at the latest text is dropped in code, markers allow inner spaces, plainer limit check)", 4e79629 "Archive natural-replies issue 03 and the PRD: reply links verified; decision 21 built", 059298d "Point the natural-replies issues at the archived PRD")
