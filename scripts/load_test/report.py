@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from companion.adapters.load_test.chat_channel import SENT_TEXT_LOG_PREFIX
+from companion.adapters.load_test.chat_model import ANSWERED_CALL_LOG_PREFIX
 from companion.adapters.load_test.scheduler import TICK_TOOK_LOG_PREFIX
 
 DASHBOARD_BAR_SECONDS = 1.0
@@ -17,7 +18,7 @@ FAILED_REPLY_LOGS = (
 FALLBACK_LOG = "using the fallback"
 SENT_TEXT = re.compile(re.escape(SENT_TEXT_LOG_PREFIX) + r"(-?\d+)")
 TICK_TOOK = re.compile(re.escape(TICK_TOOK_LOG_PREFIX) + r"([\d.]+)s")
-MODEL_CALL = re.compile(r"Load test: answered an? (.+) call")
+MODEL_CALL = re.compile(re.escape(ANSWERED_CALL_LOG_PREFIX) + r"(.+) call")
 DATABASE_ERROR = re.compile(
     r"(sqlalchemy\.exc\.\w+|psycopg\.\w*Error|psycopg\.errors\.\w+):"
     r"|QueuePool limit|too many clients"
@@ -228,7 +229,13 @@ def bar_lines(results: LoadTestResults) -> list[tuple[str, str, bool]]:
         f"{dashboard_slow} of {len(chat.dashboard_calls)} calls over "
         f"{DASHBOARD_BAR_SECONDS:.0f}s, {dashboard_errors} not 200"
     )
+    failed_posts = sum(1 for post in chat.webhook_posts if post.status != 200)
+    webhook_value = (
+        f"{seconds_summary([post.seconds for post in chat.webhook_posts])}, "
+        f"{failed_posts} not 200"
+    )
     return [
+        ("Webhook posts", webhook_value, failed_posts == 0),
         ("Texts answered", f"{answered} / {texts}", answered == texts and texts > 0),
         ("Failed replies", str(chat.failed_replies), chat.failed_replies == 0),
         (
@@ -268,7 +275,6 @@ def write_report(results: LoadTestResults) -> str:
         for round_ in chat.rounds
         if round_.answered_at is not None
     ]
-    failed_posts = sum(1 for post in chat.webhook_posts if post.status != 200)
     tick = (
         f"{results.tick_seconds:.1f}s"
         if results.tick_seconds is not None
@@ -289,9 +295,6 @@ def write_report(results: LoadTestResults) -> str:
         "",
         f"  INFO  {'Reply time':<20}{seconds_summary(reply_seconds)} "
         "(a Message's last text to its first reply, with the Message wait)",
-        f"  INFO  {'Webhook posts':<20}"
-        f"{seconds_summary([post.seconds for post in chat.webhook_posts])}, "
-        f"{failed_posts} not 200",
         f"  INFO  {'Fallback answers':<20}{chat.fallback_warnings}",
         f"  INFO  {'Load-test model':<20}{model_calls or 'no calls'}",
         f"  INFO  {'Tick':<20}{tick} for {results.tick_users} due Check-ins and "

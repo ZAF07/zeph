@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 SHORTEST_WAIT_SECONDS = 3.0
 LONGEST_WAIT_SECONDS = 8.0
 TOKENS_PER_CALL = 100
+ANSWERED_CALL_LOG_PREFIX = "Load test: answered a "
 CANNED_REPLY = "That sounds like a lot. What part of it is weighing on you most?"
 CANNED_PORTRAIT = "Someone busy at work who likes to talk things through."
 CANNED_WHEN_IT_HELPS = "When someone wants a calm, steady practice."
@@ -226,7 +227,7 @@ class LoadTestChatModel:
         """
         shape = shape_of(instructions, self._repositories.platform_settings.load())
         self._sleep(self._wait())
-        logger.info("Load test: answered a %s call", shape)
+        logger.info("%s%s call", ANSWERED_CALL_LOG_PREFIX, shape)
         return ModelAnswer(
             text=self._answer(shape, history),
             tokens_in=TOKENS_PER_CALL,

@@ -24,13 +24,13 @@ from datetime import UTC, datetime
 from typing import Any
 
 import httpx
-from sqlalchemy import create_engine
 
 from companion.adapters.load_test.scheduler import TICK_STARTED_LOG
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.config import load_settings
 from companion.core.platform_settings import CONVERSATION_QUIET_GAP
 from companion.core.ports import Repositories
+from companion.main import build_database_engine
 from scripts.load_test.report import (
     ChatResults,
     LoadTestResults,
@@ -209,6 +209,23 @@ class LogWatcher:
             if quiet_for >= quiet_seconds:
                 return
             time.sleep(quiet_seconds - quiet_for)
+
+    def wait_until_no_tick_runs(self, timeout: float) -> bool:
+        """Wait until every tick that started has finished.
+
+        Args:
+            timeout: How long to wait, in seconds.
+
+        Returns:
+            True if none is running; False if one still was after the wait.
+        """
+
+        def none_running() -> float | None:
+            """Say whether as many ticks finished as started."""
+            finished = len(self._ticks_took) >= len(self._ticks_started_at)
+            return 1.0 if finished else None
+
+        return self._wait_for(none_running, timeout) is not None
 
     def wait_for_tick(self, started_after: float, timeout: float) -> float | None:
         """Wait for a tick that started after a time to finish.
@@ -462,6 +479,9 @@ def time_a_tick(
 ) -> float | None:
     """Make Check-ins due and Conversations ended, then time the next tick.
 
+    A tick already running is let finish first, so it can't pick up part
+    of the data and the timed tick has all of it.
+
     Args:
         repositories: The stack's database.
         watcher: Follows the backend's logs.
@@ -471,6 +491,7 @@ def time_a_tick(
     Returns:
         How long the tick took; None if it didn't finish in time.
     """
+    watcher.wait_until_no_tick_runs(timeout)
     now = datetime.now(UTC)
     quiet_gap = repositories.platform_settings.load().get(CONVERSATION_QUIET_GAP)
     create_due_check_in_users(repositories, users, now)
@@ -500,7 +521,7 @@ def main() -> None:
     arguments = parse_arguments()
     check_worktree_stack(os.environ)
     settings = load_settings({**os.environ, "POSTGRES_HOST": "localhost"})
-    engine = create_engine(settings.database_url)
+    engine = build_database_engine(settings)
     repositories = build_postgres_repositories(engine)
     watcher = LogWatcher(
         [

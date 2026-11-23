@@ -56,6 +56,16 @@ def test_the_timed_tick_is_the_first_to_start_after_setup() -> None:
     assert watcher.wait_for_tick(started_after=10.0, timeout=0.01) == 95.5
 
 
+def test_setup_waits_for_a_running_tick_to_finish() -> None:
+    watcher = LogWatcher([])
+    watcher.take("Load test: tick started", read_at=1.0)
+
+    assert not watcher.wait_until_no_tick_runs(timeout=0.01)
+
+    watcher.take("Load test: tick took 3.0s", read_at=4.0)
+    assert watcher.wait_until_no_tick_runs(timeout=0.01)
+
+
 def test_failures_and_model_calls_are_counted() -> None:
     watcher = LogWatcher([])
     for line in [

@@ -27,13 +27,14 @@ def results(
         TimedCall(seconds=0.4, status=200),
     ),
     tick: float | None = 75.0,
+    webhook_posts: tuple[TimedCall, ...] = (TimedCall(seconds=0.1, status=200),),
 ) -> LoadTestResults:
     return LoadTestResults(
         chat=ChatResults(
             users=2,
             heavy_users=1,
             rounds=rounds,
-            webhook_posts=(TimedCall(seconds=0.1, status=200),),
+            webhook_posts=webhook_posts,
             failed_replies=failed_replies,
             database_errors=database_errors,
             fallback_warnings=0,
@@ -110,3 +111,11 @@ def test_a_slow_or_unfinished_tick_is_reported_but_never_fails_the_run() -> None
     assert not bar_failed(results(tick=3000.0))
     assert not bar_failed(results(tick=None))
     assert "did not finish" in write_report(results(tick=None))
+
+
+def test_a_failed_webhook_post_fails_the_run() -> None:
+    failed_posts = (TimedCall(seconds=0.1, status=200), TimedCall(120.0, status=0))
+
+    assert bar_failed(results(webhook_posts=failed_posts))
+    assert "FAIL  Webhook posts" in write_report(results(webhook_posts=failed_posts))
+    assert "PASS  Webhook posts" in write_report(results())
