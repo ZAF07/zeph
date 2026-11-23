@@ -235,7 +235,7 @@ def test_the_composer_offers_every_providers_tools_and_instructions_in_order(
         shared_photo_ids=shared_photo_ids,
     )
 
-    assert reply.parts == ["Hello there"]
+    assert reply.texts == ["Hello there"]
     [call] = chat_model.calls
     assert [tool.name for tool in call.tools] == ["one", "two", "three"]
     assert "Use one.\n\nUse none." in call.instructions
@@ -269,7 +269,7 @@ def test_what_a_providers_tool_picks_is_sent_as_the_sticker_or_shared_photo(
 
     reply = composer.compose(RecentMessages(uuid4(), []), snapshot_for(user))
 
-    assert reply.parts == ["Look at Miso"]
+    assert reply.texts == ["Look at Miso"]
     assert reply.sticker == sticker
     assert reply.shared_photo == shared_photo
 
@@ -288,7 +288,7 @@ def test_a_reply_with_only_a_pick_is_sent_but_one_with_nothing_is_empty(
     )
 
     reply = composer.compose(RecentMessages(uuid4(), []), snapshot_for(user))
-    assert reply.parts == []
+    assert reply.texts == []
     assert reply.sticker == sticker
 
     nothing_picked = build_composer(

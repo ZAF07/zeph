@@ -70,15 +70,19 @@ class TypingKeeper:
         with self._lock_for(chat_id):
             self._chats_kept_typing.discard(chat_id)
 
-    def send_text(self, chat_id: int, text: str) -> None:
+    def send_text(
+        self, chat_id: int, text: str, reply_to_message_id: int | None = None
+    ) -> None:
         """Stop keeping typing up in the chat, then send one text message.
 
         Args:
             chat_id: The chat to send to.
             text: The message text.
+            reply_to_message_id: The chat channel's ID of the message it replies
+                to; None to send it on its own.
         """
         self.stop(chat_id)
-        self._chat_channel.send_text(chat_id, text)
+        self._chat_channel.send_text(chat_id, text, reply_to_message_id)
 
     def show_typing(self, chat_id: int) -> None:
         """Show that the Companion is typing.

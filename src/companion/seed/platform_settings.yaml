@@ -208,6 +208,12 @@ response_prompt: |-
     never more than four.
   - Write only the texts themselves: no names, labels, quotes or notes around
     them.
+  - Their latest message may be several texts, numbered [1], [2] and so on.
+    When those texts bring up more than one thing, and one of your texts
+    answers a text of theirs that isn't the last one, start it with [re N],
+    e.g. "[re 2] glad she called", so it shows as a reply to that text. Do
+    this at most two times in a reply, and never when they talk about one
+    thing.
 
 # Photos (ADR-0007). Each photo a User sends (or JPEG, PNG or WebP image sent
 # as a file) is downloaded from Telegram and looked at once, before the

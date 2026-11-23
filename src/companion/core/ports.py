@@ -161,12 +161,18 @@ class ChatBlockedError(Exception):
 class ChatChannel(Protocol):
     """Sends messages to people on the chat channel (Telegram for the MVP)."""
 
-    def send_text(self, chat_id: int, text: str) -> None:
-        """Send one text message.
+    def send_text(
+        self, chat_id: int, text: str, reply_to_message_id: int | None = None
+    ) -> None:
+        """Send one text message, optionally as a reply to an earlier one.
+
+        A reply whose earlier message can't be found is sent on its own.
 
         Args:
             chat_id: The chat to send to.
             text: The message text.
+            reply_to_message_id: The chat channel's ID of the message it replies
+                to; None to send it on its own.
 
         Raises:
             ChatBlockedError: If it can't reach the person, e.g. they blocked us.

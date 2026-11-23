@@ -104,6 +104,18 @@ def readable_text(message: IncomingMessage) -> str:
     return message.text
 
 
+def known_message_id(message: IncomingMessage) -> int | None:
+    """Give a message's chat channel ID, if the chat channel gave one.
+
+    Args:
+        message: The incoming message.
+
+    Returns:
+        Its ID, or None when it is 0 (not known).
+    """
+    return message.message_id or None
+
+
 def album_caption(messages: Sequence[IncomingMessage]) -> str:
     """Write an album's caption, marking the files the Companion can't open.
 
@@ -737,9 +749,10 @@ class IncomingMessageHandler:
         photos = [item.photo for item in album_items if item.photo]
         caption = album_caption(album_items)
         replied_to = album_items[0].replied_to
+        chat_message_id = known_message_id(album_items[0])
         if photos:
             return self._photo_text_to_screen(
-                snapshot, chat_id, photos, caption, replied_to
+                snapshot, chat_id, photos, caption, replied_to, chat_message_id
             )
         if not any(item.text.strip() for item in album_items):
             self._chat_channel.send_text(
@@ -752,6 +765,7 @@ class IncomingMessageHandler:
             text=caption,
             kind=MessageKind.UNSUPPORTED,
             replied_to=replied_to,
+            chat_message_id=chat_message_id,
         )
 
     def _text_to_screen(
@@ -774,6 +788,7 @@ class IncomingMessageHandler:
                 kind=message.kind,
                 sticker=message.sticker,
                 replied_to=message.replied_to,
+                chat_message_id=known_message_id(message),
             )
         return self._photo_text_to_screen(
             snapshot,
@@ -781,6 +796,7 @@ class IncomingMessageHandler:
             [message.photo],
             message.text,
             message.replied_to,
+            known_message_id(message),
         )
 
     def _photo_text_to_screen(
@@ -790,6 +806,7 @@ class IncomingMessageHandler:
         photos: Sequence[ChannelPhoto],
         caption: str,
         replied_to: RepliedToText | None,
+        chat_message_id: int | None,
     ) -> TextToScreen:
         """Describe a User's photos and turn them into one text of their Message.
 
@@ -799,6 +816,8 @@ class IncomingMessageHandler:
             photos: The photo, or an Album's photos.
             caption: The caption; "" if none.
             replied_to: The earlier text they reply to, if any.
+            chat_message_id: The chat channel's ID for the photo, or the
+                Album's first item; None if not known.
 
         Returns:
             The text to screen, which holds each photo's description, or,
@@ -813,4 +832,5 @@ class IncomingMessageHandler:
             photos=photo_message.photos,
             safeguard_text=photo_message.safeguard_text,
             replied_to=replied_to,
+            chat_message_id=chat_message_id,
         )

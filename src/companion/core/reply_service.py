@@ -193,7 +193,7 @@ class ReplyService:
                 ),
             )
             if offered is not None and not self._woven_check_ins.was_brought_up(
-                snapshot, offered.woven, reply.parts
+                snapshot, offered.woven, reply.texts
             ):
                 self._woven_check_ins.take_back(snapshot, offered)
                 offered = None

@@ -15,12 +15,15 @@ class LoggingChatChannel:
     which Messages were answered and when. Nothing reaches Telegram.
     """
 
-    def send_text(self, chat_id: int, text: str) -> None:
+    def send_text(
+        self, chat_id: int, text: str, reply_to_message_id: int | None = None
+    ) -> None:
         """Log that a text was sent.
 
         Args:
             chat_id: The chat it is for.
             text: The text; not logged.
+            reply_to_message_id: The message it replies to; not logged.
         """
         logger.info("%s%s", SENT_TEXT_LOG_PREFIX, chat_id)
 

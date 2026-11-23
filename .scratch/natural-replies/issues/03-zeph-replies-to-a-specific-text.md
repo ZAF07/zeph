@@ -1,6 +1,6 @@
 # 03 — Zeph replies to a specific text
 
-Status: ready-for-agent
+Status: in-progress
 Track: A
 Blocked by: None - can start immediately
 
