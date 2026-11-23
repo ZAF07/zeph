@@ -46,5 +46,5 @@ Decisions and caveats:
 ## Completion
 
 - Completed: 2026-11-24
-- Commit: <to be filled in after merge>
+- Commit: 4bae05d (merge of 88d959a "Transcripts always use the User's time zone", 817e4c1 "Say what the time zone is for in describe_days_behind_evidence", 12a170f "Archive natural-replies issue 07: transcripts use the User's time zone, verified")
 
