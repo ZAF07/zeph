@@ -146,16 +146,18 @@ def test_a_reply_to_a_photo_or_sticker_says_so_with_any_caption(
     )
 
     understanding = newest_reply_steps(chat_model)[0]
+    seen = f"[photo: {FakePhotoViewer.DEFAULT_DESCRIPTION}]"
     assert (
-        '(replying to their own photo from 3 Nov 2025, "my cat") so cute'
+        f'(replying to their own photo from 3 Nov 2025, "my cat", {seen}) so cute'
         in given_text(understanding)
     )
     assert (
         '(replying to the Companion\'s sticker from 3 Nov 2025, "🤗") thanks'
         in given_text(understanding)
     )
-    assert "(replying to the Companion's photo from 3 Nov 2025) and this" in given_text(
-        understanding
+    assert (
+        f"(replying to the Companion's photo from 3 Nov 2025, {seen}) and this"
+        in given_text(understanding)
     )
 
 

@@ -146,7 +146,8 @@ def parse_replied_to(message: dict[str, Any]) -> RepliedToText | None:
     It is read only from the update, never from saved messages, so it works
     however old the earlier text is. A bot sent it if the sender is a bot,
     which in a private chat is the Companion. The part the User highlighted
-    is read instead of the whole text.
+    is read instead of the whole text, and a photo's largest size is read
+    so it can be looked at.
 
     Args:
         message: The Telegram message.
@@ -168,6 +169,7 @@ def parse_replied_to(message: dict[str, Any]) -> RepliedToText | None:
         sent_at=datetime.fromtimestamp(int(replied.get("date", 0)), UTC),
         kind=kind,
         text=cut_short(text, REPLIED_TO_TEXT_MAX_CHARACTERS),
+        photo=parse_photo(replied),
     )
 
 

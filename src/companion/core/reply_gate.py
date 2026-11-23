@@ -135,7 +135,7 @@ class ReplyGate:
             text.chat_message_id,
         )
         risk_type = self._safeguard.assess(
-            conversation_id, snapshot, text.safeguard_text
+            conversation_id, snapshot, text.safeguard_text, text.safeguard_replied_to
         )
         if risk_type == RiskType.NONE:
             return Screened(conversation_id)

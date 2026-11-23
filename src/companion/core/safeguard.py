@@ -11,6 +11,7 @@ from companion.core.models import (
     ChatRole,
     Helpline,
     ModelStep,
+    RepliedToText,
     RiskType,
     SafeguardEvent,
     SafeguardEventOverview,
@@ -147,6 +148,7 @@ class Safeguard:
         conversation_id: UUID,
         snapshot: UserSnapshot,
         newest_text: str | None = None,
+        newest_replied_to: RepliedToText | None = None,
     ) -> RiskType:
         """Classify the risk in the Conversation's newest message.
 
@@ -161,6 +163,10 @@ class Safeguard:
             newest_text: The newest message as the Safeguard reads it, when
                 that differs from the saved one, e.g. a photo's description
                 with Photo Viewing off; None to read the saved one.
+            newest_replied_to: What the newest message replies to as the
+                Safeguard reads it, when that differs from the saved one,
+                e.g. a replied-to photo's description with Photo Viewing
+                off; None to read the saved one.
 
         Returns:
             The risk type, or `RiskType.NONE` if it is not a crisis.
@@ -169,6 +175,8 @@ class Safeguard:
         messages = self._repositories.conversations.list_messages(conversation_id)
         if newest_text is not None:
             messages[-1] = replace(messages[-1], content=newest_text)
+        if newest_replied_to is not None:
+            messages[-1] = replace(messages[-1], replied_to=newest_replied_to)
         history = to_chat_history(messages, snapshot.user.time_zone)
         transcript = [ChatLine(role=ChatRole.USER, text=to_transcript(history))]
         for _ in range(2):

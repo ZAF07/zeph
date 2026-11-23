@@ -29,7 +29,8 @@ def replied_to_note(
 
     Returns:
         E.g. '(replying to the Companion's text from 3 Nov 2026, "have you
-        told your mum?")', or "their own" for the User's own text.
+        told your mum?")', or "their own" for the User's own text; a photo
+        that was looked at ends with its note, e.g. '[photo: a grey cat]'.
     """
     if replied_to.sender == RepliedToSender.USER:
         owner = "their own"
@@ -40,7 +41,8 @@ def replied_to_note(
     kind = REPLIED_TO_KIND_NAMES[replied_to.kind]
     day = format_day(replied_to.sent_at, time_zone)
     said = f', "{replied_to.text}"' if replied_to.text else ""
-    return f"(replying to {owner} {kind} from {day}{said})"
+    seen = f", {replied_to.photo_note}" if replied_to.photo_note else ""
+    return f"(replying to {owner} {kind} from {day}{said}{seen})"
 
 
 def readable_content(

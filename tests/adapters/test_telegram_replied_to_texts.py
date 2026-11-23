@@ -2,13 +2,16 @@ from datetime import UTC, datetime
 
 from companion.adapters.telegram.webhook import parse_update
 from companion.core.models import (
+    ChannelPhoto,
     IncomingMessage,
     MessageKind,
     RepliedToSender,
     RepliedToText,
 )
 from tests.telegram_helpers import (
+    telegram_file_update,
     telegram_message_update,
+    telegram_reply_to_photo_update,
     telegram_reply_update,
     telegram_text_update,
 )
@@ -76,6 +79,35 @@ def test_a_reply_to_a_photo_reads_its_caption() -> None:
     replied_to = parsed(update).replied_to
     assert replied_to is not None
     assert (replied_to.kind, replied_to.text) == (MessageKind.PHOTO, "my cat")
+
+
+def test_a_reply_to_a_photo_reads_its_largest_size_to_look_at() -> None:
+    update = telegram_reply_to_photo_update("so cute", "my cat")
+
+    replied_to = parsed(update).replied_to
+    assert replied_to is not None
+    assert replied_to.photo == ChannelPhoto(
+        file_id="file-old-cat", file_unique_id="old-cat"
+    )
+
+
+def test_a_reply_to_an_image_file_reads_it_as_a_photo_marked_if_too_big() -> None:
+    document = telegram_file_update("image/png", file_size=30 * 1024 * 1024)
+    update = telegram_reply_update("this one", document["message"])
+
+    replied_to = parsed(update).replied_to
+    assert replied_to is not None
+    assert replied_to.photo is not None
+    assert replied_to.photo.too_big_to_download
+
+
+def test_a_reply_to_a_text_or_sticker_has_no_photo_to_look_at() -> None:
+    sticker = {"file_id": "file-hug", "file_unique_id": "hug", "emoji": "🤗"}
+
+    for replied in ({"text": "hi"}, {"sticker": sticker}):
+        replied_to = parsed(telegram_reply_update("ok", replied)).replied_to
+        assert replied_to is not None
+        assert replied_to.photo is None
 
 
 def test_a_reply_to_a_sticker_reads_its_emoji_and_keeps_the_replied_sticker() -> None:
