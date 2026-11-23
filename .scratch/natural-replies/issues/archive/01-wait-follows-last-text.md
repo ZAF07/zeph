@@ -63,4 +63,4 @@ None - can start immediately.
 ## Completion
 
 - Completed: 2026-11-23
-- Commit: <to be filled in after merge>
+- Commit: d710295 (merge "Merge natural-replies-01-wait: the wait follows how the last text reads"; work in e4da08b "Natural replies 01: the wait follows how the last text reads", f8349fb review fixes, 7c23f07 migration renumbered to 0075, 0cd7e7e archive)
