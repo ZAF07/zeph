@@ -34,7 +34,7 @@ from companion.core.reply_tools import (
     ReplyOffer,
     ReplyToolProvider,
 )
-from companion.core.transcripts import THE_COMPANIONS, readable_content
+from companion.core.transcripts import readable_content
 from companion.core.usage import UsageRecordingChatModel
 
 BLANK_LINE = re.compile(r"\n\s*\n")
@@ -148,7 +148,7 @@ def write_instructions(
 def to_chat_history(
     messages: list[ConversationMessage],
     time_zone: str | None = None,
-    companions: str = THE_COMPANIONS,
+    read_by_companion: bool = False,
 ) -> list[ChatLine]:
     """Turn a Conversation's saved messages into history for the chat model.
 
@@ -160,8 +160,8 @@ def to_chat_history(
         messages: The messages, oldest first.
         time_zone: The User's IANA time zone, for when a Replied-to Text was
             sent; UTC if not given.
-        companions: How a Replied-to Text names the Companion's, e.g.
-            "your" when the Companion itself reads the history.
+        read_by_companion: True when the Companion itself reads the
+            history, so a Replied-to Text it sent is "your" text.
 
     Returns:
         One line per Message or Companion message, saying who said it.
@@ -169,7 +169,7 @@ def to_chat_history(
     history: list[ChatLine] = []
     previous: ConversationMessage | None = None
     for message in messages:
-        content = readable_content(message, time_zone, companions)
+        content = readable_content(message, time_zone, read_by_companion)
         if message.direction == MessageDirection.OUTGOING:
             history.append(ChatLine(role=ChatRole.COMPANION, text=content))
         elif (
@@ -292,7 +292,7 @@ class ResponseComposer:
         )
         offers += optional_offers
         history = to_chat_history(
-            recent.messages, snapshot.user.time_zone, companions="your"
+            recent.messages, snapshot.user.time_zone, read_by_companion=True
         )
         reply = self._chat_model.generate(
             snapshot=snapshot,

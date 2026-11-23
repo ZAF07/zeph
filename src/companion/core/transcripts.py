@@ -7,7 +7,6 @@ from companion.core.models import (
     RepliedToText,
 )
 
-THE_COMPANIONS = "the Companion's"
 REPLIED_TO_KIND_NAMES = {
     MessageKind.TEXT: "text",
     MessageKind.STICKER: "sticker",
@@ -17,23 +16,27 @@ REPLIED_TO_KIND_NAMES = {
 
 
 def replied_to_note(
-    replied_to: RepliedToText, time_zone: str | None, companions: str
+    replied_to: RepliedToText, time_zone: str | None, read_by_companion: bool
 ) -> str:
     """Write what a User's text replies to, to go before the text.
 
     Args:
         replied_to: The Replied-to Text.
         time_zone: The User's IANA time zone; UTC if they have none.
-        companions: How to say the Companion's, e.g. "the Companion's" in a
-            transcript or "your" in the Reply's own chat history.
+        read_by_companion: True when the Companion itself reads it, as in
+            the Reply's chat history, so its texts are "your" texts; False
+            for a transcript, where they are "the Companion's".
 
     Returns:
         E.g. '(replying to the Companion's text from 3 Nov 2026, "have you
         told your mum?")', or "their own" for the User's own text.
     """
-    owner = (
-        companions if replied_to.sender == RepliedToSender.COMPANION else "their own"
-    )
+    if replied_to.sender == RepliedToSender.USER:
+        owner = "their own"
+    elif read_by_companion:
+        owner = "your"
+    else:
+        owner = "the Companion's"
     kind = REPLIED_TO_KIND_NAMES[replied_to.kind]
     day = format_day(replied_to.sent_at, time_zone)
     said = f', "{replied_to.text}"' if replied_to.text else ""
@@ -43,21 +46,22 @@ def replied_to_note(
 def readable_content(
     message: ConversationMessage,
     time_zone: str | None = None,
-    companions: str = THE_COMPANIONS,
+    read_by_companion: bool = False,
 ) -> str:
     """Write a saved message's content with what it replies to, if anything.
 
     Args:
         message: The saved message.
         time_zone: The User's IANA time zone; UTC if they have none.
-        companions: How to say the Companion's; see `replied_to_note`.
+        read_by_companion: Whether the Companion itself reads it; see
+            `replied_to_note`.
 
     Returns:
         The content, after a note on the Replied-to Text when it has one.
     """
     if message.replied_to is None:
         return message.content
-    note = replied_to_note(message.replied_to, time_zone, companions)
+    note = replied_to_note(message.replied_to, time_zone, read_by_companion)
     return f"{note} {message.content}"
 
 

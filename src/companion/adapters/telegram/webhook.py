@@ -197,6 +197,7 @@ def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
     chat_id = int(chat["id"])
     username = sender.get("username")
     message_id = int(message.get("message_id", 0))
+    replied_to = parse_replied_to(message)
     text = message.get("text")
     if isinstance(text, str):
         return IncomingMessage(
@@ -206,7 +207,7 @@ def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
             text,
             message_id=message_id,
             replied_sticker=parse_replied_sticker(message),
-            replied_to=parse_replied_to(message),
+            replied_to=replied_to,
         )
     sticker = message.get("sticker")
     if isinstance(sticker, dict):
@@ -218,7 +219,7 @@ def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
             kind=MessageKind.STICKER,
             sticker=parse_sticker(sticker),
             message_id=message_id,
-            replied_to=parse_replied_to(message),
+            replied_to=replied_to,
         )
     caption = message.get("caption")
     media_group_id = message.get("media_group_id")
@@ -234,7 +235,7 @@ def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
             photo=photo,
             album_id=album_id,
             message_id=message_id,
-            replied_to=parse_replied_to(message),
+            replied_to=replied_to,
         )
     attachment = attachment_name(message)
     if attachment is None:

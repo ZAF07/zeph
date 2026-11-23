@@ -1,7 +1,16 @@
+from datetime import timedelta
+from typing import Any
+
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
-from tests.fakes import FakeAuthVerifier, FakeChatChannel, ScriptedChatModel
+from tests.fakes import (
+    FakeAuthVerifier,
+    FakeChatChannel,
+    FakeClock,
+    FakeScheduler,
+    ScriptedChatModel,
+)
 from tests.telegram_helpers import (
     OWNER_TELEGRAM_USER_ID,
     auth_headers,
@@ -13,6 +22,7 @@ from tests.telegram_helpers import (
     telegram_text_update,
 )
 from tests.test_model_call_log import newest_call
+from tests.test_post_conversation import processing_answer, quiet_gap
 from tests.test_recent_messages import given_text, newest_reply_steps
 
 QUESTION = "have you told your mum about the job yet?"
@@ -174,6 +184,32 @@ def test_later_replies_in_the_conversation_still_see_the_link(
 
     understanding, reply_plan, reply = newest_reply_steps(chat_model)
     for call in (understanding, reply_plan):
+        assert f"Person: {SEEN_AS_REPLY} {ANSWER}" in given_text(call)
+    assert reply.history[0].text == REPLY_SEES
+
+
+def test_a_new_conversation_still_sees_the_link_in_the_recent_messages(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script("oh, that's a lot to carry")
+    send_to_webhook(client, telegram_reply_update(ANSWER, {"text": QUESTION}))
+    clock.advance(quiet_gap(seeded_settings) + timedelta(minutes=1))
+    chat_model.script_processing(processing_answer())
+    scheduler.tick()
+    chat_model.script("hey you")
+
+    send_to_webhook(client, telegram_text_update("morning"))
+
+    understanding, reply_plan, reply = newest_reply_steps(chat_model)
+    for call in (understanding, reply_plan):
+        assert "New Conversation" in given_text(call)
         assert f"Person: {SEEN_AS_REPLY} {ANSWER}" in given_text(call)
     assert reply.history[0].text == REPLY_SEES
 
