@@ -240,65 +240,92 @@ class IncomingMessageHandler:
         self._typing_keeper = typing_keeper
         self._dashboard_url = dashboard_url
         self._pending_messages: dict[UUID, PendingMessage] = {}
-        self._texts_being_checked: Counter[UUID] = Counter()
+        self._messages_not_yet_handled: Counter[UUID] = Counter()
+        self._answers_held_back: set[UUID] = set()
         self._replies_being_written: dict[UUID, ReplyAttempt] = {}
         self._pending_messages_guard = threading.Lock()
 
     def handle(self, message: IncomingMessage) -> None:
         """Add an incoming message to its sender's line of work, and return at once.
 
-        Args:
-            message: The incoming message.
-        """
-        self._work_queue.add(
-            texts_line_key(message.sender_id), lambda: self._receive(message)
-        )
-
-    def _receive(self, message: IncomingMessage) -> None:
-        """Handle one incoming message, on its sender's line of work.
-
         `/start <token>` makes a Telegram Connection. Anyone else without a
-        Telegram Connection is pointed to the Dashboard to sign up. A sticker
-        from an Admin in adding mode goes into the Sticker Library; any other
-        message ends adding mode, with a summary of what was added, and is
-        then handled as normal. An Admin's "add this" reply to a sticker adds
-        it. A voice note, video or other message the Companion can't read
-        gets the unsupported reply, unless it has a caption, which is
-        answered instead. Anything else from a connected User joins their
-        Message: a photo is described first, so the Safeguard and the reply
-        read what it shows; an Album's photos are described and checked
-        together once the User pauses. If saving or checking a text fails,
-        the User gets a short fallback reply instead of silence.
+        Telegram Connection is pointed to the Dashboard to sign up. A
+        connected User's message counts as not yet handled from now until
+        its turn ends, so their Message isn't answered without it.
 
         Args:
             message: The incoming message.
         """
+        line_key = texts_line_key(message.sender_id)
         if self._telegram_connections.is_start_command(message):
-            self._telegram_connections.handle_start(message)
+            self._work_queue.add(
+                line_key, lambda: self._telegram_connections.handle_start(message)
+            )
             return
-
         connection = self._repositories.telegram_connections.get_by_telegram_user(
             message.sender_id
         )
         if connection is None:
-            reply = self._repositories.platform_settings.load().get(
-                UNKNOWN_TELEGRAM_USER_REPLY
-            )
-            self._chat_channel.send_text(
-                message.chat_id,
-                reply.replace(DASHBOARD_URL_PLACEHOLDER, self._dashboard_url),
-            )
+            self._work_queue.add(line_key, lambda: self._point_to_dashboard(message))
             return
+        user_id = connection.user_id
+        with self._pending_messages_guard:
+            self._messages_not_yet_handled[user_id] += 1
+        self._work_queue.add(line_key, lambda: self._receive(user_id, message))
 
+    def _point_to_dashboard(self, message: IncomingMessage) -> None:
+        """Tell someone without a Telegram Connection to sign up on the Dashboard.
+
+        Args:
+            message: Their message.
+        """
+        reply = self._repositories.platform_settings.load().get(
+            UNKNOWN_TELEGRAM_USER_REPLY
+        )
+        self._chat_channel.send_text(
+            message.chat_id,
+            reply.replace(DASHBOARD_URL_PLACEHOLDER, self._dashboard_url),
+        )
+
+    def _receive(self, user_id: UUID, message: IncomingMessage) -> None:
+        """Handle one message from a connected User, on their line of work.
+
+        A sticker from an Admin in adding mode goes into the Sticker Library;
+        any other message ends adding mode, with a summary of what was added,
+        and is then handled as normal. An Admin's "add this" reply to a
+        sticker adds it. A voice note, video or other message the Companion
+        can't read gets the unsupported reply, unless it has a caption, which
+        is answered instead. Anything else joins their Message: a photo is
+        described first, so the Safeguard and the reply read what it shows;
+        an Album's photos are described and checked together once the User
+        pauses. If saving or checking a text fails, the User gets a short
+        fallback reply instead of silence.
+
+        Args:
+            user_id: The User who sent it.
+            message: The incoming message.
+        """
+        try:
+            self._receive_from_user(user_id, message)
+        finally:
+            self._finish_handling(user_id)
+
+    def _receive_from_user(self, user_id: UUID, message: IncomingMessage) -> None:
+        """Send a connected User's message where it belongs.
+
+        Args:
+            user_id: The User who sent it.
+            message: The incoming message.
+        """
         if message.kind == MessageKind.STICKER and self._sticker_adding.add_if_adding(
-            connection.user_id, message
+            user_id, message
         ):
             return
-        self._sticker_adding.finish(connection.user_id)
-        if self._sticker_adding.add_if_asked(connection.user_id, message):
+        self._sticker_adding.finish(user_id)
+        if self._sticker_adding.add_if_asked(user_id, message):
             return
         if message.album_id is not None:
-            self._hold_album_item(connection.user_id, message)
+            self._hold_album_item(user_id, message)
             return
         if message.kind == MessageKind.UNSUPPORTED and not message.text.strip():
             self._chat_channel.send_text(
@@ -308,7 +335,7 @@ class IncomingMessageHandler:
                 ),
             )
             return
-        self._screen_text(connection.user_id, message)
+        self._screen_text(user_id, message)
 
     def _hold_album_item(self, user_id: UUID, message: IncomingMessage) -> None:
         """Add an Album's photo or file to the User's Message and restart the wait.
@@ -332,8 +359,9 @@ class IncomingMessageHandler:
         """Save a text and check it for crisis now, then restart the wait.
 
         A reply being written to the Message, none of it sent yet, starts
-        over with this text in it. While the text is being checked, the wait
-        ending doesn't answer the Message, so a slow check never splits it.
+        over with this text in it. From when the text arrives until it is
+        checked, the wait ending doesn't answer the Message, so a slow check
+        or a busy queue never splits it.
         A crisis gets the Crisis Reply straight away and drops the rest of
         the User's Message, so it isn't answered normally, and a reply being
         written to it. A check that fails gets the fallback reply
@@ -343,43 +371,54 @@ class IncomingMessageHandler:
             user_id: The User who sent it.
             message: The incoming message.
         """
-        with self._pending_messages_guard:
-            self._texts_being_checked[user_id] += 1
         self._start_over_reply_being_written(user_id)
+        settings = self._repositories.platform_settings.load()
+        self._typing_keeper.keep_up(
+            message.chat_id, settings.get(TYPING_REPEAT_SECONDS)
+        )
+        with self._pending_messages_guard:
+            trace = self._pending_messages.setdefault(
+                user_id, PendingMessage(chat_id=message.chat_id)
+            ).trace
         try:
-            settings = self._repositories.platform_settings.load()
-            self._typing_keeper.keep_up(
-                message.chat_id, settings.get(TYPING_REPEAT_SECONDS)
+            snapshot = self._user_snapshots.load(user_id, settings, trace)
+            text = self._text_to_screen(snapshot, message)
+            result = self._reply_gate.screen(text, snapshot)
+        except Exception:
+            logger.exception("Could not check a text from a User")
+            self._drop_pending_message(user_id)
+            self._chat_channel.send_text(
+                message.chat_id, settings.get(REPLY_FAILED_MESSAGE)
             )
-            with self._pending_messages_guard:
-                trace = self._pending_messages.setdefault(
-                    user_id, PendingMessage(chat_id=message.chat_id)
-                ).trace
-            try:
-                snapshot = self._user_snapshots.load(user_id, settings, trace)
-                text = self._text_to_screen(snapshot, message)
-                result = self._reply_gate.screen(text, snapshot)
-            except Exception:
-                logger.exception("Could not check a text from a User")
-                self._drop_pending_message(user_id)
-                self._chat_channel.send_text(
-                    message.chat_id, settings.get(REPLY_FAILED_MESSAGE)
-                )
-                return
-            if isinstance(result, Stopped):
-                self._drop_pending_message(user_id)
-                return
-            with self._pending_messages_guard:
-                pending = self._pending_messages.setdefault(
-                    user_id, PendingMessage(chat_id=message.chat_id)
-                )
-                pending.add_screened(result.conversation_id, text.text)
-        finally:
-            with self._pending_messages_guard:
-                self._texts_being_checked[user_id] -= 1
-                if not self._texts_being_checked[user_id]:
-                    del self._texts_being_checked[user_id]
+            return
+        if isinstance(result, Stopped):
+            self._drop_pending_message(user_id)
+            return
+        with self._pending_messages_guard:
+            pending = self._pending_messages.setdefault(
+                user_id, PendingMessage(chat_id=message.chat_id)
+            )
+            pending.add_screened(result.conversation_id, text.text)
         self._restart_wait(user_id, settings)
+
+    def _finish_handling(self, user_id: UUID) -> None:
+        """Count one of the User's messages as handled.
+
+        Once all of them are, an answer held back for them is added to the
+        User's line of replies, unless a new wait was started meanwhile.
+
+        Args:
+            user_id: The User.
+        """
+        with self._pending_messages_guard:
+            self._messages_not_yet_handled[user_id] -= 1
+            if self._messages_not_yet_handled[user_id]:
+                return
+            del self._messages_not_yet_handled[user_id]
+            if user_id not in self._answers_held_back:
+                return
+            self._answers_held_back.discard(user_id)
+        self._queue_answer(user_id)
 
     def _drop_pending_message(self, user_id: UUID) -> None:
         """Forget what the User has sent so far, so it isn't answered normally.
@@ -405,7 +444,7 @@ class IncomingMessageHandler:
             attempt.drop()
 
     def _start_reply(self, user_id: UUID) -> tuple[PendingMessage, ReplyAttempt] | None:
-        """Start a try at answering the User's Message, unless a text is being checked.
+        """Start a try at answering the User's Message, unless a message isn't handled.
 
         The Message stays waiting until the reply starts being sent, so a
         text that drops the try joins it.
@@ -415,11 +454,12 @@ class IncomingMessageHandler:
 
         Returns:
             The Message and the try at answering it, or None if there is no
-            Message or a text is still being checked; that text restarts the
-            wait once checked.
+            Message or one of the User's messages is not yet handled; the
+            answer is then held back until it is.
         """
         with self._pending_messages_guard:
-            if self._texts_being_checked[user_id]:
+            if self._messages_not_yet_handled[user_id]:
+                self._answers_held_back.add(user_id)
                 return None
             pending = self._pending_messages.get(user_id)
             if pending is None:
@@ -466,34 +506,32 @@ class IncomingMessageHandler:
                 del self._pending_messages[user_id]
         return was_dropped
 
-    def _is_checking_a_text(self, user_id: UUID) -> bool:
-        """Tell whether a text from the User is waiting for or being checked.
-
-        Args:
-            user_id: The User.
-
-        Returns:
-            True while any of their texts is not yet checked.
-        """
-        with self._pending_messages_guard:
-            return bool(self._texts_being_checked[user_id])
-
     def _restart_wait(self, user_id: UUID, settings: PlatformSettings) -> None:
         """Start the wait for the User to pause, restarting any wait under way.
 
         When the wait ends, answering the Message is added to the User's
-        line of replies.
+        line of replies. A new wait replaces an answer held back.
 
         Args:
             user_id: The User.
             settings: The platform settings, which say how long to wait.
         """
+        with self._pending_messages_guard:
+            self._answers_held_back.discard(user_id)
         self._timer.start(
             message_wait_key(user_id),
             settings.get(MESSAGE_WAIT_SECONDS),
-            lambda: self._work_queue.add(
-                replies_line_key(user_id), lambda: self._answer_message(user_id)
-            ),
+            lambda: self._queue_answer(user_id),
+        )
+
+    def _queue_answer(self, user_id: UUID) -> None:
+        """Add answering the User's Message to their line of replies.
+
+        Args:
+            user_id: The User.
+        """
+        self._work_queue.add(
+            replies_line_key(user_id), lambda: self._answer_message(user_id)
         )
 
     def _answer_message(self, user_id: UUID) -> None:
@@ -511,8 +549,6 @@ class IncomingMessageHandler:
         Args:
             user_id: The User who paused.
         """
-        if self._is_checking_a_text(user_id):
-            return
         started = self._start_reply(user_id)
         if started is None:
             return

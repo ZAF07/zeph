@@ -15,7 +15,7 @@ class ThreadPoolUserWorkQueue:
     hands the next piece a new turn at the back of the pool's line, so a
     heavy texter can't keep a thread from other Users. A key with nothing
     waiting holds no thread. Work not yet run is lost if the backend stops
-    (ADR-0018).
+    (ADR-0018, one backend process with in-memory per-User queues).
     """
 
     def __init__(self, max_running: int) -> None:
@@ -60,10 +60,11 @@ class ThreadPoolUserWorkQueue:
             work()
         except Exception:
             logger.exception("A User's queued work failed")
-        with self._guard:
-            line = self._waiting[key]
-            line.popleft()
-            if not line:
-                del self._waiting[key]
-                return
-        self._pool.submit(self._run_next, key)
+        finally:
+            with self._guard:
+                line = self._waiting[key]
+                line.popleft()
+                if line:
+                    self._pool.submit(self._run_next, key)
+                else:
+                    del self._waiting[key]

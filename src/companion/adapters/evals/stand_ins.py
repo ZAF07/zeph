@@ -1,3 +1,4 @@
+import logging
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import replace
@@ -17,6 +18,8 @@ from companion.core.models import (
     WebSearchResult,
 )
 from companion.core.ports import ChatModel, ChatTool, PhotoViewer
+
+logger = logging.getLogger(__name__)
 
 
 class RecordingChatChannel:
@@ -221,17 +224,35 @@ class InlineUserWorkQueue:
     """User work queue for Evals: runs work right away, on the caller's thread.
 
     An Eval sends one text at a time, so its texts are checked and answered
-    in order before the Eval moves on.
+    in order before the Eval moves on. Work added under a key whose work is
+    running waits until that work is done, so each key's work still runs one
+    piece at a time, in order. A piece that fails is logged, and later work
+    under its key still runs.
     """
 
+    def __init__(self) -> None:
+        """Start with nothing waiting."""
+        self._waiting: dict[str, list[Callable[[], None]]] = {}
+
     def add(self, key: str, work: Callable[[], None]) -> None:
-        """Run the work now.
+        """Run the work now, unless the key's work is running.
 
         Args:
             key: Names one line of a User's work.
             work: What to run.
         """
-        work()
+        line = self._waiting.get(key)
+        if line is not None:
+            line.append(work)
+            return
+        line = self._waiting[key] = [work]
+        while line:
+            try:
+                line[0]()
+            except Exception:
+                logger.exception("A User's queued work failed")
+            line.pop(0)
+        del self._waiting[key]
 
 
 class IdleScheduler:
