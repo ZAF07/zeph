@@ -65,5 +65,5 @@ Evidence (24 Nov 2026, on the branch rebased onto main with 06 and 07):
 ## Completion
 
 - Completed: 2026-11-24
-- Commit: <to be filled in after merge>
+- Commit: 5ea9859 (merge "Merge natural-replies-08-replied-to-photos: Zeph looks at a photo the User replies to"; work in 337d2bb "Zeph looks at a photo the User replies to", b437a13 "Tidy replied-to photo look after review", 56606bb "Archive natural-replies issue 08: Zeph looks at replied-to photos, verified")
 
