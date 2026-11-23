@@ -10,6 +10,18 @@ from companion.adapters.clock import SystemClock
 from companion.adapters.deepseek.chat_model import DeepSeekChatModel
 from companion.adapters.deepseek.photo_viewer import DeepSeekPhotoViewer
 from companion.adapters.fastembed.embedder import FastEmbedEmbedder
+from companion.adapters.load_test.auth import LoadTestAccounts
+from companion.adapters.load_test.chat_channel import LoggingChatChannel
+from companion.adapters.load_test.chat_model import (
+    LoadTestChatModel,
+    LoadTestPhotoViewer,
+)
+from companion.adapters.load_test.scheduler import TimedScheduler
+from companion.adapters.load_test.switch import (
+    LOAD_TEST_ADAPTER,
+    allow_load_test_adapter,
+)
+from companion.adapters.load_test.web_search import EmptyWebSearch
 from companion.adapters.pgvector.vector_store import PgvectorKnowledgeVectorStore
 from companion.adapters.postgres.eval_repositories import (
     PostgresEvalCaseRepository,
@@ -163,9 +175,14 @@ def build_web_search(settings: Settings) -> WebSearch:
 
     Raises:
         UnknownAdapterError: If the chosen adapter does not exist.
+        LoadTestNotAllowedError: If a load-test adapter is chosen outside a
+            load test.
     """
     if settings.web_search_adapter == "tavily":
         return TavilyWebSearch(settings.tavily_api_key)
+    if settings.web_search_adapter == LOAD_TEST_ADAPTER:
+        allow_load_test_adapter("WEB_SEARCH_ADAPTER")
+        return EmptyWebSearch()
     raise UnknownAdapterError("WEB_SEARCH_ADAPTER", settings.web_search_adapter)
 
 
@@ -180,9 +197,14 @@ def build_chat_channel(settings: Settings) -> ChatChannel:
 
     Raises:
         UnknownAdapterError: If the chosen adapter does not exist.
+        LoadTestNotAllowedError: If a load-test adapter is chosen outside a
+            load test.
     """
     if settings.chat_channel_adapter == "telegram":
         return TelegramChatChannel(settings.telegram_bot_token)
+    if settings.chat_channel_adapter == LOAD_TEST_ADAPTER:
+        allow_load_test_adapter("CHAT_CHANNEL_ADAPTER")
+        return LoggingChatChannel()
     raise UnknownAdapterError("CHAT_CHANNEL_ADAPTER", settings.chat_channel_adapter)
 
 
@@ -197,11 +219,16 @@ def build_auth_verifier(settings: Settings) -> AuthVerifier:
 
     Raises:
         UnknownAdapterError: If the chosen adapter does not exist.
+        LoadTestNotAllowedError: If a load-test adapter is chosen outside a
+            load test.
     """
     if settings.auth_verifier_adapter == "clerk":
         return ClerkAuthVerifier(
             settings.clerk_secret_key, authorized_parties=[settings.dashboard_url]
         )
+    if settings.auth_verifier_adapter == LOAD_TEST_ADAPTER:
+        allow_load_test_adapter("AUTH_VERIFIER_ADAPTER")
+        return LoadTestAccounts()
     raise UnknownAdapterError("AUTH_VERIFIER_ADAPTER", settings.auth_verifier_adapter)
 
 
@@ -216,9 +243,14 @@ def build_auth_accounts(settings: Settings) -> AuthAccounts:
 
     Raises:
         UnknownAdapterError: If the chosen adapter does not exist.
+        LoadTestNotAllowedError: If a load-test adapter is chosen outside a
+            load test.
     """
     if settings.auth_verifier_adapter == "clerk":
         return ClerkAccounts(settings.clerk_secret_key)
+    if settings.auth_verifier_adapter == LOAD_TEST_ADAPTER:
+        allow_load_test_adapter("AUTH_VERIFIER_ADAPTER")
+        return LoadTestAccounts()
     raise UnknownAdapterError("AUTH_VERIFIER_ADAPTER", settings.auth_verifier_adapter)
 
 
@@ -250,9 +282,14 @@ def build_scheduler(settings: Settings) -> Scheduler:
 
     Raises:
         UnknownAdapterError: If the chosen adapter does not exist.
+        LoadTestNotAllowedError: If a load-test adapter is chosen outside a
+            load test.
     """
     if settings.scheduler_adapter == "in_process":
         return InProcessScheduler(SCHEDULER_INTERVAL_SECONDS)
+    if settings.scheduler_adapter == LOAD_TEST_ADAPTER:
+        allow_load_test_adapter("SCHEDULER_ADAPTER")
+        return TimedScheduler(InProcessScheduler(SCHEDULER_INTERVAL_SECONDS))
     raise UnknownAdapterError("SCHEDULER_ADAPTER", settings.scheduler_adapter)
 
 
@@ -267,9 +304,15 @@ def build_chat_model(settings: Settings) -> ChatModel:
 
     Raises:
         UnknownAdapterError: If the chosen adapter does not exist.
+        LoadTestNotAllowedError: If a load-test adapter is chosen outside a
+            load test.
     """
     if settings.chat_model_adapter == "deepseek":
         return DeepSeekChatModel(settings.deepseek_api_key)
+    if settings.chat_model_adapter == LOAD_TEST_ADAPTER:
+        allow_load_test_adapter("CHAT_MODEL_ADAPTER")
+        engine = build_database_engine(settings)
+        return LoadTestChatModel(build_repositories(settings, engine))
     raise UnknownAdapterError("CHAT_MODEL_ADAPTER", settings.chat_model_adapter)
 
 
@@ -284,9 +327,14 @@ def build_photo_viewer(settings: Settings) -> PhotoViewer:
 
     Raises:
         UnknownAdapterError: If the chosen adapter does not exist.
+        LoadTestNotAllowedError: If a load-test adapter is chosen outside a
+            load test.
     """
     if settings.chat_model_adapter == "deepseek":
         return DeepSeekPhotoViewer(settings.deepseek_api_key)
+    if settings.chat_model_adapter == LOAD_TEST_ADAPTER:
+        allow_load_test_adapter("CHAT_MODEL_ADAPTER")
+        return LoadTestPhotoViewer()
     raise UnknownAdapterError("CHAT_MODEL_ADAPTER", settings.chat_model_adapter)
 
 

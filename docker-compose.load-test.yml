@@ -1,0 +1,17 @@
+# Only `make load-test` uses this file, on top of docker-compose.yml. It puts
+# the backend on the load-test adapters: a chat model and photo viewer that
+# wait 3-8s and give canned answers, a web search that finds nothing, a chat
+# channel that logs instead of sending, a sign-in for load-test accounts and
+# a scheduler that logs each tick's length. No model, search or Telegram call
+# is made, so a run is free. LOAD_TEST_RUN lets those adapters start; the
+# main file never passes it, so `.env` alone can't turn them on.
+services:
+  backend:
+    environment:
+      LOAD_TEST_RUN: "true"
+      CHAT_MODEL_ADAPTER: load_test
+      WEB_SEARCH_ADAPTER: load_test
+      CHAT_CHANNEL_ADAPTER: load_test
+      AUTH_VERIFIER_ADAPTER: load_test
+      SCHEDULER_ADAPTER: load_test
+      TELEGRAM_WEBHOOK_REGISTER: "false"
