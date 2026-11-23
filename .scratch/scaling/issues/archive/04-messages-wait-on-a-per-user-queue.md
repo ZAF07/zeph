@@ -1,6 +1,6 @@
 # 04 — Messages waiting their turn don't hold a thread
 
-Status: in-progress
+Status: completed
 
 ## Parent
 
@@ -32,14 +32,14 @@ Each User's chat work goes on that User's queue, which runs on a fixed message p
 
 ## Acceptance criteria
 
-- [ ] Today's webhook-level tests pass unchanged, using the fake queue.
-- [ ] New webhook-level test: the webhook returns before the work runs.
-- [ ] New webhook-level test: a burst of texts sent during a reply gets one reply afterwards, with the texts in order.
-- [ ] Adapter tests: per-User order, one piece at a time per User, different Users side by side, the N limit, and failed work logged with later work still running. The adapter is added to the contract tests.
-- [ ] The message pool size is a setting, documented next to the other settings.
-- [ ] `/run`: in the worktree stack, a User sends texts during a reply (posted to the worktree's webhook) and gets one reply afterwards, and the Dashboard still loads.
-- [ ] After issue 03 is merged (rebase on `main`), `make load-test` meets the bar: every message answered, no failed replies, no database timeouts, Dashboard API under 1s. Before and after numbers are recorded under `## Comments`. If it misses the bar, record why (for example the database pool) and fix it or raise it.
-- [ ] `pytest`, `ruff`, `ruff format` and `mypy` pass.
+- [x] Today's webhook-level tests pass unchanged, using the fake queue.
+- [x] New webhook-level test: the webhook returns before the work runs.
+- [x] New webhook-level test: a burst of texts sent during a reply gets one reply afterwards, with the texts in order.
+- [x] Adapter tests: per-User order, one piece at a time per User, different Users side by side, the N limit, and failed work logged with later work still running. The adapter is added to the contract tests.
+- [x] The message pool size is a setting, documented next to the other settings.
+- [x] `/run`: in the worktree stack, a User sends texts during a reply (posted to the worktree's webhook) and gets one reply afterwards, and the Dashboard still loads.
+- [x] After issue 03 is merged (rebase on `main`), `make load-test` meets the bar: every message answered, no failed replies, no database timeouts, Dashboard API under 1s. Before and after numbers are recorded under `## Comments`. If it misses the bar, record why (for example the database pool) and fix it or raise it.
+- [x] `pytest`, `ruff`, `ruff format` and `mypy` pass.
 
 ## Blocked by
 
@@ -60,3 +60,39 @@ None - can start immediately. The last load-test criterion needs issue 03 merged
   - Known small change: a reply already being written is dropped when the new text's turn starts, not the moment it arrives. The gap is the time to check the User's earlier texts. Under the old locks it was dropped at once.
 - 2026-11-23, checks after the fixes: `ruff check` and `ruff format --check` (574 files) clean, `mypy src` no issues, `pytest` 1510 passed, contract `-k user_work_queues` 6 passed.
 - 2026-11-23, `/run` again on a rebuilt image, same setup. Sam (new User) sent one text, Maya sent one at the same time. The moment Sam's first reply went out, 4 more texts were posted (each 200 in 3–22 ms). Sam's reply ran on `user-work_0` and Maya's on `user-work_1` side by side. Sam's burst was saved in order ("ok so", "she didnt come to dinner", "and she left me on read", "was it something i said?") and got one reply of 2 parts afterwards (`user-work_3`). Model calls for Sam: 5 safeguard, 2 understanding, 2 reply plan, 2 reply. No tracebacks. Dashboard `/` 200 in 0.66s.
+- 2026-11-23, rebased on `main` at 4ddbaea (issue 03 merged): clean rebase. `ruff check`, `ruff format --check` (592 files), `mypy src` (213 files) clean, `pytest` 1551 passed.
+- 2026-11-23, load test: `make load-test ARGS="--tick-users 10"` in this worktree (the tick isn't part of the bar, and 100 + 100 takes about 53 minutes). The chat part is the same as the baseline: 50 Users, 10 sending bursts of 8 texts, 320 texts in 180 Messages.
+
+  **Before** (issue 03 baseline, main at 904ef6a, full defaults):
+  ```
+    PASS  Webhook posts       median 0.45s, worst 18.32s, 0 not 200
+    PASS  Texts answered      320 / 320
+    PASS  Failed replies      0
+    PASS  Database timeouts   0
+    FAIL  Dashboard API       median 0.03s, worst 20.01s, 4 of 60 calls over 1s, 0 not 200
+    INFO  Reply time          median 42.57s, worst 86.50s
+    INFO  Tick                3170.6s for 100 due Check-ins and 100 ended Conversations
+  ```
+  **After** (this branch, `MESSAGE_POOL_SIZE` default 50):
+  ```
+  Load test report
+    50 Users chatting (10 sending bursts of texts): 320 texts in 180 Messages
+
+    PASS  Webhook posts       median 0.01s, worst 1.04s, 0 not 200
+    PASS  Texts answered      320 / 320
+    PASS  Failed replies      0
+    PASS  Database timeouts   0
+    PASS  Dashboard API       median 0.03s, worst 0.33s, 0 of 70 calls over 1s, 0 not 200
+
+    INFO  Reply time          median 40.50s, worst 81.69s (a Message's last text to its first reply, with the Message wait)
+    INFO  Fallback answers    0
+    INFO  Load-test model     check-in 10, conversation end 10, curiosities 10, life threads 10, patterns 10, portrait 10, reply 180, reply plan 180, safeguard 320, understanding 180
+    INFO  Tick                340.6s for 10 due Check-ins and 10 ended Conversations (target 60s, not part of the bar)
+  ```
+  The bar is met. The Dashboard API's worst call went from 20.0s to 0.33s, and webhook posts from 18.3s to 1.0s, because chat work no longer runs on the web threads. Reply times are about the same, so the 50-thread pool doesn't hold replies back. The default database pool was enough (0 timeouts), so it isn't changed. The tick is still slow (about 17s per item, one after another). That belongs to `.scratch/check-in-job/`.
+- Follow-up from issue 03, not done here: `LOAD_TEST_RUN` could move into `config.py` `Settings` now that this issue has landed.
+
+## Completion
+
+- Completed: 2026-11-23
+- Commits: listed after the merge into main
