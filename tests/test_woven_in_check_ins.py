@@ -569,10 +569,12 @@ def test_a_reply_that_fails_after_its_first_part_keeps_the_woven_in_check_in(
     chat_model.script("how did the board presentation go?\n\nand how's the salad?")
     send_text = chat_channel.send_text
 
-    def fail_the_second_part(chat_id: int, text: str) -> None:
+    def fail_the_second_part(
+        chat_id: int, text: str, reply_to_message_id: int | None = None
+    ) -> None:
         if text == "and how's the salad?":
             raise ConnectionError("telegram is down")
-        send_text(chat_id, text)
+        send_text(chat_id, text, reply_to_message_id)
 
     monkeypatch.setattr(chat_channel, "send_text", fail_the_second_part)
 

@@ -48,7 +48,10 @@ def test_texts_sent_in_a_row_get_one_reply_that_sees_them_as_one_message(
     assert chat_model.calls == []
     timer.end_message_waits()
     [reply_call] = chat_model.calls
-    assert reply_call.history[-1].text == "hey\nrough day\nmy boss yelled at me"
+    assert (
+        reply_call.history[-1].text
+        == "[1] hey\n[2] rough day\n[3] my boss yelled at me"
+    )
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["oh no, what happened?"]
 
 
@@ -163,7 +166,7 @@ def test_a_text_and_an_album_sent_together_get_one_reply(
     timer.end_message_waits()
 
     [reply_call] = chat_model.calls
-    assert reply_call.history[-1].text.startswith("look where i am\n[photo 1:")
+    assert reply_call.history[-1].text.startswith("[1] look where i am\n[2] [photo 1:")
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["what a view"]
 
 
@@ -184,7 +187,7 @@ def test_a_text_sent_while_a_reply_is_written_starts_it_over_with_every_text(
 
     dropped_call, second_call = chat_model.calls
     assert dropped_call.history[-1].text == "one"
-    assert second_call.history[-1].text == "one\ntwo"
+    assert second_call.history[-1].text == "[1] one\n[2] two"
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["second reply"]
 
 
@@ -207,7 +210,7 @@ def test_an_album_photo_sent_while_a_reply_is_written_starts_it_over(
     timer.end_message_waits()
 
     _, second_call = chat_model.calls
-    assert second_call.history[-1].text.startswith("look where i am\n[photo:")
+    assert second_call.history[-1].text.startswith("[1] look where i am\n[2] [photo:")
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["what a view"]
 
 
@@ -242,8 +245,10 @@ def test_a_text_sent_after_part_of_a_reply_went_out_starts_the_next_message(
     chat_model.script("first part\n\nsecond part", "next reply")
     send_text = chat_channel.send_text
 
-    def send_then_text_back(chat_id: int, text: str) -> None:
-        send_text(chat_id, text)
+    def send_then_text_back(
+        chat_id: int, text: str, reply_to_message_id: int | None = None
+    ) -> None:
+        send_text(chat_id, text, reply_to_message_id)
         if text == "first part":
             post_texts(client, "two")
 
@@ -322,7 +327,7 @@ def test_the_wait_ending_while_a_text_is_checked_leaves_it_in_the_same_message(
     timer.end_message_waits()
 
     [reply_call] = chat_model.calls
-    assert reply_call.history[-1].text == "hey\nrough day"
+    assert reply_call.history[-1].text == "[1] hey\n[2] rough day"
 
 
 def test_the_webhook_returns_before_the_text_is_checked_or_answered(
@@ -359,8 +364,10 @@ def test_a_burst_of_texts_sent_during_a_reply_gets_one_reply_afterwards_in_order
     chat_model.script("first part\n\nsecond part", "one reply to all of it")
     send_text = chat_channel.send_text
 
-    def send_then_burst(chat_id: int, text: str) -> None:
-        send_text(chat_id, text)
+    def send_then_burst(
+        chat_id: int, text: str, reply_to_message_id: int | None = None
+    ) -> None:
+        send_text(chat_id, text, reply_to_message_id)
         if text == "first part":
             post_texts(client, "wait", "actually", "it got worse", "my boss", "lol")
 
@@ -405,7 +412,7 @@ def test_a_text_waiting_its_turn_when_the_wait_ends_joins_the_same_message(
     timer.end_message_waits()
 
     [reply_call] = chat_model.calls
-    assert reply_call.history[-1].text == "one\ntwo"
+    assert reply_call.history[-1].text == "[1] one\n[2] two"
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["oh no, why?"]
 
 

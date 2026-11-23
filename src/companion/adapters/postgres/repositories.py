@@ -501,6 +501,7 @@ def _to_message(row: Row[Any]) -> ConversationMessage:
         photos=tuple(ChannelPhoto(**photo) for photo in row.photos),
         sticker=ChannelSticker(**row.sticker) if row.sticker else None,
         replied_to=_to_replied_to(row.replied_to) if row.replied_to else None,
+        chat_message_id=row.chat_message_id,
     )
 
 
@@ -1377,6 +1378,7 @@ class PostgresConversationRepository:
                     photos=[asdict(photo) for photo in message.photos],
                     sticker=asdict(message.sticker) if message.sticker else None,
                     replied_to=_replied_to_json(message.replied_to),
+                    chat_message_id=message.chat_message_id,
                 )
             )
             connection.execute(
@@ -1421,6 +1423,7 @@ class PostgresConversationRepository:
                     photos=[asdict(photo) for photo in message.photos],
                     sticker=asdict(message.sticker) if message.sticker else None,
                     replied_to=_replied_to_json(message.replied_to),
+                    chat_message_id=message.chat_message_id,
                 )
             )
         return True

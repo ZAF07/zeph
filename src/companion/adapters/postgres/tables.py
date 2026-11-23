@@ -133,6 +133,7 @@ conversation_messages = Table(
     Column("photos", JSONB, nullable=False, server_default="[]"),
     Column("sticker", JSONB(none_as_null=True)),
     Column("replied_to", JSONB(none_as_null=True)),
+    Column("chat_message_id", BigInteger),
 )
 
 platform_settings = Table(

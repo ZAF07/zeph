@@ -172,9 +172,10 @@ def test_each_text_of_a_message_shows_the_text_it_replies_to(
     reply = newest_reply_steps(chat_model)[-1]
     assert reply.history[-1].text == "\n".join(
         [
-            REPLY_SEES,
-            "anyway",
-            '(replying to your text from 3 Nov 2025, "how\'s the cold?") better now',
+            f"[1] {REPLY_SEES}",
+            "[2] anyway",
+            '[3] (replying to your text from 3 Nov 2025, "how\'s the cold?") '
+            "better now",
         ]
     )
 

@@ -17,12 +17,13 @@ def telegram_text_update(
     text: str,
     telegram_user_id: int = TELEGRAM_USER_ID,
     username: str = "maya_l",
+    message_id: int = 10,
 ) -> dict[str, Any]:
     """Build a Telegram webhook update for a private text message."""
     return {
         "update_id": 1,
         "message": {
-            "message_id": 10,
+            "message_id": message_id,
             "date": 1762851600,
             "from": {"id": telegram_user_id, "is_bot": False, "username": username},
             "chat": {"id": telegram_user_id, "type": "private"},
@@ -185,8 +186,7 @@ def telegram_reply_update(
         if from_companion
         else {"id": telegram_user_id, "is_bot": False, "username": "maya_l"}
     )
-    update = telegram_text_update(text, telegram_user_id)
-    update["message"]["message_id"] = message_id
+    update = telegram_text_update(text, telegram_user_id, message_id=message_id)
     update["message"]["reply_to_message"] = {
         "message_id": 3,
         "date": replied_at,

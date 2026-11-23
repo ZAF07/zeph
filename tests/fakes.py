@@ -38,6 +38,7 @@ class SentText:
 
     chat_id: int
     text: str
+    reply_to_message_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -98,12 +99,15 @@ class FakeChatChannel:
         self.photo_send_failure: Exception | None = None
         self.text_send_failures: list[Exception] = []
 
-    def send_text(self, chat_id: int, text: str) -> None:
+    def send_text(
+        self, chat_id: int, text: str, reply_to_message_id: int | None = None
+    ) -> None:
         """Record a text message.
 
         Args:
             chat_id: The chat the message is for.
             text: The message text.
+            reply_to_message_id: The message it replies to, if any.
 
         Raises:
             Exception: The first of the queued `text_send_failures`, if any;
@@ -111,7 +115,11 @@ class FakeChatChannel:
         """
         if self.text_send_failures:
             raise self.text_send_failures.pop(0)
-        self.sent.append(SentText(chat_id=chat_id, text=text))
+        self.sent.append(
+            SentText(
+                chat_id=chat_id, text=text, reply_to_message_id=reply_to_message_id
+            )
+        )
         self.events.append(f"text: {text}")
 
     def send_sticker(self, chat_id: int, file_id: str) -> None:

@@ -167,12 +167,19 @@ class TelegramChatChannel:
         self._file_url = f"{TELEGRAM_API_URL}/file/bot{bot_token}"
         self._http = http_client or httpx.Client(timeout=10)
 
-    def send_text(self, chat_id: int, text: str) -> None:
-        """Send one text message.
+    def send_text(
+        self, chat_id: int, text: str, reply_to_message_id: int | None = None
+    ) -> None:
+        """Send one text message, optionally as a reply to an earlier one.
+
+        A reply is sent even if Telegram can't find the earlier message, e.g.
+        because the User deleted it.
 
         Args:
             chat_id: The chat to send to.
             text: The message text.
+            reply_to_message_id: The chat channel's ID of the message it replies
+                to; None to send it on its own.
 
         Raises:
             TelegramBlockedError: If the person blocked the bot.
@@ -180,7 +187,13 @@ class TelegramChatChannel:
             TelegramApiError: If Telegram can't be reached or fails, so the
                 message may or may not have arrived.
         """
-        self._call("sendMessage", {"chat_id": chat_id, "text": text})
+        body: dict[str, object] = {"chat_id": chat_id, "text": text}
+        if reply_to_message_id is not None:
+            body["reply_parameters"] = {
+                "message_id": reply_to_message_id,
+                "allow_sending_without_reply": True,
+            }
+        self._call("sendMessage", body)
 
     def show_typing(self, chat_id: int) -> None:
         """Show that the Companion is typing.

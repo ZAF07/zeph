@@ -64,6 +64,36 @@ def test_a_sticker_is_sent_by_its_file_id() -> None:
     assert calls == [("sendSticker", {"chat_id": 42, "sticker": "file-seedling"})]
 
 
+def test_a_text_is_sent_on_its_own_when_it_replies_to_nothing() -> None:
+    calls: list[tuple[str, dict[str, object]]] = []
+    channel = channel_answering(lambda path, body: ok({}), calls)
+
+    channel.send_text(42, "hey")
+
+    assert calls == [("sendMessage", {"chat_id": 42, "text": "hey"})]
+
+
+def test_a_text_replying_to_a_message_is_sent_even_if_the_original_is_gone() -> None:
+    calls: list[tuple[str, dict[str, object]]] = []
+    channel = channel_answering(lambda path, body: ok({}), calls)
+
+    channel.send_text(42, "ugh, work", reply_to_message_id=101)
+
+    assert calls == [
+        (
+            "sendMessage",
+            {
+                "chat_id": 42,
+                "text": "ugh, work",
+                "reply_parameters": {
+                    "message_id": 101,
+                    "allow_sending_without_reply": True,
+                },
+            },
+        )
+    ]
+
+
 def test_a_reaction_is_put_on_a_message_by_its_id() -> None:
     calls: list[tuple[str, dict[str, object]]] = []
     channel = channel_answering(lambda path, body: ok(True), calls)
