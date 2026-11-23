@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 
 from companion.core.life_threads import (
     read_text,
-    recent_incoming_texts,
+    recent_texts_to_search,
 )
 from companion.core.memory_retrieval import format_day, format_time
 from companion.core.models import (
@@ -433,7 +433,7 @@ class MoveOutcomeFinder:
         settings = snapshot.settings
         limit = settings.get(MOVE_OUTCOMES_PER_UNDERSTANDING)
         messages = self._repositories.conversations.list_messages(conversation_id)
-        recent_texts = recent_incoming_texts(messages)
+        recent_texts = recent_texts_to_search(messages)
         if limit < 1 or not recent_texts:
             return []
         try:
