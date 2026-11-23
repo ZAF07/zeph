@@ -50,10 +50,21 @@ const checkInGapFields: (NumberField & { frequency: CheckInFrequency })[] =
 
 const checkInGapKeys = checkInGapFields.map((field) => field.key);
 
-/** The number settings on this page, grouped by section. */
-const numberSections: { heading: string; fields: NumberField[] }[] = [
+/** The trailing words, edited as one comma-separated text. */
+const trailingWordsField: TextField = {
+  key: "message_wait_trailing_words",
+  label: "Trailing words",
+};
+
+/** The number settings on this page, grouped by section, with any editors below them. */
+const numberSections: {
+  heading: string;
+  fields: NumberField[];
+  editors?: TextField[];
+}[] = [
   {
     heading: "Conversations",
+    editors: [trailingWordsField],
     fields: [
       {
         key: "conversation_quiet_gap_minutes",
@@ -72,7 +83,7 @@ const numberSections: { heading: string; fields: NumberField[] }[] = [
       },
       {
         key: "message_wait_seconds",
-        label: "Message wait",
+        label: "Wait after any other text",
         unit: "sec",
       },
       {
@@ -279,12 +290,6 @@ const textFields: TextField[] = [
     label: "“Photo Viewing off” note",
   },
 ];
-
-/** The trailing words, edited as one comma-separated text. */
-const trailingWordsField: TextField = {
-  key: "message_wait_trailing_words",
-  label: "Trailing words",
-};
 
 const numberKeys = [
   ...numberSections.flatMap((section) =>
@@ -518,7 +523,7 @@ export function PlatformSettingsForm() {
           section.heading,
           section.fields,
           settings,
-          section.heading === "Conversations" ? [trailingWordsField] : [],
+          section.editors,
         ),
       )}
       {numberSection("Web search", [webSearchLimitField], settings)}

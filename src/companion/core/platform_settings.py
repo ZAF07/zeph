@@ -1314,7 +1314,7 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     ),
     EditableSetting(
         MESSAGE_WAIT_SECONDS.key,
-        "Message wait",
+        "Wait after any other text",
         SettingKind.WHOLE_NUMBER,
         minimum=0,
         maximum=60,

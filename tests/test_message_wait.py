@@ -95,7 +95,15 @@ def test_a_text_that_trails_off_gets_the_trailing_wait(
 
 @pytest.mark.parametrize(
     "text",
-    ["hey", f"{FOURTEEN_WORDS}.", "so what", "lol ok", f"{FIFTEEN_WORDS} honestly"],
+    [
+        "hey",
+        f"{FOURTEEN_WORDS}.",
+        "so what",
+        "lol ok",
+        f"{FIFTEEN_WORDS} honestly",
+        f"{FIFTEEN_WORDS} at 30°",
+        f"{FIFTEEN_WORDS} ™",
+    ],
 )
 def test_any_other_text_gets_the_neither_wait(
     client: TestClient, timer: FakeTimer, wait_settings: dict[str, str], text: str

@@ -473,7 +473,7 @@ describe("PlatformSettingsForm", () => {
   it("shows and saves the message wait in its Conversations section", async () => {
     const user = userEvent.setup();
     renderWithQueries(<PlatformSettingsForm />);
-    const wait = await screen.findByLabelText("Message wait");
+    const wait = await screen.findByLabelText("Wait after any other text");
     expect(wait).toHaveValue(4);
     expect(
       screen.getByRole("region", { name: "Conversations" }),

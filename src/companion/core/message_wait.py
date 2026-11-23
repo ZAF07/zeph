@@ -13,7 +13,8 @@ from companion.core.platform_settings import (
 
 TRAILING_ENDINGS = ("...", "…", ",")
 FINISHED_ENDINGS = (".", "!")
-EMOJI_JOINERS = {"‍", "️", "︎"}
+EMOJI_JOINERS = {"\u200d", "\ufe0f", "\ufe0e"}
+FIRST_EMOJI = "\u2600"
 
 
 class TextReads(StrEnum):
@@ -44,13 +45,14 @@ def ends_with_emoji(text: str) -> bool:
         text: The text, with no trailing spaces.
 
     Returns:
-        True if its last character, past any skin tone or joiner, is an emoji.
+        True if its last character, past any skin tone or joiner, is an
+        emoji: a symbol from the emoji blocks on, so "°" or "™" don't count.
     """
     for character in reversed(text):
         is_skin_tone = "\U0001f3fb" <= character <= "\U0001f3ff"
         if character in EMOJI_JOINERS or is_skin_tone:
             continue
-        return unicodedata.category(character) == "So"
+        return character >= FIRST_EMOJI and unicodedata.category(character) == "So"
     return False
 
 
