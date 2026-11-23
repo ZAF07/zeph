@@ -3,6 +3,7 @@ import threading
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from datetime import datetime
 from uuid import UUID
 
 from companion.core.message_wait import message_wait
@@ -27,7 +28,13 @@ from companion.core.platform_settings import (
     UNKNOWN_TELEGRAM_USER_REPLY,
     UNSUPPORTED_MESSAGE_REPLY,
 )
-from companion.core.ports import ChatChannel, Repositories, Timer, UserWorkQueue
+from companion.core.ports import (
+    ChatChannel,
+    Clock,
+    Repositories,
+    Timer,
+    UserWorkQueue,
+)
 from companion.core.reply_attempt import ReplyAttempt, ReplyDroppedError
 from companion.core.reply_gate import ReplyGate, ReplyNeeded, Stopped
 from companion.core.reply_service import ReplyService
@@ -155,6 +162,8 @@ class PendingMessage:
 
     Attributes:
         chat_id: The chat to reply in.
+        first_text_at: When its first text arrived, which the wait cap
+            counts from, start-overs included.
         conversation_id: The Conversation its latest screened text was saved
             into; None until a text is screened.
         texts: Its screened texts as the Companion reads them, in order.
@@ -167,6 +176,7 @@ class PendingMessage:
     """
 
     chat_id: int
+    first_text_at: datetime
     conversation_id: UUID | None = None
     texts: list[str] = field(default_factory=list)
     album_items: list[IncomingMessage] = field(default_factory=list)
@@ -190,7 +200,8 @@ class IncomingMessageHandler:
     """Decides what to do with each message people send the Companion.
 
     A connected User's texts are gathered into one Message until they pause
-    for a wait that follows how their latest text reads, then answered
+    for a wait that follows how their latest text reads, never past a cap
+    from the Message's first text, then answered
     together with one reply. Each text is saved and checked by the Safeguard
     as it arrives, so a crisis is never held back by the wait or by a reply
     being written. The work runs on the User work queue, never on the
@@ -218,6 +229,7 @@ class IncomingMessageHandler:
         photo_service: PhotoService,
         user_snapshots: UserSnapshotLoader,
         timer: Timer,
+        clock: Clock,
         work_queue: UserWorkQueue,
         dashboard_url: str,
     ) -> None:
@@ -236,6 +248,8 @@ class IncomingMessageHandler:
             photo_service: Describes the photos Users send.
             user_snapshots: Reads the User once at the start of each turn.
             timer: Waits for the User to pause before answering their Message.
+            clock: Tells the time, so no Message waits past the cap from
+                its first text.
             work_queue: Runs each sender's messages, and each User's replies,
                 in order, apart from the caller's thread.
             dashboard_url: The Dashboard's address, put into some replies.
@@ -245,6 +259,7 @@ class IncomingMessageHandler:
         self._photo_service = photo_service
         self._user_snapshots = user_snapshots
         self._timer = timer
+        self._clock = clock
         self._work_queue = work_queue
         self._repositories = repositories
         self._reply_gate = reply_gate
@@ -362,9 +377,7 @@ class IncomingMessageHandler:
         """
         self._start_over_reply_being_written(user_id)
         with self._pending_messages_guard:
-            pending = self._pending_messages.setdefault(
-                user_id, PendingMessage(chat_id=message.chat_id)
-            )
+            pending = self._pending_message(user_id, message.chat_id)
             pending.album_items.append(message)
             album_items = [
                 item
@@ -373,6 +386,7 @@ class IncomingMessageHandler:
             ]
         self._restart_wait(
             user_id,
+            pending.first_text_at,
             self._repositories.platform_settings.load(),
             MessageKind.PHOTO,
             album_caption_text(album_items),
@@ -400,9 +414,7 @@ class IncomingMessageHandler:
             message.chat_id, settings.get(TYPING_REPEAT_SECONDS)
         )
         with self._pending_messages_guard:
-            trace = self._pending_messages.setdefault(
-                user_id, PendingMessage(chat_id=message.chat_id)
-            ).trace
+            trace = self._pending_message(user_id, message.chat_id).trace
         try:
             snapshot = self._user_snapshots.load(user_id, settings, trace)
             text = self._text_to_screen(snapshot, message)
@@ -418,11 +430,29 @@ class IncomingMessageHandler:
             self._drop_pending_message(user_id)
             return
         with self._pending_messages_guard:
-            pending = self._pending_messages.setdefault(
-                user_id, PendingMessage(chat_id=message.chat_id)
-            )
+            pending = self._pending_message(user_id, message.chat_id)
             pending.add_screened(result.conversation_id, text.text)
-        self._restart_wait(user_id, settings, message.kind, message.text)
+        self._restart_wait(
+            user_id, pending.first_text_at, settings, message.kind, message.text
+        )
+
+    def _pending_message(self, user_id: UUID, chat_id: int) -> PendingMessage:
+        """Find the User's Message waiting to be answered, or start one now.
+
+        Only call it under the guard.
+
+        Args:
+            user_id: The User.
+            chat_id: The chat to reply in, if a Message is started.
+
+        Returns:
+            The Message; a new one counts the wait cap from now.
+        """
+        pending = self._pending_messages.get(user_id)
+        if pending is None:
+            pending = PendingMessage(chat_id=chat_id, first_text_at=self._clock.now())
+            self._pending_messages[user_id] = pending
+        return pending
 
     def _finish_handling(self, user_id: UUID) -> None:
         """Count one of the User's messages as handled.
@@ -532,27 +562,34 @@ class IncomingMessageHandler:
     def _restart_wait(
         self,
         user_id: UUID,
+        first_text_at: datetime,
         settings: PlatformSettings,
         latest_kind: MessageKind,
         latest_text: str,
     ) -> None:
         """Start the wait for the User to pause, restarting any wait under way.
 
-        How long it is follows how the User's latest text reads. When the
-        wait ends, answering the Message is added to the User's line of
-        replies. A new wait replaces an answer held back.
+        How long it is follows how the User's latest text reads, cut to the
+        time left to the cap from the Message's first text. When the wait
+        ends, answering the Message is added to the User's line of replies.
+        A new wait replaces an answer held back.
 
         Args:
             user_id: The User.
+            first_text_at: When the Message's first text arrived.
             settings: The platform settings, which say how long to wait.
             latest_kind: What kind of message the latest text is.
             latest_text: The latest text, or its caption; "" if none.
         """
         with self._pending_messages_guard:
             self._answers_held_back.discard(user_id)
+        seconds_since_first_text = (self._clock.now() - first_text_at).total_seconds()
+        wait = message_wait(
+            latest_kind, latest_text, settings, seconds_since_first_text
+        )
         self._timer.start(
             message_wait_key(user_id),
-            message_wait(latest_kind, latest_text, settings).seconds,
+            wait.seconds,
             lambda: self._queue_answer(user_id),
         )
 

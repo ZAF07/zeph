@@ -5,7 +5,13 @@ from enum import StrEnum
 from typing import Any
 
 from companion.core.errors import InvalidError
-from companion.core.models import CheckInFrequency, Setting, StoredSetting, User
+from companion.core.models import (
+    CheckInFrequency,
+    PlatformSettings,
+    Setting,
+    StoredSetting,
+    User,
+)
 from companion.core.ports import Clock, PlatformSettingsRepository
 
 HELPLINES_PLACEHOLDER = "{helplines}"
@@ -199,10 +205,16 @@ MESSAGE_WAIT_FINISHED_SECONDS = Setting(
 MESSAGE_WAIT_TRAILING_SECONDS = Setting(
     "message_wait_trailing_seconds", read_whole_number
 )
+MESSAGE_WAIT_CAP_SECONDS = Setting("message_wait_cap_seconds", read_whole_number)
 MESSAGE_WAIT_LONG_TEXT_WORDS = Setting(
     "message_wait_long_text_words", read_whole_number
 )
 MESSAGE_WAIT_TRAILING_WORDS = Setting("message_wait_trailing_words", read_text_list)
+MESSAGE_WAITS = (
+    MESSAGE_WAIT_FINISHED_SECONDS,
+    MESSAGE_WAIT_TRAILING_SECONDS,
+    MESSAGE_WAIT_SECONDS,
+)
 TYPING_REPEAT_SECONDS = Setting("typing_repeat_seconds", read_whole_number)
 MESSAGE_RETENTION_DAYS = Setting("message_retention_days", read_whole_number)
 RECENT_MESSAGES_HOURS = Setting("recent_messages_hours", read_whole_number)
@@ -1325,6 +1337,19 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         ),
     ),
     EditableSetting(
+        MESSAGE_WAIT_CAP_SECONDS.key,
+        "Wait cap",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=60,
+        hint=(
+            "Most seconds Zeph waits from the first text of a Message, however many "
+            "texts follow, and never less than the longest wait. Shorter means a "
+            "long burst of texts is answered sooner, with more chance of cutting "
+            "the User off."
+        ),
+    ),
+    EditableSetting(
         MESSAGE_WAIT_LONG_TEXT_WORDS.key,
         "Long text",
         SettingKind.WHOLE_NUMBER,
@@ -1724,6 +1749,37 @@ def checked_text_list(setting: EditableSetting, value: Any) -> list[str]:
     return words
 
 
+def check_waits_fit_under_the_cap(
+    settings: PlatformSettings, values: Mapping[str, Any]
+) -> None:
+    """Check the Message wait cap is at least as long as each wait, after a change.
+
+    Only a change to a wait or the cap is checked, so other settings can
+    always be saved.
+
+    Args:
+        settings: The platform settings before the change.
+        values: The checked new value for each setting key being changed.
+
+    Raises:
+        InvalidSettingError: If the cap would be shorter than any of the
+            three waits.
+    """
+    keys_checked = {wait.key for wait in MESSAGE_WAITS} | {MESSAGE_WAIT_CAP_SECONDS.key}
+    if not keys_checked & values.keys():
+        return
+    longest_wait = max(
+        values.get(wait.key, settings.get(wait)) for wait in MESSAGE_WAITS
+    )
+    cap = values.get(
+        MESSAGE_WAIT_CAP_SECONDS.key, settings.get(MESSAGE_WAIT_CAP_SECONDS)
+    )
+    if cap < longest_wait:
+        raise InvalidSettingError(
+            f"The Wait cap must be at least the longest wait ({longest_wait} seconds)."
+        )
+
+
 class PlatformSettingsService:
     """Lets Admins read and change the platform settings they manage.
 
@@ -1781,12 +1837,14 @@ class PlatformSettingsService:
             Every editable setting after the change.
 
         Raises:
-            InvalidSettingError: If a key may not be changed or a value is not
-                valid; nothing is saved.
+            InvalidSettingError: If a key may not be changed, a value is not
+                valid, or the Message wait cap would be shorter than a wait;
+                nothing is saved.
         """
         validated_values = {
             key: self.checked_value(key, value) for key, value in values.items()
         }
+        check_waits_fit_under_the_cap(self._settings.load(), validated_values)
         if validated_values:
             self._settings.save_many(validated_values, self._clock.now(), admin.id)
         return self.list_editable()

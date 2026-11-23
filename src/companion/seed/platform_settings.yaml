@@ -76,10 +76,12 @@ recent_messages_cap: 400
 # finished wait; trailing off (ending in ... or a comma, ending with one of
 # message_wait_trailing_words, being one of them alone, or a photo with no
 # caption) gets the trailing wait; anything else, a sticker included, gets
-# message_wait_seconds.
+# message_wait_seconds. However many texts come, no Message waits more than
+# message_wait_cap_seconds from its first text.
 message_wait_finished_seconds: 2
 message_wait_trailing_seconds: 12
 message_wait_seconds: 6
+message_wait_cap_seconds: 20
 message_wait_long_text_words: 15
 message_wait_trailing_words:
   - and

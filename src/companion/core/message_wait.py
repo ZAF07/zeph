@@ -4,6 +4,7 @@ from enum import StrEnum
 
 from companion.core.models import MessageKind, PlatformSettings
 from companion.core.platform_settings import (
+    MESSAGE_WAIT_CAP_SECONDS,
     MESSAGE_WAIT_FINISHED_SECONDS,
     MESSAGE_WAIT_LONG_TEXT_WORDS,
     MESSAGE_WAIT_SECONDS,
@@ -35,7 +36,7 @@ class MessageWait:
     """
 
     reads: TextReads
-    seconds: int
+    seconds: float
 
 
 def ends_with_emoji(text: str) -> bool:
@@ -95,17 +96,24 @@ def how_text_reads(
 
 
 def message_wait(
-    kind: MessageKind, text: str, settings: PlatformSettings
+    kind: MessageKind,
+    text: str,
+    settings: PlatformSettings,
+    seconds_since_first_text: float,
 ) -> MessageWait:
     """Decide how long to wait for more after a User's latest text.
 
     Args:
         kind: What kind of message it is.
         text: Its text, or a photo's caption; "" if none.
-        settings: The platform settings, which hold each wait and the rules.
+        settings: The platform settings, which hold each wait, the cap and
+            the rules.
+        seconds_since_first_text: How long ago the Message's first text came.
 
     Returns:
-        How the text reads and the seconds to wait.
+        How the text reads and the seconds to wait: the wait for how it
+        reads, or the time left to the cap from the Message's first text if
+        shorter, never below zero.
     """
     reads = how_text_reads(
         kind,
@@ -118,4 +126,6 @@ def message_wait(
         TextReads.TRAILING: MESSAGE_WAIT_TRAILING_SECONDS,
         TextReads.NEITHER: MESSAGE_WAIT_SECONDS,
     }[reads]
-    return MessageWait(reads=reads, seconds=settings.get(wait_setting))
+    time_left_to_cap = settings.get(MESSAGE_WAIT_CAP_SECONDS) - seconds_since_first_text
+    seconds = max(0, min(settings.get(wait_setting), time_left_to_cap))
+    return MessageWait(reads=reads, seconds=seconds)

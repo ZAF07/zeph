@@ -87,6 +87,11 @@ const numberSections: {
         unit: "sec",
       },
       {
+        key: "message_wait_cap_seconds",
+        label: "Wait cap",
+        unit: "sec",
+      },
+      {
         key: "message_wait_long_text_words",
         label: "Long text",
         unit: "words",
