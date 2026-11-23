@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from uuid import UUID
 
+from companion.core.message_wait import message_wait
 from companion.core.model_call_log import start_trace
 from companion.core.models import (
     ChannelPhoto,
@@ -21,7 +22,6 @@ from companion.core.models import (
 from companion.core.photos import PhotoService
 from companion.core.platform_settings import (
     DASHBOARD_URL_PLACEHOLDER,
-    MESSAGE_WAIT_SECONDS,
     REPLY_FAILED_MESSAGE,
     TYPING_REPEAT_SECONDS,
     UNKNOWN_TELEGRAM_USER_REPLY,
@@ -112,10 +112,21 @@ def album_caption(messages: Sequence[IncomingMessage]) -> str:
         for message in messages
         if message.kind == MessageKind.UNSUPPORTED
     ]
-    caption = next(
+    return " ".join([*markers, album_caption_text(messages)]).strip()
+
+
+def album_caption_text(messages: Sequence[IncomingMessage]) -> str:
+    """Read an album's caption, from whichever item has it.
+
+    Args:
+        messages: The album's items.
+
+    Returns:
+        The caption; "" if none of its items has one.
+    """
+    return next(
         (message.text.strip() for message in messages if message.text.strip()), ""
     )
-    return " ".join([*markers, caption]).strip()
 
 
 def group_albums(
@@ -179,19 +190,20 @@ class IncomingMessageHandler:
     """Decides what to do with each message people send the Companion.
 
     A connected User's texts are gathered into one Message until they pause
-    for `message_wait_seconds`, then answered together with one reply. Each
-    text is saved and checked by the Safeguard as it arrives, so a crisis
-    is never held back by the wait or by a reply being written. The work
-    runs on the User work queue, never on the caller's thread: a sender's
-    messages are handled one at a time, in order, on one line, and a User's
-    replies are written one at a time on another. A text that arrives while
-    a reply is being written, before any of it is sent, drops that reply,
-    and the Message is answered again with every text once the User pauses;
-    once part of a reply is sent, a new text starts the next Message. The
-    texts waiting to be answered, and the reply being written, are only
-    read and changed under one guard, since texts are checked while a reply
-    is written. From the first text until something is sent back, typing is
-    shown again every `typing_repeat_seconds`, so the chat never looks dead.
+    for a wait that follows how their latest text reads, then answered
+    together with one reply. Each text is saved and checked by the Safeguard
+    as it arrives, so a crisis is never held back by the wait or by a reply
+    being written. The work runs on the User work queue, never on the
+    caller's thread: a sender's messages are handled one at a time, in
+    order, on one line, and a User's replies are written one at a time on
+    another. A text that arrives while a reply is being written, before any
+    of it is sent, drops that reply, and the Message is answered again with
+    every text once the User pauses; once part of a reply is sent, a new
+    text starts the next Message. The texts waiting to be answered, and the
+    reply being written, are only read and changed under one guard, since
+    texts are checked while a reply is written. From the first text until
+    something is sent back, typing is shown again every
+    `typing_repeat_seconds`, so the chat never looks dead.
     """
 
     def __init__(
@@ -354,7 +366,17 @@ class IncomingMessageHandler:
                 user_id, PendingMessage(chat_id=message.chat_id)
             )
             pending.album_items.append(message)
-        self._restart_wait(user_id, self._repositories.platform_settings.load())
+            album_items = [
+                item
+                for item in pending.album_items
+                if item.album_id == message.album_id
+            ]
+        self._restart_wait(
+            user_id,
+            self._repositories.platform_settings.load(),
+            MessageKind.PHOTO,
+            album_caption_text(album_items),
+        )
 
     def _screen_text(self, user_id: UUID, message: IncomingMessage) -> None:
         """Save a text and check it for crisis now, then restart the wait.
@@ -400,7 +422,7 @@ class IncomingMessageHandler:
                 user_id, PendingMessage(chat_id=message.chat_id)
             )
             pending.add_screened(result.conversation_id, text.text)
-        self._restart_wait(user_id, settings)
+        self._restart_wait(user_id, settings, message.kind, message.text)
 
     def _finish_handling(self, user_id: UUID) -> None:
         """Count one of the User's messages as handled.
@@ -507,21 +529,30 @@ class IncomingMessageHandler:
                 del self._pending_messages[user_id]
         return was_dropped
 
-    def _restart_wait(self, user_id: UUID, settings: PlatformSettings) -> None:
+    def _restart_wait(
+        self,
+        user_id: UUID,
+        settings: PlatformSettings,
+        latest_kind: MessageKind,
+        latest_text: str,
+    ) -> None:
         """Start the wait for the User to pause, restarting any wait under way.
 
-        When the wait ends, answering the Message is added to the User's
-        line of replies. A new wait replaces an answer held back.
+        How long it is follows how the User's latest text reads. When the
+        wait ends, answering the Message is added to the User's line of
+        replies. A new wait replaces an answer held back.
 
         Args:
             user_id: The User.
             settings: The platform settings, which say how long to wait.
+            latest_kind: What kind of message the latest text is.
+            latest_text: The latest text, or its caption; "" if none.
         """
         with self._pending_messages_guard:
             self._answers_held_back.discard(user_id)
         self._timer.start(
             message_wait_key(user_id),
-            settings.get(MESSAGE_WAIT_SECONDS),
+            message_wait(latest_kind, latest_text, settings).seconds,
             lambda: self._queue_answer(user_id),
         )
 

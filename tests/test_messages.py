@@ -96,7 +96,7 @@ def test_the_wait_is_the_admins_message_wait_setting(
     connect_telegram(client, auth_verifier, chat_channel)
     change_settings(client, admin, {"message_wait_seconds": 7})
 
-    post_texts(client, "hey", "you there?")
+    post_texts(client, "hey", "you up")
 
     [first_wait, second_wait] = [
         wait for wait in timer.waits if wait[0].startswith(MESSAGE_WAIT_PREFIX)

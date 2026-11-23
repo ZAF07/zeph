@@ -33,6 +33,22 @@ function seeded(value: SettingValue, hint = "") {
 const settings: AdminSettings = {
   conversation_quiet_gap_minutes: seeded(60),
   message_wait_seconds: seeded(4),
+  message_wait_finished_seconds: seeded(
+    2,
+    "Seconds Zeph waits for more when the User’s last text reads finished.",
+  ),
+  message_wait_trailing_seconds: seeded(
+    12,
+    "Seconds Zeph waits for more when the User’s last text ends unfinished.",
+  ),
+  message_wait_long_text_words: seeded(
+    15,
+    "How many words a text needs to read finished.",
+  ),
+  message_wait_trailing_words: seeded(
+    ["and", "so", "ok so"],
+    "Words that make a text trail off when they end it.",
+  ),
   typing_repeat_seconds: seeded(4),
   web_search_daily_limit: seeded(10),
   check_in_ignore_threshold: seeded(3),
@@ -471,6 +487,74 @@ describe("PlatformSettingsForm", () => {
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       message_wait_seconds: 6,
     });
+  });
+
+  it("shows and saves the finished and trailing waits and the long text, with hints", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const finished = await screen.findByLabelText("Wait after a finished text");
+    const trailing = screen.getByLabelText("Wait after a trailing text");
+    const longText = screen.getByLabelText("Long text");
+    const conversations = screen.getByRole("region", { name: "Conversations" });
+    expect(finished).toHaveValue(2);
+    expect(trailing).toHaveValue(12);
+    expect(longText).toHaveValue(15);
+    for (const field of [finished, trailing, longText]) {
+      expect(conversations).toContainElement(field);
+    }
+    expect(
+      screen.getByText(
+        "Seconds Zeph waits for more when the User’s last text ends unfinished.",
+      ),
+    ).toBeVisible();
+
+    await user.clear(finished);
+    await user.type(finished, "3");
+    await user.clear(trailing);
+    await user.type(trailing, "20");
+    await user.clear(longText);
+    await user.type(longText, "10");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      message_wait_finished_seconds: 3,
+      message_wait_trailing_seconds: 20,
+      message_wait_long_text_words: 10,
+    });
+  });
+
+  it("shows the trailing words with commas and saves them as a list", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const words = await screen.findByLabelText(/Trailing words/);
+    expect(words).toHaveValue("and, so, ok so");
+    expect(
+      screen.getByRole("region", { name: "Conversations" }),
+    ).toContainElement(words);
+    expect(
+      screen.getByText("Words that make a text trail off when they end it."),
+    ).toBeVisible();
+
+    await user.clear(words);
+    await user.type(words, "and, hmm , lol,");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      message_wait_trailing_words: ["and", "hmm", "lol"],
+    });
+  });
+
+  it("won't save an empty trailing words list", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const words = await screen.findByLabelText(/Trailing words/);
+
+    await user.clear(words);
+    await user.type(words, " , ");
+
+    expect(
+      screen.getByRole("button", { name: "Save settings" }),
+    ).toBeDisabled();
   });
 
   it("shows and saves the Recent Messages in its Conversations section", async () => {

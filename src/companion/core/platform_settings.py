@@ -193,6 +193,16 @@ STICKER_ADDING_QUIET_GAP = Setting("sticker_adding_quiet_gap_minutes", read_minu
 ONBOARDING_REASON_CHOICES = Setting("onboarding_reason_choices", read_text_list)
 CONVERSATION_QUIET_GAP = Setting("conversation_quiet_gap_minutes", read_minutes)
 MESSAGE_WAIT_SECONDS = Setting("message_wait_seconds", read_whole_number)
+MESSAGE_WAIT_FINISHED_SECONDS = Setting(
+    "message_wait_finished_seconds", read_whole_number
+)
+MESSAGE_WAIT_TRAILING_SECONDS = Setting(
+    "message_wait_trailing_seconds", read_whole_number
+)
+MESSAGE_WAIT_LONG_TEXT_WORDS = Setting(
+    "message_wait_long_text_words", read_whole_number
+)
+MESSAGE_WAIT_TRAILING_WORDS = Setting("message_wait_trailing_words", read_text_list)
 TYPING_REPEAT_SECONDS = Setting("typing_repeat_seconds", read_whole_number)
 MESSAGE_RETENTION_DAYS = Setting("message_retention_days", read_whole_number)
 RECENT_MESSAGES_HOURS = Setting("recent_messages_hours", read_whole_number)
@@ -380,6 +390,7 @@ class SettingKind(StrEnum):
     MODEL = "model"
     ON_OFF = "on_off"
     HOURS_BY_FREQUENCY = "hours_by_frequency"
+    TEXT_LIST = "text_list"
 
 
 @dataclass(frozen=True)
@@ -1278,14 +1289,61 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         ),
     ),
     EditableSetting(
+        MESSAGE_WAIT_FINISHED_SECONDS.key,
+        "Wait after a finished text",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=60,
+        hint=(
+            "Seconds Zeph waits for more when the User’s last text reads finished "
+            "(a question, or a long text ending in a full stop, “!” or an emoji). "
+            "Shorter means quicker replies, with more chance of cutting the User off."
+        ),
+    ),
+    EditableSetting(
+        MESSAGE_WAIT_TRAILING_SECONDS.key,
+        "Wait after a trailing text",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=60,
+        hint=(
+            "Seconds Zeph waits for more when the User’s last text ends unfinished "
+            "(“and…”, “so”, “wait”, a photo with no caption). Longer means fewer "
+            "cut-offs but slower replies."
+        ),
+    ),
+    EditableSetting(
         MESSAGE_WAIT_SECONDS.key,
         "Message wait",
         SettingKind.WHOLE_NUMBER,
-        minimum=1,
-        maximum=30,
+        minimum=0,
+        maximum=60,
         hint=(
-            "Seconds Zeph waits after a User’s last text or photo before the reply "
-            "starts, so it answers everything they sent in one reply."
+            "Seconds Zeph waits for more when the User’s last text reads neither "
+            "finished nor trailing, or is a sticker. Longer gathers more texts into "
+            "one reply but makes every reply slower."
+        ),
+    ),
+    EditableSetting(
+        MESSAGE_WAIT_LONG_TEXT_WORDS.key,
+        "Long text",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=100,
+        hint=(
+            "How many words a text ending in a full stop, “!” or an emoji needs to "
+            "read finished and get the short wait. Fewer words means more texts are "
+            "answered quickly."
+        ),
+    ),
+    EditableSetting(
+        MESSAGE_WAIT_TRAILING_WORDS.key,
+        "Trailing words",
+        SettingKind.TEXT_LIST,
+        hint=(
+            "Words that make a text trail off when they end it, and short openers "
+            "(“ok so”, “hmm”) that do when sent alone, separated by commas. Adding "
+            "a word makes Zeph wait longer after texts that end with it."
         ),
     ),
     EditableSetting(
@@ -1644,6 +1702,28 @@ class InvalidSettingError(InvalidError):
     """Raised when a setting change is not allowed or its value is not valid."""
 
 
+def checked_text_list(setting: EditableSetting, value: Any) -> list[str]:
+    """Check a new list of words, trimming and lower-casing each.
+
+    Args:
+        setting: The list setting.
+        value: The new value.
+
+    Returns:
+        The words, trimmed and lower-cased, with blank ones left out.
+
+    Raises:
+        InvalidSettingError: If the value is not a list of texts, or has no
+            words in it.
+    """
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise InvalidSettingError(f"The {setting.label} must be a list of words.")
+    words = [item.strip().lower() for item in value if item.strip()]
+    if not words:
+        raise InvalidSettingError(f"The {setting.label} needs at least one word.")
+    return words
+
+
 class PlatformSettingsService:
     """Lets Admins read and change the platform settings they manage.
 
@@ -1755,6 +1835,8 @@ class PlatformSettingsService:
             if not isinstance(value, bool):
                 raise InvalidSettingError(f"The {setting.label} must be on or off.")
             return value
+        if setting.kind == SettingKind.TEXT_LIST:
+            return checked_text_list(setting, value)
         if setting.kind == SettingKind.HOURS_BY_FREQUENCY:
             if not is_hours_by_frequency(value, setting.minimum, setting.maximum):
                 raise InvalidSettingError(
