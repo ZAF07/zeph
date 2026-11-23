@@ -147,19 +147,35 @@ def incoming_texts(messages: Sequence[ConversationMessage]) -> list[str]:
     ]
 
 
-def recent_incoming_texts(
+def recent_texts_to_search(
     messages: Sequence[ConversationMessage], count: int = RECENT_TEXTS_TO_SEARCH
 ) -> list[str]:
     """List the last few texts the User sent, which searches by meaning use.
+
+    A text that replies to an earlier one comes after that Replied-to Text,
+    so a reply to an old text searches on what the old text said too.
 
     Args:
         messages: The Conversation's messages, oldest first.
         count: How many of their latest texts to list.
 
     Returns:
-        Their last `count` texts, oldest first; none if `count` is 0.
+        Their last `count` texts, oldest first, each after its Replied-to
+        Text if it has one with words; none if `count` is 0.
     """
-    return incoming_texts(messages)[-count:] if count > 0 else []
+    if count < 1:
+        return []
+    recent = [
+        message
+        for message in messages
+        if message.direction == MessageDirection.INCOMING and message.content
+    ][-count:]
+    texts: list[str] = []
+    for message in recent:
+        if message.replied_to is not None and message.replied_to.text:
+            texts.append(message.replied_to.text)
+        texts.append(message.content)
+    return texts
 
 
 def threads_in_mind(
@@ -433,7 +449,7 @@ class ThreadReminder:
         life_thread_repository = self._repositories.life_threads
         limit = settings.get(LIFE_THREADS_PER_REPLY)
         messages = self._repositories.conversations.list_messages(conversation_id)
-        recent_texts = recent_incoming_texts(
+        recent_texts = recent_texts_to_search(
             messages, settings.get(LIFE_THREADS_TEXTS_TO_SEARCH)
         )
         found = (

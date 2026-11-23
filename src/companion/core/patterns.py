@@ -11,7 +11,7 @@ from companion.core.life_threads import (
     describe_thread,
     incoming_texts,
     read_text,
-    recent_incoming_texts,
+    recent_texts_to_search,
 )
 from companion.core.memory_retrieval import format_calendar_day, format_day
 from companion.core.models import (
@@ -593,7 +593,7 @@ class PatternReminder:
             search on or it can't be embedded.
         """
         settings = snapshot.settings
-        texts = recent_incoming_texts(
+        texts = recent_texts_to_search(
             self._repositories.conversations.list_messages(conversation_id),
             settings.get(LIFE_THREADS_TEXTS_TO_SEARCH),
         )

@@ -8,22 +8,28 @@ from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
     FakeClock,
+    FakeEmbedder,
     FakeScheduler,
     ScriptedChatModel,
+    understanding_answer,
 )
 from tests.telegram_helpers import (
     OWNER_TELEGRAM_USER_ID,
+    TELEGRAM_CHAT_ID,
     auth_headers,
     connect_owner_telegram,
     connect_telegram,
+    owner_headers,
     post_to_webhook,
     send_to_webhook,
     telegram_reply_update,
     telegram_text_update,
 )
+from tests.test_life_threads import end_conversation, new_thread, reply_plan_sees
 from tests.test_model_call_log import newest_call
 from tests.test_post_conversation import processing_answer, quiet_gap
 from tests.test_recent_messages import given_text, newest_reply_steps
+from tests.test_safeguard import use_simple_crisis_reply
 
 QUESTION = "have you told your mum about the job yet?"
 ANSWER = "not yet, scared tbh"
@@ -254,3 +260,99 @@ def test_delete_my_data_removes_the_replied_to_text_with_the_text(
 
     assert response.status_code == 204
     assert replied_to_texts_kept(engine) == 0
+
+
+def test_the_safeguard_reads_a_text_with_its_replied_to_text(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script("oh, that's a lot to carry")
+
+    send_to_webhook(client, telegram_reply_update(ANSWER, {"text": QUESTION}))
+
+    assert chat_model.safeguard_calls[-1].history[0].text == (
+        f"Latest message to classify:\nPerson: {SEEN_AS_REPLY} {ANSWER}"
+    )
+
+
+def test_yes_as_a_reply_to_zephs_self_harm_question_gets_the_crisis_reply(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+) -> None:
+    use_simple_crisis_reply(client, owner_headers(client, auth_verifier))
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script_safeguard("suicide_or_self_harm")
+    question = "are you thinking about hurting yourself?"
+
+    send_to_webhook(client, telegram_reply_update("yes", {"text": question}))
+
+    assert f'"{question}") yes' in chat_model.safeguard_calls[-1].history[0].text
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID)[-1].startswith(
+        "I'm an AI. Please reach out:"
+    )
+    assert chat_model.calls == []
+
+
+def test_recall_searches_with_the_replied_to_text(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    embedder: FakeEmbedder,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script("oh, that's a lot to carry")
+
+    send_to_webhook(client, telegram_reply_update(ANSWER, {"text": QUESTION}))
+
+    searches = [query for query in embedder.queries if ANSWER in query]
+    assert searches
+    assert all(f"{QUESTION}\n{ANSWER}" in query for query in searches)
+
+
+def test_a_thread_close_only_to_the_replied_to_text_comes_to_mind(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    end_conversation(
+        client,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        "training is going badly",
+        [
+            new_thread(
+                title="Marathon training",
+                story="Knee pain during long runs.",
+                people=("Berlin",),
+            )
+        ],
+    )
+    clock.advance(timedelta(days=30))
+    hurts = understanding_answer(means="It hurts.")
+    chat_model.script_understanding(hurts, hurts)
+
+    plain = reply_plan_sees(client, chat_model, "ugh")
+    chat_model.script("oh no")
+    send_to_webhook(
+        client,
+        telegram_reply_update(
+            "ugh", {"text": "how's the knee pain during long runs?"}, message_id=12
+        ),
+    )
+    replied = chat_model.reply_plan_calls[-1].history[0].text
+
+    assert "Marathon training" not in plain
+    assert "Marathon training" in replied
