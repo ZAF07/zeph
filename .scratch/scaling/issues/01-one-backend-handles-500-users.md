@@ -1,6 +1,6 @@
 # 01 — One backend handles 500 Users
 
-Status: needs-triage
+Status: blocked
 
 ## Why
 
@@ -13,7 +13,7 @@ Design decided in ADR-0018. Running 2+ backends is parked in issue 02.
 
 ## Next
 
-PRD written: `.scratch/scaling/PRD.md`. Issues: 03 (load test and baseline) and 04 (per-User queue), which can run in parallel. The tick speed-up stays in `.scratch/check-in-job/`; this work only measures it.
+Blocked by the tick speed-up in `.scratch/check-in-job/` (mainly issue 05, Check-in model calls side by side). Close this once the full load test (100 due Check-ins and 100 ended Conversations) passes with the tick under 60s.
 
 ## Comments
 
@@ -29,3 +29,10 @@ PRD written: `.scratch/scaling/PRD.md`. Issues: 03 (load test and baseline) and 
 - Load test fakes only the chat model (sleeps 3–8s) and Telegram sending. Postgres, the local embedder, the pools and the webhook endpoint stay real. Runs on the worktree's stack.
 - Order: (1) `make load-test` plus a baseline run on today's code, (2) per-User queue plus message pool, (3) parallel tick items. Rerun after each slice and record the numbers here. Skip any fix the baseline shows isn't needed.
 - Decision recorded in ADR-0018. Next: `/to-prd` then `/to-issues`.
+
+### 23 Nov 2026 — triage, blocked on the tick
+
+- Done: 03 (load test and baseline) and 04 (per-User queue plus message pool), both archived.
+- Load test, before 04 → after 04: Dashboard API worst 20.01s (fail) → 0.33s (pass); webhook worst 18.32s → 1.04s; 320/320 texts answered, 0 failed replies, 0 DB timeouts; reply median 42.6s → 40.5s.
+- Not done: the tick. 340.6s for 10 due Check-ins and 10 ended Conversations (run with `--tick-users 10`), against a target of under 60s for 100 + 100. That work lives in `.scratch/check-in-job/` issues 01–06, none finished yet.
+- Status set to `blocked` until the tick meets the bar.
