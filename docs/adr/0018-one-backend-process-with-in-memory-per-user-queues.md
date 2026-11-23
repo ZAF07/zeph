@@ -16,5 +16,6 @@ We chose this because nearly all the work waits on the model or Telegram, so one
 - **A restart or deploy drops messages not yet answered**, and the User gets no reply to them. If Users report lost messages or the platform gets slow, look here first.
 - Live replies come before tick work. A large tick makes Check-ins late, not double.
 - Running a second backend process is still unsafe: the reply locks, the queue, sticker adding mode, typing and the scheduler all live in memory.
-- Each User has two in-memory locks: one checks their texts one at a time, the other writes their replies one at a time. A text is checked even while a reply is being written, and can drop that reply until any of it is sent (message pipeline issue 03).
+- Each User has two lines on the queue (built 23 Nov 2026, scaling issue 04, replacing two per-User locks): one handles what they send, one message at a time, and the other writes their replies one at a time. So a heavy texter holds at most two threads. A text is checked even while a reply is being written, and can drop that reply until any of it is sent (message pipeline issue 03). A message counts as not yet handled from when it arrives, so a reply waits for texts still in line.
+- The message pool size is `MESSAGE_POOL_SIZE` (default 50). The webhook only looks up the sender's Telegram Connection and adds the message to the queue.
 - `make load-test` (fake model and Telegram; real Postgres and embedder) is how we check that the sizing holds.
