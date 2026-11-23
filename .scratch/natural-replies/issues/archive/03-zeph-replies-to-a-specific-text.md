@@ -6,7 +6,7 @@ Blocked by: None - can start immediately
 
 ## Parent
 
-`.scratch/natural-replies/PRD.md`
+`.scratch/natural-replies/archive/PRD.md`
 
 ## What to build
 
