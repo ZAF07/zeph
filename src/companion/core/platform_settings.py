@@ -759,6 +759,7 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
             "How the Reply Plan weighs what a reply could do. It runs after the "
             "Understanding, and the Reply follows what it picks."
         ),
+        max_length=40_000,
     ),
     EditableSetting(
         REPLY_PLAN_MODEL.key,
