@@ -40,7 +40,7 @@ from companion.core.transcripts import readable_content
 from companion.core.usage import UsageRecordingChatModel
 
 BLANK_LINE = re.compile(r"\n\s*\n")
-REPLY_TO_TEXT_MARKER = re.compile(r"^\[re\s*(\d+)\]\s*", re.IGNORECASE)
+REPLY_TO_TEXT_MARKER = re.compile(r"^\[\s*re\s*(\d+)\s*\]\s*", re.IGNORECASE)
 MOST_REPLIES_TO_TEXTS = 2
 PRIORITY_ORDER = (
     "Everything below is in order of priority. When two things clash, the "
@@ -115,10 +115,10 @@ def link_to_texts(
     """Turn parts that start with a marker like "[re 2]" into replies to that text.
 
     The number is a text of the Message being answered, counted from 1.
-    Only the first `MOST_REPLIES_TO_TEXTS` markers that name a text of the
-    Message with a known chat channel ID become replies; any other marker
-    is dropped and its part sent on its own. A part that was only a marker
-    is left out.
+    Only the first `MOST_REPLIES_TO_TEXTS` markers that name an earlier
+    text of the Message, not its latest, with a known chat channel ID
+    become replies; any other marker is dropped and its part sent on its
+    own. A part that was only a marker is left out.
 
     Args:
         parts: The reply's short texts, in order.
@@ -127,23 +127,20 @@ def link_to_texts(
     Returns:
         The parts with the markers taken out, each with the ID it replies to.
     """
+    earlier_texts = message_texts[:-1]
     linked: list[ReplyPart] = []
-    replies = 0
+    replies_used = 0
     for part in parts:
         marker = REPLY_TO_TEXT_MARKER.match(part)
         if marker is None:
             linked.append(ReplyPart(part))
             continue
         number = int(marker.group(1))
-        replied_to = (
-            message_texts[number - 1].chat_message_id
-            if 1 <= number <= len(message_texts)
-            else None
-        )
-        if replies == MOST_REPLIES_TO_TEXTS:
-            replied_to = None
+        replied_to = None
+        if 1 <= number <= len(earlier_texts) and replies_used < MOST_REPLIES_TO_TEXTS:
+            replied_to = earlier_texts[number - 1].chat_message_id
         if replied_to is not None:
-            replies += 1
+            replies_used += 1
         text = part[marker.end() :]
         if text:
             linked.append(ReplyPart(text, replied_to))
