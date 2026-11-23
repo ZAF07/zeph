@@ -4,11 +4,13 @@ from typing import Any
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
+from companion.core.models import PhotoImage
 from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
     FakeClock,
     FakeEmbedder,
+    FakePhotoViewer,
     FakeScheduler,
     ScriptedChatModel,
     understanding_answer,
@@ -22,11 +24,13 @@ from tests.telegram_helpers import (
     owner_headers,
     post_to_webhook,
     send_to_webhook,
+    telegram_photo_update,
     telegram_reply_update,
     telegram_text_update,
 )
 from tests.test_life_threads import end_conversation, new_thread, reply_plan_sees
 from tests.test_model_call_log import newest_call
+from tests.test_photos import CAT
 from tests.test_post_conversation import processing_answer, quiet_gap
 from tests.test_recent_messages import given_text, newest_reply_steps
 from tests.test_safeguard import use_simple_crisis_reply
@@ -278,6 +282,33 @@ def test_the_safeguard_reads_a_text_with_its_replied_to_text(
     )
 
 
+def test_the_safeguard_reads_a_photo_with_its_replied_to_text(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    photo_viewer: FakePhotoViewer,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_channel.photos["file-photo-cat"] = PhotoImage(
+        content=b"cat-jpeg", media_type="image/jpeg"
+    )
+    photo_viewer.script(CAT)
+    update = telegram_photo_update("him again")
+    update["message"]["reply_to_message"] = telegram_reply_update(
+        "", {"text": QUESTION}
+    )["message"]["reply_to_message"]
+    chat_model.script("aw")
+
+    send_to_webhook(client, update)
+
+    assert (
+        chat_model.safeguard_calls[-1]
+        .history[0]
+        .text.endswith(f"Person: {SEEN_AS_REPLY} [photo: {CAT}] him again")
+    )
+
+
 def test_yes_as_a_reply_to_zephs_self_harm_question_gets_the_crisis_reply(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
@@ -356,3 +387,24 @@ def test_a_thread_close_only_to_the_replied_to_text_comes_to_mind(
 
     assert "Marathon training" not in plain
     assert "Marathon training" in replied
+
+
+def test_texts_with_no_replied_to_words_are_searched_as_today(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    embedder: FakeEmbedder,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    photo = [{"file_id": "file-cat", "file_unique_id": "cat", "width": 9}]
+    chat_model.script("oh?")
+
+    post_to_webhook(client, telegram_text_update("anyway"))
+    send_to_webhook(
+        client, telegram_reply_update("and this", {"photo": photo}, message_id=12)
+    )
+
+    searches = [query for query in embedder.queries if "anyway" in query]
+    assert searches
+    assert all(query.endswith("anyway\nand this") for query in searches)

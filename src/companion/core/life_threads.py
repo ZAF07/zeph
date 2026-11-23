@@ -131,6 +131,24 @@ def name_phrases(texts: Sequence[str]) -> list[str]:
     return list(phrases)
 
 
+def incoming_messages(
+    messages: Sequence[ConversationMessage],
+) -> list[ConversationMessage]:
+    """List the User's messages that have text, oldest first.
+
+    Args:
+        messages: The Conversation's messages, oldest first.
+
+    Returns:
+        The User's messages with non-empty content.
+    """
+    return [
+        message
+        for message in messages
+        if message.direction == MessageDirection.INCOMING and message.content
+    ]
+
+
 def incoming_texts(messages: Sequence[ConversationMessage]) -> list[str]:
     """List the texts the User sent, oldest first.
 
@@ -140,17 +158,13 @@ def incoming_texts(messages: Sequence[ConversationMessage]) -> list[str]:
     Returns:
         The texts of the User's messages.
     """
-    return [
-        message.content
-        for message in messages
-        if message.direction == MessageDirection.INCOMING and message.content
-    ]
+    return [message.content for message in incoming_messages(messages)]
 
 
 def recent_texts_to_search(
     messages: Sequence[ConversationMessage], count: int = RECENT_TEXTS_TO_SEARCH
 ) -> list[str]:
-    """List the last few texts the User sent, which searches by meaning use.
+    """List the User's last few texts and what they reply to, to search on.
 
     A text that replies to an earlier one comes after that Replied-to Text,
     so a reply to an old text searches on what the old text said too.
@@ -165,13 +179,8 @@ def recent_texts_to_search(
     """
     if count < 1:
         return []
-    recent = [
-        message
-        for message in messages
-        if message.direction == MessageDirection.INCOMING and message.content
-    ][-count:]
     texts: list[str] = []
-    for message in recent:
+    for message in incoming_messages(messages)[-count:]:
         if message.replied_to is not None and message.replied_to.text:
             texts.append(message.replied_to.text)
         texts.append(message.content)
