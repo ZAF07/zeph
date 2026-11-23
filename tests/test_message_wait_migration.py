@@ -140,18 +140,60 @@ def yaml_trailing_words() -> list[str]:
     return words
 
 
-def test_an_install_from_before_the_cap_gets_the_wait_cap_and_keeps_its_waits(
-    engine: Engine, database_url: str
-) -> None:
+def remove_wait_cap(engine: Engine) -> None:
+    """Remove the wait cap, as on an install from before it existed."""
     with engine.begin() as connection:
         connection.execute(
             text("DELETE FROM platform_settings WHERE key = 'message_wait_cap_seconds'")
         )
-    store_message_wait(engine, 9)
-    migrate(database_url)
+
+
+def store_trailing_wait(engine: Engine, seconds: int) -> None:
+    """Store the trailing wait, as an Admin would have."""
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE platform_settings SET value = to_jsonb(CAST(:seconds AS int)) "
+                "WHERE key = 'message_wait_trailing_seconds'"
+            ),
+            {"seconds": seconds},
+        )
+
+
+def stored_wait_cap(engine: Engine) -> object:
+    """Read the stored wait cap."""
+    return stored_settings(engine, ("message_wait_cap_seconds",)).get(
+        "message_wait_cap_seconds"
+    )
+
+
+def test_the_cap_migration_adds_a_cap_of_twenty_seconds_and_keeps_the_waits(
+    engine: Engine, database_url: str
+) -> None:
+    downgrade_to(database_url, "0075")
+    try:
+        remove_wait_cap(engine)
+        store_message_wait(engine, 9)
+    finally:
+        migrate(database_url)
     seed_platform_settings(engine, SEED_FILE)
 
-    assert stored_settings(engine, ("message_wait_cap_seconds",)) == {
-        "message_wait_cap_seconds": 20
-    }
+    assert stored_wait_cap(engine) == 20
     assert stored_message_wait(engine) == 9
+
+
+def test_the_cap_migration_raises_the_cap_to_an_admins_longer_wait(
+    engine: Engine, database_url: str
+) -> None:
+    downgrade_to(database_url, "0075")
+    try:
+        remove_wait_cap(engine)
+        store_trailing_wait(engine, 25)
+    finally:
+        migrate(database_url)
+    seed_platform_settings(engine, SEED_FILE)
+
+    assert stored_wait_cap(engine) == 25
+    assert stored_settings(engine, ("message_wait_trailing_seconds",)) == {
+        "message_wait_trailing_seconds": 25
+    }

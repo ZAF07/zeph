@@ -377,12 +377,7 @@ class IncomingMessageHandler:
         """
         self._start_over_reply_being_written(user_id)
         with self._pending_messages_guard:
-            pending = self._pending_messages.setdefault(
-                user_id,
-                PendingMessage(
-                    chat_id=message.chat_id, first_text_at=self._clock.now()
-                ),
-            )
+            pending = self._pending_message(user_id, message.chat_id)
             pending.album_items.append(message)
             album_items = [
                 item
@@ -419,12 +414,7 @@ class IncomingMessageHandler:
             message.chat_id, settings.get(TYPING_REPEAT_SECONDS)
         )
         with self._pending_messages_guard:
-            trace = self._pending_messages.setdefault(
-                user_id,
-                PendingMessage(
-                    chat_id=message.chat_id, first_text_at=self._clock.now()
-                ),
-            ).trace
+            trace = self._pending_message(user_id, message.chat_id).trace
         try:
             snapshot = self._user_snapshots.load(user_id, settings, trace)
             text = self._text_to_screen(snapshot, message)
@@ -440,16 +430,29 @@ class IncomingMessageHandler:
             self._drop_pending_message(user_id)
             return
         with self._pending_messages_guard:
-            pending = self._pending_messages.setdefault(
-                user_id,
-                PendingMessage(
-                    chat_id=message.chat_id, first_text_at=self._clock.now()
-                ),
-            )
+            pending = self._pending_message(user_id, message.chat_id)
             pending.add_screened(result.conversation_id, text.text)
         self._restart_wait(
             user_id, pending.first_text_at, settings, message.kind, message.text
         )
+
+    def _pending_message(self, user_id: UUID, chat_id: int) -> PendingMessage:
+        """Find the User's Message waiting to be answered, or start one now.
+
+        Only call it under the guard.
+
+        Args:
+            user_id: The User.
+            chat_id: The chat to reply in, if a Message is started.
+
+        Returns:
+            The Message; a new one counts the wait cap from now.
+        """
+        pending = self._pending_messages.get(user_id)
+        if pending is None:
+            pending = PendingMessage(chat_id=chat_id, first_text_at=self._clock.now())
+            self._pending_messages[user_id] = pending
+        return pending
 
     def _finish_handling(self, user_id: UUID) -> None:
         """Count one of the User's messages as handled.

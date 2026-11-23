@@ -210,6 +210,11 @@ MESSAGE_WAIT_LONG_TEXT_WORDS = Setting(
     "message_wait_long_text_words", read_whole_number
 )
 MESSAGE_WAIT_TRAILING_WORDS = Setting("message_wait_trailing_words", read_text_list)
+MESSAGE_WAITS = (
+    MESSAGE_WAIT_FINISHED_SECONDS,
+    MESSAGE_WAIT_TRAILING_SECONDS,
+    MESSAGE_WAIT_SECONDS,
+)
 TYPING_REPEAT_SECONDS = Setting("typing_repeat_seconds", read_whole_number)
 MESSAGE_RETENTION_DAYS = Setting("message_retention_days", read_whole_number)
 RECENT_MESSAGES_HOURS = Setting("recent_messages_hours", read_whole_number)
@@ -1742,13 +1747,6 @@ def checked_text_list(setting: EditableSetting, value: Any) -> list[str]:
     if not words:
         raise InvalidSettingError(f"The {setting.label} needs at least one word.")
     return words
-
-
-MESSAGE_WAITS = (
-    MESSAGE_WAIT_FINISHED_SECONDS,
-    MESSAGE_WAIT_TRAILING_SECONDS,
-    MESSAGE_WAIT_SECONDS,
-)
 
 
 def check_waits_fit_under_the_cap(
