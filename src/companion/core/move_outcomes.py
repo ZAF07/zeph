@@ -161,7 +161,7 @@ def describe_moves_to_judge(
         f"Today: {format_day(now, time_zone)}\n\n"
         f"Moves Zeph made:\n{move_lines}\n\n"
         f"How Zeph read each message:\n{read_lines}\n\n"
-        f"The Conversation:\n{to_transcript_lines(messages)}"
+        f"The Conversation:\n{to_transcript_lines(messages, time_zone)}"
     )
 
 

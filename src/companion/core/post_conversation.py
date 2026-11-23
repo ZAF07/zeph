@@ -356,7 +356,7 @@ def describe_earlier_conversations(
     return (
         "\n\n".join(
             f"From {format_time(conversation.started_at, time_zone)}:\n"
-            f"{to_transcript_lines(conversation.messages)}"
+            f"{to_transcript_lines(conversation.messages, time_zone)}"
             for conversation in earlier
         )
         or "None."
@@ -370,6 +370,7 @@ def describe_conversation(
     photos_by_number: dict[int, SentPhoto],
     moods: str,
     earlier_today: str,
+    time_zone: str | None,
 ) -> str:
     """Write what the post-conversation processing model is given.
 
@@ -383,6 +384,8 @@ def describe_conversation(
             from `describe_moods`.
         earlier_today: The day's earlier Conversations, from
             `describe_earlier_conversations`.
+        time_zone: The User's IANA time zone, for when a Replied-to Text was
+            sent.
 
     Returns:
         The Memory Categories new items may go in, what is already
@@ -410,7 +413,7 @@ def describe_conversation(
         f"How Zeph read their mood at each message today:\n"
         f"{moods or 'Not read.'}\n\n"
         f"Earlier today, for the Day Summary only:\n{earlier_today}\n\n"
-        f"The Conversation that just ended:\n{to_transcript_lines(messages)}"
+        f"The Conversation that just ended:\n{to_transcript_lines(messages, time_zone)}"
     )
 
 
@@ -483,6 +486,7 @@ class DayMemoryWriter:
                 photos_by_number,
                 moods,
                 earlier_today,
+                snapshot.user.time_zone,
             ),
         )
         if answer is None:

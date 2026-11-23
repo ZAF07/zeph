@@ -207,11 +207,14 @@ def describe_numbered_threads(
     )
 
 
-def describe_days_behind_evidence(days: Sequence[DayBehindEvidence]) -> str:
+def describe_days_behind_evidence(
+    days: Sequence[DayBehindEvidence], time_zone: str | None
+) -> str:
     """Write the days behind the evidence, each as messages or its Day Summary.
 
     Args:
         days: The days, newest first.
+        time_zone: The User's IANA time zone, for the days.
 
     Returns:
         One block per day; "None." if there are none.
@@ -220,9 +223,8 @@ def describe_days_behind_evidence(days: Sequence[DayBehindEvidence]) -> str:
     for day in days:
         heading = format_calendar_day(day.day)
         if day.messages:
-            blocks.append(
-                f"{heading}, the messages:\n{to_transcript_lines(day.messages)}"
-            )
+            transcript = to_transcript_lines(day.messages, time_zone)
+            blocks.append(f"{heading}, the messages:\n{transcript}")
         elif day.summary is not None:
             blocks.append(f"{heading}, the Day Summary:\n{day.summary.summary}")
     return "\n\n".join(blocks) or "None."
@@ -265,14 +267,15 @@ def describe_patterns_to_keep(
     )
     touched_lines = describe_numbered_threads(touched, time_zone)
     closest_lines = describe_numbered_threads(closest, time_zone)
+    evidence_days = describe_days_behind_evidence(days, time_zone)
     return (
         f"Today: {format_day(now, time_zone)}\n\n"
         f"Life Threads this Conversation touched:\n{touched_lines}\n\n"
         f"Their other Life Threads closest in meaning:\n{closest_lines}\n\n"
         f"Patterns kept so far:\n{pattern_lines or 'None yet.'}\n\n"
-        f"The days behind that evidence:\n{describe_days_behind_evidence(days)}\n\n"
+        f"The days behind that evidence:\n{evidence_days}\n\n"
         f"The Conversation, on {format_calendar_day(conversation_day)}:\n"
-        f"{to_transcript_lines(messages)}"
+        f"{to_transcript_lines(messages, time_zone)}"
     )
 
 

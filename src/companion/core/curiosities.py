@@ -625,7 +625,7 @@ def describe_curiosities_to_keep(
         f"{curiosity_lines or 'None yet.'}\n\n"
         f"Asked recently, don't ask again:\n{recent_lines or 'Nothing yet.'}\n\n"
         f"A next Move Zeph had in mind but never made:\n{unmade_next_move}\n\n"
-        f"The Conversation:\n{to_transcript_lines(messages)}"
+        f"The Conversation:\n{to_transcript_lines(messages, time_zone)}"
     )
 
 

@@ -35,7 +35,7 @@ CONVERSATION = [
 
 
 def test_the_users_texts_in_a_row_are_one_line_of_chat_history() -> None:
-    assert to_chat_history(CONVERSATION) == [
+    assert to_chat_history(CONVERSATION, None) == [
         ChatLine(role=ChatRole.USER, text="morning"),
         ChatLine(role=ChatRole.COMPANION, text="morning! how'd you sleep?"),
         ChatLine(role=ChatRole.USER, text="badly\nbig day today"),

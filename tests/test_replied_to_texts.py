@@ -28,7 +28,12 @@ from tests.telegram_helpers import (
     telegram_reply_update,
     telegram_text_update,
 )
-from tests.test_life_threads import end_conversation, new_thread, reply_plan_sees
+from tests.test_life_threads import (
+    end_conversation,
+    new_thread,
+    reply_plan_sees,
+    thread_keeping_answer,
+)
 from tests.test_model_call_log import newest_call
 from tests.test_photos import CAT
 from tests.test_post_conversation import processing_answer, quiet_gap
@@ -39,6 +44,7 @@ QUESTION = "have you told your mum about the job yet?"
 ANSWER = "not yet, scared tbh"
 SEEN_AS_REPLY = f'(replying to the Companion\'s text from 3 Nov 2025, "{QUESTION}")'
 REPLY_SEES = f'(replying to your text from 3 Nov 2025, "{QUESTION}") {ANSWER}'
+NEAR_UTC_MIDNIGHT = 1762212600
 
 
 def replied_to_texts_kept(engine: Engine) -> int:
@@ -431,3 +437,31 @@ def test_the_reply_is_told_not_to_describe_a_replied_to_photo_it_cant_see(
     reply = newest_reply_steps(chat_model)[-1]
     assert "photo or sticker you can't see" in reply.instructions
     assert "Go by its caption and what they say, or ask" in reply.instructions
+
+
+def test_conversation_end_steps_show_the_replied_to_day_in_the_users_time_zone(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    headers = auth_headers(auth_verifier, "user_maya")
+    client.patch("/api/me", json={"time_zone": "Asia/Singapore"}, headers=headers)
+    chat_model.script("oh, that's a lot to carry")
+
+    send_to_webhook(
+        client,
+        telegram_reply_update(ANSWER, {"text": QUESTION}, replied_at=NEAR_UTC_MIDNIGHT),
+    )
+    clock.advance(quiet_gap(seeded_settings) + timedelta(minutes=1))
+    chat_model.script_processing(processing_answer())
+    chat_model.script_thread_keeping(thread_keeping_answer([]))
+    scheduler.tick()
+
+    singapore_day = f'(replying to the Companion\'s text from 4 Nov 2025, "{QUESTION}")'
+    for call in (chat_model.processing_calls[-1], chat_model.thread_keeping_calls[-1]):
+        assert f"Person: {singapore_day} {ANSWER}" in given_text(call)
