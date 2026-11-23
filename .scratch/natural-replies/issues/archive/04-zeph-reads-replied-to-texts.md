@@ -64,4 +64,4 @@ Decisions and caveats:
 ## Completion
 
 - Completed: 2026-11-23
-- Commit: <to be filled in after merge>
+- Commit: 05d0766 (merge of 8783ec2 "Natural replies 04: Zeph reads Replied-to Texts", f99ce41 "Natural replies 04: review fixes", bc5c82e "updated tasks status")
