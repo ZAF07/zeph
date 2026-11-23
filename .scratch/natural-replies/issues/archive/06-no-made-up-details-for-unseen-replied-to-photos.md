@@ -45,4 +45,4 @@ None - can start immediately.
 ## Completion
 
 - Completed: 2026-11-24
-- Commit: <to be filled in after merge>
+- Commit: 552bfe9 (merge "Merge natural-replies-06-unseen-photos: Zeph doesn't make up details of a replied-to photo it can't see"; work in 6ba1fdd "Natural replies 06: Zeph doesn't make up details of a replied-to photo it can't see", a8c1dc7 "updated tasks status")
