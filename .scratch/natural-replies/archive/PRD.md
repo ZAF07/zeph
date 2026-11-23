@@ -1,6 +1,6 @@
 # PRD: Natural replies: Zeph answers when the User seems done, and sees what they reply to
 
-Status: ready-for-agent
+Status: completed
 
 ## Problem Statement
 
@@ -140,3 +140,8 @@ Zeph makes Users wait too long, and it misses what they point at.
 - Platform is live with real Users (since 22 Nov 2026): migrations must keep all User data and an Admin's own setting values.
 - Shorter waits mean more start-overs on long bursts, so a few more dropped model calls. That is accepted for faster replies.
 - The design is agreed in `docs/message-pipeline/README.md` (decisions 19–21) and `CONTEXT.md` (**Message**, **Replied-to Text**).
+
+## Completion
+
+- Completed: 2026-11-23, all five issues verified and archived in `.scratch/natural-replies/issues/archive/`.
+- Commits: 01 d710295, 02 a279e3f, 03 <filled in after merge>, 04 05d0766, 05 edbb74c (merges; each issue's Completion lists its work commits).
