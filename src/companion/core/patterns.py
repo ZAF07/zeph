@@ -214,7 +214,8 @@ def describe_days_behind_evidence(
 
     Args:
         days: The days, newest first.
-        time_zone: The User's IANA time zone, for the days.
+        time_zone: The User's IANA time zone, for when a Replied-to Text was
+            sent.
 
     Returns:
         One block per day; "None." if there are none.
