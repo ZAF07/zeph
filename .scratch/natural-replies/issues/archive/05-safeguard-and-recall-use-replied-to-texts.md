@@ -35,7 +35,7 @@ Blocked by: 04
 - "yes" replying to the self-harm question gets the Crisis Reply: `test_yes_as_a_reply_to_zephs_self_harm_question_gets_the_crisis_reply`. `/run` with the real Safeguard model: the reply got the Crisis Reply and a `suicide_or_self_harm` Safeguard Event; a bare "yes" got a normal reply and no event.
 - Recall searches by it and a Thread close only to it comes to mind: `test_recall_searches_with_the_replied_to_text`, `test_a_thread_close_only_to_the_replied_to_text_comes_to_mind` (both red before the change, green after). `/run` with real embeddings: "Moving out of the shared flat" was reminded in the Reply Plan for the reply, not for the same text sent plainly.
 - No Replied-to Text, checked and searched as today: `test_texts_with_no_replied_to_words_are_searched_as_today`; existing `tests/test_safeguard.py`, `tests/test_life_threads.py`, `tests/test_patterns*.py`, `tests/test_move_outcome_recall.py` pass unchanged.
-- Tests and checks: `ruff check`, `ruff format --check`, `mypy` clean; `pytest` 1576 passed.
+- Tests and checks: `ruff check`, `ruff format --check`, `mypy` clean; `pytest` 1576 passed on the branch, 1619 after rebasing on main (with issue 01).
 - `/run` in the worktree: real backend app, Postgres, embedder and chat model in the backend container; the chat channel swapped for a recording one so nothing went to Telegram.
 - Decision 20 note in `docs/message-pipeline/README.md` now says built for the Safeguard and Recall.
 
@@ -48,4 +48,4 @@ Decisions and caveats:
 ## Completion
 
 - Completed: 2026-11-23
-- Commit: <filled in after merge>
+- Commit: edbb74c (merge of 1afad3e "Natural replies 05: the Safeguard and Recall use Replied-to Texts", 4197b0b "Natural replies 05: review fixes", 77f928c "updated tasks status")
