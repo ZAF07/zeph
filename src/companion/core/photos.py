@@ -374,14 +374,10 @@ class PhotoService:
         if replied_to.photo is None:
             return RepliedToPhotoReading(replied_to)
         settings = snapshot.settings
+        not_viewed_note = settings.get(PHOTO_NOT_VIEWED_NOTE)
         description = self.describe(snapshot, replied_to.photo)
         described = (
-            replace(
-                replied_to,
-                photo_note=photo_marker(
-                    description, settings.get(PHOTO_NOT_VIEWED_NOTE)
-                ),
-            )
+            replace(replied_to, photo_note=photo_marker(description, not_viewed_note))
             if description is not None
             else replied_to
         )
@@ -390,7 +386,7 @@ class PhotoService:
                 replied_to,
                 photo_note=photo_marker(
                     None,
-                    settings.get(PHOTO_NOT_VIEWED_NOTE),
+                    not_viewed_note,
                     viewing_off_note=settings.get(PHOTO_VIEWING_OFF_NOTE),
                 ),
             )

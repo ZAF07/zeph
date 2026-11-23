@@ -429,7 +429,7 @@ class IncomingMessageHandler:
             trace = self._pending_message(user_id, message.chat_id).trace
         try:
             snapshot = self._user_snapshots.load(user_id, settings, trace)
-            text = self._with_replied_to_photo(
+            text = self._read_replied_to_photo(
                 snapshot, self._text_to_screen(snapshot, message)
             )
             result = self._reply_gate.screen(text, snapshot)
@@ -689,7 +689,7 @@ class IncomingMessageHandler:
             if album_text is None:
                 self._remove_album_items(pending, items)
                 continue
-            album_text = self._with_replied_to_photo(snapshot, album_text)
+            album_text = self._read_replied_to_photo(snapshot, album_text)
             result = self._reply_gate.screen(album_text, snapshot)
             self._remove_album_items(pending, items)
             if isinstance(result, Stopped):
@@ -838,7 +838,7 @@ class IncomingMessageHandler:
             chat_message_id=chat_message_id,
         )
 
-    def _with_replied_to_photo(
+    def _read_replied_to_photo(
         self, snapshot: UserSnapshot, text: TextToScreen
     ) -> TextToScreen:
         """Look at the photo a text replies to, if it replies to one.
