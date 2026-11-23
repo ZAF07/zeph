@@ -95,4 +95,9 @@ None - can start immediately. The last load-test criterion needs issue 03 merged
 ## Completion
 
 - Completed: 2026-11-23
-- Commits: listed after the merge into main
+- Commits (fast-forward merged into main at 99f25c9, pushed to origin/main; not merged into `production`, so not live yet):
+  - b7ab932 Issue 04: per-User work queue on its own message pool; webhook only hands off
+  - bf73272 Issue 04 review fixes: count a User's messages from arrival, faithful inline queue, contract covers failures
+  - a4520e5 Issue 04: ADR-0018 and message pipeline doc describe the per-User queue lines
+  - 99f25c9 Archive issue 04: per-User work queue verified; load test meets the bar (Dashboard API worst 0.33s, was 20s)
+- Note for going live: `MESSAGE_POOL_SIZE` is optional (default 50); the server's `.env` needs no change.
