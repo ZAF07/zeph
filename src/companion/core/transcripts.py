@@ -45,7 +45,7 @@ def replied_to_note(
 
 def readable_content(
     message: ConversationMessage,
-    time_zone: str | None = None,
+    time_zone: str | None,
     read_by_companion: bool = False,
 ) -> str:
     """Write a saved message's content with what it replies to, if anything.
@@ -66,14 +66,14 @@ def readable_content(
 
 
 def to_transcript_lines(
-    messages: list[ConversationMessage], time_zone: str | None = None
+    messages: list[ConversationMessage], time_zone: str | None
 ) -> str:
     """Write messages as transcript lines for a model to read, not answer.
 
     Args:
         messages: The messages, oldest first.
         time_zone: The User's IANA time zone, for when a Replied-to Text was
-            sent; UTC if not given.
+            sent; UTC if they have none.
 
     Returns:
         One "Person: ..." or "Companion: ..." line per message, a text's

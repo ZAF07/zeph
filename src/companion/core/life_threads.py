@@ -674,7 +674,7 @@ def describe_threads_to_keep(
         f"Today: {format_day(now, time_zone)}\n\n"
         f"Life Threads Zeph follows that this may touch:\n"
         f"{thread_lines or 'None yet.'}\n\n"
-        f"The Conversation:\n{to_transcript_lines(messages)}"
+        f"The Conversation:\n{to_transcript_lines(messages, time_zone)}"
     )
 
 

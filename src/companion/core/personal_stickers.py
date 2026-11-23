@@ -171,6 +171,7 @@ def describe_stickers(
     messages: list[ConversationMessage],
     stickers_by_number: dict[int, SentSticker],
     kept_by_unique_id: dict[str, PersonalSticker],
+    time_zone: str | None,
 ) -> str:
     """Write what the keeping model is given.
 
@@ -178,6 +179,8 @@ def describe_stickers(
         messages: The Conversation's messages, oldest first.
         stickers_by_number: The stickers the User sent, by number.
         kept_by_unique_id: The User's Personal Stickers, by unchanging ID.
+        time_zone: The User's IANA time zone, for when a Replied-to Text was
+            sent.
 
     Returns:
         The stickers the User sent, with the note of each one kept already,
@@ -200,7 +203,7 @@ def describe_stickers(
     ]
     return (
         "Stickers the person sent:\n" + "\n".join(sticker_lines) + "\n\n"
-        f"The Conversation:\n{to_transcript_lines(marked_messages)}"
+        f"The Conversation:\n{to_transcript_lines(marked_messages, time_zone)}"
     )
 
 
@@ -281,7 +284,10 @@ class PersonalStickerKeeper:
                 ChatLine(
                     role=ChatRole.USER,
                     text=describe_stickers(
-                        messages, stickers_by_number, kept_by_unique_id
+                        messages,
+                        stickers_by_number,
+                        kept_by_unique_id,
+                        snapshot.user.time_zone,
                     ),
                 )
             ],
