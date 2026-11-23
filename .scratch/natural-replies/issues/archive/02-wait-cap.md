@@ -48,3 +48,8 @@ However many texts a User sends, no Message waits more than a cap (20s by defaul
 - Checks after rebase on main (with issue 05): `ruff check`, `ruff format --check`, `mypy` (217 files) clean; `pytest` 1632 passed; web `pnpm lint`, `format:check`, `typecheck` clean, `pnpm test` 904 passed, `pnpm build` compiled. Rebased stack started healthy at 0076 with cap 20.
 - Docs: `docs/message-pipeline/README.md` decision 19 ("the cap too") and step 2 note describe the cap as built, with migration 0076.
 
+
+## Completion
+
+- Completed: 2026-11-23
+- Commit: a279e3f (merge "Merge natural-replies-02-wait-cap: a cap on the wait from the Message's first text"; work in b1d373d "Natural replies 02: a cap on the wait from the Message's first text", 279127e "Natural replies 02: review fixes (migration 0076 adds the cap, never below a stored wait; one helper starts a Message)", 2b6a8ca "Archive natural-replies issue 02: wait cap verified")
