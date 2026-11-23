@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import datetime
 from uuid import UUID, uuid4
 
@@ -14,6 +14,8 @@ from companion.core.models import (
     MessageKind,
     PersonalSticker,
     PlatformSettings,
+    RepliedToText,
+    ReplyPart,
 )
 from companion.core.photos import sent_shared_photo_text
 from companion.core.platform_settings import (
@@ -78,6 +80,8 @@ class ConversationService:
         kind: MessageKind = MessageKind.TEXT,
         photos: tuple[ChannelPhoto, ...] = (),
         sticker: ChannelSticker | None = None,
+        replied_to: RepliedToText | None = None,
+        chat_message_id: int | None = None,
     ) -> UUID:
         """Save a User's message and show that the Companion is typing.
 
@@ -97,6 +101,8 @@ class ConversationService:
             kind: What kind of message it is.
             photos: The photos it came with, kept as chat channel IDs.
             sticker: The sticker, for a sticker message.
+            replied_to: The earlier text it replies to, if any.
+            chat_message_id: The chat channel's ID for it, if known.
 
         Returns:
             The ID of the Conversation the message was added to.
@@ -114,6 +120,8 @@ class ConversationService:
                     sent_at=self._clock.now(),
                     photos=photos,
                     sticker=sticker,
+                    replied_to=replied_to,
+                    chat_message_id=chat_message_id,
                 )
             )
         now = self._clock.now()
@@ -131,7 +139,7 @@ class ConversationService:
         user_id: UUID,
         conversation_id: UUID,
         chat_id: int,
-        reply_parts: list[str],
+        reply_parts: Sequence[ReplyPart],
         settings: PlatformSettings,
         sticker_id: UUID | None = None,
         shared_photo_id: UUID | None = None,
@@ -140,7 +148,8 @@ class ConversationService:
         """Send the Companion's reply, one short message at a time.
 
         Before each message the Companion shows typing for a while, as a
-        person would. Each message is saved as soon as it is sent. The
+        person would. A message may go as a reply to one of the User's
+        texts. Each message is saved as soon as it is sent. The
         Shared Photo, if any, comes next, then the sticker. The Shared Photo
         is looked up by the User's own ID and skipped if it was deleted
         meanwhile; if the chat channel refuses it, the error is logged and
@@ -152,7 +161,8 @@ class ConversationService:
             user_id: The User being answered.
             conversation_id: The Conversation being answered.
             chat_id: The chat to send to.
-            reply_parts: The short messages that make up the reply, in order.
+            reply_parts: The short messages that make up the reply, in order,
+                each with the User's text it replies to, if any.
             settings: The platform settings, read once for the reply.
             sticker_id: The sticker to send after them, from the Sticker
                 Library or the User's Personal Stickers.
@@ -167,15 +177,17 @@ class ConversationService:
         """
         for number, part in enumerate(reply_parts):
             self._chat_channel.show_typing(chat_id)
-            self._clock.sleep(typing_pause_seconds(part, settings))
+            self._clock.sleep(typing_pause_seconds(part.text, settings))
             before_sending()
             try:
-                self._chat_channel.send_text(chat_id, part)
+                self._chat_channel.send_text(
+                    chat_id, part.text, part.reply_to_message_id
+                )
             except Exception as error:
                 if number > 0:
                     raise ReplyPartlySentError from error
                 raise
-            self._save(conversation_id, MessageDirection.OUTGOING, part)
+            self._save(conversation_id, MessageDirection.OUTGOING, part.text)
         if shared_photo_id is not None:
             before_sending()
             self._send_shared_photo(user_id, conversation_id, chat_id, shared_photo_id)

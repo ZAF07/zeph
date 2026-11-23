@@ -12,6 +12,7 @@ from companion.core.models import (
     MessageDirection,
     ModelStep,
     PersonalSticker,
+    ReplyPart,
     SharedPhoto,
     UserSnapshot,
 )
@@ -25,6 +26,7 @@ from companion.core.ports import Repositories
 from companion.core.recent_messages import (
     RecentMessages,
     describe_stand_ins,
+    split_off_latest_message,
     starts_new_conversation,
 )
 from companion.core.reply_tools import (
@@ -34,9 +36,12 @@ from companion.core.reply_tools import (
     ReplyOffer,
     ReplyToolProvider,
 )
+from companion.core.transcripts import readable_content
 from companion.core.usage import UsageRecordingChatModel
 
 BLANK_LINE = re.compile(r"\n\s*\n")
+REPLY_TO_TEXT_MARKER = re.compile(r"^\[\s*re\s*(\d+)\s*\]\s*", re.IGNORECASE)
+MOST_REPLIES_TO_TEXTS = 2
 PRIORITY_ORDER = (
     "Everything below is in order of priority. When two things clash, the "
     "higher one wins:\n"
@@ -81,9 +86,14 @@ class ComposedReply:
             the text, if any.
     """
 
-    parts: list[str]
+    parts: list[ReplyPart]
     sticker: LibrarySticker | PersonalSticker | None
     shared_photo: SharedPhoto | None = None
+
+    @property
+    def texts(self) -> list[str]:
+        """The parts' texts, in order."""
+        return [part.text for part in self.parts]
 
 
 def split_into_messages(reply: str) -> list[str]:
@@ -97,6 +107,70 @@ def split_into_messages(reply: str) -> list[str]:
     """
     parts = (part.strip() for part in BLANK_LINE.split(reply))
     return [part for part in parts if part]
+
+
+def link_to_texts(
+    parts: Sequence[str], message_texts: Sequence[ConversationMessage]
+) -> list[ReplyPart]:
+    """Turn parts that start with a marker like "[re 2]" into replies to that text.
+
+    The number is a text of the Message being answered, counted from 1.
+    Only the first `MOST_REPLIES_TO_TEXTS` markers that name an earlier
+    text of the Message, not its latest, with a known chat channel ID
+    become replies; any other marker is dropped and its part sent on its
+    own. A part that was only a marker is left out.
+
+    Args:
+        parts: The reply's short texts, in order.
+        message_texts: The texts of the Message being answered, oldest first.
+
+    Returns:
+        The parts with the markers taken out, each with the ID it replies to.
+    """
+    earlier_texts = message_texts[:-1]
+    linked: list[ReplyPart] = []
+    replies_used = 0
+    for part in parts:
+        marker = REPLY_TO_TEXT_MARKER.match(part)
+        if marker is None:
+            linked.append(ReplyPart(part))
+            continue
+        number = int(marker.group(1))
+        replied_to = None
+        if 1 <= number <= len(earlier_texts) and replies_used < MOST_REPLIES_TO_TEXTS:
+            replied_to = earlier_texts[number - 1].chat_message_id
+        if replied_to is not None:
+            replies_used += 1
+        text = part[marker.end() :]
+        if text:
+            linked.append(ReplyPart(text, replied_to))
+    return linked
+
+
+def numbered_message_line(
+    message_texts: Sequence[ConversationMessage], time_zone: str | None
+) -> ChatLine:
+    """Write the Message being answered as one line, its texts numbered.
+
+    A Message of one text is written as it is, with no number.
+
+    Args:
+        message_texts: The Message's texts, oldest first.
+        time_zone: The User's IANA time zone, for when a Replied-to Text was
+            sent.
+
+    Returns:
+        The User's line, with each text on its own line after its number,
+        e.g. "[1] work was rough".
+    """
+    contents = [
+        readable_content(text, time_zone, read_by_companion=True)
+        for text in message_texts
+    ]
+    if len(contents) == 1:
+        return ChatLine(role=ChatRole.USER, text=contents[0])
+    numbered = (f"[{number}] {content}" for number, content in enumerate(contents, 1))
+    return ChatLine(role=ChatRole.USER, text="\n".join(numbered))
 
 
 def write_instructions(
@@ -144,14 +218,23 @@ def write_instructions(
     return "\n\n".join(part for part in parts if part)
 
 
-def to_chat_history(messages: list[ConversationMessage]) -> list[ChatLine]:
+def to_chat_history(
+    messages: list[ConversationMessage],
+    time_zone: str | None = None,
+    read_by_companion: bool = False,
+) -> list[ChatLine]:
     """Turn a Conversation's saved messages into history for the chat model.
 
     The User's messages in a row in one Conversation are one Message, so
-    they become one line with each text on its own line.
+    they become one line with each text on its own line, a text's
+    Replied-to Text noted before it.
 
     Args:
         messages: The messages, oldest first.
+        time_zone: The User's IANA time zone, for when a Replied-to Text was
+            sent; UTC if not given.
+        read_by_companion: True when the Companion itself reads the
+            history, so a Replied-to Text it sent is "your" text.
 
     Returns:
         One line per Message or Companion message, saying who said it.
@@ -159,18 +242,19 @@ def to_chat_history(messages: list[ConversationMessage]) -> list[ChatLine]:
     history: list[ChatLine] = []
     previous: ConversationMessage | None = None
     for message in messages:
+        content = readable_content(message, time_zone, read_by_companion)
         if message.direction == MessageDirection.OUTGOING:
-            history.append(ChatLine(role=ChatRole.COMPANION, text=message.content))
+            history.append(ChatLine(role=ChatRole.COMPANION, text=content))
         elif (
             previous is not None
             and previous.direction == MessageDirection.INCOMING
             and not starts_new_conversation(previous, message)
         ):
             history[-1] = ChatLine(
-                role=ChatRole.USER, text=f"{history[-1].text}\n{message.content}"
+                role=ChatRole.USER, text=f"{history[-1].text}\n{content}"
             )
         else:
-            history.append(ChatLine(role=ChatRole.USER, text=message.content))
+            history.append(ChatLine(role=ChatRole.USER, text=content))
         previous = message
     return history
 
@@ -224,7 +308,10 @@ class ResponseComposer:
         its tools and instructions, and a sticker or Shared Photo a tool
         picks is sent with the reply, after any fixed text a tool asked to
         close the reply with. When a Feature doesn't work for the User, the
-        instructions say so, so the reply can tell them plainly.
+        instructions say so, so the reply can tell them plainly. The
+        Message being answered is shown with its texts numbered, and a
+        part the model starts with "[re 2]" is sent as a reply to that text
+        (see `link_to_texts`).
 
         Args:
             recent: The Recent Messages: the Conversation to reply in and every
@@ -280,7 +367,14 @@ class ResponseComposer:
             ),
         )
         offers += optional_offers
-        history = to_chat_history(recent.messages)
+        earlier, message_texts = split_off_latest_message(recent)
+        history = to_chat_history(
+            earlier, snapshot.user.time_zone, read_by_companion=True
+        )
+        if message_texts:
+            history.append(
+                numbered_message_line(message_texts, snapshot.user.time_zone)
+            )
         reply = self._chat_model.generate(
             snapshot=snapshot,
             step=ModelStep.REPLY,
@@ -290,8 +384,10 @@ class ResponseComposer:
             history=history,
             tools=[tool for offer in offers for tool in offer.tools],
         )
-        reply_parts = split_into_messages(reply)
-        reply_parts += [offer.closing_text for offer in offers if offer.closing_text]
+        reply_parts = link_to_texts(split_into_messages(reply), message_texts)
+        reply_parts += [
+            ReplyPart(offer.closing_text) for offer in offers if offer.closing_text
+        ]
         sticker: LibrarySticker | PersonalSticker | None = None
         shared_photo: SharedPhoto | None = None
         for offer in offers:

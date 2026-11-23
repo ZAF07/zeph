@@ -35,12 +35,15 @@ class RecordingChatChannel:
         self.sent_photo_file_ids: list[str] = []
         self.photos: dict[str, PhotoImage] = {}
 
-    def send_text(self, chat_id: int, text: str) -> None:
+    def send_text(
+        self, chat_id: int, text: str, reply_to_message_id: int | None = None
+    ) -> None:
         """Record a text.
 
         Args:
             chat_id: The chat it is for.
             text: The text.
+            reply_to_message_id: The message it replies to; not recorded.
         """
         self.sent_texts.append(text)
 

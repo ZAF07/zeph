@@ -17,12 +17,13 @@ def telegram_text_update(
     text: str,
     telegram_user_id: int = TELEGRAM_USER_ID,
     username: str = "maya_l",
+    message_id: int = 10,
 ) -> dict[str, Any]:
     """Build a Telegram webhook update for a private text message."""
     return {
         "update_id": 1,
         "message": {
-            "message_id": 10,
+            "message_id": message_id,
             "date": 1762851600,
             "from": {"id": telegram_user_id, "is_bot": False, "username": username},
             "chat": {"id": telegram_user_id, "type": "private"},
@@ -159,6 +160,42 @@ def telegram_reply_to_sticker_update(
         "chat": {"id": telegram_user_id, "type": "private"},
         "sticker": replied_sticker,
     }
+    return update
+
+
+BOT_TELEGRAM_USER_ID = 7770001
+
+
+def telegram_reply_update(
+    text: str,
+    replied_to: dict[str, Any],
+    from_companion: bool = True,
+    quote: str | None = None,
+    replied_at: int = 1762151400,
+    message_id: int = 10,
+    telegram_user_id: int = TELEGRAM_USER_ID,
+) -> dict[str, Any]:
+    """Build a Telegram webhook update for a text replying to an earlier message.
+
+    The earlier message holds `replied_to`, e.g. {"text": "..."} or a photo
+    with a caption, and was sent by the Companion's bot or by the User. A
+    quote is the part of it the User highlighted.
+    """
+    sender = (
+        {"id": BOT_TELEGRAM_USER_ID, "is_bot": True, "username": "zeph_bot"}
+        if from_companion
+        else {"id": telegram_user_id, "is_bot": False, "username": "maya_l"}
+    )
+    update = telegram_text_update(text, telegram_user_id, message_id=message_id)
+    update["message"]["reply_to_message"] = {
+        "message_id": 3,
+        "date": replied_at,
+        "from": sender,
+        "chat": {"id": telegram_user_id, "type": "private"},
+        **replied_to,
+    }
+    if quote is not None:
+        update["message"]["quote"] = {"text": quote, "position": 0}
     return update
 
 

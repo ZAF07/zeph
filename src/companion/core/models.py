@@ -525,6 +525,34 @@ class PhotoImage:
     media_type: str
 
 
+class RepliedToSender(StrEnum):
+    """Who sent the text a User replied to."""
+
+    USER = "user"
+    COMPANION = "companion"
+
+
+@dataclass(frozen=True)
+class RepliedToText:
+    """An earlier text a User points at by replying to it in the chat.
+
+    It is what the chat channel shows, not a saved message, so it still
+    works after Message Retention has deleted the original.
+
+    Attributes:
+        sender: Whether the User or the Companion sent it.
+        sent_at: When it was sent.
+        kind: Whether it is a text, a sticker, a photo, or something else.
+        text: The part the User highlighted, if any, otherwise its text,
+            caption or sticker emoji, cut short; "" if it has none.
+    """
+
+    sender: RepliedToSender
+    sent_at: datetime
+    kind: MessageKind
+    text: str
+
+
 @dataclass(frozen=True)
 class IncomingMessage:
     """A message a person sent to the Companion, independent of chat channel.
@@ -546,6 +574,8 @@ class IncomingMessage:
             album's items in the order they were sent; 0 if not known.
         replied_sticker: The sticker this message replies to, if it replies
             to one.
+        replied_to: The earlier text this message replies to, if it replies
+            to one.
     """
 
     sender_id: int
@@ -559,6 +589,7 @@ class IncomingMessage:
     album_id: str | None = None
     message_id: int = 0
     replied_sticker: ChannelSticker | None = None
+    replied_to: RepliedToText | None = None
 
 
 class MessageDirection(StrEnum):
@@ -603,6 +634,9 @@ class ConversationMessage:
         sent_at: When it was sent.
         photos: The photos the message came with, as chat channel IDs.
         sticker: The sticker a User sent, for a sticker message from them.
+        replied_to: The earlier text a User's message replies to, if any.
+        chat_message_id: The chat channel's ID for a User's message, so the
+            Companion can reply to it; None if not known.
     """
 
     id: UUID
@@ -613,6 +647,22 @@ class ConversationMessage:
     sent_at: datetime
     photos: tuple[ChannelPhoto, ...] = ()
     sticker: ChannelSticker | None = None
+    replied_to: RepliedToText | None = None
+    chat_message_id: int | None = None
+
+
+@dataclass(frozen=True)
+class ReplyPart:
+    """One short text of the Companion's reply.
+
+    Attributes:
+        text: The text to send.
+        reply_to_message_id: The chat channel's ID of the User's text it is
+            sent as a reply to; None to send it on its own.
+    """
+
+    text: str
+    reply_to_message_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -633,6 +683,9 @@ class TextToScreen:
             differs from `text`: with Photo Viewing off, the Safeguard still
             reads each photo's description. None when it is the same.
         sticker: The sticker, for a sticker message.
+        replied_to: The earlier text it replies to, if any.
+        chat_message_id: The chat channel's ID for it, or an Album's first
+            item; None if not known.
     """
 
     user_id: UUID
@@ -642,6 +695,8 @@ class TextToScreen:
     photos: tuple[ChannelPhoto, ...] = ()
     safeguard_text: str | None = None
     sticker: ChannelSticker | None = None
+    replied_to: RepliedToText | None = None
+    chat_message_id: int | None = None
 
 
 @dataclass(frozen=True)

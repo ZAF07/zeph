@@ -146,6 +146,8 @@ from companion.core.models import (
     PatternToSave,
     PersonalSticker,
     PlatformSettings,
+    RepliedToSender,
+    RepliedToText,
     ReplyPlan,
     ReplyPlanForm,
     ReplyPlanShape,
@@ -498,6 +500,44 @@ def _to_message(row: Row[Any]) -> ConversationMessage:
         sent_at=row.sent_at,
         photos=tuple(ChannelPhoto(**photo) for photo in row.photos),
         sticker=ChannelSticker(**row.sticker) if row.sticker else None,
+        replied_to=_to_replied_to(row.replied_to) if row.replied_to else None,
+        chat_message_id=row.chat_message_id,
+    )
+
+
+def _replied_to_json(replied_to: RepliedToText | None) -> dict[str, str] | None:
+    """Write a Replied-to Text as JSON for the `replied_to` column.
+
+    Args:
+        replied_to: The Replied-to Text, if any.
+
+    Returns:
+        Its fields, with when it was sent as an ISO time; None if there is none.
+    """
+    if replied_to is None:
+        return None
+    return {
+        "sender": replied_to.sender.value,
+        "sent_at": replied_to.sent_at.isoformat(),
+        "kind": replied_to.kind.value,
+        "text": replied_to.text,
+    }
+
+
+def _to_replied_to(stored: dict[str, str]) -> RepliedToText:
+    """Read a Replied-to Text from the `replied_to` column.
+
+    Args:
+        stored: The column's JSON.
+
+    Returns:
+        The Replied-to Text.
+    """
+    return RepliedToText(
+        sender=RepliedToSender(stored["sender"]),
+        sent_at=datetime.fromisoformat(stored["sent_at"]),
+        kind=MessageKind(stored["kind"]),
+        text=stored["text"],
     )
 
 
@@ -1337,6 +1377,8 @@ class PostgresConversationRepository:
                     sent_at=message.sent_at,
                     photos=[asdict(photo) for photo in message.photos],
                     sticker=asdict(message.sticker) if message.sticker else None,
+                    replied_to=_replied_to_json(message.replied_to),
+                    chat_message_id=message.chat_message_id,
                 )
             )
             connection.execute(
@@ -1380,6 +1422,8 @@ class PostgresConversationRepository:
                     sent_at=message.sent_at,
                     photos=[asdict(photo) for photo in message.photos],
                     sticker=asdict(message.sticker) if message.sticker else None,
+                    replied_to=_replied_to_json(message.replied_to),
+                    chat_message_id=message.chat_message_id,
                 )
             )
         return True

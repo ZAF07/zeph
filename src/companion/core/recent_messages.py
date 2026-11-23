@@ -16,7 +16,7 @@ from companion.core.platform_settings import (
 )
 from companion.core.ports import Clock, Repositories
 from companion.core.timing import users_today
-from companion.core.transcripts import to_transcript_lines
+from companion.core.transcripts import readable_content, to_transcript_lines
 
 
 @dataclass(frozen=True)
@@ -132,7 +132,7 @@ def to_recent_transcript(
     for number, message in enumerate(messages):
         if number and starts_new_conversation(messages[number - 1], message):
             lines.append(new_conversation_line(message, time_zone))
-        lines.append(to_transcript_lines([message]))
+        lines.append(to_transcript_lines([message], time_zone))
     return "\n".join(lines)
 
 
@@ -165,7 +165,7 @@ def describe_recent_messages(recent: RecentMessages, time_zone: str | None) -> s
     """
     earlier, latest = split_off_latest_message(recent)
     transcript = to_recent_transcript(earlier, time_zone) or "Nothing yet."
-    latest_text = "\n".join(message.content for message in latest)
+    latest_text = "\n".join(readable_content(message, time_zone) for message in latest)
     latest_heading = (
         f"{new_conversation_line(latest[0], time_zone)}\nLatest message:"
         if earlier and latest and starts_new_conversation(earlier[-1], latest[0])

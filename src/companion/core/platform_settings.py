@@ -5,7 +5,13 @@ from enum import StrEnum
 from typing import Any
 
 from companion.core.errors import InvalidError
-from companion.core.models import CheckInFrequency, Setting, StoredSetting, User
+from companion.core.models import (
+    CheckInFrequency,
+    PlatformSettings,
+    Setting,
+    StoredSetting,
+    User,
+)
 from companion.core.ports import Clock, PlatformSettingsRepository
 
 HELPLINES_PLACEHOLDER = "{helplines}"
@@ -193,6 +199,22 @@ STICKER_ADDING_QUIET_GAP = Setting("sticker_adding_quiet_gap_minutes", read_minu
 ONBOARDING_REASON_CHOICES = Setting("onboarding_reason_choices", read_text_list)
 CONVERSATION_QUIET_GAP = Setting("conversation_quiet_gap_minutes", read_minutes)
 MESSAGE_WAIT_SECONDS = Setting("message_wait_seconds", read_whole_number)
+MESSAGE_WAIT_FINISHED_SECONDS = Setting(
+    "message_wait_finished_seconds", read_whole_number
+)
+MESSAGE_WAIT_TRAILING_SECONDS = Setting(
+    "message_wait_trailing_seconds", read_whole_number
+)
+MESSAGE_WAIT_CAP_SECONDS = Setting("message_wait_cap_seconds", read_whole_number)
+MESSAGE_WAIT_LONG_TEXT_WORDS = Setting(
+    "message_wait_long_text_words", read_whole_number
+)
+MESSAGE_WAIT_TRAILING_WORDS = Setting("message_wait_trailing_words", read_text_list)
+MESSAGE_WAITS = (
+    MESSAGE_WAIT_FINISHED_SECONDS,
+    MESSAGE_WAIT_TRAILING_SECONDS,
+    MESSAGE_WAIT_SECONDS,
+)
 TYPING_REPEAT_SECONDS = Setting("typing_repeat_seconds", read_whole_number)
 MESSAGE_RETENTION_DAYS = Setting("message_retention_days", read_whole_number)
 RECENT_MESSAGES_HOURS = Setting("recent_messages_hours", read_whole_number)
@@ -380,6 +402,7 @@ class SettingKind(StrEnum):
     MODEL = "model"
     ON_OFF = "on_off"
     HOURS_BY_FREQUENCY = "hours_by_frequency"
+    TEXT_LIST = "text_list"
 
 
 @dataclass(frozen=True)
@@ -1278,14 +1301,74 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         ),
     ),
     EditableSetting(
+        MESSAGE_WAIT_FINISHED_SECONDS.key,
+        "Wait after a finished text",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=60,
+        hint=(
+            "Seconds Zeph waits for more when the User’s last text reads finished "
+            "(a question, or a long text ending in a full stop, “!” or an emoji). "
+            "Shorter means quicker replies, with more chance of cutting the User off."
+        ),
+    ),
+    EditableSetting(
+        MESSAGE_WAIT_TRAILING_SECONDS.key,
+        "Wait after a trailing text",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=60,
+        hint=(
+            "Seconds Zeph waits for more when the User’s last text ends unfinished "
+            "(“and…”, “so”, “wait”, a photo with no caption). Longer means fewer "
+            "cut-offs but slower replies."
+        ),
+    ),
+    EditableSetting(
         MESSAGE_WAIT_SECONDS.key,
-        "Message wait",
+        "Wait after any other text",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=60,
+        hint=(
+            "Seconds Zeph waits for more when the User’s last text reads neither "
+            "finished nor trailing, or is a sticker. Longer gathers more texts into "
+            "one reply but makes every reply slower."
+        ),
+    ),
+    EditableSetting(
+        MESSAGE_WAIT_CAP_SECONDS.key,
+        "Wait cap",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=60,
+        hint=(
+            "Most seconds Zeph waits from the first text of a Message, however many "
+            "texts follow, and never less than the longest wait. Shorter means a "
+            "long burst of texts is answered sooner, with more chance of cutting "
+            "the User off."
+        ),
+    ),
+    EditableSetting(
+        MESSAGE_WAIT_LONG_TEXT_WORDS.key,
+        "Long text",
         SettingKind.WHOLE_NUMBER,
         minimum=1,
-        maximum=30,
+        maximum=100,
         hint=(
-            "Seconds Zeph waits after a User’s last text or photo before the reply "
-            "starts, so it answers everything they sent in one reply."
+            "How many words a text ending in a full stop, “!” or an emoji needs to "
+            "read finished and get the short wait. Fewer words means more texts are "
+            "answered quickly."
+        ),
+    ),
+    EditableSetting(
+        MESSAGE_WAIT_TRAILING_WORDS.key,
+        "Trailing words",
+        SettingKind.TEXT_LIST,
+        hint=(
+            "Words that make a text trail off when they end it, and short openers "
+            "(“ok so”, “hmm”) that do when sent alone, separated by commas. Adding "
+            "a word makes Zeph wait longer after texts that end with it."
         ),
     ),
     EditableSetting(
@@ -1644,6 +1727,59 @@ class InvalidSettingError(InvalidError):
     """Raised when a setting change is not allowed or its value is not valid."""
 
 
+def checked_text_list(setting: EditableSetting, value: Any) -> list[str]:
+    """Check a new list of words, trimming and lower-casing each.
+
+    Args:
+        setting: The list setting.
+        value: The new value.
+
+    Returns:
+        The words, trimmed and lower-cased, with blank ones left out.
+
+    Raises:
+        InvalidSettingError: If the value is not a list of texts, or has no
+            words in it.
+    """
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise InvalidSettingError(f"The {setting.label} must be a list of words.")
+    words = [item.strip().lower() for item in value if item.strip()]
+    if not words:
+        raise InvalidSettingError(f"The {setting.label} needs at least one word.")
+    return words
+
+
+def check_waits_fit_under_the_cap(
+    settings: PlatformSettings, values: Mapping[str, Any]
+) -> None:
+    """Check the Message wait cap is at least as long as each wait, after a change.
+
+    Only a change to a wait or the cap is checked, so other settings can
+    always be saved.
+
+    Args:
+        settings: The platform settings before the change.
+        values: The checked new value for each setting key being changed.
+
+    Raises:
+        InvalidSettingError: If the cap would be shorter than any of the
+            three waits.
+    """
+    keys_checked = {wait.key for wait in MESSAGE_WAITS} | {MESSAGE_WAIT_CAP_SECONDS.key}
+    if not keys_checked & values.keys():
+        return
+    longest_wait = max(
+        values.get(wait.key, settings.get(wait)) for wait in MESSAGE_WAITS
+    )
+    cap = values.get(
+        MESSAGE_WAIT_CAP_SECONDS.key, settings.get(MESSAGE_WAIT_CAP_SECONDS)
+    )
+    if cap < longest_wait:
+        raise InvalidSettingError(
+            f"The Wait cap must be at least the longest wait ({longest_wait} seconds)."
+        )
+
+
 class PlatformSettingsService:
     """Lets Admins read and change the platform settings they manage.
 
@@ -1701,12 +1837,14 @@ class PlatformSettingsService:
             Every editable setting after the change.
 
         Raises:
-            InvalidSettingError: If a key may not be changed or a value is not
-                valid; nothing is saved.
+            InvalidSettingError: If a key may not be changed, a value is not
+                valid, or the Message wait cap would be shorter than a wait;
+                nothing is saved.
         """
         validated_values = {
             key: self.checked_value(key, value) for key, value in values.items()
         }
+        check_waits_fit_under_the_cap(self._settings.load(), validated_values)
         if validated_values:
             self._settings.save_many(validated_values, self._clock.now(), admin.id)
         return self.list_editable()
@@ -1755,6 +1893,8 @@ class PlatformSettingsService:
             if not isinstance(value, bool):
                 raise InvalidSettingError(f"The {setting.label} must be on or off.")
             return value
+        if setting.kind == SettingKind.TEXT_LIST:
+            return checked_text_list(setting, value)
         if setting.kind == SettingKind.HOURS_BY_FREQUENCY:
             if not is_hours_by_frequency(value, setting.minimum, setting.maximum):
                 raise InvalidSettingError(

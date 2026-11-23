@@ -194,8 +194,18 @@ def test_a_shorter_quiet_gap_starts_a_new_conversation_sooner(
         {"message_retention_days": 0},
         {"message_retention_days": 366},
         {"photo_retry_count": 6},
-        {"message_wait_seconds": 0},
-        {"message_wait_seconds": 31},
+        {"message_wait_seconds": -1},
+        {"message_wait_seconds": 61},
+        {"message_wait_finished_seconds": -1},
+        {"message_wait_finished_seconds": 61},
+        {"message_wait_trailing_seconds": 61},
+        {"message_wait_cap_seconds": 61},
+        {"message_wait_long_text_words": 0},
+        {"message_wait_long_text_words": 101},
+        {"message_wait_trailing_words": []},
+        {"message_wait_trailing_words": ["  ", ""]},
+        {"message_wait_trailing_words": "and, so"},
+        {"message_wait_trailing_words": ["and", 3]},
         {"photo_album_max_photos": 0},
         {"photo_album_max_photos": 11},
         {"photo_model": "not-a-model"},
@@ -391,14 +401,106 @@ def test_the_photo_settings_are_editable_with_their_seeded_values(
     assert photo_viewing["model_key"] == "photo_model"
 
 
-def test_the_message_wait_is_editable_with_a_seeded_value_of_fifteen_seconds(
+def test_the_message_waits_are_editable_with_their_seeded_values(
     client: TestClient, auth_verifier: FakeAuthVerifier
 ) -> None:
     headers = owner_headers(client, auth_verifier)
 
     settings = client.get("/api/admin/settings", headers=headers).json()["settings"]
 
-    assert settings["message_wait_seconds"]["value"] == 15
+    assert settings["message_wait_finished_seconds"]["value"] == 2
+    assert settings["message_wait_trailing_seconds"]["value"] == 12
+    assert settings["message_wait_seconds"]["value"] == 6
+    assert settings["message_wait_long_text_words"]["value"] == 15
+    assert settings["message_wait_cap_seconds"]["value"] == 20
+    assert settings["message_wait_cap_seconds"]["hint"]
+    assert {"and", "so", "wait", "ok so", "lol", "hmm"} <= set(
+        settings["message_wait_trailing_words"]["value"]
+    )
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        {"message_wait_cap_seconds": 11},
+        {"message_wait_trailing_seconds": 21},
+        {"message_wait_finished_seconds": 25},
+        {"message_wait_seconds": 30, "message_wait_cap_seconds": 25},
+    ],
+)
+def test_a_wait_cap_shorter_than_any_wait_is_refused(
+    client: TestClient, auth_verifier: FakeAuthVerifier, values: dict[str, int]
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+
+    response = client.patch(
+        "/api/admin/settings", json={"values": values}, headers=headers
+    )
+
+    assert response.status_code == 422
+    assert "Wait cap must be at least the longest wait" in response.json()["detail"]
+    settings = client.get("/api/admin/settings", headers=headers).json()["settings"]
+    assert settings["message_wait_cap_seconds"]["value"] == 20
+    assert settings["message_wait_trailing_seconds"]["value"] == 12
+
+
+def test_the_wait_cap_and_a_longer_wait_can_be_saved_together(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+
+    response = client.patch(
+        "/api/admin/settings",
+        json={
+            "values": {
+                "message_wait_trailing_seconds": 30,
+                "message_wait_cap_seconds": 30,
+            }
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200, response.text
+    saved = response.json()["settings"]
+    assert saved["message_wait_trailing_seconds"]["value"] == 30
+    assert saved["message_wait_cap_seconds"]["value"] == 30
+
+
+def test_other_settings_still_save_when_a_stored_wait_is_past_the_cap(
+    client: TestClient, auth_verifier: FakeAuthVerifier, engine: Engine
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE platform_settings SET value = to_jsonb(25) "
+                "WHERE key = 'message_wait_trailing_seconds'"
+            )
+        )
+
+    response = client.patch(
+        "/api/admin/settings",
+        json={"values": {"daily_message_limit": 40}},
+        headers=headers,
+    )
+
+    assert response.status_code == 200, response.text
+
+
+def test_the_trailing_words_are_saved_trimmed_and_lower_cased(
+    client: TestClient, auth_verifier: FakeAuthVerifier
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+
+    response = client.patch(
+        "/api/admin/settings",
+        json={"values": {"message_wait_trailing_words": ["  And ", "OK so", " "]}},
+        headers=headers,
+    )
+
+    assert response.status_code == 200, response.text
+    saved = response.json()["settings"]["message_wait_trailing_words"]["value"]
+    assert saved == ["and", "ok so"]
 
 
 @pytest.mark.parametrize("key", MOVED_TO_COPY)

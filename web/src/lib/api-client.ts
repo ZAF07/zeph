@@ -229,9 +229,16 @@ export type UserFeatures = {
   personal_sticker_count: number;
 };
 
-/** The value of a platform setting Admins can edit; the Check-in gaps are hours by frequency. */
+/**
+ * The value of a platform setting Admins can edit; the Check-in gaps are
+ * hours by frequency and the trailing words a list.
+ */
 export type SettingValue =
-  string | number | boolean | Partial<Record<CheckInFrequency, number>>;
+  | string
+  | number
+  | boolean
+  | string[]
+  | Partial<Record<CheckInFrequency, number>>;
 
 /**
  * A platform setting's hint (what it is, what it serves and which step reads

@@ -169,7 +169,7 @@ class Safeguard:
         messages = self._repositories.conversations.list_messages(conversation_id)
         if newest_text is not None:
             messages[-1] = replace(messages[-1], content=newest_text)
-        history = to_chat_history(messages)
+        history = to_chat_history(messages, snapshot.user.time_zone)
         transcript = [ChatLine(role=ChatRole.USER, text=to_transcript(history))]
         for _ in range(2):
             answer = self._chat_model.generate(

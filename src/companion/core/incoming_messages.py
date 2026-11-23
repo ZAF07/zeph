@@ -3,8 +3,10 @@ import threading
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from datetime import datetime
 from uuid import UUID
 
+from companion.core.message_wait import message_wait
 from companion.core.model_call_log import start_trace
 from companion.core.models import (
     ChannelPhoto,
@@ -13,6 +15,7 @@ from companion.core.models import (
     MessageToAnswer,
     ModelCallTrace,
     PlatformSettings,
+    RepliedToText,
     TextToScreen,
     TraceKind,
     UserSnapshot,
@@ -20,13 +23,18 @@ from companion.core.models import (
 from companion.core.photos import PhotoService
 from companion.core.platform_settings import (
     DASHBOARD_URL_PLACEHOLDER,
-    MESSAGE_WAIT_SECONDS,
     REPLY_FAILED_MESSAGE,
     TYPING_REPEAT_SECONDS,
     UNKNOWN_TELEGRAM_USER_REPLY,
     UNSUPPORTED_MESSAGE_REPLY,
 )
-from companion.core.ports import ChatChannel, Repositories, Timer, UserWorkQueue
+from companion.core.ports import (
+    ChatChannel,
+    Clock,
+    Repositories,
+    Timer,
+    UserWorkQueue,
+)
 from companion.core.reply_attempt import ReplyAttempt, ReplyDroppedError
 from companion.core.reply_gate import ReplyGate, ReplyNeeded, Stopped
 from companion.core.reply_service import ReplyService
@@ -96,6 +104,18 @@ def readable_text(message: IncomingMessage) -> str:
     return message.text
 
 
+def known_message_id(message: IncomingMessage) -> int | None:
+    """Give a message's chat channel ID, if the chat channel gave one.
+
+    Args:
+        message: The incoming message.
+
+    Returns:
+        Its ID, or None when it is 0 (not known).
+    """
+    return message.message_id or None
+
+
 def album_caption(messages: Sequence[IncomingMessage]) -> str:
     """Write an album's caption, marking the files the Companion can't open.
 
@@ -111,10 +131,21 @@ def album_caption(messages: Sequence[IncomingMessage]) -> str:
         for message in messages
         if message.kind == MessageKind.UNSUPPORTED
     ]
-    caption = next(
+    return " ".join([*markers, album_caption_text(messages)]).strip()
+
+
+def album_caption_text(messages: Sequence[IncomingMessage]) -> str:
+    """Read an album's caption, from whichever item has it.
+
+    Args:
+        messages: The album's items.
+
+    Returns:
+        The caption; "" if none of its items has one.
+    """
+    return next(
         (message.text.strip() for message in messages if message.text.strip()), ""
     )
-    return " ".join([*markers, caption]).strip()
 
 
 def group_albums(
@@ -143,6 +174,8 @@ class PendingMessage:
 
     Attributes:
         chat_id: The chat to reply in.
+        first_text_at: When its first text arrived, which the wait cap
+            counts from, start-overs included.
         conversation_id: The Conversation its latest screened text was saved
             into; None until a text is screened.
         texts: Its screened texts as the Companion reads them, in order.
@@ -155,6 +188,7 @@ class PendingMessage:
     """
 
     chat_id: int
+    first_text_at: datetime
     conversation_id: UUID | None = None
     texts: list[str] = field(default_factory=list)
     album_items: list[IncomingMessage] = field(default_factory=list)
@@ -178,19 +212,21 @@ class IncomingMessageHandler:
     """Decides what to do with each message people send the Companion.
 
     A connected User's texts are gathered into one Message until they pause
-    for `message_wait_seconds`, then answered together with one reply. Each
-    text is saved and checked by the Safeguard as it arrives, so a crisis
-    is never held back by the wait or by a reply being written. The work
-    runs on the User work queue, never on the caller's thread: a sender's
-    messages are handled one at a time, in order, on one line, and a User's
-    replies are written one at a time on another. A text that arrives while
-    a reply is being written, before any of it is sent, drops that reply,
-    and the Message is answered again with every text once the User pauses;
-    once part of a reply is sent, a new text starts the next Message. The
-    texts waiting to be answered, and the reply being written, are only
-    read and changed under one guard, since texts are checked while a reply
-    is written. From the first text until something is sent back, typing is
-    shown again every `typing_repeat_seconds`, so the chat never looks dead.
+    for a wait that follows how their latest text reads, never past a cap
+    from the Message's first text, then answered
+    together with one reply. Each text is saved and checked by the Safeguard
+    as it arrives, so a crisis is never held back by the wait or by a reply
+    being written. The work runs on the User work queue, never on the
+    caller's thread: a sender's messages are handled one at a time, in
+    order, on one line, and a User's replies are written one at a time on
+    another. A text that arrives while a reply is being written, before any
+    of it is sent, drops that reply, and the Message is answered again with
+    every text once the User pauses; once part of a reply is sent, a new
+    text starts the next Message. The texts waiting to be answered, and the
+    reply being written, are only read and changed under one guard, since
+    texts are checked while a reply is written. From the first text until
+    something is sent back, typing is shown again every
+    `typing_repeat_seconds`, so the chat never looks dead.
     """
 
     def __init__(
@@ -205,6 +241,7 @@ class IncomingMessageHandler:
         photo_service: PhotoService,
         user_snapshots: UserSnapshotLoader,
         timer: Timer,
+        clock: Clock,
         work_queue: UserWorkQueue,
         dashboard_url: str,
     ) -> None:
@@ -223,6 +260,8 @@ class IncomingMessageHandler:
             photo_service: Describes the photos Users send.
             user_snapshots: Reads the User once at the start of each turn.
             timer: Waits for the User to pause before answering their Message.
+            clock: Tells the time, so no Message waits past the cap from
+                its first text.
             work_queue: Runs each sender's messages, and each User's replies,
                 in order, apart from the caller's thread.
             dashboard_url: The Dashboard's address, put into some replies.
@@ -232,6 +271,7 @@ class IncomingMessageHandler:
         self._photo_service = photo_service
         self._user_snapshots = user_snapshots
         self._timer = timer
+        self._clock = clock
         self._work_queue = work_queue
         self._repositories = repositories
         self._reply_gate = reply_gate
@@ -349,11 +389,20 @@ class IncomingMessageHandler:
         """
         self._start_over_reply_being_written(user_id)
         with self._pending_messages_guard:
-            pending = self._pending_messages.setdefault(
-                user_id, PendingMessage(chat_id=message.chat_id)
-            )
+            pending = self._pending_message(user_id, message.chat_id)
             pending.album_items.append(message)
-        self._restart_wait(user_id, self._repositories.platform_settings.load())
+            album_items = [
+                item
+                for item in pending.album_items
+                if item.album_id == message.album_id
+            ]
+        self._restart_wait(
+            user_id,
+            pending.first_text_at,
+            self._repositories.platform_settings.load(),
+            MessageKind.PHOTO,
+            album_caption_text(album_items),
+        )
 
     def _screen_text(self, user_id: UUID, message: IncomingMessage) -> None:
         """Save a text and check it for crisis now, then restart the wait.
@@ -377,9 +426,7 @@ class IncomingMessageHandler:
             message.chat_id, settings.get(TYPING_REPEAT_SECONDS)
         )
         with self._pending_messages_guard:
-            trace = self._pending_messages.setdefault(
-                user_id, PendingMessage(chat_id=message.chat_id)
-            ).trace
+            trace = self._pending_message(user_id, message.chat_id).trace
         try:
             snapshot = self._user_snapshots.load(user_id, settings, trace)
             text = self._text_to_screen(snapshot, message)
@@ -395,11 +442,29 @@ class IncomingMessageHandler:
             self._drop_pending_message(user_id)
             return
         with self._pending_messages_guard:
-            pending = self._pending_messages.setdefault(
-                user_id, PendingMessage(chat_id=message.chat_id)
-            )
+            pending = self._pending_message(user_id, message.chat_id)
             pending.add_screened(result.conversation_id, text.text)
-        self._restart_wait(user_id, settings)
+        self._restart_wait(
+            user_id, pending.first_text_at, settings, message.kind, message.text
+        )
+
+    def _pending_message(self, user_id: UUID, chat_id: int) -> PendingMessage:
+        """Find the User's Message waiting to be answered, or start one now.
+
+        Only call it under the guard.
+
+        Args:
+            user_id: The User.
+            chat_id: The chat to reply in, if a Message is started.
+
+        Returns:
+            The Message; a new one counts the wait cap from now.
+        """
+        pending = self._pending_messages.get(user_id)
+        if pending is None:
+            pending = PendingMessage(chat_id=chat_id, first_text_at=self._clock.now())
+            self._pending_messages[user_id] = pending
+        return pending
 
     def _finish_handling(self, user_id: UUID) -> None:
         """Count one of the User's messages as handled.
@@ -506,21 +571,37 @@ class IncomingMessageHandler:
                 del self._pending_messages[user_id]
         return was_dropped
 
-    def _restart_wait(self, user_id: UUID, settings: PlatformSettings) -> None:
+    def _restart_wait(
+        self,
+        user_id: UUID,
+        first_text_at: datetime,
+        settings: PlatformSettings,
+        latest_kind: MessageKind,
+        latest_text: str,
+    ) -> None:
         """Start the wait for the User to pause, restarting any wait under way.
 
-        When the wait ends, answering the Message is added to the User's
-        line of replies. A new wait replaces an answer held back.
+        How long it is follows how the User's latest text reads, cut to the
+        time left to the cap from the Message's first text. When the wait
+        ends, answering the Message is added to the User's line of replies.
+        A new wait replaces an answer held back.
 
         Args:
             user_id: The User.
+            first_text_at: When the Message's first text arrived.
             settings: The platform settings, which say how long to wait.
+            latest_kind: What kind of message the latest text is.
+            latest_text: The latest text, or its caption; "" if none.
         """
         with self._pending_messages_guard:
             self._answers_held_back.discard(user_id)
+        seconds_since_first_text = (self._clock.now() - first_text_at).total_seconds()
+        wait = message_wait(
+            latest_kind, latest_text, settings, seconds_since_first_text
+        )
         self._timer.start(
             message_wait_key(user_id),
-            settings.get(MESSAGE_WAIT_SECONDS),
+            wait.seconds,
             lambda: self._queue_answer(user_id),
         )
 
@@ -667,8 +748,12 @@ class IncomingMessageHandler:
         """
         photos = [item.photo for item in album_items if item.photo]
         caption = album_caption(album_items)
+        replied_to = album_items[0].replied_to
+        chat_message_id = known_message_id(album_items[0])
         if photos:
-            return self._photo_text_to_screen(snapshot, chat_id, photos, caption)
+            return self._photo_text_to_screen(
+                snapshot, chat_id, photos, caption, replied_to, chat_message_id
+            )
         if not any(item.text.strip() for item in album_items):
             self._chat_channel.send_text(
                 chat_id, snapshot.settings.get(UNSUPPORTED_MESSAGE_REPLY)
@@ -679,6 +764,8 @@ class IncomingMessageHandler:
             chat_id=chat_id,
             text=caption,
             kind=MessageKind.UNSUPPORTED,
+            replied_to=replied_to,
+            chat_message_id=chat_message_id,
         )
 
     def _text_to_screen(
@@ -700,9 +787,16 @@ class IncomingMessageHandler:
                 text=readable_text(message),
                 kind=message.kind,
                 sticker=message.sticker,
+                replied_to=message.replied_to,
+                chat_message_id=known_message_id(message),
             )
         return self._photo_text_to_screen(
-            snapshot, message.chat_id, [message.photo], message.text
+            snapshot,
+            message.chat_id,
+            [message.photo],
+            message.text,
+            message.replied_to,
+            known_message_id(message),
         )
 
     def _photo_text_to_screen(
@@ -711,6 +805,8 @@ class IncomingMessageHandler:
         chat_id: int,
         photos: Sequence[ChannelPhoto],
         caption: str,
+        replied_to: RepliedToText | None,
+        chat_message_id: int | None,
     ) -> TextToScreen:
         """Describe a User's photos and turn them into one text of their Message.
 
@@ -719,6 +815,9 @@ class IncomingMessageHandler:
             chat_id: The chat to reply in.
             photos: The photo, or an Album's photos.
             caption: The caption; "" if none.
+            replied_to: The earlier text they reply to, if any.
+            chat_message_id: The chat channel's ID for the photo, or the
+                Album's first item; None if not known.
 
         Returns:
             The text to screen, which holds each photo's description, or,
@@ -732,4 +831,6 @@ class IncomingMessageHandler:
             kind=MessageKind.PHOTO,
             photos=photo_message.photos,
             safeguard_text=photo_message.safeguard_text,
+            replied_to=replied_to,
+            chat_message_id=chat_message_id,
         )

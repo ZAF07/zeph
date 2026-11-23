@@ -70,10 +70,52 @@ recent_messages_hours: 24
 recent_messages_cap: 400
 
 # How many seconds the Companion waits after a User's last text, photo or
-# album photo before answering everything they sent as one Message. Long
-# enough to type the next thought, so a thought split over texts gets one
-# reply.
-message_wait_seconds: 15
+# album before answering everything they sent as one Message. The wait
+# follows how the last text reads: finished (a question, or a text of at
+# least message_wait_long_text_words ending in . ! or an emoji) gets the
+# finished wait; trailing off (ending in ... or a comma, ending with one of
+# message_wait_trailing_words, being one of them alone, or a photo with no
+# caption) gets the trailing wait; anything else, a sticker included, gets
+# message_wait_seconds. However many texts come, no Message waits more than
+# message_wait_cap_seconds from its first text.
+message_wait_finished_seconds: 2
+message_wait_trailing_seconds: 12
+message_wait_seconds: 6
+message_wait_cap_seconds: 20
+message_wait_long_text_words: 15
+message_wait_trailing_words:
+  - and
+  - but
+  - so
+  - or
+  - because
+  - cause
+  - cuz
+  - like
+  - then
+  - also
+  - plus
+  - if
+  - when
+  - the
+  - a
+  - to
+  - with
+  - wait
+  - ok so
+  - okay so
+  - so like
+  - lol
+  - hmm
+  - um
+  - uh
+  - well
+  - anyway
+  - btw
+  - omg
+  - ugh
+  - guess what
+  - hold on
 
 # The chat channel hides typing after about 5 seconds, so while a reply is
 # being worked on the Companion shows typing again every this many seconds,
@@ -166,6 +208,12 @@ response_prompt: |-
     never more than four.
   - Write only the texts themselves: no names, labels, quotes or notes around
     them.
+  - Their latest message may be several texts, numbered [1], [2] and so on.
+    When those texts bring up more than one thing, and one of your texts
+    answers a text of theirs that isn't the last one, start it with [re N],
+    e.g. "[re 2] glad she called", so it shows as a reply to that text. Do
+    this at most two times in a reply, and never when they talk about one
+    thing.
 
 # Photos (ADR-0007). Each photo a User sends (or JPEG, PNG or WebP image sent
 # as a file) is downloaded from Telegram and looked at once, before the
