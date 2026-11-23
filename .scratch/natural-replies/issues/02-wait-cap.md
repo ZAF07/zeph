@@ -1,6 +1,6 @@
 # 02 — A cap on the wait from the Message's first text
 
-Status: ready-for-agent
+Status: in-progress
 Track: A
 Blocked by: 01
 

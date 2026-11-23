@@ -41,6 +41,10 @@ const settings: AdminSettings = {
     12,
     "Seconds Zeph waits for more when the User’s last text ends unfinished.",
   ),
+  message_wait_cap_seconds: seeded(
+    20,
+    "Most seconds Zeph waits from the first text of a Message.",
+  ),
   message_wait_long_text_words: seeded(
     15,
     "How many words a text needs to read finished.",
@@ -521,6 +525,52 @@ describe("PlatformSettingsForm", () => {
       message_wait_trailing_seconds: 20,
       message_wait_long_text_words: 10,
     });
+  });
+
+  it("shows and saves the wait cap in Conversations, with its hint", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const cap = await screen.findByLabelText("Wait cap");
+    expect(cap).toHaveValue(20);
+    expect(
+      screen.getByRole("region", { name: "Conversations" }),
+    ).toContainElement(cap);
+    expect(
+      screen.getByText(
+        "Most seconds Zeph waits from the first text of a Message.",
+      ),
+    ).toBeVisible();
+
+    await user.clear(cap);
+    await user.type(cap, "30");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      message_wait_cap_seconds: 30,
+    });
+  });
+
+  it("shows why a wait cap shorter than a wait was refused", async () => {
+    apiClient.updateAdminSettings.mockRejectedValue(
+      new ApiError(
+        422,
+        "/api/admin/settings",
+        "The Wait cap must be at least the longest wait (12 seconds).",
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const cap = await screen.findByLabelText("Wait cap");
+
+    await user.clear(cap);
+    await user.type(cap, "5");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(
+      await screen.findByText(
+        "The Wait cap must be at least the longest wait (12 seconds).",
+      ),
+    ).toBeVisible();
   });
 
   it("shows the trailing words with commas and saves them as a list", async () => {

@@ -341,6 +341,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         photo_service=photo_service,
         user_snapshots=user_snapshots,
         timer=dependencies.timer,
+        clock=dependencies.clock,
         work_queue=dependencies.work_queue,
         dashboard_url=dependencies.dashboard_url,
     )

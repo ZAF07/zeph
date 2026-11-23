@@ -138,3 +138,20 @@ def yaml_trailing_words() -> list[str]:
         "message_wait_trailing_words"
     ]
     return words
+
+
+def test_an_install_from_before_the_cap_gets_the_wait_cap_and_keeps_its_waits(
+    engine: Engine, database_url: str
+) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text("DELETE FROM platform_settings WHERE key = 'message_wait_cap_seconds'")
+        )
+    store_message_wait(engine, 9)
+    migrate(database_url)
+    seed_platform_settings(engine, SEED_FILE)
+
+    assert stored_settings(engine, ("message_wait_cap_seconds",)) == {
+        "message_wait_cap_seconds": 20
+    }
+    assert stored_message_wait(engine) == 9
