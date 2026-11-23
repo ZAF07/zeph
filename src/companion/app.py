@@ -72,6 +72,7 @@ from companion.core.ports import (
     Repositories,
     Scheduler,
     Timer,
+    UserWorkQueue,
     WebSearch,
 )
 from companion.core.post_conversation import PostConversationProcessor
@@ -120,6 +121,8 @@ class AppDependencies:
         scheduler: Runs the scheduled work while the app is up.
         timer: Runs work after a wait, like answering a Message once its
             User has paused.
+        work_queue: Runs each User's chat work in order, apart from the web
+            threads, like checking their texts and answering their Messages.
         telegram_webhook_secret: The secret Telegram sends with each update.
         telegram_bot_username: The Companion's Telegram @username.
         dashboard_url: The Dashboard's public address.
@@ -150,6 +153,7 @@ class AppDependencies:
     clock: Clock
     scheduler: Scheduler
     timer: Timer
+    work_queue: UserWorkQueue
     telegram_webhook_secret: str
     telegram_bot_username: str
     dashboard_url: str
@@ -337,6 +341,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         photo_service=photo_service,
         user_snapshots=user_snapshots,
         timer=dependencies.timer,
+        work_queue=dependencies.work_queue,
         dashboard_url=dependencies.dashboard_url,
     )
 

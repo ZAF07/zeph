@@ -3,14 +3,22 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from companion.core.incoming_messages import MESSAGE_WAIT_PREFIX
-from tests.fakes import FakeAuthVerifier, FakeChatChannel, FakeTimer, ScriptedChatModel
+from companion.core.incoming_messages import MESSAGE_WAIT_PREFIX, TEXTS_LINE_PREFIX
+from companion.core.models import ChatRole
+from tests.fakes import (
+    FakeAuthVerifier,
+    FakeChatChannel,
+    FakeTimer,
+    FakeUserWorkQueue,
+    ScriptedChatModel,
+)
 from tests.telegram_helpers import (
     TELEGRAM_CHAT_ID,
     connect_telegram,
     owner_headers,
     post_to_webhook,
     send_to_webhook,
+    telegram_message_update,
     telegram_photo_update,
     telegram_text_update,
 )
@@ -315,3 +323,115 @@ def test_the_wait_ending_while_a_text_is_checked_leaves_it_in_the_same_message(
 
     [reply_call] = chat_model.calls
     assert reply_call.history[-1].text == "hey\nrough day"
+
+
+def test_the_webhook_returns_before_the_text_is_checked_or_answered(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    timer: FakeTimer,
+    work_queue: FakeUserWorkQueue,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script("oh no, what happened?")
+    work_queue.hold()
+
+    assert post_to_webhook(client, telegram_text_update("rough day")) == 200
+
+    assert chat_model.safeguard_calls == []
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == []
+    work_queue.run_held()
+    assert len(chat_model.safeguard_calls) == 1
+    timer.end_message_waits()
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["oh no, what happened?"]
+
+
+def test_a_burst_of_texts_sent_during_a_reply_gets_one_reply_afterwards_in_order(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    timer: FakeTimer,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script("first part\n\nsecond part", "one reply to all of it")
+    send_text = chat_channel.send_text
+
+    def send_then_burst(chat_id: int, text: str) -> None:
+        send_text(chat_id, text)
+        if text == "first part":
+            post_texts(client, "wait", "actually", "it got worse", "my boss", "lol")
+
+    monkeypatch.setattr(chat_channel, "send_text", send_then_burst)
+
+    send_to_webhook(client, telegram_text_update("hey"))
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
+        "first part",
+        "second part",
+    ]
+    timer.end_message_waits()
+
+    _, burst_call = chat_model.calls
+    users_words = "\n".join(
+        line.text for line in burst_call.history if line.role == ChatRole.USER
+    )
+    assert users_words.endswith("wait\nactually\nit got worse\nmy boss\nlol")
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
+        "first part",
+        "second part",
+        "one reply to all of it",
+    ]
+
+
+def test_a_text_waiting_its_turn_when_the_wait_ends_joins_the_same_message(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    timer: FakeTimer,
+    work_queue: FakeUserWorkQueue,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script("oh no, why?")
+    post_texts(client, "one")
+    work_queue.hold(TEXTS_LINE_PREFIX)
+
+    post_texts(client, "two")
+    timer.end_message_waits()
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == []
+    work_queue.run_held()
+    timer.end_message_waits()
+
+    [reply_call] = chat_model.calls
+    assert reply_call.history[-1].text == "one\ntwo"
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == ["oh no, why?"]
+
+
+def test_a_reply_held_back_for_a_message_waiting_its_turn_is_sent_once_it_is_handled(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    timer: FakeTimer,
+    work_queue: FakeUserWorkQueue,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    chat_model.script("hi you")
+    post_texts(client, "hey")
+    work_queue.hold(TEXTS_LINE_PREFIX)
+    voice_note = telegram_message_update(
+        {"voice": {"file_id": "voice-1", "file_unique_id": "voice-1"}}
+    )
+
+    assert post_to_webhook(client, voice_note) == 200
+    timer.end_message_waits()
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == []
+    work_queue.run_held()
+
+    assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [
+        seeded_settings["unsupported_message_reply"],
+        "hi you",
+    ]

@@ -1,6 +1,6 @@
 from collections.abc import Mapping
 
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -61,6 +61,8 @@ class Settings(BaseSettings):
     scheduler_adapter: str = "in_process"
 
     model_call_developer_logs: bool = False
+
+    message_pool_size: int = Field(default=50, ge=1)
 
     @property
     def initial_admin_email_set(self) -> frozenset[str]:

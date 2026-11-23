@@ -145,3 +145,20 @@ def test_model_call_developer_logs_are_printed_only_when_on(
     show_model_call_developer_logs(True)
     assert model_call_logger.level == logging.INFO
     assert len(model_call_logger.handlers) == 1
+
+
+def test_the_message_pool_has_50_threads_unless_set() -> None:
+    assert load_settings(COMPLETE_ENVIRONMENT).message_pool_size == 50
+
+
+def test_the_message_pool_size_is_read_from_the_environment() -> None:
+    environment = {**COMPLETE_ENVIRONMENT, "MESSAGE_POOL_SIZE": "12"}
+
+    assert load_settings(environment).message_pool_size == 12
+
+
+def test_an_empty_message_pool_is_refused() -> None:
+    environment = {**COMPLETE_ENVIRONMENT, "MESSAGE_POOL_SIZE": "0"}
+
+    with pytest.raises(ValueError):
+        load_settings(environment)

@@ -1,4 +1,4 @@
-.PHONY: check check-python check-web contract eval up restart worktree-setup worktree-teardown db-copy
+.PHONY: check check-python check-web contract eval load-test up restart worktree-setup worktree-teardown db-copy
 
 MAIN_DIR := $(shell dirname "$$(git rev-parse --path-format=absolute --git-common-dir)")
 THIS_DIR := $(shell git rev-parse --show-toplevel)
@@ -33,6 +33,15 @@ eval:
 	@running="$$($(COMPOSE) ps --status running --services 2>/dev/null)"; \
 	echo "$$running" | grep -qx backend && echo "$$running" | grep -qx eval-runner || { echo "The stack isn't running here (backend and eval-runner must be up). Start it with make up or make restart, then run make eval again."; exit 1; }
 	$(COMPOSE) exec -T backend python -m companion.eval_terminal $(if $(EVALS),--evals $(EVALS)) $(if $(CASES),--cases $(CASES))
+
+## Load test this worktree's stack, for free: the backend runs on the load-test adapters
+## (docker-compose.load-test.yml), so no model, search or Telegram call is made. Prints the
+## report against the bar in .scratch/scaling/PRD.md. ARGS="--tick-users 10" for a shorter run.
+## The backend stays on the load-test adapters afterwards; make restart puts it back.
+load-test:
+	$(REQUIRE_WORKTREE)
+	$(WORKTREE_COMPOSE) -f docker-compose.yml -f docker-compose.load-test.yml up --build --detach --wait postgres backend
+	set -a && . ./.env && set +a && uv run python -m scripts.load_test $(ARGS)
 
 ## Start everything.
 up:

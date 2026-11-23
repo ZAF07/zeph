@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 
+from companion.adapters.evals.stand_ins import InlineUserWorkQueue
 from companion.adapters.postgres.tables import EMBEDDING_SIZE
 from companion.core.incoming_messages import MESSAGE_WAIT_PREFIX
 from companion.core.models import (
@@ -428,6 +429,49 @@ class FakeTimer:
         keys = [key for key in self._waiting if key.startswith(key_prefix)]
         for key in keys:
             self._waiting.pop(key)()
+
+
+class FakeUserWorkQueue(InlineUserWorkQueue):
+    """User work queue that runs work right away, on the caller's thread.
+
+    Like the Evals' queue, each key's work still runs one piece at a time,
+    in order. A test can hold work instead, to see what happens before it
+    runs.
+    """
+
+    def __init__(self) -> None:
+        """Start with nothing waiting, running work as it is added."""
+        super().__init__()
+        self._held_key_prefix: str | None = None
+        self._held: list[tuple[str, Callable[[], None]]] = []
+
+    def hold(self, key_prefix: str = "") -> None:
+        """Hold the work added from now on whose key starts with a prefix.
+
+        Args:
+            key_prefix: The start of the keys to hold; "" holds all work.
+        """
+        self._held_key_prefix = key_prefix
+
+    def add(self, key: str, work: Callable[[], None]) -> None:
+        """Run the work now, unless the key's work is running or it is held.
+
+        Args:
+            key: Names one line of a User's work.
+            work: What to run.
+        """
+        if self._held_key_prefix is not None and key.startswith(self._held_key_prefix):
+            self._held.append((key, work))
+            return
+        super().add(key, work)
+
+    def run_held(self) -> None:
+        """Stop holding work and run all held work, in the order it was added."""
+        self._held_key_prefix = None
+        held = list(self._held)
+        self._held.clear()
+        for key, work in held:
+            self.add(key, work)
 
 
 def understanding_answer(

@@ -38,6 +38,7 @@ from tests.fakes import (
     FakePhotoViewer,
     FakeScheduler,
     FakeTimer,
+    FakeUserWorkQueue,
     FakeWebSearch,
     ScriptedChatModel,
 )
@@ -253,6 +254,12 @@ def timer() -> FakeTimer:
 
 
 @pytest.fixture
+def work_queue() -> FakeUserWorkQueue:
+    """A User work queue that runs work right away, unless a test holds it."""
+    return FakeUserWorkQueue()
+
+
+@pytest.fixture
 def chat_model(seeded_settings: dict[str, Any]) -> ScriptedChatModel:
     """A chat model that returns scripted replies and answers for each service."""
     return ScriptedChatModel(
@@ -284,6 +291,7 @@ def client(
     photo_viewer: FakePhotoViewer,
     scheduler: FakeScheduler,
     timer: FakeTimer,
+    work_queue: FakeUserWorkQueue,
 ) -> Iterator[TestClient]:
     """A test client for the backend wired with fakes and the real database.
 
@@ -310,6 +318,7 @@ def client(
         clock=clock,
         scheduler=scheduler,
         timer=timer,
+        work_queue=work_queue,
         telegram_webhook_secret=WEBHOOK_SECRET,
         telegram_bot_username=BOT_USERNAME,
         dashboard_url=DASHBOARD_URL,
