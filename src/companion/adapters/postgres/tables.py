@@ -132,6 +132,7 @@ conversation_messages = Table(
     Column("sent_at", DateTime(timezone=True), nullable=False),
     Column("photos", JSONB, nullable=False, server_default="[]"),
     Column("sticker", JSONB(none_as_null=True)),
+    Column("replied_to", JSONB(none_as_null=True)),
 )
 
 platform_settings = Table(

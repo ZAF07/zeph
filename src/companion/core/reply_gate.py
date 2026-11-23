@@ -131,6 +131,7 @@ class ReplyGate:
             text.kind,
             text.photos,
             text.sticker,
+            text.replied_to,
         )
         risk_type = self._safeguard.assess(
             conversation_id, snapshot, text.safeguard_text

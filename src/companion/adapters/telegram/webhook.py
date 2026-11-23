@@ -1,4 +1,5 @@
 import hmac
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Header, HTTPException, status
@@ -10,6 +11,8 @@ from companion.core.models import (
     ChannelSticker,
     IncomingMessage,
     MessageKind,
+    RepliedToSender,
+    RepliedToText,
 )
 
 SECRET_HEADER = "X-Telegram-Bot-Api-Secret-Token"
@@ -28,6 +31,7 @@ ATTACHMENT_NAMES = (
     ("dice", "dice"),
     ("story", "story"),
 )
+REPLIED_TO_TEXT_MAX_CHARACTERS = 500
 
 
 def attachment_name(message: dict[str, Any]) -> str | None:
@@ -100,12 +104,79 @@ def parse_replied_sticker(message: dict[str, Any]) -> ChannelSticker | None:
     return parse_sticker(sticker) if isinstance(sticker, dict) else None
 
 
+def cut_short(text: str, max_characters: int) -> str:
+    """Cut a text to at most a number of characters, marking where it was cut.
+
+    Args:
+        text: The text.
+        max_characters: How many characters to keep.
+
+    Returns:
+        The text, or its start followed by "…" when it was longer.
+    """
+    return text if len(text) <= max_characters else f"{text[:max_characters]}…"
+
+
+def replied_to_kind_and_text(replied: dict[str, Any]) -> tuple[MessageKind, str]:
+    """Read what kind of message a reply points at and what it said.
+
+    Args:
+        replied: The Telegram message replied to.
+
+    Returns:
+        Its kind and its text, caption or sticker emoji; "" if it has none.
+    """
+    sticker = replied.get("sticker")
+    if isinstance(sticker, dict):
+        emoji = sticker.get("emoji")
+        return MessageKind.STICKER, emoji if isinstance(emoji, str) else ""
+    text = replied.get("text")
+    if isinstance(text, str):
+        return MessageKind.TEXT, text
+    caption = replied.get("caption")
+    caption_text = caption if isinstance(caption, str) else ""
+    if parse_photo(replied) is not None:
+        return MessageKind.PHOTO, caption_text
+    return MessageKind.UNSUPPORTED, caption_text
+
+
+def parse_replied_to(message: dict[str, Any]) -> RepliedToText | None:
+    """Read the earlier text a Telegram message replies to, if it replies to one.
+
+    It is read only from the update, never from saved messages, so it works
+    however old the earlier text is. A bot sent it if the sender is a bot,
+    which in a private chat is the Companion. The part the User highlighted
+    is read instead of the whole text.
+
+    Args:
+        message: The Telegram message.
+
+    Returns:
+        The Replied-to Text, or None if the message doesn't reply to one.
+    """
+    replied = message.get("reply_to_message")
+    if not isinstance(replied, dict):
+        return None
+    sender = replied.get("from")
+    from_bot = isinstance(sender, dict) and bool(sender.get("is_bot"))
+    kind, text = replied_to_kind_and_text(replied)
+    quote = message.get("quote")
+    if isinstance(quote, dict) and isinstance(quote.get("text"), str):
+        text = quote["text"]
+    return RepliedToText(
+        sender=RepliedToSender.COMPANION if from_bot else RepliedToSender.USER,
+        sent_at=datetime.fromtimestamp(int(replied.get("date", 0)), UTC),
+        kind=kind,
+        text=cut_short(text, REPLIED_TO_TEXT_MAX_CHARACTERS),
+    )
+
+
 def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
     """Turn a Telegram update into a channel-neutral incoming message.
 
-    Text, stickers and photos are read, and the sticker a text replies to,
-    if any. A voice note, video, GIF or other
-    attachment is an unsupported message that keeps its caption. A photo or
+    Text, stickers and photos are read, with the earlier text they reply
+    to, if any, and the sticker a text replies to. A voice note, video, GIF
+    or other attachment is an unsupported message that keeps its caption. A photo or
     attachment sent with others at once keeps the album ID they share.
 
     Args:
@@ -126,6 +197,7 @@ def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
     chat_id = int(chat["id"])
     username = sender.get("username")
     message_id = int(message.get("message_id", 0))
+    replied_to = parse_replied_to(message)
     text = message.get("text")
     if isinstance(text, str):
         return IncomingMessage(
@@ -135,6 +207,7 @@ def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
             text,
             message_id=message_id,
             replied_sticker=parse_replied_sticker(message),
+            replied_to=replied_to,
         )
     sticker = message.get("sticker")
     if isinstance(sticker, dict):
@@ -146,6 +219,7 @@ def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
             kind=MessageKind.STICKER,
             sticker=parse_sticker(sticker),
             message_id=message_id,
+            replied_to=replied_to,
         )
     caption = message.get("caption")
     media_group_id = message.get("media_group_id")
@@ -161,6 +235,7 @@ def parse_update(update: dict[str, Any]) -> IncomingMessage | None:
             photo=photo,
             album_id=album_id,
             message_id=message_id,
+            replied_to=replied_to,
         )
     attachment = attachment_name(message)
     if attachment is None:
