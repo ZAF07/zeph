@@ -1,6 +1,6 @@
 # 14 — A Tagging Eval with its first cases, and the Pattern Evals guide
 
-Status: ready-for-human
+Status: completed
 Track: B
 Blocked by: 11
 
@@ -24,7 +24,7 @@ This adds Dashboard UI: read `web/design/README.md` first, add or extend the ref
 - [x] A Variant can override the tagging prompt, model and thinking switch
 - [x] The run shows its cost estimate first
 - [x] `docs/pattern-evals/README.md` exists and covers the layers, their limits and what must be done later
-- [ ] The owner has corrected the drafted cases (comment on this issue when done)
+- [x] ~~The owner has corrected the drafted cases~~ moved to issue 20: the owner corrects them after the whole PRD is built (owner's decision, 24 Nov 2026); guide in `docs/pattern-evals/adding-tagging-cases.md`
 - [x] Each criterion above was checked in the running app (`/run`) before being ticked, and the checks for the languages touched pass
 
 ## Blocked by
@@ -69,3 +69,5 @@ Evidence (24 Nov 2026, worktree stack on 3020/8020, real `deepseek-flash`, owner
 - **Open:** the owner corrects the 44 drafted cases (owner's choice: merge now, keep this issue open until they comment).
 
 Merged (24 Nov 2026): c4a6815 (merge "Merge pattern-14-tagging-eval: a Tagging Eval checks the real tagging step against expected Observations"; work in b225895 "Tagging Eval: the real tagging step checked against expected Observations", d4f5c95 "Tagging Eval: review fixes", 3857dd9 "Issue 14: evidence, findings for the owner; open for the owner's case review", c053cfd "CONTEXT: the Tagging Eval", d69944e "Tagging Eval: override test uses OpenRouter model names after rebase"). Not archived: open until the owner corrects the drafted cases in `src/companion/seed/evals/cases/tagging.yaml` (or on Admin → Evals → Cases → Tagging) and comments here; then tick the last box, set `completed`, archive.
+
+Owner's decision (24 Nov 2026): the drafted cases are the defaults until the whole PRD is built; correcting them moves to issue 20, with a guide for doing it (`docs/pattern-evals/adding-tagging-cases.md`). Issue archived.

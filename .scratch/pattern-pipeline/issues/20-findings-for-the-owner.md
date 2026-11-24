@@ -188,6 +188,14 @@ If there is nothing, the section holds one line: "Nothing found."
 
 ## 14 — Tagging Eval (2026-11-24)
 
+### Owner corrects the drafted Tagging cases
+
+- **Kind:** risk
+- **What:** The 44 Tagging cases in `src/companion/seed/evals/cases/tagging.yaml` were drafted by Claude and are the defaults until the whole PRD is built (owner's decision, 24 Nov 2026; moved here from issue 14's last criterion).
+- **Impact:** Until corrected, a Tagging Eval score measures the step against Claude's labels, not the owner's.
+- **Suggested fix:** Follow `docs/pattern-evals/adding-tagging-cases.md`: correct on the Dashboard, run, then have an agent copy the cases into the seed.
+- [ ] Owner corrected the Tagging cases
+
 ### Tagging context lines call the User "she"
 
 - **Kind:** bug
