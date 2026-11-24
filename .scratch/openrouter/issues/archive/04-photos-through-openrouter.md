@@ -57,4 +57,4 @@ An OpenRouter adapter behind the `PhotoViewer` port. It sends the instructions a
 ## Completion
 
 - Completed: 2026-11-24
-- Commit: <to be filled in after the merge>
+- Commit: 8389576 (merge of openrouter-04-photos; work in 76f63f0 ad292ed 25f0bdb f89d76e 68cc6eb)
