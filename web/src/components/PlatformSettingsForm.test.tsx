@@ -116,6 +116,7 @@ const settings: AdminSettings = {
   ),
   exploration_wait_days: seeded(3),
   exploration_rest_after_tries: seeded(4),
+  thought_experiments_per_pattern_per_week: seeded(1),
   move_outcomes_per_understanding: seeded(3),
   move_outcomes_closeness_percent: seeded(65),
   curiosities_per_conversation: seeded(1),

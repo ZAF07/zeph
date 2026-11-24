@@ -65,6 +65,7 @@ from companion.adapters.postgres.tables import (
     shared_photos,
     stickers,
     telegram_connections,
+    thought_experiments,
     understandings,
     user_feature_switches,
     user_portraits,
@@ -186,6 +187,8 @@ from companion.core.models import (
     StoredSetting,
     TaggingShape,
     TelegramConnection,
+    ThoughtExperiment,
+    ThoughtExperimentDetails,
     ThreadLeftAlone,
     ThreadReaction,
     ThreadToBringUp,
@@ -4115,6 +4118,7 @@ def _to_exploration_try(row: Row[Any]) -> ExplorationTry:
         observation_id=row.observation_id,
         part_of_life=SituationSetting(row.part_of_life) if row.part_of_life else None,
         outcome=TryOutcome(row.outcome) if row.outcome else None,
+        thought_experiment_id=row.thought_experiment_id,
     )
 
 
@@ -4281,6 +4285,199 @@ class PostgresExplorationRepository:
             connection.execute(
                 delete(explorations).where(explorations.c.user_id == user_id)
             )
+
+
+def _to_thought_experiment(row: Row[Any]) -> ThoughtExperiment:
+    """Turn a `thought_experiments` row into a Thought Experiment.
+
+    Args:
+        row: The row.
+
+    Returns:
+        The Thought Experiment.
+    """
+    return ThoughtExperiment(
+        id=row.id,
+        details=ThoughtExperimentDetails(
+            wording=row.wording,
+            pattern_type_id=row.pattern_type_id,
+            other_pattern_type_id=row.other_pattern_type_id,
+            sensitivity=CuriositySensitivity(row.sensitivity),
+            starter=row.starter,
+            on=row.is_on,
+        ),
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        archived_at=row.archived_at,
+        seed_key=row.seed_key,
+    )
+
+
+def _thought_experiment_values(details: ThoughtExperimentDetails) -> dict[str, Any]:
+    """Turn what an Admin set on a Thought Experiment into column values.
+
+    Args:
+        details: What an Admin set.
+
+    Returns:
+        The values for its columns.
+    """
+    return {
+        "wording": details.wording,
+        "pattern_type_id": details.pattern_type_id,
+        "other_pattern_type_id": details.other_pattern_type_id,
+        "sensitivity": details.sensitivity,
+        "starter": details.starter,
+        "is_on": details.on,
+    }
+
+
+class PostgresThoughtExperimentRepository:
+    """Stores Thought Experiments in Postgres. None is ever deleted."""
+
+    def __init__(self, database: Database) -> None:
+        """Set up the repository.
+
+        Args:
+            database: Where to run queries: the engine, or one transaction.
+        """
+        self._database = database
+
+    def list_all(self) -> list[ThoughtExperiment]:
+        """List every Thought Experiment, archived ones too, oldest first.
+
+        Returns:
+            The Thought Experiments.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(thought_experiments).order_by(
+                    thought_experiments.c.created_at, thought_experiments.c.id
+                )
+            ).all()
+        return [_to_thought_experiment(row) for row in rows]
+
+    def get(self, thought_experiment_id: UUID) -> ThoughtExperiment | None:
+        """Find one Thought Experiment.
+
+        Args:
+            thought_experiment_id: Its ID.
+
+        Returns:
+            It, or None if there is no such one.
+        """
+        with self._database.connect() as connection:
+            row = connection.execute(
+                select(thought_experiments).where(
+                    thought_experiments.c.id == thought_experiment_id
+                )
+            ).one_or_none()
+        return _to_thought_experiment(row) if row else None
+
+    def add(self, thought_experiment: ThoughtExperiment) -> None:
+        """Store a new Thought Experiment.
+
+        Args:
+            thought_experiment: It, with its ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                insert(thought_experiments).values(
+                    id=thought_experiment.id,
+                    created_at=thought_experiment.created_at,
+                    updated_at=thought_experiment.updated_at,
+                    archived_at=thought_experiment.archived_at,
+                    seed_key=thought_experiment.seed_key,
+                    **_thought_experiment_values(thought_experiment.details),
+                )
+            )
+
+    def update(
+        self,
+        thought_experiment_id: UUID,
+        details: ThoughtExperimentDetails,
+        now: datetime,
+    ) -> ThoughtExperiment:
+        """Change what an Admin set on a Thought Experiment.
+
+        Args:
+            thought_experiment_id: Its ID; it exists.
+            details: Its new values.
+            now: When it changed.
+
+        Returns:
+            It, saved.
+        """
+        with self._database.begin() as connection:
+            row = connection.execute(
+                update(thought_experiments)
+                .where(thought_experiments.c.id == thought_experiment_id)
+                .values(updated_at=now, **_thought_experiment_values(details))
+                .returning(thought_experiments)
+            ).one()
+        return _to_thought_experiment(row)
+
+    def archive(self, thought_experiment_id: UUID, now: datetime) -> ThoughtExperiment:
+        """Archive a Thought Experiment, so it is never asked again.
+
+        Args:
+            thought_experiment_id: Its ID; it exists.
+            now: When it was archived.
+
+        Returns:
+            It, saved.
+        """
+        with self._database.begin() as connection:
+            row = connection.execute(
+                update(thought_experiments)
+                .where(thought_experiments.c.id == thought_experiment_id)
+                .values(archived_at=now, updated_at=now)
+                .returning(thought_experiments)
+            ).one()
+        return _to_thought_experiment(row)
+
+    def close_waiting(self, thought_experiment_id: UUID) -> None:
+        """Close every waiting aimed Curiosity that would put it to a User.
+
+        Args:
+            thought_experiment_id: Its ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                update(curiosities)
+                .where(
+                    curiosities.c.state == CuriosityState.WAITING,
+                    curiosities.c.id.in_(
+                        select(exploration_tries.c.curiosity_id).where(
+                            exploration_tries.c.thought_experiment_id
+                            == thought_experiment_id
+                        )
+                    ),
+                )
+                .values(state=CuriosityState.CLOSED)
+            )
+
+    def asked_counts(self) -> dict[UUID, int]:
+        """Count how many times each Thought Experiment was put to a User.
+
+        Returns:
+            How many of its aimed Curiosities were asked, by its ID; one
+            never asked is left out.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(exploration_tries.c.thought_experiment_id, func.count())
+                .join(
+                    curiosities,
+                    curiosities.c.id == exploration_tries.c.curiosity_id,
+                )
+                .where(
+                    exploration_tries.c.thought_experiment_id.is_not(None),
+                    curiosities.c.raised_at.is_not(None),
+                )
+                .group_by(exploration_tries.c.thought_experiment_id)
+            ).all()
+        return {row[0]: row[1] for row in rows}
 
 
 def _to_curiosity(row: Row[Any]) -> Curiosity:
@@ -7379,6 +7576,7 @@ def _build_repositories(
         observations=PostgresObservationRepository(database),
         curiosities=PostgresCuriosityRepository(database),
         explorations=PostgresExplorationRepository(database),
+        thought_experiments=PostgresThoughtExperimentRepository(database),
         move_outcomes=PostgresMoveOutcomeRepository(database),
         user_portraits=PostgresUserPortraitRepository(database),
         knowledge_documents=PostgresKnowledgeDocumentRepository(database),

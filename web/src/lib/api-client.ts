@@ -857,6 +857,44 @@ export type MemoryCategoryInput = {
   always_include: boolean;
 };
 
+/** How sensitive a Thought Experiment is, as its Curiosity's. */
+export type ThoughtExperimentSensitivity = "low" | "medium" | "high";
+
+/**
+ * A made-up situation that tells two look-alike Pattern Types apart, as
+ * Admins manage it, with how many times it was put to a User.
+ */
+export type ThoughtExperiment = {
+  id: string;
+  wording: string;
+  pattern_type_id: string;
+  other_pattern_type_id: string;
+  sensitivity: ThoughtExperimentSensitivity;
+  starter: boolean;
+  on: boolean;
+  archived_at: string | null;
+  asked_count: number;
+};
+
+/** What an Admin sets on a Thought Experiment. */
+export type ThoughtExperimentInput = {
+  wording: string;
+  pattern_type_id: string;
+  other_pattern_type_id: string;
+  sensitivity: ThoughtExperimentSensitivity;
+  starter: boolean;
+  on: boolean;
+};
+
+/** A Pattern Type a Thought Experiment can name. */
+export type PatternTypeChoice = { id: string; name: string };
+
+/** Every Thought Experiment, oldest first, and the Pattern Types to pick from. */
+export type ThoughtExperimentList = {
+  thought_experiments: ThoughtExperiment[];
+  pattern_types: PatternTypeChoice[];
+};
+
 /** The kinds of file a Knowledge document can be. */
 export type KnowledgeFileType = "text" | "markdown" | "pdf";
 
@@ -1559,6 +1597,17 @@ export type ApiClient = {
   ) => Promise<MemoryCategory>;
   archiveMemoryCategory: (id: string) => Promise<MemoryCategory>;
   restoreMemoryCategory: (id: string) => Promise<MemoryCategory>;
+  listThoughtExperiments: () => Promise<ThoughtExperimentList>;
+  addThoughtExperiment: (
+    input: ThoughtExperimentInput,
+    saveAnyway: boolean,
+  ) => Promise<ThoughtExperiment>;
+  updateThoughtExperiment: (
+    id: string,
+    input: ThoughtExperimentInput,
+    saveAnyway: boolean,
+  ) => Promise<ThoughtExperiment>;
+  archiveThoughtExperiment: (id: string) => Promise<ThoughtExperiment>;
   listKnowledgeDocuments: () => Promise<KnowledgeDocument[]>;
   getKnowledgeDocument: (id: string) => Promise<KnowledgeDocumentWithText>;
   updateKnowledgeDocumentDetails: (
@@ -2066,6 +2115,24 @@ export function createApiClient(
     restoreMemoryCategory: (id) =>
       request<MemoryCategory>(
         `/api/admin/memory-categories/${id}/restore`,
+        "POST",
+      ),
+    listThoughtExperiments: () =>
+      request<ThoughtExperimentList>("/api/admin/thought-experiments"),
+    addThoughtExperiment: (input, saveAnyway) =>
+      request<ThoughtExperiment>("/api/admin/thought-experiments", "POST", {
+        ...input,
+        save_anyway: saveAnyway,
+      }),
+    updateThoughtExperiment: (id, input, saveAnyway) =>
+      request<ThoughtExperiment>(
+        `/api/admin/thought-experiments/${id}`,
+        "PUT",
+        { ...input, save_anyway: saveAnyway },
+      ),
+    archiveThoughtExperiment: (id) =>
+      request<ThoughtExperiment>(
+        `/api/admin/thought-experiments/${id}/archive`,
         "POST",
       ),
     listKnowledgeDocuments: async () =>

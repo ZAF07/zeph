@@ -16,6 +16,7 @@ import { patternCatalogFixtures } from "@/lib/design-fixtures/pattern-catalog";
 import { planFixtures } from "@/lib/design-fixtures/plan";
 import { alex, shellFixtures, zaf } from "@/lib/design-fixtures/shell";
 import { telegramFixtures } from "@/lib/design-fixtures/telegram";
+import { thoughtExperimentsFixtures } from "@/lib/design-fixtures/thought-experiments";
 
 /** Who the design fixtures sign in as: Alex the User, or Zaf the Admin. */
 export type DesignAs = "user" | "admin";
@@ -92,6 +93,7 @@ export function createFixtureClient(designAs: DesignAs): ApiClient {
     ...overviewFixtures,
     ...copyFixtures,
     ...patternCatalogFixtures,
+    ...thoughtExperimentsFixtures,
     ...evalDaySummaryFixtures,
   });
 }

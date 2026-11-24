@@ -339,6 +339,9 @@ EXPLORATION_WAIT = Setting("exploration_wait_days", read_days)
 EXPLORATION_REST_AFTER_TRIES = Setting(
     "exploration_rest_after_tries", read_whole_number
 )
+THOUGHT_EXPERIMENTS_PER_PATTERN_PER_WEEK = Setting(
+    "thought_experiments_per_pattern_per_week", read_whole_number
+)
 PATTERN_PUSHED_BACK_WAIT = Setting("pattern_pushed_back_wait_days", read_days)
 PATTERN_CLOSENESS_PERCENT = Setting("pattern_closeness_percent", read_whole_number)
 PORTRAIT_MODEL = Setting("portrait_model", read_text)
@@ -1498,6 +1501,17 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
             "After this many tries in a row with nothing useful, an Exploration "
             "rests and frees its place on the Agenda. A new Observation for its "
             "Pattern wakes it."
+        ),
+    ),
+    EditableSetting(
+        THOUGHT_EXPERIMENTS_PER_PATTERN_PER_WEEK.key,
+        "Thought Experiments per Pattern a week",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=7,
+        hint=(
+            "The most Thought Experiments Zeph puts to a User about one Pattern "
+            "in 7 days, counting one still waiting to be asked. 0 asks none."
         ),
     ),
     EditableSetting(

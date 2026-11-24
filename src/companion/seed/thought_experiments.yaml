@@ -1,0 +1,273 @@
+# The first Thought Experiments: made-up situations, each written to tell two
+# look-alike Pattern Types apart. Loaded when the backend starts: each entry
+# whose `key` isn't stored yet is added. One already stored is never changed,
+# even when edited, switched off or archived on the Dashboard, so change them
+# there. A new entry here, with a new key, is added on the next start. Keep
+# keys unique and never reuse one.
+#
+# Each entry has `key`, `wording` (what the User hears, ending in an open
+# question), `pattern_types` (the two it tells apart, by catalog ID),
+# `sensitivity` (low, medium or high, as a Curiosity's) and `starter` (may be
+# offered to a new User; one broad one per area). How to write a good one is
+# in docs/thought-experiments/README.md.
+
+- key: belong-worth-team-plan
+  pattern_types: [CONF.AVOID.BELONG, ACH.WORTH.PERF]
+  sensitivity: low
+  starter: true
+  wording: >-
+    Your team lead, who you get on well with, shares a plan in a meeting and
+    you can see a real problem with it. Nobody else has spoken up. What do you
+    do, and what's on your mind as you decide?
+
+- key: belong-worth-friend-feedback
+  pattern_types: [CONF.AVOID.BELONG, ACH.WORTH.PERF]
+  sensitivity: low
+  wording: >-
+    A close friend reads something you wrote and says, kindly, that one part
+    doesn't work. Afterwards, what stays with you more: that the part wasn't
+    good enough, or that things might feel a little awkward between you? And
+    what do you say back to them?
+
+- key: belong-uncert-friend-or-shop
+  pattern_types: [CONF.AVOID.BELONG, CTRL.UNCERT.PLAN]
+  sensitivity: low
+  wording: >-
+    Picture two times you disagree with a decision: once with a close friend,
+    once with a shop that got your order wrong. How it will turn out is just
+    as unclear both times. In which one is it harder for you to speak up, and
+    why?
+
+- key: belong-uncert-holiday-known
+  pattern_types: [CONF.AVOID.BELONG, CTRL.UNCERT.PLAN]
+  sensitivity: low
+  wording: >-
+    A friend you're close to picks a holiday plan you're not keen on. You
+    could say so, or go along with it. Say you knew for certain how the trip
+    would turn out either way. Would that change what you do? What would?
+
+- key: give-belong-no-one-minds
+  pattern_types: [APPR.GIVE.NEEDED, CONF.AVOID.BELONG]
+  sensitivity: low
+  starter: true
+  wording: >-
+    A colleague asks if you could take on a small extra task this week. Say
+    you knew they wouldn't mind at all if you said no, and it wouldn't change
+    how they see you. Would you still want to say yes? What would make it
+    worth it to you?
+
+- key: belong-give-what-is-lost
+  pattern_types: [CONF.AVOID.BELONG, APPR.GIVE.NEEDED]
+  sensitivity: low
+  wording: >-
+    A friend asks for help with something you've helped them with many times
+    before. Picture saying no. What would feel lost: the ease between you, or
+    being the one they turn to? And what do you end up doing?
+
+- key: belong-moodfix-dinner
+  pattern_types: [CONF.AVOID.BELONG, REL.MOOD.FIX]
+  sensitivity: medium
+  wording: >-
+    At dinner, a family member is in a low mood and makes a comment you don't
+    agree with. In that moment, do you say what you think, let it go, or try
+    to lift their mood? What's behind that choice?
+
+- key: belong-moodfix-partner-plan
+  pattern_types: [CONF.AVOID.BELONG, REL.MOOD.FIX]
+  sensitivity: medium
+  wording: >-
+    Your partner comes home tense and starts talking about a plan you think
+    won't work. What comes first for you: sharing your view, keeping it to
+    yourself, or helping them feel better? Why that one?
+
+- key: worth-uncert-two-presentations
+  pattern_types: [ACH.WORTH.PERF, CTRL.UNCERT.PLAN]
+  sensitivity: low
+  starter: true
+  wording: >-
+    Picture two presentations. For the first, you know exactly what will be
+    asked, but people will judge how well you do. For the second, nobody will
+    judge you, but you have no idea what will be asked. Which one would you
+    spend more time preparing for, and why?
+
+- key: worth-uncert-trip-weather
+  pattern_types: [ACH.WORTH.PERF, CTRL.UNCERT.PLAN]
+  sensitivity: low
+  wording: >-
+    You're planning a trip for a group of friends. Everything is booked, but
+    one day's plans depend on the weather. How do you feel about that open
+    day? Would you feel any different if you knew no one would blame you if
+    it went wrong?
+
+- key: worth-defend-report
+  pattern_types: [ACH.WORTH.PERF, CONF.DEFEND.SELF]
+  sensitivity: low
+  wording: >-
+    Your manager tells you a report you wrote missed the point. What's the
+    first thing you say or do? And what goes through your head about it that
+    evening?
+
+- key: worth-defend-harsh
+  pattern_types: [ACH.WORTH.PERF, CONF.DEFEND.SELF]
+  sensitivity: low
+  wording: >-
+    A friend tells you that you were a bit harsh with someone in your group.
+    Is your first reaction closer to explaining why you said it, or to going
+    over it later and thinking less of yourself? What happens after that?
+
+- key: worth-goalmove-hit-or-miss
+  pattern_types: [ACH.WORTH.PERF, ACH.GOAL.MOVE]
+  sensitivity: low
+  wording: >-
+    You finally reach a goal you've worked on for months, like a fitness
+    target or a step up at work. What do you do the next day, and how long
+    does the good feeling last? Now picture you missed it by a little
+    instead: what would you say to yourself?
+
+- key: confirm-check-holiday-and-friend
+  pattern_types: [APPR.CONFIRM.CHOICE, REL.CHECK.SECURE]
+  sensitivity: low
+  wording: >-
+    You've just booked a holiday you're excited about. On the same day, a
+    close friend hasn't answered your messages since the morning. Which would
+    you want more right then: someone saying the holiday was a good choice,
+    or knowing things are fine with your friend? What do you do?
+
+- key: uncert-confirm-job-offers
+  pattern_types: [CTRL.UNCERT.PLAN, APPR.CONFIRM.CHOICE]
+  sensitivity: low
+  starter: true
+  wording: >-
+    You're choosing between two job offers. Before you decide, would you
+    rather gather more facts, or ask people you trust what they'd do? And
+    once you've chosen, do you still want people to tell you it was right?
+
+- key: confirm-uncert-paid-course
+  pattern_types: [APPR.CONFIRM.CHOICE, CTRL.UNCERT.PLAN]
+  sensitivity: low
+  wording: >-
+    You've just signed up and paid for a course. A friend asks about it. Do
+    you find yourself wanting them to say it was a good idea, or thinking
+    about what might go wrong with it? What do you do with that feeling?
+
+- key: confirm-open-trip-date
+  pattern_types: [APPR.CONFIRM.CHOICE, CTRL.OPEN.FREEDOM]
+  sensitivity: low
+  wording: >-
+    A friend asks you to fix a date now for a trip together in three months.
+    Do you say yes now, or keep it open for a while? If you said yes, would
+    you want to hear from others that it was a good call?
+
+- key: give-moodfix-two-friends
+  pattern_types: [APPR.GIVE.NEEDED, REL.MOOD.FIX]
+  sensitivity: low
+  wording: >-
+    At a party, one friend seems quiet and down but hasn't asked for
+    anything. Another friend asks you outright to help them move house next
+    week. Which of the two pulls at you more, and what do you do about each?
+
+- key: give-selfrely-swap-tasks
+  pattern_types: [APPR.GIVE.NEEDED, CTRL.SELF.RELY]
+  sensitivity: low
+  wording: >-
+    A colleague offers to take one of your tasks so you can help with one of
+    theirs instead. Would you rather keep your own task, take on theirs, or
+    do both? Why?
+
+- key: hide-withdraw-hard-week
+  pattern_types: [APPR.HIDE.BURDEN, CONF.WITHDRAW.HURT]
+  sensitivity: medium
+  wording: >-
+    You've had a really hard week, and a close friend who had nothing to do
+    with it asks how you are. What do you tell them? Would it be any
+    different if they were the reason the week was hard?
+
+- key: withdraw-hide-forgotten
+  pattern_types: [CONF.WITHDRAW.HURT, APPR.HIDE.BURDEN]
+  sensitivity: medium
+  wording: >-
+    Someone you live with forgot something that mattered to you, and it
+    hurt. Later they ask if everything's okay. What do you say? Is it the
+    same as what you'd say to a friend who asked?
+
+- key: hide-selfrely-sick
+  pattern_types: [APPR.HIDE.BURDEN, CTRL.SELF.RELY]
+  sensitivity: low
+  wording: >-
+    You're ill and behind on a project. A friend offers two things: to help
+    with the work, and to listen to how rough it's been. Which offer are you
+    more likely to turn down, and why?
+
+- key: defend-withdraw-in-front-of-friends
+  pattern_types: [CONF.DEFEND.SELF, CONF.WITHDRAW.HURT]
+  sensitivity: medium
+  wording: >-
+    In front of friends, your partner says you got something wrong. In that
+    moment, do you tend to answer back or go quiet? And what happens between
+    the two of you later?
+
+- key: distance-withdraw-every-week
+  pattern_types: [REL.DISTANCE.INDEP, CONF.WITHDRAW.HURT]
+  sensitivity: low
+  wording: >-
+    A friend you're close to suggests seeing each other every week from now
+    on. Nothing has gone wrong between you. How do you feel about it, and
+    what do you say?
+
+- key: withdraw-distance-two-weeks
+  pattern_types: [CONF.WITHDRAW.HURT, REL.DISTANCE.INDEP]
+  sensitivity: medium
+  wording: >-
+    Picture two weeks with someone you're seeing. In one, they say something
+    careless that stings. In the other, they say nothing wrong but want to
+    spend every evening with you. In which week would you pull back more,
+    and what would that look like?
+
+- key: open-distance-weekend-away
+  pattern_types: [CTRL.OPEN.FREEDOM, REL.DISTANCE.INDEP]
+  sensitivity: low
+  wording: >-
+    A close friend asks you to commit now to a weekend away together in two
+    months. Picture the same weekend with a group of people you know less
+    well. Which one are you quicker to say yes to? What makes the other one
+    harder?
+
+- key: selfrely-uncert-client-order
+  pattern_types: [CTRL.SELF.RELY, CTRL.UNCERT.PLAN]
+  sensitivity: low
+  wording: >-
+    You need to get a big order to a client by Friday. A colleague you trust
+    offers to do half, and you know it will arrive on time either way. Do you
+    take the help? What would make you say no?
+
+- key: uncert-check-two-silences
+  pattern_types: [CTRL.UNCERT.PLAN, REL.CHECK.SECURE]
+  sensitivity: low
+  wording: >-
+    You've sent an important email to a company and a message to a close
+    friend, and neither has replied by the end of the day. Which silence
+    stays with you more, and what, if anything, do you do about it?
+
+- key: check-uncert-delayed-flight
+  pattern_types: [REL.CHECK.SECURE, CTRL.UNCERT.PLAN]
+  sensitivity: low
+  wording: >-
+    Your flight home is delayed with no new time given, and the person
+    you're going home to hasn't answered your text. What's on your mind
+    first, and what do you do while you wait?
+
+- key: check-moodfix-quiet-evening
+  pattern_types: [REL.CHECK.SECURE, REL.MOOD.FIX]
+  sensitivity: low
+  starter: true
+  wording: >-
+    Someone close to you seems quieter than usual one evening. What's your
+    first thought about why, and what, if anything, do you do?
+
+- key: absorb-distance-project-evenings
+  pattern_types: [ACH.ABSORB.PULL, REL.DISTANCE.INDEP]
+  sensitivity: low
+  wording: >-
+    You've started a project you love, and it's taking all your evenings. A
+    friend says they miss you. What do you do? Would it be any different if
+    the project ended tomorrow?

@@ -79,6 +79,9 @@ class TaggingContext:
         user_texts: What the User wrote in that Conversation, oldest first.
         time_zone: The User's IANA time zone, for the day of each quote.
         now: When they were tagged.
+        thought_experiment_numbers: The numbers of the Thought Experiments
+            put to the User in that Conversation, as the model was shown
+            them; an Observation answering one is a "what if" answer.
     """
 
     user_id: UUID
@@ -88,6 +91,7 @@ class TaggingContext:
     user_texts: Sequence[UserText]
     time_zone: str | None
     now: datetime
+    thought_experiment_numbers: frozenset[int] = frozenset()
 
 
 class DropReason(StrEnum):
@@ -349,6 +353,22 @@ def describe_unclear_asked(unclear: Mapping[int, Observation]) -> str:
     )
 
 
+def describe_thought_experiments_asked(questions: Mapping[int, str]) -> str:
+    """Write the Thought Experiments put to the User, as the tagging model reads them.
+
+    Args:
+        questions: The questions that put each one to the User, as asked,
+            by number.
+
+    Returns:
+        One numbered line per question; "None." with none.
+    """
+    return (
+        "\n".join(f"[{number}] {question}" for number, question in questions.items())
+        or "None."
+    )
+
+
 def read_choice[Choice: StrEnum](
     entry: dict[str, Any], key: str, choices: type[Choice]
 ) -> Choice | None:
@@ -483,7 +503,9 @@ def check_observation(entry: Any, context: TaggingContext) -> Observation | Drop
         The Observation; or why it is dropped: its Pattern Types or sign
         aren't in the catalog, its quote isn't word for word in the User's
         own texts, a tag or its kind of evidence isn't from its list, or it
-        has no context or who it is about.
+        has no context or who it is about. One that names a Thought
+        Experiment put to the User in the Conversation is a "what if"
+        answer, whatever kind the model wrote.
     """
     if not isinstance(entry, dict):
         return DropReason.NOT_AN_OBSERVATION
@@ -505,6 +527,13 @@ def check_observation(entry: Any, context: TaggingContext) -> Observation | Drop
     about = read_text(entry, "about")
     if context_line is None or about is None:
         return DropReason.MISSING_DETAILS
+    answered = entry.get("thought_experiment")
+    if (
+        isinstance(answered, int)
+        and not isinstance(answered, bool)
+        and answered in context.thought_experiment_numbers
+    ):
+        evidence_kind = EvidenceKind.WHAT_IF_ANSWER
     direction, sign = matched
     second = pattern_types[1] if len(pattern_types) > 1 else None
     return Observation(
@@ -659,6 +688,7 @@ def describe_conversation_to_tag(
     now: datetime,
     time_zone: str | None,
     unclear: Mapping[int, Observation] | None = None,
+    thought_experiments: Mapping[int, str] | None = None,
 ) -> str:
     """Write what the tagging model is given.
 
@@ -670,10 +700,14 @@ def describe_conversation_to_tag(
         time_zone: The User's IANA time zone, for the days.
         unclear: The unclear stories Zeph asked about in this Conversation,
             by number; None or empty with none.
+        thought_experiments: The questions that put a Thought Experiment to
+            the User in this Conversation, as asked, by number; None or
+            empty with none.
 
     Returns:
         Today's date, the Threads, the Pattern Catalog, the tag lists, the
-        unclear stories asked about and the Conversation.
+        unclear stories asked about, the Thought Experiments put to them
+        and the Conversation.
     """
     thread_lines = "\n".join(
         f"[{number}] {describe_thread(thread, time_zone)}"
@@ -689,6 +723,8 @@ def describe_conversation_to_tag(
         f"The lists each tag comes from:\n{describe_tag_lists()}\n\n"
         f"Unclear stories Zeph asked about in this Conversation:\n"
         f"{describe_unclear_asked(unclear or {})}\n\n"
+        f"Thought Experiments Zeph put to them in this Conversation:\n"
+        f"{describe_thought_experiments_asked(thought_experiments or {})}\n\n"
         f"The Conversation:\n{to_transcript_lines(messages, time_zone)}"
     )
 
@@ -757,7 +793,13 @@ class PatternTagger:
         ]
         unclear = self._unclear_asked_in(snapshot, conversation_id)
         tagged = self._tag(
-            snapshot, conversation_id, messages, touched, pattern_types, unclear
+            snapshot,
+            conversation_id,
+            messages,
+            touched,
+            pattern_types,
+            unclear,
+            self._thought_experiments_asked_in(snapshot, conversation_id),
         )
         if tagged is None:
             return None
@@ -801,7 +843,13 @@ class PatternTagger:
         if not may_keep_observations(snapshot):
             return []
         tagged = self._tag(
-            snapshot, conversation_id, messages, threads, pattern_types, {}
+            snapshot,
+            conversation_id,
+            messages,
+            threads,
+            pattern_types,
+            {},
+            self._thought_experiments_asked_in(snapshot, conversation_id),
         )
         if tagged is None:
             return []
@@ -828,6 +876,7 @@ class PatternTagger:
         threads: Sequence[LifeThread],
         pattern_types: Sequence[PatternType],
         unclear: Mapping[int, Observation],
+        thought_experiments: Mapping[int, str],
     ) -> tuple[PlannedObservations, list[Any]] | None:
         """Ask the model for a Conversation's Observations and check them.
 
@@ -841,6 +890,8 @@ class PatternTagger:
             threads: The Life Threads an Observation may belong to.
             pattern_types: The Pattern Types to tag against.
             unclear: The unclear stories asked about in it, by number.
+            thought_experiments: The questions that put a Thought Experiment
+                to the User in it, as asked, by number.
 
         Returns:
             The Observations that passed and those dropped, and the unclear
@@ -857,7 +908,13 @@ class PatternTagger:
         answer = self._ask(
             snapshot,
             describe_conversation_to_tag(
-                numbered_threads, pattern_types, messages, now, time_zone, unclear
+                numbered_threads,
+                pattern_types,
+                messages,
+                now,
+                time_zone,
+                unclear,
+                thought_experiments,
             ),
         )
         if answer is None:
@@ -876,6 +933,7 @@ class PatternTagger:
                 user_texts=user_texts,
                 time_zone=time_zone,
                 now=now,
+                thought_experiment_numbers=frozenset(thought_experiments),
             ),
         )
         self._model_call_log.record_tagging_shape(
@@ -913,6 +971,45 @@ class PatternTagger:
             if observation.id in aimed_at and observation.unclear
         ]
         return dict(enumerate(unclear, start=1))
+
+    def _thought_experiments_asked_in(
+        self, snapshot: UserSnapshot, conversation_id: UUID
+    ) -> dict[int, str]:
+        """Find the questions that put a Thought Experiment to the User here.
+
+        The words are the aimed Curiosity's, as asked, so an Admin's edit
+        since then doesn't change what the tagging model reads.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            conversation_id: The ended Conversation.
+
+        Returns:
+            The questions, numbered from 1 in the order they were asked;
+            none when no aimed Curiosity put one in it.
+        """
+        raised = [
+            curiosity
+            for curiosity in self._repositories.curiosities.list_raised_in(
+                conversation_id
+            )
+            if curiosity.aim == CuriosityAim.EXPLORATION
+        ]
+        if not raised:
+            return {}
+        putting = {
+            attempt.curiosity_id
+            for attempt in self._repositories.explorations.list_tries(snapshot.user.id)
+            if attempt.thought_experiment_id is not None
+        }
+        asked = sorted(
+            (curiosity for curiosity in raised if curiosity.id in putting),
+            key=lambda curiosity: curiosity.raised_at or curiosity.created_at,
+        )
+        return {
+            number: curiosity.question
+            for number, curiosity in enumerate(asked, start=1)
+        }
 
     def _ask(
         self, snapshot: UserSnapshot, description: str

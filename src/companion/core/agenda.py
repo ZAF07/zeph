@@ -25,6 +25,7 @@ from companion.core.models import (
     PlatformSettings,
     Relationship,
     SituationSetting,
+    ThoughtExperiment,
     ThreadReaction,
     TryOutcome,
     UserSnapshot,
@@ -40,14 +41,22 @@ from companion.core.platform_settings import (
     AGENDA_SIZE,
     EXPLORATION_REST_AFTER_TRIES,
     EXPLORATION_WAIT,
+    THOUGHT_EXPERIMENTS_PER_PATTERN_PER_WEEK,
 )
 from companion.core.ports import Clock, Repositories
+from companion.core.thought_experiments import (
+    pick_thought_experiment,
+    put_to_user,
+    thought_experiment_question,
+    thought_experiments_this_week,
+)
 from companion.core.timing import users_today
 
 PARTS_OF_LIFE = (SituationSetting.HOME, SituationSetting.WORK, SituationSetting.SOCIAL)
 WAYS = (
     ExplorationWay.STORY_FOLLOW_UP,
     ExplorationWay.OTHER_PERSON,
+    ExplorationWay.THOUGHT_EXPERIMENT,
     ExplorationWay.NOTICE_THIS_WEEK,
 )
 NEED_ORDER = (
@@ -75,6 +84,7 @@ OTHER_PEOPLE = (
 WAY_WORDS = {
     ExplorationWay.STORY_FOLLOW_UP: "story follow-up",
     ExplorationWay.OTHER_PERSON: "would it differ with someone else",
+    ExplorationWay.THOUGHT_EXPERIMENT: "a Thought Experiment",
     ExplorationWay.NOTICE_THIS_WEEK: "notice this week",
 }
 OUTCOME_WORDS = {
@@ -108,11 +118,14 @@ class AgendaNumbers:
         size: The most Explorations active at once.
         wait: How long to wait after a try with nothing.
         rest_after_tries: Tries with nothing in a row before resting.
+        thought_experiments_per_week: The most Thought Experiments asked for
+            one Pattern in 7 days.
     """
 
     size: int
     wait: timedelta
     rest_after_tries: int
+    thought_experiments_per_week: int
 
 
 @dataclass(frozen=True)
@@ -131,6 +144,7 @@ class AgendaInput:
         conversation_id: The Conversation that just ended.
         now: When the Agenda is kept.
         time_zone: The User's IANA time zone.
+        thought_experiments: Every Thought Experiment, archived ones too.
     """
 
     user_id: UUID
@@ -144,6 +158,7 @@ class AgendaInput:
     conversation_id: UUID
     now: datetime
     time_zone: str | None
+    thought_experiments: Sequence[ThoughtExperiment] = ()
 
 
 def observations_of(
@@ -315,7 +330,7 @@ def next_way(
     last = asked[-1]
     if last.outcome not in NOTHING_USEFUL:
         return last.way
-    return WAYS[(WAYS.index(last.way) + 1) % len(WAYS)]
+    return way_after(last.way)
 
 
 def try_outcome(
@@ -682,6 +697,7 @@ def aimed_curiosity(
     not_before: date | None,
     user_id: UUID,
     now: datetime,
+    thought_experiment: ThoughtExperiment | None = None,
 ) -> tuple[Curiosity, ExplorationTry]:
     """Write the aimed Curiosity for an Exploration's top need, with its try.
 
@@ -693,18 +709,28 @@ def aimed_curiosity(
         not_before: The first day it may be asked; None for any day.
         user_id: The User.
         now: When it is written.
+        thought_experiment: The Thought Experiment it puts to the User, for
+            that way; None otherwise. Its wording and sensitivity are used.
 
     Returns:
         The Curiosity, waiting, and its try, not yet asked.
     """
-    question, why = aimed_question(need, way, pattern_type)
+    question, why = (
+        thought_experiment_question(thought_experiment)
+        if thought_experiment
+        else aimed_question(need, way, pattern_type)
+    )
     curiosity = Curiosity(
         id=uuid4(),
         user_id=user_id,
         question=question,
         why=why,
         not_before=not_before,
-        sensitivity=CuriositySensitivity.MEDIUM,
+        sensitivity=(
+            thought_experiment.details.sensitivity
+            if thought_experiment
+            else CuriositySensitivity.MEDIUM
+        ),
         state=CuriosityState.WAITING,
         created_at=now,
         aim=CuriosityAim.EXPLORATION,
@@ -720,6 +746,7 @@ def aimed_curiosity(
         created_at=now,
         observation_id=need.observation.id if need.observation else None,
         part_of_life=need.part_of_life,
+        thought_experiment_id=thought_experiment.id if thought_experiment else None,
     )
 
 
@@ -882,7 +909,20 @@ def next_try_for(
         or pattern_type is None
     ):
         return [attempt.curiosity_id for attempt in waiting], None
-    closed = [attempt.curiosity_id for attempt in waiting if not aims_at(attempt, top)]
+    askable = {
+        thought_experiment.id
+        for thought_experiment in agenda.thought_experiments
+        if thought_experiment.askable
+    }
+    closed = [
+        attempt.curiosity_id
+        for attempt in waiting
+        if not aims_at(attempt, top)
+        or (
+            attempt.thought_experiment_id is not None
+            and attempt.thought_experiment_id not in askable
+        )
+    ]
     tried_here = any(
         curiosity.raised_conversation_id == agenda.conversation_id
         for curiosity in agenda.aimed
@@ -890,14 +930,75 @@ def next_try_for(
     )
     if len(closed) < len(waiting) or tried_here:
         return closed, None
+    way = next_way(top, its_tries, asked_at)
+    thought_experiment = (
+        thought_experiment_for(exploration, top, its_tries, agenda, numbers)
+        if way == ExplorationWay.THOUGHT_EXPERIMENT
+        else None
+    )
+    if way == ExplorationWay.THOUGHT_EXPERIMENT and thought_experiment is None:
+        way = way_after(way)
     return closed, aimed_curiosity(
         exploration,
         top,
-        next_way(top, its_tries, asked_at),
+        way,
         pattern_type,
         not_before_after(its_tries, asked_at, numbers.wait, agenda.time_zone),
         agenda.user_id,
         agenda.now,
+        thought_experiment,
+    )
+
+
+def way_after(way: ExplorationWay) -> ExplorationWay:
+    """Name the way that comes after another, round again after the last.
+
+    Args:
+        way: The way.
+
+    Returns:
+        The next, a little pushier, way.
+    """
+    return WAYS[(WAYS.index(way) + 1) % len(WAYS)]
+
+
+def thought_experiment_for(
+    exploration: Exploration,
+    need: OpenNeed,
+    its_tries: Sequence[ExplorationTry],
+    agenda: AgendaInput,
+    numbers: AgendaNumbers,
+) -> ThoughtExperiment | None:
+    """Pick the Thought Experiment an Exploration's next try puts to the User.
+
+    Only an unclear need is tried this way, since a Thought Experiment tells
+    two look-alike Pattern Types apart, and only while fewer than the
+    Admin-set number were asked for its Pattern in the last 7 days.
+
+    Args:
+        exploration: The Exploration.
+        need: Its top open need.
+        its_tries: Its tries.
+        agenda: What the Agenda is kept from.
+        numbers: The Admin-set numbers.
+
+    Returns:
+        The Thought Experiment for the look-alike pair with the most unclear
+        evidence; None when the need isn't unclear, the week's are used up
+        or none is left to ask.
+    """
+    aimed = {curiosity.id: curiosity for curiosity in agenda.aimed}
+    if (
+        need.need != ExplorationNeed.UNCLEAR
+        or thought_experiments_this_week(its_tries, aimed, agenda.now)
+        >= numbers.thought_experiments_per_week
+    ):
+        return None
+    return pick_thought_experiment(
+        exploration.pattern_type_id,
+        observations_of(exploration.pattern_type_id, agenda.observations),
+        agenda.thought_experiments,
+        put_to_user(agenda.tries, aimed),
     )
 
 
@@ -947,6 +1048,9 @@ def agenda_numbers(settings: PlatformSettings) -> AgendaNumbers:
         size=settings.get(AGENDA_SIZE),
         wait=settings.get(EXPLORATION_WAIT),
         rest_after_tries=settings.get(EXPLORATION_REST_AFTER_TRIES),
+        thought_experiments_per_week=settings.get(
+            THOUGHT_EXPERIMENTS_PER_PATTERN_PER_WEEK
+        ),
     )
 
 
@@ -1036,6 +1140,7 @@ class AgendaKeeper:
                     conversation_id=conversation_id,
                     now=now,
                     time_zone=user.time_zone,
+                    thought_experiments=repositories.thought_experiments.list_all(),
                 ),
                 agenda_numbers(snapshot.settings),
             )

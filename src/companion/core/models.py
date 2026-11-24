@@ -3254,6 +3254,7 @@ class ExplorationWay(StrEnum):
 
     STORY_FOLLOW_UP = "story_follow_up"
     OTHER_PERSON = "other_person"
+    THOUGHT_EXPERIMENT = "thought_experiment"
     NOTICE_THIS_WEEK = "notice_this_week"
 
 
@@ -3282,6 +3283,8 @@ class ExplorationTry:
             otherwise.
         outcome: How it came back; None until the Conversation it was asked
             in ends. When and where it was asked are its Curiosity's.
+        thought_experiment_id: The Thought Experiment it puts to the User,
+            for that way; None otherwise.
     """
 
     curiosity_id: UUID
@@ -3293,6 +3296,74 @@ class ExplorationTry:
     observation_id: UUID | None = None
     part_of_life: SituationSetting | None = None
     outcome: TryOutcome | None = None
+    thought_experiment_id: UUID | None = None
+
+
+@dataclass(frozen=True)
+class ThoughtExperimentDetails:
+    """What an Admin sets on a Thought Experiment.
+
+    Attributes:
+        wording: The made-up situation and its question, as the User hears it.
+        pattern_type_id: One of the two look-alike Pattern Types it tells
+            apart.
+        other_pattern_type_id: The other one.
+        sensitivity: How sensitive it is, as its Curiosity's.
+        starter: Whether it may be offered to a new User.
+        on: Whether Zeph may ask it.
+    """
+
+    wording: str
+    pattern_type_id: str
+    other_pattern_type_id: str
+    sensitivity: CuriositySensitivity
+    starter: bool
+    on: bool
+
+
+@dataclass(frozen=True)
+class ThoughtExperiment:
+    """A made-up situation written to tell two look-alike Pattern Types apart.
+
+    Managed by Admins and never deleted: an archived one is never asked
+    again, and the tries that asked it still name it.
+
+    Attributes:
+        id: Our ID for it.
+        details: What an Admin set.
+        created_at: When it was added.
+        updated_at: When it was last changed.
+        archived_at: When it was archived; None while it isn't.
+        seed_key: The key of the seed entry it came from; None for one an
+            Admin added.
+    """
+
+    id: UUID
+    details: ThoughtExperimentDetails
+    created_at: datetime
+    updated_at: datetime
+    archived_at: datetime | None = None
+    seed_key: str | None = None
+
+    @property
+    def askable(self) -> bool:
+        """Say whether Zeph may ask it now.
+
+        Returns:
+            True when it is on and not archived.
+        """
+        return self.details.on and self.archived_at is None
+
+    @property
+    def pair(self) -> frozenset[str]:
+        """Name the two Pattern Types it tells apart, in no order.
+
+        Returns:
+            Their IDs.
+        """
+        return frozenset(
+            (self.details.pattern_type_id, self.details.other_pattern_type_id)
+        )
 
 
 @dataclass(frozen=True)

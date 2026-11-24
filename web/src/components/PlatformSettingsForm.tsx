@@ -263,6 +263,11 @@ const fieldSections: {
         label: "Tries with nothing before resting",
         unit: "tries",
       },
+      {
+        key: "thought_experiments_per_pattern_per_week",
+        label: "Thought Experiments per Pattern a week",
+        unit: "a week",
+      },
     ],
   },
   {

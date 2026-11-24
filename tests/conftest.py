@@ -21,6 +21,7 @@ from companion.adapters.postgres.database import (
     seed_moves,
     seed_needs,
     seed_platform_settings,
+    seed_thought_experiments,
 )
 from companion.adapters.postgres.eval_repositories import (
     PostgresEvalCaseRepository,
@@ -60,6 +61,7 @@ MEMORY_CATEGORIES_SEED_FILE = SEED_DIR / "memory_categories.yaml"
 CHECK_IN_KINDS_SEED_FILE = SEED_DIR / "check_in_kinds.yaml"
 NEEDS_SEED_FILE = SEED_DIR / "needs.yaml"
 MOVES_SEED_FILE = SEED_DIR / "moves.yaml"
+THOUGHT_EXPERIMENTS_SEED_FILE = SEED_DIR / "thought_experiments.yaml"
 JUDGE_SEED_FILE = SEED_DIR / "evals" / "judge.yaml"
 KNOWLEDGE_SEED_FILE = SEED_DIR / "knowledge" / "knowledge.yaml"
 
@@ -191,6 +193,7 @@ def engine(database_url: str) -> Iterator[Engine]:
                 "daily_usage, stickers, check_in_kinds, check_ins, "
                 "feature_switches, user_feature_switches, shared_photos, "
                 "personal_stickers, pending_auth_account_deletions, needs, moves, "
+                "thought_experiments, "
                 "eval_cases, eval_runs, eval_images, eval_judge_settings CASCADE"
             )
         )
@@ -202,6 +205,7 @@ def engine(database_url: str) -> Iterator[Engine]:
     seed_check_in_kinds(engine, CHECK_IN_KINDS_SEED_FILE)
     seed_needs(engine, NEEDS_SEED_FILE)
     seed_moves(engine, MOVES_SEED_FILE, NEEDS_SEED_FILE)
+    seed_thought_experiments(engine, THOUGHT_EXPERIMENTS_SEED_FILE)
     PostgresJudgeSettingsRepository(engine).add_missing(
         yaml.safe_load(JUDGE_SEED_FILE.read_text()), datetime.now(UTC)
     )

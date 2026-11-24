@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from typing import Any
 from uuid import uuid4
@@ -465,3 +466,23 @@ def test_a_story_is_settled_once_and_an_answer_with_no_settled_list_settles_none
     assert clear.pattern_type_id == "CONF.AVOID.BELONG"
     assert read_settled_answer('{"observations": []}') == []
     assert read_settled_answer('{"observations": [], "settled": "no"}') == []
+
+
+@pytest.mark.parametrize(
+    ("answered", "kind"),
+    [
+        (1, EvidenceKind.WHAT_IF_ANSWER),
+        (2, EvidenceKind.REAL_STORY),
+        (True, EvidenceKind.REAL_STORY),
+        ("1", EvidenceKind.REAL_STORY),
+        (None, EvidenceKind.REAL_STORY),
+    ],
+)
+def test_an_answer_to_a_thought_experiment_shown_is_a_what_if_answer(
+    answered: Any, kind: EvidenceKind
+) -> None:
+    shown = replace(context(), thought_experiment_numbers=frozenset({1}))
+
+    [observation] = plan_observations([entry(thought_experiment=answered)], shown).kept
+
+    assert observation.evidence_kind == kind
