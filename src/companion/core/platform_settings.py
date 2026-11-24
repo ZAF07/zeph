@@ -396,7 +396,7 @@ class ModelPrice:
     """What one model costs in SGD per 1,000,000 tokens.
 
     Attributes:
-        model: The model's name, e.g. "deepseek/deepseek-v4.1-flash".
+        model: The model's name, e.g. "deepseek/deepseek-v4.1-flash-1017".
         sgd_in: SGD per 1,000,000 tokens it reads.
         sgd_out: SGD per 1,000,000 tokens it writes.
     """
@@ -411,7 +411,7 @@ def read_model_prices(value: Any) -> dict[str, ModelPrice]:
 
     Args:
         value: The stored value: SGD in and out by model, e.g.
-            {"deepseek/deepseek-v4.1-flash": {"in": 0.38, "out": 1.54}}.
+            {"deepseek/deepseek-v4.1-flash-1017": {"in": 0.38, "out": 1.54}}.
 
     Returns:
         Each priced model's price, by name.

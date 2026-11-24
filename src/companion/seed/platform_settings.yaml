@@ -135,10 +135,11 @@ max_typing_seconds: 5
 
 # The models Admins can pick for each core service.
 available_models:
-  - deepseek/deepseek-v4.1-flash
+  - deepseek/deepseek-v4.1-flash-1017
+  - deepseek/deepseek-v4-pro-0813
 
 # The model that writes the Companion's replies.
-response_model: deepseek/deepseek-v4.1-flash
+response_model: deepseek/deepseek-v4.1-flash-1017
 response_thinking: false
 
 # The Companion's voice and character. Any change must keep the honesty rules.
@@ -221,7 +222,7 @@ response_prompt: |-
 # as a file) is downloaded from Telegram and looked at once, before the
 # Safeguard, with the prompt below. The Safeguard, the reply and memory read
 # the description; the image itself is never kept.
-photo_model: deepseek/deepseek-v4.1-flash
+photo_model: deepseek/deepseek-v4.1-flash-1017
 photo_thinking: false
 
 photo_description_prompt: |-
@@ -295,7 +296,7 @@ photo_retry_count: 2
 photo_album_max_photos: 5
 
 # The model the Safeguard uses to check each incoming message for crisis.
-safeguard_model: deepseek/deepseek-v4.1-flash
+safeguard_model: deepseek/deepseek-v4.1-flash-1017
 safeguard_thinking: true
 
 # How the Safeguard classifies each incoming message. The answer must be
@@ -343,7 +344,7 @@ crisis_reply: |-
 # User Memory. When a Conversation ends, post-conversation processing writes a
 # Day Summary, changes the User's Memory Items and picks the photos to
 # keep as Shared Photos in one call.
-memory_processing_model: deepseek/deepseek-v4.1-flash
+memory_processing_model: deepseek/deepseek-v4.1-flash-1017
 memory_processing_thinking: true
 
 memory_processing_prompt: |-
@@ -430,7 +431,7 @@ memory_processing_prompt: |-
 # what they said and mean, how they feel and what they want (keeping their
 # words apart from guesses), and what past to look up. It decides nothing
 # about the reply; the Reply Plan does.
-understanding_model: deepseek/deepseek-v4.1-flash
+understanding_model: deepseek/deepseek-v4.1-flash-1017
 understanding_thinking: true
 
 understanding_prompt: |-
@@ -498,7 +499,7 @@ understanding_prompt: |-
 # the Moves, which Life Threads and Curiosities to bring up or leave alone,
 # which memories and Knowledge it uses, whether a Shared Photo may be sent
 # and whether to ask why. The reply follows it.
-reply_plan_model: deepseek/deepseek-v4.1-flash
+reply_plan_model: deepseek/deepseek-v4.1-flash-1017
 reply_plan_thinking: true
 
 reply_plan_prompt: |-
@@ -873,7 +874,7 @@ knowledge_closeness_percent: 60
 
 # Drafts a Knowledge document's "when it helps" description when it is made
 # ready without one. Admins can rewrite it on the document's page.
-knowledge_when_it_helps_model: deepseek/deepseek-v4.1-flash
+knowledge_when_it_helps_model: deepseek/deepseek-v4.1-flash-1017
 knowledge_when_it_helps_thinking: false
 knowledge_when_it_helps_prompt: |-
   You help Zeph, an AI companion, decide when a document from its Knowledge
@@ -1070,7 +1071,7 @@ sticker_tool_description: >-
 # When a Conversation ends and User Memory works for the User, this call
 # starts and adds to their Life Threads, and records how they took each
 # Thread the Companion brought up.
-life_thread_keeping_model: deepseek/deepseek-v4.1-flash
+life_thread_keeping_model: deepseek/deepseek-v4.1-flash-1017
 life_thread_keeping_thinking: true
 
 life_thread_keeping_prompt: |-
@@ -1128,7 +1129,7 @@ life_thread_keeping_prompt: |-
 # the User deletes a Memory Item, Life Thread, Pattern, Move Outcome or
 # Summary, so the Portrait no longer holds it. It is never shown the old
 # Portrait.
-portrait_model: deepseek/deepseek-v4.1-flash
+portrait_model: deepseek/deepseek-v4.1-flash-1017
 portrait_thinking: true
 
 portrait_prompt: |-
@@ -1161,7 +1162,7 @@ portrait_prompt: |-
 # When a Conversation ends and User Memory and Curiosities work for the User,
 # this call writes things Zeph wants to ask them later, records how they took
 # the ones Zeph asked, and closes ones no longer relevant.
-curiosity_keeping_model: deepseek/deepseek-v4.1-flash
+curiosity_keeping_model: deepseek/deepseek-v4.1-flash-1017
 curiosity_keeping_thinking: true
 
 curiosity_keeping_prompt: |-
@@ -1256,7 +1257,7 @@ curiosity_keeping_prompt: |-
 # the situation, how the User felt, whether it helped and why. It runs only
 # when the Conversation's Understandings made a Move. Users see these under
 # "What helps you" on the Memories page.
-move_outcome_keeping_model: deepseek/deepseek-v4.1-flash
+move_outcome_keeping_model: deepseek/deepseek-v4.1-flash-1017
 move_outcome_keeping_thinking: true
 
 move_outcome_keeping_prompt: |-
@@ -1300,7 +1301,7 @@ move_outcome_keeping_prompt: |-
 # and the Conversation. Code keeps only the Observations whose Pattern Type
 # and sign exist, whose quote is word for word in the User's own texts and
 # whose tags come from the lists. Nothing reaches a reply.
-pattern_tagging_model: deepseek/deepseek-v4.1-flash
+pattern_tagging_model: deepseek/deepseek-v4.1-flash-1017
 pattern_tagging_thinking: true
 
 pattern_tagging_prompt: |-
@@ -1379,7 +1380,7 @@ pattern_tagging_prompt: |-
 # pattern_keeping_threads), every Pattern kept so far and the days behind
 # the evidence of Patterns linked to those Threads (up to
 # pattern_keeping_days): messages while they are kept, Day Summaries after.
-pattern_keeping_model: deepseek/deepseek-v4.1-flash
+pattern_keeping_model: deepseek/deepseek-v4.1-flash-1017
 pattern_keeping_thinking: true
 pattern_keeping_threads: 8
 pattern_keeping_days: 14
@@ -1435,7 +1436,7 @@ pattern_keeping_prompt: |-
 # Personal Stickers. When a Conversation ends and the person sent stickers in
 # it, this model picks the ones whose meaning was clear and writes when to use
 # each. It runs only while the Personal Stickers Feature works for them.
-personal_sticker_keeping_model: deepseek/deepseek-v4.1-flash
+personal_sticker_keeping_model: deepseek/deepseek-v4.1-flash-1017
 personal_sticker_keeping_thinking: false
 
 personal_sticker_keeping_prompt: |-
@@ -1469,7 +1470,7 @@ personal_stickers_limit: 30
 # Check-ins. On each scheduler tick, this model decides for each User who is
 # due: a Check-in Kind and message, or to skip. It gets the Persona and this
 # prompt.
-check_in_model: deepseek/deepseek-v4.1-flash
+check_in_model: deepseek/deepseek-v4.1-flash-1017
 check_in_thinking: true
 
 check_in_prompt: |-
@@ -1519,10 +1520,10 @@ check_in_reply_window_hours: 24
 # 1 USD ≈ 1.28 SGD. A model with no price shows tokens only. A run that uses
 # more tokens than the limit ends Stopped over limit.
 model_prices:
-  deepseek/deepseek-v4.1-flash:
+  deepseek/deepseek-v4.1-flash-1017:
     in: 0.38
     out: 1.54
-  deepseek/deepseek-v4-pro:
+  deepseek/deepseek-v4-pro-0813:
     in: 1.69
     out: 5.07
 

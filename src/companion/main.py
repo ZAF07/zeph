@@ -23,6 +23,7 @@ from companion.adapters.load_test.switch import (
 )
 from companion.adapters.load_test.web_search import EmptyWebSearch
 from companion.adapters.openrouter.chat_model import OpenRouterChatModel
+from companion.adapters.openrouter.photo_viewer import OpenRouterPhotoViewer
 from companion.adapters.pgvector.vector_store import PgvectorKnowledgeVectorStore
 from companion.adapters.postgres.eval_repositories import (
     PostgresEvalCaseRepository,
@@ -296,6 +297,24 @@ def build_scheduler(settings: Settings) -> Scheduler:
     raise UnknownAdapterError("SCHEDULER_ADAPTER", settings.scheduler_adapter)
 
 
+def required_key(name: str, value: str) -> str:
+    """Check that the key a chosen adapter needs is set.
+
+    Args:
+        name: The key's name in `.env`.
+        value: The key as loaded; empty when not set.
+
+    Returns:
+        The key.
+
+    Raises:
+        MissingSettingsError: If the key is not set.
+    """
+    if not value:
+        raise MissingSettingsError([name])
+    return value
+
+
 def build_chat_model(settings: Settings) -> ChatModel:
     """Build the chat model chosen in `.env`.
 
@@ -307,16 +326,18 @@ def build_chat_model(settings: Settings) -> ChatModel:
 
     Raises:
         UnknownAdapterError: If the chosen adapter does not exist.
-        MissingSettingsError: If OpenRouter is chosen without its key.
+        MissingSettingsError: If the chosen adapter's key is missing.
         LoadTestNotAllowedError: If a load-test adapter is chosen outside a
             load test.
     """
     if settings.chat_model_adapter == "deepseek":
-        return DeepSeekChatModel(settings.deepseek_api_key)
+        return DeepSeekChatModel(
+            required_key("DEEPSEEK_API_KEY", settings.deepseek_api_key)
+        )
     if settings.chat_model_adapter == "openrouter":
-        if not settings.openrouter_api_key:
-            raise MissingSettingsError(["OPENROUTER_API_KEY"])
-        return OpenRouterChatModel(settings.openrouter_api_key)
+        return OpenRouterChatModel(
+            required_key("OPENROUTER_API_KEY", settings.openrouter_api_key)
+        )
     if settings.chat_model_adapter == LOAD_TEST_ADAPTER:
         allow_load_test_adapter("CHAT_MODEL_ADAPTER")
         engine = build_database_engine(settings)
@@ -327,9 +348,6 @@ def build_chat_model(settings: Settings) -> ChatModel:
 def build_photo_viewer(settings: Settings) -> PhotoViewer:
     """Build the photo viewer for the chat model chosen in `.env`.
 
-    Photos still go to direct DeepSeek when OpenRouter is chosen, until the
-    OpenRouter adapter can look at photos.
-
     Args:
         settings: The loaded settings.
 
@@ -338,11 +356,18 @@ def build_photo_viewer(settings: Settings) -> PhotoViewer:
 
     Raises:
         UnknownAdapterError: If the chosen adapter does not exist.
+        MissingSettingsError: If the chosen adapter's key is missing.
         LoadTestNotAllowedError: If a load-test adapter is chosen outside a
             load test.
     """
-    if settings.chat_model_adapter in ("deepseek", "openrouter"):
-        return DeepSeekPhotoViewer(settings.deepseek_api_key)
+    if settings.chat_model_adapter == "deepseek":
+        return DeepSeekPhotoViewer(
+            required_key("DEEPSEEK_API_KEY", settings.deepseek_api_key)
+        )
+    if settings.chat_model_adapter == "openrouter":
+        return OpenRouterPhotoViewer(
+            required_key("OPENROUTER_API_KEY", settings.openrouter_api_key)
+        )
     if settings.chat_model_adapter == LOAD_TEST_ADAPTER:
         allow_load_test_adapter("CHAT_MODEL_ADAPTER")
         return LoadTestPhotoViewer()

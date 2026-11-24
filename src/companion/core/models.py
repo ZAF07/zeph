@@ -2563,7 +2563,7 @@ class ModelCall:
         trace: The trace it belongs to.
         user_id: The User it was for.
         step: Which step it was for.
-        model: The model asked, e.g. "deepseek/deepseek-v4.1-flash".
+        model: The model asked, e.g. "deepseek/deepseek-v4.1-flash-1017".
         thinking: Whether the model was asked to think before it answers.
         started_at: When the call started.
         duration_ms: How long it took, in milliseconds.

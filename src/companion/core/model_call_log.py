@@ -37,7 +37,7 @@ class ModelCallRequest:
 
     Attributes:
         step: Which step it is for.
-        model: The model asked, e.g. "deepseek/deepseek-v4.1-flash".
+        model: The model asked, e.g. "deepseek/deepseek-v4.1-flash-1017".
         thinking: Whether the model was asked to think before it answers.
         instructions: What the model is told to be and do.
         history: The lines it is given, oldest first.

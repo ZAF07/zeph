@@ -1,4 +1,5 @@
 import json
+import logging
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -12,6 +13,8 @@ from companion.adapters.chat_tools import (
 )
 from companion.core.models import ChatLine, ChatRole, ModelAnswer, ToolCallRecord
 from companion.core.ports import ChatTool
+
+logger = logging.getLogger(__name__)
 
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -51,11 +54,16 @@ def reply_message(body: dict[str, Any]) -> dict[str, Any]:
         The message.
 
     Raises:
-        OpenRouterReplyError: If the body holds an error or no reply.
+        OpenRouterReplyError: If the body or its choice holds an error, the
+            choice finished with an error, or there is no reply.
     """
     if body.get("error") or not body.get("choices"):
         raise OpenRouterReplyError(f"OpenRouter sent no reply: {body.get('error')}")
-    message: dict[str, Any] = body["choices"][0]["message"]
+    choice: dict[str, Any] = body["choices"][0]
+    if choice.get("error") or choice.get("finish_reason") == "error":
+        error = choice.get("error") or "the reply ended with an error"
+        raise OpenRouterReplyError(f"OpenRouter sent no reply: {error}")
+    message: dict[str, Any] = choice["message"]
     return message
 
 
@@ -141,6 +149,18 @@ def run_tool_call(
     return ToolCallRecord(name, arguments, result)
 
 
+def model_maker(model: str) -> str:
+    """Name the provider that made a model.
+
+    Args:
+        model: The OpenRouter model name, e.g. "anthropic/claude-haiku-5.5".
+
+    Returns:
+        The part of the name before the "/", e.g. "anthropic".
+    """
+    return model.split("/")[0]
+
+
 def build_request(
     model: str,
     thinking: bool,
@@ -153,6 +173,10 @@ def build_request(
     When the model may no longer call tools, the tools are still sent, with
     `tool_choice` "none", because the messages already hold tool calls and
     some providers (e.g. Anthropic) refuse those without the tools.
+
+    Only the model's maker may answer, because our own provider keys are the
+    makers' keys: any other host would be paid with OpenRouter credits. A
+    model its maker does not serve fails.
 
     Args:
         model: The OpenRouter model name, sent as given.
@@ -168,6 +192,7 @@ def build_request(
         "model": model,
         "messages": messages,
         "reasoning": {"enabled": thinking},
+        "provider": {"only": [model_maker(model)]},
     }
     if tools:
         request["tools"] = [to_tool_schema(tool) for tool in tools]
@@ -222,6 +247,55 @@ def answer_with_tools(
     return to_model_answer(bodies, tool_calls)
 
 
+def new_http_client() -> httpx.Client:
+    """Make the HTTP client used when none is given.
+
+    Returns:
+        A client that waits up to a minute for a reply.
+    """
+    return httpx.Client(timeout=60)
+
+
+def warn_if_paid_with_credits(model: str, body: dict[str, Any]) -> None:
+    """Log a warning when a reply was paid with OpenRouter credits.
+
+    Args:
+        model: The model that was asked.
+        body: The reply body, whose usage says if our own provider key paid.
+    """
+    if (body.get("usage") or {}).get("is_byok") is False:
+        logger.warning(
+            "A call to %s was paid with OpenRouter credits, not our own key", model
+        )
+
+
+def send_request(
+    http_client: httpx.Client, api_key: str, request: dict[str, Any]
+) -> dict[str, Any]:
+    """Send one Chat Completions request to OpenRouter.
+
+    Args:
+        http_client: The HTTP client to send with.
+        api_key: The OpenRouter API key.
+        request: The request body.
+
+    Returns:
+        The reply body.
+
+    Raises:
+        httpx.HTTPStatusError: If OpenRouter answers with an error status.
+    """
+    response = http_client.post(
+        OPENROUTER_CHAT_URL,
+        json=request,
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    response.raise_for_status()
+    body: dict[str, Any] = response.json()
+    warn_if_paid_with_credits(str(request["model"]), body)
+    return body
+
+
 class OpenRouterChatModel:
     """Generates text with any model OpenRouter offers, over plain HTTP."""
 
@@ -233,7 +307,7 @@ class OpenRouterChatModel:
             http_client: The HTTP client to use; a new one is made if not given.
         """
         self._api_key = api_key
-        self._http = http_client or httpx.Client(timeout=60)
+        self._http = http_client or new_http_client()
 
     def generate(
         self,
@@ -247,7 +321,7 @@ class OpenRouterChatModel:
 
         Args:
             model: The OpenRouter model name, sent as given, e.g.
-                "deepseek/deepseek-v4.1-flash".
+                "deepseek/deepseek-v4.1-flash-1017".
             thinking: Whether the model should think before it answers.
             instructions: What the model should be and do (Persona and prompt).
             history: The Conversation so far, oldest first.
@@ -262,30 +336,11 @@ class OpenRouterChatModel:
             OpenRouterReplyError: If OpenRouter answers with an error body.
         """
         return answer_with_tools(
-            lambda messages, may_call_tools: self._send(
-                build_request(model, thinking, messages, tools, may_call_tools)
+            lambda messages, may_call_tools: send_request(
+                self._http,
+                self._api_key,
+                build_request(model, thinking, messages, tools, may_call_tools),
             ),
             to_openrouter_messages(instructions, history),
             tools,
         )
-
-    def _send(self, request: dict[str, Any]) -> dict[str, Any]:
-        """Send one Chat Completions request to OpenRouter.
-
-        Args:
-            request: The request body.
-
-        Returns:
-            The reply body.
-
-        Raises:
-            httpx.HTTPStatusError: If OpenRouter answers with an error status.
-        """
-        response = self._http.post(
-            OPENROUTER_CHAT_URL,
-            json=request,
-            headers={"Authorization": f"Bearer {self._api_key}"},
-        )
-        response.raise_for_status()
-        body: dict[str, Any] = response.json()
-        return body

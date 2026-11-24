@@ -4,7 +4,7 @@ from typing import Any
 from sqlalchemy import Engine, text
 
 from companion.adapters.postgres.database import migrate
-from tests.test_moves_migration import downgrade_to
+from tests.test_moves_migration import downgrade_to, upgrade_to
 
 OLD_SETTINGS = {
     "response_model": "deepseek-v4-pro",
@@ -50,10 +50,15 @@ def test_the_migration_renames_saved_models_to_openrouter_names(
     try:
         save_values(engine, "platform_settings", OLD_SETTINGS)
         save_values(engine, "eval_judge_settings", {"model": "deepseek-flash"})
+        upgrade_to(database_url, "0087")
+        renamed_settings = stored_values(
+            engine, "platform_settings", list(OLD_SETTINGS)
+        )
+        renamed_judge = stored_values(engine, "eval_judge_settings", ["model"])
     finally:
         migrate(database_url)
 
-    assert stored_values(engine, "platform_settings", list(OLD_SETTINGS)) == {
+    assert renamed_settings == {
         "response_model": "deepseek/deepseek-v4-pro",
         "photo_model": "deepseek/deepseek-v4.1-flash",
         "check_in_model": "some-other-model",
@@ -67,9 +72,7 @@ def test_the_migration_renames_saved_models_to_openrouter_names(
             "some-other-model": {"in": 1, "out": 2},
         },
     }
-    assert stored_values(engine, "eval_judge_settings", ["model"]) == {
-        "model": "deepseek/deepseek-v4.1-flash"
-    }
+    assert renamed_judge == {"model": "deepseek/deepseek-v4.1-flash"}
 
 
 def test_going_back_restores_the_direct_deepseek_names(
@@ -78,7 +81,7 @@ def test_going_back_restores_the_direct_deepseek_names(
     downgrade_to(database_url, "0086")
     try:
         save_values(engine, "platform_settings", OLD_SETTINGS)
-        migrate(database_url)
+        upgrade_to(database_url, "0087")
         downgrade_to(database_url, "0086")
 
         assert (

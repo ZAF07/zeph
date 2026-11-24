@@ -262,8 +262,8 @@ def test_the_old_reasoner_name_asked_to_think_logs_no_warning(
 @pytest.mark.parametrize(
     ("openrouter_name", "direct_name"),
     [
-        ("deepseek/deepseek-v4.1-flash", "deepseek-flash"),
-        ("deepseek/deepseek-v4-pro", "deepseek-v4-pro"),
+        ("deepseek/deepseek-v4.1-flash-1017", "deepseek-flash"),
+        ("deepseek/deepseek-v4-pro-0813", "deepseek-v4-pro"),
     ],
 )
 def test_an_openrouter_deepseek_name_is_sent_as_its_direct_name(
