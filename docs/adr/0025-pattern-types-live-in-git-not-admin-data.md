@@ -1,6 +1,6 @@
 # Pattern Types live in git, not in Admin-managed data
 
-Status: accepted. Built: the catalog loads on start and Admins read it on the Dashboard (pattern-pipeline issue 10). An exception to ADR-0004.
+Status: accepted. Built: the catalog loads on start and Admins read it on the Dashboard (pattern-pipeline issue 10); the first fifteen Pattern Types, approved by the owner, and the Admin guide `docs/pattern-catalog/README.md` (issue 15). An exception to ADR-0004.
 
 ADR-0004 keeps everything that shapes the Companion as data Admins edit on the Dashboard, live from the next reply. Pattern Types are the exception: they are YAML files in the repo, loaded into the database on deploy, and Admins can read them on the Dashboard but not edit them. A Pattern Type decides what Zeph may claim about a person, and every Observation is tagged under one version of it. A live edit would change the meaning of evidence already gathered with no way to score it again, and would reach Users with no review and no Eval run.
 
