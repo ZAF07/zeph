@@ -47,4 +47,4 @@ Evidence (24 Nov 2026, worktree stack, branch `pattern-03-directness`):
 ## Completion
 
 - Completed: 2026-11-24
-- Commit: <to be filled in after the merge>
+- Commit: 78bbd8e (merge "Merge pattern-03-directness: Users set how direct Zeph is with its Read"; work in c47da90 "Pattern pipeline issue 03: Users set how direct Zeph is with its Read", b1f75e7 "Directness review fixes: one ChoiceSegments for Check-ins and directness, a missing directness line means follow the three conditions, direct never cuts in mid-vent", 48afc4b "Issue 03 done: archived with evidence, findings logged in issue 20, docs say the directness setting is built", 586044d "Directness migration follows 0084 from main: now 0085", 5ed5570 "Directness migration follows 0085 from main: now 0086; Account baselines rebuilt with issue 13's change")
