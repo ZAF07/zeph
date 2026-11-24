@@ -286,6 +286,8 @@ CURIOSITIES_PER_CONVERSATION = Setting(
 )
 CURIOSITIES_WAITING_LIMIT = Setting("curiosities_waiting_limit", read_whole_number)
 CURIOSITY_REPLIES_BETWEEN = Setting("curiosity_replies_between", read_whole_number)
+CURIOSITIES_PER_REPLY = Setting("curiosities_per_reply", read_whole_number)
+CURIOSITY_HELD_WHEN_ASKING_WHY = Setting("curiosity_held_when_asking_why", read_on_off)
 FOLLOW_UPS_PER_CONVERSATION = Setting("follow_ups_per_conversation", read_whole_number)
 CURIOSITY_BRUSH_OFFS_TO_BACK_OFF = Setting(
     "curiosity_brush_offs_to_back_off", read_whole_number
@@ -1453,6 +1455,26 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         hint=(
             "How many Curiosities can be raised in one Conversation; until then, due "
             "ones are offered to the Reply Plan before each reply. 0 means none."
+        ),
+    ),
+    EditableSetting(
+        CURIOSITIES_PER_REPLY.key,
+        "Most Curiosities per reply",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=5,
+        hint=(
+            "How many Curiosities one reply may ask. Most Curiosities raised per "
+            "Conversation still caps it."
+        ),
+    ),
+    EditableSetting(
+        CURIOSITY_HELD_WHEN_ASKING_WHY.key,
+        "Hold a Curiosity when the reply asks why",
+        SettingKind.ON_OFF,
+        hint=(
+            "When on, a reply that asks why they feel as they do asks no "
+            "Curiosity too, and it stays due. When off, the reply can ask both."
         ),
     ),
     EditableSetting(

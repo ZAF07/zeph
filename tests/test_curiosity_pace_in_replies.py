@@ -31,7 +31,7 @@ from tests.test_older_summaries import set_settings
 
 DESK = "Did the new desk arrive?"
 CAT = "How is the cat?"
-NONE_OFFERED = "in this Conversation):\nNone."
+NONE_OFFERED = "in this reply):\nNone."
 GET_CURIOUS_LINE = "- Get curious:"
 A_MINUTE = timedelta(minutes=1)
 

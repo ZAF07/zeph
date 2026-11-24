@@ -43,6 +43,7 @@ from companion.core.models import (
 )
 from companion.core.platform_settings import (
     CURIOSITIES_PER_CONVERSATION,
+    CURIOSITIES_PER_REPLY,
     CURIOSITIES_WAITING_LIMIT,
     CURIOSITY_BACK_OFF,
     CURIOSITY_BRUSH_OFFS_TO_BACK_OFF,
@@ -83,6 +84,14 @@ TREATMENT_WORDS = {
     CuriosityTreatment.NEVER: "never: ask none",
 }
 NO_REASON_GIVEN = "No reason given."
+ASK_WHY_FIRST_NOTE = (
+    "This reply also asks why they feel as they do. Ask that first, then this "
+    "after it, so the two read as one easy turn, not a list of questions."
+)
+MORE_THAN_ONE_QUESTION_NOTE = (
+    "This reply asks more than one question, which is fine this time, even if "
+    "you usually ask at most one. Keep each short."
+)
 
 
 @dataclass(frozen=True)
@@ -107,6 +116,7 @@ class DueCuriosities:
             once the Conversation has raised as many as it may.
         raised_here: How many were already raised in this Conversation.
         per_conversation: The most that may be raised in one Conversation.
+        per_reply: The most one reply may ask.
         awaiting_reaction: The newest Curiosity raised in this Conversation
             while how the User took it isn't known yet; None if there is none.
     """
@@ -114,6 +124,7 @@ class DueCuriosities:
     offered: tuple[NumberedCuriosity, ...]
     raised_here: int
     per_conversation: int
+    per_reply: int
     awaiting_reaction: Curiosity | None = None
 
     @property
@@ -125,8 +136,19 @@ class DueCuriosities:
         """
         return max(self.per_conversation - self.raised_here, 0)
 
+    @property
+    def left_for_this_reply(self) -> int:
+        """How many this reply may ask: no more than one reply may, or than are left.
 
-NO_DUE_CURIOSITIES = DueCuriosities(offered=(), raised_here=0, per_conversation=0)
+        Returns:
+            The number; never below 0.
+        """
+        return min(self.left, self.per_reply)
+
+
+NO_DUE_CURIOSITIES = DueCuriosities(
+    offered=(), raised_here=0, per_conversation=0, per_reply=0
+)
 
 
 def format_date(day: date) -> str:
@@ -197,9 +219,9 @@ def describe_due_curiosities(due: DueCuriosities, time_zone: str | None) -> str:
         time_zone: The User's IANA time zone, for the days.
 
     Returns:
-        How many were raised of the most allowed, then one line per
-        Curiosity, with its guess if it holds one; "None." if none is
-        offered.
+        How many were raised of the most allowed and how many this reply may
+        ask, then one line per Curiosity, with its guess if it holds one;
+        "None." if none is offered.
     """
     lines = [
         f"[{item.number}] {item.curiosity.question} Why: {item.curiosity.why} "
@@ -211,7 +233,8 @@ def describe_due_curiosities(due: DueCuriosities, time_zone: str | None) -> str:
     ]
     return (
         f"(raised {due.raised_here} of at most {due.per_conversation} in this "
-        f"Conversation):\n" + ("\n".join(lines) or "None.")
+        f"Conversation; at most {due.left_for_this_reply} in this reply):\n"
+        + ("\n".join(lines) or "None.")
     )
 
 
@@ -275,17 +298,22 @@ def why_none_asked(
     return reason or NO_REASON_GIVEN
 
 
-def format_curiosities_for_reply(chosen: Sequence[CuriosityToRaise], need: Need) -> str:
+def format_curiosities_for_reply(
+    chosen: Sequence[CuriosityToRaise], need: Need, also_asks_why: bool
+) -> str:
     """Write the reply's section on the Curiosity it is to ask.
 
     Args:
         chosen: The Curiosities the Reply Plan chose, and how.
         need: The Need the reply follows; one that tests the water asks it
             lightly, as something they can let pass.
+        also_asks_why: Whether the reply also asks why they feel as they do;
+            then it is told to ask that first and this after it.
 
     Returns:
-        The section, with each one's guess to check if it holds one; "" if
-        none was chosen.
+        The section, with each one's guess to check if it holds one, and a
+        note that more than one question is fine when the reply asks more
+        than one; "" if none was chosen.
     """
     if not chosen:
         return ""
@@ -299,10 +327,15 @@ def format_curiosities_for_reply(chosen: Sequence[CuriosityToRaise], need: Need)
         if need.curiosities == CuriosityTreatment.TEST_THE_WATER
         else "Ask them this in this reply, the way a friend would"
     )
-    return (
+    section = (
         f"{how_to_ask}. It is part of the plan, not an extra to leave out:\n"
         + "\n".join(lines)
     )
+    notes = [
+        *([ASK_WHY_FIRST_NOTE] if also_asks_why else []),
+        *([MORE_THAN_ONE_QUESTION_NOTE] if len(chosen) + also_asks_why > 1 else []),
+    ]
+    return "\n".join([section, *notes])
 
 
 class CuriosityRaiser:
@@ -351,6 +384,7 @@ class CuriosityRaiser:
             offered=(),
             raised_here=len(raised_here),
             per_conversation=per_conversation,
+            per_reply=snapshot.settings.get(CURIOSITIES_PER_REPLY),
             awaiting_reaction=(
                 newest_here
                 if newest_here is not None and newest_here.reaction is None

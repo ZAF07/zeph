@@ -54,6 +54,7 @@ from companion.core.move_outcomes import describe_move_outcome
 from companion.core.past_day import PastDayTool
 from companion.core.patterns import RemindedPattern, describe_patterns_in_mind
 from companion.core.platform_settings import (
+    CURIOSITY_HELD_WHEN_ASKING_WHY,
     FOLLOW_UPS_PER_CONVERSATION,
     HOME_GOALS_MEMORY_CATEGORY,
     PERSONA_OUTLOOK,
@@ -78,7 +79,6 @@ from companion.core.woven_check_ins import WovenCheckIn
 
 logger = logging.getLogger(__name__)
 
-MOST_CURIOSITIES_PER_REPLY = 1
 ASKS_WHY_INSTEAD = "The reply asks why they feel as they do instead."
 NO_REPLY_PLAN = "The Reply Plan couldn't be made."
 
@@ -628,9 +628,9 @@ def read_curiosities_to_raise(
             more the Conversation may raise.
 
     Returns:
-        The Curiosities, each once, no more than one per reply and no more
-        than the Conversation may still raise; an unknown number is skipped
-        and an odd "how" reads as weaving it in.
+        The Curiosities, each once, no more than one reply may ask and no
+        more than the Conversation may still raise; an unknown number is
+        skipped and an odd "how" reads as weaving it in.
     """
     if not isinstance(value, list):
         return ()
@@ -655,7 +655,7 @@ def read_curiosities_to_raise(
             guess=item.curiosity.guess,
             how_sure=item.curiosity.how_sure,
         )
-    return tuple(chosen.values())[: min(due.left, MOST_CURIOSITIES_PER_REPLY)]
+    return tuple(chosen.values())[: due.left_for_this_reply]
 
 
 def keep_held_back_threads_alone(
@@ -782,8 +782,8 @@ def read_reply_plan_form(
     Text around the JSON object, such as a code fence, is ignored. Life
     Threads are named by their numbers in the reminded list; no held-back
     Thread is ever brought up. Curiosities are named by their numbers in the
-    due list; at most one is brought up per reply, and no more than the
-    Conversation may still raise. Knowledge documents are named by their
+    due list; no more are brought up than one reply may ask, and no more
+    than the Conversation may still raise. Knowledge documents are named by their
     numbers in the Knowledge list. A missing or odd "send_photo" reads as
     allowed, and a missing or odd "ask_why" as not said. The Read is said
     only when there is one and "say_read" is true. A Check-in is chosen only
@@ -857,27 +857,33 @@ def read_reply_plan_form(
 
 
 def settle_curiosities(
-    form: ReplyPlanForm, need: Need, due: DueCuriosities, asked_why: bool
+    form: ReplyPlanForm,
+    need: Need,
+    due: DueCuriosities,
+    held_back_by_asking_why: bool,
 ) -> ReplyPlanForm:
     """Hold the form's Curiosities to what the picked Need and the reply allow.
 
-    A reply that asks why asks no Curiosity too: one question per reply.
-    Under a Need that asks Curiosities by default, a reply that asks none of
-    those offered keeps the reason.
+    When Admins hold Curiosities back from a reply that asks why, such a
+    reply asks no Curiosity too. Under a Need that asks Curiosities by
+    default, a reply that asks none of those offered keeps the reason.
 
     Args:
         form: The form, as read.
         need: The Need the reply follows.
         due: The Curiosities the reply may ask under that Need.
-        asked_why: Whether the reply asks why they feel as they do.
+        held_back_by_asking_why: Whether the reply asks why they feel as
+            they do while Admins hold Curiosities back from such a reply.
 
     Returns:
         The form, asking a Curiosity only when one was offered under the
-        Need and the reply doesn't ask why, with why none is asked when the
-        Need asks by default.
+        Need and the reply isn't held back by asking why, with why none is
+        asked when the Need asks by default.
     """
-    chosen = form.curiosities if due.offered and not asked_why else ()
-    reason = ASKS_WHY_INSTEAD if asked_why else form.curiosity_not_asked_why
+    chosen = form.curiosities if due.offered and not held_back_by_asking_why else ()
+    reason = (
+        ASKS_WHY_INSTEAD if held_back_by_asking_why else form.curiosity_not_asked_why
+    )
     return replace(
         form,
         curiosities=chosen,
@@ -1261,8 +1267,8 @@ class ReplyPlanService:
         and was made in the previous reply, is dropped, with the next
         Move's why. A lead or supporting Move that asks a question is dropped
         too, and not saved as made, when the reply asks why or raises a
-        Curiosity: only one question per reply. No Curiosity is raised
-        under a Need that never asks one, or in a reply that asks why;
+        Curiosity. No Curiosity is raised under a Need that never asks one,
+        or, while Admins hold Curiosities back then, in a reply that asks why;
         under a Need that asks by default, why none was asked is saved
         with the form. An unreadable form or a
         failed call falls back to the fallback Need with no Moves and no
@@ -1337,7 +1343,12 @@ class ReplyPlanService:
             need = find_need(needs, form.need)
         asked_why = should_ask_why(understanding.form, form, earlier)
         due_under_need = offered_under(need, due)
-        form = settle_curiosities(form, need, due_under_need, asked_why)
+        form = settle_curiosities(
+            form,
+            need,
+            due_under_need,
+            asked_why and snapshot.settings.get(CURIOSITY_HELD_WHEN_ASKING_WHY),
+        )
         asks_another_question = asked_why or bool(form.curiosities)
         picked = pick_moves(need, needs, moves, form)
         if asks_another_question:
@@ -1380,7 +1391,7 @@ class ReplyPlanService:
                 ask_why_note,
                 format_threads_for_reply(reminded, model_form, snapshot.user.time_zone),
                 format_threads_left_alone(model_form),
-                format_curiosities_for_reply(form.curiosities, need),
+                format_curiosities_for_reply(form.curiosities, need, asked_why),
                 past_days,
             ),
             asks_a_question=asks_another_question or picked.asks_a_question,
