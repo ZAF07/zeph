@@ -305,6 +305,9 @@ PATTERN_KEEPING_THINKING = Setting("pattern_keeping_thinking", read_on_off)
 PATTERN_KEEPING_PROMPT = Setting("pattern_keeping_prompt", read_text)
 PATTERN_KEEPING_THREADS = Setting("pattern_keeping_threads", read_whole_number)
 PATTERN_KEEPING_DAYS = Setting("pattern_keeping_days", read_whole_number)
+PATTERN_TAGGING_MODEL = Setting("pattern_tagging_model", read_text)
+PATTERN_TAGGING_THINKING = Setting("pattern_tagging_thinking", read_on_off)
+PATTERN_TAGGING_PROMPT = Setting("pattern_tagging_prompt", read_text)
 PATTERN_PUSHED_BACK_WAIT = Setting("pattern_pushed_back_wait_days", read_days)
 PATTERN_CLOSENESS_PERCENT = Setting("pattern_closeness_percent", read_whole_number)
 PORTRAIT_MODEL = Setting("portrait_model", read_text)
@@ -968,6 +971,28 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
     EditableSetting(
         MOVE_OUTCOME_KEEPING_THINKING.key,
         "Move Outcome keeping thinking",
+        SettingKind.ON_OFF,
+        hint=THINKING_HINT,
+    ),
+    EditableSetting(
+        PATTERN_TAGGING_PROMPT.key,
+        "Pattern tagging prompt",
+        SettingKind.TEXT,
+        hint=(
+            "How to read a Conversation into the Pattern Catalog as Observations, "
+            "which code then checks. It runs once a Conversation ends, after Life "
+            "Threads, while Pattern noticing works."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_TAGGING_MODEL.key,
+        "Pattern tagging model",
+        SettingKind.MODEL,
+        hint=MODEL_HINT,
+    ),
+    EditableSetting(
+        PATTERN_TAGGING_THINKING.key,
+        "Pattern tagging thinking",
         SettingKind.ON_OFF,
         hint=THINKING_HINT,
     ),
@@ -1739,6 +1764,19 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         prompt_key=CHECK_IN_PROMPT.key,
         model_key=CHECK_IN_MODEL.key,
         thinking_key=CHECK_IN_THINKING.key,
+    ),
+    CoreService(
+        name="Pattern tagging",
+        runs_when="Conversation end · after Life Threads, while Pattern noticing works",
+        description=(
+            "Reads the Conversation into the Pattern Catalog: each Observation "
+            "with its Pattern Type and sign, for or against, the User’s exact "
+            "quote and its situation tags. Code drops any whose Pattern Type, "
+            "sign, quote or tags don’t check out. Nothing reaches a reply."
+        ),
+        prompt_key=PATTERN_TAGGING_PROMPT.key,
+        model_key=PATTERN_TAGGING_MODEL.key,
+        thinking_key=PATTERN_TAGGING_THINKING.key,
     ),
     CoreService(
         name="Pattern keeping",

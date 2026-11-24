@@ -634,6 +634,13 @@ class CheckInShapeResponse(BaseModel):
     brought_up: bool
 
 
+class TaggingShapeResponse(BaseModel):
+    """How many Observations a Pattern tagging call wrote and code dropped."""
+
+    tagged: int
+    dropped: int
+
+
 class ModelCallResponse(BaseModel):
     """One model call in a trace; `content` is null unless full content was kept."""
 
@@ -651,6 +658,7 @@ class ModelCallResponse(BaseModel):
     understanding_shape: UnderstandingShapeResponse | None
     check_in_shape: CheckInShapeResponse | None
     reply_plan_shape: ReplyPlanShapeResponse | None
+    tagging_shape: TaggingShapeResponse | None
 
 
 class ModelCallTraceResponse(BaseModel):
@@ -1198,6 +1206,13 @@ def to_model_call_response(call: ModelCall) -> ModelCallResponse:
         reply_plan_shape=(
             to_reply_plan_shape_response(call.reply_plan_shape)
             if call.reply_plan_shape
+            else None
+        ),
+        tagging_shape=(
+            TaggingShapeResponse(
+                tagged=call.tagging_shape.tagged, dropped=call.tagging_shape.dropped
+            )
+            if call.tagging_shape
             else None
         ),
     )

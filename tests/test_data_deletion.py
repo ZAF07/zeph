@@ -59,17 +59,36 @@ def set_up_user_with_every_kind_of_data(
     """Give a User messages, User Memory, a Check-in and a Telegram Connection.
 
     Their User Memory holds a Memory Item, a Day Summary, a Shared
-    Photo, two Life Threads, a Pattern, a Move Outcome and a User Portrait,
-    and they have a Personal Sticker and a Curiosity.
+    Photo, two Life Threads, an Observation, a Pattern, a Move Outcome and a
+    User Portrait, and they have a Personal Sticker and a Curiosity.
 
     Returns:
         Their Dashboard API headers and their User ID.
     """
     headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
-    client.put(
-        "/api/admin/features/personal_stickers",
-        json={"on": True},
-        headers=owner_headers(client, auth_verifier),
+    for feature in ("personal_stickers", "pattern_noticing"):
+        client.put(
+            f"/api/admin/features/{feature}",
+            json={"on": True},
+            headers=owner_headers(client, auth_verifier),
+        )
+    chat_model.script_pattern_tagging(
+        json.dumps(
+            {
+                "observations": [
+                    {
+                        "pattern_types": ["ACH.WORTH.PERF"],
+                        "sign": "I1",
+                        "direction": "for",
+                        "quote": "I started a new job",
+                        "context": "Started a new job in design.",
+                        "about": "themselves",
+                        "thread": 1,
+                        "evidence": "real_story",
+                    }
+                ]
+            }
+        )
     )
     chat_model.script_reply_plan(
         reply_plan_answer(need="Accountability", lead_move="Push")

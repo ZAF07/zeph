@@ -45,6 +45,7 @@ const plainUsersTrace: ModelCallTraceDetails = {
       content: null,
       understanding_shape: null,
       check_in_shape: null,
+      tagging_shape: null,
       reply_plan_shape: null,
     },
     {
@@ -66,6 +67,7 @@ const plainUsersTrace: ModelCallTraceDetails = {
         past_look_ups: 2,
       },
       check_in_shape: null,
+      tagging_shape: null,
       reply_plan_shape: null,
     },
     {
@@ -82,6 +84,7 @@ const plainUsersTrace: ModelCallTraceDetails = {
       content: null,
       understanding_shape: null,
       check_in_shape: null,
+      tagging_shape: null,
       reply_plan_shape: {
         need: "Be heard",
         lead_move: "Calm",
@@ -114,6 +117,7 @@ const plainUsersTrace: ModelCallTraceDetails = {
       content: null,
       understanding_shape: null,
       check_in_shape: { kind: "A follow-up", brought_up: true },
+      tagging_shape: null,
       reply_plan_shape: null,
     },
     {
@@ -130,6 +134,7 @@ const plainUsersTrace: ModelCallTraceDetails = {
       content: null,
       understanding_shape: null,
       check_in_shape: null,
+      tagging_shape: null,
       reply_plan_shape: null,
     },
   ],
@@ -174,6 +179,7 @@ const adminsTrace: ModelCallTraceDetails = {
       },
       understanding_shape: null,
       check_in_shape: null,
+      tagging_shape: null,
       reply_plan_shape: null,
     },
   ],
@@ -261,6 +267,35 @@ describe("ModelCallTraceView", () => {
     expect(factValue("Brought up")).toBe("Yes");
     const reply = screen.getByRole("article", { name: "Reply" });
     expect(within(reply).queryByText("Brought up")).not.toBeInTheDocument();
+  });
+
+  it("shows how many Observations a tagging call wrote and code dropped", async () => {
+    const [firstCall] = plainUsersTrace.calls;
+    apiClient.getModelCallTrace.mockResolvedValue({
+      ...plainUsersTrace,
+      kind: "conversation_end",
+      calls: [
+        {
+          ...firstCall,
+          id: "c9",
+          step: "pattern_tagging",
+          understanding_shape: null,
+          reply_plan_shape: null,
+          check_in_shape: null,
+          tagging_shape: { tagged: 3, dropped: 2 },
+        },
+      ],
+    });
+
+    renderWithQueries(<ModelCallTraceView traceId="t1" />);
+
+    const tagging = await screen.findByRole("article", {
+      name: "Pattern tagging",
+    });
+    const factValue = (label: string) =>
+      within(tagging).getByText(label).nextElementSibling?.textContent;
+    expect(factValue("Observations tagged")).toBe("3");
+    expect(factValue("Dropped by code")).toBe("2");
   });
 
   it("shows full content for an Admin's own chat, tool calls included", async () => {

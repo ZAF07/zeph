@@ -1308,6 +1308,7 @@ def _eval_model_call_values(case_result_id: UUID, call: ModelCall) -> dict[str, 
         "reply_plan_shape": (
             asdict(call.reply_plan_shape) if call.reply_plan_shape else None
         ),
+        "tagging_shape": asdict(call.tagging_shape) if call.tagging_shape else None,
     }
 
 

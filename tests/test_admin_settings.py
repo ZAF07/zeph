@@ -363,6 +363,7 @@ def test_core_services_list_their_prompt_and_model_settings(
         "Personal Sticker keeping",
         "Knowledge “when it helps”",
         "Check-ins",
+        "Pattern tagging",
         "Pattern keeping",
     ]
     service = response["services"][3]

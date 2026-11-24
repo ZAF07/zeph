@@ -11,8 +11,12 @@ from companion.core.models import (
     PatternArea,
     PatternTypeFile,
     PatternTypeStatus,
+    Power,
+    Relationship,
     SignPart,
     SignStrength,
+    SituationMatch,
+    SituationSetting,
 )
 from companion.core.pattern_catalog import (
     InvalidPatternCatalogError,
@@ -91,7 +95,7 @@ def test_a_pattern_type_is_read_with_all_its_details() -> None:
         if pattern_type.id == "CONF.AVOID.BELONG"
     )
 
-    assert conflict.version == "0.1.0"
+    assert conflict.version == "0.2.0"
     assert conflict.if_situation == "Disagreement with a valued other"
     assert conflict.then_behaviour == "Withholds or softens own view"
     assert conflict.function == "To protect belonging"
@@ -108,6 +112,10 @@ def test_a_pattern_type_is_read_with_all_its_details() -> None:
     ]
     assert conflict.anyone_would == (
         "Low-stakes avoidance with strangers or authority only"
+    )
+    assert conflict.anyone_would_when == (
+        SituationMatch(relationships=(Relationship.STRANGER,)),
+        SituationMatch(powers=(Power.ABOVE,)),
     )
     assert [exclusion.evidence for exclusion in conflict.exclusions] == [
         ExcludedEvidence.IGNORED,
@@ -326,3 +334,63 @@ def test_a_file_that_is_not_yaml_is_refused_with_its_name(tmp_path: Path) -> Non
         read_pattern_catalog_seed(tmp_path)
 
     assert raised.value.problems == ["broken.yaml: the file is not valid YAML."]
+
+
+def test_anyone_would_when_is_read_as_tag_matches() -> None:
+    [pattern_type] = read_pattern_types(
+        [
+            PatternTypeFile(
+                name="a.yaml",
+                content=changed(
+                    anyone_would_when=[
+                        {"relationship": ["stranger", "acquaintance"]},
+                        {"power": ["above"], "setting": ["work"]},
+                    ]
+                ),
+            )
+        ]
+    )
+
+    assert pattern_type.anyone_would_when == (
+        SituationMatch(
+            relationships=(Relationship.STRANGER, Relationship.ACQUAINTANCE)
+        ),
+        SituationMatch(powers=(Power.ABOVE,), settings=(SituationSetting.WORK,)),
+    )
+
+
+def test_anyone_would_when_may_be_left_out() -> None:
+    [pattern_type] = read_pattern_types([PatternTypeFile(name="a.yaml", content=VALID)])
+
+    assert pattern_type.anyone_would_when == ()
+
+
+@pytest.mark.parametrize(
+    ("anyone_would_when", "problem"),
+    [
+        ("strangers", "a.yaml: anyone_would_when must be a list."),
+        (
+            [{}],
+            "a.yaml: anyone_would_when[1] needs at least one of relationship, "
+            "power, setting or stance.",
+        ),
+        (
+            [{"relationship": ["boss"]}],
+            "a.yaml: anyone_would_when[1].relationship has boss; each must be one "
+            "of partner, family, friend, acquaintance, colleague, stranger.",
+        ),
+        (
+            [{"power": "above"}],
+            "a.yaml: anyone_would_when[1].power must be a list.",
+        ),
+        (
+            [{"relationship": ["stranger"], "mood": ["calm"]}],
+            "a.yaml: anyone_would_when[1].mood is not a field of a situation "
+            "anyone would act the same in.",
+        ),
+    ],
+)
+def test_a_wrong_anyone_would_when_is_refused_with_a_reason(
+    anyone_would_when: Any, problem: str
+) -> None:
+    assert problems_of(changed(anyone_would_when=anyone_would_when)) == [problem]

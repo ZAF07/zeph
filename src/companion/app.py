@@ -54,6 +54,7 @@ from companion.core.model_call_log import ModelCallLog
 from companion.core.move_outcomes import MoveOutcomeFinder, MoveOutcomeKeeper
 from companion.core.moves import MoveService
 from companion.core.needs import NeedService
+from companion.core.observations import PatternTagger
 from companion.core.past_day import PastDayTool
 from companion.core.pattern_catalog import PatternCatalogService
 from companion.core.patterns import PatternKeeper, PatternReminder
@@ -376,6 +377,15 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 repositories=dependencies.repositories,
                 chat_model=chat_model,
                 embedder=dependencies.embedder,
+                clock=dependencies.clock,
+            ),
+            pattern_tagger=PatternTagger(
+                repositories=dependencies.repositories,
+                pattern_catalog=PatternCatalogService(
+                    dependencies.repositories.pattern_catalog
+                ),
+                chat_model=chat_model,
+                model_call_log=model_call_log,
                 clock=dependencies.clock,
             ),
             pattern_keeper=PatternKeeper(

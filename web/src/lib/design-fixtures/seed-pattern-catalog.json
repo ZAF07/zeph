@@ -2,7 +2,7 @@
   "pattern_types": [
     {
       "id": "CONF.AVOID.BELONG",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "area": "conflict",
       "name": "Conflict avoidance to preserve belonging",
       "definition": "When disagreement arises with someone whose approval matters, the person suppresses, delays or dilutes their own position. The driver is fear that conflict will damage the relationship, not lack of opinion.",
