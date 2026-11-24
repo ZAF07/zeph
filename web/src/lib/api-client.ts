@@ -510,7 +510,8 @@ export type CheckInKindOverview = CheckInKind & { sent_last_30_days: number };
  * How Curiosities are treated while a Need is picked: the Reply Plan asks a
  * due one or says why not, asks one only if it fits, or never asks one.
  */
-export type CuriosityTreatment = "ask_by_default" | "only_if_it_fits" | "never";
+export type CuriosityTreatment =
+  "ask_by_default" | "test_the_water" | "only_if_it_fits" | "never";
 
 /**
  * A Need's name, when it fits, how to reply, the Moves it rules out and how

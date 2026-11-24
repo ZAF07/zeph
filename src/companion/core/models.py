@@ -960,6 +960,7 @@ class CuriosityTreatment(StrEnum):
     """How Curiosities are treated while a Need is picked."""
 
     ASK_BY_DEFAULT = "ask_by_default"
+    TEST_THE_WATER = "test_the_water"
     ONLY_IF_IT_FITS = "only_if_it_fits"
     NEVER = "never"
 
@@ -1587,6 +1588,8 @@ class ReplyPlanForm:
             said.
         curiosity_not_asked_why: Why no Curiosity is asked, when the Need
             asks them by default and one was offered; "" otherwise.
+        curiosity_taken: How the User took the Curiosity Zeph asked in its
+            last reply; None when it asked none, or it can't be told.
     """
 
     need: str
@@ -1612,6 +1615,7 @@ class ReplyPlanForm:
     patterns_used: tuple[PatternPicked, ...] = ()
     pattern_offered: PatternPicked | None = None
     curiosity_not_asked_why: str = ""
+    curiosity_taken: ThreadReaction | None = None
 
 
 @dataclass(frozen=True)

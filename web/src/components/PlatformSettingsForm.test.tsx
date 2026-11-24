@@ -99,6 +99,10 @@ const settings: AdminSettings = {
   curiosities_per_conversation: seeded(1),
   curiosities_waiting_limit: seeded(10),
   curiosity_check_ins_per_week: seeded(1),
+  curiosity_replies_between: seeded(3),
+  follow_ups_per_conversation: seeded(3),
+  curiosity_brush_offs_to_back_off: seeded(2),
+  curiosity_back_off_days: seeded(3),
   knowledge_closeness_percent: seeded(60),
   photo_retry_count: seeded(2),
   photo_album_max_photos: seeded(5),
@@ -416,6 +420,40 @@ describe("PlatformSettingsForm", () => {
       curiosities_per_conversation: 2,
       curiosities_waiting_limit: 20,
       curiosity_check_ins_per_week: 3,
+    });
+  });
+
+  it("shows and saves the Curiosity pace and backing off", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const between = await screen.findByLabelText(
+      "Fewest replies between Curiosities",
+    );
+    const followUps = screen.getByLabelText(
+      "Most follow-up questions per Conversation",
+    );
+    const brushOffs = screen.getByLabelText("Brush-offs before backing off");
+    const days = screen.getByLabelText("Days of doubled spacing");
+    expect(between).toHaveValue(3);
+    expect(followUps).toHaveValue(3);
+    expect(brushOffs).toHaveValue(2);
+    expect(days).toHaveValue(3);
+
+    await user.clear(between);
+    await user.type(between, "4");
+    await user.clear(followUps);
+    await user.type(followUps, "2");
+    await user.clear(brushOffs);
+    await user.type(brushOffs, "3");
+    await user.clear(days);
+    await user.type(days, "5");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      curiosity_replies_between: 4,
+      follow_ups_per_conversation: 2,
+      curiosity_brush_offs_to_back_off: 3,
+      curiosity_back_off_days: 5,
     });
   });
 

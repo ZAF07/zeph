@@ -33,3 +33,14 @@ This adds Dashboard UI: read `web/design/README.md` first, add or extend the ref
 - `01-needs-say-how-curiosities-are-treated.md`
 
 ## Comments
+
+Plan (24 Nov 2026, branch `pattern-02-test-the-water`, worktree ports 3010/8010):
+
+- **How Zeph knows a Curiosity was brushed off mid-Conversation.** Today the reaction is only judged when the Conversation ends. The Reply Plan of the next reply is now shown "the Curiosity Zeph asked in its last reply" and says how they took it (`curiosity_taken`: engaged / brushed off / asked to drop); code saves it on that Curiosity straight away. The Conversation-end keeping step still judges it again. With the fewest replies between Curiosities at least 1, the reply right after one can't ask another, so reading it there is in time. The Understanding stays free of Curiosities. `reply_plan_prompt` is reloaded from the seed by migration (as 0080 did, a day ago).
+- **Pure rules in `core/curiosities.py`**, tested with plain values: brush-offs in a row (newest first, stopping at an engaged answer, unknown skipped); the replies needed (doubled while backing off); whether a Curiosity may be offered now; whether test the water still allows one. They run in `CuriosityRaiser.due`, before the Reply Plan call; test the water depends on the picked Need, so it runs in `offered_under`, like never.
+- **Pace counts replies across Conversations** (Reply Plans since the newest Curiosity was raised): the live limit is 1 Curiosity per Conversation, so spacing inside one Conversation would do nothing.
+- **Follow-ups (Get curious)**: code knows them as Moves that ask a question (`asks_a_question`), not by name. Once this Conversation's Reply Plans made the cap of them, none is offered. They never use the Curiosity budget.
+- **Asked to drop stays dropped**: the keeping step is always shown every Curiosity the User asked to drop, not only the last 10 raised.
+- **Settings** (seeded, editable with hints, so Variants can override them): `curiosity_replies_between` 3, `follow_ups_per_conversation` 3, `curiosity_brush_offs_to_back_off` 2, `curiosity_back_off_days` 3.
+- **Needs**: new choice `test_the_water`; migration 0081 moves Just chatting to it (by name) and the seed starts it there.
+- **Dashboard**: "Test the water" in the Needs select; four field rows in the Settings page's Curiosities group. No new parts, no reference edits.

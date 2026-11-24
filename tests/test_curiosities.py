@@ -208,14 +208,17 @@ def test_a_curiosity_brought_up_reaches_the_reply_and_is_marked_raised(
     [curiosity] = stored_curiosities(engine)
     next_message = reply_plan_sees(client, chat_model, "busy day today")
 
-    assert "Ask them this in this reply" in instructions
+    assert "It is part of the plan, not an extra to leave out" in instructions
     assert (
         f"- {PRESENTATION} Open with it. Why you wonder: {PRESENTATION_WHY}"
     ) in instructions
     assert curiosity["state"] == "raised"
     assert curiosity["raised_at"] is not None
     assert curiosity["raised_conversation_id"] is not None
-    assert PRESENTATION not in next_message
+    assert f"[1] {PRESENTATION}" not in next_message
+    assert f"The Curiosity you asked in your last reply: {PRESENTATION}" in (
+        next_message
+    )
 
 
 def test_a_curiosity_woven_in_is_still_asked_in_this_reply(
@@ -263,10 +266,18 @@ def test_no_curiosity_is_offered_once_the_admin_set_number_was_raised(
         ],
     )
     clock.advance(timedelta(days=2))
-    set_settings(client, auth_verifier, {"curiosities_per_conversation": 2})
+    set_settings(
+        client,
+        auth_verifier,
+        {"curiosities_per_conversation": 2, "curiosity_replies_between": 1},
+    )
 
     bring_up_curiosity(chat_model, 1)
     first = reply_plan_sees(client, chat_model, "hey you")
+    clock.advance(timedelta(minutes=1))
+    chat_model.script_reply_plan(reply_plan_answer(curiosity_taken="engaged"))
+    reply_plan_sees(client, chat_model, "it went well!")
+    clock.advance(timedelta(minutes=1))
     second = reply_plan_sees(client, chat_model, "so anyway")
     bring_up_curiosity(chat_model, 1, 2)
     reply_instructions(client, chat_model, "what's new with you")
@@ -277,7 +288,7 @@ def test_no_curiosity_is_offered_once_the_admin_set_number_was_raised(
     assert "raised 1 of at most 2 in this Conversation" in second
     assert "[1] Did the new desk arrive?" in second
     assert "How is the cat?" in second
-    assert "Did the new desk arrive?" not in third
+    assert "] Did the new desk arrive?" not in third
     assert "How is the cat?" not in third
     assert len(raised) == 2
 

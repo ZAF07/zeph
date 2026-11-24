@@ -159,6 +159,7 @@ class ReplyService:
             patterns,
         )
         plan = planned.reply_plan.form
+        self._curiosity_raiser.record_reaction(due, plan.curiosity_taken)
         attempt.raise_if_dropped()
         memory = self._memory_retrieval.recall(
             snapshot,

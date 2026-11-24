@@ -1116,6 +1116,18 @@ class ReplyPlanRepository(Protocol):
         """
         ...
 
+    def count_since(self, user_id: UUID, since: datetime) -> int:
+        """Count the Reply Plans made for a User after a time, in any Conversation.
+
+        Args:
+            user_id: The User's ID.
+            since: The time; Reply Plans made at it or before are left out.
+
+        Returns:
+            How many there are.
+        """
+        ...
+
 
 class LifeThreadRepository(Protocol):
     """Stores each User's Life Threads, found by name or by meaning."""
@@ -1550,6 +1562,17 @@ class CuriosityRepository(Protocol):
         Args:
             user_id: The User's ID.
             limit: The most to return.
+
+        Returns:
+            The Curiosities.
+        """
+        ...
+
+    def list_asked_to_drop(self, user_id: UUID) -> list[Curiosity]:
+        """List the Curiosities a User asked Zeph to drop, newest raised first.
+
+        Args:
+            user_id: The User's ID.
 
         Returns:
             The Curiosities.

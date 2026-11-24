@@ -285,6 +285,12 @@ CURIOSITIES_PER_CONVERSATION = Setting(
     "curiosities_per_conversation", read_whole_number
 )
 CURIOSITIES_WAITING_LIMIT = Setting("curiosities_waiting_limit", read_whole_number)
+CURIOSITY_REPLIES_BETWEEN = Setting("curiosity_replies_between", read_whole_number)
+FOLLOW_UPS_PER_CONVERSATION = Setting("follow_ups_per_conversation", read_whole_number)
+CURIOSITY_BRUSH_OFFS_TO_BACK_OFF = Setting(
+    "curiosity_brush_offs_to_back_off", read_whole_number
+)
+CURIOSITY_BACK_OFF = Setting("curiosity_back_off_days", read_days)
 CURIOSITY_CHECK_INS_PER_WEEK = Setting(
     "curiosity_check_ins_per_week", read_whole_number
 )
@@ -1265,6 +1271,51 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         hint=(
             "Most Curiosities waiting at once. When a Conversation’s end makes more, "
             "Curiosity keeping closes the oldest."
+        ),
+    ),
+    EditableSetting(
+        CURIOSITY_REPLIES_BETWEEN.key,
+        "Fewest replies between Curiosities",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "How many replies must pass after a Curiosity is raised, in any "
+            "Conversation, before another is offered to the Reply Plan."
+        ),
+    ),
+    EditableSetting(
+        FOLLOW_UPS_PER_CONVERSATION.key,
+        "Most follow-up questions per Conversation",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=10,
+        hint=(
+            "How many replies in one Conversation may make a Move that asks a "
+            "question, such as Get curious. These don't use the Curiosity limit."
+        ),
+    ),
+    EditableSetting(
+        CURIOSITY_BRUSH_OFFS_TO_BACK_OFF.key,
+        "Brush-offs before backing off",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=10,
+        hint=(
+            "After this many Curiosities brushed off in a row, none is offered for "
+            "the rest of the Conversation and the spacing doubles. One engaged "
+            "answer ends it."
+        ),
+    ),
+    EditableSetting(
+        CURIOSITY_BACK_OFF.key,
+        "Days of doubled spacing",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=60,
+        hint=(
+            "How long the fewest replies between Curiosities stays doubled after "
+            "Zeph backs off, counted from the last brush-off."
         ),
     ),
     EditableSetting(

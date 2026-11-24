@@ -131,7 +131,7 @@ def test_a_move_that_asks_is_dropped_when_the_reply_raises_a_curiosity(
         client, chat_model, "hey you", lead_move="Suggest", **RAISE_CURIOSITY
     )
 
-    assert "Ask them this in this reply" in instructions
+    assert "It is part of the plan, not an extra to leave out" in instructions
     assert how_to_do_it("Suggest") not in instructions
     assert saved_moves(engine)[-1] == (None, None)
 
