@@ -11,7 +11,7 @@ from companion.core.evals.cases import (
 from companion.core.evals.made_up_memory import to_thread_to_save
 from companion.core.evals.models import CaseCheckResult, CaseOutcome, Check
 from companion.core.evals.move_outcome_eval import last_call_facts
-from companion.core.evals.ports import EvalCompanion
+from companion.core.evals.ports import EvalCompanion, EvalSetupError
 from companion.core.evals.understanding_eval import (
     calls_in_new_traces,
     transcript_line,
@@ -74,6 +74,19 @@ def save_ended_conversation(
     return conversation.id
 
 
+def named_pattern_types(observation: Observation) -> list[str]:
+    """List the Pattern Types an Observation names.
+
+    Args:
+        observation: The kept Observation.
+
+    Returns:
+        Its Pattern Type's ID, then, when unclear, the second one's.
+    """
+    second = observation.second_pattern_type_id
+    return [observation.pattern_type_id, *([second] if second else [])]
+
+
 def observation_label(observation: Observation) -> str:
     """Name a kept Observation the way expected ones are named.
 
@@ -103,11 +116,8 @@ def matches(expected: ExpectedObservation, observation: Observation) -> bool:
         the expected Pattern Type is the one kept, or, when unclear, either
         of its two.
     """
-    named = {observation.pattern_type_id}
-    if observation.second_pattern_type_id:
-        named.add(observation.second_pattern_type_id)
     return (
-        expected.pattern_type in named
+        expected.pattern_type in named_pattern_types(observation)
         and expected.direction == observation.direction
         and expected.unclear == observation.unclear
         and expected.situational == observation.situational
@@ -177,11 +187,8 @@ def kept_facts(
         context, who it is about, its Thread's title (None for none) and
         whether it matches one expected.
     """
-    pattern_types = [observation.pattern_type_id]
-    if observation.second_pattern_type_id:
-        pattern_types.append(observation.second_pattern_type_id)
     return {
-        "pattern_types": pattern_types,
+        "pattern_types": named_pattern_types(observation),
         "sign": observation.sign_id,
         "direction": observation.direction.value,
         "unclear": observation.unclear,
@@ -288,6 +295,10 @@ def check_tagging_case(case: TaggingCase, companion: EvalCompanion) -> CaseCheck
         Its facts hold what was kept and dropped and the tagging call's
         time and tokens. A failed case notes the Observations and the
         Conversation.
+
+    Raises:
+        EvalSetupError: If the tagging step didn't run at all, e.g. with an
+            empty Pattern Catalog, so the case is an Error, not a Fail.
     """
     companion.move_clock(case.now - companion.now())
     user_id = companion.connect_user()
@@ -306,6 +317,10 @@ def check_tagging_case(case: TaggingCase, companion: EvalCompanion) -> CaseCheck
     calls_in_new_traces(repositories, user_id, seen_trace_ids)
     planned = companion.tag_observations(conversation_id, touched)
     tagging_calls = calls_in_new_traces(repositories, user_id, seen_trace_ids)
+    if planned is None and not any(
+        call.step == ModelStep.PATTERN_TAGGING for call in tagging_calls
+    ):
+        raise EvalSetupError("The tagging step didn't run for the made-up User")
 
     checks = (
         check_kept(case.observations, planned.kept)

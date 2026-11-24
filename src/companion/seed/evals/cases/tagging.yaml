@@ -24,7 +24,7 @@
 #     unclear: true                    when it could be either of two look-alikes
 #     situational: true                when anyone would have acted the same
 #                                      (only CONF.AVOID.BELONG can be: strangers,
-#                                      or someone above them)
+#                                      or someone above them, for or against)
 
 now: 2026-11-24T10:00:00
 
@@ -189,6 +189,7 @@ cases:
     observations:
       - pattern_type: CONF.AVOID.BELONG
         direction: against
+        situational: true
 
   # CONF.AVOID.BELONG where anyone would do it (situational).
 
@@ -594,6 +595,7 @@ cases:
       - pattern_type: CONF.AVOID.BELONG
         direction: for
         unclear: true
+        situational: true
 
   - id: unclear-ach-or-ctrl-over-prepares
     messages:
