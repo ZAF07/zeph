@@ -30,7 +30,7 @@
 now: 2026-11-24T10:00:00
 
 cases:
-  # Conflict avoidance to preserve belonging (CONF.AVOID.BELONG), for.
+  # Softening disagreement to protect belonging (CONF.AVOID.BELONG), for.
 
   - id: conf-yes-to-sister-then-resents
     threads:
