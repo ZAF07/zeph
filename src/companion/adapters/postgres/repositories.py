@@ -37,6 +37,8 @@ from companion.adapters.postgres.tables import (
     curiosities,
     daily_usage,
     day_summaries,
+    exploration_tries,
+    explorations,
     feature_switches,
     helplines,
     knowledge_documents,
@@ -70,6 +72,7 @@ from companion.adapters.postgres.tables import (
 )
 from companion.core.features import feature_details
 from companion.core.models import (
+    AgendaChanges,
     BringUpWay,
     CatalogPattern,
     ChannelPhoto,
@@ -105,6 +108,11 @@ from companion.core.models import (
     DaySummary,
     Directness,
     EvidenceKind,
+    Exploration,
+    ExplorationNeed,
+    ExplorationState,
+    ExplorationTry,
+    ExplorationWay,
     Feature,
     FeatureSwitch,
     HeldBack,
@@ -183,6 +191,7 @@ from companion.core.models import (
     ThreadToBringUp,
     ToolCallRecord,
     TraceKind,
+    TryOutcome,
     Understanding,
     UnderstandingForm,
     UnderstandingShape,
@@ -3305,6 +3314,39 @@ class PostgresObservationRepository:
                 ],
             )
 
+    def settle(self, settled: Sequence[Observation]) -> None:
+        """Save unclear Observations made clear, with the Pattern Type now named.
+
+        Args:
+            settled: The Observations, each with one Pattern Type and its
+                sign; none saves nothing.
+        """
+        if not settled:
+            return
+        with self._database.begin() as connection:
+            connection.execute(
+                update(observations)
+                .where(observations.c.id == bindparam("observation_id"))
+                .values(
+                    pattern_type_id=bindparam("new_pattern_type_id"),
+                    pattern_type_version=bindparam("new_pattern_type_version"),
+                    sign_id=bindparam("new_sign_id"),
+                    second_pattern_type_id=None,
+                    second_pattern_type_version=None,
+                    situational=bindparam("new_situational"),
+                ),
+                [
+                    {
+                        "observation_id": observation.id,
+                        "new_pattern_type_id": observation.pattern_type_id,
+                        "new_pattern_type_version": observation.pattern_type_version,
+                        "new_sign_id": observation.sign_id,
+                        "new_situational": observation.situational,
+                    }
+                    for observation in settled
+                ],
+            )
+
     def list_for_user(self, user_id: UUID) -> list[Observation]:
         """List a User's Observations, oldest tagged first.
 
@@ -4009,6 +4051,215 @@ class PostgresUserPortraitRepository:
             )
 
 
+def _to_exploration(row: Row[Any]) -> Exploration:
+    """Turn an `explorations` row into an Exploration.
+
+    Args:
+        row: The row.
+
+    Returns:
+        The Exploration.
+    """
+    return Exploration(
+        id=row.id,
+        user_id=row.user_id,
+        pattern_id=row.pattern_id,
+        pattern_type_id=row.pattern_type_id,
+        state=ExplorationState(row.state),
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        rested_at=row.rested_at,
+        woke_at=row.woke_at,
+    )
+
+
+def _to_exploration_try(row: Row[Any]) -> ExplorationTry:
+    """Turn an `exploration_tries` row into a try.
+
+    Args:
+        row: The row.
+
+    Returns:
+        The try.
+    """
+    return ExplorationTry(
+        curiosity_id=row.curiosity_id,
+        exploration_id=row.exploration_id,
+        user_id=row.user_id,
+        need=ExplorationNeed(row.need),
+        way=ExplorationWay(row.way),
+        created_at=row.created_at,
+        observation_id=row.observation_id,
+        part_of_life=SituationSetting(row.part_of_life) if row.part_of_life else None,
+        outcome=TryOutcome(row.outcome) if row.outcome else None,
+    )
+
+
+class PostgresExplorationRepository:
+    """Stores Explorations and their tries in Postgres.
+
+    An Exploration goes with its Pattern, and a try with its aimed Curiosity.
+    """
+
+    def __init__(self, database: Database) -> None:
+        """Set up the repository.
+
+        Args:
+            database: Where to run queries: the engine, or one transaction.
+        """
+        self._database = database
+
+    def list_for_user(self, user_id: UUID) -> list[Exploration]:
+        """List a User's Explorations, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Explorations.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(explorations)
+                .where(explorations.c.user_id == user_id)
+                .order_by(explorations.c.created_at, explorations.c.id)
+            ).all()
+        return [_to_exploration(row) for row in rows]
+
+    def list_tries(self, user_id: UUID) -> list[ExplorationTry]:
+        """List every try of a User's, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The tries.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(exploration_tries)
+                .where(exploration_tries.c.user_id == user_id)
+                .order_by(exploration_tries.c.created_at)
+            ).all()
+        return [_to_exploration_try(row) for row in rows]
+
+    def save_agenda(self, changes: AgendaChanges) -> None:
+        """Save what keeping a User's Agenda changed, in one step.
+
+        A new aimed Curiosity whose Observation was deleted meanwhile is not
+        added, nor is its try: the Observations still there are locked until
+        the step ends.
+
+        Args:
+            changes: The changes.
+        """
+        with self._database.begin() as connection:
+            if changes.added:
+                connection.execute(
+                    insert(explorations).values(
+                        [asdict(exploration) for exploration in changes.added]
+                    )
+                )
+            if changes.changed:
+                connection.execute(
+                    update(explorations)
+                    .where(explorations.c.id == bindparam("exploration_id"))
+                    .values(
+                        state=bindparam("new_state"),
+                        updated_at=bindparam("new_updated_at"),
+                        rested_at=bindparam("new_rested_at"),
+                        woke_at=bindparam("new_woke_at"),
+                    ),
+                    [
+                        {
+                            "exploration_id": exploration.id,
+                            "new_state": exploration.state,
+                            "new_updated_at": exploration.updated_at,
+                            "new_rested_at": exploration.rested_at,
+                            "new_woke_at": exploration.woke_at,
+                        }
+                        for exploration in changes.changed
+                    ],
+                )
+            if changes.judged:
+                connection.execute(
+                    update(exploration_tries)
+                    .where(exploration_tries.c.curiosity_id == bindparam("try_id"))
+                    .values(outcome=bindparam("new_outcome")),
+                    [
+                        {"try_id": attempt.curiosity_id, "new_outcome": attempt.outcome}
+                        for attempt in changes.judged
+                    ],
+                )
+            if changes.closed_curiosity_ids:
+                connection.execute(
+                    update(curiosities)
+                    .where(
+                        curiosities.c.id.in_(changes.closed_curiosity_ids),
+                        curiosities.c.state == CuriosityState.WAITING,
+                    )
+                    .values(state=CuriosityState.CLOSED)
+                )
+            self._add_aimed(connection, changes)
+
+    def _add_aimed(self, connection: Connection, changes: AgendaChanges) -> None:
+        """Add the new aimed Curiosities and their tries, if their aim is still there.
+
+        Args:
+            connection: The connection the step runs on.
+            changes: The changes.
+        """
+        observation_ids = {
+            curiosity.source_observation_id for curiosity in changes.new_curiosities
+        } - {None}
+        found = set(
+            connection.execute(
+                select(observations.c.id)
+                .where(observations.c.id.in_(observation_ids))
+                .with_for_update(read=True)
+            ).scalars()
+        )
+        added = [
+            curiosity
+            for curiosity in changes.new_curiosities
+            if curiosity.source_observation_id in found | {None}
+        ]
+        if not added:
+            return
+        added_ids = {curiosity.id for curiosity in added}
+        connection.execute(
+            insert(curiosities).values(
+                [
+                    {**asdict(curiosity), "reaction": curiosity.reaction}
+                    for curiosity in added
+                ]
+            )
+        )
+        connection.execute(
+            insert(exploration_tries).values(
+                [
+                    asdict(attempt)
+                    for attempt in changes.new_tries
+                    if attempt.curiosity_id in added_ids
+                ]
+            )
+        )
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete every one of a User's Explorations and their tries.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(exploration_tries).where(exploration_tries.c.user_id == user_id)
+            )
+            connection.execute(
+                delete(explorations).where(explorations.c.user_id == user_id)
+            )
+
+
 def _to_curiosity(row: Row[Any]) -> Curiosity:
     """Turn a `curiosities` row into a Curiosity.
 
@@ -4035,6 +4286,8 @@ def _to_curiosity(row: Row[Any]) -> Curiosity:
         reaction=ThreadReaction(row.reaction) if row.reaction else None,
         guess=row.guess,
         how_sure=HowSure(row.how_sure) if row.how_sure else None,
+        exploration_id=row.exploration_id,
+        source_observation_id=row.source_observation_id,
     )
 
 
@@ -4087,6 +4340,26 @@ class PostgresCuriosityRepository:
                 select(curiosities)
                 .where(curiosities.c.raised_conversation_id == conversation_id)
                 .order_by(curiosities.c.raised_at, curiosities.c.position)
+            ).all()
+        return [_to_curiosity(row) for row in rows]
+
+    def list_aimed(self, user_id: UUID) -> list[Curiosity]:
+        """List a User's aimed Curiosities, in any state, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Curiosities with the aim of an Exploration's need.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(curiosities)
+                .where(
+                    curiosities.c.user_id == user_id,
+                    curiosities.c.aim == CuriosityAim.EXPLORATION,
+                )
+                .order_by(curiosities.c.position)
             ).all()
         return [_to_curiosity(row) for row in rows]
 
@@ -7082,6 +7355,7 @@ def _build_repositories(
         patterns=PostgresPatternRepository(database),
         observations=PostgresObservationRepository(database),
         curiosities=PostgresCuriosityRepository(database),
+        explorations=PostgresExplorationRepository(database),
         move_outcomes=PostgresMoveOutcomeRepository(database),
         user_portraits=PostgresUserPortraitRepository(database),
         knowledge_documents=PostgresKnowledgeDocumentRepository(database),

@@ -110,6 +110,12 @@ const settings: AdminSettings = {
   pattern_suspected_situations: seeded(2),
   pattern_suspected_points: seeded(100),
   pattern_closed_under_points: seeded(-150),
+  agenda_size: seeded(
+    3,
+    "How many of a User's suspected Patterns Zeph explores at once.",
+  ),
+  exploration_wait_days: seeded(3),
+  exploration_rest_after_tries: seeded(4),
   move_outcomes_per_understanding: seeded(3),
   move_outcomes_closeness_percent: seeded(65),
   curiosities_per_conversation: seeded(1),
@@ -534,6 +540,36 @@ describe("PlatformSettingsForm", () => {
     expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
       pattern_half_life_days: 60,
       pattern_closed_under_points: -200,
+    });
+  });
+
+  it("shows and saves the Agenda numbers in the Patterns section", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const size = await screen.findByLabelText("Explorations on the Agenda");
+    const wait = screen.getByLabelText("Wait after a try with nothing");
+    const rest = screen.getByLabelText("Tries with nothing before resting");
+    expect(size).toHaveValue(3);
+    expect(wait).toHaveValue(3);
+    expect(rest).toHaveValue(4);
+    expect(screen.getByRole("region", { name: "Patterns" })).toContainElement(
+      size,
+    );
+    expect(
+      screen.getByText(
+        "How many of a User's suspected Patterns Zeph explores at once.",
+      ),
+    ).toBeInTheDocument();
+
+    await user.clear(size);
+    await user.type(size, "2");
+    await user.clear(rest);
+    await user.type(rest, "5");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      agenda_size: 2,
+      exploration_rest_after_tries: 5,
     });
   });
 

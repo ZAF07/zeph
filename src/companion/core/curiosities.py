@@ -72,6 +72,7 @@ AIM_WORDS = {
     CuriosityAim.LOOK_BACK: "how something went, or looks to them now",
     CuriosityAim.GUESS: "whether a guess is right",
     CuriosityAim.NEXT_MOVE: "where they've got to on help never given",
+    CuriosityAim.EXPLORATION: "something Zeph is exploring about them (the Agenda)",
 }
 TREATMENT_WORDS = {
     CuriosityTreatment.ASK_BY_DEFAULT: (
@@ -163,21 +164,28 @@ def format_date(day: date) -> str:
     return f"{day.day} {day:%b %Y}"
 
 
-def due_curiosities(waiting: Sequence[Curiosity], today: date) -> list[Curiosity]:
-    """Keep the waiting Curiosities whose day has come.
+def due_curiosities(
+    waiting: Sequence[Curiosity], today: date, exploring: bool
+) -> list[Curiosity]:
+    """Keep the waiting Curiosities whose day has come, aimed ones first.
 
     Args:
         waiting: A User's waiting Curiosities.
         today: The day it is in the User's time zone.
+        exploring: Whether Pattern exploring works for the User; without it,
+            no Curiosity aimed at an Exploration's need is kept.
 
     Returns:
-        Those with no "not before" day or whose day has come, in order.
+        Those with no "not before" day or whose day has come: the aimed ones
+        first, then the rest, each in order.
     """
-    return [
+    due = [
         curiosity
         for curiosity in waiting
-        if curiosity.not_before is None or curiosity.not_before <= today
+        if (curiosity.not_before is None or curiosity.not_before <= today)
+        and (exploring or curiosity.aim != CuriosityAim.EXPLORATION)
     ]
+    return sorted(due, key=lambda curiosity: curiosity.aim != CuriosityAim.EXPLORATION)
 
 
 def how_sure_word(how_sure: HowSure | None) -> str:
@@ -397,7 +405,11 @@ class CuriosityRaiser:
             or not self._pace_allows(snapshot, conversation_id)
         ):
             return due_here
-        waiting = due_curiosities(store.list_waiting(snapshot.user.id), snapshot.today)
+        waiting = due_curiosities(
+            store.list_waiting(snapshot.user.id),
+            snapshot.today,
+            snapshot.works(Feature.PATTERN_EXPLORING),
+        )
         return replace(
             due_here,
             offered=tuple(
@@ -926,7 +938,11 @@ class CuriosityKeeper:
             return
         store = self._repositories.curiosities
         user_id = snapshot.user.id
-        waiting = store.list_waiting(user_id)
+        waiting = [
+            curiosity
+            for curiosity in store.list_waiting(user_id)
+            if curiosity.aim != CuriosityAim.EXPLORATION
+        ]
         raised_here = store.list_raised_in(conversation_id)
         threads = {
             thread.id: thread

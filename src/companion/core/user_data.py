@@ -36,6 +36,7 @@ def delete_user_data(repositories: Repositories, user_id: UUID) -> None:
         in_transaction.conversations.delete_for_user(user_id)
         in_transaction.model_calls.delete_for_user(user_id)
         in_transaction.user_memory.delete_for_user(user_id)
+        in_transaction.explorations.delete_for_user(user_id)
         in_transaction.curiosities.delete_for_user(user_id)
         in_transaction.observations.delete_for_user(user_id)
         in_transaction.patterns.delete_for_user(user_id)

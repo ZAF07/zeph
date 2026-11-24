@@ -5,6 +5,7 @@ from datetime import date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from companion.core.agenda import AgendaKeeper
 from companion.core.curiosities import CuriosityKeeper
 from companion.core.life_threads import LifeThreadKeeper
 from companion.core.memory_retrieval import format_time
@@ -682,6 +683,7 @@ class PostConversationProcessor:
         pattern_scorer: PatternScorer,
         pattern_keeper: PatternKeeper,
         curiosity_keeper: CuriosityKeeper,
+        agenda_keeper: AgendaKeeper,
         move_outcome_keeper: MoveOutcomeKeeper,
         portrait_writer: PortraitWriter,
         embedder: Embedder,
@@ -707,6 +709,8 @@ class PostConversationProcessor:
                 Patterns.
             curiosity_keeper: Writes, updates and closes the User's
                 Curiosities.
+            agenda_keeper: Keeps the User's Agenda and writes its aimed
+                Curiosities while Pattern exploring works.
             move_outcome_keeper: Keeps what was learned about each Move made.
             portrait_writer: Rewrites the User's Portrait.
             embedder: Embeds each Summary, so it can be found by meaning.
@@ -720,6 +724,7 @@ class PostConversationProcessor:
         self._pattern_scorer = pattern_scorer
         self._pattern_keeper = pattern_keeper
         self._curiosity_keeper = curiosity_keeper
+        self._agenda_keeper = agenda_keeper
         self._move_outcome_keeper = move_outcome_keeper
         self._portrait_writer = portrait_writer
         self._clock = clock
@@ -742,7 +747,8 @@ class PostConversationProcessor:
         tagged and the User's Patterns of Pattern Types scored while Pattern
         noticing works, then its Patterns from the
         Threads it touched, then its Curiosities while the
-        Curiosities Feature works, then its Move Outcomes, and then the User
+        Curiosities Feature works, then the Agenda while Pattern exploring
+        works too, then its Move Outcomes, and then the User
         Portrait is rewritten; if any of them fails, the failure is logged and
         not tried again, so nothing is ever added twice.
 
@@ -773,6 +779,7 @@ class PostConversationProcessor:
         self._keep_patterns(snapshot, conversation.id, messages, touched)
         if snapshot.works(Feature.CURIOSITIES):
             self._keep_curiosities(snapshot, conversation.id, messages)
+            self._keep_agenda(snapshot, conversation.id)
         self._keep_move_outcomes(snapshot, conversation.id, messages)
         self._write_portrait(snapshot)
 
@@ -886,6 +893,18 @@ class PostConversationProcessor:
             self._curiosity_keeper.keep_from(snapshot, conversation_id, messages)
         except Exception:
             logger.exception("Could not keep Curiosities")
+
+    def _keep_agenda(self, snapshot: UserSnapshot, conversation_id: UUID) -> None:
+        """Keep the User's Agenda, logging a failure instead of raising.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            conversation_id: The ended Conversation.
+        """
+        try:
+            self._agenda_keeper.keep(snapshot, conversation_id)
+        except Exception:
+            logger.exception("Could not keep the Agenda")
 
     def _keep_move_outcomes(
         self,

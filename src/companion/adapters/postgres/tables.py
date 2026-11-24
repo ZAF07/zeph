@@ -492,6 +492,18 @@ curiosities = Table(
     Column("guess", Text),
     Column("how_sure", Text),
     Column("aim", Text, nullable=False),
+    Column(
+        "exploration_id",
+        Uuid,
+        ForeignKey("explorations.id", ondelete="CASCADE"),
+        index=True,
+    ),
+    Column(
+        "source_observation_id",
+        Uuid,
+        ForeignKey("observations.id", ondelete="CASCADE"),
+        index=True,
+    ),
     Index("ix_curiosities_user_id_state", "user_id", "state"),
 )
 
@@ -630,6 +642,67 @@ observations = Table(
     Column("second_pattern_type_version", Text),
     Column("situational", Boolean, nullable=False),
     Column("tagged_at", DateTime(timezone=True), nullable=False),
+)
+
+explorations = Table(
+    "explorations",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column(
+        "pattern_id",
+        Uuid,
+        ForeignKey("patterns.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    ),
+    Column("pattern_type_id", Text, nullable=False),
+    Column("state", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("rested_at", DateTime(timezone=True)),
+    Column("woke_at", DateTime(timezone=True)),
+)
+
+exploration_tries = Table(
+    "exploration_tries",
+    metadata,
+    Column(
+        "curiosity_id",
+        Uuid,
+        ForeignKey("curiosities.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "exploration_id",
+        Uuid,
+        ForeignKey("explorations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("need", Text, nullable=False),
+    Column("way", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column(
+        "observation_id",
+        Uuid,
+        ForeignKey("observations.id", ondelete="SET NULL"),
+    ),
+    Column("part_of_life", Text),
+    Column("outcome", Text),
 )
 
 patterns_in_mind = Table(

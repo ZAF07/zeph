@@ -331,6 +331,11 @@ PATTERN_SUSPECTED_SITUATIONS = Setting(
 )
 PATTERN_SUSPECTED_POINTS = Setting("pattern_suspected_points", read_whole_number)
 PATTERN_CLOSED_UNDER_POINTS = Setting("pattern_closed_under_points", read_whole_number)
+AGENDA_SIZE = Setting("agenda_size", read_whole_number)
+EXPLORATION_WAIT = Setting("exploration_wait_days", read_days)
+EXPLORATION_REST_AFTER_TRIES = Setting(
+    "exploration_rest_after_tries", read_whole_number
+)
 PATTERN_PUSHED_BACK_WAIT = Setting("pattern_pushed_back_wait_days", read_days)
 PATTERN_CLOSENESS_PERCENT = Setting("pattern_closeness_percent", read_whole_number)
 PORTRAIT_MODEL = Setting("portrait_model", read_text)
@@ -1432,6 +1437,41 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
             "A noticed or suspected Pattern whose score falls under this, in "
             "points, is closed. One whose score comes back over it is noticed "
             "again."
+        ),
+    ),
+    EditableSetting(
+        AGENDA_SIZE.key,
+        "Explorations on the Agenda",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=20,
+        hint=(
+            "How many of a User's suspected Patterns Zeph explores at once, "
+            "highest score first, while Pattern exploring works. Each gets an "
+            "aimed Curiosity when a Conversation ends."
+        ),
+    ),
+    EditableSetting(
+        EXPLORATION_WAIT.key,
+        "Wait after a try with nothing",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=365,
+        hint=(
+            "Days before an Exploration is tried again, a different way, after "
+            "an aimed Curiosity came back vague or brushed off."
+        ),
+    ),
+    EditableSetting(
+        EXPLORATION_REST_AFTER_TRIES.key,
+        "Tries with nothing before resting",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "After this many tries in a row with nothing useful, an Exploration "
+            "rests and frees its place on the Agenda. A new Observation for its "
+            "Pattern wakes it."
         ),
     ),
     EditableSetting(

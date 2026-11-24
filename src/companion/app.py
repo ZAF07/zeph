@@ -20,6 +20,7 @@ from companion.adapters.http.pattern_catalog_api import (
 )
 from companion.adapters.telegram.webhook import build_telegram_webhook_router
 from companion.core.admin_users import AdminUserService
+from companion.core.agenda import AgendaKeeper, AgendaReader
 from companion.core.chat_settings import SettingsTools
 from companion.core.check_in_kinds import CheckInKindService
 from companion.core.check_in_schedule import CheckInScheduleService
@@ -286,6 +287,9 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         curiosity_raiser=CuriosityRaiser(
             repositories=dependencies.repositories, clock=dependencies.clock
         ),
+        agenda=AgendaReader(
+            dependencies.repositories, pattern_catalog_service, dependencies.clock
+        ),
         move_outcome_finder=MoveOutcomeFinder(
             repositories=dependencies.repositories, embedder=dependencies.embedder
         ),
@@ -398,6 +402,11 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 repositories=dependencies.repositories,
                 chat_model=chat_model,
                 embedder=dependencies.embedder,
+                clock=dependencies.clock,
+            ),
+            agenda_keeper=AgendaKeeper(
+                repositories=dependencies.repositories,
+                pattern_catalog=pattern_catalog_service,
                 clock=dependencies.clock,
             ),
             curiosity_keeper=CuriosityKeeper(

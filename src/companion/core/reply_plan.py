@@ -5,6 +5,11 @@ from dataclasses import dataclass, replace
 from typing import Any
 from uuid import UUID, uuid4
 
+from companion.core.agenda import (
+    AgendaEntry,
+    describe_agenda,
+    describe_open_needs_for_reply,
+)
 from companion.core.curiosities import (
     DueCuriosities,
     NumberedCuriosity,
@@ -364,6 +369,7 @@ def describe_message_for_reply_plan(
     check_in_kinds: Sequence[CheckInKind] = (),
     last_conversation_where: str = "",
     patterns: Sequence[RemindedPattern] = (),
+    agenda: Sequence[AgendaEntry] = (),
 ) -> str:
     """Write what the Reply Plan model is given about the Message.
 
@@ -390,14 +396,16 @@ def describe_message_for_reply_plan(
             Recent Messages was when its last Reply Plan was made; "" if
             none.
         patterns: The Patterns in mind, numbered.
+        agenda: The User's active Explorations; empty while Pattern
+            exploring doesn't work for them or they are struggling.
 
     Returns:
         The time, the Understanding, how direct the User wants it to be
         (left out while they are struggling), Needs, Moves and which each
         Need allows, past Move Outcomes with their days, User Portrait, Goals,
         Memory Categories, recent Conversations, reminded Life Threads, the
-        Patterns in mind, due Curiosities and how each Need treats them,
-        Knowledge documents, the due
+        Patterns in mind, due Curiosities and how each Need treats them, the
+        Agenda with its earlier tries, Knowledge documents, the due
         Check-in's Kinds when one is due, where the previous Conversation
         was, earlier Reply Plans, earlier messages across Conversations and
         latest message.
@@ -467,6 +475,7 @@ def describe_message_for_reply_plan(
         f"\n\nThings you've been wondering about them, whose time has come "
         f"{describe_due_curiosities(due, snapshot.user.time_zone)}"
         f"{awaiting_line}"
+        f"{describe_agenda(agenda, snapshot.user.time_zone)}"
         f"\n\nHow each Need treats them:\n{describe_curiosity_treatments(needs)}"
         f"\n\nKnowledge documents, with when each helps:\n"
         f"{knowledge_lines or 'None.'}"
@@ -1105,6 +1114,7 @@ def format_reply_guidance(
     left_alone_section: str,
     curiosities_section: str,
     past_days: Sequence[str] = (),
+    open_needs_line: str = "",
 ) -> ReplyGuidance:
     """Write what the Reply Plan adds to the reply's instructions.
 
@@ -1120,6 +1130,8 @@ def format_reply_guidance(
         left_alone_section: The Life Threads to leave alone; "" if none.
         curiosities_section: The Curiosity to ask; "" if none.
         past_days: What each call of the past-day tool read, in order.
+        open_needs_line: What the Agenda still wants to learn, given when a
+            lead or supporting Move asks a question; "" otherwise.
 
     Returns:
         The Threads to leave alone as a boundary; the Need and how to reply,
@@ -1148,6 +1160,8 @@ def format_reply_guidance(
         lines.append(
             f"Support it with: {picked.support.name}. {picked.support.how_to_do_it}"
         )
+    if open_needs_line and picked.asks_a_question:
+        lines.append(open_needs_line)
     if plan.guidance:
         lines.append(plan.guidance)
     if understanding.mood:
@@ -1280,6 +1294,7 @@ class ReplyPlanService:
         move_outcomes: Sequence[MoveOutcome],
         check_in_kinds: Sequence[CheckInKind] = (),
         patterns: Sequence[RemindedPattern] = (),
+        agenda: Sequence[AgendaEntry] = (),
     ) -> PlannedReply:
         """Make and save the Reply Plan of the Conversation's newest Message.
 
@@ -1313,6 +1328,10 @@ class ReplyPlanService:
             check_in_kinds: The Check-in Kinds it may weave in, when code
                 allows a due Check-in; empty when none is.
             patterns: The Patterns in mind, numbered.
+            agenda: The User's active Explorations; empty while Pattern
+                exploring doesn't work for them or they are struggling. A
+                lead or supporting Move that asks a question is told its
+                open needs.
 
         Returns:
             The saved Reply Plan, what it adds to the reply and the
@@ -1351,6 +1370,7 @@ class ReplyPlanService:
                 check_in_kinds,
                 self._last_conversation_where(recent),
                 patterns,
+                agenda,
             ),
             reminded,
             due,
@@ -1417,6 +1437,7 @@ class ReplyPlanService:
                 format_threads_left_alone(model_form),
                 format_curiosities_for_reply(form.curiosities, need, asked_why),
                 past_days,
+                describe_open_needs_for_reply(agenda),
             ),
             asks_a_question=asks_another_question or picked.asks_a_question,
             may_send_photo=may_send_photo(understanding.form, form),

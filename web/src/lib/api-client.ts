@@ -210,7 +210,8 @@ export type Feature =
   | "photo_viewing"
   | "personal_stickers"
   | "curiosities"
-  | "pattern_noticing";
+  | "pattern_noticing"
+  | "pattern_exploring";
 
 /** A Feature's switch for everyone and who last changed it, and when. */
 export type FeatureSwitch = {
@@ -232,7 +233,8 @@ export type FeatureReason =
   | "off_for_everyone"
   | "off_for_user"
   | "turned_off_by_user"
-  | "stickers_off";
+  | "stickers_off"
+  | "pattern_noticing_off";
 
 /** Whether a Feature works for one User, why, and the Admin's switch for them. */
 export type UserFeatureStatus = {

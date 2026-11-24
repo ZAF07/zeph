@@ -60,13 +60,14 @@ def set_up_user_with_every_kind_of_data(
 
     Their User Memory holds a Memory Item, a Day Summary, a Shared
     Photo, two Life Threads, an Observation, a Pattern, a Move Outcome and a
-    User Portrait, and they have a Personal Sticker and a Curiosity.
+    User Portrait, and they have a Personal Sticker, a Curiosity and an
+    Exploration with its aimed Curiosity.
 
     Returns:
         Their Dashboard API headers and their User ID.
     """
     headers = set_up_user_with_check_ins(client, auth_verifier, chat_channel)
-    for feature in ("personal_stickers", "pattern_noticing"):
+    for feature in ("personal_stickers", "pattern_noticing", "pattern_exploring"):
         client.put(
             f"/api/admin/features/{feature}",
             json={"on": True},
@@ -86,7 +87,17 @@ def set_up_user_with_every_kind_of_data(
                         "about": "themselves",
                         "thread": 1,
                         "evidence": "real_story",
-                    }
+                    },
+                    {
+                        "pattern_types": ["ACH.WORTH.PERF"],
+                        "sign": "I1",
+                        "direction": "for",
+                        "quote": "a new job",
+                        "context": "Set up for the new job the same day.",
+                        "about": "themselves",
+                        "thread": 2,
+                        "evidence": "real_story",
+                    },
                 ]
             }
         )

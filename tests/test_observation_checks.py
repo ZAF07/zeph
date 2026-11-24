@@ -26,6 +26,8 @@ from companion.core.observations import (
     TaggingContext,
     is_situational,
     plan_observations,
+    plan_settled,
+    read_settled_answer,
     read_tagging_answer,
     users_own_texts,
 )
@@ -394,3 +396,72 @@ def test_a_quote_may_start_or_end_at_punctuation() -> None:
     ).kept
 
     assert observation.quote == "It’s fine, honestly"
+
+
+def unclear_mei() -> Any:
+    """Mei's story, kept unclear between belonging and self-worth."""
+    [kept] = plan_observations(
+        [entry(pattern_types=["CONF.AVOID.BELONG", "ACH.WORTH.PERF"])], context()
+    ).kept
+    return kept
+
+
+@pytest.mark.parametrize(
+    ("settled", "pattern_type", "sign"),
+    [
+        (
+            {"pattern_type": "CONF.AVOID.BELONG", "sign": "I1"},
+            "CONF.AVOID.BELONG",
+            "I1",
+        ),
+        ({"pattern_type": "ACH.WORTH.PERF", "sign": "I1"}, "ACH.WORTH.PERF", "I1"),
+    ],
+)
+def test_a_settled_unclear_story_becomes_clear_under_the_pattern_type_named(
+    settled: dict[str, Any], pattern_type: str, sign: str
+) -> None:
+    story = unclear_mei()
+
+    [clear] = plan_settled([{"unclear": 1, **settled}], {1: story}, PATTERN_TYPES)
+
+    assert (clear.id, clear.pattern_type_id, clear.sign_id) == (
+        story.id,
+        pattern_type,
+        sign,
+    )
+    assert clear.pattern_type_version == PATTERN_TYPES[pattern_type].version
+    assert not clear.unclear
+    assert clear.quote == story.quote
+
+
+@pytest.mark.parametrize(
+    "settled",
+    [
+        {"unclear": 2, "pattern_type": "CONF.AVOID.BELONG", "sign": "I2"},
+        {"unclear": 1, "pattern_type": "CTRL.UNCERT.PLAN", "sign": "I1"},
+        {"unclear": 1, "pattern_type": "CONF.AVOID.BELONG", "sign": "C1"},
+        {"unclear": 1, "pattern_type": "CONF.AVOID.BELONG", "sign": "Z9"},
+        {"unclear": True, "pattern_type": "CONF.AVOID.BELONG", "sign": "I2"},
+        "settle it",
+    ],
+)
+def test_code_keeps_a_settling_only_for_one_of_its_two_pattern_types_and_a_sign(
+    settled: Any,
+) -> None:
+    assert plan_settled([settled], {1: unclear_mei()}, PATTERN_TYPES) == []
+
+
+def test_a_story_is_settled_once_and_an_answer_with_no_settled_list_settles_none() -> (
+    None
+):
+    story = unclear_mei()
+    twice = [
+        {"unclear": 1, "pattern_type": "CONF.AVOID.BELONG", "sign": "I2"},
+        {"unclear": 1, "pattern_type": "ACH.WORTH.PERF", "sign": "I1"},
+    ]
+
+    [clear] = plan_settled(twice, {1: story}, PATTERN_TYPES)
+
+    assert clear.pattern_type_id == "CONF.AVOID.BELONG"
+    assert read_settled_answer('{"observations": []}') == []
+    assert read_settled_answer('{"observations": [], "settled": "no"}') == []

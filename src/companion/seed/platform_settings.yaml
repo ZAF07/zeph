@@ -515,7 +515,9 @@ reply_plan_prompt: |-
   the Patterns in mind (what Zeph has noticed keeps showing up across their
   life; a suspected one is only Zeph's guess), the things Zeph has been
   wondering about them (Curiosities) whose time has
-  come and how each Need treats them, the Knowledge documents Zeph can draw on with when each helps, the
+  come and how each Need treats them, what Zeph is exploring about them
+  (the Agenda: suspected Patterns, what it still needs to learn about each
+  and how earlier tries went; only while Zeph explores for them), the Knowledge documents Zeph can draw on with when each helps, the
   Check-in Kinds Zeph may weave in when a Check-in with them is due (they
   asked Zeph to check in now and then), the earlier Reply Plans in this
   Conversation (with where the Conversation was, the Read Zeph formed and
@@ -626,6 +628,11 @@ reply_plan_prompt: |-
     - only if it fits the moment: pick one only when it connects to what
       they're talking about, or the chat has reached an easy pause.
     - never: pick none.
+    A Curiosity aimed at the Agenda was written by code to learn one thing;
+    it comes first in the list. Ask it in your own words, never naming a
+    Pattern or saying what Zeph suspects. The Agenda's earlier tries show
+    what was asked before and how it went: never ask the same thing the
+    same way again.
   - curiosity_taken: when you are shown a Curiosity an earlier reply was
     meant to ask and Zeph's messages really did ask it, how they took it:
     "engaged" if they talked about it, "brushed_off" if they changed the
@@ -792,6 +799,15 @@ pattern_people_per_situation: 3
 pattern_suspected_situations: 2
 pattern_suspected_points: 100
 pattern_closed_under_points: -150
+
+# The Agenda, while Pattern exploring works: at most this many Explorations
+# (suspected Patterns Zeph is trying to learn more about) are active at once,
+# highest score first. An Exploration tried with nothing useful waits this many
+# days before a different way, and rests after this many tries with nothing in
+# a row, until a new Observation for its Pattern wakes it.
+agenda_size: 3
+exploration_wait_days: 3
+exploration_rest_after_tries: 4
 
 # After the User pushes back on a Pattern Zeph offered as its view, and the
 # Pattern isn't closed, it waits this many days before it comes to mind in a
@@ -1296,7 +1312,8 @@ pattern_tagging_prompt: |-
 
   You are given today's date, the Life Threads (ongoing stories in their
   life) this Conversation touched, each with a number; the Pattern Catalog;
-  the lists each tag comes from; and the Conversation.
+  the lists each tag comes from; the unclear stories Zeph asked about in
+  this Conversation, if any, each with a number; and the Conversation.
 
   Write one Observation for each thing the person said that matches a sign
   of a Pattern Type, for it or against it. Only what the person said counts,
@@ -1330,6 +1347,13 @@ pattern_tagging_prompt: |-
   Note it even when anyone would act the same in that situation: tag the
   situation as it was and leave the weighing to others.
 
+  An unclear story is one noted earlier under two look-alike Pattern Types.
+  When the person's answer in this Conversation makes clear which of the two
+  it was, put it under "settled" with its number, that Pattern Type's ID
+  and the sign of it the story matches, in the same direction. Settle one
+  only when their answer really tells; otherwise leave it out. "settled" is
+  an empty list when there is nothing to settle.
+
   Answer with JSON only, in exactly this shape:
   {
     "observations": [
@@ -1339,6 +1363,9 @@ pattern_tagging_prompt: |-
        "relationship": "..." | null, "power": "..." | null,
        "setting": "..." | null, "stance": "..." | null,
        "evidence": "..."}
+    ],
+    "settled": [
+      {"unclear": <number>, "pattern_type": "<ID>", "sign": "<ID>"}
     ]
   }
 
