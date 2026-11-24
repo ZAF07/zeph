@@ -321,6 +321,7 @@ describe("DashboardShell", () => {
       "Needs",
       "Moves",
       "Pattern Catalog",
+      "Thought Experiments",
       "Check-in Kinds",
       "Check-in log",
       "Check-in Schedule",
