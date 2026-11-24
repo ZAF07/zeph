@@ -261,6 +261,25 @@ def test_tool_calls_are_run_and_their_results_sent_back_until_a_reply() -> None:
     }
 
 
+def test_several_tool_calls_in_one_round_each_get_their_result() -> None:
+    requests: list[httpx.Request] = []
+    two_calls = tool_call_reply('{"query": "a"}', call_id="c1")
+    second_call = tool_call_reply('{"query": "b"}', call_id="c2")
+    two_calls["choices"][0]["message"]["tool_calls"].append(
+        second_call["choices"][0]["message"]["tool_calls"][0]
+    )
+    chat_model = scripted_openrouter([two_calls, openrouter_reply()], requests)
+
+    generate_with_tools(chat_model)
+
+    messages = json.loads(requests[1].content)["messages"]
+    assert [call["id"] for call in messages[-3]["tool_calls"]] == ["c1", "c2"]
+    assert messages[-2:] == [
+        {"role": "tool", "tool_call_id": "c1", "content": "results for a"},
+        {"role": "tool", "tool_call_id": "c2", "content": "results for b"},
+    ]
+
+
 def test_a_call_to_a_tool_that_was_not_offered_runs_nothing() -> None:
     requests: list[httpx.Request] = []
     chat_model = scripted_openrouter(
@@ -311,7 +330,11 @@ def test_after_too_many_tool_rounds_the_model_must_answer_without_tools() -> Non
     assert len(requests) == MAX_TOOL_ROUNDS + 1
     for request in requests[:-1]:
         assert "tool_choice" not in json.loads(request.content)
-    assert json.loads(requests[-1].content)["tool_choice"] == "none"
+    final_request = json.loads(requests[-1].content)
+    assert final_request["tool_choice"] == "none"
+    assert [tool["function"]["name"] for tool in final_request["tools"]] == [
+        "web_search"
+    ]
 
 
 def test_tokens_are_added_up_across_every_tool_round() -> None:

@@ -1,14 +1,21 @@
 import json
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import httpx
 
+from companion.adapters.chat_tools import (
+    MAX_TOOL_ROUNDS,
+    broken_arguments_message,
+    to_tool_schema,
+    unknown_tool_message,
+)
 from companion.core.models import ChatLine, ChatRole, ModelAnswer, ToolCallRecord
 from companion.core.ports import ChatTool
 
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
-MAX_TOOL_ROUNDS = 4
+
+AskOpenRouter = Callable[[list[dict[str, Any]], bool], dict[str, Any]]
 
 
 class OpenRouterReplyError(RuntimeError):
@@ -32,25 +39,6 @@ def to_openrouter_messages(
         role = "user" if line.role == ChatRole.USER else "assistant"
         messages.append({"role": role, "content": line.text})
     return messages
-
-
-def to_tool_schema(tool: ChatTool) -> dict[str, Any]:
-    """Describe a tool in the OpenAI function format OpenRouter takes.
-
-    Args:
-        tool: The tool.
-
-    Returns:
-        The tool's schema.
-    """
-    return {
-        "type": "function",
-        "function": {
-            "name": tool.name,
-            "description": tool.description,
-            "parameters": tool.parameters,
-        },
-    }
 
 
 def reply_message(body: dict[str, Any]) -> dict[str, Any]:
@@ -146,11 +134,92 @@ def run_tool_call(
     except json.JSONDecodeError:
         arguments = None
     if not isinstance(arguments, dict):
-        result = f"The arguments for {name} were not valid JSON. Try again."
+        result = broken_arguments_message(name)
         return ToolCallRecord(name, {"raw": raw_arguments}, result)
     tool = tools_by_name.get(name)
-    result = tool.run(arguments) if tool else f"There is no tool called {name}."
+    result = tool.run(arguments) if tool else unknown_tool_message(name)
     return ToolCallRecord(name, arguments, result)
+
+
+def build_request(
+    model: str,
+    thinking: bool,
+    messages: list[dict[str, Any]],
+    tools: Sequence[ChatTool],
+    may_call_tools: bool,
+) -> dict[str, Any]:
+    """Build one Chat Completions request body.
+
+    When the model may no longer call tools, the tools are still sent, with
+    `tool_choice` "none", because the messages already hold tool calls and
+    some providers (e.g. Anthropic) refuse those without the tools.
+
+    Args:
+        model: The OpenRouter model name, sent as given.
+        thinking: Whether the model should think before it answers.
+        messages: The messages so far.
+        tools: The tools offered; none sends no tools.
+        may_call_tools: Whether the model may call a tool this round.
+
+    Returns:
+        The request body.
+    """
+    request: dict[str, Any] = {
+        "model": model,
+        "messages": messages,
+        "reasoning": {"enabled": thinking},
+    }
+    if tools:
+        request["tools"] = [to_tool_schema(tool) for tool in tools]
+        if not may_call_tools:
+            request["tool_choice"] = "none"
+    return request
+
+
+def answer_with_tools(
+    ask: AskOpenRouter, messages: list[dict[str, Any]], tools: Sequence[ChatTool]
+) -> ModelAnswer:
+    """Let the model call tools, sending back each result, until it replies.
+
+    After `MAX_TOOL_ROUNDS` rounds of tool calls the model must reply
+    without calling any more.
+
+    Args:
+        ask: Sends the messages to the model, saying whether it may call
+            tools, and returns the reply body.
+        messages: The messages so far; tool calls and results are added.
+        tools: The tools the model may call; with none, the first reply is
+            the answer.
+
+    Returns:
+        The reply text, the tokens every round took, every tool call made
+        and the model's reasoning.
+
+    Raises:
+        OpenRouterReplyError: If a reply body holds an error or no reply.
+    """
+    tools_by_name = {tool.name: tool for tool in tools}
+    bodies: list[dict[str, Any]] = []
+    tool_calls: list[ToolCallRecord] = []
+    for _ in range(MAX_TOOL_ROUNDS):
+        body = ask(messages, True)
+        bodies.append(body)
+        message = reply_message(body)
+        if not message.get("tool_calls"):
+            return to_model_answer(bodies, tool_calls)
+        messages.append(to_assistant_message(message))
+        for tool_call in message["tool_calls"]:
+            record = run_tool_call(tool_call, tools_by_name)
+            tool_calls.append(record)
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tool_call["id"],
+                    "content": record.result,
+                }
+            )
+    bodies.append(ask(messages, False))
+    return to_model_answer(bodies, tool_calls)
 
 
 class OpenRouterChatModel:
@@ -176,10 +245,6 @@ class OpenRouterChatModel:
     ) -> ModelAnswer:
         """Generate the next reply, calling tools first if the model wants to.
 
-        Each round the tool results are sent back, until the model replies.
-        After `MAX_TOOL_ROUNDS` rounds of tool calls the model must reply
-        without calling any more.
-
         Args:
             model: The OpenRouter model name, sent as given, e.g.
                 "deepseek/deepseek-v4.1-flash".
@@ -196,38 +261,15 @@ class OpenRouterChatModel:
             httpx.HTTPStatusError: If OpenRouter answers with an error status.
             OpenRouterReplyError: If OpenRouter answers with an error body.
         """
-        messages = to_openrouter_messages(instructions, history)
-        request: dict[str, Any] = {
-            "model": model,
-            "messages": messages,
-            "reasoning": {"enabled": thinking},
-        }
-        if tools:
-            request["tools"] = [to_tool_schema(tool) for tool in tools]
-        tools_by_name = {tool.name: tool for tool in tools}
-        bodies: list[dict[str, Any]] = []
-        tool_calls: list[ToolCallRecord] = []
-        for _ in range(MAX_TOOL_ROUNDS):
-            body = self._ask(request)
-            bodies.append(body)
-            message = reply_message(body)
-            if not message.get("tool_calls"):
-                return to_model_answer(bodies, tool_calls)
-            messages.append(to_assistant_message(message))
-            for tool_call in message["tool_calls"]:
-                record = run_tool_call(tool_call, tools_by_name)
-                tool_calls.append(record)
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_call["id"],
-                        "content": record.result,
-                    }
-                )
-        bodies.append(self._ask({**request, "tool_choice": "none"}))
-        return to_model_answer(bodies, tool_calls)
+        return answer_with_tools(
+            lambda messages, may_call_tools: self._send(
+                build_request(model, thinking, messages, tools, may_call_tools)
+            ),
+            to_openrouter_messages(instructions, history),
+            tools,
+        )
 
-    def _ask(self, request: dict[str, Any]) -> dict[str, Any]:
+    def _send(self, request: dict[str, Any]) -> dict[str, Any]:
         """Send one Chat Completions request to OpenRouter.
 
         Args:
