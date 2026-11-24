@@ -28,10 +28,10 @@ CLAUDE_PRICES = {
 def test_the_migration_adds_opus_and_fable_and_keeps_everything_else(
     engine: Engine, database_url: str
 ) -> None:
-    downgrade_to(database_url, "0091")
+    downgrade_to(database_url, "0092")
     try:
         save_values(engine, "platform_settings", OLD_SETTINGS)
-        upgrade_to(database_url, "0092")
+        upgrade_to(database_url, "0093")
 
         assert stored_values(engine, "platform_settings", list(OLD_SETTINGS)) == {
             **OLD_SETTINGS,
@@ -51,7 +51,7 @@ def test_the_migration_adds_opus_and_fable_and_keeps_everything_else(
 def test_a_model_already_saved_without_a_price_stays_without_one(
     engine: Engine, database_url: str
 ) -> None:
-    downgrade_to(database_url, "0091")
+    downgrade_to(database_url, "0092")
     try:
         save_values(
             engine,
@@ -64,7 +64,7 @@ def test_a_model_already_saved_without_a_price_stays_without_one(
                 "model_prices": {"anthropic/claude-fable-5.2": {"in": 3, "out": 9}},
             },
         )
-        upgrade_to(database_url, "0092")
+        upgrade_to(database_url, "0093")
 
         assert stored_values(
             engine, "platform_settings", ["available_models", "model_prices"]
@@ -82,7 +82,7 @@ def test_a_model_already_saved_without_a_price_stays_without_one(
 def test_a_model_already_saved_keeps_its_place_and_its_price(
     engine: Engine, database_url: str
 ) -> None:
-    downgrade_to(database_url, "0091")
+    downgrade_to(database_url, "0092")
     try:
         save_values(
             engine,
@@ -95,7 +95,7 @@ def test_a_model_already_saved_keeps_its_place_and_its_price(
                 "model_prices": {"anthropic/claude-opus-5.5": {"in": 1, "out": 2}},
             },
         )
-        upgrade_to(database_url, "0092")
+        upgrade_to(database_url, "0093")
 
         assert stored_values(
             engine, "platform_settings", ["available_models", "model_prices"]
@@ -115,12 +115,12 @@ def test_a_model_already_saved_keeps_its_place_and_its_price(
 
 
 def test_going_back_keeps_opus_and_fable(engine: Engine, database_url: str) -> None:
-    downgrade_to(database_url, "0091")
+    downgrade_to(database_url, "0092")
     try:
         save_values(engine, "platform_settings", OLD_SETTINGS)
-        upgrade_to(database_url, "0092")
+        upgrade_to(database_url, "0093")
         after_upgrade = stored_values(engine, "platform_settings", list(OLD_SETTINGS))
-        downgrade_to(database_url, "0091")
+        downgrade_to(database_url, "0092")
 
         assert (
             stored_values(engine, "platform_settings", list(OLD_SETTINGS))

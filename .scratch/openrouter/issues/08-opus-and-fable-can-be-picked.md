@@ -24,7 +24,7 @@ Admins can also pick `anthropic/claude-opus-5.5` and `anthropic/claude-fable-5.2
 
 ## Comments
 
-- 2026-11-25, status (branch `openrouter-08-opus-and-fable`, commit ec20517, not merged): migration `0092_opus_and_fable_can_be_picked.py`, seed and tests are written, and the affected tests pass. Prices: opus 5.12 in / 25.6 out, fable 10.24 in / 51.2 out (USD 4/20 and 8/40 at 1.28). The operator asked for a quick check only, not a full `/run`.
+- 2026-11-25, status (branch `openrouter-08-opus-and-fable`, commit ec20517, not merged): migration `0093_opus_and_fable_can_be_picked.py`, seed and tests are written, and the affected tests pass. Prices: opus 5.12 in / 25.6 out, fable 10.24 in / 51.2 out (USD 4/20 and 8/40 at 1.28). The operator asked for a quick check only, not a full `/run`.
 - 2026-11-25, **blocker found by the quick check.** One real call to each model through `OpenRouterChatModel`:
   - thinking on: both reply, `is_byok: true`.
   - thinking off: both fail with 400 "Reasoning is mandatory for this endpoint and cannot be disabled." The adapter sends `reasoning: {enabled: false}`; `effort: "none"` fails the same way. Leaving the `reasoning` field out, or `effort: "low"`, works (the model then thinks a little when it needs to).

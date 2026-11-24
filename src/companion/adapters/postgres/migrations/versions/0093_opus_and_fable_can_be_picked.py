@@ -7,8 +7,8 @@ A Claude model an Admin already added is kept as it is, with or without a
 price. Every service stays on the model it uses, and no other setting is
 touched.
 
-Revision ID: 0092
-Revises: 0091
+Revision ID: 0093
+Revises: 0092
 Create Date: 2026-11-25
 """
 
@@ -19,8 +19,8 @@ from typing import Any
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0092"
-down_revision: str | None = "0091"
+revision: str = "0093"
+down_revision: str | None = "0092"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
