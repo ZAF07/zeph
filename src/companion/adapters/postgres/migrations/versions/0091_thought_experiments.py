@@ -7,8 +7,8 @@ from the seed on next start, even where an Admin edited it, since tagging
 now marks answers to Thought Experiments. The weekly number comes from the
 seed on next start. No User data is removed.
 
-Revision ID: 0089
-Revises: 0088
+Revision ID: 0091
+Revises: 0090
 Create Date: 2026-11-24
 """
 
@@ -17,8 +17,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0089"
-down_revision: str | None = "0088"
+revision: str = "0091"
+down_revision: str | None = "0090"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -63,11 +63,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Remove Thought Experiments and the aimed Curiosities that put one."""
-    op.execute(
-        "DELETE FROM curiosities WHERE id IN (SELECT curiosity_id FROM "
-        "exploration_tries WHERE thought_experiment_id IS NOT NULL)"
-    )
+    """Remove Thought Experiments; tries that put one keep their Curiosity.
+
+    No User data is removed: a try that put a Thought Experiment only loses
+    the link to it.
+    """
     op.drop_index("ix_exploration_tries_thought_experiment_id", "exploration_tries")
     op.drop_column("exploration_tries", "thought_experiment_id")
     op.drop_table("thought_experiments")

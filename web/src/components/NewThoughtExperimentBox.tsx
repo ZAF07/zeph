@@ -11,6 +11,7 @@ import type {
 } from "@/lib/api-client";
 import {
   EMPTY_THOUGHT_EXPERIMENT,
+  SAVE_FAILED_TEXT,
   isThoughtExperimentComplete,
 } from "@/lib/thought-experiment-draft";
 import { useCardAction } from "@/lib/use-card-action";
@@ -38,10 +39,7 @@ export function NewThoughtExperimentBox({
     EMPTY_THOUGHT_EXPERIMENT,
   );
   const action = useCardAction();
-  const leading = useLeadingWordingSave(
-    action,
-    "Couldn’t save the Thought Experiment. Please try again.",
-  );
+  const leading = useLeadingWordingSave(action, SAVE_FAILED_TEXT);
 
   return (
     <NewCardBox

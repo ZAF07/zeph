@@ -48,3 +48,15 @@ Plan (24 Nov 2026, branch `pattern-05-thought-experiments`, worktree `ai-chat-co
 - **"What if" answers.** The tagging step is shown the Thought Experiments asked in the Conversation, numbered; an Observation that answers one says its number, and code makes its kind "what if" answer. Tagging prompt reloaded from the seed.
 - **Docs.** `docs/thought-experiments/README.md`; the first set (~30, every look-alike pair of issue 15's catalog, one starter per area) for the owner to review.
 - **Tests.** Pure tests for the leading check, picking and the weekly limit, the way order; HTTP-edge tests for the Admin API, seeding, the Conversation-end chain and tagging; web tests for the manager.
+
+Decisions made while building (24 Nov 2026):
+
+- **Migration is 0091.** Main took 0089 (tagging context without he or she) and 0090 (DeepSeek served model names) while this was built. Its downgrade removes no User data: tries only lose the link.
+- **The tagger reads the words as asked** (the aimed Curiosity's question), not the Thought Experiment's current wording, so an edit mid-Conversation can't mislead it. Only a whole number matches a Thought Experiment shown; `true` doesn't count as 1.
+- **The pair is picked across the Pattern's unclear stories**, as the PRD says ("the pair with the most unclear evidence"); the try still aims at the top unclear story, so the "way" order of that need moves on as before.
+- **The weekly limit is per Exploration**, which is one per Pattern (unique) and goes with it.
+- **No one-sided-question check.** The leading check is a word list only (phrases that suggest the answer, words that make a choice sound bad, with endings: "weakness" counts). "Save anyway" covers a word that is fine where it is. Noted in the guide's limits.
+- **Pattern Type options show IDs only**, so a long name is never clipped in the select; names are on the Pattern Catalog page.
+- **Starter and On are switches** (the references draw on/off as switches, not tick boxes), saved with the card's save bar.
+- **Design files.** As issues 10 and 14 did, the issue's "add the reference" was followed: new `AdminThoughtExperiments.html` built only from card-list and field-row parts, its baseline and lines in `routes.json` and `manifest.json`, and the menu link on the other twelve admin references. `shoot.cjs` on the untouched references changed no baseline; after the link it changed none either, since the sidebar is cut at the 800px viewport above the new link.
+- **Review (standards and spec).** Fixed: migration number and downgrade, tagger words as asked (and no per-item lookups), `true` ≠ 1, a named `way_after`, shared "times asked" words and save-failed text, a checked sensitivity instead of a cast, fixture import order. Left as judgement calls: `close_waiting` lives on the Thought Experiment repository (it closes only the Curiosities of its tries), the API counts all asks to answer for one (Admin page only), `LeadingWordingConfirm` borrows the remove confirm part (no warning part exists in the design).

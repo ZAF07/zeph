@@ -2,7 +2,7 @@ import { CardCount } from "@/components/CardCount";
 import { CardSaveBar } from "@/components/CardSaveBar";
 import { FoldingCard } from "@/components/FoldingCard";
 import type { ThoughtExperiment } from "@/lib/api-client";
-import { pairTitle } from "@/lib/thought-experiment-draft";
+import { askedWords, pairTitle } from "@/lib/thought-experiment-draft";
 
 /**
  * One archived Thought Experiment as a card of the card list, read only.
@@ -29,9 +29,7 @@ export function ArchivedThoughtExperimentCard({
       meta={
         <CardCount
           count={thoughtExperiment.asked_count}
-          words={
-            thoughtExperiment.asked_count === 1 ? "time asked" : "times asked"
-          }
+          words={askedWords(thoughtExperiment.asked_count)}
         />
       }
       isDirty={false}

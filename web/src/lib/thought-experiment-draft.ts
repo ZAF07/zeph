@@ -16,6 +16,10 @@ export const SENSITIVITY_OPTIONS: {
   { value: "high", label: "High" },
 ];
 
+/** What a card says when a save fails for any reason but leading wording. */
+export const SAVE_FAILED_TEXT =
+  "Couldn’t save the Thought Experiment. Please try again.";
+
 /** A new Thought Experiment before the Admin fills it in. */
 export const EMPTY_THOUGHT_EXPERIMENT: ThoughtExperimentInput = {
   wording: "",
@@ -128,4 +132,27 @@ export function patternTypeOptions(
     return [{ value: current, label: current }, ...options];
   }
   return options;
+}
+
+/**
+ * Words for how many times a Thought Experiment was asked.
+ *
+ * @param count - How many times it was put to a User.
+ * @returns "time asked" for one, "times asked" otherwise.
+ */
+export function askedWords(count: number): string {
+  return count === 1 ? "time asked" : "times asked";
+}
+
+/**
+ * Finds the sensitivity a select chose.
+ *
+ * @param chosen - The chosen option's value.
+ * @returns That sensitivity; low when the value is none of them.
+ */
+export function sensitivityOf(chosen: string): ThoughtExperimentSensitivity {
+  return (
+    SENSITIVITY_OPTIONS.find((option) => option.value === chosen)?.value ??
+    "low"
+  );
 }

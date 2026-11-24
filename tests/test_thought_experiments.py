@@ -366,7 +366,8 @@ def test_the_thought_experiment_for_the_unclear_pair_is_asked_and_tagged_what_if
 
     tagging_input = chat_model.pattern_tagging_calls[-1].history[0].text
     assert (
-        f'Thought Experiments Zeph put to them in this Conversation:\n[1] "{TEAM_PLAN}'
+        "Thought Experiments Zeph put to them in this Conversation:\n[1] Put this "
+        f'made-up situation to them, keeping its words: "{TEAM_PLAN}'
     ) in tagging_input
     answered = next(
         o for o in observations_of(client.engine, user_id) if o.quote == ANSWER
@@ -447,7 +448,7 @@ def test_the_migration_keeps_user_data_and_reloads_the_tagging_prompt(
             )
         )
 
-    downgrade_to(database_url, "0088")
+    downgrade_to(database_url, "0090")
     try:
         with client.engine.connect() as connection:
             tables = connection.execute(

@@ -34,7 +34,6 @@ from companion.core.models import (
     SituationTags,
     Stance,
     TaggingShape,
-    ThoughtExperiment,
     UserSnapshot,
 )
 from companion.core.pattern_catalog import PatternCatalogService
@@ -354,22 +353,18 @@ def describe_unclear_asked(unclear: Mapping[int, Observation]) -> str:
     )
 
 
-def describe_thought_experiments_asked(
-    thought_experiments: Mapping[int, ThoughtExperiment],
-) -> str:
+def describe_thought_experiments_asked(questions: Mapping[int, str]) -> str:
     """Write the Thought Experiments put to the User, as the tagging model reads them.
 
     Args:
-        thought_experiments: The Thought Experiments, by number.
+        questions: The questions that put each one to the User, as asked,
+            by number.
 
     Returns:
-        One line per Thought Experiment with its wording; "None." with none.
+        One numbered line per question; "None." with none.
     """
     return (
-        "\n".join(
-            f'[{number}] "{thought_experiment.details.wording}"'
-            for number, thought_experiment in thought_experiments.items()
-        )
+        "\n".join(f"[{number}] {question}" for number, question in questions.items())
         or "None."
     )
 
@@ -532,7 +527,12 @@ def check_observation(entry: Any, context: TaggingContext) -> Observation | Drop
     about = read_text(entry, "about")
     if context_line is None or about is None:
         return DropReason.MISSING_DETAILS
-    if entry.get("thought_experiment") in context.thought_experiment_numbers:
+    answered = entry.get("thought_experiment")
+    if (
+        isinstance(answered, int)
+        and not isinstance(answered, bool)
+        and answered in context.thought_experiment_numbers
+    ):
         evidence_kind = EvidenceKind.WHAT_IF_ANSWER
     direction, sign = matched
     second = pattern_types[1] if len(pattern_types) > 1 else None
@@ -688,7 +688,7 @@ def describe_conversation_to_tag(
     now: datetime,
     time_zone: str | None,
     unclear: Mapping[int, Observation] | None = None,
-    thought_experiments: Mapping[int, ThoughtExperiment] | None = None,
+    thought_experiments: Mapping[int, str] | None = None,
 ) -> str:
     """Write what the tagging model is given.
 
@@ -700,8 +700,9 @@ def describe_conversation_to_tag(
         time_zone: The User's IANA time zone, for the days.
         unclear: The unclear stories Zeph asked about in this Conversation,
             by number; None or empty with none.
-        thought_experiments: The Thought Experiments put to the User in
-            this Conversation, by number; None or empty with none.
+        thought_experiments: The questions that put a Thought Experiment to
+            the User in this Conversation, as asked, by number; None or
+            empty with none.
 
     Returns:
         Today's date, the Threads, the Pattern Catalog, the tag lists, the
@@ -973,16 +974,19 @@ class PatternTagger:
 
     def _thought_experiments_asked_in(
         self, snapshot: UserSnapshot, conversation_id: UUID
-    ) -> dict[int, ThoughtExperiment]:
-        """Find the Thought Experiments an aimed Curiosity put to the User here.
+    ) -> dict[int, str]:
+        """Find the questions that put a Thought Experiment to the User here.
+
+        The words are the aimed Curiosity's, as asked, so an Admin's edit
+        since then doesn't change what the tagging model reads.
 
         Args:
             snapshot: The User whose Conversation it was.
             conversation_id: The ended Conversation.
 
         Returns:
-            Them, numbered from 1 in the order they were asked; none when no
-            aimed Curiosity put one in it.
+            The questions, numbered from 1 in the order they were asked;
+            none when no aimed Curiosity put one in it.
         """
         raised = [
             curiosity
@@ -993,22 +997,19 @@ class PatternTagger:
         ]
         if not raised:
             return {}
-        put = {
-            attempt.curiosity_id: attempt.thought_experiment_id
+        putting = {
+            attempt.curiosity_id
             for attempt in self._repositories.explorations.list_tries(snapshot.user.id)
             if attempt.thought_experiment_id is not None
         }
-        asked = []
-        for curiosity in sorted(raised, key=lambda c: c.raised_at or c.created_at):
-            thought_experiment_id = put.get(curiosity.id)
-            found = (
-                self._repositories.thought_experiments.get(thought_experiment_id)
-                if thought_experiment_id
-                else None
-            )
-            if found is not None:
-                asked.append(found)
-        return dict(enumerate(asked, start=1))
+        asked = sorted(
+            (curiosity for curiosity in raised if curiosity.id in putting),
+            key=lambda curiosity: curiosity.raised_at or curiosity.created_at,
+        )
+        return {
+            number: curiosity.question
+            for number, curiosity in enumerate(asked, start=1)
+        }
 
     def _ask(
         self, snapshot: UserSnapshot, description: str

@@ -15,6 +15,8 @@ import type {
   ThoughtExperimentInput,
 } from "@/lib/api-client";
 import {
+  askedWords,
+  SAVE_FAILED_TEXT,
   isThoughtExperimentChanged,
   isThoughtExperimentComplete,
   pairTitle,
@@ -56,10 +58,7 @@ export function ThoughtExperimentCard({
   );
   const [isConfirmingArchive, setIsConfirmingArchive] = useState(false);
   const action = useCardAction();
-  const leading = useLeadingWordingSave(
-    action,
-    "Couldn’t save the Thought Experiment. Please try again.",
-  );
+  const leading = useLeadingWordingSave(action, SAVE_FAILED_TEXT);
   const isDirty = isThoughtExperimentChanged(draft, thoughtExperiment);
 
   function save(saveAnyway: boolean) {
@@ -125,9 +124,7 @@ export function ThoughtExperimentCard({
       meta={
         <CardCount
           count={thoughtExperiment.asked_count}
-          words={
-            thoughtExperiment.asked_count === 1 ? "time asked" : "times asked"
-          }
+          words={askedWords(thoughtExperiment.asked_count)}
         />
       }
       isDirty={isDirty}

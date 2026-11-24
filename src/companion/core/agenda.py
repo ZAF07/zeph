@@ -330,7 +330,7 @@ def next_way(
     last = asked[-1]
     if last.outcome not in NOTHING_USEFUL:
         return last.way
-    return WAYS[(WAYS.index(last.way) + 1) % len(WAYS)]
+    return way_after(last.way)
 
 
 def try_outcome(
@@ -937,7 +937,7 @@ def next_try_for(
         else None
     )
     if way == ExplorationWay.THOUGHT_EXPERIMENT and thought_experiment is None:
-        way = WAYS[WAYS.index(way) + 1]
+        way = way_after(way)
     return closed, aimed_curiosity(
         exploration,
         top,
@@ -948,6 +948,18 @@ def next_try_for(
         agenda.now,
         thought_experiment,
     )
+
+
+def way_after(way: ExplorationWay) -> ExplorationWay:
+    """Name the way that comes after another, round again after the last.
+
+    Args:
+        way: The way.
+
+    Returns:
+        The next, a little pushier, way.
+    """
+    return WAYS[(WAYS.index(way) + 1) % len(WAYS)]
 
 
 def thought_experiment_for(

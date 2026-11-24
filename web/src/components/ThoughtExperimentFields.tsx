@@ -9,11 +9,11 @@ import { Switch } from "@/components/Switch";
 import type {
   PatternTypeChoice,
   ThoughtExperimentInput,
-  ThoughtExperimentSensitivity,
 } from "@/lib/api-client";
 import {
   SENSITIVITY_OPTIONS,
   patternTypeOptions,
+  sensitivityOf,
 } from "@/lib/thought-experiment-draft";
 
 /**
@@ -92,7 +92,7 @@ export function ThoughtExperimentFields({
             onChange={(chosen) =>
               onChange({
                 ...value,
-                sensitivity: chosen as ThoughtExperimentSensitivity,
+                sensitivity: sensitivityOf(chosen),
               })
             }
           />
