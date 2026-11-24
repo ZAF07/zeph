@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
+import { ChoiceSegments } from "@/components/ChoiceSegments";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
 import type { Directness } from "@/lib/api-client";
 import { type Copy, readCopy } from "@/lib/copy";
@@ -47,30 +48,18 @@ export function DirectnessSetting({
       <p className="mt-0 mb-2 max-w-[620px] text-[14px] text-soft">
         {accountCopy("directness.help")}
       </p>
-      <div
-        role="group"
-        aria-label={title}
-        className="mt-3.5 box-border grid w-full max-w-[640px] grid-cols-3 gap-1 rounded-pill border border-line bg-bg-deep p-1"
-      >
-        {levels.map((level) => {
-          const isPicked = level === directness;
-          return (
-            <button
-              key={level}
-              type="button"
-              aria-pressed={isPicked}
-              disabled={updatePreferences.isPending}
-              onClick={() => updatePreferences.mutate({ directness: level })}
-              className={`min-h-12 cursor-pointer rounded-pill border-0 px-2 py-1 text-center text-[13px] leading-[1.2] disabled:cursor-not-allowed ${
-                isPicked
-                  ? "bg-cream font-medium text-ink"
-                  : "bg-transparent font-light text-soft"
-              }`}
-            >
-              {accountCopy(`directness.${level}`)}
-            </button>
-          );
-        })}
+      <div className="mt-3.5">
+        <ChoiceSegments
+          label={title}
+          options={levels.map((level) => ({
+            value: level,
+            label: accountCopy(`directness.${level}`),
+          }))}
+          value={directness}
+          layoutClassName="max-w-[640px] grid-cols-3 rounded-pill"
+          disabled={updatePreferences.isPending}
+          onChange={(level) => updatePreferences.mutate({ directness: level })}
+        />
       </div>
       {changedInChatAt ? (
         <div className="mt-2">

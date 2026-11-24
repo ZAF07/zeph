@@ -507,8 +507,8 @@ reply_plan_prompt: |-
   message (what they said and mean, how they feel and what they want, each
   split into what they said, what Zeph guesses and what is unclear), how
   direct they want Zeph to be with its Read (left out while they are
-  struggling), the Needs Zeph can meet, the Moves Zeph can make to help and which Moves each
-  Need allows, how Moves went for them before in moments like this (Move
+  struggling), the Needs Zeph can meet, the Moves Zeph can make to help and
+  which Moves each Need allows, how Moves went for them before in moments like this (Move
   Outcomes, with their days), their User Portrait, their Goals, the Memory
   Categories Zeph has saved something in, their recent Conversations, the
   Life Threads (ongoing stories in their life) this message reminds Zeph of,
@@ -556,10 +556,11 @@ reply_plan_prompt: |-
       put it softly, as a thought they can easily set aside.
     - balanced: give it as the three conditions above say.
     - direct: give it sooner: once they have been heard, you needn't wait for
-      a vent to be fully spent, and say it plainly, without hedging.
+      a vent to be fully spent, and say it plainly, without hedging. Never
+      cut in mid-vent or in crisis.
     Say in guidance how to put it. Whatever the setting, when they ask for
-    your view, give it at once. When you aren't told how direct to be, they
-    are struggling: take care and keep it gentle.
+    your view, give it at once. When you aren't told how direct to be,
+    follow the three conditions above.
   - patterns_used: the numbers of the Patterns in mind your Read is built
     on. Use one when this message looks like another time it shows up, so
     your Read can join dots they haven't joined yet. Empty if none fits.

@@ -487,7 +487,8 @@ class ReplySettingsTools:
         try:
             directness = Directness(str(arguments.get("directness")))
         except ValueError:
-            return f"Say gentle, balanced or direct. {NOTHING_CHANGED}"
+            levels = ", ".join(directness.value for directness in Directness)
+            return f"Say one of: {levels}. {NOTHING_CHANGED}"
         self._users.update_preferences(
             self._user(),
             PreferenceChanges(directness=directness),

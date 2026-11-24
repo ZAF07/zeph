@@ -221,8 +221,8 @@ class UserService:
         """Change a User's name, own switches, directness, country or time zone.
 
         Only the User Memory and Photo Viewing settings, directness and time
-        zone are marked as changed in chat or on the Dashboard, and only when their
-        value really changes.
+        zone are marked as changed in chat or on the Dashboard, and only when
+        their value really changes.
 
         Args:
             user: The User making the change.
@@ -264,7 +264,11 @@ class UserService:
                 if changes.photo_viewing_enabled is not None
                 else user.photo_viewing_enabled
             ),
-            directness=changes.directness or user.directness,
+            directness=(
+                changes.directness
+                if changes.directness is not None
+                else user.directness
+            ),
             country=(
                 check_country(changes.country)
                 if changes.country is not None

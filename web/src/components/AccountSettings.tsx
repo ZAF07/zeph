@@ -15,10 +15,10 @@ import { useMe, usePlatformContent } from "@/lib/queries";
 
 /**
  * The editable parts of the Account & privacy page: Profile, User Memory,
- * Photo Viewing, How direct Zeph is, Your stickers, Delete my data and Delete account. Every
- * word is the Account tab's Copy, with the location labels from
- * Onboarding's and the User Memory explanation and Memory-off notes from
- * Shared.
+ * Photo Viewing, How direct Zeph is, Your stickers, Delete my data and
+ * Delete account. Every word is the Account tab's Copy, with the location
+ * labels from Onboarding's and the User Memory explanation and Memory-off
+ * notes from Shared.
  *
  * @param props - `copy` holds the Account page's Copy slots, onboarding's
  *   location labels and the Shared Memory slots.
