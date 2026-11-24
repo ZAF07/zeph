@@ -13,6 +13,10 @@ class ToolsNotSupportedError(NotImplementedError):
     """Raised when the OpenRouter adapter is asked to let the model call tools."""
 
 
+class OpenRouterReplyError(RuntimeError):
+    """Raised when OpenRouter answers without a reply, e.g. with an error body."""
+
+
 def to_openrouter_messages(
     instructions: str, history: list[ChatLine]
 ) -> list[dict[str, str]]:
@@ -41,14 +45,20 @@ def to_model_answer(body: dict[str, Any]) -> ModelAnswer:
     Returns:
         The answer; missing usage counts as no tokens, and the reasoning is
         None when the reply has none.
+
+    Raises:
+        OpenRouterReplyError: If the body holds an error or no reply.
     """
+    if body.get("error") or not body.get("choices"):
+        raise OpenRouterReplyError(f"OpenRouter sent no reply: {body.get('error')}")
     message = body["choices"][0]["message"]
     usage = body.get("usage") or {}
+    reasoning = message.get("reasoning")
     return ModelAnswer(
         text=str(message.get("content") or ""),
         tokens_in=int(usage.get("prompt_tokens") or 0),
         tokens_out=int(usage.get("completion_tokens") or 0),
-        reasoning=message.get("reasoning") or None,
+        reasoning=str(reasoning) if reasoning else None,
     )
 
 
@@ -88,7 +98,8 @@ class OpenRouterChatModel:
 
         Raises:
             ToolsNotSupportedError: If any tools are given.
-            httpx.HTTPStatusError: If OpenRouter answers with an error.
+            httpx.HTTPStatusError: If OpenRouter answers with an error status.
+            OpenRouterReplyError: If OpenRouter answers with an error body.
         """
         if tools:
             raise ToolsNotSupportedError(

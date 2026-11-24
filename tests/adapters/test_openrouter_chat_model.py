@@ -6,6 +6,7 @@ import pytest
 
 from companion.adapters.openrouter.chat_model import (
     OpenRouterChatModel,
+    OpenRouterReplyError,
     ToolsNotSupportedError,
 )
 from companion.core.models import ChatLine, ChatRole, ModelAnswer
@@ -124,6 +125,18 @@ def test_an_http_error_is_raised_for_the_caller_to_handle() -> None:
     )
 
     with pytest.raises(httpx.HTTPStatusError):
+        generate(chat_model)
+
+
+def test_an_error_body_with_a_200_status_is_raised_clearly() -> None:
+    chat_model = openrouter_with(
+        httpx.Response(
+            200, json={"error": {"code": 502, "message": "Provider returned error"}}
+        ),
+        [],
+    )
+
+    with pytest.raises(OpenRouterReplyError, match="Provider returned error"):
         generate(chat_model)
 
 

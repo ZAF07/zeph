@@ -26,3 +26,8 @@ A new OpenRouter adapter behind the `ChatModel` port, built on plain `httpx` (no
 - 01
 
 ## Comments
+
+- 2026-11-24, in progress (branch `openrouter-02-replies`). Built: `src/companion/adapters/openrouter/chat_model.py` (plain `httpx`, model name as given, `reasoning: {enabled}`, reasoning text from `message.reasoning`, tokens from `usage`; HTTP error status raises `httpx.HTTPStatusError`, an error body with a 200 raises `OpenRouterReplyError`, both caught by core as today; any tools raise `ToolsNotSupportedError` before sending). `CHAT_MODEL_ADAPTER=openrouter` builds it; a missing `OPENROUTER_API_KEY` fails in `build_chat_model`, which runs at app start. ADR 0028, ADR 0003 list, `CONTEXT.md` Model Price, BYOK step in `docs/DEPLOYMENT_GUIDE.md`. Two contract tests added.
+  - Decisions: photos stay on direct DeepSeek under `openrouter` until 04, so the stack still starts. Under `openrouter` the reply and Reply Plan steps nearly always offer tools, so until 03 they fall back as on any model error; `/run` uses a tool-free service (Safeguard or Understanding) to show the model change.
+  - Code review: standards clean; fixes made for reasoning type, ADR 0003 list, 200-with-error body.
+  - Waiting on: `OPENROUTER_API_KEY` in `.env` and the operator's OK to run the paid contract tests and `/run`.
