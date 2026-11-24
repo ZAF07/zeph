@@ -3153,6 +3153,7 @@ class PostgresLifeThreadRepository:
 
 PATTERN_COLUMNS = [column for column in patterns.c if column.name != "embedding"]
 HAS_NO_PATTERN_TYPE = patterns.c.pattern_type_id.is_(None)
+HAS_PATTERN_TYPE = patterns.c.pattern_type_id.is_not(None)
 
 
 def _to_pattern(row: Row[Any], evidence: Sequence[PatternEvidence]) -> Pattern:
@@ -3641,7 +3642,7 @@ class PostgresPatternRepository:
         with self._database.connect() as connection:
             rows = connection.execute(
                 select(*PATTERN_COLUMNS)
-                .where(patterns.c.user_id == user_id, ~HAS_NO_PATTERN_TYPE)
+                .where(patterns.c.user_id == user_id, HAS_PATTERN_TYPE)
                 .order_by(patterns.c.started_at, patterns.c.id)
             ).all()
         return [
@@ -3677,7 +3678,7 @@ class PostgresPatternRepository:
             if deleted_ids:
                 connection.execute(
                     delete(patterns).where(
-                        patterns.c.id.in_(deleted_ids), ~HAS_NO_PATTERN_TYPE
+                        patterns.c.id.in_(deleted_ids), HAS_PATTERN_TYPE
                     )
                 )
             if added:

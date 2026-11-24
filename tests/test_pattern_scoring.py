@@ -329,3 +329,20 @@ def test_a_pattern_with_no_observations_left_is_deleted_without_a_move() -> None
 
     assert planned.deleted_ids == [noticed.id]
     assert not planned.moves
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        PatternState.READY,
+        PatternState.SHARED,
+        PatternState.CONFIRMED,
+        PatternState.CONTESTED,
+    ],
+)
+def test_a_pattern_past_suspected_is_never_deleted_by_scoring(
+    state: PatternState,
+) -> None:
+    planned = plan([pattern(state)], [], PatternMoveCause.OBSERVATIONS_DELETED)
+
+    assert not planned.deleted_ids and not planned.moves

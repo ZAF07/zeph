@@ -280,17 +280,22 @@ class UserMemoryService:
     def _score_patterns_again(self, user_id: UUID) -> None:
         """Score the User's Patterns of Pattern Types again, after Observations went.
 
+        A failure is logged instead of raised: the deletion already happened.
+
         Args:
             user_id: The User's ID.
         """
         user = self._repositories.users.get(user_id)
         if user is None:
             return
-        self._pattern_scorer.score(
-            user,
-            self._repositories.platform_settings.load(),
-            PatternMoveCause.OBSERVATIONS_DELETED,
-        )
+        try:
+            self._pattern_scorer.score(
+                user,
+                self._repositories.platform_settings.load(),
+                PatternMoveCause.OBSERVATIONS_DELETED,
+            )
+        except Exception:
+            logger.exception("Could not score Patterns after a deletion")
 
     def _rewrite_portrait(self, user_id: UUID) -> None:
         """Ask for the User's Portrait to be written again, after a deletion.

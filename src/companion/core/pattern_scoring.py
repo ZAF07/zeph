@@ -336,6 +336,38 @@ def logged_move(
     )
 
 
+def moved(
+    pattern: CatalogPattern,
+    score: PatternScore,
+    bars: StateBars,
+    cause: PatternMoveCause,
+    conversation_id: UUID | None,
+    now: datetime,
+    planned: PlannedPatternMoves,
+) -> CatalogPattern:
+    """Move a Pattern to the state its score calls for, logging the move.
+
+    Args:
+        pattern: The Pattern, in its state now.
+        score: Its score now.
+        bars: The Admin-set bars.
+        cause: What made it be scored again.
+        conversation_id: The Conversation tagged, when that is the cause.
+        now: When it is scored.
+        planned: Where the move is logged.
+
+    Returns:
+        The Pattern in its new state; the same Pattern if it doesn't move.
+    """
+    state = state_for(pattern.state, score, bars)
+    if state == pattern.state:
+        return pattern
+    planned.moves.append(
+        logged_move(pattern, pattern.state, state, score, cause, conversation_id, now)
+    )
+    return replace(pattern, state=state, updated_at=now)
+
+
 def plan_pattern_moves(
     user_id: UUID,
     patterns: Sequence[CatalogPattern],
@@ -351,7 +383,8 @@ def plan_pattern_moves(
     """Score a User's Patterns again from their Observations, and move them.
 
     A Pattern Type with Observations and no Pattern gets one, noticed, which
-    may move on at once. A Pattern with no Observations left is deleted.
+    may move on at once. A noticed, suspected or closed Pattern with no
+    Observations left is deleted; one in any other state is kept.
 
     Args:
         user_id: The User.
@@ -374,16 +407,18 @@ def plan_pattern_moves(
         added=[],
         changed=[],
         deleted_ids=[
-            pattern.id for pattern in patterns if pattern.pattern_type_id not in by_type
+            pattern.id
+            for pattern in patterns
+            if pattern.pattern_type_id not in by_type
+            and pattern.state in STATES_MOVED_BY_SCORE
         ],
         moves=[],
     )
     for pattern_type_id, its_observations in by_type.items():
         score = score_observations(its_observations, sign_strengths, numbers, today)
         pattern = existing.get(pattern_type_id)
-        is_new = pattern is None
         if pattern is None:
-            pattern = CatalogPattern(
+            noticed = CatalogPattern(
                 id=uuid4(),
                 user_id=user_id,
                 pattern_type_id=pattern_type_id,
@@ -393,21 +428,16 @@ def plan_pattern_moves(
             )
             planned.moves.append(
                 logged_move(
-                    pattern, None, pattern.state, score, cause, conversation_id, now
+                    noticed, None, noticed.state, score, cause, conversation_id, now
                 )
             )
-        state = state_for(pattern.state, score, bars)
-        if state != pattern.state:
-            planned.moves.append(
-                logged_move(
-                    pattern, pattern.state, state, score, cause, conversation_id, now
-                )
+            planned.added.append(
+                moved(noticed, score, bars, cause, conversation_id, now, planned)
             )
-            pattern = replace(pattern, state=state, updated_at=now)
-            if not is_new:
-                planned.changed.append(pattern)
-        if is_new:
-            planned.added.append(pattern)
+            continue
+        after = moved(pattern, score, bars, cause, conversation_id, now, planned)
+        if after is not pattern:
+            planned.changed.append(after)
     return planned
 
 
