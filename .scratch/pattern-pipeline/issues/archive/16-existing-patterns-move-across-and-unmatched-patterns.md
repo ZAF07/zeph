@@ -67,4 +67,4 @@ Evidence (25 Nov 2026, worktree stack on 3030/8030, one made-up User only, real 
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: <merge commit, filled in after the merge>
+- Commit: 35e3503 (merge "Merge pattern-16-existing-patterns-move: old Patterns move across (suspected become unmatched), Pattern keeping only notes unmatched Patterns, and an Admin matching command links Patterns to Pattern Types and tags their evidence again"; work in 0cff435 "Pattern pipeline 16: old Patterns move across (suspected become unmatched), Pattern keeping only notes unmatched Patterns, and an Admin matching command links Patterns to Pattern Types and tags their evidence again", 36b15a3 "Pattern pipeline 16: review fixes (a match is saved only after its evidence is tagged, keeping sees the Pattern Types only while tagging runs for the User, the command builds its own matcher, reports days with no messages left and exits 1 on a failed User)", 8139e45 "Issue 16 done: migration is 0092 after main's 0091, evidence, issue archived, findings for the owner in issue 20")
