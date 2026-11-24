@@ -43,4 +43,4 @@ None - can start immediately
 ## Completion
 
 - Completed: 2026-11-24
-- Commit: <merge commit, filled in below after merge>
+- Commit: 5a029e2 (merge of openrouter-01-model-names; work in 625d390, 4371234, fd70d24)
