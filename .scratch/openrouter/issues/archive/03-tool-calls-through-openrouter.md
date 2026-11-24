@@ -37,4 +37,4 @@ The OpenRouter adapter runs tool calls the way the DeepSeek adapter does today. 
 ## Completion
 
 - Completed: 2026-11-24
-- Commit: <to be filled in after merge>
+- Commit: ddaf1e7 (merge of openrouter-03-tool-calls; work in 4df61aa, 25d7591, 48126db)
