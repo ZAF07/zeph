@@ -25,3 +25,8 @@ Saved model names switch to OpenRouter's names, while the app still calls DeepSe
 None - can start immediately
 
 ## Comments
+
+- 2026-11-24, OpenRouter names (from `https://openrouter.ai/api/v1/models`, checked against direct DeepSeek's `/models`):
+  - `deepseek-flash` → `deepseek/deepseek-v4.1-flash`. Direct `deepseek-flash` is "DeepSeek-V4.1-Flash" and takes images; OpenRouter's `deepseek/deepseek-v4-flash` is the older 0423 build and is text only, so it would break photos.
+  - `deepseek-v4-pro` → `deepseek/deepseek-v4-pro` (text only on both).
+- Decisions: the direct DeepSeek adapter keeps a name with no provider part as it is (so old names and the contract tests still work), maps the two OpenRouter DeepSeek names, and raises `UnsupportedModelError` for any other `provider/model` name. The migration (0086) also renames the Judge's model in `eval_judge_settings`. Past Eval Runs (snapshots, Variants, call logs) are history and keep the names they ran with.

@@ -2,7 +2,7 @@
 # Loaded on start; a key already in the database is never overwritten, so
 # Admins' edits on the Dashboard stay. Edits never come back to this file.
 
-model: deepseek-flash
+model: deepseek/deepseek-v4.1-flash
 
 thinking: false
 
