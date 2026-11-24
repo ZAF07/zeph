@@ -193,6 +193,19 @@ class ChatSetting(StrEnum):
     USER_MEMORY = "user_memory"
     PHOTO_VIEWING = "photo_viewing"
     TIME_ZONE = "time_zone"
+    DIRECTNESS = "directness"
+
+
+class Directness(StrEnum):
+    """How direct a User wants the Companion to be with its Read.
+
+    It changes how soon and how plainly the Read is said, never whether the
+    Companion forms one or whether a Pattern may be shared.
+    """
+
+    GENTLE = "gentle"
+    BALANCED = "balanced"
+    DIRECT = "direct"
 
 
 class ChangedBy(StrEnum):
@@ -221,6 +234,7 @@ class User:
             AI notice, if they have.
         user_memory_enabled: Whether the Companion may keep User Memory.
         photo_viewing_enabled: Whether the Companion may look at their photos.
+        directness: How direct they want the Companion to be with its Read.
         onboarding_completed_at: When they finished onboarding, if they have.
         role: Whether they are a plain User or an Admin.
         check_ins: Their Check-in settings.
@@ -246,6 +260,7 @@ class User:
     ai_notice_acknowledged_at: datetime | None = None
     user_memory_enabled: bool = True
     photo_viewing_enabled: bool = True
+    directness: Directness = Directness.BALANCED
     onboarding_completed_at: datetime | None = None
     role: UserRole = UserRole.USER
     check_ins: CheckInSettings = field(default_factory=CheckInSettings)
@@ -406,6 +421,7 @@ class PreferenceChanges:
         name: What the Companion should call them.
         user_memory_enabled: Whether the Companion may keep User Memory.
         photo_viewing_enabled: Whether the Companion may look at their photos.
+        directness: How direct they want the Companion to be with its Read.
         country: Two-letter country code.
         time_zone: IANA time zone name.
     """
@@ -413,6 +429,7 @@ class PreferenceChanges:
     name: str | None = None
     user_memory_enabled: bool | None = None
     photo_viewing_enabled: bool | None = None
+    directness: Directness | None = None
     country: str | None = None
     time_zone: str | None = None
 

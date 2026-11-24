@@ -58,6 +58,7 @@ const onboardedUser: Me = {
   user_memory_available: true,
   photo_viewing_enabled: true,
   photo_viewing_available: true,
+  directness: "balanced",
   personal_stickers_available: true,
   show_pattern_noticing_notice: false,
   onboarding_completed_at: "2026-11-11T09:00:00Z",
@@ -489,6 +490,77 @@ describe("AccountSettings", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows how direct Zeph is, balanced picked, with its help text", async () => {
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+
+    const section = await screen.findByRole("region", {
+      name: "How direct Zeph is",
+    });
+    const levels = within(section).getByRole("group", {
+      name: "How direct Zeph is",
+    });
+    expect(
+      within(levels)
+        .getAllByRole("button")
+        .map((level) => level.textContent),
+    ).toEqual(["Gentle", "Balanced", "Direct"]);
+    expect(
+      within(levels).getByRole("button", { name: "Balanced" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      within(section).getByText(/How soon and how plainly Zeph tells you/),
+    ).toBeInTheDocument();
+  });
+
+  it("saves a new directness straight away", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+    const direct = await screen.findByRole("button", { name: "Direct" });
+
+    await user.click(direct);
+
+    expect(apiClient.updatePreferences).toHaveBeenCalledWith({
+      directness: "direct",
+    });
+    await vi.waitFor(() =>
+      expect(direct).toHaveAttribute("aria-pressed", "true"),
+    );
+  });
+
+  it("marks directness as changed in chat", async () => {
+    apiClient.getMe.mockResolvedValue({
+      ...onboardedUser,
+      directness: "gentle",
+      changed_in_chat: { directness: "2026-11-07T09:00:00Z" },
+    });
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+
+    const section = await screen.findByRole("region", {
+      name: "How direct Zeph is",
+    });
+    expect(
+      within(section).getByText("Changed in chat · 7 Nov"),
+    ).toBeInTheDocument();
+    expect(
+      within(section).getByRole("button", { name: "Gentle" }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("tells the User when changing directness fails", async () => {
+    apiClient.updatePreferences.mockRejectedValue(new Error("down"));
+    const user = userEvent.setup();
+    renderWithQueries(<AccountSettings copy={seedCopy()} />);
+
+    await user.click(await screen.findByRole("button", { name: "Gentle" }));
+
+    const section = screen.getByRole("region", { name: "How direct Zeph is" });
+    expect(
+      await within(section).findByText(
+        "We couldn’t change that. Please try again.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   describe("reads every word from Copy", () => {
     const changedAt = "2026-11-03T02:00:00Z";
 
@@ -522,6 +594,7 @@ describe("AccountSettings", () => {
           time_zone: changedAt,
           user_memory: changedAt,
           photo_viewing: changedAt,
+          directness: changedAt,
         },
       });
       apiClient.listPersonalStickers.mockResolvedValue([
@@ -545,7 +618,7 @@ describe("AccountSettings", () => {
     it("with everything on, settings changed in chat and stickers kept", async () => {
       await renderMarked();
 
-      expect(screen.getAllByText("⟦account.changed_in_chat⟧")).toHaveLength(3);
+      expect(screen.getAllByText("⟦account.changed_in_chat⟧")).toHaveLength(4);
       expect(
         await screen.findByRole("button", {
           name: "⟦account.stickers.remove⟧",

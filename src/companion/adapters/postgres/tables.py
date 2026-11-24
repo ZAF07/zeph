@@ -40,6 +40,7 @@ users = Table(
     Column("ai_notice_acknowledged_at", DateTime(timezone=True)),
     Column("user_memory_enabled", Boolean, nullable=False, server_default="true"),
     Column("photo_viewing_enabled", Boolean, nullable=False, server_default="true"),
+    Column("directness", Text, nullable=False, server_default="balanced"),
     Column("onboarding_completed_at", DateTime(timezone=True)),
     Column("role", Text, nullable=False, server_default="user"),
     Column("check_ins_enabled", Boolean, nullable=False, server_default="false"),

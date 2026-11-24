@@ -50,6 +50,7 @@ function newUser(overrides: Partial<Me> = {}): Me {
     user_memory_available: true,
     photo_viewing_enabled: true,
     photo_viewing_available: true,
+    directness: "balanced",
     personal_stickers_available: false,
     show_pattern_noticing_notice: false,
     onboarding_completed_at: null,

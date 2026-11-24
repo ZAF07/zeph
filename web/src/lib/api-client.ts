@@ -35,7 +35,11 @@ export type ChatSetting =
   | "quiet_hours"
   | "user_memory"
   | "photo_viewing"
-  | "time_zone";
+  | "time_zone"
+  | "directness";
+
+/** How direct a User wants Zeph to be with its Read of what is going on. */
+export type Directness = "gentle" | "balanced" | "direct";
 
 /**
  * The signed-in User, with their profile and preferences. `changed_in_chat`
@@ -46,6 +50,7 @@ export type ChatSetting =
  * Personal Stickers works for them; they have no switch of their own.
  * `show_pattern_noticing_notice` says whether to show the notice that Zeph now
  * keeps quotes as evidence, until they press "Got it".
+ * `directness` is how direct they want Zeph to be with its Read.
  */
 export type Me = {
   id: string;
@@ -60,6 +65,7 @@ export type Me = {
   user_memory_available: boolean;
   photo_viewing_enabled: boolean;
   photo_viewing_available: boolean;
+  directness: Directness;
   personal_stickers_available: boolean;
   show_pattern_noticing_notice: boolean;
   onboarding_completed_at: string | null;
@@ -149,6 +155,7 @@ export type PreferenceChanges = {
   name?: string;
   user_memory_enabled?: boolean;
   photo_viewing_enabled?: boolean;
+  directness?: Directness;
   country?: string;
   time_zone?: string;
 };

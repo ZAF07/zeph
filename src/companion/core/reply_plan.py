@@ -30,6 +30,7 @@ from companion.core.models import (
     ChosenCheckIn,
     ChosenKnowledgeDocument,
     CuriosityToRaise,
+    Directness,
     Feature,
     KnowledgeDocument,
     KnowledgeLookup,
@@ -327,6 +328,27 @@ def format_knowledge_document(number: int, document: KnowledgeDocument) -> str:
     return f"{line}: {document.when_it_helps}" if document.when_it_helps else line
 
 
+def describe_directness(
+    directness: Directness, understanding: UnderstandingForm
+) -> str:
+    """Write the line telling the Reply Plan how direct the User wants it to be.
+
+    It is left out while the User is struggling, so the Reply Plan takes care
+    whatever the setting.
+
+    Args:
+        directness: How direct the User wants the Companion to be with its
+            Read.
+        understanding: How the Companion understood the Message.
+
+    Returns:
+        The line with a blank line after it, or "" while they are struggling.
+    """
+    if understanding.struggling:
+        return ""
+    return f"How direct they want you to be with your Read: {directness.value}\n\n"
+
+
 def describe_message_for_reply_plan(
     snapshot: UserSnapshot,
     understanding: UnderstandingForm,
@@ -370,8 +392,9 @@ def describe_message_for_reply_plan(
         patterns: The Patterns in mind, numbered.
 
     Returns:
-        The time, the Understanding, Needs, Moves and which each Need
-        allows, past Move Outcomes with their days, User Portrait, Goals,
+        The time, the Understanding, how direct the User wants it to be
+        (left out while they are struggling), Needs, Moves and which each
+        Need allows, past Move Outcomes with their days, User Portrait, Goals,
         Memory Categories, recent Conversations, reminded Life Threads, the
         Patterns in mind, due Curiosities and how each Need treats them,
         Knowledge documents, the due
@@ -424,6 +447,7 @@ def describe_message_for_reply_plan(
         f"Time where they are: {format_local_time(snapshot.local_now)}\n\n"
         f"How you understood their latest message:\n"
         f"{describe_understanding(understanding)}\n\n"
+        f"{describe_directness(snapshot.user.directness, understanding)}"
         f"Needs:\n{need_lines}\n"
         f"Fallback Need: {fallback.name}\n\n"
         f"Moves:\n{move_lines or 'None.'}\n\n"

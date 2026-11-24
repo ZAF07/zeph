@@ -9,6 +9,7 @@ from companion.core.models import (
     ChangedBy,
     CheckInChanges,
     CheckInFrequency,
+    Directness,
     Feature,
     LifeThread,
     MemoryItem,
@@ -93,6 +94,24 @@ FORGET_PARAMETERS: dict[str, Any] = {
     },
     "required": ["number"],
 }
+DIRECTNESS_WORDS = {
+    Directness.GENTLE: (
+        "gentle: you wait for a good moment to give your view and put it softly"
+    ),
+    Directness.BALANCED: "balanced: you give your view when there is room for it",
+    Directness.DIRECT: "direct: you give your view sooner and in plain words",
+}
+DIRECTNESS_PARAMETERS: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "directness": {
+            "type": "string",
+            "enum": [directness.value for directness in Directness],
+            "description": "Gentle, balanced or direct.",
+        }
+    },
+    "required": ["directness"],
+}
 TIME_ZONE_PARAMETERS: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -158,7 +177,8 @@ class ReplySettingsTools:
         Args:
             user_id: The User being replied to.
             repositories: Where Users are stored.
-            users: Changes User Memory, Photo Viewing and the time zone.
+            users: Changes User Memory, Photo Viewing, directness and the
+                time zone.
             check_ins: Changes Check-in settings.
             user_memory: Lists and forgets Memory Items and Life Threads.
             data_deletion: Asks to delete the User's data.
@@ -229,6 +249,18 @@ class ReplySettingsTools:
                 ),
                 parameters=ON_OR_OFF_PARAMETERS,
                 run=self._turn_photo_viewing_on_or_off,
+            ),
+            ChatTool(
+                name="change_directness",
+                description=(
+                    "Change how direct you are with your view of what is "
+                    "really going on for the person. Use direct when they ask "
+                    "you to be blunter, straighter or more honest; gentle when "
+                    "they ask you to go easier, be softer or hold back; "
+                    "balanced when they want it back to normal."
+                ),
+                parameters=DIRECTNESS_PARAMETERS,
+                run=self._change_directness,
             ),
             ChatTool(
                 name="list_memories",
@@ -441,6 +473,30 @@ class ReplySettingsTools:
             "Photo Viewing is off: you won't look at, keep or use their photos "
             "until they turn it on. Every photo is still checked for safety, "
             f"and their Shared Photos weren't deleted. {TELL_THEM}"
+        )
+
+    def _change_directness(self, arguments: dict[str, Any]) -> str:
+        """Change how direct the Companion is with its Read.
+
+        Args:
+            arguments: The model's arguments, with "directness".
+
+        Returns:
+            What the model is told back.
+        """
+        try:
+            directness = Directness(str(arguments.get("directness")))
+        except ValueError:
+            return f"Say gentle, balanced or direct. {NOTHING_CHANGED}"
+        self._users.update_preferences(
+            self._user(),
+            PreferenceChanges(directness=directness),
+            changed_by=ChangedBy.CHAT,
+        )
+        return (
+            f"You are now {DIRECTNESS_WORDS[directness]}. Whatever the setting, "
+            f"you give your view when they ask, and take care when they are "
+            f"struggling. {TELL_THEM}"
         )
 
     def _list_memories(self, arguments: dict[str, Any]) -> str:
