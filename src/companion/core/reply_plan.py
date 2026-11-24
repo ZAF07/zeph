@@ -648,13 +648,11 @@ def read_pattern_offered(
     Returns:
         The Pattern; None if the value isn't the number of a confirmed one.
     """
-    picked = read_pattern_picked(value, by_number)
-    confirmed_ids = {
-        item.pattern.id
-        for item in by_number.values()
-        if item.pattern.state == PatternState.CONFIRMED
-    }
-    return picked if picked and picked.pattern_id in confirmed_ids else None
+    number = read_number(value)
+    item = None if number is None else by_number.get(number)
+    if item is None or item.pattern.state != PatternState.CONFIRMED:
+        return None
+    return PatternPicked(pattern_id=item.pattern.id, pattern=item.pattern.pattern)
 
 
 def read_patterns_picked(

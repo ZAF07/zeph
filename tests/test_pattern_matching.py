@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi.testclient import TestClient
 
+from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.core.models import (
     Pattern,
     PatternEvidence,
@@ -21,13 +22,18 @@ from companion.core.pattern_matching import (
     plan_days_to_tag_again,
     read_fitting_pattern_type,
     read_matching_answer,
+)
+from companion.pattern_matching_terminal import (
+    build_pattern_matcher,
+    match_and_report,
+    read_pattern_type_ids,
     report_lines,
 )
-from companion.pattern_matching_terminal import match_and_report, read_pattern_type_ids
 from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
     FakeClock,
+    FakePhotoViewer,
     FakeScheduler,
     ScriptedChatModel,
 )
@@ -70,10 +76,17 @@ def matching_answer(pattern_type_id: str | None) -> str:
     return json.dumps({"pattern_type": pattern_type_id})
 
 
-def matcher_of(client: TestClient) -> PatternMatcher:
-    """The app's Pattern matcher, as the Admin command gets it."""
-    matcher: PatternMatcher = client.app.state.pattern_matcher
-    return matcher
+def matcher_of(
+    client: TestClient, chat_model: ScriptedChatModel, clock: FakeClock
+) -> PatternMatcher:
+    """Build the Pattern matcher on the test database and fakes, as the Admin
+    command builds it."""
+    return build_pattern_matcher(
+        build_postgres_repositories(client.engine),
+        chat_model,
+        FakePhotoViewer(),
+        clock,
+    )
 
 
 def have_unmatched_pattern(
@@ -114,7 +127,7 @@ def test_a_pattern_is_linked_to_the_pattern_type_it_fits_and_stays_as_it_was(
     [before] = patterns_of(client.engine, user_id)
     chat_model.script_pattern_matching(matching_answer(ABSORBED))
 
-    [report] = matcher_of(client).match()
+    [report] = matcher_of(client, chat_model, clock).match()
 
     [pattern] = patterns_of(client.engine, user_id)
     assert pattern.matched_pattern_type_id == ABSORBED
@@ -162,7 +175,7 @@ def test_a_pattern_that_fits_no_pattern_type_in_the_catalog_stays_not_matched(
     chat_model.script_pattern_matching(answer, answer)
     tagging_calls = len(chat_model.pattern_tagging_calls)
 
-    [report] = matcher_of(client).match()
+    [report] = matcher_of(client, chat_model, clock).match()
 
     [pattern] = patterns_of(client.engine, user_id)
     assert pattern.matched_pattern_type_id is None
@@ -200,7 +213,7 @@ def test_matched_evidence_is_tagged_again_into_observations_checked_like_any_oth
         )
     )
 
-    [report] = matcher_of(client).match()
+    [report] = matcher_of(client, chat_model, clock).match()
 
     [observation] = observations_of(client.engine, user_id)
     assert (observation.pattern_type_id, observation.quote) == (
@@ -239,7 +252,7 @@ def test_users_not_told_about_pattern_noticing_are_left_for_a_later_run(
     user_id = maya_id(client, auth_verifier)
     start_goes_quiet_pattern(client, chat_model, clock, scheduler, seeded_settings)
 
-    [report] = matcher_of(client).match()
+    [report] = matcher_of(client, chat_model, clock).match()
 
     assert report.user_id == UUID(user_id)
     assert report.skipped_why is not None
@@ -268,11 +281,11 @@ def test_only_the_pattern_types_asked_for_are_matched_against(
     )
     chat_model.script_pattern_matching(matching_answer(ABSORBED))
 
-    [first] = matcher_of(client).match([BELONG])
+    [first] = matcher_of(client, chat_model, clock).match([BELONG])
     seen = chat_model.pattern_matching_calls[-1].history[0].text
     [pattern] = patterns_of(client.engine, user_id)
     with pytest.raises(UnknownPatternTypeError):
-        matcher_of(client).match(["ACH.MADE.UP"])
+        matcher_of(client, chat_model, clock).match(["ACH.MADE.UP"])
 
     assert f"{BELONG}: " in seen
     assert ABSORBED not in seen
@@ -299,9 +312,9 @@ def test_a_matched_pattern_is_not_asked_about_again(
         seeded_settings,
     )
     chat_model.script_pattern_matching(matching_answer(ABSORBED))
-    matcher_of(client).match()
+    matcher_of(client, chat_model, clock).match()
 
-    assert matcher_of(client).match() == []
+    assert matcher_of(client, chat_model, clock).match() == []
     assert len(chat_model.pattern_matching_calls) == 1
 
 
@@ -325,7 +338,7 @@ def test_a_conversation_tagged_again_twice_keeps_each_quote_once(
     )
     chat_model.script_pattern_matching(matching_answer(ABSORBED))
     chat_model.script_pattern_tagging(tagging_answer(FORGOT_TO_EAT))
-    matcher_of(client).match()
+    matcher_of(client, chat_model, clock).match()
     [first] = patterns_of(client.engine, user_id)
     keep_pattern(
         client.engine,
@@ -337,7 +350,7 @@ def test_a_conversation_tagged_again_twice_keeps_each_quote_once(
     chat_model.script_pattern_matching(matching_answer(ABSORBED))
     chat_model.script_pattern_tagging(tagging_answer(FORGOT_TO_EAT))
 
-    [report] = matcher_of(client).match()
+    [report] = matcher_of(client, chat_model, clock).match()
 
     assert (report.conversations_tagged, report.observations_kept) == (1, 0)
     assert len(observations_of(client.engine, user_id)) == 1
@@ -366,12 +379,45 @@ def test_evidence_whose_messages_message_retention_deleted_is_not_tagged(
     tagging_calls = len(chat_model.pattern_tagging_calls)
     chat_model.script_pattern_matching(matching_answer(ABSORBED))
 
-    [report] = matcher_of(client).match()
+    [report] = matcher_of(client, chat_model, clock).match()
 
     [pattern] = patterns_of(client.engine, user_id)
     assert pattern.matched_pattern_type_id == ABSORBED
     assert (report.conversations_tagged, report.observations_kept) == (0, 0)
+    assert report.days_without_messages == 1
     assert len(chat_model.pattern_tagging_calls) == tagging_calls
+
+
+def test_a_matching_run_that_fails_leaves_the_pattern_for_the_next_run(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    user_id = have_unmatched_pattern(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+    )
+    chat_model.script_pattern_matching(matching_answer(ABSORBED))
+    chat_model.script_pattern_tagging(RuntimeError("model down"))
+    printed: list[str] = []
+
+    every_user_done = match_and_report(
+        matcher_of(client, chat_model, clock), [], printed.append
+    )
+
+    [pattern] = patterns_of(client.engine, user_id)
+    assert pattern.matched_pattern_type_id is None
+    assert every_user_done is False
+    assert printed == [f"User {user_id}: skipped (it failed; see the backend log)"]
 
 
 def test_a_closed_pattern_is_linked_but_its_evidence_is_left_alone(
@@ -396,7 +442,7 @@ def test_a_closed_pattern_is_linked_but_its_evidence_is_left_alone(
     tagging_calls = len(chat_model.pattern_tagging_calls)
     chat_model.script_pattern_matching(matching_answer(ABSORBED))
 
-    [report] = matcher_of(client).match()
+    [report] = matcher_of(client, chat_model, clock).match()
 
     [pattern] = patterns_of(client.engine, user_id)
     assert (pattern.state, pattern.matched_pattern_type_id) == (
@@ -430,11 +476,13 @@ def test_the_admin_command_prints_ids_and_counts_and_never_a_users_words(
     chat_model.script_pattern_tagging(tagging_answer(FORGOT_TO_EAT))
     printed: list[str] = []
 
-    match_and_report(matcher_of(client), read_pattern_type_ids(""), printed.append)
+    match_and_report(
+        matcher_of(client, chat_model, clock), read_pattern_type_ids(""), printed.append
+    )
 
     assert printed == [
         f"User {user_id}: 1 Patterns looked at, 1 matched, 1 Conversations tagged "
-        "again, 1 Observations kept",
+        "again, 1 Observations kept, 0 evidence days with no messages left",
         f"  Pattern {pattern.id} (unmatched): {ABSORBED}",
     ]
 
@@ -483,7 +531,7 @@ def test_the_report_says_when_there_was_nothing_to_match_or_a_user_was_skipped()
     ) == [
         f"User {user_id}: skipped (not told yet)",
         f"User {user_id}: 1 Patterns looked at, 0 matched, 0 Conversations tagged "
-        "again, 0 Observations kept",
+        "again, 0 Observations kept, 0 evidence days with no messages left",
         f"  Pattern {pattern_id} (confirmed): fits no Pattern Type",
     ]
 

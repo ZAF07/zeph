@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from typing import Any
+from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
 from sqlalchemy import text
@@ -20,11 +21,14 @@ from tests.test_patterns import GOES_QUIET, patterns_of, start_goes_quiet_patter
 from tests.test_patterns_dashboard import (
     CLOSED,
     EARNS_REST,
+    HIDDEN,
     keep_pattern,
     maya_headers,
     patterns_shown,
     threads_by_title,
 )
+
+OLD_ID = UUID("0f6f2c7e-58a4-4d0b-9d0e-6f1f6f0a9f16")
 
 
 def test_the_migration_keeps_every_old_pattern_and_makes_suspected_ones_unmatched(
@@ -61,6 +65,26 @@ def test_the_migration_keeps_every_old_pattern_and_makes_suspected_ones_unmatche
             ).all()
             connection.execute(
                 text(
+                    "INSERT INTO patterns (id, user_id, pattern, state, started_at, "
+                    "updated_at) VALUES (:id, :user_id, :pattern, 'suspected', "
+                    "now(), now())"
+                ),
+                {"id": OLD_ID, "user_id": user_id, "pattern": HIDDEN},
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO pattern_evidence (id, pattern_id, life_thread_id, "
+                    "day, line) VALUES (:id, :pattern_id, :thread_id, "
+                    "'2026-11-04', 'Cleaned at midnight.')"
+                ),
+                {
+                    "id": uuid4(),
+                    "pattern_id": OLD_ID,
+                    "thread_id": threads["Side project"],
+                },
+            )
+            connection.execute(
+                text(
                     "UPDATE platform_settings SET value = '\"Old keeping rules.\"' "
                     "WHERE key = 'pattern_keeping_prompt'"
                 )
@@ -73,7 +97,14 @@ def test_the_migration_keeps_every_old_pattern_and_makes_suspected_ones_unmatche
         (EARNS_REST, "confirmed"),
         (CLOSED, "closed"),
     }
-    after = patterns_of(client.engine, user_id)
+    every_pattern = patterns_of(client.engine, user_id)
+    [inserted_old] = [item for item in every_pattern if item.id == OLD_ID]
+    assert (inserted_old.pattern, inserted_old.state) == (
+        HIDDEN,
+        PatternState.UNMATCHED,
+    )
+    assert [item.line for item in inserted_old.evidence] == ["Cleaned at midnight."]
+    after = [item for item in every_pattern if item.id != OLD_ID]
     assert after == before
     assert {pattern.pattern: pattern.state for pattern in after} == {
         GOES_QUIET: PatternState.UNMATCHED,

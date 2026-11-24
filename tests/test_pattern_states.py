@@ -359,6 +359,11 @@ def test_the_keeping_step_cant_change_a_pattern_of_a_pattern_type(
 
     seen = chat_model.pattern_keeping_calls[-1].history[0].text
     assert "Patterns kept so far:\nNone yet." in seen
+    looked_for = seen.split("Pattern Types Zeph already looks for:\n")[1]
+    assert (
+        "- Softening disagreement to protect belonging. If: "
+        in (looked_for.split("Patterns kept so far:")[0])
+    )
     assert patterns_of(client.engine, user_id) == before
     assert before[0].state == PatternState.SUSPECTED
     assert moves_of(client.engine, user_id) == moves_before

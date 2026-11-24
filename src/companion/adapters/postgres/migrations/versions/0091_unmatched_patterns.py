@@ -35,7 +35,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Make unmatched Patterns suspected again and forget every match."""
+    """Make unmatched Patterns suspected again and forget every match.
+
+    The Pattern keeping prompt is reloaded from the seed again.
+    """
     op.execute("UPDATE patterns SET state = 'suspected' WHERE state = 'unmatched'")
     op.drop_column("patterns", "matched_pattern_type_id")
     op.execute("DELETE FROM platform_settings WHERE key = 'pattern_keeping_prompt'")

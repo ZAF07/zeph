@@ -29,6 +29,7 @@ from companion.core.models import (
     PatternType,
     UserSnapshot,
 )
+from companion.core.observations import may_keep_observations
 from companion.core.pattern_catalog import PatternCatalogService
 from companion.core.platform_settings import (
     LIFE_THREADS_TEXTS_TO_SEARCH,
@@ -261,7 +262,8 @@ def describe_patterns_to_keep(
     Args:
         touched: The Threads the Conversation touched, by number.
         closest: The User's other Threads closest in meaning, by number.
-        pattern_types: Every Pattern Type in the catalog now.
+        pattern_types: The Pattern Types tagging looks for, for this User;
+            none while Pattern noticing doesn't work for them.
         known: The User's Patterns with no Pattern Type, by number.
         days: The days behind the evidence in play, newest first.
         messages: The Conversation's messages, oldest first.
@@ -644,7 +646,9 @@ class PatternKeeper:
         Runs whenever the User wrote something. The model sees the Threads
         the Conversation touched, the User's other Threads closest in
         meaning to those and to their texts, however old (up to the
-        Admin-set number), the Pattern Types in the catalog, all their
+        Admin-set number), the Pattern Types in the catalog (only while
+        tagging notes the evidence for those, so nothing that recurs is
+        left unkept for a User without Pattern noticing), all their
         Patterns with no Pattern Type, and the days behind the evidence of
         the Patterns linked to those Threads (up to the Admin-set number).
         An unreadable answer is asked again once; if it is still unreadable
@@ -682,9 +686,11 @@ class PatternKeeper:
             {thread.id for thread in threads.values()},
             settings.get(PATTERN_KEEPING_DAYS),
         )
-        pattern_types = [
-            entry.pattern_type for entry in self._pattern_catalog.catalog()
-        ]
+        pattern_types = (
+            [entry.pattern_type for entry in self._pattern_catalog.catalog()]
+            if may_keep_observations(snapshot)
+            else []
+        )
         entries = self._ask(
             snapshot,
             describe_patterns_to_keep(

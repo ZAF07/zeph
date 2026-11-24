@@ -181,11 +181,7 @@ def test_keeping_is_given_the_touched_and_closest_threads_however_old_and_the_pa
     )
     assert "[3]" not in seen
     assert f"Patterns kept so far:\n[1] (unmatched) {GOES_QUIET} Evidence:" in seen
-    looked_for = seen.split("Pattern Types Zeph already looks for:\n")[1]
-    assert (
-        "- Softening disagreement to protect belonging. If: "
-        in (looked_for.split("Patterns kept so far:")[0])
-    )
+    assert "Pattern Types Zeph already looks for:\nNone.\n" in seen
 
 
 def test_days_within_retention_reach_keeping_as_messages_and_older_ones_as_summaries(

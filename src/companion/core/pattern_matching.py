@@ -39,6 +39,9 @@ from companion.core.user_snapshot import UserSnapshotLoader
 
 logger = logging.getLogger(__name__)
 
+NOT_NOTICING = "Pattern noticing doesn't work for them, or they haven't pressed Got it"
+FAILED = "it failed; see the backend log"
+
 
 class UnknownPatternTypeError(InvalidError):
     """Raised when the matching pass is asked for a Pattern Type not in the catalog."""
@@ -78,6 +81,8 @@ class UserMatchingReport:
         matches: Each Pattern looked at, with the Pattern Type it fits.
         conversations_tagged: How many past Conversations were tagged again.
         observations_kept: How many new Observations that gave.
+        days_without_messages: How many days of matched evidence had no
+            messages left to tag, since Message Retention deleted them.
     """
 
     user_id: UUID
@@ -85,6 +90,31 @@ class UserMatchingReport:
     matches: tuple[PatternMatch, ...] = ()
     conversations_tagged: int = 0
     observations_kept: int = 0
+    days_without_messages: int = 0
+
+    @property
+    def failed(self) -> bool:
+        """Say whether matching this User's Patterns failed.
+
+        Returns:
+            True when it raised and was logged.
+        """
+        return self.skipped_why == FAILED
+
+
+@dataclass(frozen=True)
+class TaggedAgain:
+    """How tagging a User's matched evidence again went.
+
+    Attributes:
+        conversations: How many past Conversations were tagged again.
+        observations_kept: How many new Observations that gave.
+        days_without_messages: How many evidence days had no messages left.
+    """
+
+    conversations: int = 0
+    observations_kept: int = 0
+    days_without_messages: int = 0
 
 
 @dataclass(frozen=True)
@@ -100,10 +130,6 @@ class DayToTagAgain:
     day: date
     pattern_type_ids: frozenset[str]
     thread_ids: frozenset[UUID]
-
-
-NOT_NOTICING = "Pattern noticing doesn't work for them, or they haven't pressed Got it"
-FAILED = "it failed; see the backend log"
 
 
 def describe_pattern_to_match(
@@ -335,6 +361,9 @@ class PatternMatcher:
     ) -> UserMatchingReport:
         """Match one User's Patterns, then tag their evidence again and score.
 
+        A match is saved only once its evidence was tagged again, so a run
+        that fails part-way leaves the Pattern to be matched by the next.
+
         Args:
             snapshot: The User.
             patterns: Their Patterns not matched yet.
@@ -355,23 +384,24 @@ class PatternMatcher:
             for pattern, pattern_type_id in found
             if pattern_type_id is not None
         ]
-        for pattern, pattern_type_id in matched:
-            self._repositories.patterns.save_match(pattern.id, pattern_type_id)
-        conversations_tagged, observations_kept = self._tag_again(
+        tagged = self._tag_again(
             snapshot, plan_days_to_tag_again(matched), pattern_types
         )
-        if observations_kept:
+        if tagged.observations_kept:
             self._pattern_scorer.score(
                 snapshot.user, snapshot.settings, PatternMoveCause.EVIDENCE_TAGGED_AGAIN
             )
+        for pattern, pattern_type_id in matched:
+            self._repositories.patterns.save_match(pattern.id, pattern_type_id)
         return UserMatchingReport(
             user_id=user_id,
             matches=tuple(
                 PatternMatch(pattern.id, pattern.state, pattern_type_id)
                 for pattern, pattern_type_id in found
             ),
-            conversations_tagged=conversations_tagged,
-            observations_kept=observations_kept,
+            conversations_tagged=tagged.conversations,
+            observations_kept=tagged.observations_kept,
+            days_without_messages=tagged.days_without_messages,
         )
 
     def _tag_again(
@@ -379,7 +409,7 @@ class PatternMatcher:
         snapshot: UserSnapshot,
         days: Sequence[DayToTagAgain],
         pattern_types: Mapping[str, PatternType],
-    ) -> tuple[int, int]:
+    ) -> TaggedAgain:
         """Tag again the Conversations of the days behind matched evidence.
 
         A Conversation whose messages Message Retention deleted can't be
@@ -392,32 +422,39 @@ class PatternMatcher:
             pattern_types: The Pattern Types matched against, by ID.
 
         Returns:
-            How many Conversations were tagged again, and how many new
-            Observations were kept.
+            How many Conversations were tagged again, how many new
+            Observations were kept and how many days had no messages left.
         """
         if not days:
-            return 0, 0
+            return TaggedAgain()
         user_id = snapshot.user.id
         conversations = self._repositories.conversations
         threads = self._repositories.life_threads.list_for_user(user_id)
-        conversations_tagged = observations_kept = 0
+        conversations_tagged = observations_kept = days_without_messages = 0
         for day in days:
-            for conversation in conversations.list_started_between(
-                user_id, *day_span(day.day, snapshot.user.time_zone)
-            ):
-                messages = conversations.list_messages(conversation.id)
+            messages_by_conversation = {
+                conversation.id: conversations.list_messages(conversation.id)
+                for conversation in conversations.list_started_between(
+                    user_id, *day_span(day.day, snapshot.user.time_zone)
+                )
+            }
+            if not any(messages_by_conversation.values()):
+                days_without_messages += 1
+            for conversation_id, messages in messages_by_conversation.items():
                 if not messages:
                     continue
                 kept = self._pattern_tagger.tag_again(
                     snapshot,
-                    conversation.id,
+                    conversation_id,
                     messages,
                     [thread for thread in threads if thread.id in day.thread_ids],
                     [pattern_types[key] for key in sorted(day.pattern_type_ids)],
                 )
                 conversations_tagged += 1
                 observations_kept += len(kept)
-        return conversations_tagged, observations_kept
+        return TaggedAgain(
+            conversations_tagged, observations_kept, days_without_messages
+        )
 
     def _ask(
         self,
@@ -454,34 +491,3 @@ class PatternMatcher:
                 return read_fitting_pattern_type(parsed, pattern_types)
         logger.warning("Pattern matching gave no readable answer")
         return None
-
-
-def report_lines(reports: Sequence[UserMatchingReport]) -> list[str]:
-    """Write what the matching pass did, for the Admin who ran it.
-
-    Args:
-        reports: What was done for each User.
-
-    Returns:
-        One line per User and per Pattern, with IDs and counts only, never
-        a User's words; a single line when there was nothing to match.
-    """
-    if not reports:
-        return ["No Pattern to match."]
-    lines = []
-    for report in reports:
-        if report.skipped_why is not None:
-            lines.append(f"User {report.user_id}: skipped ({report.skipped_why})")
-            continue
-        matched = sum(1 for match in report.matches if match.pattern_type_id)
-        lines.append(
-            f"User {report.user_id}: {len(report.matches)} Patterns looked at, "
-            f"{matched} matched, {report.conversations_tagged} Conversations tagged "
-            f"again, {report.observations_kept} Observations kept"
-        )
-        lines.extend(
-            f"  Pattern {match.pattern_id} ({match.state.value}): "
-            f"{match.pattern_type_id or 'fits no Pattern Type'}"
-            for match in report.matches
-        )
-    return lines
