@@ -44,7 +44,8 @@ anyone-would-do-it.
   makes tagging worse.
 - **Can't show:**
   - That the expected answers are right. They were drafted by Claude and
-    corrected by one person, the owner. One rater's labels are one opinion.
+    to be corrected by one person, the owner, once the PRD is built
+    (`adding-tagging-cases.md`). One rater's labels are one opinion.
   - How often it is right on real Users. Made-up Conversations are cleaner
     and more on-topic than real ones; real people hint, joke and contradict
     themselves.
@@ -97,4 +98,5 @@ read the estimate, Start run. Each result shows Expected, Kept by code and
 Dropped by code. Terminal: `make eval EVALS=tagging`, or
 `make eval CASES=conf-yes-to-sister-then-resents`. Cases are edited on Admin
 → Evals → Cases → Tagging; the seed is
-`src/companion/seed/evals/cases/tagging.yaml`.
+`src/companion/seed/evals/cases/tagging.yaml`. How to correct the drafted
+cases and add your own: `adding-tagging-cases.md`.
