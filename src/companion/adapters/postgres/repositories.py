@@ -2,6 +2,7 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import asdict
 from datetime import date, datetime
+from enum import StrEnum
 from functools import partial
 from typing import Any, Protocol
 from uuid import UUID, uuid4
@@ -48,6 +49,7 @@ from companion.adapters.postgres.tables import (
     moves,
     need_ruled_out_moves,
     needs,
+    observations,
     pattern_evidence,
     pattern_types,
     patterns,
@@ -99,6 +101,7 @@ from companion.core.models import (
     CuriosityTreatment,
     DailyUsage,
     DaySummary,
+    EvidenceKind,
     Feature,
     FeatureSwitch,
     HeldBack,
@@ -140,6 +143,8 @@ from companion.core.models import (
     Need,
     NeedDetails,
     NextDueTimeChange,
+    Observation,
+    ObservationDirection,
     OfferedTool,
     Pattern,
     PatternEvidence,
@@ -150,6 +155,8 @@ from companion.core.models import (
     PatternTypeVersion,
     PersonalSticker,
     PlatformSettings,
+    Power,
+    Relationship,
     RepliedToSender,
     RepliedToText,
     ReplyPlan,
@@ -160,7 +167,11 @@ from companion.core.models import (
     SafeguardEventOverview,
     SaidReadUnclear,
     SharedPhoto,
+    SituationSetting,
+    SituationTags,
+    Stance,
     StoredSetting,
+    TaggingShape,
     TelegramConnection,
     ThreadLeftAlone,
     ThreadReaction,
@@ -3163,6 +3174,135 @@ def _to_pattern(row: Row[Any], evidence: Sequence[PatternEvidence]) -> Pattern:
         ),
         confirmed_at=row.confirmed_at,
     )
+
+
+def to_observation(row: Row[Any]) -> Observation:
+    """Turn an `observations` row into an Observation.
+
+    Args:
+        row: The row.
+
+    Returns:
+        The Observation.
+    """
+    return Observation(
+        id=row.id,
+        user_id=row.user_id,
+        conversation_id=row.conversation_id,
+        pattern_type_id=row.pattern_type_id,
+        pattern_type_version=row.pattern_type_version,
+        sign_id=row.sign_id,
+        direction=ObservationDirection(row.direction),
+        quote=row.quote,
+        context=row.context,
+        day=row.day,
+        thread_id=row.life_thread_id,
+        about=row.about,
+        tags=SituationTags(
+            relationship=Relationship(row.relationship) if row.relationship else None,
+            power=Power(row.power) if row.power else None,
+            setting=SituationSetting(row.setting) if row.setting else None,
+            stance=Stance(row.stance) if row.stance else None,
+        ),
+        evidence_kind=EvidenceKind(row.evidence_kind),
+        second_pattern_type_id=row.second_pattern_type_id,
+        second_pattern_type_version=row.second_pattern_type_version,
+        situational=row.situational,
+        tagged_at=row.tagged_at,
+    )
+
+
+class PostgresObservationRepository:
+    """Stores Observations in Postgres, apart from the messages they quote."""
+
+    def __init__(self, database: Database) -> None:
+        """Set up the repository.
+
+        Args:
+            database: Where to run queries: the engine, or one transaction.
+        """
+        self._database = database
+
+    def add_many(self, new_observations: Sequence[Observation]) -> None:
+        """Save new Observations, all together.
+
+        Args:
+            new_observations: The Observations; none saves nothing.
+        """
+        if not new_observations:
+            return
+        with self._database.begin() as connection:
+            connection.execute(
+                insert(observations),
+                [
+                    {
+                        "id": observation.id,
+                        "user_id": observation.user_id,
+                        "conversation_id": observation.conversation_id,
+                        "pattern_type_id": observation.pattern_type_id,
+                        "pattern_type_version": observation.pattern_type_version,
+                        "sign_id": observation.sign_id,
+                        "direction": observation.direction.value,
+                        "quote": observation.quote,
+                        "context": observation.context,
+                        "day": observation.day,
+                        "life_thread_id": observation.thread_id,
+                        "about": observation.about,
+                        "relationship": _value_or_none(observation.tags.relationship),
+                        "power": _value_or_none(observation.tags.power),
+                        "setting": _value_or_none(observation.tags.setting),
+                        "stance": _value_or_none(observation.tags.stance),
+                        "evidence_kind": observation.evidence_kind.value,
+                        "second_pattern_type_id": observation.second_pattern_type_id,
+                        "second_pattern_type_version": (
+                            observation.second_pattern_type_version
+                        ),
+                        "situational": observation.situational,
+                        "tagged_at": observation.tagged_at,
+                    }
+                    for observation in new_observations
+                ],
+            )
+
+    def list_for_user(self, user_id: UUID) -> list[Observation]:
+        """List a User's Observations, oldest tagged first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Observations.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(observations)
+                .where(observations.c.user_id == user_id)
+                .order_by(observations.c.position)
+            ).all()
+        return [to_observation(row) for row in rows]
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete all of a User's Observations.
+
+        Args:
+            user_id: The User's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                delete(observations).where(observations.c.user_id == user_id)
+            )
+
+
+def _value_or_none(tag: StrEnum | None) -> str | None:
+    """Store a tag that may be empty.
+
+    Args:
+        tag: The tag.
+
+    Returns:
+        Its value; None when empty.
+    """
+    return tag.value if tag else None
 
 
 class PostgresPatternRepository:
@@ -6252,6 +6392,7 @@ def to_model_call(row: Row[Any]) -> ModelCall:
         reply_plan_shape=(
             _to_reply_plan_shape(row.reply_plan_shape) if row.reply_plan_shape else None
         ),
+        tagging_shape=TaggingShape(**row.tagging_shape) if row.tagging_shape else None,
     )
 
 
@@ -6299,6 +6440,9 @@ class PostgresModelCallRepository:
                     ),
                     reply_plan_shape=(
                         asdict(call.reply_plan_shape) if call.reply_plan_shape else None
+                    ),
+                    tagging_shape=(
+                        asdict(call.tagging_shape) if call.tagging_shape else None
                     ),
                 )
             )
@@ -6375,6 +6519,30 @@ class PostgresModelCallRepository:
                 update(model_calls)
                 .where(model_calls.c.id == newest_check_in_call)
                 .values(check_in_shape=asdict(shape))
+            )
+
+    def set_tagging_shape(self, trace_id: UUID, shape: TaggingShape) -> None:
+        """Save a Pattern tagging call's shape on a trace's newest tagging call.
+
+        Args:
+            trace_id: The trace's ID.
+            shape: How many Observations were tagged and dropped.
+        """
+        newest_tagging_call = (
+            select(model_calls.c.id)
+            .where(
+                model_calls.c.trace_id == trace_id,
+                model_calls.c.step == ModelStep.PATTERN_TAGGING.value,
+            )
+            .order_by(model_calls.c.position.desc())
+            .limit(1)
+            .scalar_subquery()
+        )
+        with self._database.begin() as connection:
+            connection.execute(
+                update(model_calls)
+                .where(model_calls.c.id == newest_tagging_call)
+                .values(tagging_shape=asdict(shape))
             )
 
     def list_traces(
@@ -6696,6 +6864,7 @@ def _build_repositories(
         user_memory=PostgresUserMemoryRepository(database),
         life_threads=PostgresLifeThreadRepository(database),
         patterns=PostgresPatternRepository(database),
+        observations=PostgresObservationRepository(database),
         curiosities=PostgresCuriosityRepository(database),
         move_outcomes=PostgresMoveOutcomeRepository(database),
         user_portraits=PostgresUserPortraitRepository(database),

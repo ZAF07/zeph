@@ -188,7 +188,8 @@ export type Feature =
   | "settings_in_chat"
   | "photo_viewing"
   | "personal_stickers"
-  | "curiosities";
+  | "curiosities"
+  | "pattern_noticing";
 
 /** A Feature's switch for everyone and who last changed it, and when. */
 export type FeatureSwitch = {
@@ -658,6 +659,7 @@ export type ModelStep =
   | "life_threads"
   | "curiosities"
   | "move_outcomes"
+  | "pattern_tagging"
   | "patterns"
   | "portrait"
   | "personal_stickers";
@@ -736,6 +738,12 @@ export type CheckInShape = {
   brought_up: boolean;
 };
 
+/** How many Observations a Pattern tagging call wrote and code dropped. */
+export type TaggingShape = {
+  tagged: number;
+  dropped: number;
+};
+
 /** One model call in a trace; `content` is null unless it was kept. */
 export type ModelCall = {
   id: string;
@@ -752,6 +760,7 @@ export type ModelCall = {
   understanding_shape: UnderstandingShape | null;
   check_in_shape: CheckInShape | null;
   reply_plan_shape: ReplyPlanShape | null;
+  tagging_shape: TaggingShape | null;
 };
 
 /** One Model Call Log trace with every call in it, in order. */

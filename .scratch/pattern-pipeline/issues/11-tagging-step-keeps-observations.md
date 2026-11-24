@@ -34,3 +34,12 @@ Code keeps only Observations whose Pattern Type and sign exist, whose quote is w
 - `10-pattern-catalog-loads-and-admins-read-it.md`
 
 ## Comments
+
+Plan (24 Nov 2026, branch `pattern-11-tagging-step`, worktree `ai-chat-companion-pattern-11`):
+
+- **"Anyone would do this" as tags.** Code can't match free text, so each Pattern Type gets `anyone_would_when`: a list of tag matches (e.g. `relationship: [stranger]`, `power: [above]`). An Observation is situational when its tags fit any one match. The three YAML files go to 0.2.0 for it. The Admin page isn't changed in this issue.
+- **New step** `PatternTagger` in `core/observations.py`, after Life Threads and before Pattern keeping, only while User Memory and the new Feature Pattern noticing work (off for everyone to start, not in the reply note). It is given today, the Threads touched (numbered), every current Pattern Type (signs, signs against, look-alikes, anyone-would), the tag lists and the Conversation. Own prompt, model and thinking switch (`pattern_tagging_*`), in the core services list. Unreadable answer asked once more.
+- **Checks in code (pure):** Pattern Type exists (one, or two different ones = unclear); sign is in that Pattern Type's signs for "for", signs against for "against"; quote is word for word in one of the User's own texts of the Conversation (spaces and curly quotes evened out, nothing else); relationship, power, setting and stance are from their lists or empty; kind of evidence from its list; who it's about given; exact repeats dropped. Thread number not shown → no Thread.
+- **Saved** in a new `observations` table: User, Conversation, Pattern Type and its version (and the second when unclear), sign, for/against, quote, context line, day (of the text quoted, User's time zone), Life Thread (deleted with it), who, the four tags, kind, unclear, situational. No link to the message, so Message Retention can't touch it. Delete My Data and Account Deletion remove them.
+- **Model Call Log:** a tagging shape (tagged, dropped) on the step's call, for every User; counts only. Shown on the trace page.
+- Not here: linking Observations to Patterns and scoring (12), the kept-quotes list (13), the Eval (14), the exclusion flag.

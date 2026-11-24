@@ -2221,6 +2221,7 @@ class Feature(StrEnum):
     PHOTO_VIEWING = "photo_viewing"
     PERSONAL_STICKERS = "personal_stickers"
     CURIOSITIES = "curiosities"
+    PATTERN_NOTICING = "pattern_noticing"
 
 
 @dataclass(frozen=True)
@@ -2354,6 +2355,7 @@ class ModelStep(StrEnum):
     LIFE_THREADS = "life_threads"
     CURIOSITIES = "curiosities"
     MOVE_OUTCOMES = "move_outcomes"
+    PATTERN_TAGGING = "pattern_tagging"
     PATTERNS = "patterns"
     PORTRAIT = "portrait"
     PERSONAL_STICKERS = "personal_stickers"
@@ -2497,6 +2499,19 @@ class CheckInShape:
 
 
 @dataclass(frozen=True)
+class TaggingShape:
+    """The shape of a Pattern tagging call: counts only, never any words.
+
+    Attributes:
+        tagged: How many Observations the model wrote.
+        dropped: How many of them code dropped.
+    """
+
+    tagged: int
+    dropped: int
+
+
+@dataclass(frozen=True)
 class ModelCall:
     """One model call in the Model Call Log.
 
@@ -2522,6 +2537,9 @@ class ModelCall:
             Woven-in Check-in, kept for every User; None for other calls.
         reply_plan_shape: The shape of the Reply Plan it made, kept for
             every User; None for other steps.
+        tagging_shape: How many Observations a Pattern tagging call wrote
+            and how many were dropped, kept for every User; None for other
+            steps.
     """
 
     id: UUID
@@ -2540,6 +2558,7 @@ class ModelCall:
     understanding_shape: UnderstandingShape | None
     check_in_shape: CheckInShape | None = None
     reply_plan_shape: ReplyPlanShape | None = None
+    tagging_shape: TaggingShape | None = None
 
 
 @dataclass(frozen=True)
@@ -2820,6 +2839,80 @@ class PatternTypeNumbers:
     base_rate: float
 
 
+class Relationship(StrEnum):
+    """Who the other person in an Observation is to the User."""
+
+    PARTNER = "partner"
+    FAMILY = "family"
+    FRIEND = "friend"
+    ACQUAINTANCE = "acquaintance"
+    COLLEAGUE = "colleague"
+    STRANGER = "stranger"
+
+
+class Power(StrEnum):
+    """Where the other person in an Observation stands next to the User."""
+
+    ABOVE = "above"
+    EQUAL = "equal"
+    BELOW = "below"
+
+
+class SituationSetting(StrEnum):
+    """Where what an Observation is about happened."""
+
+    HOME = "home"
+    WORK = "work"
+    SOCIAL = "social"
+    ONLINE = "online"
+
+
+class Stance(StrEnum):
+    """How the other person in an Observation was towards the User."""
+
+    SUPPORTIVE = "supportive"
+    NEUTRAL = "neutral"
+    HOSTILE = "hostile"
+
+
+@dataclass(frozen=True)
+class SituationTags:
+    """The situation an Observation is about, as tags from the fixed lists.
+
+    Attributes:
+        relationship: Who the other person is to the User; None if there is
+            no one else or it isn't clear.
+        power: Where they stand next to the User; None if it isn't clear.
+        setting: Where it happened; None if it isn't clear.
+        stance: How they were towards the User; None if it isn't clear.
+    """
+
+    relationship: Relationship | None
+    power: Power | None
+    setting: SituationSetting | None
+    stance: Stance | None
+
+
+@dataclass(frozen=True)
+class SituationMatch:
+    """One situation where anyone would act the same, as tags.
+
+    A tag left empty matches any value. An Observation fits when, for every
+    tag given, its own value is one of those listed.
+
+    Attributes:
+        relationships: The relationships it covers.
+        powers: The power positions it covers.
+        settings: The settings it covers.
+        stances: The stances it covers.
+    """
+
+    relationships: tuple[Relationship, ...] = ()
+    powers: tuple[Power, ...] = ()
+    settings: tuple[SituationSetting, ...] = ()
+    stances: tuple[Stance, ...] = ()
+
+
 @dataclass(frozen=True)
 class PatternType:
     """One entry of the Pattern Catalog, at one version (ADR-0025).
@@ -2839,6 +2932,8 @@ class PatternType:
         look_alikes: What it can be mistaken for.
         anyone_would: What anyone would do in the situation, which is no
             evidence of it.
+        anyone_would_when: The same as situation tags, so code can tell
+            when an Observation is situational.
         exclusions: When it must not be shared.
         approved_wording: How Zeph may word it to a User.
         prediction_wording: How Zeph words its Prediction, with `{name}`
@@ -2869,6 +2964,7 @@ class PatternType:
     status: PatternTypeStatus
     approved_by: str | None
     approved_on: date | None
+    anyone_would_when: tuple[SituationMatch, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -2916,3 +3012,78 @@ class CatalogPatternType:
     pattern_type: PatternType
     loaded_at: datetime
     other_versions: tuple[str, ...]
+
+
+class ObservationDirection(StrEnum):
+    """Whether an Observation counts for its Pattern Type or against it."""
+
+    FOR = "for"
+    AGAINST = "against"
+
+
+class EvidenceKind(StrEnum):
+    """What kind of evidence an Observation is, strongest first."""
+
+    REAL_STORY = "real_story"
+    REPORTED_HABIT = "reported_habit"
+    WHAT_IF_ANSWER = "what_if_answer"
+    OWN_OPINION = "own_opinion"
+
+
+@dataclass(frozen=True)
+class Observation:
+    """One quoted piece of evidence for or against a Pattern Type.
+
+    It is User Memory, and it outlives Message Retention (ADR-0027): it
+    keeps the quote itself, not a link to the message.
+
+    Attributes:
+        id: The Observation's ID.
+        user_id: The User it is about.
+        conversation_id: The Conversation it was tagged from.
+        pattern_type_id: The Pattern Type it matched.
+        pattern_type_version: That Pattern Type's version when it was tagged.
+        sign_id: The sign it matched, e.g. `I2`.
+        direction: Whether it counts for the Pattern Type or against it.
+        quote: The User's own words, word for word.
+        context: What was going on, in the Companion's words.
+        day: The day the User said it, in their time zone.
+        thread_id: The Life Thread it belongs to; None if none.
+        about: Who it is about, e.g. "their mum".
+        tags: The situation, as tags.
+        evidence_kind: What kind of evidence it is.
+        second_pattern_type_id: The look-alike it couldn't be told apart
+            from, which makes it unclear; None when it is clear.
+        second_pattern_type_version: That Pattern Type's version; None when
+            it is clear.
+        situational: Whether anyone would act the same in its situation.
+        tagged_at: When it was tagged.
+    """
+
+    id: UUID
+    user_id: UUID
+    conversation_id: UUID
+    pattern_type_id: str
+    pattern_type_version: str
+    sign_id: str
+    direction: ObservationDirection
+    quote: str
+    context: str
+    day: date
+    thread_id: UUID | None
+    about: str
+    tags: SituationTags
+    evidence_kind: EvidenceKind
+    second_pattern_type_id: str | None
+    second_pattern_type_version: str | None
+    situational: bool
+    tagged_at: datetime
+
+    @property
+    def unclear(self) -> bool:
+        """Say whether it names two Pattern Types it couldn't tell apart.
+
+        Returns:
+            True when it has a second Pattern Type.
+        """
+        return self.second_pattern_type_id is not None

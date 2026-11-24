@@ -558,6 +558,50 @@ pattern_evidence = Table(
     Column("line", Text, nullable=False),
 )
 
+observations = Table(
+    "observations",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("position", BigInteger, Identity(), nullable=False, unique=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column(
+        "conversation_id",
+        Uuid,
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("pattern_type_id", Text, nullable=False),
+    Column("pattern_type_version", Text, nullable=False),
+    Column("sign_id", Text, nullable=False),
+    Column("direction", Text, nullable=False),
+    Column("quote", Text, nullable=False),
+    Column("context", Text, nullable=False),
+    Column("day", Date, nullable=False),
+    Column(
+        "life_thread_id",
+        Uuid,
+        ForeignKey("life_threads.id", ondelete="CASCADE"),
+        index=True,
+    ),
+    Column("about", Text, nullable=False),
+    Column("relationship", Text),
+    Column("power", Text),
+    Column("setting", Text),
+    Column("stance", Text),
+    Column("evidence_kind", Text, nullable=False),
+    Column("second_pattern_type_id", Text),
+    Column("second_pattern_type_version", Text),
+    Column("situational", Boolean, nullable=False),
+    Column("tagged_at", DateTime(timezone=True), nullable=False),
+)
+
 patterns_in_mind = Table(
     "patterns_in_mind",
     metadata,
@@ -790,6 +834,7 @@ model_calls = Table(
     Column("understanding_shape", JSONB(none_as_null=True)),
     Column("check_in_shape", JSONB(none_as_null=True)),
     Column("reply_plan_shape", JSONB(none_as_null=True)),
+    Column("tagging_shape", JSONB(none_as_null=True)),
 )
 
 eval_cases = Table(
@@ -923,4 +968,5 @@ eval_model_calls = Table(
     Column("understanding_shape", JSONB(none_as_null=True)),
     Column("check_in_shape", JSONB(none_as_null=True)),
     Column("reply_plan_shape", JSONB(none_as_null=True)),
+    Column("tagging_shape", JSONB(none_as_null=True)),
 )

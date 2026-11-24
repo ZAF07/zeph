@@ -2,6 +2,7 @@ import type {
   CheckInShape,
   ModelStep,
   ReplyPlanShape,
+  TaggingShape,
   TraceKind,
   UnderstandingShape,
 } from "@/lib/api-client";
@@ -18,6 +19,7 @@ export const modelSteps: { id: ModelStep; label: string }[] = [
   { id: "life_threads", label: "Life Threads" },
   { id: "curiosities", label: "Curiosities" },
   { id: "move_outcomes", label: "Move Outcomes" },
+  { id: "pattern_tagging", label: "Pattern tagging" },
   { id: "patterns", label: "Pattern keeping" },
   { id: "portrait", label: "User Portrait" },
   { id: "personal_stickers", label: "Personal Stickers" },
@@ -108,6 +110,21 @@ export function checkInShapeFacts(
   return [
     { label: "Check-in Kind", value: shape.kind },
     { label: "Brought up", value: shape.brought_up ? "Yes" : "No" },
+  ];
+}
+
+/**
+ * Lists the facts of a Pattern tagging call, as labels and values.
+ *
+ * @param shape - The call's shape.
+ * @returns E.g. "Observations tagged: 3", "Dropped by code: 1".
+ */
+export function taggingShapeFacts(
+  shape: TaggingShape,
+): { label: string; value: string }[] {
+  return [
+    { label: "Observations tagged", value: String(shape.tagged) },
+    { label: "Dropped by code", value: String(shape.dropped) },
   ];
 }
 

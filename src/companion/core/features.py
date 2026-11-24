@@ -143,6 +143,19 @@ FEATURES: tuple[FeatureDetails, ...] = (
         ),
         in_reply_note=False,
     ),
+    FeatureDetails(
+        feature=Feature.PATTERN_NOTICING,
+        name="Pattern noticing",
+        description=(
+            "When a Conversation ends, Zeph notes what the User said that is "
+            "evidence for or against a Pattern Type in the Pattern Catalog, "
+            "with their exact words. It is silent: nothing reaches a reply. "
+            "It works only while User Memory works. Turning it off deletes "
+            "nothing."
+        ),
+        on_by_default=False,
+        in_reply_note=False,
+    ),
 )
 
 

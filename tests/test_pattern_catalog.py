@@ -88,7 +88,7 @@ def test_admin_reads_a_pattern_type_with_all_its_details(
     assert [sign["id"] for sign in conflict.pop("signs_against")] == ["D1", "D2"]
     assert conflict == {
         "id": "CONF.AVOID.BELONG",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "area": "conflict",
         "name": "Conflict avoidance to preserve belonging",
         "if_situation": "Disagreement with a valued other",
@@ -308,7 +308,7 @@ def test_a_pattern_type_taken_out_of_the_files_leaves_the_catalog_but_is_kept(
     assert [pattern_type["id"] for pattern_type in catalog(client, headers)] == [
         "TEST.ONE"
     ]
-    assert ("CONF.AVOID.BELONG", "0.1.0", False) in stored_versions(engine)
+    assert ("CONF.AVOID.BELONG", "0.2.0", False) in stored_versions(engine)
 
 
 def test_a_plain_user_cannot_read_the_pattern_catalog(

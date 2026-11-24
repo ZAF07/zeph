@@ -14,6 +14,7 @@ from companion.core.platform_settings import (
     MEMORY_PROCESSING_PROMPT,
     MOVE_OUTCOME_KEEPING_PROMPT,
     PATTERN_KEEPING_PROMPT,
+    PATTERN_TAGGING_PROMPT,
     PERSONAL_STICKER_KEEPING_PROMPT,
     PORTRAIT_PROMPT,
     REPLY_PLAN_PROMPT,
@@ -48,6 +49,7 @@ class CallShape(StrEnum):
     BROUGHT_UP_CHECK = "brought-up check"
     CONVERSATION_END = "conversation end"
     LIFE_THREADS = "life threads"
+    PATTERN_TAGGING = "pattern tagging"
     PATTERNS = "patterns"
     CURIOSITIES = "curiosities"
     MOVE_OUTCOMES = "move outcomes"
@@ -84,6 +86,7 @@ def shape_of(instructions: str, settings: PlatformSettings) -> CallShape:
         settings.get(UNDERSTANDING_PROMPT): CallShape.UNDERSTANDING,
         settings.get(MEMORY_PROCESSING_PROMPT): CallShape.CONVERSATION_END,
         settings.get(LIFE_THREAD_KEEPING_PROMPT): CallShape.LIFE_THREADS,
+        settings.get(PATTERN_TAGGING_PROMPT): CallShape.PATTERN_TAGGING,
         settings.get(PATTERN_KEEPING_PROMPT): CallShape.PATTERNS,
         settings.get(CURIOSITY_KEEPING_PROMPT): CallShape.CURIOSITIES,
         settings.get(MOVE_OUTCOME_KEEPING_PROMPT): CallShape.MOVE_OUTCOMES,
@@ -259,6 +262,8 @@ class LoadTestChatModel:
                 return conversation_end_answer()
             case CallShape.LIFE_THREADS:
                 return json.dumps({"threads": []})
+            case CallShape.PATTERN_TAGGING:
+                return json.dumps({"observations": []})
             case CallShape.PATTERNS:
                 return json.dumps({"patterns": []})
             case CallShape.CURIOSITIES:

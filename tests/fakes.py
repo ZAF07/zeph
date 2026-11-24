@@ -666,6 +666,7 @@ class ScriptedChatModel:
         curiosity_keeping_prompt: str = "",
         move_outcome_keeping_prompt: str = "",
         pattern_keeping_prompt: str = "",
+        pattern_tagging_prompt: str = "",
     ) -> None:
         """Start with no replies scripted, no calls and no delay.
 
@@ -691,6 +692,8 @@ class ScriptedChatModel:
                 Outcome keeping call.
             pattern_keeping_prompt: The instructions that mark a Pattern
                 keeping call.
+            pattern_tagging_prompt: The instructions that mark a Pattern
+                tagging call.
         """
         self._replies: list[str | Exception | ToolCall] = []
         self._safeguard_answers: list[str | Exception] = []
@@ -705,6 +708,7 @@ class ScriptedChatModel:
         self._brought_up_check_answers: list[str | Exception] = []
         self._move_outcome_keeping_answers: list[str | Exception] = []
         self._pattern_keeping_answers: list[str | Exception] = []
+        self._pattern_tagging_answers: list[str | Exception] = []
         self.safeguard_prompt = safeguard_prompt
         self.memory_processing_prompt = memory_processing_prompt
         self.understanding_prompt = understanding_prompt
@@ -716,6 +720,7 @@ class ScriptedChatModel:
         self.portrait_prompt = portrait_prompt
         self.move_outcome_keeping_prompt = move_outcome_keeping_prompt
         self.pattern_keeping_prompt = pattern_keeping_prompt
+        self.pattern_tagging_prompt = pattern_tagging_prompt
         self.calls: list[ChatModelCall] = []
         self.safeguard_calls: list[ChatModelCall] = []
         self.processing_calls: list[ChatModelCall] = []
@@ -729,6 +734,7 @@ class ScriptedChatModel:
         self.brought_up_check_calls: list[ChatModelCall] = []
         self.move_outcome_keeping_calls: list[ChatModelCall] = []
         self.pattern_keeping_calls: list[ChatModelCall] = []
+        self.pattern_tagging_calls: list[ChatModelCall] = []
         self.call_order: list[str] = []
         self.delay_seconds = 0.0
         self.before_next_reply: Callable[[], None] | None = None
@@ -830,6 +836,15 @@ class ScriptedChatModel:
         """
         self._pattern_keeping_answers.extend(answers)
 
+    def script_pattern_tagging(self, *answers: str | Exception) -> None:
+        """Queue Pattern tagging answers, one per call.
+
+        Args:
+            answers: The JSON answers; an exception is raised instead of
+                returned, to act like a failing model.
+        """
+        self._pattern_tagging_answers.extend(answers)
+
     def script_brought_up_check(self, *answers: str | Exception) -> None:
         """Queue answers to whether a reply brought up its Check-in, one per call.
 
@@ -919,6 +934,16 @@ class ScriptedChatModel:
                 self._move_outcome_keeping_answers.pop(0)
                 if self._move_outcome_keeping_answers
                 else json.dumps({"move_outcomes": []})
+            )
+        elif (
+            self.pattern_tagging_prompt and instructions == self.pattern_tagging_prompt
+        ):
+            self.pattern_tagging_calls.append(call)
+            self.call_order.append("pattern_tagging")
+            answer = (
+                self._pattern_tagging_answers.pop(0)
+                if self._pattern_tagging_answers
+                else json.dumps({"observations": []})
             )
         elif (
             self.pattern_keeping_prompt and instructions == self.pattern_keeping_prompt

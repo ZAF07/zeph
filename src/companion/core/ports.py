@@ -57,6 +57,7 @@ from companion.core.models import (
     Need,
     NeedDetails,
     NextDueTimeChange,
+    Observation,
     Pattern,
     PatternToSave,
     PatternTypeVersion,
@@ -71,6 +72,7 @@ from companion.core.models import (
     SharedPhoto,
     StickerImage,
     StoredSetting,
+    TaggingShape,
     TelegramConnection,
     Understanding,
     UnderstandingShape,
@@ -1282,6 +1284,37 @@ class LifeThreadRepository(Protocol):
         ...
 
 
+class ObservationRepository(Protocol):
+    """Stores each User's Observations, which outlive Message Retention (ADR-0027)."""
+
+    def add_many(self, observations: Sequence[Observation]) -> None:
+        """Save new Observations, all together.
+
+        Args:
+            observations: The Observations; none saves nothing.
+        """
+        ...
+
+    def list_for_user(self, user_id: UUID) -> list[Observation]:
+        """List a User's Observations, oldest tagged first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Observations.
+        """
+        ...
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete all of a User's Observations.
+
+        Args:
+            user_id: The User's ID.
+        """
+        ...
+
+
 class PatternRepository(Protocol):
     """Stores each User's Patterns with their evidence, found by meaning."""
 
@@ -2090,6 +2123,15 @@ class ModelCallRepository(Protocol):
         Args:
             trace_id: The trace's ID.
             shape: The decision's shape.
+        """
+        ...
+
+    def set_tagging_shape(self, trace_id: UUID, shape: TaggingShape) -> None:
+        """Save a Pattern tagging call's shape on a trace's newest tagging call.
+
+        Args:
+            trace_id: The trace's ID.
+            shape: How many Observations were tagged and dropped.
         """
         ...
 
@@ -2957,6 +2999,7 @@ class Repositories:
     user_memory: UserMemoryRepository
     life_threads: LifeThreadRepository
     patterns: PatternRepository
+    observations: ObservationRepository
     curiosities: CuriosityRepository
     move_outcomes: MoveOutcomeRepository
     user_portraits: UserPortraitRepository

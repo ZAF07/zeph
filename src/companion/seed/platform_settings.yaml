@@ -1223,6 +1223,71 @@ move_outcome_keeping_prompt: |-
     ]
   }
 
+# When a Conversation ends and User Memory and Pattern noticing work for the
+# User, after Life Threads are kept, this call reads the Conversation into
+# the Pattern Catalog as Observations. It sees the Threads the Conversation
+# touched, every Pattern Type in the catalog, the lists each tag comes from
+# and the Conversation. Code keeps only the Observations whose Pattern Type
+# and sign exist, whose quote is word for word in the User's own texts and
+# whose tags come from the lists. Nothing reaches a reply.
+pattern_tagging_model: deepseek-flash
+pattern_tagging_thinking: true
+
+pattern_tagging_prompt: |-
+  You read a Conversation between a person and Zeph, an AI companion, and
+  note what the person said that is evidence about them, using a fixed
+  catalog of Pattern Types. A Pattern Type is a way of acting in a kind of
+  situation (if this happens, they do that, to get or protect something).
+  Each has signs for it and signs against it.
+
+  You are given today's date, the Life Threads (ongoing stories in their
+  life) this Conversation touched, each with a number; the Pattern Catalog;
+  the lists each tag comes from; and the Conversation.
+
+  Write one Observation for each thing the person said that matches a sign
+  of a Pattern Type, for it or against it. Only what the person said counts,
+  never what Zeph said, and only what this Conversation shows. Most
+  Conversations have few Observations or none; an empty list is a good
+  answer when nothing fits. Never stretch a sign to fit, and never note a
+  Pattern Type that isn't in the catalog.
+
+  For each Observation:
+  - pattern_types: the ID of the Pattern Type it matches. When it fits two
+    look-alikes and you can't tell which, give both IDs, the one whose sign
+    it matches first. Never more than two.
+  - sign: the ID of the sign it matches, from the first Pattern Type.
+  - direction: "for" when it matches one of the signs for, "against" when it
+    matches one of the signs against.
+  - quote: the person's own words, copied exactly from one of their texts,
+    as short as still makes sense. Don't fix spelling, shorten words or join
+    two texts.
+  - context: one line on what was going on, in your words, that makes sense
+    read on its own months later.
+  - about: who it is about, e.g. "Mei, their sister", or "themselves".
+  - thread: the number of the Life Thread it belongs to; null if none fits.
+  - relationship, power, setting, stance: the other person and the
+    situation, each from its list; null when there is no one else or it
+    isn't clear. Power is where the other person stands next to them.
+    Stance is how the other person was towards them.
+  - evidence: "real_story" for something that happened, "reported_habit"
+    for what they say they usually do, "what_if_answer" for their answer to
+    a made-up situation, "own_opinion" for their view of themselves.
+
+  Note it even when anyone would act the same in that situation: tag the
+  situation as it was and leave the weighing to others.
+
+  Answer with JSON only, in exactly this shape:
+  {
+    "observations": [
+      {"pattern_types": ["<ID>"], "sign": "<ID>",
+       "direction": "for" | "against", "quote": "...", "context": "...",
+       "about": "...", "thread": <number> | null,
+       "relationship": "..." | null, "power": "..." | null,
+       "setting": "..." | null, "stance": "..." | null,
+       "evidence": "..."}
+    ]
+  }
+
 # When a Conversation ends and User Memory works for the User, after Life
 # Threads are kept, this call keeps their Patterns: what keeps showing up
 # across their Threads (ADR-0020). It sees the Threads the Conversation

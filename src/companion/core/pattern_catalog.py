@@ -18,8 +18,13 @@ from companion.core.models import (
     PatternTypeNumbers,
     PatternTypeStatus,
     PatternTypeVersion,
+    Power,
+    Relationship,
     SignPart,
     SignStrength,
+    SituationMatch,
+    SituationSetting,
+    Stance,
 )
 from companion.core.ports import PatternCatalogRepository
 
@@ -187,6 +192,47 @@ class _Fields:
             self.note(f"{field} must be a list of texts.")
             return ()
         return tuple(item.strip() for item in value)
+
+    def optional_choices[Choice: StrEnum](
+        self, field: str, choices: type[Choice]
+    ) -> tuple[Choice, ...]:
+        """Read a list of values from a fixed list that may be left out.
+
+        Args:
+            field: The field's name.
+            choices: The fixed list.
+
+        Returns:
+            The values, in order; empty when it is left out or not valid.
+        """
+        if not self.has(field):
+            return ()
+        value = self._content[field]
+        if not isinstance(value, list) or not all(
+            isinstance(item, str) for item in value
+        ):
+            self.note(f"{field} must be a list.")
+            return ()
+        allowed = [choice.value for choice in choices]
+        wrong = [item for item in value if item not in allowed]
+        if wrong:
+            self.note(
+                f"{field} has {', '.join(wrong)}; each must be one of "
+                f"{', '.join(allowed)}."
+            )
+            return ()
+        return tuple(choices(item) for item in value)
+
+    def optional_groups(self, field: str) -> list["_Fields"]:
+        """Read a list of groups that may be left out.
+
+        Args:
+            field: The field's name.
+
+        Returns:
+            Each entry's fields, in order; none when it is left out.
+        """
+        return self.groups(field) if self.has(field) else []
 
     def groups(self, field: str, at_least_one: bool = False) -> list["_Fields"]:
         """Read a required list of groups, such as the signs.
@@ -378,6 +424,36 @@ def _read_exclusions(groups: list[_Fields]) -> tuple[PatternExclusion, ...]:
     return tuple(exclusions)
 
 
+def _read_anyone_would_when(fields: _Fields) -> tuple[SituationMatch, ...]:
+    """Read the situations where anyone would act the same, as tags.
+
+    Args:
+        fields: The Pattern Type's fields.
+
+    Returns:
+        The situations, in order; none when they are left out.
+    """
+    matches = []
+    groups = fields.optional_groups("anyone_would_when")
+    for number, group in enumerate(groups, start=1):
+        match = SituationMatch(
+            relationships=group.optional_choices("relationship", Relationship),
+            powers=group.optional_choices("power", Power),
+            settings=group.optional_choices("setting", SituationSetting),
+            stances=group.optional_choices("stance", Stance),
+        )
+        if not any(
+            group.has(field) for field in ("relationship", "power", "setting", "stance")
+        ):
+            fields.note(
+                f"anyone_would_when[{number}] needs at least one of relationship, "
+                "power, setting or stance."
+            )
+        group.no_other_fields("a situation anyone would act the same in")
+        matches.append(match)
+    return tuple(matches)
+
+
 def _read_numbers(group: _Fields) -> PatternTypeNumbers:
     """Read a Pattern Type's own numbers.
 
@@ -430,6 +506,7 @@ def _read_pattern_type(
         signs_against=_read_signs(fields.groups("signs_against", at_least_one=True)),
         look_alikes=_read_look_alikes(fields),
         anyone_would=fields.text("anyone_would"),
+        anyone_would_when=_read_anyone_would_when(fields),
         exclusions=_read_exclusions(fields.groups("exclusions")),
         approved_wording=fields.text("approved_wording"),
         prediction_wording=fields.text("prediction_wording"),

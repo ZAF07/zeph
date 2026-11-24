@@ -8,6 +8,7 @@ import {
   modelStepLabel,
   traceKindLabel,
   replyPlanShapeFacts,
+  taggingShapeFacts,
   understandingShapeFacts,
 } from "@/lib/model-calls";
 
@@ -200,5 +201,15 @@ describe("describePatternUse", () => {
         pattern_offered: true,
       }),
     ).toBe("Offered");
+  });
+});
+
+describe("taggingShapeFacts", () => {
+  it("names the tagging step and counts what was tagged and dropped", () => {
+    expect(modelStepLabel("pattern_tagging")).toBe("Pattern tagging");
+    expect(taggingShapeFacts({ tagged: 3, dropped: 1 })).toEqual([
+      { label: "Observations tagged", value: "3" },
+      { label: "Dropped by code", value: "1" },
+    ]);
   });
 });

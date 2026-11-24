@@ -3,7 +3,7 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: CONF.AVOID.BELONG
-version: 0.1.0
+version: 0.2.0
 area: conflict
 name: Conflict avoidance to preserve belonging
 status: draft
@@ -68,6 +68,9 @@ look_alikes:
       closeness
 
 anyone_would: Low-stakes avoidance with strangers or authority only
+anyone_would_when:
+  - relationship: [stranger]
+  - power: [above]
 
 exclusions:
   - text: Active relationship crisis
