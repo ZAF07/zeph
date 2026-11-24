@@ -147,7 +147,10 @@ def test_a_due_guess_is_shown_to_the_reply_plan_as_a_guess_to_check_gently(
 
     seen = reply_plan_sees(client, chat_model, "talked to mum last night")
 
-    assert f"[1] {MUM} Why: {MUM_WHY} Sensitivity: low. {MUM_GUESS_SHOWN}" in seen
+    assert (
+        f"[1] {MUM} Why: {MUM_WHY} Aim: whether a guess is right. "
+        f"Sensitivity: low. {MUM_GUESS_SHOWN}"
+    ) in seen
 
 
 def test_a_raised_guess_tells_the_reply_to_check_it_never_state_it(

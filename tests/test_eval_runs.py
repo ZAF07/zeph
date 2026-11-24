@@ -489,7 +489,13 @@ def test_override_choices_list_the_editable_settings_needs_moves_and_models(
     assert "eval_run_token_limit" not in keys
     fallback = next(need for need in choices["needs"] if need["name"] == "Ask more")
     assert fallback["key"].startswith("need:")
-    assert set(fallback["value"]) == {"name", "when_it_fits", "how_to_reply"}
+    assert set(fallback["value"]) == {
+        "name",
+        "when_it_fits",
+        "how_to_reply",
+        "curiosities",
+    }
+    assert fallback["value"]["curiosities"] == "only_if_it_fits"
     research = next(move for move in choices["moves"] if move["name"] == "Research")
     assert research["key"].startswith("move:")
     assert set(research["value"]) == {"name", "when_it_fits", "how_to_do_it"}

@@ -514,7 +514,7 @@ reply_plan_prompt: |-
   the Patterns in mind (what Zeph has noticed keeps showing up across their
   life; a suspected one is only Zeph's guess), the things Zeph has been
   wondering about them (Curiosities) whose time has
-  come, the Knowledge documents Zeph can draw on with when each helps, the
+  come and how each Need treats them, the Knowledge documents Zeph can draw on with when each helps, the
   Check-in Kinds Zeph may weave in when a Check-in with them is due (they
   asked Zeph to check in now and then), the earlier Reply Plans in this
   Conversation (with where the Conversation was, the Read Zeph formed and
@@ -597,13 +597,22 @@ reply_plan_prompt: |-
     up in something else, bring it up; a long time since it last came up is
     a reason to ask how things are now.
     Usually at most one. Never one marked "don't bring it up".
-    Curiosities go here too, as {"curiosity": <number>, "how": ...}, only
-    when Zeph should ask it in this very reply: "lead" to open with it,
-    usually at the start of a Conversation when they're just saying hi, or
-    "weave" to ask it after answering what they said, when it connects.
-    Otherwise leave it out for a better moment: when they're upset, busy
-    with something else, or it's sensitive and the moment isn't right.
-    Never more than the Conversation has left.
+    A Curiosity goes here too, as {"curiosity": <number>, "how": ...}:
+    "lead" to open with it, usually at the start of a Conversation when
+    they're just saying hi, or "weave" to ask it after answering what they
+    said. One you pick is part of the plan: the reply will ask it. At most
+    one per reply, and none when the Conversation has none left. How the
+    Need you picked treats Curiosities decides:
+    - ask by default: pick one. Zeph is curious about them and asks. Leave
+      it out only for a real reason (they just asked something that needs
+      the whole reply, the reply already asks another question, it's
+      sensitive and the moment is wrong), and give that reason in
+      no_curiosity_why.
+    - only if it fits the moment: pick one only when it connects to what
+      they're talking about, or the chat has reached an easy pause.
+    - never: pick none.
+  - no_curiosity_why: under a Need that asks by default, when a Curiosity
+    was offered and you picked none, a few words on why. Null otherwise.
   - left_alone: the Life Threads the message touches that Zeph should not
     raise, each with a short reason (e.g. "they're struggling with something
     else", "too painful right now").
@@ -654,6 +663,7 @@ reply_plan_prompt: |-
     "threads_touched": [<number>],
     "bring_up": [{"thread": <number>, "how": "lead" | "weave", "why": "..."},
                  {"curiosity": <number>, "how": "lead" | "weave"}],
+    "no_curiosity_why": "..." | null,
     "left_alone": [{"thread": <number>, "reason": "..."}],
     "knowledge": {"documents": [<number>], "search": "<search phrase>"} | null,
     "send_photo": true | false,
@@ -1071,36 +1081,42 @@ curiosity_keeping_prompt: |-
   recently, the next Move Zeph had in mind but never made, and the
   Conversation.
 
-  - Write a new Curiosity for something worth asking about later: an event
-    coming up, a decision they're weighing, something left unfinished.
-    Never write one to check something that keeps showing up across their
-    stories: that is a Pattern, kept elsewhere, and Zeph checks it by
-    offering its view. Give what to ask (a short question in Zeph's voice),
-    why Zeph wonders, the first day it makes sense to ask ("not_before", as
+  - Every new Curiosity has an aim: what Zeph is trying to learn by asking.
+    There are four, described below: "commitment", "look_back", "guess"
+    and "next_move". Never write a Curiosity that has none of these aims;
+    one without an aim is not saved. Never write one to check something
+    that keeps showing up across their stories: that is a Pattern, kept
+    elsewhere, and Zeph checks it by offering its view. For each, give its
+    aim ("aim"), what to ask (a short question in Zeph's voice), why Zeph
+    wonders, the first day it makes sense to ask ("not_before", as
     YYYY-MM-DD, e.g. the day after their presentation; null for any day),
     how sensitive it is ("low", "medium" or "high"), and the number of the
     Memory Item ("memory_item") or Life Thread ("thread") it comes from, if
     one. Usually none or one per Conversation; never one about something
     already asked recently or already waiting.
-  - A commitment they agreed to in this Conversation ("I'll call mum
-    tonight"), never one Zeph only suggested: a follow-up on how it went
-    ("did you get to call your mum?"), with not_before at least the day
-    after it was due and its Life Thread's number, if one. Write one for
-    each new commitment, on top of the usual one or so, unless they
+  - "commitment": a commitment they agreed to in this Conversation ("I'll
+    call mum tonight"), never one Zeph only suggested: a follow-up on how
+    it went ("did you get to call your mum?"), with not_before at least the
+    day after it was due and its Life Thread's number, if one. Write one
+    for each new commitment, on top of the usual one or so, unless they
     already said how it went.
-  - A next Move is a kind of help Zeph meant to give later in the
-    Conversation (e.g. "Plan steps, once they've picked a host") but the
+  - "next_move": a next Move is a kind of help Zeph meant to give later in
+    the Conversation (e.g. "Plan steps, once they've picked a host") but the
     Conversation ended first. If it's still worth following up, write it as
     a new Curiosity about where they've got to, not about the help itself
     (e.g. "did they get the app deployed?", "did they decide what 'done'
     means for internal testing?"). Leave it out if the Conversation shows it
     no longer fits, e.g. they sorted it themselves or didn't want that help.
-  - Something they vented about where Zeph only listened: a gentle
-    look-back once it has had time to settle, asking how they see it now
-    (e.g. "how are you feeling about the thing with your boss now?"), with
-    not_before at least the next day and sensitivity at least medium.
-  - A Curiosity can hold a guess: something Zeph suspects about them but
-    isn't sure of. Getting to know them means noticing what they hint at
+  - "look_back": looking back at something from this Conversation once it
+    has happened or had time to settle. An event that was coming up or a
+    decision they were weighing: how it went ("how did the presentation
+    go?"), with not_before the day after it. Something they vented about
+    where Zeph only listened: how they see it now (e.g. "how are you
+    feeling about the thing with your boss now?"), with not_before at
+    least the next day and sensitivity at least medium.
+  - "guess": a Curiosity can hold a guess: something Zeph suspects about
+    them but isn't sure of. Getting to know them means noticing what they
+    hint at
     but never say outright: their job, who someone is to them, where
     someone lives, a routine. When the Conversation hints at one of these
     and what Zeph remembers doesn't already say it, write a guess (e.g.
@@ -1124,10 +1140,12 @@ curiosity_keeping_prompt: |-
   nothing new:
   {
     "curiosities": [
-      {"ask": "...", "why": "...", "not_before": "YYYY-MM-DD" | null,
+      {"aim": "commitment" | "look_back" | "next_move",
+       "ask": "...", "why": "...", "not_before": "YYYY-MM-DD" | null,
        "sensitivity": "low" | "medium" | "high",
        "memory_item": <number> | null, "thread": <number> | null},
-      {"ask": "...", "why": "...", "not_before": "YYYY-MM-DD" | null,
+      {"aim": "guess",
+       "ask": "...", "why": "...", "not_before": "YYYY-MM-DD" | null,
        "sensitivity": "...", "guess": "...",
        "how_sure": "low" | "medium" | "high",
        "memory_item": <number> | null, "thread": <number> | null},

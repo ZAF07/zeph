@@ -40,10 +40,12 @@ def new_curiosity(
     why: str = PRESENTATION_WHY,
     not_before: str | None = FRIDAY,
     sensitivity: str = "low",
+    aim: str | None = "look_back",
     **source: int,
 ) -> dict[str, Any]:
     """Build a new Curiosity as the keeping model writes it."""
     return {
+        "aim": aim,
         "ask": ask,
         "why": why,
         "not_before": not_before,
@@ -206,7 +208,7 @@ def test_a_curiosity_brought_up_reaches_the_reply_and_is_marked_raised(
     [curiosity] = stored_curiosities(engine)
     next_message = reply_plan_sees(client, chat_model, "busy day today")
 
-    assert "Something you've been wondering about them" in instructions
+    assert "Ask them this in this reply" in instructions
     assert (
         f"- {PRESENTATION} Open with it. Why you wonder: {PRESENTATION_WHY}"
     ) in instructions

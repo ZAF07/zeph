@@ -55,16 +55,14 @@ class ReplyGuidance:
         boundaries: The Life Threads to leave alone, each with why; "" if
             none.
         plan: The Need's "how to reply", the Moves' "how to do it", the
-            nuance and mood, the "ask why" note when it applies and the
-            Life Threads to bring up; "" if none.
-        curiosities: The Curiosities it chose to bring up; "" if none.
+            nuance and mood, the "ask why" note when it applies, the Life
+            Threads to bring up and the Curiosity to ask; "" if none.
         past_days: The past days it read with the past-day tool, word for
             word or saying none are kept; "" if it read none.
     """
 
     boundaries: str = ""
     plan: str = ""
-    curiosities: str = ""
     past_days: str = ""
 
 

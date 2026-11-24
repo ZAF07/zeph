@@ -4,7 +4,14 @@ from typing import Any
 from uuid import UUID
 
 from companion.core.errors import InvalidError
-from companion.core.models import Move, MoveDetails, Need, NeedDetails, User
+from companion.core.models import (
+    CuriosityTreatment,
+    Move,
+    MoveDetails,
+    Need,
+    NeedDetails,
+    User,
+)
 from companion.core.moves import MoveService
 from companion.core.needs import NeedService
 from companion.core.platform_settings import (
@@ -100,13 +107,36 @@ def need_values(need: Need | NeedDetails) -> dict[str, str]:
         need: The Need, or its details.
 
     Returns:
-        Its name, when it fits and how to reply.
+        Its name, when it fits, how to reply and how Curiosities are
+        treated.
     """
     return {
         "name": need.name,
         "when_it_fits": need.when_it_fits,
         "how_to_reply": need.how_to_reply,
+        "curiosities": need.curiosities.value,
     }
+
+
+def overridden_need(need: Need, value: Mapping[str, Any]) -> Need:
+    """Apply a Variant's change to a Need.
+
+    Args:
+        need: The live Need.
+        value: The override's value, as `need_values` wrote it; one saved
+            before Needs said how Curiosities are treated has no such field.
+
+    Returns:
+        The Need with the override's texts and, if it names one, its way of
+        treating Curiosities.
+    """
+    return replace(
+        need,
+        name=value["name"],
+        when_it_fits=value["when_it_fits"],
+        how_to_reply=value["how_to_reply"],
+        curiosities=CuriosityTreatment(value.get("curiosities", need.curiosities)),
+    )
 
 
 def move_values(move: Move | MoveDetails) -> dict[str, str]:
@@ -233,7 +263,7 @@ def variant_needs(
             "This Variant changes a Need deleted before the run started."
         )
     return [
-        replace(need, **overrides[need_override_key(need.id)])
+        overridden_need(need, overrides[need_override_key(need.id)])
         if need_override_key(need.id) in overrides
         else need
         for need in live_needs
@@ -318,33 +348,44 @@ def has_text_fields(value: Any, names: Sequence[str]) -> bool:
     )
 
 
-def need_details(
-    key: str, value: Any, ruled_out_move_ids: frozenset[UUID]
-) -> NeedDetails:
+def need_details(key: str, value: Any, live: Need | None) -> NeedDetails:
     """Read a Need override's value.
 
     Args:
         key: The override's key, for the message.
-        value: Its value: a name, when it fits and how to reply.
-        ruled_out_move_ids: The live Need's ruled-out Moves, which an
-            override keeps.
+        value: Its value: a name, when it fits, how to reply and,
+            optionally, how Curiosities are treated.
+        live: The live Need, whose ruled-out Moves an override keeps, and
+            whose way of treating Curiosities it keeps when it names none;
+            None while only the value's shape is checked.
 
     Returns:
         The details.
 
     Raises:
-        InvalidOverrideError: If a field is missing or not text.
+        InvalidOverrideError: If a text field is missing or not text, or
+            the way of treating Curiosities isn't one of the choices.
     """
     if not has_text_fields(value, NEED_FIELDS):
         raise InvalidOverrideError(
             f"The change to '{key}' needs a name, when it fits and how to reply."
         )
-    return NeedDetails(
+    treatment = value.get("curiosities")
+    if treatment is not None and treatment not in {
+        choice.value for choice in CuriosityTreatment
+    }:
+        raise InvalidOverrideError(
+            f"The change to '{key}' has an unknown choice for Curiosities."
+        )
+    details = NeedDetails(
         name=value["name"],
         when_it_fits=value["when_it_fits"],
         how_to_reply=value["how_to_reply"],
-        ruled_out_move_ids=ruled_out_move_ids,
+        ruled_out_move_ids=live.ruled_out_move_ids if live else frozenset(),
     )
+    if treatment is not None:
+        return replace(details, curiosities=CuriosityTreatment(treatment))
+    return replace(details, curiosities=live.curiosities) if live else details
 
 
 class SettingOverrideService:
@@ -421,18 +462,18 @@ class SettingOverrideService:
         Args:
             need_id: The overridden Need's ID.
             key: The override's key, for the message.
-            value: Its value: a name, when it fits and how to reply.
+            value: Its value: a name, when it fits, how to reply and,
+                optionally, how Curiosities are treated.
 
         Returns:
             The details.
 
         Raises:
-            InvalidOverrideError: If a field is missing or not text.
+            InvalidOverrideError: If a field is missing or malformed.
             NeedNotFoundError: If there is no such live Need.
         """
-        details = need_details(key, value, frozenset())
-        live = self._need_service.get(need_id)
-        return replace(details, ruled_out_move_ids=live.ruled_out_move_ids)
+        need_details(key, value, None)
+        return need_details(key, value, self._need_service.get(need_id))
 
     def _move_details(self, move_id: UUID, key: str, value: Any) -> MoveDetails:
         """Read a Move override's value, keeping the live Move's other settings.

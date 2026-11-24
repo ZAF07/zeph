@@ -6,9 +6,12 @@
 # stance, and the Moves (moves.yaml) say what to do. `ruled_out_moves` names
 # the Moves that never go with the Need. The Need with
 # `fallback: true` is used when it isn't clear, or when the Understanding
-# fails; there is exactly one, and it can't be deleted.
+# fails; there is exactly one, and it can't be deleted. `curiosities` says
+# how Curiosities are treated while the Need is picked: `ask_by_default` (the
+# Reply Plan asks a due one or says why not), `only_if_it_fits` or `never`.
 
 - name: Be heard
+  curiosities: never
   when_it_fits: >-
     They're letting out something painful or frustrating, staying on it or
     coming back to it, often with strong words, and want it to land with
@@ -29,6 +32,7 @@
     - Research
 
 - name: Think it through
+  curiosities: ask_by_default
   when_it_fits: >-
     They are weighing something up, puzzling over a choice, a feeling or a
     pattern, and want to reach their own understanding, and haven't asked
@@ -42,6 +46,7 @@
     - Research
 
 - name: Advice
+  curiosities: only_if_it_fits
   when_it_fits: >-
     They ask what to do, what you would do, or for your view, ideas or a
     plan, even while they are still weighing it up.
@@ -51,6 +56,7 @@
     their situation rather than piling on options.
 
 - name: Accountability
+  curiosities: ask_by_default
   when_it_fits: >-
     They mention one of their Goals, even in passing and without naming it:
     progress, a slip, an excuse or a plan they made. A slip they sound fed up
@@ -62,6 +68,7 @@
     asking what's next.
 
 - name: Get it done
+  curiosities: never
   when_it_fits: >-
     They ask Zeph to do something it can do for them: change a setting, turn
     something on or off, forget something, or delete their data.
@@ -83,6 +90,7 @@
     - Get curious
 
 - name: Ask more
+  curiosities: only_if_it_fits
   fallback: true
   when_it_fits: >-
     It isn't clear what they want, or there isn't enough to go on yet.
@@ -101,6 +109,7 @@
     - Get curious
 
 - name: Just chatting
+  curiosities: only_if_it_fits
   when_it_fits: >-
     Small talk, banter, a greeting, a passing update or something fun, with
     nothing heavy underneath, including passing mentions of everyday hard

@@ -45,6 +45,14 @@ def downgrade_to(database_url: str, revision: str) -> None:
     command.downgrade(config, revision)
 
 
+def upgrade_to(database_url: str, revision: str) -> None:
+    """Bring the database forward to a revision before the newest."""
+    config = Config()
+    config.set_main_option("script_location", str(MIGRATIONS_DIR))
+    config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
+    command.upgrade(config, revision)
+
+
 def downgrade_to_before_moves(database_url: str) -> None:
     """Take the database back to the revision before Moves."""
     downgrade_to(database_url, "0049")

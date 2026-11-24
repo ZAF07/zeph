@@ -22,7 +22,7 @@ from companion.adapters.postgres.tables import (
     needs,
     platform_settings,
 )
-from companion.core.models import CopySeedSlot
+from companion.core.models import CopySeedSlot, CuriosityTreatment
 from companion.core.pattern_catalog import PatternCatalogService
 
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
@@ -232,8 +232,9 @@ def seed_needs(engine: Engine, seed_file: Path) -> None:
     Args:
         engine: The database engine.
         seed_file: YAML file listing Needs with `name`, `when_it_fits`,
-            `how_to_reply` and an optional `fallback`, in the order to show
-            them.
+            `how_to_reply`, an optional `fallback` and an optional
+            `curiosities` (how Curiosities are treated while it is picked;
+            only if they fit, when left out), in the order to show them.
     """
     seed = yaml.safe_load(seed_file.read_text())
     rows = [
@@ -244,6 +245,9 @@ def seed_needs(engine: Engine, seed_file: Path) -> None:
             "how_to_reply": need["how_to_reply"],
             "sort_order": sort_order,
             "is_fallback": need.get("fallback", False),
+            "curiosities": CuriosityTreatment(
+                need.get("curiosities", CuriosityTreatment.ONLY_IF_IT_FITS)
+            ),
         }
         for sort_order, need in enumerate(seed)
     ]

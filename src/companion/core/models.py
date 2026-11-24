@@ -956,6 +956,14 @@ class MoveDirection(StrEnum):
     DOWN = "down"
 
 
+class CuriosityTreatment(StrEnum):
+    """How Curiosities are treated while a Need is picked."""
+
+    ASK_BY_DEFAULT = "ask_by_default"
+    ONLY_IF_IT_FITS = "only_if_it_fits"
+    NEVER = "never"
+
+
 @dataclass(frozen=True)
 class NeedDetails:
     """What an Admin sets on a Need.
@@ -965,12 +973,14 @@ class NeedDetails:
         when_it_fits: When to pick it, as the Understanding model is told.
         how_to_reply: How to reply when it is picked, as the reply is told.
         ruled_out_move_ids: The Moves that never go with it.
+        curiosities: How Curiosities are treated while it is picked.
     """
 
     name: str
     when_it_fits: str
     how_to_reply: str
     ruled_out_move_ids: frozenset[UUID]
+    curiosities: CuriosityTreatment = CuriosityTreatment.ONLY_IF_IT_FITS
 
 
 @dataclass(frozen=True)
@@ -985,6 +995,7 @@ class Need:
         sort_order: Where it comes in the list, lowest first.
         is_fallback: Whether it is the one used when it isn't clear.
         ruled_out_move_ids: The Moves that never go with it.
+        curiosities: How Curiosities are treated while it is picked.
     """
 
     id: UUID
@@ -994,6 +1005,7 @@ class Need:
     sort_order: int
     is_fallback: bool
     ruled_out_move_ids: frozenset[UUID]
+    curiosities: CuriosityTreatment = CuriosityTreatment.ONLY_IF_IT_FITS
 
 
 @dataclass(frozen=True)
@@ -1259,6 +1271,15 @@ class CuriosityState(StrEnum):
     CLOSED = "closed"
 
 
+class CuriosityAim(StrEnum):
+    """What a Curiosity is trying to learn. One with no aim is never made."""
+
+    COMMITMENT = "commitment"
+    LOOK_BACK = "look_back"
+    GUESS = "guess"
+    NEXT_MOVE = "next_move"
+
+
 @dataclass(frozen=True)
 class Curiosity:
     """Something the Companion wants to ask a User later. Internal: never shown.
@@ -1273,6 +1294,9 @@ class Curiosity:
         sensitivity: How sensitive it is.
         state: Waiting, raised or closed (no longer relevant).
         created_at: When it was made.
+        aim: What it is trying to learn: how a commitment went, how
+            something looks to them now, whether a guess is right, or where
+            they've got to on a next Move never made.
         source_memory_item_id: The Memory Item it came from, if any; deleting
             that item deletes it.
         source_life_thread_id: The Life Thread it came from, if any; deleting
@@ -1295,6 +1319,7 @@ class Curiosity:
     sensitivity: CuriositySensitivity
     state: CuriosityState
     created_at: datetime
+    aim: CuriosityAim
     source_memory_item_id: UUID | None = None
     source_life_thread_id: UUID | None = None
     raised_at: datetime | None = None
@@ -1560,6 +1585,8 @@ class ReplyPlanForm:
         pattern_offered: The Pattern the reply offers as Zeph's view, with
             the Read; None for none, and always None when the Read isn't
             said.
+        curiosity_not_asked_why: Why no Curiosity is asked, when the Need
+            asks them by default and one was offered; "" otherwise.
     """
 
     need: str
@@ -1584,6 +1611,7 @@ class ReplyPlanForm:
     check_in: ChosenCheckIn | None = None
     patterns_used: tuple[PatternPicked, ...] = ()
     pattern_offered: PatternPicked | None = None
+    curiosity_not_asked_why: str = ""
 
 
 @dataclass(frozen=True)
@@ -2425,6 +2453,11 @@ class ReplyPlanShape:
             None for none.
         pattern_used: Whether its Read was built on a Pattern in mind.
         pattern_offered: Whether the reply was to offer a Pattern.
+        curiosities_offered: How many Curiosities it could ask; 0 when the
+            Need it picked never asks one. None on a shape saved before
+            this was recorded.
+        curiosity_asked: Whether the reply was to ask a Curiosity; None on
+            a shape saved before this was recorded.
     """
 
     need: str
@@ -2442,6 +2475,8 @@ class ReplyPlanShape:
     check_in_kind: str | None = None
     pattern_used: bool = False
     pattern_offered: bool = False
+    curiosities_offered: int | None = None
+    curiosity_asked: bool | None = None
 
 
 @dataclass(frozen=True)

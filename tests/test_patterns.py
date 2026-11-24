@@ -22,7 +22,7 @@ from tests.telegram_helpers import auth_headers, connect_telegram, owner_headers
 from tests.test_features import maya_id
 from tests.test_life_threads import end_conversation, new_thread
 from tests.test_model_call_log import list_traces, open_trace
-from tests.test_moves_migration import downgrade_to
+from tests.test_moves_migration import downgrade_to, upgrade_to
 from tests.test_older_summaries import set_settings
 
 PROJECT = new_thread(
@@ -573,10 +573,10 @@ def test_the_migration_keeps_a_curiosity_prompt_an_admin_edited(
     downgrade_to(database_url, "0067")
     try:
         store_curiosity_prompt(engine, "Admin's own Curiosity prompt.")
+        upgrade_to(database_url, "0068")
+        assert stored_curiosity_prompt(engine) == "Admin's own Curiosity prompt."
     finally:
         migrate(database_url)
-
-    assert stored_curiosity_prompt(engine) == "Admin's own Curiosity prompt."
 
 
 def test_a_pattern_is_confirmed_even_when_no_thread_changed_in_the_conversation(

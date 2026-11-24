@@ -123,7 +123,15 @@ def set_up_user_with_every_kind_of_data(
     )
     chat_model.script_curiosity_keeping(
         json.dumps(
-            {"curiosities": [{"ask": "How is the new job?", "why": "Just started."}]}
+            {
+                "curiosities": [
+                    {
+                        "aim": "look_back",
+                        "ask": "How is the new job?",
+                        "why": "Just started.",
+                    }
+                ]
+            }
         )
     )
     have_conversation(

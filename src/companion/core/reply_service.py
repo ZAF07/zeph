@@ -141,7 +141,9 @@ class ReplyService:
         patterns = self._pattern_reminder.remind(
             snapshot, message.conversation_id, understanding.form.means, reminded
         )
-        due = self._curiosity_raiser.due(snapshot, message.conversation_id)
+        due = self._curiosity_raiser.due(
+            snapshot, message.conversation_id, understanding.form.struggling
+        )
         move_outcomes = self._move_outcome_finder.find(
             snapshot, message.conversation_id
         )

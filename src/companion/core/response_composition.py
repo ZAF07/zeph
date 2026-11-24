@@ -48,13 +48,12 @@ PRIORITY_ORDER = (
     "1. Safety, privacy and their own boundaries.\n"
     "2. What they just asked or need right now.\n"
     "3. Today's guidance: what they need from you, the Moves and how to make "
-    "them.\n"
+    "them, and a question you planned to ask them.\n"
     "4. What you remember about them, used accurately. Never state something "
     "you only suspect as fact.\n"
     "5. Your voice, as described at the top.\n"
-    "6. Optional extras: a Check-in, something you've been wondering about "
-    "them, Knowledge passages, a sticker, a photo of theirs. Leave out any "
-    "that doesn't fit what they need right now."
+    "6. Optional extras: a Check-in, Knowledge passages, a sticker, a photo "
+    "of theirs. Leave out any that doesn't fit what they need right now."
 )
 BOUNDARIES_HEADING = "## 1. Safety, privacy and their boundaries"
 ASKED_NOW_HEADING = "## 2. What they just asked or need right now"
@@ -198,7 +197,7 @@ def write_instructions(
         guidance: Today's guidance from the Understanding; "" if none.
         memory: The User Memory that matters; "" if none.
         optional_extras: The extras the reply may leave out, e.g. a
-            Woven-in Check-in, Curiosities or Knowledge passages.
+            Woven-in Check-in or Knowledge passages.
 
     Returns:
         The instructions.
@@ -362,7 +361,6 @@ class ResponseComposer:
             memory=remembered,
             optional_extras=(
                 *(offer.instructions for offer in optional_offers),
-                guidance.curiosities,
                 knowledge,
             ),
         )

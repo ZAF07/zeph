@@ -169,6 +169,7 @@ class PostgresEvalEnvironment:
                 "how_to_reply": need.how_to_reply,
                 "sort_order": need.sort_order,
                 "is_fallback": need.is_fallback,
+                "curiosities": need.curiosities,
             }
             for need in needs
         ]
