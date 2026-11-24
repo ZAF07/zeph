@@ -9,6 +9,7 @@ from companion.core.models import (
     ChannelPhoto,
     Feature,
     PhotoImage,
+    RepliedToText,
     SharedPhoto,
     UserSnapshot,
 )
@@ -98,6 +99,22 @@ class PhotoMessage:
     text: str
     photos: tuple[ChannelPhoto, ...]
     safeguard_text: str | None = None
+
+
+@dataclass(frozen=True)
+class RepliedToPhotoReading:
+    """A Replied-to Text as the Companion and the Safeguard read it.
+
+    Attributes:
+        replied_to: The Replied-to Text as the Companion reads it, with its
+            photo's description when the reply may see it.
+        safeguard_replied_to: The Replied-to Text with its photo's
+            description, for the Safeguard alone, when Photo Viewing is off;
+            None when it is the same as `replied_to`.
+    """
+
+    replied_to: RepliedToText
+    safeguard_replied_to: RepliedToText | None = None
 
 
 def photo_marker(
@@ -334,6 +351,47 @@ class PhotoService:
                 for photo, description in zip(looked_at, descriptions, strict=True)
             ),
         )
+
+    def read_replied_to(
+        self, snapshot: UserSnapshot, replied_to: RepliedToText
+    ) -> RepliedToPhotoReading:
+        """Look at the photo a User's text replies to, as for a new photo.
+
+        It is always described for the Safeguard. When Photo Viewing doesn't
+        work for the User, the Companion reads only the caption and the
+        "Photo Viewing off" note. A photo that can't be looked at leaves the
+        caption alone.
+
+        Args:
+            snapshot: The User who replied.
+            replied_to: The Replied-to Text, with the photo it holds, if any.
+
+        Returns:
+            The Replied-to Text as the Companion reads it and, with Photo
+            Viewing off, as the Safeguard reads it; unchanged when it holds
+            no photo.
+        """
+        if replied_to.photo is None:
+            return RepliedToPhotoReading(replied_to)
+        settings = snapshot.settings
+        not_viewed_note = settings.get(PHOTO_NOT_VIEWED_NOTE)
+        description = self.describe(snapshot, replied_to.photo)
+        described = (
+            replace(replied_to, photo_note=photo_marker(description, not_viewed_note))
+            if description is not None
+            else replied_to
+        )
+        if not snapshot.works(Feature.PHOTO_VIEWING):
+            not_looked_at = replace(
+                replied_to,
+                photo_note=photo_marker(
+                    None,
+                    not_viewed_note,
+                    viewing_off_note=settings.get(PHOTO_VIEWING_OFF_NOTE),
+                ),
+            )
+            return RepliedToPhotoReading(not_looked_at, safeguard_replied_to=described)
+        return RepliedToPhotoReading(described)
 
     def describe(self, snapshot: UserSnapshot, photo: ChannelPhoto) -> str | None:
         """Download a photo and write a detailed description of it.

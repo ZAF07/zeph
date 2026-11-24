@@ -220,7 +220,7 @@ def write_instructions(
 
 def to_chat_history(
     messages: list[ConversationMessage],
-    time_zone: str | None = None,
+    time_zone: str | None,
     read_by_companion: bool = False,
 ) -> list[ChatLine]:
     """Turn a Conversation's saved messages into history for the chat model.
@@ -232,7 +232,7 @@ def to_chat_history(
     Args:
         messages: The messages, oldest first.
         time_zone: The User's IANA time zone, for when a Replied-to Text was
-            sent; UTC if not given.
+            sent; UTC if they have none.
         read_by_companion: True when the Companion itself reads the
             history, so a Replied-to Text it sent is "your" text.
 

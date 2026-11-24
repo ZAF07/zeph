@@ -5,6 +5,7 @@ from companion.core.models import (
     MessageToAnswer,
     ModelCallTrace,
     PlatformSettings,
+    RepliedToText,
     RiskType,
     TextToScreen,
     TraceKind,
@@ -88,6 +89,7 @@ class FakeSafeguard:
         conversation_id: UUID,
         snapshot: UserSnapshot,
         newest_text: str | None = None,
+        newest_replied_to: RepliedToText | None = None,
     ) -> RiskType:
         """Report the set risk.
 
@@ -95,6 +97,8 @@ class FakeSafeguard:
             conversation_id: The Conversation.
             snapshot: The User.
             newest_text: The message as the Safeguard reads it, if different.
+            newest_replied_to: What it replies to as the Safeguard reads it,
+                if different.
 
         Returns:
             The set risk.

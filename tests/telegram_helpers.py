@@ -44,6 +44,27 @@ def telegram_message_update(
     return update
 
 
+def photo_sizes(file_unique_id: str) -> list[dict[str, Any]]:
+    """Build a Telegram photo's sizes: a small one, then the large one read.
+
+    The large size's file ID is "file-" and the unique ID.
+    """
+    return [
+        {
+            "file_id": f"small-{file_unique_id}",
+            "file_unique_id": f"small-{file_unique_id}",
+            "width": 90,
+            "height": 60,
+        },
+        {
+            "file_id": f"file-{file_unique_id}",
+            "file_unique_id": file_unique_id,
+            "width": 1280,
+            "height": 853,
+        },
+    ]
+
+
 def telegram_photo_update(
     caption: str | None = None,
     file_unique_id: str = "photo-cat",
@@ -54,22 +75,7 @@ def telegram_photo_update(
 
     A photo with an album id is one of several sent together.
     """
-    content: dict[str, Any] = {
-        "photo": [
-            {
-                "file_id": f"small-{file_unique_id}",
-                "file_unique_id": f"small-{file_unique_id}",
-                "width": 90,
-                "height": 60,
-            },
-            {
-                "file_id": f"file-{file_unique_id}",
-                "file_unique_id": file_unique_id,
-                "width": 1280,
-                "height": 853,
-            },
-        ]
-    }
+    content: dict[str, Any] = {"photo": photo_sizes(file_unique_id)}
     if caption is not None:
         content["caption"] = caption
     if album_id is not None:
@@ -309,3 +315,20 @@ def owner_headers(
     headers = auth_headers(auth_verifier, OWNER_AUTH_ID)
     assert client.get("/api/me", headers=headers).json()["role"] == "admin"
     return headers
+
+
+def telegram_reply_to_photo_update(
+    text: str,
+    caption: str | None = None,
+    from_companion: bool = False,
+    file_unique_id: str = "old-cat",
+) -> dict[str, Any]:
+    """Build a Telegram webhook update for a text replying to an earlier photo.
+
+    The photo comes in a small and a large size, as `telegram_photo_update`
+    builds it, so its large size's file ID is "file-" and the unique ID.
+    """
+    replied_to: dict[str, Any] = {"photo": photo_sizes(file_unique_id)}
+    if caption is not None:
+        replied_to["caption"] = caption
+    return telegram_reply_update(text, replied_to, from_companion=from_companion)
