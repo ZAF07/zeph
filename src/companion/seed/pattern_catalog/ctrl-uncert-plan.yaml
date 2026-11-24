@@ -6,7 +6,9 @@ id: CTRL.UNCERT.PLAN
 version: 0.2.0
 area: control
 name: Control-seeking under uncertainty
-status: draft
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
 
 definition: >-
   When outcomes are uncertain, the person responds by planning, checking,

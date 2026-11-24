@@ -6,7 +6,9 @@ id: CTRL.OPEN.FREEDOM
 version: 0.1.0
 area: control
 name: Keeping options open and putting off committing
-status: draft
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
 
 definition: >-
   When a choice would close off other options, the person puts it off,

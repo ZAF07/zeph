@@ -2624,7 +2624,7 @@ def test_a_tagging_case_runs_the_real_tagging_step_and_shows_kept_and_dropped(
     [tagging_call] = chat_model.pattern_tagging_calls
     shown = tagging_call.history[0].text
     assert "[1] Helping Mei move" in shown
-    assert "CONF.AVOID.BELONG: Conflict avoidance to preserve belonging" in shown
+    assert "CONF.AVOID.BELONG: Softening disagreement to protect belonging" in shown
     assert "I said yes to Mei again, it's fine." in shown
     trace = client.get(
         f"/api/admin/eval-runs/{run['id']}/results/{result['id']}", headers=admin

@@ -6,7 +6,9 @@ id: CONF.DEFEND.SELF
 version: 0.1.0
 area: conflict
 name: Pushing back at once when criticised
-status: draft
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
 
 definition: >-
   When someone points out a fault or questions what the person did, they

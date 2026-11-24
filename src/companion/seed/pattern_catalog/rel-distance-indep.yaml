@@ -6,7 +6,9 @@ id: REL.DISTANCE.INDEP
 version: 0.1.0
 area: relationships
 name: Pulling back when someone gets closer or needs more
-status: draft
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
 
 definition: >-
   When someone wants to get closer, asks for more time or leans on them,

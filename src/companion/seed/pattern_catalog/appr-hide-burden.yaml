@@ -6,7 +6,9 @@ id: APPR.HIDE.BURDEN
 version: 0.1.0
 area: approval
 name: Saying "I'm fine" and hiding what's hard
-status: draft
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
 
 definition: >-
   When something is hard, the person keeps it to themselves and tells others

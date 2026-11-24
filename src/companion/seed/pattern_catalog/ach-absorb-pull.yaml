@@ -6,7 +6,9 @@ id: ACH.ABSORB.PULL
 version: 0.1.0
 area: achievement
 name: Everything else goes quiet when something grabs them
-status: draft
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
 
 definition: >-
   When a task, project or interest grabs them, the person goes all in and

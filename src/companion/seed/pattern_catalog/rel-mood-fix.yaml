@@ -6,7 +6,9 @@ id: REL.MOOD.FIX
 version: 0.1.0
 area: relationships
 name: Taking on other people's moods as theirs to fix
-status: draft
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
 
 definition: >-
   When someone close is upset, tense or low, the person feels it as their

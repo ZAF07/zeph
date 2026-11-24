@@ -6,7 +6,9 @@ id: CTRL.SELF.RELY
 version: 0.1.0
 area: control
 name: Doing it all themselves rather than leaning on others
-status: draft
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
 
 definition: >-
   When a job could be shared or help is on offer, the person does it

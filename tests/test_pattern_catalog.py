@@ -19,6 +19,7 @@ DESIGN_FIXTURE_CATALOG_FILE = (
     Path(__file__).parent.parent
     / "web/src/lib/design-fixtures/seed-pattern-catalog.json"
 )
+ALL_ROWS_IN_ORDER = "SELECT * FROM pattern_types ORDER BY pattern_type_id, version"
 TEST_ONE_ROWS = "SELECT * FROM pattern_types WHERE pattern_type_id = 'TEST.ONE'"
 
 
@@ -63,21 +64,21 @@ def test_the_fifteen_pattern_types_are_loaded_on_start(
         (pattern_type["id"], pattern_type["area"], pattern_type["status"])
         for pattern_type in pattern_types
     ] == [
-        ("CONF.AVOID.BELONG", "conflict", "draft"),
-        ("CONF.DEFEND.SELF", "conflict", "draft"),
-        ("CONF.WITHDRAW.HURT", "conflict", "draft"),
-        ("APPR.CONFIRM.CHOICE", "approval", "draft"),
-        ("APPR.GIVE.NEEDED", "approval", "draft"),
-        ("APPR.HIDE.BURDEN", "approval", "draft"),
-        ("CTRL.OPEN.FREEDOM", "control", "draft"),
-        ("CTRL.SELF.RELY", "control", "draft"),
-        ("CTRL.UNCERT.PLAN", "control", "draft"),
-        ("ACH.ABSORB.PULL", "achievement", "draft"),
-        ("ACH.GOAL.MOVE", "achievement", "draft"),
-        ("ACH.WORTH.PERF", "achievement", "draft"),
-        ("REL.CHECK.SECURE", "relationships", "draft"),
-        ("REL.DISTANCE.INDEP", "relationships", "draft"),
-        ("REL.MOOD.FIX", "relationships", "draft"),
+        ("CONF.AVOID.BELONG", "conflict", "approved"),
+        ("CONF.DEFEND.SELF", "conflict", "approved"),
+        ("CONF.WITHDRAW.HURT", "conflict", "approved"),
+        ("APPR.CONFIRM.CHOICE", "approval", "approved"),
+        ("APPR.GIVE.NEEDED", "approval", "approved"),
+        ("APPR.HIDE.BURDEN", "approval", "approved"),
+        ("CTRL.OPEN.FREEDOM", "control", "approved"),
+        ("CTRL.SELF.RELY", "control", "approved"),
+        ("CTRL.UNCERT.PLAN", "control", "approved"),
+        ("ACH.ABSORB.PULL", "achievement", "approved"),
+        ("ACH.GOAL.MOVE", "achievement", "approved"),
+        ("ACH.WORTH.PERF", "achievement", "approved"),
+        ("REL.CHECK.SECURE", "relationships", "approved"),
+        ("REL.DISTANCE.INDEP", "relationships", "approved"),
+        ("REL.MOOD.FIX", "relationships", "approved"),
     ]
 
 
@@ -102,7 +103,7 @@ def test_admin_reads_a_pattern_type_with_all_its_details(
         "id": "CONF.AVOID.BELONG",
         "version": "0.3.0",
         "area": "conflict",
-        "name": "Conflict avoidance to preserve belonging",
+        "name": "Softening disagreement to protect belonging",
         "if_situation": "Disagreement with a valued other",
         "then_behaviour": "Withholds or softens own view",
         "function": "To protect belonging",
@@ -132,7 +133,7 @@ def test_admin_reads_a_pattern_type_with_all_its_details(
                 "to fix the other's mood",
             },
         ],
-        "anyone_would": "Low-stakes avoidance with strangers or authority only",
+        "anyone_would": "Keeping quiet over small things with strangers or people in charge",
         "exclusions": [
             {"text": "Active relationship crisis", "evidence": "ignored"},
             {"text": "Grief", "evidence": "ignored"},
@@ -142,9 +143,9 @@ def test_admin_reads_a_pattern_type_with_all_its_details(
         "prediction_wording": "Next time {person} asks for something you'd "
         "rather not do, notice whether you say yes before you've decided.",
         "numbers": {"situations_needed": 3, "base_rate": 0.2},
-        "status": "draft",
-        "approved_by": None,
-        "approved_on": None,
+        "status": "approved",
+        "approved_by": "Zaf",
+        "approved_on": "2026-11-24",
         "other_versions": [],
     }
 
@@ -234,12 +235,12 @@ def test_loading_the_same_files_again_changes_nothing(
 ) -> None:
     load_catalog(engine, tmp_path, VALID)
     with engine.connect() as connection:
-        first = connection.execute(text("SELECT * FROM pattern_types")).all()
+        first = connection.execute(text(ALL_ROWS_IN_ORDER)).all()
 
     load_catalog(engine, tmp_path, VALID)
 
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT * FROM pattern_types")).all() == first
+        assert connection.execute(text(ALL_ROWS_IN_ORDER)).all() == first
 
 
 def test_going_back_to_an_earlier_version_makes_it_current_again(

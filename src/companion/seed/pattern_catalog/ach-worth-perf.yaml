@@ -6,7 +6,9 @@ id: ACH.WORTH.PERF
 version: 0.2.0
 area: achievement
 name: Performance-contingent self-worth
-status: draft
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
 
 definition: >-
   The person's sense of worth rises and falls with how well they perform.
@@ -14,7 +16,7 @@ definition: >-
   standards alone do not qualify; the marker is self-judgement after a miss.
 
 if: Performance is evaluated or falls short
-then: Self-criticism, over-preparation or avoidance of the task
+then: Self-criticism, over-preparation or putting the task off
 function: To protect a sense of being worthy
 
 frameworks:

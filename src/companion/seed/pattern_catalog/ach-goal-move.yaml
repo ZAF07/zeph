@@ -6,7 +6,9 @@ id: ACH.GOAL.MOVE
 version: 0.1.0
 area: achievement
 name: Moving the goal as soon as they reach it
-status: draft
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
 
 definition: >-
   When the person reaches a goal, they barely pause before setting a bigger

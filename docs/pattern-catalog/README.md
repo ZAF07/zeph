@@ -28,8 +28,8 @@ There are fifteen, three in each of five areas:
 | Achievement | ACH.WORTH.PERF, ACH.ABSORB.PULL, ACH.GOAL.MOVE |
 | Relationships | REL.CHECK.SECURE, REL.DISTANCE.INDEP, REL.MOOD.FIX |
 
-All fifteen start as draft. The owner reads each one and approves it or sends
-it back.
+All fifteen were written as drafts and approved by the owner (Zaf) on
+24 Nov 2026.
 
 ## Where it lives
 

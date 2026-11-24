@@ -167,7 +167,7 @@ def test_tagging_runs_after_life_threads_and_before_pattern_keeping_and_sees_it_
     assert call.instructions == seeded_settings["pattern_tagging_prompt"]
     assert call.model == seeded_settings["pattern_tagging_model"]
     assert "Life Threads this Conversation touched:\n[1] Falling-out with Mei" in seen
-    assert "CONF.AVOID.BELONG: Conflict avoidance to preserve belonging" in seen
+    assert "CONF.AVOID.BELONG: Softening disagreement to protect belonging" in seen
     assert "- I2 (strong): Reports agreeing in the moment" in seen
     assert "ACH.WORTH.PERF: Performance-contingent self-worth" in seen
     assert "relationship: partner, family, friend" in seen

@@ -5,8 +5,10 @@
 id: CONF.AVOID.BELONG
 version: 0.3.0
 area: conflict
-name: Conflict avoidance to preserve belonging
-status: draft
+name: Softening disagreement to protect belonging
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
 
 definition: >-
   When disagreement arises with someone whose approval matters, the person
@@ -74,7 +76,7 @@ look_alikes:
     tells_apart: >-
       Stays quiet about their own view; the other acts to fix the other's mood
 
-anyone_would: Low-stakes avoidance with strangers or authority only
+anyone_would: Keeping quiet over small things with strangers or people in charge
 anyone_would_when:
   - relationship: [stranger]
   - power: [above]

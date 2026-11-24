@@ -4,7 +4,7 @@
       "id": "CONF.AVOID.BELONG",
       "version": "0.3.0",
       "area": "conflict",
-      "name": "Conflict avoidance to preserve belonging",
+      "name": "Softening disagreement to protect belonging",
       "definition": "When disagreement arises with someone whose approval matters, the person suppresses, delays or dilutes their own position. The driver is fear that conflict will damage the relationship, not lack of opinion.",
       "if_situation": "Disagreement with a valued other",
       "then_behaviour": "Withholds or softens own view",
@@ -83,7 +83,7 @@
           "tells_apart": "Stays quiet about their own view; the other acts to fix the other's mood"
         }
       ],
-      "anyone_would": "Low-stakes avoidance with strangers or authority only",
+      "anyone_would": "Keeping quiet over small things with strangers or people in charge",
       "exclusions": [
         {
           "text": "Active relationship crisis",
@@ -100,9 +100,9 @@
         "situations_needed": 3,
         "base_rate": 0.2
       },
-      "status": "draft",
-      "approved_by": null,
-      "approved_on": null,
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
       "loaded_at": "2026-11-24T09:00:00Z",
       "other_versions": []
     },
@@ -196,9 +196,9 @@
         "situations_needed": 3,
         "base_rate": 0.2
       },
-      "status": "draft",
-      "approved_by": null,
-      "approved_on": null,
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
       "loaded_at": "2026-11-24T09:00:00Z",
       "other_versions": []
     },
@@ -301,9 +301,9 @@
         "situations_needed": 3,
         "base_rate": 0.25
       },
-      "status": "draft",
-      "approved_by": null,
-      "approved_on": null,
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
       "loaded_at": "2026-11-24T09:00:00Z",
       "other_versions": []
     },
@@ -402,9 +402,9 @@
         "situations_needed": 3,
         "base_rate": 0.2
       },
-      "status": "draft",
-      "approved_by": null,
-      "approved_on": null,
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
       "loaded_at": "2026-11-24T09:00:00Z",
       "other_versions": []
     },
@@ -472,7 +472,7 @@
       "look_alikes": [
         {
           "pattern_type_id": "CONF.AVOID.BELONG",
-          "name": "Conflict avoidance to preserve belonging",
+          "name": "Softening disagreement to protect belonging",
           "tells_apart": "Says yes to be needed and keep a place; the other says yes to avoid the friction of saying no"
         },
         {
@@ -503,9 +503,9 @@
         "situations_needed": 3,
         "base_rate": 0.25
       },
-      "status": "draft",
-      "approved_by": null,
-      "approved_on": null,
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
       "loaded_at": "2026-11-24T09:00:00Z",
       "other_versions": []
     },
@@ -603,9 +603,9 @@
         "situations_needed": 3,
         "base_rate": 0.25
       },
-      "status": "draft",
-      "approved_by": null,
-      "approved_on": null,
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
       "loaded_at": "2026-11-24T09:00:00Z",
       "other_versions": []
     },
@@ -695,9 +695,9 @@
         "situations_needed": 3,
         "base_rate": 0.2
       },
-      "status": "draft",
-      "approved_by": null,
-      "approved_on": null,
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
       "loaded_at": "2026-11-24T09:00:00Z",
       "other_versions": []
     },
@@ -792,9 +792,9 @@
         "situations_needed": 3,
         "base_rate": 0.2
       },
-      "status": "draft",
-      "approved_by": null,
-      "approved_on": null,
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
       "loaded_at": "2026-11-24T09:00:00Z",
       "other_versions": []
     },
@@ -867,7 +867,7 @@
         },
         {
           "pattern_type_id": "CONF.AVOID.BELONG",
-          "name": "Conflict avoidance to preserve belonging",
+          "name": "Softening disagreement to protect belonging",
           "tells_apart": "Uneasy about any unknown outcome, closeness or not; the other keeps quiet only when closeness is at stake"
         },
         {
@@ -899,9 +899,9 @@
         "situations_needed": 3,
         "base_rate": 0.2
       },
-      "status": "draft",
-      "approved_by": null,
-      "approved_on": null,
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
       "loaded_at": "2026-11-24T09:00:00Z",
       "other_versions": []
     },
@@ -991,9 +991,9 @@
         "situations_needed": 3,
         "base_rate": 0.2
       },
-      "status": "draft",
-      "approved_by": null,
-      "approved_on": null,
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
       "loaded_at": "2026-11-24T09:00:00Z",
       "other_versions": []
     },
@@ -1083,9 +1083,9 @@
         "situations_needed": 3,
         "base_rate": 0.2
       },
-      "status": "draft",
-      "approved_by": null,
-      "approved_on": null,
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
       "loaded_at": "2026-11-24T09:00:00Z",
       "other_versions": []
     },
@@ -1096,7 +1096,7 @@
       "name": "Performance-contingent self-worth",
       "definition": "The person's sense of worth rises and falls with how well they perform. Falling short is felt as a verdict on the self, not on the work. High standards alone do not qualify; the marker is self-judgement after a miss.",
       "if_situation": "Performance is evaluated or falls short",
-      "then_behaviour": "Self-criticism, over-preparation or avoidance of the task",
+      "then_behaviour": "Self-criticism, over-preparation or putting the task off",
       "function": "To protect a sense of being worthy",
       "frameworks": [
         "Self-critical vs high-standards dimensions of perfectionism (Frost and Hewitt–Flett traditions)",
@@ -1158,7 +1158,7 @@
         },
         {
           "pattern_type_id": "CONF.AVOID.BELONG",
-          "name": "Conflict avoidance to preserve belonging",
+          "name": "Softening disagreement to protect belonging",
           "tells_apart": "Fears criticism as a verdict on their competence; the other keeps quiet to protect the relationship"
         },
         {
@@ -1190,9 +1190,9 @@
         "situations_needed": 3,
         "base_rate": 0.25
       },
-      "status": "draft",
-      "approved_by": null,
-      "approved_on": null,
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
       "loaded_at": "2026-11-24T09:00:00Z",
       "other_versions": []
     },
@@ -1303,9 +1303,9 @@
         "situations_needed": 3,
         "base_rate": 0.2
       },
-      "status": "draft",
-      "approved_by": null,
-      "approved_on": null,
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
       "loaded_at": "2026-11-24T09:00:00Z",
       "other_versions": []
     },
@@ -1416,9 +1416,9 @@
         "situations_needed": 3,
         "base_rate": 0.2
       },
-      "status": "draft",
-      "approved_by": null,
-      "approved_on": null,
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
       "loaded_at": "2026-11-24T09:00:00Z",
       "other_versions": []
     },
@@ -1491,7 +1491,7 @@
         },
         {
           "pattern_type_id": "CONF.AVOID.BELONG",
-          "name": "Conflict avoidance to preserve belonging",
+          "name": "Softening disagreement to protect belonging",
           "tells_apart": "Acts to fix the other's mood; the other stays quiet about their own view"
         },
         {
@@ -1529,9 +1529,9 @@
         "situations_needed": 3,
         "base_rate": 0.25
       },
-      "status": "draft",
-      "approved_by": null,
-      "approved_on": null,
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
       "loaded_at": "2026-11-24T09:00:00Z",
       "other_versions": []
     }

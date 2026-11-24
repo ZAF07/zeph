@@ -6,7 +6,9 @@ id: REL.CHECK.SECURE
 version: 0.1.0
 area: relationships
 name: Reading silence as something wrong and reaching out to check
-status: draft
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
 
 definition: >-
   When someone close goes quiet, replies late or seems distant, the person

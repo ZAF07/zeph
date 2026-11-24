@@ -6,7 +6,9 @@ id: APPR.CONFIRM.CHOICE
 version: 0.1.0
 area: approval
 name: Asking others to confirm a choice already made
-status: draft
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
 
 definition: >-
   After making a choice, the person asks one or more others whether it was

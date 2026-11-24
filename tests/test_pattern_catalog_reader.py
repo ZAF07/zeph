@@ -1,5 +1,6 @@
 import copy
 import re
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -79,7 +80,7 @@ CLINICAL_TERMS = re.compile(
     r"\b(disorder|diagnos\w*|trauma\w*|depress\w*|anxiety|anxious|avoidant|"
     r"attachment|codependen\w*|narcissis\w*|borderline|neurotic\w*|ocd|adhd|ptsd|"
     r"symptom\w*|patholog\w*|obsessi\w*|compulsi\w*|phobi\w*|paranoi\w*|"
-    r"clinical\w*|schema\w*|dysfunction\w*|mental illness)\b",
+    r"clinical\w*|schema\w*|dysfunction\w*|mental illness|avoidance)\b",
     re.IGNORECASE,
 )
 
@@ -93,7 +94,7 @@ def seed_pattern_types() -> list[PatternType]:
     return read_pattern_types(read_pattern_catalog_seed(PATTERN_CATALOG_DIR))
 
 
-def test_the_fifteen_pattern_types_in_the_repo_are_valid_drafts_three_per_area() -> (
+def test_the_fifteen_pattern_types_in_the_repo_are_approved_three_per_area() -> (
     None
 ):
     pattern_types = seed_pattern_types()
@@ -104,9 +105,10 @@ def test_the_fifteen_pattern_types_in_the_repo_are_valid_drafts_three_per_area()
             pattern_type for pattern_type in pattern_types if pattern_type.area == area
         ]
         assert len(in_area) == 3, area
-    assert {pattern_type.status for pattern_type in pattern_types} == {
-        PatternTypeStatus.DRAFT
-    }
+    assert {
+        (pattern_type.status, pattern_type.approved_by, pattern_type.approved_on)
+        for pattern_type in pattern_types
+    } == {(PatternTypeStatus.APPROVED, "Zaf", date(2026, 11, 24))}
 
 
 def test_every_look_alike_in_the_repo_is_named_back_by_the_other_pattern_type() -> None:
@@ -176,7 +178,7 @@ def test_a_pattern_type_is_read_with_all_its_details() -> None:
         "REL.MOOD.FIX",
     ]
     assert conflict.anyone_would == (
-        "Low-stakes avoidance with strangers or authority only"
+        "Keeping quiet over small things with strangers or people in charge"
     )
     assert conflict.anyone_would_when == (
         SituationMatch(relationships=(Relationship.STRANGER,)),
@@ -189,7 +191,7 @@ def test_a_pattern_type_is_read_with_all_its_details() -> None:
     assert conflict.approved_wording.startswith("You seem to protect closeness")
     assert "{person}" in conflict.prediction_wording
     assert (conflict.numbers.situations_needed, conflict.numbers.base_rate) == (3, 0.2)
-    assert (conflict.approved_by, conflict.approved_on) == (None, None)
+    assert (conflict.approved_by, conflict.approved_on) == ("Zaf", date(2026, 11, 24))
 
 
 def test_a_missing_required_field_is_refused_by_name() -> None:

@@ -6,7 +6,9 @@ id: CONF.WITHDRAW.HURT
 version: 0.1.0
 area: conflict
 name: Going quiet and pulling away when hurt
-status: draft
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
 
 definition: >-
   When someone close hurts or lets them down, the person goes quiet, keeps to
