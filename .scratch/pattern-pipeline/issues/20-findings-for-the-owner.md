@@ -133,4 +133,27 @@ If there is nothing, the section holds one line: "Nothing found."
 - **Impact:** if the prompt and the code drift apart, the code checks will quietly drop the model's tags. Observations then lose their tags, or are dropped, with nothing to say why.
 - **Suggested fix:** build the prompt's tag lists from the enums, so the code is the only place they are written. A small change, but it needs a reload of the tagging prompt.
 
+## 13 — "Things you said that Zeph kept" (2026-11-24)
+
+### Seed Copy is behind the design references, so Memories pixel tests fail
+
+- **Kind:** failure
+- **What:** `src/companion/seed/copy.yaml` still has "Conversation Summaries" (`memories.tabs.summaries` and the Day Summaries heading and intro) and an older Memories hero line ("short summaries of past Conversations"), while every `Memories*` reference says "Day Summaries" / "a short account of each day you talked". In fixture mode `compare.cjs` fails Memories--tab-summaries (0.71%), M-Memories (0.91%) and M-Memories--tab-patterns (0.58%) on main, and M-Memories--tab-quotes (0.64%) on this branch, all from that text.
+- **Impact:** the pixel test can't pass for those pages, so real drift on them would go unnoticed; new Users get the old wording seeded.
+- **Suggested fix:** update those seed texts to the references' wording (and a migration only if the live stored slots should change too); about half an hour.
+
+### Tagging needs Users to be told first, so Evals of tagging keep nothing
+
+- **Kind:** potential failure
+- **What:** `PatternTagger.tag_from` (`core/observations.py`) now keeps nothing until `users.pattern_noticing_told_at` is set. Eval Users made by `adapters/evals/in_process_companion.py` never press "Got it".
+- **Impact:** the tagging Eval (issue 14) and the whole-pipeline Eval (19) would see no Observations and score as if the tagger found nothing.
+- **Suggested fix:** set `pattern_noticing_told_at` when the in-process companion makes its Eval User, as it already does for `ai_notice_acknowledged_at`; a few lines.
+
+### A deleted quote could come back if a Conversation is ever tagged twice
+
+- **Kind:** risk
+- **What:** the User lock covers scoring and deleting a quote, but tagging's `observations.add_many` runs outside it. Today each Conversation is tagged once, so nothing deleted can be inserted again.
+- **Impact:** if Conversation ends are ever retried after tagging, or old Conversations are tagged again (e.g. when a Pattern Type is added), a quote the User deleted could be kept again.
+- **Suggested fix:** before building any retagging, keep a record of deleted quotes (Conversation and quote) and skip them in `plan_observations`; about an hour.
+
 ## Comments
