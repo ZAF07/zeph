@@ -70,3 +70,5 @@ None - can start immediately
   - `ecee2af` Admins set most Curiosities per reply and holding one when the reply asks why
   - `f5e9370` Review fixes: tell the Reply when more than one question is fine; clearer names
   - `0eec472` Docs: the reply is told when more than one question is fine
+  - `74ba573` updated tasks status
+- Merged into `main`: `9421a48` Merge issue 21: Admins set two of the Curiosity reply rules
