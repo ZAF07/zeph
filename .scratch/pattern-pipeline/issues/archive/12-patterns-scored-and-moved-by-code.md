@@ -72,3 +72,8 @@ Evidence (24 Nov 2026, worktree stack on 3010/8010, made-up User only; build `68
 - **Silent.** In the container on the real database, the old-style readers (Recall, Pattern keeping) returned only the old suspected Pattern; confirmed (Patterns tab, Portrait) none; the User's Patterns tab showed "No patterns yet". Test: `test_patterns_of_pattern_types_reach_no_reply_and_no_old_pattern_step`. Migration: `test_the_migration_keeps_every_old_pattern_with_its_evidence`.
 - **Checks.** `make check` on the final code: ruff clean, ruff format clean, mypy clean (236 files), pytest 1891 passed; `pnpm lint`, `pnpm format:check`, `pnpm typecheck` clean, `pnpm test` 136 files, 932 tests passed. Pixel test (git-ignored copy of `compare.cjs` blocking Clerk's protect probes): `FAIL AdminUsers 2.80% differs, height 800 vs 933`, and the same numbers with main's `web/src`, so not from this branch.
 - **Review.** Standards and spec reviews run. Fixed: Patterns past suspected are never deleted by scoring, rescoring after a deletion can't break it, clearer planner branches, `HAS_PATTERN_TYPE`. Left: some parameters travel together in `pattern_scoring.py` (a small "why and when" type could gather them); `save_moves` takes the plan's four parts one by one; `list_moves` has no app caller yet (it is the log's reader for tests and later pages).
+
+## Completion
+
+- Completed: 2026-11-24
+- Commit: 324adab (merge "Merge pattern-12-scoring: Patterns scored from Observations and moved by code, with a log"; work in d29d014 "Patterns of Pattern Types are scored from Observations and moved by code, with a log", 4f2136e "Pattern scoring review fixes: keep Patterns past suspected, safe rescoring", 2bcb865 "Archive pattern-pipeline issue 12: Patterns scored and moved by code, verified")
