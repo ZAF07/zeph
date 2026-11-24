@@ -3,9 +3,9 @@
 import { secondaryButton } from "@/components/button-styles";
 import { ChangedByAdminCaption } from "@/components/ChangedByAdminCaption";
 import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
-import { CheckInFrequencySegments } from "@/components/CheckInFrequencySegments";
 import { CheckInKindsList } from "@/components/CheckInKindsList";
 import { CheckInSettingRow } from "@/components/CheckInSettingRow";
+import { ChoiceSegments } from "@/components/ChoiceSegments";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LoadingPanel } from "@/components/LoadingPanel";
 import { PageHero } from "@/components/PageHero";
@@ -188,10 +188,11 @@ export function CheckInsSettings({ copy }: { copy: Copy }) {
                     {checkInsCopy("frequency.caption")}
                   </div>
                 </div>
-                <CheckInFrequencySegments
+                <ChoiceSegments
                   label={checkInsCopy("frequency.label")}
                   options={checkInFrequencyChoices(copy)}
                   value={checkIns.frequency}
+                  layoutClassName="grid-cols-2 rounded-[28px] min-[900px]:mx-auto min-[900px]:max-w-[640px] min-[900px]:grid-cols-4 min-[900px]:rounded-pill"
                   disabled={isSaving}
                   onChange={(frequency) => changeSettings({ frequency })}
                 />

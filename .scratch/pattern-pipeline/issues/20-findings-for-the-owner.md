@@ -124,6 +124,36 @@ If there is nothing, the section holds one line: "Nothing found."
 - **Impact:** agents lose time and may think their change broke the build. A deploy could fail the same way.
 - **Suggested fix:** keep the full build log on the next failure. Fetching fonts with `next/font/google` during the build is the first suspect.
 
+## 03 — Users set how direct Zeph is with its Read (2026-11-24)
+
+### The Reply model doesn't reliably call change_directness
+
+- **Kind:** failure
+- **What:** across three Settings Eval runs, `more-direct` passed 1 of 3 and `gentler` passed 1 of 2 (Eval Runs 2eb36fca, 11e0451e, 29a300a8). When it failed, the reply asked a question, or said "Done — I've set myself to direct" without calling the tool. In a live `/run`, "could you go easier on me…" got "you're on gentle now" while the setting was still direct. A plainer "please change how direct you are to gentle" did call it. Every other Settings case passes. Adding "Never say you changed a setting without calling its tool" to `reply_settings_instructions` helped `more-direct` once, but didn't fix it.
+- **Impact:** a User asks Zeph to be gentler or blunter, is told it's done, and nothing changes. Their Dashboard still shows the old level.
+- **Suggested fix:** try the Reply with thinking on, or a stronger reply model, for replies that offer settings tools. Compare on the two cases, 3 tries each, about S$0.05.
+
+### A tool call sent to the User as plain text
+
+- **Kind:** bug
+- **What:** in Eval Run 2eb36fca (`more-direct`), deepseek-flash wrote the tool call into its reply instead of calling it. The made-up User got the messages "<tool call>" and "<function=change_directness>\n<parameter=directness>direct</parameter>\n</function>\n</tool_call>".
+- **Impact:** real Users can get raw markup in chat, and the change they asked for isn't made.
+- **Suggested fix:** in the chat model adapter, catch replies that hold `<tool call>` or `<function=` markup. Run the tool from them, or retry the call once, and never send that markup. A small adapter change with a test.
+
+### Pixel test can't run as shipped
+
+- **Kind:** failure
+- **What:** `web/design/compare.cjs` waits for `networkidle`, which Clerk's `protect.clerk.com` probes never reach, so every signed-in page times out. This check used a copy in the git-ignored `web/design/.diff/` that aborts those requests. `M-Account` passes at 0.45% (limit 0.5%). The differing pixels are in the time zone field, the sticker icons and the "Delete my data" text, none of which this issue touched.
+- **Impact:** every UI issue has to patch the test by hand to get a PASS. One small change to the Account page will push `M-Account` over the limit for reasons unrelated to that change.
+- **Suggested fix:** the owner adds the `protect.clerk.com` abort to `compare.cjs` and looks at why those three parts of `M-Account` drift.
+
+### Migration 0086 overwrites Admin prompt edits too
+
+- **Kind:** risk
+- **What:** like 0073 to 0081 (see 02), 0086 drops the stored `reply_plan_prompt` and `reply_settings_instructions` so they reload from the seed.
+- **Impact:** the same as in 02: Admin edits to these two prompts are lost on deploy.
+- **Suggested fix:** the same as in 02.
+
 ## 11 — Tagging step keeps Observations (2026-11-24)
 
 ### Tag names written out by hand in several places

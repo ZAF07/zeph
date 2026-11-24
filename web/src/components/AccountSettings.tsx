@@ -1,6 +1,7 @@
 "use client";
 
 import { DeleteAccountSection } from "@/components/DeleteAccountSection";
+import { DirectnessSetting } from "@/components/DirectnessSetting";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LoadingPanel } from "@/components/LoadingPanel";
 import { MemoryOffNotice } from "@/components/MemoryOffNotice";
@@ -14,10 +15,10 @@ import { useMe, usePlatformContent } from "@/lib/queries";
 
 /**
  * The editable parts of the Account & privacy page: Profile, User Memory,
- * Photo Viewing, Your stickers, Delete my data and Delete account. Every
- * word is the Account tab's Copy, with the location labels from
- * Onboarding's and the User Memory explanation and Memory-off notes from
- * Shared.
+ * Photo Viewing, How direct Zeph is, Your stickers, Delete my data and
+ * Delete account. Every word is the Account tab's Copy, with the location
+ * labels from Onboarding's and the User Memory explanation and Memory-off
+ * notes from Shared.
  *
  * @param props - `copy` holds the Account page's Copy slots, onboarding's
  *   location labels and the Shared Memory slots.
@@ -71,6 +72,12 @@ export function AccountSettings({ copy }: { copy: Copy }) {
         explanation={accountCopy("photos.explanation")}
         changedInChatAt={me.changed_in_chat.photo_viewing}
         timeZone={me.time_zone ?? undefined}
+      />
+      <DirectnessSetting
+        directness={me.directness}
+        changedInChatAt={me.changed_in_chat.directness}
+        timeZone={me.time_zone ?? undefined}
+        copy={copy}
       />
       <PersonalStickersSection
         available={me.personal_stickers_available}

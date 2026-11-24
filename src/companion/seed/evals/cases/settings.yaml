@@ -30,6 +30,14 @@
   message: stop looking at my photos
   tools: [turn_photo_viewing_on_or_off]
 
+- id: more-direct
+  message: you can be blunter with me, just tell me straight what you think
+  tools: [change_directness]
+
+- id: gentler
+  message: could you go a bit easier on me when you tell me what you think?
+  tools: [change_directness]
+
 - id: forget-why-here
   message: forget what I told you about why I came here
   memories:

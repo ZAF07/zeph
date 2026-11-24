@@ -218,11 +218,11 @@ class UserService:
         changes: PreferenceChanges,
         changed_by: ChangedBy = ChangedBy.DASHBOARD,
     ) -> User:
-        """Change a User's name, own Feature switches, country or time zone.
+        """Change a User's name, own switches, directness, country or time zone.
 
-        Only the User Memory and Photo Viewing settings and time zone are
-        marked as changed in chat or on the Dashboard, and only when their
-        value really changes.
+        Only the User Memory and Photo Viewing settings, directness and time
+        zone are marked as changed in chat or on the Dashboard, and only when
+        their value really changes.
 
         Args:
             user: The User making the change.
@@ -245,6 +245,8 @@ class UserService:
         if changes.photo_viewing_enabled not in (None, user.photo_viewing_enabled):
             self._features.require_available(user.id, Feature.PHOTO_VIEWING)
             changed.append(ChatSetting.PHOTO_VIEWING)
+        if changes.directness not in (None, user.directness):
+            changed.append(ChatSetting.DIRECTNESS)
         check_ins = user.check_ins
         if changes.time_zone not in (None, user.time_zone):
             changed.append(ChatSetting.TIME_ZONE)
@@ -261,6 +263,11 @@ class UserService:
                 changes.photo_viewing_enabled
                 if changes.photo_viewing_enabled is not None
                 else user.photo_viewing_enabled
+            ),
+            directness=(
+                changes.directness
+                if changes.directness is not None
+                else user.directness
             ),
             country=(
                 check_country(changes.country)

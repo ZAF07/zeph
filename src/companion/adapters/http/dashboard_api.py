@@ -19,6 +19,7 @@ from companion.core.models import (
     ConnectionToken,
     ConnectionTokenStatus,
     DaySummary,
+    Directness,
     LifeThread,
     MemoryGroup,
     MemoryItem,
@@ -60,6 +61,7 @@ class MeResponse(BaseModel):
     user_memory_available: bool
     photo_viewing_enabled: bool
     photo_viewing_available: bool
+    directness: Directness
     personal_stickers_available: bool
     show_pattern_noticing_notice: bool
     onboarding_completed_at: datetime | None
@@ -94,6 +96,7 @@ class PreferencesRequest(BaseModel):
     name: str | None = None
     user_memory_enabled: bool | None = None
     photo_viewing_enabled: bool | None = None
+    directness: Directness | None = None
     country: str | None = None
     time_zone: str | None = None
 
@@ -596,6 +599,7 @@ def to_me_response(me: Me) -> MeResponse:
         user_memory_available=me.user_memory_available,
         photo_viewing_enabled=user.photo_viewing_enabled,
         photo_viewing_available=me.photo_viewing_available,
+        directness=user.directness,
         personal_stickers_available=me.personal_stickers_available,
         show_pattern_noticing_notice=me.show_pattern_noticing_notice,
         onboarding_completed_at=user.onboarding_completed_at,
@@ -784,7 +788,7 @@ def build_dashboard_api_router(
     def update_me(
         user: Annotated[User, Depends(current_user)], request: PreferencesRequest
     ) -> MeResponse:
-        """Change the User's name, own Feature switches, country or time zone.
+        """Change the User's name, own switches, directness, country or time zone.
 
         Args:
             user: The signed-in User.
@@ -801,6 +805,7 @@ def build_dashboard_api_router(
             name=request.name,
             user_memory_enabled=request.user_memory_enabled,
             photo_viewing_enabled=request.photo_viewing_enabled,
+            directness=request.directness,
             country=request.country,
             time_zone=request.time_zone,
         )

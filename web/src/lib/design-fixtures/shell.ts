@@ -14,6 +14,7 @@ export const alex: Me = {
   user_memory_available: true,
   photo_viewing_enabled: true,
   photo_viewing_available: true,
+  directness: "balanced",
   personal_stickers_available: true,
   show_pattern_noticing_notice: false,
   onboarding_completed_at: "2026-11-02T10:00:00+08:00",

@@ -137,7 +137,7 @@ The web app where Users manage their account, preferences and privacy, and where
 _Avoid_: Portal, web app, console
 
 **Chat Setting Change**:
-A change to one of a User's settings made by telling the Companion in plain words instead of on the Dashboard: pausing or resuming Check-ins, Check-in frequency, quiet hours, User Memory on or off, time zone, forgetting a Memory Item or Life Thread, or Delete My Data. The Dashboard marks each such setting "Changed in chat" until it is next changed there; a forgotten Memory Item or Life Thread is simply gone, so there is nothing left to mark.
+A change to one of a User's settings made by telling the Companion in plain words instead of on the Dashboard: pausing or resuming Check-ins, Check-in frequency, quiet hours, User Memory on or off, Photo Viewing on or off, how direct the Companion is with its Read, time zone, forgetting a Memory Item or Life Thread, or Delete My Data. The Dashboard marks each such setting "Changed in chat" until it is next changed there; a forgotten Memory Item or Life Thread is simply gone, so there is nothing left to mark.
 _Avoid_: Chat command, slash command, bot setting
 
 **Admin Setting Change**:
