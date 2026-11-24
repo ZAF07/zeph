@@ -51,7 +51,7 @@ Decisions made while building (24 Nov 2026):
 - **Unclear:** the sign is checked against the first Pattern Type named; the second only has to be a different Pattern Type in the catalog. Both versions are kept.
 - **Empty tags:** relationship, power, setting and stance may be empty (null) when there is no one else or it isn't clear; a value given must be from its list. The kind of evidence is required.
 - **Model Call Log:** "tagged" is everything the model wrote, "dropped" what code refused; kept = tagged − dropped. Also added to Eval traces' table (`eval_model_calls`), since Eval traces read through the same row reader.
-- **Migration** is 0081: pattern-01 merged its own 0080 first.
+- **Migration** is 0082: pattern-01 and pattern-02 merged 0080 and 0081 first.
 - **Design reference:** the Pattern Catalog design fixture now says CONF.AVOID.BELONG 0.2.0 (a backend test keeps it equal to the real catalog). `reference/AdminPatternCatalog.html` still draws "v0.1.0"; the pixel test passes at 0.03%, so it was left for the designer to update.
 
 Evidence (24 Nov 2026, worktree stack on 3020/8020, real DeepSeek model, made-up Users only; final build `cd19c8f`):
