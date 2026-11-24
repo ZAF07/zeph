@@ -369,7 +369,7 @@ How one Eval Case went in one Variant on one try: Pass, Fail (the Companion beha
 _Avoid_: Test result, score
 
 **Model Price**:
-What a model costs in Singapore dollars per million tokens in and out, set by Admins and used for Eval Run cost estimates and totals. A run is priced at the Model Prices it started with. A model with no price shows tokens only, marked "no price set", and never blocks a run. The estimate uses the highest price DeepSeek charges, so real costs are lower.
+What a model costs in Singapore dollars per million tokens in and out, set by Admins and used for Eval Run cost estimates and totals. A run is priced at the Model Prices it started with. A model with no price shows tokens only, marked "no price set", and never blocks a run. Admins set the price per model name, whichever provider runs it; for DeepSeek models it is the highest price DeepSeek charges, so real costs are lower. The price OpenRouter reports is not used.
 _Avoid_: Rate, tariff
 
 **Missed Crisis**:

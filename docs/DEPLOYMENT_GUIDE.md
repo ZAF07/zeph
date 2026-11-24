@@ -176,6 +176,10 @@ docker compose start backend web
 
 Reset the bot token when it leaks or might have, not on a schedule. Steps: [RESET_TELEGRAM_TOKEN_GUIDE.md](RESET_TELEGRAM_TOKEN_GUIDE.md) (BotFather revoke → update `.env` → `make restart`).
 
+## OpenRouter keys
+
+Model calls can go through OpenRouter with our own provider keys (BYOK, ADR-0028). They must never spend OpenRouter credits. In the OpenRouter account's BYOK (integrations) settings, open each provider key (Anthropic, DeepSeek) and set "Shared capacity fallback" to "Never use any other provider or key for this key's models". Do this once per key, and again for any key added later. Then set `OPENROUTER_API_KEY` in `.env` and `CHAT_MODEL_ADAPTER=openrouter`, and run `make restart`. To go back to direct DeepSeek, set `CHAT_MODEL_ADAPTER=deepseek` and `make restart`.
+
 ## Local and production bots
 
 Production keeps the real Telegram bot; local development uses its own bot, so the two stacks never take the webhook from each other. See [LOCAL_TELEGRAM_BOT_GUIDE.md](LOCAL_TELEGRAM_BOT_GUIDE.md) (ADR-0022).

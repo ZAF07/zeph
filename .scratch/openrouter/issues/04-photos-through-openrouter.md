@@ -26,3 +26,5 @@ An OpenRouter adapter behind the `PhotoViewer` port. It sends the instructions a
 - 03
 
 ## Comments
+
+- 2026-11-24, from 02's `/run`: the operator saw the two test calls (`deepseek/deepseek-v4-pro`, `deepseek/deepseek-v4.1-flash`) on the OpenRouter activity page, but they used OpenRouter credits, not the operator's own DeepSeek key. Before this issue makes `openrouter` the default, the operator fixes the BYOK setup (DeepSeek key added, "Shared capacity fallback" set to "Never use any other provider or key for this key's models"; see `docs/DEPLOYMENT_GUIDE.md` "OpenRouter keys") and a test call is seen on the activity page as BYOK.

@@ -22,6 +22,7 @@ from companion.adapters.load_test.switch import (
     allow_load_test_adapter,
 )
 from companion.adapters.load_test.web_search import EmptyWebSearch
+from companion.adapters.openrouter.chat_model import OpenRouterChatModel
 from companion.adapters.pgvector.vector_store import PgvectorKnowledgeVectorStore
 from companion.adapters.postgres.eval_repositories import (
     PostgresEvalCaseRepository,
@@ -37,7 +38,7 @@ from companion.adapters.telegram.chat_channel import TelegramChatChannel
 from companion.adapters.timer import ThreadTimer
 from companion.adapters.user_work_queue import ThreadPoolUserWorkQueue
 from companion.app import AppDependencies, create_app
-from companion.config import Settings, load_settings
+from companion.config import MissingSettingsError, Settings, load_settings
 from companion.core.model_call_log import logger as model_call_logger
 from companion.core.ports import (
     AuthAccounts,
@@ -306,11 +307,16 @@ def build_chat_model(settings: Settings) -> ChatModel:
 
     Raises:
         UnknownAdapterError: If the chosen adapter does not exist.
+        MissingSettingsError: If OpenRouter is chosen without its key.
         LoadTestNotAllowedError: If a load-test adapter is chosen outside a
             load test.
     """
     if settings.chat_model_adapter == "deepseek":
         return DeepSeekChatModel(settings.deepseek_api_key)
+    if settings.chat_model_adapter == "openrouter":
+        if not settings.openrouter_api_key:
+            raise MissingSettingsError(["OPENROUTER_API_KEY"])
+        return OpenRouterChatModel(settings.openrouter_api_key)
     if settings.chat_model_adapter == LOAD_TEST_ADAPTER:
         allow_load_test_adapter("CHAT_MODEL_ADAPTER")
         engine = build_database_engine(settings)
@@ -320,6 +326,9 @@ def build_chat_model(settings: Settings) -> ChatModel:
 
 def build_photo_viewer(settings: Settings) -> PhotoViewer:
     """Build the photo viewer for the chat model chosen in `.env`.
+
+    Photos still go to direct DeepSeek when OpenRouter is chosen, until the
+    OpenRouter adapter can look at photos.
 
     Args:
         settings: The loaded settings.
@@ -332,7 +341,7 @@ def build_photo_viewer(settings: Settings) -> PhotoViewer:
         LoadTestNotAllowedError: If a load-test adapter is chosen outside a
             load test.
     """
-    if settings.chat_model_adapter == "deepseek":
+    if settings.chat_model_adapter in ("deepseek", "openrouter"):
         return DeepSeekPhotoViewer(settings.deepseek_api_key)
     if settings.chat_model_adapter == LOAD_TEST_ADAPTER:
         allow_load_test_adapter("CHAT_MODEL_ADAPTER")

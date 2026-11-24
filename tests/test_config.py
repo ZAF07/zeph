@@ -3,11 +3,16 @@ import logging
 import pytest
 from sqlalchemy import create_engine
 
+from companion.adapters.deepseek.chat_model import DeepSeekChatModel
+from companion.adapters.deepseek.photo_viewer import DeepSeekPhotoViewer
+from companion.adapters.openrouter.chat_model import OpenRouterChatModel
 from companion.adapters.tavily.web_search import TavilyWebSearch
 from companion.config import MissingSettingsError, load_settings
 from companion.main import (
     UnknownAdapterError,
+    build_chat_model,
     build_embedder,
+    build_photo_viewer,
     build_text_extractor,
     build_vector_store,
     build_web_search,
@@ -72,6 +77,45 @@ def test_deepseek_key_is_required() -> None:
         load_settings(environment)
 
     assert "DEEPSEEK_API_KEY" in str(error.value)
+
+
+def test_the_chat_model_adapter_defaults_to_direct_deepseek() -> None:
+    settings = load_settings(COMPLETE_ENVIRONMENT)
+
+    assert settings.chat_model_adapter == "deepseek"
+    assert isinstance(build_chat_model(settings), DeepSeekChatModel)
+    assert isinstance(build_photo_viewer(settings), DeepSeekPhotoViewer)
+
+
+def test_the_openrouter_choice_builds_the_openrouter_chat_model() -> None:
+    settings = load_settings(
+        {
+            **COMPLETE_ENVIRONMENT,
+            "CHAT_MODEL_ADAPTER": "openrouter",
+            "OPENROUTER_API_KEY": "sk-or-x",
+        }
+    )
+
+    assert isinstance(build_chat_model(settings), OpenRouterChatModel)
+    assert isinstance(build_photo_viewer(settings), DeepSeekPhotoViewer)
+
+
+def test_the_openrouter_choice_without_its_key_fails_at_startup() -> None:
+    settings = load_settings(
+        {**COMPLETE_ENVIRONMENT, "CHAT_MODEL_ADAPTER": "openrouter"}
+    )
+
+    with pytest.raises(MissingSettingsError, match="OPENROUTER_API_KEY"):
+        build_chat_model(settings)
+
+
+def test_an_unknown_chat_model_adapter_is_refused() -> None:
+    settings = load_settings({**COMPLETE_ENVIRONMENT, "CHAT_MODEL_ADAPTER": "gpt"})
+
+    with pytest.raises(UnknownAdapterError, match="CHAT_MODEL_ADAPTER"):
+        build_chat_model(settings)
+    with pytest.raises(UnknownAdapterError, match="CHAT_MODEL_ADAPTER"):
+        build_photo_viewer(settings)
 
 
 def test_initial_admin_emails_are_split_and_lower_cased() -> None:
