@@ -876,7 +876,7 @@ class PatternTagger:
         threads: Sequence[LifeThread],
         pattern_types: Sequence[PatternType],
         unclear: Mapping[int, Observation],
-        thought_experiments: Mapping[int, ThoughtExperiment],
+        thought_experiments: Mapping[int, str],
     ) -> tuple[PlannedObservations, list[Any]] | None:
         """Ask the model for a Conversation's Observations and check them.
 
@@ -890,8 +890,8 @@ class PatternTagger:
             threads: The Life Threads an Observation may belong to.
             pattern_types: The Pattern Types to tag against.
             unclear: The unclear stories asked about in it, by number.
-            thought_experiments: The Thought Experiments put to the User in
-                it, by number.
+            thought_experiments: The questions that put a Thought Experiment
+                to the User in it, as asked, by number.
 
         Returns:
             The Observations that passed and those dropped, and the unclear

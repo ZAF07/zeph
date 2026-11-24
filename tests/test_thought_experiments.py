@@ -453,7 +453,7 @@ def test_the_migration_keeps_user_data_and_reloads_the_tagging_prompt(
             )
         )
 
-    downgrade_to(database_url, "0090")
+    downgrade_to(database_url, "0093")
     try:
         with client.engine.connect() as connection:
             tables = connection.execute(

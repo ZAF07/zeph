@@ -4,7 +4,8 @@ What a Thought Experiment is, how Zeph uses one, where to find material, how
 to write a good one, how to manage them on the Dashboard, and what each
 change does. For how the whole Pattern pipeline works, see
 `docs/pattern-pipeline/README.md`. For the Pattern Types they tell apart, see
-the Pattern Catalog (Admin → Pattern Catalog).
+the Pattern Catalog (Admin → Pattern Catalog) and
+`docs/pattern-catalog/README.md`.
 
 ## What it is
 
@@ -203,10 +204,8 @@ two for the pairs most often confused, and five are starters, one per area:
 | Achievement | worth-uncert-two-presentations (ACH.WORTH.PERF or CTRL.UNCERT.PLAN) |
 | Relationships | check-moodfix-quiet-evening (REL.CHECK.SECURE or REL.MOOD.FIX) |
 
-None trips the leading-wording check. Six tell apart the first three
-Pattern Types; the other 25 name at least one of the twelve Pattern Types
-added by issue 15. Until those are in the catalog, they are stored but never
-picked, since no unclear story can name them.
+None trips the leading-wording check. All 31 can be picked: every Pattern
+Type they name is in the catalog.
 
 ## Limits
 
