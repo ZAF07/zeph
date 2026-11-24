@@ -558,7 +558,8 @@ class PatternTagger:
     ) -> None:
         """Tag and keep the Observations in an ended Conversation.
 
-        Runs only while Pattern noticing works for the User and they wrote
+        Runs only while Pattern noticing works for the User, once they have
+        pressed "Got it" on the notice saying so, and only when they wrote
         something in their own words. An unreadable answer is asked again
         once; if it is still unreadable nothing is kept. How many were
         tagged and dropped goes into the Model Call Log, never their words.
@@ -572,6 +573,8 @@ class PatternTagger:
                 brought up.
         """
         if not snapshot.works(Feature.PATTERN_NOTICING):
+            return
+        if snapshot.user.pattern_noticing_told_at is None:
             return
         user_texts = users_own_texts(messages)
         pattern_types = [

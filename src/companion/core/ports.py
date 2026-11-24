@@ -592,6 +592,18 @@ class UserRepository(Protocol):
         """
         ...
 
+    def mark_pattern_noticing_told(self, user_id: UUID, told_at: datetime) -> User:
+        """Save that a User was told about Pattern noticing, the first time only.
+
+        Args:
+            user_id: The User's ID.
+            told_at: When they pressed "Got it".
+
+        Returns:
+            The saved User.
+        """
+        ...
+
 
 class PendingAuthAccountDeletionRepository(Protocol):
     """Stores the auth provider accounts still to delete, by auth ID only."""
@@ -1305,6 +1317,18 @@ class ObservationRepository(Protocol):
 
         Returns:
             The Observations.
+        """
+        ...
+
+    def delete(self, user_id: UUID, observation_id: UUID) -> bool:
+        """Delete one of a User's Observations.
+
+        Args:
+            user_id: The User's ID.
+            observation_id: The Observation's ID.
+
+        Returns:
+            True if it was deleted; False if the User has no such Observation.
         """
         ...
 
@@ -3077,5 +3101,17 @@ class Transaction(Protocol):
 
         Returns:
             The IDs of the Users who are Admins.
+        """
+        ...
+
+    def lock_user(self, user_id: UUID) -> None:
+        """Lock one User until the transaction ends.
+
+        Another transaction locking them waits for this one, then sees its
+        changes. Scoring their Patterns and deleting their Observations take
+        it, so neither works from what the other is changing.
+
+        Args:
+            user_id: The User's ID.
         """
         ...

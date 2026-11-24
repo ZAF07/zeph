@@ -15,6 +15,7 @@ export const alex: Me = {
   photo_viewing_enabled: true,
   photo_viewing_available: true,
   personal_stickers_available: true,
+  pattern_noticing_notice: false,
   onboarding_completed_at: "2026-11-02T10:00:00+08:00",
   role: "user",
   changed_in_chat: {

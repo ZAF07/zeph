@@ -32,6 +32,7 @@ const maya: AdminUser = {
   move_outcome_count: 3,
   has_portrait: true,
   pattern_counts: { ...noPatterns, noticed: 3, suspected: 1, confirmed: 2 },
+  kept_quote_count: 5,
 };
 
 const ren: AdminUser = {
@@ -47,6 +48,7 @@ const ren: AdminUser = {
   move_outcome_count: 0,
   has_portrait: false,
   pattern_counts: noPatterns,
+  kept_quote_count: 0,
 };
 
 function rowFor(name: string): HTMLElement {
@@ -155,6 +157,7 @@ describe("AdminUsers", () => {
     );
     expect(panel.queryByText("Closed Patterns")).toBeNull();
     expect(panel.getByText("Move outcomes").nextSibling).toHaveTextContent("3");
+    expect(panel.getByText("Kept quotes").nextSibling).toHaveTextContent("5");
     expect(panel.getByText("Portrait").nextSibling).toHaveTextContent(
       "Written",
     );
@@ -176,6 +179,7 @@ describe("AdminUsers", () => {
       "Not written",
     );
     expect(panel.queryByText("Noticed Patterns")).toBeNull();
+    expect(panel.queryByText("Kept quotes")).toBeNull();
   });
 
   it("makes a User an Admin", async () => {

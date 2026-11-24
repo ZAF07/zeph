@@ -22,7 +22,8 @@ const sectionHeading =
 /**
  * The Users page's side panel for one User: their role and a button to
  * make or remove an Admin, their Features switches, what Zeph holds about
- * them (counts only, with a row for each Pattern state they have any in),
+ * them (counts only, with a row for each Pattern state they have any in,
+ * and their kept quotes when they have any),
  * and a link to their Check-ins. Its heading takes focus
  * when it opens.
  *
@@ -77,6 +78,9 @@ export function UserManagePanel({ user }: { user: AdminUser }) {
     },
     ...otherPatternCounts(user.pattern_counts),
     { label: "Move outcomes", value: String(user.move_outcome_count) },
+    ...(user.kept_quote_count > 0
+      ? [{ label: "Kept quotes", value: String(user.kept_quote_count) }]
+      : []),
     { label: "Portrait", value: user.has_portrait ? "Written" : "Not written" },
   ];
   const scheduleSearch = new URLSearchParams({

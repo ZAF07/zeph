@@ -44,6 +44,7 @@ export default async function RootPage() {
             "home.",
             "onboarding.check_ins.frequency_",
             "shared.memory_off.",
+            "shared.pattern_noticing.",
           ])}
         />
       </DashboardFrame>

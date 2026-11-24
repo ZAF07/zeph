@@ -44,6 +44,8 @@ export type ChatSetting =
  * `photo_viewing_available` are false when an Admin has that Feature off for
  * them, so they can't switch it. `personal_stickers_available` says whether
  * Personal Stickers works for them; they have no switch of their own.
+ * `pattern_noticing_notice` says whether to show the notice that Zeph now
+ * keeps quotes as evidence, until they press "Got it".
  */
 export type Me = {
   id: string;
@@ -59,6 +61,7 @@ export type Me = {
   photo_viewing_enabled: boolean;
   photo_viewing_available: boolean;
   personal_stickers_available: boolean;
+  pattern_noticing_notice: boolean;
   onboarding_completed_at: string | null;
   role: UserRole;
   changed_in_chat: Partial<Record<ChatSetting, string>>;
@@ -180,6 +183,7 @@ export type AdminUser = {
   move_outcome_count: number;
   has_portrait: boolean;
   pattern_counts: Record<PatternState, number>;
+  kept_quote_count: number;
 };
 
 /** A User's role after a change. */
@@ -477,6 +481,17 @@ export type Pattern = {
   pattern: string;
   agreed_at: string;
   evidence: PatternEvidence[];
+};
+
+/**
+ * A quote Zeph keeps as evidence: the User's exact words, Zeph's note on
+ * what was going on, and the day (`YYYY-MM-DD`). No Pattern is named.
+ */
+export type KeptQuote = {
+  id: string;
+  quote: string;
+  context: string;
+  day: string;
 };
 
 /** A photo that matters to the User, kept in their User Memory. */
@@ -1338,6 +1353,7 @@ export type PatternType = {
 export type ApiClient = {
   getMe: () => Promise<Me>;
   updatePreferences: (changes: PreferenceChanges) => Promise<Me>;
+  markPatternNoticingTold: () => Promise<Me>;
   completeOnboarding: (answers: OnboardingAnswers) => Promise<Me>;
   deleteMyData: () => Promise<void>;
   deleteAccount: () => Promise<void>;
@@ -1359,6 +1375,8 @@ export type ApiClient = {
   deleteLifeThread: (id: string) => Promise<void>;
   listPatterns: () => Promise<Pattern[]>;
   deletePattern: (id: string) => Promise<void>;
+  listKeptQuotes: () => Promise<KeptQuote[]>;
+  deleteKeptQuote: (id: string) => Promise<void>;
   listMoveOutcomes: () => Promise<MoveOutcome[]>;
   deleteMoveOutcome: (id: string) => Promise<void>;
   getUserPortrait: () => Promise<UserPortrait | null>;
@@ -1623,6 +1641,8 @@ export function createApiClient(
   return {
     getMe: () => request<Me>("/api/me"),
     updatePreferences: (changes) => request<Me>("/api/me", "PATCH", changes),
+    markPatternNoticingTold: () =>
+      request<Me>("/api/me/pattern-noticing-told", "POST"),
     completeOnboarding: (answers) =>
       request<Me>("/api/onboarding", "PUT", answers),
     deleteMyData: () => request<void>("/api/me/data", "DELETE"),
@@ -1657,6 +1677,9 @@ export function createApiClient(
     listPatterns: async () =>
       (await request<{ patterns: Pattern[] }>("/api/patterns")).patterns,
     deletePattern: (id) => request<void>(`/api/patterns/${id}`, "DELETE"),
+    listKeptQuotes: async () =>
+      (await request<{ quotes: KeptQuote[] }>("/api/kept-quotes")).quotes,
+    deleteKeptQuote: (id) => request<void>(`/api/kept-quotes/${id}`, "DELETE"),
     listMoveOutcomes: async () =>
       (await request<{ move_outcomes: MoveOutcome[] }>("/api/move-outcomes"))
         .move_outcomes,

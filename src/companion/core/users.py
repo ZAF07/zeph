@@ -198,6 +198,20 @@ class UserService:
         self._user_memory.remember_onboarding(saved)
         return saved
 
+    def mark_pattern_noticing_told(self, user: User) -> User:
+        """Save that the User pressed "Got it" on the Pattern noticing notice.
+
+        From then on Zeph may keep their quotes as evidence while Pattern
+        noticing works; pressing it again keeps the first time.
+
+        Args:
+            user: The User.
+
+        Returns:
+            The saved User.
+        """
+        return self._users.mark_pattern_noticing_told(user.id, self._clock.now())
+
     def update_preferences(
         self,
         user: User,

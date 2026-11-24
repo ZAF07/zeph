@@ -76,6 +76,12 @@ export function StatesSheet() {
             body="When Zeph notices the same thing across different parts of your life, and you agree with it, it appears here with what it is based on."
           />
         </StatesSheetSample>
+        <StatesSheetSample label="Things you said, none kept">
+          <EmptyState
+            title="Nothing kept yet"
+            body="When something you say helps Zeph notice what you do again and again, it may keep your exact words here after the Conversation ends."
+          />
+        </StatesSheetSample>
         <StatesSheetSample label="Check-ins, none sent">
           <EmptyState
             title="No check-ins yet"
@@ -100,6 +106,17 @@ export function StatesSheet() {
             action={
               <button type="button" className={secondaryButton}>
                 Resume now
+              </button>
+            }
+          />
+        </StatesSheetSample>
+        <StatesSheetSample label="Home and Memories, before Zeph keeps quotes">
+          <PausedNotice
+            title="Zeph now keeps some of your words."
+            body="To notice what you do again and again, Zeph may keep short quotes of what you say, with a note on what was going on. They stay after your messages are deleted, until you delete them. See them on your Memories page under Things you said. Nothing is kept until you press Got it."
+            action={
+              <button type="button" className={secondaryButton}>
+                Got it
               </button>
             }
           />

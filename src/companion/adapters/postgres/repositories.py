@@ -290,6 +290,7 @@ def _to_user(row: Row[Any]) -> User:
         settings_changed_in_chat=_to_setting_stamps(row.settings_changed_in_chat),
         settings_changed_by_admin=_to_setting_stamps(row.settings_changed_by_admin),
         data_deletion_requested_at=row.data_deletion_requested_at,
+        pattern_noticing_told_at=row.pattern_noticing_told_at,
     )
 
 
@@ -928,6 +929,12 @@ class PostgresUserRepository:
             .where(move_outcomes.c.user_id == users.c.id)
             .scalar_subquery()
         )
+        kept_quote_count = (
+            select(func.count())
+            .select_from(observations)
+            .where(observations.c.user_id == users.c.id)
+            .scalar_subquery()
+        )
         has_portrait = (
             select(user_portraits.c.user_id)
             .where(
@@ -949,6 +956,7 @@ class PostgresUserRepository:
             life_thread_count.label("life_thread_count"),
             has_portrait.label("has_portrait"),
             move_outcome_count.label("move_outcome_count"),
+            kept_quote_count.label("kept_quote_count"),
         ).order_by(users.c.created_at.desc())
         pattern_count_statement = select(
             patterns.c.user_id, patterns.c.state, func.count()
@@ -968,6 +976,7 @@ class PostgresUserRepository:
                 life_thread_count=row.life_thread_count,
                 has_portrait=row.has_portrait,
                 move_outcome_count=row.move_outcome_count,
+                kept_quote_count=row.kept_quote_count,
                 pattern_counts={
                     state: pattern_counts.get(row.id, {}).get(state, 0)
                     for state in PatternState
@@ -1043,6 +1052,29 @@ class PostgresUserRepository:
                 delete(users).where(users.c.id == user_id).returning(users.c.id)
             ).scalar_one_or_none()
         return deleted_id is not None
+
+    def mark_pattern_noticing_told(self, user_id: UUID, told_at: datetime) -> User:
+        """Save that a User was told about Pattern noticing, the first time only.
+
+        Args:
+            user_id: The User's ID.
+            told_at: When they pressed "Got it".
+
+        Returns:
+            The saved User.
+        """
+        with self._database.begin() as connection:
+            row = connection.execute(
+                update(users)
+                .where(users.c.id == user_id)
+                .values(
+                    pattern_noticing_told_at=func.coalesce(
+                        users.c.pattern_noticing_told_at, told_at
+                    )
+                )
+                .returning(users)
+            ).one()
+        return _to_user(row)
 
 
 class PostgresPendingAuthAccountDeletionRepository:
@@ -3286,6 +3318,27 @@ class PostgresObservationRepository:
                 .order_by(observations.c.position)
             ).all()
         return [to_observation(row) for row in rows]
+
+    def delete(self, user_id: UUID, observation_id: UUID) -> bool:
+        """Delete one of a User's Observations.
+
+        Args:
+            user_id: The User's ID.
+            observation_id: The Observation's ID.
+
+        Returns:
+            True if it was deleted; False if the User has no such Observation.
+        """
+        with self._database.begin() as connection:
+            deleted_id = connection.execute(
+                delete(observations)
+                .where(
+                    observations.c.id == observation_id,
+                    observations.c.user_id == user_id,
+                )
+                .returning(observations.c.id)
+            ).scalar_one_or_none()
+        return deleted_id is not None
 
     def delete_for_user(self, user_id: UUID) -> None:
         """Delete all of a User's Observations.
@@ -6378,6 +6431,16 @@ class PostgresTransaction:
                 .order_by(users.c.id)
                 .with_for_update()
             ).scalars()
+        )
+
+    def lock_user(self, user_id: UUID) -> None:
+        """Lock one User's row until the transaction ends.
+
+        Args:
+            user_id: The User's ID.
+        """
+        self._connection.execute(
+            select(users.c.id).where(users.c.id == user_id).with_for_update()
         )
 
     @contextmanager

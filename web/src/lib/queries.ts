@@ -31,6 +31,7 @@ export const queryKeys = {
   daySummaries: ["day-summaries"],
   lifeThreads: ["life-threads"],
   patterns: ["patterns"],
+  keptQuotes: ["kept-quotes"],
   moveOutcomes: ["move-outcomes"],
   userPortrait: ["user-portrait"],
   sharedPhotos: ["shared-photos"],

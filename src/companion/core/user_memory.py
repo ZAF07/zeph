@@ -12,6 +12,7 @@ from companion.core.models import (
     MemoryItem,
     MemorySource,
     MoveOutcome,
+    Observation,
     Pattern,
     PatternMoveCause,
     User,
@@ -55,6 +56,26 @@ class PatternNotFoundError(MemoryNotFoundError):
     """Raised when a User has no confirmed Pattern with that ID."""
 
     shown_message = "Pattern not found"
+
+
+class KeptQuoteNotFoundError(MemoryNotFoundError):
+    """Raised when a User has no kept quote (Observation) with that ID."""
+
+    shown_message = "Quote not found"
+
+
+def newest_first(observations: list[Observation]) -> list[Observation]:
+    """Order Observations by their day, newest first, the latest tagged first on a day.
+
+    Args:
+        observations: The Observations, oldest tagged first.
+
+    Returns:
+        The same Observations, newest first.
+    """
+    return sorted(
+        reversed(observations), key=lambda observation: observation.day, reverse=True
+    )
 
 
 class UserPortraitNotFoundError(MemoryNotFoundError):
@@ -225,6 +246,42 @@ class UserMemoryService:
         if not self._repositories.patterns.delete_confirmed(user_id, pattern_id):
             raise PatternNotFoundError
         self._rewrite_portrait(user_id)
+
+    def list_kept_quotes(self, user_id: UUID) -> list[Observation]:
+        """List the quotes Zeph keeps as evidence for a User, newest day first.
+
+        Listed whatever User Memory says, so a User can always see their own
+        words; the Dashboard shows only each quote, its context line and day.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The User's Observations, newest first.
+        """
+        return newest_first(self._repositories.observations.list_for_user(user_id))
+
+    def delete_kept_quote(self, user_id: UUID, observation_id: UUID) -> None:
+        """Delete one of a User's kept quotes, and score their Patterns again at once.
+
+        The User is locked while it is deleted, as scoring locks them, so a
+        Conversation end already scoring finishes first and the scoring after
+        the deletion never counts it.
+
+        Args:
+            user_id: The User's ID.
+            observation_id: The kept quote's (Observation's) ID.
+
+        Raises:
+            KeptQuoteNotFoundError: If the User has no such kept quote.
+        """
+        with self._repositories.transaction() as transaction:
+            transaction.lock_user(user_id)
+            if not transaction.repositories.observations.delete(
+                user_id, observation_id
+            ):
+                raise KeptQuoteNotFoundError
+        self._score_patterns_again(user_id)
 
     def list_move_outcomes(self, user_id: UUID) -> list[MoveOutcome]:
         """List a User's Move Outcomes, newest made first.

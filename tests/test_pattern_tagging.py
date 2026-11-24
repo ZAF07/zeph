@@ -65,7 +65,7 @@ def observations_of(engine: Engine, user_id: str) -> list[Observation]:
 
 
 def turn_noticing_on(client: TestClient, auth_verifier: FakeAuthVerifier) -> str:
-    """Turn Pattern noticing on for Maya only and return her User ID."""
+    """Turn Pattern noticing on for Maya only, tell her, and return her User ID."""
     user_id = maya_id(client, auth_verifier)
     switch_for_user(
         client,
@@ -74,7 +74,17 @@ def turn_noticing_on(client: TestClient, auth_verifier: FakeAuthVerifier) -> str
         "pattern_noticing",
         "on",
     )
+    tell_about_noticing(client, auth_verifier)
     return user_id
+
+
+def tell_about_noticing(client: TestClient, auth_verifier: FakeAuthVerifier) -> None:
+    """Have Maya press "Got it" on the Pattern noticing notice."""
+    response = client.post(
+        "/api/me/pattern-noticing-told",
+        headers=auth_headers(auth_verifier, "user_maya"),
+    )
+    assert response.status_code == 200
 
 
 def end_tagged_conversation(
@@ -326,6 +336,7 @@ def test_pattern_noticing_on_for_everyone_tags_every_user(
     switch_for_everyone(
         client, owner_headers(client, auth_verifier), "pattern_noticing", True
     )
+    tell_about_noticing(client, auth_verifier)
 
     end_tagged_conversation(
         client, chat_model, clock, scheduler, seeded_settings, observation_entry()

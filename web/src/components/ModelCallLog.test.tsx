@@ -30,6 +30,7 @@ const users: AdminUser[] = [
     move_outcome_count: 0,
     has_portrait: false,
     pattern_counts: noPatterns,
+    kept_quote_count: 0,
   },
 ];
 

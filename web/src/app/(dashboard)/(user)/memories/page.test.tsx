@@ -30,7 +30,7 @@ describe("the /memories page", () => {
     loadCopy.mockResolvedValue(seedCopy());
   });
 
-  it("gives the page only its own Copy slots and the Shared Memory-off notes", async () => {
+  it("gives the page only its own Copy slots, the Shared Memory-off notes and the notice of what changed", async () => {
     render(await MemoriesPage());
 
     expect(
@@ -39,10 +39,13 @@ describe("the /memories page", () => {
     const keys = Object.keys(memoriesCopy.mock.lastCall?.[0] ?? {});
     expect(keys.length).toBeGreaterThan(0);
     expect(keys).toContain("shared.memory_off.paused_title");
+    expect(keys).toContain("shared.pattern_noticing.got_it");
     expect(
       keys.every(
         (key) =>
-          key.startsWith("memories.") || key.startsWith("shared.memory_off."),
+          key.startsWith("memories.") ||
+          key.startsWith("shared.memory_off.") ||
+          key.startsWith("shared.pattern_noticing."),
       ),
     ).toBe(true);
   });
