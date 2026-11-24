@@ -354,6 +354,8 @@ def test_model_prices_are_seeded_and_admins_change_them_with_the_limit(
                 "sgd_out": 1.54,
             },
             {"model": "deepseek/deepseek-v4-pro-0813", "sgd_in": 1.69, "sgd_out": 5.07},
+            {"model": "anthropic/claude-haiku-5.5", "sgd_in": 0.13, "sgd_out": 0.64},
+            {"model": "anthropic/claude-sonnet-5.5", "sgd_in": 2.56, "sgd_out": 12.8},
         ],
         "token_limit": 1_000_000,
     }
@@ -366,6 +368,8 @@ def test_model_prices_are_seeded_and_admins_change_them_with_the_limit(
                 "sgd_out": 2.0,
             },
             {"model": "deepseek/deepseek-v4-pro-0813", "sgd_in": None, "sgd_out": None},
+            {"model": "anthropic/claude-haiku-5.5", "sgd_in": None, "sgd_out": None},
+            {"model": "anthropic/claude-sonnet-5.5", "sgd_in": None, "sgd_out": None},
         ],
         "token_limit": 250_000,
     }
@@ -525,4 +529,6 @@ def test_override_choices_list_the_editable_settings_needs_moves_and_models(
     assert choices["models"] == [
         "deepseek/deepseek-v4.1-flash-1017",
         "deepseek/deepseek-v4-pro-0813",
+        "anthropic/claude-haiku-5.5",
+        "anthropic/claude-sonnet-5.5",
     ]

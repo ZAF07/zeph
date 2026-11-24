@@ -11,6 +11,7 @@ from companion.core.platform_settings import (
     KNOWLEDGE_WHEN_IT_HELPS_THINKING,
     LIFE_THREAD_KEEPING_THINKING,
     MEMORY_PROCESSING_THINKING,
+    MODEL_PRICES,
     MOVE_OUTCOME_KEEPING_THINKING,
     PATTERN_KEEPING_THINKING,
     PATTERN_TAGGING_THINKING,
@@ -25,6 +26,7 @@ from companion.core.platform_settings import (
 
 CURRENT_MODEL = "deepseek/deepseek-v4.1-flash-1017"
 PRO_MODEL = "deepseek/deepseek-v4-pro-0813"
+CLAUDE_MODELS = ["anthropic/claude-haiku-5.5", "anthropic/claude-sonnet-5.5"]
 
 THINKING_CALLS: list[Setting[bool]] = [
     UNDERSTANDING_THINKING,
@@ -48,10 +50,20 @@ NOT_THINKING_CALLS: list[Setting[bool]] = [
 ]
 
 
-def test_the_current_model_and_the_pro_model_are_the_ones_to_pick(
+def test_the_deepseek_and_claude_models_are_the_ones_to_pick(
     seeded_settings: dict[str, Any],
 ) -> None:
-    assert seeded_settings[AVAILABLE_MODELS.key] == [CURRENT_MODEL, PRO_MODEL]
+    assert seeded_settings[AVAILABLE_MODELS.key] == [
+        CURRENT_MODEL,
+        PRO_MODEL,
+        *CLAUDE_MODELS,
+    ]
+
+
+def test_every_model_to_pick_has_a_price(seeded_settings: dict[str, Any]) -> None:
+    assert set(seeded_settings[MODEL_PRICES.key]) == set(
+        seeded_settings[AVAILABLE_MODELS.key]
+    )
 
 
 @pytest.mark.parametrize(
