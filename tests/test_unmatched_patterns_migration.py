@@ -57,7 +57,7 @@ def test_the_migration_keeps_every_old_pattern_and_makes_suspected_ones_unmatche
     before = patterns_of(client.engine, user_id)
     shown_before = patterns_shown(client, maya_headers(auth_verifier))
 
-    downgrade_to(database_url, "0090")
+    downgrade_to(database_url, "0091")
     try:
         with client.engine.begin() as connection:
             old_rows = connection.execute(

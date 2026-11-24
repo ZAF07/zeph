@@ -8,8 +8,8 @@ finds it fits. The Pattern keeping prompt is reloaded from the seed on next
 start, even where an Admin edited it, since the step now only notes
 unmatched Patterns. No User data is removed.
 
-Revision ID: 0091
-Revises: 0090
+Revision ID: 0092
+Revises: 0091
 Create Date: 2026-11-24
 """
 
@@ -18,8 +18,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0091"
-down_revision: str | None = "0090"
+revision: str = "0092"
+down_revision: str | None = "0091"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
