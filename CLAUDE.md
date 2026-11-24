@@ -94,6 +94,8 @@ Every piece of work — feature, refactor, or bug — gets an issue file in `.sc
 
 **Debugging:** `/file-bug` to record it as an issue → `/diagnosing-bugs` (build a tight pass/fail feedback loop before touching code) → fix test-first with `/tdd` → `/run` the fix in the running system → `/code-review` → `/post-implement`, recording the confirmed hypothesis in the archived issue.
 
+**Findings for the owner:** anything worth the owner's attention that meets you on any issue (your own shortcomings, a defect or risk outside your task, a misleading test or Eval, a cost or decision the owner didn't get to make) goes as an entry in `.scratch/findings/issues/01-findings-for-the-owner.md`, in the shape that file gives. Update its "Recommended next steps" if your entry changes them.
+
 **What counts as a bug (important):** a bug is a defect in **already-implemented, shipped code** — the running system crashes, throws, or logs an error when exercised. Those get filed with `/file-bug`. A defect in code being written _right now_ (a broken function in the current diff, a failing test you just introduced) is **not** filed — fix it in place as part of finishing that work. When the user mentions a bug, this is the distinction to apply before reaching for `/file-bug`.
 
 **Session ritual:**
