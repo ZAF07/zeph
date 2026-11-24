@@ -99,6 +99,6 @@ Three Features, each needing the one before, all off to start, switched per User
 3. Scoring, states, the log, unmatched Patterns, moving existing Patterns across.
 4. Agenda, Explorations, Thought Experiments, Familiarity, starter questions.
 5. Ready gate, sharing, Predictions, the new Patterns tab.
-6. Unmatched review page, the directness setting, remaining guides.
+6. Unmatched review page, the directness setting, remaining guides. *Directness setting built (24 Nov 2026): see "6. Reply Plan" in `docs/message-pipeline/README.md`.*
 
 Related decisions: ADR-0024 (Patterns tested by code), ADR-0025 (Pattern Types in git), ADR-0026 (Curiosities have an aim), ADR-0027 (quotes outlive Message Retention), ADR-0017 (guesses are Curiosities), ADR-0021 (small one-job steps).
