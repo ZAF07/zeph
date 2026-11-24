@@ -7,8 +7,8 @@ the Judge's model is renamed. An Admin's own choice is kept, only renamed.
 The pro model is added to `available_models` when missing, so Admins can
 pick it. Other names, past Eval Runs and User data are not touched.
 
-Revision ID: 0089
-Revises: 0088
+Revision ID: 0090
+Revises: 0089
 Create Date: 2026-11-24
 """
 
@@ -19,8 +19,8 @@ from typing import Any
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0089"
-down_revision: str | None = "0088"
+revision: str = "0090"
+down_revision: str | None = "0089"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
