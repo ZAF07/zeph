@@ -39,6 +39,17 @@ None - can start immediately
   - `/run`: Prompts & models shows 15 model pickers, all on the new names with options `[deepseek/deepseek-v4.1-flash, deepseek/deepseek-v4-pro]`, no old names on the page, and the Reply picker on the kept `deepseek/deepseek-v4-pro`. A Telegram update sent to `/telegram/webhook` (real app and adapters in the backend container, `CHAT_MODEL_ADAPTER=deepseek`, only the chat channel swapped for a recording one, as fake chat IDs can't receive sends) got two reply texts. The Model Call Log shows safeguard, understanding and reply_plan on `deepseek/deepseek-v4.1-flash` and reply on `deepseek/deepseek-v4-pro`, with no errors.
   - Checks after rebasing on main: `pytest` 1926 passed, `ruff`, `ruff format --check` and `mypy` clean. The migration was renumbered 0086 to 0087 because main added `0086_directness`.
   - Caveats: saved `deepseek-chat`/`deepseek-reasoner` names (if any remain on prod) are not renamed; they still work under direct DeepSeek because names with no provider part pass through. Re-running an old Eval Run whose Variant overrides use old names is refused with the usual "must be one of the listed models", since overrides are checked again. Web test fixtures still use the old example names (cosmetic).
+- 2026-11-24, proposed fix for old `deepseek-chat` / `deepseek-reasoner` names left on prod. These must be gone before issue 02 makes OpenRouter the default, because OpenRouter won't know them and that service's calls would fail.
+  1. **Check prod first.** Run `SELECT key, value FROM platform_settings WHERE value::text IN ('"deepseek-chat"', '"deepseek-reasoner"') OR (key = 'available_models' AND (value ? 'deepseek-chat' OR value ? 'deepseek-reasoner')) OR (key = 'model_prices' AND (value ? 'deepseek-chat' OR value ? 'deepseek-reasoner'));` and the same check on `eval_judge_settings` (key `model`). If nothing comes back, there is nothing to do; record that here.
+  2. **If any are found, add a small data migration (next free number)** that renames them the way direct DeepSeek treats them today, so behaviour doesn't change:
+     - `deepseek-chat` → `deepseek/deepseek-v4.1-flash`, leaving that service's `*_thinking` as it is.
+     - `deepseek-reasoner` → `deepseek/deepseek-v4.1-flash`, and set that service's `*_thinking` to `true`, since `deepseek-reasoner` always thinks.
+     - In `available_models`, swap each old name for `deepseek/deepseek-v4.1-flash` and drop duplicates. In `model_prices`, drop the old keys if `deepseek/deepseek-v4.1-flash` already has a price; otherwise rename the key.
+     - Judge: the same rename, with `thinking` set to `true` for `deepseek-reasoner`.
+     - Downgrade leaves the names as they are, since the old names can't be told apart once renamed.
+  3. **Test it** like `tests/test_openrouter_model_names_migration.py`: an old-name setting is renamed, a reasoner service's thinking is turned on, and other values are kept.
+  4. **`/run`:** set an old name with SQL, restart the backend, and confirm Prompts & models shows the new name and a Telegram message still gets a reply.
+  5. Once no saved name can be an old one, the `deepseek-chat` / `deepseek-reasoner` handling in `build_client` (`src/companion/adapters/deepseek/chat_model.py`) can be removed in a later clean-up.
 
 ## Completion
 
