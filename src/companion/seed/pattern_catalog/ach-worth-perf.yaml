@@ -60,10 +60,12 @@ look_alikes:
     tells_apart: A miss brings disappointment in the work, not in the self
   - pattern_type: CONF.AVOID.BELONG
     tells_apart: >-
-      Fears others' reaction to the relationship, not the verdict on
-      competence
+      Fears criticism as a verdict on their competence; the other keeps quiet
+      to protect the relationship
   - pattern_type: CTRL.UNCERT.PLAN
-    tells_apart: Over-prepares to reduce unknowns, not to prove worth
+    tells_apart: >-
+      Over-prepares to prove their worth; the other over-prepares to reduce
+      unknowns
   - pattern_type: CONF.DEFEND.SELF
     tells_apart: >-
       Turns the criticism inward and judges themselves; the other turns it

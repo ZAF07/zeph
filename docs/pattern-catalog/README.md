@@ -50,7 +50,7 @@ was last loaded. Zeph keeps replying either way.
 | `version` | Like `0.3.0`. Every loaded version is kept and never changes. | The loader. Each Observation keeps the version it was tagged under. |
 | `area` | conflict, approval, control, achievement or relationships. | The Dashboard groups and orders by it. |
 | `name` | A short plain name. | The Dashboard; look-alikes that name this type show it. |
-| `status` | draft, approved or archived. See "Review status" below. | The Dashboard. Sharing will read it (not built yet). |
+| `status` | draft, approved or archived. See "Review status" below. | The Dashboard only. Tagging looks for every Pattern Type whatever its status; the Ready gate and sharing will read it (not built yet). |
 | `approved_by`, `approved_on` | Who approved it and on what day. Both or neither; only for approved or archived. | The Dashboard. |
 | `definition` | What the Pattern is, in two or three sentences, including what it is *not*. | The tagging model. |
 | `if`, `then`, `function` | The situation, the behaviour, and what it does for the person. | The tagging model; the Dashboard card title. |
@@ -130,7 +130,7 @@ against it (issue 16, not built yet).
 | `anyone_would_when` | Changes which new Observations are situational. Past ones keep how they were marked. |
 | `exclusions`, `approved_wording`, `prediction_wording`, `numbers` | Nothing yet; they wait for the Ready gate and sharing. |
 | `status` draft → approved | Nothing yet beyond the Dashboard. Once the Ready gate is built, only approved Pattern Types may become Ready and be shared; drafts gather evidence silently. Needs `approved_by` and `approved_on`. |
-| `status` → archived | To come: an archived Pattern Type stops being looked for and is never shared. Keep the file; never delete it. |
+| `status` → archived | Today nothing: the tagging step is sent every Pattern Type in the catalog, archived ones too, so an archived one is still looked for. To come: it stops being looked for and is never shared. Keep the file; never delete it. |
 | A file deleted | It leaves the catalog, but its stored versions and Observations stay. Archive instead. |
 | A new Pattern Type | The tagging step looks for it from the next Conversation end; the tagging prompt grows, so each Conversation end and each Tagging Eval run costs a little more. |
 | A broken file | Nothing loads; the backend starts on the last catalog and prints every problem. |
@@ -140,6 +140,7 @@ against it (issue 16, not built yet).
 - **draft**: may gather evidence silently; never becomes Ready or shared.
 - **approved**: may become Ready and be shared once the gate passes. Set
   `approved_by` (e.g. `Zaf`) and `approved_on` (e.g. `2026-11-25`).
-- **archived**: retired. Kept so old Observations still make sense.
+- **archived**: retired. Kept so old Observations still make sense. Until
+  that is built, it is still looked for at tagging.
 
 Approving is a change like any other: a new version, a review and a deploy.

@@ -60,12 +60,12 @@ signs_against:
 look_alikes:
   - pattern_type: ACH.WORTH.PERF
     tells_apart: >-
-      Avoids conflict because criticism means failure, not because of fear the
-      relationship will break
+      Keeps quiet to protect the relationship; the other fears criticism as a
+      verdict on their competence
   - pattern_type: CTRL.UNCERT.PLAN
     tells_apart: >-
-      Avoids conflict because its outcome is unpredictable; indifferent to
-      closeness
+      Keeps quiet because closeness is at stake; the other is uneasy about any
+      unknown outcome, closeness or not
   - pattern_type: APPR.GIVE.NEEDED
     tells_apart: >-
       Says yes to avoid the friction of saying no; the other says yes to be

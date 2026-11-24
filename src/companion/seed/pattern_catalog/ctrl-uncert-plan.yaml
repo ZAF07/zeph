@@ -60,10 +60,12 @@ signs_against:
 look_alikes:
   - pattern_type: ACH.WORTH.PERF
     tells_apart: >-
-      Controls to guarantee a good result for self-worth; uncertainty itself
-      is tolerable
+      Over-prepares because not knowing is the problem; the other over-prepares
+      to prove their worth, and the unknown itself is bearable
   - pattern_type: CONF.AVOID.BELONG
-    tells_apart: Avoids the unknown only when the relationship is at stake
+    tells_apart: >-
+      Uneasy about any unknown outcome, closeness or not; the other keeps quiet
+      only when closeness is at stake
   - pattern_type: APPR.CONFIRM.CHOICE
     tells_apart: >-
       Seeks information or control over an outcome still open; the other

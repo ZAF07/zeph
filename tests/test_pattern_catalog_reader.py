@@ -85,7 +85,11 @@ CLINICAL_TERMS = re.compile(
 
 
 def seed_pattern_types() -> list[PatternType]:
-    """The Pattern Types in the repo's catalog folder."""
+    """Read the Pattern Types in the repo's catalog folder.
+
+    Returns:
+        The Pattern Types, in their files' order.
+    """
     return read_pattern_types(read_pattern_catalog_seed(PATTERN_CATALOG_DIR))
 
 

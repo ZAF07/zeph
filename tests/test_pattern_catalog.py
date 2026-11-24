@@ -52,7 +52,7 @@ def stored_versions(engine: Engine) -> list[tuple[str, str, bool]]:
     return [(row.pattern_type_id, row.version, row.is_current) for row in rows]
 
 
-def test_the_three_drafted_pattern_types_are_loaded_on_start(
+def test_the_fifteen_pattern_types_are_loaded_on_start(
     client: TestClient, auth_verifier: FakeAuthVerifier
 ) -> None:
     headers = owner_headers(client, auth_verifier)
@@ -110,14 +110,14 @@ def test_admin_reads_a_pattern_type_with_all_its_details(
             {
                 "pattern_type_id": "ACH.WORTH.PERF",
                 "name": "Performance-contingent self-worth",
-                "tells_apart": "Avoids conflict because criticism means failure, "
-                "not because of fear the relationship will break",
+                "tells_apart": "Keeps quiet to protect the relationship; the other "
+                "fears criticism as a verdict on their competence",
             },
             {
                 "pattern_type_id": "CTRL.UNCERT.PLAN",
                 "name": "Control-seeking under uncertainty",
-                "tells_apart": "Avoids conflict because its outcome is "
-                "unpredictable; indifferent to closeness",
+                "tells_apart": "Keeps quiet because closeness is at stake; the "
+                "other is uneasy about any unknown outcome, closeness or not",
             },
             {
                 "pattern_type_id": "APPR.GIVE.NEEDED",

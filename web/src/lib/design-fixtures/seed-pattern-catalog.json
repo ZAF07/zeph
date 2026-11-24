@@ -65,12 +65,12 @@
         {
           "pattern_type_id": "ACH.WORTH.PERF",
           "name": "Performance-contingent self-worth",
-          "tells_apart": "Avoids conflict because criticism means failure, not because of fear the relationship will break"
+          "tells_apart": "Keeps quiet to protect the relationship; the other fears criticism as a verdict on their competence"
         },
         {
           "pattern_type_id": "CTRL.UNCERT.PLAN",
           "name": "Control-seeking under uncertainty",
-          "tells_apart": "Avoids conflict because its outcome is unpredictable; indifferent to closeness"
+          "tells_apart": "Keeps quiet because closeness is at stake; the other is uneasy about any unknown outcome, closeness or not"
         },
         {
           "pattern_type_id": "APPR.GIVE.NEEDED",
@@ -863,12 +863,12 @@
         {
           "pattern_type_id": "ACH.WORTH.PERF",
           "name": "Performance-contingent self-worth",
-          "tells_apart": "Controls to guarantee a good result for self-worth; uncertainty itself is tolerable"
+          "tells_apart": "Over-prepares because not knowing is the problem; the other over-prepares to prove their worth, and the unknown itself is bearable"
         },
         {
           "pattern_type_id": "CONF.AVOID.BELONG",
           "name": "Conflict avoidance to preserve belonging",
-          "tells_apart": "Avoids the unknown only when the relationship is at stake"
+          "tells_apart": "Uneasy about any unknown outcome, closeness or not; the other keeps quiet only when closeness is at stake"
         },
         {
           "pattern_type_id": "APPR.CONFIRM.CHOICE",
@@ -1159,12 +1159,12 @@
         {
           "pattern_type_id": "CONF.AVOID.BELONG",
           "name": "Conflict avoidance to preserve belonging",
-          "tells_apart": "Fears others' reaction to the relationship, not the verdict on competence"
+          "tells_apart": "Fears criticism as a verdict on their competence; the other keeps quiet to protect the relationship"
         },
         {
           "pattern_type_id": "CTRL.UNCERT.PLAN",
           "name": "Control-seeking under uncertainty",
-          "tells_apart": "Over-prepares to reduce unknowns, not to prove worth"
+          "tells_apart": "Over-prepares to prove their worth; the other over-prepares to reduce unknowns"
         },
         {
           "pattern_type_id": "CONF.DEFEND.SELF",
