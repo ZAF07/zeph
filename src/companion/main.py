@@ -385,6 +385,19 @@ def quiet_http_client_logs() -> None:
         logging.getLogger(logger_name).setLevel(logging.WARNING)
 
 
+def print_info_logs(logger: logging.Logger) -> None:
+    """Print a logger's logs from INFO up.
+
+    Nothing else prints INFO logs, so the logger gets its own handler, once.
+
+    Args:
+        logger: The logger to print.
+    """
+    logger.setLevel(logging.INFO)
+    if not logger.handlers:
+        logger.addHandler(logging.StreamHandler())
+
+
 def show_model_call_developer_logs(enabled: bool) -> None:
     """Print the Model Call Log's developer logs, for local and worktree runs.
 
@@ -394,23 +407,18 @@ def show_model_call_developer_logs(enabled: bool) -> None:
     Args:
         enabled: Whether developer logs are on (`MODEL_CALL_DEVELOPER_LOGS`).
     """
-    if not enabled:
-        return
-    model_call_logger.setLevel(logging.INFO)
-    if not model_call_logger.handlers:
-        model_call_logger.addHandler(logging.StreamHandler())
+    if enabled:
+        print_info_logs(model_call_logger)
 
 
 def show_prompt_cache_logs() -> None:
-    """Print the OpenRouter adapter's logs of prompt cache use.
+    """Print the OpenRouter adapter's INFO logs, which say how the cache was used.
 
     Each line says how many of a Claude call's prompt tokens came from the
-    cache, with no content, so it is safe to print everywhere. It is logged
-    at INFO, which nothing else prints, so the logger gets its own handler.
+    prompt cache. The adapter logs no content, so its logs are safe to print
+    everywhere.
     """
-    openrouter_logger.setLevel(logging.INFO)
-    if not openrouter_logger.handlers:
-        openrouter_logger.addHandler(logging.StreamHandler())
+    print_info_logs(openrouter_logger)
 
 
 def build_production_app() -> FastAPI:

@@ -21,7 +21,7 @@ MODELS_THAT_ALWAYS_THINK = frozenset(
     {"anthropic/claude-opus-5.5", "anthropic/claude-fable-5.2"}
 )
 
-PROMPT_CACHING_MAKER = "anthropic"
+CLAUDE_MAKER = "anthropic"
 
 AskOpenRouter = Callable[[list[dict[str, Any]], bool], dict[str, Any]]
 
@@ -176,10 +176,12 @@ def caches_prompts(model: str) -> bool:
         True for Claude models (made by Anthropic), which cache only what is
         marked; False for the rest, which get no marker.
     """
-    return model_maker(model) == PROMPT_CACHING_MAKER
+    return model_maker(model) == CLAUDE_MAKER
 
 
-def with_cached_instructions(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def with_instructions_marked_for_caching(
+    messages: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     """Mark the instructions so the provider caches them.
 
     Args:
@@ -188,8 +190,12 @@ def with_cached_instructions(messages: list[dict[str, Any]]) -> list[dict[str, A
 
     Returns:
         The same messages, with the instructions as one text part carrying
-        a `cache_control` marker. The given list is not changed.
+        a `cache_control` marker. The given list is not changed. Empty
+        instructions are left as they are, because Anthropic refuses an
+        empty text part.
     """
+    if not messages[0]["content"]:
+        return messages
     instructions = {
         "type": "text",
         "text": messages[0]["content"],
@@ -233,7 +239,9 @@ def build_request(
     request: dict[str, Any] = {
         "model": model,
         "messages": (
-            with_cached_instructions(messages) if caches_prompts(model) else messages
+            with_instructions_marked_for_caching(messages)
+            if caches_prompts(model)
+            else messages
         ),
         "provider": {"only": [model_maker(model)]},
     }

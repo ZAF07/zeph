@@ -19,6 +19,15 @@ HISTORY = [
     ChatLine(role=ChatRole.USER, text="how are you?"),
 ]
 
+ADAPTER_LOGGER = "companion.adapters.openrouter.chat_model"
+
+CACHED_INSTRUCTIONS = {
+    "role": "system",
+    "content": [
+        {"type": "text", "text": "Be Zeph.", "cache_control": {"type": "ephemeral"}}
+    ],
+}
+
 
 def openrouter_reply(
     content: str = "Doing well.", reasoning: str | None = None
@@ -258,16 +267,6 @@ def test_a_reply_paid_with_our_own_key_logs_no_warning(
     assert not caplog.text
 
 
-ADAPTER_LOGGER = "companion.adapters.openrouter.chat_model"
-
-CACHED_INSTRUCTIONS = {
-    "role": "system",
-    "content": [
-        {"type": "text", "text": "Be Zeph.", "cache_control": {"type": "ephemeral"}}
-    ],
-}
-
-
 def generate_with_claude(chat_model: OpenRouterChatModel) -> ModelAnswer:
     return chat_model.generate(
         model="anthropic/claude-haiku-5.5",
@@ -289,6 +288,21 @@ def test_a_claude_model_gets_its_instructions_marked_for_caching() -> None:
         {"role": "assistant", "content": "hey!"},
         {"role": "user", "content": "how are you?"},
     ]
+
+
+def test_empty_instructions_for_a_claude_model_are_sent_unmarked() -> None:
+    requests: list[httpx.Request] = []
+    chat_model = openrouter_with(httpx.Response(200, json=openrouter_reply()), requests)
+
+    chat_model.generate(
+        model="anthropic/claude-haiku-5.5",
+        thinking=False,
+        instructions="",
+        history=HISTORY,
+    )
+
+    system_message = json.loads(requests[0].content)["messages"][0]
+    assert system_message == {"role": "system", "content": ""}
 
 
 def test_a_deepseek_model_gets_no_caching_marker() -> None:

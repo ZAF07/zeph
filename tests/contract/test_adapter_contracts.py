@@ -166,9 +166,9 @@ def test_openrouter_reads_a_claude_models_instructions_from_the_cache_the_second
             )
 
     _, second_call = [
-        record.getMessage()
-        for record in caplog.records
-        if record.name == OPENROUTER_LOGGER
+        message
+        for message in caplog.messages
+        if "prompt tokens from the cache" in message
     ]
     cached_tokens = int(second_call.split(" read ")[1].split(" of ")[0])
     assert cached_tokens > 0, second_call
