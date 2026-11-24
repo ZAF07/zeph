@@ -3,7 +3,7 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: ACH.WORTH.PERF
-version: 0.1.0
+version: 0.2.0
 area: achievement
 name: Performance-contingent self-worth
 status: draft
@@ -64,6 +64,14 @@ look_alikes:
       competence
   - pattern_type: CTRL.UNCERT.PLAN
     tells_apart: Over-prepares to reduce unknowns, not to prove worth
+  - pattern_type: CONF.DEFEND.SELF
+    tells_apart: >-
+      Turns the criticism inward and judges themselves; the other turns it
+      outward and answers back
+  - pattern_type: ACH.GOAL.MOVE
+    tells_apart: >-
+      Judges themselves after falling short; the other moves the goal after
+      succeeding
 
 anyone_would: >-
   Disappointment after a real, costly setback, or preparing hard where the

@@ -3,7 +3,7 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: CTRL.UNCERT.PLAN
-version: 0.1.0
+version: 0.2.0
 area: control
 name: Control-seeking under uncertainty
 status: draft
@@ -64,6 +64,18 @@ look_alikes:
       is tolerable
   - pattern_type: CONF.AVOID.BELONG
     tells_apart: Avoids the unknown only when the relationship is at stake
+  - pattern_type: APPR.CONFIRM.CHOICE
+    tells_apart: >-
+      Seeks information or control over an outcome still open; the other
+      seeks agreement about a choice already made
+  - pattern_type: CTRL.SELF.RELY
+    tells_apart: >-
+      Uneasy about the outcome, whoever is doing it; the other distrusts
+      people to come through, even when the outcome is clear
+  - pattern_type: REL.CHECK.SECURE
+    tells_apart: >-
+      Uneasy about any unknown outcome; the other's not knowing is only about
+      people and how they feel about them
 
 anyone_would: A real crisis where control-seeking is adaptive
 

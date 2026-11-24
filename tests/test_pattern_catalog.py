@@ -64,8 +64,20 @@ def test_the_three_drafted_pattern_types_are_loaded_on_start(
         for pattern_type in pattern_types
     ] == [
         ("CONF.AVOID.BELONG", "conflict", "draft"),
+        ("CONF.DEFEND.SELF", "conflict", "draft"),
+        ("CONF.WITHDRAW.HURT", "conflict", "draft"),
+        ("APPR.CONFIRM.CHOICE", "approval", "draft"),
+        ("APPR.GIVE.NEEDED", "approval", "draft"),
+        ("APPR.HIDE.BURDEN", "approval", "draft"),
+        ("CTRL.OPEN.FREEDOM", "control", "draft"),
+        ("CTRL.SELF.RELY", "control", "draft"),
         ("CTRL.UNCERT.PLAN", "control", "draft"),
+        ("ACH.ABSORB.PULL", "achievement", "draft"),
+        ("ACH.GOAL.MOVE", "achievement", "draft"),
         ("ACH.WORTH.PERF", "achievement", "draft"),
+        ("REL.CHECK.SECURE", "relationships", "draft"),
+        ("REL.DISTANCE.INDEP", "relationships", "draft"),
+        ("REL.MOOD.FIX", "relationships", "draft"),
     ]
 
 
@@ -88,7 +100,7 @@ def test_admin_reads_a_pattern_type_with_all_its_details(
     assert [sign["id"] for sign in conflict.pop("signs_against")] == ["D1", "D2"]
     assert conflict == {
         "id": "CONF.AVOID.BELONG",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "area": "conflict",
         "name": "Conflict avoidance to preserve belonging",
         "if_situation": "Disagreement with a valued other",
@@ -106,6 +118,18 @@ def test_admin_reads_a_pattern_type_with_all_its_details(
                 "name": "Control-seeking under uncertainty",
                 "tells_apart": "Avoids conflict because its outcome is "
                 "unpredictable; indifferent to closeness",
+            },
+            {
+                "pattern_type_id": "APPR.GIVE.NEEDED",
+                "name": "Saying yes and over-giving to feel needed",
+                "tells_apart": "Says yes to avoid the friction of saying no; "
+                "the other says yes to be needed and keep a place",
+            },
+            {
+                "pattern_type_id": "REL.MOOD.FIX",
+                "name": "Taking on other people's moods as theirs to fix",
+                "tells_apart": "Stays quiet about their own view; the other acts "
+                "to fix the other's mood",
             },
         ],
         "anyone_would": "Low-stakes avoidance with strangers or authority only",
@@ -130,7 +154,11 @@ def test_a_look_alike_that_is_not_a_pattern_type_keeps_its_own_name(
 ) -> None:
     headers = owner_headers(client, auth_verifier)
 
-    achievement = catalog(client, headers)[2]
+    achievement = next(
+        pattern_type
+        for pattern_type in catalog(client, headers)
+        if pattern_type["id"] == "ACH.WORTH.PERF"
+    )
 
     assert achievement["look_alikes"][0] == {
         "pattern_type_id": None,
@@ -271,7 +299,7 @@ def test_a_malformed_pattern_type_stops_the_whole_load(
         "- TEST.ONE.yaml: definition is missing."
     )
     assert stored_versions(engine) == before
-    assert len(catalog(client, headers)) == 3
+    assert len(catalog(client, headers)) == 15
 
 
 def test_on_start_a_catalog_that_cannot_be_loaded_is_reported_and_the_last_kept(
@@ -292,7 +320,7 @@ def test_on_start_a_catalog_that_cannot_be_loaded_is_reported_and_the_last_kept(
         "control, achievement, relationships.\n"
         "The backend starts with the catalog as it was last loaded.\n"
     )
-    assert len(catalog(client, headers)) == 3
+    assert len(catalog(client, headers)) == 15
 
 
 def test_a_pattern_type_taken_out_of_the_files_leaves_the_catalog_but_is_kept(
@@ -308,7 +336,7 @@ def test_a_pattern_type_taken_out_of_the_files_leaves_the_catalog_but_is_kept(
     assert [pattern_type["id"] for pattern_type in catalog(client, headers)] == [
         "TEST.ONE"
     ]
-    assert ("CONF.AVOID.BELONG", "0.2.0", False) in stored_versions(engine)
+    assert ("CONF.AVOID.BELONG", "0.3.0", False) in stored_versions(engine)
 
 
 def test_a_plain_user_cannot_read_the_pattern_catalog(

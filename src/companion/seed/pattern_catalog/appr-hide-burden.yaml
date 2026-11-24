@@ -1,0 +1,89 @@
+# One Pattern Type of the Pattern Catalog (ADR-0025). Loaded when the backend
+# starts. Any change needs a new `version`: a stored version never changes,
+# so a change that keeps its version is refused and the last catalog stays.
+
+id: APPR.HIDE.BURDEN
+version: 0.1.0
+area: approval
+name: Saying "I'm fine" and hiding what's hard
+status: draft
+
+definition: >-
+  When something is hard, the person keeps it to themselves and tells others
+  they are fine. They worry that sharing it would weigh on people or make
+  them less welcome, so they carry it alone and show an easy face.
+
+if: Going through something hard while others are around
+then: Says they're fine and keeps it to themselves
+function: To avoid being a burden
+
+frameworks:
+  - Self-concealment (Larson and Chastain)
+  - Perceived burdensomeness in help-seeking research
+  - Emotional suppression (Gross)
+  - Young's emotional inhibition schema theme
+
+signs:
+  - id: I1
+    text: Tells people they're fine during a week they describe as hard
+    strength: strong
+    part: behaviour
+  - id: I2
+    text: Says they don't want to "dump" their problems on anyone
+    strength: strong
+    part: inside
+  - id: I3
+    text: Turns a question about how they are into a question about the other person
+    strength: moderate
+    part: behaviour
+  - id: I4
+    text: Mentions something hard only after it's over, as a passing remark
+    strength: moderate
+    part: behaviour
+  - id: I5
+    text: Apologises for "going on" after sharing a little
+    strength: weak
+    part: behaviour
+
+signs_against:
+  - id: D1
+    text: Tells a friend or family member when they're struggling and asks for support
+    strength: strong
+    part: behaviour
+  - id: D2
+    text: Keeps something private by choice and feels at ease with that, not lonely
+    strength: moderate
+    part: inside
+
+look_alikes:
+  - pattern_type: CONF.WITHDRAW.HURT
+    tells_apart: >-
+      Hides any struggle from everyone so as not to weigh on them; the other
+      hides a hurt from the one who caused it
+  - pattern_type: CTRL.SELF.RELY
+    tells_apart: >-
+      Keeps their troubles to themselves so as not to be a weight; the other
+      keeps their tasks to themselves so as not to be let down
+
+anyone_would: Saying "fine, thanks" to a stranger or acquaintance who asks in passing
+anyone_would_when:
+  - relationship: [stranger, acquaintance]
+
+exclusions:
+  - text: Any sign the hard thing puts them at risk; that is for the Safeguard, never a Pattern
+    evidence: ignored
+  - text: Grief
+    evidence: counted_not_shared
+  - text: Serious illness, their own or a close family member's
+    evidence: counted_not_shared
+
+approved_wording: >-
+  When things are hard, you seem to keep them to yourself so you don't weigh
+  on the people around you.
+prediction_wording: >-
+  Next time someone asks how you are on a hard day, notice what you say, and
+  what you'd have said if you weren't worried about weighing on them.
+
+numbers:
+  situations_needed: 3
+  base_rate: 0.25

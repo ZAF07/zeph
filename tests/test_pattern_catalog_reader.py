@@ -1,4 +1,5 @@
 import copy
+import re
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +10,7 @@ from companion.adapters.pattern_catalog_seed import read_pattern_catalog_seed
 from companion.core.models import (
     ExcludedEvidence,
     PatternArea,
+    PatternType,
     PatternTypeFile,
     PatternTypeStatus,
     Power,
@@ -73,17 +75,74 @@ def problems_of(*contents: dict[str, Any]) -> list[str]:
     return raised.value.problems
 
 
-def test_the_three_drafted_pattern_types_in_the_repo_are_valid_drafts() -> None:
-    pattern_types = read_pattern_types(read_pattern_catalog_seed(PATTERN_CATALOG_DIR))
+CLINICAL_TERMS = re.compile(
+    r"\b(disorder|diagnos\w*|trauma\w*|depress\w*|anxiety|anxious|avoidant|"
+    r"attachment|codependen\w*|narcissis\w*|borderline|neurotic\w*|ocd|adhd|ptsd|"
+    r"symptom\w*|patholog\w*|obsessi\w*|compulsi\w*|phobi\w*|paranoi\w*|"
+    r"clinical\w*|schema\w*|dysfunction\w*|mental illness)\b",
+    re.IGNORECASE,
+)
 
-    assert {pattern_type.id: pattern_type.area for pattern_type in pattern_types} == {
-        "ACH.WORTH.PERF": PatternArea.ACHIEVEMENT,
-        "CONF.AVOID.BELONG": PatternArea.CONFLICT,
-        "CTRL.UNCERT.PLAN": PatternArea.CONTROL,
-    }
+
+def seed_pattern_types() -> list[PatternType]:
+    """The Pattern Types in the repo's catalog folder."""
+    return read_pattern_types(read_pattern_catalog_seed(PATTERN_CATALOG_DIR))
+
+
+def test_the_fifteen_pattern_types_in_the_repo_are_valid_drafts_three_per_area() -> (
+    None
+):
+    pattern_types = seed_pattern_types()
+
+    assert len(pattern_types) == 15
+    for area in PatternArea:
+        in_area = [
+            pattern_type for pattern_type in pattern_types if pattern_type.area == area
+        ]
+        assert len(in_area) == 3, area
     assert {pattern_type.status for pattern_type in pattern_types} == {
         PatternTypeStatus.DRAFT
     }
+
+
+def test_every_look_alike_in_the_repo_is_named_back_by_the_other_pattern_type() -> None:
+    pattern_types = seed_pattern_types()
+    pairs = {
+        (pattern_type.id, look_alike.pattern_type_id)
+        for pattern_type in pattern_types
+        for look_alike in pattern_type.look_alikes
+        if look_alike.pattern_type_id
+    }
+
+    assert [pair for pair in sorted(pairs) if pair[::-1] not in pairs] == []
+
+
+def test_no_pattern_type_in_the_repo_uses_clinical_terms_outside_its_frameworks() -> (
+    None
+):
+    found = []
+    for pattern_type in seed_pattern_types():
+        texts = [
+            pattern_type.name,
+            pattern_type.definition,
+            pattern_type.if_situation,
+            pattern_type.then_behaviour,
+            pattern_type.function,
+            pattern_type.anyone_would,
+            pattern_type.approved_wording,
+            pattern_type.prediction_wording,
+            *(sign.text for sign in pattern_type.signs + pattern_type.signs_against),
+            *(look_alike.tells_apart for look_alike in pattern_type.look_alikes),
+            *(look_alike.name or "" for look_alike in pattern_type.look_alikes),
+            *(exclusion.text for exclusion in pattern_type.exclusions),
+        ]
+        found += [
+            f"{pattern_type.id}: {match.group()}"
+            for text in texts
+            for match in CLINICAL_TERMS.finditer(text)
+        ]
+
+    assert found == []
 
 
 def test_a_pattern_type_is_read_with_all_its_details() -> None:
@@ -95,7 +154,7 @@ def test_a_pattern_type_is_read_with_all_its_details() -> None:
         if pattern_type.id == "CONF.AVOID.BELONG"
     )
 
-    assert conflict.version == "0.2.0"
+    assert conflict.version == "0.3.0"
     assert conflict.if_situation == "Disagreement with a valued other"
     assert conflict.then_behaviour == "Withholds or softens own view"
     assert conflict.function == "To protect belonging"
@@ -109,6 +168,8 @@ def test_a_pattern_type_is_read_with_all_its_details() -> None:
     assert [look_alike.pattern_type_id for look_alike in conflict.look_alikes] == [
         "ACH.WORTH.PERF",
         "CTRL.UNCERT.PLAN",
+        "APPR.GIVE.NEEDED",
+        "REL.MOOD.FIX",
     ]
     assert conflict.anyone_would == (
         "Low-stakes avoidance with strangers or authority only"

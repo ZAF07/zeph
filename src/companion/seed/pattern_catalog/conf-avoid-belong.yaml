@@ -3,7 +3,7 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: CONF.AVOID.BELONG
-version: 0.2.0
+version: 0.3.0
 area: conflict
 name: Conflict avoidance to preserve belonging
 status: draft
@@ -66,6 +66,13 @@ look_alikes:
     tells_apart: >-
       Avoids conflict because its outcome is unpredictable; indifferent to
       closeness
+  - pattern_type: APPR.GIVE.NEEDED
+    tells_apart: >-
+      Says yes to avoid the friction of saying no; the other says yes to be
+      needed and keep a place
+  - pattern_type: REL.MOOD.FIX
+    tells_apart: >-
+      Stays quiet about their own view; the other acts to fix the other's mood
 
 anyone_would: Low-stakes avoidance with strangers or authority only
 anyone_would_when:

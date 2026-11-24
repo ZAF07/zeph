@@ -1,0 +1,93 @@
+# One Pattern Type of the Pattern Catalog (ADR-0025). Loaded when the backend
+# starts. Any change needs a new `version`: a stored version never changes,
+# so a change that keeps its version is refused and the last catalog stays.
+
+id: REL.MOOD.FIX
+version: 0.1.0
+area: relationships
+name: Taking on other people's moods as theirs to fix
+status: draft
+
+definition: >-
+  When someone close is upset, tense or low, the person feels it as their
+  own job to make it better, and steps in without being asked: cheering,
+  smoothing, fixing. A calm mood around them is what lets them feel safe.
+
+if: Someone close is upset, tense or low
+then: Steps in to cheer, smooth or fix it, unasked
+function: To keep things calm and feel safe
+
+frameworks:
+  - Emotional contagion (Hatfield)
+  - Young's self-sacrifice schema theme
+  - Unmitigated communion (Helgeson and Fritz)
+  - Family systems, over-functioning (Bowen)
+
+signs:
+  - id: I1
+    text: Notices a shift in someone's mood straight away and can't relax until it lifts
+    strength: strong
+    part: inside
+  - id: I2
+    text: Starts cheering up or sorting out a problem nobody asked them to sort
+    strength: strong
+    part: behaviour
+  - id: I3
+    text: Asks "is it something I did?" when someone is in a bad mood
+    strength: moderate
+    part: inside
+  - id: I4
+    text: Changes their own plans to keep a tense person calm
+    strength: moderate
+    part: behaviour
+  - id: I5
+    text: Describes themselves as the peacekeeper in the family or group
+    strength: weak
+    part: inside
+
+signs_against:
+  - id: D1
+    text: Lets someone be in a bad mood without stepping in, and stays at ease
+    strength: strong
+    part: inside
+  - id: D2
+    text: Helps with a mood only when asked, and asks what would help first
+    strength: moderate
+    part: behaviour
+
+look_alikes:
+  - pattern_type: APPR.GIVE.NEEDED
+    tells_apart: >-
+      Steps in to fix a mood without being asked; the other gives when asked
+  - pattern_type: CONF.AVOID.BELONG
+    tells_apart: >-
+      Acts to fix the other's mood; the other stays quiet about their own view
+  - pattern_type: REL.CHECK.SECURE
+    tells_apart: >-
+      Reads a mood as theirs to fix and sets about fixing it; the other reads
+      distance as trouble for the bond and asks about it
+
+anyone_would: Comforting someone after a death or a real shock
+
+exclusions:
+  - text: Any sign of abuse, threats or controlling behaviour; keeping someone calm may be about safety, and that stays with the Safeguard
+    evidence: ignored
+  - text: Living with someone whose drinking, drug use or temper makes home unsafe
+    evidence: ignored
+  - text: Caring for a family member with a serious illness
+    evidence: counted_not_shared
+  - text: Grief in the family or friend group
+    evidence: counted_not_shared
+  - text: Parenting a young child, where soothing moods is the job
+    evidence: ignored
+
+approved_wording: >-
+  When someone close is having a hard time, you seem to feel it's yours to
+  fix, as if things aren't safe until they're calm again.
+prediction_wording: >-
+  Next time {person} is in a low mood, notice how quickly you step in, and
+  whether they asked you to.
+
+numbers:
+  situations_needed: 3
+  base_rate: 0.25

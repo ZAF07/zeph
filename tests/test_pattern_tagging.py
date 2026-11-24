@@ -129,7 +129,7 @@ def test_with_pattern_noticing_on_a_conversation_end_keeps_the_valid_observation
     assert observation.quote == "I said yes to Mei again"
     assert observation.context == CONTEXT_LINE
     assert observation.pattern_type_id == "CONF.AVOID.BELONG"
-    assert observation.pattern_type_version == "0.2.0"
+    assert observation.pattern_type_version == "0.3.0"
     assert (observation.sign_id, observation.direction) == (
         "I2",
         ObservationDirection.FOR,
@@ -203,7 +203,7 @@ def test_unclear_and_situational_observations_are_saved_as_such(
     assert (
         unclear.second_pattern_type_id,
         unclear.second_pattern_type_version,
-    ) == ("ACH.WORTH.PERF", "0.1.0")
+    ) == ("ACH.WORTH.PERF", "0.2.0")
     assert not unclear.situational
     assert situational.situational
     assert not situational.unclear

@@ -1,0 +1,94 @@
+# One Pattern Type of the Pattern Catalog (ADR-0025). Loaded when the backend
+# starts. Any change needs a new `version`: a stored version never changes,
+# so a change that keeps its version is refused and the last catalog stays.
+
+id: CONF.WITHDRAW.HURT
+version: 0.1.0
+area: conflict
+name: Going quiet and pulling away when hurt
+status: draft
+
+definition: >-
+  When someone close hurts or lets them down, the person goes quiet, keeps to
+  themselves and waits for it to pass rather than saying they were hurt.
+  Showing the hurt would mean showing they need the other person, and that
+  feels riskier than the distance.
+
+if: Hurt or let down by someone close
+then: Goes quiet, pulls away and doesn't say why
+function: To avoid showing they need someone
+
+frameworks:
+  - Withdrawal in the demand–withdraw cycle (Christensen)
+  - Gottman's stonewalling
+  - Emotional suppression (Gross)
+  - Attachment theory, the self-reliant end (Bowlby; Bartholomew)
+
+signs:
+  - id: I1
+    text: Stops replying or answers in short, flat messages after being hurt
+    strength: strong
+    part: behaviour
+  - id: I2
+    text: Says "I'm fine" to the person who hurt them while clearly not fine
+    strength: moderate
+    part: behaviour
+  - id: I3
+    text: Expects the other person to notice and come to them without being told
+    strength: moderate
+    part: inside
+  - id: I4
+    text: Feels that saying "that hurt" would make them look weak or needy
+    strength: strong
+    part: inside
+  - id: I5
+    text: Makes plans that keep them out of the person's way for a few days
+    strength: weak
+    part: behaviour
+
+signs_against:
+  - id: D1
+    text: Tells the person soon after that something they did hurt
+    strength: strong
+    part: behaviour
+  - id: D2
+    text: Takes some time alone to calm down, then comes back to talk it through
+    strength: moderate
+    part: behaviour
+
+look_alikes:
+  - pattern_type: CONF.DEFEND.SELF
+    tells_apart: >-
+      Goes quiet and moves away after a hurt; the other answers back at once
+      and moves toward the fight
+  - pattern_type: REL.DISTANCE.INDEP
+    tells_apart: >-
+      Pulls away after being hurt; the other pulls away when things get close,
+      with no hurt before it
+  - pattern_type: APPR.HIDE.BURDEN
+    tells_apart: >-
+      Hides a hurt from the one who caused it; the other hides any struggle
+      from everyone so as not to weigh on them
+
+anyone_would: Keeping distance from a stranger or acquaintance who was rude
+anyone_would_when:
+  - relationship: [stranger, acquaintance]
+
+exclusions:
+  - text: The person who hurt them is someone they need to be safe from
+    evidence: ignored
+  - text: Grief
+    evidence: ignored
+  - text: Active relationship crisis, such as a breakup in the last month
+    evidence: counted_not_shared
+
+approved_wording: >-
+  When someone close hurts you, you seem to go quiet and keep your distance
+  rather than let them see it landed.
+prediction_wording: >-
+  Next time {person} lets you down, notice whether you tell them, or wait for
+  them to work it out.
+
+numbers:
+  situations_needed: 3
+  base_rate: 0.25
