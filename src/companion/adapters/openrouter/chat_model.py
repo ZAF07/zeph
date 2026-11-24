@@ -51,11 +51,15 @@ def reply_message(body: dict[str, Any]) -> dict[str, Any]:
         The message.
 
     Raises:
-        OpenRouterReplyError: If the body holds an error or no reply.
+        OpenRouterReplyError: If the body or its choice holds an error, the
+            choice finished with an error, or there is no reply.
     """
     if body.get("error") or not body.get("choices"):
         raise OpenRouterReplyError(f"OpenRouter sent no reply: {body.get('error')}")
-    message: dict[str, Any] = body["choices"][0]["message"]
+    choice: dict[str, Any] = body["choices"][0]
+    if choice.get("error") or choice.get("finish_reason") == "error":
+        raise OpenRouterReplyError(f"OpenRouter sent no reply: {choice.get('error')}")
+    message: dict[str, Any] = choice["message"]
     return message
 
 
@@ -222,6 +226,41 @@ def answer_with_tools(
     return to_model_answer(bodies, tool_calls)
 
 
+def new_http_client() -> httpx.Client:
+    """Make the HTTP client used when none is given.
+
+    Returns:
+        A client that waits up to a minute for a reply.
+    """
+    return httpx.Client(timeout=60)
+
+
+def send_request(
+    http_client: httpx.Client, api_key: str, request: dict[str, Any]
+) -> dict[str, Any]:
+    """Send one Chat Completions request to OpenRouter.
+
+    Args:
+        http_client: The HTTP client to send with.
+        api_key: The OpenRouter API key.
+        request: The request body.
+
+    Returns:
+        The reply body.
+
+    Raises:
+        httpx.HTTPStatusError: If OpenRouter answers with an error status.
+    """
+    response = http_client.post(
+        OPENROUTER_CHAT_URL,
+        json=request,
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    response.raise_for_status()
+    body: dict[str, Any] = response.json()
+    return body
+
+
 class OpenRouterChatModel:
     """Generates text with any model OpenRouter offers, over plain HTTP."""
 
@@ -233,7 +272,7 @@ class OpenRouterChatModel:
             http_client: The HTTP client to use; a new one is made if not given.
         """
         self._api_key = api_key
-        self._http = http_client or httpx.Client(timeout=60)
+        self._http = http_client or new_http_client()
 
     def generate(
         self,
@@ -262,30 +301,11 @@ class OpenRouterChatModel:
             OpenRouterReplyError: If OpenRouter answers with an error body.
         """
         return answer_with_tools(
-            lambda messages, may_call_tools: self._send(
-                build_request(model, thinking, messages, tools, may_call_tools)
+            lambda messages, may_call_tools: send_request(
+                self._http,
+                self._api_key,
+                build_request(model, thinking, messages, tools, may_call_tools),
             ),
             to_openrouter_messages(instructions, history),
             tools,
         )
-
-    def _send(self, request: dict[str, Any]) -> dict[str, Any]:
-        """Send one Chat Completions request to OpenRouter.
-
-        Args:
-            request: The request body.
-
-        Returns:
-            The reply body.
-
-        Raises:
-            httpx.HTTPStatusError: If OpenRouter answers with an error status.
-        """
-        response = self._http.post(
-            OPENROUTER_CHAT_URL,
-            json=request,
-            headers={"Authorization": f"Bearer {self._api_key}"},
-        )
-        response.raise_for_status()
-        body: dict[str, Any] = response.json()
-        return body

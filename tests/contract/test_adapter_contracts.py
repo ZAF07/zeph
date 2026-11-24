@@ -13,6 +13,7 @@ from companion.adapters.deepseek.photo_viewer import DeepSeekPhotoViewer
 from companion.adapters.evals.stand_ins import InlineUserWorkQueue
 from companion.adapters.fastembed.embedder import FastEmbedEmbedder
 from companion.adapters.openrouter.chat_model import OpenRouterChatModel
+from companion.adapters.openrouter.photo_viewer import OpenRouterPhotoViewer
 from companion.adapters.postgres.tables import EMBEDDING_SIZE
 from companion.adapters.tavily.web_search import TavilyWebSearch
 from companion.adapters.telegram.chat_channel import TelegramChatChannel
@@ -22,6 +23,10 @@ from companion.core.ports import ChatTool, UserWorkQueue
 from tests.fakes import FakeUserWorkQueue
 
 pytestmark = pytest.mark.contract
+
+WEEKEND_LIST_PHOTO = (
+    Path(__file__).parents[2] / "src/companion/seed/evals/images/weekend-list.jpg"
+)
 
 
 def required_env(key: str) -> str:
@@ -164,13 +169,33 @@ def test_openrouter_calls_an_offered_tool_and_uses_its_result(model: str) -> Non
 
 def test_deepseek_describes_a_photo() -> None:
     photo_viewer = DeepSeekPhotoViewer(required_env("DEEPSEEK_API_KEY"))
-    image_file = Path(__file__).parents[2] / "evals/images/weekend-list.jpg"
 
     answer = photo_viewer.look(
         model="deepseek-flash",
         thinking=False,
         instructions="Write out the handwritten list in the photo.",
-        photo=PhotoImage(content=image_file.read_bytes(), media_type="image/jpeg"),
+        photo=PhotoImage(
+            content=WEEKEND_LIST_PHOTO.read_bytes(), media_type="image/jpeg"
+        ),
+    )
+
+    assert "compost" in answer.text.lower()
+    assert answer.tokens_in > 0
+
+
+@pytest.mark.parametrize(
+    "model", ["deepseek/deepseek-v4.1-flash", "anthropic/claude-haiku-5.5"]
+)
+def test_openrouter_describes_a_photo(model: str) -> None:
+    photo_viewer = OpenRouterPhotoViewer(required_env("OPENROUTER_API_KEY"))
+
+    answer = photo_viewer.look(
+        model=model,
+        thinking=False,
+        instructions="Write out the handwritten list in the photo.",
+        photo=PhotoImage(
+            content=WEEKEND_LIST_PHOTO.read_bytes(), media_type="image/jpeg"
+        ),
     )
 
     assert "compost" in answer.text.lower()

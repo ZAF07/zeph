@@ -6,6 +6,7 @@ from sqlalchemy import create_engine
 from companion.adapters.deepseek.chat_model import DeepSeekChatModel
 from companion.adapters.deepseek.photo_viewer import DeepSeekPhotoViewer
 from companion.adapters.openrouter.chat_model import OpenRouterChatModel
+from companion.adapters.openrouter.photo_viewer import OpenRouterPhotoViewer
 from companion.adapters.tavily.web_search import TavilyWebSearch
 from companion.config import MissingSettingsError, load_settings
 from companion.main import (
@@ -87,7 +88,7 @@ def test_the_chat_model_adapter_defaults_to_direct_deepseek() -> None:
     assert isinstance(build_photo_viewer(settings), DeepSeekPhotoViewer)
 
 
-def test_the_openrouter_choice_builds_the_openrouter_chat_model() -> None:
+def test_the_openrouter_choice_builds_the_openrouter_adapters() -> None:
     settings = load_settings(
         {
             **COMPLETE_ENVIRONMENT,
@@ -97,7 +98,7 @@ def test_the_openrouter_choice_builds_the_openrouter_chat_model() -> None:
     )
 
     assert isinstance(build_chat_model(settings), OpenRouterChatModel)
-    assert isinstance(build_photo_viewer(settings), DeepSeekPhotoViewer)
+    assert isinstance(build_photo_viewer(settings), OpenRouterPhotoViewer)
 
 
 def test_the_openrouter_choice_without_its_key_fails_at_startup() -> None:
@@ -107,6 +108,8 @@ def test_the_openrouter_choice_without_its_key_fails_at_startup() -> None:
 
     with pytest.raises(MissingSettingsError, match="OPENROUTER_API_KEY"):
         build_chat_model(settings)
+    with pytest.raises(MissingSettingsError, match="OPENROUTER_API_KEY"):
+        build_photo_viewer(settings)
 
 
 def test_an_unknown_chat_model_adapter_is_refused() -> None:

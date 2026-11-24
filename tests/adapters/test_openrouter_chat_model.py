@@ -140,6 +140,47 @@ def test_an_error_body_with_a_200_status_is_raised_clearly() -> None:
         generate(chat_model)
 
 
+def test_an_error_inside_the_choice_with_a_200_status_is_raised_clearly() -> None:
+    chat_model = openrouter_with(
+        httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": ""},
+                        "finish_reason": "error",
+                        "error": {"message": "Provider returned error"},
+                    }
+                ]
+            },
+        ),
+        [],
+    )
+
+    with pytest.raises(OpenRouterReplyError, match="Provider returned error"):
+        generate(chat_model)
+
+
+def test_a_choice_that_finished_with_an_error_is_raised_clearly() -> None:
+    chat_model = openrouter_with(
+        httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": ""},
+                        "finish_reason": "error",
+                    }
+                ]
+            },
+        ),
+        [],
+    )
+
+    with pytest.raises(OpenRouterReplyError):
+        generate(chat_model)
+
+
 def tool_call_reply(
     arguments: str,
     call_id: str = "call_1",
