@@ -117,12 +117,14 @@ describe("the / page", () => {
     expect(keys.length).toBeGreaterThan(0);
     expect(keys).toContain("onboarding.check_ins.frequency_weekly");
     expect(keys).toContain("shared.memory_off.paused_title");
+    expect(keys).toContain("shared.pattern_noticing.got_it");
     expect(
       keys.every(
         (key) =>
           key.startsWith("home.") ||
           key.startsWith("onboarding.check_ins.frequency_") ||
-          key.startsWith("shared.memory_off."),
+          key.startsWith("shared.memory_off.") ||
+          key.startsWith("shared.pattern_noticing."),
       ),
     ).toBe(true);
   });

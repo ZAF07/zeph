@@ -230,6 +230,8 @@ class User:
             for them; a setting is left out once the User changes it.
         data_deletion_requested_at: When they asked in chat to delete their
             data and are yet to reply with the confirmation word; None if not.
+        pattern_noticing_told_at: When they pressed "Got it" on the notice
+            saying Zeph keeps quotes as evidence; none is kept before.
     """
 
     id: UUID
@@ -250,6 +252,7 @@ class User:
     settings_changed_in_chat: dict[ChatSetting, datetime] = field(default_factory=dict)
     settings_changed_by_admin: dict[ChatSetting, datetime] = field(default_factory=dict)
     data_deletion_requested_at: datetime | None = None
+    pattern_noticing_told_at: datetime | None = None
 
     @property
     def has_finished_onboarding(self) -> bool:
@@ -355,6 +358,8 @@ class UserOverview:
             them.
         pattern_counts: How many Patterns they have in each state, every
             state given, with or without a Pattern Type; never their content.
+        kept_quote_count: How many quotes Zeph keeps as evidence for them
+            (their Observations); never the quotes.
     """
 
     user: User
@@ -365,6 +370,7 @@ class UserOverview:
     has_portrait: bool
     move_outcome_count: int
     pattern_counts: Mapping[PatternState, int]
+    kept_quote_count: int
 
 
 @dataclass(frozen=True)

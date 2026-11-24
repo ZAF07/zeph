@@ -1266,6 +1266,10 @@
       name: "Tabs: Photos"
       max_length: 30
       text: Photos
+    - key: memories.tabs.quotes
+      name: "Tabs: Things you said"
+      max_length: 30
+      text: Things you said
     - key: memories.loading
       name: Loading, read out by screen readers
       max_length: 60
@@ -1585,6 +1589,46 @@
       text: >-
         When you send Zeph a photo that matters to you, it may keep it here
         after the Conversation ends.
+    - key: memories.quotes.heading
+      name: "Things you said tab: heading"
+      max_length: 60
+      text: Things you said that Zeph kept
+    - key: memories.quotes.lead
+      name: "Things you said tab: line under the heading"
+      max_length: 300
+      text: >-
+        Your exact words that Zeph keeps to notice what you do again and again.
+        They stay after your messages are deleted, until you delete them.
+        Delete one and Zeph stops using it.
+    - key: memories.quotes.quote
+      name: "Things you said tab: each quote in quote marks"
+      max_length: 40
+      placeholders: [quote]
+      text: "“{quote}”"
+    - key: memories.quotes.said_on
+      name: "Things you said tab: the day you said it"
+      max_length: 60
+      placeholders: [day]
+      text: You said this on {day}
+    - key: memories.quotes.note_label
+      name: "Things you said tab: label above Zeph's note"
+      max_length: 40
+      text: Zeph's note
+    - key: memories.quotes.delete
+      name: "Things you said tab: delete button, read out by screen readers"
+      max_length: 80
+      placeholders: [quote]
+      text: "Delete quote: {quote}"
+    - key: memories.quotes.empty_title
+      name: "Things you said tab: nothing yet, title"
+      max_length: 80
+      text: Nothing kept yet
+    - key: memories.quotes.empty_body
+      name: "Things you said tab: nothing yet, message"
+      max_length: 200
+      text: >-
+        When something you say helps Zeph notice what you do again and again,
+        it may keep your exact words here after the Conversation ends.
 
 - tab: check_ins
   name: Check-ins
@@ -2121,6 +2165,10 @@
       max_length: 100
       placeholders: [count]
       text: Messages are otherwise kept for {count} days.
+    - key: account.delete_data.kept_quotes
+      name: "Delete my data: quotes kept as evidence, after how long messages are kept"
+      max_length: 200
+      text: Quotes Zeph keeps as evidence stay until you delete them.
     - key: account.delete_data.button
       name: "Delete my data: button"
       max_length: 30
@@ -2368,6 +2416,26 @@
         You can see what I remember on your Dashboard and delete any of it, or tell me "forget that" in chat.
 
         I also keep a few private notes to follow up with you, like something to ask about later. You won't see these, and Delete My Data removes them along with everything else.
+    - key: shared.pattern_noticing.title
+      name: "What changed, before Zeph keeps quotes: title, on Home and Memories"
+      max_length: 60
+      text: Zeph now keeps some of your words.
+    - key: shared.pattern_noticing.body
+      name: "What changed, before Zeph keeps quotes: message"
+      max_length: 400
+      text: >-
+        To notice what you do again and again, Zeph may keep short quotes of
+        what you say, with a note on what was going on. They stay after your
+        messages are deleted, until you delete them. See them on your Memories
+        page under Things you said. Nothing is kept until you press Got it.
+    - key: shared.pattern_noticing.got_it
+      name: "What changed, before Zeph keeps quotes: button"
+      max_length: 30
+      text: Got it
+    - key: shared.pattern_noticing.save_failed
+      name: "What changed, before Zeph keeps quotes: Got it couldn't be saved"
+      max_length: 100
+      text: We couldn’t save that. Please try again.
     - key: shared.memory_off.paused_title
       name: "Memory paused by the User: title, on Home, Memories and Account"
       max_length: 60

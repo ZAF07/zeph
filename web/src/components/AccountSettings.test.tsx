@@ -59,6 +59,7 @@ const onboardedUser: Me = {
   photo_viewing_enabled: true,
   photo_viewing_available: true,
   personal_stickers_available: true,
+  show_pattern_noticing_notice: false,
   onboarding_completed_at: "2026-11-11T09:00:00Z",
   role: "user",
   changed_in_chat: {},
@@ -260,7 +261,9 @@ describe("AccountSettings", () => {
     renderWithQueries(<AccountSettings copy={editedCopy} />);
 
     expect(
-      await screen.findByText("Messages are otherwise kept for 14 days."),
+      await screen.findByText(
+        "Messages are otherwise kept for 14 days. Quotes Zeph keeps as evidence stay until you delete them.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -278,7 +281,11 @@ describe("AccountSettings", () => {
       />,
     );
 
-    expect(await screen.findByText("Kept for just 1 day.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "Kept for just 1 day. Quotes Zeph keeps as evidence stay until you delete them.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("deletes the User's data only after confirming in the dialog", async () => {

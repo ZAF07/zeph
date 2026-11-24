@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { ChangedInChatCaption } from "@/components/ChangedInChatCaption";
 import { DaySummariesList } from "@/components/DaySummariesList";
+import { KeptQuotesList } from "@/components/KeptQuotesList";
 import { LifeThreadsList } from "@/components/LifeThreadsList";
 import { LoadFailed } from "@/components/LoadFailed";
 import { LoadingPanel } from "@/components/LoadingPanel";
@@ -14,6 +15,7 @@ import { MemoryItemsList } from "@/components/MemoryItemsList";
 import { MemoryOffNotice } from "@/components/MemoryOffNotice";
 import { MoveOutcomesList } from "@/components/MoveOutcomesList";
 import { PageHero } from "@/components/PageHero";
+import { PatternNoticingNotice } from "@/components/PatternNoticingNotice";
 import { PatternsList } from "@/components/PatternsList";
 import { SaveFailedNote } from "@/components/SaveFailedNote";
 import { SharedPhotosList } from "@/components/SharedPhotosList";
@@ -32,8 +34,10 @@ import { useApiClient } from "@/lib/use-api-client";
 /**
  * The Memories page: what Zeph remembers, by Memory Category, its User
  * Portrait of the User, the Life Threads it follows, the Patterns they
- * agreed with, what helps them (Move Outcomes), the Day Summaries and the
- * Shared Photos, each deletable, with the User Memory switch. One tab shows at a time; the
+ * agreed with, what helps them (Move Outcomes), the Day Summaries, the
+ * Shared Photos and the quotes Zeph keeps as evidence, each deletable, with
+ * the User Memory switch and, until they press Got it, the notice saying
+ * Zeph now keeps some of their words. One tab shows at a time; the
  * address's `?tab=` picks it, and choosing a tab updates `?tab=` without
  * loading the page again. Every word is the Memories tab's Copy.
  *
@@ -78,6 +82,10 @@ export function Memories({ copy }: { copy: Copy }) {
     queryKey: queryKeys.sharedPhotos,
     queryFn: () => apiClient.listSharedPhotos(),
   });
+  const quotesQuery = useQuery({
+    queryKey: queryKeys.keptQuotes,
+    queryFn: () => apiClient.listKeptQuotes(),
+  });
   const queries = [
     meQuery,
     groupsQuery,
@@ -87,6 +95,7 @@ export function Memories({ copy }: { copy: Copy }) {
     outcomesQuery,
     summariesQuery,
     photosQuery,
+    quotesQuery,
   ];
 
   const me = meQuery.data;
@@ -96,6 +105,7 @@ export function Memories({ copy }: { copy: Copy }) {
   const outcomes = outcomesQuery.data;
   const summaries = summariesQuery.data;
   const photos = photosQuery.data;
+  const quotes = quotesQuery.data;
   const portrait = portraitQuery.data;
   const isLoaded = Boolean(
     me &&
@@ -105,7 +115,8 @@ export function Memories({ copy }: { copy: Copy }) {
     patterns &&
     outcomes &&
     summaries &&
-    photos,
+    photos &&
+    quotes,
   );
   const loadFailed = !isLoaded && queries.some((query) => query.isError);
   const timeZone = me?.time_zone ?? undefined;
@@ -165,6 +176,8 @@ export function Memories({ copy }: { copy: Copy }) {
       {updatePreferences.isError ? (
         <SaveFailedNote>{memoriesCopy("switch.save_failed")}</SaveFailedNote>
       ) : null}
+
+      {me ? <PatternNoticingNotice me={me} copy={copy} /> : null}
 
       {me ? (
         <MemoryOffNotice
@@ -233,6 +246,9 @@ export function Memories({ copy }: { copy: Copy }) {
           ) : null}
           {photos && tab === "photos" ? (
             <SharedPhotosList photos={photos} copy={copy} timeZone={timeZone} />
+          ) : null}
+          {quotes && tab === "quotes" ? (
+            <KeptQuotesList quotes={quotes} copy={copy} />
           ) : null}
         </div>
       ) : null}

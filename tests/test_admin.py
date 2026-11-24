@@ -96,6 +96,7 @@ def test_admin_sees_every_user_with_counts_but_no_message_text(
             "contested": 0,
             "closed": 0,
         },
+        "kept_quote_count": 0,
     }
     assert rows["user_ren@example.com"]["telegram_connected"] is False
     assert rows["user_ren@example.com"]["messages_sent"] == 0

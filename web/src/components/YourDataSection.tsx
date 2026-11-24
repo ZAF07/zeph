@@ -12,7 +12,8 @@ import { useApiClient } from "@/lib/use-api-client";
 
 /**
  * The Delete my data row: what it removes and how long messages are
- * otherwise kept, with Delete my data behind a confirm dialog. After a
+ * otherwise kept, that quotes kept as evidence stay until deleted, with
+ * Delete my data behind a confirm dialog. After a
  * delete, every page loads its data again.
  *
  * @param props - `retentionDays` is how many days messages are kept, from
@@ -51,7 +52,8 @@ export function YourDataSection({
               copy,
               countSlotKey("account.delete_data.retention", retentionDays),
               { count: retentionDays },
-            )}
+            )}{" "}
+            {accountCopy("delete_data.kept_quotes")}
           </p>
         </>
       }

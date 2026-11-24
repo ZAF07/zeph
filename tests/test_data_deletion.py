@@ -72,6 +72,7 @@ def set_up_user_with_every_kind_of_data(
             json={"on": True},
             headers=owner_headers(client, auth_verifier),
         )
+    client.post("/api/me/pattern-noticing-told", headers=headers)
     chat_model.script_pattern_tagging(
         json.dumps(
             {

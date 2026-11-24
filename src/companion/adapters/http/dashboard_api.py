@@ -26,6 +26,7 @@ from companion.core.models import (
     MoveOutcome,
     MoveResult,
     MoveRole,
+    Observation,
     OnboardingAnswers,
     Pattern,
     PauseLength,
@@ -60,6 +61,7 @@ class MeResponse(BaseModel):
     photo_viewing_enabled: bool
     photo_viewing_available: bool
     personal_stickers_available: bool
+    show_pattern_noticing_notice: bool
     onboarding_completed_at: datetime | None
     role: UserRole
     changed_in_chat: dict[ChatSetting, datetime]
@@ -316,6 +318,24 @@ class PatternsResponse(BaseModel):
     patterns: list[PatternResponse]
 
 
+class KeptQuoteResponse(BaseModel):
+    """A quote Zeph keeps as evidence: the User's words, Zeph's note and the day.
+
+    No Pattern Type or Pattern is named.
+    """
+
+    id: str
+    quote: str
+    context: str
+    day: date
+
+
+class KeptQuotesResponse(BaseModel):
+    """The quotes Zeph keeps as evidence for a User, newest day first."""
+
+    quotes: list[KeptQuoteResponse]
+
+
 class UserPortraitResponse(BaseModel):
     """A User's User Portrait and when it was last written."""
 
@@ -394,6 +414,23 @@ def to_life_thread_response(thread: LifeThread) -> LifeThreadResponse:
         story=thread.story,
         is_open=thread.is_open,
         updated_at=thread.updated_at,
+    )
+
+
+def to_kept_quote_response(observation: Observation) -> KeptQuoteResponse:
+    """Describe a kept quote for the Dashboard, naming no Pattern.
+
+    Args:
+        observation: The Observation whose quote Zeph keeps.
+
+    Returns:
+        Its quote, context line and day.
+    """
+    return KeptQuoteResponse(
+        id=str(observation.id),
+        quote=observation.quote,
+        context=observation.context,
+        day=observation.day,
     )
 
 
@@ -560,6 +597,7 @@ def to_me_response(me: Me) -> MeResponse:
         photo_viewing_enabled=user.photo_viewing_enabled,
         photo_viewing_available=me.photo_viewing_available,
         personal_stickers_available=me.personal_stickers_available,
+        show_pattern_noticing_notice=me.show_pattern_noticing_notice,
         onboarding_completed_at=user.onboarding_completed_at,
         role=user.role,
         changed_in_chat=user.settings_changed_in_chat,
@@ -767,6 +805,20 @@ def build_dashboard_api_router(
             time_zone=request.time_zone,
         )
         return me_response(user_service.update_preferences(user, changes))
+
+    @router.post("/me/pattern-noticing-told")
+    def mark_pattern_noticing_told(
+        user: Annotated[User, Depends(current_user)],
+    ) -> MeResponse:
+        """Save that the User pressed "Got it" on the Pattern noticing notice.
+
+        Args:
+            user: The signed-in User.
+
+        Returns:
+            The updated User, whose notice no longer shows.
+        """
+        return me_response(user_service.mark_pattern_noticing_told(user))
 
     @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
     def delete_account(user: Annotated[User, Depends(current_user)]) -> Response:
@@ -1141,6 +1193,46 @@ def build_dashboard_api_router(
             CoreError: 404 if the User has no such confirmed Pattern.
         """
         user_memory_service.delete_pattern(user.id, pattern_id)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @router.get("/kept-quotes")
+    def list_kept_quotes(
+        user: Annotated[User, Depends(current_user)],
+    ) -> KeptQuotesResponse:
+        """Return the quotes Zeph keeps as evidence for the User, newest day first.
+
+        Args:
+            user: The signed-in User.
+
+        Returns:
+            Each quote with its context line and day, and no Pattern named.
+        """
+        return KeptQuotesResponse(
+            quotes=[
+                to_kept_quote_response(observation)
+                for observation in user_memory_service.list_kept_quotes(user.id)
+            ]
+        )
+
+    @router.delete(
+        "/kept-quotes/{observation_id}", status_code=status.HTTP_204_NO_CONTENT
+    )
+    def delete_kept_quote(
+        user: Annotated[User, Depends(current_user)], observation_id: UUID
+    ) -> Response:
+        """Delete one of the User's kept quotes, so it is never used again.
+
+        Args:
+            user: The signed-in User.
+            observation_id: The kept quote's ID.
+
+        Returns:
+            An empty response.
+
+        Raises:
+            CoreError: 404 if the User has no such kept quote.
+        """
+        user_memory_service.delete_kept_quote(user.id, observation_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @router.get("/move-outcomes")

@@ -37,6 +37,7 @@ export const memoriesTabs = [
   "helps",
   "summaries",
   "photos",
+  "quotes",
 ] as const;
 
 /** One tab of the Memories page. */

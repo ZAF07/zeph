@@ -64,6 +64,7 @@ users = Table(
     Column("settings_changed_in_chat", JSONB, nullable=False, server_default="{}"),
     Column("settings_changed_by_admin", JSONB, nullable=False, server_default="{}"),
     Column("data_deletion_requested_at", DateTime(timezone=True)),
+    Column("pattern_noticing_told_at", DateTime(timezone=True)),
 )
 
 telegram_connections = Table(

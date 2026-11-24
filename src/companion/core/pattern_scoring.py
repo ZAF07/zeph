@@ -518,6 +518,10 @@ class PatternScorer:
     ) -> None:
         """Score the User's Patterns again from all their Observations.
 
+        The User is locked while their Observations and Patterns are read and
+        the moves saved, so an Observation deleted meanwhile is never counted
+        in a state saved after its deletion.
+
         Args:
             user: The User.
             settings: The platform settings, which may hold an Eval
@@ -525,8 +529,31 @@ class PatternScorer:
             cause: What made them be scored again.
             conversation_id: The Conversation tagged, when that is the cause.
         """
-        observations = self._repositories.observations.list_for_user(user.id)
-        patterns = self._repositories.patterns.list_of_pattern_types(user.id)
+        with self._repositories.transaction() as transaction:
+            transaction.lock_user(user.id)
+            self._score_locked(
+                transaction.repositories, user, settings, cause, conversation_id
+            )
+
+    def _score_locked(
+        self,
+        repositories: Repositories,
+        user: User,
+        settings: PlatformSettings,
+        cause: PatternMoveCause,
+        conversation_id: UUID | None,
+    ) -> None:
+        """Score the User's Patterns again while they are locked.
+
+        Args:
+            repositories: The repositories, inside the locking transaction.
+            user: The User.
+            settings: The platform settings.
+            cause: What made them be scored again.
+            conversation_id: The Conversation tagged, when that is the cause.
+        """
+        observations = repositories.observations.list_for_user(user.id)
+        patterns = repositories.patterns.list_of_pattern_types(user.id)
         if not observations and not patterns:
             return
         sign_strengths = {
@@ -547,6 +574,6 @@ class PatternScorer:
             cause,
             conversation_id,
         )
-        self._repositories.patterns.save_moves(
+        repositories.patterns.save_moves(
             planned.added, planned.changed, planned.deleted_ids, planned.moves
         )

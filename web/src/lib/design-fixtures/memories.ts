@@ -4,6 +4,7 @@ import type {
   LifeThread,
   MemoryGroup,
   MoveOutcome,
+  KeptQuote,
   Pattern,
   SharedPhoto,
   UserPortrait,
@@ -132,6 +133,28 @@ const patterns: Pattern[] = [
   },
 ];
 
+/** Alex's kept quotes, as drawn in `Memories--tab-quotes.html`. */
+const keptQuotes: KeptQuote[] = [
+  {
+    id: "design-quote-1",
+    quote: "If I stop now, everyone will see I can't keep up.",
+    context: "Talking about working through the weekend.",
+    day: "2026-11-12",
+  },
+  {
+    id: "design-quote-2",
+    quote: "It's probably just me running away again.",
+    context: "Talking about the van trip he has been planning.",
+    day: "2026-11-09",
+  },
+  {
+    id: "design-quote-3",
+    quote: "I felt like I hadn't earned the afternoon off.",
+    context: "After visiting his father on a weekday.",
+    day: "2026-11-02",
+  },
+];
+
 /** Alex's Move Outcomes, as drawn in `Memories--tab-helps.html`. */
 const moveOutcomes: MoveOutcome[] = [
   {
@@ -181,6 +204,7 @@ export const memoriesFixtures: Partial<ApiClient> = {
   getUserPortrait: async () => portrait,
   listLifeThreads: async () => lifeThreads,
   listPatterns: async () => patterns,
+  listKeptQuotes: async () => keptQuotes,
   listMoveOutcomes: async () => moveOutcomes,
   listDaySummaries: async () => summaries,
   listSharedPhotos: async () => sharedPhotos,

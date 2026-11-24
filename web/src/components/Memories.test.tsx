@@ -6,6 +6,7 @@ import { Memories } from "@/components/Memories";
 import type {
   ApiClient,
   DaySummary,
+  KeptQuote,
   LifeThread,
   MemoryGroup,
   MoveOutcome,
@@ -32,6 +33,9 @@ const apiClient = {
   deleteLifeThread: vi.fn<ApiClient["deleteLifeThread"]>(),
   listPatterns: vi.fn<ApiClient["listPatterns"]>(),
   deletePattern: vi.fn<ApiClient["deletePattern"]>(),
+  listKeptQuotes: vi.fn<ApiClient["listKeptQuotes"]>(),
+  deleteKeptQuote: vi.fn<ApiClient["deleteKeptQuote"]>(),
+  markPatternNoticingTold: vi.fn<ApiClient["markPatternNoticingTold"]>(),
   listMoveOutcomes: vi.fn<ApiClient["listMoveOutcomes"]>(),
   deleteMoveOutcome: vi.fn<ApiClient["deleteMoveOutcome"]>(),
   getUserPortrait: vi.fn<ApiClient["getUserPortrait"]>(),
@@ -175,6 +179,21 @@ const patterns: Pattern[] = [
   },
 ];
 
+const keptQuotes: KeptQuote[] = [
+  {
+    id: "quote-1",
+    quote: "If I stop now, everyone will see I can't keep up.",
+    context: "Talking about working through the weekend.",
+    day: "2026-11-12",
+  },
+  {
+    id: "quote-2",
+    quote: "It's probably just me running away again.",
+    context: "Talking about the van trip.",
+    day: "2026-11-09",
+  },
+];
+
 const portrait: UserPortrait = {
   text: "Maya is a designer weighing a new role. Walks help; pep talks don’t.",
   updated_at: "2026-11-13T09:00:00Z",
@@ -217,6 +236,8 @@ describe("Memories", () => {
     apiClient.deleteLifeThread.mockResolvedValue(undefined);
     apiClient.listPatterns.mockResolvedValue(patterns);
     apiClient.deletePattern.mockResolvedValue(undefined);
+    apiClient.listKeptQuotes.mockResolvedValue(keptQuotes);
+    apiClient.deleteKeptQuote.mockResolvedValue(undefined);
     apiClient.listMoveOutcomes.mockResolvedValue(moveOutcomes);
     apiClient.deleteMoveOutcome.mockResolvedValue(undefined);
     apiClient.getUserPortrait.mockResolvedValue(portrait);
@@ -706,6 +727,169 @@ describe("Memories", () => {
     expect(apiClient.deletePattern).toHaveBeenCalledWith("pattern-2");
   });
 
+  it("lists each kept quote apart from Zeph's note, with its day, newest first", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<Memories copy={seedCopy()} />);
+
+    await user.click(
+      await screen.findByRole("tab", { name: "Things you said" }),
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Things you said that Zeph kept" }),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        "Your exact words that Zeph keeps to notice what you do again and again. They stay after your messages are deleted, until you delete them. Delete one and Zeph stops using it.",
+      ),
+    ).toBeVisible();
+    const [newest, older] = screen.getAllByRole("listitem");
+    const quote = within(newest).getByText(
+      "“If I stop now, everyone will see I can't keep up.”",
+    );
+    const note = within(newest).getByText(
+      "Talking about working through the weekend.",
+    );
+    expect(quote).not.toBe(note);
+    expect(quote).not.toContainElement(note);
+    expect(within(newest).getByText("Zeph's note")).toBeVisible();
+    expect(within(newest).getByText("You said this on 12 Nov")).toBeVisible();
+    expect(within(older).getByText("You said this on 9 Nov")).toBeVisible();
+    expect(
+      within(screen.getByRole("tabpanel")).queryByText(/pattern/i),
+    ).toBeNull();
+  });
+
+  it("deletes a kept quote at once", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<Memories copy={seedCopy()} />);
+    await user.click(
+      await screen.findByRole("tab", { name: "Things you said" }),
+    );
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Delete quote: If I stop now, everyone will see I can't keep up.",
+      }),
+    );
+
+    expect(apiClient.deleteKeptQuote).toHaveBeenCalledWith("quote-1");
+    expect(
+      screen.queryByText("“If I stop now, everyone will see I can't keep up.”"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText("“It's probably just me running away again.”"),
+    ).toBeVisible();
+  });
+
+  it("keeps a kept quote and explains when deleting it fails", async () => {
+    apiClient.deleteKeptQuote.mockRejectedValue(new Error("down"));
+    const user = userEvent.setup();
+    renderWithQueries(<Memories copy={seedCopy()} />);
+    await user.click(
+      await screen.findByRole("tab", { name: "Things you said" }),
+    );
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Delete quote: It's probably just me running away again.",
+      }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn’t delete that. Please try again.",
+    );
+    expect(
+      screen.getByText("“It's probably just me running away again.”"),
+    ).toBeVisible();
+  });
+
+  it("explains when no quote is kept yet", async () => {
+    apiClient.listKeptQuotes.mockResolvedValue([]);
+    const user = userEvent.setup();
+    renderWithQueries(<Memories copy={seedCopy()} />);
+
+    await user.click(
+      await screen.findByRole("tab", { name: "Things you said" }),
+    );
+
+    expect(screen.getByText("Nothing kept yet")).toBeVisible();
+    expect(
+      screen.getByText(
+        "When something you say helps Zeph notice what you do again and again, it may keep your exact words here after the Conversation ends.",
+      ),
+    ).toBeVisible();
+  });
+
+  it("still shows and deletes kept quotes when User Memory is off", async () => {
+    apiClient.getMe.mockResolvedValue({ ...maya, user_memory_enabled: false });
+    const user = userEvent.setup();
+    renderWithQueries(<Memories copy={seedCopy()} />);
+    await user.click(
+      await screen.findByRole("tab", { name: "Things you said" }),
+    );
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Delete quote: It's probably just me running away again.",
+      }),
+    );
+
+    expect(apiClient.deleteKeptQuote).toHaveBeenCalledWith("quote-2");
+  });
+
+  it("tells the User what changed until they press Got it", async () => {
+    apiClient.getMe.mockResolvedValue({
+      ...maya,
+      show_pattern_noticing_notice: true,
+    });
+    apiClient.markPatternNoticingTold.mockResolvedValue({
+      ...maya,
+      show_pattern_noticing_notice: false,
+    });
+    const user = userEvent.setup();
+    renderWithQueries(<Memories copy={seedCopy()} />);
+
+    expect(
+      await screen.findByText("Zeph now keeps some of your words."),
+    ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Got it" }));
+
+    expect(apiClient.markPatternNoticingTold).toHaveBeenCalled();
+    expect(
+      screen.queryByText("Zeph now keeps some of your words."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the notice and explains when Got it can't be saved", async () => {
+    apiClient.getMe.mockResolvedValue({
+      ...maya,
+      show_pattern_noticing_notice: true,
+    });
+    apiClient.markPatternNoticingTold.mockRejectedValue(new Error("down"));
+    const user = userEvent.setup();
+    renderWithQueries(<Memories copy={seedCopy()} />);
+
+    await user.click(await screen.findByRole("button", { name: "Got it" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn’t save that. Please try again.",
+    );
+    expect(
+      screen.getByText("Zeph now keeps some of your words."),
+    ).toBeVisible();
+  });
+
+  it("shows no notice once the User has been told", async () => {
+    renderWithQueries(<Memories copy={seedCopy()} />);
+
+    await screen.findByRole("tabpanel");
+
+    expect(
+      screen.queryByText("Zeph now keeps some of your words."),
+    ).not.toBeInTheDocument();
+  });
+
   it("shows what helps: each Move Outcome's situation, feeling, result, why and date", async () => {
     const user = userEvent.setup();
     renderWithQueries(<Memories copy={seedCopy()} />);
@@ -1006,6 +1190,7 @@ describe("Memories", () => {
       "helps",
       "summaries",
       "photos",
+      "quotes",
     ];
 
     /**
@@ -1052,6 +1237,13 @@ describe("Memories", () => {
             thread: "⟦data⟧",
             line: "⟦data⟧",
           })),
+        })),
+      );
+      apiClient.listKeptQuotes.mockResolvedValue(
+        keptQuotes.map((quote) => ({
+          ...quote,
+          quote: "⟦data⟧",
+          context: "⟦data⟧",
         })),
       );
       apiClient.listMoveOutcomes.mockResolvedValue(
@@ -1127,6 +1319,7 @@ describe("Memories", () => {
       apiClient.listMoveOutcomes.mockResolvedValue([]);
       apiClient.listDaySummaries.mockResolvedValue([]);
       apiClient.listSharedPhotos.mockResolvedValue([]);
+      apiClient.listKeptQuotes.mockResolvedValue([]);
 
       const { container } = renderWithQueries(<Memories copy={markedCopy()} />);
 
