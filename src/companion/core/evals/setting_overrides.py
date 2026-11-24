@@ -348,19 +348,13 @@ def has_text_fields(value: Any, names: Sequence[str]) -> bool:
     )
 
 
-def need_details(key: str, value: Any, live: Need | None) -> NeedDetails:
-    """Read a Need override's value.
+def check_need_override(key: str, value: Any) -> None:
+    """Check a Need override's value has the right shape.
 
     Args:
         key: The override's key, for the message.
         value: Its value: a name, when it fits, how to reply and,
             optionally, how Curiosities are treated.
-        live: The live Need, whose ruled-out Moves an override keeps, and
-            whose way of treating Curiosities it keeps when it names none;
-            None while only the value's shape is checked.
-
-    Returns:
-        The details.
 
     Raises:
         InvalidOverrideError: If a text field is missing or not text, or
@@ -371,21 +365,32 @@ def need_details(key: str, value: Any, live: Need | None) -> NeedDetails:
             f"The change to '{key}' needs a name, when it fits and how to reply."
         )
     treatment = value.get("curiosities")
-    if treatment is not None and treatment not in {
-        choice.value for choice in CuriosityTreatment
-    }:
+    choices = [choice.value for choice in CuriosityTreatment]
+    if treatment is not None and treatment not in choices:
         raise InvalidOverrideError(
             f"The change to '{key}' has an unknown choice for Curiosities."
         )
-    details = NeedDetails(
-        name=value["name"],
-        when_it_fits=value["when_it_fits"],
-        how_to_reply=value["how_to_reply"],
-        ruled_out_move_ids=live.ruled_out_move_ids if live else frozenset(),
+
+
+def need_details(value: Mapping[str, Any], live: Need) -> NeedDetails:
+    """Read a checked Need override's value.
+
+    Args:
+        value: Its value, as `check_need_override` passed it.
+        live: The live Need, whose ruled-out Moves an override keeps, and
+            whose way of treating Curiosities it keeps when it names none.
+
+    Returns:
+        The details.
+    """
+    changed = overridden_need(live, value)
+    return NeedDetails(
+        name=changed.name,
+        when_it_fits=changed.when_it_fits,
+        how_to_reply=changed.how_to_reply,
+        ruled_out_move_ids=changed.ruled_out_move_ids,
+        curiosities=changed.curiosities,
     )
-    if treatment is not None:
-        return replace(details, curiosities=CuriosityTreatment(treatment))
-    return replace(details, curiosities=live.curiosities) if live else details
 
 
 class SettingOverrideService:
@@ -472,8 +477,8 @@ class SettingOverrideService:
             InvalidOverrideError: If a field is missing or malformed.
             NeedNotFoundError: If there is no such live Need.
         """
-        need_details(key, value, None)
-        return need_details(key, value, self._need_service.get(need_id))
+        check_need_override(key, value)
+        return need_details(value, self._need_service.get(need_id))
 
     def _move_details(self, move_id: UUID, key: str, value: Any) -> MoveDetails:
         """Read a Move override's value, keeping the live Move's other settings.

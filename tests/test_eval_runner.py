@@ -1214,8 +1214,9 @@ def test_a_variant_can_override_how_a_need_treats_curiosities(
     assert PostgresNeedRepository(engine).list_all() == live_needs
 
 
+@pytest.mark.parametrize("choice", ["always", ["never"], 3])
 def test_a_need_override_with_an_unknown_curiosities_choice_is_refused(
-    client: TestClient, auth_verifier: FakeAuthVerifier
+    client: TestClient, auth_verifier: FakeAuthVerifier, choice: object
 ) -> None:
     admin = owner_headers(client, auth_verifier)
     key = need_key(client, admin, "Just chatting")
@@ -1223,7 +1224,7 @@ def test_a_need_override_with_an_unknown_curiosities_choice_is_refused(
         "name": "Just chatting",
         "when_it_fits": "x",
         "how_to_reply": "y",
-        "curiosities": "always",
+        "curiosities": choice,
     }
 
     response = client.post(

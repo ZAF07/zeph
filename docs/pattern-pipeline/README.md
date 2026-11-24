@@ -2,7 +2,7 @@
 
 Read this before planning or changing Patterns, Observations, Curiosities, the Agenda or Thought Experiments. Terms in **bold** are defined in `CONTEXT.md`. The reply path itself is in `docs/message-pipeline/README.md`.
 
-**Status:** target design, agreed 24 Nov 2026. **Not built yet.** Until it is, Patterns work as ADR-0020 says. Every decision behind it, with starting numbers and the first fifteen Pattern Types, is in `.scratch/pattern-pipeline/grill-decisions.md`.
+**Status:** target design, agreed 24 Nov 2026. **Not built yet**, except where a "Built" note says so. Until it is, Patterns work as ADR-0020 says. Every decision behind it, with starting numbers and the first fifteen Pattern Types, is in `.scratch/pattern-pipeline/grill-decisions.md`.
 
 **Built so far:** the Pattern Catalog loads from `src/companion/seed/pattern_catalog/` when the backend starts, and Admins read it on the Dashboard's Pattern Catalog page (ADR-0025). Nothing reads it in the reply path yet.
 
@@ -88,7 +88,7 @@ Three Features, each needing the one before, all off to start, switched per User
 
 ## Build order
 
-1. Curiosity standing fix (per-Need field; a picked Curiosity is part of the plan). No catalog needed.
+1. Curiosity standing fix (per-Need field; a picked Curiosity is part of the plan). No catalog needed. *Built (24 Nov 2026), without "test the water", pace and backing off, which come next: see "6. Reply Plan", "7. Reply" and "d. Curiosities" in `docs/message-pipeline/README.md`.*
 2. Catalog, tagging, Observations, the Tagging Eval, "Things you said that Zeph kept".
 3. Scoring, states, the log, unmatched Patterns, moving existing Patterns across.
 4. Agenda, Explorations, Thought Experiments, Familiarity, starter questions.

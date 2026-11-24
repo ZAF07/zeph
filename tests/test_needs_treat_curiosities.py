@@ -8,7 +8,7 @@ from sqlalchemy import Engine, text
 
 from companion.adapters.postgres.database import migrate
 from companion.core.curiosities import NO_REASON_GIVEN
-from companion.core.reply_plan import ASKS_WHY_INSTEAD
+from companion.core.reply_plan import ASKS_WHY_INSTEAD, NO_REPLY_PLAN
 from companion.core.response_composition import (
     GUIDANCE_HEADING,
     MEMORY_HEADING,
@@ -339,6 +339,34 @@ def test_a_reply_that_asks_why_asks_no_curiosity_too(
     )
 
 
+def test_a_failed_reply_plan_under_ask_by_default_says_it_could_not_be_made(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+    engine: Engine,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    presentation_is_due(client, chat_model, clock, scheduler, seeded_settings)
+    admin = owner_headers(client, auth_verifier)
+    set_treatment(client, admin, "Ask more", "ask_by_default")
+    chat_model.script_reply_plan("not a form")
+
+    try:
+        reply_instructions(client, chat_model, "hey you")
+        form = saved_reply_plans(engine)[-1]["form"]
+    finally:
+        set_treatment(client, admin, "Ask more", "only_if_it_fits")
+
+    assert (form["curiosities"], form["curiosity_not_asked_why"]) == (
+        [],
+        NO_REPLY_PLAN,
+    )
+
+
 @pytest.mark.parametrize("aim", ["commitment", "look_back", "next_move"])
 def test_a_new_curiosity_is_saved_with_its_aim(
     client: TestClient,
@@ -391,6 +419,7 @@ def test_the_keeping_step_saves_no_curiosity_without_an_aim(
             without_aim,
             new_curiosity(ask="Null aim?", aim=None),
             new_curiosity(ask="Odd aim?", aim="small talk"),
+            {**new_curiosity(ask="A list as its aim?"), "aim": ["look_back"]},
             new_curiosity(ask="A guess with no guess?", aim="guess"),
             {**new_curiosity(ask="Do you live near the sea?", aim=None), "guess": "x"},
             new_curiosity(ask=DESK, aim="look_back"),

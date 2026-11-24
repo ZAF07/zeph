@@ -1,6 +1,6 @@
 # Every Curiosity has an aim and, once picked, is part of the plan
 
-Status: accepted, not built yet. Amends ADR-0017.
+Status: accepted. Amends ADR-0017. Built in part (24 Nov 2026): aims on the Curiosities a model writes, the per-Need field (ask by default, only if it fits, never) and a picked Curiosity as part of the plan. Testing lightly, pace, backing off and the Agenda are not built yet.
 
 Zeph was passive: with the live limits at 5 Curiosities per Conversation and 7 Curiosity Check-ins a week, it still raised almost nothing that mattered. The cause was not the budget. A Curiosity could be dropped twice (the Reply Plan was told to leave it out unless the moment was right, then the Reply got it as an optional extra), it lost to every other question, and a model wrote it with nothing to aim at. We keep Curiosities as the one store of things to ask, and change their standing: each has an aim, code writes and ranks the ones that serve a Pattern, each Need says how Curiosities are treated while it is picked, and one the Reply Plan picks is part of the plan the Reply follows.
 

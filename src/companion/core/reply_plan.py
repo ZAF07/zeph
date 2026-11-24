@@ -78,6 +78,7 @@ logger = logging.getLogger(__name__)
 
 MOST_CURIOSITIES_PER_REPLY = 1
 ASKS_WHY_INSTEAD = "The reply asks why they feel as they do instead."
+NO_REPLY_PLAN = "The Reply Plan couldn't be made."
 
 
 @dataclass(frozen=True)
@@ -868,9 +869,12 @@ def fallback_form(fallback: Need) -> ReplyPlanForm:
 
     Returns:
         A form with the fallback Need, no Moves, no Memory Categories, and
-        no asking why, as the old combined call's fallback never asked.
+        no asking why, as the old combined call's fallback never asked. It
+        says why it asks no Curiosity, kept only when the Need owes a reason.
     """
-    return ReplyPlanForm(need=fallback.name, ask_why=False)
+    return ReplyPlanForm(
+        need=fallback.name, ask_why=False, curiosity_not_asked_why=NO_REPLY_PLAN
+    )
 
 
 def fallback_need(needs: Sequence[Need]) -> Need:

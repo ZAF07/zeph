@@ -452,9 +452,10 @@ def read_aim(entry: dict[str, Any]) -> CuriosityAim | None:
     if read_text(entry, "guess"):
         return CuriosityAim.GUESS
     value = entry.get("aim")
-    if value == CuriosityAim.GUESS or value not in {aim.value for aim in CuriosityAim}:
-        return None
-    return CuriosityAim(value)
+    aims_without_a_guess = [
+        aim.value for aim in CuriosityAim if aim != CuriosityAim.GUESS
+    ]
+    return CuriosityAim(value) if value in aims_without_a_guess else None
 
 
 def read_number(entry: dict[str, Any], key: str) -> int | None:
