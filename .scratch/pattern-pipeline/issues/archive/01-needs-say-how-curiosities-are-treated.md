@@ -63,4 +63,4 @@ Evidence (24 Nov 2026, worktree stack on ports 3010/8010; the real backend with 
 ## Completion
 
 - Completed: 2026-11-24
-- Commit: <filled in after the merge>
+- Commit: 844c76d (merge "Merge pattern-01-needs-curiosities: each Need says how Curiosities are treated; a picked Curiosity is part of the plan"; work in 6d20818 "Each Need says how Curiosities are treated; a picked Curiosity is part of the plan", d4c3c60 "Needs page gets a Curiosities field; the trace shows Curiosities offered and asked", 75c2f70 "Review fixes and docs for Needs treating Curiosities", 2ff5e3a "Point the guide at migration 0080", ef93861 "Archive pattern-pipeline issue 01: Needs say how Curiosities are treated, verified")
