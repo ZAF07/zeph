@@ -79,4 +79,4 @@ Evidence (24–25 Nov 2026, worktree stack on 3010/8010, migration 0091 (renumbe
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: <to be filled after merge>
+- Commit: 96dd733 (merge "Merge pattern-05-thought-experiments: Admins manage Thought Experiments, code picks one for a User's unclear look-alike pair, answers are tagged what if"; work in 3f9f1f3 "Thought Experiments: Admins manage them, code picks one for the unclear pair, answers are tagged what if", 1c74f9a review fixes, 70f48bc Check-in test, be33458 docs, b7bbd45 menu tests, 27adee0 issue archived, 150801e migration 0094 and rebase fixes)
