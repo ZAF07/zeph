@@ -1,3 +1,4 @@
+from companion.core.agenda import AgendaReader
 from companion.core.conversations import ConversationService, ReplyPartlySentError
 from companion.core.curiosities import CuriosityRaiser
 from companion.core.knowledge_retrieval import KnowledgeRetrieval
@@ -60,6 +61,7 @@ class ReplyService:
         woven_check_ins: WovenCheckIns,
         recent_messages: RecentMessagesReader,
         pattern_reminder: PatternReminder,
+        agenda: AgendaReader,
     ) -> None:
         """Set up the service.
 
@@ -84,6 +86,7 @@ class ReplyService:
             recent_messages: Reads the messages every step of the reply sees.
             pattern_reminder: Finds the Patterns that come to mind for each
                 Message.
+            agenda: Reads the User's Agenda for the Reply Plan.
         """
         self._reply_gate = reply_gate
         self._conversations = conversations
@@ -98,6 +101,7 @@ class ReplyService:
         self._woven_check_ins = woven_check_ins
         self._recent_messages = recent_messages
         self._pattern_reminder = pattern_reminder
+        self._agenda = agenda
 
     def handle(
         self, message: MessageToAnswer, snapshot: UserSnapshot, attempt: ReplyAttempt
@@ -157,6 +161,7 @@ class ReplyService:
             move_outcomes,
             self._woven_check_ins.kinds_to_offer(snapshot, understanding.form),
             patterns,
+            self._agenda.read(snapshot, understanding.form.struggling),
         )
         plan = planned.reply_plan.form
         attempt.raise_if_dropped()

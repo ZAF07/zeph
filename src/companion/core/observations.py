@@ -2,7 +2,7 @@ import json
 import logging
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
@@ -15,6 +15,7 @@ from companion.core.models import (
     ChatLine,
     ChatRole,
     ConversationMessage,
+    CuriosityAim,
     EvidenceKind,
     Feature,
     LifeThread,
@@ -246,6 +247,105 @@ def read_tagging_answer(answer: str) -> list[Any] | None:
         return None
     observations: list[Any] = parsed["observations"]
     return observations
+
+
+def read_settled_answer(answer: str) -> list[Any]:
+    """Read the unclear stories the tagging model settled from its JSON answer.
+
+    Args:
+        answer: The model's answer, already readable for its Observations.
+
+    Returns:
+        What it settled, as the model wrote it; empty when it settled none.
+    """
+    start, end = answer.find("{"), answer.rfind("}")
+    try:
+        parsed = json.loads(answer[start : end + 1])
+    except json.JSONDecodeError:
+        return []
+    settled = parsed.get("settled") if isinstance(parsed, dict) else None
+    return settled if isinstance(settled, list) else []
+
+
+def plan_settled(
+    entries: Sequence[Any],
+    unclear: Mapping[int, Observation],
+    pattern_types: Mapping[str, PatternType],
+) -> list[Observation]:
+    """Make clear the unclear Observations the tagging model settled.
+
+    Code keeps a settling only when it names one of the Observation's two
+    Pattern Types and a sign of that Pattern Type in the Observation's
+    direction. Whether anyone would act the same is worked out again for
+    the Pattern Type named.
+
+    Args:
+        entries: What the model settled, as it wrote it.
+        unclear: The unclear Observations it was shown, by number.
+        pattern_types: The Pattern Types in the catalog now, by ID.
+
+    Returns:
+        The Observations made clear, each once.
+    """
+    settled: dict[UUID, Observation] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        number = entry.get("unclear")
+        observation = (
+            unclear.get(number)
+            if isinstance(number, int) and not isinstance(number, bool)
+            else None
+        )
+        pattern_type = pattern_types.get(entry.get("pattern_type") or "")
+        if (
+            observation is None
+            or observation.id in settled
+            or pattern_type is None
+            or pattern_type.id
+            not in (observation.pattern_type_id, observation.second_pattern_type_id)
+        ):
+            continue
+        signs = (
+            pattern_type.signs
+            if observation.direction == ObservationDirection.FOR
+            else pattern_type.signs_against
+        )
+        if entry.get("sign") not in {sign.id for sign in signs}:
+            continue
+        settled[observation.id] = replace(
+            observation,
+            pattern_type_id=pattern_type.id,
+            pattern_type_version=pattern_type.version,
+            sign_id=entry["sign"],
+            second_pattern_type_id=None,
+            second_pattern_type_version=None,
+            situational=is_situational(
+                observation.tags, pattern_type.anyone_would_when
+            ),
+        )
+    return list(settled.values())
+
+
+def describe_unclear_asked(unclear: Mapping[int, Observation]) -> str:
+    """Write the unclear stories Zeph asked about, as the tagging model reads them.
+
+    Args:
+        unclear: The unclear Observations, by number.
+
+    Returns:
+        One line per story with its quote, who it was about, its day, its
+        context line and its two Pattern Types; "None." with none.
+    """
+    return (
+        "\n".join(
+            f'[{number}] "{observation.quote}" ({observation.about}, '
+            f"{observation.day.day} {observation.day:%b %Y}; {observation.context}): "
+            f"{observation.pattern_type_id} or {observation.second_pattern_type_id}"
+            for number, observation in unclear.items()
+        )
+        or "None."
+    )
 
 
 def read_choice[Choice: StrEnum](
@@ -529,6 +629,7 @@ def describe_conversation_to_tag(
     messages: list[ConversationMessage],
     now: datetime,
     time_zone: str | None,
+    unclear: Mapping[int, Observation] | None = None,
 ) -> str:
     """Write what the tagging model is given.
 
@@ -538,10 +639,12 @@ def describe_conversation_to_tag(
         messages: The Conversation's messages, oldest first.
         now: The current time.
         time_zone: The User's IANA time zone, for the days.
+        unclear: The unclear stories Zeph asked about in this Conversation,
+            by number; None or empty with none.
 
     Returns:
-        Today's date, the Threads, the Pattern Catalog, the tag lists and
-        the Conversation.
+        Today's date, the Threads, the Pattern Catalog, the tag lists, the
+        unclear stories asked about and the Conversation.
     """
     thread_lines = "\n".join(
         f"[{number}] {describe_thread(thread, time_zone)}"
@@ -555,6 +658,8 @@ def describe_conversation_to_tag(
         f"Life Threads this Conversation touched:\n{thread_lines or 'None.'}\n\n"
         f"The Pattern Catalog:\n{catalog}\n\n"
         f"The lists each tag comes from:\n{describe_tag_lists()}\n\n"
+        f"Unclear stories Zeph asked about in this Conversation:\n"
+        f"{describe_unclear_asked(unclear or {})}\n\n"
         f"The Conversation:\n{to_transcript_lines(messages, time_zone)}"
     )
 
@@ -629,15 +734,17 @@ class PatternTagger:
         threads = dict(enumerate(touched, start=1))
         now = self._clock.now()
         time_zone = snapshot.user.time_zone
-        entries = self._ask(
+        unclear = self._unclear_asked_in(snapshot, conversation_id)
+        answer = self._ask(
             snapshot,
             describe_conversation_to_tag(
-                threads, pattern_types, messages, now, time_zone
+                threads, pattern_types, messages, now, time_zone, unclear
             ),
         )
-        if entries is None:
+        if answer is None:
             logger.warning("Pattern tagging gave no readable answer")
             return None
+        entries, settled = answer
         planned = plan_observations(
             entries,
             TaggingContext(
@@ -656,18 +763,59 @@ class PatternTagger:
             snapshot, TaggingShape(tagged=len(entries), dropped=planned.dropped)
         )
         self._repositories.observations.add_many(planned.kept)
+        self._repositories.observations.settle(
+            plan_settled(
+                settled,
+                unclear,
+                {pattern_type.id: pattern_type for pattern_type in pattern_types},
+            )
+        )
         return planned
 
-    def _ask(self, snapshot: UserSnapshot, description: str) -> list[Any] | None:
+    def _unclear_asked_in(
+        self, snapshot: UserSnapshot, conversation_id: UUID
+    ) -> dict[int, Observation]:
+        """Find the unclear Observations an aimed Curiosity asked about here.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            conversation_id: The ended Conversation.
+
+        Returns:
+            Those still unclear, numbered from 1; none when no aimed
+            Curiosity about one was raised in it.
+        """
+        aimed_at = {
+            curiosity.source_observation_id
+            for curiosity in self._repositories.curiosities.list_raised_in(
+                conversation_id
+            )
+            if curiosity.aim == CuriosityAim.EXPLORATION
+        } - {None}
+        if not aimed_at:
+            return {}
+        unclear = [
+            observation
+            for observation in self._repositories.observations.list_for_user(
+                snapshot.user.id
+            )
+            if observation.id in aimed_at and observation.unclear
+        ]
+        return dict(enumerate(unclear, start=1))
+
+    def _ask(
+        self, snapshot: UserSnapshot, description: str
+    ) -> tuple[list[Any], list[Any]] | None:
         """Ask the model for the Observations, once more if it can't be read.
 
         Args:
             snapshot: The User whose Conversation it was.
-            description: The Threads, catalog, tag lists and Conversation.
+            description: The Threads, catalog, tag lists, unclear stories
+                asked about and Conversation.
 
         Returns:
-            The Observations it wrote, or None if both answers were
-            unreadable.
+            The Observations it wrote and the unclear stories it settled, or
+            None if both answers were unreadable.
         """
         settings = snapshot.settings
         for _ in range(2):
@@ -681,5 +829,5 @@ class PatternTagger:
             )
             entries = read_tagging_answer(answer)
             if entries is not None:
-                return entries
+                return entries, read_settled_answer(answer)
         return None

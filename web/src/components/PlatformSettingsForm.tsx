@@ -248,6 +248,21 @@ const fieldSections: {
         label: "Score that closes a Pattern",
         unit: "points",
       },
+      {
+        key: "agenda_size",
+        label: "Explorations on the Agenda",
+        unit: "at once",
+      },
+      {
+        key: "exploration_wait_days",
+        label: "Wait after a try with nothing",
+        unit: "days",
+      },
+      {
+        key: "exploration_rest_after_tries",
+        label: "Tries with nothing before resting",
+        unit: "tries",
+      },
     ],
   },
   {

@@ -7,6 +7,7 @@ from uuid import UUID
 
 from companion.core.models import (
     AccountIdentity,
+    AgendaChanges,
     CatalogPattern,
     ChannelSticker,
     ChatLine,
@@ -27,6 +28,8 @@ from companion.core.models import (
     DailyUsage,
     DaySummary,
     EmbeddedChunk,
+    Exploration,
+    ExplorationTry,
     Feature,
     FeatureSwitch,
     Helpline,
@@ -1309,6 +1312,15 @@ class ObservationRepository(Protocol):
         """
         ...
 
+    def settle(self, settled: Sequence[Observation]) -> None:
+        """Save unclear Observations made clear, with the Pattern Type now named.
+
+        Args:
+            settled: The Observations, each with one Pattern Type and its
+                sign; none saves nothing.
+        """
+        ...
+
     def list_for_user(self, user_id: UUID) -> list[Observation]:
         """List a User's Observations, oldest tagged first.
 
@@ -1631,6 +1643,54 @@ class UserPortraitRepository(Protocol):
         ...
 
 
+class ExplorationRepository(Protocol):
+    """Stores each User's Explorations and their tries, which are never shown.
+
+    An Exploration goes with its Pattern, and a try with its aimed Curiosity.
+    """
+
+    def list_for_user(self, user_id: UUID) -> list[Exploration]:
+        """List a User's Explorations, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Explorations.
+        """
+        ...
+
+    def list_tries(self, user_id: UUID) -> list[ExplorationTry]:
+        """List every try of a User's, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The tries.
+        """
+        ...
+
+    def save_agenda(self, changes: AgendaChanges) -> None:
+        """Save what keeping a User's Agenda changed, in one step.
+
+        A new aimed Curiosity whose Observation was deleted meanwhile is not
+        added, nor is its try.
+
+        Args:
+            changes: The changes.
+        """
+        ...
+
+    def delete_for_user(self, user_id: UUID) -> None:
+        """Delete every one of a User's Explorations and their tries.
+
+        Args:
+            user_id: The User's ID.
+        """
+        ...
+
+
 class CuriosityRepository(Protocol):
     """Stores each User's Curiosities, which are internal and never shown.
 
@@ -1657,6 +1717,17 @@ class CuriosityRepository(Protocol):
 
         Returns:
             The Curiosities.
+        """
+        ...
+
+    def list_aimed(self, user_id: UUID) -> list[Curiosity]:
+        """List a User's aimed Curiosities, in any state, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Curiosities with the aim of an Exploration's need.
         """
         ...
 
@@ -3072,6 +3143,7 @@ class Repositories:
     patterns: PatternRepository
     observations: ObservationRepository
     curiosities: CuriosityRepository
+    explorations: ExplorationRepository
     move_outcomes: MoveOutcomeRepository
     user_portraits: UserPortraitRepository
     knowledge_documents: KnowledgeDocumentRepository

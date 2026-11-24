@@ -958,7 +958,9 @@ class CheckInService:
                     has_shared_photos=user_id in with_shared_photos,
                     has_due_curiosity=bool(
                         due_curiosities(
-                            waiting_curiosities.get(user_id, []), snapshot.today
+                            waiting_curiosities.get(user_id, []),
+                            snapshot.today,
+                            snapshot.works(Feature.PATTERN_EXPLORING),
                         )
                     ),
                     curiosity_check_ins_this_week=curiosity_check_ins.get(user_id, 0),
@@ -1022,7 +1024,9 @@ class CheckInService:
         )
         curiosities_to_ask = (
             due_curiosities(
-                self._repositories.curiosities.list_waiting(user.id), snapshot.today
+                self._repositories.curiosities.list_waiting(user.id),
+                snapshot.today,
+                snapshot.works(Feature.PATTERN_EXPLORING),
             )
             if any(kind.raises_curiosity for kind in kinds)
             else []

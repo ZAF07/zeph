@@ -1312,6 +1312,7 @@ class CuriosityAim(StrEnum):
     LOOK_BACK = "look_back"
     GUESS = "guess"
     NEXT_MOVE = "next_move"
+    EXPLORATION = "exploration"
 
 
 @dataclass(frozen=True)
@@ -1330,7 +1331,8 @@ class Curiosity:
         created_at: When it was made.
         aim: What it is trying to learn: how a commitment went, how
             something looks to them now, whether a guess is right, or where
-            they've got to on a next Move never made.
+            they've got to on a next Move never made, or an Exploration's
+            need.
         source_memory_item_id: The Memory Item it came from, if any; deleting
             that item deletes it.
         source_life_thread_id: The Life Thread it came from, if any; deleting
@@ -1343,6 +1345,10 @@ class Curiosity:
         guess: What the Companion suspects but isn't sure of, e.g. "their
             mum lives in Singapore"; None for a plain Curiosity.
         how_sure: How sure it is of the guess; None without one.
+        exploration_id: The Exploration it is a try for, when code wrote it
+            for the Agenda; deleting that Exploration deletes it.
+        source_observation_id: The Observation it aims at, if any; deleting
+            that Observation deletes it.
     """
 
     id: UUID
@@ -1361,6 +1367,8 @@ class Curiosity:
     reaction: ThreadReaction | None = None
     guess: str | None = None
     how_sure: HowSure | None = None
+    exploration_id: UUID | None = None
+    source_observation_id: UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -2255,6 +2263,7 @@ class Feature(StrEnum):
     PERSONAL_STICKERS = "personal_stickers"
     CURIOSITIES = "curiosities"
     PATTERN_NOTICING = "pattern_noticing"
+    PATTERN_EXPLORING = "pattern_exploring"
 
 
 @dataclass(frozen=True)
@@ -2295,6 +2304,7 @@ class FeatureReason(StrEnum):
     OFF_FOR_USER = "off_for_user"
     TURNED_OFF_BY_USER = "turned_off_by_user"
     STICKERS_OFF = "stickers_off"
+    PATTERN_NOTICING_OFF = "pattern_noticing_off"
 
 
 @dataclass(frozen=True)
@@ -3185,3 +3195,113 @@ class PatternMove:
     points: float
     situations: int
     moved_at: datetime
+
+
+class ExplorationState(StrEnum):
+    """Where an Exploration stands on its User's Agenda."""
+
+    ACTIVE = "active"
+    WAITING = "waiting"
+    RESTING = "resting"
+
+
+@dataclass(frozen=True)
+class Exploration:
+    """Zeph's ongoing effort on one suspected Pattern. Internal: never shown.
+
+    Attributes:
+        id: Our ID for it.
+        user_id: The User it is about.
+        pattern_id: The Pattern it explores; deleting that Pattern deletes it.
+        pattern_type_id: That Pattern's Pattern Type's ID.
+        state: Active (on the Agenda), waiting for a place, or resting.
+        created_at: When it was made.
+        updated_at: When its state last changed.
+        rested_at: When it last started resting; None if it never did.
+        woke_at: When it last woke from resting; None if it never did.
+    """
+
+    id: UUID
+    user_id: UUID
+    pattern_id: UUID
+    pattern_type_id: str
+    state: ExplorationState
+    created_at: datetime
+    updated_at: datetime
+    rested_at: datetime | None = None
+    woke_at: datetime | None = None
+
+
+class ExplorationNeed(StrEnum):
+    """What an Exploration still needs to learn, in the order it is worked on."""
+
+    UNCLEAR = "unclear"
+    MISSING_PART = "missing_part"
+    COUNTER_TEST = "counter_test"
+
+
+class ExplorationWay(StrEnum):
+    """How an aimed Curiosity asks, least pushy first."""
+
+    STORY_FOLLOW_UP = "story_follow_up"
+    OTHER_PERSON = "other_person"
+    NOTICE_THIS_WEEK = "notice_this_week"
+
+
+class TryOutcome(StrEnum):
+    """How a try came back, as code judges it from the User's reaction."""
+
+    USEFUL = "useful"
+    VAGUE = "vague"
+    BRUSHED_OFF = "brushed_off"
+
+
+@dataclass(frozen=True)
+class ExplorationTry:
+    """One try at an Exploration's need: an aimed Curiosity and how it went.
+
+    Attributes:
+        curiosity_id: The aimed Curiosity; deleting it deletes the try.
+        exploration_id: The Exploration it is for.
+        user_id: The User it is about.
+        need: The need it aims at.
+        way: How it asks.
+        created_at: When code wrote it.
+        observation_id: The Observation it aims at, for an unclear story or
+            a counter-test on a story; None otherwise.
+        part_of_life: The part of life it aims at, for a missing one; None
+            otherwise.
+        outcome: How it came back; None until the Conversation it was asked
+            in ends. When and where it was asked are its Curiosity's.
+    """
+
+    curiosity_id: UUID
+    exploration_id: UUID
+    user_id: UUID
+    need: ExplorationNeed
+    way: ExplorationWay
+    created_at: datetime
+    observation_id: UUID | None = None
+    part_of_life: SituationSetting | None = None
+    outcome: TryOutcome | None = None
+
+
+@dataclass(frozen=True)
+class AgendaChanges:
+    """What keeping a User's Agenda at a Conversation's end changes.
+
+    Attributes:
+        added: New Explorations, in their state.
+        changed: Explorations whose state changed.
+        judged: Tries with the outcome just worked out.
+        closed_curiosity_ids: Waiting aimed Curiosities no longer wanted.
+        new_curiosities: The aimed Curiosities code wrote.
+        new_tries: Their tries.
+    """
+
+    added: list[Exploration]
+    changed: list[Exploration]
+    judged: list[ExplorationTry]
+    closed_curiosity_ids: list[UUID]
+    new_curiosities: list[Curiosity]
+    new_tries: list[ExplorationTry]
