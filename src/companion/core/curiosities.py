@@ -84,9 +84,13 @@ TREATMENT_WORDS = {
     CuriosityTreatment.NEVER: "never: ask none",
 }
 NO_REASON_GIVEN = "No reason given."
-ALSO_ASKS_WHY = (
+ASK_WHY_FIRST_NOTE = (
     "This reply also asks why they feel as they do. Ask that first, then this "
     "after it, so the two read as one easy turn, not a list of questions."
+)
+MORE_THAN_ONE_QUESTION_NOTE = (
+    "This reply asks more than one question, which is fine this time, even if "
+    "you usually ask at most one. Keep each short."
 )
 
 
@@ -295,7 +299,7 @@ def why_none_asked(
 
 
 def format_curiosities_for_reply(
-    chosen: Sequence[CuriosityToRaise], need: Need, also_asks_why: bool = False
+    chosen: Sequence[CuriosityToRaise], need: Need, also_asks_why: bool
 ) -> str:
     """Write the reply's section on the Curiosity it is to ask.
 
@@ -307,8 +311,9 @@ def format_curiosities_for_reply(
             then it is told to ask that first and this after it.
 
     Returns:
-        The section, with each one's guess to check if it holds one; "" if
-        none was chosen.
+        The section, with each one's guess to check if it holds one, and a
+        note that more than one question is fine when the reply asks more
+        than one; "" if none was chosen.
     """
     if not chosen:
         return ""
@@ -326,7 +331,11 @@ def format_curiosities_for_reply(
         f"{how_to_ask}. It is part of the plan, not an extra to leave out:\n"
         + "\n".join(lines)
     )
-    return f"{section}\n{ALSO_ASKS_WHY}" if also_asks_why else section
+    notes = [
+        *([ASK_WHY_FIRST_NOTE] if also_asks_why else []),
+        *([MORE_THAN_ONE_QUESTION_NOTE] if len(chosen) + also_asks_why > 1 else []),
+    ]
+    return "\n".join([section, *notes])
 
 
 class CuriosityRaiser:

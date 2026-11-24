@@ -860,8 +860,7 @@ def settle_curiosities(
     form: ReplyPlanForm,
     need: Need,
     due: DueCuriosities,
-    asked_why: bool,
-    held_when_asking_why: bool,
+    held_back_by_asking_why: bool,
 ) -> ReplyPlanForm:
     """Hold the form's Curiosities to what the picked Need and the reply allow.
 
@@ -873,18 +872,18 @@ def settle_curiosities(
         form: The form, as read.
         need: The Need the reply follows.
         due: The Curiosities the reply may ask under that Need.
-        asked_why: Whether the reply asks why they feel as they do.
-        held_when_asking_why: Whether a reply that asks why asks no
-            Curiosity too.
+        held_back_by_asking_why: Whether the reply asks why they feel as
+            they do while Admins hold Curiosities back from such a reply.
 
     Returns:
         The form, asking a Curiosity only when one was offered under the
         Need and the reply isn't held back by asking why, with why none is
         asked when the Need asks by default.
     """
-    held_back = asked_why and held_when_asking_why
-    chosen = form.curiosities if due.offered and not held_back else ()
-    reason = ASKS_WHY_INSTEAD if held_back else form.curiosity_not_asked_why
+    chosen = form.curiosities if due.offered and not held_back_by_asking_why else ()
+    reason = (
+        ASKS_WHY_INSTEAD if held_back_by_asking_why else form.curiosity_not_asked_why
+    )
     return replace(
         form,
         curiosities=chosen,
@@ -1348,8 +1347,7 @@ class ReplyPlanService:
             form,
             need,
             due_under_need,
-            asked_why,
-            snapshot.settings.get(CURIOSITY_HELD_WHEN_ASKING_WHY),
+            asked_why and snapshot.settings.get(CURIOSITY_HELD_WHEN_ASKING_WHY),
         )
         asks_another_question = asked_why or bool(form.curiosities)
         picked = pick_moves(need, needs, moves, form)

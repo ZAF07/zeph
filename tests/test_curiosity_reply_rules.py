@@ -5,7 +5,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
 from companion.adapters.postgres.database import migrate, seed_platform_settings
-from companion.core.curiosities import ALSO_ASKS_WHY
+from companion.core.curiosities import (
+    ASK_WHY_FIRST_NOTE,
+    MORE_THAN_ONE_QUESTION_NOTE,
+)
 from companion.main import SEED_FILE
 from tests.fakes import (
     FakeAuthVerifier,
@@ -134,6 +137,7 @@ def test_at_two_per_reply_a_reply_asks_two_curiosities(
     ]
     assert PRESENTATION in instructions
     assert DESK in instructions
+    assert MORE_THAN_ONE_QUESTION_NOTE in instructions
     assert [row["state"] for row in stored_curiosities(engine)] == ["raised"] * 2
     assert (shape["curiosities_offered"], shape["curiosity_asked"]) == (2, True)
 
@@ -158,6 +162,7 @@ def test_the_per_conversation_limit_still_caps_the_per_reply_number(
 
     assert PRESENTATION in instructions
     assert DESK not in instructions
+    assert MORE_THAN_ONE_QUESTION_NOTE not in instructions
     assert [row["state"] for row in stored_curiosities(engine)] == [
         "raised",
         "waiting",
@@ -218,7 +223,8 @@ def test_with_holding_off_a_reply_that_asks_why_also_asks_the_curiosity(
     ]
     assert seeded_settings["reply_ask_why_note"].strip() in instructions
     assert PRESENTATION in instructions
-    assert ALSO_ASKS_WHY in instructions
+    assert ASK_WHY_FIRST_NOTE in instructions
+    assert MORE_THAN_ONE_QUESTION_NOTE in instructions
     assert form["curiosity_not_asked_why"] == ""
     assert stored_curiosities(engine)[0]["state"] == "raised"
     assert (shape["curiosities_offered"], shape["curiosity_asked"]) == (1, True)
