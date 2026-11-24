@@ -81,4 +81,4 @@ Evidence (25 Nov 2026, worktree stack on 3010/8010, migration 0095 applied by th
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: <filled in after the merge>
+- Commit: fa12dcb (merge of `pattern-06-familiarity` into main; work commits 04cbb6d, 42af4ea, 522d2b5)
