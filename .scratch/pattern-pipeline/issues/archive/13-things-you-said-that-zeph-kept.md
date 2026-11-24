@@ -69,4 +69,4 @@ Evidence (24 Nov 2026, worktree stack on 3020/8020, real DeepSeek model, made-up
 ## Completion
 
 - Completed: 2026-11-24
-- Commit: <to be filled in after the merge>
+- Commit: 8683df3 (merge "Merge pattern-13-kept-quotes: Users see and delete the quotes Zeph keeps, and are told before any is kept"; work in dbe2ace "Things you said that Zeph kept: Users see and delete kept quotes, are told before any is kept", 7dd8d32 "Kept quotes review fixes: clearer notice flag name, response mapper, save-failed test", 25a8f8b "Docs: kept quotes and telling Users first, built (issue 13)", 5983f98 "Archive pattern-pipeline issue 13: kept quotes and telling Users first, verified; findings in issue 20", 43e1e6e "Pattern noticing told migration follows 0084 from main: now 0085")
