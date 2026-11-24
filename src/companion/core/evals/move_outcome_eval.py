@@ -259,20 +259,23 @@ def outcome_facts(outcome: MoveOutcome) -> dict[str, str]:
     }
 
 
-def keeping_call_facts(calls: Sequence[ModelCall]) -> dict[str, int] | None:
-    """Write the Move Outcome keeping call's time and tokens for the report.
+def last_call_facts(
+    calls: Sequence[ModelCall], step: ModelStep
+) -> dict[str, int] | None:
+    """Write the time and tokens of a Conversation-end step's call for the report.
 
     Args:
-        calls: The model calls the keeping step made.
+        calls: The model calls the step made.
+        step: The step, e.g. Move Outcome keeping.
 
     Returns:
-        The last keeping call's `duration_ms`, `tokens_in` and `tokens_out`;
-        None if no Move was made, so nothing was asked.
+        Its last call's `duration_ms`, `tokens_in` and `tokens_out`; None if
+        nothing was asked.
     """
-    keeping_calls = [call for call in calls if call.step == ModelStep.MOVE_OUTCOMES]
-    if not keeping_calls:
+    step_calls = [call for call in calls if call.step == step]
+    if not step_calls:
         return None
-    call = keeping_calls[-1]
+    call = step_calls[-1]
     return {
         "duration_ms": call.duration_ms,
         "tokens_in": call.tokens_in,
@@ -329,7 +332,7 @@ def check_move_outcome_case(
         checks=checks,
         facts={
             "outcomes": [outcome_facts(outcome) for outcome in kept],
-            "call": keeping_call_facts(keeping_calls),
+            "call": last_call_facts(keeping_calls, ModelStep.MOVE_OUTCOMES),
         },
         notes=(
             []

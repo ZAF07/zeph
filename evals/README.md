@@ -4,7 +4,7 @@ The evals measure how the Companion behaves with the real LLM. They are not
 tests: they cost money and their results vary a little from run to run. They
 never run in `make check`.
 
-There are eight:
+There are nine:
 
 - **Safeguard**: about 30 labelled messages (clear crises, subtle crises and
   false alarms like "this traffic is killing me"), and photos of test images
@@ -75,6 +75,21 @@ There are eight:
   or the expected answers, then marks each answer Match or Miss against the
   answer expected, with a reason. A case passes only if every answer
   matches. A case makes one processing call and two judge calls.
+- **Tagging**: each case is a made-up ended Conversation (From, Text), the
+  Life Threads it touched, and the Observations expected (Pattern Type, for
+  or against, unclear, anyone would). The made-up User has Pattern noticing
+  on and has been told; the real tagging step runs alone on it with the
+  whole Pattern Catalog (loaded into the Eval database from its files) and
+  the Pattern tagging prompt, model and thinking in the Platform Settings (a
+  Variant can override them). Code then checks what it wrote as it does for
+  real Users. A case passes only when every Observation expected was kept
+  (same Pattern Type, or when unclear either of its two; same for or
+  against, unclear and anyone would) and nothing else was; several quotes
+  for one expected Observation still match it. No judge. The result shows
+  each Observation expected, each one kept (quote, Pattern Type and sign,
+  who, Life Thread, context) and each one dropped with why. What this Eval
+  can and can't show: `docs/pattern-evals/README.md`. A case makes one
+  tagging call (two if the first answer can't be read).
 
 ## Where they run
 
@@ -118,14 +133,16 @@ From the terminal, with the stack running (`make up`, or `make restart` in a
 worktree, which runs its own stack and Eval database):
 
 ```sh
-make eval                                # all eight Evals
+make eval                                # all nine Evals
 make eval EVALS=safeguard                # one Eval
 make eval EVALS=persona,understanding    # several
 make eval CASES=reminded-of-sister       # single cases, by key
 make eval EVALS=safeguard CASES=small-talk  # both
 ```
 
-It queues a run marked as started from the terminal, prints each case as it
+It prints the run's estimate first (cases, SGD at the live prices, how many
+never ran so use a rough figure), then queues a run marked as started from
+the terminal, prints each case as it
 finishes, then the report, and exits non-zero if any case failed or errored.
 The Dashboard's runs list hides terminal runs unless "Show terminal runs" is
 on. A full run takes about 10 minutes.
@@ -215,6 +232,13 @@ time, the Judge's reason for each rule, and for a failed case what happened.
   called and the tools it did call. A failed case also prints Zeph's reply.
 - **Photo descriptions**: a failed case shows what leaked and the
   description.
+- **Tagging**: each expected Observation shows `kept` with the quotes that
+  matched it, or "nothing kept like it"; each kept one that matches none
+  expected shows under "Kept but not expected". The Dashboard shows
+  Expected, Kept by code and Dropped by code. A drop names its reason
+  (quote not word for word, sign or Pattern Type not in the catalog, a tag
+  off its list, no context or who, a repeat). Many drops for one reason
+  point at the prompt.
   "called no tool" on a clear request usually means Zeph asked "want me
   to?" instead of acting.
 
@@ -244,6 +268,7 @@ Run it after changing any of these:
 - the settings instructions (`reply_settings_instructions`) or the settings
   tools
 - the photo description prompt or photo model
+- the Pattern tagging prompt or model, or any Pattern Type file (Tagging)
 - the Understanding prompt or model, the Needs, or the Life Thread,
   Curiosity and closeness settings
 - the embedding model
@@ -264,7 +289,7 @@ the test images in `src/companion/seed/evals/images/`. On start-up the
 backend adds every case whose key (its `id`) isn't in the database yet, with
 its images. It never changes a case already there, edited or archived, so
 editing a seed file doesn't change an existing case, and keys must be unique
-across all eight files. Each file explains its own format at the top; the
+across all nine files. Each file explains its own format at the top; the
 backend rewrites it into the form's shape when it reads it.
 
 - `safeguard.yaml`: add an `id`, a `kind` (`clear_crisis`, `subtle_crisis` or
@@ -297,6 +322,13 @@ backend rewrites it into the form's shape when it reads it.
 - `day_summary.yaml`: add an `id`, the day's `messages` (each `who`, `time`
   and `text`, in order; write times with AM or PM, since YAML reads a bare
   21:10 as a number) and `questions` (each `question` and `expected`).
+- `tagging.yaml`: add an `id`, the `threads` it touched (each `title`,
+  `story`, `people`; leave out for none), the `messages` (each `who` and
+  `text`) and the `observations` expected (each `pattern_type`, `direction`,
+  and `unclear: true` or `situational: true` when they apply; leave out when
+  there is nothing to tag). Only CONF.AVOID.BELONG can be situational today
+  (strangers, or someone above them). The quote must be the User's own
+  words, so put the telling line in a User message.
 
 Test images are small and made for the purpose (rendered text and shapes, no
 real people or real card numbers). Keep new ones small, too.

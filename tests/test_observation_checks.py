@@ -21,6 +21,8 @@ from companion.core.models import (
     Stance,
 )
 from companion.core.observations import (
+    DroppedEntry,
+    DropReason,
     TaggingContext,
     is_situational,
     plan_observations,
@@ -179,6 +181,40 @@ def test_an_observation_that_fails_a_check_is_dropped(changes: dict[str, Any]) -
     planned = plan_observations([entry(**changes)], context())
 
     assert (planned.kept, planned.dropped) == ([], 1)
+
+
+@pytest.mark.parametrize(
+    ("changes", "reason"),
+    [
+        ({"pattern_types": ["CONF.NOT.THERE"]}, DropReason.UNKNOWN_PATTERN_TYPE),
+        ({"sign": "I9"}, DropReason.UNKNOWN_SIGN),
+        ({"direction": "sideways"}, DropReason.UNKNOWN_SIGN),
+        ({"quote": "I said no to Mei"}, DropReason.QUOTE_NOT_WORD_FOR_WORD),
+        ({"quote": ""}, DropReason.QUOTE_NOT_WORD_FOR_WORD),
+        ({"stance": "angry"}, DropReason.TAG_OFF_ITS_LIST),
+        ({"evidence": "rumour"}, DropReason.TAG_OFF_ITS_LIST),
+        ({"about": ""}, DropReason.MISSING_DETAILS),
+        ({"context": None}, DropReason.MISSING_DETAILS),
+    ],
+)
+def test_each_dropped_entry_comes_back_with_why_it_was_dropped(
+    changes: dict[str, Any], reason: DropReason
+) -> None:
+    written = entry(**changes)
+
+    planned = plan_observations([written], context())
+
+    assert planned.dropped_entries == [DroppedEntry(written, reason)]
+
+
+def test_a_repeat_and_an_entry_that_is_not_an_observation_say_why() -> None:
+    planned = plan_observations([entry(), entry(), "a quote"], context())
+
+    assert [dropped.reason for dropped in planned.dropped_entries] == [
+        DropReason.REPEAT,
+        DropReason.NOT_AN_OBSERVATION,
+    ]
+    assert planned.dropped == 2
 
 
 def test_a_sign_against_counts_against() -> None:

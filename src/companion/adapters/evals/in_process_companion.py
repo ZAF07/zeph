@@ -35,8 +35,16 @@ from companion.core.evals.cases import EvalWebResult
 from companion.core.evals.models import EvalImage, ModelTokens, Replies
 from companion.core.evals.ports import EvalSetupError
 from companion.core.model_call_log import ModelCallLog, start_trace
-from companion.core.models import Feature, PhotoImage, TraceKind, UserSnapshot
+from companion.core.models import (
+    Feature,
+    LifeThread,
+    PhotoImage,
+    TraceKind,
+    UserSnapshot,
+)
 from companion.core.move_outcomes import MoveOutcomeKeeper
+from companion.core.observations import PatternTagger, PlannedObservations
+from companion.core.pattern_catalog import PatternCatalogService
 from companion.core.ports import ChatModel, Embedder, PhotoViewer, Repositories
 from companion.core.post_conversation import DayMemoryWriter
 from companion.core.usage import UsageLimiter, UsageRecordingChatModel
@@ -626,6 +634,75 @@ class InProcessCompanion:
             snapshot,
             conversation_id,
             self._repositories.conversations.list_messages(conversation_id),
+        )
+
+    def turn_pattern_noticing_on(self) -> None:
+        """Turn Pattern noticing on for the made-up User, who has been told.
+
+        An Admin switches it on for them, and they press "Got it" on the
+        notice, so the tagging step runs for them.
+
+        Raises:
+            EvalSetupError: If no User is connected.
+        """
+        if self._user_id is None:
+            raise EvalSetupError("Connect the User before turning Pattern noticing on")
+        require_status(
+            self._client.put(
+                f"/api/admin/users/{self._user_id}/features/pattern_noticing",
+                json={"switch": "on"},
+                headers=self._admin_headers(),
+            ),
+            200,
+            "Turning Pattern noticing on",
+        )
+        require_status(
+            self._client.post(
+                "/api/me/pattern-noticing-told", headers=self._user_headers()
+            ),
+            200,
+            "Pressing Got it on the Pattern noticing notice",
+        )
+
+    def tag_observations(
+        self, conversation_id: UUID, touched: Sequence[LifeThread]
+    ) -> PlannedObservations | None:
+        """Run the Conversation-end tagging step alone on a Conversation.
+
+        It is built the way the app builds it after Life Threads, with the
+        Model Call Log keeping full content, and runs in its own
+        Conversation-end trace.
+
+        Args:
+            conversation_id: The made-up User's ended Conversation.
+            touched: The Life Threads it touched, in the order shown.
+
+        Returns:
+            The Observations kept and those dropped; None when the step
+            didn't run or its answer couldn't be read.
+
+        Raises:
+            EvalSetupError: If no User is connected, or User Memory doesn't
+                work for them.
+        """
+        snapshot = self._conversation_end_snapshot()
+        tagger = PatternTagger(
+            self._repositories,
+            PatternCatalogService(self._repositories.pattern_catalog),
+            self._conversation_end_chat_model(),
+            ModelCallLog(
+                self._repositories,
+                self._clock,
+                content_for_everyone=True,
+                developer_logs=False,
+            ),
+            self._clock,
+        )
+        return tagger.tag_from(
+            snapshot,
+            conversation_id,
+            self._repositories.conversations.list_messages(conversation_id),
+            touched,
         )
 
     def write_day_summary(self) -> None:

@@ -5,6 +5,7 @@ import type {
   FormShape,
   FormValues,
 } from "@/lib/api-client";
+import { taggingShape } from "@/lib/design-fixtures/eval-tagging";
 import { evalOrder } from "@/lib/evals";
 
 /** The Day Summary case shape, as the backend describes it. */
@@ -194,18 +195,20 @@ export const dayCaseSampleResult: CaseResult = {
   },
 };
 
+const drawnShapes: Partial<Record<EvalName, FormShape>> = {
+  day_summary: daySummaryShape,
+  tagging: taggingShape,
+};
+
 /**
- * The case shapes for the Day Summary case form; the other Evals have no
- * drawn form, so their shapes are empty.
+ * The case shapes for the Day Summary and Tagging case forms; the other
+ * Evals have no drawn form, so their shapes are empty.
  */
 export const evalDaySummaryFixtures: Partial<ApiClient> = {
   listEvalCaseShapes: () =>
     Promise.resolve(
       Object.fromEntries(
-        evalOrder.map((name) => [
-          name,
-          name === "day_summary" ? daySummaryShape : { sections: [] },
-        ]),
+        evalOrder.map((name) => [name, drawnShapes[name] ?? { sections: [] }]),
       ) as Record<EvalName, FormShape>,
     ),
 };

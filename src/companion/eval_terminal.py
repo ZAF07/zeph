@@ -5,7 +5,11 @@ from collections.abc import Callable
 
 from sqlalchemy import Engine
 
-from companion.adapters.evals.terminal_report import progress_line, report_lines
+from companion.adapters.evals.terminal_report import (
+    estimate_line,
+    progress_line,
+    report_lines,
+)
 from companion.adapters.postgres.eval_repositories import (
     PostgresEvalCaseRepository,
     PostgresEvalRunRepository,
@@ -30,7 +34,7 @@ def read_evals(names: str) -> list[EvalName]:
     """Read the Evals asked for on the command line.
 
     Args:
-        names: Comma-separated Eval names; "" for all eight.
+        names: Comma-separated Eval names; "" for all nine.
 
     Returns:
         The Evals.
@@ -66,7 +70,7 @@ def start_and_watch_run(
     write: Callable[[str], None],
     sleep: Callable[[float], None],
 ) -> bool:
-    """Queue a terminal run, print each case as it finishes, then the report.
+    """Print the estimate, queue a terminal run, print each case, then the report.
 
     Args:
         service: Starts and reads Eval Runs.
@@ -78,6 +82,7 @@ def start_and_watch_run(
     Returns:
         True if the run finished with no Fail or Error.
     """
+    write(estimate_line(service.estimate(evals, case_keys)))
     run = service.start_run(None, StartedFrom.TERMINAL, evals, case_keys).run
     picked = [name.value for name in evals] + case_keys
     write(f"Queued Eval Run {run.id} ({', '.join(picked)})")

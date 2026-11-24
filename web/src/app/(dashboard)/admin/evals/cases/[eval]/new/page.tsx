@@ -7,16 +7,21 @@ import { DaySummaryResultPanel } from "@/components/DaySummaryResultPanel";
 import { DesignNote } from "@/components/DesignNote";
 import { EvalCaseEditor } from "@/components/EvalCaseEditor";
 import { env } from "@/env";
+import { TaggingResultPanel } from "@/components/TaggingResultPanel";
 import {
   dayCaseDraft,
   dayCaseSampleResult,
 } from "@/lib/design-fixtures/eval-day-summary";
+import {
+  taggingCaseDraft,
+  taggingCaseSampleResult,
+} from "@/lib/design-fixtures/eval-tagging";
 import { evalDetails, toEvalName } from "@/lib/evals";
 
 /**
  * The admin page for adding a case to an Eval. In design-fixture mode the
- * Day Summary case form opens filled in, with the drawn sample result and
- * notes under it.
+ * Day Summary and Tagging case forms open filled in, with the drawn sample
+ * result and notes under them.
  *
  * @param props - `params` holds the Eval's name from the address.
  * @returns The page.
@@ -30,7 +35,9 @@ export default async function AdminNewEvalCasePage({
   if (evalName === null) {
     notFound();
   }
-  const isDesignSample = env.designFixtures && evalName === "day_summary";
+  const isDaySample = env.designFixtures && evalName === "day_summary";
+  const isTaggingSample = env.designFixtures && evalName === "tagging";
+  const isDesignSample = isDaySample || isTaggingSample;
   return (
     <>
       <Link
@@ -52,15 +59,29 @@ export default async function AdminNewEvalCasePage({
       />
       <EvalCaseEditor
         evalName={evalName}
-        draft={isDesignSample ? dayCaseDraft : undefined}
+        draft={
+          isDaySample
+            ? dayCaseDraft
+            : isTaggingSample
+              ? taggingCaseDraft
+              : undefined
+        }
       />
-      {isDesignSample && dayCaseSampleResult.day_summary ? (
+      {isDesignSample ? (
         <>
           <DesignNote title="How a result reads, on a run" />
-          <DaySummaryResultPanel
-            caseKey={dayCaseSampleResult.case_key}
-            result={dayCaseSampleResult.day_summary}
-          />
+          {isDaySample && dayCaseSampleResult.day_summary ? (
+            <DaySummaryResultPanel
+              caseKey={dayCaseSampleResult.case_key}
+              result={dayCaseSampleResult.day_summary}
+            />
+          ) : null}
+          {isTaggingSample && taggingCaseSampleResult.tagging ? (
+            <TaggingResultPanel
+              caseKey={taggingCaseSampleResult.case_key}
+              result={taggingCaseSampleResult.tagging}
+            />
+          ) : null}
           <DesignNote title="About this page" />
           <p className="m-0 max-w-[760px] text-[14px] text-soft">
             Every Eval case form has this shape: Key, then one panel per part of

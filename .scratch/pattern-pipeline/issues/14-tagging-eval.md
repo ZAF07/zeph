@@ -1,6 +1,6 @@
 # 14 — A Tagging Eval with its first cases, and the Pattern Evals guide
 
-Status: ready-for-agent
+Status: in-progress
 Track: B
 Blocked by: 11
 
@@ -32,3 +32,14 @@ This adds Dashboard UI: read `web/design/README.md` first, add or extend the ref
 - `11-tagging-step-keeps-observations.md`
 
 ## Comments
+
+Plan (24 Nov 2026, branch `pattern-14-tagging-eval`, worktree `ai-chat-companion-pattern-14`):
+
+- **New Eval kind `tagging`** in the existing runner, no Judge (code checks only). A case: `now`, the Life Threads the Conversation touched (title, story, people), the messages (`who`, `text`, a minute apart) and the Observations expected (Pattern Type ID, for or against, unclear, situational). The case form is drawn from its shape like every other Eval (ADR-0014).
+- **Runs the real tagging step alone.** The made-up User gets Pattern noticing on and has pressed "Got it"; the Threads and the ended Conversation are saved; then `PatternTagger.tag_from` runs on them with the Eval database's Platform Settings, so a Variant can override `pattern_tagging_prompt`, `_model` and `_thinking`. The Eval database now loads the Pattern Catalog from its files for each case. No other Conversation-end step runs.
+- **Pass rule.** Each expected Observation must be matched by a kept one with the same Pattern Type (when unclear, either of its two), direction, unclear and situational; and every kept one must match an expected one. An empty list means nothing may be kept. Several kept quotes for one expected Observation are fine.
+- **What was dropped.** `plan_observations` also gives each dropped entry with why (unknown Pattern Type, unknown sign, quote not word for word, tag off its list, missing details, repeat). `tag_from` returns what it planned. The result's facts keep kept and dropped; the Case Result API gains a `tagging` part like `day_summary`, and the Dashboard shows it (new reference `AdminEvalTaggingCase.html`, built from the Day Summary case's parts).
+- **Estimate first.** The Dashboard already shows it before starting; the terminal (`make eval`) now prints it before queueing. A rough per-case figure for Tagging is added.
+- **Seed:** `seed/evals/cases/tagging.yaml`, about 40 cases over the three Pattern Types: clear for, against, unclear (two look-alikes), nothing to tag, and anyone-would (situational; only CONF.AVOID.BELONG has `anyone_would_when`).
+- **Docs:** `docs/pattern-evals/README.md` (three layers, limits, later work, cost reminder), `evals/README.md` section, pattern-pipeline README built note.
+- The owner correcting the drafted cases is theirs to do; it stays open until they comment.
