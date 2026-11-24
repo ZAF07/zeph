@@ -2464,6 +2464,27 @@ class PostgresReplyPlanRepository:
                 )
             )
 
+    def count_since(self, user_id: UUID, since: datetime) -> int:
+        """Count the Reply Plans made for a User after a time, in any Conversation.
+
+        Args:
+            user_id: The User's ID.
+            since: The time; Reply Plans made at it or before are left out.
+
+        Returns:
+            How many there are.
+        """
+        with self._database.connect() as connection:
+            count = connection.execute(
+                select(func.count())
+                .select_from(reply_plans)
+                .where(
+                    reply_plans.c.user_id == user_id,
+                    reply_plans.c.made_at > since,
+                )
+            ).scalar_one()
+        return int(count)
+
     def list_for_conversation(self, conversation_id: UUID) -> list[ReplyPlan]:
         """List a Conversation's Reply Plans, oldest first.
 
@@ -2625,6 +2646,11 @@ def _to_reply_plan_form(stored: dict[str, Any]) -> ReplyPlanForm:
             else None
         ),
         curiosity_not_asked_why=stored.get("curiosity_not_asked_why", ""),
+        curiosity_taken=(
+            ThreadReaction(stored["curiosity_taken"])
+            if stored.get("curiosity_taken")
+            else None
+        ),
     )
 
 
@@ -3715,6 +3741,26 @@ class PostgresCuriosityRepository:
                 select(curiosities)
                 .where(curiosities.c.raised_conversation_id == conversation_id)
                 .order_by(curiosities.c.raised_at, curiosities.c.position)
+            ).all()
+        return [_to_curiosity(row) for row in rows]
+
+    def list_asked_to_drop(self, user_id: UUID) -> list[Curiosity]:
+        """List the Curiosities a User asked Zeph to drop, newest raised first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Curiosities.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(curiosities)
+                .where(
+                    curiosities.c.user_id == user_id,
+                    curiosities.c.reaction == ThreadReaction.ASKED_TO_DROP,
+                )
+                .order_by(curiosities.c.raised_at.desc(), curiosities.c.position)
             ).all()
         return [_to_curiosity(row) for row in rows]
 

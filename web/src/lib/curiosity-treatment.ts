@@ -6,6 +6,7 @@ export const curiosityTreatmentOptions: {
   label: string;
 }[] = [
   { value: "ask_by_default", label: "Ask by default" },
+  { value: "test_the_water", label: "Test the water" },
   { value: "only_if_it_fits", label: "Only if it fits" },
   { value: "never", label: "Never" },
 ];

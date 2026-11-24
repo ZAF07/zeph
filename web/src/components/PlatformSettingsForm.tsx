@@ -187,6 +187,26 @@ const numberSections: {
         unit: "waiting",
       },
       {
+        key: "curiosity_replies_between",
+        label: "Fewest replies between Curiosities",
+        unit: "replies",
+      },
+      {
+        key: "follow_ups_per_conversation",
+        label: "Most follow-up questions per Conversation",
+        unit: "per chat",
+      },
+      {
+        key: "curiosity_brush_offs_to_back_off",
+        label: "Brush-offs before backing off",
+        unit: "in a row",
+      },
+      {
+        key: "curiosity_back_off_days",
+        label: "Days of doubled spacing",
+        unit: "days",
+      },
+      {
         key: "curiosity_check_ins_per_week",
         label: "Most Curiosity Check-ins per week",
         unit: "per week",

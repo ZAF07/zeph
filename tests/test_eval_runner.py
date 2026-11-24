@@ -1209,7 +1209,7 @@ def test_a_variant_can_override_how_a_need_treats_curiosities(
     runner.work_next_run()
 
     reply_plan_a, reply_plan_b = chat_model.reply_plan_calls
-    assert "- Just chatting: only if it fits the moment" in str(reply_plan_a)
+    assert "- Just chatting: test the water" in str(reply_plan_a)
     assert "- Just chatting: never: ask none" in str(reply_plan_b)
     assert PostgresNeedRepository(engine).list_all() == live_needs
 
@@ -1234,6 +1234,30 @@ def test_a_need_override_with_an_unknown_curiosities_choice_is_refused(
     )
 
     assert response.status_code == 422
+
+
+def test_a_variant_can_override_the_follow_up_cap(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, UNDERSTANDING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    start_run(
+        client,
+        admin,
+        EvalName.UNDERSTANDING,
+        variants=[{}, {"follow_ups_per_conversation": 0}],
+    )
+    chat_model.script("Hi!", "Hi!")
+
+    runner.work_next_run()
+
+    reply_plan_a, reply_plan_b = chat_model.reply_plan_calls
+    assert "- Get curious:" in reply_plan_a.history[0].text
+    assert "- Get curious:" not in reply_plan_b.history[0].text
 
 
 def test_reply_plan_prompt_and_outlook_overrides_reach_only_their_variant(

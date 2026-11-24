@@ -44,6 +44,7 @@ from companion.core.models import (
     ReplyPlanForm,
     ReplyPlanShape,
     ThreadLeftAlone,
+    ThreadReaction,
     ThreadToBringUp,
     Understanding,
     UnderstandingForm,
@@ -53,6 +54,7 @@ from companion.core.move_outcomes import describe_move_outcome
 from companion.core.past_day import PastDayTool
 from companion.core.patterns import RemindedPattern, describe_patterns_in_mind
 from companion.core.platform_settings import (
+    FOLLOW_UPS_PER_CONVERSATION,
     HOME_GOALS_MEMORY_CATEGORY,
     PERSONA_OUTLOOK,
     REPLY_ASK_WHY_NOTE,
@@ -237,6 +239,48 @@ def moves_without_repeat_questions(
     ]
 
 
+def follow_ups_made(moves: Sequence[Move], earlier: Sequence[ReplyPlan]) -> int:
+    """Count the replies in the Conversation that made a Move asking a question.
+
+    These are follow-ups on what the User is telling now, e.g. the Get
+    curious Move; they never use the Curiosity budget.
+
+    Args:
+        moves: Every Move, in order.
+        earlier: This Conversation's earlier Reply Plans, oldest first.
+
+    Returns:
+        How many of them led with or were supported by such a Move.
+    """
+    asking = {move.name.lower() for move in moves if move.asks_a_question}
+    return sum(
+        1
+        for reply_plan in earlier
+        if any(
+            name and name.lower() in asking
+            for name in (reply_plan.lead_move, reply_plan.support_move)
+        )
+    )
+
+
+def moves_within_follow_up_cap(
+    moves: Sequence[Move], earlier: Sequence[ReplyPlan], cap: int
+) -> list[Move]:
+    """List the Moves, leaving out those that ask a question once the cap is reached.
+
+    Args:
+        moves: Every Move, in order.
+        earlier: This Conversation's earlier Reply Plans, oldest first.
+        cap: The most follow-ups one Conversation may make.
+
+    Returns:
+        The Moves still offered, in order.
+    """
+    if follow_ups_made(moves, earlier) < cap:
+        return list(moves)
+    return [move for move in moves if not move.asks_a_question]
+
+
 def format_allowed_moves(need: Need, moves: Sequence[Move]) -> str:
     """Write which Moves a Need allows, as the Reply Plan reads it.
 
@@ -362,6 +406,14 @@ def describe_message_for_reply_plan(
         if check_in_kinds
         else ""
     )
+    awaiting = due.awaiting_reaction
+    awaiting_line = (
+        f"\n\nA Curiosity an earlier reply in this Conversation was meant to ask: "
+        f"{awaiting.question} If Zeph's messages did ask it, say how they took it "
+        f"in curiosity_taken; if they never asked it, leave it null."
+        if awaiting is not None
+        else ""
+    )
     last_conversation_line = (
         f"Where the previous Conversation was when it ended: "
         f"{last_conversation_where}\n\n"
@@ -390,6 +442,7 @@ def describe_message_for_reply_plan(
         f"{describe_patterns_in_mind(patterns, snapshot.user.time_zone)}"
         f"\n\nThings you've been wondering about them, whose time has come "
         f"{describe_due_curiosities(due, snapshot.user.time_zone)}"
+        f"{awaiting_line}"
         f"\n\nHow each Need treats them:\n{describe_curiosity_treatments(needs)}"
         f"\n\nKnowledge documents, with when each helps:\n"
         f"{knowledge_lines or 'None.'}"
@@ -639,6 +692,25 @@ def keep_held_back_threads_alone(
     )
 
 
+def read_curiosity_taken(value: Any, due: DueCuriosities) -> ThreadReaction | None:
+    """Read how the form says the User took the Curiosity asked in the last reply.
+
+    Args:
+        value: The `curiosity_taken` field's value, e.g. "brushed_off".
+        due: The Curiosities the model was shown, with the one awaiting a
+            reaction.
+
+    Returns:
+        The reaction; None when no Curiosity awaits one, or the value names
+        none.
+    """
+    if due.awaiting_reaction is None:
+        return None
+    if value in {reaction.value for reaction in ThreadReaction}:
+        return ThreadReaction(value)
+    return None
+
+
 def read_knowledge_lookup(
     value: Any, by_number: dict[int, KnowledgeDocument]
 ) -> KnowledgeLookup | None:
@@ -779,6 +851,7 @@ def read_reply_plan_form(
         patterns_used=tuple(dict.fromkeys([*used, *([offered] if offered else [])])),
         pattern_offered=offered,
         curiosity_not_asked_why=read_form_text(parsed.get("no_curiosity_why")),
+        curiosity_taken=read_curiosity_taken(parsed.get("curiosity_taken"), due),
     )
     return keep_held_back_threads_alone(form, reminded)
 
@@ -1218,11 +1291,14 @@ class ReplyPlanService:
         conversation_id = recent.conversation_id
         needs = self._repositories.needs.list_all()
         earlier = self._repositories.reply_plans.list_for_conversation(conversation_id)
-        moves = moves_without_repeat_questions(
-            moves_that_work(
-                self._repositories.moves.list_all(), self._working_features(snapshot)
+        all_moves = self._repositories.moves.list_all()
+        moves = moves_within_follow_up_cap(
+            moves_without_repeat_questions(
+                moves_that_work(all_moves, self._working_features(snapshot)),
+                earlier,
             ),
             earlier,
+            snapshot.settings.get(FOLLOW_UPS_PER_CONVERSATION),
         )
         knowledge_documents = number_knowledge_documents(
             self._knowledge_documents(snapshot)
@@ -1304,7 +1380,7 @@ class ReplyPlanService:
                 ask_why_note,
                 format_threads_for_reply(reminded, model_form, snapshot.user.time_zone),
                 format_threads_left_alone(model_form),
-                format_curiosities_for_reply(form.curiosities),
+                format_curiosities_for_reply(form.curiosities, need),
                 past_days,
             ),
             asks_a_question=asks_another_question or picked.asks_a_question,

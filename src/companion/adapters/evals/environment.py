@@ -197,6 +197,7 @@ class PostgresEvalEnvironment:
                 "needed_feature": (
                     None if move.needed_feature is None else move.needed_feature.value
                 ),
+                "asks_a_question": move.asks_a_question,
             }
             for move in moves
         ]

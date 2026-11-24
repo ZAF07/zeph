@@ -608,9 +608,16 @@ reply_plan_prompt: |-
       the whole reply, the reply already asks another question, it's
       sensitive and the moment is wrong), and give that reason in
       no_curiosity_why.
+    - test the water: at most one light opener in a Conversation, asked in
+      passing so they can let it go.
     - only if it fits the moment: pick one only when it connects to what
       they're talking about, or the chat has reached an easy pause.
     - never: pick none.
+  - curiosity_taken: when you are shown a Curiosity an earlier reply was
+    meant to ask and Zeph's messages really did ask it, how they took it:
+    "engaged" if they talked about it, "brushed_off" if they changed the
+    subject or gave a short answer, "asked_to_drop" if they asked Zeph not
+    to bring it up. Null if Zeph never asked it, or otherwise.
   - no_curiosity_why: under a Need that asks by default, when a Curiosity
     was offered and you picked none, a few words on why. Null otherwise.
   - left_alone: the Life Threads the message touches that Zeph should not
@@ -664,6 +671,7 @@ reply_plan_prompt: |-
     "bring_up": [{"thread": <number>, "how": "lead" | "weave", "why": "..."},
                  {"curiosity": <number>, "how": "lead" | "weave"}],
     "no_curiosity_why": "..." | null,
+    "curiosity_taken": "engaged" | "brushed_off" | "asked_to_drop" | null,
     "left_alone": [{"thread": <number>, "reason": "..."}],
     "knowledge": {"documents": [<number>], "search": "<search phrase>"} | null,
     "send_photo": true | false,
@@ -764,6 +772,22 @@ curiosities_per_conversation: 1
 # How many of a User's Curiosities can wait at once. When a Conversation's end
 # makes more, the oldest waiting ones are closed.
 curiosities_waiting_limit: 10
+
+# The fewest replies, counted across Conversations, between two Curiosities
+# raised in replies.
+curiosity_replies_between: 3
+
+# How many replies in one Conversation may make a Move that asks a question
+# (Get curious): follow-ups on what the User is telling now. They don't use
+# the Curiosity limit above.
+follow_ups_per_conversation: 3
+
+# After this many Curiosities brushed off in a row (asked to drop counts), no
+# Curiosity is offered for the rest of the Conversation, and the fewest replies
+# between Curiosities doubles for curiosity_back_off_days from the last
+# brush-off. One engaged answer ends it.
+curiosity_brush_offs_to_back_off: 2
+curiosity_back_off_days: 3
 
 # How many "Something I've been wondering" Check-ins a User can get in any 7
 # days. That Check-in Kind asks one of their Curiosities whose day has come.

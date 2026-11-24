@@ -88,7 +88,7 @@ Three Features, each needing the one before, all off to start, switched per User
 
 ## Build order
 
-1. Curiosity standing fix (per-Need field; a picked Curiosity is part of the plan). No catalog needed. *Built (24 Nov 2026), without "test the water", pace and backing off, which come next: see "6. Reply Plan", "7. Reply" and "d. Curiosities" in `docs/message-pipeline/README.md`.*
+1. Curiosity standing fix (per-Need field; a picked Curiosity is part of the plan). No catalog needed. *Built (24 Nov 2026), with "test the water", pace and backing off: see "6. Reply Plan", "7. Reply" and "d. Curiosities" in `docs/message-pipeline/README.md`.*
 2. Catalog, tagging, Observations, the Tagging Eval, "Things you said that Zeph kept".
 3. Scoring, states, the log, unmatched Patterns, moving existing Patterns across.
 4. Agenda, Explorations, Thought Experiments, Familiarity, starter questions.

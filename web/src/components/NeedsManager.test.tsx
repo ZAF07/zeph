@@ -192,7 +192,7 @@ describe("NeedsManager", () => {
       within(card.getByLabelText("Curiosities"))
         .getAllByRole("option")
         .map((option) => option.textContent),
-    ).toEqual(["Ask by default", "Only if it fits", "Never"]);
+    ).toEqual(["Ask by default", "Test the water", "Only if it fits", "Never"]);
   });
 
   it("saves a Need's changed Curiosities choice", async () => {

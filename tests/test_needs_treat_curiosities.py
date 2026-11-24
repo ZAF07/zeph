@@ -88,7 +88,7 @@ def test_each_starting_need_says_how_curiosities_are_treated(
         "Accountability": "ask_by_default",
         "Get it done": "never",
         "Ask more": "only_if_it_fits",
-        "Just chatting": "only_if_it_fits",
+        "Just chatting": "test_the_water",
     }
 
 
@@ -518,6 +518,6 @@ def test_the_migration_gives_saved_curiosities_an_aim_and_needs_their_treatment(
         "Accountability": "ask_by_default",
         "Get it done": "never",
         "Ask more": "only_if_it_fits",
-        "Just chatting": "only_if_it_fits",
+        "Just chatting": "test_the_water",
         "Celebrate": "only_if_it_fits",
     }
