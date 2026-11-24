@@ -61,6 +61,7 @@ Evidence (24 Nov 2026, worktree stack on 3030/8030, build `ef2c110` rebased on m
 - **Owner set each status.** All 15 approved by Zaf on 24 Nov 2026; the page shows 15 "Approved" chips and 15 "Approved by Zaf on 24 Nov 2026. May be shared once ready." lines, no "Draft".
 - **Checks.** `make check` on `ef2c110`: ruff and ruff format clean, mypy "no issues found in 247 source files", pytest 2037 passed, Prettier, ESLint and `tsc` clean, Vitest 953 passed. Pixel test (copy of `compare.cjs` that blocks Clerk's protect probes, as before): "PASS AdminPatternCatalog 0.00% differs, height 3669 vs 3669". The running app seeds all 68 Tagging cases.
 
+- **After the last rebase** (main `ce2e125`, build `5527a45`): `make check` again all clean, pytest 2058 passed, Vitest 953 passed; `make restart` built and started, 15 approved Pattern Types current, no load errors.
 
 ## Completion
 
