@@ -1375,63 +1375,91 @@ pattern_tagging_prompt: |-
     ]
   }
 
+# The matching pass, run by an Admin command (`make match-patterns`), never by
+# a reply or a Conversation end. For each Pattern with no Pattern Type that
+# wasn't matched yet (those kept before the Pattern Catalog, and unmatched
+# ones), this call says which Pattern Type it fits, or none. Code keeps the
+# answer only when the Pattern Type is in the catalog, then tags the
+# Conversations behind the Pattern's evidence again against it (ADR-0024).
+pattern_matching_model: deepseek/deepseek-v4.1-flash-1017
+pattern_matching_thinking: true
+
+pattern_matching_prompt: |-
+  You check whether a Pattern that Zeph, an AI companion, noticed about a
+  person fits one of a fixed set of Pattern Types. A Pattern is a way the
+  person thinks, feels, acts or chooses that keeps showing up across their
+  life, written freely, with its evidence. A Pattern Type is a way of acting
+  in a kind of situation, for a reason: "if this happens, they tend to do
+  that, to protect or get something".
+
+  You are given the Pattern Types, each with its ID, and the Pattern with
+  its evidence.
+
+  Say which one Pattern Type the Pattern fits. It fits only when the
+  situation, what they do and why all match the Pattern Type; being about
+  the same part of life is not enough. Mind each Pattern Type's look-alikes
+  and what anyone would do. When it fits none, or you can't tell between
+  two, say none: a wrong match is worse than no match.
+
+  Answer with JSON only, in exactly this shape:
+  {"pattern_type": "<ID>" | null}
+
 # When a Conversation ends and User Memory works for the User, after Life
-# Threads are kept, this call keeps their Patterns: what keeps showing up
-# across their Threads (ADR-0020). It sees the Threads the Conversation
-# touched, their other Threads closest in meaning (up to
-# pattern_keeping_threads), every Pattern kept so far and the days behind
-# the evidence of Patterns linked to those Threads (up to
-# pattern_keeping_days): messages while they are kept, Day Summaries after.
+# Threads are kept, this call notes their unmatched Patterns: what keeps
+# showing up across their Threads and fits no Pattern Type (ADR-0024). Code
+# starts, confirms and closes Patterns of Pattern Types from Observations;
+# this call never does. It sees the Threads the Conversation touched, their
+# other Threads closest in meaning (up to pattern_keeping_threads), the
+# Pattern Types Zeph already looks for, every Pattern with no Pattern Type
+# kept so far and the days behind the evidence of Patterns linked to those
+# Threads (up to pattern_keeping_days): messages while they are kept, Day
+# Summaries after.
 pattern_keeping_model: deepseek/deepseek-v4.1-flash-1017
 pattern_keeping_thinking: true
 pattern_keeping_threads: 8
 pattern_keeping_days: 14
 
 pattern_keeping_prompt: |-
-  You keep the Patterns of a person who talks with Zeph, an AI companion. A
-  Pattern is a way they think, feel, act or choose that keeps showing up
-  across different parts of their life, most often something they haven't
-  put into words themselves (e.g. "when something grabs them, everything
-  else goes quiet: eating, people, patience", or "keeps choosing freedom
-  over security"). What they keep choosing shows what they value, and goals
-  they only show by what they do count too. A single fact is not a Pattern,
-  and nor is one story.
+  You note the unmatched Patterns of a person who talks with Zeph, an AI
+  companion. A Pattern is a way they think, feel, act or choose that keeps
+  showing up across different parts of their life, most often something they
+  haven't put into words themselves (e.g. "when something grabs them,
+  everything else goes quiet: eating, people, patience", or "keeps choosing
+  freedom over security"). What they keep choosing shows what they value, and
+  goals they only show by what they do count too. A single fact is not a
+  Pattern, and nor is one story.
+
+  Zeph already looks for a fixed set of Pattern Types, and another step
+  notes the evidence for those. Your job is only what fits none of them: an
+  unmatched Pattern.
 
   You are given today's date, the Life Threads (ongoing stories in their
   life) this Conversation touched and their other Threads closest in
-  meaning, each with a number; the Patterns kept so far, each with a number,
-  its state and its evidence; the days behind that evidence, as messages or
-  as Day Summaries; and the Conversation that just ended, with the day it
-  started.
+  meaning, each with a number; the Pattern Types Zeph already looks for; the
+  Patterns kept so far, each with a number, its state and its evidence; the
+  days behind that evidence, as messages or as Day Summaries; and the
+  Conversation that just ended, with the day it started.
 
   You may:
-  - Add evidence to a Pattern that showed up again.
-  - Start a suspected Pattern, only when the same way shows up in two or
-    more different Threads you were given, with evidence from each.
-  - When Zeph offered a view from a Pattern, new or kept, in this
-    Conversation, say how they took it: "agreed", "pushed_back" or
-    "brushed_off". Confirm it ("confirmed") only when they agreed it is
-    them. Close it ("closed") only when they pushed back by rejecting it
-    outright; a softer push back or brushing it off leaves it as it is.
-  Never change a closed Pattern, and never start one that repeats a Pattern
-  already kept. Each piece of evidence names its Thread, the day it
-  happened (YYYY-MM-DD; for what happened in this Conversation, the day it
-  started) and one line on what happened, written to make
-  sense on its own months from now. Write about "they". Don't diagnose or
-  judge. Use only what you are given.
+  - Add evidence to an unmatched Pattern that showed up again.
+  - Start an unmatched Pattern, only when the same way shows up in two or
+    more different Threads you were given, with evidence from each, and it
+    fits none of the Pattern Types.
+  Never start one that fits a Pattern Type, even loosely, or that repeats a
+  Pattern already kept. Never change a confirmed or closed Pattern. Each
+  piece of evidence names its Thread, the day it happened (YYYY-MM-DD; for
+  what happened in this Conversation, the day it started) and one line on
+  what happened, written to make sense on its own months from now. Write
+  about "they". Don't diagnose or judge. Use only what you are given.
 
   Answer with JSON only, in exactly this shape, leaving out Patterns with
-  nothing new, and "reaction" and "state" when no view was offered:
+  nothing new:
   {
     "patterns": [
       {"pattern": "a sentence or two",
-       "evidence": [{"thread": <number>, "day": "YYYY-MM-DD", "line": "..."}],
-       "reaction": "agreed" | "pushed_back" | "brushed_off",
-       "state": "confirmed" | "closed"},
+       "evidence": [{"thread": <number>, "day": "YYYY-MM-DD", "line": "..."}]},
       {"pattern": <number>,
-       "evidence": [{"thread": <number>, "day": "YYYY-MM-DD", "line": "..."}],
-       "reaction": "agreed" | "pushed_back" | "brushed_off",
-       "state": "confirmed" | "closed"}
+       "evidence": [{"thread": <number>, "day": "YYYY-MM-DD", "line": "..."}]}
     ]
   }
 

@@ -116,8 +116,16 @@ it as a look-alike to every Pattern Type it can be mistaken for, with new
 versions for those. Add at least one Tagging Eval case for it and one against
 it (a test needs both for every Pattern Type). Then follow steps 4 to 6 above.
 
-When a Pattern Type is added, old unmatched evidence is to be tagged again
-against it (issue 16, not built yet).
+After the deploy, run `make match-patterns TYPES=<the new ID>` on that stack
+(for production, on the server). It asks a model, for each User's Pattern
+with no Pattern Type that isn't matched yet, whether it fits the new Pattern
+Type. Where one does, the Conversations behind its evidence that Message
+Retention still keeps are tagged again against it, so old evidence becomes
+Observations, checked and scored like any other. It makes real model calls
+(a few per Pattern), prints only IDs and counts, and leaves out Users for
+whom Pattern noticing doesn't work or who haven't pressed "Got it"; run it
+again later for them. `make match-patterns` with no `TYPES` matches against
+the whole catalog.
 
 ## What each change does
 

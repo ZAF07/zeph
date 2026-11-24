@@ -58,6 +58,7 @@ from companion.core.needs import NeedService
 from companion.core.observations import PatternTagger
 from companion.core.past_day import PastDayTool
 from companion.core.pattern_catalog import PatternCatalogService
+from companion.core.pattern_matching import PatternMatcher
 from companion.core.pattern_scoring import PatternScorer
 from companion.core.patterns import PatternKeeper, PatternReminder
 from companion.core.personal_stickers import (
@@ -207,6 +208,13 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         dependencies.clock,
     )
     user_snapshots = UserSnapshotLoader(dependencies.repositories, dependencies.clock)
+    pattern_tagger = PatternTagger(
+        repositories=dependencies.repositories,
+        pattern_catalog=pattern_catalog_service,
+        chat_model=chat_model,
+        model_call_log=model_call_log,
+        clock=dependencies.clock,
+    )
     check_in_service = CheckInService(
         repositories=dependencies.repositories,
         features=feature_service,
@@ -390,16 +398,11 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 embedder=dependencies.embedder,
                 clock=dependencies.clock,
             ),
-            pattern_tagger=PatternTagger(
-                repositories=dependencies.repositories,
-                pattern_catalog=pattern_catalog_service,
-                chat_model=chat_model,
-                model_call_log=model_call_log,
-                clock=dependencies.clock,
-            ),
+            pattern_tagger=pattern_tagger,
             pattern_scorer=pattern_scorer,
             pattern_keeper=PatternKeeper(
                 repositories=dependencies.repositories,
+                pattern_catalog=pattern_catalog_service,
                 chat_model=chat_model,
                 embedder=dependencies.embedder,
                 clock=dependencies.clock,
@@ -450,6 +453,14 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         dependencies.scheduler.stop()
 
     app = FastAPI(title="Companion backend", lifespan=run_scheduler)
+    app.state.pattern_matcher = PatternMatcher(
+        repositories=dependencies.repositories,
+        pattern_catalog=pattern_catalog_service,
+        user_snapshots=user_snapshots,
+        chat_model=chat_model,
+        pattern_tagger=pattern_tagger,
+        pattern_scorer=pattern_scorer,
+    )
     add_core_error_handlers(app)
     app.add_middleware(
         CORSMiddleware,

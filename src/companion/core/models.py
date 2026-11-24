@@ -343,9 +343,11 @@ class AdminCheckInChanges:
 class PatternState(StrEnum):
     """Where a Pattern stands, from first noticed to confirmed or closed.
 
-    Code moves a Pattern of a Pattern Type between them (ADR-0024). An
-    unmatched Pattern, kept under the old rules, is only suspected,
-    confirmed or closed.
+    Code moves a Pattern of a Pattern Type between the first seven
+    (ADR-0024). Unmatched is apart from them: the state of a Pattern the
+    keeping step wrote that fits no Pattern Type, which code never moves.
+    A Pattern kept before the Pattern Catalog, with no Pattern Type, is
+    unmatched, confirmed or closed.
     """
 
     NOTICED = "noticed"
@@ -355,6 +357,7 @@ class PatternState(StrEnum):
     CONFIRMED = "confirmed"
     CONTESTED = "contested"
     CLOSED = "closed"
+    UNMATCHED = "unmatched"
 
 
 @dataclass(frozen=True)
@@ -1199,7 +1202,7 @@ class Pattern:
         id: Our ID for the Pattern.
         user_id: The User it is about.
         pattern: The pattern in a sentence or two.
-        state: Suspected, confirmed or closed.
+        state: Unmatched, confirmed or closed.
         evidence: Each time it showed up, oldest first.
         started_at: When it was first kept.
         updated_at: When it last changed.
@@ -1208,6 +1211,8 @@ class Pattern:
         last_reaction: How the User took that view; None if never offered.
         confirmed_at: When the User agreed with it, so it became confirmed;
             None while it is not confirmed.
+        matched_pattern_type_id: The Pattern Type the matching pass found
+            it fits; None when it fits none or wasn't matched yet.
     """
 
     id: UUID
@@ -1220,6 +1225,7 @@ class Pattern:
     last_offered_at: datetime | None = None
     last_reaction: PatternReaction | None = None
     confirmed_at: datetime | None = None
+    matched_pattern_type_id: str | None = None
 
     @property
     def thread_ids(self) -> set[UUID]:
@@ -2383,6 +2389,7 @@ class TraceKind(StrEnum):
     CHECK_IN = "check_in"
     CONVERSATION_END = "conversation_end"
     PORTRAIT_REWRITE = "portrait_rewrite"
+    PATTERN_MATCHING = "pattern_matching"
 
 
 class ModelStep(StrEnum):
@@ -2399,6 +2406,7 @@ class ModelStep(StrEnum):
     CURIOSITIES = "curiosities"
     MOVE_OUTCOMES = "move_outcomes"
     PATTERN_TAGGING = "pattern_tagging"
+    PATTERN_MATCHING = "pattern_matching"
     PATTERNS = "patterns"
     PORTRAIT = "portrait"
     PERSONAL_STICKERS = "personal_stickers"
@@ -3162,6 +3170,7 @@ class PatternMoveCause(StrEnum):
 
     CONVERSATION_TAGGED = "conversation_tagged"
     OBSERVATIONS_DELETED = "observations_deleted"
+    EVIDENCE_TAGGED_AGAIN = "evidence_tagged_again"
 
 
 @dataclass(frozen=True)

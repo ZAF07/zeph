@@ -46,6 +46,7 @@ from companion.core.models import (
     MoveOutcome,
     Need,
     PatternPicked,
+    PatternState,
     ReplyPlan,
     ReplyPlanForm,
     ReplyPlanShape,
@@ -470,7 +471,8 @@ def describe_message_for_reply_plan(
         f"ones first, then those from earlier in this Conversation:\n"
         f"{describe_reminded_threads(reminded, snapshot.user.time_zone)}"
         f"\n\nPatterns in mind: what you've noticed keeps showing up across "
-        f"their life. A suspected one is only your guess:\n"
+        f"their life. An unmatched one is only your guess: your Read may think "
+        f"with it, but never offer it or say it as a pattern:\n"
         f"{describe_patterns_in_mind(patterns, snapshot.user.time_zone)}"
         f"\n\nThings you've been wondering about them, whose time has come "
         f"{describe_due_curiosities(due, snapshot.user.time_zone)}"
@@ -629,6 +631,30 @@ def read_pattern_picked(
     if item is None:
         return None
     return PatternPicked(pattern_id=item.pattern.id, pattern=item.pattern.pattern)
+
+
+def read_pattern_offered(
+    value: Any, by_number: dict[int, RemindedPattern]
+) -> PatternPicked | None:
+    """Find the Pattern in mind the form offers, if it may be offered.
+
+    Only a confirmed Pattern may be: an unmatched one is never offered as a
+    Pattern, whatever the model wrote.
+
+    Args:
+        value: The number, as the model wrote it.
+        by_number: The Patterns in mind, by number.
+
+    Returns:
+        The Pattern; None if the value isn't the number of a confirmed one.
+    """
+    picked = read_pattern_picked(value, by_number)
+    confirmed_ids = {
+        item.pattern.id
+        for item in by_number.values()
+        if item.pattern.state == PatternState.CONFIRMED
+    }
+    return picked if picked and picked.pattern_id in confirmed_ids else None
 
 
 def read_patterns_picked(
@@ -855,7 +881,7 @@ def read_reply_plan_form(
     by_number = {item.number: item for item in reminded}
     patterns_by_number = {item.number: item for item in patterns}
     offered = (
-        read_pattern_picked(parsed.get("offer_pattern"), patterns_by_number)
+        read_pattern_offered(parsed.get("offer_pattern"), patterns_by_number)
         if say_read
         else None
     )

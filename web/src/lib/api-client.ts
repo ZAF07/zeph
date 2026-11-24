@@ -166,7 +166,10 @@ export type PlatformContent = {
   message_retention_days: number;
 };
 
-/** Where a Pattern stands, from first noticed to confirmed or closed. */
+/**
+ * Where a Pattern stands, from first noticed to confirmed or closed.
+ * Unmatched is apart: a Pattern that fits no Pattern Type.
+ */
 export type PatternState =
   | "noticed"
   | "suspected"
@@ -174,7 +177,8 @@ export type PatternState =
   | "shared"
   | "confirmed"
   | "contested"
-  | "closed";
+  | "closed"
+  | "unmatched";
 
 /** A User as Admins see them: activity counts, never message text. */
 export type AdminUser = {
@@ -679,7 +683,11 @@ export type AdminCheckInChanges = {
 
 /** What a Model Call Log trace was for. */
 export type TraceKind =
-  "message" | "check_in" | "conversation_end" | "portrait_rewrite";
+  | "message"
+  | "check_in"
+  | "conversation_end"
+  | "portrait_rewrite"
+  | "pattern_matching";
 
 /** Which step of the Companion's work a model call was for. */
 export type ModelStep =
@@ -694,6 +702,7 @@ export type ModelStep =
   | "curiosities"
   | "move_outcomes"
   | "pattern_tagging"
+  | "pattern_matching"
   | "patterns"
   | "portrait"
   | "personal_stickers";

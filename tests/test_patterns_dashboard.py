@@ -12,7 +12,6 @@ from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.core.models import (
     Pattern,
     PatternEvidence,
-    PatternReaction,
     PatternState,
     PatternToSave,
 )
@@ -32,8 +31,6 @@ from tests.test_patterns import (
     MUM,
     PROJECT,
     end_with_pattern_answer,
-    evidence,
-    pattern_keeping_answer,
     patterns_of,
     start_goes_quiet_pattern,
 )
@@ -155,7 +152,7 @@ def test_a_user_sees_only_confirmed_patterns_newest_agreed_first_with_evidence(
         confirmed_at=datetime(2026, 11, 12, 20, 0),
     )
     hidden_patterns = [
-        (HIDDEN, PatternState.SUSPECTED),
+        (HIDDEN, PatternState.UNMATCHED),
         (CLOSED, PatternState.CLOSED),
     ]
     for pattern_text, state in hidden_patterns:
@@ -187,83 +184,6 @@ def test_a_user_sees_only_confirmed_patterns_newest_agreed_first_with_evidence(
             "line": "Felt guilty taking an afternoon off.",
         },
     ]
-
-
-def test_agreeing_with_a_pattern_records_the_day_and_a_later_reaction_keeps_it(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-    scheduler: FakeScheduler,
-    seeded_settings: dict[str, Any],
-) -> None:
-    connect_telegram(client, auth_verifier, chat_channel)
-    user_id = maya_id(client, auth_verifier)
-    start_goes_quiet_pattern(client, chat_model, clock, scheduler, seeded_settings)
-    have_pattern_answer = (client, chat_model, clock, scheduler, seeded_settings)
-    [suspected] = patterns_of(client.engine, user_id)
-    assert suspected.confirmed_at is None
-
-    end_with_pattern_answer(
-        *have_pattern_answer, {"pattern": 1, "reaction": "agreed", "state": "confirmed"}
-    )
-    agreed_at = clock.now()
-    end_with_pattern_answer(
-        *have_pattern_answer, {"pattern": 1, "reaction": "brushed_off"}
-    )
-
-    [pattern] = patterns_of(client.engine, user_id)
-    assert pattern.state == PatternState.CONFIRMED
-    assert pattern.last_reaction == PatternReaction.BRUSHED_OFF
-    assert pattern.confirmed_at == agreed_at
-    [shown] = patterns_shown(client, maya_headers(auth_verifier))
-    assert datetime.fromisoformat(shown["agreed_at"]) == agreed_at
-
-
-def test_a_new_pattern_agreed_with_at_once_is_dated_and_agreeing_again_keeps_the_day(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-    scheduler: FakeScheduler,
-    seeded_settings: dict[str, Any],
-) -> None:
-    connect_telegram(client, auth_verifier, chat_channel)
-    user_id = maya_id(client, auth_verifier)
-    chat_model.script_pattern_keeping(
-        pattern_keeping_answer(
-            [
-                {
-                    "pattern": GOES_QUIET,
-                    "evidence": [
-                        evidence(1, "Skipped meals for days while on the app."),
-                        evidence(2, "Snapped at mum because the app had them."),
-                    ],
-                    "reaction": "agreed",
-                    "state": "confirmed",
-                }
-            ]
-        )
-    )
-    keep_threads(client, chat_model, clock, scheduler, seeded_settings)
-    [started_confirmed] = patterns_of(client.engine, user_id)
-    agreed_at = started_confirmed.confirmed_at
-
-    end_with_pattern_answer(
-        client,
-        chat_model,
-        clock,
-        scheduler,
-        seeded_settings,
-        {"pattern": 1, "reaction": "agreed", "state": "confirmed"},
-    )
-
-    assert agreed_at is not None
-    [pattern] = patterns_of(client.engine, user_id)
-    assert pattern.last_offered_at == clock.now()
-    assert pattern.confirmed_at == agreed_at < clock.now()
 
 
 def test_deleting_a_pattern_removes_it_and_rewrites_the_portrait_without_it(
@@ -332,7 +252,7 @@ def test_a_user_cannot_delete_a_suspected_or_another_users_pattern(
         (date(2026, 11, 3), threads["Mum's visit"], "Snapped at mum."),
     ]
     suspected_id = keep_pattern(
-        client.engine, user_id, HIDDEN, PatternState.SUSPECTED, shared_evidence
+        client.engine, user_id, HIDDEN, PatternState.UNMATCHED, shared_evidence
     )
     confirmed_id = keep_pattern(
         client.engine,
@@ -415,7 +335,7 @@ def test_the_portrait_is_written_from_confirmed_patterns_only(
         confirmed_at=datetime(2026, 11, 3, 20, 0),
     )
     keep_pattern(
-        client.engine, user_id, HIDDEN, PatternState.SUSPECTED, shared_evidence
+        client.engine, user_id, HIDDEN, PatternState.UNMATCHED, shared_evidence
     )
     keep_pattern(client.engine, user_id, CLOSED, PatternState.CLOSED, shared_evidence)
     clock.advance(timedelta(days=1))

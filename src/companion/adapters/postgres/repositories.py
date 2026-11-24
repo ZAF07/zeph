@@ -3223,6 +3223,7 @@ def _to_pattern(row: Row[Any], evidence: Sequence[PatternEvidence]) -> Pattern:
             PatternReaction(row.last_reaction) if row.last_reaction else None
         ),
         confirmed_at=row.confirmed_at,
+        matched_pattern_type_id=row.matched_pattern_type_id,
     )
 
 
@@ -3430,10 +3431,35 @@ class PostgresPatternRepository:
             The Patterns, each with its evidence oldest first.
         """
         return self._list(
-            user_id,
             and_(patterns.c.user_id == user_id, HAS_NO_PATTERN_TYPE),
             [patterns.c.started_at, patterns.c.id],
         )
+
+    def list_not_matched(self) -> list[Pattern]:
+        """List every User's Patterns with no Pattern Type and none matched.
+
+        Returns:
+            The Patterns, each User's together, oldest started first, each
+            with its evidence oldest first.
+        """
+        return self._list(
+            and_(HAS_NO_PATTERN_TYPE, patterns.c.matched_pattern_type_id.is_(None)),
+            [patterns.c.user_id, patterns.c.started_at, patterns.c.id],
+        )
+
+    def save_match(self, pattern_id: UUID, pattern_type_id: str) -> None:
+        """Save the Pattern Type a Pattern with none of its own was found to fit.
+
+        Args:
+            pattern_id: The Pattern's ID.
+            pattern_type_id: The Pattern Type's ID.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                update(patterns)
+                .where(patterns.c.id == pattern_id, HAS_NO_PATTERN_TYPE)
+                .values(matched_pattern_type_id=pattern_type_id)
+            )
 
     def list_confirmed(self, user_id: UUID) -> list[Pattern]:
         """List the Patterns a User agreed with, newest agreed first.
@@ -3445,7 +3471,6 @@ class PostgresPatternRepository:
             The confirmed Patterns, each with its evidence oldest first.
         """
         return self._list(
-            user_id,
             and_(
                 patterns.c.user_id == user_id,
                 HAS_NO_PATTERN_TYPE,
@@ -3535,15 +3560,13 @@ class PostgresPatternRepository:
 
     def _list(
         self,
-        user_id: UUID,
         which: ColumnElement[bool],
         order: Sequence[ColumnElement[Any]],
     ) -> list[Pattern]:
-        """List the User's Patterns that match, in the given order, with evidence.
+        """List the Patterns that match, in the given order, with evidence.
 
         Args:
-            user_id: The User's ID.
-            which: Which of their Patterns to list.
+            which: Which Patterns to list.
             order: The order to list them in.
 
         Returns:

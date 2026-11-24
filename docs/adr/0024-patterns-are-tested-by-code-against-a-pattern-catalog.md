@@ -1,6 +1,6 @@
 # Patterns are tested by code against a Pattern Catalog
 
-Status: accepted, not built yet. Replaces ADR-0020.
+Status: accepted, built in part (what is built is listed in `docs/pattern-pipeline/README.md`). Replaces ADR-0020.
 
 Under ADR-0020 the model wrote Patterns freely, and a User's "yes" to a Read confirmed one. That made Zeph's deepest claims about a person rest on a model's guess and on a reaction people give easily: they accept flattering reads and reject accurate ones that sting. We now test Patterns. Each is of a Pattern Type from a human-written Pattern Catalog; the model only reads what Users say into it, as Observations with an exact quote and tags from fixed lists; code checks the quotes, works out a score, and alone moves a Pattern between seven states (noticed, suspected, ready, shared, confirmed, contested, closed), logging every move. Only a ready Pattern is shared, with the User's own quotes and a Prediction they test in their own life. The flow is in `docs/pattern-pipeline/README.md`.
 
@@ -18,5 +18,5 @@ Under ADR-0020 the model wrote Patterns freely, and a User's "yes" to a Read con
 - A situation is one Life Thread; the same way shown with different people within it adds weight, up to a cap. A Pattern needs several situations across more than one Conversation.
 - Users see a Pattern only once Zeph has told them about it, which keeps ADR-0020's reason (a cold read on a page lands like a horoscope) and stops them answering Zeph's questions knowing what it looks for.
 - Curiosities may now be made to check a Pattern (ADR-0026), which ADR-0020 ruled out.
-- Patterns the live User already has are kept: confirmed ones stay confirmed and visible, suspected ones become unmatched, and each is matched to a Pattern Type where one fits.
+- Patterns the live User already has are kept: confirmed ones stay confirmed and visible, suspected ones become unmatched, and each is matched to a Pattern Type where one fits. A match is a link from the old Pattern to the Pattern Type, not a change of the Pattern: its words, state and evidence stay, and the Conversations behind its evidence are tagged again so a Pattern of that Pattern Type grows from checked Observations. Making the old Pattern itself the Pattern of the Pattern Type was rejected: it has no Observations, so scoring would delete or close it.
 - Rollout is three Features, each needing the one before: Pattern noticing, Pattern exploring, Pattern sharing.

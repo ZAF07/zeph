@@ -1,4 +1,4 @@
-.PHONY: check check-python check-web contract eval load-test up restart worktree-setup worktree-teardown db-copy
+.PHONY: check check-python check-web contract eval match-patterns load-test up restart worktree-setup worktree-teardown db-copy
 
 MAIN_DIR := $(shell dirname "$$(git rev-parse --path-format=absolute --git-common-dir)")
 THIS_DIR := $(shell git rev-parse --show-toplevel)
@@ -33,6 +33,12 @@ eval:
 	@running="$$($(COMPOSE) ps --status running --services 2>/dev/null)"; \
 	echo "$$running" | grep -qx backend && echo "$$running" | grep -qx eval-runner || { echo "The stack isn't running here (backend and eval-runner must be up). Start it with make up or make restart, then run make eval again."; exit 1; }
 	$(COMPOSE) exec -T backend python -m companion.eval_terminal $(if $(EVALS),--evals $(EVALS)) $(if $(CASES),--cases $(CASES))
+
+## Match Patterns with no Pattern Type to the Pattern Catalog on this stack, then tag their
+## evidence again (real model calls, a few per Pattern). Run once after the Pattern Catalog is
+## first loaded, and again with TYPES=ID,ID after adding Pattern Types. Needs the backend running.
+match-patterns:
+	$(COMPOSE) exec -T backend python -m companion.pattern_matching_terminal $(if $(TYPES),--pattern-types $(TYPES))
 
 ## Load test this worktree's stack, for free: the backend runs on the load-test adapters
 ## (docker-compose.load-test.yml), so no model, search or Telegram call is made. Prints the

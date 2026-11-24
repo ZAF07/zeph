@@ -384,6 +384,7 @@ def test_core_services_list_their_prompt_and_model_settings(
         "Knowledge “when it helps”",
         "Check-ins",
         "Pattern tagging",
+        "Pattern matching",
         "Pattern keeping",
     ]
     service = response["services"][3]

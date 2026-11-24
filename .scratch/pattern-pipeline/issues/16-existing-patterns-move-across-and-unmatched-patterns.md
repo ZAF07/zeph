@@ -30,3 +30,12 @@ The Pattern keeping step changes job: it no longer starts, confirms or closes ca
 - `12-patterns-scored-and-moved-by-code.md`
 
 ## Comments
+
+Plan (24 Nov 2026, branch `pattern-16-existing-patterns-move`, worktree `ai-chat-companion-pattern-16`):
+
+- **Unmatched is a state of a written Pattern.** `PatternState` gains `unmatched`, used only by Patterns with no Pattern Type (the ones the keeping step writes). It is not one of the seven states code moves a catalog Pattern between.
+- **Migration.** Every old suspected Pattern becomes unmatched; confirmed and closed are left as they are; no row or evidence is removed. `patterns` gains `matched_pattern_type_id`. `pattern_keeping_prompt` is reloaded from the seed.
+- **Keeping step.** Starts only unmatched Patterns (two or more Threads, as before) and adds evidence only to unmatched ones. It no longer reads reactions, confirms or closes. It is shown the Pattern Types so it leaves those to tagging. It never sees a catalog Pattern.
+- **In replies.** An unmatched Pattern still comes to mind and the Reply Plan may build its Read on it, but code drops any try to offer it: only a confirmed Pattern can be offered.
+- **Matching (Admin command).** `python -m companion.pattern_matching_terminal` (`make match-patterns`, `TYPES=ID,ID` for only some Pattern Types). For each written Pattern not matched yet, one model call says which Pattern Type it fits, or none; code keeps the answer only when the ID is in the catalog. A match is a link (`matched_pattern_type_id`); the Pattern, its words, state and evidence stay as they are. Then the Conversations behind its evidence whose messages are still kept are tagged again against that Pattern Type with the normal checks, and the User's Patterns are scored again (cause `evidence_tagged_again`). Closed ones are linked but not tagged again. Only for Users for whom Pattern noticing works and who pressed "Got it". The same command with `TYPES=` is the "tag again when a Pattern Type is added" step. It prints counts and IDs, never a User's words.
+- **Admins** see an "Unmatched Patterns" count per User.

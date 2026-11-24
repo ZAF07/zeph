@@ -5,12 +5,13 @@ from types import ModuleType
 from typing import Any
 from uuid import UUID
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
 from companion.adapters.postgres.database import migrate
 from companion.adapters.postgres.repositories import build_postgres_repositories
-from companion.core.models import Pattern, PatternReaction, PatternState
+from companion.core.models import Pattern, PatternState
 from tests.fakes import (
     FakeAuthVerifier,
     FakeChatChannel,
@@ -56,7 +57,16 @@ def patterns_of(engine: Engine, user_id: str) -> list[Pattern]:
     return build_postgres_repositories(engine).patterns.list_for_user(UUID(user_id))
 
 
-def test_two_threads_showing_the_same_way_of_acting_start_a_suspected_pattern(
+def set_pattern_state(engine: Engine, state: PatternState) -> None:
+    """Put every Pattern in a state, as one kept before the Pattern Catalog
+    could be."""
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE patterns SET state = :state"), {"state": state.value}
+        )
+
+
+def test_two_threads_showing_the_same_way_of_acting_start_an_unmatched_pattern(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -92,7 +102,7 @@ def test_two_threads_showing_the_same_way_of_acting_start_a_suspected_pattern(
 
     [pattern] = patterns_of(client.engine, maya_id(client, auth_verifier))
     assert pattern.pattern == GOES_QUIET
-    assert pattern.state == PatternState.SUSPECTED
+    assert pattern.state == PatternState.UNMATCHED
     assert [(item.thread_title, item.line) for item in pattern.evidence] == [
         ("Side project", "Skipped meals for days while on the app."),
         ("Mum's visit", "Snapped at mum because the app had them."),
@@ -114,7 +124,7 @@ def start_goes_quiet_pattern(
     seeded_settings: dict[str, Any],
 ) -> None:
     """Have a Conversation whose end starts the side project and mum's visit
-    Threads (the project settled) and a suspected Pattern linking them."""
+    Threads (the project settled) and an unmatched Pattern linking them."""
     chat_model.script_pattern_keeping(
         pattern_keeping_answer(
             [
@@ -170,7 +180,12 @@ def test_keeping_is_given_the_touched_and_closest_threads_however_old_and_the_pa
         in seen
     )
     assert "[3]" not in seen
-    assert f"Patterns kept so far:\n[1] (suspected) {GOES_QUIET} Evidence:" in seen
+    assert f"Patterns kept so far:\n[1] (unmatched) {GOES_QUIET} Evidence:" in seen
+    looked_for = seen.split("Pattern Types Zeph already looks for:\n")[1]
+    assert (
+        "- Softening disagreement to protect belonging. If: "
+        in (looked_for.split("Patterns kept so far:")[0])
+    )
 
 
 def test_days_within_retention_reach_keeping_as_messages_and_older_ones_as_summaries(
@@ -254,7 +269,7 @@ def end_with_pattern_answer(
     )
 
 
-def test_a_pattern_is_confirmed_or_closed_by_how_the_user_took_it_and_stays_closed(
+def test_keeping_never_confirms_or_closes_a_pattern_whatever_the_model_writes(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -268,38 +283,65 @@ def test_a_pattern_is_confirmed_or_closed_by_how_the_user_took_it_and_stays_clos
     start_goes_quiet_pattern(client, chat_model, clock, scheduler, seeded_settings)
     have_pattern_answer = (client, chat_model, clock, scheduler, seeded_settings)
 
-    end_with_pattern_answer(*have_pattern_answer, {"pattern": 1, "state": "confirmed"})
-    [pattern] = patterns_of(client.engine, user_id)
-    assert pattern.state == PatternState.SUSPECTED
-
     end_with_pattern_answer(
         *have_pattern_answer, {"pattern": 1, "reaction": "agreed", "state": "confirmed"}
     )
     [pattern] = patterns_of(client.engine, user_id)
-    assert pattern.state == PatternState.CONFIRMED
-    assert pattern.last_reaction == PatternReaction.AGREED
-    assert pattern.last_offered_at == clock.now()
+    assert pattern.state == PatternState.UNMATCHED
+    assert pattern.last_reaction is None
 
     end_with_pattern_answer(
         *have_pattern_answer,
         {"pattern": 1, "reaction": "pushed_back", "state": "closed"},
     )
     [pattern] = patterns_of(client.engine, user_id)
-    assert pattern.state == PatternState.CLOSED
+    assert pattern.state == PatternState.UNMATCHED
 
     end_with_pattern_answer(
         *have_pattern_answer,
         {
             "pattern": 1,
-            "reaction": "agreed",
             "state": "confirmed",
             "evidence": [evidence(1, "Forgot to eat while learning guitar.")],
         },
     )
     [pattern] = patterns_of(client.engine, user_id)
-    assert pattern.state == PatternState.CLOSED
-    assert pattern.last_reaction == PatternReaction.PUSHED_BACK
-    assert len(pattern.evidence) == 2
+    assert pattern.state == PatternState.UNMATCHED
+    assert len(pattern.evidence) == 3
+
+
+@pytest.mark.parametrize("state", [PatternState.CONFIRMED, PatternState.CLOSED])
+def test_keeping_adds_nothing_to_a_confirmed_or_closed_pattern(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+    state: PatternState,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    user_id = maya_id(client, auth_verifier)
+    start_goes_quiet_pattern(client, chat_model, clock, scheduler, seeded_settings)
+    set_pattern_state(client.engine, state)
+    before = patterns_of(client.engine, user_id)
+
+    end_with_pattern_answer(
+        client,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+        {
+            "pattern": 1,
+            "evidence": [evidence(1, "Forgot to eat while learning guitar.")],
+        },
+    )
+
+    assert patterns_of(client.engine, user_id) == before
+    seen = chat_model.pattern_keeping_calls[-1].history[0].text
+    assert f"[1] ({state.value}) {GOES_QUIET}" in seen
 
 
 def test_with_user_memory_off_no_pattern_is_started_or_changed(
@@ -327,12 +369,15 @@ def test_with_user_memory_off_no_pattern_is_started_or_changed(
         clock,
         scheduler,
         seeded_settings,
-        {"pattern": 1, "reaction": "agreed", "state": "confirmed"},
+        {
+            "pattern": 1,
+            "evidence": [evidence(1, "Forgot to eat while learning guitar.")],
+        },
     )
 
     assert len(chat_model.pattern_keeping_calls) == calls_before
     [pattern] = patterns_of(client.engine, user_id)
-    assert pattern.state == PatternState.SUSPECTED
+    assert len(pattern.evidence) == 2
 
 
 def test_deleting_a_linked_thread_drops_its_evidence_and_the_pattern_once_none_is_left(
@@ -396,7 +441,7 @@ def test_pattern_keeping_is_the_last_core_service_with_its_limits_and_hints(
     )
 
 
-def test_admins_see_only_how_many_confirmed_patterns_a_user_has_and_the_keeping_step(
+def test_admins_see_only_how_many_unmatched_patterns_a_user_has_and_the_keeping_step(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -407,67 +452,19 @@ def test_admins_see_only_how_many_confirmed_patterns_a_user_has_and_the_keeping_
 ) -> None:
     connect_telegram(client, auth_verifier, chat_channel)
     start_goes_quiet_pattern(client, chat_model, clock, scheduler, seeded_settings)
-    end_with_pattern_answer(
-        client,
-        chat_model,
-        clock,
-        scheduler,
-        seeded_settings,
-        {"pattern": 1, "reaction": "agreed", "state": "confirmed"},
-    )
     admin = owner_headers(client, auth_verifier)
 
     users = client.get("/api/admin/users", headers=admin)
     traces = list_traces(client, admin, step="patterns")
 
     [maya] = [row for row in users.json()["users"] if row["role"] == "user"]
-    assert maya["pattern_counts"]["confirmed"] == 1
+    assert maya["pattern_counts"]["unmatched"] == 1
+    assert maya["pattern_counts"]["suspected"] == 0
     assert "grabs" not in users.text
-    assert len(traces) == 2
+    assert len(traces) == 1
     opened = open_trace(client, admin, traces[0]["trace_id"])
     [keeping] = [call for call in opened["calls"] if call["step"] == "patterns"]
     assert keeping["content"] is None
-
-
-def test_a_new_pattern_the_user_agreed_with_in_the_same_conversation_starts_confirmed(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-    scheduler: FakeScheduler,
-    seeded_settings: dict[str, Any],
-) -> None:
-    connect_telegram(client, auth_verifier, chat_channel)
-    chat_model.script_pattern_keeping(
-        pattern_keeping_answer(
-            [
-                {
-                    "pattern": GOES_QUIET,
-                    "evidence": [
-                        evidence(1, "Skipped meals for days while on the app."),
-                        evidence(2, "Snapped at mum because the app had them."),
-                    ],
-                    "reaction": "agreed",
-                    "state": "confirmed",
-                }
-            ]
-        )
-    )
-
-    end_conversation(
-        client,
-        chat_model,
-        clock,
-        scheduler,
-        seeded_settings,
-        "the app has me, I forgot to eat and snapped at mum",
-        [PROJECT, MUM],
-    )
-
-    [pattern] = patterns_of(client.engine, maya_id(client, auth_verifier))
-    assert pattern.state == PatternState.CONFIRMED
-    assert pattern.last_reaction == PatternReaction.AGREED
 
 
 def test_evidence_is_dated_to_the_day_the_conversation_started(
@@ -579,7 +576,7 @@ def test_the_migration_keeps_a_curiosity_prompt_an_admin_edited(
         migrate(database_url)
 
 
-def test_a_pattern_is_confirmed_even_when_no_thread_changed_in_the_conversation(
+def test_keeping_runs_even_when_no_thread_changed_in_the_conversation(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
     chat_channel: FakeChatChannel,
@@ -591,11 +588,6 @@ def test_a_pattern_is_confirmed_even_when_no_thread_changed_in_the_conversation(
     connect_telegram(client, auth_verifier, chat_channel)
     start_goes_quiet_pattern(client, chat_model, clock, scheduler, seeded_settings)
     clock.advance(timedelta(days=1))
-    chat_model.script_pattern_keeping(
-        pattern_keeping_answer(
-            [{"pattern": 1, "reaction": "agreed", "state": "confirmed"}]
-        )
-    )
 
     end_conversation(
         client,
@@ -607,34 +599,6 @@ def test_a_pattern_is_confirmed_even_when_no_thread_changed_in_the_conversation(
         [],
     )
 
-    [pattern] = patterns_of(client.engine, maya_id(client, auth_verifier))
-    assert pattern.state == PatternState.CONFIRMED
     seen = chat_model.pattern_keeping_calls[-1].history[0].text
     closest = seen.split("Their other Life Threads closest in meaning:\n")[1]
-    assert "Side project (" in closest.split("Patterns kept so far:")[0]
-
-
-def test_a_brushed_off_view_never_closes_a_pattern(
-    client: TestClient,
-    auth_verifier: FakeAuthVerifier,
-    chat_channel: FakeChatChannel,
-    chat_model: ScriptedChatModel,
-    clock: FakeClock,
-    scheduler: FakeScheduler,
-    seeded_settings: dict[str, Any],
-) -> None:
-    connect_telegram(client, auth_verifier, chat_channel)
-    start_goes_quiet_pattern(client, chat_model, clock, scheduler, seeded_settings)
-
-    end_with_pattern_answer(
-        client,
-        chat_model,
-        clock,
-        scheduler,
-        seeded_settings,
-        {"pattern": 1, "reaction": "brushed_off", "state": "closed"},
-    )
-
-    [pattern] = patterns_of(client.engine, maya_id(client, auth_verifier))
-    assert pattern.state == PatternState.SUSPECTED
-    assert pattern.last_reaction == PatternReaction.BRUSHED_OFF
+    assert "Side project (" in closest.split("Pattern Types Zeph already")[0]
