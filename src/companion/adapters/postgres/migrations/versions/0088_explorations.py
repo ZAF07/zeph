@@ -9,8 +9,8 @@ edited them, since tagging now settles unclear
 Observations and the Reply Plan now sees the Agenda. The Agenda's numbers
 come from the seed on next start. No User data is removed.
 
-Revision ID: 0087
-Revises: 0086
+Revision ID: 0088
+Revises: 0087
 Create Date: 2026-11-24
 """
 
@@ -19,8 +19,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0087"
-down_revision: str | None = "0086"
+revision: str = "0088"
+down_revision: str | None = "0087"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -524,7 +524,7 @@ def test_the_migration_keeps_user_data_and_reloads_the_two_prompts(
             )
         )
 
-    downgrade_to(database_url, "0086")
+    downgrade_to(database_url, "0087")
     try:
         with client.engine.connect() as connection:
             aims = connection.execute(text("SELECT aim FROM curiosities")).scalars()

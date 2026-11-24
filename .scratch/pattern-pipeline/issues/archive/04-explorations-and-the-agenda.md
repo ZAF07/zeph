@@ -64,7 +64,7 @@ Decisions made while building (24 Nov 2026):
 - **Check-ins** may ask an aimed Curiosity, under the existing weekly Curiosity Check-in limit (decision 28). One that gets no reply is a vague try; the wait still applies.
 - **Useful evidence** is any Observation of the Pattern Type from the Conversation it was asked in, including ones from before the question (Observations keep a day, not a time).
 - **Saving the Agenda** adds and closes aimed Curiosities in the Exploration repository, so it is one step under the User lock; the port says so.
-- **Migration** is 0087.
+- **Migration** is 0088 (main took 0087 for OpenRouter model names while this was built).
 
 Evidence (24 Nov 2026, worktree stack on 3010/8010, real DeepSeek model through the real webhook (`InProcessCompanion` in the backend container on the worktree database, recording chat channel), Conversation ends run by the running backend's scheduler, times moved back with SQL instead of waiting; made-up User only. Some Observations were added with SQL, quoting the User's own texts, where noted):
 
