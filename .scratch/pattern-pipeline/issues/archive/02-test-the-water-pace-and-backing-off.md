@@ -110,4 +110,4 @@ Evidence (24 Nov 2026, worktree stack on ports 3010/8010):
 ## Completion
 
 - Completed: 2026-11-24
-- Commit: <to be filled in after the merge>
+- Commit: 0280619 (merge "Merge pattern-02-test-the-water: test the water, pace between Curiosities and backing off after brush-offs"; work in c2351af "Test the water, pace between Curiosities and backing off after brush-offs", c9a16cc "Review fixes: test the water asks one opener per Conversation", 55c03b8 "Ask how a Curiosity was taken only if it was really asked; docs", 5eaaf58 "Archive pattern-pipeline issue 02: test the water, pace and backing off, verified", 6a75a44 "CONTEXT: say what asking to drop a Curiosity means, not how")
