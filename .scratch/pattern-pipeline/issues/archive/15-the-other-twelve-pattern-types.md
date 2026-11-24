@@ -66,4 +66,4 @@ Evidence (24 Nov 2026, worktree stack on 3030/8030, build `ef2c110` rebased on m
 ## Completion
 
 - Completed: 2026-11-24
-- Commit: <to be filled in after merge>
+- Commit: `ce7cd02` "Merge pattern-15-other-twelve: the full first Pattern Catalog, fifteen approved Pattern Types with look-alikes both ways, and the catalog guide" (branch head `22835eb`)
