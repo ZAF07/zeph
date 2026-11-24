@@ -18,7 +18,7 @@ Don't log notes about how your own work went.
 
 ## When you finish an issue of this PRD
 
-Before archiving, ask: did I find a bug, failure, risk or potential failure, in my task or outside it, that my diff doesn't fix? Add one section for your issue at the bottom of this file, in issue order, with one entry per finding:
+Before archiving, ask: did I find a bug, failure, risk or potential failure, in my task or outside it, that my diff doesn't fix? Add one section for your issue above `## Comments`, in issue order, with one entry per finding:
 
 ```markdown
 ## NN — <issue title> (<YYYY-MM-DD>)
