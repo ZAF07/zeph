@@ -4,6 +4,8 @@ Read this before planning or changing Patterns, Observations, Curiosities, the A
 
 **Status:** target design, agreed 24 Nov 2026. **Not built yet.** Until it is, Patterns work as ADR-0020 says. Every decision behind it, with starting numbers and the first fifteen Pattern Types, is in `.scratch/pattern-pipeline/grill-decisions.md`.
 
+**Built so far:** the Pattern Catalog loads from `src/companion/seed/pattern_catalog/` when the backend starts, and Admins read it on the Dashboard's Pattern Catalog page (ADR-0025). Nothing reads it in the reply path yet.
+
 ## What it is for
 
 Zeph helps a User see their own patterns. It turns everyday conversations and Thought Experiments into evidence-backed Patterns about how they act in different situations, and they test them in their own life.

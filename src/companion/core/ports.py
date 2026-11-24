@@ -59,6 +59,7 @@ from companion.core.models import (
     NextDueTimeChange,
     Pattern,
     PatternToSave,
+    PatternTypeVersion,
     PersonalSticker,
     PhotoImage,
     PlatformSettings,
@@ -1887,6 +1888,29 @@ class CopyRepository(Protocol):
         ...
 
 
+class PatternCatalogRepository(Protocol):
+    """Stores every loaded version of each Pattern Type (ADR-0025)."""
+
+    def list_versions(self) -> list[PatternTypeVersion]:
+        """List every stored version of every Pattern Type.
+
+        Returns:
+            The versions, by Pattern Type ID and then newest loaded first.
+        """
+        ...
+
+    def save_loaded(self, versions: Sequence[PatternTypeVersion]) -> None:
+        """Keep the versions just loaded as the catalog, in one step.
+
+        A version not stored yet is added. Versions stored earlier stay as
+        they were. Exactly the given versions are then the current ones.
+
+        Args:
+            versions: The version of each Pattern Type its file now holds.
+        """
+        ...
+
+
 class HelplineRepository(Protocol):
     """Stores Helplines per country and the one international fallback."""
 
@@ -2899,6 +2923,7 @@ class Repositories:
     conversations: ConversationRepository
     platform_settings: PlatformSettingsRepository
     copy: CopyRepository
+    pattern_catalog: PatternCatalogRepository
     helplines: HelplineRepository
     safeguard_events: SafeguardEventRepository
     memory_categories: MemoryCategoryRepository

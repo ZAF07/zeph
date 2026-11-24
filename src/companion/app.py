@@ -15,6 +15,9 @@ from companion.adapters.http.dashboard_api import build_dashboard_api_router
 from companion.adapters.http.errors import add_core_error_handlers
 from companion.adapters.http.eval_api import build_eval_api_router
 from companion.adapters.http.eval_case_api import build_eval_case_api_router
+from companion.adapters.http.pattern_catalog_api import (
+    build_pattern_catalog_api_router,
+)
 from companion.adapters.telegram.webhook import build_telegram_webhook_router
 from companion.core.admin_users import AdminUserService
 from companion.core.chat_settings import SettingsTools
@@ -52,6 +55,7 @@ from companion.core.move_outcomes import MoveOutcomeFinder, MoveOutcomeKeeper
 from companion.core.moves import MoveService
 from companion.core.needs import NeedService
 from companion.core.past_day import PastDayTool
+from companion.core.pattern_catalog import PatternCatalogService
 from companion.core.patterns import PatternKeeper, PatternReminder
 from companion.core.personal_stickers import (
     PersonalStickerKeeper,
@@ -442,6 +446,14 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             current_admin=current_admin,
             copy_service=CopyService(
                 dependencies.repositories.copy, dependencies.clock
+            ),
+        )
+    )
+    app.include_router(
+        build_pattern_catalog_api_router(
+            current_admin=current_admin,
+            pattern_catalog_service=PatternCatalogService(
+                dependencies.repositories.pattern_catalog
             ),
         )
     )

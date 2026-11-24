@@ -1,0 +1,289 @@
+{
+  "pattern_types": [
+    {
+      "id": "CONF.AVOID.BELONG",
+      "version": "0.1.0",
+      "area": "conflict",
+      "name": "Conflict avoidance to preserve belonging",
+      "definition": "When disagreement arises with someone whose approval matters, the person suppresses, delays or dilutes their own position. The driver is fear that conflict will damage the relationship, not lack of opinion.",
+      "if_situation": "Disagreement with a valued other",
+      "then_behaviour": "Withholds or softens own view",
+      "function": "To protect belonging",
+      "frameworks": [
+        "Young's subjugation and approval-seeking schema themes",
+        "Anxious attachment dimension (ECR-R)",
+        "HEXACO agreeableness facets (gentleness, flexibility)",
+        "Schwartz conformity and benevolence values"
+      ],
+      "signs": [
+        {
+          "id": "I1",
+          "text": "Apologises or hedges before stating a need",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I2",
+          "text": "Reports agreeing in the moment, then resenting it later",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "I3",
+          "text": "Rehearses conversations to avoid upsetting someone",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I4",
+          "text": "Describes the other's anger as the worst outcome, above the issue itself",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "I5",
+          "text": "Uses \"it's fine\" or \"not a big deal\" about something they then dwell on",
+          "strength": "weak",
+          "part": "behaviour"
+        }
+      ],
+      "signs_against": [
+        {
+          "id": "D1",
+          "text": "States disagreement directly with close others and reports little distress",
+          "strength": "strong",
+          "part": "behaviour"
+        },
+        {
+          "id": "D2",
+          "text": "Avoids conflict only with people who hold power over them (points to a situational or status driver)",
+          "strength": "moderate",
+          "part": "situation"
+        }
+      ],
+      "look_alikes": [
+        {
+          "pattern_type_id": "ACH.WORTH.PERF",
+          "name": "Performance-contingent self-worth",
+          "tells_apart": "Avoids conflict because criticism means failure, not because of fear the relationship will break"
+        },
+        {
+          "pattern_type_id": "CTRL.UNCERT.PLAN",
+          "name": "Control-seeking under uncertainty",
+          "tells_apart": "Avoids conflict because its outcome is unpredictable; indifferent to closeness"
+        }
+      ],
+      "anyone_would": "Low-stakes avoidance with strangers or authority only",
+      "exclusions": [
+        {
+          "text": "Active relationship crisis",
+          "evidence": "ignored"
+        },
+        {
+          "text": "Grief",
+          "evidence": "ignored"
+        }
+      ],
+      "approved_wording": "You seem to protect closeness by keeping disagreements small, even when they matter to you.",
+      "prediction_wording": "Next time {person} asks for something you'd rather not do, notice whether you say yes before you've decided.",
+      "numbers": {
+        "situations_needed": 3,
+        "base_rate": 0.2
+      },
+      "status": "draft",
+      "approved_by": null,
+      "approved_on": null,
+      "loaded_at": "2026-11-24T09:00:00Z",
+      "other_versions": []
+    },
+    {
+      "id": "CTRL.UNCERT.PLAN",
+      "version": "0.1.0",
+      "area": "control",
+      "name": "Control-seeking under uncertainty",
+      "definition": "When outcomes are uncertain, the person responds by planning, checking, gathering information or taking over. The discomfort comes from not knowing, and acting on it brings relief even when it changes nothing.",
+      "if_situation": "An important outcome is unknown or depends on others",
+      "then_behaviour": "Over-plans, seeks reassurance or takes control",
+      "function": "To reduce the distress of uncertainty",
+      "frameworks": [
+        "Intolerance of uncertainty (Dugas and colleagues)",
+        "Big Five neuroticism (anxiety facet) with high conscientiousness",
+        "Beck's catastrophising distortion",
+        "Schwartz security value"
+      ],
+      "signs": [
+        {
+          "id": "I1",
+          "text": "Re-checks or refreshes for news on something they can't influence",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I2",
+          "text": "Takes over a shared task rather than waiting on someone",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I3",
+          "text": "Describes waiting as worse than a known bad outcome",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "I4",
+          "text": "Builds contingency plans for unlikely scenarios",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I5",
+          "text": "Irritation when plans change at short notice, out of proportion to the cost",
+          "strength": "weak",
+          "part": "inside"
+        }
+      ],
+      "signs_against": [
+        {
+          "id": "D1",
+          "text": "Comfortably leaves an important outcome open for days",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "D2",
+          "text": "Plans heavily only where the stakes are concrete and planning changes the outcome (rational, not distress-driven)",
+          "strength": "moderate",
+          "part": "situation"
+        }
+      ],
+      "look_alikes": [
+        {
+          "pattern_type_id": "ACH.WORTH.PERF",
+          "name": "Performance-contingent self-worth",
+          "tells_apart": "Controls to guarantee a good result for self-worth; uncertainty itself is tolerable"
+        },
+        {
+          "pattern_type_id": "CONF.AVOID.BELONG",
+          "name": "Conflict avoidance to preserve belonging",
+          "tells_apart": "Avoids the unknown only when the relationship is at stake"
+        }
+      ],
+      "anyone_would": "A real crisis where control-seeking is adaptive",
+      "exclusions": [
+        {
+          "text": "Active health or safety emergency",
+          "evidence": "ignored"
+        }
+      ],
+      "approved_wording": "Not knowing seems to weigh on you more than a bad answer would, so you reach for control.",
+      "prediction_wording": "Next time you're waiting on {outcome}, notice how often you check and what changes when you do.",
+      "numbers": {
+        "situations_needed": 3,
+        "base_rate": 0.2
+      },
+      "status": "draft",
+      "approved_by": null,
+      "approved_on": null,
+      "loaded_at": "2026-11-24T09:00:00Z",
+      "other_versions": []
+    },
+    {
+      "id": "ACH.WORTH.PERF",
+      "version": "0.1.0",
+      "area": "achievement",
+      "name": "Performance-contingent self-worth",
+      "definition": "The person's sense of worth rises and falls with how well they perform. Falling short is felt as a verdict on the self, not on the work. High standards alone do not qualify; the marker is self-judgement after a miss.",
+      "if_situation": "Performance is evaluated or falls short",
+      "then_behaviour": "Self-criticism, over-preparation or avoidance of the task",
+      "function": "To protect a sense of being worthy",
+      "frameworks": [
+        "Self-critical vs high-standards dimensions of perfectionism (Frost and Hewitt–Flett traditions)",
+        "Contingencies of self-worth (Crocker)",
+        "Young's unrelenting-standards schema",
+        "Beck's all-or-nothing and labelling distortions"
+      ],
+      "signs": [
+        {
+          "id": "I1",
+          "text": "Labels self after a mistake (\"I'm useless\") rather than the act",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "I2",
+          "text": "Discounts success as luck or as the minimum expected",
+          "strength": "moderate",
+          "part": "inside"
+        },
+        {
+          "id": "I3",
+          "text": "Delays starting or shipping until it is \"good enough\"",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I4",
+          "text": "Mood tracks recent output, e.g. a bad workday ruins the evening",
+          "strength": "moderate",
+          "part": "inside"
+        },
+        {
+          "id": "I5",
+          "text": "Compares own output unfavourably with specific others",
+          "strength": "weak",
+          "part": "inside"
+        }
+      ],
+      "signs_against": [
+        {
+          "id": "D1",
+          "text": "Describes a failure with curiosity and no self-labelling",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "D2",
+          "text": "High standards that bring satisfaction, not dread",
+          "strength": "moderate",
+          "part": "inside"
+        }
+      ],
+      "look_alikes": [
+        {
+          "pattern_type_id": null,
+          "name": "High standards (healthy)",
+          "tells_apart": "A miss brings disappointment in the work, not in the self"
+        },
+        {
+          "pattern_type_id": "CONF.AVOID.BELONG",
+          "name": "Conflict avoidance to preserve belonging",
+          "tells_apart": "Fears others' reaction to the relationship, not the verdict on competence"
+        },
+        {
+          "pattern_type_id": "CTRL.UNCERT.PLAN",
+          "name": "Control-seeking under uncertainty",
+          "tells_apart": "Over-prepares to reduce unknowns, not to prove worth"
+        }
+      ],
+      "anyone_would": "Disappointment after a real, costly setback, or preparing hard where the stakes are high",
+      "exclusions": [
+        {
+          "text": "Active burnout or job loss in the last month",
+          "evidence": "counted_not_shared"
+        }
+      ],
+      "approved_wording": "How well you perform seems to decide how much you allow yourself to feel okay.",
+      "prediction_wording": "After the next piece of feedback on {domain}, notice whether your first thought is about the work or about you.",
+      "numbers": {
+        "situations_needed": 3,
+        "base_rate": 0.25
+      },
+      "status": "draft",
+      "approved_by": null,
+      "approved_on": null,
+      "loaded_at": "2026-11-24T09:00:00Z",
+      "other_versions": []
+    }
+  ]
+}

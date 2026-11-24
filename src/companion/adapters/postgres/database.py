@@ -8,7 +8,11 @@ from alembic.config import Config
 from sqlalchemy import Engine, exists, select
 from sqlalchemy.dialects.postgresql import insert
 
-from companion.adapters.postgres.repositories import PostgresCopyRepository
+from companion.adapters.pattern_catalog_seed import read_pattern_catalog_seed
+from companion.adapters.postgres.repositories import (
+    PostgresCopyRepository,
+    PostgresPatternCatalogRepository,
+)
 from companion.adapters.postgres.tables import (
     check_in_kinds,
     helplines,
@@ -19,6 +23,7 @@ from companion.adapters.postgres.tables import (
     platform_settings,
 )
 from companion.core.models import CopySeedSlot
+from companion.core.pattern_catalog import PatternCatalogService
 
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
@@ -99,6 +104,22 @@ def seed_copy(engine: Engine, seed_file: Path) -> None:
     """
     PostgresCopyRepository(engine).sync_with_seed(
         read_copy_seed(seed_file), datetime.now(UTC)
+    )
+
+
+def load_pattern_catalog(engine: Engine, seed_dir: Path) -> None:
+    """Make the stored Pattern Catalog follow its files (ADR-0025).
+
+    Args:
+        engine: The database engine.
+        seed_dir: The folder holding one YAML file per Pattern Type.
+
+    Raises:
+        InvalidPatternCatalogError: If a file is not valid, or a Pattern Type
+            changed while keeping a version already stored; nothing is loaded.
+    """
+    PatternCatalogService(PostgresPatternCatalogRepository(engine)).load(
+        read_pattern_catalog_seed(seed_dir), datetime.now(UTC)
     )
 
 
