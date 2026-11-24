@@ -71,3 +71,8 @@ Evidence (24 Nov 2026, worktree stack on 3020/8020, real `deepseek-flash`, owner
 Merged (24 Nov 2026): c4a6815 (merge "Merge pattern-14-tagging-eval: a Tagging Eval checks the real tagging step against expected Observations"; work in b225895 "Tagging Eval: the real tagging step checked against expected Observations", d4f5c95 "Tagging Eval: review fixes", 3857dd9 "Issue 14: evidence, findings for the owner; open for the owner's case review", c053cfd "CONTEXT: the Tagging Eval", d69944e "Tagging Eval: override test uses OpenRouter model names after rebase"). Not archived: open until the owner corrects the drafted cases in `src/companion/seed/evals/cases/tagging.yaml` (or on Admin → Evals → Cases → Tagging) and comments here; then tick the last box, set `completed`, archive.
 
 Owner's decision (24 Nov 2026): the drafted cases are the defaults until the whole PRD is built; correcting them moves to issue 20, with a guide for doing it (`docs/pattern-evals/adding-tagging-cases.md`). Issue archived.
+
+## Completion
+
+- Completed: 2026-11-24
+- Commit: c4a6815 (merge "Merge pattern-14-tagging-eval: a Tagging Eval checks the real tagging step against expected Observations"; work in b225895, d4f5c95, 3857dd9, c053cfd, d69944e) and 1f4caa8 (merge "Merge pattern-14-case-guide: how to correct and add Tagging cases; issue 14 archived"; work in 5cfba29 "Pattern Evals: guide for correcting and adding Tagging cases; owner step moves to issue 20, issue 14 archived")
