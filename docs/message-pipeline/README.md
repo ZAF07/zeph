@@ -54,7 +54,8 @@ flowchart TD
 
     subgraph END[Conversation end, in order]
       E1[a. Day Summary, Memory Items, Shared Photos] --> E2[b. Life Threads]
-      E2 --> E3[c. Patterns]
+      E2 --> T[b2. Pattern tagging, while Pattern noticing works]
+      T --> E3[c. Patterns]
       E3 --> E4[d. Curiosities]
       E4 --> E5[e. Move Outcomes]
       E5 --> E6[f. User Portrait]
@@ -157,6 +158,10 @@ After the quiet gap (Admin-set), these run in order, each using what the earlier
 - **How:** one model call with the Threads this Conversation may touch.
 - *Built (19 Nov 2026): a commitment the User agreed to (never one Zeph only suggested) goes into its Thread's story with the day it was due, and later how it went. The prompt says which home each thing learned has.*
 
+### b2. Pattern tagging *(new)*
+
+- *Built (24 Nov 2026): after Life Threads and before Patterns, while the Feature Pattern noticing works (off for everyone to start), one call reads the Conversation into the Pattern Catalog as Observations, and code keeps only those that check out. Silent: nothing reaches a reply. See `docs/pattern-pipeline/README.md`, Tagging and Checks.*
+
 ### c. Patterns *(new)*
 
 - **What:** adds evidence to Patterns that showed up again, starts suspected ones when the same way of thinking, feeling, acting or choosing shows up across two or more Threads, and confirms or closes one by how the User took a Read Zeph offered from it.
@@ -206,6 +211,7 @@ Every prompt is an Admin-editable Platform Setting (key in `platform_settings`),
 | Check-in on its own | `check_in_prompt` | **yes** | Check-in Kinds, recent Check-ins, Shared Photos, due Curiosities, memory | `core/check_ins.py` |
 | Conversation end a. | `memory_processing_prompt` | no | Memory Categories, current Memory Items, photos sent, moods through the day, the day's earlier Conversations, the Conversation that just ended. Writes the Day Summary. | `core/post_conversation.py` |
 | Conversation end b. | `life_thread_keeping_prompt` | no | Today, the Threads it may touch, the Conversation | `core/life_threads.py` |
+| Conversation end b2. | `pattern_tagging_prompt` | no | Today, the Threads touched (numbered), every current Pattern Type with its signs, look-alikes and what anyone would do, the tag lists, the Conversation | `core/observations.py` |
 | Conversation end c. | `pattern_keeping_prompt` | no | Today, the Threads touched and the closest ones, every Pattern with its evidence (those a Reply Plan offered in this Conversation marked), the days behind that evidence (messages or Day Summaries), the Conversation under the day it started | `core/patterns.py` |
 | Conversation end d. | `curiosity_keeping_prompt` | no | Today, Memory Items, Threads touched, Curiosities waiting or raised, those asked recently, the unmade next Move, the Conversation | `core/curiosities.py` |
 | Conversation end e. | `move_outcome_keeping_prompt` | no | The Moves each Reply Plan made, with the Understanding's mood, the Conversation | `core/move_outcomes.py` |

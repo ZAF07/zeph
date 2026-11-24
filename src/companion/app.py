@@ -381,6 +381,9 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             ),
             pattern_tagger=PatternTagger(
                 repositories=dependencies.repositories,
+                pattern_catalog=PatternCatalogService(
+                    dependencies.repositories.pattern_catalog
+                ),
                 chat_model=chat_model,
                 model_call_log=model_call_log,
                 clock=dependencies.clock,

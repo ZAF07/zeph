@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 
 MOST_PATTERN_TYPES_PER_OBSERVATION = 2
 EVENED_OUT_CHARACTERS = str.maketrans({"’": "'", "‘": "'", "“": '"', "”": '"'})
-SPACES = re.compile(r"\s+")
+WHITESPACE_RUNS = re.compile(r"\s+")
 
 
 @dataclass(frozen=True)
@@ -139,7 +139,7 @@ def even_out(text: str) -> str:
         It with each run of spaces as one space and curly quotes made
         straight, without spaces around it.
     """
-    return SPACES.sub(" ", text.translate(EVENED_OUT_CHARACTERS)).strip()
+    return WHITESPACE_RUNS.sub(" ", text.translate(EVENED_OUT_CHARACTERS)).strip()
 
 
 def find_quoted_text(quote: str, user_texts: Sequence[UserText]) -> UserText | None:
@@ -150,12 +150,16 @@ def find_quoted_text(quote: str, user_texts: Sequence[UserText]) -> UserText | N
         user_texts: What the User wrote, oldest first.
 
     Returns:
-        The first of their texts that holds the whole quote; None if none
-        does.
+        The first of their texts that holds the whole quote, starting and
+        ending on whole words; None if none does.
     """
-    wanted = even_out(quote)
+    whole_words = re.compile(rf"(?<!\w){re.escape(even_out(quote))}(?!\w)")
     return next(
-        (user_text for user_text in user_texts if wanted in even_out(user_text.text)),
+        (
+            user_text
+            for user_text in user_texts
+            if whole_words.search(even_out(user_text.text))
+        ),
         None,
     )
 
@@ -210,48 +214,51 @@ def read_tagging_answer(answer: str) -> list[Any] | None:
     return observations
 
 
-def read_tag[Tag: StrEnum](
-    entry: dict[str, Any], key: str, tags: type[Tag]
-) -> tuple[bool, Tag | None]:
+def read_choice[Choice: StrEnum](
+    entry: dict[str, Any], key: str, choices: type[Choice]
+) -> Choice | None:
     """Read one value the model wrote that must come from a fixed list.
 
     Args:
         entry: The Observation, as the model wrote it.
-        key: The tag's name.
-        tags: Its fixed list.
+        key: The value's name.
+        choices: Its fixed list.
 
     Returns:
-        Whether it is valid, and the tag; None when left empty.
+        The value; None when it is left empty or not from the list.
     """
     value = entry.get(key)
-    if value is None:
-        return True, None
-    allowed = {tag.value: tag for tag in tags}
-    if not isinstance(value, str) or value not in allowed:
-        return False, None
-    return True, allowed[value]
+    allowed = {choice.value: choice for choice in choices}
+    return allowed.get(value) if isinstance(value, str) else None
 
 
 def read_tags(entry: dict[str, Any]) -> SituationTags | None:
     """Read the situation tags of one Observation the model wrote.
 
+    A tag may be left empty when there is no one else or it isn't clear.
+
     Args:
         entry: The Observation, as the model wrote it.
 
     Returns:
-        The tags; None if any of them is not from its list.
+        The tags; None if any of them is given but not from its list.
     """
-    relationship = read_tag(entry, "relationship", Relationship)
-    power = read_tag(entry, "power", Power)
-    setting = read_tag(entry, "setting", SituationSetting)
-    stance = read_tag(entry, "stance", Stance)
-    if not all(valid for valid, _ in (relationship, power, setting, stance)):
+    tag_lists: tuple[tuple[str, type[StrEnum]], ...] = (
+        ("relationship", Relationship),
+        ("power", Power),
+        ("setting", SituationSetting),
+        ("stance", Stance),
+    )
+    if any(
+        entry.get(key) is not None and read_choice(entry, key, tags) is None
+        for key, tags in tag_lists
+    ):
         return None
     return SituationTags(
-        relationship=relationship[1],
-        power=power[1],
-        setting=setting[1],
-        stance=stance[1],
+        relationship=read_choice(entry, "relationship", Relationship),
+        power=read_choice(entry, "power", Power),
+        setting=read_choice(entry, "setting", SituationSetting),
+        stance=read_choice(entry, "stance", Stance),
     )
 
 
@@ -298,7 +305,7 @@ def read_sign(
         Pattern Type's signs for, when it is for, or signs against, when it
         is against.
     """
-    _, direction = read_tag(entry, "direction", ObservationDirection)
+    direction = read_choice(entry, "direction", ObservationDirection)
     if direction is None:
         return None
     signs = (
@@ -348,21 +355,17 @@ def check_observation(entry: Any, context: TaggingContext) -> Observation | None
     if pattern_types is None:
         return None
     matched = read_sign(entry, pattern_types[0])
+    if matched is None:
+        return None
     quote = read_text(entry, "quote")
     quoted_text = find_quoted_text(quote, context.user_texts) if quote else None
+    if quote is None or quoted_text is None:
+        return None
     tags = read_tags(entry)
+    evidence_kind = read_choice(entry, "evidence", EvidenceKind)
     context_line = read_text(entry, "context")
     about = read_text(entry, "about")
-    _, evidence_kind = read_tag(entry, "evidence", EvidenceKind)
-    if (
-        matched is None
-        or evidence_kind is None
-        or quote is None
-        or quoted_text is None
-        or tags is None
-        or context_line is None
-        or about is None
-    ):
+    if tags is None or evidence_kind is None or context_line is None or about is None:
         return None
     direction, sign = matched
     second = pattern_types[1] if len(pattern_types) > 1 else None
@@ -526,6 +529,7 @@ class PatternTagger:
     def __init__(
         self,
         repositories: Repositories,
+        pattern_catalog: PatternCatalogService,
         chat_model: UsageRecordingChatModel,
         model_call_log: ModelCallLog,
         clock: Clock,
@@ -533,13 +537,14 @@ class PatternTagger:
         """Set up the tagger.
 
         Args:
-            repositories: Where the Pattern Catalog and Observations are
-                stored.
+            repositories: Where Observations are stored.
+            pattern_catalog: Reads the Pattern Types in the catalog now.
             chat_model: Writes the Observations and records the tokens used.
             model_call_log: Records how many were tagged and dropped.
             clock: Tells the current time.
         """
         self._repositories = repositories
+        self._pattern_catalog = pattern_catalog
         self._chat_model = chat_model
         self._model_call_log = model_call_log
         self._clock = clock
@@ -570,10 +575,7 @@ class PatternTagger:
             return
         user_texts = users_own_texts(messages)
         pattern_types = [
-            entry.pattern_type
-            for entry in PatternCatalogService(
-                self._repositories.pattern_catalog
-            ).catalog()
+            entry.pattern_type for entry in self._pattern_catalog.catalog()
         ]
         if not user_texts or not pattern_types:
             return

@@ -531,10 +531,10 @@ def read_thread_keeping_answer(answer: str) -> list[Any] | None:
 
 
 def read_text(entry: dict[str, Any], key: str) -> str | None:
-    """Read a non-empty text field from one Thread the model wrote.
+    """Read a non-empty text field from one entry a model wrote.
 
     Args:
-        entry: The Thread, as the model wrote it.
+        entry: The entry, such as a Thread, as the model wrote it.
         key: The field's name.
 
     Returns:

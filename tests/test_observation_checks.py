@@ -345,3 +345,16 @@ def test_the_tagging_answer_is_read_from_its_json(
     answer: str, read: list[Any] | None
 ) -> None:
     assert read_tagging_answer(answer) == read
+
+
+@pytest.mark.parametrize("quote", ["aid yes", "said yes to M", "ain"])
+def test_a_quote_that_cuts_into_a_word_is_not_word_for_word(quote: str) -> None:
+    assert plan_observations([entry(quote=quote)], context()).dropped == 1
+
+
+def test_a_quote_may_start_or_end_at_punctuation() -> None:
+    [observation] = plan_observations(
+        [entry(quote="It’s fine, honestly")], context()
+    ).kept
+
+    assert observation.quote == "It’s fine, honestly"
