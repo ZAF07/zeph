@@ -747,7 +747,8 @@ class PostConversationProcessor:
 
         Personal Stickers are kept first, whatever User Memory says; if that
         fails, the failure is logged and processing goes on. Nothing more is
-        saved when User Memory doesn't work for the User, and no photo is
+        saved when User Memory doesn't work for the User, except how well
+        the Companion knows them (their Familiarity), and no photo is
         kept when Photo Viewing doesn't. One model call, given all of the
         day's messages, gives the day's rewritten Day Summary, the operations
         and the photos to keep as Shared Photos; an unreadable answer is asked
@@ -779,6 +780,8 @@ class PostConversationProcessor:
         if snapshot is not None:
             self._keep_personal_stickers(snapshot, messages)
         if snapshot is None or not snapshot.works(Feature.USER_MEMORY) or not messages:
+            if snapshot is not None:
+                self._keep_familiarity(snapshot)
             self._repositories.user_memory.save_processed_conversation(
                 conversation.id, self._clock.now(), None, NO_CHANGES
             )

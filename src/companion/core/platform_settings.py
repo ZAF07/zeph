@@ -1587,9 +1587,9 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         minimum=0,
         maximum=5,
         hint=(
-            "The most starter Thought Experiments in one Conversation; the next "
-            "is written when a Conversation ends. The Curiosity limits still "
-            "apply."
+            "The most starter Thought Experiments in one Conversation (0 asks "
+            "none); the next is written when a Conversation ends. The Curiosity "
+            "limits still apply."
         ),
     ),
     EditableSetting(

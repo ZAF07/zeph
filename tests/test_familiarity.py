@@ -37,6 +37,7 @@ from tests.test_pattern_tagging import (
     observations_of,
     turn_noticing_on,
 )
+from tests.test_post_conversation import quiet_gap
 from tests.test_recent_messages import change_settings
 from tests.test_thought_experiments import ROUTE, TEAM_PLAN, listed
 
@@ -314,6 +315,33 @@ def test_no_starter_is_written_without_pattern_exploring(
     assert NEW_LINE in saw
     assert starters_of(client.engine, user_id) == []
     assert familiarity_of_maya(client, auth_verifier) == "new"
+
+
+def test_familiarity_is_worked_out_even_while_user_memory_is_off(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    change_settings(
+        client,
+        auth_verifier,
+        {"familiarity_conversations": 1, "familiarity_life_threads": 0},
+    )
+    maya = auth_headers(auth_verifier, "user_maya")
+    client.patch(
+        "/api/me", json={"user_memory_enabled": False}, headers=maya
+    ).raise_for_status()
+
+    talk(client, chat_model, clock, "hi there")
+    clock.advance(quiet_gap(seeded_settings) + timedelta(minutes=1))
+    scheduler.tick()
+
+    assert familiarity_of_maya(client, auth_verifier) == "getting_to_know"
 
 
 def test_switching_a_starter_off_closes_its_waiting_curiosity_at_once(

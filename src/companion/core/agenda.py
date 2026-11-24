@@ -146,7 +146,7 @@ class AgendaInput:
         now: When the Agenda is kept.
         time_zone: The User's IANA time zone.
         thought_experiments: Every Thought Experiment, archived ones too.
-        put_as_starters: The Thought Experiments already put to them as
+        starters_put: The Thought Experiments already put to them as
             starters, or waiting to be.
     """
 
@@ -162,7 +162,7 @@ class AgendaInput:
     now: datetime
     time_zone: str | None
     thought_experiments: Sequence[ThoughtExperiment] = ()
-    put_as_starters: Set[UUID] = frozenset()
+    starters_put: Set[UUID] = frozenset()
 
 
 def observations_of(
@@ -1003,7 +1003,7 @@ def thought_experiment_for(
         exploration.pattern_type_id,
         observations_of(exploration.pattern_type_id, agenda.observations),
         agenda.thought_experiments,
-        put_to_user(agenda.tries, aimed) | agenda.put_as_starters,
+        put_to_user(agenda.tries, aimed) | agenda.starters_put,
     )
 
 
@@ -1146,7 +1146,7 @@ class AgendaKeeper:
                     now=now,
                     time_zone=user.time_zone,
                     thought_experiments=repositories.thought_experiments.list_all(),
-                    put_as_starters=put_as_starters(
+                    starters_put=put_as_starters(
                         repositories.curiosities.list_starters(user.id)
                     ),
                 ),

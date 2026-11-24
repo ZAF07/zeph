@@ -135,7 +135,9 @@ def starter_curiosity(
     )
 
 
-def plan_starters(starters: StarterInput, numbers: StarterNumbers) -> CuriosityChanges:
+def plan_starters(
+    starter_input: StarterInput, numbers: StarterNumbers
+) -> CuriosityChanges:
     """Decide which starter Thought Experiments wait for a User's next Conversation.
 
     They are offered only while the Companion is new to the User, within the
@@ -146,7 +148,7 @@ def plan_starters(starters: StarterInput, numbers: StarterNumbers) -> CuriosityC
     Conversation may ask.
 
     Args:
-        starters: What they are planned from.
+        starter_input: What they are planned from.
         numbers: The Admin-set limits.
 
     Returns:
@@ -154,14 +156,19 @@ def plan_starters(starters: StarterInput, numbers: StarterNumbers) -> CuriosityC
     """
     waiting = [
         curiosity
-        for curiosity in starters.starters
+        for curiosity in starter_input.starters
         if curiosity.state == CuriosityState.WAITING
     ]
     asked = [
-        curiosity for curiosity in starters.starters if curiosity.raised_at is not None
+        curiosity
+        for curiosity in starter_input.starters
+        if curiosity.raised_at is not None
     ]
     offered = starters_offered(
-        starters.familiarity, starters.signed_up_at, starters.now, numbers.days
+        starter_input.familiarity,
+        starter_input.signed_up_at,
+        starter_input.now,
+        numbers.days,
     ) and not any(
         curiosity.reaction == ThreadReaction.ASKED_TO_DROP for curiosity in asked
     )
@@ -177,11 +184,11 @@ def plan_starters(starters: StarterInput, numbers: StarterNumbers) -> CuriosityC
         numbers.most - len(asked) - len(waiting),
         numbers.per_conversation - len(waiting),
     )
-    already_put = put_as_starters(starters.starters) | starters.put_by_agenda
+    already_put = put_as_starters(starter_input.starters) | starter_input.put_by_agenda
     left = sorted(
         (
             thought_experiment
-            for thought_experiment in starters.thought_experiments
+            for thought_experiment in starter_input.thought_experiments
             if thought_experiment.askable
             and thought_experiment.details.starter
             and thought_experiment.id not in already_put
@@ -190,7 +197,9 @@ def plan_starters(starters: StarterInput, numbers: StarterNumbers) -> CuriosityC
     )
     return CuriosityChanges(
         added=[
-            starter_curiosity(thought_experiment, starters.user_id, starters.now)
+            starter_curiosity(
+                thought_experiment, starter_input.user_id, starter_input.now
+            )
             for thought_experiment in left[: max(room, 0)]
         ],
         updated=[],
