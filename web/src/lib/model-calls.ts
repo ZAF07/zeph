@@ -149,13 +149,32 @@ export function describePatternUse(shape: ReplyPlanShape): string {
 }
 
 /**
+ * Lists a Reply Plan's facts about Curiosities, as labels and values.
+ *
+ * @param shape - The Reply Plan's shape.
+ * @returns "Curiosities offered: 2" and "Curiosity asked: Yes"; nothing for
+ * a trace saved before they were recorded.
+ */
+function curiosityFacts(
+  shape: ReplyPlanShape,
+): { label: string; value: string }[] {
+  if (shape.curiosities_offered == null || shape.curiosity_asked == null) {
+    return [];
+  }
+  return [
+    { label: "Curiosities offered", value: String(shape.curiosities_offered) },
+    { label: "Curiosity asked", value: shape.curiosity_asked ? "Yes" : "No" },
+  ];
+}
+
+/**
  * Lists the facts of a Reply Plan's shape, as labels and values.
  *
  * @param shape - The Reply Plan's shape.
  * @returns E.g. "Need picked: Be heard", "Lead Move: Calm", "Threads brought
  * up: 2 (1 lead, 1 weave)", "Read formed: Yes", "Read said: No", "Pattern:
  * Used, not offered", "Check-in Kinds offered: 2", "Check-in Kind chosen:
- * None".
+ * None", "Curiosities offered: 2", "Curiosity asked: Yes".
  */
 export function replyPlanShapeFacts(
   shape: ReplyPlanShape,
@@ -184,5 +203,6 @@ export function replyPlanShapeFacts(
       value: String(shape.check_in_kinds_offered),
     },
     { label: "Check-in Kind chosen", value: shape.check_in_kind ?? "None" },
+    ...curiosityFacts(shape),
   ];
 }

@@ -1,25 +1,36 @@
 import { CardCheckbox } from "@/components/CardCheckbox";
 import { CardTextField } from "@/components/CardTextField";
 import { FieldRow } from "@/components/FieldRow";
+import { FieldSelect } from "@/components/FieldSelect";
 import type { Move, NeedInput } from "@/lib/api-client";
+import {
+  curiosityTreatmentOptions,
+  toCuriosityTreatment,
+} from "@/lib/curiosity-treatment";
 
 /**
  * A Need's fields inside its card or the add box: name, "when it fits",
- * "how to reply", and a field row of the Moves it rules out.
+ * "how to reply", and field rows for how Curiosities are treated and the
+ * Moves it rules out.
  *
  * @param props - `value` is the Need as edited; `moves` are every Move, to
- *   rule out; `onChange` gets the edited Need.
+ *   rule out; `idPrefix` keeps the field ids apart from other cards';
+ *   `onChange` gets the edited Need.
  * @returns The fields.
  */
 export function NeedFields({
   value,
   moves,
+  idPrefix,
   onChange,
 }: {
   value: NeedInput;
   moves: Move[];
+  idPrefix: string;
   onChange: (value: NeedInput) => void;
 }) {
+  const curiositiesId = `${idPrefix}-curiosities`;
+
   function toggleRuledOut(moveId: string, isRuledOut: boolean) {
     const ruledOut = new Set(value.ruled_out_move_ids);
     if (isRuledOut) {
@@ -63,6 +74,20 @@ export function NeedFields({
         }
       />
       <ul className="m-0 list-none p-0">
+        <FieldRow
+          title="Curiosities"
+          caption="Whether the Reply Plan asks a due Curiosity while this Need is picked. Ask by default means it asks one or says why not."
+          htmlFor={curiositiesId}
+        >
+          <FieldSelect
+            id={curiositiesId}
+            value={value.curiosities}
+            options={curiosityTreatmentOptions}
+            onChange={(picked) =>
+              onChange({ ...value, curiosities: toCuriosityTreatment(picked) })
+            }
+          />
+        </FieldRow>
         <FieldRow
           title="Ruled-out Moves"
           caption="Never offered to the Understanding with this Need."
