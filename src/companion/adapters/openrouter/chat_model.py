@@ -21,6 +21,8 @@ MODELS_THAT_ALWAYS_THINK = frozenset(
     {"anthropic/claude-opus-5.5", "anthropic/claude-fable-5.2"}
 )
 
+PROMPT_CACHING_MAKER = "anthropic"
+
 AskOpenRouter = Callable[[list[dict[str, Any]], bool], dict[str, Any]]
 
 
@@ -164,6 +166,38 @@ def model_maker(model: str) -> str:
     return model.split("/")[0]
 
 
+def caches_prompts(model: str) -> bool:
+    """Say whether a model's instructions are marked for prompt caching.
+
+    Args:
+        model: The OpenRouter model name.
+
+    Returns:
+        True for Claude models (made by Anthropic), which cache only what is
+        marked; False for the rest, which get no marker.
+    """
+    return model_maker(model) == PROMPT_CACHING_MAKER
+
+
+def with_cached_instructions(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Mark the instructions so the provider caches them.
+
+    Args:
+        messages: The messages, starting with the system message, whose
+            content is the instructions as plain text.
+
+    Returns:
+        The same messages, with the instructions as one text part carrying
+        a `cache_control` marker. The given list is not changed.
+    """
+    instructions = {
+        "type": "text",
+        "text": messages[0]["content"],
+        "cache_control": {"type": "ephemeral"},
+    }
+    return [{**messages[0], "content": [instructions]}, *messages[1:]]
+
+
 def build_request(
     model: str,
     thinking: bool,
@@ -184,6 +218,8 @@ def build_request(
     A model that always thinks refuses to be told not to, so thinking off
     is left unsaid for it and it thinks only as much as it needs.
 
+    A Claude model gets its instructions marked for prompt caching.
+
     Args:
         model: The OpenRouter model name, sent as given.
         thinking: Whether the model should think before it answers.
@@ -196,7 +232,9 @@ def build_request(
     """
     request: dict[str, Any] = {
         "model": model,
-        "messages": messages,
+        "messages": (
+            with_cached_instructions(messages) if caches_prompts(model) else messages
+        ),
         "provider": {"only": [model_maker(model)]},
     }
     if thinking or model not in MODELS_THAT_ALWAYS_THINK:
@@ -276,6 +314,30 @@ def warn_if_paid_with_credits(model: str, body: dict[str, Any]) -> None:
         )
 
 
+def log_cached_tokens(model: str, body: dict[str, Any]) -> None:
+    """Log how much of a Claude call's prompt came from the prompt cache.
+
+    Nothing is logged for a model whose instructions are not marked for
+    caching. A reply that says nothing about the cache counts as none.
+
+    Args:
+        model: The model that was asked.
+        body: The reply body, whose usage holds the cached-token counts.
+    """
+    if not caches_prompts(model):
+        return
+    usage = body.get("usage") or {}
+    details = usage.get("prompt_tokens_details") or {}
+    logger.info(
+        "A call to %s read %d of its %d prompt tokens from the cache "
+        "and wrote %d to it",
+        model,
+        int(details.get("cached_tokens") or 0),
+        int(usage.get("prompt_tokens") or 0),
+        int(details.get("cache_write_tokens") or 0),
+    )
+
+
 def send_request(
     http_client: httpx.Client, api_key: str, request: dict[str, Any]
 ) -> dict[str, Any]:
@@ -300,6 +362,7 @@ def send_request(
     response.raise_for_status()
     body: dict[str, Any] = response.json()
     warn_if_paid_with_credits(str(request["model"]), body)
+    log_cached_tokens(str(request["model"]), body)
     return body
 
 

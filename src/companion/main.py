@@ -23,6 +23,7 @@ from companion.adapters.load_test.switch import (
 )
 from companion.adapters.load_test.web_search import EmptyWebSearch
 from companion.adapters.openrouter.chat_model import OpenRouterChatModel
+from companion.adapters.openrouter.chat_model import logger as openrouter_logger
 from companion.adapters.openrouter.photo_viewer import OpenRouterPhotoViewer
 from companion.adapters.pgvector.vector_store import PgvectorKnowledgeVectorStore
 from companion.adapters.postgres.eval_repositories import (
@@ -400,6 +401,18 @@ def show_model_call_developer_logs(enabled: bool) -> None:
         model_call_logger.addHandler(logging.StreamHandler())
 
 
+def show_prompt_cache_logs() -> None:
+    """Print the OpenRouter adapter's logs of prompt cache use.
+
+    Each line says how many of a Claude call's prompt tokens came from the
+    cache, with no content, so it is safe to print everywhere. It is logged
+    at INFO, which nothing else prints, so the logger gets its own handler.
+    """
+    openrouter_logger.setLevel(logging.INFO)
+    if not openrouter_logger.handlers:
+        openrouter_logger.addHandler(logging.StreamHandler())
+
+
 def build_production_app() -> FastAPI:
     """Build the backend app with the adapters chosen in `.env`.
 
@@ -411,6 +424,7 @@ def build_production_app() -> FastAPI:
     quiet_http_client_logs()
     settings = load_settings()
     show_model_call_developer_logs(settings.model_call_developer_logs)
+    show_prompt_cache_logs()
     engine = build_database_engine(settings)
     dependencies = AppDependencies(
         repositories=build_repositories(settings, engine),

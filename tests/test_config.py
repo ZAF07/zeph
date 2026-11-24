@@ -19,6 +19,7 @@ from companion.main import (
     build_web_search,
     quiet_http_client_logs,
     show_model_call_developer_logs,
+    show_prompt_cache_logs,
 )
 
 COMPLETE_ENVIRONMENT = {
@@ -191,6 +192,18 @@ def test_model_call_developer_logs_are_printed_only_when_on(
     show_model_call_developer_logs(True)
     assert model_call_logger.level == logging.INFO
     assert len(model_call_logger.handlers) == 1
+
+
+def test_prompt_cache_logs_are_printed(monkeypatch: pytest.MonkeyPatch) -> None:
+    openrouter_logger = logging.getLogger("companion.adapters.openrouter.chat_model")
+    monkeypatch.setattr(openrouter_logger, "level", logging.NOTSET)
+    monkeypatch.setattr(openrouter_logger, "handlers", [])
+
+    show_prompt_cache_logs()
+    show_prompt_cache_logs()
+
+    assert openrouter_logger.level == logging.INFO
+    assert len(openrouter_logger.handlers) == 1
 
 
 def test_the_message_pool_has_50_threads_unless_set() -> None:

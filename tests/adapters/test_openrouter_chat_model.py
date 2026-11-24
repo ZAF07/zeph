@@ -258,6 +258,94 @@ def test_a_reply_paid_with_our_own_key_logs_no_warning(
     assert not caplog.text
 
 
+ADAPTER_LOGGER = "companion.adapters.openrouter.chat_model"
+
+CACHED_INSTRUCTIONS = {
+    "role": "system",
+    "content": [
+        {"type": "text", "text": "Be Zeph.", "cache_control": {"type": "ephemeral"}}
+    ],
+}
+
+
+def generate_with_claude(chat_model: OpenRouterChatModel) -> ModelAnswer:
+    return chat_model.generate(
+        model="anthropic/claude-haiku-5.5",
+        thinking=False,
+        instructions="Be Zeph.",
+        history=HISTORY,
+    )
+
+
+def test_a_claude_model_gets_its_instructions_marked_for_caching() -> None:
+    requests: list[httpx.Request] = []
+    chat_model = openrouter_with(httpx.Response(200, json=openrouter_reply()), requests)
+
+    generate_with_claude(chat_model)
+
+    assert json.loads(requests[0].content)["messages"] == [
+        CACHED_INSTRUCTIONS,
+        {"role": "user", "content": "hi"},
+        {"role": "assistant", "content": "hey!"},
+        {"role": "user", "content": "how are you?"},
+    ]
+
+
+def test_a_deepseek_model_gets_no_caching_marker() -> None:
+    requests: list[httpx.Request] = []
+    chat_model = openrouter_with(httpx.Response(200, json=openrouter_reply()), requests)
+
+    generate(chat_model)
+
+    assert "cache_control" not in requests[0].content.decode()
+
+
+def test_the_cached_tokens_of_a_claude_reply_are_logged(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    reply = openrouter_reply()
+    reply["usage"]["prompt_tokens_details"] = {
+        "cached_tokens": 4000,
+        "cache_write_tokens": 12,
+    }
+    chat_model = openrouter_with(httpx.Response(200, json=reply), [])
+
+    with caplog.at_level(logging.INFO, logger=ADAPTER_LOGGER):
+        generate_with_claude(chat_model)
+
+    assert caplog.messages == [
+        "A call to anthropic/claude-haiku-5.5 read 4000 of its 42 prompt tokens "
+        "from the cache and wrote 12 to it"
+    ]
+
+
+def test_a_claude_reply_that_says_nothing_about_the_cache_is_logged_as_none_cached(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    chat_model = openrouter_with(httpx.Response(200, json=openrouter_reply()), [])
+
+    with caplog.at_level(logging.INFO, logger=ADAPTER_LOGGER):
+        generate_with_claude(chat_model)
+
+    assert caplog.messages == [
+        "A call to anthropic/claude-haiku-5.5 read 0 of its 42 prompt tokens "
+        "from the cache and wrote 0 to it"
+    ]
+
+
+def test_the_cached_tokens_of_a_deepseek_reply_are_not_logged(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    reply = openrouter_reply()
+    reply["usage"]["prompt_tokens_details"] = {"cached_tokens": 30}
+    chat_model = openrouter_with(httpx.Response(200, json=reply), [])
+
+    with caplog.at_level(logging.INFO, logger=ADAPTER_LOGGER):
+        generate(chat_model)
+
+    assert not caplog.text
+
+
 def tool_call_reply(
     arguments: str,
     call_id: str = "call_1",
@@ -377,6 +465,27 @@ def test_tool_calls_are_run_and_their_results_sent_back_until_a_reply() -> None:
         "tool_call_id": "call_1",
         "content": "results for seneca",
     }
+
+
+def test_a_claude_model_keeps_the_caching_marker_on_every_tool_round() -> None:
+    requests: list[httpx.Request] = []
+    chat_model = scripted_openrouter(
+        [tool_call_reply('{"query": "seneca"}'), openrouter_reply("Found it.")],
+        requests,
+    )
+
+    chat_model.generate(
+        model="anthropic/claude-haiku-5.5",
+        thinking=False,
+        instructions="Be Zeph.",
+        history=HISTORY,
+        tools=[search_tool([])],
+    )
+
+    assert [json.loads(request.content)["messages"][0] for request in requests] == [
+        CACHED_INSTRUCTIONS,
+        CACHED_INSTRUCTIONS,
+    ]
 
 
 def test_several_tool_calls_in_one_round_each_get_their_result() -> None:
