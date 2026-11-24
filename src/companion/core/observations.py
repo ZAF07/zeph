@@ -8,6 +8,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid4
 
+from companion.core.curiosities import format_date
 from companion.core.life_threads import describe_thread, read_text
 from companion.core.memory_retrieval import format_day
 from companion.core.model_call_log import ModelCallLog
@@ -340,7 +341,7 @@ def describe_unclear_asked(unclear: Mapping[int, Observation]) -> str:
     return (
         "\n".join(
             f'[{number}] "{observation.quote}" ({observation.about}, '
-            f"{observation.day.day} {observation.day:%b %Y}; {observation.context}): "
+            f"{format_date(observation.day)}; {observation.context}): "
             f"{observation.pattern_type_id} or {observation.second_pattern_type_id}"
             for number, observation in unclear.items()
         )

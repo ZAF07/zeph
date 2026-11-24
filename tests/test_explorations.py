@@ -541,3 +541,24 @@ def test_the_migration_keeps_user_data_and_reloads_the_two_prompts(
             )
         ).scalar_one()
     assert stored == 0
+
+
+def test_no_agenda_is_kept_while_curiosities_is_off(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    user_id = turn_exploring_on(client, auth_verifier)
+    switch_for_user(
+        client, owner_headers(client, auth_verifier), user_id, "curiosities", "off"
+    )
+
+    suspect_belonging(client, chat_model, clock, scheduler, seeded_settings)
+
+    assert explorations_of(client.engine, user_id) == []
+    assert aimed_of(client.engine, user_id) == []

@@ -271,6 +271,19 @@ def test_each_try_at_a_need_moves_to_a_different_way_least_pushy_first() -> None
     assert way_after(first, second, third) == ExplorationWay.STORY_FOLLOW_UP
 
 
+def test_after_a_useful_try_the_same_way_is_used_again() -> None:
+    its = exploration(pattern())
+    curiosity, useful = asked(
+        its, way=ExplorationWay.OTHER_PERSON, outcome=TryOutcome.USEFUL
+    )
+
+    way = next_way(
+        OpenNeed(ExplorationNeed.COUNTER_TEST), [useful], {curiosity.id: NOW}
+    )
+
+    assert way == ExplorationWay.OTHER_PERSON
+
+
 def test_a_try_at_another_need_does_not_move_this_ones_way() -> None:
     its = exploration(pattern())
     story = observation(second=WORTH)
@@ -298,6 +311,7 @@ def test_a_try_at_another_need_does_not_move_this_ones_way() -> None:
         (ThreadReaction.ENGAGED, False, True, TryOutcome.USEFUL),
         (ThreadReaction.ENGAGED, False, False, TryOutcome.VAGUE),
         (None, False, True, TryOutcome.VAGUE),
+        (None, True, False, TryOutcome.USEFUL),
     ],
 )
 def test_code_decides_how_a_try_came_back(

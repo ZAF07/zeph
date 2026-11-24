@@ -1,4 +1,4 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 from uuid import UUID, uuid4
@@ -7,6 +7,7 @@ from companion.core.memory_retrieval import format_day
 from companion.core.models import (
     AgendaChanges,
     CatalogPattern,
+    CatalogPatternType,
     Curiosity,
     CuriosityAim,
     CuriositySensitivity,
@@ -254,6 +255,39 @@ def aims_at(attempt: ExplorationTry, need: OpenNeed) -> bool:
     )
 
 
+def tries_of(
+    exploration: Exploration, tries: Sequence[ExplorationTry]
+) -> list[ExplorationTry]:
+    """Keep one Exploration's tries.
+
+    Args:
+        exploration: The Exploration.
+        tries: Every try.
+
+    Returns:
+        Its tries, in the order given.
+    """
+    return [attempt for attempt in tries if attempt.exploration_id == exploration.id]
+
+
+def asked_in_order(
+    tries: Iterable[ExplorationTry], asked_at: Mapping[UUID, datetime]
+) -> list[ExplorationTry]:
+    """Keep the tries that were asked, in the order they were asked.
+
+    Args:
+        tries: The tries.
+        asked_at: When each asked try's Curiosity was asked, by Curiosity ID.
+
+    Returns:
+        The asked ones, first asked first.
+    """
+    return sorted(
+        (attempt for attempt in tries if attempt.curiosity_id in asked_at),
+        key=lambda attempt: asked_at[attempt.curiosity_id],
+    )
+
+
 def next_way(
     need: OpenNeed,
     tries: Sequence[ExplorationTry],
@@ -261,8 +295,9 @@ def next_way(
 ) -> ExplorationWay:
     """Pick how to ask about a need next, least pushy first.
 
-    Each try at the same need moves on to the next way, round again after
-    the last, so the next try is always a different way.
+    A try at the same need that came back with nothing moves on to the
+    next way, round again after the last, so the next try is a different
+    way; after a useful one the same way is used again.
 
     Args:
         need: The open need.
@@ -270,19 +305,17 @@ def next_way(
         asked_at: When each asked try's Curiosity was asked, by Curiosity ID.
 
     Returns:
-        The way after the one tried last at this need; the first if none was.
+        The way to use next; the first if none was tried at this need.
     """
-    asked = sorted(
-        (
-            attempt
-            for attempt in tries
-            if attempt.curiosity_id in asked_at and aims_at(attempt, need)
-        ),
-        key=lambda attempt: asked_at[attempt.curiosity_id],
-    )
+    asked = [
+        attempt for attempt in asked_in_order(tries, asked_at) if aims_at(attempt, need)
+    ]
     if not asked:
         return WAYS[0]
-    return WAYS[(WAYS.index(asked[-1].way) + 1) % len(WAYS)]
+    last = asked[-1]
+    if last.outcome not in NOTHING_USEFUL:
+        return last.way
+    return WAYS[(WAYS.index(last.way) + 1) % len(WAYS)]
 
 
 def try_outcome(
@@ -297,12 +330,13 @@ def try_outcome(
             Observation for its Pattern.
 
     Returns:
-        Brushed off when brushed off or asked to drop; useful when engaged
-        and it settled something or brought new evidence; vague otherwise.
+        Brushed off when brushed off or asked to drop; useful when it
+        settled the unclear story, or when engaged and it brought new
+        evidence; vague otherwise.
     """
     if reaction in (ThreadReaction.BRUSHED_OFF, ThreadReaction.ASKED_TO_DROP):
         return TryOutcome.BRUSHED_OFF
-    if reaction == ThreadReaction.ENGAGED and (settled or new_evidence):
+    if settled or (reaction == ThreadReaction.ENGAGED and new_evidence):
         return TryOutcome.USEFUL
     return TryOutcome.VAGUE
 
@@ -324,22 +358,17 @@ def tries_with_nothing(
     Returns:
         How many of its newest tries in a row came back vague or brushed off.
     """
-    judged = sorted(
-        (
-            attempt
-            for attempt in tries
-            if attempt.outcome is not None
-            and attempt.curiosity_id in asked_at
-            and (
-                exploration.woke_at is None
-                or asked_at[attempt.curiosity_id] > exploration.woke_at
-            )
-        ),
-        key=lambda attempt: asked_at[attempt.curiosity_id],
-        reverse=True,
-    )
+    judged = [
+        attempt
+        for attempt in asked_in_order(tries, asked_at)
+        if attempt.outcome is not None
+        and (
+            exploration.woke_at is None
+            or asked_at[attempt.curiosity_id] > exploration.woke_at
+        )
+    ]
     count = 0
-    for attempt in judged:
+    for attempt in reversed(judged):
         if attempt.outcome not in NOTHING_USEFUL:
             break
         count += 1
@@ -519,10 +548,7 @@ def not_before_after(
         The day of its last try plus the wait, when that try came back with
         nothing; None otherwise.
     """
-    asked = sorted(
-        (attempt for attempt in tries if attempt.curiosity_id in asked_at),
-        key=lambda attempt: asked_at[attempt.curiosity_id],
-    )
+    asked = asked_in_order(tries, asked_at)
     if not asked or asked[-1].outcome not in NOTHING_USEFUL:
         return None
     return users_today(time_zone, asked_at[asked[-1].curiosity_id]) + wait
@@ -654,7 +680,8 @@ def aimed_curiosity(
     way: ExplorationWay,
     pattern_type: PatternType,
     not_before: date | None,
-    agenda: AgendaInput,
+    user_id: UUID,
+    now: datetime,
 ) -> tuple[Curiosity, ExplorationTry]:
     """Write the aimed Curiosity for an Exploration's top need, with its try.
 
@@ -664,7 +691,8 @@ def aimed_curiosity(
         way: How to ask.
         pattern_type: Its Pattern's Pattern Type.
         not_before: The first day it may be asked; None for any day.
-        agenda: What the Agenda is kept from.
+        user_id: The User.
+        now: When it is written.
 
     Returns:
         The Curiosity, waiting, and its try, not yet asked.
@@ -672,13 +700,13 @@ def aimed_curiosity(
     question, why = aimed_question(need, way, pattern_type)
     curiosity = Curiosity(
         id=uuid4(),
-        user_id=agenda.user_id,
+        user_id=user_id,
         question=question,
         why=why,
         not_before=not_before,
         sensitivity=CuriositySensitivity.MEDIUM,
         state=CuriosityState.WAITING,
-        created_at=agenda.now,
+        created_at=now,
         aim=CuriosityAim.EXPLORATION,
         exploration_id=exploration.id,
         source_observation_id=need.observation.id if need.observation else None,
@@ -686,10 +714,10 @@ def aimed_curiosity(
     return curiosity, ExplorationTry(
         curiosity_id=curiosity.id,
         exploration_id=exploration.id,
-        user_id=agenda.user_id,
+        user_id=user_id,
         need=need.need,
         way=way,
-        created_at=agenda.now,
+        created_at=now,
         observation_id=need.observation.id if need.observation else None,
         part_of_life=need.part_of_life,
     )
@@ -763,7 +791,7 @@ def plan_agenda(agenda: AgendaInput, numbers: AgendaNumbers) -> AgendaChanges:
         next_state(
             exploration,
             patterns.get(exploration.pattern_id),
-            [attempt for attempt in tries if attempt.exploration_id == exploration.id],
+            tries_of(exploration, tries),
             asked_at,
             observations_of(exploration.pattern_type_id, agenda.observations),
             exploration.id in dropped,
@@ -790,7 +818,13 @@ def plan_agenda(agenda: AgendaInput, numbers: AgendaNumbers) -> AgendaChanges:
         for exploration in stepped
     ]
     before = {exploration.id: exploration for exploration in agenda.explorations}
-    planned = AgendaChanges(
+    next_tries = [
+        next_try_for(
+            exploration, tries_of(exploration, tries), asked_at, agenda, numbers
+        )
+        for exploration in placed
+    ]
+    return AgendaChanges(
         added=[exploration for exploration in placed if exploration.id not in before],
         changed=[
             exploration
@@ -798,24 +832,22 @@ def plan_agenda(agenda: AgendaInput, numbers: AgendaNumbers) -> AgendaChanges:
             if exploration.id in before and exploration != before[exploration.id]
         ],
         judged=judged,
-        closed_curiosity_ids=[],
-        new_curiosities=[],
-        new_tries=[],
+        closed_curiosity_ids=[
+            curiosity_id for closed, _ in next_tries for curiosity_id in closed
+        ],
+        new_curiosities=[written[0] for _, written in next_tries if written],
+        new_tries=[written[1] for _, written in next_tries if written],
     )
-    for exploration in placed:
-        write_next_try(exploration, tries, asked_at, agenda, numbers, planned)
-    return planned
 
 
-def write_next_try(
+def next_try_for(
     exploration: Exploration,
-    tries: Sequence[ExplorationTry],
+    its_tries: Sequence[ExplorationTry],
     asked_at: Mapping[UUID, datetime],
     agenda: AgendaInput,
     numbers: AgendaNumbers,
-    planned: AgendaChanges,
-) -> None:
-    """Close an Exploration's waiting aimed Curiosity, or write its next one.
+) -> tuple[list[UUID], tuple[Curiosity, ExplorationTry] | None]:
+    """Work out an Exploration's aimed Curiosities to close, and its next one.
 
     A waiting one is closed when the Exploration isn't active or no longer
     aims at its top need. A new one is written only for an active
@@ -824,57 +856,82 @@ def write_next_try(
 
     Args:
         exploration: The Exploration, in its new state.
-        tries: Every try, judged.
+        its_tries: Its tries, judged.
         asked_at: When each asked try's Curiosity was asked, by Curiosity ID.
         agenda: What the Agenda is kept from.
         numbers: The Admin-set numbers.
-        planned: Where the changes are written.
+
+    Returns:
+        The IDs of its waiting aimed Curiosities to close, and its new aimed
+        Curiosity with its try; None when none is written.
     """
-    its_tries = [
-        attempt for attempt in tries if attempt.exploration_id == exploration.id
-    ]
-    waiting = [
-        attempt
-        for attempt in its_tries
-        if any(
-            curiosity.id == attempt.curiosity_id
-            and curiosity.state == CuriosityState.WAITING
-            for curiosity in agenda.aimed
-        )
-    ]
+    waiting_ids = {
+        curiosity.id
+        for curiosity in agenda.aimed
+        if curiosity.state == CuriosityState.WAITING
+    }
+    waiting = [attempt for attempt in its_tries if attempt.curiosity_id in waiting_ids]
     pattern_type = agenda.pattern_types.get(exploration.pattern_type_id)
     needs = open_needs(
         observations_of(exploration.pattern_type_id, agenda.observations), its_tries
     )
     top = needs[0] if needs else None
-    wanted = (
-        exploration.state == ExplorationState.ACTIVE
-        and top is not None
-        and pattern_type is not None
-    )
-    still_waiting = [
-        attempt for attempt in waiting if wanted and top and aims_at(attempt, top)
-    ]
-    planned.closed_curiosity_ids.extend(
-        attempt.curiosity_id for attempt in waiting if attempt not in still_waiting
-    )
+    if (
+        exploration.state != ExplorationState.ACTIVE
+        or top is None
+        or pattern_type is None
+    ):
+        return [attempt.curiosity_id for attempt in waiting], None
+    closed = [attempt.curiosity_id for attempt in waiting if not aims_at(attempt, top)]
     tried_here = any(
         curiosity.raised_conversation_id == agenda.conversation_id
         for curiosity in agenda.aimed
         if curiosity.exploration_id == exploration.id
     )
-    if not wanted or still_waiting or tried_here or top is None or not pattern_type:
-        return
-    curiosity, attempt = aimed_curiosity(
+    if len(closed) < len(waiting) or tried_here:
+        return closed, None
+    return closed, aimed_curiosity(
         exploration,
         top,
         next_way(top, its_tries, asked_at),
         pattern_type,
         not_before_after(its_tries, asked_at, numbers.wait, agenda.time_zone),
-        agenda,
+        agenda.user_id,
+        agenda.now,
     )
-    planned.new_curiosities.append(curiosity)
-    planned.new_tries.append(attempt)
+
+
+def pattern_scores(
+    observations: Sequence[Observation],
+    catalog: Sequence[CatalogPatternType],
+    settings: PlatformSettings,
+    today: date,
+) -> dict[str, PatternScore]:
+    """Work out each of a User's Patterns' scores, as scoring does.
+
+    Args:
+        observations: All their Observations.
+        catalog: The Pattern Catalog now.
+        settings: The platform settings, for the scoring numbers.
+        today: The User's day now, for fading.
+
+    Returns:
+        Each score, by Pattern Type ID.
+    """
+    sign_strengths = {
+        (entry.pattern_type.id, sign.id): sign.strength
+        for entry in catalog
+        for sign in (*entry.pattern_type.signs, *entry.pattern_type.signs_against)
+    }
+    numbers = scoring_numbers(settings)
+    return {
+        pattern_type_id: score_observations(
+            its_observations, sign_strengths, numbers, today
+        )
+        for pattern_type_id, its_observations in observations_by_pattern_type(
+            observations
+        ).items()
+    }
 
 
 def agenda_numbers(settings: PlatformSettings) -> AgendaNumbers:
@@ -921,7 +978,8 @@ class AgendaKeeper:
     def keep(self, snapshot: UserSnapshot, conversation_id: UUID) -> None:
         """Keep the User's Agenda after their Patterns were scored.
 
-        Runs only while Pattern exploring works for them. The User is locked
+        Runs only while Pattern exploring and Curiosities work for them,
+        since an aimed Curiosity can be asked only then. The User is locked
         while it reads and saves, like scoring, so an Observation deleted
         meanwhile is never aimed at.
 
@@ -929,7 +987,10 @@ class AgendaKeeper:
             snapshot: The User whose Conversation it was.
             conversation_id: The ended Conversation.
         """
-        if not snapshot.works(Feature.PATTERN_EXPLORING):
+        if not (
+            snapshot.works(Feature.PATTERN_EXPLORING)
+            and snapshot.works(Feature.CURIOSITIES)
+        ):
             return
         with self._repositories.transaction() as transaction:
             transaction.lock_user(snapshot.user.id)
@@ -955,22 +1016,10 @@ class AgendaKeeper:
             return
         observations = repositories.observations.list_for_user(user.id)
         catalog = self._pattern_catalog.catalog()
-        sign_strengths = {
-            (entry.pattern_type.id, sign.id): sign.strength
-            for entry in catalog
-            for sign in (*entry.pattern_type.signs, *entry.pattern_type.signs_against)
-        }
         now = self._clock.now()
-        today = users_today(user.time_zone, now)
-        numbers = scoring_numbers(snapshot.settings)
-        scores = {
-            pattern_type_id: score_observations(
-                its_observations, sign_strengths, numbers, today
-            )
-            for pattern_type_id, its_observations in observations_by_pattern_type(
-                observations
-            ).items()
-        }
+        scores = pattern_scores(
+            observations, catalog, snapshot.settings, users_today(user.time_zone, now)
+        )
         repositories.explorations.save_agenda(
             plan_agenda(
                 AgendaInput(
@@ -1084,10 +1133,10 @@ def describe_agenda(entries: Sequence[AgendaEntry], time_zone: str | None) -> st
             f"  Tried before:\n{tries or '  - Nothing yet.'}"
         )
     return (
-        "\n\nWhat you are exploring about them (the Agenda). These are only "
-        "suspicions: never name them, never say you are exploring, and never "
-        "claim any of them. Its aimed Curiosities are among the ones whose time "
-        "has come:\n"
+        "\n\nWhat you are exploring about them (the Agenda), most worth "
+        "learning first. These are only suspicions: never name them, never say "
+        "you are exploring, and never claim any of them. When an aimed "
+        "Curiosity's day has come, it is first among the Curiosities above:\n"
         + "\n".join(blocks)
         + "\nIf you pick a Move that asks a question, such as Get curious, aim it "
         "at something still to learn above when it fits what they just said."
@@ -1123,7 +1172,10 @@ class AgendaReader:
     """
 
     def __init__(
-        self, repositories: Repositories, pattern_catalog: PatternCatalogService
+        self,
+        repositories: Repositories,
+        pattern_catalog: PatternCatalogService,
+        clock: Clock,
     ) -> None:
         """Set up the reader.
 
@@ -1131,9 +1183,11 @@ class AgendaReader:
             repositories: Where Explorations, Observations and Curiosities
                 are stored.
             pattern_catalog: Reads the Pattern Types in the catalog now.
+            clock: Tells the current time, for the scores.
         """
         self._repositories = repositories
         self._pattern_catalog = pattern_catalog
+        self._clock = clock
 
     def read(self, snapshot: UserSnapshot, struggling: bool) -> list[AgendaEntry]:
         """Read the User's active Explorations with their needs and tries.
@@ -1143,7 +1197,7 @@ class AgendaReader:
             struggling: Whether the Understanding found them struggling.
 
         Returns:
-            The active Explorations, oldest first; none while Pattern
+            The active Explorations in rank order; none while Pattern
             exploring doesn't work for them or they are struggling.
         """
         if struggling or not snapshot.works(Feature.PATTERN_EXPLORING):
@@ -1156,43 +1210,41 @@ class AgendaReader:
         ]
         if not active:
             return []
-        pattern_types = {
-            entry.pattern_type.id: entry.pattern_type
-            for entry in self._pattern_catalog.catalog()
-        }
+        catalog = self._pattern_catalog.catalog()
+        pattern_types = {entry.pattern_type.id: entry.pattern_type for entry in catalog}
         observations = self._repositories.observations.list_for_user(user_id)
         tries = self._repositories.explorations.list_tries(user_id)
         aimed = {
             curiosity.id: curiosity
             for curiosity in self._repositories.curiosities.list_aimed(user_id)
         }
-        entries = []
-        for exploration in active:
-            pattern_type = pattern_types.get(exploration.pattern_type_id)
-            if pattern_type is None:
-                continue
-            its_tries = [
-                attempt for attempt in tries if attempt.exploration_id == exploration.id
-            ]
-            asked = sorted(
-                (
-                    AskedTry(aimed[attempt.curiosity_id], attempt)
-                    for attempt in its_tries
-                    if attempt.curiosity_id in aimed
-                    and aimed[attempt.curiosity_id].raised_at is not None
+        asked_at = {
+            curiosity_id: curiosity.raised_at
+            for curiosity_id, curiosity in aimed.items()
+            if curiosity.raised_at is not None
+        }
+        scores = pattern_scores(
+            observations,
+            catalog,
+            snapshot.settings,
+            users_today(snapshot.user.time_zone, self._clock.now()),
+        )
+        return [
+            AgendaEntry(
+                pattern_type=pattern_types[exploration.pattern_type_id],
+                open_needs=tuple(
+                    open_needs(
+                        observations_of(exploration.pattern_type_id, observations),
+                        tries_of(exploration, tries),
+                    )
                 ),
-                key=lambda item: item.curiosity.raised_at or item.curiosity.created_at,
+                earlier_tries=tuple(
+                    AskedTry(aimed[attempt.curiosity_id], attempt)
+                    for attempt in asked_in_order(
+                        tries_of(exploration, tries), asked_at
+                    )
+                ),
             )
-            entries.append(
-                AgendaEntry(
-                    pattern_type=pattern_type,
-                    open_needs=tuple(
-                        open_needs(
-                            observations_of(exploration.pattern_type_id, observations),
-                            its_tries,
-                        )
-                    ),
-                    earlier_tries=tuple(asked),
-                )
-            )
-        return entries
+            for exploration in rank_explorations(active, scores)
+            if exploration.pattern_type_id in pattern_types
+        ]

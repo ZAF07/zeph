@@ -1647,6 +1647,8 @@ class ExplorationRepository(Protocol):
     """Stores each User's Explorations and their tries, which are never shown.
 
     An Exploration goes with its Pattern, and a try with its aimed Curiosity.
+    Saving the Agenda also adds and closes aimed Curiosities, so an
+    Exploration's changes, tries and Curiosities are saved in one step.
     """
 
     def list_for_user(self, user_id: UUID) -> list[Exploration]:

@@ -287,7 +287,9 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
         curiosity_raiser=CuriosityRaiser(
             repositories=dependencies.repositories, clock=dependencies.clock
         ),
-        agenda=AgendaReader(dependencies.repositories, pattern_catalog_service),
+        agenda=AgendaReader(
+            dependencies.repositories, pattern_catalog_service, dependencies.clock
+        ),
         move_outcome_finder=MoveOutcomeFinder(
             repositories=dependencies.repositories, embedder=dependencies.embedder
         ),

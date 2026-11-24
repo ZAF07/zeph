@@ -748,7 +748,7 @@ class PostConversationProcessor:
         noticing works, then its Patterns from the
         Threads it touched, then its Curiosities while the
         Curiosities Feature works, then the Agenda while Pattern exploring
-        works, then its Move Outcomes, and then the User
+        works too, then its Move Outcomes, and then the User
         Portrait is rewritten; if any of them fails, the failure is logged and
         not tried again, so nothing is ever added twice.
 
@@ -779,7 +779,6 @@ class PostConversationProcessor:
         self._keep_patterns(snapshot, conversation.id, messages, touched)
         if snapshot.works(Feature.CURIOSITIES):
             self._keep_curiosities(snapshot, conversation.id, messages)
-        if snapshot.works(Feature.PATTERN_EXPLORING):
             self._keep_agenda(snapshot, conversation.id)
         self._keep_move_outcomes(snapshot, conversation.id, messages)
         self._write_portrait(snapshot)
