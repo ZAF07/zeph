@@ -56,4 +56,4 @@ Evidence (24 Nov 2026, worktree stack on ports 3020/8020, real data, final build
 ## Completion
 
 - Completed: 2026-11-24
-- Commit: <filled in after the merge>
+- Commit: b0338b3 (merge "Merge pattern-10-pattern-catalog: Pattern Catalog loads from YAML and Admins read it"; work in 34bc5e9 "Pattern Catalog loads from YAML and Admins read it", b0c5438 "Pattern Catalog: keep the last catalog on a bad load, stricter checks, docs", 91823d4 "Archive pattern-pipeline issue 10: Pattern Catalog loads and Admins read it, verified")
