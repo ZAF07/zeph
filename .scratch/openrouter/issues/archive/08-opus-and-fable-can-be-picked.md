@@ -49,4 +49,4 @@ Admins can also pick `anthropic/claude-opus-5.5` and `anthropic/claude-fable-5.2
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: <merge commit, filled in after the merge>
+- Commit: 48424e0 (merge of openrouter-08-opus-and-fable; work in 5edc776 27fa09c a0a29ec 93900c7)
