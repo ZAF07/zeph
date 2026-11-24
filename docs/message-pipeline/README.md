@@ -243,4 +243,6 @@ Every field an Admin can edit for the pipeline (the Persona's voice and Outlook,
 - The exact fields of the Understanding and the Reply Plan.
 - Parked for later: confirming suspected Patterns on the Dashboard (ADR-0020).
 
+**Next design (agreed 24 Nov 2026, not built):** Patterns become tested by code against a Pattern Catalog, Curiosities get an aim and a stronger standing, and the Reply Plan is given an Agenda. It adds Conversation-end steps (tagging Observations, scoring, the Agenda) and changes what the Reply Plan is offered. See `docs/pattern-pipeline/README.md`.
+
 Related decisions: ADR-0016 (Needs and Moves), ADR-0017 (guesses are Curiosities), ADR-0020 (suspected Patterns), ADR-0021 (small one-job steps).

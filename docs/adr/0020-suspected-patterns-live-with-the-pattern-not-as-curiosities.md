@@ -1,5 +1,7 @@
 # Suspected Patterns live with the Pattern, not as Curiosities
 
+Status: to be replaced by ADR-0024 (agreed 24 Nov 2026). The code follows this ADR until the pattern pipeline is built.
+
 ADR-0017 keeps every guess about a User as a Curiosity and rules out a second store of guesses. A Pattern (a recurring way a User thinks, feels or acts across parts of their life) is an exception: we keep suspected Patterns as Patterns, hidden from the User, and let the Companion form its read from them, offered only as its view, never as fact. In a real Conversation the read that finally helped ("the PM, the project and the impatience with your mum are the same thing") was a suspected Pattern; under ADR-0017 the Companion could not have used it until the User confirmed it, and a Curiosity is a one-off question that is asked once and closed, while a Pattern must gather evidence across many Conversations and be thought with every time a linked Life Thread comes up.
 
 ## Considered Options
