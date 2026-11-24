@@ -40,6 +40,7 @@ from companion.core.models import (
     CheckInScheduleEntry,
     CheckInStatus,
     CuriosityTreatment,
+    Familiarity,
     Feature,
     FeatureReason,
     FeatureStatus,
@@ -110,6 +111,7 @@ class AdminUserResponse(BaseModel):
     has_portrait: bool
     pattern_counts: dict[PatternState, int]
     kept_quote_count: int
+    familiarity: Familiarity
 
 
 class HeldBackResponse(BaseModel):
@@ -1347,6 +1349,7 @@ def to_admin_user_response(overview: UserOverview) -> AdminUserResponse:
         move_outcome_count=overview.move_outcome_count,
         pattern_counts=dict(overview.pattern_counts),
         kept_quote_count=overview.kept_quote_count,
+        familiarity=overview.user.familiarity,
         has_portrait=overview.has_portrait,
     )
 

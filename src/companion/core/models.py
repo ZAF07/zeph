@@ -216,6 +216,18 @@ class ChangedBy(StrEnum):
     ADMIN = "admin"
 
 
+class Familiarity(StrEnum):
+    """How well the Companion knows a User, least first.
+
+    Code works it out from counts against Admin-set bars each time a
+    Conversation ends; the Reply Plan is told it on every reply.
+    """
+
+    NEW = "new"
+    GETTING_TO_KNOW = "getting_to_know"
+    KNOWS_WELL = "knows_well"
+
+
 @dataclass(frozen=True)
 class User:
     """A person with an account who converses with the Companion.
@@ -246,6 +258,8 @@ class User:
             data and are yet to reply with the confirmation word; None if not.
         pattern_noticing_told_at: When they pressed "Got it" on the notice
             saying Zeph keeps quotes as evidence; none is kept before.
+        familiarity: How well the Companion knows them, as worked out when
+            their last Conversation ended.
     """
 
     id: UUID
@@ -268,6 +282,7 @@ class User:
     settings_changed_by_admin: dict[ChatSetting, datetime] = field(default_factory=dict)
     data_deletion_requested_at: datetime | None = None
     pattern_noticing_told_at: datetime | None = None
+    familiarity: Familiarity = Familiarity.NEW
 
     @property
     def has_finished_onboarding(self) -> bool:
@@ -358,6 +373,25 @@ class PatternState(StrEnum):
     CONTESTED = "contested"
     CLOSED = "closed"
     UNMATCHED = "unmatched"
+
+
+@dataclass(frozen=True)
+class FamiliarityCounts:
+    """What the Companion has of a User, as Familiarity is worked out from.
+
+    Attributes:
+        conversations: How many Conversations they have had.
+        life_threads: How many Life Threads the Companion follows for them.
+        real_story_observations: How many of their Observations are from
+            something that really happened.
+        pattern_states: How many Patterns they have in each state, with or
+            without a Pattern Type; a state with none may be left out.
+    """
+
+    conversations: int
+    life_threads: int
+    real_story_observations: int
+    pattern_states: Mapping[PatternState, int]
 
 
 @dataclass(frozen=True)
@@ -1319,6 +1353,10 @@ class CuriosityAim(StrEnum):
     GUESS = "guess"
     NEXT_MOVE = "next_move"
     EXPLORATION = "exploration"
+    STARTER = "starter"
+
+
+AIMS_WRITTEN_BY_CODE = frozenset({CuriosityAim.EXPLORATION, CuriosityAim.STARTER})
 
 
 @dataclass(frozen=True)
@@ -1337,8 +1375,9 @@ class Curiosity:
         created_at: When it was made.
         aim: What it is trying to learn: how a commitment went, how
             something looks to them now, whether a guess is right, or where
-            they've got to on a next Move never made, or an Exploration's
-            need.
+            they've got to on a next Move never made, an Exploration's
+            need, or how a new User would choose in a starter Thought
+            Experiment.
         source_memory_item_id: The Memory Item it came from, if any; deleting
             that item deletes it.
         source_life_thread_id: The Life Thread it came from, if any; deleting
@@ -1355,6 +1394,9 @@ class Curiosity:
             for the Agenda; deleting that Exploration deletes it.
         source_observation_id: The Observation it aims at, if any; deleting
             that Observation deletes it.
+        thought_experiment_id: The starter Thought Experiment it puts to a
+            new User, when code wrote it for that; None otherwise (an
+            Exploration's try names its own).
     """
 
     id: UUID
@@ -1375,6 +1417,7 @@ class Curiosity:
     how_sure: HowSure | None = None
     exploration_id: UUID | None = None
     source_observation_id: UUID | None = None
+    thought_experiment_id: UUID | None = None
 
 
 @dataclass(frozen=True)

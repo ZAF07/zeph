@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 
 from companion.core.agenda import AgendaKeeper
 from companion.core.curiosities import CuriosityKeeper
+from companion.core.familiarity import FamiliarityKeeper
 from companion.core.life_threads import LifeThreadKeeper
 from companion.core.memory_retrieval import format_time
 from companion.core.model_call_log import start_trace
@@ -17,6 +18,7 @@ from companion.core.models import (
     Conversation,
     ConversationMessage,
     DaySummary,
+    Familiarity,
     Feature,
     LifeThread,
     MemoryCategory,
@@ -43,6 +45,7 @@ from companion.core.platform_settings import (
     MEMORY_PROCESSING_THINKING,
 )
 from companion.core.ports import Clock, Embedder, Repositories
+from companion.core.starter_thought_experiments import StarterThoughtExperimentKeeper
 from companion.core.timing import day_span, users_today
 from companion.core.transcripts import to_transcript_lines
 from companion.core.usage import UsageRecordingChatModel
@@ -684,6 +687,8 @@ class PostConversationProcessor:
         pattern_keeper: PatternKeeper,
         curiosity_keeper: CuriosityKeeper,
         agenda_keeper: AgendaKeeper,
+        familiarity_keeper: FamiliarityKeeper,
+        starter_keeper: StarterThoughtExperimentKeeper,
         move_outcome_keeper: MoveOutcomeKeeper,
         portrait_writer: PortraitWriter,
         embedder: Embedder,
@@ -710,6 +715,10 @@ class PostConversationProcessor:
                 Curiosities.
             agenda_keeper: Keeps the User's Agenda and writes its aimed
                 Curiosities while Pattern exploring works.
+            familiarity_keeper: Works out how well the Companion knows the
+                User.
+            starter_keeper: Writes a new User's next starter Thought
+                Experiment while Pattern exploring works.
             move_outcome_keeper: Keeps what was learned about each Move made.
             portrait_writer: Rewrites the User's Portrait.
             embedder: Embeds each Summary, so it can be found by meaning.
@@ -724,6 +733,8 @@ class PostConversationProcessor:
         self._pattern_keeper = pattern_keeper
         self._curiosity_keeper = curiosity_keeper
         self._agenda_keeper = agenda_keeper
+        self._familiarity_keeper = familiarity_keeper
+        self._starter_keeper = starter_keeper
         self._move_outcome_keeper = move_outcome_keeper
         self._portrait_writer = portrait_writer
         self._clock = clock
@@ -745,8 +756,10 @@ class PostConversationProcessor:
         processed, its Life Threads are kept, then its Observations are
         tagged and the User's Patterns of Pattern Types scored while Pattern
         noticing works, then its unmatched Patterns from the
-        Threads it touched, then its Curiosities while the
-        Curiosities Feature works, then the Agenda while Pattern exploring
+        Threads it touched, then the User's Familiarity is worked out, then
+        its Curiosities while the
+        Curiosities Feature works, then the Agenda and a new User's starter
+        Thought Experiments while Pattern exploring
         works too, then its Move Outcomes, and then the User
         Portrait is rewritten; if any of them fails, the failure is logged and
         not tried again, so nothing is ever added twice.
@@ -776,9 +789,11 @@ class PostConversationProcessor:
         if snapshot.works(Feature.PATTERN_NOTICING):
             self._score_patterns(snapshot, conversation.id)
         self._keep_patterns(snapshot, conversation.id, messages, touched)
+        familiarity = self._keep_familiarity(snapshot)
         if snapshot.works(Feature.CURIOSITIES):
             self._keep_curiosities(snapshot, conversation.id, messages)
             self._keep_agenda(snapshot, conversation.id)
+            self._keep_starters(snapshot, familiarity)
         self._keep_move_outcomes(snapshot, conversation.id, messages)
         self._write_portrait(snapshot)
 
@@ -904,6 +919,33 @@ class PostConversationProcessor:
             self._agenda_keeper.keep(snapshot, conversation_id)
         except Exception:
             logger.exception("Could not keep the Agenda")
+
+    def _keep_familiarity(self, snapshot: UserSnapshot) -> Familiarity:
+        """Work out the User's Familiarity, logging a failure instead of raising.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+
+        Returns:
+            Their Familiarity now; as it was if working it out failed.
+        """
+        try:
+            return self._familiarity_keeper.keep(snapshot)
+        except Exception:
+            logger.exception("Could not work out Familiarity")
+            return snapshot.user.familiarity
+
+    def _keep_starters(self, snapshot: UserSnapshot, familiarity: Familiarity) -> None:
+        """Keep a new User's starter Thought Experiments, logging a failure.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            familiarity: How well the Companion knows them now.
+        """
+        try:
+            self._starter_keeper.keep(snapshot, familiarity)
+        except Exception:
+            logger.exception("Could not keep starter Thought Experiments")
 
     def _keep_move_outcomes(
         self,

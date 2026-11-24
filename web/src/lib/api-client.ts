@@ -180,6 +180,9 @@ export type PatternState =
   | "closed"
   | "unmatched";
 
+/** How well Zeph knows a User, worked out when a Conversation ends. */
+export type Familiarity = "new" | "getting_to_know" | "knows_well";
+
 /** A User as Admins see them: activity counts, never message text. */
 export type AdminUser = {
   id: string;
@@ -195,6 +198,7 @@ export type AdminUser = {
   has_portrait: boolean;
   pattern_counts: Record<PatternState, number>;
   kept_quote_count: number;
+  familiarity: Familiarity;
 };
 
 /** A User's role after a change. */

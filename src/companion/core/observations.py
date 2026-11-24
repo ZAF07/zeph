@@ -13,6 +13,7 @@ from companion.core.life_threads import describe_thread, read_text
 from companion.core.memory_retrieval import format_day
 from companion.core.model_call_log import ModelCallLog
 from companion.core.models import (
+    AIMS_WRITTEN_BY_CODE,
     ChatLine,
     ChatRole,
     ConversationMessage,
@@ -977,8 +978,9 @@ class PatternTagger:
     ) -> dict[int, str]:
         """Find the questions that put a Thought Experiment to the User here.
 
-        The words are the aimed Curiosity's, as asked, so an Admin's edit
-        since then doesn't change what the tagging model reads.
+        The words are the Curiosity's, as asked, so an Admin's edit since
+        then doesn't change what the tagging model reads. A starter one put
+        to a new User counts like one an Exploration's try put.
 
         Args:
             snapshot: The User whose Conversation it was.
@@ -986,14 +988,14 @@ class PatternTagger:
 
         Returns:
             The questions, numbered from 1 in the order they were asked;
-            none when no aimed Curiosity put one in it.
+            none when no Curiosity put one in it.
         """
         raised = [
             curiosity
             for curiosity in self._repositories.curiosities.list_raised_in(
                 conversation_id
             )
-            if curiosity.aim == CuriosityAim.EXPLORATION
+            if curiosity.aim in AIMS_WRITTEN_BY_CODE
         ]
         if not raised:
             return {}
@@ -1001,6 +1003,10 @@ class PatternTagger:
             attempt.curiosity_id
             for attempt in self._repositories.explorations.list_tries(snapshot.user.id)
             if attempt.thought_experiment_id is not None
+        } | {
+            curiosity.id
+            for curiosity in raised
+            if curiosity.thought_experiment_id is not None
         }
         asked = sorted(
             (curiosity for curiosity in raised if curiosity.id in putting),

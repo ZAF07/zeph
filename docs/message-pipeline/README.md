@@ -57,9 +57,11 @@ flowchart TD
       E2 --> T[b2. Pattern tagging, while Pattern noticing works]
       T --> SC[b3. Pattern scoring, code, while Pattern noticing works]
       SC --> E3[c. Patterns]
-      E3 --> E4[d. Curiosities]
+      E3 --> FA[c2. Familiarity, code]
+      FA --> E4[d. Curiosities]
       E4 --> AG[d2. Agenda, code, while Pattern exploring works]
-      AG --> E5[e. Move Outcomes]
+      AG --> ST[d3. Starter Thought Experiments, code, for a new User]
+      ST --> E5[e. Move Outcomes]
       E5 --> E6[f. User Portrait]
     end
 ```
@@ -190,6 +192,10 @@ After the quiet gap (Admin-set), these run in order, each using what the earlier
 
 - *Built (24 Nov 2026): right after Curiosities, while Pattern exploring and Curiosities work, code judges the aimed Curiosities asked, rests and wakes Explorations, ranks the Agenda and writes each active Exploration's next aimed Curiosity. No model call. The Reply Plan sees the Agenda on every reply. See `docs/pattern-pipeline/README.md`, Explorations and the Agenda.*
 
+### c2, d3. Familiarity and starter Thought Experiments *(new, code only)*
+
+- *Built (25 Nov 2026): after Patterns, code works out the User's Familiarity (new, getting to know, knows well) from counts against Admin-set bars and saves it; the Reply Plan is told it in one line on every reply. After the Agenda, while Pattern exploring and Curiosities work, code writes a new User's next starter Thought Experiment as a waiting Curiosity (aim `starter`), within the Admin-set number, days and per-Conversation cap, and closes the waiting ones once the User is getting to know. No model call. See `docs/pattern-pipeline/README.md`, Familiarity and starter Thought Experiments.*
+
 ### e. Move Outcomes
 
 - **What:** how each Move went, in which situation and mood.
@@ -217,7 +223,7 @@ Every prompt is an Admin-editable Platform Setting (key in `platform_settings`),
 | Safeguard | `safeguard_prompt` | no | The Conversation as a transcript, ending with the new text | `core/safeguard.py` |
 | Photo description | `photo_description_prompt` | no | The photo, its caption; also a photo a User's text replies to, when the text arrives, at one look per such reply; caption only when it can't be looked at (decision 20 lists the limits) | `core/photos.py` |
 | Understanding (reads only) | `understanding_prompt` | no | Time, Portrait, earlier Understandings, the Recent Messages (Day Summaries standing in, if any) | `core/understanding.py` (`describe_message_for_understanding`) |
-| Reply Plan | `reply_plan_prompt` | **Outlook only** (`persona_outlook`, in front) | Time, the Understanding, how direct the User wants it to be (left out while they are struggling), Needs, Moves and which each allows, Move Outcomes, Portrait, Goals, Memory Categories, recent Summaries, the Threads in mind (reminded by this message or earlier in the Conversation), the Patterns in mind (linked to those Threads, close in meaning, or from earlier in the Conversation), due Curiosities with their aims and how each Need treats them, the Curiosity an earlier reply was meant to ask whose reaction isn't known, the Agenda with earlier tries (while Pattern exploring works and they aren't struggling), Knowledge documents, the due Check-in's Kinds (only when code allows one), where the previous Conversation was when it ended, earlier Reply Plans (with where the Conversation was, the Read and whether it was said), the Recent Messages. Tool: `past_day` | `core/reply_plan.py` (`describe_message_for_reply_plan`) |
+| Reply Plan | `reply_plan_prompt` | **Outlook only** (`persona_outlook`, in front) | Time, the Understanding, how direct the User wants it to be (left out while they are struggling), how well Zeph knows them (Familiarity, one line), Needs, Moves and which each allows, Move Outcomes, Portrait, Goals, Memory Categories, recent Summaries, the Threads in mind (reminded by this message or earlier in the Conversation), the Patterns in mind (linked to those Threads, close in meaning, or from earlier in the Conversation), due Curiosities with their aims and how each Need treats them, the Curiosity an earlier reply was meant to ask whose reaction isn't known, the Agenda with earlier tries (while Pattern exploring works and they aren't struggling), Knowledge documents, the due Check-in's Kinds (only when code allows one), where the previous Conversation was when it ended, earlier Reply Plans (with where the Conversation was, the Read and whether it was said), the Recent Messages. Tool: `past_day` | `core/reply_plan.py` (`describe_message_for_reply_plan`) |
 | Woven-in Check-in brought-up check | none: a fixed yes/no prompt in code (`BROUGHT_UP_CHECK_PROMPT`), on `check_in_model` without thinking | no | The Check-in's Kind, description and note, and the reply as it will be sent | `core/woven_check_ins.py` |
 | Reply | `response_prompt` | **voice** | **Instructions** = the Persona's voice (`persona`) + `response_prompt` + the priority order with its clash rule + one section per level: 1. data deletion note, Threads to leave alone; 2. "answer a direct question first", each tool's instructions (web search, settings, sticker adding, photos), Features not available; 3. the Reply Plan's guidance (the Need's "how to reply", the Read when it is to be said with the Pattern it offers, if any, the Moves' "how to do it", its guidance line, the Understanding's mood, ask-why note, Threads to bring up, the Curiosity to ask); 4. memory text, Day Summaries standing in for Recent Messages left out, the past days the Reply Plan read; 6. the Woven-in Check-in the Reply Plan chose, Knowledge passages. The Persona's voice (5) stays in front. **Input** = the Recent Messages as chat turns. | `core/response_composition.py`, guidance from `format_reply_guidance` in `core/reply_plan.py` |
 | Check-in on its own | `check_in_prompt` | **yes** | Check-in Kinds, recent Check-ins, Shared Photos, due Curiosities, memory | `core/check_ins.py` |

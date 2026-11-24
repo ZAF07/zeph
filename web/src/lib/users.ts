@@ -1,4 +1,4 @@
-import type { PatternState, UserRole } from "@/lib/api-client";
+import type { Familiarity, PatternState, UserRole } from "@/lib/api-client";
 
 /**
  * Names a User for admin messages: their name, else their email.
@@ -21,6 +21,22 @@ export function displayNameOf(user: {
  */
 export function roleLabel(role: UserRole): string {
   return role === "admin" ? "Admin" : "User";
+}
+
+const familiarityLabels: Record<Familiarity, string> = {
+  new: "New",
+  getting_to_know: "Getting to know",
+  knows_well: "Knows well",
+};
+
+/**
+ * Says how well Zeph knows a User in plain words.
+ *
+ * @param familiarity - The User's Familiarity.
+ * @returns "New", "Getting to know" or "Knows well".
+ */
+export function familiarityLabel(familiarity: Familiarity): string {
+  return familiarityLabels[familiarity];
 }
 
 /** Every Pattern state but confirmed, in order, with its row's label. */

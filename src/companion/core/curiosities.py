@@ -20,6 +20,7 @@ from companion.core.life_threads import (
 )
 from companion.core.memory_retrieval import format_day
 from companion.core.models import (
+    AIMS_WRITTEN_BY_CODE,
     BringUpWay,
     ChatLine,
     ChatRole,
@@ -51,8 +52,10 @@ from companion.core.platform_settings import (
     CURIOSITY_KEEPING_PROMPT,
     CURIOSITY_KEEPING_THINKING,
     CURIOSITY_REPLIES_BETWEEN,
+    STARTER_THOUGHT_EXPERIMENT_DAYS,
 )
 from companion.core.ports import Clock, Embedder, Repositories
+from companion.core.starter_thought_experiments import starters_offered
 from companion.core.transcripts import to_transcript_lines
 from companion.core.usage import UsageRecordingChatModel
 
@@ -73,6 +76,10 @@ AIM_WORDS = {
     CuriosityAim.GUESS: "whether a guess is right",
     CuriosityAim.NEXT_MOVE: "where they've got to on help never given",
     CuriosityAim.EXPLORATION: "something Zeph is exploring about them (the Agenda)",
+    CuriosityAim.STARTER: (
+        "how they would choose in a made-up situation, to start getting to "
+        "know them (a starter Thought Experiment)"
+    ),
 }
 TREATMENT_WORDS = {
     CuriosityTreatment.ASK_BY_DEFAULT: (
@@ -165,27 +172,38 @@ def format_date(day: date) -> str:
 
 
 def due_curiosities(
-    waiting: Sequence[Curiosity], today: date, exploring: bool
+    waiting: Sequence[Curiosity], snapshot: UserSnapshot
 ) -> list[Curiosity]:
-    """Keep the waiting Curiosities whose day has come, aimed ones first.
+    """Keep the waiting Curiosities whose day has come, code-written ones first.
 
     Args:
         waiting: A User's waiting Curiosities.
-        today: The day it is in the User's time zone.
-        exploring: Whether Pattern exploring works for the User; without it,
-            no Curiosity aimed at an Exploration's need is kept.
+        snapshot: The User. Without Pattern exploring, no Curiosity written
+            by code is kept; a starter Thought Experiment is kept only
+            while starters are still offered to them.
 
     Returns:
-        Those with no "not before" day or whose day has come: the aimed ones
-        first, then the rest, each in order.
+        Those with no "not before" day or whose day has come: the ones code
+        wrote first, then the rest, each in order.
     """
+    exploring = snapshot.works(Feature.PATTERN_EXPLORING)
+    starters = exploring and starters_offered(
+        snapshot.user.familiarity,
+        snapshot.user.created_at,
+        snapshot.local_now,
+        snapshot.settings.get(STARTER_THOUGHT_EXPERIMENT_DAYS),
+    )
+    may_be_asked = {
+        CuriosityAim.EXPLORATION: exploring,
+        CuriosityAim.STARTER: starters,
+    }
     due = [
         curiosity
         for curiosity in waiting
-        if (curiosity.not_before is None or curiosity.not_before <= today)
-        and (exploring or curiosity.aim != CuriosityAim.EXPLORATION)
+        if (curiosity.not_before is None or curiosity.not_before <= snapshot.today)
+        and may_be_asked.get(curiosity.aim, True)
     ]
-    return sorted(due, key=lambda curiosity: curiosity.aim != CuriosityAim.EXPLORATION)
+    return sorted(due, key=lambda curiosity: curiosity.aim not in AIMS_WRITTEN_BY_CODE)
 
 
 def how_sure_word(how_sure: HowSure | None) -> str:
@@ -405,11 +423,7 @@ class CuriosityRaiser:
             or not self._pace_allows(snapshot, conversation_id)
         ):
             return due_here
-        waiting = due_curiosities(
-            store.list_waiting(snapshot.user.id),
-            snapshot.today,
-            snapshot.works(Feature.PATTERN_EXPLORING),
-        )
+        waiting = due_curiosities(store.list_waiting(snapshot.user.id), snapshot)
         return replace(
             due_here,
             offered=tuple(
@@ -584,19 +598,22 @@ def read_aim(entry: dict[str, Any]) -> CuriosityAim | None:
     """Read the aim the model gave a new Curiosity.
 
     One that holds a guess aims at checking it, whatever the model wrote.
+    The aims only code writes are never the model's to give.
 
     Args:
         entry: The Curiosity, as the model wrote it.
 
     Returns:
-        The aim; None if it names none of the aims, or says "guess" with no
-        guess.
+        The aim; None if it names none of the model's aims, or says "guess"
+        with no guess.
     """
     if read_text(entry, "guess"):
         return CuriosityAim.GUESS
     value = entry.get("aim")
     aims_without_a_guess = [
-        aim.value for aim in CuriosityAim if aim != CuriosityAim.GUESS
+        aim.value
+        for aim in CuriosityAim
+        if aim != CuriosityAim.GUESS and aim not in AIMS_WRITTEN_BY_CODE
     ]
     return CuriosityAim(value) if value in aims_without_a_guess else None
 
@@ -941,7 +958,7 @@ class CuriosityKeeper:
         waiting = [
             curiosity
             for curiosity in store.list_waiting(user_id)
-            if curiosity.aim != CuriosityAim.EXPLORATION
+            if curiosity.aim not in AIMS_WRITTEN_BY_CODE
         ]
         raised_here = store.list_raised_in(conversation_id)
         threads = {

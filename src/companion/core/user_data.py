@@ -4,7 +4,7 @@ from enum import StrEnum
 from uuid import UUID
 
 from companion.core.admin_users import refuse_if_last_admin
-from companion.core.models import PlatformSettings, User, UserSnapshot
+from companion.core.models import Familiarity, PlatformSettings, User, UserSnapshot
 from companion.core.platform_settings import (
     DATA_DELETED_REPLY,
     DATA_DELETION_CONFIRMATION_WORD,
@@ -26,6 +26,7 @@ def delete_user_data(repositories: Repositories, user_id: UUID) -> None:
     (hidden ones too), Move Outcomes, Curiosities, User Portrait, Personal Stickers,
     Check-in history, connection tokens and Telegram Connection go. Their
     profile, settings, Usage, Safeguard Events and Feature Switches stay.
+    The Companion is new to them again (their Familiarity).
 
     Args:
         repositories: Where the User's data is stored.
@@ -47,6 +48,7 @@ def delete_user_data(repositories: Repositories, user_id: UUID) -> None:
         in_transaction.check_ins.delete_for_user(user_id)
         in_transaction.connection_tokens.delete_for_user(user_id)
         in_transaction.telegram_connections.delete_for_user(user_id)
+        in_transaction.users.save_familiarity(user_id, Familiarity.NEW)
 
 
 def _delete_user(repositories: Repositories, user_id: UUID) -> bool:

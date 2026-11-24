@@ -30,6 +30,8 @@ from companion.core.models import (
     EmbeddedChunk,
     Exploration,
     ExplorationTry,
+    Familiarity,
+    FamiliarityCounts,
     Feature,
     FeatureSwitch,
     Helpline,
@@ -606,6 +608,27 @@ class UserRepository(Protocol):
 
         Returns:
             The saved User.
+        """
+        ...
+
+    def familiarity_counts(self, user_id: UUID) -> FamiliarityCounts:
+        """Count what the Companion has of a User, for their Familiarity.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            Their Conversations, Life Threads, Observations from real
+            stories and Patterns in each state.
+        """
+        ...
+
+    def save_familiarity(self, user_id: UUID, familiarity: Familiarity) -> None:
+        """Save how well the Companion knows a User.
+
+        Args:
+            user_id: The User's ID.
+            familiarity: Their Familiarity now.
         """
         ...
 
@@ -1776,7 +1799,9 @@ class ThoughtExperimentRepository(Protocol):
         ...
 
     def close_waiting(self, thought_experiment_id: UUID) -> None:
-        """Close every waiting aimed Curiosity that would put it to a User.
+        """Close every waiting Curiosity that would put it to a User.
+
+        Both an Exploration's try and a starter for a new User.
 
         Args:
             thought_experiment_id: Its ID.
@@ -1787,8 +1812,8 @@ class ThoughtExperimentRepository(Protocol):
         """Count how many times each Thought Experiment was put to a User.
 
         Returns:
-            How many of its aimed Curiosities were asked, by its ID; one
-            never asked is left out.
+            How many of its Curiosities were asked, by its ID, whether for an
+            Exploration or as a starter; one never asked is left out.
         """
         ...
 
@@ -1830,6 +1855,17 @@ class CuriosityRepository(Protocol):
 
         Returns:
             The Curiosities with the aim of an Exploration's need.
+        """
+        ...
+
+    def list_starters(self, user_id: UUID) -> list[Curiosity]:
+        """List a User's starter Thought Experiment Curiosities, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Curiosities with the starter aim, in any state.
         """
         ...
 

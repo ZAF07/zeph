@@ -342,6 +342,14 @@ EXPLORATION_REST_AFTER_TRIES = Setting(
 THOUGHT_EXPERIMENTS_PER_PATTERN_PER_WEEK = Setting(
     "thought_experiments_per_pattern_per_week", read_whole_number
 )
+FAMILIARITY_CONVERSATIONS = Setting("familiarity_conversations", read_whole_number)
+FAMILIARITY_LIFE_THREADS = Setting("familiarity_life_threads", read_whole_number)
+FAMILIARITY_REAL_STORIES = Setting("familiarity_real_stories", read_whole_number)
+STARTER_THOUGHT_EXPERIMENTS = Setting("starter_thought_experiments", read_whole_number)
+STARTER_THOUGHT_EXPERIMENT_DAYS = Setting("starter_thought_experiment_days", read_days)
+STARTER_THOUGHT_EXPERIMENTS_PER_CONVERSATION = Setting(
+    "starter_thought_experiments_per_conversation", read_whole_number
+)
 PATTERN_PUSHED_BACK_WAIT = Setting("pattern_pushed_back_wait_days", read_days)
 PATTERN_CLOSENESS_PERCENT = Setting("pattern_closeness_percent", read_whole_number)
 PORTRAIT_MODEL = Setting("portrait_model", read_text)
@@ -1512,6 +1520,76 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         hint=(
             "The most Thought Experiments Zeph puts to a User about one Pattern "
             "in 7 days, counting one still waiting to be asked. 0 asks none."
+        ),
+    ),
+    EditableSetting(
+        FAMILIARITY_CONVERSATIONS.key,
+        "Conversations to be getting to know",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=1000,
+        hint=(
+            "A new User becomes one Zeph is getting to know after this many "
+            "Conversations, once the other two bars are met too. A first "
+            "suspected Pattern gets them there sooner."
+        ),
+    ),
+    EditableSetting(
+        FAMILIARITY_LIFE_THREADS.key,
+        "Life Threads to be getting to know",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=1000,
+        hint=(
+            "How many Life Threads Zeph must follow for a new User before it is "
+            "getting to know them, with the Conversations and real stories bars."
+        ),
+    ),
+    EditableSetting(
+        FAMILIARITY_REAL_STORIES.key,
+        "Real stories to be getting to know",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=1000,
+        hint=(
+            "How many Observations from things that really happened a new User "
+            "needs before Zeph is getting to know them, with the other two "
+            "bars. 0 means none are needed."
+        ),
+    ),
+    EditableSetting(
+        STARTER_THOUGHT_EXPERIMENTS.key,
+        "Starter Thought Experiments for a new User",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=50,
+        hint=(
+            "The most starter Thought Experiments Zeph puts to a new User while "
+            "Pattern exploring works, counting one still waiting; 0 asks none. "
+            "They stop once Zeph is getting to know them."
+        ),
+    ),
+    EditableSetting(
+        STARTER_THOUGHT_EXPERIMENT_DAYS.key,
+        "Days starter Thought Experiments are offered",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=365,
+        hint=(
+            "Starter Thought Experiments are offered only for this many days "
+            "after a User signs up. After that, one still waiting is closed."
+        ),
+    ),
+    EditableSetting(
+        STARTER_THOUGHT_EXPERIMENTS_PER_CONVERSATION.key,
+        "Starter Thought Experiments per Conversation",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=5,
+        hint=(
+            "The most starter Thought Experiments in one Conversation; the next "
+            "is written when a Conversation ends. The Curiosity limits still "
+            "apply."
         ),
     ),
     EditableSetting(
