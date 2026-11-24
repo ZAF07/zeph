@@ -1,6 +1,5 @@
 import logging
 from collections.abc import Callable, Sequence
-from typing import Any
 
 from langchain_core.messages import (
     AIMessage,
@@ -12,12 +11,17 @@ from langchain_core.messages import (
 from langchain_deepseek import ChatDeepSeek
 from pydantic import SecretStr
 
+from companion.adapters.chat_tools import (
+    MAX_TOOL_ROUNDS,
+    broken_arguments_message,
+    to_tool_schema,
+    unknown_tool_message,
+)
 from companion.core.models import ChatLine, ChatRole, ModelAnswer, ToolCallRecord
 from companion.core.ports import ChatTool
 
 logger = logging.getLogger(__name__)
 
-MAX_TOOL_ROUNDS = 4
 CURRENT_MODEL = "deepseek-flash"
 OLD_CHAT_MODEL = "deepseek-chat"
 OLD_REASONER_MODEL = "deepseek-reasoner"
@@ -119,25 +123,6 @@ def to_langchain_messages(
     return messages
 
 
-def to_tool_schema(tool: ChatTool) -> dict[str, Any]:
-    """Describe a tool in the OpenAI function format DeepSeek takes.
-
-    Args:
-        tool: The tool.
-
-    Returns:
-        The tool's schema.
-    """
-    return {
-        "type": "function",
-        "function": {
-            "name": tool.name,
-            "description": tool.description,
-            "parameters": tool.parameters,
-        },
-    }
-
-
 def to_model_answer(
     text: str,
     responses: Sequence[AIMessage],
@@ -204,7 +189,7 @@ def answer_with_tools(
         messages.append(response)
         for broken_call in response.invalid_tool_calls:
             name = broken_call["name"] or ""
-            result = f"The arguments for {name} were not valid JSON. Try again."
+            result = broken_arguments_message(name)
             messages.append(ToolMessage(result, tool_call_id=broken_call["id"] or ""))
             tool_calls.append(
                 ToolCallRecord(name, {"raw": broken_call["args"]}, result)
@@ -214,7 +199,7 @@ def answer_with_tools(
             result = (
                 tool.run(tool_call["args"])
                 if tool
-                else f"There is no tool called {tool_call['name']}."
+                else unknown_tool_message(tool_call["name"])
             )
             messages.append(ToolMessage(result, tool_call_id=tool_call["id"]))
             tool_calls.append(

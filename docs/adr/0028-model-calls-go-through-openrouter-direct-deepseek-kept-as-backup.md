@@ -1,6 +1,6 @@
 # Model calls go through OpenRouter, direct DeepSeek kept as backup
 
-Status: accepted. Built in part (openrouter issue 02): plain replies go through OpenRouter when `CHAT_MODEL_ADAPTER=openrouter`. Tools, photos and making OpenRouter the default come in issues 03 and 04. Amends ADR-0003's adapter list.
+Status: accepted. Built in part (openrouter issues 02 and 03): replies, with tool calls, go through OpenRouter when `CHAT_MODEL_ADAPTER=openrouter`. Photos and making OpenRouter the default come in issue 04. Amends ADR-0003's adapter list.
 
 Every model call went straight to DeepSeek, so trying another provider meant a new adapter per provider. Model calls now go through one OpenRouter adapter behind the `ChatModel` and `PhotoViewer` ports, using the operator's own provider keys (BYOK). A new model is then just a new name in Platform Settings. The adapter is plain `httpx` against OpenRouter's Chat Completions API, not LangChain, so we control the request (`reasoning`, `cache_control`, provider routing) and read the reasoning text straight from the reply. It sends the model name exactly as saved, and the thinking switch becomes `reasoning: {enabled: true|false}`.
 
