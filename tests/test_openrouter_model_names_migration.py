@@ -46,7 +46,7 @@ def stored_values(engine: Engine, table: str, keys: list[str]) -> dict[str, Any]
 def test_the_migration_renames_saved_models_to_openrouter_names(
     engine: Engine, database_url: str
 ) -> None:
-    downgrade_to(database_url, "0085")
+    downgrade_to(database_url, "0086")
     try:
         save_values(engine, "platform_settings", OLD_SETTINGS)
         save_values(engine, "eval_judge_settings", {"model": "deepseek-flash"})
@@ -75,11 +75,11 @@ def test_the_migration_renames_saved_models_to_openrouter_names(
 def test_going_back_restores_the_direct_deepseek_names(
     engine: Engine, database_url: str
 ) -> None:
-    downgrade_to(database_url, "0085")
+    downgrade_to(database_url, "0086")
     try:
         save_values(engine, "platform_settings", OLD_SETTINGS)
         migrate(database_url)
-        downgrade_to(database_url, "0085")
+        downgrade_to(database_url, "0086")
 
         assert (
             stored_values(engine, "platform_settings", list(OLD_SETTINGS))
