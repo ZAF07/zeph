@@ -43,3 +43,8 @@ Evidence (24 Nov 2026, worktree stack, branch `pattern-03-directness`):
 - **Pixel test:** Account, M-Account, CheckIns and M-CheckIns PASS (0.19%, 0.45%, 0.03%, 0.06%), using the Clerk-probe workaround copy of `compare.cjs`. The `Account` and `M-Account` references and baselines are extended with the new card.
 - **Checks:** pytest 1902 passed; ruff, ruff format and mypy clean; pnpm lint, format:check and typecheck clean; vitest 936 passed.
 
+
+## Completion
+
+- Completed: 2026-11-24
+- Commit: <to be filled in after the merge>
