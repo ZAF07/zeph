@@ -283,4 +283,4 @@ def test_a_model_direct_deepseek_cant_call_fails_clearly(model: str) -> None:
         build_client("key", model, False)
 
     assert model in str(error.value)
-    assert "CHAT_MODEL_ADAPTER" in str(error.value)
+    assert "Pick a DeepSeek model" in str(error.value)

@@ -22,11 +22,13 @@ down_revision: str | None = "0085"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-OPENROUTER_NAMES = {
+OPENROUTER_NAME_BY_DIRECT_NAME = {
     "deepseek-flash": "deepseek/deepseek-v4.1-flash",
     "deepseek-v4-pro": "deepseek/deepseek-v4-pro",
 }
-DIRECT_NAMES = {new: old for old, new in OPENROUTER_NAMES.items()}
+DIRECT_NAME_BY_OPENROUTER_NAME = {
+    new: old for old, new in OPENROUTER_NAME_BY_DIRECT_NAME.items()
+}
 
 
 def renamed_value(key: str, value: Any, names: Mapping[str, str]) -> Any:
@@ -71,11 +73,11 @@ def rename_models(table: str, names: Mapping[str, str]) -> None:
 
 def upgrade() -> None:
     """Rename the DeepSeek model names to their OpenRouter names."""
-    rename_models("platform_settings", OPENROUTER_NAMES)
-    rename_models("eval_judge_settings", OPENROUTER_NAMES)
+    rename_models("platform_settings", OPENROUTER_NAME_BY_DIRECT_NAME)
+    rename_models("eval_judge_settings", OPENROUTER_NAME_BY_DIRECT_NAME)
 
 
 def downgrade() -> None:
     """Rename the OpenRouter DeepSeek names back to the direct names."""
-    rename_models("platform_settings", DIRECT_NAMES)
-    rename_models("eval_judge_settings", DIRECT_NAMES)
+    rename_models("platform_settings", DIRECT_NAME_BY_OPENROUTER_NAME)
+    rename_models("eval_judge_settings", DIRECT_NAME_BY_OPENROUTER_NAME)

@@ -52,12 +52,14 @@ def to_direct_name(model: str) -> str:
     """
     if "/" not in model:
         return model
-    if model not in DIRECT_NAMES_BY_OPENROUTER_NAME:
+    direct_name = DIRECT_NAMES_BY_OPENROUTER_NAME.get(model)
+    if direct_name is None:
         raise UnsupportedModelError(
-            f"Direct DeepSeek can't call {model}. Pick a DeepSeek model, or "
-            "set CHAT_MODEL_ADAPTER=openrouter."
+            f"Direct DeepSeek can't call {model}. Pick a DeepSeek model in "
+            "Prompts and models, or set CHAT_MODEL_ADAPTER to an adapter "
+            "that can call it."
         )
-    return DIRECT_NAMES_BY_OPENROUTER_NAME[model]
+    return direct_name
 
 
 def build_client(api_key: str, model: str, thinking: bool) -> ChatDeepSeek:
@@ -79,17 +81,17 @@ def build_client(api_key: str, model: str, thinking: bool) -> ChatDeepSeek:
     Raises:
         UnsupportedModelError: If direct DeepSeek can't call the model.
     """
-    model = to_direct_name(model)
-    if model == OLD_REASONER_MODEL:
+    direct_model = to_direct_name(model)
+    if direct_model == OLD_REASONER_MODEL:
         if not thinking:
             logger.warning(
                 "deepseek-reasoner always thinks; thinking stays on for this call"
             )
         thinking = True
-    if model in (OLD_CHAT_MODEL, OLD_REASONER_MODEL):
-        model = CURRENT_MODEL
+    if direct_model in (OLD_CHAT_MODEL, OLD_REASONER_MODEL):
+        direct_model = CURRENT_MODEL
     return ChatDeepSeek(
-        model_name=model,
+        model_name=direct_model,
         api_key=SecretStr(api_key),
         timeout=60,
         extra_body={"thinking": {"type": "enabled" if thinking else "disabled"}},
