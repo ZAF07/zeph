@@ -87,4 +87,4 @@ Evidence (24 Nov 2026, worktree stack on 3010/8010, real DeepSeek model through 
 ## Completion
 
 - Completed: 2026-11-24
-- Commit: <merge commit, filled in after merging>
+- Commit: 0093514 (merge of `pattern-04-explorations` into main)
