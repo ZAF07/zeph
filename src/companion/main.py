@@ -23,6 +23,7 @@ from companion.adapters.load_test.switch import (
 )
 from companion.adapters.load_test.web_search import EmptyWebSearch
 from companion.adapters.openrouter.chat_model import OpenRouterChatModel
+from companion.adapters.openrouter.chat_model import logger as openrouter_logger
 from companion.adapters.openrouter.photo_viewer import OpenRouterPhotoViewer
 from companion.adapters.pgvector.vector_store import PgvectorKnowledgeVectorStore
 from companion.adapters.postgres.eval_repositories import (
@@ -384,6 +385,19 @@ def quiet_http_client_logs() -> None:
         logging.getLogger(logger_name).setLevel(logging.WARNING)
 
 
+def print_info_logs(logger: logging.Logger) -> None:
+    """Print a logger's logs from INFO up.
+
+    Nothing else prints INFO logs, so the logger gets its own handler, once.
+
+    Args:
+        logger: The logger to print.
+    """
+    logger.setLevel(logging.INFO)
+    if not logger.handlers:
+        logger.addHandler(logging.StreamHandler())
+
+
 def show_model_call_developer_logs(enabled: bool) -> None:
     """Print the Model Call Log's developer logs, for local and worktree runs.
 
@@ -393,11 +407,18 @@ def show_model_call_developer_logs(enabled: bool) -> None:
     Args:
         enabled: Whether developer logs are on (`MODEL_CALL_DEVELOPER_LOGS`).
     """
-    if not enabled:
-        return
-    model_call_logger.setLevel(logging.INFO)
-    if not model_call_logger.handlers:
-        model_call_logger.addHandler(logging.StreamHandler())
+    if enabled:
+        print_info_logs(model_call_logger)
+
+
+def show_prompt_cache_logs() -> None:
+    """Print the OpenRouter adapter's INFO logs, which say how the cache was used.
+
+    Each line says how many of a Claude call's prompt tokens came from the
+    prompt cache. The adapter logs no content, so its logs are safe to print
+    everywhere.
+    """
+    print_info_logs(openrouter_logger)
 
 
 def build_production_app() -> FastAPI:
@@ -411,6 +432,7 @@ def build_production_app() -> FastAPI:
     quiet_http_client_logs()
     settings = load_settings()
     show_model_call_developer_logs(settings.model_call_developer_logs)
+    show_prompt_cache_logs()
     engine = build_database_engine(settings)
     dependencies = AppDependencies(
         repositories=build_repositories(settings, engine),

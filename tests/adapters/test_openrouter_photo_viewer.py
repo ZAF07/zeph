@@ -73,6 +73,42 @@ def test_the_photo_goes_as_a_data_url_in_a_user_message_after_the_instructions()
     ]
 
 
+def test_a_claude_model_gets_its_instructions_marked_for_caching() -> None:
+    requests: list[httpx.Request] = []
+    photo_viewer = openrouter_with(
+        httpx.Response(200, json=openrouter_reply()), requests
+    )
+
+    photo_viewer.look(
+        model="anthropic/claude-haiku-5.5",
+        thinking=False,
+        instructions="Describe the photo.",
+        photo=PHOTO,
+    )
+
+    assert json.loads(requests[0].content)["messages"][0] == {
+        "role": "system",
+        "content": [
+            {
+                "type": "text",
+                "text": "Describe the photo.",
+                "cache_control": {"type": "ephemeral"},
+            }
+        ],
+    }
+
+
+def test_a_deepseek_model_gets_no_caching_marker() -> None:
+    requests: list[httpx.Request] = []
+    photo_viewer = openrouter_with(
+        httpx.Response(200, json=openrouter_reply()), requests
+    )
+
+    look(photo_viewer)
+
+    assert "cache_control" not in requests[0].content.decode()
+
+
 def test_the_data_url_carries_the_photos_media_type() -> None:
     requests: list[httpx.Request] = []
     photo_viewer = openrouter_with(

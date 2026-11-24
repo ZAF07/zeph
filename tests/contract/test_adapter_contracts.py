@@ -1,3 +1,4 @@
+import logging
 import os
 import threading
 from pathlib import Path
@@ -23,6 +24,8 @@ from companion.core.ports import ChatTool, UserWorkQueue
 from tests.fakes import FakeUserWorkQueue
 
 pytestmark = pytest.mark.contract
+
+OPENROUTER_LOGGER = "companion.adapters.openrouter.chat_model"
 
 WEEKEND_LIST_PHOTO = (
     Path(__file__).parents[2] / "src/companion/seed/evals/images/weekend-list.jpg"
@@ -141,6 +144,34 @@ def test_openrouter_returns_reasoning_when_thinking_is_on(model: str) -> None:
 
     assert "96" in reply.text
     assert reply.reasoning
+
+
+def test_openrouter_reads_a_claude_models_instructions_from_the_cache_the_second_time(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The instructions are long, as Claude caches only a prompt of some size."""
+    chat_model = OpenRouterChatModel(required_env("OPENROUTER_API_KEY"))
+    house_rules = "\n".join(
+        f"House rule {number}: always greet guest number {number} by name."
+        for number in range(1, 601)
+    )
+
+    with caplog.at_level(logging.INFO, logger=OPENROUTER_LOGGER):
+        for _ in range(2):
+            chat_model.generate(
+                model="anthropic/claude-haiku-5.5",
+                thinking=False,
+                instructions=f"Reply with one short sentence.\n{house_rules}",
+                history=[ChatLine(role=ChatRole.USER, text="hi there")],
+            )
+
+    _, second_call = [
+        message
+        for message in caplog.messages
+        if "prompt tokens from the cache" in message
+    ]
+    cached_tokens = int(second_call.split(" read ")[1].split(" of ")[0])
+    assert cached_tokens > 0, second_call
 
 
 @pytest.mark.parametrize(
