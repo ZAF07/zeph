@@ -548,6 +548,8 @@ def test_an_admin_edits_the_judge_and_a_model_not_listed_is_refused(
         "deepseek/deepseek-v4-pro-0813",
         "anthropic/claude-haiku-5.5",
         "anthropic/claude-sonnet-5.5",
+        "anthropic/claude-opus-5.5",
+        "anthropic/claude-fable-5.2",
     ]
     assert saved.status_code == 200
     assert saved.json()["values"] == new_values

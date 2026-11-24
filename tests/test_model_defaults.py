@@ -27,7 +27,12 @@ from companion.core.platform_settings import (
 
 CURRENT_MODEL = "deepseek/deepseek-v4.1-flash-1017"
 PRO_MODEL = "deepseek/deepseek-v4-pro-0813"
-CLAUDE_MODELS = ["anthropic/claude-haiku-5.5", "anthropic/claude-sonnet-5.5"]
+CLAUDE_MODELS = [
+    "anthropic/claude-haiku-5.5",
+    "anthropic/claude-sonnet-5.5",
+    "anthropic/claude-opus-5.5",
+    "anthropic/claude-fable-5.2",
+]
 
 THINKING_CALLS: list[Setting[bool]] = [
     UNDERSTANDING_THINKING,

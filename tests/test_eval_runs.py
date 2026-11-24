@@ -356,6 +356,8 @@ def test_model_prices_are_seeded_and_admins_change_them_with_the_limit(
             {"model": "deepseek/deepseek-v4-pro-0813", "sgd_in": 1.69, "sgd_out": 5.07},
             {"model": "anthropic/claude-haiku-5.5", "sgd_in": 0.13, "sgd_out": 0.64},
             {"model": "anthropic/claude-sonnet-5.5", "sgd_in": 2.56, "sgd_out": 12.8},
+            {"model": "anthropic/claude-opus-5.5", "sgd_in": 5.12, "sgd_out": 25.6},
+            {"model": "anthropic/claude-fable-5.2", "sgd_in": 10.24, "sgd_out": 51.2},
         ],
         "token_limit": 1_000_000,
     }
@@ -370,6 +372,8 @@ def test_model_prices_are_seeded_and_admins_change_them_with_the_limit(
             {"model": "deepseek/deepseek-v4-pro-0813", "sgd_in": None, "sgd_out": None},
             {"model": "anthropic/claude-haiku-5.5", "sgd_in": None, "sgd_out": None},
             {"model": "anthropic/claude-sonnet-5.5", "sgd_in": None, "sgd_out": None},
+            {"model": "anthropic/claude-opus-5.5", "sgd_in": None, "sgd_out": None},
+            {"model": "anthropic/claude-fable-5.2", "sgd_in": None, "sgd_out": None},
         ],
         "token_limit": 250_000,
     }
@@ -531,4 +535,6 @@ def test_override_choices_list_the_editable_settings_needs_moves_and_models(
         "deepseek/deepseek-v4-pro-0813",
         "anthropic/claude-haiku-5.5",
         "anthropic/claude-sonnet-5.5",
+        "anthropic/claude-opus-5.5",
+        "anthropic/claude-fable-5.2",
     ]
