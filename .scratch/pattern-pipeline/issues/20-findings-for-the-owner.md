@@ -147,10 +147,10 @@ If there is nothing, the section holds one line: "Nothing found."
 - **Impact:** every UI issue has to patch the test by hand to get a PASS. One small change to the Account page will push `M-Account` over the limit for reasons unrelated to that change.
 - **Suggested fix:** the owner adds the `protect.clerk.com` abort to `compare.cjs` and looks at why those three parts of `M-Account` drift.
 
-### Migration 0085 overwrites Admin prompt edits too
+### Migration 0086 overwrites Admin prompt edits too
 
 - **Kind:** risk
-- **What:** like 0073 to 0081 (see 02), 0085 drops the stored `reply_plan_prompt` and `reply_settings_instructions` so they reload from the seed.
+- **What:** like 0073 to 0081 (see 02), 0086 drops the stored `reply_plan_prompt` and `reply_settings_instructions` so they reload from the seed.
 - **Impact:** the same as in 02: Admin edits to these two prompts are lost on deploy.
 - **Suggested fix:** the same as in 02.
 

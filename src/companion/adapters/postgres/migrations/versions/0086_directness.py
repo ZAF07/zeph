@@ -5,8 +5,8 @@ instructions reload from the seed on next start, even where an Admin edited
 them, because the old ones know nothing of the setting. No User data is
 removed.
 
-Revision ID: 0085
-Revises: 0084
+Revision ID: 0086
+Revises: 0085
 Create Date: 2026-11-24
 """
 
@@ -15,8 +15,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0085"
-down_revision: str | None = "0084"
+revision: str = "0086"
+down_revision: str | None = "0085"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

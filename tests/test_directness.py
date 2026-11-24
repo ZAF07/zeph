@@ -182,7 +182,7 @@ def test_an_existing_install_puts_users_on_balanced_and_reloads_the_prompts(
 ) -> None:
     maya = auth_headers(auth_verifier, "user_maya")
     me(client, maya)
-    downgrade_to(database_url, "0084")
+    downgrade_to(database_url, "0085")
     try:
         with engine.begin() as connection:
             connection.execute(
