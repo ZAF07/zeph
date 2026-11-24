@@ -94,9 +94,7 @@ def seed_pattern_types() -> list[PatternType]:
     return read_pattern_types(read_pattern_catalog_seed(PATTERN_CATALOG_DIR))
 
 
-def test_the_fifteen_pattern_types_in_the_repo_are_approved_three_per_area() -> (
-    None
-):
+def test_the_fifteen_pattern_types_in_the_repo_are_approved_three_per_area() -> None:
     pattern_types = seed_pattern_types()
 
     assert len(pattern_types) == 15

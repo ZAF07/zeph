@@ -133,7 +133,8 @@ def test_admin_reads_a_pattern_type_with_all_its_details(
                 "to fix the other's mood",
             },
         ],
-        "anyone_would": "Keeping quiet over small things with strangers or people in charge",
+        "anyone_would": "Keeping quiet over small things with strangers or "
+        "people in charge",
         "exclusions": [
             {"text": "Active relationship crisis", "evidence": "ignored"},
             {"text": "Grief", "evidence": "ignored"},
