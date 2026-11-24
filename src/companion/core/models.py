@@ -322,6 +322,23 @@ class AdminCheckInChanges:
     quiet_hours_end: time | None = None
 
 
+class PatternState(StrEnum):
+    """Where a Pattern stands, from first noticed to confirmed or closed.
+
+    Code moves a Pattern of a Pattern Type between them (ADR-0024). An
+    unmatched Pattern, kept under the old rules, is only suspected,
+    confirmed or closed.
+    """
+
+    NOTICED = "noticed"
+    SUSPECTED = "suspected"
+    READY = "ready"
+    SHARED = "shared"
+    CONFIRMED = "confirmed"
+    CONTESTED = "contested"
+    CLOSED = "closed"
+
+
 @dataclass(frozen=True)
 class UserOverview:
     """What Admins see about a User: activity counts, never message text.
@@ -336,7 +353,8 @@ class UserOverview:
         has_portrait: Whether they have a User Portrait.
         move_outcome_count: How many Move Outcomes the Companion keeps for
             them.
-        confirmed_pattern_count: How many of their Patterns they agreed with.
+        pattern_counts: How many Patterns they have in each state, every
+            state given, with or without a Pattern Type; never their content.
     """
 
     user: User
@@ -346,7 +364,7 @@ class UserOverview:
     life_thread_count: int
     has_portrait: bool
     move_outcome_count: int
-    confirmed_pattern_count: int
+    pattern_counts: Mapping[PatternState, int]
 
 
 @dataclass(frozen=True)
@@ -1118,14 +1136,6 @@ class LifeThreadToSave:
     thread: LifeThread
     name_keys: tuple[str, ...]
     embedding: list[float] | None
-
-
-class PatternState(StrEnum):
-    """Whether a Pattern is only suspected, agreed with by the User, or rejected."""
-
-    SUSPECTED = "suspected"
-    CONFIRMED = "confirmed"
-    CLOSED = "closed"
 
 
 class PatternReaction(StrEnum):
@@ -3087,3 +3097,68 @@ class Observation:
             True when it has a second Pattern Type.
         """
         return self.second_pattern_type_id is not None
+
+
+@dataclass(frozen=True)
+class CatalogPattern:
+    """A User's Pattern of one Pattern Type, fed by their Observations.
+
+    Its Observations are the User's Observations naming its Pattern Type,
+    first or second. Its score is worked out from them when it is read and
+    never stored; only its state is.
+
+    Attributes:
+        id: Our ID for the Pattern.
+        user_id: The User it is about.
+        pattern_type_id: Its Pattern Type's ID.
+        state: Where it stands.
+        started_at: When it was first noticed.
+        updated_at: When it last moved.
+    """
+
+    id: UUID
+    user_id: UUID
+    pattern_type_id: str
+    state: PatternState
+    started_at: datetime
+    updated_at: datetime
+
+
+class PatternMoveCause(StrEnum):
+    """What made code score a User's Patterns again, so one moved."""
+
+    CONVERSATION_TAGGED = "conversation_tagged"
+    OBSERVATIONS_DELETED = "observations_deleted"
+
+
+@dataclass(frozen=True)
+class PatternMove:
+    """One move of a Pattern between states, as its append-only log keeps it.
+
+    It holds no words of the User's, and stays when its Pattern is deleted.
+
+    Attributes:
+        id: The move's ID.
+        user_id: The User whose Pattern moved.
+        pattern_id: The Pattern that moved.
+        pattern_type_id: Its Pattern Type's ID.
+        from_state: The state it left; None when it was first noticed.
+        to_state: The state it moved to.
+        cause: What made code score it again.
+        conversation_id: The Conversation tagged, when that was the cause.
+        points: Its score at the move.
+        situations: The situations it was seen in at the move.
+        moved_at: When it moved.
+    """
+
+    id: UUID
+    user_id: UUID
+    pattern_id: UUID
+    pattern_type_id: str
+    from_state: PatternState | None
+    to_state: PatternState
+    cause: PatternMoveCause
+    conversation_id: UUID | None
+    points: float
+    situations: int
+    moved_at: datetime

@@ -68,6 +68,7 @@ from companion.core.models import (
     MoveDirection,
     Need,
     NeedDetails,
+    PatternState,
     PauseLength,
     ReplyPlanShape,
     RiskType,
@@ -107,7 +108,7 @@ class AdminUserResponse(BaseModel):
     life_thread_count: int
     move_outcome_count: int
     has_portrait: bool
-    confirmed_pattern_count: int
+    pattern_counts: dict[PatternState, int]
 
 
 class HeldBackResponse(BaseModel):
@@ -1343,7 +1344,7 @@ def to_admin_user_response(overview: UserOverview) -> AdminUserResponse:
         messages_sent=overview.messages_sent,
         life_thread_count=overview.life_thread_count,
         move_outcome_count=overview.move_outcome_count,
-        confirmed_pattern_count=overview.confirmed_pattern_count,
+        pattern_counts=dict(overview.pattern_counts),
         has_portrait=overview.has_portrait,
     )
 

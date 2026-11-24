@@ -750,6 +750,36 @@ move_outcomes_closeness_percent: 65
 # brought up again unless they raise it.
 life_thread_brushed_off_wait_days: 14
 
+# Scoring Patterns of Pattern Types (ADR-0024). Code scores each of a User's
+# Patterns from its Observations when a Conversation ends, after tagging, and
+# when Observations are deleted. An Observation is worth its sign's points
+# times the percent its kind of evidence keeps, cut to the unclear percent
+# when it names two look-alikes, nothing when anyone would act the same,
+# negative when against, and halved every half-life. Starting values from the
+# pattern-pipeline grill (decision 29, in points: its 1.0 is 100), to be tuned
+# by Evals and real use.
+pattern_weak_sign_points: 30
+pattern_moderate_sign_points: 70
+pattern_strong_sign_points: 140
+pattern_real_story_percent: 100
+pattern_reported_habit_percent: 70
+pattern_what_if_percent: 40
+pattern_own_opinion_percent: 30
+pattern_unclear_percent: 25
+pattern_half_life_days: 75
+
+# A situation is one Life Thread (with none, the same person and setting).
+# Within it, for and against apart, only the strongest Observation per person
+# counts, up to this many people.
+pattern_people_per_situation: 3
+
+# A noticed Pattern seen in this many situations with at least this score is
+# suspected; one under the floor is closed. States follow the evidence, so a
+# Pattern can move back.
+pattern_suspected_situations: 2
+pattern_suspected_points: 100
+pattern_closed_under_points: -150
+
 # After the User pushes back on a Pattern Zeph offered as its view, and the
 # Pattern isn't closed, it waits this many days before it comes to mind in a
 # reply again. A closed Pattern never comes to mind.

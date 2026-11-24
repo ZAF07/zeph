@@ -57,6 +57,7 @@ from companion.core.needs import NeedService
 from companion.core.observations import PatternTagger
 from companion.core.past_day import PastDayTool
 from companion.core.pattern_catalog import PatternCatalogService
+from companion.core.pattern_scoring import PatternScorer
 from companion.core.patterns import PatternKeeper, PatternReminder
 from companion.core.personal_stickers import (
     PersonalStickerKeeper,
@@ -181,8 +182,14 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     feature_service = FeatureService(
         dependencies.repositories, dependencies.clock, dependencies.dashboard_url
     )
+    pattern_catalog_service = PatternCatalogService(
+        dependencies.repositories.pattern_catalog
+    )
+    pattern_scorer = PatternScorer(
+        dependencies.repositories, pattern_catalog_service, dependencies.clock
+    )
     user_memory_service = UserMemoryService(
-        dependencies.repositories, feature_service, dependencies.clock
+        dependencies.repositories, feature_service, pattern_scorer, dependencies.clock
     )
     usage_limiter = UsageLimiter(dependencies.repositories, dependencies.clock)
     model_call_log = ModelCallLog(
@@ -381,13 +388,12 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             ),
             pattern_tagger=PatternTagger(
                 repositories=dependencies.repositories,
-                pattern_catalog=PatternCatalogService(
-                    dependencies.repositories.pattern_catalog
-                ),
+                pattern_catalog=pattern_catalog_service,
                 chat_model=chat_model,
                 model_call_log=model_call_log,
                 clock=dependencies.clock,
             ),
+            pattern_scorer=pattern_scorer,
             pattern_keeper=PatternKeeper(
                 repositories=dependencies.repositories,
                 chat_model=chat_model,
@@ -462,9 +468,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     app.include_router(
         build_pattern_catalog_api_router(
             current_admin=current_admin,
-            pattern_catalog_service=PatternCatalogService(
-                dependencies.repositories.pattern_catalog
-            ),
+            pattern_catalog_service=pattern_catalog_service,
         )
     )
     app.include_router(

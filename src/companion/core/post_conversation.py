@@ -24,6 +24,7 @@ from companion.core.models import (
     MemorySource,
     MessageDirection,
     ModelStep,
+    PatternMoveCause,
     PlatformSettings,
     SharedPhoto,
     TraceKind,
@@ -32,6 +33,7 @@ from companion.core.models import (
 )
 from companion.core.move_outcomes import MoveOutcomeKeeper
 from companion.core.observations import PatternTagger
+from companion.core.pattern_scoring import PatternScorer
 from companion.core.patterns import PatternKeeper
 from companion.core.personal_stickers import PersonalStickerKeeper
 from companion.core.platform_settings import (
@@ -677,6 +679,7 @@ class PostConversationProcessor:
         personal_sticker_keeper: PersonalStickerKeeper,
         life_thread_keeper: LifeThreadKeeper,
         pattern_tagger: PatternTagger,
+        pattern_scorer: PatternScorer,
         pattern_keeper: PatternKeeper,
         curiosity_keeper: CuriosityKeeper,
         move_outcome_keeper: MoveOutcomeKeeper,
@@ -698,6 +701,8 @@ class PostConversationProcessor:
             life_thread_keeper: Starts and adds to the User's Life Threads.
             pattern_tagger: Tags the User's Observations while Pattern
                 noticing works.
+            pattern_scorer: Scores and moves the User's Patterns of Pattern
+                Types while Pattern noticing works.
             pattern_keeper: Starts, adds to, confirms and closes the User's
                 Patterns.
             curiosity_keeper: Writes, updates and closes the User's
@@ -712,6 +717,7 @@ class PostConversationProcessor:
         self._personal_sticker_keeper = personal_sticker_keeper
         self._life_thread_keeper = life_thread_keeper
         self._pattern_tagger = pattern_tagger
+        self._pattern_scorer = pattern_scorer
         self._pattern_keeper = pattern_keeper
         self._curiosity_keeper = curiosity_keeper
         self._move_outcome_keeper = move_outcome_keeper
@@ -733,7 +739,8 @@ class PostConversationProcessor:
         again once, and if it is still unreadable nothing is saved, so a bad
         answer is never retried forever. Once the Conversation is marked
         processed, its Life Threads are kept, then its Observations are
-        tagged while Pattern noticing works, then its Patterns from the
+        tagged and the User's Patterns of Pattern Types scored while Pattern
+        noticing works, then its Patterns from the
         Threads it touched, then its Curiosities while the
         Curiosities Feature works, then its Move Outcomes, and then the User
         Portrait is rewritten; if any of them fails, the failure is logged and
@@ -761,6 +768,8 @@ class PostConversationProcessor:
         self._day_memory_writer.write(snapshot, conversation, messages)
         touched = self._keep_life_threads(snapshot, conversation.id, messages)
         self._tag_observations(snapshot, conversation.id, messages, touched)
+        if snapshot.works(Feature.PATTERN_NOTICING):
+            self._score_patterns(snapshot, conversation.id)
         self._keep_patterns(snapshot, conversation.id, messages, touched)
         if snapshot.works(Feature.CURIOSITIES):
             self._keep_curiosities(snapshot, conversation.id, messages)
@@ -810,6 +819,24 @@ class PostConversationProcessor:
             self._pattern_tagger.tag_from(snapshot, conversation_id, messages, touched)
         except Exception:
             logger.exception("Could not tag Observations")
+
+    def _score_patterns(self, snapshot: UserSnapshot, conversation_id: UUID) -> None:
+        """Score the User's Patterns again, logging a failure instead of raising.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            conversation_id: The ended Conversation, whose Observations were
+                tagged.
+        """
+        try:
+            self._pattern_scorer.score(
+                snapshot.user,
+                snapshot.settings,
+                PatternMoveCause.CONVERSATION_TAGGED,
+                conversation_id,
+            )
+        except Exception:
+            logger.exception("Could not score Patterns")
 
     def _keep_patterns(
         self,

@@ -55,7 +55,8 @@ flowchart TD
     subgraph END[Conversation end, in order]
       E1[a. Day Summary, Memory Items, Shared Photos] --> E2[b. Life Threads]
       E2 --> T[b2. Pattern tagging, while Pattern noticing works]
-      T --> E3[c. Patterns]
+      T --> SC[b3. Pattern scoring, code, while Pattern noticing works]
+      SC --> E3[c. Patterns]
       E3 --> E4[d. Curiosities]
       E4 --> E5[e. Move Outcomes]
       E5 --> E6[f. User Portrait]
@@ -161,6 +162,10 @@ After the quiet gap (Admin-set), these run in order, each using what the earlier
 ### b2. Pattern tagging *(new)*
 
 - *Built (24 Nov 2026): after Life Threads and before Patterns, while the Feature Pattern noticing works (off for everyone to start), one call reads the Conversation into the Pattern Catalog as Observations, and code keeps only those that check out. Silent: nothing reaches a reply. See `docs/pattern-pipeline/README.md`, Tagging and Checks.*
+
+### b3. Pattern scoring *(new, code only)*
+
+- *Built (24 Nov 2026): right after tagging, while Pattern noticing works, code scores each of the User's Patterns of Pattern Types from all their Observations and moves it between noticed, suspected and closed, logging each move. No model call; silent. Deleting a Life Thread scores again at once. See `docs/pattern-pipeline/README.md`, Scoring.*
 
 ### c. Patterns *(new)*
 

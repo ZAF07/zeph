@@ -156,6 +156,16 @@ export type PlatformContent = {
   message_retention_days: number;
 };
 
+/** Where a Pattern stands, from first noticed to confirmed or closed. */
+export type PatternState =
+  | "noticed"
+  | "suspected"
+  | "ready"
+  | "shared"
+  | "confirmed"
+  | "contested"
+  | "closed";
+
 /** A User as Admins see them: activity counts, never message text. */
 export type AdminUser = {
   id: string;
@@ -169,7 +179,7 @@ export type AdminUser = {
   life_thread_count: number;
   move_outcome_count: number;
   has_portrait: boolean;
-  confirmed_pattern_count: number;
+  pattern_counts: Record<PatternState, number>;
 };
 
 /** A User's role after a change. */

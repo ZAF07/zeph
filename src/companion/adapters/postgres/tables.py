@@ -5,6 +5,7 @@ from sqlalchemy import (
     Column,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Identity,
     Index,
@@ -525,7 +526,8 @@ patterns = Table(
         nullable=False,
         index=True,
     ),
-    Column("pattern", Text, nullable=False),
+    Column("pattern", Text),
+    Column("pattern_type_id", Text),
     Column("state", Text, nullable=False),
     Column("started_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
@@ -533,6 +535,32 @@ patterns = Table(
     Column("last_reaction", Text),
     Column("confirmed_at", DateTime(timezone=True)),
     Column("embedding", Vector(EMBEDDING_SIZE)),
+    UniqueConstraint(
+        "user_id", "pattern_type_id", name="uq_patterns_user_id_pattern_type_id"
+    ),
+)
+
+pattern_moves = Table(
+    "pattern_moves",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("position", BigInteger, Identity(), nullable=False, unique=True),
+    Column(
+        "user_id",
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("pattern_id", Uuid, nullable=False),
+    Column("pattern_type_id", Text, nullable=False),
+    Column("from_state", Text),
+    Column("to_state", Text, nullable=False),
+    Column("cause", Text, nullable=False),
+    Column("conversation_id", Uuid),
+    Column("points", Float, nullable=False),
+    Column("situations", Integer, nullable=False),
+    Column("moved_at", DateTime(timezone=True), nullable=False),
 )
 
 pattern_evidence = Table(

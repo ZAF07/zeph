@@ -36,6 +36,8 @@ from companion.core.models import (
     UserRole,
     UserSnapshot,
 )
+from companion.core.pattern_catalog import PatternCatalogService
+from companion.core.pattern_scoring import PatternScorer
 from companion.core.photos import PhotoService, PhotoTools, SendPhotoTools
 from companion.core.platform_settings import (
     REPLY_DELETE_DATA_INSTRUCTIONS,
@@ -326,7 +328,14 @@ def build_settings_tools(repositories: Repositories) -> SettingsTools:
     clock = FakeClock(NOW)
     chat_channel = FakeChatChannel()
     features = FeatureService(repositories, clock, DASHBOARD_URL)
-    user_memory = UserMemoryService(repositories, features, clock)
+    user_memory = UserMemoryService(
+        repositories,
+        features,
+        PatternScorer(
+            repositories, PatternCatalogService(repositories.pattern_catalog), clock
+        ),
+        clock,
+    )
     usage_limiter = UsageLimiter(repositories, clock)
     check_ins = CheckInService(
         repositories=repositories,

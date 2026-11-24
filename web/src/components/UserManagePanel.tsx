@@ -12,7 +12,7 @@ import { ApiError, type AdminUser, type UserRole } from "@/lib/api-client";
 import { formatDay } from "@/lib/dates";
 import { queryKeys, reloadUserPages } from "@/lib/queries";
 import { useApiClient } from "@/lib/use-api-client";
-import { displayNameOf, roleLabel } from "@/lib/users";
+import { displayNameOf, otherPatternCounts, roleLabel } from "@/lib/users";
 
 type RoleNote = { text: string; isError: boolean };
 
@@ -22,7 +22,8 @@ const sectionHeading =
 /**
  * The Users page's side panel for one User: their role and a button to
  * make or remove an Admin, their Features switches, what Zeph holds about
- * them (counts only), and a link to their Check-ins. Its heading takes focus
+ * them (counts only, with a row for each Pattern state they have any in),
+ * and a link to their Check-ins. Its heading takes focus
  * when it opens.
  *
  * @param props - `user` is the User being managed.
@@ -72,8 +73,9 @@ export function UserManagePanel({ user }: { user: AdminUser }) {
     { label: "Life threads", value: String(user.life_thread_count) },
     {
       label: "Confirmed Patterns",
-      value: String(user.confirmed_pattern_count),
+      value: String(user.pattern_counts.confirmed),
     },
+    ...otherPatternCounts(user.pattern_counts),
     { label: "Move outcomes", value: String(user.move_outcome_count) },
     { label: "Portrait", value: user.has_portrait ? "Written" : "Not written" },
   ];

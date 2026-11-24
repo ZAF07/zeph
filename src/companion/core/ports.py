@@ -7,6 +7,7 @@ from uuid import UUID
 
 from companion.core.models import (
     AccountIdentity,
+    CatalogPattern,
     ChannelSticker,
     ChatLine,
     CheckIn,
@@ -59,6 +60,7 @@ from companion.core.models import (
     NextDueTimeChange,
     Observation,
     Pattern,
+    PatternMove,
     PatternToSave,
     PatternTypeVersion,
     PersonalSticker,
@@ -1316,10 +1318,16 @@ class ObservationRepository(Protocol):
 
 
 class PatternRepository(Protocol):
-    """Stores each User's Patterns with their evidence, found by meaning."""
+    """Stores each User's Patterns, and the log of their moves.
+
+    A Pattern kept under the old rules has no Pattern Type, its own evidence
+    and is found by meaning; only those are read by the methods that return
+    a `Pattern`. A Pattern of a Pattern Type is fed by Observations and moved
+    by code.
+    """
 
     def list_for_user(self, user_id: UUID) -> list[Pattern]:
-        """List a User's Patterns, oldest started first, with their evidence.
+        """List a User's Patterns with no Pattern Type, oldest started first.
 
         Args:
             user_id: The User's ID.
@@ -1330,7 +1338,7 @@ class PatternRepository(Protocol):
         ...
 
     def list_confirmed(self, user_id: UUID) -> list[Pattern]:
-        """List the Patterns a User agreed with, newest agreed first.
+        """List the Patterns with no Pattern Type a User agreed with, newest first.
 
         Args:
             user_id: The User's ID.
@@ -1406,6 +1414,45 @@ class PatternRepository(Protocol):
         """
         ...
 
+    def list_of_pattern_types(self, user_id: UUID) -> list[CatalogPattern]:
+        """List a User's Patterns of Pattern Types, oldest started first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Patterns.
+        """
+        ...
+
+    def save_moves(
+        self,
+        added: Sequence[CatalogPattern],
+        changed: Sequence[CatalogPattern],
+        deleted_ids: Sequence[UUID],
+        moves: Sequence[PatternMove],
+    ) -> None:
+        """Save what scoring a User's Patterns of Pattern Types changed, in one step.
+
+        Args:
+            added: Patterns noticed for the first time.
+            changed: Patterns that moved, in their new state.
+            deleted_ids: Patterns with no Observations left; their moves stay.
+            moves: The moves, added to the log in order.
+        """
+        ...
+
+    def list_moves(self, user_id: UUID) -> list[PatternMove]:
+        """List every move of a User's Patterns, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The moves, including those of Patterns since deleted.
+        """
+        ...
+
     def delete_confirmed(self, user_id: UUID, pattern_id: UUID) -> bool:
         """Delete one of a User's confirmed Patterns, with its evidence.
 
@@ -1420,7 +1467,7 @@ class PatternRepository(Protocol):
         ...
 
     def delete_for_user(self, user_id: UUID) -> None:
-        """Delete every one of a User's Patterns.
+        """Delete every one of a User's Patterns, and the log of their moves.
 
         Args:
             user_id: The User's ID.

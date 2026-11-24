@@ -13,9 +13,11 @@ from companion.core.models import (
     MemorySource,
     MoveOutcome,
     Pattern,
+    PatternMoveCause,
     User,
     UserPortrait,
 )
+from companion.core.pattern_scoring import PatternScorer
 from companion.core.platform_settings import (
     ONBOARDING_NAME_MEMORY_CATEGORY,
     ONBOARDING_REASONS_MEMORY_CATEGORY,
@@ -72,7 +74,11 @@ class UserMemoryService:
     """
 
     def __init__(
-        self, repositories: Repositories, features: FeatureService, clock: Clock
+        self,
+        repositories: Repositories,
+        features: FeatureService,
+        pattern_scorer: PatternScorer,
+        clock: Clock,
     ) -> None:
         """Set up the service.
 
@@ -80,10 +86,13 @@ class UserMemoryService:
             repositories: Where User Memory, Memory Categories and settings
                 are stored.
             features: Says whether User Memory works for the User.
+            pattern_scorer: Scores the User's Patterns again once
+                Observations are deleted.
             clock: Tells the current time.
         """
         self._repositories = repositories
         self._features = features
+        self._pattern_scorer = pattern_scorer
         self._clock = clock
 
     def list_groups(self, user_id: UUID) -> list[MemoryGroup]:
@@ -172,7 +181,8 @@ class UserMemoryService:
         """Delete one of a User's Life Threads, so it is never brought up again.
 
         Its evidence in Patterns goes with it, and so does a Pattern left
-        with no evidence.
+        with no evidence. So do its Observations, and the User's Patterns
+        of Pattern Types are scored again at once.
 
         Args:
             user_id: The User's ID.
@@ -186,6 +196,7 @@ class UserMemoryService:
             if not in_transaction.life_threads.delete(user_id, thread_id):
                 raise LifeThreadNotFoundError
             in_transaction.patterns.delete_without_evidence(user_id)
+        self._score_patterns_again(user_id)
         self._rewrite_portrait(user_id)
 
     def list_confirmed_patterns(self, user_id: UUID) -> list[Pattern]:
@@ -265,6 +276,26 @@ class UserMemoryService:
         """
         if not self._repositories.user_portraits.clear(user_id, self._clock.now()):
             raise UserPortraitNotFoundError
+
+    def _score_patterns_again(self, user_id: UUID) -> None:
+        """Score the User's Patterns of Pattern Types again, after Observations went.
+
+        A failure is logged instead of raised: the deletion already happened.
+
+        Args:
+            user_id: The User's ID.
+        """
+        user = self._repositories.users.get(user_id)
+        if user is None:
+            return
+        try:
+            self._pattern_scorer.score(
+                user,
+                self._repositories.platform_settings.load(),
+                PatternMoveCause.OBSERVATIONS_DELETED,
+            )
+        except Exception:
+            logger.exception("Could not score Patterns after a deletion")
 
     def _rewrite_portrait(self, user_id: UUID) -> None:
         """Ask for the User's Portrait to be written again, after a deletion.

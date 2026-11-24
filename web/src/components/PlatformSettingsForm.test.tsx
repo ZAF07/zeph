@@ -94,6 +94,22 @@ const settings: AdminSettings = {
     30,
     "Days before a Pattern the User pushed back on comes to mind for the Reply Plan again.",
   ),
+  pattern_weak_sign_points: seeded(30),
+  pattern_moderate_sign_points: seeded(70),
+  pattern_strong_sign_points: seeded(140),
+  pattern_real_story_percent: seeded(100),
+  pattern_reported_habit_percent: seeded(70),
+  pattern_what_if_percent: seeded(40),
+  pattern_own_opinion_percent: seeded(30),
+  pattern_unclear_percent: seeded(25),
+  pattern_half_life_days: seeded(
+    75,
+    "After this many days an Observation counts half.",
+  ),
+  pattern_people_per_situation: seeded(3),
+  pattern_suspected_situations: seeded(2),
+  pattern_suspected_points: seeded(100),
+  pattern_closed_under_points: seeded(-150),
   move_outcomes_per_understanding: seeded(3),
   move_outcomes_closeness_percent: seeded(65),
   curiosities_per_conversation: seeded(1),
@@ -454,6 +470,32 @@ describe("PlatformSettingsForm", () => {
       follow_ups_per_conversation: 2,
       curiosity_brush_offs_to_back_off: 3,
       curiosity_back_off_days: 5,
+    });
+  });
+
+  it("shows and saves the Pattern scoring numbers, a negative floor too", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const halfLife = await screen.findByLabelText("Pattern evidence half-life");
+    const floor = screen.getByLabelText("Score that closes a Pattern");
+    expect(halfLife).toHaveValue(75);
+    expect(floor).toHaveValue(-150);
+    expect(screen.getByLabelText("Points for a strong sign")).toHaveValue(140);
+    expect(screen.getByLabelText("Unclear counts")).toHaveValue(25);
+    expect(screen.getByLabelText("Situations to be suspected")).toHaveValue(2);
+    expect(
+      screen.getByText("After this many days an Observation counts half."),
+    ).toBeInTheDocument();
+
+    await user.clear(halfLife);
+    await user.type(halfLife, "60");
+    await user.clear(floor);
+    await user.type(floor, "-200");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      pattern_half_life_days: 60,
+      pattern_closed_under_points: -200,
     });
   });
 
