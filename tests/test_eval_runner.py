@@ -2826,3 +2826,37 @@ def test_tagging_overrides_reach_only_their_variant(
     )
     assert (variant_call.model, variant_call.thinking) == ("deepseek-pro", False)
     assert PostgresPlatformSettingsRepository(engine).load().values == live_before
+
+
+def test_a_tagging_case_fails_when_a_kept_context_line_says_he_or_she(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, MEI_TAGGING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.TAGGING)
+    chat_model.script_pattern_tagging(
+        tagging_answer(
+            tagged_entry(context="She agreed to help her sister Mei move again.")
+        )
+    )
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "fail"
+    assert [
+        (check["group"], check["name"], check["passed"], check["detail"])
+        for check in result["checks"]
+    ] == [
+        ("CONF.AVOID.BELONG · for", "kept", True, 'kept 1: "I said yes to Mei again"'),
+        (
+            "Context lines",
+            "no he or she",
+            False,
+            '"She agreed to help her sister Mei move again." says she, her',
+        ),
+    ]

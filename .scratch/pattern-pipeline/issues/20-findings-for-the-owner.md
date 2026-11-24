@@ -198,6 +198,8 @@ If there is nothing, the section holds one line: "Nothing found."
 
 ### Tagging context lines call the User "she"
 
+- **Fixed (24 Nov 2026):** issue 22 (`archive/22-context-lines-gender-the-user.md`).
+
 - **Kind:** bug
 - **What:** In the first Tagging Eval run (run `4352910b`, case `conf-mum-holiday-plans`) the real tagging step wrote context lines like "she spent the evening resentful" and "Explaining why she gave in". The tagging prompt doesn't ask for they/them.
 - **Impact:** Context lines are shown to Users as "Zeph's note" on "Things you said that Zeph kept" (issue 13), so a User can be misgendered on their own Memories page.
