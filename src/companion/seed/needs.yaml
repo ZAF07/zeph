@@ -8,8 +8,8 @@
 # `fallback: true` is used when it isn't clear, or when the Understanding
 # fails; there is exactly one, and it can't be deleted. `curiosities` says
 # how Curiosities are treated while the Need is picked: `ask_by_default` (the
-# Reply Plan asks a due one or says why not), `test_the_water` (one light
-# opener, none more once they let one pass), `only_if_it_fits` or `never`.
+# Reply Plan asks a due one or says why not), `test_the_water` (at most one
+# light opener per Conversation), `only_if_it_fits` or `never`.
 
 - name: Be heard
   curiosities: never

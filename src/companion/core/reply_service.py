@@ -159,7 +159,6 @@ class ReplyService:
             patterns,
         )
         plan = planned.reply_plan.form
-        self._curiosity_raiser.record_reaction(due, plan.curiosity_taken)
         attempt.raise_if_dropped()
         memory = self._memory_retrieval.recall(
             snapshot,
@@ -217,4 +216,5 @@ class ReplyService:
                 self._woven_check_ins.take_back(snapshot, offered)
             raise
         self._thread_reminder.mark_raised(message.conversation_id, plan.bring_up)
+        self._curiosity_raiser.record_reaction(due, plan.curiosity_taken)
         self._curiosity_raiser.mark_raised(message.conversation_id, plan.curiosities)

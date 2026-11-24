@@ -608,14 +608,13 @@ reply_plan_prompt: |-
       the whole reply, the reply already asks another question, it's
       sensitive and the moment is wrong), and give that reason in
       no_curiosity_why.
-    - test the water: at most one light opener, asked in passing so they
-      can let it go. Once they let one pass, pick none for the rest of the
-      Conversation.
+    - test the water: at most one light opener in a Conversation, asked in
+      passing so they can let it go.
     - only if it fits the moment: pick one only when it connects to what
       they're talking about, or the chat has reached an easy pause.
     - never: pick none.
-  - curiosity_taken: when you are shown the Curiosity you asked in your last
-    reply, how they took it: "engaged" if they talked about it,
+  - curiosity_taken: when you are shown a Curiosity you asked earlier in
+    this Conversation, how they took it: "engaged" if they talked about it,
     "brushed_off" if they changed the subject or gave a short answer,
     "asked_to_drop" if they asked Zeph not to bring it up. Null otherwise.
   - no_curiosity_why: under a Need that asks by default, when a Curiosity

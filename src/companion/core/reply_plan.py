@@ -30,7 +30,6 @@ from companion.core.models import (
     ChosenCheckIn,
     ChosenKnowledgeDocument,
     CuriosityToRaise,
-    CuriosityTreatment,
     Feature,
     KnowledgeDocument,
     KnowledgeLookup,
@@ -409,8 +408,9 @@ def describe_message_for_reply_plan(
     )
     awaiting = due.awaiting_reaction
     awaiting_line = (
-        f"\n\nThe Curiosity you asked in your last reply: {awaiting.question} "
-        f"Say how they took it in curiosity_taken."
+        f"\n\nA Curiosity you asked earlier in this Conversation, not yet known "
+        f"how they took it: {awaiting.question} Say how they took it in "
+        f"curiosity_taken."
         if awaiting is not None
         else ""
     )
@@ -1380,11 +1380,7 @@ class ReplyPlanService:
                 ask_why_note,
                 format_threads_for_reply(reminded, model_form, snapshot.user.time_zone),
                 format_threads_left_alone(model_form),
-                format_curiosities_for_reply(
-                    form.curiosities,
-                    light_opener=need.curiosities == CuriosityTreatment.TEST_THE_WATER
-                    and due.raised_here == 0,
-                ),
+                format_curiosities_for_reply(form.curiosities, need),
                 past_days,
             ),
             asks_a_question=asks_another_question or picked.asks_a_question,

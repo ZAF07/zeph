@@ -1,7 +1,7 @@
 """Just chatting tests the water, and the Reply Plan says how a Curiosity was taken.
 
-Just chatting moves from only if it fits to test the water: one light
-opener, none more once the User lets one pass. It is found by name, ignoring
+Just chatting moves from only if it fits to test the water: at most one
+light opener in a Conversation. It is found by name, ignoring
 case; a Need an Admin changed to another choice keeps that choice. The Reply
 Plan prompt reloads from the seed on next start, even where an Admin edited
 it, because the old one knows nothing of test the water or of saying how

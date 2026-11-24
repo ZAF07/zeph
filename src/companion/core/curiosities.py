@@ -9,7 +9,6 @@ from uuid import UUID, uuid4
 from companion.core.curiosity_pace import (
     CuriosityPace,
     may_offer_curiosity,
-    may_offer_testing_the_water,
 )
 from companion.core.life_threads import (
     MOST_THREADS_AT_CONVERSATION_END,
@@ -78,7 +77,7 @@ TREATMENT_WORDS = {
         "ask by default: ask one in this reply, or say why not"
     ),
     CuriosityTreatment.TEST_THE_WATER: (
-        "test the water: one light opener at most, and none more once they let one pass"
+        "test the water: one light opener in a Conversation at most"
     ),
     CuriosityTreatment.ONLY_IF_IT_FITS: "only if it fits the moment",
     CuriosityTreatment.NEVER: "never: ask none",
@@ -110,16 +109,12 @@ class DueCuriosities:
         per_conversation: The most that may be raised in one Conversation.
         awaiting_reaction: The newest Curiosity raised in this Conversation
             while how the User took it isn't known yet; None if there is none.
-        every_one_here_engaged: Whether the User engaged with every Curiosity
-            raised in this Conversation, so a Need that tests the water may
-            still ask one.
     """
 
     offered: tuple[NumberedCuriosity, ...]
     raised_here: int
     per_conversation: int
     awaiting_reaction: Curiosity | None = None
-    every_one_here_engaged: bool = True
 
     @property
     def left(self) -> int:
@@ -243,15 +238,11 @@ def offered_under(need: Need, due: DueCuriosities) -> DueCuriosities:
 
     Returns:
         The same Curiosities; none when the Need never asks one, or tests the
-        water and the User didn't engage with one raised in this
-        Conversation.
+        water and this Conversation already raised one.
     """
     if need.curiosities == CuriosityTreatment.NEVER:
         return replace(due, offered=())
-    if (
-        need.curiosities == CuriosityTreatment.TEST_THE_WATER
-        and not due.every_one_here_engaged
-    ):
+    if need.curiosities == CuriosityTreatment.TEST_THE_WATER and due.raised_here:
         return replace(due, offered=())
     return due
 
@@ -284,14 +275,12 @@ def why_none_asked(
     return reason or NO_REASON_GIVEN
 
 
-def format_curiosities_for_reply(
-    chosen: Sequence[CuriosityToRaise], light_opener: bool = False
-) -> str:
+def format_curiosities_for_reply(chosen: Sequence[CuriosityToRaise], need: Need) -> str:
     """Write the reply's section on the Curiosity it is to ask.
 
     Args:
         chosen: The Curiosities the Reply Plan chose, and how.
-        light_opener: Whether the Need tests the water, so it is asked
+        need: The Need the reply follows; one that tests the water asks it
             lightly, as something they can let pass.
 
     Returns:
@@ -307,7 +296,7 @@ def format_curiosities_for_reply(
     ]
     how_to_ask = (
         "Ask them this lightly, in passing, as something they can let go"
-        if light_opener
+        if need.curiosities == CuriosityTreatment.TEST_THE_WATER
         else "Ask them this in this reply, the way a friend would"
     )
     return (
@@ -358,7 +347,7 @@ class CuriosityRaiser:
         per_conversation = snapshot.settings.get(CURIOSITIES_PER_CONVERSATION)
         raised_here = store.list_raised_in(conversation_id)
         newest_here = raised_here[-1] if raised_here else None
-        none_offered = DueCuriosities(
+        due_here = DueCuriosities(
             offered=(),
             raised_here=len(raised_here),
             per_conversation=per_conversation,
@@ -367,17 +356,16 @@ class CuriosityRaiser:
                 if newest_here is not None and newest_here.reaction is None
                 else None
             ),
-            every_one_here_engaged=may_offer_testing_the_water(raised_here),
         )
         if (
             struggling
             or len(raised_here) >= per_conversation
             or not self._pace_allows(snapshot, conversation_id)
         ):
-            return none_offered
+            return due_here
         waiting = due_curiosities(store.list_waiting(snapshot.user.id), snapshot.today)
         return replace(
-            none_offered,
+            due_here,
             offered=tuple(
                 NumberedCuriosity(number, curiosity)
                 for number, curiosity in enumerate(waiting, start=1)

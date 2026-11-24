@@ -121,8 +121,7 @@ def test_an_admin_can_set_a_need_to_test_the_water_and_the_reply_plan_is_told(
         "test_the_water"
     )
     assert (
-        "- Just chatting: test the water: one light opener at most, and none more "
-        "once they let one pass"
+        "- Just chatting: test the water: one light opener in a Conversation at most"
     ) in saw
 
 
@@ -172,15 +171,40 @@ def test_under_test_the_water_none_is_asked_once_they_let_the_opener_pass(
     shape = newest_call(client, owner_headers(client, auth_verifier), "reply_plan")[
         "reply_plan_shape"
     ]
-    assert f"The Curiosity you asked in your last reply: {PRESENTATION}" in (
-        after_opener
-    )
+    assert f"how they took it: {PRESENTATION} Say how they took it" in (after_opener)
     assert reactions(engine)[PRESENTATION] == "brushed_off"
     assert f"[1] {DESK}" in saw
     assert (shape["curiosities_offered"], shape["curiosity_asked"]) == (0, False)
     assert {row["question"]: row["state"] for row in stored_curiosities(engine)}[
         DESK
     ] == "waiting"
+
+
+def test_under_test_the_water_none_more_is_asked_even_after_an_engaged_opener(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+    engine: Engine,
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    three_are_due(client, chat_model, clock, scheduler, seeded_settings)
+    set_settings(
+        client,
+        auth_verifier,
+        {"curiosities_per_conversation": 5, "curiosity_replies_between": 1},
+    )
+    send(client, chat_model, clock, "hey you", **raise_first("Just chatting"))
+    send(client, chat_model, clock, "it went great!", curiosity_taken="engaged")
+
+    send(client, chat_model, clock, "so anyway", **raise_first("Just chatting"))
+
+    states = {row["question"]: row["state"] for row in stored_curiosities(engine)}
+    assert reactions(engine)[PRESENTATION] == "engaged"
+    assert states[DESK] == "waiting"
 
 
 def test_no_curiosity_is_offered_until_the_set_number_of_replies_has_passed(
@@ -380,7 +404,7 @@ def test_a_reaction_is_read_only_when_the_last_reply_asked_a_curiosity(
 
     saw = send(client, chat_model, clock, "hey you", curiosity_taken="brushed_off")
 
-    assert "The Curiosity you asked in your last reply" not in saw
+    assert "not yet known how they took it" not in saw
     assert set(reactions(engine).values()) == {None}
 
 

@@ -216,9 +216,7 @@ def test_a_curiosity_brought_up_reaches_the_reply_and_is_marked_raised(
     assert curiosity["raised_at"] is not None
     assert curiosity["raised_conversation_id"] is not None
     assert f"[1] {PRESENTATION}" not in next_message
-    assert f"The Curiosity you asked in your last reply: {PRESENTATION}" in (
-        next_message
-    )
+    assert f"not yet known how they took it: {PRESENTATION}" in next_message
 
 
 def test_a_curiosity_woven_in_is_still_asked_in_this_reply(
@@ -279,7 +277,12 @@ def test_no_curiosity_is_offered_once_the_admin_set_number_was_raised(
     reply_plan_sees(client, chat_model, "it went well!")
     clock.advance(timedelta(minutes=1))
     second = reply_plan_sees(client, chat_model, "so anyway")
-    bring_up_curiosity(chat_model, 1, 2)
+    chat_model.script_reply_plan(
+        reply_plan_answer(
+            need="Ask more",
+            bring_up=[{"curiosity": number, "how": "lead"} for number in (1, 2)],
+        )
+    )
     reply_instructions(client, chat_model, "what's new with you")
     third = reply_plan_sees(client, chat_model, "ok")
     raised = [row for row in stored_curiosities(engine) if row["state"] == "raised"]

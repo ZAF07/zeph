@@ -113,19 +113,3 @@ def may_offer_curiosity(
     if replies_since_last is None:
         return True
     return replies_since_last >= replies_needed(recently_raised, now, pace)
-
-
-def may_offer_testing_the_water(raised_here: Sequence[Curiosity]) -> bool:
-    """Decide whether a Need that tests the water may still ask a Curiosity.
-
-    Args:
-        raised_here: The Curiosities raised in this Conversation.
-
-    Returns:
-        True for the light opener, and while the User engaged with every one
-        raised; False once one wasn't engaged with, or how they took it isn't
-        known.
-    """
-    return all(
-        curiosity.reaction == ThreadReaction.ENGAGED for curiosity in raised_here
-    )

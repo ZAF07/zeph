@@ -5,7 +5,6 @@ from companion.core.curiosity_pace import (
     CuriosityPace,
     brush_offs_in_a_row,
     may_offer_curiosity,
-    may_offer_testing_the_water,
     replies_needed,
 )
 from companion.core.models import (
@@ -120,13 +119,3 @@ def test_one_engaged_answer_returns_the_spacing_to_normal() -> None:
 
     assert replies_needed(history, NOW, PACE) == 3
     assert may_offer_curiosity(history, THIS_CONVERSATION, 3, NOW, PACE)
-
-
-def test_test_the_water_allows_a_light_opener_when_none_was_raised_here() -> None:
-    assert may_offer_testing_the_water([])
-
-
-def test_test_the_water_allows_no_more_once_one_was_not_engaged_with() -> None:
-    assert not may_offer_testing_the_water([raised(BRUSHED_OFF)])
-    assert not may_offer_testing_the_water([raised(None)])
-    assert may_offer_testing_the_water([raised(ENGAGED)])
