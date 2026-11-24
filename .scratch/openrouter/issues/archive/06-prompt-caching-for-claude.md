@@ -45,4 +45,4 @@ Calls to Claude models through OpenRouter mark the system instructions with `cac
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: <to be filled in after the merge>
+- Commit: 8972339 (merge of openrouter-06-prompt-caching; work in 4089d53 94caa3f 834f5ac 0953a7c 339352c)
