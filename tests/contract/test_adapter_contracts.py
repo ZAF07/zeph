@@ -12,6 +12,7 @@ from companion.adapters.deepseek.chat_model import DeepSeekChatModel
 from companion.adapters.deepseek.photo_viewer import DeepSeekPhotoViewer
 from companion.adapters.evals.stand_ins import InlineUserWorkQueue
 from companion.adapters.fastembed.embedder import FastEmbedEmbedder
+from companion.adapters.openrouter.chat_model import OpenRouterChatModel
 from companion.adapters.postgres.tables import EMBEDDING_SIZE
 from companion.adapters.tavily.web_search import TavilyWebSearch
 from companion.adapters.telegram.chat_channel import TelegramChatChannel
@@ -92,6 +93,35 @@ def test_deepseek_thinks_only_when_asked(model: str) -> None:
 
     assert answer(thinking=True)
     assert answer(thinking=False) is None
+
+
+def test_openrouter_generates_a_deepseek_reply() -> None:
+    chat_model = OpenRouterChatModel(required_env("OPENROUTER_API_KEY"))
+
+    reply = chat_model.generate(
+        model="deepseek/deepseek-v4.1-flash",
+        thinking=False,
+        instructions="Reply with one short friendly sentence.",
+        history=[ChatLine(role=ChatRole.USER, text="hi there")],
+    )
+
+    assert reply.text.strip()
+    assert reply.tokens_in > 0
+    assert reply.tokens_out > 0
+
+
+def test_openrouter_returns_reasoning_when_thinking_is_on() -> None:
+    chat_model = OpenRouterChatModel(required_env("OPENROUTER_API_KEY"))
+
+    reply = chat_model.generate(
+        model="deepseek/deepseek-v4.1-flash",
+        thinking=True,
+        instructions="Answer with one number.",
+        history=[ChatLine(role=ChatRole.USER, text="What is 17 times 23?")],
+    )
+
+    assert "391" in reply.text
+    assert reply.reasoning
 
 
 def test_deepseek_describes_a_photo() -> None:

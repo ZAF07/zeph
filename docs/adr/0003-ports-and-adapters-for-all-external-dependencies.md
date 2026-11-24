@@ -2,6 +2,8 @@
 
 The LangGraph parts of this decision are replaced by ADR-0009: replies now run in plain core code.
 
+Model calls can now go through OpenRouter, with direct DeepSeek kept as backup (ADR-0028).
+
 Every external dependency — LLM provider, conversation framework, auth, database, vector store, embeddings, web search, scheduler and chat channel — sits behind a port in the core, with the concrete adapter chosen via config. For the MVP the adapters are DeepSeek (via LangChain's chat-model interface), LangGraph, Clerk, Postgres, pgvector, a local fastembed model, Tavily, an in-process scheduler loop and Telegram. LangGraph lives inside an adapter rather than the core, so the core never imports LangChain or LangGraph.
 
 ## Consequences

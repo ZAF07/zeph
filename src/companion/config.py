@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     dashboard_url: str
 
     deepseek_api_key: str
+    openrouter_api_key: str = ""
     tavily_api_key: str
     initial_admin_emails: str = ""
 
