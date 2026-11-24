@@ -1,3 +1,4 @@
+import re
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta
 from typing import Any
@@ -30,6 +31,10 @@ from companion.core.ports import Repositories
 MESSAGE_GAP = timedelta(minutes=1)
 ENDED_AFTER = timedelta(hours=1)
 NOT_EXPECTED = "Kept but not expected"
+CONTEXT_LINES = "Context lines"
+GENDERED_WORDS = re.compile(
+    r"\b(he|she|him|her|his|hers|himself|herself)\b", re.IGNORECASE
+)
 
 
 def save_ended_conversation(
@@ -170,6 +175,45 @@ def check_kept(
     return checks
 
 
+def gendered_words(context: str) -> list[str]:
+    """Find the he or she words in a context line.
+
+    Context lines are shown to Users, so they never guess anyone's gender.
+    Code can't tell who a pronoun means, so any of them counts.
+
+    Args:
+        context: The context line.
+
+    Returns:
+        Each he or she word in it, lowercased, once, in the order found.
+    """
+    return list(dict.fromkeys(word.lower() for word in GENDERED_WORDS.findall(context)))
+
+
+def check_context_lines(kept: Sequence[Observation]) -> list[Check]:
+    """Check no kept Observation's context line says he or she.
+
+    Args:
+        kept: The Observations kept.
+
+    Returns:
+        A failed check per context line that does, naming the words.
+    """
+    checks = []
+    for observation in kept:
+        words = gendered_words(observation.context)
+        if words:
+            checks.append(
+                Check(
+                    "no he or she",
+                    False,
+                    f'"{observation.context}" says {", ".join(words)}',
+                    CONTEXT_LINES,
+                )
+            )
+    return checks
+
+
 def kept_facts(
     observation: Observation,
     expected: Sequence[ExpectedObservation],
@@ -290,7 +334,8 @@ def check_tagging_case(case: TaggingCase, companion: EvalCompanion) -> CaseCheck
         companion: The app on the Eval database.
 
     Returns:
-        A check per expected Observation and per one kept but not expected;
+        A check per expected Observation, per one kept but not expected and
+        per kept context line that says he or she;
         a failed "answer read" check alone if the answer couldn't be read.
         Its facts hold what was kept and dropped and the tagging call's
         time and tokens. A failed case notes the Observations and the
@@ -323,7 +368,7 @@ def check_tagging_case(case: TaggingCase, companion: EvalCompanion) -> CaseCheck
         raise EvalSetupError("The tagging step didn't run for the made-up User")
 
     checks = (
-        check_kept(case.observations, planned.kept)
+        check_kept(case.observations, planned.kept) + check_context_lines(planned.kept)
         if planned is not None
         else [
             Check("answer read", False, "the tagging model's answer couldn't be read")
