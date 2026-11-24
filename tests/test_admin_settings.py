@@ -393,6 +393,8 @@ def test_core_services_list_their_prompt_and_model_settings(
     assert response["model_choices"] == [
         "deepseek/deepseek-v4.1-flash-1017",
         "deepseek/deepseek-v4-pro-0813",
+        "anthropic/claude-haiku-5.5",
+        "anthropic/claude-sonnet-5.5",
     ]
 
 

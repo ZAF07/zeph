@@ -115,17 +115,31 @@ def test_openrouter_generates_a_deepseek_reply() -> None:
     assert reply.tokens_out > 0
 
 
-def test_openrouter_returns_reasoning_when_thinking_is_on() -> None:
+@pytest.mark.parametrize(
+    "model", ["deepseek/deepseek-v4.1-flash-1017", "anthropic/claude-haiku-5.5"]
+)
+def test_openrouter_returns_reasoning_when_thinking_is_on(model: str) -> None:
+    """The question takes a few steps, as Claude skips thinking on easy ones."""
     chat_model = OpenRouterChatModel(required_env("OPENROUTER_API_KEY"))
 
     reply = chat_model.generate(
-        model="deepseek/deepseek-v4.1-flash-1017",
+        model=model,
         thinking=True,
         instructions="Answer with one number.",
-        history=[ChatLine(role=ChatRole.USER, text="What is 17 times 23?")],
+        history=[
+            ChatLine(
+                role=ChatRole.USER,
+                text=(
+                    "A farmer has chickens and rabbits: 37 heads and 106 legs "
+                    "in all. Then a third of the rabbits (rounded down) are "
+                    "swapped for twice as many chickens. How many legs are "
+                    "there now?"
+                ),
+            )
+        ],
     )
 
-    assert "391" in reply.text
+    assert "106" in reply.text
     assert reply.reasoning
 
 

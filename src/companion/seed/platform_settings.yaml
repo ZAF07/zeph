@@ -137,6 +137,8 @@ max_typing_seconds: 5
 available_models:
   - deepseek/deepseek-v4.1-flash-1017
   - deepseek/deepseek-v4-pro-0813
+  - anthropic/claude-haiku-5.5
+  - anthropic/claude-sonnet-5.5
 
 # The model that writes the Companion's replies.
 response_model: deepseek/deepseek-v4.1-flash-1017
@@ -1516,9 +1518,10 @@ check_in_hours_between:
 check_in_reply_window_hours: 24
 
 # Eval Runs. Model Prices are SGD per 1,000,000 tokens read ("in") and
-# written ("out"): DeepSeek's peak, cache-miss prices on 15 Nov 2026 at
-# 1 USD ≈ 1.28 SGD. A model with no price shows tokens only. A run that uses
-# more tokens than the limit ends Stopped over limit.
+# written ("out"): DeepSeek's peak, cache-miss prices on 15 Nov 2026 and
+# Anthropic's prices on 24 Nov 2026, at 1 USD ≈ 1.28 SGD. A model with no
+# price shows tokens only. A run that uses more tokens than the limit ends
+# Stopped over limit.
 model_prices:
   deepseek/deepseek-v4.1-flash-1017:
     in: 0.38
@@ -1526,5 +1529,11 @@ model_prices:
   deepseek/deepseek-v4-pro-0813:
     in: 1.69
     out: 5.07
+  anthropic/claude-haiku-5.5:
+    in: 0.13
+    out: 0.64
+  anthropic/claude-sonnet-5.5:
+    in: 2.56
+    out: 12.8
 
 eval_run_token_limit: 1000000
