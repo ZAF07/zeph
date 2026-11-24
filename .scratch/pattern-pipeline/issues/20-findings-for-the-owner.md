@@ -1,4 +1,4 @@
-# 01 — Findings for the owner: shortcomings and things worth looking into
+# 20 — Findings for the owner: shortcomings and things worth looking into
 
 Status: needs-triage
 Track: shared
@@ -6,7 +6,7 @@ Blocked by: none
 
 ## What this is
 
-One shared log, for every feature and every issue. When an agent working on any issue meets something the owner should look at, it adds an entry here instead of letting it sink into one issue's comments. This covers:
+One shared log for the issues of the pattern-pipeline PRD (`.scratch/pattern-pipeline/PRD.md`). When an agent working on one of them meets something the owner should look at, it adds an entry here instead of letting it sink into one issue's comments. This covers:
 
 - its own shortcomings, such as a step skipped, a guess made, or evidence that is thin;
 - defects or risks in code outside its task;
@@ -15,7 +15,7 @@ One shared log, for every feature and every issue. When an agent working on any 
 
 This file is not for fixing things. A finding the owner decides to act on gets its own issue (or `/file-bug` if it is a bug in shipped code), and the entry here links to it.
 
-## When you finish an issue (every agent, every issue)
+## When you finish an issue of this PRD
 
 Before you archive, answer these four questions honestly:
 
