@@ -88,7 +88,7 @@ Every piece of work — feature, refactor, or bug — gets an issue file in `.sc
 3. `/to-issues` — break into tracer-bullet vertical slices with `Blocked by:` dependencies.
 4. Per issue, on a branch: `/implement <issue path>` — TDD at agreed seams, quality gates, then `/code-review`.
 5. `/verify` (or `/run`) — confirm the change actually works in the running app, not just that tests pass. Skipping this is how green tests ship broken behaviour.
-6. `/post-implement` — verify acceptance criteria with evidence, mark `completed`, archive. Then `/domain-modeling` if the change moved the domain model (new terms, decisions) so `CONTEXT.md`/ADRs don't drift.
+6. `/post-implement` — verify acceptance criteria with evidence, mark `completed`, archive. Before archiving, fill in the end-of-work template in `.scratch/findings/issues/01-findings-for-the-owner.md`. Then `/domain-modeling` if the change moved the domain model (new terms, decisions) so `CONTEXT.md`/ADRs don't drift.
 
 **Improve existing code:** `/simplify` for diff-scoped cleanup; `/improve-codebase-architecture` (with `/codebase-design` vocabulary) for structural work. Once scoped, funnel into an issue and follow steps 4–6 above — refactors get issues too, and get verified too.
 

@@ -15,21 +15,31 @@ One shared log, for every feature and every issue. When an agent working on any 
 
 This file is not for fixing things. A finding the owner decides to act on gets its own issue (or `/file-bug` if it is a bug in shipped code), and the entry here links to it.
 
-## How to add an entry
+## When you finish an issue (every agent, every issue)
 
-Add it at the bottom of `## Entries`, newest last, in this shape:
+Before you archive, answer these four questions honestly:
+
+1. What did I skip, guess or check only thinly?
+2. What did I see outside my task that looks wrong or risky?
+3. Did any test, Eval or tool mislead me?
+4. Did I spend money or make a call the owner should have made?
+
+For each "yes", add an entry at the bottom of `## Entries`, newest last:
 
 ```markdown
-### <date> · <issue path or "none"> · <short title>
+### <YYYY-MM-DD> · <issue path> · <short title>
 
-- **Kind:** shortcoming (mine) | finding (in the system) | risk | cost
-- **What happened:** one or two plain sentences, with evidence (file:line, command output, Eval Run id).
-- **Why it matters:** what goes wrong for Users or the owner if it is left.
-- **Recommended next step:** one concrete action, and roughly what it costs.
+- **Kind:** shortcoming (mine) | finding | risk | cost
+- **What:** one or two sentences, with evidence (file:line, commit, Eval Run, output).
+- **Why it matters:** what goes wrong if it's left.
+- **Next step:** one concrete action, and roughly what it costs.
 - **State:** open | turned into <issue path> | dropped (why)
 ```
 
-Keep entries short. Don't repeat what an archived issue already says; point to it.
+If every answer is "no", add one line instead:
+`### <YYYY-MM-DD> · <issue path> · nothing to report`
+
+Then update "Recommended next steps" below if your entry changes the order. Keep entries short, and point to the archived issue rather than repeating it.
 
 ## Recommended next steps (kept up to date, most useful first)
 
