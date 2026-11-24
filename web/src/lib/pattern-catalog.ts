@@ -71,11 +71,12 @@ export function describeStatus(patternType: PatternType): string {
     patternType.approved_by && patternType.approved_on
       ? ` by ${patternType.approved_by} on ${formatDay(patternType.approved_on, "UTC")}`
       : "";
+  const label = statusLabels[patternType.status];
   if (patternType.status === "draft") {
-    return "Draft. Gathers evidence, never shared.";
+    return `${label}. Gathers evidence, never shared.`;
   }
   if (patternType.status === "approved") {
-    return `Approved${approval}. May be shared once ready.`;
+    return `${label}${approval}. May be shared once ready.`;
   }
-  return `Archived${approval ? `. Approved${approval}` : ""}. No longer used.`;
+  return `${label}${approval ? `. Approved${approval}` : ""}. No longer used.`;
 }

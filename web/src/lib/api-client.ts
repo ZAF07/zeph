@@ -1282,7 +1282,7 @@ export type PatternType = {
   signs: PatternSign[];
   signs_against: PatternSign[];
   look_alikes: LookAlike[];
-  anyone_would: string | null;
+  anyone_would: string;
   exclusions: PatternExclusion[];
   approved_wording: string;
   prediction_wording: string;

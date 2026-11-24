@@ -210,14 +210,14 @@ _Avoid_: Profile, persona (Persona is the Companion's voice), bio
 
 ### Patterns
 
-_Target design agreed 24 Nov 2026 and not built yet; `docs/pattern-pipeline/README.md` says how these fit together._
+_Target design agreed 24 Nov 2026 and not built yet, apart from the Pattern Catalog loading and its Dashboard page; `docs/pattern-pipeline/README.md` says how these fit together._
 
 **Pattern Catalog**:
 The human-written, versioned set of Pattern Types the Companion may look for in a User. It is the only source of Patterns that can be shared: the model reads what Users say into it and never adds to it. Unlike Platform Settings it lives with the code and changes only through a reviewed change and a deploy, so every Observation can keep the version it was tagged under and history can be scored again; Admins read it on the Dashboard but don't edit it there. The numbers that apply to every Pattern Type (score bars, situations needed, fading, limits) are Platform Settings.
 _Avoid_: Codebook, ontology, rule set
 
 **Pattern Type**:
-One entry in the Pattern Catalog: a way of acting written as "in this situation, the person tends to do this, apparently to protect or get that", in our own words and never in clinical language. It has a definition; signs for it, each weak, moderate or strong and marked with the part it shows (the situation, what goes on inside, or the behaviour); signs against it; its look-alikes, each with what tells the two apart, including what anyone would do in that situation; exclusions (times it must not be scored or shared, e.g. grief or a recent job loss); the approved wording for sharing it and for its Prediction; its own numbers; and one of five areas (conflict, approval, control, achievement, relationships). It is draft, approved (with who approved it and when) or archived: a Pattern of a draft Pattern Type gathers evidence but is never ready, and an archived one is no longer looked for.
+One entry in the Pattern Catalog: a way of acting written as "in this situation, the person tends to do this, apparently to protect or get that", in our own words and never in clinical language. It has a stable ID that is never reused and a version: any change gives it a new version, and every version loaded is kept as it was. It has a definition; signs for it, each weak, moderate or strong and marked with the part it shows (the situation, what goes on inside, or the behaviour); signs against it; its look-alikes, each with what tells the two apart, including what anyone would do in that situation; exclusions (times it must not be scored or shared, e.g. grief or a recent job loss); the approved wording for sharing it and for its Prediction; its own numbers; and one of five areas (conflict, approval, control, achievement, relationships). It is draft, approved (with who approved it and when) or archived: a Pattern of a draft Pattern Type gathers evidence but is never ready, and an archived one is no longer looked for.
 _Avoid_: Hypothesis type, construct, trait, codebook entry
 
 **Observation**:

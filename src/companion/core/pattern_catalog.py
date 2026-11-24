@@ -1,5 +1,6 @@
 import re
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from datetime import date, datetime
 from enum import StrEnum
 from typing import Any
@@ -22,8 +23,8 @@ from companion.core.models import (
 )
 from companion.core.ports import PatternCatalogRepository
 
-PATTERN_TYPE_ID = re.compile(r"[A-Z][A-Z0-9]*(\.[A-Z][A-Z0-9]*)+")
-VERSION = re.compile(r"\d+\.\d+\.\d+")
+PATTERN_TYPE_ID_SHAPE = re.compile(r"[A-Z][A-Z0-9]*(\.[A-Z][A-Z0-9]*)+")
+VERSION_SHAPE = re.compile(r"\d+\.\d+\.\d+")
 
 
 class InvalidPatternCatalogError(InvalidError):
@@ -346,6 +347,11 @@ def _read_look_alikes(fields: _Fields) -> tuple[LookAlike, ...]:
             fields.note(
                 f"look_alikes[{number}] needs either pattern_type or name{ending}"
             )
+        if look_alike.name and PATTERN_TYPE_ID_SHAPE.fullmatch(look_alike.name):
+            fields.note(
+                f"look_alikes[{number}].name is {look_alike.name}, which looks like "
+                "a Pattern Type's ID; give an ID as pattern_type."
+            )
         group.no_other_fields("a look-alike")
         look_alikes.append(look_alike)
     return tuple(look_alikes)
@@ -411,8 +417,8 @@ def _read_pattern_type(
     approval_given = approved_by is not None or fields.has("approved_on")
     approval_whole = approved_by is not None and fields.has("approved_on")
     pattern_type = PatternType(
-        id=fields.matching("id", PATTERN_TYPE_ID, "CONF.AVOID.BELONG"),
-        version=fields.matching("version", VERSION, "1.0.0"),
+        id=fields.matching("id", PATTERN_TYPE_ID_SHAPE, "CONF.AVOID.BELONG"),
+        version=fields.matching("version", VERSION_SHAPE, "1.0.0"),
         area=fields.choice("area", PatternArea),
         name=fields.text("name"),
         definition=fields.text("definition"),
@@ -423,7 +429,7 @@ def _read_pattern_type(
         signs=_read_signs(fields.groups("signs", at_least_one=True)),
         signs_against=_read_signs(fields.groups("signs_against", at_least_one=True)),
         look_alikes=_read_look_alikes(fields),
-        anyone_would=fields.optional_text("anyone_would"),
+        anyone_would=fields.text("anyone_would"),
         exclusions=_read_exclusions(fields.groups("exclusions")),
         approved_wording=fields.text("approved_wording"),
         prediction_wording=fields.text("prediction_wording"),
@@ -436,9 +442,11 @@ def _read_pattern_type(
     for sign_id in dict.fromkeys(sign_ids):
         if sign_id and sign_ids.count(sign_id) > 1:
             fields.note(f"{sign_id} is the ID of more than one sign.")
-    if status == PatternTypeStatus.APPROVED and not approval_whole:
+    if approval_given and not approval_whole:
+        fields.note("approved_by and approved_on go together; one is missing.")
+    elif status == PatternTypeStatus.APPROVED and not approval_whole:
         fields.note("an approved Pattern Type needs approved_by and approved_on.")
-    if status == PatternTypeStatus.DRAFT and approval_given:
+    elif status == PatternTypeStatus.DRAFT and approval_given:
         fields.note(
             "only an approved or archived Pattern Type may have "
             "approved_by and approved_on."
@@ -574,7 +582,8 @@ class PatternCatalogService:
 
         Returns:
             The Pattern Types at their current versions, by area and then ID,
-            each with when it was loaded and its other stored versions.
+            each with when it was loaded and its other stored versions. A
+            look-alike that is a Pattern Type carries that Pattern Type's name.
         """
         versions = self._pattern_catalog.list_versions()
         current = [version for version in versions if version.is_current]
@@ -584,11 +593,26 @@ class PatternCatalogService:
                 for version in current
             ]
         )
+        name_by_id = {
+            pattern_type.id: pattern_type.name for pattern_type in pattern_types
+        }
         area_order = list(PatternArea)
         return sorted(
             (
                 CatalogPatternType(
-                    pattern_type=pattern_type,
+                    pattern_type=replace(
+                        pattern_type,
+                        look_alikes=tuple(
+                            replace(
+                                look_alike,
+                                name=look_alike.name
+                                or name_by_id[look_alike.pattern_type_id],
+                            )
+                            if look_alike.pattern_type_id
+                            else look_alike
+                            for look_alike in pattern_type.look_alikes
+                        ),
+                    ),
                     loaded_at=version.loaded_at,
                     other_versions=tuple(
                         other.version

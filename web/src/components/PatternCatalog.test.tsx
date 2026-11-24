@@ -28,7 +28,6 @@ const approvedType: PatternType = {
   status: "approved",
   approved_by: "Zaf",
   approved_on: "2026-11-24",
-  anyone_would: null,
   exclusions: [],
   other_versions: [],
 };
@@ -164,9 +163,6 @@ describe("PatternCatalog", () => {
       groupOf(card, "Numbers and status").getByText("No other versions"),
     ).toBeVisible();
     expect(groupOf(card, "Exclusions").getByText("None")).toBeVisible();
-    expect(
-      groupOf(card, "Look-alikes").queryByText("What anyone would do"),
-    ).not.toBeInTheDocument();
   });
 
   it("opens and folds every card with Expand all and Collapse all", async () => {

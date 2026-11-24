@@ -10,6 +10,7 @@ from sqlalchemy import Engine, text
 
 from companion.adapters.postgres.database import load_pattern_catalog
 from companion.core.pattern_catalog import InvalidPatternCatalogError
+from companion.prestart import load_pattern_catalog_or_keep_last
 from tests.fakes import FakeAuthVerifier
 from tests.telegram_helpers import auth_headers, owner_headers
 from tests.test_pattern_catalog_reader import VALID
@@ -136,7 +137,7 @@ def test_a_look_alike_that_is_not_a_pattern_type_keeps_its_own_name(
         "name": "High standards (healthy)",
         "tells_apart": "A miss brings disappointment in the work, not in the self",
     }
-    assert achievement["anyone_would"] is None
+    assert achievement["anyone_would"].startswith("Disappointment after a real")
     assert achievement["exclusions"] == [
         {
             "text": "Active burnout or job loss in the last month",
@@ -270,6 +271,27 @@ def test_a_malformed_pattern_type_stops_the_whole_load(
         "- TEST.ONE.yaml: definition is missing."
     )
     assert stored_versions(engine) == before
+    assert len(catalog(client, headers)) == 3
+
+
+def test_on_start_a_catalog_that_cannot_be_loaded_is_reported_and_the_last_kept(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    engine: Engine,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    headers = owner_headers(client, auth_verifier)
+    (tmp_path / "bad.yaml").write_text(yaml.safe_dump({**VALID, "area": "money"}))
+
+    load_pattern_catalog_or_keep_last(engine, tmp_path)
+
+    assert capsys.readouterr().err == (
+        "The Pattern Catalog can't be loaded. Nothing was changed.\n"
+        "- bad.yaml: area is money; it must be one of conflict, approval, "
+        "control, achievement, relationships.\n"
+        "The backend starts with the catalog as it was last loaded.\n"
+    )
     assert len(catalog(client, headers)) == 3
 
 

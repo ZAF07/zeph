@@ -110,9 +110,9 @@ export function PatternTypeCard({
         title="Look-alikes"
         caption="What it can be mistaken for, and what tells them apart."
       >
-        {patternType.look_alikes.map((lookAlike) => (
+        {patternType.look_alikes.map((lookAlike, index) => (
           <PatternTypeEntry
-            key={lookAlike.name}
+            key={`${index}-${lookAlike.name}`}
             title={lookAlike.name}
             detail={lookAlike.tells_apart}
             tags={
@@ -122,22 +122,20 @@ export function PatternTypeCard({
             }
           />
         ))}
-        {patternType.anyone_would ? (
-          <PatternTypeEntry
-            title="What anyone would do"
-            detail={patternType.anyone_would}
-            tags={<CardTag>Carries no weight</CardTag>}
-          />
-        ) : null}
+        <PatternTypeEntry
+          title="What anyone would do"
+          detail={patternType.anyone_would}
+          tags={<CardTag>Carries no weight</CardTag>}
+        />
       </PatternTypeGroup>
       <PatternTypeGroup
         id={groupId("exclusions")}
         title="Exclusions"
         caption="When it must not be shared, and what happens to evidence from then."
       >
-        {patternType.exclusions.map((exclusion) => (
+        {patternType.exclusions.map((exclusion, index) => (
           <PatternTypeEntry
-            key={exclusion.text}
+            key={`${index}-${exclusion.text}`}
             title={exclusion.text}
             tags={<CardTag>{evidenceLabels[exclusion.evidence]}</CardTag>}
           />

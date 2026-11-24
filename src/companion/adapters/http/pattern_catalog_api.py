@@ -67,7 +67,7 @@ class PatternTypeResponse(BaseModel):
     signs: list[PatternSignResponse]
     signs_against: list[PatternSignResponse]
     look_alikes: list[LookAlikeResponse]
-    anyone_would: str | None
+    anyone_would: str
     exclusions: list[PatternExclusionResponse]
     approved_wording: str
     prediction_wording: str
@@ -108,10 +108,8 @@ def to_pattern_catalog_response(
         catalog: Every Pattern Type in the catalog now.
 
     Returns:
-        The response body, each look-alike that is a Pattern Type carrying
-        that Pattern Type's name.
+        The response body.
     """
-    name_by_id = {entry.pattern_type.id: entry.pattern_type.name for entry in catalog}
     return PatternCatalogResponse(
         pattern_types=[
             PatternTypeResponse(
@@ -131,8 +129,7 @@ def to_pattern_catalog_response(
                 look_alikes=[
                     LookAlikeResponse(
                         pattern_type_id=look_alike.pattern_type_id,
-                        name=look_alike.name
-                        or name_by_id[look_alike.pattern_type_id or ""],
+                        name=look_alike.name or "",
                         tells_apart=look_alike.tells_apart,
                     )
                     for look_alike in entry.pattern_type.look_alikes

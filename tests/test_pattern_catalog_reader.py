@@ -38,6 +38,7 @@ VALID: dict[str, Any] = {
         {"id": "D1", "text": "Says the other", "strength": "weak", "part": "situation"}
     ],
     "look_alikes": [{"name": "Something else", "tells_apart": "How they differ"}],
+    "anyone_would": "What anyone would do",
     "exclusions": [{"text": "Grief", "evidence": "ignored"}],
     "approved_wording": "You seem to do this.",
     "prediction_wording": "Next time {person} asks, notice what you do.",
@@ -262,6 +263,16 @@ def test_every_problem_is_listed_together_in_one_clear_message() -> None:
             changed(status="approved", approved_by="Zaf", approved_on="soon"),
             "a.yaml: approved_on must be a day like 2026-11-24.",
         ),
+        (
+            changed(status="archived", approved_by="Zaf"),
+            "a.yaml: approved_by and approved_on go together; one is missing.",
+        ),
+        (
+            changed(look_alikes=[{"name": "TEST.TWOO", "tells_apart": "How"}]),
+            "a.yaml: look_alikes[1].name is TEST.TWOO, which looks like a "
+            "Pattern Type's ID; give an ID as pattern_type.",
+        ),
+        (without("anyone_would"), "a.yaml: anyone_would is missing."),
         ("just text", "a.yaml: the file must hold a Pattern Type's fields."),
     ],
 )

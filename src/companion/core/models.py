@@ -2743,7 +2743,9 @@ class LookAlike:
     Attributes:
         pattern_type_id: The other Pattern Type's ID; None when the look-alike
             is not a Pattern Type.
-        name: What it is called when it is not a Pattern Type; else None.
+        name: What it is called. A Pattern Type's file gives it only when the
+            look-alike is not a Pattern Type; the catalog Admins read fills in
+            the other Pattern Type's name.
         tells_apart: What tells the two apart.
     """
 
@@ -2797,7 +2799,7 @@ class PatternType:
         signs_against: What counts against it.
         look_alikes: What it can be mistaken for.
         anyone_would: What anyone would do in the situation, which is no
-            evidence of it; None when nothing is written.
+            evidence of it.
         exclusions: When it must not be shared.
         approved_wording: How Zeph may word it to a User.
         prediction_wording: How Zeph words its Prediction, with `{name}`
@@ -2820,7 +2822,7 @@ class PatternType:
     signs: tuple[PatternSign, ...]
     signs_against: tuple[PatternSign, ...]
     look_alikes: tuple[LookAlike, ...]
-    anyone_would: str | None
+    anyone_would: str
     exclusions: tuple[PatternExclusion, ...]
     approved_wording: str
     prediction_wording: str

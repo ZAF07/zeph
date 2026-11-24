@@ -50,6 +50,7 @@ Translate inline styles to Tailwind classes using the tokens, with arbitrary val
 | `AdminCheckInLog` | `/admin/check-in-log` | Also the **table template**. |
 | `AdminPersona`, `AdminPersonaOutlook` | `/admin/persona`, `?tab=outlook` | Voice and Outlook tabs. `AdminPersona` is also the **form template**. |
 | `AdminPrompts` | `/admin/prompts` | Prompts & models. One folding card per core service, as in the card-list template, with "Model & settings" and "Prompts" groups inside. |
+| `AdminPatternCatalog` | `/admin/pattern-catalog` | The Pattern Catalog, read only. One folding card per Pattern Type, as in the card-list template, with no add button and no save bar. |
 | `AdminModelCallTrace` | `/admin/model-calls/design-trace` | One trace from the Model call log. |
 | `AdminEvalDaySummaryCase` | `/admin/evals/cases/day_summary/new` | The Day Summary Eval case form, and how a result reads. |
 | `AdminCheckInKinds` | `/admin/check-in-kinds` | Also the **card-list template**. |

@@ -1,6 +1,6 @@
 # One Pattern Type of the Pattern Catalog (ADR-0025). Loaded when the backend
 # starts. Any change needs a new `version`: a stored version never changes,
-# and the backend refuses to start on a change that keeps its version.
+# so a change that keeps its version is refused and the last catalog stays.
 
 id: ACH.WORTH.PERF
 version: 0.1.0
@@ -64,6 +64,10 @@ look_alikes:
       competence
   - pattern_type: CTRL.UNCERT.PLAN
     tells_apart: Over-prepares to reduce unknowns, not to prove worth
+
+anyone_would: >-
+  Disappointment after a real, costly setback, or preparing hard where the
+  stakes are high
 
 exclusions:
   - text: Active burnout or job loss in the last month

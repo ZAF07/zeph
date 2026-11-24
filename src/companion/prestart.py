@@ -1,8 +1,10 @@
 import sys
 from collections.abc import Callable
 from functools import partial
+from pathlib import Path
 
 import yaml
+from sqlalchemy import Engine
 
 from companion.adapters.eval_case_seed import read_eval_case_seed, read_eval_image_seed
 from companion.adapters.knowledge_seed import read_knowledge_seed
@@ -70,29 +72,44 @@ def register_telegram_webhook(
     print(f"Telegram webhook registered at {webhook_url}")
 
 
+def load_pattern_catalog_or_keep_last(engine: Engine, seed_dir: Path) -> None:
+    """Load the Pattern Catalog, or say why not and keep the last one loaded.
+
+    A catalog that can't be loaded must not stop Zeph from replying, so the
+    problems are printed and the start goes on with the stored catalog.
+
+    Args:
+        engine: The database engine.
+        seed_dir: The folder holding one YAML file per Pattern Type.
+    """
+    try:
+        load_pattern_catalog(engine, seed_dir)
+    except InvalidPatternCatalogError as error:
+        print(
+            f"{error}\nThe backend starts with the catalog as it was last loaded.",
+            file=sys.stderr,
+        )
+
+
 def prepare() -> None:
     """Get everything ready before the backend starts serving.
 
     Checks settings, migrates the database, loads seed data (making Copy
     follow its seed file while keeping Admin-edited text, making the Pattern
-    Catalog follow its files while keeping past versions, adding new Eval
+    Catalog follow its files while keeping past versions, or keeping the last
+    catalog loaded when the files can't be loaded, adding new Eval
     Cases by key with their images, and Judge settings not stored yet,
     embedding the starter Knowledge and drafting when each document helps on first run,
     finishing any upload a restart interrupted and saving the text of
     documents uploaded before text was saved) and registers the Telegram
     webhook unless turned off.
-
-    Raises:
-        MissingSettingsError: If a required setting is missing.
-        InvalidPatternCatalogError: If the Pattern Catalog's files can't be
-            loaded; the catalog stays as it was.
     """
     settings = load_settings()
     migrate(settings.database_url)
     engine = build_database_engine(settings)
     seed_platform_settings(engine, SEED_FILE)
     seed_copy(engine, COPY_SEED_FILE)
-    load_pattern_catalog(engine, PATTERN_CATALOG_DIR)
+    load_pattern_catalog_or_keep_last(engine, PATTERN_CATALOG_DIR)
     seed_helplines(engine, HELPLINES_SEED_FILE)
     seed_memory_categories(engine, MEMORY_CATEGORIES_SEED_FILE)
     seed_check_in_kinds(engine, CHECK_IN_KINDS_SEED_FILE)
@@ -133,6 +150,6 @@ def prepare() -> None:
 if __name__ == "__main__":
     try:
         prepare()
-    except (MissingSettingsError, InvalidPatternCatalogError) as error:
+    except MissingSettingsError as error:
         print(error, file=sys.stderr)
         sys.exit(1)
