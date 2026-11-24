@@ -24,6 +24,10 @@ from tests.fakes import (
     ScriptedChatModel,
 )
 from tests.telegram_helpers import auth_headers, connect_telegram, owner_headers
+from tests.test_curiosity_check_in import (
+    WONDERING_OFFERED,
+    wondering_answer,
+)
 from tests.test_explorations import (
     BELONG,
     WORTH,
@@ -35,6 +39,7 @@ from tests.test_explorations import (
     turn_exploring_on,
 )
 from tests.test_moves_migration import downgrade_to
+from tests.test_onboarding import onboarding_answers
 from tests.test_pattern_tagging import observation_entry, observations_of
 from tests.test_recent_messages import change_settings
 
@@ -468,3 +473,45 @@ def test_the_migration_keeps_user_data_and_reloads_the_tagging_prompt(
             )
         ).scalar_one()
     assert stored == 0
+
+
+def test_a_waiting_thought_experiment_can_be_sent_by_the_wondering_check_in(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    user_id = try_twice_with_nothing(
+        client,
+        auth_verifier,
+        chat_channel,
+        chat_model,
+        clock,
+        scheduler,
+        seeded_settings,
+    )
+    answers = onboarding_answers(check_ins_enabled=True, check_in_frequency="most_days")
+    maya = auth_headers(auth_verifier, "user_maya")
+    client.put("/api/onboarding", json=answers, headers=maya).raise_for_status()
+    clock.advance(timedelta(days=1, hours=13))
+    chat_channel.sent.clear()
+    chat_model.script(wondering_answer("random thought experiment for you...", 1))
+
+    scheduler.tick()
+
+    [saw] = [
+        call.history[0].text
+        for call in chat_model.calls
+        if WONDERING_OFFERED in call.history[0].text
+    ]
+    assert (
+        '1. Put this made-up situation to them, keeping its words: "' + TEAM_PLAN
+    ) in saw
+    assert [sent.text for sent in chat_channel.sent] == [
+        "random thought experiment for you..."
+    ]
+    *_, asked = aimed_of(client.engine, user_id)
+    assert asked.state == CuriosityState.RAISED
