@@ -13,6 +13,7 @@ import { modelCallTraceFixtures } from "@/lib/design-fixtures/model-call-trace";
 import { onboardingFixtures } from "@/lib/design-fixtures/onboarding";
 import { overviewFixtures } from "@/lib/design-fixtures/overview";
 import { patternCatalogFixtures } from "@/lib/design-fixtures/pattern-catalog";
+import { thoughtExperimentsFixtures } from "@/lib/design-fixtures/thought-experiments";
 import { planFixtures } from "@/lib/design-fixtures/plan";
 import { alex, shellFixtures, zaf } from "@/lib/design-fixtures/shell";
 import { telegramFixtures } from "@/lib/design-fixtures/telegram";
@@ -92,6 +93,7 @@ export function createFixtureClient(designAs: DesignAs): ApiClient {
     ...overviewFixtures,
     ...copyFixtures,
     ...patternCatalogFixtures,
+    ...thoughtExperimentsFixtures,
     ...evalDaySummaryFixtures,
   });
 }

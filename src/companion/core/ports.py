@@ -79,6 +79,8 @@ from companion.core.models import (
     StoredSetting,
     TaggingShape,
     TelegramConnection,
+    ThoughtExperiment,
+    ThoughtExperimentDetails,
     Understanding,
     UnderstandingShape,
     User,
@@ -1713,6 +1715,84 @@ class ExplorationRepository(Protocol):
         ...
 
 
+class ThoughtExperimentRepository(Protocol):
+    """Stores the Thought Experiments Admins manage. None is ever deleted."""
+
+    def list_all(self) -> list[ThoughtExperiment]:
+        """List every Thought Experiment, archived ones too, oldest first.
+
+        Returns:
+            The Thought Experiments.
+        """
+        ...
+
+    def get(self, thought_experiment_id: UUID) -> ThoughtExperiment | None:
+        """Find one Thought Experiment.
+
+        Args:
+            thought_experiment_id: Its ID.
+
+        Returns:
+            It, or None if there is no such one.
+        """
+        ...
+
+    def add(self, thought_experiment: ThoughtExperiment) -> None:
+        """Store a new Thought Experiment.
+
+        Args:
+            thought_experiment: It, with its ID.
+        """
+        ...
+
+    def update(
+        self,
+        thought_experiment_id: UUID,
+        details: ThoughtExperimentDetails,
+        now: datetime,
+    ) -> ThoughtExperiment:
+        """Change what an Admin set on a Thought Experiment.
+
+        Args:
+            thought_experiment_id: Its ID; it exists.
+            details: Its new values.
+            now: When it changed.
+
+        Returns:
+            It, saved.
+        """
+        ...
+
+    def archive(self, thought_experiment_id: UUID, now: datetime) -> ThoughtExperiment:
+        """Archive a Thought Experiment, so it is never asked again.
+
+        Args:
+            thought_experiment_id: Its ID; it exists.
+            now: When it was archived.
+
+        Returns:
+            It, saved.
+        """
+        ...
+
+    def close_waiting(self, thought_experiment_id: UUID) -> None:
+        """Close every waiting aimed Curiosity that would put it to a User.
+
+        Args:
+            thought_experiment_id: Its ID.
+        """
+        ...
+
+    def asked_counts(self) -> dict[UUID, int]:
+        """Count how many times each Thought Experiment was put to a User.
+
+        Returns:
+            How many of its aimed Curiosities were asked, by its ID; one
+            never asked is left out.
+        """
+        ...
+
+
 class CuriosityRepository(Protocol):
     """Stores each User's Curiosities, which are internal and never shown.
 
@@ -3166,6 +3246,7 @@ class Repositories:
     observations: ObservationRepository
     curiosities: CuriosityRepository
     explorations: ExplorationRepository
+    thought_experiments: ThoughtExperimentRepository
     move_outcomes: MoveOutcomeRepository
     user_portraits: UserPortraitRepository
     knowledge_documents: KnowledgeDocumentRepository

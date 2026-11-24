@@ -36,3 +36,15 @@ This adds Dashboard UI: read `web/design/README.md` first, add or extend the ref
 - `04-explorations-and-the-agenda.md`
 
 ## Comments
+
+Plan (24 Nov 2026, branch `pattern-05-thought-experiments`, worktree `ai-chat-companion-pattern-05`; started once issue 04 was archived, merged and torn down):
+
+- **Store.** `thought_experiments` (migration 0089): wording, the two Pattern Types it tells apart, sensitivity (low, medium, high, as a Curiosity's), starter, on, archived (when), a seed key. Never deleted. `exploration_tries.thought_experiment_id` links a try to the one it asked, so past tries keep showing it after an edit or archive.
+- **Seed.** `seed/thought_experiments.yaml`, each with a `key`. At start, code adds each seeded one whose key isn't stored yet, in any state, so a seed never overwrites an edit and never brings back an archived one.
+- **Admin page** `/admin/thought-experiments`, from the card-list template: one card each with Wording, Tells apart (two Pattern Types from the catalog), Sensitivity, Starter and On, each with a hint; add, edit, switch off and archive (with confirm); archived ones listed apart, read only, with how often they were asked. New reference `AdminThoughtExperiments.html` from card-list parts only, its baseline, the menu link on the other admin references (as issues 10 and 14 did).
+- **Leading wording.** A pure code check on save (no model call): phrases that suggest the answer ("wouldn't you", "surely", "most people would", …) or a question offering only one side. Save is refused with the flags unless the Admin presses "Save anyway"; the card shows each flag with what to change.
+- **Picking (code).** A new way between "would it differ with someone else" and "notice this week": for an unclear need, code takes the look-alike pair with the most unclear Observations of that Pattern, and picks a Thought Experiment for that pair that is on, not archived and never put to this User, starter or not. Never more than `thought_experiments_per_pattern_per_week` (1, Patterns section, hint, Eval override) per Pattern in 7 days (asked or waiting). None to pick: the next way is used. Other needs skip this way.
+- **Asking.** It is an aimed Curiosity whose question tells the Reply to put the made-up situation in its own words (quoted), with the Thought Experiment's sensitivity. So it is asked in chat as any aimed Curiosity, or by the Curiosity Check-in Kind under its weekly limit. Switching one off or archiving it closes its waiting Curiosities at once; the Agenda also closes any left.
+- **"What if" answers.** The tagging step is shown the Thought Experiments asked in the Conversation, numbered; an Observation that answers one says its number, and code makes its kind "what if" answer. Tagging prompt reloaded from the seed.
+- **Docs.** `docs/thought-experiments/README.md`; the first set (~30, every look-alike pair of issue 15's catalog, one starter per area) for the owner to review.
+- **Tests.** Pure tests for the leading check, picking and the weekly limit, the way order; HTTP-edge tests for the Admin API, seeding, the Conversation-end chain and tagging; web tests for the manager.

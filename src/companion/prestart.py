@@ -18,6 +18,7 @@ from companion.adapters.postgres.database import (
     seed_moves,
     seed_needs,
     seed_platform_settings,
+    seed_thought_experiments,
 )
 from companion.adapters.postgres.eval_repositories import (
     PostgresEvalCaseRepository,
@@ -42,6 +43,7 @@ from companion.main import (
     NEEDS_SEED_FILE,
     PATTERN_CATALOG_DIR,
     SEED_FILE,
+    THOUGHT_EXPERIMENTS_SEED_FILE,
     build_chat_model,
     build_clock,
     build_database_engine,
@@ -115,6 +117,7 @@ def prepare() -> None:
     seed_check_in_kinds(engine, CHECK_IN_KINDS_SEED_FILE)
     seed_needs(engine, NEEDS_SEED_FILE)
     seed_moves(engine, MOVES_SEED_FILE, NEEDS_SEED_FILE)
+    seed_thought_experiments(engine, THOUGHT_EXPERIMENTS_SEED_FILE)
     seed_cases = read_eval_case_seed(EVAL_CASES_DIR, EVAL_IMAGES_DIR)
     add_seed_cases(
         PostgresEvalCaseRepository(engine),

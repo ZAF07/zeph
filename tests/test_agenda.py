@@ -36,6 +36,8 @@ from companion.core.models import (
     Relationship,
     SituationSetting,
     SituationTags,
+    ThoughtExperiment,
+    ThoughtExperimentDetails,
     ThreadReaction,
     TryOutcome,
 )
@@ -57,7 +59,9 @@ PATTERN_TYPES = {
         read_pattern_catalog_seed(PATTERN_CATALOG_DIR)
     )
 }
-NUMBERS = AgendaNumbers(size=3, wait=timedelta(days=3), rest_after_tries=4)
+NUMBERS = AgendaNumbers(
+    size=3, wait=timedelta(days=3), rest_after_tries=4, thought_experiments_per_week=1
+)
 
 
 def observation(
@@ -141,6 +145,7 @@ def asked(
     aimed_at: Observation | None = None,
     part_of_life: SituationSetting | None = None,
     state: CuriosityState = CuriosityState.RAISED,
+    thought_experiment: ThoughtExperiment | None = None,
 ) -> tuple[Curiosity, ExplorationTry]:
     """An aimed Curiosity of an Exploration and its try, asked some days ago."""
     raised_at = (
@@ -171,6 +176,30 @@ def asked(
         observation_id=aimed_at.id if aimed_at else None,
         part_of_life=part_of_life,
         outcome=outcome if raised_at else None,
+        thought_experiment_id=thought_experiment.id if thought_experiment else None,
+    )
+
+
+def thought_experiment(
+    pair: tuple[str, str] = (BELONG, WORTH),
+    on: bool = True,
+    archived: bool = False,
+) -> ThoughtExperiment:
+    """A Thought Experiment telling two Pattern Types apart, low sensitivity."""
+    return ThoughtExperiment(
+        id=uuid4(),
+        details=ThoughtExperimentDetails(
+            wording="A close friend reads your work and says one part fails. What "
+            "stays with you more?",
+            pattern_type_id=pair[0],
+            other_pattern_type_id=pair[1],
+            sensitivity=CuriositySensitivity.LOW,
+            starter=False,
+            on=on,
+        ),
+        created_at=NOW - timedelta(days=60),
+        updated_at=NOW - timedelta(days=60),
+        archived_at=NOW if archived else None,
     )
 
 
@@ -181,6 +210,7 @@ def keep(
     tried: list[tuple[Curiosity, ExplorationTry]] | None = None,
     scores: dict[str, PatternScore] | None = None,
     numbers: AgendaNumbers = NUMBERS,
+    thought_experiments: list[ThoughtExperiment] | None = None,
 ) -> AgendaChanges:
     """Keep the Agenda at the end of the Conversation ENDED."""
     tried = tried or []
@@ -197,6 +227,7 @@ def keep(
             conversation_id=ENDED,
             now=NOW,
             time_zone="Asia/Singapore",
+            thought_experiments=thought_experiments or [],
         ),
         numbers,
     )
@@ -256,7 +287,8 @@ def test_each_try_at_a_need_moves_to_a_different_way_least_pushy_first() -> None
     need = OpenNeed(ExplorationNeed.COUNTER_TEST)
     first = asked(its, way=ExplorationWay.STORY_FOLLOW_UP, days_ago=9)
     second = asked(its, way=ExplorationWay.OTHER_PERSON, days_ago=5)
-    third = asked(its, way=ExplorationWay.NOTICE_THIS_WEEK, days_ago=2)
+    third = asked(its, way=ExplorationWay.THOUGHT_EXPERIMENT, days_ago=4)
+    fourth = asked(its, way=ExplorationWay.NOTICE_THIS_WEEK, days_ago=2)
 
     def way_after(*tried: tuple[Curiosity, ExplorationTry]) -> ExplorationWay:
         return next_way(
@@ -267,8 +299,9 @@ def test_each_try_at_a_need_moves_to_a_different_way_least_pushy_first() -> None
 
     assert way_after() == ExplorationWay.STORY_FOLLOW_UP
     assert way_after(first) == ExplorationWay.OTHER_PERSON
-    assert way_after(first, second) == ExplorationWay.NOTICE_THIS_WEEK
-    assert way_after(first, second, third) == ExplorationWay.STORY_FOLLOW_UP
+    assert way_after(first, second) == ExplorationWay.THOUGHT_EXPERIMENT
+    assert way_after(first, second, third) == ExplorationWay.NOTICE_THIS_WEEK
+    assert way_after(first, second, third, fourth) == ExplorationWay.STORY_FOLLOW_UP
 
 
 def test_after_a_useful_try_the_same_way_is_used_again() -> None:
@@ -617,7 +650,9 @@ def test_an_exploration_whose_pattern_is_no_longer_suspected_leaves_the_agenda()
 
 
 @pytest.mark.parametrize("need", list(ExplorationNeed))
-@pytest.mark.parametrize("way", list(ExplorationWay))
+@pytest.mark.parametrize(
+    "way", [way for way in ExplorationWay if way != ExplorationWay.THOUGHT_EXPERIMENT]
+)
 def test_every_aimed_question_is_written_by_code_without_the_pattern(
     need: ExplorationNeed, way: ExplorationWay
 ) -> None:
@@ -636,3 +671,162 @@ def test_every_aimed_question_is_written_by_code_without_the_pattern(
     assert why
     assert belong.name not in question + why
     assert "I said yes again" not in question
+
+
+def unclear_story_tried_twice(
+    its: Exploration, story: Observation
+) -> list[tuple[Curiosity, ExplorationTry]]:
+    """Two tries with nothing at an unclear story, 10 and 8 days ago."""
+    return [
+        asked(
+            its,
+            need=ExplorationNeed.UNCLEAR,
+            aimed_at=story,
+            way=ExplorationWay.STORY_FOLLOW_UP,
+            days_ago=10,
+        ),
+        asked(
+            its,
+            need=ExplorationNeed.UNCLEAR,
+            aimed_at=story,
+            way=ExplorationWay.OTHER_PERSON,
+            days_ago=8,
+        ),
+    ]
+
+
+def test_after_another_person_an_unclear_story_gets_a_thought_experiment() -> None:
+    suspected = pattern()
+    story = observation(second=WORTH, days_ago=12)
+    its = exploration(suspected)
+    worth_one = thought_experiment()
+
+    planned = keep(
+        [suspected],
+        [story],
+        [its],
+        unclear_story_tried_twice(its, story),
+        thought_experiments=[thought_experiment((BELONG, PLAN)), worth_one],
+    )
+
+    [attempt] = planned.new_tries
+    assert (attempt.need, attempt.way, attempt.thought_experiment_id) == (
+        ExplorationNeed.UNCLEAR,
+        ExplorationWay.THOUGHT_EXPERIMENT,
+        worth_one.id,
+    )
+    [curiosity] = planned.new_curiosities
+    assert worth_one.details.wording in curiosity.question
+    assert "keeping its words" in curiosity.question
+    assert curiosity.sensitivity == CuriositySensitivity.LOW
+    assert PATTERN_TYPES[BELONG].name not in curiosity.question + curiosity.why
+
+
+def test_with_none_to_ask_the_next_way_is_used() -> None:
+    suspected = pattern()
+    story = observation(second=WORTH, days_ago=12)
+    its = exploration(suspected)
+
+    planned = keep(
+        [suspected],
+        [story],
+        [its],
+        unclear_story_tried_twice(its, story),
+        thought_experiments=[
+            thought_experiment(on=False),
+            thought_experiment(archived=True),
+            thought_experiment((BELONG, PLAN)),
+        ],
+    )
+
+    [attempt] = planned.new_tries
+    assert (attempt.way, attempt.thought_experiment_id) == (
+        ExplorationWay.NOTICE_THIS_WEEK,
+        None,
+    )
+
+
+def test_never_more_than_the_admin_set_number_a_week_for_a_pattern() -> None:
+    suspected = pattern()
+    story = observation(second=WORTH, days_ago=12)
+    its = exploration(suspected)
+    asked_one = thought_experiment()
+    tried = [
+        asked(
+            its,
+            need=ExplorationNeed.UNCLEAR,
+            aimed_at=story,
+            way=ExplorationWay.OTHER_PERSON,
+            days_ago=10,
+        ),
+        asked(
+            its,
+            need=ExplorationNeed.UNCLEAR,
+            aimed_at=story,
+            way=ExplorationWay.THOUGHT_EXPERIMENT,
+            days_ago=4,
+            outcome=TryOutcome.USEFUL,
+            thought_experiment=asked_one,
+        ),
+    ]
+    options = [asked_one, thought_experiment()]
+
+    limited = keep([suspected], [story], [its], tried, thought_experiments=options)
+    raised = keep(
+        [suspected],
+        [story],
+        [its],
+        tried,
+        numbers=replace(NUMBERS, thought_experiments_per_week=2),
+        thought_experiments=options,
+    )
+
+    assert limited.new_tries[0].way == ExplorationWay.NOTICE_THIS_WEEK
+    assert raised.new_tries[0].way == ExplorationWay.THOUGHT_EXPERIMENT
+    assert raised.new_tries[0].thought_experiment_id == options[1].id
+
+
+def test_a_counter_test_never_gets_a_thought_experiment() -> None:
+    suspected = pattern()
+    its = exploration(suspected)
+    tried = [
+        asked(its, way=ExplorationWay.STORY_FOLLOW_UP, days_ago=10),
+        asked(its, way=ExplorationWay.OTHER_PERSON, days_ago=8),
+    ]
+
+    planned = keep(
+        [suspected],
+        [observation(setting=None)],
+        [its],
+        tried,
+        thought_experiments=[thought_experiment()],
+    )
+
+    [attempt] = planned.new_tries
+    assert (attempt.need, attempt.way) == (
+        ExplorationNeed.COUNTER_TEST,
+        ExplorationWay.NOTICE_THIS_WEEK,
+    )
+
+
+def test_a_waiting_thought_experiment_switched_off_or_archived_is_closed() -> None:
+    suspected = pattern()
+    story = observation(second=WORTH, days_ago=12)
+    its = exploration(suspected)
+    archived = thought_experiment(archived=True)
+    waiting = asked(
+        its,
+        need=ExplorationNeed.UNCLEAR,
+        aimed_at=story,
+        way=ExplorationWay.THOUGHT_EXPERIMENT,
+        state=CuriosityState.WAITING,
+        thought_experiment=archived,
+    )
+
+    planned = keep(
+        [suspected], [story], [its], [waiting], thought_experiments=[archived]
+    )
+
+    assert planned.closed_curiosity_ids == [waiting[0].id]
+    [attempt] = planned.new_tries
+    assert attempt.thought_experiment_id is None

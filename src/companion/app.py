@@ -18,6 +18,9 @@ from companion.adapters.http.eval_case_api import build_eval_case_api_router
 from companion.adapters.http.pattern_catalog_api import (
     build_pattern_catalog_api_router,
 )
+from companion.adapters.http.thought_experiment_api import (
+    build_thought_experiment_api_router,
+)
 from companion.adapters.telegram.webhook import build_telegram_webhook_router
 from companion.core.admin_users import AdminUserService
 from companion.core.agenda import AgendaKeeper, AgendaReader
@@ -93,6 +96,7 @@ from companion.core.scheduled_work import ScheduledWork
 from companion.core.sticker_adding import StickerAdding
 from companion.core.stickers import StickerLibraryService, StickerTools
 from companion.core.telegram_connection import TelegramConnectionService
+from companion.core.thought_experiments import ThoughtExperimentService
 from companion.core.typing_keeper import TypingKeeper
 from companion.core.understanding import UnderstandingService
 from companion.core.usage import UsageLimiter, UsageRecordingChatModel
@@ -478,6 +482,15 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
     app.include_router(
         build_pattern_catalog_api_router(
             current_admin=current_admin,
+            pattern_catalog_service=pattern_catalog_service,
+        )
+    )
+    app.include_router(
+        build_thought_experiment_api_router(
+            current_admin=current_admin,
+            thought_experiment_service=ThoughtExperimentService(
+                dependencies.repositories, pattern_catalog_service, dependencies.clock
+            ),
             pattern_catalog_service=pattern_catalog_service,
         )
     )

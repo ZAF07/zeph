@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -21,8 +21,13 @@ from companion.adapters.postgres.tables import (
     need_ruled_out_moves,
     needs,
     platform_settings,
+    thought_experiments,
 )
-from companion.core.models import CopySeedSlot, CuriosityTreatment
+from companion.core.models import (
+    CopySeedSlot,
+    CuriositySensitivity,
+    CuriosityTreatment,
+)
 from companion.core.pattern_catalog import PatternCatalogService
 
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
@@ -255,6 +260,45 @@ def seed_needs(engine: Engine, seed_file: Path) -> None:
         if connection.execute(select(exists().select_from(needs))).scalar():
             return
         connection.execute(insert(needs).values(rows))
+
+
+def seed_thought_experiments(engine: Engine, seed_file: Path) -> None:
+    """Add each seeded Thought Experiment whose key isn't stored yet.
+
+    One already stored with its key is left as it is, edited, switched off
+    or archived, so a seed never overwrites an Admin's change and never
+    brings back an archived one. New ones keep the file's order.
+
+    Args:
+        engine: The database engine.
+        seed_file: YAML file listing Thought Experiments with `key`,
+            `wording`, `pattern_types` (the two it tells apart),
+            `sensitivity` and an optional `starter`, in order.
+    """
+    seed = yaml.safe_load(seed_file.read_text())
+    now = datetime.now(UTC)
+    rows = [
+        {
+            "id": uuid4(),
+            "seed_key": entry["key"],
+            "wording": " ".join(entry["wording"].split()),
+            "pattern_type_id": entry["pattern_types"][0],
+            "other_pattern_type_id": entry["pattern_types"][1],
+            "sensitivity": CuriositySensitivity(entry["sensitivity"]),
+            "starter": entry.get("starter", False),
+            "is_on": True,
+            "created_at": now + timedelta(microseconds=order),
+            "updated_at": now,
+        }
+        for order, entry in enumerate(seed)
+    ]
+    with engine.begin() as connection:
+        stored = set(
+            connection.execute(select(thought_experiments.c.seed_key)).scalars()
+        )
+        new_rows = [row for row in rows if row["seed_key"] not in stored]
+        if new_rows:
+            connection.execute(insert(thought_experiments).values(new_rows))
 
 
 def seed_moves(engine: Engine, moves_seed_file: Path, needs_seed_file: Path) -> None:

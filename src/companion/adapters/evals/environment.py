@@ -15,6 +15,7 @@ from companion.adapters.postgres.database import (
     seed_moves,
     seed_needs,
     seed_platform_settings,
+    seed_thought_experiments,
 )
 from companion.adapters.postgres.tables import (
     metadata,
@@ -118,6 +119,9 @@ class PostgresEvalEnvironment:
             self._engine,
             self._seed_dir / "moves.yaml",
             self._seed_dir / "needs.yaml",
+        )
+        seed_thought_experiments(
+            self._engine, self._seed_dir / "thought_experiments.yaml"
         )
         load_pattern_catalog(self._engine, self._seed_dir / "pattern_catalog")
         return InProcessCompanion(

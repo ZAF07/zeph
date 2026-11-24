@@ -89,6 +89,7 @@ export const queryKeys = {
   evalCosts: ["eval-costs"],
   usage: (days: number) => ["usage", days],
   memoryCategories: ["memory-categories"],
+  thoughtExperiments: ["thought-experiments"],
   knowledgeDocuments: ["knowledge-documents"],
   knowledgeDocument: (documentId: string) => ["knowledge-document", documentId],
   stickers: ["stickers"],

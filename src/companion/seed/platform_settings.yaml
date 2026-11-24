@@ -814,6 +814,10 @@ agenda_size: 3
 exploration_wait_days: 3
 exploration_rest_after_tries: 4
 
+# At most this many Thought Experiments are put to a User about one Pattern in
+# 7 days, counting one still waiting to be asked.
+thought_experiments_per_pattern_per_week: 1
+
 # After the User pushes back on a Pattern Zeph offered as its view, and the
 # Pattern isn't closed, it waits this many days before it comes to mind in a
 # reply again. A closed Pattern never comes to mind.
@@ -1318,7 +1322,9 @@ pattern_tagging_prompt: |-
   You are given today's date, the Life Threads (ongoing stories in their
   life) this Conversation touched, each with a number; the Pattern Catalog;
   the lists each tag comes from; the unclear stories Zeph asked about in
-  this Conversation, if any, each with a number; and the Conversation.
+  this Conversation, if any, each with a number; the Thought Experiments
+  (made-up situations) Zeph put to them in this Conversation, if any, each
+  with a number; and the Conversation.
 
   Write one Observation for each thing the person said that matches a sign
   of a Pattern Type, for it or against it. Only what the person said counts,
@@ -1351,6 +1357,10 @@ pattern_tagging_prompt: |-
   - evidence: "real_story" for something that happened, "reported_habit"
     for what they say they usually do, "what_if_answer" for their answer to
     a made-up situation, "own_opinion" for their view of themselves.
+  - thought_experiment: the number of the Thought Experiment it answers,
+    when it is their answer to one Zeph put to them; null otherwise. Its
+    evidence is then "what_if_answer". A real story they tell while
+    answering is a "real_story" with null here.
 
   Note it even when anyone would act the same in that situation: tag the
   situation as it was and leave the weighing to others.
@@ -1370,7 +1380,7 @@ pattern_tagging_prompt: |-
        "about": "...", "thread": <number> | null,
        "relationship": "..." | null, "power": "..." | null,
        "setting": "..." | null, "stance": "..." | null,
-       "evidence": "..."}
+       "evidence": "...", "thought_experiment": <number> | null}
     ],
     "settled": [
       {"unclear": <number>, "pattern_type": "<ID>", "sign": "<ID>"}

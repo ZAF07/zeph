@@ -704,6 +704,28 @@ exploration_tries = Table(
     ),
     Column("part_of_life", Text),
     Column("outcome", Text),
+    Column(
+        "thought_experiment_id",
+        Uuid,
+        ForeignKey("thought_experiments.id"),
+        index=True,
+    ),
+)
+
+thought_experiments = Table(
+    "thought_experiments",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("wording", Text, nullable=False),
+    Column("pattern_type_id", Text, nullable=False),
+    Column("other_pattern_type_id", Text, nullable=False),
+    Column("sensitivity", Text, nullable=False),
+    Column("starter", Boolean, nullable=False),
+    Column("is_on", Boolean, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("archived_at", DateTime(timezone=True)),
+    Column("seed_key", Text, unique=True),
 )
 
 patterns_in_mind = Table(
