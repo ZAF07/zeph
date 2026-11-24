@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence, Set
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 from uuid import UUID, uuid4
@@ -44,6 +44,7 @@ from companion.core.platform_settings import (
     THOUGHT_EXPERIMENTS_PER_PATTERN_PER_WEEK,
 )
 from companion.core.ports import Clock, Repositories
+from companion.core.starter_thought_experiments import put_as_starters
 from companion.core.thought_experiments import (
     pick_thought_experiment,
     put_to_user,
@@ -145,6 +146,8 @@ class AgendaInput:
         now: When the Agenda is kept.
         time_zone: The User's IANA time zone.
         thought_experiments: Every Thought Experiment, archived ones too.
+        starters_put: The Thought Experiments already put to them as
+            starters, or waiting to be.
     """
 
     user_id: UUID
@@ -159,6 +162,7 @@ class AgendaInput:
     now: datetime
     time_zone: str | None
     thought_experiments: Sequence[ThoughtExperiment] = ()
+    starters_put: Set[UUID] = frozenset()
 
 
 def observations_of(
@@ -984,8 +988,9 @@ def thought_experiment_for(
 
     Returns:
         The Thought Experiment for the look-alike pair with the most unclear
-        evidence; None when the need isn't unclear, the week's are used up
-        or none is left to ask.
+        evidence, never one already put to them, as a starter either; None
+        when the need isn't unclear, the week's are used up or none is left
+        to ask.
     """
     aimed = {curiosity.id: curiosity for curiosity in agenda.aimed}
     if (
@@ -998,7 +1003,7 @@ def thought_experiment_for(
         exploration.pattern_type_id,
         observations_of(exploration.pattern_type_id, agenda.observations),
         agenda.thought_experiments,
-        put_to_user(agenda.tries, aimed),
+        put_to_user(agenda.tries, aimed) | agenda.starters_put,
     )
 
 
@@ -1141,6 +1146,9 @@ class AgendaKeeper:
                     now=now,
                     time_zone=user.time_zone,
                     thought_experiments=repositories.thought_experiments.list_all(),
+                    starters_put=put_as_starters(
+                        repositories.curiosities.list_starters(user.id)
+                    ),
                 ),
                 agenda_numbers(snapshot.settings),
             )

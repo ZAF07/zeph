@@ -203,6 +203,20 @@ def test_situations_count_only_where_the_pattern_showed() -> None:
     assert score.situations == 1
 
 
+def test_what_if_answers_alone_never_make_a_situation() -> None:
+    answers = [
+        observation(kind=EvidenceKind.WHAT_IF_ANSWER, thread=None, about=about)
+        for about in ("their team lead", "a friend", "their mum")
+    ]
+
+    made_up_only = score_of(*answers)
+    with_a_real_story = score_of(*answers, observation(thread=None, about="a friend"))
+
+    assert made_up_only == PatternScore(points=pytest.approx(168), situations=0)
+    assert state_for(PatternState.NOTICED, made_up_only, BARS) == PatternState.NOTICED
+    assert with_a_real_story.situations == 1
+
+
 def test_an_unclear_observation_counts_toward_each_of_its_pattern_types() -> None:
     grouped = observations_by_pattern_type([observation(second=WORTH)])
 

@@ -43,6 +43,7 @@ from companion.core.evals.ports import (
 )
 from companion.core.evals.runs import EvalRunService
 from companion.core.evals.setting_overrides import SettingOverrideService
+from companion.core.familiarity import FamiliarityKeeper
 from companion.core.features import FeatureService
 from companion.core.helplines import HelplineService
 from companion.core.home import HomeService
@@ -93,6 +94,7 @@ from companion.core.reply_service import ReplyService
 from companion.core.response_composition import ResponseComposer
 from companion.core.safeguard import Safeguard
 from companion.core.scheduled_work import ScheduledWork
+from companion.core.starter_thought_experiments import StarterThoughtExperimentKeeper
 from companion.core.sticker_adding import StickerAdding
 from companion.core.stickers import StickerLibraryService, StickerTools
 from companion.core.telegram_connection import TelegramConnectionService
@@ -413,6 +415,10 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
                 repositories=dependencies.repositories,
                 pattern_catalog=pattern_catalog_service,
                 clock=dependencies.clock,
+            ),
+            familiarity_keeper=FamiliarityKeeper(dependencies.repositories),
+            starter_keeper=StarterThoughtExperimentKeeper(
+                repositories=dependencies.repositories, clock=dependencies.clock
             ),
             curiosity_keeper=CuriosityKeeper(
                 repositories=dependencies.repositories,

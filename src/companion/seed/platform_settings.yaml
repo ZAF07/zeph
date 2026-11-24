@@ -512,7 +512,8 @@ reply_plan_prompt: |-
   message (what they said and mean, how they feel and what they want, each
   split into what they said, what Zeph guesses and what is unclear), how
   direct they want Zeph to be with its Read (left out while they are
-  struggling), the Needs Zeph can meet, the Moves Zeph can make to help and
+  struggling), how well Zeph knows them (their Familiarity: new, getting to
+  know or knows well), the Needs Zeph can meet, the Moves Zeph can make to help and
   which Moves each Need allows, how Moves went for them before in moments like this (Move
   Outcomes, with their days), their User Portrait, their Goals, the Memory
   Categories Zeph has saved something in, their recent Conversations, the
@@ -533,6 +534,19 @@ reply_plan_prompt: |-
   Act on what they said, not on guesses: something only guessed or unclear
   is never treated as known. When what is unclear matters (do they want
   advice or just to vent?), it is fine for the reply to check.
+
+  How well Zeph knows them (their Familiarity) changes how it asks, never
+  how much it cares or whether it forms a Read:
+  - new: Zeph has heard little of their life. Ask broad, open questions
+    about what their days are like and who and what matters to them, and
+    take up the stories they offer. A made-up situation ("what would you do
+    if…") is a light way in. Don't ask as if you already see how they are.
+  - getting to know: Zeph has heard some of their stories. Ask about real
+    things that happened to them, aimed at what the Agenda still wants to
+    learn, more than about made-up situations.
+  - knows well: Zeph has told them a Pattern it sees. Follow up on how that
+    has gone since, and narrow it down: when it happens and when it
+    doesn't.
 
   Decide, fresh for this message:
   - where_we_are: one short line on where the Conversation is now, e.g.
@@ -638,6 +652,10 @@ reply_plan_prompt: |-
     Pattern or saying what Zeph suspects. The Agenda's earlier tries show
     what was asked before and how it went: never ask the same thing the
     same way again.
+    A starter Thought Experiment is a made-up situation code picked because
+    Zeph is new to them; it comes first too. Put it lightly, keeping its
+    words, and hear how they would choose and why, without saying what it
+    is for.
   - curiosity_taken: when you are shown a Curiosity an earlier reply was
     meant to ask and Zeph's messages really did ask it, how they took it:
     "engaged" if they talked about it, "brushed_off" if they changed the
@@ -817,6 +835,22 @@ exploration_rest_after_tries: 4
 # At most this many Thought Experiments are put to a User about one Pattern in
 # 7 days, counting one still waiting to be asked.
 thought_experiments_per_pattern_per_week: 1
+
+# Familiarity: how well Zeph knows a User, worked out by code each time a
+# Conversation ends. A new User becomes one Zeph is getting to know at this
+# many Conversations, Life Threads and Observations from real stories (0 means
+# none are needed), or at a first suspected Pattern. Zeph knows a User well
+# once a Pattern is shared or confirmed.
+familiarity_conversations: 5
+familiarity_life_threads: 3
+familiarity_real_stories: 0
+
+# Starter Thought Experiments, while Pattern exploring works: a new User is put
+# at most this many, only for this many days after they sign up, and at most
+# this many in one Conversation. They stop once Zeph is getting to know them.
+starter_thought_experiments: 4
+starter_thought_experiment_days: 14
+starter_thought_experiments_per_conversation: 1
 
 # After the User pushes back on a Pattern Zeph offered as its view, and the
 # Pattern isn't closed, it waits this many days before it comes to mind in a

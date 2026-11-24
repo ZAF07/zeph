@@ -19,6 +19,7 @@ from companion.core.curiosities import (
     offered_under,
     why_none_asked,
 )
+from companion.core.familiarity import describe_familiarity
 from companion.core.life_threads import (
     RemindedThread,
     describe_reminded_threads,
@@ -402,7 +403,8 @@ def describe_message_for_reply_plan(
 
     Returns:
         The time, the Understanding, how direct the User wants it to be
-        (left out while they are struggling), Needs, Moves and which each
+        (left out while they are struggling), how well the Companion knows
+        them (their Familiarity), Needs, Moves and which each
         Need allows, past Move Outcomes with their days, User Portrait, Goals,
         Memory Categories, recent Conversations, reminded Life Threads, the
         Patterns in mind, due Curiosities and how each Need treats them, the
@@ -457,6 +459,7 @@ def describe_message_for_reply_plan(
         f"How you understood their latest message:\n"
         f"{describe_understanding(understanding)}\n\n"
         f"{describe_directness(snapshot.user.directness, understanding)}"
+        f"{describe_familiarity(snapshot.user.familiarity)}"
         f"Needs:\n{need_lines}\n"
         f"Fallback Need: {fallback.name}\n\n"
         f"Moves:\n{move_lines or 'None.'}\n\n"

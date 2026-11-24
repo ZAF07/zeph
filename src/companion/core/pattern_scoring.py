@@ -89,6 +89,22 @@ class PatternScore:
 
 
 @dataclass(frozen=True)
+class ObservationPoints:
+    """What one Observation counts for in its situation.
+
+    Attributes:
+        person: Who it is about.
+        points: Its points today; negative when against.
+        made_up: Whether it answers a made-up situation (a "what if"
+            answer) and not something from their life.
+    """
+
+    person: str
+    points: float
+    made_up: bool
+
+
+@dataclass(frozen=True)
 class PlannedPatternMoves:
     """What scoring a User's Patterns again changes.
 
@@ -184,14 +200,17 @@ def strongest_people_sum(points_by_person: Mapping[str, float], cap: int) -> flo
     return sum(strongest[:cap])
 
 
-def score_situation(points: Sequence[tuple[str, float]], cap: int) -> PatternScore:
+def score_situation(points: Sequence[ObservationPoints], cap: int) -> PatternScore:
     """Score one situation from the points of its Observations.
 
     For it and against it are counted apart: on each side only the strongest
-    Observation per person counts, up to the cap of people.
+    Observation per person counts, up to the cap of people. The Pattern
+    showed in the situation only when something from their life counts for
+    it there: "what if" answers add points, but alone they never make a
+    situation.
 
     Args:
-        points: Each Observation's person and points.
+        points: What each of its Observations counts for.
         cap: The most people who count on each side.
 
     Returns:
@@ -199,14 +218,15 @@ def score_situation(points: Sequence[tuple[str, float]], cap: int) -> PatternSco
     """
     strongest_for: dict[str, float] = {}
     strongest_against: dict[str, float] = {}
-    for person, value in points:
-        side = strongest_for if value > 0 else strongest_against
-        if abs(value) > abs(side.get(person, 0.0)):
-            side[person] = value
+    for counted in points:
+        side = strongest_for if counted.points > 0 else strongest_against
+        if abs(counted.points) > abs(side.get(counted.person, 0.0)):
+            side[counted.person] = counted.points
     points_for = strongest_people_sum(strongest_for, cap)
     points_against = strongest_people_sum(strongest_against, cap)
+    showed = any(counted.points > 0 and not counted.made_up for counted in points)
     return PatternScore(
-        points=points_for + points_against, situations=1 if points_for > 0 else 0
+        points=points_for + points_against, situations=1 if showed else 0
     )
 
 
@@ -227,12 +247,13 @@ def score_observations(
     Returns:
         The sum over its situations, and how many it showed in.
     """
-    by_situation: dict[Hashable, list[tuple[str, float]]] = {}
+    by_situation: dict[Hashable, list[ObservationPoints]] = {}
     for observation in observations:
         by_situation.setdefault(situation_of(observation), []).append(
-            (
-                person_of(observation),
-                observation_points(observation, sign_strengths, numbers, today),
+            ObservationPoints(
+                person=person_of(observation),
+                points=observation_points(observation, sign_strengths, numbers, today),
+                made_up=observation.evidence_kind == EvidenceKind.WHAT_IF_ANSWER,
             )
         )
     scores = [

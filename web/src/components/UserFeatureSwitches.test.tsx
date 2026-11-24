@@ -36,6 +36,7 @@ const ren: AdminUser = {
   has_portrait: false,
   pattern_counts: noPatterns,
   kept_quote_count: 0,
+  familiarity: "new",
 };
 
 const webSearch: UserFeatureStatus = {

@@ -34,3 +34,5 @@ Safe means: no exclusion of its Pattern Type applies (the tagging step flags the
 - `04-explorations-and-the-agenda.md`
 
 ## Comments
+
+- 25 Nov 2026 (from issue 06): scoring now counts a situation only when something other than a "what if" answer counts for the Pattern there (`score_situation` in `core/pattern_scoring.py`). The ready gate should use the same situations count, so Thought Experiment answers alone never make a Pattern ready.

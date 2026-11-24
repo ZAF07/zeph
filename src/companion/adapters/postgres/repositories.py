@@ -114,6 +114,8 @@ from companion.core.models import (
     ExplorationState,
     ExplorationTry,
     ExplorationWay,
+    Familiarity,
+    FamiliarityCounts,
     Feature,
     FeatureSwitch,
     HeldBack,
@@ -305,6 +307,7 @@ def _to_user(row: Row[Any]) -> User:
         settings_changed_by_admin=_to_setting_stamps(row.settings_changed_by_admin),
         data_deletion_requested_at=row.data_deletion_requested_at,
         pattern_noticing_told_at=row.pattern_noticing_told_at,
+        familiarity=Familiarity(row.familiarity),
     )
 
 
@@ -1090,6 +1093,73 @@ class PostgresUserRepository:
                 .returning(users)
             ).one()
         return _to_user(row)
+
+    def familiarity_counts(self, user_id: UUID) -> FamiliarityCounts:
+        """Count what the Companion has of a User, for their Familiarity.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            Their Conversations, Life Threads, Observations from real
+            stories and Patterns in each state.
+        """
+        conversation_count = (
+            select(func.count())
+            .select_from(conversations)
+            .where(conversations.c.user_id == user_id)
+            .scalar_subquery()
+        )
+        life_thread_count = (
+            select(func.count())
+            .select_from(life_threads)
+            .where(life_threads.c.user_id == user_id)
+            .scalar_subquery()
+        )
+        real_story_count = (
+            select(func.count())
+            .select_from(observations)
+            .where(
+                observations.c.user_id == user_id,
+                observations.c.evidence_kind == EvidenceKind.REAL_STORY,
+            )
+            .scalar_subquery()
+        )
+        with self._database.connect() as connection:
+            counts = connection.execute(
+                select(
+                    conversation_count.label("conversations"),
+                    life_thread_count.label("life_threads"),
+                    real_story_count.label("real_stories"),
+                )
+            ).one()
+            pattern_rows = connection.execute(
+                select(patterns.c.state, func.count())
+                .where(patterns.c.user_id == user_id)
+                .group_by(patterns.c.state)
+            ).all()
+        return FamiliarityCounts(
+            conversations=counts.conversations,
+            life_threads=counts.life_threads,
+            real_story_observations=counts.real_stories,
+            pattern_states={
+                PatternState(state): count for state, count in pattern_rows
+            },
+        )
+
+    def save_familiarity(self, user_id: UUID, familiarity: Familiarity) -> None:
+        """Save how well the Companion knows a User.
+
+        Args:
+            user_id: The User's ID.
+            familiarity: Their Familiarity now.
+        """
+        with self._database.begin() as connection:
+            connection.execute(
+                update(users)
+                .where(users.c.id == user_id)
+                .values(familiarity=familiarity.value)
+            )
 
 
 class PostgresPendingAuthAccountDeletionRepository:
@@ -4437,7 +4507,9 @@ class PostgresThoughtExperimentRepository:
         return _to_thought_experiment(row)
 
     def close_waiting(self, thought_experiment_id: UUID) -> None:
-        """Close every waiting aimed Curiosity that would put it to a User.
+        """Close every waiting Curiosity that would put it to a User.
+
+        Both an Exploration's try and a starter for a new User.
 
         Args:
             thought_experiment_id: Its ID.
@@ -4447,11 +4519,14 @@ class PostgresThoughtExperimentRepository:
                 update(curiosities)
                 .where(
                     curiosities.c.state == CuriosityState.WAITING,
-                    curiosities.c.id.in_(
-                        select(exploration_tries.c.curiosity_id).where(
-                            exploration_tries.c.thought_experiment_id
-                            == thought_experiment_id
-                        )
+                    or_(
+                        curiosities.c.thought_experiment_id == thought_experiment_id,
+                        curiosities.c.id.in_(
+                            select(exploration_tries.c.curiosity_id).where(
+                                exploration_tries.c.thought_experiment_id
+                                == thought_experiment_id
+                            )
+                        ),
                     ),
                 )
                 .values(state=CuriosityState.CLOSED)
@@ -4461,21 +4536,24 @@ class PostgresThoughtExperimentRepository:
         """Count how many times each Thought Experiment was put to a User.
 
         Returns:
-            How many of its aimed Curiosities were asked, by its ID; one
-            never asked is left out.
+            How many of its Curiosities were asked, by its ID, whether for an
+            Exploration or as a starter; one never asked is left out.
         """
+        put = func.coalesce(
+            curiosities.c.thought_experiment_id,
+            exploration_tries.c.thought_experiment_id,
+        )
         with self._database.connect() as connection:
             rows = connection.execute(
-                select(exploration_tries.c.thought_experiment_id, func.count())
-                .join(
-                    curiosities,
-                    curiosities.c.id == exploration_tries.c.curiosity_id,
+                select(put, func.count())
+                .select_from(
+                    curiosities.outerjoin(
+                        exploration_tries,
+                        exploration_tries.c.curiosity_id == curiosities.c.id,
+                    )
                 )
-                .where(
-                    exploration_tries.c.thought_experiment_id.is_not(None),
-                    curiosities.c.raised_at.is_not(None),
-                )
-                .group_by(exploration_tries.c.thought_experiment_id)
+                .where(put.is_not(None), curiosities.c.raised_at.is_not(None))
+                .group_by(put)
             ).all()
         return {row[0]: row[1] for row in rows}
 
@@ -4508,6 +4586,7 @@ def _to_curiosity(row: Row[Any]) -> Curiosity:
         how_sure=HowSure(row.how_sure) if row.how_sure else None,
         exploration_id=row.exploration_id,
         source_observation_id=row.source_observation_id,
+        thought_experiment_id=row.thought_experiment_id,
     )
 
 
@@ -4578,6 +4657,26 @@ class PostgresCuriosityRepository:
                 .where(
                     curiosities.c.user_id == user_id,
                     curiosities.c.aim == CuriosityAim.EXPLORATION,
+                )
+                .order_by(curiosities.c.position)
+            ).all()
+        return [_to_curiosity(row) for row in rows]
+
+    def list_starters(self, user_id: UUID) -> list[Curiosity]:
+        """List a User's starter Thought Experiment Curiosities, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Curiosities with the starter aim, in any state.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(curiosities)
+                .where(
+                    curiosities.c.user_id == user_id,
+                    curiosities.c.aim == CuriosityAim.STARTER,
                 )
                 .order_by(curiosities.c.position)
             ).all()

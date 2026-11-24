@@ -33,6 +33,7 @@ const maya: AdminUser = {
   has_portrait: true,
   pattern_counts: { ...noPatterns, noticed: 3, suspected: 1, confirmed: 2 },
   kept_quote_count: 5,
+  familiarity: "knows_well",
 };
 
 const ren: AdminUser = {
@@ -49,6 +50,7 @@ const ren: AdminUser = {
   has_portrait: false,
   pattern_counts: noPatterns,
   kept_quote_count: 0,
+  familiarity: "new",
 };
 
 function rowFor(name: string): HTMLElement {
@@ -157,6 +159,9 @@ describe("AdminUsers", () => {
     );
     expect(panel.queryByText("Closed Patterns")).toBeNull();
     expect(panel.getByText("Move outcomes").nextSibling).toHaveTextContent("3");
+    expect(panel.getByText("Familiarity").nextSibling).toHaveTextContent(
+      "Knows well",
+    );
     expect(panel.getByText("Kept quotes").nextSibling).toHaveTextContent("5");
     expect(panel.getByText("Portrait").nextSibling).toHaveTextContent(
       "Written",
@@ -180,6 +185,7 @@ describe("AdminUsers", () => {
     );
     expect(panel.queryByText("Noticed Patterns")).toBeNull();
     expect(panel.queryByText("Kept quotes")).toBeNull();
+    expect(panel.getByText("Familiarity").nextSibling).toHaveTextContent("New");
   });
 
   it("makes a User an Admin", async () => {

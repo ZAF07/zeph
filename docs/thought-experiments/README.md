@@ -82,7 +82,7 @@ edited, switched off or archived. So:
 | Wording | The situation and its question, as the User hears it. | The reply (in its own words) and the tagging step. |
 | Pattern Type, Its look-alike | The two Pattern Types its answer tells apart, from the catalog. The order doesn't matter. | Code, to pick it for the pair with the most unclear stories. |
 | Sensitivity | Low, medium or high, as a Curiosity's. | The Reply Plan and the Check-ins model, which are told it and wait for a better moment for a sensitive one. |
-| Starter | Broad enough to put to a new User in their first Conversations. | Nothing yet: starter questions come with issue 06. Any Thought Experiment, starter or not, can be picked for an Exploration. |
+| Starter | Broad enough to put to a new User in their first Conversations. | Code, to pick the next one for a new User (see "Starters for new Users" below). Any Thought Experiment, starter or not, can also be picked for an Exploration. |
 | On | Whether Zeph may ask it. | Code. Switching it off closes any Curiosity waiting to ask it. |
 
 The Dashboard also shows how many times each one was asked.
@@ -190,6 +190,34 @@ it, so it is archived instead.
 A User who was already asked one is never asked it again, even after an
 edit.
 
+## Starters for new Users
+
+While Zeph is new to a User (their Familiarity, shown on the Users page) and
+Pattern exploring works for them, code puts starter Thought Experiments to
+them in their first Conversations:
+
+- The oldest starter that is on, not archived and never put to them comes
+  first.
+- The next one is written when a Conversation ends, so the first is asked in
+  their second Conversation.
+- It is asked like any Curiosity: the Reply Plan picks the moment under the
+  usual Need rules, and it may be skipped.
+- Its answer is a "what if" answer. Such answers add to a Pattern's score but
+  alone never make it suspected.
+
+Three numbers on Platform settings (Patterns section) limit them:
+
+| Setting | Starts at | What it does |
+|---|---|---|
+| Starter Thought Experiments for a new User | 4 | The most put to one User. |
+| Days starter Thought Experiments are offered | 14 | Days after sign-up they are offered. |
+| Starter Thought Experiments per Conversation | 1 | The most in one Conversation. |
+
+They stop once Zeph is getting to know the User (by default 5 Conversations
+and 3 Life Threads, or a first suspected Pattern), when the days have passed,
+or when the User asks Zeph to drop one. To stop them for everyone, set the
+first number to 0 or unmark every starter.
+
 ## The first set
 
 31 Thought Experiments, drafted by Claude on 24 Nov 2026 for the owner to
@@ -211,7 +239,7 @@ Type they name is in the catalog.
 
 - The leading-wording check is a word list. It misses leading questions that
   use none of its words.
-- Starter Thought Experiments for new Users, and Familiarity, come with
-  issue 06. Until then the starter flag is only stored.
+- Starters are picked oldest first, not by area. To change the order, switch
+  off the ones to skip.
 - Whether a Thought Experiment really tells its two Pattern Types apart is
   untested. The whole-pipeline Eval (issue 19) and real answers will show it.

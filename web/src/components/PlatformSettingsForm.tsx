@@ -268,6 +268,36 @@ const fieldSections: {
         label: "Thought Experiments per Pattern a week",
         unit: "a week",
       },
+      {
+        key: "familiarity_conversations",
+        label: "Conversations to be getting to know",
+        unit: "chats",
+      },
+      {
+        key: "familiarity_life_threads",
+        label: "Life Threads to be getting to know",
+        unit: "threads",
+      },
+      {
+        key: "familiarity_real_stories",
+        label: "Real stories to be getting to know",
+        unit: "stories",
+      },
+      {
+        key: "starter_thought_experiments",
+        label: "Starter Thought Experiments for a new User",
+        unit: "in all",
+      },
+      {
+        key: "starter_thought_experiment_days",
+        label: "Days starter Thought Experiments are offered",
+        unit: "days",
+      },
+      {
+        key: "starter_thought_experiments_per_conversation",
+        label: "Starter Thought Experiments per Conversation",
+        unit: "per chat",
+      },
     ],
   },
   {

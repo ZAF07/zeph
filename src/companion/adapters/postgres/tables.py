@@ -66,6 +66,7 @@ users = Table(
     Column("settings_changed_by_admin", JSONB, nullable=False, server_default="{}"),
     Column("data_deletion_requested_at", DateTime(timezone=True)),
     Column("pattern_noticing_told_at", DateTime(timezone=True)),
+    Column("familiarity", Text, nullable=False, server_default="new"),
 )
 
 telegram_connections = Table(
@@ -502,6 +503,12 @@ curiosities = Table(
         "source_observation_id",
         Uuid,
         ForeignKey("observations.id", ondelete="CASCADE"),
+        index=True,
+    ),
+    Column(
+        "thought_experiment_id",
+        Uuid,
+        ForeignKey("thought_experiments.id"),
         index=True,
     ),
     Index("ix_curiosities_user_id_state", "user_id", "state"),

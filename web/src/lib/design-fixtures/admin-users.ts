@@ -27,6 +27,7 @@ function listedUser(
     kept_quote_count: 0,
     has_portrait: false,
     pattern_counts: noPatterns,
+    familiarity: "new",
     ...user,
   };
 }
@@ -46,6 +47,7 @@ const users: AdminUser[] = [
     kept_quote_count: 0,
     has_portrait: true,
     pattern_counts: { ...noPatterns, confirmed: 2 },
+    familiarity: "knows_well",
   }),
   listedUser({
     id: "design-priya",
