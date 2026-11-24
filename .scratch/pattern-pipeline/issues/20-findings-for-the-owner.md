@@ -240,4 +240,41 @@ If there is nothing, the section holds one line: "Nothing found."
 - **Impact:** A Tagging run may now fail cases where the model picks a fair new look-alike, and each run costs several times more (the whole catalog goes in every call).
 - **Suggested fix:** Run the Tagging Eval once (show the estimate first), then correct expectations to "unclear" with the right pair where the new types fit. An hour plus the run.
 
+## 16 — Existing Patterns move across, and free noticing becomes unmatched Patterns (2026-11-25)
+
+### A push-back on a confirmed old Pattern is no longer recorded
+
+- **Kind:** risk
+- **What:** a confirmed Pattern kept before the Pattern Catalog can still be offered with the Read (`read_pattern_offered` in `core/reply_plan.py`), but the keeping step no longer reads how the User took it (`plan_pattern_changes` in `core/patterns.py`). `last_offered_at` and `last_reaction` stay as they were.
+- **Impact:** the live User can reject a Pattern they once agreed with and Zeph keeps using and offering it, with no wait. The Reply Plan keeps reading "they agreed".
+- **Suggested fix:** in issue 09 (contested), read the reaction to an offered confirmed Pattern in code's terms and make it contested. Until then, a small option is to stop offering old confirmed Patterns. An hour either way.
+
+### The ready gate doesn't know a User already agreed with a matched Pattern
+
+- **Kind:** potential failure
+- **What:** a match is a link (`patterns.matched_pattern_type_id`); the old confirmed Pattern and the Pattern of that Pattern Type are two rows. Nothing yet reads the link.
+- **Impact:** once sharing is built, Zeph could share as new a Pattern the User agreed with months ago.
+- **Suggested fix:** in issue 07, make "the User has a confirmed Pattern matched to this Pattern Type" an input to the gate (block, or share as "you've seen this before"). Small, inside that issue.
+
+### Old evidence past Message Retention can't become Observations
+
+- **Kind:** risk
+- **What:** tagging again needs the User's exact words, so only Conversations whose messages are still kept (30 days) are tagged (`PatternMatcher._tag_again`). The command reports these as "evidence days with no messages left".
+- **Impact:** most of the live User's older evidence gives no Observations when their Patterns are matched; those Patterns of Pattern Types start from what they say from now on.
+- **Suggested fix:** run `make match-patterns` on production soon after Pattern noticing is on and the User has pressed "Got it", while more messages are still kept. No code.
+
+### A Pattern keeps its first match
+
+- **Kind:** risk
+- **What:** `list_not_matched` leaves out any Pattern that has a link, so one matched to a Pattern Type is never checked against a better one added later.
+- **Impact:** an old Pattern can stay linked to a near fit after its true Pattern Type is written.
+- **Suggested fix:** let `make match-patterns TYPES=…` also look at Patterns already matched, and keep the new link only when the model picks the new Pattern Type over the old. A few hours, with a test.
+
+### An unreadable matching answer is reported as "fits no Pattern Type"
+
+- **Kind:** bug
+- **What:** `PatternMatcher._ask` returns None both when the model says none and when two answers in a row can't be read; the report prints the same line for both (a warning goes to the backend log).
+- **Impact:** an Admin can't tell a model failure from a real "no fit". The Pattern is asked about again on the next run, so nothing is lost.
+- **Suggested fix:** carry "couldn't be read" in `PatternMatch` and print it. Under an hour.
+
 ## Comments

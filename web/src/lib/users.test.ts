@@ -32,12 +32,14 @@ describe("otherPatternCounts", () => {
       otherPatternCounts({
         ...noPatterns,
         closed: 1,
+        unmatched: 4,
         noticed: 4,
         confirmed: 2,
       }),
     ).toEqual([
       { label: "Noticed Patterns", value: "4" },
       { label: "Closed Patterns", value: "1" },
+      { label: "Unmatched Patterns", value: "4" },
     ]);
   });
 

@@ -1356,10 +1356,10 @@ class ObservationRepository(Protocol):
 class PatternRepository(Protocol):
     """Stores each User's Patterns, and the log of their moves.
 
-    A Pattern kept under the old rules has no Pattern Type, its own evidence
-    and is found by meaning; only those are read by the methods that return
-    a `Pattern`. A Pattern of a Pattern Type is fed by Observations and moved
-    by code.
+    A Pattern with no Pattern Type (an unmatched one, or one kept before the
+    Pattern Catalog) has its own words and evidence and is found by meaning;
+    only those are read by the methods that return a `Pattern`. A Pattern of
+    a Pattern Type is fed by Observations and moved by code.
     """
 
     def list_for_user(self, user_id: UUID) -> list[Pattern]:
@@ -1447,6 +1447,26 @@ class PatternRepository(Protocol):
 
         Args:
             user_id: The User's ID.
+        """
+        ...
+
+    def list_not_matched(self) -> list[Pattern]:
+        """List every User's Patterns with no Pattern Type and none matched.
+
+        Returns:
+            The Patterns, each User's together, oldest started first, each
+            with its evidence oldest first.
+        """
+        ...
+
+    def save_match(self, pattern_id: UUID, pattern_type_id: str) -> None:
+        """Save the Pattern Type a Pattern with none of its own was found to fit.
+
+        The Pattern keeps its words, state and evidence.
+
+        Args:
+            pattern_id: The Pattern's ID.
+            pattern_type_id: The Pattern Type's ID.
         """
         ...
 

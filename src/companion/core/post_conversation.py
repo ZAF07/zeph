@@ -705,8 +705,7 @@ class PostConversationProcessor:
                 noticing works.
             pattern_scorer: Scores and moves the User's Patterns of Pattern
                 Types while Pattern noticing works.
-            pattern_keeper: Starts, adds to, confirms and closes the User's
-                Patterns.
+            pattern_keeper: Notes the User's unmatched Patterns.
             curiosity_keeper: Writes, updates and closes the User's
                 Curiosities.
             agenda_keeper: Keeps the User's Agenda and writes its aimed
@@ -745,7 +744,7 @@ class PostConversationProcessor:
         answer is never retried forever. Once the Conversation is marked
         processed, its Life Threads are kept, then its Observations are
         tagged and the User's Patterns of Pattern Types scored while Pattern
-        noticing works, then its Patterns from the
+        noticing works, then its unmatched Patterns from the
         Threads it touched, then its Curiosities while the
         Curiosities Feature works, then the Agenda while Pattern exploring
         works too, then its Move Outcomes, and then the User

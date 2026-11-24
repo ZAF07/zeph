@@ -310,6 +310,9 @@ PATTERN_KEEPING_DAYS = Setting("pattern_keeping_days", read_whole_number)
 PATTERN_TAGGING_MODEL = Setting("pattern_tagging_model", read_text)
 PATTERN_TAGGING_THINKING = Setting("pattern_tagging_thinking", read_on_off)
 PATTERN_TAGGING_PROMPT = Setting("pattern_tagging_prompt", read_text)
+PATTERN_MATCHING_MODEL = Setting("pattern_matching_model", read_text)
+PATTERN_MATCHING_THINKING = Setting("pattern_matching_thinking", read_on_off)
+PATTERN_MATCHING_PROMPT = Setting("pattern_matching_prompt", read_text)
 PATTERN_WEAK_SIGN_POINTS = Setting("pattern_weak_sign_points", read_whole_number)
 PATTERN_MODERATE_SIGN_POINTS = Setting(
     "pattern_moderate_sign_points", read_whole_number
@@ -1025,12 +1028,35 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
         hint=THINKING_HINT,
     ),
     EditableSetting(
+        PATTERN_MATCHING_PROMPT.key,
+        "Pattern matching prompt",
+        SettingKind.TEXT,
+        hint=(
+            "How to say which Pattern Type, if any, a Pattern written before the "
+            "Pattern Catalog or an unmatched one fits. It runs only when an Admin "
+            "runs the matching command."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_MATCHING_MODEL.key,
+        "Pattern matching model",
+        SettingKind.MODEL,
+        hint=MODEL_HINT,
+    ),
+    EditableSetting(
+        PATTERN_MATCHING_THINKING.key,
+        "Pattern matching thinking",
+        SettingKind.ON_OFF,
+        hint=THINKING_HINT,
+    ),
+    EditableSetting(
         PATTERN_KEEPING_PROMPT.key,
         "Pattern keeping prompt",
         SettingKind.TEXT,
         hint=(
-            "What counts as a Pattern. It runs once a Conversation ends, after Life "
-            "Threads are kept."
+            "What counts as an unmatched Pattern: a way of acting that shows in "
+            "two or more Life Threads and fits no Pattern Type. It runs once a "
+            "Conversation ends, after Life Threads are kept."
         ),
     ),
     EditableSetting(
@@ -2009,11 +2035,25 @@ CORE_SERVICES: tuple[CoreService, ...] = (
         thinking_key=PATTERN_TAGGING_THINKING.key,
     ),
     CoreService(
+        name="Pattern matching",
+        runs_when="Only when an Admin runs the matching command",
+        description=(
+            "Says which Pattern Type, if any, a Pattern with none fits. Code keeps "
+            "the answer only when the Pattern Type is in the Pattern Catalog, then "
+            "tags the Conversations behind the Pattern’s evidence again against it."
+        ),
+        prompt_key=PATTERN_MATCHING_PROMPT.key,
+        model_key=PATTERN_MATCHING_MODEL.key,
+        thinking_key=PATTERN_MATCHING_THINKING.key,
+    ),
+    CoreService(
         name="Pattern keeping",
         runs_when="Conversation end · after Life Threads",
         description=(
             "Looks across Life Threads for the same way of thinking, feeling or "
-            "acting, and keeps it as a Pattern."
+            "acting that fits no Pattern Type, and keeps it as an unmatched "
+            "Pattern. It never starts, confirms or closes a Pattern of a Pattern "
+            "Type."
         ),
         prompt_key=PATTERN_KEEPING_PROMPT.key,
         model_key=PATTERN_KEEPING_MODEL.key,

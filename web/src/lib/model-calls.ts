@@ -20,6 +20,7 @@ export const modelSteps: { id: ModelStep; label: string }[] = [
   { id: "curiosities", label: "Curiosities" },
   { id: "move_outcomes", label: "Move Outcomes" },
   { id: "pattern_tagging", label: "Pattern tagging" },
+  { id: "pattern_matching", label: "Pattern matching" },
   { id: "patterns", label: "Pattern keeping" },
   { id: "portrait", label: "User Portrait" },
   { id: "personal_stickers", label: "Personal Stickers" },
@@ -30,6 +31,7 @@ const traceKindLabels: Record<TraceKind, string> = {
   check_in: "Check-in",
   conversation_end: "Conversation end",
   portrait_rewrite: "Portrait rewrite",
+  pattern_matching: "Pattern matching",
 };
 
 /**

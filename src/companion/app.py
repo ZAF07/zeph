@@ -400,6 +400,7 @@ def create_app(dependencies: AppDependencies) -> FastAPI:
             pattern_scorer=pattern_scorer,
             pattern_keeper=PatternKeeper(
                 repositories=dependencies.repositories,
+                pattern_catalog=pattern_catalog_service,
                 chat_model=chat_model,
                 embedder=dependencies.embedder,
                 clock=dependencies.clock,

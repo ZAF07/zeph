@@ -529,6 +529,38 @@ def check_observation(entry: Any, context: TaggingContext) -> Observation | Drop
     )
 
 
+def repeat_key(observation: Observation) -> tuple[str, str, str]:
+    """Say what makes an Observation a repeat of another from its Conversation.
+
+    Args:
+        observation: The Observation.
+
+    Returns:
+        Its Pattern Type, sign and quote, evened out.
+    """
+    return (
+        observation.pattern_type_id,
+        observation.sign_id,
+        even_out(observation.quote),
+    )
+
+
+def may_keep_observations(snapshot: UserSnapshot) -> bool:
+    """Say whether Zeph may keep a User's words as Observations.
+
+    Args:
+        snapshot: The User.
+
+    Returns:
+        True while Pattern noticing works for them and they have pressed
+        "Got it" on the notice saying so.
+    """
+    return (
+        snapshot.works(Feature.PATTERN_NOTICING)
+        and snapshot.user.pattern_noticing_told_at is not None
+    )
+
+
 def plan_observations(
     entries: list[Any], context: TaggingContext
 ) -> PlannedObservations:
@@ -552,11 +584,7 @@ def plan_observations(
         if isinstance(observation, DropReason):
             dropped.append(DroppedEntry(entry, observation))
             continue
-        key = (
-            observation.pattern_type_id,
-            observation.sign_id,
-            even_out(observation.quote),
-        )
+        key = repeat_key(observation)
         if key in seen:
             dropped.append(DroppedEntry(entry, DropReason.REPEAT))
             continue
@@ -722,24 +750,114 @@ class PatternTagger:
             The Observations kept and those dropped; None when the step
             didn't run or its answer couldn't be read.
         """
-        if not snapshot.works(Feature.PATTERN_NOTICING):
+        if not may_keep_observations(snapshot):
             return None
-        if snapshot.user.pattern_noticing_told_at is None:
-            return None
-        user_texts = users_own_texts(messages)
         pattern_types = [
             entry.pattern_type for entry in self._pattern_catalog.catalog()
         ]
+        unclear = self._unclear_asked_in(snapshot, conversation_id)
+        tagged = self._tag(
+            snapshot, conversation_id, messages, touched, pattern_types, unclear
+        )
+        if tagged is None:
+            return None
+        planned, settled = tagged
+        self._repositories.observations.add_many(planned.kept)
+        self._repositories.observations.settle(
+            plan_settled(
+                settled,
+                unclear,
+                {pattern_type.id: pattern_type for pattern_type in pattern_types},
+            )
+        )
+        return planned
+
+    def tag_again(
+        self,
+        snapshot: UserSnapshot,
+        conversation_id: UUID,
+        messages: list[ConversationMessage],
+        threads: Sequence[LifeThread],
+        pattern_types: Sequence[PatternType],
+    ) -> list[Observation]:
+        """Tag a past Conversation again, against some Pattern Types only.
+
+        Used when stored evidence is found to fit a Pattern Type after its
+        Conversation ended. The same rules and checks as `tag_from` apply.
+        An Observation already kept from that Conversation (the same
+        Pattern Type, sign and quote) is not kept twice.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            conversation_id: The past Conversation.
+            messages: Its messages still kept, oldest first.
+            threads: The Life Threads the stored evidence is in.
+            pattern_types: The Pattern Types to tag against.
+
+        Returns:
+            The new Observations kept; none when the step didn't run or its
+            answer couldn't be read.
+        """
+        if not may_keep_observations(snapshot):
+            return []
+        tagged = self._tag(
+            snapshot, conversation_id, messages, threads, pattern_types, {}
+        )
+        if tagged is None:
+            return []
+        already_kept = {
+            repeat_key(observation)
+            for observation in self._repositories.observations.list_for_user(
+                snapshot.user.id
+            )
+            if observation.conversation_id == conversation_id
+        }
+        new = [
+            observation
+            for observation in tagged[0].kept
+            if repeat_key(observation) not in already_kept
+        ]
+        self._repositories.observations.add_many(new)
+        return new
+
+    def _tag(
+        self,
+        snapshot: UserSnapshot,
+        conversation_id: UUID,
+        messages: list[ConversationMessage],
+        threads: Sequence[LifeThread],
+        pattern_types: Sequence[PatternType],
+        unclear: Mapping[int, Observation],
+    ) -> tuple[PlannedObservations, list[Any]] | None:
+        """Ask the model for a Conversation's Observations and check them.
+
+        Nothing is saved but how many were tagged and dropped, in the Model
+        Call Log.
+
+        Args:
+            snapshot: The User whose Conversation it was.
+            conversation_id: The Conversation.
+            messages: Its messages, oldest first.
+            threads: The Life Threads an Observation may belong to.
+            pattern_types: The Pattern Types to tag against.
+            unclear: The unclear stories asked about in it, by number.
+
+        Returns:
+            The Observations that passed and those dropped, and the unclear
+            stories the model settled; None when the User wrote nothing in
+            their own words, there is no Pattern Type or the answer couldn't
+            be read.
+        """
+        user_texts = users_own_texts(messages)
         if not user_texts or not pattern_types:
             return None
-        threads = dict(enumerate(touched, start=1))
+        numbered_threads = dict(enumerate(threads, start=1))
         now = self._clock.now()
         time_zone = snapshot.user.time_zone
-        unclear = self._unclear_asked_in(snapshot, conversation_id)
         answer = self._ask(
             snapshot,
             describe_conversation_to_tag(
-                threads, pattern_types, messages, now, time_zone, unclear
+                numbered_threads, pattern_types, messages, now, time_zone, unclear
             ),
         )
         if answer is None:
@@ -754,7 +872,7 @@ class PatternTagger:
                 pattern_types={
                     pattern_type.id: pattern_type for pattern_type in pattern_types
                 },
-                threads=threads,
+                threads=numbered_threads,
                 user_texts=user_texts,
                 time_zone=time_zone,
                 now=now,
@@ -763,15 +881,7 @@ class PatternTagger:
         self._model_call_log.record_tagging_shape(
             snapshot, TaggingShape(tagged=len(entries), dropped=planned.dropped)
         )
-        self._repositories.observations.add_many(planned.kept)
-        self._repositories.observations.settle(
-            plan_settled(
-                settled,
-                unclear,
-                {pattern_type.id: pattern_type for pattern_type in pattern_types},
-            )
-        )
-        return planned
+        return planned, settled
 
     def _unclear_asked_in(
         self, snapshot: UserSnapshot, conversation_id: UUID

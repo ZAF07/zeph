@@ -31,7 +31,12 @@ from tests.test_pattern_tagging import (
     tagging_answer,
     turn_noticing_on,
 )
-from tests.test_patterns import GOES_QUIET, start_goes_quiet_pattern
+from tests.test_patterns import (
+    GOES_QUIET,
+    evidence,
+    pattern_keeping_answer,
+    start_goes_quiet_pattern,
+)
 from tests.test_patterns import patterns_of as old_patterns_of
 from tests.test_recent_messages import change_settings
 
@@ -318,6 +323,51 @@ def test_patterns_of_pattern_types_reach_no_reply_and_no_old_pattern_step(
         "/api/patterns", headers=auth_headers(auth_verifier, "user_maya")
     )
     assert patterns_tab.json()["patterns"] == []
+
+
+def test_the_keeping_step_cant_change_a_pattern_of_a_pattern_type(
+    client: TestClient,
+    auth_verifier: FakeAuthVerifier,
+    chat_channel: FakeChatChannel,
+    chat_model: ScriptedChatModel,
+    clock: FakeClock,
+    scheduler: FakeScheduler,
+    seeded_settings: dict[str, Any],
+) -> None:
+    connect_telegram(client, auth_verifier, chat_channel)
+    user_id = turn_noticing_on(client, auth_verifier)
+    end_tagged_conversation(
+        client, chat_model, clock, scheduler, seeded_settings, MEI_STORY, WORK_STORY
+    )
+    before = patterns_of(client.engine, user_id)
+    moves_before = moves_of(client.engine, user_id)
+    chat_model.script_pattern_keeping(
+        pattern_keeping_answer(
+            [
+                {
+                    "pattern": 1,
+                    "reaction": "agreed",
+                    "state": "confirmed",
+                    "evidence": [evidence(1, "Said yes to Mei again.")],
+                },
+                {"pattern": BELONG, "state": "closed"},
+            ]
+        )
+    )
+
+    end_tagged_conversation(client, chat_model, clock, scheduler, seeded_settings)
+
+    seen = chat_model.pattern_keeping_calls[-1].history[0].text
+    assert "Patterns kept so far:\nNone yet." in seen
+    looked_for = seen.split("Pattern Types Zeph already looks for:\n")[1]
+    assert (
+        "- Softening disagreement to protect belonging. If: "
+        in (looked_for.split("Patterns kept so far:")[0])
+    )
+    assert patterns_of(client.engine, user_id) == before
+    assert before[0].state == PatternState.SUSPECTED
+    assert moves_of(client.engine, user_id) == moves_before
+    assert old_patterns_of(client.engine, user_id) == []
 
 
 def test_every_scoring_number_is_a_setting_with_a_hint_and_an_eval_override(

@@ -31,6 +31,7 @@ const otherPatternStates: { state: PatternState; label: string }[] = [
   { state: "shared", label: "Shared Patterns" },
   { state: "contested", label: "Contested Patterns" },
   { state: "closed", label: "Closed Patterns" },
+  { state: "unmatched", label: "Unmatched Patterns" },
 ];
 
 /** A User with no Patterns in any state. */
@@ -42,6 +43,7 @@ export const noPatterns: Record<PatternState, number> = {
   confirmed: 0,
   contested: 0,
   closed: 0,
+  unmatched: 0,
 };
 
 /**

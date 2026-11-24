@@ -548,6 +548,7 @@ patterns = Table(
     Column("last_offered_at", DateTime(timezone=True)),
     Column("last_reaction", Text),
     Column("confirmed_at", DateTime(timezone=True)),
+    Column("matched_pattern_type_id", Text),
     Column("embedding", Vector(EMBEDDING_SIZE)),
     UniqueConstraint(
         "user_id", "pattern_type_id", name="uq_patterns_user_id_pattern_type_id"
