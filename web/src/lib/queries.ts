@@ -38,6 +38,7 @@ export const queryKeys = {
   personalStickers: ["personal-stickers"],
   adminSettings: ["admin-settings"],
   copyPage: ["copy-page"],
+  patternCatalog: ["pattern-catalog"],
   coreServices: ["core-services"],
   adminUsers: ["admin-users"],
   features: ["features"],

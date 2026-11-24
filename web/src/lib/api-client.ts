@@ -1223,6 +1223,77 @@ export type CopyTab = {
   slots: CopySlot[];
 };
 
+/** The part of life a Pattern Type is about. */
+export type PatternArea =
+  "conflict" | "approval" | "control" | "achievement" | "relationships";
+
+/** How much one sign of a Pattern Type counts. */
+export type SignStrength = "weak" | "moderate" | "strong";
+
+/**
+ * The part of a Pattern a sign shows: the situation, what goes on inside
+ * the person, or the behaviour.
+ */
+export type SignPart = "situation" | "inside" | "behaviour";
+
+/** What happens to evidence gathered while an exclusion applies. */
+export type ExcludedEvidence = "ignored" | "counted_not_shared";
+
+/** Where a Pattern Type stands in review; only approved ones are shared. */
+export type PatternTypeStatus = "draft" | "approved" | "archived";
+
+/** One sign for or against a Pattern Type. */
+export type PatternSign = {
+  id: string;
+  text: string;
+  strength: SignStrength;
+  part: SignPart;
+};
+
+/**
+ * Something a Pattern Type can be mistaken for. `pattern_type_id` is null
+ * when the look-alike is not a Pattern Type.
+ */
+export type LookAlike = {
+  pattern_type_id: string | null;
+  name: string;
+  tells_apart: string;
+};
+
+/** A time in a User's life when a Pattern Type must not be shared. */
+export type PatternExclusion = { text: string; evidence: ExcludedEvidence };
+
+/**
+ * One Pattern Type of the Pattern Catalog, as Admins read it (ADR-0025).
+ * `anyone_would` is what anyone would do in the situation, which is no
+ * evidence of it. `approved_by` and `approved_on` are set once approved.
+ * `other_versions` are its other stored versions, newest first.
+ */
+export type PatternType = {
+  id: string;
+  version: string;
+  area: PatternArea;
+  name: string;
+  definition: string;
+  if_situation: string;
+  then_behaviour: string;
+  function: string;
+  frameworks: string[];
+  signs: PatternSign[];
+  signs_against: PatternSign[];
+  look_alikes: LookAlike[];
+  anyone_would: string | null;
+  exclusions: PatternExclusion[];
+  approved_wording: string;
+  prediction_wording: string;
+  numbers: { situations_needed: number; base_rate: number };
+  status: PatternTypeStatus;
+  approved_by: string | null;
+  approved_on: string | null;
+  loaded_at: string;
+  other_versions: string[];
+};
+
 /** Every call the Dashboard makes to the backend. */
 export type ApiClient = {
   getMe: () => Promise<Me>;
@@ -1274,6 +1345,7 @@ export type ApiClient = {
   getAdminSettings: () => Promise<AdminSettings>;
   getCopyPage: () => Promise<CopyTab[]>;
   saveCopyTab: (tab: string, texts: Copy) => Promise<CopyTab[]>;
+  getPatternCatalog: () => Promise<PatternType[]>;
   updateAdminSettings: (
     values: Record<string, SettingValue>,
   ) => Promise<AdminSettings>;
@@ -1604,6 +1676,12 @@ export function createApiClient(
           { texts },
         )
       ).tabs,
+    getPatternCatalog: async () =>
+      (
+        await request<{ pattern_types: PatternType[] }>(
+          "/api/admin/pattern-catalog",
+        )
+      ).pattern_types,
     getCoreServices: () => request<CoreServices>("/api/admin/core-services"),
     listHelplines: () => request<Helplines>("/api/admin/helplines"),
     addHelpline: (helpline) =>

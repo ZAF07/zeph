@@ -161,6 +161,16 @@ copy_slots = Table(
     Column("updated_by", Uuid, ForeignKey("users.id", ondelete="SET NULL")),
 )
 
+pattern_types = Table(
+    "pattern_types",
+    metadata,
+    Column("pattern_type_id", Text, primary_key=True),
+    Column("version", Text, primary_key=True),
+    Column("content", JSONB, nullable=False),
+    Column("is_current", Boolean, nullable=False),
+    Column("loaded_at", DateTime(timezone=True), nullable=False),
+)
+
 helplines = Table(
     "helplines",
     metadata,

@@ -49,6 +49,7 @@ from companion.adapters.postgres.tables import (
     need_ruled_out_moves,
     needs,
     pattern_evidence,
+    pattern_types,
     patterns,
     patterns_in_mind,
     pending_auth_account_deletions,
@@ -144,6 +145,7 @@ from companion.core.models import (
     PatternReaction,
     PatternState,
     PatternToSave,
+    PatternTypeVersion,
     PersonalSticker,
     PlatformSettings,
     RepliedToSender,
@@ -1641,6 +1643,78 @@ class PostgresPlatformSettingsRepository:
                     .where(platform_settings.c.key == key)
                     .values(value=value, updated_at=updated_at, updated_by=updated_by)
                 )
+
+
+class PostgresPatternCatalogRepository:
+    """Stores Pattern Type versions in Postgres, one row per version."""
+
+    def __init__(self, database: Database) -> None:
+        """Set up the repository.
+
+        Args:
+            database: Where to run queries: the engine, or one transaction.
+        """
+        self._database = database
+
+    def list_versions(self) -> list[PatternTypeVersion]:
+        """List every stored version of every Pattern Type.
+
+        Returns:
+            The versions, by Pattern Type ID and then newest loaded first.
+        """
+        statement = select(pattern_types).order_by(
+            pattern_types.c.pattern_type_id, pattern_types.c.loaded_at.desc()
+        )
+        with self._database.connect() as connection:
+            rows = connection.execute(statement).all()
+        return [
+            PatternTypeVersion(
+                pattern_type_id=row.pattern_type_id,
+                version=row.version,
+                content=row.content,
+                is_current=row.is_current,
+                loaded_at=row.loaded_at,
+            )
+            for row in rows
+        ]
+
+    def save_loaded(self, versions: Sequence[PatternTypeVersion]) -> None:
+        """Keep the versions just loaded as the catalog, in one step.
+
+        A version not stored yet is added. Versions stored earlier stay as
+        they were. Exactly the given versions are then the current ones.
+
+        Args:
+            versions: The version of each Pattern Type its file now holds.
+        """
+        loaded_keys = [
+            (version.pattern_type_id, version.version) for version in versions
+        ]
+        with self._database.begin() as connection:
+            if versions:
+                connection.execute(
+                    insert(pattern_types)
+                    .values(
+                        [
+                            {
+                                "pattern_type_id": version.pattern_type_id,
+                                "version": version.version,
+                                "content": version.content,
+                                "is_current": True,
+                                "loaded_at": version.loaded_at,
+                            }
+                            for version in versions
+                        ]
+                    )
+                    .on_conflict_do_nothing()
+                )
+            connection.execute(
+                update(pattern_types).values(
+                    is_current=tuple_(
+                        pattern_types.c.pattern_type_id, pattern_types.c.version
+                    ).in_(loaded_keys)
+                )
+            )
 
 
 class PostgresCopyRepository:
@@ -6555,6 +6629,7 @@ def _build_repositories(
         conversations=PostgresConversationRepository(database),
         platform_settings=PostgresPlatformSettingsRepository(database),
         copy=PostgresCopyRepository(database),
+        pattern_catalog=PostgresPatternCatalogRepository(database),
         helplines=PostgresHelplineRepository(database),
         safeguard_events=PostgresSafeguardEventRepository(database),
         memory_categories=PostgresMemoryCategoryRepository(database),

@@ -1,0 +1,81 @@
+# One Pattern Type of the Pattern Catalog (ADR-0025). Loaded when the backend
+# starts. Any change needs a new `version`: a stored version never changes,
+# and the backend refuses to start on a change that keeps its version.
+
+id: ACH.WORTH.PERF
+version: 0.1.0
+area: achievement
+name: Performance-contingent self-worth
+status: draft
+
+definition: >-
+  The person's sense of worth rises and falls with how well they perform.
+  Falling short is felt as a verdict on the self, not on the work. High
+  standards alone do not qualify; the marker is self-judgement after a miss.
+
+if: Performance is evaluated or falls short
+then: Self-criticism, over-preparation or avoidance of the task
+function: To protect a sense of being worthy
+
+frameworks:
+  - Self-critical vs high-standards dimensions of perfectionism (Frost and Hewitt–Flett traditions)
+  - Contingencies of self-worth (Crocker)
+  - Young's unrelenting-standards schema
+  - Beck's all-or-nothing and labelling distortions
+
+signs:
+  - id: I1
+    text: Labels self after a mistake ("I'm useless") rather than the act
+    strength: strong
+    part: inside
+  - id: I2
+    text: Discounts success as luck or as the minimum expected
+    strength: moderate
+    part: inside
+  - id: I3
+    text: Delays starting or shipping until it is "good enough"
+    strength: moderate
+    part: behaviour
+  - id: I4
+    text: Mood tracks recent output, e.g. a bad workday ruins the evening
+    strength: moderate
+    part: inside
+  - id: I5
+    text: Compares own output unfavourably with specific others
+    strength: weak
+    part: inside
+
+signs_against:
+  - id: D1
+    text: Describes a failure with curiosity and no self-labelling
+    strength: strong
+    part: inside
+  - id: D2
+    text: High standards that bring satisfaction, not dread
+    strength: moderate
+    part: inside
+
+look_alikes:
+  - name: High standards (healthy)
+    tells_apart: A miss brings disappointment in the work, not in the self
+  - pattern_type: CONF.AVOID.BELONG
+    tells_apart: >-
+      Fears others' reaction to the relationship, not the verdict on
+      competence
+  - pattern_type: CTRL.UNCERT.PLAN
+    tells_apart: Over-prepares to reduce unknowns, not to prove worth
+
+exclusions:
+  - text: Active burnout or job loss in the last month
+    evidence: counted_not_shared
+
+approved_wording: >-
+  How well you perform seems to decide how much you allow yourself to feel
+  okay.
+prediction_wording: >-
+  After the next piece of feedback on {domain}, notice whether your first
+  thought is about the work or about you.
+
+numbers:
+  situations_needed: 3
+  base_rate: 0.25

@@ -12,6 +12,7 @@ from testcontainers.community.postgres import PostgresContainer
 
 from companion.adapters.pgvector.vector_store import PgvectorKnowledgeVectorStore
 from companion.adapters.postgres.database import (
+    load_pattern_catalog,
     migrate,
     seed_check_in_kinds,
     seed_copy,
@@ -54,6 +55,7 @@ SEED_DIR = Path(__file__).parent.parent / "src/companion/seed"
 SEED_FILE = SEED_DIR / "platform_settings.yaml"
 HELPLINES_SEED_FILE = SEED_DIR / "helplines.yaml"
 COPY_SEED_FILE = SEED_DIR / "copy.yaml"
+PATTERN_CATALOG_DIR = SEED_DIR / "pattern_catalog"
 MEMORY_CATEGORIES_SEED_FILE = SEED_DIR / "memory_categories.yaml"
 CHECK_IN_KINDS_SEED_FILE = SEED_DIR / "check_in_kinds.yaml"
 NEEDS_SEED_FILE = SEED_DIR / "needs.yaml"
@@ -183,6 +185,7 @@ def engine(database_url: str) -> Iterator[Engine]:
             text(
                 "TRUNCATE users, telegram_connections, connection_tokens, "
                 "conversations, conversation_messages, platform_settings, copy_slots, "
+                "pattern_types, "
                 "helplines, safeguard_events, memory_categories, memory_items, "
                 "day_summaries, knowledge_documents, knowledge_chunks, "
                 "daily_usage, stickers, check_in_kinds, check_ins, "
@@ -193,6 +196,7 @@ def engine(database_url: str) -> Iterator[Engine]:
         )
     seed_platform_settings(engine, SEED_FILE)
     seed_copy(engine, COPY_SEED_FILE)
+    load_pattern_catalog(engine, PATTERN_CATALOG_DIR)
     seed_helplines(engine, HELPLINES_SEED_FILE)
     seed_memory_categories(engine, MEMORY_CATEGORIES_SEED_FILE)
     seed_check_in_kinds(engine, CHECK_IN_KINDS_SEED_FILE)

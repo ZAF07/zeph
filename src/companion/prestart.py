@@ -7,6 +7,7 @@ import yaml
 from companion.adapters.eval_case_seed import read_eval_case_seed, read_eval_image_seed
 from companion.adapters.knowledge_seed import read_knowledge_seed
 from companion.adapters.postgres.database import (
+    load_pattern_catalog,
     migrate,
     seed_check_in_kinds,
     seed_copy,
@@ -25,6 +26,7 @@ from companion.adapters.telegram.chat_channel import TelegramChatChannel
 from companion.config import MissingSettingsError, Settings, load_settings
 from companion.core.evals.case_seed import add_seed_cases, add_seed_judge_settings
 from companion.core.knowledge import KnowledgeService
+from companion.core.pattern_catalog import InvalidPatternCatalogError
 from companion.main import (
     CHECK_IN_KINDS_SEED_FILE,
     COPY_SEED_FILE,
@@ -36,6 +38,7 @@ from companion.main import (
     MEMORY_CATEGORIES_SEED_FILE,
     MOVES_SEED_FILE,
     NEEDS_SEED_FILE,
+    PATTERN_CATALOG_DIR,
     SEED_FILE,
     build_chat_model,
     build_clock,
@@ -71,18 +74,25 @@ def prepare() -> None:
     """Get everything ready before the backend starts serving.
 
     Checks settings, migrates the database, loads seed data (making Copy
-    follow its seed file while keeping Admin-edited text, adding new Eval
+    follow its seed file while keeping Admin-edited text, making the Pattern
+    Catalog follow its files while keeping past versions, adding new Eval
     Cases by key with their images, and Judge settings not stored yet,
     embedding the starter Knowledge and drafting when each document helps on first run,
     finishing any upload a restart interrupted and saving the text of
     documents uploaded before text was saved) and registers the Telegram
     webhook unless turned off.
+
+    Raises:
+        MissingSettingsError: If a required setting is missing.
+        InvalidPatternCatalogError: If the Pattern Catalog's files can't be
+            loaded; the catalog stays as it was.
     """
     settings = load_settings()
     migrate(settings.database_url)
     engine = build_database_engine(settings)
     seed_platform_settings(engine, SEED_FILE)
     seed_copy(engine, COPY_SEED_FILE)
+    load_pattern_catalog(engine, PATTERN_CATALOG_DIR)
     seed_helplines(engine, HELPLINES_SEED_FILE)
     seed_memory_categories(engine, MEMORY_CATEGORIES_SEED_FILE)
     seed_check_in_kinds(engine, CHECK_IN_KINDS_SEED_FILE)
@@ -123,6 +133,6 @@ def prepare() -> None:
 if __name__ == "__main__":
     try:
         prepare()
-    except MissingSettingsError as error:
+    except (MissingSettingsError, InvalidPatternCatalogError) as error:
         print(error, file=sys.stderr)
         sys.exit(1)

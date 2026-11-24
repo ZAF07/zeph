@@ -1,0 +1,87 @@
+# One Pattern Type of the Pattern Catalog (ADR-0025). Loaded when the backend
+# starts. Any change needs a new `version`: a stored version never changes,
+# and the backend refuses to start on a change that keeps its version.
+
+id: CONF.AVOID.BELONG
+version: 0.1.0
+area: conflict
+name: Conflict avoidance to preserve belonging
+status: draft
+
+definition: >-
+  When disagreement arises with someone whose approval matters, the person
+  suppresses, delays or dilutes their own position. The driver is fear that
+  conflict will damage the relationship, not lack of opinion.
+
+if: Disagreement with a valued other
+then: Withholds or softens own view
+function: To protect belonging
+
+frameworks:
+  - Young's subjugation and approval-seeking schema themes
+  - Anxious attachment dimension (ECR-R)
+  - HEXACO agreeableness facets (gentleness, flexibility)
+  - Schwartz conformity and benevolence values
+
+signs:
+  - id: I1
+    text: Apologises or hedges before stating a need
+    strength: moderate
+    part: behaviour
+  - id: I2
+    text: Reports agreeing in the moment, then resenting it later
+    strength: strong
+    part: inside
+  - id: I3
+    text: Rehearses conversations to avoid upsetting someone
+    strength: moderate
+    part: behaviour
+  - id: I4
+    text: Describes the other's anger as the worst outcome, above the issue itself
+    strength: strong
+    part: inside
+  - id: I5
+    text: Uses "it's fine" or "not a big deal" about something they then dwell on
+    strength: weak
+    part: behaviour
+
+signs_against:
+  - id: D1
+    text: States disagreement directly with close others and reports little distress
+    strength: strong
+    part: behaviour
+  - id: D2
+    text: >-
+      Avoids conflict only with people who hold power over them (points to a
+      situational or status driver)
+    strength: moderate
+    part: situation
+
+look_alikes:
+  - pattern_type: ACH.WORTH.PERF
+    tells_apart: >-
+      Avoids conflict because criticism means failure, not because of fear the
+      relationship will break
+  - pattern_type: CTRL.UNCERT.PLAN
+    tells_apart: >-
+      Avoids conflict because its outcome is unpredictable; indifferent to
+      closeness
+
+anyone_would: Low-stakes avoidance with strangers or authority only
+
+exclusions:
+  - text: Active relationship crisis
+    evidence: ignored
+  - text: Grief
+    evidence: ignored
+
+approved_wording: >-
+  You seem to protect closeness by keeping disagreements small, even when they
+  matter to you.
+prediction_wording: >-
+  Next time {person} asks for something you'd rather not do, notice whether
+  you say yes before you've decided.
+
+numbers:
+  situations_needed: 3
+  base_rate: 0.2

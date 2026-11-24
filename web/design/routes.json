@@ -36,6 +36,7 @@
   {"ref":"AdminPersona","path":"/admin/persona","auth":"admin","w":1280},
   {"ref":"AdminPersonaOutlook","path":"/admin/persona?tab=outlook","auth":"admin","w":1280},
   {"ref":"AdminPrompts","path":"/admin/prompts","auth":"admin","w":1280},
+  {"ref":"AdminPatternCatalog","path":"/admin/pattern-catalog","auth":"admin","w":1280},
   {"ref":"AdminModelCallTrace","path":"/admin/model-calls/design-trace","auth":"admin","w":1280},
   {"ref":"AdminEvalDaySummaryCase","path":"/admin/evals/cases/day_summary/new","auth":"admin","w":1280},
   {"ref":"AdminCheckInKinds","path":"/admin/check-in-kinds","auth":"admin","w":1280},

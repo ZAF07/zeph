@@ -320,6 +320,7 @@ describe("DashboardShell", () => {
       "Memory Categories",
       "Needs",
       "Moves",
+      "Pattern Catalog",
       "Check-in Kinds",
       "Check-in log",
       "Check-in Schedule",

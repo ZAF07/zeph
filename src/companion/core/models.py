@@ -2672,3 +2672,206 @@ class CopyTab:
     tab: str
     name: str
     slots: list[CopySlot]
+
+
+class PatternArea(StrEnum):
+    """The part of life a Pattern Type is about."""
+
+    CONFLICT = "conflict"
+    APPROVAL = "approval"
+    CONTROL = "control"
+    ACHIEVEMENT = "achievement"
+    RELATIONSHIPS = "relationships"
+
+
+class SignStrength(StrEnum):
+    """How much one sign of a Pattern Type counts."""
+
+    WEAK = "weak"
+    MODERATE = "moderate"
+    STRONG = "strong"
+
+
+class SignPart(StrEnum):
+    """The part of a Pattern a sign shows.
+
+    The situation that sets it off, what goes on inside the person (how they
+    read it, what they believe and feel), or the behaviour that follows.
+    """
+
+    SITUATION = "situation"
+    INSIDE = "inside"
+    BEHAVIOUR = "behaviour"
+
+
+class ExcludedEvidence(StrEnum):
+    """What happens to evidence gathered while an exclusion applies."""
+
+    IGNORED = "ignored"
+    COUNTED_NOT_SHARED = "counted_not_shared"
+
+
+class PatternTypeStatus(StrEnum):
+    """Where a Pattern Type stands in review; only approved ones are shared."""
+
+    DRAFT = "draft"
+    APPROVED = "approved"
+    ARCHIVED = "archived"
+
+
+@dataclass(frozen=True)
+class PatternSign:
+    """One sign for or against a Pattern Type.
+
+    Attributes:
+        id: Its key within the Pattern Type, e.g. `I1`.
+        text: What the User says or does.
+        strength: How much it counts.
+        part: The part of the Pattern it shows.
+    """
+
+    id: str
+    text: str
+    strength: SignStrength
+    part: SignPart
+
+
+@dataclass(frozen=True)
+class LookAlike:
+    """Something a Pattern Type can be mistaken for.
+
+    Attributes:
+        pattern_type_id: The other Pattern Type's ID; None when the look-alike
+            is not a Pattern Type.
+        name: What it is called when it is not a Pattern Type; else None.
+        tells_apart: What tells the two apart.
+    """
+
+    pattern_type_id: str | None
+    name: str | None
+    tells_apart: str
+
+
+@dataclass(frozen=True)
+class PatternExclusion:
+    """A time in a User's life when a Pattern Type must not be shared.
+
+    Attributes:
+        text: What is going on, e.g. "Grief".
+        evidence: Whether evidence from then is ignored, or counted but not
+            shared.
+    """
+
+    text: str
+    evidence: ExcludedEvidence
+
+
+@dataclass(frozen=True)
+class PatternTypeNumbers:
+    """A Pattern Type's own numbers.
+
+    Attributes:
+        situations_needed: How many situations it must be seen in.
+        base_rate: The share of adults thought to show it clearly, from 0 to 1.
+    """
+
+    situations_needed: int
+    base_rate: float
+
+
+@dataclass(frozen=True)
+class PatternType:
+    """One entry of the Pattern Catalog, at one version (ADR-0025).
+
+    Attributes:
+        id: Its stable ID, e.g. `CONF.AVOID.BELONG`. Never reused.
+        version: Its version, e.g. `1.0.0`; any change gives it a new one.
+        area: The part of life it is about.
+        name: Its internal name.
+        definition: What it is, in a few sentences.
+        if_situation: The situation that sets it off.
+        then_behaviour: What the person does then.
+        function: What that protects or gets them.
+        frameworks: The published ideas it draws on.
+        signs: What counts for it.
+        signs_against: What counts against it.
+        look_alikes: What it can be mistaken for.
+        anyone_would: What anyone would do in the situation, which is no
+            evidence of it; None when nothing is written.
+        exclusions: When it must not be shared.
+        approved_wording: How Zeph may word it to a User.
+        prediction_wording: How Zeph words its Prediction, with `{name}`
+            placeholders.
+        numbers: Its own numbers.
+        status: Where it stands in review.
+        approved_by: Who approved it; None unless approved.
+        approved_on: The day it was approved; None unless approved.
+    """
+
+    id: str
+    version: str
+    area: PatternArea
+    name: str
+    definition: str
+    if_situation: str
+    then_behaviour: str
+    function: str
+    frameworks: tuple[str, ...]
+    signs: tuple[PatternSign, ...]
+    signs_against: tuple[PatternSign, ...]
+    look_alikes: tuple[LookAlike, ...]
+    anyone_would: str | None
+    exclusions: tuple[PatternExclusion, ...]
+    approved_wording: str
+    prediction_wording: str
+    numbers: PatternTypeNumbers
+    status: PatternTypeStatus
+    approved_by: str | None
+    approved_on: date | None
+
+
+@dataclass(frozen=True)
+class PatternTypeFile:
+    """One Pattern Type as its YAML file holds it, before it is checked.
+
+    Attributes:
+        name: The file's name, used to say where a problem is.
+        content: What the file holds, as plain JSON values.
+    """
+
+    name: str
+    content: Any
+
+
+@dataclass(frozen=True)
+class PatternTypeVersion:
+    """One stored version of a Pattern Type. It never changes once stored.
+
+    Attributes:
+        pattern_type_id: The Pattern Type's ID.
+        version: The version.
+        content: The Pattern Type as its file held it at this version.
+        is_current: Whether this is the version in the catalog now.
+        loaded_at: When this version was first loaded.
+    """
+
+    pattern_type_id: str
+    version: str
+    content: Any
+    is_current: bool
+    loaded_at: datetime
+
+
+@dataclass(frozen=True)
+class CatalogPatternType:
+    """A Pattern Type in the catalog now, with its history.
+
+    Attributes:
+        pattern_type: The Pattern Type at its current version.
+        loaded_at: When that version was first loaded.
+        other_versions: Its other stored versions, newest first.
+    """
+
+    pattern_type: PatternType
+    loaded_at: datetime
+    other_versions: tuple[str, ...]
