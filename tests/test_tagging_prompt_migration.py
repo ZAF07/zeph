@@ -20,7 +20,7 @@ def test_an_existing_install_reloads_the_tagging_prompt_that_never_says_he_or_sh
     config = Config()
     config.set_main_option("script_location", str(MIGRATIONS_DIR))
     config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
-    command.downgrade(config, "0087")
+    command.downgrade(config, "0088")
     try:
         with engine.begin() as connection:
             connection.execute(
@@ -36,4 +36,6 @@ def test_an_existing_install_reloads_the_tagging_prompt_that_never_says_he_or_sh
 
     prompt = stored_setting(engine, "pattern_tagging_prompt")
     assert prompt == seeded_settings["pattern_tagging_prompt"]
-    assert "Never write he, she, him, her, his or hers" in prompt
+    assert "Never write he, she, him, her, his, hers, himself or herself" in " ".join(
+        prompt.split()
+    )

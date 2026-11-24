@@ -1333,9 +1333,10 @@ pattern_tagging_prompt: |-
     as short as still makes sense. Don't fix spelling, shorten words or join
     two texts.
   - context: one line on what was going on, in your words, that makes sense
-    read on its own months later. Never write he, she, him, her, his or hers
-    about anyone: you can't know the person's gender, so call them "they",
-    and name others by name or role (e.g. "Mei", "their mother").
+    read on its own months later. Never write he, she, him, her, his, hers,
+    himself or herself about anyone: you can't know the person's gender, so
+    call them "they", and name others by name or role (e.g. "Mei", "their
+    mother").
   - about: who it is about, e.g. "Mei, their sister", or "themselves".
   - thread: the number of the Life Thread it belongs to; null if none fits.
   - relationship, power, setting, stance: the other person and the

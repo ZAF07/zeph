@@ -7,8 +7,8 @@ reloads it from the seed on next start, even where an Admin edited it;
 Pattern noticing is off for everyone, so none is expected. No User data is
 removed.
 
-Revision ID: 0088
-Revises: 0087
+Revision ID: 0089
+Revises: 0088
 Create Date: 2026-11-24
 """
 
@@ -16,8 +16,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0088"
-down_revision: str | None = "0087"
+revision: str = "0089"
+down_revision: str | None = "0088"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

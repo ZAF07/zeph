@@ -31,7 +31,7 @@ from companion.core.ports import Repositories
 MESSAGE_GAP = timedelta(minutes=1)
 ENDED_AFTER = timedelta(hours=1)
 NOT_EXPECTED = "Kept but not expected"
-CONTEXT_LINES = "Context lines"
+CONTEXT_LINE_GROUP = "Context lines"
 GENDERED_WORDS = re.compile(
     r"\b(he|she|him|her|his|hers|himself|herself)\b", re.IGNORECASE
 )
@@ -208,7 +208,7 @@ def check_context_lines(kept: Sequence[Observation]) -> list[Check]:
                     "no he or she",
                     False,
                     f'"{observation.context}" says {", ".join(words)}',
-                    CONTEXT_LINES,
+                    CONTEXT_LINE_GROUP,
                 )
             )
     return checks
