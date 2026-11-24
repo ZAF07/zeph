@@ -421,7 +421,7 @@ def test_admins_see_only_how_many_confirmed_patterns_a_user_has_and_the_keeping_
     traces = list_traces(client, admin, step="patterns")
 
     [maya] = [row for row in users.json()["users"] if row["role"] == "user"]
-    assert maya["confirmed_pattern_count"] == 1
+    assert maya["pattern_counts"]["confirmed"] == 1
     assert "grabs" not in users.text
     assert len(traces) == 2
     opened = open_trace(client, admin, traces[0]["trace_id"])

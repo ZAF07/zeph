@@ -51,6 +51,7 @@ from companion.adapters.postgres.tables import (
     needs,
     observations,
     pattern_evidence,
+    pattern_moves,
     pattern_types,
     patterns,
     patterns_in_mind,
@@ -70,6 +71,7 @@ from companion.adapters.postgres.tables import (
 from companion.core.features import feature_details
 from companion.core.models import (
     BringUpWay,
+    CatalogPattern,
     ChannelPhoto,
     ChannelSticker,
     ChatLine,
@@ -148,6 +150,8 @@ from companion.core.models import (
     OfferedTool,
     Pattern,
     PatternEvidence,
+    PatternMove,
+    PatternMoveCause,
     PatternPicked,
     PatternReaction,
     PatternState,
@@ -924,15 +928,6 @@ class PostgresUserRepository:
             .where(move_outcomes.c.user_id == users.c.id)
             .scalar_subquery()
         )
-        confirmed_pattern_count = (
-            select(func.count())
-            .select_from(patterns)
-            .where(
-                patterns.c.user_id == users.c.id,
-                patterns.c.state == PatternState.CONFIRMED.value,
-            )
-            .scalar_subquery()
-        )
         has_portrait = (
             select(user_portraits.c.user_id)
             .where(
@@ -954,10 +949,16 @@ class PostgresUserRepository:
             life_thread_count.label("life_thread_count"),
             has_portrait.label("has_portrait"),
             move_outcome_count.label("move_outcome_count"),
-            confirmed_pattern_count.label("confirmed_pattern_count"),
         ).order_by(users.c.created_at.desc())
+        pattern_count_statement = select(
+            patterns.c.user_id, patterns.c.state, func.count()
+        ).group_by(patterns.c.user_id, patterns.c.state)
         with self._database.connect() as connection:
             rows = connection.execute(statement).all()
+            pattern_count_rows = connection.execute(pattern_count_statement).all()
+        pattern_counts: dict[UUID, dict[PatternState, int]] = {}
+        for user_id, state, count in pattern_count_rows:
+            pattern_counts.setdefault(user_id, {})[PatternState(state)] = count
         return [
             UserOverview(
                 user=_to_user(row),
@@ -967,7 +968,10 @@ class PostgresUserRepository:
                 life_thread_count=row.life_thread_count,
                 has_portrait=row.has_portrait,
                 move_outcome_count=row.move_outcome_count,
-                confirmed_pattern_count=row.confirmed_pattern_count,
+                pattern_counts={
+                    state: pattern_counts.get(row.id, {}).get(state, 0)
+                    for state in PatternState
+                },
             )
             for row in rows
         ]
@@ -3148,6 +3152,7 @@ class PostgresLifeThreadRepository:
 
 
 PATTERN_COLUMNS = [column for column in patterns.c if column.name != "embedding"]
+HAS_NO_PATTERN_TYPE = patterns.c.pattern_type_id.is_(None)
 
 
 def _to_pattern(row: Row[Any], evidence: Sequence[PatternEvidence]) -> Pattern:
@@ -3327,7 +3332,7 @@ class PostgresPatternRepository:
         """
         return self._list(
             user_id,
-            patterns.c.user_id == user_id,
+            and_(patterns.c.user_id == user_id, HAS_NO_PATTERN_TYPE),
             [patterns.c.started_at, patterns.c.id],
         )
 
@@ -3344,6 +3349,7 @@ class PostgresPatternRepository:
             user_id,
             and_(
                 patterns.c.user_id == user_id,
+                HAS_NO_PATTERN_TYPE,
                 patterns.c.state == PatternState.CONFIRMED.value,
             ),
             [patterns.c.confirmed_at.desc(), patterns.c.id],
@@ -3371,6 +3377,7 @@ class PostgresPatternRepository:
                     select(patterns.c.id)
                     .where(
                         patterns.c.user_id == user_id,
+                        HAS_NO_PATTERN_TYPE,
                         patterns.c.embedding.is_not(None),
                         distance <= 1 - min_closeness,
                     )
@@ -3615,20 +3622,160 @@ class PostgresPatternRepository:
                 .where(
                     patterns.c.user_id == user_id,
                     patterns.c.id == pattern_id,
+                    HAS_NO_PATTERN_TYPE,
                     patterns.c.state == PatternState.CONFIRMED.value,
                 )
                 .returning(patterns.c.id)
             ).first()
         return deleted is not None
 
+    def list_of_pattern_types(self, user_id: UUID) -> list[CatalogPattern]:
+        """List a User's Patterns of Pattern Types, oldest started first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The Patterns.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(*PATTERN_COLUMNS)
+                .where(patterns.c.user_id == user_id, ~HAS_NO_PATTERN_TYPE)
+                .order_by(patterns.c.started_at, patterns.c.id)
+            ).all()
+        return [
+            CatalogPattern(
+                id=row.id,
+                user_id=row.user_id,
+                pattern_type_id=row.pattern_type_id,
+                state=PatternState(row.state),
+                started_at=row.started_at,
+                updated_at=row.updated_at,
+            )
+            for row in rows
+        ]
+
+    def save_moves(
+        self,
+        added: Sequence[CatalogPattern],
+        changed: Sequence[CatalogPattern],
+        deleted_ids: Sequence[UUID],
+        moves: Sequence[PatternMove],
+    ) -> None:
+        """Save what scoring a User's Patterns of Pattern Types changed, in one step.
+
+        Args:
+            added: Patterns noticed for the first time.
+            changed: Patterns that moved, in their new state.
+            deleted_ids: Patterns with no Observations left; their moves stay.
+            moves: The moves, added to the log in order.
+        """
+        if not added and not changed and not deleted_ids and not moves:
+            return
+        with self._database.begin() as connection:
+            if deleted_ids:
+                connection.execute(
+                    delete(patterns).where(
+                        patterns.c.id.in_(deleted_ids), ~HAS_NO_PATTERN_TYPE
+                    )
+                )
+            if added:
+                connection.execute(
+                    insert(patterns),
+                    [
+                        {
+                            "id": pattern.id,
+                            "user_id": pattern.user_id,
+                            "pattern_type_id": pattern.pattern_type_id,
+                            "state": pattern.state.value,
+                            "started_at": pattern.started_at,
+                            "updated_at": pattern.updated_at,
+                        }
+                        for pattern in added
+                    ],
+                )
+            if changed:
+                connection.execute(
+                    update(patterns)
+                    .where(patterns.c.id == bindparam("pattern_id"))
+                    .values(
+                        state=bindparam("new_state"),
+                        updated_at=bindparam("new_updated_at"),
+                    ),
+                    [
+                        {
+                            "pattern_id": pattern.id,
+                            "new_state": pattern.state.value,
+                            "new_updated_at": pattern.updated_at,
+                        }
+                        for pattern in changed
+                    ],
+                )
+            if moves:
+                connection.execute(
+                    insert(pattern_moves),
+                    [
+                        {
+                            "id": move.id,
+                            "user_id": move.user_id,
+                            "pattern_id": move.pattern_id,
+                            "pattern_type_id": move.pattern_type_id,
+                            "from_state": _value_or_none(move.from_state),
+                            "to_state": move.to_state.value,
+                            "cause": move.cause.value,
+                            "conversation_id": move.conversation_id,
+                            "points": move.points,
+                            "situations": move.situations,
+                            "moved_at": move.moved_at,
+                        }
+                        for move in moves
+                    ],
+                )
+
+    def list_moves(self, user_id: UUID) -> list[PatternMove]:
+        """List every move of a User's Patterns, oldest first.
+
+        Args:
+            user_id: The User's ID.
+
+        Returns:
+            The moves, including those of Patterns since deleted.
+        """
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(pattern_moves)
+                .where(pattern_moves.c.user_id == user_id)
+                .order_by(pattern_moves.c.position)
+            ).all()
+        return [
+            PatternMove(
+                id=row.id,
+                user_id=row.user_id,
+                pattern_id=row.pattern_id,
+                pattern_type_id=row.pattern_type_id,
+                from_state=PatternState(row.from_state) if row.from_state else None,
+                to_state=PatternState(row.to_state),
+                cause=PatternMoveCause(row.cause),
+                conversation_id=row.conversation_id,
+                points=row.points,
+                situations=row.situations,
+                moved_at=row.moved_at,
+            )
+            for row in rows
+        ]
+
     def delete_for_user(self, user_id: UUID) -> None:
-        """Delete every one of a User's Patterns.
+        """Delete every one of a User's Patterns, and the log of their moves.
 
         Args:
             user_id: The User's ID.
         """
         with self._database.begin() as connection:
             connection.execute(delete(patterns).where(patterns.c.user_id == user_id))
+            connection.execute(
+                delete(pattern_moves).where(pattern_moves.c.user_id == user_id)
+            )
 
 
 def _stored_reaction(reaction: PatternReaction | None) -> str | None:
@@ -3656,7 +3803,9 @@ def _delete_patterns_without_evidence(connection: Connection, user_id: UUID) -> 
         .exists()
     )
     connection.execute(
-        delete(patterns).where(patterns.c.user_id == user_id, ~has_evidence)
+        delete(patterns).where(
+            patterns.c.user_id == user_id, HAS_NO_PATTERN_TYPE, ~has_evidence
+        )
     )
 
 

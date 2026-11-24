@@ -1,0 +1,522 @@
+from collections.abc import Hashable, Mapping, Sequence
+from dataclasses import dataclass, replace
+from datetime import date, datetime
+from uuid import UUID, uuid4
+
+from companion.core.models import (
+    CatalogPattern,
+    EvidenceKind,
+    Observation,
+    ObservationDirection,
+    PatternMove,
+    PatternMoveCause,
+    PatternState,
+    PlatformSettings,
+    SignStrength,
+    User,
+)
+from companion.core.pattern_catalog import PatternCatalogService
+from companion.core.platform_settings import (
+    PATTERN_CLOSED_UNDER_POINTS,
+    PATTERN_HALF_LIFE_DAYS,
+    PATTERN_MODERATE_SIGN_POINTS,
+    PATTERN_OWN_OPINION_PERCENT,
+    PATTERN_PEOPLE_PER_SITUATION,
+    PATTERN_REAL_STORY_PERCENT,
+    PATTERN_REPORTED_HABIT_PERCENT,
+    PATTERN_STRONG_SIGN_POINTS,
+    PATTERN_SUSPECTED_POINTS,
+    PATTERN_SUSPECTED_SITUATIONS,
+    PATTERN_UNCLEAR_PERCENT,
+    PATTERN_WEAK_SIGN_POINTS,
+    PATTERN_WHAT_IF_PERCENT,
+)
+from companion.core.ports import Clock, Repositories
+from companion.core.timing import users_today
+
+STATES_MOVED_BY_SCORE = frozenset(
+    {PatternState.NOTICED, PatternState.SUSPECTED, PatternState.CLOSED}
+)
+
+
+@dataclass(frozen=True)
+class ScoringNumbers:
+    """The Admin-set numbers an Observation's weight is worked out with.
+
+    Attributes:
+        sign_points: The points each strength of sign is worth.
+        evidence_percents: How much of that each kind of evidence keeps.
+        unclear_percent: How much an unclear Observation keeps, toward each
+            of its two Pattern Types.
+        half_life_days: After how many days an Observation counts half.
+        people_per_situation: The most people whose Observations count in
+            one situation.
+    """
+
+    sign_points: Mapping[SignStrength, int]
+    evidence_percents: Mapping[EvidenceKind, int]
+    unclear_percent: int
+    half_life_days: int
+    people_per_situation: int
+
+
+@dataclass(frozen=True)
+class StateBars:
+    """The Admin-set bars a Pattern moves between states at.
+
+    Attributes:
+        suspected_situations: The fewest situations to be suspected.
+        suspected_points: The lowest score to be suspected.
+        closed_under_points: A score under this closes it.
+    """
+
+    suspected_situations: int
+    suspected_points: int
+    closed_under_points: int
+
+
+@dataclass(frozen=True)
+class PatternScore:
+    """A Pattern's score, worked out from its Observations when it is read.
+
+    Attributes:
+        points: The score.
+        situations: How many situations it showed in.
+    """
+
+    points: float
+    situations: int
+
+
+@dataclass(frozen=True)
+class PlannedPatternMoves:
+    """What scoring a User's Patterns again changes.
+
+    Attributes:
+        added: Patterns noticed for the first time, in their state now.
+        changed: Patterns that moved, in their new state.
+        deleted_ids: Patterns with no Observations left.
+        moves: Every move, in order, for the log.
+    """
+
+    added: list[CatalogPattern]
+    changed: list[CatalogPattern]
+    deleted_ids: list[UUID]
+    moves: list[PatternMove]
+
+
+def observation_points(
+    observation: Observation,
+    sign_strengths: Mapping[tuple[str, str], SignStrength],
+    numbers: ScoringNumbers,
+    today: date,
+) -> float:
+    """Work out what one Observation is worth today.
+
+    Its sign's points times its kind of evidence, cut when unclear, nothing
+    when situational, negative when against, and halved every half-life
+    since the day it was said.
+
+    Args:
+        observation: The Observation.
+        sign_strengths: Each sign's strength, by Pattern Type ID and sign ID.
+        numbers: The Admin-set numbers.
+        today: The User's day now.
+
+    Returns:
+        The points; 0 when its sign isn't in the catalog now.
+    """
+    strength = sign_strengths.get((observation.pattern_type_id, observation.sign_id))
+    if strength is None or observation.situational:
+        return 0.0
+    points = (
+        numbers.sign_points[strength]
+        * numbers.evidence_percents[observation.evidence_kind]
+        / 100
+    )
+    if observation.unclear:
+        points = points * numbers.unclear_percent / 100
+    if observation.direction == ObservationDirection.AGAINST:
+        points = -points
+    age_in_days = max((today - observation.day).days, 0)
+    fading: float = 0.5 ** (age_in_days / numbers.half_life_days)
+    return points * fading
+
+
+def situation_of(observation: Observation) -> Hashable:
+    """Say which situation an Observation belongs to.
+
+    Args:
+        observation: The Observation.
+
+    Returns:
+        Its Life Thread; with none, the person it is about and the setting.
+    """
+    if observation.thread_id is not None:
+        return observation.thread_id
+    return (person_of(observation), observation.tags.setting)
+
+
+def person_of(observation: Observation) -> str:
+    """Say who an Observation is about, so two mentions of one person match.
+
+    Args:
+        observation: The Observation.
+
+    Returns:
+        Who it is about, trimmed and in lower case.
+    """
+    return observation.about.strip().casefold()
+
+
+def strongest_people_sum(points_by_person: Mapping[str, float], cap: int) -> float:
+    """Add up the strongest people's points, up to the cap of people.
+
+    Args:
+        points_by_person: Each person's strongest points, all for or all
+            against.
+        cap: The most people who count.
+
+    Returns:
+        The sum of the strongest `cap` of them.
+    """
+    strongest = sorted(points_by_person.values(), key=abs, reverse=True)
+    return sum(strongest[:cap])
+
+
+def score_situation(points: Sequence[tuple[str, float]], cap: int) -> PatternScore:
+    """Score one situation from the points of its Observations.
+
+    For it and against it are counted apart: on each side only the strongest
+    Observation per person counts, up to the cap of people.
+
+    Args:
+        points: Each Observation's person and points.
+        cap: The most people who count on each side.
+
+    Returns:
+        Its points, and 1 situation if the Pattern showed in it, else 0.
+    """
+    strongest_for: dict[str, float] = {}
+    strongest_against: dict[str, float] = {}
+    for person, value in points:
+        side = strongest_for if value > 0 else strongest_against
+        if abs(value) > abs(side.get(person, 0.0)):
+            side[person] = value
+    points_for = strongest_people_sum(strongest_for, cap)
+    points_against = strongest_people_sum(strongest_against, cap)
+    return PatternScore(
+        points=points_for + points_against, situations=1 if points_for > 0 else 0
+    )
+
+
+def score_observations(
+    observations: Sequence[Observation],
+    sign_strengths: Mapping[tuple[str, str], SignStrength],
+    numbers: ScoringNumbers,
+    today: date,
+) -> PatternScore:
+    """Work out a Pattern's score from its Observations, as of today.
+
+    Args:
+        observations: The Observations naming its Pattern Type.
+        sign_strengths: Each sign's strength, by Pattern Type ID and sign ID.
+        numbers: The Admin-set numbers.
+        today: The User's day now.
+
+    Returns:
+        The sum over its situations, and how many it showed in.
+    """
+    by_situation: dict[Hashable, list[tuple[str, float]]] = {}
+    for observation in observations:
+        by_situation.setdefault(situation_of(observation), []).append(
+            (
+                person_of(observation),
+                observation_points(observation, sign_strengths, numbers, today),
+            )
+        )
+    scores = [
+        score_situation(points, numbers.people_per_situation)
+        for points in by_situation.values()
+    ]
+    return PatternScore(
+        points=sum(score.points for score in scores),
+        situations=sum(score.situations for score in scores),
+    )
+
+
+def state_for(
+    current: PatternState, score: PatternScore, bars: StateBars
+) -> PatternState:
+    """Say which state a Pattern should be in for its score.
+
+    Only noticed, suspected and closed are moved by the score; a Pattern in
+    any other state stays there. The state follows the evidence, so a
+    Pattern moves back as well as on.
+
+    Args:
+        current: The state it is in.
+        score: Its score now.
+        bars: The Admin-set bars.
+
+    Returns:
+        Closed under the floor; suspected in enough situations with a high
+        enough score; otherwise noticed.
+    """
+    if current not in STATES_MOVED_BY_SCORE:
+        return current
+    if score.points < bars.closed_under_points:
+        return PatternState.CLOSED
+    if (
+        score.situations >= bars.suspected_situations
+        and score.points >= bars.suspected_points
+    ):
+        return PatternState.SUSPECTED
+    return PatternState.NOTICED
+
+
+def observations_by_pattern_type(
+    observations: Sequence[Observation],
+) -> dict[str, list[Observation]]:
+    """Group Observations by the Pattern Types they count toward.
+
+    An unclear one counts toward both of its Pattern Types.
+
+    Args:
+        observations: The User's Observations.
+
+    Returns:
+        Each Pattern Type's Observations, by its ID, in the order given.
+    """
+    grouped: dict[str, list[Observation]] = {}
+    for observation in observations:
+        grouped.setdefault(observation.pattern_type_id, []).append(observation)
+        if observation.second_pattern_type_id is not None:
+            grouped.setdefault(observation.second_pattern_type_id, []).append(
+                observation
+            )
+    return grouped
+
+
+def logged_move(
+    pattern: CatalogPattern,
+    from_state: PatternState | None,
+    to_state: PatternState,
+    score: PatternScore,
+    cause: PatternMoveCause,
+    conversation_id: UUID | None,
+    now: datetime,
+) -> PatternMove:
+    """Write one move of a Pattern as its log keeps it.
+
+    Args:
+        pattern: The Pattern that moved.
+        from_state: The state it left; None when it was first noticed.
+        to_state: The state it moved to.
+        score: Its score at the move.
+        cause: What made it be scored again.
+        conversation_id: The Conversation tagged, when that is the cause.
+        now: When it moved.
+
+    Returns:
+        The move.
+    """
+    return PatternMove(
+        id=uuid4(),
+        user_id=pattern.user_id,
+        pattern_id=pattern.id,
+        pattern_type_id=pattern.pattern_type_id,
+        from_state=from_state,
+        to_state=to_state,
+        cause=cause,
+        conversation_id=conversation_id,
+        points=score.points,
+        situations=score.situations,
+        moved_at=now,
+    )
+
+
+def plan_pattern_moves(
+    user_id: UUID,
+    patterns: Sequence[CatalogPattern],
+    observations: Sequence[Observation],
+    sign_strengths: Mapping[tuple[str, str], SignStrength],
+    numbers: ScoringNumbers,
+    bars: StateBars,
+    today: date,
+    now: datetime,
+    cause: PatternMoveCause,
+    conversation_id: UUID | None,
+) -> PlannedPatternMoves:
+    """Score a User's Patterns again from their Observations, and move them.
+
+    A Pattern Type with Observations and no Pattern gets one, noticed, which
+    may move on at once. A Pattern with no Observations left is deleted.
+
+    Args:
+        user_id: The User.
+        patterns: Their Patterns of Pattern Types now.
+        observations: All their Observations.
+        sign_strengths: Each sign's strength, by Pattern Type ID and sign ID.
+        numbers: The Admin-set scoring numbers.
+        bars: The Admin-set state bars.
+        today: The User's day now, for fading.
+        now: When it is scored.
+        cause: What made it be scored again.
+        conversation_id: The Conversation tagged, when that is the cause.
+
+    Returns:
+        The Patterns added, moved and deleted, and every move for the log.
+    """
+    by_type = observations_by_pattern_type(observations)
+    existing = {pattern.pattern_type_id: pattern for pattern in patterns}
+    planned = PlannedPatternMoves(
+        added=[],
+        changed=[],
+        deleted_ids=[
+            pattern.id for pattern in patterns if pattern.pattern_type_id not in by_type
+        ],
+        moves=[],
+    )
+    for pattern_type_id, its_observations in by_type.items():
+        score = score_observations(its_observations, sign_strengths, numbers, today)
+        pattern = existing.get(pattern_type_id)
+        is_new = pattern is None
+        if pattern is None:
+            pattern = CatalogPattern(
+                id=uuid4(),
+                user_id=user_id,
+                pattern_type_id=pattern_type_id,
+                state=PatternState.NOTICED,
+                started_at=now,
+                updated_at=now,
+            )
+            planned.moves.append(
+                logged_move(
+                    pattern, None, pattern.state, score, cause, conversation_id, now
+                )
+            )
+        state = state_for(pattern.state, score, bars)
+        if state != pattern.state:
+            planned.moves.append(
+                logged_move(
+                    pattern, pattern.state, state, score, cause, conversation_id, now
+                )
+            )
+            pattern = replace(pattern, state=state, updated_at=now)
+            if not is_new:
+                planned.changed.append(pattern)
+        if is_new:
+            planned.added.append(pattern)
+    return planned
+
+
+def scoring_numbers(settings: PlatformSettings) -> ScoringNumbers:
+    """Read the Admin-set scoring numbers.
+
+    Args:
+        settings: The platform settings.
+
+    Returns:
+        The numbers an Observation's weight is worked out with.
+    """
+    return ScoringNumbers(
+        sign_points={
+            SignStrength.WEAK: settings.get(PATTERN_WEAK_SIGN_POINTS),
+            SignStrength.MODERATE: settings.get(PATTERN_MODERATE_SIGN_POINTS),
+            SignStrength.STRONG: settings.get(PATTERN_STRONG_SIGN_POINTS),
+        },
+        evidence_percents={
+            EvidenceKind.REAL_STORY: settings.get(PATTERN_REAL_STORY_PERCENT),
+            EvidenceKind.REPORTED_HABIT: settings.get(PATTERN_REPORTED_HABIT_PERCENT),
+            EvidenceKind.WHAT_IF_ANSWER: settings.get(PATTERN_WHAT_IF_PERCENT),
+            EvidenceKind.OWN_OPINION: settings.get(PATTERN_OWN_OPINION_PERCENT),
+        },
+        unclear_percent=settings.get(PATTERN_UNCLEAR_PERCENT),
+        half_life_days=settings.get(PATTERN_HALF_LIFE_DAYS),
+        people_per_situation=settings.get(PATTERN_PEOPLE_PER_SITUATION),
+    )
+
+
+def state_bars(settings: PlatformSettings) -> StateBars:
+    """Read the Admin-set bars a Pattern moves between states at.
+
+    Args:
+        settings: The platform settings.
+
+    Returns:
+        The bars.
+    """
+    return StateBars(
+        suspected_situations=settings.get(PATTERN_SUSPECTED_SITUATIONS),
+        suspected_points=settings.get(PATTERN_SUSPECTED_POINTS),
+        closed_under_points=settings.get(PATTERN_CLOSED_UNDER_POINTS),
+    )
+
+
+class PatternScorer:
+    """Scores a User's Patterns of Pattern Types again and moves them, with a log.
+
+    Runs when a Conversation's Observations were tagged and when
+    Observations are deleted. Nothing reaches a reply.
+    """
+
+    def __init__(
+        self,
+        repositories: Repositories,
+        pattern_catalog: PatternCatalogService,
+        clock: Clock,
+    ) -> None:
+        """Set up the scorer.
+
+        Args:
+            repositories: Where Observations, Patterns and their log are
+                stored.
+            pattern_catalog: Reads each sign's strength in the catalog now.
+            clock: Tells the current time.
+        """
+        self._repositories = repositories
+        self._pattern_catalog = pattern_catalog
+        self._clock = clock
+
+    def score(
+        self,
+        user: User,
+        settings: PlatformSettings,
+        cause: PatternMoveCause,
+        conversation_id: UUID | None = None,
+    ) -> None:
+        """Score the User's Patterns again from all their Observations.
+
+        Args:
+            user: The User.
+            settings: The platform settings, which may hold an Eval
+                Variant's overrides.
+            cause: What made them be scored again.
+            conversation_id: The Conversation tagged, when that is the cause.
+        """
+        observations = self._repositories.observations.list_for_user(user.id)
+        patterns = self._repositories.patterns.list_of_pattern_types(user.id)
+        if not observations and not patterns:
+            return
+        sign_strengths = {
+            (entry.pattern_type.id, sign.id): sign.strength
+            for entry in self._pattern_catalog.catalog()
+            for sign in (*entry.pattern_type.signs, *entry.pattern_type.signs_against)
+        }
+        now = self._clock.now()
+        planned = plan_pattern_moves(
+            user.id,
+            patterns,
+            observations,
+            sign_strengths,
+            scoring_numbers(settings),
+            state_bars(settings),
+            users_today(user.time_zone, now),
+            now,
+            cause,
+            conversation_id,
+        )
+        self._repositories.patterns.save_moves(
+            planned.added, planned.changed, planned.deleted_ids, planned.moves
+        )

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { displayNameOf, roleLabel } from "@/lib/users";
+import {
+  displayNameOf,
+  noPatterns,
+  otherPatternCounts,
+  roleLabel,
+} from "@/lib/users";
 
 describe("displayNameOf", () => {
   it("uses the name, else the email, else This User", () => {
@@ -18,5 +23,25 @@ describe("roleLabel", () => {
   it("says Admin or User", () => {
     expect(roleLabel("admin")).toBe("Admin");
     expect(roleLabel("user")).toBe("User");
+  });
+});
+
+describe("otherPatternCounts", () => {
+  it("lists the states other than confirmed that have any, in order", () => {
+    expect(
+      otherPatternCounts({
+        ...noPatterns,
+        closed: 1,
+        noticed: 4,
+        confirmed: 2,
+      }),
+    ).toEqual([
+      { label: "Noticed Patterns", value: "4" },
+      { label: "Closed Patterns", value: "1" },
+    ]);
+  });
+
+  it("lists nothing for a User with no Patterns", () => {
+    expect(otherPatternCounts(noPatterns)).toEqual([]);
   });
 });

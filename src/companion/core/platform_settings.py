@@ -308,6 +308,27 @@ PATTERN_KEEPING_DAYS = Setting("pattern_keeping_days", read_whole_number)
 PATTERN_TAGGING_MODEL = Setting("pattern_tagging_model", read_text)
 PATTERN_TAGGING_THINKING = Setting("pattern_tagging_thinking", read_on_off)
 PATTERN_TAGGING_PROMPT = Setting("pattern_tagging_prompt", read_text)
+PATTERN_WEAK_SIGN_POINTS = Setting("pattern_weak_sign_points", read_whole_number)
+PATTERN_MODERATE_SIGN_POINTS = Setting(
+    "pattern_moderate_sign_points", read_whole_number
+)
+PATTERN_STRONG_SIGN_POINTS = Setting("pattern_strong_sign_points", read_whole_number)
+PATTERN_REAL_STORY_PERCENT = Setting("pattern_real_story_percent", read_whole_number)
+PATTERN_REPORTED_HABIT_PERCENT = Setting(
+    "pattern_reported_habit_percent", read_whole_number
+)
+PATTERN_WHAT_IF_PERCENT = Setting("pattern_what_if_percent", read_whole_number)
+PATTERN_OWN_OPINION_PERCENT = Setting("pattern_own_opinion_percent", read_whole_number)
+PATTERN_UNCLEAR_PERCENT = Setting("pattern_unclear_percent", read_whole_number)
+PATTERN_HALF_LIFE_DAYS = Setting("pattern_half_life_days", read_whole_number)
+PATTERN_PEOPLE_PER_SITUATION = Setting(
+    "pattern_people_per_situation", read_whole_number
+)
+PATTERN_SUSPECTED_SITUATIONS = Setting(
+    "pattern_suspected_situations", read_whole_number
+)
+PATTERN_SUSPECTED_POINTS = Setting("pattern_suspected_points", read_whole_number)
+PATTERN_CLOSED_UNDER_POINTS = Setting("pattern_closed_under_points", read_whole_number)
 PATTERN_PUSHED_BACK_WAIT = Setting("pattern_pushed_back_wait_days", read_days)
 PATTERN_CLOSENESS_PERCENT = Setting("pattern_closeness_percent", read_whole_number)
 PORTRAIT_MODEL = Setting("portrait_model", read_text)
@@ -1262,6 +1283,153 @@ EDITABLE_SETTINGS: tuple[EditableSetting, ...] = (
             "their latest texts for Recall to bring it to mind with no Thread. "
             "Fits score about 47–66 and small talk up to about 61, so a low bar "
             "brings in some noise."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_WEAK_SIGN_POINTS.key,
+        "Points for a weak sign",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=1000,
+        hint=(
+            "What an Observation matching a weak sign of its Pattern Type is "
+            "worth, before its kind of evidence and fading. Scoring runs at "
+            "Conversation end after tagging, and when Observations are deleted."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_MODERATE_SIGN_POINTS.key,
+        "Points for a moderate sign",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=1000,
+        hint=(
+            "What an Observation matching a moderate sign is worth, before its "
+            "kind of evidence and fading."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_STRONG_SIGN_POINTS.key,
+        "Points for a strong sign",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=1000,
+        hint=(
+            "What an Observation matching a strong sign is worth, before its "
+            "kind of evidence and fading."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_REAL_STORY_PERCENT.key,
+        "Real story counts",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=100,
+        hint=(
+            "How much of its sign's points an Observation from something that "
+            "really happened keeps."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_REPORTED_HABIT_PERCENT.key,
+        "Reported habit counts",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=100,
+        hint=(
+            "How much of its sign's points an Observation keeps when the User "
+            "says what they usually do."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_WHAT_IF_PERCENT.key,
+        "“What if” answer counts",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=100,
+        hint=(
+            "How much of its sign's points an Observation keeps when it answers "
+            "a made-up situation."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_OWN_OPINION_PERCENT.key,
+        "Own opinion counts",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=100,
+        hint=(
+            "How much of its sign's points an Observation keeps when it is the "
+            "User's opinion of themselves."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_UNCLEAR_PERCENT.key,
+        "Unclear counts",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=100,
+        hint=(
+            "How much an unclear Observation, naming two look-alike Pattern "
+            "Types, keeps toward each of them."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_HALF_LIFE_DAYS.key,
+        "Pattern evidence half-life",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=3650,
+        hint=(
+            "After this many days an Observation counts half, and a quarter "
+            "after twice as long, so Patterns keep up with who the User is now."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_PEOPLE_PER_SITUATION.key,
+        "Most people per situation",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "Within one Life Thread only the strongest Observation per person "
+            "counts, for and against apart; this many people at most add "
+            "weight."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_SUSPECTED_SITUATIONS.key,
+        "Situations to be suspected",
+        SettingKind.WHOLE_NUMBER,
+        minimum=1,
+        maximum=50,
+        hint=(
+            "How many situations (Life Threads; with none, the same person and "
+            "setting) a noticed Pattern must show in to become suspected."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_SUSPECTED_POINTS.key,
+        "Score to be suspected",
+        SettingKind.WHOLE_NUMBER,
+        minimum=0,
+        maximum=10000,
+        hint=(
+            "The lowest score, in points, at which a noticed Pattern seen in "
+            "enough situations becomes suspected. Under it, a suspected one "
+            "goes back to noticed."
+        ),
+    ),
+    EditableSetting(
+        PATTERN_CLOSED_UNDER_POINTS.key,
+        "Score that closes a Pattern",
+        SettingKind.WHOLE_NUMBER,
+        minimum=-10000,
+        maximum=0,
+        hint=(
+            "A noticed or suspected Pattern whose score falls under this, in "
+            "points, is closed. One whose score comes back over it is noticed "
+            "again."
         ),
     ),
     EditableSetting(

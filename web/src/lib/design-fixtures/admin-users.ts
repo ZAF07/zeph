@@ -4,6 +4,7 @@ import type {
   FeatureSwitch,
   UserFeatures,
 } from "@/lib/api-client";
+import { noPatterns } from "@/lib/users";
 
 /** Builds a listed User; counts not drawn in `AdminUsers.html` are 0. */
 function listedUser(
@@ -24,7 +25,7 @@ function listedUser(
     life_thread_count: 0,
     move_outcome_count: 0,
     has_portrait: false,
-    confirmed_pattern_count: 0,
+    pattern_counts: noPatterns,
     ...user,
   };
 }
@@ -42,7 +43,7 @@ const users: AdminUser[] = [
     life_thread_count: 6,
     move_outcome_count: 14,
     has_portrait: true,
-    confirmed_pattern_count: 2,
+    pattern_counts: { ...noPatterns, confirmed: 2 },
   }),
   listedUser({
     id: "design-priya",

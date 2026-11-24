@@ -174,6 +174,76 @@ const numberSections: {
     ],
   },
   {
+    heading: "Patterns",
+    fields: [
+      {
+        key: "pattern_weak_sign_points",
+        label: "Points for a weak sign",
+        unit: "points",
+      },
+      {
+        key: "pattern_moderate_sign_points",
+        label: "Points for a moderate sign",
+        unit: "points",
+      },
+      {
+        key: "pattern_strong_sign_points",
+        label: "Points for a strong sign",
+        unit: "points",
+      },
+      {
+        key: "pattern_real_story_percent",
+        label: "Real story counts",
+        unit: "%",
+      },
+      {
+        key: "pattern_reported_habit_percent",
+        label: "Reported habit counts",
+        unit: "%",
+      },
+      {
+        key: "pattern_what_if_percent",
+        label: "“What if” answer counts",
+        unit: "%",
+      },
+      {
+        key: "pattern_own_opinion_percent",
+        label: "Own opinion counts",
+        unit: "%",
+      },
+      {
+        key: "pattern_unclear_percent",
+        label: "Unclear counts",
+        unit: "%",
+      },
+      {
+        key: "pattern_half_life_days",
+        label: "Pattern evidence half-life",
+        unit: "days",
+      },
+      {
+        key: "pattern_people_per_situation",
+        label: "Most people per situation",
+        unit: "people",
+      },
+      {
+        key: "pattern_suspected_situations",
+        label: "Situations to be suspected",
+        unit: "situations",
+      },
+      {
+        key: "pattern_suspected_points",
+        label: "Score to be suspected",
+        unit: "points",
+      },
+      {
+        key: "pattern_closed_under_points",
+        label: "Score that closes a Pattern",
+        unit: "points",
+      },
+    ],
+  },
+  {
     heading: "Curiosities",
     fields: [
       {
@@ -329,7 +399,7 @@ const allKeys = [
   trailingWordsField.key,
 ];
 
-const wholeNumber = /^\d+$/;
+const wholeNumber = /^-?\d+$/;
 
 /**
  * Names the saved setting a field belongs to: each Check-in gap field
