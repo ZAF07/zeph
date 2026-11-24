@@ -233,4 +233,11 @@ If there is nothing, the section holds one line: "Nothing found."
 - **Impact:** A deploy built on the server could fail the same way now and then.
 - **Suggested fix:** If it happens again, keep the full build log and look for a memory or race cause.
 
+### The first 44 Tagging cases were written for a three-type catalog
+
+- **Kind:** eval quality
+- **What:** Issue 15 grew the catalog from three Pattern Types to fifteen. The first 44 Tagging cases expect only CONF.AVOID.BELONG, ACH.WORTH.PERF or CTRL.UNCERT.PLAN; several now also fit a new look-alike (e.g. `conf-yes-to-sister-then-resents` could read as APPR.GIVE.NEEDED). The 24 new cases (one for, one against per new type) haven't been run.
+- **Impact:** A Tagging run may now fail cases where the model picks a fair new look-alike, and each run costs several times more (the whole catalog goes in every call).
+- **Suggested fix:** Run the Tagging Eval once (show the estimate first), then correct expectations to "unclear" with the right pair where the new types fit. An hour plus the run.
+
 ## Comments

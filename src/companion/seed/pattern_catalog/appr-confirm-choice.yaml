@@ -1,0 +1,93 @@
+# One Pattern Type of the Pattern Catalog (ADR-0025). Loaded when the backend
+# starts. Any change needs a new `version`: a stored version never changes,
+# so a change that keeps its version is refused and the last catalog stays.
+
+id: APPR.CONFIRM.CHOICE
+version: 0.1.0
+area: approval
+name: Asking others to confirm a choice already made
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
+
+definition: >-
+  After making a choice, the person asks one or more others whether it was
+  right. They are not looking for new information; the choice is made. The
+  asking quiets the fear of having got it wrong, until the next doubt.
+
+if: Has just made a choice that matters to them
+then: Asks others to confirm it was the right one
+function: To quiet the fear of having got it wrong
+
+frameworks:
+  - Excessive reassurance seeking (Coyne; Joiner)
+  - Maximising and regret in choices (Schwartz)
+  - Self-concept clarity (Campbell)
+  - Contingencies of self-worth, others' approval (Crocker)
+
+signs:
+  - id: I1
+    text: Asks several people the same "did I do the right thing?" about one choice
+    strength: strong
+    part: behaviour
+  - id: I2
+    text: Feels relief when someone agrees, which fades within a day
+    strength: strong
+    part: inside
+  - id: I3
+    text: Shares a decision as a question ("I've booked it, is that okay?")
+    strength: moderate
+    part: behaviour
+  - id: I4
+    text: Re-reads reviews or advice about something already bought or decided
+    strength: moderate
+    part: behaviour
+  - id: I5
+    text: Says they don't trust their own judgement on everyday things
+    strength: weak
+    part: inside
+
+signs_against:
+  - id: D1
+    text: Makes a choice and moves on without checking it with anyone
+    strength: strong
+    part: behaviour
+  - id: D2
+    text: Asks for others' views before deciding, then decides and stops asking
+    strength: moderate
+    part: behaviour
+
+look_alikes:
+  - pattern_type: REL.CHECK.SECURE
+    tells_apart: >-
+      Checks whether they chose right; the other checks whether the bond is
+      still okay
+  - pattern_type: CTRL.UNCERT.PLAN
+    tells_apart: >-
+      Seeks agreement about a choice already made; the other seeks
+      information or control over an outcome still open
+  - pattern_type: CTRL.OPEN.FREEDOM
+    tells_apart: >-
+      Commits, then looks for reassurance; the other doesn't commit at all
+
+anyone_would: Checking a work decision with a manager who has to sign it off
+anyone_would_when:
+  - power: [above]
+    setting: [work]
+
+exclusions:
+  - text: A big life decision in the last two weeks, such as a move or a new job
+    evidence: counted_not_shared
+  - text: Grief
+    evidence: ignored
+
+approved_wording: >-
+  Once you've chosen, you seem to need someone else to say it was right
+  before you can settle.
+prediction_wording: >-
+  After your next {decision}, notice whether you ask anyone if it was right,
+  and how long the relief lasts if they say yes.
+
+numbers:
+  situations_needed: 3
+  base_rate: 0.2

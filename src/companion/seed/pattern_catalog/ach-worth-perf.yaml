@@ -3,10 +3,12 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: ACH.WORTH.PERF
-version: 0.1.0
+version: 0.2.0
 area: achievement
 name: Performance-contingent self-worth
-status: draft
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
 
 definition: >-
   The person's sense of worth rises and falls with how well they perform.
@@ -14,7 +16,7 @@ definition: >-
   standards alone do not qualify; the marker is self-judgement after a miss.
 
 if: Performance is evaluated or falls short
-then: Self-criticism, over-preparation or avoidance of the task
+then: Self-criticism, over-preparation or putting the task off
 function: To protect a sense of being worthy
 
 frameworks:
@@ -60,10 +62,20 @@ look_alikes:
     tells_apart: A miss brings disappointment in the work, not in the self
   - pattern_type: CONF.AVOID.BELONG
     tells_apart: >-
-      Fears others' reaction to the relationship, not the verdict on
-      competence
+      Fears criticism as a verdict on their competence; the other keeps quiet
+      to protect the relationship
   - pattern_type: CTRL.UNCERT.PLAN
-    tells_apart: Over-prepares to reduce unknowns, not to prove worth
+    tells_apart: >-
+      Over-prepares to prove their worth; the other over-prepares to reduce
+      unknowns
+  - pattern_type: CONF.DEFEND.SELF
+    tells_apart: >-
+      Turns the criticism inward and judges themselves; the other turns it
+      outward and answers back
+  - pattern_type: ACH.GOAL.MOVE
+    tells_apart: >-
+      Judges themselves after falling short; the other moves the goal after
+      succeeding
 
 anyone_would: >-
   Disappointment after a real, costly setback, or preparing hard where the

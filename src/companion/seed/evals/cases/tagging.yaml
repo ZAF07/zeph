@@ -22,14 +22,15 @@
 #   - pattern_type: <Pattern Type ID>  when unclear, either of the two
 #     direction: for | against
 #     unclear: true                    when it could be either of two look-alikes
-#     situational: true                when anyone would have acted the same
-#                                      (only CONF.AVOID.BELONG can be: strangers,
-#                                      or someone above them, for or against)
+#     situational: true                when anyone would have acted the same:
+#                                      the Observation's tags fit one of its
+#                                      Pattern Type's `anyone_would_when`, for
+#                                      or against
 
 now: 2026-11-24T10:00:00
 
 cases:
-  # Conflict avoidance to preserve belonging (CONF.AVOID.BELONG), for.
+  # Softening disagreement to protect belonging (CONF.AVOID.BELONG), for.
 
   - id: conf-yes-to-sister-then-resents
     threads:
@@ -718,3 +719,379 @@ cases:
           then resenting it later. Does that fit?
       - who: person
         text: not really, just tired. going to bed early
+
+  # The twelve Pattern Types added later (issue 15): one case for and one
+  # against each. All with people close to them, so none is situational.
+
+  - id: defend-snaps-back-at-partner
+    threads:
+      - title: Living with Sam
+        story: They moved in with their partner Sam two months ago.
+        people: [Sam]
+    messages:
+      - who: person
+        text: >-
+          Sam said I left the kitchen in a state again. I told him at least I
+          cook, which is more than he does.
+      - who: zeph
+        text: How did it go from there?
+      - who: person
+        text: >-
+          Badly. It was one comment about some dishes but it felt like he was
+          saying I'm a slob as a person.
+    observations:
+      - pattern_type: CONF.DEFEND.SELF
+        direction: for
+
+  - id: defend-asks-what-friend-meant
+    messages:
+      - who: person
+        text: >-
+          My friend Tom said I'd been a bit distant lately. I asked him what
+          he'd noticed, and to be fair he had a point about me cancelling
+          twice.
+      - who: zeph
+        text: That's a generous way to take it.
+      - who: person
+        text: We've sorted a date for next week. Felt good to clear the air.
+    observations:
+      - pattern_type: CONF.DEFEND.SELF
+        direction: against
+
+  - id: withdraw-goes-quiet-on-friend
+    messages:
+      - who: person
+        text: >-
+          Lena forgot my birthday drinks. I haven't replied to her since, just
+          left her on read.
+      - who: zeph
+        text: Have you told her it hurt?
+      - who: person
+        text: >-
+          No. Saying "that hurt" would make me look so needy. She should
+          figure it out.
+    observations:
+      - pattern_type: CONF.WITHDRAW.HURT
+        direction: for
+
+  - id: withdraw-tells-brother-it-hurt
+    messages:
+      - who: person
+        text: >-
+          My brother joked about my job in front of everyone at dinner. I
+          called him the next morning and told him that one stung.
+      - who: zeph
+        text: How did he take it?
+      - who: person
+        text: He apologised. We're fine now.
+    observations:
+      - pattern_type: CONF.WITHDRAW.HURT
+        direction: against
+
+  - id: give-turns-favour-into-a-project
+    messages:
+      - who: person
+        text: >-
+          My friend asked me to look over her CV. I ended up rewriting the
+          whole thing and doing her cover letter too, till 2am.
+      - who: zeph
+        text: That's a lot more than a look-over. How do you feel today?
+      - who: person
+        text: >-
+          Tired but kind of good? Honestly on days nobody needs anything from
+          me I feel a bit useless.
+    observations:
+      - pattern_type: APPR.GIVE.NEEDED
+        direction: for
+
+  - id: give-says-no-to-cousin
+    messages:
+      - who: person
+        text: >-
+          My cousin asked me to dog-sit for a week. I said no, I've got too
+          much on, and I don't feel bad about it at all.
+      - who: zeph
+        text: Sounds like you knew your limits.
+      - who: person
+        text: Yep, she found someone else anyway.
+    observations:
+      - pattern_type: APPR.GIVE.NEEDED
+        direction: against
+
+  - id: confirm-asks-everyone-about-flat
+    messages:
+      - who: person
+        text: >-
+          I signed for the flat yesterday. I've asked my mum, my sister and two
+          friends if I did the right thing.
+      - who: zeph
+        text: What did they say?
+      - who: person
+        text: >-
+          They all said yes. I felt better for about an hour, then I was back
+          on the reviews of the area again.
+    observations:
+      - pattern_type: APPR.CONFIRM.CHOICE
+        direction: for
+
+  - id: confirm-picks-course-and-moves-on
+    messages:
+      - who: person
+        text: >-
+          I asked a couple of friends what they thought of the two courses,
+          then picked the evening one. Done, not thinking about it any more.
+      - who: zeph
+        text: Nice, when does it start?
+      - who: person
+        text: January. Looking forward to it.
+    observations:
+      - pattern_type: APPR.CONFIRM.CHOICE
+        direction: against
+
+  - id: hide-tells-friends-its-fine
+    messages:
+      - who: person
+        text: >-
+          This week has been awful, deadlines and the landlord on my back.
+          When my friends asked I just said I'm fine, all good.
+      - who: zeph
+        text: That sounds like a heavy thing to carry quietly.
+      - who: person
+        text: I don't want to dump my problems on anyone. They've got their own stuff.
+    observations:
+      - pattern_type: APPR.HIDE.BURDEN
+        direction: for
+
+  - id: hide-calls-sister-for-support
+    messages:
+      - who: person
+        text: >-
+          Work has been brutal this month. I rang my sister last night and told
+          her I was struggling, and asked if I could come stay at the weekend.
+      - who: zeph
+        text: Good that you reached out. What did she say?
+      - who: person
+        text: She said of course. I feel lighter already.
+    observations:
+      - pattern_type: APPR.HIDE.BURDEN
+        direction: against
+
+  - id: rely-turns-down-help-with-move
+    messages:
+      - who: person
+        text: >-
+          My friends offered to help me move but I said no, it's quicker if I
+          just do it myself. Every time I've relied on people they've let me
+          down.
+      - who: zeph
+        text: That's a big job alone.
+      - who: person
+        text: It's fine. I'd rather carry it than wait on someone who won't show.
+    observations:
+      - pattern_type: CTRL.SELF.RELY
+        direction: for
+
+  - id: rely-lets-partner-plan-trip
+    threads:
+      - title: Living with Sam
+        story: They moved in with their partner Sam two months ago.
+        people: [Sam]
+    messages:
+      - who: person
+        text: >-
+          I've handed the whole holiday over to Sam. He's booking it his way
+          and I'm not checking any of it.
+      - who: zeph
+        text: How does that feel?
+      - who: person
+        text: Honestly great. One less thing.
+    observations:
+      - pattern_type: CTRL.SELF.RELY
+        direction: against
+
+  - id: freedom-maybe-to-every-plan
+    messages:
+      - who: person
+        text: >-
+          My friends want to book the summer trip now. I keep saying maybe.
+          The moment something's fixed in the diary I feel trapped.
+      - who: zeph
+        text: What would happen if you said yes?
+      - who: person
+        text: >-
+          Prices will go up if I wait, I know. I'd still rather pay more than
+          be locked in.
+    observations:
+      - pattern_type: CTRL.OPEN.FREEDOM
+        direction: for
+
+  - id: freedom-books-early-feels-settled
+    messages:
+      - who: person
+        text: >-
+          Booked Christmas with my family back in August. I love having it
+          sorted, I feel totally settled.
+      - who: zeph
+        text: Early planner!
+      - who: person
+        text: Always. Less to think about.
+    observations:
+      - pattern_type: CTRL.OPEN.FREEDOM
+        direction: against
+
+  - id: absorb-forgets-meals-for-game
+    messages:
+      - who: person
+        text: >-
+          I started building this little game on Friday and didn't stop till
+          Sunday night. Skipped dinner twice and forgot I'd said I'd see my
+          friend.
+      - who: zeph
+        text: Sounds like it really grabbed you. How was it stopping?
+      - who: person
+        text: Awful, honestly. I was so irritable when I had to log off for work.
+    observations:
+      - pattern_type: ACH.ABSORB.PULL
+        direction: for
+
+  - id: absorb-paints-and-still-meets-friends
+    messages:
+      - who: person
+        text: >-
+          I've been deep into painting all weekend, but I still stopped for
+          meals and had my friend over Saturday night.
+      - who: zeph
+        text: Sounds like a good balance.
+      - who: person
+        text: It was. Back at it tonight.
+    observations:
+      - pattern_type: ACH.ABSORB.PULL
+        direction: against
+
+  - id: goal-marathon-felt-like-nothing
+    messages:
+      - who: person
+        text: >-
+          I finished my first marathon on Sunday. Already signed up for an
+          ultra in spring.
+      - who: zeph
+        text: Congratulations! How did finishing feel?
+      - who: person
+        text: >-
+          Weirdly the marathon felt like nothing by Monday. I can't even say
+          what would be enough.
+    observations:
+      - pattern_type: ACH.GOAL.MOVE
+        direction: for
+
+  - id: goal-enjoys-promotion
+    messages:
+      - who: person
+        text: >-
+          Got the promotion! I'm taking a few weeks just to enjoy it before I
+          think about what's next.
+      - who: zeph
+        text: That's brilliant news. Celebrating?
+      - who: person
+        text: Dinner with my partner tonight.
+    observations:
+      - pattern_type: ACH.GOAL.MOVE
+        direction: against
+
+  - id: check-are-we-okay-after-slow-reply
+    threads:
+      - title: Dating Alex
+        story: They started seeing Alex a few months ago.
+        people: [Alex]
+    messages:
+      - who: person
+        text: >-
+          Alex took four hours to reply this afternoon. I sent "are we okay?
+          did I do something?"
+      - who: zeph
+        text: What did Alex say?
+      - who: person
+        text: >-
+          He was in a meeting. But until he answered I couldn't settle at all.
+    observations:
+      - pattern_type: REL.CHECK.SECURE
+        direction: for
+
+  - id: check-assumes-friend-is-busy
+    messages:
+      - who: person
+        text: >-
+          Haven't heard from Nadia all week. I figure she's just busy with the
+          new job, so I'm getting on with my week.
+      - who: zeph
+        text: Will you message her?
+      - who: person
+        text: Maybe at the weekend. No rush.
+    observations:
+      - pattern_type: REL.CHECK.SECURE
+        direction: against
+
+  - id: distance-needs-space-after-serious
+    threads:
+      - title: Dating Alex
+        story: They started seeing Alex a few months ago.
+        people: [Alex]
+    messages:
+      - who: person
+        text: >-
+          Alex asked if we could see each other more than twice a week. I felt
+          so crowded. Now I want more space.
+      - who: zeph
+        text: Did anything happen before that?
+      - who: person
+        text: No, it was a lovely week. That's kind of the weird part.
+    observations:
+      - pattern_type: REL.DISTANCE.INDEP
+        direction: for
+
+  - id: distance-makes-room-for-partner
+    threads:
+      - title: Living with Sam
+        story: They moved in with their partner Sam two months ago.
+        people: [Sam]
+    messages:
+      - who: person
+        text: >-
+          Sam wants us to have Sunday as our day together every week. I love
+          that, so I've moved my gym session.
+      - who: zeph
+        text: Sweet. Any plans for this Sunday?
+      - who: person
+        text: Market and a long walk.
+    observations:
+      - pattern_type: REL.DISTANCE.INDEP
+        direction: against
+
+  - id: fix-cheers-up-mum-unasked
+    messages:
+      - who: person
+        text: >-
+          Mum was quiet at lunch and I couldn't relax until it lifted. I spent
+          the whole afternoon cheering her up and sorting her bills, she never
+          asked.
+      - who: zeph
+        text: What do you think was going on for her?
+      - who: person
+        text: No idea. I just kept wondering if it was something I did.
+    observations:
+      - pattern_type: REL.MOOD.FIX
+        direction: for
+
+  - id: fix-lets-flatmate-be-grumpy
+    messages:
+      - who: person
+        text: >-
+          My flatmate was in a foul mood tonight. I left her to it and watched
+          my show, totally at ease.
+      - who: zeph
+        text: Sometimes people just need space.
+      - who: person
+        text: Exactly. She'll be fine tomorrow.
+    observations:
+      - pattern_type: REL.MOOD.FIX
+        direction: against

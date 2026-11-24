@@ -3,10 +3,12 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: CTRL.UNCERT.PLAN
-version: 0.1.0
+version: 0.2.0
 area: control
 name: Control-seeking under uncertainty
-status: draft
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
 
 definition: >-
   When outcomes are uncertain, the person responds by planning, checking,
@@ -60,10 +62,24 @@ signs_against:
 look_alikes:
   - pattern_type: ACH.WORTH.PERF
     tells_apart: >-
-      Controls to guarantee a good result for self-worth; uncertainty itself
-      is tolerable
+      Over-prepares because not knowing is the problem; the other over-prepares
+      to prove their worth, and the unknown itself is bearable
   - pattern_type: CONF.AVOID.BELONG
-    tells_apart: Avoids the unknown only when the relationship is at stake
+    tells_apart: >-
+      Uneasy about any unknown outcome, closeness or not; the other keeps quiet
+      only when closeness is at stake
+  - pattern_type: APPR.CONFIRM.CHOICE
+    tells_apart: >-
+      Seeks information or control over an outcome still open; the other
+      seeks agreement about a choice already made
+  - pattern_type: CTRL.SELF.RELY
+    tells_apart: >-
+      Uneasy about the outcome, whoever is doing it; the other distrusts
+      people to come through, even when the outcome is clear
+  - pattern_type: REL.CHECK.SECURE
+    tells_apart: >-
+      Uneasy about any unknown outcome; the other's not knowing is only about
+      people and how they feel about them
 
 anyone_would: A real crisis where control-seeking is adaptive
 

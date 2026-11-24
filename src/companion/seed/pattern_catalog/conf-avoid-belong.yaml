@@ -3,10 +3,12 @@
 # so a change that keeps its version is refused and the last catalog stays.
 
 id: CONF.AVOID.BELONG
-version: 0.2.0
+version: 0.3.0
 area: conflict
-name: Conflict avoidance to preserve belonging
-status: draft
+name: Softening disagreement to protect belonging
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
 
 definition: >-
   When disagreement arises with someone whose approval matters, the person
@@ -60,14 +62,21 @@ signs_against:
 look_alikes:
   - pattern_type: ACH.WORTH.PERF
     tells_apart: >-
-      Avoids conflict because criticism means failure, not because of fear the
-      relationship will break
+      Keeps quiet to protect the relationship; the other fears criticism as a
+      verdict on their competence
   - pattern_type: CTRL.UNCERT.PLAN
     tells_apart: >-
-      Avoids conflict because its outcome is unpredictable; indifferent to
-      closeness
+      Keeps quiet because closeness is at stake; the other is uneasy about any
+      unknown outcome, closeness or not
+  - pattern_type: APPR.GIVE.NEEDED
+    tells_apart: >-
+      Says yes to avoid the friction of saying no; the other says yes to be
+      needed and keep a place
+  - pattern_type: REL.MOOD.FIX
+    tells_apart: >-
+      Stays quiet about their own view; the other acts to fix the other's mood
 
-anyone_would: Low-stakes avoidance with strangers or authority only
+anyone_would: Keeping quiet over small things with strangers or people in charge
 anyone_would_when:
   - relationship: [stranger]
   - power: [above]

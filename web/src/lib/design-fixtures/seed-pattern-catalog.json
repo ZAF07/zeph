@@ -2,9 +2,9 @@
   "pattern_types": [
     {
       "id": "CONF.AVOID.BELONG",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "area": "conflict",
-      "name": "Conflict avoidance to preserve belonging",
+      "name": "Softening disagreement to protect belonging",
       "definition": "When disagreement arises with someone whose approval matters, the person suppresses, delays or dilutes their own position. The driver is fear that conflict will damage the relationship, not lack of opinion.",
       "if_situation": "Disagreement with a valued other",
       "then_behaviour": "Withholds or softens own view",
@@ -65,15 +65,25 @@
         {
           "pattern_type_id": "ACH.WORTH.PERF",
           "name": "Performance-contingent self-worth",
-          "tells_apart": "Avoids conflict because criticism means failure, not because of fear the relationship will break"
+          "tells_apart": "Keeps quiet to protect the relationship; the other fears criticism as a verdict on their competence"
         },
         {
           "pattern_type_id": "CTRL.UNCERT.PLAN",
           "name": "Control-seeking under uncertainty",
-          "tells_apart": "Avoids conflict because its outcome is unpredictable; indifferent to closeness"
+          "tells_apart": "Keeps quiet because closeness is at stake; the other is uneasy about any unknown outcome, closeness or not"
+        },
+        {
+          "pattern_type_id": "APPR.GIVE.NEEDED",
+          "name": "Saying yes and over-giving to feel needed",
+          "tells_apart": "Says yes to avoid the friction of saying no; the other says yes to be needed and keep a place"
+        },
+        {
+          "pattern_type_id": "REL.MOOD.FIX",
+          "name": "Taking on other people's moods as theirs to fix",
+          "tells_apart": "Stays quiet about their own view; the other acts to fix the other's mood"
         }
       ],
-      "anyone_would": "Low-stakes avoidance with strangers or authority only",
+      "anyone_would": "Keeping quiet over small things with strangers or people in charge",
       "exclusions": [
         {
           "text": "Active relationship crisis",
@@ -90,15 +100,707 @@
         "situations_needed": 3,
         "base_rate": 0.2
       },
-      "status": "draft",
-      "approved_by": null,
-      "approved_on": null,
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
+      "loaded_at": "2026-11-24T09:00:00Z",
+      "other_versions": []
+    },
+    {
+      "id": "CONF.DEFEND.SELF",
+      "version": "0.1.0",
+      "area": "conflict",
+      "name": "Pushing back at once when criticised",
+      "definition": "When someone points out a fault or questions what the person did, they answer straight away with a counter-attack or a long explanation. The criticism lands as a threat to how they see themselves, so it has to be dealt with now, before it can be weighed.",
+      "if_situation": "Criticised or told they got something wrong",
+      "then_behaviour": "Hits back or explains themselves at once",
+      "function": "To protect how they see themselves",
+      "frameworks": [
+        "Self-verification and self-image threat (Swann; Baumeister)",
+        "Contingencies of self-worth (Crocker)",
+        "Gottman's defensiveness in close relationships",
+        "Big Five agreeableness, low end"
+      ],
+      "signs": [
+        {
+          "id": "I1",
+          "text": "Replies to a complaint with a complaint of their own about the other person",
+          "strength": "strong",
+          "part": "behaviour"
+        },
+        {
+          "id": "I2",
+          "text": "Gives a long account of why it wasn't their fault before taking in what was said",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I3",
+          "text": "Describes a small remark as an attack on who they are",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "I4",
+          "text": "Replays the criticism later, building the case they wish they'd made",
+          "strength": "moderate",
+          "part": "inside"
+        },
+        {
+          "id": "I5",
+          "text": "Says feedback \"came out of nowhere\" when the other person had raised it before",
+          "strength": "weak",
+          "part": "situation"
+        }
+      ],
+      "signs_against": [
+        {
+          "id": "D1",
+          "text": "Asks what the other person meant, or agrees with part of it, before answering",
+          "strength": "strong",
+          "part": "behaviour"
+        },
+        {
+          "id": "D2",
+          "text": "Pushes back only when the criticism is clearly unfair and says why calmly",
+          "strength": "moderate",
+          "part": "inside"
+        }
+      ],
+      "look_alikes": [
+        {
+          "pattern_type_id": "ACH.WORTH.PERF",
+          "name": "Performance-contingent self-worth",
+          "tells_apart": "Turns the criticism outward and answers back; the other turns it inward and judges themselves"
+        },
+        {
+          "pattern_type_id": "CONF.WITHDRAW.HURT",
+          "name": "Going quiet and pulling away when hurt",
+          "tells_apart": "Moves toward the other person to answer back; the other goes quiet and moves away"
+        }
+      ],
+      "anyone_would": "Standing up for themselves when someone is openly hostile or insulting",
+      "exclusions": [
+        {
+          "text": "The criticism came during a formal complaint, dismissal or legal dispute",
+          "evidence": "ignored"
+        },
+        {
+          "text": "Grief",
+          "evidence": "ignored"
+        }
+      ],
+      "approved_wording": "When someone finds fault with you, you seem to answer it straight away, before you've had a chance to weigh whether any of it is fair.",
+      "prediction_wording": "Next time {person} points out something you did, notice what you say in the first few seconds, and whether it's an answer or a question.",
+      "numbers": {
+        "situations_needed": 3,
+        "base_rate": 0.2
+      },
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
+      "loaded_at": "2026-11-24T09:00:00Z",
+      "other_versions": []
+    },
+    {
+      "id": "CONF.WITHDRAW.HURT",
+      "version": "0.1.0",
+      "area": "conflict",
+      "name": "Going quiet and pulling away when hurt",
+      "definition": "When someone close hurts or lets them down, the person goes quiet, keeps to themselves and waits for it to pass rather than saying they were hurt. Showing the hurt would mean showing they need the other person, and that feels riskier than the distance.",
+      "if_situation": "Hurt or let down by someone close",
+      "then_behaviour": "Goes quiet, pulls away and doesn't say why",
+      "function": "To avoid showing they need someone",
+      "frameworks": [
+        "Withdrawal in the demand–withdraw cycle (Christensen)",
+        "Gottman's stonewalling",
+        "Emotional suppression (Gross)",
+        "Attachment theory, the self-reliant end (Bowlby; Bartholomew)"
+      ],
+      "signs": [
+        {
+          "id": "I1",
+          "text": "Stops replying or answers in short, flat messages after being hurt",
+          "strength": "strong",
+          "part": "behaviour"
+        },
+        {
+          "id": "I2",
+          "text": "Says \"I'm fine\" to the person who hurt them while clearly not fine",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I3",
+          "text": "Expects the other person to notice and come to them without being told",
+          "strength": "moderate",
+          "part": "inside"
+        },
+        {
+          "id": "I4",
+          "text": "Feels that saying \"that hurt\" would make them look weak or needy",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "I5",
+          "text": "Makes plans that keep them out of the person's way for a few days",
+          "strength": "weak",
+          "part": "behaviour"
+        }
+      ],
+      "signs_against": [
+        {
+          "id": "D1",
+          "text": "Tells the person soon after that something they did hurt",
+          "strength": "strong",
+          "part": "behaviour"
+        },
+        {
+          "id": "D2",
+          "text": "Takes some time alone to calm down, then comes back to talk it through",
+          "strength": "moderate",
+          "part": "behaviour"
+        }
+      ],
+      "look_alikes": [
+        {
+          "pattern_type_id": "CONF.DEFEND.SELF",
+          "name": "Pushing back at once when criticised",
+          "tells_apart": "Goes quiet and moves away after a hurt; the other answers back at once and moves toward the fight"
+        },
+        {
+          "pattern_type_id": "REL.DISTANCE.INDEP",
+          "name": "Pulling back when someone gets closer or needs more",
+          "tells_apart": "Pulls away after being hurt; the other pulls away when things get close, with no hurt before it"
+        },
+        {
+          "pattern_type_id": "APPR.HIDE.BURDEN",
+          "name": "Saying \"I'm fine\" and hiding what's hard",
+          "tells_apart": "Hides a hurt from the one who caused it; the other hides any struggle from everyone so as not to weigh on them"
+        }
+      ],
+      "anyone_would": "Keeping distance from a stranger or acquaintance who was rude",
+      "exclusions": [
+        {
+          "text": "The person who hurt them is someone they need to be safe from",
+          "evidence": "ignored"
+        },
+        {
+          "text": "Grief",
+          "evidence": "ignored"
+        },
+        {
+          "text": "Active relationship crisis, such as a breakup in the last month",
+          "evidence": "counted_not_shared"
+        }
+      ],
+      "approved_wording": "When someone close hurts you, you seem to go quiet and keep your distance rather than let them see it landed.",
+      "prediction_wording": "Next time {person} lets you down, notice whether you tell them, or wait for them to work it out.",
+      "numbers": {
+        "situations_needed": 3,
+        "base_rate": 0.25
+      },
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
+      "loaded_at": "2026-11-24T09:00:00Z",
+      "other_versions": []
+    },
+    {
+      "id": "APPR.CONFIRM.CHOICE",
+      "version": "0.1.0",
+      "area": "approval",
+      "name": "Asking others to confirm a choice already made",
+      "definition": "After making a choice, the person asks one or more others whether it was right. They are not looking for new information; the choice is made. The asking quiets the fear of having got it wrong, until the next doubt.",
+      "if_situation": "Has just made a choice that matters to them",
+      "then_behaviour": "Asks others to confirm it was the right one",
+      "function": "To quiet the fear of having got it wrong",
+      "frameworks": [
+        "Excessive reassurance seeking (Coyne; Joiner)",
+        "Maximising and regret in choices (Schwartz)",
+        "Self-concept clarity (Campbell)",
+        "Contingencies of self-worth, others' approval (Crocker)"
+      ],
+      "signs": [
+        {
+          "id": "I1",
+          "text": "Asks several people the same \"did I do the right thing?\" about one choice",
+          "strength": "strong",
+          "part": "behaviour"
+        },
+        {
+          "id": "I2",
+          "text": "Feels relief when someone agrees, which fades within a day",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "I3",
+          "text": "Shares a decision as a question (\"I've booked it, is that okay?\")",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I4",
+          "text": "Re-reads reviews or advice about something already bought or decided",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I5",
+          "text": "Says they don't trust their own judgement on everyday things",
+          "strength": "weak",
+          "part": "inside"
+        }
+      ],
+      "signs_against": [
+        {
+          "id": "D1",
+          "text": "Makes a choice and moves on without checking it with anyone",
+          "strength": "strong",
+          "part": "behaviour"
+        },
+        {
+          "id": "D2",
+          "text": "Asks for others' views before deciding, then decides and stops asking",
+          "strength": "moderate",
+          "part": "behaviour"
+        }
+      ],
+      "look_alikes": [
+        {
+          "pattern_type_id": "REL.CHECK.SECURE",
+          "name": "Reading silence as something wrong and reaching out to check",
+          "tells_apart": "Checks whether they chose right; the other checks whether the bond is still okay"
+        },
+        {
+          "pattern_type_id": "CTRL.UNCERT.PLAN",
+          "name": "Control-seeking under uncertainty",
+          "tells_apart": "Seeks agreement about a choice already made; the other seeks information or control over an outcome still open"
+        },
+        {
+          "pattern_type_id": "CTRL.OPEN.FREEDOM",
+          "name": "Keeping options open and putting off committing",
+          "tells_apart": "Commits, then looks for reassurance; the other doesn't commit at all"
+        }
+      ],
+      "anyone_would": "Checking a work decision with a manager who has to sign it off",
+      "exclusions": [
+        {
+          "text": "A big life decision in the last two weeks, such as a move or a new job",
+          "evidence": "counted_not_shared"
+        },
+        {
+          "text": "Grief",
+          "evidence": "ignored"
+        }
+      ],
+      "approved_wording": "Once you've chosen, you seem to need someone else to say it was right before you can settle.",
+      "prediction_wording": "After your next {decision}, notice whether you ask anyone if it was right, and how long the relief lasts if they say yes.",
+      "numbers": {
+        "situations_needed": 3,
+        "base_rate": 0.2
+      },
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
+      "loaded_at": "2026-11-24T09:00:00Z",
+      "other_versions": []
+    },
+    {
+      "id": "APPR.GIVE.NEEDED",
+      "version": "0.1.0",
+      "area": "approval",
+      "name": "Saying yes and over-giving to feel needed",
+      "definition": "When someone asks for help, the person says yes and then gives more than was asked, often at a cost to themselves. Being the one others rely on is part of how they know they matter, so saying no feels like losing a place.",
+      "if_situation": "Asked for help or a favour",
+      "then_behaviour": "Says yes and gives more than was asked",
+      "function": "To feel needed",
+      "frameworks": [
+        "Unmitigated communion (Helgeson and Fritz)",
+        "Young's self-sacrifice schema theme",
+        "Schwartz benevolence value",
+        "Contingencies of self-worth, others' approval (Crocker)"
+      ],
+      "signs": [
+        {
+          "id": "I1",
+          "text": "Agrees to help before checking whether they have the time",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I2",
+          "text": "Turns a small favour into a much bigger job without being asked",
+          "strength": "strong",
+          "part": "behaviour"
+        },
+        {
+          "id": "I3",
+          "text": "Feels flat or useless on days nobody needs anything from them",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "I4",
+          "text": "Feels hurt when their help is turned down or not noticed",
+          "strength": "moderate",
+          "part": "inside"
+        },
+        {
+          "id": "I5",
+          "text": "Describes themselves as \"the one everyone calls\"",
+          "strength": "weak",
+          "part": "inside"
+        }
+      ],
+      "signs_against": [
+        {
+          "id": "D1",
+          "text": "Says no to a request without much guilt and feels fine after",
+          "strength": "strong",
+          "part": "behaviour"
+        },
+        {
+          "id": "D2",
+          "text": "Helps a lot, but only where they chose to and it costs them little",
+          "strength": "moderate",
+          "part": "situation"
+        }
+      ],
+      "look_alikes": [
+        {
+          "pattern_type_id": "CONF.AVOID.BELONG",
+          "name": "Softening disagreement to protect belonging",
+          "tells_apart": "Says yes to be needed and keep a place; the other says yes to avoid the friction of saying no"
+        },
+        {
+          "pattern_type_id": "REL.MOOD.FIX",
+          "name": "Taking on other people's moods as theirs to fix",
+          "tells_apart": "Gives when asked; the other steps in to fix a mood without being asked"
+        },
+        {
+          "pattern_type_id": "CTRL.SELF.RELY",
+          "name": "Doing it all themselves rather than leaning on others",
+          "tells_apart": "Takes on other people's tasks to be needed; the other keeps their own tasks so as not to depend on anyone"
+        }
+      ],
+      "anyone_would": "Saying yes to a reasonable request from a manager at work",
+      "exclusions": [
+        {
+          "text": "Caring for a seriously ill or dependent family member",
+          "evidence": "counted_not_shared"
+        },
+        {
+          "text": "Grief",
+          "evidence": "ignored"
+        }
+      ],
+      "approved_wording": "Being the one people turn to seems to matter a lot to you, so yes comes easily, even when it costs you.",
+      "prediction_wording": "Next time {person} asks you for something, notice whether you say yes before you've checked what it will cost you.",
+      "numbers": {
+        "situations_needed": 3,
+        "base_rate": 0.25
+      },
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
+      "loaded_at": "2026-11-24T09:00:00Z",
+      "other_versions": []
+    },
+    {
+      "id": "APPR.HIDE.BURDEN",
+      "version": "0.1.0",
+      "area": "approval",
+      "name": "Saying \"I'm fine\" and hiding what's hard",
+      "definition": "When something is hard, the person keeps it to themselves and tells others they are fine. They worry that sharing it would weigh on people or make them less welcome, so they carry it alone and show an easy face.",
+      "if_situation": "Going through something hard while others are around",
+      "then_behaviour": "Says they're fine and keeps it to themselves",
+      "function": "To avoid being a burden",
+      "frameworks": [
+        "Self-concealment (Larson and Chastain)",
+        "Perceived burdensomeness in help-seeking research",
+        "Emotional suppression (Gross)",
+        "Young's emotional inhibition schema theme"
+      ],
+      "signs": [
+        {
+          "id": "I1",
+          "text": "Tells people they're fine during a week they describe as hard",
+          "strength": "strong",
+          "part": "behaviour"
+        },
+        {
+          "id": "I2",
+          "text": "Says they don't want to \"dump\" their problems on anyone",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "I3",
+          "text": "Turns a question about how they are into a question about the other person",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I4",
+          "text": "Mentions something hard only after it's over, as a passing remark",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I5",
+          "text": "Apologises for \"going on\" after sharing a little",
+          "strength": "weak",
+          "part": "behaviour"
+        }
+      ],
+      "signs_against": [
+        {
+          "id": "D1",
+          "text": "Tells a friend or family member when they're struggling and asks for support",
+          "strength": "strong",
+          "part": "behaviour"
+        },
+        {
+          "id": "D2",
+          "text": "Keeps something private by choice and feels at ease with that, not lonely",
+          "strength": "moderate",
+          "part": "inside"
+        }
+      ],
+      "look_alikes": [
+        {
+          "pattern_type_id": "CONF.WITHDRAW.HURT",
+          "name": "Going quiet and pulling away when hurt",
+          "tells_apart": "Hides any struggle from everyone so as not to weigh on them; the other hides a hurt from the one who caused it"
+        },
+        {
+          "pattern_type_id": "CTRL.SELF.RELY",
+          "name": "Doing it all themselves rather than leaning on others",
+          "tells_apart": "Keeps their troubles to themselves so as not to be a weight; the other keeps their tasks to themselves so as not to be let down"
+        }
+      ],
+      "anyone_would": "Saying \"fine, thanks\" to a stranger or acquaintance who asks in passing",
+      "exclusions": [
+        {
+          "text": "Any sign the hard thing puts them at risk; that is for the Safeguard, never a Pattern",
+          "evidence": "ignored"
+        },
+        {
+          "text": "Grief",
+          "evidence": "counted_not_shared"
+        },
+        {
+          "text": "Serious illness, their own or a close family member's",
+          "evidence": "counted_not_shared"
+        }
+      ],
+      "approved_wording": "When things are hard, you seem to keep them to yourself so you don't weigh on the people around you.",
+      "prediction_wording": "Next time someone asks how you are on a hard day, notice what you say, and what you'd have said if you weren't worried about weighing on them.",
+      "numbers": {
+        "situations_needed": 3,
+        "base_rate": 0.25
+      },
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
+      "loaded_at": "2026-11-24T09:00:00Z",
+      "other_versions": []
+    },
+    {
+      "id": "CTRL.OPEN.FREEDOM",
+      "version": "0.1.0",
+      "area": "control",
+      "name": "Keeping options open and putting off committing",
+      "definition": "When a choice would close off other options, the person puts it off, keeps several open or commits only loosely. Being tied down feels like losing freedom, so not choosing feels safer, even when waiting costs them.",
+      "if_situation": "A commitment would close off other options",
+      "then_behaviour": "Delays deciding and keeps options open",
+      "function": "To protect their freedom",
+      "frameworks": [
+        "Reactance theory (Brehm)",
+        "Maximising in choices (Schwartz)",
+        "Self-determination theory, autonomy need (Deci and Ryan)",
+        "Schwartz self-direction and stimulation values"
+      ],
+      "signs": [
+        {
+          "id": "I1",
+          "text": "Answers an invitation with \"maybe\" and decides on the day",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I2",
+          "text": "Feels trapped or restless once something is fixed in the diary",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "I3",
+          "text": "Keeps two or more options going long past the point of choosing",
+          "strength": "strong",
+          "part": "behaviour"
+        },
+        {
+          "id": "I4",
+          "text": "Pays a cost, such as a higher price or a lost place, rather than commit early",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I5",
+          "text": "Describes long-term plans as a cage",
+          "strength": "weak",
+          "part": "inside"
+        }
+      ],
+      "signs_against": [
+        {
+          "id": "D1",
+          "text": "Commits early to a plan and feels settled, not trapped",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "D2",
+          "text": "Delays only when they truly lack the information to choose",
+          "strength": "moderate",
+          "part": "situation"
+        }
+      ],
+      "look_alikes": [
+        {
+          "pattern_type_id": "APPR.CONFIRM.CHOICE",
+          "name": "Asking others to confirm a choice already made",
+          "tells_apart": "Doesn't commit at all; the other commits, then looks for reassurance"
+        },
+        {
+          "pattern_type_id": "REL.DISTANCE.INDEP",
+          "name": "Pulling back when someone gets closer or needs more",
+          "tells_apart": "Protects freedom around choices and plans; the other protects room from a person getting closer"
+        }
+      ],
+      "anyone_would": "Waiting to decide while an important fact is still unknown",
+      "exclusions": [
+        {
+          "text": "A choice forced by money trouble, illness or a visa",
+          "evidence": "ignored"
+        }
+      ],
+      "approved_wording": "You seem to keep your options open for as long as you can, as if choosing one would take something away from you.",
+      "prediction_wording": "Next time you're asked to commit to {plan}, notice what you feel just before you answer, and whether \"maybe\" comes out first.",
+      "numbers": {
+        "situations_needed": 3,
+        "base_rate": 0.2
+      },
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
+      "loaded_at": "2026-11-24T09:00:00Z",
+      "other_versions": []
+    },
+    {
+      "id": "CTRL.SELF.RELY",
+      "version": "0.1.0",
+      "area": "control",
+      "name": "Doing it all themselves rather than leaning on others",
+      "definition": "When a job could be shared or help is on offer, the person does it themselves. Relying on others has let them down before, or they expect it to, so carrying it alone feels safer than waiting on someone who might not come through.",
+      "if_situation": "A task could be shared or someone offers help",
+      "then_behaviour": "Turns help down and does it all themselves",
+      "function": "To avoid being let down",
+      "frameworks": [
+        "Compulsive self-reliance in attachment theory (Bowlby)",
+        "Young's mistrust and emotional deprivation schema themes",
+        "Interpersonal trust (Rotter)",
+        "Schwartz self-direction value"
+      ],
+      "signs": [
+        {
+          "id": "I1",
+          "text": "Turns down an offer of help on something that is clearly too much for one person",
+          "strength": "strong",
+          "part": "behaviour"
+        },
+        {
+          "id": "I2",
+          "text": "Says \"it's quicker if I just do it myself\"",
+          "strength": "moderate",
+          "part": "inside"
+        },
+        {
+          "id": "I3",
+          "text": "Expects others to drop the ball, and names past times they did",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "I4",
+          "text": "Redoes work someone else already finished",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I5",
+          "text": "Feels uneasy owing anyone a favour",
+          "strength": "weak",
+          "part": "inside"
+        }
+      ],
+      "signs_against": [
+        {
+          "id": "D1",
+          "text": "Hands over a part of something that matters and lets the other person do it their way",
+          "strength": "strong",
+          "part": "behaviour"
+        },
+        {
+          "id": "D2",
+          "text": "Does things alone because they enjoy it, and accepts help when it's needed",
+          "strength": "moderate",
+          "part": "inside"
+        }
+      ],
+      "look_alikes": [
+        {
+          "pattern_type_id": "APPR.GIVE.NEEDED",
+          "name": "Saying yes and over-giving to feel needed",
+          "tells_apart": "Keeps their own tasks so as not to depend on anyone; the other takes on other people's tasks to be needed"
+        },
+        {
+          "pattern_type_id": "APPR.HIDE.BURDEN",
+          "name": "Saying \"I'm fine\" and hiding what's hard",
+          "tells_apart": "Keeps their tasks to themselves so as not to be let down; the other keeps their troubles to themselves so as not to be a weight"
+        },
+        {
+          "pattern_type_id": "CTRL.UNCERT.PLAN",
+          "name": "Control-seeking under uncertainty",
+          "tells_apart": "Distrusts people to come through, even when the outcome is clear; the other is uneasy about the outcome, whoever is doing it"
+        }
+      ],
+      "anyone_would": "Doing a task alone when nobody else is free or able to help",
+      "exclusions": [
+        {
+          "text": "Living alone through a crisis with nobody nearby to help",
+          "evidence": "counted_not_shared"
+        }
+      ],
+      "approved_wording": "You seem to carry things yourself rather than lean on others, as if relying on someone is the bigger risk.",
+      "prediction_wording": "Next time someone offers to help with {task}, notice whether you say yes, and what you expect would happen if you did.",
+      "numbers": {
+        "situations_needed": 3,
+        "base_rate": 0.2
+      },
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
       "loaded_at": "2026-11-24T09:00:00Z",
       "other_versions": []
     },
     {
       "id": "CTRL.UNCERT.PLAN",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "area": "control",
       "name": "Control-seeking under uncertainty",
       "definition": "When outcomes are uncertain, the person responds by planning, checking, gathering information or taking over. The discomfort comes from not knowing, and acting on it brings relief even when it changes nothing.",
@@ -161,12 +863,27 @@
         {
           "pattern_type_id": "ACH.WORTH.PERF",
           "name": "Performance-contingent self-worth",
-          "tells_apart": "Controls to guarantee a good result for self-worth; uncertainty itself is tolerable"
+          "tells_apart": "Over-prepares because not knowing is the problem; the other over-prepares to prove their worth, and the unknown itself is bearable"
         },
         {
           "pattern_type_id": "CONF.AVOID.BELONG",
-          "name": "Conflict avoidance to preserve belonging",
-          "tells_apart": "Avoids the unknown only when the relationship is at stake"
+          "name": "Softening disagreement to protect belonging",
+          "tells_apart": "Uneasy about any unknown outcome, closeness or not; the other keeps quiet only when closeness is at stake"
+        },
+        {
+          "pattern_type_id": "APPR.CONFIRM.CHOICE",
+          "name": "Asking others to confirm a choice already made",
+          "tells_apart": "Seeks information or control over an outcome still open; the other seeks agreement about a choice already made"
+        },
+        {
+          "pattern_type_id": "CTRL.SELF.RELY",
+          "name": "Doing it all themselves rather than leaning on others",
+          "tells_apart": "Uneasy about the outcome, whoever is doing it; the other distrusts people to come through, even when the outcome is clear"
+        },
+        {
+          "pattern_type_id": "REL.CHECK.SECURE",
+          "name": "Reading silence as something wrong and reaching out to check",
+          "tells_apart": "Uneasy about any unknown outcome; the other's not knowing is only about people and how they feel about them"
         }
       ],
       "anyone_would": "A real crisis where control-seeking is adaptive",
@@ -182,20 +899,204 @@
         "situations_needed": 3,
         "base_rate": 0.2
       },
-      "status": "draft",
-      "approved_by": null,
-      "approved_on": null,
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
+      "loaded_at": "2026-11-24T09:00:00Z",
+      "other_versions": []
+    },
+    {
+      "id": "ACH.ABSORB.PULL",
+      "version": "0.1.0",
+      "area": "achievement",
+      "name": "Everything else goes quiet when something grabs them",
+      "definition": "When a task, project or interest grabs them, the person goes all in and the rest of life drops away: meals, sleep, messages, plans. Being in the pull of it feels so good that stepping out feels like a loss.",
+      "if_situation": "Something grabs their interest",
+      "then_behaviour": "Goes all in and lets everything else drop",
+      "function": "To stay in the pull of it",
+      "frameworks": [
+        "Flow (Csikszentmihalyi)",
+        "Obsessive versus harmonious passion (Vallerand)",
+        "Big Five openness and low orderliness",
+        "Schwartz stimulation value"
+      ],
+      "signs": [
+        {
+          "id": "I1",
+          "text": "Loses whole evenings or nights to one thing without noticing the time",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I2",
+          "text": "Misses meals, sleep or plans because they were caught up in something",
+          "strength": "strong",
+          "part": "behaviour"
+        },
+        {
+          "id": "I3",
+          "text": "Leaves messages unanswered for days while on a project",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I4",
+          "text": "Feels flat or irritable when made to stop",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "I5",
+          "text": "Moves from one all-consuming interest to the next",
+          "strength": "weak",
+          "part": "situation"
+        }
+      ],
+      "signs_against": [
+        {
+          "id": "D1",
+          "text": "Gets deeply into something and still stops for meals, sleep and people",
+          "strength": "strong",
+          "part": "behaviour"
+        },
+        {
+          "id": "D2",
+          "text": "Only goes all in near a real deadline, then goes back to normal",
+          "strength": "moderate",
+          "part": "situation"
+        }
+      ],
+      "look_alikes": [
+        {
+          "pattern_type_id": null,
+          "name": "Healthy focus",
+          "tells_apart": "Deep focus that they can step out of when life needs them, with nothing important dropped"
+        },
+        {
+          "pattern_type_id": "REL.DISTANCE.INDEP",
+          "name": "Pulling back when someone gets closer or needs more",
+          "tells_apart": "People drop away because something else has their attention; the other pulls away because the person is getting closer"
+        }
+      ],
+      "anyone_would": "Working long hours in the last days before a real deadline",
+      "exclusions": [
+        {
+          "text": "Using absorption to get through a loss or crisis",
+          "evidence": "counted_not_shared"
+        }
+      ],
+      "approved_wording": "When something grabs you, everything else seems to go quiet, and coming back to the rest of life can feel like a loss.",
+      "prediction_wording": "Next time {interest} pulls you in, notice what you let drop, and how you feel when something makes you stop.",
+      "numbers": {
+        "situations_needed": 3,
+        "base_rate": 0.2
+      },
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
+      "loaded_at": "2026-11-24T09:00:00Z",
+      "other_versions": []
+    },
+    {
+      "id": "ACH.GOAL.MOVE",
+      "version": "0.1.0",
+      "area": "achievement",
+      "name": "Moving the goal as soon as they reach it",
+      "definition": "When the person reaches a goal, they barely pause before setting a bigger one. The win counts for little because the next target is already in view. Keeping a goal ahead means never having to ask whether they've done enough.",
+      "if_situation": "Reaches a goal or gets a win",
+      "then_behaviour": "Sets a new, bigger goal at once",
+      "function": "So \"enough\" never has to be faced",
+      "frameworks": [
+        "The hedonic treadmill (Brickman and Campbell)",
+        "Self-discrepancy theory (Higgins)",
+        "Young's unrelenting-standards schema theme",
+        "Schwartz achievement value"
+      ],
+      "signs": [
+        {
+          "id": "I1",
+          "text": "Talks about the next goal in the same breath as a win",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I2",
+          "text": "Says reaching a goal \"felt like nothing\" or wore off in a day",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "I3",
+          "text": "Can't name a point at which they would be satisfied",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "I4",
+          "text": "Raises a target partway through because it now looks too easy",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I5",
+          "text": "Skips or plays down marking a milestone",
+          "strength": "weak",
+          "part": "behaviour"
+        }
+      ],
+      "signs_against": [
+        {
+          "id": "D1",
+          "text": "Takes time to enjoy a win before thinking about what's next",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "D2",
+          "text": "Sets a new goal because they want it, not because the old one felt empty",
+          "strength": "moderate",
+          "part": "inside"
+        }
+      ],
+      "look_alikes": [
+        {
+          "pattern_type_id": null,
+          "name": "Ambition with satisfaction",
+          "tells_apart": "Aims higher after a win, but the win still felt good and counted"
+        },
+        {
+          "pattern_type_id": "ACH.WORTH.PERF",
+          "name": "Performance-contingent self-worth",
+          "tells_apart": "Moves the goal after succeeding; the other judges themselves after falling short"
+        }
+      ],
+      "anyone_would": "Setting the next step in a fixed path, such as the next exam in a course",
+      "exclusions": [
+        {
+          "text": "Money trouble that makes the next goal a real need",
+          "evidence": "ignored"
+        }
+      ],
+      "approved_wording": "Each time you reach a goal, you seem to set the next one before the last one has had a chance to count.",
+      "prediction_wording": "When you next reach {goal}, notice how long you stay with it before your mind moves to what's next.",
+      "numbers": {
+        "situations_needed": 3,
+        "base_rate": 0.2
+      },
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
       "loaded_at": "2026-11-24T09:00:00Z",
       "other_versions": []
     },
     {
       "id": "ACH.WORTH.PERF",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "area": "achievement",
       "name": "Performance-contingent self-worth",
       "definition": "The person's sense of worth rises and falls with how well they perform. Falling short is felt as a verdict on the self, not on the work. High standards alone do not qualify; the marker is self-judgement after a miss.",
       "if_situation": "Performance is evaluated or falls short",
-      "then_behaviour": "Self-criticism, over-preparation or avoidance of the task",
+      "then_behaviour": "Self-criticism, over-preparation or putting the task off",
       "function": "To protect a sense of being worthy",
       "frameworks": [
         "Self-critical vs high-standards dimensions of perfectionism (Frost and Hewitt–Flett traditions)",
@@ -257,13 +1158,23 @@
         },
         {
           "pattern_type_id": "CONF.AVOID.BELONG",
-          "name": "Conflict avoidance to preserve belonging",
-          "tells_apart": "Fears others' reaction to the relationship, not the verdict on competence"
+          "name": "Softening disagreement to protect belonging",
+          "tells_apart": "Fears criticism as a verdict on their competence; the other keeps quiet to protect the relationship"
         },
         {
           "pattern_type_id": "CTRL.UNCERT.PLAN",
           "name": "Control-seeking under uncertainty",
-          "tells_apart": "Over-prepares to reduce unknowns, not to prove worth"
+          "tells_apart": "Over-prepares to prove their worth; the other over-prepares to reduce unknowns"
+        },
+        {
+          "pattern_type_id": "CONF.DEFEND.SELF",
+          "name": "Pushing back at once when criticised",
+          "tells_apart": "Turns the criticism inward and judges themselves; the other turns it outward and answers back"
+        },
+        {
+          "pattern_type_id": "ACH.GOAL.MOVE",
+          "name": "Moving the goal as soon as they reach it",
+          "tells_apart": "Judges themselves after falling short; the other moves the goal after succeeding"
         }
       ],
       "anyone_would": "Disappointment after a real, costly setback, or preparing hard where the stakes are high",
@@ -279,9 +1190,348 @@
         "situations_needed": 3,
         "base_rate": 0.25
       },
-      "status": "draft",
-      "approved_by": null,
-      "approved_on": null,
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
+      "loaded_at": "2026-11-24T09:00:00Z",
+      "other_versions": []
+    },
+    {
+      "id": "REL.CHECK.SECURE",
+      "version": "0.1.0",
+      "area": "relationships",
+      "name": "Reading silence as something wrong and reaching out to check",
+      "definition": "When someone close goes quiet, replies late or seems distant, the person reads it as a sign that something is wrong between them and reaches out to check. The checking is about the bond, and it settles them only once they hear things are okay.",
+      "if_situation": "Someone close goes quiet or seems distant",
+      "then_behaviour": "Reads it as trouble and reaches out to check",
+      "function": "To feel secure in the bond",
+      "frameworks": [
+        "Attachment theory, the closeness-seeking end (Bowlby; Fraley and Shaver)",
+        "Rejection sensitivity (Downey and Feldman)",
+        "Excessive reassurance seeking (Coyne; Joiner)",
+        "Mind-reading and jumping to conclusions (Beck)"
+      ],
+      "signs": [
+        {
+          "id": "I1",
+          "text": "Sends a \"are we okay?\" or \"did I do something?\" message after a slow reply",
+          "strength": "strong",
+          "part": "behaviour"
+        },
+        {
+          "id": "I2",
+          "text": "Reads a short or late reply as a sign the other person is upset with them",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "I3",
+          "text": "Checks when someone was last online or re-reads past messages for clues",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I4",
+          "text": "Can't settle until they've heard back",
+          "strength": "moderate",
+          "part": "inside"
+        },
+        {
+          "id": "I5",
+          "text": "Sends a second message before the first has been answered",
+          "strength": "weak",
+          "part": "behaviour"
+        }
+      ],
+      "signs_against": [
+        {
+          "id": "D1",
+          "text": "Assumes a quiet partner or friend is just busy and carries on with their day",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "D2",
+          "text": "Checks in only after a real change, such as a missed plan or a row",
+          "strength": "moderate",
+          "part": "situation"
+        }
+      ],
+      "look_alikes": [
+        {
+          "pattern_type_id": "APPR.CONFIRM.CHOICE",
+          "name": "Asking others to confirm a choice already made",
+          "tells_apart": "Checks whether the bond is still okay; the other checks whether they chose right"
+        },
+        {
+          "pattern_type_id": "CTRL.UNCERT.PLAN",
+          "name": "Control-seeking under uncertainty",
+          "tells_apart": "The not knowing is only about people and how they feel about them; the other is uneasy about any unknown outcome"
+        },
+        {
+          "pattern_type_id": "REL.MOOD.FIX",
+          "name": "Taking on other people's moods as theirs to fix",
+          "tells_apart": "Reads distance as trouble for the bond and asks about it; the other reads a mood as theirs to fix and sets about fixing it"
+        }
+      ],
+      "anyone_would": "Checking on someone who has gone silent after saying they were travelling or unwell",
+      "exclusions": [
+        {
+          "text": "Any sign of abuse, threats or controlling behaviour in the relationship; that stays with the Safeguard",
+          "evidence": "ignored"
+        },
+        {
+          "text": "The other person really is in danger or missing",
+          "evidence": "ignored"
+        },
+        {
+          "text": "A breakup, separation or affair in the last month",
+          "evidence": "counted_not_shared"
+        },
+        {
+          "text": "Grief, including the loss of a pet",
+          "evidence": "ignored"
+        },
+        {
+          "text": "A long-distance relationship across time zones in its first weeks",
+          "evidence": "counted_not_shared"
+        }
+      ],
+      "approved_wording": "When someone close goes quiet, you seem to read it as something wrong between you, and you need to check before you can settle.",
+      "prediction_wording": "Next time {person} takes a while to reply, notice what story you tell yourself about why, and what you do with it.",
+      "numbers": {
+        "situations_needed": 3,
+        "base_rate": 0.2
+      },
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
+      "loaded_at": "2026-11-24T09:00:00Z",
+      "other_versions": []
+    },
+    {
+      "id": "REL.DISTANCE.INDEP",
+      "version": "0.1.0",
+      "area": "relationships",
+      "name": "Pulling back when someone gets closer or needs more",
+      "definition": "When someone wants to get closer, asks for more time or leans on them, the person pulls back: slower replies, fewer plans, a sudden need for space. Closeness that grows feels like a claim on them, and stepping back keeps them their own.",
+      "if_situation": "Someone gets closer or needs more of them",
+      "then_behaviour": "Pulls back and makes more room",
+      "function": "To protect their independence",
+      "frameworks": [
+        "Attachment theory, the self-reliant end (Bowlby; Fraley and Shaver)",
+        "Closeness and autonomy needs in couples (Baxter's dialectics)",
+        "Reactance theory (Brehm)",
+        "Self-determination theory, autonomy need (Deci and Ryan)"
+      ],
+      "signs": [
+        {
+          "id": "I1",
+          "text": "Wants more space soon after a relationship gets more serious",
+          "strength": "strong",
+          "part": "behaviour"
+        },
+        {
+          "id": "I2",
+          "text": "Feels crowded or smothered when someone asks to see them more",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "I3",
+          "text": "Goes cold on someone after a warm, close evening",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I4",
+          "text": "Keeps parts of their life apart from a partner or close friend on purpose",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I5",
+          "text": "Finds a fault in someone just as they start to like them",
+          "strength": "weak",
+          "part": "inside"
+        }
+      ],
+      "signs_against": [
+        {
+          "id": "D1",
+          "text": "Welcomes a partner or friend wanting more time together and makes room for it",
+          "strength": "strong",
+          "part": "behaviour"
+        },
+        {
+          "id": "D2",
+          "text": "Asks for space for a clear reason, such as a busy week, and comes back",
+          "strength": "moderate",
+          "part": "situation"
+        }
+      ],
+      "look_alikes": [
+        {
+          "pattern_type_id": "CONF.WITHDRAW.HURT",
+          "name": "Going quiet and pulling away when hurt",
+          "tells_apart": "Pulls away when things get close, with no hurt before it; the other pulls away after being hurt"
+        },
+        {
+          "pattern_type_id": "CTRL.OPEN.FREEDOM",
+          "name": "Keeping options open and putting off committing",
+          "tells_apart": "Protects room from a person getting closer; the other protects freedom around choices and plans"
+        },
+        {
+          "pattern_type_id": "ACH.ABSORB.PULL",
+          "name": "Everything else goes quiet when something grabs them",
+          "tells_apart": "Pulls away because the person is getting closer; the other lets people drop because something else has their attention"
+        }
+      ],
+      "anyone_would": "Keeping a stranger or new acquaintance who pushes for closeness at arm's length",
+      "exclusions": [
+        {
+          "text": "Any sign of abuse, threats or controlling behaviour in the relationship; that stays with the Safeguard",
+          "evidence": "ignored"
+        },
+        {
+          "text": "The other person is pushing past a no, or won't respect a limit",
+          "evidence": "ignored"
+        },
+        {
+          "text": "A breakup, separation or affair in the last month",
+          "evidence": "counted_not_shared"
+        },
+        {
+          "text": "Grief",
+          "evidence": "ignored"
+        },
+        {
+          "text": "Caring for a new baby, or a family member who is ill",
+          "evidence": "counted_not_shared"
+        }
+      ],
+      "approved_wording": "When someone starts getting closer or needing more of you, you seem to step back to keep some room that's yours.",
+      "prediction_wording": "Next time {person} asks for more of your time, notice what you feel first, and whether you make a little more distance afterwards.",
+      "numbers": {
+        "situations_needed": 3,
+        "base_rate": 0.2
+      },
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
+      "loaded_at": "2026-11-24T09:00:00Z",
+      "other_versions": []
+    },
+    {
+      "id": "REL.MOOD.FIX",
+      "version": "0.1.0",
+      "area": "relationships",
+      "name": "Taking on other people's moods as theirs to fix",
+      "definition": "When someone close is upset, tense or low, the person feels it as their own job to make it better, and steps in without being asked: cheering, smoothing, fixing. A calm mood around them is what lets them feel safe.",
+      "if_situation": "Someone close is upset, tense or low",
+      "then_behaviour": "Steps in to cheer, smooth or fix it, unasked",
+      "function": "To keep things calm and feel safe",
+      "frameworks": [
+        "Emotional contagion (Hatfield)",
+        "Young's self-sacrifice schema theme",
+        "Unmitigated communion (Helgeson and Fritz)",
+        "Family systems, over-functioning (Bowen)"
+      ],
+      "signs": [
+        {
+          "id": "I1",
+          "text": "Notices a shift in someone's mood straight away and can't relax until it lifts",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "I2",
+          "text": "Starts cheering up or sorting out a problem nobody asked them to sort",
+          "strength": "strong",
+          "part": "behaviour"
+        },
+        {
+          "id": "I3",
+          "text": "Asks \"is it something I did?\" when someone is in a bad mood",
+          "strength": "moderate",
+          "part": "inside"
+        },
+        {
+          "id": "I4",
+          "text": "Changes their own plans to keep a tense person calm",
+          "strength": "moderate",
+          "part": "behaviour"
+        },
+        {
+          "id": "I5",
+          "text": "Describes themselves as the peacekeeper in the family or group",
+          "strength": "weak",
+          "part": "inside"
+        }
+      ],
+      "signs_against": [
+        {
+          "id": "D1",
+          "text": "Lets someone be in a bad mood without stepping in, and stays at ease",
+          "strength": "strong",
+          "part": "inside"
+        },
+        {
+          "id": "D2",
+          "text": "Helps with a mood only when asked, and asks what would help first",
+          "strength": "moderate",
+          "part": "behaviour"
+        }
+      ],
+      "look_alikes": [
+        {
+          "pattern_type_id": "APPR.GIVE.NEEDED",
+          "name": "Saying yes and over-giving to feel needed",
+          "tells_apart": "Steps in to fix a mood without being asked; the other gives when asked"
+        },
+        {
+          "pattern_type_id": "CONF.AVOID.BELONG",
+          "name": "Softening disagreement to protect belonging",
+          "tells_apart": "Acts to fix the other's mood; the other stays quiet about their own view"
+        },
+        {
+          "pattern_type_id": "REL.CHECK.SECURE",
+          "name": "Reading silence as something wrong and reaching out to check",
+          "tells_apart": "Reads a mood as theirs to fix and sets about fixing it; the other reads distance as trouble for the bond and asks about it"
+        }
+      ],
+      "anyone_would": "Comforting someone after a death or a real shock",
+      "exclusions": [
+        {
+          "text": "Any sign of abuse, threats or controlling behaviour; keeping someone calm may be about safety, and that stays with the Safeguard",
+          "evidence": "ignored"
+        },
+        {
+          "text": "Living with someone whose drinking, drug use or temper makes home unsafe",
+          "evidence": "ignored"
+        },
+        {
+          "text": "Caring for a family member with a serious illness",
+          "evidence": "counted_not_shared"
+        },
+        {
+          "text": "Grief in the family or friend group",
+          "evidence": "counted_not_shared"
+        },
+        {
+          "text": "Parenting a young child, where soothing moods is the job",
+          "evidence": "ignored"
+        }
+      ],
+      "approved_wording": "When someone close is having a hard time, you seem to feel it's yours to fix, as if things aren't safe until they're calm again.",
+      "prediction_wording": "Next time {person} is in a low mood, notice how quickly you step in, and whether they asked you to.",
+      "numbers": {
+        "situations_needed": 3,
+        "base_rate": 0.25
+      },
+      "status": "approved",
+      "approved_by": "Zaf",
+      "approved_on": "2026-11-24",
       "loaded_at": "2026-11-24T09:00:00Z",
       "other_versions": []
     }

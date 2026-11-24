@@ -162,7 +162,7 @@ def test_a_suspected_pattern_gets_an_exploration_and_an_aimed_curiosity(
     assert curiosity.state == CuriosityState.WAITING
     assert curiosity.exploration_id == exploration.id
     assert curiosity.question.startswith(MEI_STORY_POINTER)
-    assert "Conflict avoidance" not in curiosity.question + curiosity.why
+    assert "Softening disagreement" not in curiosity.question + curiosity.why
     unclear = next(o for o in observations_of(client.engine, user_id) if o.unclear)
     assert curiosity.source_observation_id == unclear.id
     [attempt] = tries_of(client.engine, user_id)
@@ -211,7 +211,7 @@ def test_the_reply_plan_sees_the_agenda_and_the_aimed_curiosity_first(
     saw = talk(client, chat_model, clock, "hey, how are you")
 
     assert AGENDA_HEADER in saw
-    assert "[1] Conflict avoidance to preserve belonging: if disagreement" in saw
+    assert "[1] Softening disagreement to protect belonging: if disagreement" in saw
     assert "Still to learn: what drove what they told you about Mei" in saw
     assert "  - Nothing yet." in saw
     assert "such as Get curious, aim it at something still to learn" in saw
@@ -245,7 +245,7 @@ def test_a_move_that_asks_a_question_is_given_the_open_needs(
     told = chat_model.calls[-1].instructions
     assert "Lead with: Get curious." in told
     assert "aim it at one of these: what drove what they told you about Mei" in (told)
-    assert "Conflict avoidance" not in told
+    assert "Softening disagreement" not in told
 
 
 def test_an_answer_that_settles_the_unclear_story_is_tagged_clear_and_useful(

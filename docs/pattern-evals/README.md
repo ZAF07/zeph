@@ -6,9 +6,11 @@ Eval score as "Zeph's Patterns are right".
 
 **Evals cost money.** Every run calls the real model. Before any run, remind
 the owner and show the estimate: the Dashboard's New run page shows it before
-Start run, and `make eval` prints it first. A full Tagging run (44 cases) is
-estimated at about 308,000 tokens in and 40,000 out, about S$0.18 at the
-prices of 24 Nov 2026.
+Start run, and `make eval` prints it first. A full Tagging run of the first
+44 cases, with three Pattern Types, was estimated at about 308,000 tokens in
+and 40,000 out, about S$0.18 at the prices of 24 Nov 2026. The catalog now
+has fifteen Pattern Types, all sent with every tagging call, and the seed 68
+cases, so a full run costs several times that: read the estimate.
 
 ## The three layers
 
@@ -33,9 +35,10 @@ the Life Threads it touched, and the Observations expected: Pattern Type,
 for or against, unclear (two look-alikes) or not, anyone-would-do-it
 (situational) or not. The real tagging step runs on it with the whole
 Pattern Catalog, code checks what it wrote, and the case passes only when
-the Observations kept are exactly the ones expected. The seed has 44 cases
-over the three Pattern Types: clear, against, unclear, nothing to tag and
-anyone-would-do-it.
+the Observations kept are exactly the ones expected. The seed has 68 cases:
+44 over the first three Pattern Types (clear, against, unclear, nothing to
+tag and anyone-would-do-it), and one for and one against each of the twelve
+added later.
 
 - **Shows:** whether the step finds the Pattern Type a careful reader would,
   says for or against right, says "unclear" when two look-alikes fit, keeps

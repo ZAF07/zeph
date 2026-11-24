@@ -1,0 +1,93 @@
+# One Pattern Type of the Pattern Catalog (ADR-0025). Loaded when the backend
+# starts. Any change needs a new `version`: a stored version never changes,
+# so a change that keeps its version is refused and the last catalog stays.
+
+id: APPR.GIVE.NEEDED
+version: 0.1.0
+area: approval
+name: Saying yes and over-giving to feel needed
+status: approved
+approved_by: Zaf
+approved_on: 2026-11-24
+
+definition: >-
+  When someone asks for help, the person says yes and then gives more than
+  was asked, often at a cost to themselves. Being the one others rely on is
+  part of how they know they matter, so saying no feels like losing a place.
+
+if: Asked for help or a favour
+then: Says yes and gives more than was asked
+function: To feel needed
+
+frameworks:
+  - Unmitigated communion (Helgeson and Fritz)
+  - Young's self-sacrifice schema theme
+  - Schwartz benevolence value
+  - Contingencies of self-worth, others' approval (Crocker)
+
+signs:
+  - id: I1
+    text: Agrees to help before checking whether they have the time
+    strength: moderate
+    part: behaviour
+  - id: I2
+    text: Turns a small favour into a much bigger job without being asked
+    strength: strong
+    part: behaviour
+  - id: I3
+    text: Feels flat or useless on days nobody needs anything from them
+    strength: strong
+    part: inside
+  - id: I4
+    text: Feels hurt when their help is turned down or not noticed
+    strength: moderate
+    part: inside
+  - id: I5
+    text: Describes themselves as "the one everyone calls"
+    strength: weak
+    part: inside
+
+signs_against:
+  - id: D1
+    text: Says no to a request without much guilt and feels fine after
+    strength: strong
+    part: behaviour
+  - id: D2
+    text: Helps a lot, but only where they chose to and it costs them little
+    strength: moderate
+    part: situation
+
+look_alikes:
+  - pattern_type: CONF.AVOID.BELONG
+    tells_apart: >-
+      Says yes to be needed and keep a place; the other says yes to avoid the
+      friction of saying no
+  - pattern_type: REL.MOOD.FIX
+    tells_apart: >-
+      Gives when asked; the other steps in to fix a mood without being asked
+  - pattern_type: CTRL.SELF.RELY
+    tells_apart: >-
+      Takes on other people's tasks to be needed; the other keeps their own
+      tasks so as not to depend on anyone
+
+anyone_would: Saying yes to a reasonable request from a manager at work
+anyone_would_when:
+  - power: [above]
+    setting: [work]
+
+exclusions:
+  - text: Caring for a seriously ill or dependent family member
+    evidence: counted_not_shared
+  - text: Grief
+    evidence: ignored
+
+approved_wording: >-
+  Being the one people turn to seems to matter a lot to you, so yes comes
+  easily, even when it costs you.
+prediction_wording: >-
+  Next time {person} asks you for something, notice whether you say yes before
+  you've checked what it will cost you.
+
+numbers:
+  situations_needed: 3
+  base_rate: 0.25
