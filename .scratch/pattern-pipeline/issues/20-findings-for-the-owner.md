@@ -101,4 +101,13 @@ If there is nothing, the section holds one line: "Nothing found."
 - **Impact:** agents lose time and may think their change broke the build. A deploy could fail the same way.
 - **Suggested fix:** keep the full build log on the next failure. Fetching fonts with `next/font/google` during the build is the first suspect.
 
+## 11 — Tagging step keeps Observations (2026-11-24)
+
+### Tag names written out by hand in several places
+
+- **Kind:** potential failure
+- **What:** the tag values (relationship, power, setting, stance) are written out by hand in the enums in `core/models.py`, the reader in `core/observations.py:247` and `:475`, the tagging prompt (`seed/platform_settings.yaml:1298`) and the catalog loader (`adapters/pattern_catalog.py`).
+- **Impact:** if the prompt and the code drift apart, the code checks will quietly drop the model's tags. Observations then lose their tags, or are dropped, with nothing to say why.
+- **Suggested fix:** build the prompt's tag lists from the enums, so the code is the only place they are written. A small change, but it needs a reload of the tagging prompt.
+
 ## Comments
