@@ -2820,6 +2820,9 @@ def test_tagging_overrides_reach_only_their_variant(
     [variant_call] = [
         call for call in chat_model.calls if call.instructions == "Tag carefully."
     ]
-    assert (live_call.model, live_call.thinking) == ("deepseek-flash", True)
+    assert (live_call.model, live_call.thinking) == (
+        "deepseek/deepseek-v4.1-flash",
+        True,
+    )
     assert (variant_call.model, variant_call.thinking) == ("deepseek-pro", False)
     assert PostgresPlatformSettingsRepository(engine).load().values == live_before
