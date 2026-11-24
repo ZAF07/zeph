@@ -45,4 +45,4 @@ A new OpenRouter adapter behind the `ChatModel` port, built on plain `httpx` (no
 ## Completion
 
 - Completed: 2026-11-24
-- Commit: <to be filled in after merge>
+- Commit: d994ef0 (merge of openrouter-02-replies; work in 5a9812f, 4bd601e, 5c31ebe, 1dc0bd6)
