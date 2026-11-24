@@ -4,10 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 
 import { CardCount } from "@/components/CardCount";
 import { CardList } from "@/components/CardList";
+import { CardListLoading } from "@/components/CardListLoading";
 import { CoreServiceCard } from "@/components/CoreServiceCard";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadFailed } from "@/components/LoadFailed";
-import { LoadingPanel } from "@/components/LoadingPanel";
 import { LockIcon } from "@/components/LockIcon";
 import { queryKeys } from "@/lib/queries";
 import { useAdminSettings } from "@/lib/use-admin-settings";
@@ -43,7 +43,7 @@ export function PromptsAndModels() {
         />
       );
     }
-    return <LoadingPanel shape="card" label="Loading services" />;
+    return <CardListLoading label="Loading services" />;
   }
 
   const { services, model_choices: modelChoices } = coreServices;

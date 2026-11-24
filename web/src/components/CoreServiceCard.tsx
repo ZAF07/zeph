@@ -84,11 +84,11 @@ export function CoreServiceCard({
     ...extraKeys.map((key) => extraPrompts[key]),
     ...limitKeys.map((key) => limits[key]),
   ].every((text) => text?.trim());
-  const headingId = `service-${service.prompt_key}`;
-  const modelId = `${headingId}-model`;
-  const promptHintId = `${headingId}-prompt-hint`;
-  const settingsGroupId = `${headingId}-settings`;
-  const promptsGroupId = `${headingId}-prompts`;
+  const idPrefix = `service-${service.prompt_key}`;
+  const modelId = `${idPrefix}-model`;
+  const promptHintId = `${idPrefix}-prompt-hint`;
+  const settingsGroupId = `${idPrefix}-settings`;
+  const promptsGroupId = `${idPrefix}-prompts`;
 
   function discard() {
     setModel(savedModel);
@@ -189,7 +189,7 @@ export function CoreServiceCard({
             />
           </FieldRow>
           {service.limits.map((limit) => {
-            const limitId = `${headingId}-${limit.key}`;
+            const limitId = `${idPrefix}-${limit.key}`;
             return (
               <FieldRow
                 key={limit.key}
