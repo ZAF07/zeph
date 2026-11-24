@@ -841,11 +841,11 @@ describe("Memories", () => {
   it("tells the User what changed until they press Got it", async () => {
     apiClient.getMe.mockResolvedValue({
       ...maya,
-      pattern_noticing_notice: true,
+      show_pattern_noticing_notice: true,
     });
     apiClient.markPatternNoticingTold.mockResolvedValue({
       ...maya,
-      pattern_noticing_notice: false,
+      show_pattern_noticing_notice: false,
     });
     const user = userEvent.setup();
     renderWithQueries(<Memories copy={seedCopy()} />);
@@ -859,6 +859,25 @@ describe("Memories", () => {
     expect(
       screen.queryByText("Zeph now keeps some of your words."),
     ).not.toBeInTheDocument();
+  });
+
+  it("keeps the notice and explains when Got it can't be saved", async () => {
+    apiClient.getMe.mockResolvedValue({
+      ...maya,
+      show_pattern_noticing_notice: true,
+    });
+    apiClient.markPatternNoticingTold.mockRejectedValue(new Error("down"));
+    const user = userEvent.setup();
+    renderWithQueries(<Memories copy={seedCopy()} />);
+
+    await user.click(await screen.findByRole("button", { name: "Got it" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn’t save that. Please try again.",
+    );
+    expect(
+      screen.getByText("Zeph now keeps some of your words."),
+    ).toBeVisible();
   });
 
   it("shows no notice once the User has been told", async () => {

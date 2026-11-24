@@ -345,7 +345,7 @@ describe("DashboardHome", () => {
     apiClient.getHome.mockResolvedValue(homeWith());
     apiClient.getMe.mockResolvedValue({
       ...userWithRole("user"),
-      pattern_noticing_notice: true,
+      show_pattern_noticing_notice: true,
     });
     apiClient.markPatternNoticingTold.mockResolvedValue(userWithRole("user"));
     const user = userEvent.setup();

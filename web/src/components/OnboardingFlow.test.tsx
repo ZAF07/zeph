@@ -51,7 +51,7 @@ function newUser(overrides: Partial<Me> = {}): Me {
     photo_viewing_enabled: true,
     photo_viewing_available: true,
     personal_stickers_available: false,
-    pattern_noticing_notice: false,
+    show_pattern_noticing_notice: false,
     onboarding_completed_at: null,
     role: "user",
     changed_in_chat: {},

@@ -26,6 +26,7 @@ from companion.core.models import (
     MoveOutcome,
     MoveResult,
     MoveRole,
+    Observation,
     OnboardingAnswers,
     Pattern,
     PauseLength,
@@ -60,7 +61,7 @@ class MeResponse(BaseModel):
     photo_viewing_enabled: bool
     photo_viewing_available: bool
     personal_stickers_available: bool
-    pattern_noticing_notice: bool
+    show_pattern_noticing_notice: bool
     onboarding_completed_at: datetime | None
     role: UserRole
     changed_in_chat: dict[ChatSetting, datetime]
@@ -416,6 +417,23 @@ def to_life_thread_response(thread: LifeThread) -> LifeThreadResponse:
     )
 
 
+def to_kept_quote_response(observation: Observation) -> KeptQuoteResponse:
+    """Describe a kept quote for the Dashboard, naming no Pattern.
+
+    Args:
+        observation: The Observation whose quote Zeph keeps.
+
+    Returns:
+        Its quote, context line and day.
+    """
+    return KeptQuoteResponse(
+        id=str(observation.id),
+        quote=observation.quote,
+        context=observation.context,
+        day=observation.day,
+    )
+
+
 def to_pattern_response(pattern: Pattern) -> PatternResponse:
     """Describe a confirmed Pattern for the Dashboard.
 
@@ -579,7 +597,7 @@ def to_me_response(me: Me) -> MeResponse:
         photo_viewing_enabled=user.photo_viewing_enabled,
         photo_viewing_available=me.photo_viewing_available,
         personal_stickers_available=me.personal_stickers_available,
-        pattern_noticing_notice=me.pattern_noticing_notice,
+        show_pattern_noticing_notice=me.show_pattern_noticing_notice,
         onboarding_completed_at=user.onboarding_completed_at,
         role=user.role,
         changed_in_chat=user.settings_changed_in_chat,
@@ -1191,12 +1209,7 @@ def build_dashboard_api_router(
         """
         return KeptQuotesResponse(
             quotes=[
-                KeptQuoteResponse(
-                    id=str(observation.id),
-                    quote=observation.quote,
-                    context=observation.context,
-                    day=observation.day,
-                )
+                to_kept_quote_response(observation)
                 for observation in user_memory_service.list_kept_quotes(user.id)
             ]
         )

@@ -304,27 +304,31 @@ def test_admins_see_only_how_many_kept_quotes_a_user_has(
     assert "Lay awake" not in response.text
 
 
+def shows_notice(client: TestClient, headers: dict[str, str]) -> bool:
+    """Say whether the Dashboard is told to show the Pattern noticing notice."""
+    shown: bool = client.get("/api/me", headers=headers).json()[
+        "show_pattern_noticing_notice"
+    ]
+    return shown
+
+
 def test_the_notice_shows_while_pattern_noticing_works_until_the_user_says_got_it(
     client: TestClient,
     auth_verifier: FakeAuthVerifier,
 ) -> None:
     headers = auth_headers(auth_verifier, MAYA)
     user_id = maya_id(client, auth_verifier)
-    assert client.get("/api/me", headers=headers).json()["pattern_noticing_notice"] is (
-        False
-    )
+    assert not shows_notice(client, headers)
     switch_for_user(
         client, owner_headers(client, auth_verifier), user_id, "pattern_noticing", "on"
     )
-    assert client.get("/api/me", headers=headers).json()["pattern_noticing_notice"]
+    assert shows_notice(client, headers)
 
     response = client.post("/api/me/pattern-noticing-told", headers=headers)
 
     assert response.status_code == 200
-    assert response.json()["pattern_noticing_notice"] is False
-    assert client.get("/api/me", headers=headers).json()["pattern_noticing_notice"] is (
-        False
-    )
+    assert response.json()["show_pattern_noticing_notice"] is False
+    assert not shows_notice(client, headers)
 
 
 def test_no_quote_is_kept_until_the_user_has_been_told(

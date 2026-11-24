@@ -64,6 +64,12 @@ class KeptQuoteNotFoundError(MemoryNotFoundError):
     shown_message = "Quote not found"
 
 
+class UserPortraitNotFoundError(MemoryNotFoundError):
+    """Raised when a User has no User Portrait."""
+
+    shown_message = "User Portrait not found"
+
+
 def newest_first(observations: list[Observation]) -> list[Observation]:
     """Order Observations by their day, newest first, the latest tagged first on a day.
 
@@ -76,12 +82,6 @@ def newest_first(observations: list[Observation]) -> list[Observation]:
     return sorted(
         reversed(observations), key=lambda observation: observation.day, reverse=True
     )
-
-
-class UserPortraitNotFoundError(MemoryNotFoundError):
-    """Raised when a User has no User Portrait."""
-
-    shown_message = "User Portrait not found"
 
 
 class UserMemoryService:

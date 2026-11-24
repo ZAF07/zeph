@@ -44,7 +44,7 @@ export type ChatSetting =
  * `photo_viewing_available` are false when an Admin has that Feature off for
  * them, so they can't switch it. `personal_stickers_available` says whether
  * Personal Stickers works for them; they have no switch of their own.
- * `pattern_noticing_notice` says whether to show the notice that Zeph now
+ * `show_pattern_noticing_notice` says whether to show the notice that Zeph now
  * keeps quotes as evidence, until they press "Got it".
  */
 export type Me = {
@@ -61,7 +61,7 @@ export type Me = {
   photo_viewing_enabled: boolean;
   photo_viewing_available: boolean;
   personal_stickers_available: boolean;
-  pattern_noticing_notice: boolean;
+  show_pattern_noticing_notice: boolean;
   onboarding_completed_at: string | null;
   role: UserRole;
   changed_in_chat: Partial<Record<ChatSetting, string>>;

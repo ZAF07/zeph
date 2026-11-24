@@ -15,7 +15,7 @@ import { useApiClient } from "@/lib/use-api-client";
  * evidence, drawn as the design's notice row with a "Got it" button. Zeph
  * keeps no quote for them until they press it; then the notice goes.
  *
- * @param props - `me` is the signed-in User, whose `pattern_noticing_notice`
+ * @param props - `me` is the signed-in User, whose `show_pattern_noticing_notice`
  *   says whether to show it, and `copy` holds the Shared
  *   `shared.pattern_noticing.` slots.
  * @returns The notice, or nothing once they have been told.
@@ -28,7 +28,7 @@ export function PatternNoticingNotice({ me, copy }: { me: Me; copy: Copy }) {
     onSuccess: (told) => queryClient.setQueryData(queryKeys.me, told),
   });
 
-  if (!me.pattern_noticing_notice) {
+  if (!me.show_pattern_noticing_notice) {
     return null;
   }
   return (
