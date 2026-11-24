@@ -41,3 +41,8 @@ Evidence (24 Nov 2026, worktree stack on 3040/8040, real model, owner approved t
 - **No longer reproduces.** After review (prompt also names himself/herself, rebased on main's changed prompt): `conf-mum-holiday-plans` wrote "They agreed to Christmas at their mother's…", "Explaining why they gave in…", "…they brush aside their own preference…"; `conf-rehearses-text-to-friend` named Priya instead of "her" and passed. The mum case still fails on "anyone would" (issue 20), not on he/she. Other failures in the full run are the kinds already in issue 20.
 - **Checks** on the final build: `make check` ruff, ruff format, mypy clean (247 files), pytest 2035 passed; `pnpm lint`, `format:check`, `typecheck` clean, `pnpm test` 137 files, 953 tests passed.
 - **Review.** Standards and spec reviews run. Fixed: migration renumbered to 0089 after main's 0088, the prompt names himself/herself like the check, a clearer group-label name. Left: the word list lives in the regex and the prompt (a test ties them), migration tests copy their setup steps (already the case).
+
+## Completion
+
+- Completed: 2026-11-24
+- Commit: c2c69c4 (merge "Merge pattern-22-context-pronouns: tagging context lines never say he or she"; work in 515dc6e "Tagging context lines never say he or she", 173a2d7 "Issue 22: review fixes (migration 0089, himself/herself), evidence, archived")
