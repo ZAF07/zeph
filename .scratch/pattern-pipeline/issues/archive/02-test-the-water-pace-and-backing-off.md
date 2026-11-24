@@ -107,6 +107,25 @@ Evidence (24 Nov 2026, worktree stack on ports 3010/8010):
 - **Review.** Standards and spec reviews were run. Fixed: test the water is one per Conversation; the reaction is saved once the reply is sent, so a dropped try saves none; the wording after a fallback Reply Plan; the stale `CuriosityTreatment` TSDoc; a name. A live run then showed a false brush-off on a Curiosity the reply never asked, fixed in 55c03b8. The fix's null case wasn't seen live: in runs 2 and 3 every pick that had a next message was asked.
 - **Cost.** About 50 messages across three runs, roughly 5 DeepSeek-flash calls each.
 
+Eval Runs (24 Nov 2026, after the merge, on a fresh worktree off main; the owner asked for them; estimate S$0.23):
+
+- **Whole Understanding Eval, live settings**: 22 of 30 passed, S$0.21.
+  - Passed: `curiosity-raised-once`, under Just chatting's new test the water. The opener asked "How'd the board thing go on Thursday?" and nothing was asked on the next message.
+  - The 8 failures don't touch this work's rules:
+    - asked why (`strong-mood-unknown-cause`)
+    - the Need (`knowledge-for-a-reflective-question`)
+    - a judge rule on a vent (`no-knowledge-for-a-vent`)
+    - a woven-in Check-in (`check-in-not-now-while-asking-for-help`)
+    - lead Moves (`internal-testing-finish-line`, `small-talk-makes-no-move`)
+    - the next Move (`next-move-held-then-made`)
+    - `guess-checked-gently`
+  - `guess-checked-gently` flips between tries. When its Curiosity is asked, issue 01's one-question rule drops Get curious, which the case expects to lead.
+  - No run of these cases from before this work was at hand to compare against.
+- **Variant run, follow-up cap**: S$0.02. Variant A ran live settings; Variant B overrode `follow_ups_per_conversation` to 0.
+  - `passing-update-gets-curious`: A led with Get curious and passed. B led with Suggest and failed, as it should.
+  - `guess-checked-gently`: A led with Get curious. B made no Move.
+  - So a Variant override of the new setting changes a real run, and the live settings were untouched.
+
 ## Completion
 
 - Completed: 2026-11-24
