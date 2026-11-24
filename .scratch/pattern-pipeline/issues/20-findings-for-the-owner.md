@@ -2,7 +2,7 @@
 
 Status: needs-triage
 Track: shared
-Blocked by: 01, 02, 03, 04, 05, 06, 07, 08, 09, 11, 12, 13, 14, 15, 16, 17, 18, 19
+Blocked by: 01, 02, 03, 04, 05, 06, 07, 08, 09, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21
 
 ## What this is
 
@@ -32,6 +32,29 @@ Before archiving, ask: did I find a bug, failure, risk or potential failure, in 
 ```
 
 If there is nothing, the section holds one line: "Nothing found."
+
+## 01 — Needs say how Curiosities are treated (2026-11-24)
+
+### A never-Need still shows the Reply Plan the due Curiosities
+
+- **Kind:** risk
+- **What:** the Reply Plan picks the Need and the Curiosity in the same model call, so the due Curiosities can't be hidden under a Need set to never. Code drops any pick afterwards (`core/curiosities.py:243`, `settle_curiosities` in `core/reply_plan.py:859`) and logs 0 offered.
+- **Impact:** the model can still shape its Moves around a Curiosity that code then drops, so the reply may lean toward a topic the Need says not to raise.
+- **Suggested fix:** pick the Need first, then offer Curiosities in a second step only when the Need allows them. One more small model call per reply, and a reload of `reply_plan_prompt`.
+
+### A never-Need doesn't stop questions the reply makes up itself
+
+- **Kind:** potential failure
+- **What:** in the Eval Run for issue 01 (Understanding, case `curiosity-raised-once`), Variant B had "Just chatting" set to never: 0 Curiosities offered, yet the reply still asked about the presentation, from its memory of the week.
+- **Impact:** an Admin who sets a Need to never expects no such questions (for example under "Be heard"), but the User can still get one.
+- **Suggested fix:** under a never-Need, tell the Reply not to bring up open topics from memory unless the User does. A small prompt change and an S$0.01 Eval run to check it.
+
+### Needs and Moves page hints name the wrong step
+
+- **Kind:** bug
+- **What:** the hints say "when the Understanding picks this Need" (`web/src/components/NeedFields.tsx:69`) and "this Move" (`web/src/components/MoveFields.tsx:56`). The Reply Plan picks both.
+- **Impact:** Admins get a wrong picture of which step and prompt to tune.
+- **Suggested fix:** change both hints to "the Reply Plan" and update the matching design reference text. A few minutes.
 
 ## 02 — Test the water, pace and backing off (2026-11-24)
 
