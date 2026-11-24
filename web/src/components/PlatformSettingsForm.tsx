@@ -12,6 +12,7 @@ import { LoadFailed } from "@/components/LoadFailed";
 import { LoadingPanel } from "@/components/LoadingPanel";
 import { SaveBar } from "@/components/SaveBar";
 import { SavedNote } from "@/components/SavedNote";
+import { Switch } from "@/components/Switch";
 import type {
   AdminSettings,
   CheckInFrequency,
@@ -37,6 +38,12 @@ type TextField = {
   label: string;
 };
 
+type SwitchField = {
+  key: string;
+  label: string;
+  isSwitch: true;
+};
+
 const checkInGapsKey = "check_in_hours_between";
 
 /** One field per Check-in Frequency; together they save the Check-in gaps. */
@@ -56,10 +63,10 @@ const trailingWordsField: TextField = {
   label: "Trailing words",
 };
 
-/** The number settings on this page, grouped by section, with any editors below them. */
-const numberSections: {
+/** The number and on/off settings on this page, grouped by section, with any editors below them. */
+const fieldSections: {
   heading: string;
-  fields: NumberField[];
+  fields: (NumberField | SwitchField)[];
   editors?: TextField[];
 }[] = [
   {
@@ -252,6 +259,16 @@ const numberSections: {
         unit: "per chat",
       },
       {
+        key: "curiosities_per_reply",
+        label: "Most Curiosities per reply",
+        unit: "per reply",
+      },
+      {
+        key: "curiosity_held_when_asking_why",
+        label: "Hold a Curiosity when the reply asks why",
+        isSwitch: true,
+      },
+      {
         key: "curiosities_waiting_limit",
         label: "Most Curiosities waiting at once",
         unit: "waiting",
@@ -386,15 +403,32 @@ const textFields: TextField[] = [
   },
 ];
 
+/**
+ * Says whether a field is an on/off switch rather than a number.
+ *
+ * @param field - The field.
+ * @returns True for a switch.
+ */
+function isSwitchField(field: NumberField | SwitchField): field is SwitchField {
+  return "isSwitch" in field;
+}
+
+const sectionFields = fieldSections.flatMap((section) => section.fields);
+
 const numberKeys = [
-  ...numberSections.flatMap((section) =>
-    section.fields.map((field) => field.key),
-  ),
+  ...sectionFields
+    .filter((field) => !isSwitchField(field))
+    .map((field) => field.key),
   webSearchLimitField.key,
 ];
 
+const switchKeys = sectionFields
+  .filter(isSwitchField)
+  .map((field) => field.key);
+
 const allKeys = [
   ...numberKeys,
+  ...switchKeys,
   ...textFields.map((field) => field.key),
   trailingWordsField.key,
 ];
@@ -425,6 +459,9 @@ function savedText(settings: AdminSettings, key: string): string {
   if (Array.isArray(value)) {
     return value.join(", ");
   }
+  if (typeof value === "boolean") {
+    return String(value);
+  }
   const gapField = checkInGapFields.find((field) => field.key === key);
   if (!gapField) {
     return textSetting(settings, key);
@@ -454,11 +491,14 @@ function savedDrafts(settings: AdminSettings): Record<string, string> {
  *
  * @param key - The setting's key.
  * @param value - The typed text.
- * @returns A number, or the text itself.
+ * @returns A number, on or off, or the text itself.
  */
 function settingValue(key: string, value: string): SettingValue {
   if (key === trailingWordsField.key) {
     return wordList(value);
+  }
+  if (switchKeys.includes(key)) {
+    return value === "true";
   }
   return numberKeys.includes(key) ? Number(value) : value;
 }
@@ -542,6 +582,22 @@ export function PlatformSettingsForm() {
     );
   }
 
+  function switchRow(field: SwitchField, loadedSettings: AdminSettings) {
+    return (
+      <FieldRow
+        key={field.key}
+        title={field.label}
+        caption={hintFor(field.key, loadedSettings)}
+      >
+        <Switch
+          label={field.label}
+          checked={values[field.key] === "true"}
+          onChange={(isOn) => edit(field.key, String(isOn))}
+        />
+      </FieldRow>
+    );
+  }
+
   function textEditor(field: TextField, loadedSettings: AdminSettings) {
     const hintId = `${field.key}-hint`;
     return (
@@ -563,9 +619,9 @@ export function PlatformSettingsForm() {
     );
   }
 
-  function numberSection(
+  function fieldSection(
     heading: string,
-    fields: NumberField[],
+    fields: (NumberField | SwitchField)[],
     loadedSettings: AdminSettings,
     editors: TextField[] = [],
   ) {
@@ -582,7 +638,11 @@ export function PlatformSettingsForm() {
             fields.map((field) => settingKeyFor(field.key)),
           )}
         >
-          {fields.map((field) => numberRow(field, loadedSettings))}
+          {fields.map((field) =>
+            isSwitchField(field)
+              ? switchRow(field, loadedSettings)
+              : numberRow(field, loadedSettings),
+          )}
         </FieldRows>
         {editors.map((field) => textEditor(field, loadedSettings))}
       </section>
@@ -613,15 +673,15 @@ export function PlatformSettingsForm() {
 
   return (
     <>
-      {numberSections.map((section) =>
-        numberSection(
+      {fieldSections.map((section) =>
+        fieldSection(
           section.heading,
           section.fields,
           settings,
           section.editors,
         ),
       )}
-      {numberSection("Web search", [webSearchLimitField], settings)}
+      {fieldSection("Web search", [webSearchLimitField], settings)}
 
       <section aria-label="Wording" className="flex flex-col gap-3">
         <FormSectionHeading title="Wording" />

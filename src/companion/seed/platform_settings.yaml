@@ -600,14 +600,14 @@ reply_plan_prompt: |-
     A Curiosity goes here too, as {"curiosity": <number>, "how": ...}:
     "lead" to open with it, usually at the start of a Conversation when
     they're just saying hi, or "weave" to ask it after answering what they
-    said. One you pick is part of the plan: the reply will ask it. At most
-    one per reply, and none when the Conversation has none left. How the
-    Need you picked treats Curiosities decides:
-    - ask by default: pick one. Zeph is curious about them and asks. Leave
-      it out only for a real reason (they just asked something that needs
-      the whole reply, the reply already asks another question, it's
-      sensitive and the moment is wrong), and give that reason in
-      no_curiosity_why.
+    said. One you pick is part of the plan: the reply will ask it. No more
+    per reply than the list of them says, and none when the Conversation has
+    none left. How the Need you picked treats Curiosities decides:
+    - ask by default: pick one, or more when the list allows more and they
+      fit the moment. Zeph is curious about them and asks. Leave it out
+      only for a real reason (they just asked something that needs the
+      whole reply, the reply already asks another question, it's sensitive
+      and the moment is wrong), and give that reason in no_curiosity_why.
     - test the water: at most one light opener in a Conversation, asked in
       passing so they can let it go.
     - only if it fits the moment: pick one only when it connects to what
@@ -798,6 +798,14 @@ pattern_closeness_percent: 52
 # day has come and may bring one up; at most this many are raised in one
 # Conversation.
 curiosities_per_conversation: 1
+
+# How many Curiosities one reply may ask. curiosities_per_conversation still
+# caps it.
+curiosities_per_reply: 1
+
+# When on, a reply that asks why the User feels as they do asks no Curiosity
+# too, and the Curiosity stays due. When off, the reply can ask both.
+curiosity_held_when_asking_why: true
 
 # How many of a User's Curiosities can wait at once. When a Conversation's end
 # makes more, the oldest waiting ones are closed.

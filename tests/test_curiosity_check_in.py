@@ -201,7 +201,10 @@ def test_a_reply_starts_a_conversation_the_curiosity_was_raised_in(
         "it went great!",
     ]
     reply_plan_saw = chat_model.reply_plan_calls[-1].history[0].text
-    assert "(raised 1 of at most 1 in this Conversation):\nNone." in reply_plan_saw
+    assert (
+        "(raised 1 of at most 1 in this Conversation; at most 0 in this reply):"
+        "\nNone." in reply_plan_saw
+    )
     assert WEDDING not in reply_plan_saw
     presentation, _ = stored_curiosities(engine)
     assert presentation["raised_conversation_id"] is not None

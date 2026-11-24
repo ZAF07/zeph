@@ -113,6 +113,14 @@ const settings: AdminSettings = {
   move_outcomes_per_understanding: seeded(3),
   move_outcomes_closeness_percent: seeded(65),
   curiosities_per_conversation: seeded(1),
+  curiosities_per_reply: seeded(
+    1,
+    "Most Curiosities raised per Conversation still caps it.",
+  ),
+  curiosity_held_when_asking_why: seeded(
+    true,
+    "When on, a reply that asks why asks no Curiosity too.",
+  ),
   curiosities_waiting_limit: seeded(10),
   curiosity_check_ins_per_week: seeded(1),
   curiosity_replies_between: seeded(3),
@@ -436,6 +444,36 @@ describe("PlatformSettingsForm", () => {
       curiosities_per_conversation: 2,
       curiosities_waiting_limit: 20,
       curiosity_check_ins_per_week: 3,
+    });
+  });
+
+  it("shows and saves the Curiosities per reply and holding one back, with hints", async () => {
+    const user = userEvent.setup();
+    renderWithQueries(<PlatformSettingsForm />);
+    const perReply = await screen.findByLabelText("Most Curiosities per reply");
+    const held = screen.getByRole("switch", {
+      name: "Hold a Curiosity when the reply asks why",
+    });
+    expect(perReply).toHaveValue(1);
+    expect(held).toHaveAttribute("aria-checked", "true");
+    expect(
+      screen.getByText(
+        "Most Curiosities raised per Conversation still caps it.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("When on, a reply that asks why asks no Curiosity too."),
+    ).toBeInTheDocument();
+
+    await user.clear(perReply);
+    await user.type(perReply, "2");
+    await user.click(held);
+    expect(held).toHaveAttribute("aria-checked", "false");
+    await user.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(apiClient.updateAdminSettings).toHaveBeenCalledWith({
+      curiosities_per_reply: 2,
+      curiosity_held_when_asking_why: false,
     });
   });
 
@@ -778,7 +816,9 @@ describe("PlatformSettingsForm", () => {
     expect(
       await screen.findByLabelText("Per-user daily web search limit"),
     ).toHaveValue(10);
-    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("switch", { name: /web search/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("saves a new daily web search limit as a number", async () => {
