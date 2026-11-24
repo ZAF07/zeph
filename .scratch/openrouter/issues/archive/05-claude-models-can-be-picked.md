@@ -51,4 +51,4 @@ Admins can pick a Claude model for any core service in Prompts and models. A mig
 ## Completion
 
 - Completed: 2026-11-24
-- Commit: <merge commit, filled in after the merge>
+- Commit: c7d2442 (merge of openrouter-05-claude-models; work in 38fc6e0 1665f7b 3d43edc 851335c)
