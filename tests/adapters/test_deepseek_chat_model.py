@@ -11,6 +11,7 @@ from langchain_core.messages import (
 
 from companion.adapters.deepseek.chat_model import (
     MAX_TOOL_ROUNDS,
+    UnsupportedModelError,
     answer_with_tools,
     build_client,
     to_langchain_messages,
@@ -256,3 +257,30 @@ def test_the_old_reasoner_name_asked_to_think_logs_no_warning(
 
     assert sent == ("deepseek-flash", {"thinking": {"type": "enabled"}})
     assert not caplog.text
+
+
+@pytest.mark.parametrize(
+    ("openrouter_name", "direct_name"),
+    [
+        ("deepseek/deepseek-v4.1-flash", "deepseek-flash"),
+        ("deepseek/deepseek-v4-pro", "deepseek-v4-pro"),
+    ],
+)
+def test_an_openrouter_deepseek_name_is_sent_as_its_direct_name(
+    openrouter_name: str, direct_name: str
+) -> None:
+    assert thinking_sent(openrouter_name, False) == (
+        direct_name,
+        {"thinking": {"type": "disabled"}},
+    )
+
+
+@pytest.mark.parametrize(
+    "model", ["anthropic/claude-sonnet-5.5", "deepseek/deepseek-unknown"]
+)
+def test_a_model_direct_deepseek_cant_call_fails_clearly(model: str) -> None:
+    with pytest.raises(UnsupportedModelError) as error:
+        build_client("key", model, False)
+
+    assert model in str(error.value)
+    assert "Pick a DeepSeek model" in str(error.value)

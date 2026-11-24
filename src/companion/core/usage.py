@@ -194,7 +194,7 @@ class UsageRecordingChatModel:
         Args:
             snapshot: The User the answer is for.
             step: Which step the answer is for.
-            model: The model to use, e.g. "deepseek-flash".
+            model: The model to use, e.g. "deepseek/deepseek-v4.1-flash".
             thinking: Whether the model should think before it answers.
             instructions: What the model should be and do.
             history: The Conversation so far, oldest first.
@@ -236,7 +236,7 @@ class UsageRecordingChatModel:
 
         Args:
             snapshot: The User who sent the photo.
-            model: The model to use, e.g. "deepseek-flash".
+            model: The model to use, e.g. "deepseek/deepseek-v4.1-flash".
             thinking: Whether the model should think before it answers.
             instructions: What to write about the photo.
             photo: The photo's image.

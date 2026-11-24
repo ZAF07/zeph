@@ -851,7 +851,7 @@ def test_a_run_is_priced_per_model_and_a_model_without_a_price_is_named(
     assert priced["unpriced_models"] == []
     assert unpriced["state"] == "finished"
     assert unpriced["cost_sgd"] == 0
-    assert unpriced["unpriced_models"] == ["deepseek-flash"]
+    assert unpriced["unpriced_models"] == ["deepseek/deepseek-v4.1-flash"]
 
 
 def test_the_estimate_uses_each_cases_tokens_from_its_last_run(
@@ -1821,7 +1821,7 @@ def test_move_outcome_keeping_overrides_reach_only_their_variant(
         connection.execute(
             text(
                 "UPDATE platform_settings SET value = "
-                '\'["deepseek-flash", "deepseek-pro"]\'::jsonb '
+                '\'["deepseek/deepseek-v4.1-flash", "deepseek-pro"]\'::jsonb '
                 "WHERE key = 'available_models'"
             )
         )
@@ -1841,7 +1841,10 @@ def test_move_outcome_keeping_overrides_reach_only_their_variant(
     [variant_call] = [
         call for call in chat_model.calls if call.instructions == "Keep the lessons."
     ]
-    assert (live_call.model, live_call.thinking) == ("deepseek-flash", True)
+    assert (live_call.model, live_call.thinking) == (
+        "deepseek/deepseek-v4.1-flash",
+        True,
+    )
     assert (variant_call.model, variant_call.thinking) == ("deepseek-pro", False)
     assert PostgresPlatformSettingsRepository(engine).load().values == live_before
 

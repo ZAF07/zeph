@@ -511,10 +511,12 @@ def test_an_admin_edits_the_judge_and_a_model_not_listed_is_refused(
         headers=admin,
     )
 
-    assert seeded["values"]["model"] == "deepseek-flash"
+    assert seeded["values"]["model"] == "deepseek/deepseek-v4.1-flash"
     assert seeded["values"]["thinking"] is False
     model_field = seeded["shape"]["sections"][0]["fields"][0]
-    assert [option["value"] for option in model_field["options"]] == ["deepseek-flash"]
+    assert [option["value"] for option in model_field["options"]] == [
+        "deepseek/deepseek-v4.1-flash"
+    ]
     assert saved.status_code == 200
     assert saved.json()["values"] == new_values
     assert refused.status_code == 422
