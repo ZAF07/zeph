@@ -186,4 +186,41 @@ If there is nothing, the section holds one line: "Nothing found."
 - **Impact:** if Conversation ends are ever retried after tagging, or old Conversations are tagged again (e.g. when a Pattern Type is added), a quote the User deleted could be kept again.
 - **Suggested fix:** before building any retagging, keep a record of deleted quotes (Conversation and quote) and skip them in `plan_observations`; about an hour.
 
+## 14 — Tagging Eval (2026-11-24)
+
+### Tagging context lines call the User "she"
+
+- **Kind:** bug
+- **What:** In the first Tagging Eval run (run `4352910b`, case `conf-mum-holiday-plans`) the real tagging step wrote context lines like "she spent the evening resentful" and "Explaining why she gave in". The tagging prompt doesn't ask for they/them.
+- **Impact:** Context lines are shown to Users as "Zeph's note" on "Things you said that Zeph kept" (issue 13), so a User can be misgendered on their own Memories page.
+- **Suggested fix:** Add one line to `pattern_tagging_prompt`: write context lines with "they/them" (or "you") and never guess a gender; add a Tagging Eval rule or a code check later. Minutes; then re-run the Tagging Eval (about S$0.15).
+
+### First Tagging Eval run: 33 of 44 pass
+
+- **Kind:** failure
+- **What:** Run `4352910b` (24 Nov 2026, live settings, `deepseek-flash` with thinking, S$0.1476): all four "anyone would" CONF.AVOID.BELONG cases (waiter, taxi, CEO, airline queue) kept nothing; the mum case was kept as situational (code marks a parent tagged power "above" as "anyone would"); three of four unclear cases came back as one clear Observation or two separate ones instead of one unclear; CTRL "real crisis" cases were tagged "for" or nothing instead of "against" (D2). Two seed cases were wrong for code's rules and were fixed in review (`conf-against-only-with-boss`, `unclear-conf-or-ach-boss-feedback` now expect situational).
+- **Impact:** Until fixed, low-stakes stranger moments are never recorded as "anyone would" (so they don't count against a Pattern), parents count as "anyone would", and look-alike Pattern Types are rarely marked unclear, so scores lean on guesses.
+- **Suggested fix:** The owner corrects the drafted cases first (issue 14's open criterion), then decide per finding: say in the tagging prompt when to tag "anyone would" moments and when to write one unclear Observation; consider narrowing CONF.AVOID.BELONG's `anyone_would_when` power `above` to people outside family (new catalog version). An hour plus a S$0.15 re-run.
+
+### The estimate for never-run Tagging cases is off
+
+- **Kind:** risk
+- **What:** New run estimated 308,000 in / 39,600 out tokens (S$0.178) for 44 Tagging cases; the run used 79,120 in / 76,318 out (S$0.148). A never-run case uses a rough per-Eval figure (`ROUGH_TOKENS_PER_CASE`, 7,000 / 900) priced on the reply model, while tagging with thinking writes far more than it reads.
+- **Impact:** Small here, but a new Eval or a Variant with a dearer model can be estimated well under its real cost. After one run the estimate uses each case's real tokens, so it corrects itself.
+- **Suggested fix:** Set Tagging's rough figure to about 1,900 / 1,800 and price rough figures on the model of the step each Eval runs. Under an hour.
+
+### An unclear case matches any pair holding the expected Pattern Type
+
+- **Kind:** potential failure
+- **What:** `matches` in `core/evals/tagging_eval.py` passes an unclear expectation when the expected Pattern Type is either of the two kept, whatever the other is (a CONF/ACH case passes if CONF/CTRL is kept).
+- **Impact:** A Tagging case can pass with the wrong look-alike pair.
+- **Suggested fix:** If the owner wants the pair checked, add an optional "second Pattern Type" field to the expected Observation. An hour.
+
+### `make restart` web build failed once, then passed
+
+- **Kind:** potential failure
+- **What:** In the pattern-14 worktree the first `make restart` failed in `pnpm build` ("Build failed because of webpack errors"); the next two passed with no change. The error lines weren't kept.
+- **Impact:** A deploy built on the server could fail the same way now and then.
+- **Suggested fix:** If it happens again, keep the full build log and look for a memory or race cause.
+
 ## Comments
