@@ -20,7 +20,8 @@ from companion.core.evals.models import (
     StoredEvalCase,
     Variant,
 )
-from companion.core.models import ModelCall, Move, Need
+from companion.core.models import LifeThread, ModelCall, Move, Need
+from companion.core.observations import PlannedObservations
 from companion.core.ports import ChatModel, Embedder, Repositories
 
 
@@ -253,6 +254,40 @@ class EvalCompanion(Protocol):
 
         Args:
             conversation_id: The made-up User's finished Conversation.
+
+        Raises:
+            EvalSetupError: If no User is connected, or User Memory doesn't
+                work for them.
+        """
+        ...
+
+    def turn_pattern_noticing_on(self) -> None:
+        """Turn Pattern noticing on for the made-up User, who has been told.
+
+        An Admin switches it on for them, and they press "Got it" on the
+        notice, so the tagging step runs for them.
+
+        Raises:
+            EvalSetupError: If no User is connected.
+        """
+        ...
+
+    def tag_observations(
+        self, conversation_id: UUID, touched: Sequence[LifeThread]
+    ) -> PlannedObservations | None:
+        """Run the Conversation-end tagging step alone on a Conversation.
+
+        It runs as it does after Life Threads, in its own Conversation-end
+        trace, with the Eval database's Platform Settings and the Pattern
+        Catalog loaded from its files. No other Conversation-end step runs.
+
+        Args:
+            conversation_id: The made-up User's ended Conversation.
+            touched: The Life Threads it touched, in the order shown.
+
+        Returns:
+            The Observations kept and those dropped; None when the step
+            didn't run or its answer couldn't be read.
 
         Raises:
             EvalSetupError: If no User is connected, or User Memory doesn't

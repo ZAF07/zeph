@@ -1042,8 +1042,10 @@ def test_the_terminal_runs_single_cases_and_prints_each_one(
     )
 
     assert passed is True
-    assert lines[0].startswith("Queued Eval Run ")
-    assert lines[0].endswith("(traffic)")
+    assert lines[0].startswith("Estimate: 1 case, about S$")
+    assert "never run" in lines[0]
+    assert lines[1].startswith("Queued Eval Run ")
+    assert lines[1].endswith("(traffic)")
     assert any("traffic" in line and line.startswith("PASS") for line in lines)
     assert not any("plan" in line for line in lines)
 
@@ -2510,4 +2512,317 @@ def test_a_memory_processing_override_reaches_only_its_variant(
         if call.instructions == "Write the day warmly."
     ]
     assert "I snapped at my sister again this morning." in variant_call.history[0].text
+    assert PostgresPlatformSettingsRepository(engine).load().values == live_before
+
+
+MEI_TAGGING_CASE = EvalCase(
+    key="yes-to-mei",
+    eval=EvalName.TAGGING,
+    content={
+        "now": "2026-11-24T10:00:00",
+        "threads": [
+            {
+                "title": "Helping Mei move",
+                "story": "Their sister Mei keeps asking for help moving flats.",
+                "people": ["Mei"],
+            }
+        ],
+        "messages": [
+            {
+                "who": "person",
+                "text": "I said yes to Mei again, it's fine. Then I stewed all night",
+            },
+            {"who": "zeph", "text": "That sounds like a long night."},
+        ],
+        "observations": [
+            {
+                "pattern_type": "CONF.AVOID.BELONG",
+                "direction": "for",
+                "unclear": False,
+                "situational": False,
+            }
+        ],
+    },
+)
+
+
+def tagged_entry(**changes: Any) -> dict[str, Any]:
+    """One Observation as the tagging model writes it, with some fields changed."""
+    return {
+        "pattern_types": ["CONF.AVOID.BELONG"],
+        "sign": "I2",
+        "direction": "for",
+        "quote": "I said yes to Mei again",
+        "context": "Agreed to help Mei move again, then resented it.",
+        "about": "Mei, their sister",
+        "thread": 1,
+        "relationship": "family",
+        "power": "equal",
+        "setting": "home",
+        "stance": "neutral",
+        "evidence": "real_story",
+        **changes,
+    }
+
+
+def tagging_answer(*entries: dict[str, Any]) -> str:
+    """Build the JSON the tagging model answers with."""
+    return json.dumps({"observations": list(entries)})
+
+
+def test_a_tagging_case_runs_the_real_tagging_step_and_shows_kept_and_dropped(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, MEI_TAGGING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.TAGGING)
+    chat_model.script_pattern_tagging(
+        tagging_answer(
+            tagged_entry(),
+            tagged_entry(quote="I said no to Mei", sign="I5"),
+        )
+    )
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "pass", result
+    assert [
+        (check["group"], check["name"], check["passed"]) for check in result["checks"]
+    ] == [("CONF.AVOID.BELONG · for", "kept", True)]
+    tagging = result["tagging"]
+    assert tagging["answered"] is True
+    [kept] = tagging["kept"]
+    assert kept == {
+        "pattern_types": ["CONF.AVOID.BELONG"],
+        "sign": "I2",
+        "direction": "for",
+        "unclear": False,
+        "situational": False,
+        "quote": "I said yes to Mei again",
+        "context": "Agreed to help Mei move again, then resented it.",
+        "about": "Mei, their sister",
+        "thread": "Helping Mei move",
+        "expected": True,
+    }
+    [dropped] = tagging["dropped"]
+    assert dropped["quote"] == "I said no to Mei"
+    assert dropped["reason"] == "quote not word for word in the User's own texts"
+    assert tagging["expected"] == [
+        {
+            "pattern_type": "CONF.AVOID.BELONG",
+            "direction": "for",
+            "unclear": False,
+            "situational": False,
+            "matched": True,
+        }
+    ]
+    [tagging_call] = chat_model.pattern_tagging_calls
+    shown = tagging_call.history[0].text
+    assert "[1] Helping Mei move" in shown
+    assert "CONF.AVOID.BELONG: Conflict avoidance to preserve belonging" in shown
+    assert "I said yes to Mei again, it's fine." in shown
+    trace = client.get(
+        f"/api/admin/eval-runs/{run['id']}/results/{result['id']}", headers=admin
+    ).json()
+    assert [call["step"] for call in trace["calls"]] == ["pattern_tagging"]
+    [saved] = PostgresEvalRunRepository(engine).list_results(UUID(run["id"]))
+    assert set(saved.result.facts["call"]) == {"duration_ms", "tokens_in", "tokens_out"}
+
+
+def test_a_tagging_case_fails_when_what_was_kept_differs_from_what_was_expected(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    unclear_case = EvalCase(
+        key="unclear-mei",
+        eval=EvalName.TAGGING,
+        content={
+            **MEI_TAGGING_CASE.content,
+            "observations": [
+                {
+                    "pattern_type": "ACH.WORTH.PERF",
+                    "direction": "for",
+                    "unclear": True,
+                    "situational": False,
+                }
+            ],
+        },
+    )
+    add_cases(engine, unclear_case)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.TAGGING)
+    chat_model.script_pattern_tagging(tagging_answer(tagged_entry()))
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "fail"
+    assert [
+        (check["group"], check["name"], check["passed"]) for check in result["checks"]
+    ] == [
+        ("ACH.WORTH.PERF · for · unclear", "kept", False),
+        ("Kept but not expected", "CONF.AVOID.BELONG · for", False),
+    ]
+    assert result["tagging"]["kept"][0]["expected"] is False
+    assert result["tagging"]["expected"][0]["matched"] is False
+
+
+def test_an_unclear_observation_matches_either_of_its_two_pattern_types(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    unclear_case = EvalCase(
+        key="unclear-mei",
+        eval=EvalName.TAGGING,
+        content={
+            **MEI_TAGGING_CASE.content,
+            "observations": [
+                {
+                    "pattern_type": "ACH.WORTH.PERF",
+                    "direction": "for",
+                    "unclear": True,
+                    "situational": False,
+                }
+            ],
+        },
+    )
+    add_cases(engine, unclear_case)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.TAGGING)
+    chat_model.script_pattern_tagging(
+        tagging_answer(
+            tagged_entry(pattern_types=["CONF.AVOID.BELONG", "ACH.WORTH.PERF"])
+        )
+    )
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "pass", result
+
+
+def test_a_nothing_to_tag_case_passes_only_when_nothing_is_kept(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    nothing_case = EvalCase(
+        key="nothing-here",
+        eval=EvalName.TAGGING,
+        content={**MEI_TAGGING_CASE.content, "observations": []},
+    )
+    situational_case = EvalCase(
+        key="stranger",
+        eval=EvalName.TAGGING,
+        content={
+            **MEI_TAGGING_CASE.content,
+            "observations": [
+                {
+                    "pattern_type": "CONF.AVOID.BELONG",
+                    "direction": "for",
+                    "unclear": False,
+                    "situational": True,
+                }
+            ],
+        },
+    )
+    add_cases(engine, nothing_case, situational_case)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.TAGGING)
+    chat_model.script_pattern_tagging(
+        tagging_answer(),
+        tagging_answer(tagged_entry(relationship="stranger")),
+    )
+
+    runner.work_next_run()
+
+    results = results_by_key(open_run(client, admin, run["id"]))
+    nothing = results["nothing-here"]
+    assert nothing["outcome"] == "pass", nothing
+    assert [(c["name"], c["passed"]) for c in nothing["checks"]] == [
+        ("nothing kept", True)
+    ]
+    assert nothing["tagging"]["kept"] == []
+    stranger = results["stranger"]
+    assert stranger["outcome"] == "pass", stranger
+    assert stranger["tagging"]["kept"][0]["situational"] is True
+
+
+def test_an_unreadable_tagging_answer_fails_the_case(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    nothing_case = EvalCase(
+        key="nothing-here",
+        eval=EvalName.TAGGING,
+        content={**MEI_TAGGING_CASE.content, "observations": []},
+    )
+    add_cases(engine, nothing_case)
+    admin = owner_headers(client, auth_verifier)
+    run = start_run(client, admin, EvalName.TAGGING)
+    chat_model.script_pattern_tagging("not json", "still not json")
+
+    runner.work_next_run()
+
+    [result] = open_run(client, admin, run["id"])["results"]
+    assert result["outcome"] == "fail"
+    assert [(c["name"], c["passed"]) for c in result["checks"]] == [
+        ("answer read", False)
+    ]
+    assert result["tagging"]["answered"] is False
+
+
+def test_tagging_overrides_reach_only_their_variant(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, MEI_TAGGING_CASE)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE platform_settings SET value = "
+                '\'["deepseek-flash", "deepseek-pro"]\'::jsonb '
+                "WHERE key = 'available_models'"
+            )
+        )
+    admin = owner_headers(client, auth_verifier)
+    live_before = PostgresPlatformSettingsRepository(engine).load().values
+    overrides = {
+        "pattern_tagging_prompt": "Tag carefully.",
+        "pattern_tagging_model": "deepseek-pro",
+        "pattern_tagging_thinking": False,
+    }
+    start_run(client, admin, EvalName.TAGGING, variants=[{}, overrides])
+    chat_model.script(tagging_answer())
+
+    runner.work_next_run()
+
+    [live_call] = chat_model.pattern_tagging_calls
+    [variant_call] = [
+        call for call in chat_model.calls if call.instructions == "Tag carefully."
+    ]
+    assert (live_call.model, live_call.thinking) == (
+        "deepseek/deepseek-v4.1-flash",
+        True,
+    )
+    assert (variant_call.model, variant_call.thinking) == ("deepseek-pro", False)
     assert PostgresPlatformSettingsRepository(engine).load().values == live_before

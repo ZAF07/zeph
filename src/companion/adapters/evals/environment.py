@@ -7,6 +7,7 @@ from sqlalchemy import Engine, create_engine, insert, make_url, text
 
 from companion.adapters.evals.in_process_companion import InProcessCompanion
 from companion.adapters.postgres.database import (
+    load_pattern_catalog,
     migrate,
     seed_check_in_kinds,
     seed_helplines,
@@ -118,6 +119,7 @@ class PostgresEvalEnvironment:
             self._seed_dir / "moves.yaml",
             self._seed_dir / "needs.yaml",
         )
+        load_pattern_catalog(self._engine, self._seed_dir / "pattern_catalog")
         return InProcessCompanion(
             engine=self._engine,
             chat_model=self._chat_model,

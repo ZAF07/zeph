@@ -88,17 +88,51 @@ class TaggingContext:
     now: datetime
 
 
+class DropReason(StrEnum):
+    """Why code dropped an Observation the tagging model wrote."""
+
+    NOT_AN_OBSERVATION = "not an Observation"
+    UNKNOWN_PATTERN_TYPE = "Pattern Type not in the catalog"
+    UNKNOWN_SIGN = "sign not among that Pattern Type's signs for or against"
+    QUOTE_NOT_WORD_FOR_WORD = "quote not word for word in the User's own texts"
+    TAG_OFF_ITS_LIST = "a tag or the kind of evidence not from its list"
+    MISSING_DETAILS = "no context line or no one it is about"
+    REPEAT = "repeats one already kept"
+
+
+@dataclass(frozen=True)
+class DroppedEntry:
+    """An Observation the tagging model wrote that code dropped, and why.
+
+    Attributes:
+        entry: The Observation, as the model wrote it.
+        reason: Why it was dropped.
+    """
+
+    entry: Any
+    reason: DropReason
+
+
 @dataclass(frozen=True)
 class PlannedObservations:
-    """The Observations code keeps from a tagging answer, and how many it dropped.
+    """The Observations code keeps from a tagging answer, and those it dropped.
 
     Attributes:
         kept: The Observations that passed every check, in the order written.
-        dropped: How many the model wrote that didn't.
+        dropped_entries: Those the model wrote that didn't, with why.
     """
 
     kept: list[Observation]
-    dropped: int
+    dropped_entries: list[DroppedEntry]
+
+    @property
+    def dropped(self) -> int:
+        """Count the Observations dropped.
+
+        Returns:
+            How many the model wrote that didn't pass.
+        """
+        return len(self.dropped_entries)
 
 
 def users_own_texts(messages: Sequence[ConversationMessage]) -> list[UserText]:
@@ -337,7 +371,7 @@ def read_thread(
     return thread.id if thread else None
 
 
-def check_observation(entry: Any, context: TaggingContext) -> Observation | None:
+def check_observation(entry: Any, context: TaggingContext) -> Observation | DropReason:
     """Check one Observation the model wrote, and turn it into one to keep.
 
     Args:
@@ -345,28 +379,31 @@ def check_observation(entry: Any, context: TaggingContext) -> Observation | None
         context: What it is checked against.
 
     Returns:
-        The Observation; None if its Pattern Types or sign aren't in the
-        catalog, its quote isn't word for word in the User's own texts, a
-        tag isn't from its list, or it has no context or who it is about.
+        The Observation; or why it is dropped: its Pattern Types or sign
+        aren't in the catalog, its quote isn't word for word in the User's
+        own texts, a tag or its kind of evidence isn't from its list, or it
+        has no context or who it is about.
     """
     if not isinstance(entry, dict):
-        return None
+        return DropReason.NOT_AN_OBSERVATION
     pattern_types = read_named_pattern_types(entry, context.pattern_types)
     if pattern_types is None:
-        return None
+        return DropReason.UNKNOWN_PATTERN_TYPE
     matched = read_sign(entry, pattern_types[0])
     if matched is None:
-        return None
+        return DropReason.UNKNOWN_SIGN
     quote = read_text(entry, "quote")
     quoted_text = find_quoted_text(quote, context.user_texts) if quote else None
     if quote is None or quoted_text is None:
-        return None
+        return DropReason.QUOTE_NOT_WORD_FOR_WORD
     tags = read_tags(entry)
     evidence_kind = read_choice(entry, "evidence", EvidenceKind)
+    if tags is None or evidence_kind is None:
+        return DropReason.TAG_OFF_ITS_LIST
     context_line = read_text(entry, "context")
     about = read_text(entry, "about")
-    if tags is None or evidence_kind is None or context_line is None or about is None:
-        return None
+    if context_line is None or about is None:
+        return DropReason.MISSING_DETAILS
     direction, sign = matched
     second = pattern_types[1] if len(pattern_types) > 1 else None
     return Observation(
@@ -404,13 +441,15 @@ def plan_observations(
         context: What they are checked against.
 
     Returns:
-        The Observations kept and how many were dropped.
+        The Observations kept and those dropped, with why.
     """
     kept: list[Observation] = []
+    dropped: list[DroppedEntry] = []
     seen: set[tuple[str, str, str]] = set()
     for entry in entries:
         observation = check_observation(entry, context)
-        if observation is None:
+        if isinstance(observation, DropReason):
+            dropped.append(DroppedEntry(entry, observation))
             continue
         key = (
             observation.pattern_type_id,
@@ -418,10 +457,11 @@ def plan_observations(
             even_out(observation.quote),
         )
         if key in seen:
+            dropped.append(DroppedEntry(entry, DropReason.REPEAT))
             continue
         seen.add(key)
         kept.append(observation)
-    return PlannedObservations(kept=kept, dropped=len(entries) - len(kept))
+    return PlannedObservations(kept=kept, dropped_entries=dropped)
 
 
 def describe_signs(signs: Sequence[PatternSign]) -> str:
@@ -555,7 +595,7 @@ class PatternTagger:
         conversation_id: UUID,
         messages: list[ConversationMessage],
         touched: Sequence[LifeThread],
-    ) -> None:
+    ) -> PlannedObservations | None:
         """Tag and keep the Observations in an ended Conversation.
 
         Runs only while Pattern noticing works for the User, once they have
@@ -571,17 +611,21 @@ class PatternTagger:
             messages: Its messages, oldest first.
             touched: The Life Threads the Conversation started, changed or
                 brought up.
+
+        Returns:
+            The Observations kept and those dropped; None when the step
+            didn't run or its answer couldn't be read.
         """
         if not snapshot.works(Feature.PATTERN_NOTICING):
-            return
+            return None
         if snapshot.user.pattern_noticing_told_at is None:
-            return
+            return None
         user_texts = users_own_texts(messages)
         pattern_types = [
             entry.pattern_type for entry in self._pattern_catalog.catalog()
         ]
         if not user_texts or not pattern_types:
-            return
+            return None
         threads = dict(enumerate(touched, start=1))
         now = self._clock.now()
         time_zone = snapshot.user.time_zone
@@ -593,7 +637,7 @@ class PatternTagger:
         )
         if entries is None:
             logger.warning("Pattern tagging gave no readable answer")
-            return
+            return None
         planned = plan_observations(
             entries,
             TaggingContext(
@@ -612,6 +656,7 @@ class PatternTagger:
             snapshot, TaggingShape(tagged=len(entries), dropped=planned.dropped)
         )
         self._repositories.observations.add_many(planned.kept)
+        return planned
 
     def _ask(self, snapshot: UserSnapshot, description: str) -> list[Any] | None:
         """Ask the model for the Observations, once more if it can't be read.

@@ -10,6 +10,7 @@ from companion.core.models import (
     HowSure,
     MoveResult,
     MoveRole,
+    ObservationDirection,
     ThreadReaction,
 )
 
@@ -1341,3 +1342,111 @@ def read_day_summary_case(key: str, content: dict[str, Any]) -> DaySummaryCase:
             for entry in content["questions"]
         ],
     )
+
+
+@dataclass(frozen=True)
+class TaggingMessage:
+    """One message of a Tagging case's ended Conversation.
+
+    Attributes:
+        from_person: True if the User sent it; False if Zeph did.
+        text: What it says.
+    """
+
+    from_person: bool
+    text: str
+
+
+@dataclass(frozen=True)
+class ExpectedObservation:
+    """An Observation the tagging step must keep.
+
+    Attributes:
+        pattern_type: The Pattern Type's ID, e.g. CONF.AVOID.BELONG; when
+            unclear, either of the two it names.
+        direction: Whether it counts for or against.
+        unclear: Whether it names two Pattern Types it can't tell apart.
+        situational: Whether anyone would have acted the same there.
+    """
+
+    pattern_type: str
+    direction: ObservationDirection
+    unclear: bool
+    situational: bool
+
+    @property
+    def label(self) -> str:
+        """Name it as the Case Result groups its checks.
+
+        Returns:
+            E.g. "CONF.AVOID.BELONG · for · unclear".
+        """
+        parts = [self.pattern_type, self.direction.value]
+        if self.unclear:
+            parts.append("unclear")
+        if self.situational:
+            parts.append("situational")
+        return " · ".join(parts)
+
+
+@dataclass(frozen=True)
+class TaggingCase:
+    """An ended Conversation and the Observations its tagging should keep.
+
+    Attributes:
+        id: The case's key.
+        now: When the first message was sent, in UTC.
+        threads: The Life Threads the Conversation touched, in the order
+            the tagging step is shown them.
+        messages: The Conversation, oldest first.
+        observations: The Observations that must be kept; none means
+            nothing may be kept.
+    """
+
+    id: str
+    now: datetime
+    threads: list[EvalThread]
+    messages: list[TaggingMessage]
+    observations: list[ExpectedObservation]
+
+
+def read_tagging_case(key: str, content: dict[str, Any]) -> TaggingCase:
+    """Read a Tagging case and check it can be checked.
+
+    Args:
+        key: The case's key.
+        content: `now`, `threads` (each `{title, story, people}`),
+            `messages` (each `{who, text}`) and `observations` (each
+            `{pattern_type, direction, unclear, situational}`).
+
+    Returns:
+        The case.
+
+    Raises:
+        InvalidEvalCaseError: If the User says nothing in their own words,
+            so there is nothing the tagging step could quote.
+    """
+    case = TaggingCase(
+        id=key,
+        now=to_utc(content["now"]),
+        threads=[to_eval_thread(entry) for entry in content.get("threads") or []],
+        messages=[
+            TaggingMessage(from_person=entry["who"] == "person", text=entry["text"])
+            for entry in content["messages"]
+        ],
+        observations=[
+            ExpectedObservation(
+                pattern_type=entry["pattern_type"].strip(),
+                direction=ObservationDirection(entry["direction"]),
+                unclear=bool(entry.get("unclear")),
+                situational=bool(entry.get("situational")),
+            )
+            for entry in content.get("observations") or []
+        ],
+    )
+    if not any(message.from_person for message in case.messages):
+        raise InvalidEvalCaseError(
+            f"{key} can't be checked: the User sends no message",
+            {"messages": "Add at least one message from the User."},
+        )
+    return case

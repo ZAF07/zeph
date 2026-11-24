@@ -6,6 +6,7 @@ from companion.core.evals.models import (
     CaseResult,
     Check,
     Cost,
+    Estimate,
     EvalName,
     EvalRunOverview,
 )
@@ -19,6 +20,7 @@ EVAL_TITLES = {
     EvalName.UNDERSTANDING: "Understanding",
     EvalName.MOVE_OUTCOME: "Move Outcome",
     EvalName.DAY_SUMMARY: "Day Summary",
+    EvalName.TAGGING: "Tagging",
 }
 OUTCOME_MARKS = {
     CaseOutcome.PASS: "PASS",
@@ -244,6 +246,7 @@ SCORES: dict[EvalName, Callable[[Sequence[CaseResult]], str]] = {
     EvalName.UNDERSTANDING: checks_score("Understanding", "checks and rules passed"),
     EvalName.MOVE_OUTCOME: checks_score("Move Outcome", "checks and rules passed"),
     EvalName.DAY_SUMMARY: checks_score("Day Summary", "questions matched"),
+    EvalName.TAGGING: cases_score("Tagging"),
 }
 
 
@@ -285,6 +288,25 @@ def cost_line(cost: Cost) -> str:
             f"; {models} {'has' if one else 'have'} no price set, "
             f"so {'its' if one else 'their'} tokens aren't counted"
         )
+    return line
+
+
+def estimate_line(estimate: Estimate) -> str:
+    """Write what a run is likely to cost, printed before it is queued.
+
+    Args:
+        estimate: The run's estimate, at the live Model Prices.
+
+    Returns:
+        E.g. "Estimate: 40 cases, about S$0.4100 at the live prices (40 never
+        run, so a rough figure)", naming any model with no price set.
+    """
+    cases = f"{estimate.case_count} case{'' if estimate.case_count == 1 else 's'}"
+    line = f"Estimate: {cases}, about S${estimate.cost.sgd:.4f} at the live prices"
+    if estimate.rough_case_count:
+        line += f" ({estimate.rough_case_count} never run, so a rough figure)"
+    if estimate.cost.unpriced_models:
+        line += f"; no price set for {', '.join(estimate.cost.unpriced_models)}"
     return line
 
 

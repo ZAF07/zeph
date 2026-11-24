@@ -5,14 +5,18 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
 from companion.adapters.eval_case_seed import read_eval_case_seed
+from companion.adapters.pattern_catalog_seed import read_pattern_catalog_seed
 from companion.adapters.postgres.eval_repositories import (
     PostgresEvalCaseRepository,
     PostgresEvalImageRepository,
 )
 from companion.core.evals.case_seed import add_seed_cases
 from companion.core.evals.case_shapes import CASE_SHAPES, find_problems
+from companion.core.evals.cases import read_tagging_case
 from companion.core.evals.models import EvalCase, EvalName
+from companion.core.pattern_catalog import read_pattern_types
 from companion.main import EVAL_CASES_DIR, EVAL_IMAGES_DIR
+from tests.conftest import PATTERN_CATALOG_DIR
 from tests.fakes import FakeAuthVerifier, FakeClock
 from tests.telegram_helpers import auth_headers, owner_headers
 
@@ -109,6 +113,24 @@ VALID_CONTENT: dict[EvalName, dict[str, Any]] = {
             }
         ],
     },
+    EvalName.TAGGING: {
+        "now": "2026-11-24T10:00:00",
+        "threads": [
+            {"title": "Helping Mei move", "story": "Mei asked.", "people": ["Mei"]}
+        ],
+        "messages": [
+            {"who": "person", "text": "I said yes to Mei again, it's fine."},
+            {"who": "zeph", "text": "How do you feel about it?"},
+        ],
+        "observations": [
+            {
+                "pattern_type": "CONF.AVOID.BELONG",
+                "direction": "for",
+                "unclear": False,
+                "situational": False,
+            }
+        ],
+    },
 }
 
 
@@ -120,6 +142,7 @@ EDITS: dict[EvalName, dict[str, Any]] = {
     EvalName.PHOTO_DESCRIPTIONS: {"must_leave_out": ["4929", "hunter2"]},
     EvalName.UNDERSTANDING: {"now": "2026-11-14T09:00:00"},
     EvalName.MOVE_OUTCOME: {"now": "2026-11-15T09:00:00"},
+    EvalName.TAGGING: {"observations": []},
     EvalName.DAY_SUMMARY: {
         "questions": [
             {
@@ -405,6 +428,12 @@ def test_an_invalid_save_is_refused_with_a_message_per_field(
             "No such rule below: no_such",
         ),
         (
+            EvalName.TAGGING,
+            {"messages": [{"who": "zeph", "text": "How was your day?"}]},
+            "messages",
+            "Add at least one message from the User.",
+        ),
+        (
             EvalName.DAY_SUMMARY,
             {"messages": [{"who": "person", "time": "teatime", "text": "hi"}]},
             "messages.0.time",
@@ -585,3 +614,35 @@ def test_the_seed_leaves_a_case_edited_on_the_dashboard_and_an_archived_one_alon
 def test_every_seed_case_fits_its_eval_s_case_shape() -> None:
     for case in read_eval_case_seed(EVAL_CASES_DIR, EVAL_IMAGES_DIR):
         assert find_problems(CASE_SHAPES[case.eval], case.content) == {}, case.key
+
+
+def test_the_tagging_seed_covers_each_kind_of_case_for_every_pattern_type() -> None:
+    pattern_types = {
+        pattern_type.id: pattern_type
+        for pattern_type in read_pattern_types(
+            read_pattern_catalog_seed(PATTERN_CATALOG_DIR)
+        )
+    }
+    cases = [
+        read_tagging_case(case.key, case.content)
+        for case in read_eval_case_seed(EVAL_CASES_DIR, EVAL_IMAGES_DIR)
+        if case.eval == EvalName.TAGGING
+    ]
+    expected = [item for case in cases for item in case.observations]
+
+    assert len(cases) >= 40
+    assert {item.pattern_type for item in expected} == set(pattern_types)
+    for pattern_type in pattern_types:
+        directions = {
+            item.direction.value
+            for item in expected
+            if item.pattern_type == pattern_type and not item.unclear
+        }
+        assert directions == {"for", "against"}, pattern_type
+    assert sum(1 for case in cases if not case.observations) >= 5
+    assert sum(1 for item in expected if item.unclear) >= 4
+    situational = [item for item in expected if item.situational]
+    assert len(situational) >= 4
+    assert all(
+        pattern_types[item.pattern_type].anyone_would_when for item in situational
+    )

@@ -1507,6 +1507,129 @@ DAY_SUMMARY_SHAPE = FormShape(
     ]
 )
 
+TAGGING_SHAPE = FormShape(
+    [
+        ShapeSection(
+            "When",
+            "The time the ended Conversation started.",
+            [
+                ShapeField(
+                    "now",
+                    "When the first message was sent",
+                    "In UTC, which is also the User's time zone. The messages "
+                    "come a minute apart from it.",
+                    FieldKind.DATE_TIME,
+                    required=True,
+                ),
+            ],
+        ),
+        ShapeSection(
+            "Life Threads it touched",
+            "The made-up User's Life Threads this Conversation started, "
+            "changed or brought up. The tagging step is shown them numbered, "
+            "in this order.",
+            [
+                group_list_field(
+                    "threads",
+                    "Life Threads",
+                    "Leave empty when the Conversation touched none.",
+                    "Life Thread",
+                    [
+                        text_field("title", "Title", "The Thread's title."),
+                        long_text_field("story", "Story", "What happened so far."),
+                        text_list_field(
+                            "people",
+                            "People",
+                            "The people or things in it, e.g. Mei.",
+                            "Person",
+                        ),
+                    ],
+                ),
+            ],
+        ),
+        ShapeSection(
+            "The ended Conversation",
+            "Every message, oldest first. The real tagging step reads all of "
+            "it, with the whole Pattern Catalog, when the Conversation ends.",
+            [
+                group_list_field(
+                    "messages",
+                    "Messages",
+                    "What the User and Zeph said, in order. Only the User's own "
+                    "words can be quoted.",
+                    "Message",
+                    [
+                        ShapeField(
+                            "who",
+                            "From",
+                            "",
+                            FieldKind.CHOICE,
+                            required=True,
+                            options=[
+                                ChoiceOption("person", "User"),
+                                ChoiceOption("zeph", "Zeph"),
+                            ],
+                            default="person",
+                        ),
+                        long_text_field("text", "Text", ""),
+                    ],
+                    required=True,
+                ),
+            ],
+        ),
+        ShapeSection(
+            "Observations to expect",
+            "What code must keep after its checks. The case passes only when "
+            "every one below is kept and nothing else is. Leave empty when "
+            "there is nothing to tag.",
+            [
+                group_list_field(
+                    "observations",
+                    "Observations",
+                    "Several quotes kept for one Observation below still match it.",
+                    "Observation",
+                    [
+                        text_field(
+                            "pattern_type",
+                            "Pattern Type",
+                            "Its ID in the Pattern Catalog, e.g. "
+                            "CONF.AVOID.BELONG. When unclear, either of the two.",
+                        ),
+                        ShapeField(
+                            "direction",
+                            "For or against",
+                            "Whether it counts for the Pattern Type or against it.",
+                            FieldKind.CHOICE,
+                            required=True,
+                            options=[
+                                ChoiceOption("for", "For"),
+                                ChoiceOption("against", "Against"),
+                            ],
+                            default="for",
+                        ),
+                        ShapeField(
+                            "unclear",
+                            "Unclear",
+                            "On when it could be either of two look-alike "
+                            "Pattern Types.",
+                            FieldKind.ON_OFF,
+                            default=False,
+                        ),
+                        ShapeField(
+                            "situational",
+                            "Anyone would",
+                            "On when anyone would have acted the same there, "
+                            "so it counts for nothing.",
+                            FieldKind.ON_OFF,
+                            default=False,
+                        ),
+                    ],
+                ),
+            ],
+        ),
+    ]
+)
+
 CASE_SHAPES: dict[EvalName, FormShape] = {
     EvalName.SAFEGUARD: SAFEGUARD_SHAPE,
     EvalName.PERSONA: PERSONA_SHAPE,
@@ -1516,4 +1639,5 @@ CASE_SHAPES: dict[EvalName, FormShape] = {
     EvalName.UNDERSTANDING: UNDERSTANDING_SHAPE,
     EvalName.MOVE_OUTCOME: MOVE_OUTCOME_SHAPE,
     EvalName.DAY_SUMMARY: DAY_SUMMARY_SHAPE,
+    EvalName.TAGGING: TAGGING_SHAPE,
 }

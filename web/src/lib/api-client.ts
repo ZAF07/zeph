@@ -899,7 +899,7 @@ export type Sticker = {
   added_at: string;
 };
 
-/** One of the eight Evals. */
+/** One of the nine Evals. */
 export type EvalName =
   | "safeguard"
   | "persona"
@@ -908,7 +908,8 @@ export type EvalName =
   | "photo_descriptions"
   | "understanding"
   | "move_outcome"
-  | "day_summary";
+  | "day_summary"
+  | "tagging";
 
 /** An Eval and the cases a new run of it would run. */
 export type EvalSummary = { eval: EvalName; case_keys: string[] };
@@ -1108,6 +1109,7 @@ export type CaseResult = {
   duration_ms: number;
   finished_at: string;
   day_summary?: DaySummaryResult | null;
+  tagging?: TaggingResult | null;
 };
 
 /** One question of a Day Summary case, answered from the Summary and marked. */
@@ -1123,6 +1125,46 @@ export type DaySummaryAnswer = {
 export type DaySummaryResult = {
   summary: string;
   answers: DaySummaryAnswer[];
+};
+
+/** An Observation a Tagging case's tagging step kept. */
+export type KeptObservation = {
+  pattern_types: string[];
+  sign: string;
+  direction: string;
+  unclear: boolean;
+  situational: boolean;
+  quote: string;
+  context: string;
+  about: string;
+  thread: string | null;
+  expected: boolean;
+};
+
+/** An Observation the tagging model wrote that code dropped, and why. */
+export type DroppedObservation = {
+  pattern_types: string[];
+  sign: string;
+  direction: string;
+  quote: string;
+  reason: string;
+};
+
+/** An Observation a Tagging case expected, and whether one like it was kept. */
+export type ExpectedObservation = {
+  pattern_type: string;
+  direction: string;
+  unclear: boolean;
+  situational: boolean;
+  matched: boolean;
+};
+
+/** What a Tagging case's tagging step kept and dropped, and what it expected. */
+export type TaggingResult = {
+  answered: boolean;
+  kept: KeptObservation[];
+  dropped: DroppedObservation[];
+  expected: ExpectedObservation[];
 };
 
 /** How one Variant's finished cases went, added up. */

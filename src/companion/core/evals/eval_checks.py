@@ -9,6 +9,7 @@ from companion.core.evals.cases import (
     read_photo_description_case,
     read_safeguard_case,
     read_settings_case,
+    read_tagging_case,
     read_understanding_case,
 )
 from companion.core.evals.day_summary_eval import check_day_summary_case
@@ -26,6 +27,7 @@ from companion.core.evals.photo_description_eval import check_photo_description_
 from companion.core.evals.ports import EvalCompanion
 from companion.core.evals.safeguard_eval import check_safeguard_case
 from companion.core.evals.settings_eval import check_settings_case
+from companion.core.evals.tagging_eval import check_tagging_case
 from companion.core.evals.understanding_eval import check_understanding_case
 
 type CaseChecker = Callable[
@@ -109,6 +111,7 @@ CHECKERS: dict[EvalName, CaseChecker] = {
         read_move_outcome_case, check_move_outcome_case
     ),
     EvalName.DAY_SUMMARY: judged_checker(read_day_summary_case, check_day_summary_case),
+    EvalName.TAGGING: checker(read_tagging_case, check_tagging_case),
 }
 
 READERS: dict[EvalName, Callable[[str, dict[str, Any]], object]] = {
@@ -120,6 +123,7 @@ READERS: dict[EvalName, Callable[[str, dict[str, Any]], object]] = {
     EvalName.UNDERSTANDING: read_understanding_case,
     EvalName.MOVE_OUTCOME: read_move_outcome_case,
     EvalName.DAY_SUMMARY: read_day_summary_case,
+    EvalName.TAGGING: read_tagging_case,
 }
 
 

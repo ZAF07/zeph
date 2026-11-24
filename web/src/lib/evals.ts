@@ -44,6 +44,11 @@ export const evalDetails: Record<EvalName, { label: string; checks: string }> =
       checks:
         "Writes a Day Summary from a made-up day with the live memory processing prompt. The Judge then answers each question from the Summary alone, and the case passes only if every answer matches.",
     },
+    tagging: {
+      label: "Tagging",
+      checks:
+        "Runs the real tagging step on a made-up Conversation, with the whole Pattern Catalog. The case passes only when the Observations code keeps are exactly the ones expected.",
+    },
   };
 
 /** Every Eval, in the order shown. */

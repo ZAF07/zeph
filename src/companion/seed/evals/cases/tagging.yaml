@@ -1,0 +1,720 @@
+# Tagging eval. Each case gives a made-up User an ended Conversation, with
+# the Life Threads it touched, and runs the real tagging step on it alone,
+# with the whole Pattern Catalog. Code then checks what it wrote, as it does
+# for real Users, and the Observations it keeps are compared with the ones
+# expected below.
+#
+# Drafted by Claude to start; the owner corrects them (they are the one rater
+# so far). See docs/pattern-evals/README.md for what this Eval can and can't
+# show.
+#
+# `now` is when the first message was sent (UTC, which is also the person's
+# time zone); the messages come a minute apart. A case can set its own `now`.
+#
+# threads: [{title, story, people}]   the Life Threads the Conversation touched,
+#                                     shown to the tagging step numbered, in order
+# messages: [{who, text}]
+#   who: person | zeph                only the person's own words can be quoted
+#
+# observations: the Observations that must be kept. The case passes only when
+# every one is kept and nothing else is. Several quotes kept for one entry
+# still match it. Leave it out when there is nothing to tag.
+#   - pattern_type: <Pattern Type ID>  when unclear, either of the two
+#     direction: for | against
+#     unclear: true                    when it could be either of two look-alikes
+#     situational: true                when anyone would have acted the same
+#                                      (only CONF.AVOID.BELONG can be: strangers,
+#                                      or someone above them, for or against)
+
+now: 2026-11-24T10:00:00
+
+cases:
+  # Conflict avoidance to preserve belonging (CONF.AVOID.BELONG), for.
+
+  - id: conf-yes-to-sister-then-resents
+    threads:
+      - title: Helping Mei move
+        story: Their sister Mei keeps asking for help moving flats.
+        people: [Mei]
+    messages:
+      - who: person
+        text: >-
+          Mei asked me to help her move again this Saturday. I said yes straight
+          away even though I'd planned to rest. Now I'm annoyed at her and at
+          myself.
+      - who: zeph
+        text: That's a lot to give up a rest day for. What made you say yes?
+      - who: person
+        text: >-
+          Honestly if I said no she'd be cold with me for weeks, and that's
+          worse than losing a Saturday.
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: for
+
+  - id: conf-partner-dinner-its-fine
+    threads:
+      - title: Living with Sam
+        story: They moved in with their partner Sam two months ago.
+        people: [Sam]
+    messages:
+      - who: person
+        text: >-
+          Sam booked dinner with his parents on my birthday without asking. I
+          told him it's fine, not a big deal.
+      - who: zeph
+        text: How are you feeling about it now?
+      - who: person
+        text: >-
+          I keep thinking about it. I've replayed it all morning. But bringing
+          it up would just start a fight.
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: for
+
+  - id: conf-rehearses-text-to-friend
+    messages:
+      - who: person
+        text: >-
+          I need to tell Priya I can't be her bridesmaid. I've rewritten the
+          message about nine times so it doesn't upset her.
+      - who: zeph
+        text: Nine drafts is a lot of care. What worries you most?
+      - who: person
+        text: >-
+          That she'll be hurt and pull away. Losing her would be so much worse
+          than the cost of the dress.
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: for
+
+  - id: conf-apologises-before-asking-flatmate
+    messages:
+      - who: person
+        text: >-
+          Sorry if this is a dumb question, but how do I ask my flatmate to stop
+          leaving dishes out? Every time I start I end up saying sorry and
+          dropping it.
+      - who: zeph
+        text: It's not dumb at all. What happens when you try?
+      - who: person
+        text: >-
+          I say "sorry, it's probably me being fussy" and then wash them myself.
+          I just don't want things to get weird between us, we're close.
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: for
+
+  - id: conf-agrees-with-friends-on-trip
+    threads:
+      - title: Bali trip with uni friends
+        story: Their old uni group is planning a trip to Bali in March.
+        people: [uni friends]
+    messages:
+      - who: person
+        text: >-
+          The group picked the expensive villa. I said sounds great in the chat
+          but I really can't afford it.
+      - who: zeph
+        text: Did anyone know the budget was a worry for you?
+      - who: person
+        text: >-
+          No. I didn't want to be the one who makes it awkward. If I push back
+          they'll just plan the next one without me.
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: for
+
+  - id: conf-mum-holiday-plans
+    messages:
+      - who: person
+        text: >-
+          Mum wants us all at hers for Christmas again. I agreed on the phone
+          and then spent the evening stewing because I wanted to go away with
+          Leo this year.
+      - who: zeph
+        text: It sounds like you had other plans in mind.
+      - who: person
+        text: >-
+          Yeah. But her being upset with me is the worst thing, I can't stand
+          it. So it's fine, we'll go to hers.
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: for
+
+  # CONF.AVOID.BELONG, against.
+
+  - id: conf-against-tells-brother-no
+    messages:
+      - who: person
+        text: >-
+          My brother asked to borrow money again and I told him no, straight
+          out. He grumbled a bit but we're fine.
+      - who: zeph
+        text: How did it feel to say it?
+      - who: person
+        text: >-
+          Fine actually. We disagree all the time and it never really shakes
+          things between us.
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: against
+
+  - id: conf-against-argues-with-partner
+    messages:
+      - who: person
+        text: >-
+          Had a proper argument with Jun about where to live. I told him I don't
+          want to move to his hometown and said why.
+      - who: zeph
+        text: How are things between you now?
+      - who: person
+        text: >-
+          Good. We said our piece, had dinner, moved on. I don't get worked up
+          about disagreeing with him.
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: against
+
+  - id: conf-against-only-with-boss
+    messages:
+      - who: person
+        text: >-
+          With my friends and family I'll say exactly what I think. It's only
+          with my director that I go quiet and agree to everything.
+      - who: zeph
+        text: What's different with your director?
+      - who: person
+        text: She decides my promotion. Anyone else, I'll argue all day.
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: against
+        situational: true
+
+  # CONF.AVOID.BELONG where anyone would do it (situational).
+
+  - id: conf-situational-cold-food-waiter
+    messages:
+      - who: person
+        text: >-
+          My food came out cold at the restaurant and I just ate it. Told the
+          waiter it was fine when he asked.
+      - who: zeph
+        text: Did it bother you much?
+      - who: person
+        text: Not really, it was a random place, I'll never go back anyway.
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: for
+        situational: true
+
+  - id: conf-situational-taxi-driver-route
+    messages:
+      - who: person
+        text: >-
+          The taxi driver took the long way and I didn't say anything. Didn't
+          want an argument with a stranger at midnight.
+      - who: zeph
+        text: That sounds like a sensible call at that hour.
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: for
+        situational: true
+
+  - id: conf-situational-ceo-town-hall
+    messages:
+      - who: person
+        text: >-
+          At the town hall the CEO said the reorg would be good for everyone. I
+          disagree but I kept my mouth shut, it wasn't the moment.
+      - who: zeph
+        text: It can be hard to speak up in a room like that.
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: for
+        situational: true
+
+  - id: conf-situational-airline-queue
+    messages:
+      - who: person
+        text: >-
+          Someone cut in front of me at the airline desk. I let it go, it's
+          fine, I wasn't going to make a scene with some guy I don't know.
+      - who: zeph
+        text: Queues at airports test everyone's patience.
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: for
+        situational: true
+
+  # Performance-contingent self-worth (ACH.WORTH.PERF), for.
+
+  - id: ach-im-useless-after-typo
+    messages:
+      - who: person
+        text: >-
+          I sent the client deck with a typo on the first slide. I'm useless. I
+          can't even get the basics right.
+      - who: zeph
+        text: That sounds like it stung. Did the client say anything?
+      - who: person
+        text: No, nobody noticed. But I did, and it's ruined my whole evening.
+    observations:
+      - pattern_type: ACH.WORTH.PERF
+        direction: for
+
+  - id: ach-promotion-was-luck
+    threads:
+      - title: New role as team lead
+        story: They were promoted to team lead last week.
+        people: [their team]
+    messages:
+      - who: person
+        text: >-
+          Everyone keeps congratulating me on the promotion. Honestly I think I
+          just got lucky, there wasn't anyone else.
+      - who: zeph
+        text: You don't think the work you did had anything to do with it?
+      - who: person
+        text: It's the minimum they'd expect from anyone in the job.
+    observations:
+      - pattern_type: ACH.WORTH.PERF
+        direction: for
+
+  - id: ach-wont-ship-portfolio
+    messages:
+      - who: person
+        text: >-
+          My portfolio site has been "nearly done" for eight months. I won't put
+          it live until every project looks perfect.
+      - who: zeph
+        text: What would happen if it went live as it is?
+      - who: person
+        text: >-
+          People would see it isn't good enough and then they'd know I'm not
+          good enough either.
+    observations:
+      - pattern_type: ACH.WORTH.PERF
+        direction: for
+
+  - id: ach-bad-run-ruins-day
+    messages:
+      - who: person
+        text: >-
+          Ran my 10k two minutes slower than last month. Felt rubbish about
+          myself for the rest of the day, couldn't enjoy dinner.
+      - who: zeph
+        text: Two minutes slower ruined the whole day?
+      - who: person
+        text: Yeah. If I'm not improving, what's the point of me.
+    observations:
+      - pattern_type: ACH.WORTH.PERF
+        direction: for
+
+  - id: ach-compares-with-colleague
+    messages:
+      - who: person
+        text: >-
+          Aisha presented right after me and hers was so much sharper. Mine
+          looked like a student's next to hers.
+      - who: zeph
+        text: What did people say about yours?
+      - who: person
+        text: >-
+          They said it was good. But I keep thinking I'm a fraud and they'll
+          figure it out soon.
+    observations:
+      - pattern_type: ACH.WORTH.PERF
+        direction: for
+
+  - id: ach-exam-result-verdict
+    messages:
+      - who: person
+        text: >-
+          Got a B on the accounting exam. I studied for weeks. I'm just stupid,
+          that's the only explanation.
+      - who: zeph
+        text: A B after weeks of study sounds frustrating.
+      - who: person
+        text: It's not frustrating, it's proof.
+    observations:
+      - pattern_type: ACH.WORTH.PERF
+        direction: for
+
+  # ACH.WORTH.PERF, against.
+
+  - id: ach-against-curious-about-failed-launch
+    messages:
+      - who: person
+        text: >-
+          Our launch flopped. Weirdly I'm more curious than upset. I want to
+          dig into the numbers and see what we got wrong.
+      - who: zeph
+        text: That's a calm way to take it. What do you think happened?
+      - who: person
+        text: >-
+          Probably the pricing. It's a lesson, not a judgement on me. Next one
+          will be better.
+    observations:
+      - pattern_type: ACH.WORTH.PERF
+        direction: against
+
+  - id: ach-against-high-standards-joy
+    messages:
+      - who: person
+        text: >-
+          I spent the whole weekend sanding the table again until it was
+          perfect. I love that part, it's my favourite kind of work.
+      - who: zeph
+        text: It sounds like the care itself is the fun bit.
+      - who: person
+        text: Totally. No stress about it at all, it's satisfying.
+    observations:
+      - pattern_type: ACH.WORTH.PERF
+        direction: against
+
+  - id: ach-against-shrugs-off-rejection
+    messages:
+      - who: person
+        text: >-
+          Didn't get the job. Bit disappointed in how I answered the system
+          design question, I'll practise that. Otherwise I feel okay about
+          myself.
+      - who: zeph
+        text: That's a good balance to find.
+    observations:
+      - pattern_type: ACH.WORTH.PERF
+        direction: against
+
+  # ACH.WORTH.PERF where anyone would feel it: nothing to tag.
+
+  - id: ach-anyone-lost-big-bid
+    messages:
+      - who: person
+        text: >-
+          Gutted. We lost the tender we'd worked on for three months, the one
+          that would have kept the team going all year.
+      - who: zeph
+        text: That's a real loss after so much work. How are you holding up?
+      - who: person
+        text: Tired and sad. Going to have a quiet night and regroup tomorrow.
+
+  # Control-seeking under uncertainty (CTRL.UNCERT.PLAN), for.
+
+  - id: ctrl-refreshes-for-results
+    messages:
+      - who: person
+        text: >-
+          The biopsy results are due sometime this week. I've refreshed the
+          clinic portal about forty times today.
+      - who: zeph
+        text: Waiting on something like that is really hard.
+      - who: person
+        text: >-
+          Honestly the waiting is worse than bad news would be. At least then I
+          could plan.
+    observations:
+      - pattern_type: CTRL.UNCERT.PLAN
+        direction: for
+
+  - id: ctrl-takes-over-group-project
+    threads:
+      - title: Course group project
+        story: A four-person project for their part-time MBA, due in two weeks.
+        people: [group mates]
+    messages:
+      - who: person
+        text: >-
+          Nobody had replied in the project chat for a day so I just did the
+          whole slide deck myself last night.
+      - who: zeph
+        text: How did the others react?
+      - who: person
+        text: >-
+          They said thanks. I couldn't stand not knowing if it would get done,
+          it was easier to take it over.
+    observations:
+      - pattern_type: CTRL.UNCERT.PLAN
+        direction: for
+
+  - id: ctrl-contingency-plans-for-trip
+    messages:
+      - who: person
+        text: >-
+          For the weekend in Penang I've got a plan B and C if the ferry is
+          cancelled, a backup hotel, and a list of clinics in case someone gets
+          sick.
+      - who: zeph
+        text: That's thorough. Is anything worrying you about the trip?
+      - who: person
+        text: >-
+          Not really, I just can't relax unless I know every way it could go.
+    observations:
+      - pattern_type: CTRL.UNCERT.PLAN
+        direction: for
+
+  - id: ctrl-irritated-meeting-moved
+    messages:
+      - who: person
+        text: >-
+          My manager moved our 1:1 by an hour and I was irrationally furious
+          about it all afternoon.
+      - who: zeph
+        text: What about it got to you?
+      - who: person
+        text: >-
+          I'd planned my whole day around it. When plans change last minute I
+          feel like the floor's gone.
+    observations:
+      - pattern_type: CTRL.UNCERT.PLAN
+        direction: for
+
+  - id: ctrl-checks-on-partner-flight
+    messages:
+      - who: person
+        text: >-
+          Kai's flight is delayed. I've checked the tracker every five minutes
+          even though I can't do anything about it.
+      - who: zeph
+        text: It's natural to want to know.
+      - who: person
+        text: >-
+          I know it changes nothing but checking is the only thing that makes
+          the knot in my stomach ease.
+    observations:
+      - pattern_type: CTRL.UNCERT.PLAN
+        direction: for
+
+  - id: ctrl-reassurance-from-landlord
+    messages:
+      - who: person
+        text: >-
+          I've messaged the landlord three times to ask if he's renewing our
+          lease. He said probably, but I need to know for sure.
+      - who: zeph
+        text: Probably isn't very settling.
+      - who: person
+        text: >-
+          No. I'd honestly rather he said no than leave it hanging like this.
+    observations:
+      - pattern_type: CTRL.UNCERT.PLAN
+        direction: for
+
+  # CTRL.UNCERT.PLAN, against.
+
+  - id: ctrl-against-leaves-offer-open
+    messages:
+      - who: person
+        text: >-
+          I've had the job offer for a week and told them I'll decide by the
+          end of the month. I'm in no rush, it's nice to let it sit.
+      - who: zeph
+        text: That sounds calm. Not tempted to settle it?
+      - who: person
+        text: Nope, not knowing yet doesn't bother me at all.
+    observations:
+      - pattern_type: CTRL.UNCERT.PLAN
+        direction: against
+
+  - id: ctrl-against-lets-partner-plan
+    messages:
+      - who: person
+        text: >-
+          Leo is planning our anniversary and won't tell me anything. I love it,
+          I have no idea what's happening and I'm totally relaxed about that.
+      - who: zeph
+        text: A surprise can be lovely.
+    observations:
+      - pattern_type: CTRL.UNCERT.PLAN
+        direction: against
+
+  - id: ctrl-against-results-wait-calm
+    messages:
+      - who: person
+        text: >-
+          Waiting on the visa decision, could be weeks. I've stopped checking.
+          It's out of my hands and I'm fine leaving it there.
+      - who: zeph
+        text: That's a good place to get to with something that big.
+    observations:
+      - pattern_type: CTRL.UNCERT.PLAN
+        direction: against
+
+  # CTRL.UNCERT.PLAN where anyone would do it: a real crisis.
+
+  - id: ctrl-anyone-dad-in-hospital
+    threads:
+      - title: Dad's stroke
+        story: Their father had a stroke two days ago and is in hospital.
+        people: [Dad]
+    messages:
+      - who: person
+        text: >-
+          Dad's being discharged Friday. I've booked the carer, rearranged the
+          flat and set up his medication schedule with the nurse.
+      - who: zeph
+        text: You've done a lot in two days. How are you holding up?
+      - who: person
+        text: >-
+          Exhausted, but every bit of this planning matters for him coming home
+          safely.
+    observations:
+      - pattern_type: CTRL.UNCERT.PLAN
+        direction: against
+
+  - id: ctrl-anyone-flood-evacuation
+    messages:
+      - who: person
+        text: >-
+          The river's rising and they've warned our street might flood tonight.
+          I've packed go-bags, moved the car to higher ground and called my
+          neighbours.
+      - who: zeph
+        text: That sounds frightening. Is everyone safe for now?
+      - who: person
+        text: Yes. The plan is what's keeping us safe.
+    observations:
+      - pattern_type: CTRL.UNCERT.PLAN
+        direction: against
+
+  # Unclear: two look-alike Pattern Types.
+
+  - id: unclear-conf-or-ach-boss-feedback
+    messages:
+      - who: person
+        text: >-
+          My lead rewrote half my report and I just said thanks. I didn't push
+          back even though I think mine was clearer.
+      - who: zeph
+        text: What stopped you from pushing back?
+      - who: person
+        text: >-
+          I don't know. Maybe I didn't want things to get tense with her, or
+          maybe deep down I thought if she rewrote it, mine must have been bad.
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: for
+        unclear: true
+        situational: true
+
+  - id: unclear-ach-or-ctrl-over-prepares
+    messages:
+      - who: person
+        text: >-
+          I've prepared for Thursday's interview every night for two weeks.
+          Forty pages of notes.
+      - who: zeph
+        text: What's driving all the preparation?
+      - who: person
+        text: >-
+          Partly I can't stand not knowing what they'll ask. Partly if I fail
+          it'll prove I'm not cut out for this.
+    observations:
+      - pattern_type: ACH.WORTH.PERF
+        direction: for
+        unclear: true
+
+  - id: unclear-conf-or-ctrl-avoids-talk
+    messages:
+      - who: person
+        text: >-
+          I keep putting off the talk with my housemate about the rent going up.
+      - who: zeph
+        text: What makes it hard to start?
+      - who: person
+        text: >-
+          I can't predict how she'll take it and I hate that. And I don't want
+          things to go sour between us either.
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: for
+        unclear: true
+
+  - id: unclear-ach-or-conf-hides-mistake
+    messages:
+      - who: person
+        text: >-
+          I made a mistake in the budget and haven't told my co-founder. Every
+          day I don't tell her it gets worse.
+      - who: zeph
+        text: What do you think would happen if you told her?
+      - who: person
+        text: >-
+          Either she'd see I'm not good at this, or she'd be angry and we'd fall
+          out. I can't tell which scares me more.
+    observations:
+      - pattern_type: ACH.WORTH.PERF
+        direction: for
+        unclear: true
+
+  # Two Pattern Types in one Conversation, each clear.
+
+  - id: two-types-agrees-then-replans
+    messages:
+      - who: person
+        text: >-
+          My sister wanted to change our holiday dates and I said yes even
+          though I'd already booked leave. I resent it now.
+      - who: zeph
+        text: That sounds frustrating.
+      - who: person
+        text: >-
+          And then because of the change I rebuilt the whole itinerary three
+          times. Not knowing what we'd be doing each day was unbearable.
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: for
+      - pattern_type: CTRL.UNCERT.PLAN
+        direction: for
+
+  # Nothing to tag.
+
+  - id: nothing-small-talk
+    messages:
+      - who: person
+        text: morning! just made a really good coffee
+      - who: zeph
+        text: Good start to the day. What kind?
+      - who: person
+        text: flat white, finally got the milk right haha
+
+  - id: nothing-logistics
+    messages:
+      - who: person
+        text: can you remind me what day the recycling goes out?
+      - who: zeph
+        text: You told me it's Tuesdays.
+      - who: person
+        text: thanks, perfect
+
+  - id: nothing-weather-vent
+    messages:
+      - who: person
+        text: >-
+          This rain is relentless. Third day in a row, my shoes are soaked.
+      - who: zeph
+        text: Sounds miserable. Got anything cosy planned tonight?
+      - who: person
+        text: Soup and a film. That'll do.
+
+  - id: nothing-about-a-friend
+    messages:
+      - who: person
+        text: >-
+          My friend Jo always apologises before she asks for anything, even
+          just to pass the salt. It's kind of sweet.
+      - who: zeph
+        text: Some people are very careful like that.
+      - who: person
+        text: Yeah she's lovely. We're getting dinner Friday.
+
+  - id: nothing-only-zeph-says-it
+    messages:
+      - who: person
+        text: had a long day at work, glad it's over
+      - who: zeph
+        text: >-
+          It sounds like you might be going along with what others want and
+          then resenting it later. Does that fit?
+      - who: person
+        text: not really, just tired. going to bed early

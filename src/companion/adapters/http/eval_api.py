@@ -186,8 +186,56 @@ class DaySummaryResultResponse(BaseModel):
     answers: list[DaySummaryAnswerResponse]
 
 
+class KeptObservationResponse(BaseModel):
+    """An Observation a Tagging case's tagging step kept."""
+
+    pattern_types: list[str]
+    sign: str
+    direction: str
+    unclear: bool
+    situational: bool
+    quote: str
+    context: str
+    about: str
+    thread: str | None
+    expected: bool
+
+
+class DroppedObservationResponse(BaseModel):
+    """An Observation the tagging model wrote that code dropped, and why."""
+
+    pattern_types: list[str]
+    sign: str
+    direction: str
+    quote: str
+    reason: str
+
+
+class ExpectedObservationResponse(BaseModel):
+    """An Observation a Tagging case expected, and whether one like it was kept."""
+
+    pattern_type: str
+    direction: str
+    unclear: bool
+    situational: bool
+    matched: bool
+
+
+class TaggingResultResponse(BaseModel):
+    """What a Tagging case's tagging step kept and dropped, and what it expected."""
+
+    answered: bool
+    kept: list[KeptObservationResponse]
+    dropped: list[DroppedObservationResponse]
+    expected: list[ExpectedObservationResponse]
+
+
 class CaseResultResponse(BaseModel):
-    """One case's result in a run; `day_summary` only for a checked Day Summary case."""
+    """One case's result in a run.
+
+    `day_summary` only for a checked Day Summary case, `tagging` only for a
+    checked Tagging case.
+    """
 
     id: str
     variant: str
@@ -203,6 +251,7 @@ class CaseResultResponse(BaseModel):
     duration_ms: int
     finished_at: datetime
     day_summary: DaySummaryResultResponse | None = None
+    tagging: TaggingResultResponse | None = None
 
 
 class EvalRunDetailsResponse(EvalRunResponse):
@@ -529,6 +578,22 @@ def to_day_summary_result(result: CaseResult) -> DaySummaryResultResponse | None
     )
 
 
+def to_tagging_result(result: CaseResult) -> TaggingResultResponse | None:
+    """Read what a Tagging case kept and dropped from its result's facts.
+
+    Args:
+        result: The Case Result.
+
+    Returns:
+        What was kept, dropped and expected; None for another Eval's case,
+        or a Tagging case that couldn't be checked.
+    """
+    facts = result.result.facts
+    if result.eval != EvalName.TAGGING or "tagging" not in facts:
+        return None
+    return TaggingResultResponse(**facts["tagging"])
+
+
 def to_case_result_response(result: CaseResult) -> CaseResultResponse:
     """Turn a Case Result into its API shape.
 
@@ -561,6 +626,7 @@ def to_case_result_response(result: CaseResult) -> CaseResultResponse:
         duration_ms=result.duration_ms,
         finished_at=result.finished_at,
         day_summary=to_day_summary_result(result),
+        tagging=to_tagging_result(result),
     )
 
 
