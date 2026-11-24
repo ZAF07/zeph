@@ -171,7 +171,9 @@ def test_under_test_the_water_none_is_asked_once_they_let_the_opener_pass(
     shape = newest_call(client, owner_headers(client, auth_verifier), "reply_plan")[
         "reply_plan_shape"
     ]
-    assert f"how they took it: {PRESENTATION} Say how they took it" in (after_opener)
+    assert f"was meant to ask: {PRESENTATION} If Zeph's messages did ask it" in (
+        after_opener
+    )
     assert reactions(engine)[PRESENTATION] == "brushed_off"
     assert f"[1] {DESK}" in saw
     assert (shape["curiosities_offered"], shape["curiosity_asked"]) == (0, False)
@@ -404,7 +406,7 @@ def test_a_reaction_is_read_only_when_the_last_reply_asked_a_curiosity(
 
     saw = send(client, chat_model, clock, "hey you", curiosity_taken="brushed_off")
 
-    assert "not yet known how they took it" not in saw
+    assert "was meant to ask" not in saw
     assert set(reactions(engine).values()) == {None}
 
 

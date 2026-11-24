@@ -613,10 +613,11 @@ reply_plan_prompt: |-
     - only if it fits the moment: pick one only when it connects to what
       they're talking about, or the chat has reached an easy pause.
     - never: pick none.
-  - curiosity_taken: when you are shown a Curiosity you asked earlier in
-    this Conversation, how they took it: "engaged" if they talked about it,
-    "brushed_off" if they changed the subject or gave a short answer,
-    "asked_to_drop" if they asked Zeph not to bring it up. Null otherwise.
+  - curiosity_taken: when you are shown a Curiosity an earlier reply was
+    meant to ask and Zeph's messages really did ask it, how they took it:
+    "engaged" if they talked about it, "brushed_off" if they changed the
+    subject or gave a short answer, "asked_to_drop" if they asked Zeph not
+    to bring it up. Null if Zeph never asked it, or otherwise.
   - no_curiosity_why: under a Need that asks by default, when a Curiosity
     was offered and you picked none, a few words on why. Null otherwise.
   - left_alone: the Life Threads the message touches that Zeph should not

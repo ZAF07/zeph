@@ -216,7 +216,7 @@ def test_a_curiosity_brought_up_reaches_the_reply_and_is_marked_raised(
     assert curiosity["raised_at"] is not None
     assert curiosity["raised_conversation_id"] is not None
     assert f"[1] {PRESENTATION}" not in next_message
-    assert f"not yet known how they took it: {PRESENTATION}" in next_message
+    assert f"was meant to ask: {PRESENTATION}" in next_message
 
 
 def test_a_curiosity_woven_in_is_still_asked_in_this_reply(

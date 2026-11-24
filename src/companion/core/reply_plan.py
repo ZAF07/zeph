@@ -408,9 +408,9 @@ def describe_message_for_reply_plan(
     )
     awaiting = due.awaiting_reaction
     awaiting_line = (
-        f"\n\nA Curiosity you asked earlier in this Conversation, not yet known "
-        f"how they took it: {awaiting.question} Say how they took it in "
-        f"curiosity_taken."
+        f"\n\nA Curiosity an earlier reply in this Conversation was meant to ask: "
+        f"{awaiting.question} If Zeph's messages did ask it, say how they took it "
+        f"in curiosity_taken; if they never asked it, leave it null."
         if awaiting is not None
         else ""
     )
