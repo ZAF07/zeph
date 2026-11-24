@@ -61,7 +61,8 @@ def reply_message(body: dict[str, Any]) -> dict[str, Any]:
         raise OpenRouterReplyError(f"OpenRouter sent no reply: {body.get('error')}")
     choice: dict[str, Any] = body["choices"][0]
     if choice.get("error") or choice.get("finish_reason") == "error":
-        raise OpenRouterReplyError(f"OpenRouter sent no reply: {choice.get('error')}")
+        error = choice.get("error") or "the reply ended with an error"
+        raise OpenRouterReplyError(f"OpenRouter sent no reply: {error}")
     message: dict[str, Any] = choice["message"]
     return message
 
@@ -148,6 +149,18 @@ def run_tool_call(
     return ToolCallRecord(name, arguments, result)
 
 
+def model_maker(model: str) -> str:
+    """Name the provider that made a model.
+
+    Args:
+        model: The OpenRouter model name, e.g. "anthropic/claude-haiku-5.5".
+
+    Returns:
+        The part of the name before the "/", e.g. "anthropic".
+    """
+    return model.split("/")[0]
+
+
 def build_request(
     model: str,
     thinking: bool,
@@ -161,9 +174,9 @@ def build_request(
     `tool_choice` "none", because the messages already hold tool calls and
     some providers (e.g. Anthropic) refuse those without the tools.
 
-    Only the model's maker (the part of the name before the "/") may answer,
-    because our own provider keys are the makers' keys: any other host would
-    be paid with OpenRouter credits. A model its maker does not serve fails.
+    Only the model's maker may answer, because our own provider keys are the
+    makers' keys: any other host would be paid with OpenRouter credits. A
+    model its maker does not serve fails.
 
     Args:
         model: The OpenRouter model name, sent as given.
@@ -179,7 +192,7 @@ def build_request(
         "model": model,
         "messages": messages,
         "reasoning": {"enabled": thinking},
-        "provider": {"only": [model.split("/")[0]]},
+        "provider": {"only": [model_maker(model)]},
     }
     if tools:
         request["tools"] = [to_tool_schema(tool) for tool in tools]
@@ -243,13 +256,23 @@ def new_http_client() -> httpx.Client:
     return httpx.Client(timeout=60)
 
 
+def warn_if_paid_with_credits(model: str, body: dict[str, Any]) -> None:
+    """Log a warning when a reply was paid with OpenRouter credits.
+
+    Args:
+        model: The model that was asked.
+        body: The reply body, whose usage says if our own provider key paid.
+    """
+    if (body.get("usage") or {}).get("is_byok") is False:
+        logger.warning(
+            "A call to %s was paid with OpenRouter credits, not our own key", model
+        )
+
+
 def send_request(
     http_client: httpx.Client, api_key: str, request: dict[str, Any]
 ) -> dict[str, Any]:
     """Send one Chat Completions request to OpenRouter.
-
-    A reply paid with OpenRouter credits, not our own provider key, is
-    logged as a warning.
 
     Args:
         http_client: The HTTP client to send with.
@@ -269,11 +292,7 @@ def send_request(
     )
     response.raise_for_status()
     body: dict[str, Any] = response.json()
-    if (body.get("usage") or {}).get("is_byok") is False:
-        logger.warning(
-            "A call to %s was paid with OpenRouter credits, not our own key",
-            request["model"],
-        )
+    warn_if_paid_with_credits(str(request["model"]), body)
     return body
 
 

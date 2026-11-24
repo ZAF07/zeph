@@ -24,6 +24,7 @@ from companion.core.platform_settings import (
 )
 
 CURRENT_MODEL = "deepseek/deepseek-v4.1-flash-1017"
+PRO_MODEL = "deepseek/deepseek-v4-pro-0813"
 
 THINKING_CALLS: list[Setting[bool]] = [
     UNDERSTANDING_THINKING,
@@ -47,10 +48,10 @@ NOT_THINKING_CALLS: list[Setting[bool]] = [
 ]
 
 
-def test_the_current_model_is_the_only_one_to_pick(
+def test_the_current_model_and_the_pro_model_are_the_ones_to_pick(
     seeded_settings: dict[str, Any],
 ) -> None:
-    assert seeded_settings[AVAILABLE_MODELS.key] == [CURRENT_MODEL]
+    assert seeded_settings[AVAILABLE_MODELS.key] == [CURRENT_MODEL, PRO_MODEL]
 
 
 @pytest.mark.parametrize(

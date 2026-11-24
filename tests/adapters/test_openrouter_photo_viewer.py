@@ -90,7 +90,7 @@ def test_the_data_url_carries_the_photos_media_type() -> None:
     assert image_part["image_url"]["url"].startswith("data:image/jpeg;base64,")
 
 
-def test_the_model_name_is_sent_as_given_and_no_tools_are_sent() -> None:
+def test_the_model_name_is_sent_as_given_to_its_maker_only_with_no_tools() -> None:
     requests: list[httpx.Request] = []
     photo_viewer = openrouter_with(
         httpx.Response(200, json=openrouter_reply()), requests
@@ -105,6 +105,7 @@ def test_the_model_name_is_sent_as_given_and_no_tools_are_sent() -> None:
 
     body = json.loads(requests[0].content)
     assert body["model"] == "anthropic/claude-haiku-5.5"
+    assert body["provider"] == {"only": ["anthropic"]}
     assert "tools" not in body
 
 
@@ -156,4 +157,25 @@ def test_an_error_body_is_raised_as_a_clear_error() -> None:
     )
 
     with pytest.raises(OpenRouterReplyError, match="provider down"):
+        look(photo_viewer)
+
+
+def test_an_error_inside_the_choice_is_raised_as_a_clear_error() -> None:
+    photo_viewer = openrouter_with(
+        httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": ""},
+                        "finish_reason": "error",
+                        "error": {"message": "Provider returned error"},
+                    }
+                ]
+            },
+        ),
+        [],
+    )
+
+    with pytest.raises(OpenRouterReplyError, match="Provider returned error"):
         look(photo_viewer)

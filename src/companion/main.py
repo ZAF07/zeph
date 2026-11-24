@@ -297,6 +297,24 @@ def build_scheduler(settings: Settings) -> Scheduler:
     raise UnknownAdapterError("SCHEDULER_ADAPTER", settings.scheduler_adapter)
 
 
+def required_key(name: str, value: str) -> str:
+    """Check that the key a chosen adapter needs is set.
+
+    Args:
+        name: The key's name in `.env`.
+        value: The key as loaded; empty when not set.
+
+    Returns:
+        The key.
+
+    Raises:
+        MissingSettingsError: If the key is not set.
+    """
+    if not value:
+        raise MissingSettingsError([name])
+    return value
+
+
 def build_chat_model(settings: Settings) -> ChatModel:
     """Build the chat model chosen in `.env`.
 
@@ -313,13 +331,13 @@ def build_chat_model(settings: Settings) -> ChatModel:
             load test.
     """
     if settings.chat_model_adapter == "deepseek":
-        if not settings.deepseek_api_key:
-            raise MissingSettingsError(["DEEPSEEK_API_KEY"])
-        return DeepSeekChatModel(settings.deepseek_api_key)
+        return DeepSeekChatModel(
+            required_key("DEEPSEEK_API_KEY", settings.deepseek_api_key)
+        )
     if settings.chat_model_adapter == "openrouter":
-        if not settings.openrouter_api_key:
-            raise MissingSettingsError(["OPENROUTER_API_KEY"])
-        return OpenRouterChatModel(settings.openrouter_api_key)
+        return OpenRouterChatModel(
+            required_key("OPENROUTER_API_KEY", settings.openrouter_api_key)
+        )
     if settings.chat_model_adapter == LOAD_TEST_ADAPTER:
         allow_load_test_adapter("CHAT_MODEL_ADAPTER")
         engine = build_database_engine(settings)
@@ -343,13 +361,13 @@ def build_photo_viewer(settings: Settings) -> PhotoViewer:
             load test.
     """
     if settings.chat_model_adapter == "deepseek":
-        if not settings.deepseek_api_key:
-            raise MissingSettingsError(["DEEPSEEK_API_KEY"])
-        return DeepSeekPhotoViewer(settings.deepseek_api_key)
+        return DeepSeekPhotoViewer(
+            required_key("DEEPSEEK_API_KEY", settings.deepseek_api_key)
+        )
     if settings.chat_model_adapter == "openrouter":
-        if not settings.openrouter_api_key:
-            raise MissingSettingsError(["OPENROUTER_API_KEY"])
-        return OpenRouterPhotoViewer(settings.openrouter_api_key)
+        return OpenRouterPhotoViewer(
+            required_key("OPENROUTER_API_KEY", settings.openrouter_api_key)
+        )
     if settings.chat_model_adapter == LOAD_TEST_ADAPTER:
         allow_load_test_adapter("CHAT_MODEL_ADAPTER")
         return LoadTestPhotoViewer()

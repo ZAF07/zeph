@@ -178,7 +178,7 @@ def test_a_choice_that_finished_with_an_error_is_raised_clearly() -> None:
         [],
     )
 
-    with pytest.raises(OpenRouterReplyError):
+    with pytest.raises(OpenRouterReplyError, match="ended with an error"):
         generate(chat_model)
 
 

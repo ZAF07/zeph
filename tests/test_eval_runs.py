@@ -364,7 +364,8 @@ def test_model_prices_are_seeded_and_admins_change_them_with_the_limit(
                 "model": "deepseek/deepseek-v4.1-flash-1017",
                 "sgd_in": 0.5,
                 "sgd_out": 2.0,
-            }
+            },
+            {"model": "deepseek/deepseek-v4-pro-0813", "sgd_in": None, "sgd_out": None},
         ],
         "token_limit": 250_000,
     }
