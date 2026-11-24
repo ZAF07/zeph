@@ -178,7 +178,19 @@ Reset the bot token when it leaks or might have, not on a schedule. Steps: [RESE
 
 ## OpenRouter keys
 
-Model calls can go through OpenRouter with our own provider keys (BYOK, ADR-0028). They must never spend OpenRouter credits. In the OpenRouter account's BYOK (integrations) settings, open each provider key (Anthropic, DeepSeek) and set "Shared capacity fallback" to "Never use any other provider or key for this key's models". Do this once per key, and again for any key added later. Then set `OPENROUTER_API_KEY` in `.env` and `CHAT_MODEL_ADAPTER=openrouter`, and run `make restart`. To go back to direct DeepSeek, set `CHAT_MODEL_ADAPTER=deepseek` and `make restart`.
+Model calls go through OpenRouter with our own provider keys (BYOK, ADR-0028). They must never spend OpenRouter credits. Set `OPENROUTER_API_KEY` in `.env`; `CHAT_MODEL_ADAPTER` defaults to `openrouter`.
+
+Do these once in the OpenRouter account, and again for any provider key added later:
+
+1. In the BYOK (integrations) settings, add each provider key (Anthropic, DeepSeek) and set its "Shared capacity fallback" to "Never use any other provider or key for this key's models".
+2. In the privacy settings, allow providers that may train on inputs. DeepSeek is one, and without this OpenRouter refuses DeepSeek's own servers ("Paid model training violation").
+
+Two things in the code keep calls on our own keys:
+
+- Each call may only be answered by the model's maker (the part of the name before the "/"), because our keys are the makers' keys. A model its maker does not serve fails with an error. For DeepSeek, pick the dated names DeepSeek itself serves (`deepseek/deepseek-v4.1-flash-1017`, `deepseek/deepseek-v4-pro-0813`); the undated names are only served by other hosts.
+- If a reply was still paid with credits, the backend logs the warning "was paid with OpenRouter credits, not our own key". OpenRouter's activity page shows the same per call (BYOK or not).
+
+To go back to direct DeepSeek, set `CHAT_MODEL_ADAPTER=deepseek` and `DEEPSEEK_API_KEY`, and run `make restart`.
 
 ## Local and production bots
 

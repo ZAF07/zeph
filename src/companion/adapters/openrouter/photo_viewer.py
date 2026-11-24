@@ -57,7 +57,7 @@ class OpenRouterPhotoViewer:
 
         Args:
             model: The OpenRouter model name, sent as given, e.g.
-                "deepseek/deepseek-v4.1-flash".
+                "deepseek/deepseek-v4.1-flash-1017".
             thinking: Whether the model should think before it answers.
             instructions: What to write about the photo.
             photo: The photo's image.

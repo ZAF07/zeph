@@ -170,7 +170,7 @@ about 1.4 seconds and 1,500 tokens in, 130 out. A whole `make eval` run that
 day used about 343,000 in and 15,500 out and took about 6 minutes.
 
 Since 2026-11-15 every call uses `deepseek-flash` (saved as
-`deepseek/deepseek-v4.1-flash` since 2026-11-24), with Thinking on for the
+`deepseek/deepseek-v4.1-flash-1017` since 2026-11-24), with Thinking on for the
 Safeguard, Understanding and the calls after a Conversation (off for the
 reply and the judge). A whole run (2026-11-15) used about 382,000 tokens in
 and 44,000 out (the reasoning counts as output) and took about 9 minutes.

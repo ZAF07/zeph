@@ -234,7 +234,11 @@ def test_a_case_never_run_is_estimated_with_its_evals_rough_figure(
     assert (estimate["case_count"], estimate["rough_case_count"]) == (2, 2)
     assert (estimate["tokens_in"], estimate["tokens_out"]) == (8_000, 800)
     assert estimate["models"] == [
-        {"model": "deepseek/deepseek-v4.1-flash", "tokens_in": 8_000, "tokens_out": 800}
+        {
+            "model": "deepseek/deepseek-v4.1-flash-1017",
+            "tokens_in": 8_000,
+            "tokens_out": 800,
+        }
     ]
     assert estimate["cost_sgd"] == pytest.approx((8_000 * 0.38 + 800 * 1.54) / 1e6)
     assert estimate["unpriced_models"] == []
@@ -326,8 +330,16 @@ def test_model_prices_are_seeded_and_admins_change_them_with_the_limit(
         "/api/admin/eval-costs",
         json={
             "prices": [
-                {"model": "deepseek/deepseek-v4.1-flash", "sgd_in": 0.5, "sgd_out": 2},
-                {"model": "deepseek/deepseek-v4-pro", "sgd_in": None, "sgd_out": None},
+                {
+                    "model": "deepseek/deepseek-v4.1-flash-1017",
+                    "sgd_in": 0.5,
+                    "sgd_out": 2,
+                },
+                {
+                    "model": "deepseek/deepseek-v4-pro-0813",
+                    "sgd_in": None,
+                    "sgd_out": None,
+                },
             ],
             "token_limit": 250_000,
         },
@@ -336,15 +348,23 @@ def test_model_prices_are_seeded_and_admins_change_them_with_the_limit(
 
     assert seeded == {
         "prices": [
-            {"model": "deepseek/deepseek-v4.1-flash", "sgd_in": 0.38, "sgd_out": 1.54},
-            {"model": "deepseek/deepseek-v4-pro", "sgd_in": 1.69, "sgd_out": 5.07},
+            {
+                "model": "deepseek/deepseek-v4.1-flash-1017",
+                "sgd_in": 0.38,
+                "sgd_out": 1.54,
+            },
+            {"model": "deepseek/deepseek-v4-pro-0813", "sgd_in": 1.69, "sgd_out": 5.07},
         ],
         "token_limit": 1_000_000,
     }
     assert saved.status_code == 200
     assert saved.json() == {
         "prices": [
-            {"model": "deepseek/deepseek-v4.1-flash", "sgd_in": 0.5, "sgd_out": 2.0}
+            {
+                "model": "deepseek/deepseek-v4.1-flash-1017",
+                "sgd_in": 0.5,
+                "sgd_out": 2.0,
+            }
         ],
         "token_limit": 250_000,
     }
@@ -501,4 +521,7 @@ def test_override_choices_list_the_editable_settings_needs_moves_and_models(
     research = next(move for move in choices["moves"] if move["name"] == "Research")
     assert research["key"].startswith("move:")
     assert set(research["value"]) == {"name", "when_it_fits", "how_to_do_it"}
-    assert choices["models"] == ["deepseek/deepseek-v4.1-flash"]
+    assert choices["models"] == [
+        "deepseek/deepseek-v4.1-flash-1017",
+        "deepseek/deepseek-v4-pro-0813",
+    ]

@@ -308,11 +308,13 @@ def build_chat_model(settings: Settings) -> ChatModel:
 
     Raises:
         UnknownAdapterError: If the chosen adapter does not exist.
-        MissingSettingsError: If OpenRouter is chosen without its key.
+        MissingSettingsError: If the chosen adapter's key is missing.
         LoadTestNotAllowedError: If a load-test adapter is chosen outside a
             load test.
     """
     if settings.chat_model_adapter == "deepseek":
+        if not settings.deepseek_api_key:
+            raise MissingSettingsError(["DEEPSEEK_API_KEY"])
         return DeepSeekChatModel(settings.deepseek_api_key)
     if settings.chat_model_adapter == "openrouter":
         if not settings.openrouter_api_key:
@@ -336,11 +338,13 @@ def build_photo_viewer(settings: Settings) -> PhotoViewer:
 
     Raises:
         UnknownAdapterError: If the chosen adapter does not exist.
-        MissingSettingsError: If OpenRouter is chosen without its key.
+        MissingSettingsError: If the chosen adapter's key is missing.
         LoadTestNotAllowedError: If a load-test adapter is chosen outside a
             load test.
     """
     if settings.chat_model_adapter == "deepseek":
+        if not settings.deepseek_api_key:
+            raise MissingSettingsError(["DEEPSEEK_API_KEY"])
         return DeepSeekPhotoViewer(settings.deepseek_api_key)
     if settings.chat_model_adapter == "openrouter":
         if not settings.openrouter_api_key:

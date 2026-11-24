@@ -104,7 +104,7 @@ def test_openrouter_generates_a_deepseek_reply() -> None:
     chat_model = OpenRouterChatModel(required_env("OPENROUTER_API_KEY"))
 
     reply = chat_model.generate(
-        model="deepseek/deepseek-v4.1-flash",
+        model="deepseek/deepseek-v4.1-flash-1017",
         thinking=False,
         instructions="Reply with one short friendly sentence.",
         history=[ChatLine(role=ChatRole.USER, text="hi there")],
@@ -119,7 +119,7 @@ def test_openrouter_returns_reasoning_when_thinking_is_on() -> None:
     chat_model = OpenRouterChatModel(required_env("OPENROUTER_API_KEY"))
 
     reply = chat_model.generate(
-        model="deepseek/deepseek-v4.1-flash",
+        model="deepseek/deepseek-v4.1-flash-1017",
         thinking=True,
         instructions="Answer with one number.",
         history=[ChatLine(role=ChatRole.USER, text="What is 17 times 23?")],
@@ -130,7 +130,7 @@ def test_openrouter_returns_reasoning_when_thinking_is_on() -> None:
 
 
 @pytest.mark.parametrize(
-    "model", ["deepseek/deepseek-v4.1-flash", "anthropic/claude-haiku-5.5"]
+    "model", ["deepseek/deepseek-v4.1-flash-1017", "anthropic/claude-haiku-5.5"]
 )
 def test_openrouter_calls_an_offered_tool_and_uses_its_result(model: str) -> None:
     chat_model = OpenRouterChatModel(required_env("OPENROUTER_API_KEY"))
@@ -184,7 +184,7 @@ def test_deepseek_describes_a_photo() -> None:
 
 
 @pytest.mark.parametrize(
-    "model", ["deepseek/deepseek-v4.1-flash", "anthropic/claude-haiku-5.5"]
+    "model", ["deepseek/deepseek-v4.1-flash-1017", "anthropic/claude-haiku-5.5"]
 )
 def test_openrouter_describes_a_photo(model: str) -> None:
     photo_viewer = OpenRouterPhotoViewer(required_env("OPENROUTER_API_KEY"))

@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Any
 
 import httpx
@@ -50,7 +51,7 @@ def openrouter_with(
 
 def generate(chat_model: OpenRouterChatModel, thinking: bool = False) -> ModelAnswer:
     return chat_model.generate(
-        model="deepseek/deepseek-v4-pro",
+        model="deepseek/deepseek-v4-pro-0813",
         thinking=thinking,
         instructions="Be Zeph.",
         history=HISTORY,
@@ -67,7 +68,7 @@ def test_a_reply_sends_the_model_name_as_given_with_the_conversation() -> None:
     assert str(request.url) == "https://openrouter.ai/api/v1/chat/completions"
     assert request.headers["Authorization"] == "Bearer sk-or-test"
     body = json.loads(request.content)
-    assert body["model"] == "deepseek/deepseek-v4-pro"
+    assert body["model"] == "deepseek/deepseek-v4-pro-0813"
     assert body["messages"] == [
         {"role": "system", "content": "Be Zeph."},
         {"role": "user", "content": "hi"},
@@ -179,6 +180,52 @@ def test_a_choice_that_finished_with_an_error_is_raised_clearly() -> None:
 
     with pytest.raises(OpenRouterReplyError):
         generate(chat_model)
+
+
+@pytest.mark.parametrize(
+    ("model", "maker"),
+    [
+        ("deepseek/deepseek-v4.1-flash-1017", "deepseek"),
+        ("anthropic/claude-haiku-5.5", "anthropic"),
+    ],
+)
+def test_only_the_models_maker_may_answer(model: str, maker: str) -> None:
+    requests: list[httpx.Request] = []
+    chat_model = openrouter_with(httpx.Response(200, json=openrouter_reply()), requests)
+
+    chat_model.generate(
+        model=model, thinking=False, instructions="Be Zeph.", history=HISTORY
+    )
+
+    assert json.loads(requests[0].content)["provider"] == {"only": [maker]}
+
+
+def test_a_reply_paid_with_openrouter_credits_is_logged_as_a_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    reply = openrouter_reply()
+    reply["usage"]["is_byok"] = False
+    chat_model = openrouter_with(httpx.Response(200, json=reply), [])
+
+    with caplog.at_level(logging.WARNING):
+        generate(chat_model)
+
+    assert "deepseek/deepseek-v4-pro-0813" in caplog.text
+    assert "OpenRouter credits" in caplog.text
+
+
+@pytest.mark.parametrize("usage", [{"is_byok": True}, {}])
+def test_a_reply_paid_with_our_own_key_logs_no_warning(
+    usage: dict[str, Any], caplog: pytest.LogCaptureFixture
+) -> None:
+    reply = openrouter_reply()
+    reply["usage"].update(usage)
+    chat_model = openrouter_with(httpx.Response(200, json=reply), [])
+
+    with caplog.at_level(logging.WARNING):
+        generate(chat_model)
+
+    assert not caplog.text
 
 
 def tool_call_reply(

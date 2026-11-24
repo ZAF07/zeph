@@ -302,7 +302,7 @@ class ChatModel(Protocol):
         and logs a warning; it never fails for it.
 
         Args:
-            model: The model to use, e.g. "deepseek/deepseek-v4.1-flash".
+            model: The model to use, e.g. "deepseek/deepseek-v4.1-flash-1017".
             thinking: Whether the model should think before it answers.
             instructions: What the model should be and do (Persona and prompt).
             history: The Conversation so far, oldest first.
@@ -326,7 +326,7 @@ class PhotoViewer(Protocol):
         and logs a warning; it never fails for it.
 
         Args:
-            model: The model to use, e.g. "deepseek/deepseek-v4.1-flash".
+            model: The model to use, e.g. "deepseek/deepseek-v4.1-flash-1017".
             thinking: Whether the model should think before it answers.
             instructions: What to write about the photo.
             photo: The photo's image.

@@ -43,7 +43,7 @@ def openrouter_with(
 
 def look(photo_viewer: OpenRouterPhotoViewer, thinking: bool = False) -> ModelAnswer:
     return photo_viewer.look(
-        model="deepseek/deepseek-v4.1-flash",
+        model="deepseek/deepseek-v4.1-flash-1017",
         thinking=thinking,
         instructions="Describe the photo.",
         photo=PHOTO,
@@ -80,7 +80,7 @@ def test_the_data_url_carries_the_photos_media_type() -> None:
     )
 
     photo_viewer.look(
-        model="deepseek/deepseek-v4.1-flash",
+        model="deepseek/deepseek-v4.1-flash-1017",
         thinking=False,
         instructions="Describe the photo.",
         photo=PhotoImage(content=b"jpeg-bytes", media_type="image/jpeg"),

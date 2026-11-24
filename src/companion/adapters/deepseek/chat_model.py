@@ -26,8 +26,8 @@ CURRENT_MODEL = "deepseek-flash"
 OLD_CHAT_MODEL = "deepseek-chat"
 OLD_REASONER_MODEL = "deepseek-reasoner"
 DIRECT_NAMES_BY_OPENROUTER_NAME = {
-    "deepseek/deepseek-v4.1-flash": "deepseek-flash",
-    "deepseek/deepseek-v4-pro": "deepseek-v4-pro",
+    "deepseek/deepseek-v4.1-flash-1017": "deepseek-flash",
+    "deepseek/deepseek-v4-pro-0813": "deepseek-v4-pro",
 }
 
 AskModel = Callable[[list[BaseMessage]], AIMessage]
@@ -40,7 +40,7 @@ class UnsupportedModelError(ValueError):
 def to_direct_name(model: str) -> str:
     """Turn a model name saved in Platform Settings into DeepSeek's own name.
 
-    Saved names are OpenRouter names (e.g. "deepseek/deepseek-v4.1-flash").
+    Saved names are OpenRouter names (e.g. "deepseek/deepseek-v4.1-flash-1017").
     A name with no provider part is taken to be a direct DeepSeek name
     already and is kept as it is.
 
@@ -76,7 +76,7 @@ def build_client(api_key: str, model: str, thinking: bool) -> ChatDeepSeek:
 
     Args:
         api_key: The DeepSeek API key.
-        model: The model to use, e.g. "deepseek/deepseek-v4.1-flash".
+        model: The model to use, e.g. "deepseek/deepseek-v4.1-flash-1017".
         thinking: Whether the model should think before it answers.
 
     Returns:
@@ -233,7 +233,7 @@ class DeepSeekChatModel:
         """Generate the next reply, calling tools first if the model wants to.
 
         Args:
-            model: The model to use, e.g. "deepseek/deepseek-v4.1-flash".
+            model: The model to use, e.g. "deepseek/deepseek-v4.1-flash-1017".
             thinking: Whether the model should think before it answers.
             instructions: What the model should be and do (Persona and prompt).
             history: The Conversation so far, oldest first.

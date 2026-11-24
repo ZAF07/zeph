@@ -134,7 +134,7 @@ def test_persona_prompt_model_and_thinking_changes_apply_to_the_next_reply(
             "values": {
                 "persona": "You are Zeph, retuned by an Admin.",
                 "response_prompt": "Reply in one short line.",
-                "response_model": "deepseek/deepseek-v4.1-flash",
+                "response_model": "deepseek/deepseek-v4.1-flash-1017",
                 "response_thinking": True,
             }
         },
@@ -145,7 +145,7 @@ def test_persona_prompt_model_and_thinking_changes_apply_to_the_next_reply(
     send_to_webhook(client, telegram_text_update("hi"))
 
     [call] = chat_model.calls
-    assert call.model == "deepseek/deepseek-v4.1-flash"
+    assert call.model == "deepseek/deepseek-v4.1-flash-1017"
     assert call.thinking is True
     assert "You are Zeph, retuned by an Admin." in call.instructions
     assert "Reply in one short line." in call.instructions
@@ -167,7 +167,7 @@ def test_saving_a_model_admins_cant_pick_is_refused(
     reloaded = client.get("/api/admin/settings", headers=headers).json()
     assert (
         reloaded["settings"]["response_model"]["value"]
-        == "deepseek/deepseek-v4.1-flash"
+        == "deepseek/deepseek-v4.1-flash-1017"
     )
 
 
@@ -390,7 +390,10 @@ def test_core_services_list_their_prompt_and_model_settings(
     assert service["prompt_key"] == "response_prompt"
     assert service["model_key"] == "response_model"
     assert service["thinking_key"] == "response_thinking"
-    assert response["model_choices"] == ["deepseek/deepseek-v4.1-flash"]
+    assert response["model_choices"] == [
+        "deepseek/deepseek-v4.1-flash-1017",
+        "deepseek/deepseek-v4-pro-0813",
+    ]
 
 
 def test_the_photo_settings_are_editable_with_their_seeded_values(
@@ -402,7 +405,7 @@ def test_the_photo_settings_are_editable_with_their_seeded_values(
 
     settings = client.get("/api/admin/settings", headers=headers).json()["settings"]
 
-    assert settings["photo_model"]["value"] == "deepseek/deepseek-v4.1-flash"
+    assert settings["photo_model"]["value"] == "deepseek/deepseek-v4.1-flash-1017"
     assert settings["photo_thinking"]["value"] is False
     assert settings["photo_retry_count"]["value"] == 2
     assert settings["photo_album_max_photos"]["value"] == 5

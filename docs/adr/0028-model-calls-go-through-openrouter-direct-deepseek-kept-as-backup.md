@@ -1,6 +1,6 @@
 # Model calls go through OpenRouter, direct DeepSeek kept as backup
 
-Status: accepted. Built in part (openrouter issues 02 and 03): replies, with tool calls, go through OpenRouter when `CHAT_MODEL_ADAPTER=openrouter`. Photos and making OpenRouter the default come in issue 04. Amends ADR-0003's adapter list.
+Status: accepted. Built (openrouter issues 02 to 04): replies, tool calls and photos go through OpenRouter, and `openrouter` is the default `CHAT_MODEL_ADAPTER`. Amends ADR-0003's adapter list.
 
 Every model call went straight to DeepSeek, so trying another provider meant a new adapter per provider. Model calls now go through one OpenRouter adapter behind the `ChatModel` and `PhotoViewer` ports, using the operator's own provider keys (BYOK). A new model is then just a new name in Platform Settings. The adapter is plain `httpx` against OpenRouter's Chat Completions API, not LangChain, so we control the request (`reasoning`, `cache_control`, provider routing) and read the reasoning text straight from the reply. It sends the model name exactly as saved, and the thinking switch becomes `reasoning: {enabled: true|false}`.
 
@@ -14,6 +14,8 @@ The direct DeepSeek adapter stays, chosen with `CHAT_MODEL_ADAPTER=deepseek`, as
 
 ## Consequences
 
-- Calls must never spend OpenRouter credits. On each BYOK key in the OpenRouter account, "Shared capacity fallback" is set to "Never use any other provider or key for this key's models" (a manual step; see `docs/DEPLOYMENT_GUIDE.md`).
-- `OPENROUTER_API_KEY` is read through config. Choosing `openrouter` without it fails at startup.
+- Calls must never spend OpenRouter credits. On each BYOK key in the OpenRouter account, "Shared capacity fallback" is set to "Never use any other provider or key for this key's models", and the account's privacy settings allow providers that may train on inputs, or DeepSeek's own servers are refused (manual steps; see `docs/DEPLOYMENT_GUIDE.md`).
+- Each request allows only the model's maker to answer (`provider: {only: [<the part of the name before "/">]}`), because our keys are the makers' keys. Without it, a model its maker does not serve under that name is quietly answered by another host on credits; with it, the call fails. This is why the saved DeepSeek names are the dated ones DeepSeek itself serves. A model whose maker is not also its OpenRouter provider can't be called until this rule is widened.
+- The adapter logs a warning when a reply's usage says it was not paid with our own key.
+- `OPENROUTER_API_KEY` is read through config. A chosen adapter without its key fails at startup; `DEEPSEEK_API_KEY` is only needed for the `deepseek` backup.
 - Model Prices are still set by Admins per model name; OpenRouter's reported cost is not used.

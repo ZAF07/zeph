@@ -1,4 +1,5 @@
 import json
+import logging
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -12,6 +13,8 @@ from companion.adapters.chat_tools import (
 )
 from companion.core.models import ChatLine, ChatRole, ModelAnswer, ToolCallRecord
 from companion.core.ports import ChatTool
+
+logger = logging.getLogger(__name__)
 
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -158,6 +161,10 @@ def build_request(
     `tool_choice` "none", because the messages already hold tool calls and
     some providers (e.g. Anthropic) refuse those without the tools.
 
+    Only the model's maker (the part of the name before the "/") may answer,
+    because our own provider keys are the makers' keys: any other host would
+    be paid with OpenRouter credits. A model its maker does not serve fails.
+
     Args:
         model: The OpenRouter model name, sent as given.
         thinking: Whether the model should think before it answers.
@@ -172,6 +179,7 @@ def build_request(
         "model": model,
         "messages": messages,
         "reasoning": {"enabled": thinking},
+        "provider": {"only": [model.split("/")[0]]},
     }
     if tools:
         request["tools"] = [to_tool_schema(tool) for tool in tools]
@@ -240,6 +248,9 @@ def send_request(
 ) -> dict[str, Any]:
     """Send one Chat Completions request to OpenRouter.
 
+    A reply paid with OpenRouter credits, not our own provider key, is
+    logged as a warning.
+
     Args:
         http_client: The HTTP client to send with.
         api_key: The OpenRouter API key.
@@ -258,6 +269,11 @@ def send_request(
     )
     response.raise_for_status()
     body: dict[str, Any] = response.json()
+    if (body.get("usage") or {}).get("is_byok") is False:
+        logger.warning(
+            "A call to %s was paid with OpenRouter credits, not our own key",
+            request["model"],
+        )
     return body
 
 
@@ -286,7 +302,7 @@ class OpenRouterChatModel:
 
         Args:
             model: The OpenRouter model name, sent as given, e.g.
-                "deepseek/deepseek-v4.1-flash".
+                "deepseek/deepseek-v4.1-flash-1017".
             thinking: Whether the model should think before it answers.
             instructions: What the model should be and do (Persona and prompt).
             history: The Conversation so far, oldest first.

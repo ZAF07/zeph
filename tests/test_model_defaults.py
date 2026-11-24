@@ -23,7 +23,7 @@ from companion.core.platform_settings import (
     UNDERSTANDING_THINKING,
 )
 
-CURRENT_MODEL = "deepseek/deepseek-v4.1-flash"
+CURRENT_MODEL = "deepseek/deepseek-v4.1-flash-1017"
 
 THINKING_CALLS: list[Setting[bool]] = [
     UNDERSTANDING_THINKING,
