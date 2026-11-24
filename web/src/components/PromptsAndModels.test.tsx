@@ -481,4 +481,93 @@ describe("PromptsAndModels", () => {
       await screen.findByRole("region", { name: "Response composition" }),
     ).toBeVisible();
   });
+
+  describe("with several services", () => {
+    beforeEach(() => {
+      apiClient.getCoreServices.mockResolvedValue({
+        services: [
+          coreServices.services[0]!,
+          {
+            ...coreServices.services[0]!,
+            name: "Safeguard",
+            runs_when: "Every message",
+            description: "Checks each message for risk.",
+            prompt_key: "safeguard_prompt",
+            model_key: "safeguard_model",
+            thinking_key: "safeguard_thinking",
+          },
+        ],
+        model_choices: coreServices.model_choices,
+      });
+    });
+
+    it("starts with the first service open and the others folded", async () => {
+      renderWithQueries(<PromptsAndModels />);
+
+      expect(
+        await screen.findByRole("button", { name: /Response composition/ }),
+      ).toHaveAttribute("aria-expanded", "true");
+      const safeguard = screen.getByRole("button", { name: /Safeguard/ });
+      expect(safeguard).toHaveAttribute("aria-expanded", "false");
+      expect(safeguard).toHaveTextContent("Checks each message for risk.");
+      expect(safeguard).toHaveTextContent("Every message");
+      const safeguardCard = within(
+        screen.getByRole("region", { name: "Safeguard" }),
+      );
+      expect(safeguardCard.getByLabelText("Prompt")).not.toBeVisible();
+    });
+
+    it("opens a folded service when its row is clicked", async () => {
+      const user = userEvent.setup();
+      renderWithQueries(<PromptsAndModels />);
+
+      await user.click(
+        await screen.findByRole("button", { name: /Safeguard/ }),
+      );
+
+      const safeguardCard = within(
+        screen.getByRole("region", { name: "Safeguard" }),
+      );
+      expect(safeguardCard.getByLabelText("Prompt")).toBeVisible();
+      expect(
+        screen.getByRole("button", { name: /Response composition/ }),
+      ).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("opens and folds every service with Expand all and Collapse all", async () => {
+      const user = userEvent.setup();
+      renderWithQueries(<PromptsAndModels />);
+      const responseRow = await screen.findByRole("button", {
+        name: /Response composition/,
+      });
+      const safeguardRow = screen.getByRole("button", { name: /Safeguard/ });
+
+      await user.click(screen.getByRole("button", { name: "Expand all" }));
+      expect(responseRow).toHaveAttribute("aria-expanded", "true");
+      expect(safeguardRow).toHaveAttribute("aria-expanded", "true");
+
+      await user.click(screen.getByRole("button", { name: "Collapse all" }));
+      expect(responseRow).toHaveAttribute("aria-expanded", "false");
+      expect(safeguardRow).toHaveAttribute("aria-expanded", "false");
+    });
+  });
+
+  it("puts a service's model and settings and its prompts in their own groups", async () => {
+    renderWithQueries(<PromptsAndModels />);
+    const card = within(
+      await screen.findByRole("region", { name: "Response composition" }),
+    );
+
+    const settingsGroup = within(
+      card.getByRole("group", { name: "Model & settings" }),
+    );
+    expect(settingsGroup.getByLabelText("Model")).toBeVisible();
+    expect(
+      settingsGroup.getByRole("switch", {
+        name: "Thinking for Response composition",
+      }),
+    ).toBeVisible();
+    const promptsGroup = within(card.getByRole("group", { name: "Prompts" }));
+    expect(promptsGroup.getByLabelText("Prompt")).toHaveValue("Reply briefly.");
+  });
 });

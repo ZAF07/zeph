@@ -2,18 +2,21 @@
 
 import { useQuery } from "@tanstack/react-query";
 
+import { CardCount } from "@/components/CardCount";
+import { CardList } from "@/components/CardList";
+import { CardListLoading } from "@/components/CardListLoading";
 import { CoreServiceCard } from "@/components/CoreServiceCard";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadFailed } from "@/components/LoadFailed";
-import { LoadingPanel } from "@/components/LoadingPanel";
 import { LockIcon } from "@/components/LockIcon";
 import { queryKeys } from "@/lib/queries";
 import { useAdminSettings } from "@/lib/use-admin-settings";
 import { useApiClient } from "@/lib/use-api-client";
 
 /**
- * The admin Prompts & models page: one part per core service, each with its
- * model and prompt, built from the form template.
+ * The admin Prompts & models page, from the card-list template: a folding
+ * card per core service, each with its model and prompts. The first card
+ * starts open.
  *
  * @returns The services, or a loading, empty or error state.
  */
@@ -40,7 +43,7 @@ export function PromptsAndModels() {
         />
       );
     }
-    return <LoadingPanel shape="card" label="Loading services" />;
+    return <CardListLoading label="Loading services" />;
   }
 
   const { services, model_choices: modelChoices } = coreServices;
@@ -55,16 +58,25 @@ export function PromptsAndModels() {
 
   return (
     <>
-      <div className="flex flex-col gap-6">
-        {services.map((service) => (
+      <CardList
+        items={services.map((service) => ({ id: service.prompt_key, service }))}
+        count={
+          <CardCount
+            count={services.length}
+            words={services.length === 1 ? "service" : "services"}
+          />
+        }
+        renderCard={({ id, service }, _index, folding) => (
           <CoreServiceCard
-            key={service.name}
+            key={id}
             service={service}
             modelChoices={modelChoices}
             settings={settings}
+            isOpen={folding.isOpen}
+            onToggle={folding.onToggle}
           />
-        ))}
-      </div>
+        )}
+      />
       <p className="m-0 text-[13px] text-soft">
         <span className="inline-flex items-center gap-1.5 text-[12px] text-text">
           <LockIcon />
