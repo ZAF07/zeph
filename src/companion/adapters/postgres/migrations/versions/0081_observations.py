@@ -7,8 +7,8 @@ and its Life Thread. Pattern tagging calls also keep how many Observations
 were tagged and dropped, in the Model Call Log and in Eval traces. The
 tagging prompt, model and thinking switch come from the seed on next start.
 
-Revision ID: 0080
-Revises: 0079
+Revision ID: 0081
+Revises: 0080
 Create Date: 2026-11-24
 """
 
@@ -18,8 +18,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0080"
-down_revision: str | None = "0079"
+revision: str = "0081"
+down_revision: str | None = "0080"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
