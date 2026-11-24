@@ -11,6 +11,7 @@ from companion.core.platform_settings import (
     KNOWLEDGE_WHEN_IT_HELPS_THINKING,
     LIFE_THREAD_KEEPING_THINKING,
     MEMORY_PROCESSING_THINKING,
+    MODEL_PRICES,
     MOVE_OUTCOME_KEEPING_THINKING,
     PATTERN_KEEPING_THINKING,
     PATTERN_TAGGING_THINKING,
@@ -60,8 +61,8 @@ def test_the_deepseek_and_claude_models_are_the_ones_to_pick(
 
 
 def test_every_model_to_pick_has_a_price(seeded_settings: dict[str, Any]) -> None:
-    assert (
-        list(seeded_settings["model_prices"]) == seeded_settings[AVAILABLE_MODELS.key]
+    assert set(seeded_settings[MODEL_PRICES.key]) == set(
+        seeded_settings[AVAILABLE_MODELS.key]
     )
 
 

@@ -1,10 +1,11 @@
 """Admins can pick a Claude model for a core service.
 
 Two Claude models (OpenRouter names) are added to `available_models`, and
-their Model Prices to `model_prices`, when missing. Prices are SGD per
+the Model Price of each one added to `model_prices`. Prices are SGD per
 1,000,000 tokens: Anthropic's prices on 24 Nov 2026 at 1 USD ≈ 1.28 SGD.
-A Claude model or price an Admin already saved is kept as it is. Every
-service stays on the model it uses, and no other setting is touched.
+A Claude model an Admin already added is kept as it is, with or without a
+price. Every service stays on the model it uses, and no other setting is
+touched.
 
 Revision ID: 0091
 Revises: 0090
@@ -27,6 +28,7 @@ CLAUDE_MODEL_PRICES = {
     "anthropic/claude-haiku-5.5": {"in": 0.13, "out": 0.64},
     "anthropic/claude-sonnet-5.5": {"in": 2.56, "out": 12.8},
 }
+CLAUDE_MODELS = list(CLAUDE_MODEL_PRICES)
 
 
 def stored_value(key: str) -> Any:
@@ -65,14 +67,22 @@ def save_value(key: str, value: Any) -> None:
 
 
 def upgrade() -> None:
-    """Add the Claude models and their prices, where missing."""
+    """Add the Claude models Admins can't pick yet, each with its price.
+
+    A Claude model an Admin already added is left as it is, with the price
+    they saved or with none.
+    """
     models = stored_value("available_models")
-    if isinstance(models, list):
-        missing = [name for name in CLAUDE_MODEL_PRICES if name not in models]
-        save_value("available_models", [*models, *missing])
+    if not isinstance(models, list):
+        return
+    added_models = [name for name in CLAUDE_MODELS if name not in models]
+    if not added_models:
+        return
+    save_value("available_models", [*models, *added_models])
     prices = stored_value("model_prices")
     if isinstance(prices, dict):
-        save_value("model_prices", {**CLAUDE_MODEL_PRICES, **prices})
+        added_prices = {name: CLAUDE_MODEL_PRICES[name] for name in added_models}
+        save_value("model_prices", {**added_prices, **prices})
 
 
 def downgrade() -> None:

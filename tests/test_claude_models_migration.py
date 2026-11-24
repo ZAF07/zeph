@@ -45,6 +45,36 @@ def test_the_migration_adds_the_claude_models_and_keeps_everything_else(
     }
 
 
+def test_a_claude_model_already_saved_without_a_price_stays_without_one(
+    engine: Engine, database_url: str
+) -> None:
+    downgrade_to(database_url, "0090")
+    try:
+        save_values(
+            engine,
+            "platform_settings",
+            {
+                "available_models": [
+                    "anthropic/claude-haiku-5.5",
+                    "anthropic/claude-sonnet-5.5",
+                ],
+                "model_prices": {"anthropic/claude-sonnet-5.5": {"in": 3, "out": 9}},
+            },
+        )
+    finally:
+        migrate(database_url)
+
+    assert stored_values(
+        engine, "platform_settings", ["available_models", "model_prices"]
+    ) == {
+        "available_models": [
+            "anthropic/claude-haiku-5.5",
+            "anthropic/claude-sonnet-5.5",
+        ],
+        "model_prices": {"anthropic/claude-sonnet-5.5": {"in": 3, "out": 9}},
+    }
+
+
 def test_a_claude_model_already_saved_keeps_its_place_and_its_price(
     engine: Engine, database_url: str
 ) -> None:

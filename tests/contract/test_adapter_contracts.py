@@ -132,14 +132,14 @@ def test_openrouter_returns_reasoning_when_thinking_is_on(model: str) -> None:
                 text=(
                     "A farmer has chickens and rabbits: 37 heads and 106 legs "
                     "in all. Then a third of the rabbits (rounded down) are "
-                    "swapped for twice as many chickens. How many legs are "
-                    "there now?"
+                    "swapped for the same number of chickens. How many legs "
+                    "are there now?"
                 ),
             )
         ],
     )
 
-    assert "106" in reply.text
+    assert "96" in reply.text
     assert reply.reasoning
 
 
