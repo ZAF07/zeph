@@ -53,5 +53,5 @@ Evidence (24 Nov 2026, branch `admin-ui-01-fold-prompts`):
 ## Completion
 
 - Completed: 2026-11-24
-- Commit: <to be filled in manually>
+- Commit: 712ff7c (merge "Merge admin-ui-01-fold-prompts: Prompts & models fold into a card per service"; work in cc06764 "Fold Prompts & models into a card per service", 7dbd4f4 "Tidy Prompts & models cards after review", bac9853 "Archive admin-ui issue 01: Prompts & models fold into a card per service, verified")
 
