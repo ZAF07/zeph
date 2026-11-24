@@ -124,6 +124,44 @@ def test_openrouter_returns_reasoning_when_thinking_is_on() -> None:
     assert reply.reasoning
 
 
+@pytest.mark.parametrize(
+    "model", ["deepseek/deepseek-v4.1-flash", "anthropic/claude-haiku-5.5"]
+)
+def test_openrouter_calls_an_offered_tool_and_uses_its_result(model: str) -> None:
+    chat_model = OpenRouterChatModel(required_env("OPENROUTER_API_KEY"))
+    queries: list[str] = []
+
+    def run_search(arguments: dict[str, object]) -> str:
+        queries.append(str(arguments.get("query", "")))
+        return "Result: the secret word of the day is 'lantern'."
+
+    reply = chat_model.generate(
+        model=model,
+        thinking=True,
+        instructions=(
+            "Always use the web_search tool before answering. "
+            "Then answer in one short sentence."
+        ),
+        history=[ChatLine(role=ChatRole.USER, text="What's the secret word today?")],
+        tools=[
+            ChatTool(
+                name="web_search",
+                description="Search the web.",
+                parameters={
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"],
+                },
+                run=run_search,
+            )
+        ],
+    )
+
+    assert queries
+    assert "lantern" in reply.text.lower()
+    assert reply.tool_calls
+
+
 def test_deepseek_describes_a_photo() -> None:
     photo_viewer = DeepSeekPhotoViewer(required_env("DEEPSEEK_API_KEY"))
     image_file = Path(__file__).parents[2] / "evals/images/weekend-list.jpg"
