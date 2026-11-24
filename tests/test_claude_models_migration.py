@@ -1,7 +1,7 @@
 from sqlalchemy import Engine
 
 from companion.adapters.postgres.database import migrate
-from tests.test_moves_migration import downgrade_to
+from tests.test_moves_migration import downgrade_to, upgrade_to
 from tests.test_openrouter_model_names_migration import save_values, stored_values
 
 OLD_SETTINGS = {
@@ -30,19 +30,20 @@ def test_the_migration_adds_the_claude_models_and_keeps_everything_else(
     downgrade_to(database_url, "0090")
     try:
         save_values(engine, "platform_settings", OLD_SETTINGS)
+        upgrade_to(database_url, "0091")
+
+        assert stored_values(engine, "platform_settings", list(OLD_SETTINGS)) == {
+            **OLD_SETTINGS,
+            "available_models": [
+                "deepseek/deepseek-v4.1-flash-1017",
+                "deepseek/deepseek-v4-pro-0813",
+                "anthropic/claude-haiku-5.5",
+                "anthropic/claude-sonnet-5.5",
+            ],
+            "model_prices": {**OLD_SETTINGS["model_prices"], **CLAUDE_PRICES},
+        }
     finally:
         migrate(database_url)
-
-    assert stored_values(engine, "platform_settings", list(OLD_SETTINGS)) == {
-        **OLD_SETTINGS,
-        "available_models": [
-            "deepseek/deepseek-v4.1-flash-1017",
-            "deepseek/deepseek-v4-pro-0813",
-            "anthropic/claude-haiku-5.5",
-            "anthropic/claude-sonnet-5.5",
-        ],
-        "model_prices": {**OLD_SETTINGS["model_prices"], **CLAUDE_PRICES},
-    }
 
 
 def test_a_claude_model_already_saved_without_a_price_stays_without_one(
@@ -61,18 +62,19 @@ def test_a_claude_model_already_saved_without_a_price_stays_without_one(
                 "model_prices": {"anthropic/claude-sonnet-5.5": {"in": 3, "out": 9}},
             },
         )
+        upgrade_to(database_url, "0091")
+
+        assert stored_values(
+            engine, "platform_settings", ["available_models", "model_prices"]
+        ) == {
+            "available_models": [
+                "anthropic/claude-haiku-5.5",
+                "anthropic/claude-sonnet-5.5",
+            ],
+            "model_prices": {"anthropic/claude-sonnet-5.5": {"in": 3, "out": 9}},
+        }
     finally:
         migrate(database_url)
-
-    assert stored_values(
-        engine, "platform_settings", ["available_models", "model_prices"]
-    ) == {
-        "available_models": [
-            "anthropic/claude-haiku-5.5",
-            "anthropic/claude-sonnet-5.5",
-        ],
-        "model_prices": {"anthropic/claude-sonnet-5.5": {"in": 3, "out": 9}},
-    }
 
 
 def test_a_claude_model_already_saved_keeps_its_place_and_its_price(
@@ -91,29 +93,30 @@ def test_a_claude_model_already_saved_keeps_its_place_and_its_price(
                 "model_prices": {"anthropic/claude-haiku-5.5": {"in": 1, "out": 2}},
             },
         )
+        upgrade_to(database_url, "0091")
+
+        assert stored_values(
+            engine, "platform_settings", ["available_models", "model_prices"]
+        ) == {
+            "available_models": [
+                "anthropic/claude-haiku-5.5",
+                "deepseek/deepseek-v4.1-flash-1017",
+                "anthropic/claude-sonnet-5.5",
+            ],
+            "model_prices": {
+                "anthropic/claude-haiku-5.5": {"in": 1, "out": 2},
+                "anthropic/claude-sonnet-5.5": {"in": 2.56, "out": 12.8},
+            },
+        }
     finally:
         migrate(database_url)
-
-    assert stored_values(
-        engine, "platform_settings", ["available_models", "model_prices"]
-    ) == {
-        "available_models": [
-            "anthropic/claude-haiku-5.5",
-            "deepseek/deepseek-v4.1-flash-1017",
-            "anthropic/claude-sonnet-5.5",
-        ],
-        "model_prices": {
-            "anthropic/claude-haiku-5.5": {"in": 1, "out": 2},
-            "anthropic/claude-sonnet-5.5": {"in": 2.56, "out": 12.8},
-        },
-    }
 
 
 def test_going_back_keeps_the_claude_models(engine: Engine, database_url: str) -> None:
     downgrade_to(database_url, "0090")
     try:
         save_values(engine, "platform_settings", OLD_SETTINGS)
-        migrate(database_url)
+        upgrade_to(database_url, "0091")
         after_upgrade = stored_values(engine, "platform_settings", list(OLD_SETTINGS))
         downgrade_to(database_url, "0090")
 
