@@ -396,6 +396,8 @@ def test_core_services_list_their_prompt_and_model_settings(
         "deepseek/deepseek-v4-pro-0813",
         "anthropic/claude-haiku-5.5",
         "anthropic/claude-sonnet-5.5",
+        "anthropic/claude-opus-5.5",
+        "anthropic/claude-fable-5.2",
     ]
 
 

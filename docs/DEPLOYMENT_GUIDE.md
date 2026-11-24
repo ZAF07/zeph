@@ -187,7 +187,7 @@ Do these once in the OpenRouter account, and again for any provider key added la
 
 Two things in the code keep calls on our own keys:
 
-- Each call may only be answered by the model's maker (the part of the name before the "/"), because our keys are the makers' keys. A model its maker does not serve fails with an error. For DeepSeek, pick the dated names DeepSeek itself serves (`deepseek/deepseek-v4.1-flash-1017`, `deepseek/deepseek-v4-pro-0813`); the undated names are only served by other hosts. The Claude models Admins can pick (`anthropic/claude-haiku-5.5`, `anthropic/claude-sonnet-5.5`) are served by Anthropic under those names.
+- Each call may only be answered by the model's maker (the part of the name before the "/"), because our keys are the makers' keys. A model its maker does not serve fails with an error. For DeepSeek, pick the dated names DeepSeek itself serves (`deepseek/deepseek-v4.1-flash-1017`, `deepseek/deepseek-v4-pro-0813`); the undated names are only served by other hosts. The Claude models Admins can pick (`anthropic/claude-haiku-5.5`, `anthropic/claude-sonnet-5.5`, `anthropic/claude-opus-5.5`, `anthropic/claude-fable-5.2`) are served by Anthropic under those names. Opus and Fable always think, so the thinking switch does nothing for them.
 - If a reply was still paid with credits, the backend logs the warning "was paid with OpenRouter credits, not our own key". OpenRouter's activity page shows the same per call (BYOK or not).
 
 To go back to direct DeepSeek, set `CHAT_MODEL_ADAPTER=deepseek` and `DEEPSEEK_API_KEY`, and run `make restart`.
