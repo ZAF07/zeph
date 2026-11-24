@@ -91,10 +91,12 @@ from companion.core.models import (
     CopySeedSlot,
     CopySlot,
     Curiosity,
+    CuriosityAim,
     CuriosityChanges,
     CuriositySensitivity,
     CuriosityState,
     CuriosityToRaise,
+    CuriosityTreatment,
     DailyUsage,
     DaySummary,
     Feature,
@@ -323,6 +325,7 @@ def _to_need(row: Row[Any], ruled_out_move_ids: frozenset[UUID]) -> Need:
         sort_order=row.sort_order,
         is_fallback=row.is_fallback,
         ruled_out_move_ids=ruled_out_move_ids,
+        curiosities=CuriosityTreatment(row.curiosities),
     )
 
 
@@ -2155,6 +2158,7 @@ class PostgresNeedRepository:
                     how_to_reply=details.how_to_reply,
                     sort_order=0 if highest is None else int(highest) + 1,
                     is_fallback=False,
+                    curiosities=details.curiosities,
                 )
                 .returning(needs)
             ).one()
@@ -2182,6 +2186,7 @@ class PostgresNeedRepository:
                     name=details.name,
                     when_it_fits=details.when_it_fits,
                     how_to_reply=details.how_to_reply,
+                    curiosities=details.curiosities,
                 )
                 .returning(needs)
             ).one()
@@ -2556,8 +2561,8 @@ def _to_knowledge_lookup(stored: dict[str, Any] | None) -> KnowledgeLookup | Non
 def _to_reply_plan_form(stored: dict[str, Any]) -> ReplyPlanForm:
     """Turn a saved form back into a Reply Plan form.
 
-    A form saved before Reply Plans formed a Read, weighed a Check-in or
-    used Patterns, reads as having none.
+    A form saved before Reply Plans formed a Read, weighed a Check-in,
+    used Patterns or said why no Curiosity was asked, reads as having none.
 
     Args:
         stored: The form as saved.
@@ -2619,6 +2624,7 @@ def _to_reply_plan_form(stored: dict[str, Any]) -> ReplyPlanForm:
             if stored.get("pattern_offered")
             else None
         ),
+        curiosity_not_asked_why=stored.get("curiosity_not_asked_why", ""),
     )
 
 
@@ -3649,6 +3655,7 @@ def _to_curiosity(row: Row[Any]) -> Curiosity:
         sensitivity=CuriositySensitivity(row.sensitivity),
         state=CuriosityState(row.state),
         created_at=row.created_at,
+        aim=CuriosityAim(row.aim),
         source_memory_item_id=row.source_memory_item_id,
         source_life_thread_id=row.source_life_thread_id,
         raised_at=row.raised_at,
@@ -6120,7 +6127,8 @@ def _to_reply_plan_shape(values: dict[str, Any]) -> ReplyPlanShape:
     """Read a Reply Plan call's stored shape.
 
     A shape saved before Reply Plans formed a Read, or weighed a Check-in,
-    reads as forming none and being offered none.
+    reads as forming none and being offered none; one saved before
+    Curiosities were recorded has none recorded.
 
     Args:
         values: The stored JSON.
@@ -6144,6 +6152,8 @@ def _to_reply_plan_shape(values: dict[str, Any]) -> ReplyPlanShape:
         pattern_used=values.get("pattern_used", False),
         pattern_offered=values.get("pattern_offered", False),
         check_in_kind=values.get("check_in_kind"),
+        curiosities_offered=values.get("curiosities_offered"),
+        curiosity_asked=values.get("curiosity_asked"),
     )
 
 

@@ -1185,6 +1185,57 @@ def test_a_need_override_reaches_only_its_variant_and_live_needs_stay(
     assert PostgresNeedRepository(engine).list_all() == live_needs
 
 
+def test_a_variant_can_override_how_a_need_treats_curiosities(
+    client: TestClient,
+    engine: Engine,
+    auth_verifier: FakeAuthVerifier,
+    chat_model: ScriptedChatModel,
+    runner: EvalRunner,
+) -> None:
+    add_cases(engine, UNDERSTANDING_CASE)
+    admin = owner_headers(client, auth_verifier)
+    key = need_key(client, admin, "Just chatting")
+    live_needs = PostgresNeedRepository(engine).list_all()
+    [live] = [need for need in live_needs if need.name == "Just chatting"]
+    override = {
+        "name": live.name,
+        "when_it_fits": live.when_it_fits,
+        "how_to_reply": live.how_to_reply,
+        "curiosities": "never",
+    }
+    start_run(client, admin, EvalName.UNDERSTANDING, variants=[{}, {key: override}])
+    chat_model.script("Hi!", "Hi!")
+
+    runner.work_next_run()
+
+    reply_plan_a, reply_plan_b = chat_model.reply_plan_calls
+    assert "- Just chatting: only if it fits the moment" in str(reply_plan_a)
+    assert "- Just chatting: never: ask none" in str(reply_plan_b)
+    assert PostgresNeedRepository(engine).list_all() == live_needs
+
+
+@pytest.mark.parametrize("choice", ["always", ["never"], 3])
+def test_a_need_override_with_an_unknown_curiosities_choice_is_refused(
+    client: TestClient, auth_verifier: FakeAuthVerifier, choice: object
+) -> None:
+    admin = owner_headers(client, auth_verifier)
+    key = need_key(client, admin, "Just chatting")
+    override = {
+        "name": "Just chatting",
+        "when_it_fits": "x",
+        "how_to_reply": "y",
+        "curiosities": choice,
+    }
+
+    response = client.post(
+        "/api/admin/eval-runs",
+        json={"evals": ["understanding"], "variants": [{key: override}], "repeats": 1},
+        headers=admin,
+    )
+
+    assert response.status_code == 422
+
+
 def test_reply_plan_prompt_and_outlook_overrides_reach_only_their_variant(
     client: TestClient,
     engine: Engine,
@@ -1994,6 +2045,7 @@ def rule_out_live(
             "when_it_fits": need["when_it_fits"],
             "how_to_reply": need["how_to_reply"],
             "ruled_out_move_ids": [*need["ruled_out_move_ids"], move["id"]],
+            "curiosities": need["curiosities"],
         },
         headers=admin,
     )

@@ -13,6 +13,7 @@ export function isNeedChanged(draft: NeedInput, saved: NeedInput): boolean {
     draft.name !== saved.name ||
     draft.when_it_fits !== saved.when_it_fits ||
     draft.how_to_reply !== saved.how_to_reply ||
+    draft.curiosities !== saved.curiosities ||
     ruledOut.size !== saved.ruled_out_move_ids.length ||
     saved.ruled_out_move_ids.some((id) => !ruledOut.has(id))
   );
@@ -44,5 +45,6 @@ export function needInputOf(need: NeedInput): NeedInput {
     when_it_fits: need.when_it_fits,
     how_to_reply: need.how_to_reply,
     ruled_out_move_ids: need.ruled_out_move_ids,
+    curiosities: need.curiosities,
   };
 }

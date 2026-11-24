@@ -66,8 +66,8 @@ class NeedService:
         """Add a Need last in the list.
 
         Args:
-            details: Its name, when it fits, how to reply and the Moves it
-                rules out.
+            details: Its name, when it fits, how to reply, the Moves it
+                rules out and how Curiosities are treated.
 
         Returns:
             The saved Need.
@@ -84,7 +84,7 @@ class NeedService:
             raise name_taken_error(checked.name) from error
 
     def update(self, need_id: UUID, details: NeedDetails) -> Need:
-        """Change a Need's name, when it fits, how to reply and ruled-out Moves.
+        """Change a Need's texts, ruled-out Moves and how Curiosities are treated.
 
         Args:
             need_id: The Need's ID.
@@ -204,6 +204,7 @@ class NeedService:
             when_it_fits=details.when_it_fits.strip(),
             how_to_reply=details.how_to_reply.strip(),
             ruled_out_move_ids=details.ruled_out_move_ids,
+            curiosities=details.curiosities,
         )
         if not checked.name or not checked.when_it_fits or not checked.how_to_reply:
             raise InvalidNeedError(

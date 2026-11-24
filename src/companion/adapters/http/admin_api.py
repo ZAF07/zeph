@@ -39,6 +39,7 @@ from companion.core.models import (
     CheckInOutcome,
     CheckInScheduleEntry,
     CheckInStatus,
+    CuriosityTreatment,
     Feature,
     FeatureReason,
     FeatureStatus,
@@ -439,6 +440,7 @@ class NeedResponse(BaseModel):
     how_to_reply: str
     is_fallback: bool
     ruled_out_move_ids: list[str]
+    curiosities: CuriosityTreatment
 
 
 class NeedsResponse(BaseModel):
@@ -448,12 +450,13 @@ class NeedsResponse(BaseModel):
 
 
 class NeedRequest(BaseModel):
-    """A Need's name, when it fits, how to reply and the Moves it rules out."""
+    """A Need's texts, the Moves it rules out and how Curiosities are treated."""
 
     name: str
     when_it_fits: str
     how_to_reply: str
     ruled_out_move_ids: list[UUID]
+    curiosities: CuriosityTreatment
 
     def to_details(self) -> NeedDetails:
         """Turn the request into Need details.
@@ -466,6 +469,7 @@ class NeedRequest(BaseModel):
             when_it_fits=self.when_it_fits,
             how_to_reply=self.how_to_reply,
             ruled_out_move_ids=frozenset(self.ruled_out_move_ids),
+            curiosities=self.curiosities,
         )
 
 
@@ -619,6 +623,8 @@ class ReplyPlanShapeResponse(BaseModel):
     check_in_kind: str | None
     pattern_used: bool
     pattern_offered: bool
+    curiosities_offered: int | None
+    curiosity_asked: bool | None
 
 
 class CheckInShapeResponse(BaseModel):
@@ -912,6 +918,7 @@ def to_need_response(need: Need) -> NeedResponse:
         how_to_reply=need.how_to_reply,
         is_fallback=need.is_fallback,
         ruled_out_move_ids=sorted(str(move_id) for move_id in need.ruled_out_move_ids),
+        curiosities=need.curiosities,
     )
 
 
@@ -1147,6 +1154,8 @@ def to_reply_plan_shape_response(shape: ReplyPlanShape) -> ReplyPlanShapeRespons
         check_in_kind=shape.check_in_kind,
         pattern_used=shape.pattern_used,
         pattern_offered=shape.pattern_offered,
+        curiosities_offered=shape.curiosities_offered,
+        curiosity_asked=shape.curiosity_asked,
     )
 
 

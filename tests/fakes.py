@@ -548,6 +548,7 @@ def reply_plan_answer(
     check_in: object = None,
     patterns_used: Sequence[object] = (),
     offer_pattern: object = None,
+    no_curiosity_why: object = None,
 ) -> str:
     """Build the form the Reply Plan model answers with.
 
@@ -584,6 +585,8 @@ def reply_plan_answer(
             on, or anything else a model might write there.
         offer_pattern: The number of the Pattern the reply offers, or
             anything else a model might write there; None for none.
+        no_curiosity_why: Why no Curiosity is asked, or anything else a
+            model might write there; None for no reason.
 
     Returns:
         The form as JSON.
@@ -614,6 +617,7 @@ def reply_plan_answer(
         "check_in": check_in,
         "patterns_used": list(patterns_used),
         "offer_pattern": offer_pattern,
+        "no_curiosity_why": no_curiosity_why,
     }
     if ask_why is not None:
         answer["ask_why"] = ask_why

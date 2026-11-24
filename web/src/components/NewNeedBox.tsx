@@ -5,6 +5,7 @@ import { useState } from "react";
 import { NeedFields } from "@/components/NeedFields";
 import { NewCardBox } from "@/components/NewCardBox";
 import type { Move, NeedInput } from "@/lib/api-client";
+import { defaultCuriosityTreatment } from "@/lib/curiosity-treatment";
 import { isNeedComplete } from "@/lib/need-draft";
 import { useCardAction } from "@/lib/use-card-action";
 
@@ -13,6 +14,7 @@ const emptyNeed: NeedInput = {
   when_it_fits: "",
   how_to_reply: "",
   ruled_out_move_ids: [],
+  curiosities: defaultCuriosityTreatment,
 };
 
 /**
@@ -48,7 +50,12 @@ export function NewNeedBox({
         )
       }
     >
-      <NeedFields value={draft} moves={moves} onChange={setDraft} />
+      <NeedFields
+        value={draft}
+        moves={moves}
+        idPrefix="new-need"
+        onChange={setDraft}
+      />
     </NewCardBox>
   );
 }

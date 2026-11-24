@@ -224,6 +224,7 @@ needs = Table(
     Column("how_to_reply", Text, nullable=False),
     Column("sort_order", Integer, nullable=False),
     Column("is_fallback", Boolean, nullable=False, server_default="false"),
+    Column("curiosities", Text, nullable=False, server_default="only_if_it_fits"),
     Index(
         "needs_one_fallback",
         "is_fallback",
@@ -487,6 +488,7 @@ curiosities = Table(
     Column("reaction", Text),
     Column("guess", Text),
     Column("how_sure", Text),
+    Column("aim", Text, nullable=False),
     Index("ix_curiosities_user_id_state", "user_id", "state"),
 )
 

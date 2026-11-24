@@ -112,7 +112,6 @@ def test_the_composer_puts_each_input_at_its_level(engine: Engine) -> None:
         guidance=ReplyGuidance(
             boundaries="Leave alone: their dog.",
             plan="Lead with a real read.",
-            curiosities="Ask about the trip.",
         ),
         optional_offers=[ReplyOffer(instructions="A Check-in is due.")],
     )
@@ -128,7 +127,6 @@ def test_the_composer_puts_each_input_at_its_level(engine: Engine) -> None:
         "They work at a bank.",
         OPTIONAL_EXTRAS_HEADING,
         "A Check-in is due.",
-        "Ask about the trip.",
         "Breathing helps.",
     )
     assert order == sorted(order)

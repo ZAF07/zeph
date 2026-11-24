@@ -65,6 +65,7 @@ def need_body(need: dict[str, Any], ruled_out_move_ids: list[str]) -> dict[str, 
         "when_it_fits": need["when_it_fits"],
         "how_to_reply": need["how_to_reply"],
         "ruled_out_move_ids": ruled_out_move_ids,
+        "curiosities": need["curiosities"],
     }
 
 
@@ -316,6 +317,7 @@ def test_a_needs_ruled_out_moves_are_shown_and_saved(
             "when_it_fits": "Good news.",
             "how_to_reply": "Be glad with them.",
             "ruled_out_move_ids": [ids["Research"]],
+            "curiosities": "only_if_it_fits",
         },
         headers=admin,
     )

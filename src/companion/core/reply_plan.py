@@ -8,8 +8,11 @@ from uuid import UUID, uuid4
 from companion.core.curiosities import (
     DueCuriosities,
     NumberedCuriosity,
+    describe_curiosity_treatments,
     describe_due_curiosities,
     format_curiosities_for_reply,
+    offered_under,
+    why_none_asked,
 )
 from companion.core.life_threads import (
     RemindedThread,
@@ -73,6 +76,10 @@ from companion.core.woven_check_ins import WovenCheckIn
 
 logger = logging.getLogger(__name__)
 
+MOST_CURIOSITIES_PER_REPLY = 1
+ASKS_WHY_INSTEAD = "The reply asks why they feel as they do instead."
+NO_REPLY_PLAN = "The Reply Plan couldn't be made."
+
 
 @dataclass(frozen=True)
 class PickedMoves:
@@ -119,8 +126,8 @@ class PlannedReply:
         reply_guidance: What it adds to the reply's instructions, by
             priority: the Life Threads to leave alone; the Need's "how to
             reply", the Moves' "how to do it", the guidance and mood, the
-            "ask why" note when it applies and the Life Threads to bring up;
-            and the Curiosities to bring up.
+            "ask why" note when it applies, the Life Threads to bring up and
+            the Curiosity to ask.
         asks_a_question: Whether the reply already asks the User a question:
             through a Move that asks one, asking why or a Curiosity.
         may_send_photo: Whether the reply may send one of the User's Shared
@@ -322,7 +329,8 @@ def describe_message_for_reply_plan(
         The time, the Understanding, Needs, Moves and which each Need
         allows, past Move Outcomes with their days, User Portrait, Goals,
         Memory Categories, recent Conversations, reminded Life Threads, the
-        Patterns in mind, due Curiosities, Knowledge documents, the due
+        Patterns in mind, due Curiosities and how each Need treats them,
+        Knowledge documents, the due
         Check-in's Kinds when one is due, where the previous Conversation
         was, earlier Reply Plans, earlier messages across Conversations and
         latest message.
@@ -382,6 +390,7 @@ def describe_message_for_reply_plan(
         f"{describe_patterns_in_mind(patterns, snapshot.user.time_zone)}"
         f"\n\nThings you've been wondering about them, whose time has come "
         f"{describe_due_curiosities(due, snapshot.user.time_zone)}"
+        f"\n\nHow each Need treats them:\n{describe_curiosity_treatments(needs)}"
         f"\n\nKnowledge documents, with when each helps:\n"
         f"{knowledge_lines or 'None.'}"
         f"{check_in_section}"
@@ -566,9 +575,9 @@ def read_curiosities_to_raise(
             more the Conversation may raise.
 
     Returns:
-        The Curiosities, each once and no more than the Conversation may
-        still raise; an unknown number is skipped and an odd "how" reads as
-        weaving it in.
+        The Curiosities, each once, no more than one per reply and no more
+        than the Conversation may still raise; an unknown number is skipped
+        and an odd "how" reads as weaving it in.
     """
     if not isinstance(value, list):
         return ()
@@ -593,7 +602,7 @@ def read_curiosities_to_raise(
             guess=item.curiosity.guess,
             how_sure=item.curiosity.how_sure,
         )
-    return tuple(chosen.values())[: due.left]
+    return tuple(chosen.values())[: min(due.left, MOST_CURIOSITIES_PER_REPLY)]
 
 
 def keep_held_back_threads_alone(
@@ -701,13 +710,14 @@ def read_reply_plan_form(
     Text around the JSON object, such as a code fence, is ignored. Life
     Threads are named by their numbers in the reminded list; no held-back
     Thread is ever brought up. Curiosities are named by their numbers in the
-    due list, and no more are brought up than the Conversation may still
-    raise. Knowledge documents are named by their numbers in the Knowledge
-    list. A missing or odd "send_photo" reads as allowed, and a missing or
-    odd "ask_why" as not said. The Read is said only when there is one and
-    "say_read" is true. A Check-in is chosen only from the Kinds offered.
-    Patterns are named by their numbers in the Patterns in mind; one is
-    offered only when the Read is said, and an offered one counts as used.
+    due list; at most one is brought up per reply, and no more than the
+    Conversation may still raise. Knowledge documents are named by their
+    numbers in the Knowledge list. A missing or odd "send_photo" reads as
+    allowed, and a missing or odd "ask_why" as not said. The Read is said
+    only when there is one and "say_read" is true. A Check-in is chosen only
+    from the Kinds offered. Patterns are named by their numbers in the
+    Patterns in mind; one is offered only when the Read is said, and an
+    offered one counts as used.
 
     Args:
         answer: The model's answer.
@@ -768,8 +778,38 @@ def read_reply_plan_form(
         check_in=read_check_in_choice(parsed.get("check_in"), check_in_kinds),
         patterns_used=tuple(dict.fromkeys([*used, *([offered] if offered else [])])),
         pattern_offered=offered,
+        curiosity_not_asked_why=read_form_text(parsed.get("no_curiosity_why")),
     )
     return keep_held_back_threads_alone(form, reminded)
+
+
+def settle_curiosities(
+    form: ReplyPlanForm, need: Need, due: DueCuriosities, asked_why: bool
+) -> ReplyPlanForm:
+    """Hold the form's Curiosities to what the picked Need and the reply allow.
+
+    A reply that asks why asks no Curiosity too: one question per reply.
+    Under a Need that asks Curiosities by default, a reply that asks none of
+    those offered keeps the reason.
+
+    Args:
+        form: The form, as read.
+        need: The Need the reply follows.
+        due: The Curiosities the reply may ask under that Need.
+        asked_why: Whether the reply asks why they feel as they do.
+
+    Returns:
+        The form, asking a Curiosity only when one was offered under the
+        Need and the reply doesn't ask why, with why none is asked when the
+        Need asks by default.
+    """
+    chosen = form.curiosities if due.offered and not asked_why else ()
+    reason = ASKS_WHY_INSTEAD if asked_why else form.curiosity_not_asked_why
+    return replace(
+        form,
+        curiosities=chosen,
+        curiosity_not_asked_why=why_none_asked(need, due, chosen, reason),
+    )
 
 
 def may_send_photo(understanding: UnderstandingForm, plan: ReplyPlanForm) -> bool:
@@ -829,9 +869,12 @@ def fallback_form(fallback: Need) -> ReplyPlanForm:
 
     Returns:
         A form with the fallback Need, no Moves, no Memory Categories, and
-        no asking why, as the old combined call's fallback never asked.
+        no asking why, as the old combined call's fallback never asked. It
+        says why it asks no Curiosity, kept only when the Need owes a reason.
     """
-    return ReplyPlanForm(need=fallback.name, ask_why=False)
+    return ReplyPlanForm(
+        need=fallback.name, ask_why=False, curiosity_not_asked_why=NO_REPLY_PLAN
+    )
 
 
 def fallback_need(needs: Sequence[Need]) -> Need:
@@ -972,16 +1015,16 @@ def format_reply_guidance(
         threads_section: The Life Threads that matter and those to bring up;
             "" if none matter.
         left_alone_section: The Life Threads to leave alone; "" if none.
-        curiosities_section: The Curiosities to bring up; "" if none.
+        curiosities_section: The Curiosity to ask; "" if none.
         past_days: What each call of the past-day tool read, in order.
 
     Returns:
         The Threads to leave alone as a boundary; the Need and how to reply,
         the Read when the plan says to give it now with the Pattern it
         offers, if any, the lead and supporting
-        Moves and how to make them, the guidance, the mood, the note and the
-        Threads to bring up as the plan; the Curiosities, as an optional
-        extra; and the past days it read, with what the reply remembers.
+        Moves and how to make them, the guidance, the mood, the note, the
+        Threads to bring up and the Curiosity to ask as the plan; and the
+        past days it read, with what the reply remembers.
     """
     lines = [f"What they need from you right now: {need.name}.", need.how_to_reply]
     if plan.say_read:
@@ -1011,8 +1054,9 @@ def format_reply_guidance(
     if ask_why_note:
         lines.append(ask_why_note)
     reply_plan = "\n".join(lines)
-    if threads_section:
-        reply_plan += f"\n\n{threads_section}"
+    for section in (threads_section, curiosities_section):
+        if section:
+            reply_plan += f"\n\n{section}"
     past_days_section = (
         "Past days you looked up for this reply:\n\n" + "\n\n".join(past_days)
         if past_days
@@ -1021,7 +1065,6 @@ def format_reply_guidance(
     return ReplyGuidance(
         boundaries=left_alone_section,
         plan=reply_plan,
-        curiosities=curiosities_section,
         past_days=past_days_section,
     )
 
@@ -1032,6 +1075,7 @@ def describe_reply_plan_shape(
     form: ReplyPlanForm,
     reminded: Sequence[RemindedThread],
     check_in_kinds_offered: int = 0,
+    curiosities_offered: int = 0,
 ) -> ReplyPlanShape:
     """Describe the shape of a Reply Plan for the Model Call Log.
 
@@ -1041,13 +1085,16 @@ def describe_reply_plan_shape(
         form: The form the reply follows.
         reminded: The Life Threads the Message reminded the Companion of.
         check_in_kinds_offered: How many Check-in Kinds it could weave in.
+        curiosities_offered: How many Curiosities it could ask under the
+            Need.
 
     Returns:
         The Need, the lead, supporting and next Moves' names, how many Life
         Threads were reminded, brought up, left alone and held back,
         whether a Read was formed and said, how many Check-in Kinds were
-        offered and which it chose, and whether a Pattern was used and
-        offered; never any words.
+        offered and which it chose, whether a Pattern was used and
+        offered, and how many Curiosities were offered and whether one is
+        asked; never any words.
     """
     ways = [item.how for item in form.bring_up]
     held_back = [item for item in reminded if item.hold_back]
@@ -1067,6 +1114,8 @@ def describe_reply_plan_shape(
         check_in_kind=form.check_in.kind if form.check_in else None,
         pattern_used=bool(form.patterns_used),
         pattern_offered=form.pattern_offered is not None,
+        curiosities_offered=curiosities_offered,
+        curiosity_asked=bool(form.curiosities),
     )
 
 
@@ -1080,7 +1129,8 @@ class ReplyPlanService:
     whose needed Feature doesn't work for the User right now, and any that
     asks a question and was made in the previous reply), which Move it means
     to make next and why, which Memory Categories and Knowledge matter,
-    which Life Threads and Curiosities to bring up or leave alone, which
+    which Life Threads to bring up or leave alone, which Curiosity to ask
+    (as the picked Need treats them), which
     Patterns in mind its Read is built on and whether to offer one, whether a
     Shared Photo may be sent, whether to ask why and, when a Check-in is
     due, whether one of its Kinds fits this reply. It sees this
@@ -1138,7 +1188,10 @@ class ReplyPlanService:
         and was made in the previous reply, is dropped, with the next
         Move's why. A lead or supporting Move that asks a question is dropped
         too, and not saved as made, when the reply asks why or raises a
-        Curiosity: only one question per reply. An unreadable form or a
+        Curiosity: only one question per reply. No Curiosity is raised
+        under a Need that never asks one, or in a reply that asks why;
+        under a Need that asks by default, why none was asked is saved
+        with the form. An unreadable form or a
         failed call falls back to the fallback Need with no Moves and no
         Memory Categories, so the reply still goes, with no Life Thread,
         no Curiosity brought up and no Check-in.
@@ -1207,6 +1260,8 @@ class ReplyPlanService:
             form = model_form
             need = find_need(needs, form.need)
         asked_why = should_ask_why(understanding.form, form, earlier)
+        due_under_need = offered_under(need, due)
+        form = settle_curiosities(form, need, due_under_need, asked_why)
         asks_another_question = asked_why or bool(form.curiosities)
         picked = pick_moves(need, needs, moves, form)
         if asks_another_question:
@@ -1230,7 +1285,12 @@ class ReplyPlanService:
         self._model_call_log.record_reply_plan_shape(
             snapshot,
             describe_reply_plan_shape(
-                need, picked, form, reminded, len(check_in_kinds)
+                need,
+                picked,
+                form,
+                reminded,
+                len(check_in_kinds),
+                len(due_under_need.offered),
             ),
         )
         ask_why_note = snapshot.settings.get(REPLY_ASK_WHY_NOTE) if asked_why else ""

@@ -52,6 +52,32 @@ describe("model call labels", () => {
     ]);
   });
 
+  it("writes how many Curiosities a Reply Plan was offered and whether it asked one", () => {
+    const facts = replyPlanShapeFacts({
+      need: "Think it through",
+      lead_move: null,
+      support_move: null,
+      next_move: null,
+      threads_reminded: 0,
+      threads_led_with: 0,
+      threads_woven_in: 0,
+      threads_left_alone: 0,
+      threads_held_back: 0,
+      read_formed: false,
+      read_said: false,
+      check_in_kinds_offered: 0,
+      check_in_kind: null,
+      pattern_used: false,
+      pattern_offered: false,
+      curiosities_offered: 2,
+      curiosity_asked: true,
+    });
+    expect(facts.slice(-2)).toEqual([
+      { label: "Curiosities offered", value: "2" },
+      { label: "Curiosity asked", value: "Yes" },
+    ]);
+  });
+
   it("writes a Reply Plan with no Moves or Threads brought up", () => {
     const facts = replyPlanShapeFacts({
       need: "Ask more",
@@ -71,6 +97,9 @@ describe("model call labels", () => {
       pattern_offered: false,
     });
     expect(facts).toContainEqual({ label: "Need picked", value: "Ask more" });
+    expect(facts.map((fact) => fact.label)).not.toContain(
+      "Curiosities offered",
+    );
     expect(facts).toContainEqual({ label: "Pattern", value: "None" });
     expect(facts).toContainEqual({ label: "Threads brought up", value: "0" });
     expect(facts).toContainEqual({ label: "Lead Move", value: "None" });

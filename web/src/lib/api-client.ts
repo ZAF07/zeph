@@ -506,12 +506,22 @@ export type CheckInKind = CheckInKindInput & {
 /** A Check-in Kind and how many Check-ins of it were sent in 30 days. */
 export type CheckInKindOverview = CheckInKind & { sent_last_30_days: number };
 
-/** A Need's name, when it fits, how to reply and the Moves it rules out. */
+/**
+ * How Curiosities are treated while a Need is picked: the Reply Plan asks a
+ * due one or says why not, asks one only if it fits, or never asks one.
+ */
+export type CuriosityTreatment = "ask_by_default" | "only_if_it_fits" | "never";
+
+/**
+ * A Need's name, when it fits, how to reply, the Moves it rules out and how
+ * Curiosities are treated while it is picked.
+ */
 export type NeedInput = {
   name: string;
   when_it_fits: string;
   how_to_reply: string;
   ruled_out_move_ids: string[];
+  curiosities: CuriosityTreatment;
 };
 
 /**
@@ -694,7 +704,9 @@ export type UnderstandingShape = {
 
 /**
  * The shape of a Reply Plan: the Need, Move names, counts and whether a Read
- * was formed and said, never any words.
+ * was formed and said, never any words. `curiosities_offered` and
+ * `curiosity_asked` are missing or null on a trace saved before they were
+ * recorded.
  */
 export type ReplyPlanShape = {
   need: string;
@@ -712,6 +724,8 @@ export type ReplyPlanShape = {
   check_in_kind: string | null;
   pattern_used: boolean;
   pattern_offered: boolean;
+  curiosities_offered?: number | null;
+  curiosity_asked?: boolean | null;
 };
 
 /** The shape of a check on whether a reply brought up its Woven-in Check-in. */
@@ -904,7 +918,7 @@ export type EvalRunPick = { evals: EvalName[]; case_keys: string[] };
 
 /**
  * A Variant's Setting Overrides, by setting key, or `need:<id>` for a Need
- * (its name, when it fits and how to reply).
+ * (its name, when it fits, how to reply and how Curiosities are treated).
  */
 export type SettingOverrides = Record<string, unknown>;
 
@@ -950,11 +964,16 @@ export type OverridableSetting = {
   value: unknown;
 };
 
-/** A Need as an override's value. */
+/**
+ * A Need as an override's value. `curiosities` is missing on one saved
+ * before Needs said how Curiosities are treated, which keeps the live
+ * Need's choice.
+ */
 export type NeedOverride = {
   name: string;
   when_it_fits: string;
   how_to_reply: string;
+  curiosities?: CuriosityTreatment;
 };
 
 /** A Need a Variant can override, keyed `need:<id>`, with its live details. */

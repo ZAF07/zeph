@@ -64,6 +64,7 @@ export function NeedCard({
       <NeedFields
         value={draft}
         moves={moves}
+        idPrefix={`need-${need.id}`}
         onChange={(next) => {
           setDraft(next);
           action.clearFailure();
