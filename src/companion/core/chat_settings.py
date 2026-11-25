@@ -59,11 +59,13 @@ CLAIM_CHECK_PROMPT = (
     "Answer with only yes or no."
 )
 UNBACKED_CLAIM_NOTE = (
-    "Your last draft of this reply told them a setting was changed, but you "
-    "called no tool, so nothing was changed. Write the reply again. If they "
-    "asked for a change your tools can make, call the tool first and then say "
-    "what you changed. If you call no tool, don't say or hint that anything "
-    "was changed."
+    "Your last draft of this reply said or promised a change to one of their "
+    "settings, but you called no tool, so nothing was changed and the reply "
+    "would not be true. Write the reply again. If they asked for that change, "
+    "call its settings tool now, before you write anything, and then say what "
+    "you changed. Only if they asked for no change, write the reply without "
+    "saying, promising or hinting that anything was or will be changed. Your "
+    "last draft was:"
 )
 TELL_THEM = "Tell them plainly what you changed."
 NOTHING_CHANGED = "Nothing changed."
@@ -824,8 +826,9 @@ class SettingsTools:
             reply: The reply as written.
 
         Returns:
-            `UNBACKED_CLAIM_NOTE` if the reply called no settings tool and
-            says a setting was changed; "" otherwise.
+            `UNBACKED_CLAIM_NOTE` with the reply under it, if the reply
+            called no settings tool and says a setting was changed; ""
+            otherwise.
         """
         if called or not reply.strip():
             return ""
@@ -847,4 +850,4 @@ class SettingsTools:
         except Exception:
             logger.exception("The settings claim check failed; the reply goes")
             return ""
-        return UNBACKED_CLAIM_NOTE if read_claim_answer(answer) else ""
+        return f"{UNBACKED_CLAIM_NOTE}\n{reply}" if read_claim_answer(answer) else ""

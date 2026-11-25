@@ -52,7 +52,9 @@ def test_a_reply_that_says_it_is_done_with_no_tool_called_is_written_again(
 
     first, second = chat_model.calls
     assert UNBACKED_CLAIM_NOTE not in first.instructions
-    assert second.instructions == f"{first.instructions}\n\n{UNBACKED_CLAIM_NOTE}"
+    assert second.instructions == (
+        f"{first.instructions}\n\n{UNBACKED_CLAIM_NOTE}\n{FALSE_CLAIM}"
+    )
     assert second.fixed_instructions == first.fixed_instructions
     assert chat_channel.texts_sent_to(TELEGRAM_CHAT_ID) == [TRUE_CLAIM]
     assert me(client, headers)["directness"] == "gentle"
