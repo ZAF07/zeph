@@ -12,7 +12,7 @@ and 40,000 out, about S$0.18 at the prices of 24 Nov 2026. The catalog now
 has fifteen Pattern Types, all sent with every tagging call, and the seed 68
 cases, so a full run costs several times that: read the estimate.
 
-## The three layers
+## The four layers
 
 ### 1. Code: scoring, the gate and state moves
 
@@ -60,7 +60,64 @@ added later.
     never marks theirs situational. Those cases expect the step to say
     nothing, or a sign against.
 
-### 3. The Whole-pipeline Eval
+#### Unclear stories an aimed Curiosity asked about
+
+A Tagging case can also give unclear Observations the made-up User already
+has and mark one as asked about in this Conversation by an aimed Curiosity
+(issue 25). The real tagging step is shown it, as for a real User, and the
+case passes only when the story ends as expected: clear for one of its two
+Pattern Types, or still unclear. The seed has 3: an answer that settles
+it, one that tells nothing either way, and one that brushes the question
+off.
+
+- **Shows:** whether the step settles a story when the answer really
+  tells, and leaves it unclear when it doesn't.
+- **Can't show:** that the answers sound like real ones. Claude wrote both
+  Zeph's question and the User's answer, so the settling answer says its
+  reason plainly. Real answers are shorter and sideways. It also can't
+  show the question was a good one: Zeph's line in the case is typed, not
+  written by the reply.
+
+### 3. The Agenda cases in the Understanding Eval
+
+The Agenda's rules are code, with ordinary tests. What only a real model
+can show is tested by cases in the Understanding Eval (`understanding`, in
+`evals/README.md`), with keys starting `agenda-` (issue 25). A case gives a
+made-up User suspected Patterns: Observations and the tries already made.
+Setup saves them as real rows and runs the real scoring and Agenda code, so
+the Agenda and the aimed Curiosity are the ones code writes. One Message is
+then sent, and checked on the Reply Plan (was it shown the Agenda, did it
+bring up the aimed Curiosity, which need and way) and, by the Judge, on the
+reply (does it ask the aimed question as one question in its own words,
+without naming the Pattern Type, its if/then, a clinical word or the
+User's own quote). The seed has 9: one per open need (unclear story,
+missing part of life, counter-test), a Thought Experiment, two
+Explorations at once, and four must-not-ask moments (struggling, brushed
+off, asked to drop, the last Conversation already tried).
+
+- **Shows:** whether the Reply Plan picks the aimed Curiosity at an easy
+  moment, whether the reply words it well and keeps the Pattern unnamed,
+  and whether Zeph leaves the story alone when it shouldn't ask. It
+  catches a Reply Plan or Reply prompt change that makes Zeph stop asking,
+  ask clumsily, name a Pattern, or push after a brush-off.
+- **Can't show:**
+  - Timing in a real Conversation. Each case is one Message at a moment
+    Claude chose as fitting or not. Whether Zeph picks good moments over a
+    long, messy Conversation isn't tested.
+  - What the User answers, or that the question leads to a true Pattern.
+    Nobody answers here. A model that plays the User is issue 26.
+  - The must-not-ask rules themselves. Whether an aimed Curiosity is
+    offered after a brush-off, a drop or a try yesterday is decided by
+    code and covered by tests; here code has already taken it away. These
+    cases show what the model does with what is left: the Agenda is still
+    shown after a brush-off or a try yesterday, and the reply must not go
+    back to the story on its own.
+  - That the Judge's rules are right. They were drafted by Claude for the
+    owner to correct, and "names a pattern" is a judgement call.
+  - A steady result. One Message, one run. Use Repeats before trusting a
+    change.
+
+### 4. The Whole-pipeline Eval
 
 It has its own Eval kind (`whole_pipeline`, in `evals/README.md`). A case is a
 made-up User with hidden true Pattern Types and a script of several
@@ -100,7 +157,9 @@ is not, and one true beside a single story of its look-alike.
   - A User who answers back. The texts are a script: they don't answer
     Zeph's questions, so an aimed Curiosity, a Thought Experiment or a
     shared Pattern never gets a real answer. The counter-test is met by a
-    scripted "it doesn't happen with…" story, not by Zeph asking.
+    scripted "it doesn't happen with…" story, not by Zeph asking. Whether
+    the aimed question is asked well, and an answer read right, is tested
+    apart: see "The Agenda cases" and "Unclear stories" above.
   - Sharing by Check-in, Prediction follow-ups, or anything over weeks: the
     made-up User has Check-ins off and a script covers about two weeks, so
     fading and the wait before a Check-in shares are never reached.
@@ -165,6 +224,17 @@ EVALS=whole_pipeline`, or `make eval CASES=ordinary-fortnight`; a plain
 → Whole pipeline; the seed is
 `src/companion/seed/evals/cases/whole_pipeline.yaml`, drafted by Claude for
 the owner to correct.
+
+## How to run the Agenda cases
+
+They are ordinary Understanding and Tagging cases, so run only them by key.
+Terminal: `make eval
+CASES=agenda-unclear-story-asked,agenda-missing-part-of-life-asked,agenda-counter-test-asked,agenda-thought-experiment-asked,agenda-two-explorations-top-one-asked,agenda-not-asked-while-struggling,agenda-not-asked-after-brush-off,agenda-not-asked-after-asked-to-drop,agenda-not-asked-two-conversations-in-a-row,unclear-story-settled-by-the-answer,unclear-story-answer-tells-nothing,unclear-story-question-brushed-off`.
+Dashboard: Admin → Evals → New run, pick those cases, read the estimate,
+Start run. An Understanding Message is about 4,500 tokens and a Tagging
+case about 8,000, so all twelve are a few cents. Cases are edited on Admin
+→ Evals → Cases → Understanding (Made-up User Memory → Suspected Patterns)
+and → Tagging (Unclear stories they already have).
 
 ## How to run the Tagging Eval
 

@@ -10,6 +10,7 @@ const result: TaggingResult = taggingCaseSampleResult.tagging ?? {
   kept: [],
   dropped: [],
   expected: [],
+  unclear: [],
 };
 
 describe("TaggingResultPanel", () => {
@@ -77,6 +78,7 @@ describe("TaggingResultPanel", () => {
             },
           ],
           dropped: [],
+          unclear: [],
         }}
       />,
     );
@@ -97,7 +99,13 @@ describe("TaggingResultPanel", () => {
     render(
       <TaggingResultPanel
         caseKey="case"
-        result={{ answered: false, expected: [], kept: [], dropped: [] }}
+        result={{
+          answered: false,
+          expected: [],
+          kept: [],
+          dropped: [],
+          unclear: [],
+        }}
       />,
     );
 
@@ -112,5 +120,59 @@ describe("TaggingResultPanel", () => {
       within(panel).getByText("Nothing to tag, so nothing may be kept."),
     ).toBeInTheDocument();
     expect(within(panel).getByText("Nothing was kept.")).toBeInTheDocument();
+  });
+
+  it("shows how each unclear story ended and fails when one ended wrong", () => {
+    const story = {
+      quote: "I said yes to Mei again",
+      pattern_types: ["CONF.AVOID.BELONG", "ACH.WORTH.PERF"],
+      direction: "for",
+      asked: true,
+      ended_clear_for: "CONF.AVOID.BELONG",
+      sign: "I4",
+      expected_clear_for: "CONF.AVOID.BELONG",
+      matched: true,
+    };
+    render(
+      <TaggingResultPanel
+        caseKey="case"
+        result={{
+          answered: true,
+          expected: [],
+          kept: [],
+          dropped: [],
+          unclear: [
+            story,
+            {
+              ...story,
+              quote: "I redid the slides twice",
+              asked: false,
+              ended_clear_for: null,
+              sign: null,
+              matched: false,
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByText("Failed · 1 unclear story wrong"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Unclear stories")).toBeInTheDocument();
+    expect(screen.getByText("“I said yes to Mei again”")).toBeInTheDocument();
+    expect(screen.getByText("Ended clear")).toBeInTheDocument();
+    expect(screen.getByText("CONF.AVOID.BELONG I4 · for")).toBeInTheDocument();
+    expect(screen.getByText("Stayed unclear")).toBeInTheDocument();
+    expect(
+      screen.getByText("CONF.AVOID.BELONG or ACH.WORTH.PERF · for · unclear"),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("Clear for CONF.AVOID.BELONG")).toHaveLength(2);
+  });
+
+  it("shows no unclear stories part when the User had none", () => {
+    render(<TaggingResultPanel caseKey="case" result={result} />);
+
+    expect(screen.queryByText("Unclear stories")).not.toBeInTheDocument();
   });
 });

@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from typing import Any, Protocol
 from uuid import UUID
 
+from companion.core.agenda import AgendaEntry
 from companion.core.evals.cases import EvalWebResult
 from companion.core.evals.models import (
     CaseHistoryRow,
@@ -280,6 +281,58 @@ class EvalCompanion(Protocol):
 
         Raises:
             EvalSetupError: If no User is connected.
+        """
+        ...
+
+    def turn_pattern_exploring_on(self) -> None:
+        """Turn Pattern noticing and exploring on for the made-up User.
+
+        An Admin switches each on for them, and they press "Got it" on the
+        Pattern noticing notice. Pattern sharing stays off.
+
+        Raises:
+            EvalSetupError: If no User is connected.
+        """
+        ...
+
+    def score_patterns(self) -> None:
+        """Score the made-up User's Patterns from their Observations.
+
+        The real scoring step runs alone, as it does after tagging, with the
+        Eval database's Platform Settings.
+
+        Raises:
+            EvalSetupError: If no User is connected, or User Memory doesn't
+                work for them.
+        """
+        ...
+
+    def keep_agenda(self, conversation_id: UUID) -> None:
+        """Keep the made-up User's Agenda as if a Conversation just ended.
+
+        The real Agenda step runs alone, as it does after scoring: it gives
+        each suspected Pattern an Exploration and writes the aimed
+        Curiosities.
+
+        Args:
+            conversation_id: The Conversation that just ended.
+
+        Raises:
+            EvalSetupError: If no User is connected, or User Memory doesn't
+                work for them.
+        """
+        ...
+
+    def read_agenda(self) -> list[AgendaEntry]:
+        """Read the made-up User's Agenda as the Reply Plan is given it.
+
+        Returns:
+            Their active Explorations with what each still needs to learn,
+            as for a User who isn't struggling.
+
+        Raises:
+            EvalSetupError: If no User is connected, or User Memory doesn't
+                work for them.
         """
         ...
 

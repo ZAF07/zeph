@@ -41,6 +41,41 @@
 #       result: didnt_help                   helped | didnt_help | mixed
 #       why: ...
 #       days_ago: 12                         when the Move was made
+#   patterns:                                Patterns Zeph suspects of them. With
+#                                            any, the person has Pattern noticing
+#                                            and Pattern exploring on. These are
+#                                            saved as real rows, then the real
+#                                            scoring and Agenda code run, so the
+#                                            Agenda and the aimed Curiosity are
+#                                            the ones code writes (issue 25).
+#     - pattern_type: CONF.AVOID.BELONG      must come out suspected, or the
+#                                            case is an Error
+#       observations:
+#         - quote: ...                       their own words
+#           sign: I2                         a sign of the Pattern Type
+#           direction: for                   for | against
+#           context: ...                     Zeph points at the story with this
+#           about: Mei, their sister
+#           days_ago: 5                      1 or more
+#           second_pattern_type: <ID>        makes it unclear (optional)
+#           thread: <Thread title>           optional
+#           setting: home                    home | work | social | online
+#           relationship: family             partner | family | friend |
+#                                            acquaintance | colleague | stranger
+#       tries:                               aimed Curiosities already asked
+#         - need: unclear                    unclear | missing_part | counter_test
+#           way: story_follow_up             story_follow_up | other_person |
+#                                            notice_this_week
+#           outcome: vague                   useful | vague | brushed_off |
+#                                            asked_to_drop
+#           days_ago: 5                      asked in that day's made-up
+#                                            Conversation; when that is the
+#                                            newest one, no new aimed Curiosity
+#                                            is written (never two in a row)
+#   thought_experiments: [{wording, pattern_type, other_pattern_type,
+#                          sensitivity}]     the only ones on the platform for
+#                                            this case; leave out to keep the
+#                                            seeded ones
 #
 # earlier: [{person: ...}, {zeph: ...}]   already in the open Conversation
 #
@@ -65,6 +100,13 @@
 #   raised: [<Thread title>]     it brings the Thread up
 #   not_raised: [<Thread title>] it doesn't
 #   curiosity_raised: true|false
+#   agenda_shown: true|false     it was shown the Agenda (needs `patterns`)
+#   aimed_raised: true|false     it brings up an aimed Curiosity, one the
+#                                Agenda code wrote; false: none of them
+#   aimed_need: unclear | missing_part | counter_test
+#   aimed_way: story_follow_up | other_person | thought_experiment |
+#              notice_this_week
+#   aimed_pattern_type: <ID>     which Exploration the one brought up is for
 #   asked_why: true|false        the reply is told to gently ask why
 #   knowledge: true|false        Knowledge documents are chosen
 #   woven_in: true|false         the reply weaves in the due Check-in;
@@ -110,6 +152,51 @@ rules:
     Zeph's last reply gently asks what's behind how they feel, once, warmly
     and in its own words, like a friend would. It doesn't fire off several
     questions or sound like an interview or a therapist.
+  never_names_a_pattern: >-
+    Zeph's last reply never names or describes a pattern, habit or tendency
+    of theirs, and never says it is exploring, testing or trying to work
+    something out about them. It doesn't say or paraphrase "softening
+    disagreement", "protecting belonging", "self-worth depends on
+    performance" or "saying yes to feel needed", doesn't put an if/then about
+    them into words (such as "when you disagree with someone close, you hold
+    back"), and uses no clinical or textbook words such as people-pleasing,
+    conflict avoidance, attachment, schema or perfectionism.
+  no_quote_back: >-
+    Zeph's last reply doesn't quote the person's earlier words back to them
+    as evidence, for example in quotation marks or as "you said ...".
+    Referring in its own words to something that happened (such as Mei's
+    move) is fine.
+  asks_what_followed_mei_move: >-
+    Zeph's last reply goes back, lightly and in its own words, to the time
+    Mei asked for help moving, and asks what happened next or what they were
+    hoping would or wouldn't happen. It is one easy question, not a list of
+    questions, and doesn't sound like an interview or a therapist.
+  asks_about_disagreeing_at_work: >-
+    Zeph's last reply asks, lightly and in its own words, about a recent time
+    at work when they didn't agree with someone they get on with, or what
+    they did then. It is one easy question, not a list of questions, and
+    doesn't sound like an interview or a therapist.
+  asks_for_a_different_time: >-
+    Zeph's last reply goes back, lightly and in its own words, to the meeting
+    where they agreed to Wen's timeline, and asks whether there was a time in
+    a similar spot when they did something different. It is one easy
+    question, not a list of questions.
+  puts_the_airport_what_if: >-
+    Zeph's last reply puts the made-up airport lift situation to them as a
+    what-if (a friend asks for a lift at 5am and would be fine with a no) and
+    asks what they would do. It keeps the situation's meaning, asks nothing
+    else, and doesn't say why it is asking.
+  one_question_at_most: >-
+    Zeph's last reply asks at most one question.
+  leaves_mei_move_alone: >-
+    Zeph's last reply doesn't go back to the time Mei asked for help moving,
+    doesn't ask why they said yes or what they were hoping for then, and
+    doesn't ask whether it would have gone differently with someone else.
+    Talking about Mei herself, or about today, is fine.
+  stays_with_dad_news: >-
+    Zeph's last reply stays with what is happening now: their dad in
+    hospital and how scared they are. It asks about nothing else, and brings
+    up no older story such as Mei's move.
   asks_about_presentation: >-
     Zeph's last reply asks how the presentation to the board went, naturally
     and warmly.
@@ -664,3 +751,291 @@ cases:
           wants_said: true
           read_formed: true
           read_said: true
+
+  # The Agenda (issue 25). Drafted by Claude to start; the owner corrects
+  # them. Each made-up User has suspected Patterns saved as real rows, and
+  # the real scoring and Agenda code then write the Agenda and the aimed
+  # Curiosity. See docs/pattern-evals/README.md for what these can and can't
+  # show.
+
+  # Open need: an unclear story. The aimed Curiosity goes back to Mei's move.
+  - id: agenda-unclear-story-asked
+    memory: &dana-unclear-mei
+      portrait: &dana-portrait >-
+        Dana is 31, a product designer in Singapore. She is close to her
+        younger sister and has a small circle of old friends.
+      patterns:
+        - pattern_type: CONF.AVOID.BELONG
+          observations:
+            - &mei-unclear
+              quote: Mei asked me to help her move again and I said yes straight away
+              sign: I2
+              direction: for
+              context: >-
+                Mei asked for help moving flat on their one free day; they
+                said yes at once.
+              about: Mei, their sister
+              days_ago: 5
+              second_pattern_type: APPR.GIVE.NEEDED
+              setting: home
+              relationship: family
+            - &jo-clear
+              quote: >-
+                I told Jo the trip dates were fine, then I was annoyed about
+                it the whole weekend
+              sign: I2
+              direction: for
+              context: >-
+                Jo picked dates for a trip that were bad for them; they
+                agreed anyway.
+              about: Jo, a close friend
+              days_ago: 9
+              setting: social
+              relationship: friend
+    messages:
+      - text: mei's coming over for dinner on sunday. need to figure out what to cook
+        expect:
+          struggling: false
+          agenda_shown: true
+          aimed_raised: true
+          aimed_need: unclear
+          aimed_way: story_follow_up
+          aimed_pattern_type: CONF.AVOID.BELONG
+          rules:
+            - asks_what_followed_mei_move
+            - never_names_a_pattern
+            - no_quote_back
+
+  # Open need: a part of life not seen yet. Home and friends are seen, work
+  # isn't, and no story is unclear.
+  - id: agenda-missing-part-of-life-asked
+    memory:
+      portrait: *dana-portrait
+      patterns:
+        - pattern_type: CONF.AVOID.BELONG
+          observations:
+            - &mei-clear
+              quote: >-
+                I said yes to Mei because she'd be cold with me for weeks if
+                I said no
+              sign: I4
+              direction: for
+              context: >-
+                Mei asked for help moving flat on their one free day; they
+                said yes at once.
+              about: Mei, their sister
+              days_ago: 5
+              setting: home
+              relationship: family
+            - *jo-clear
+    messages:
+      - text: work was fine today, nothing dramatic. just glad it's the weekend
+        expect:
+          struggling: false
+          agenda_shown: true
+          aimed_raised: true
+          aimed_need: missing_part
+          aimed_way: story_follow_up
+          rules:
+            - asks_about_disagreeing_at_work
+            - never_names_a_pattern
+            - no_quote_back
+
+  # Open need: a counter-test. Every part of life is seen, nothing is
+  # unclear and nothing counts against it yet.
+  - id: agenda-counter-test-asked
+    memory:
+      portrait: *dana-portrait
+      patterns:
+        - pattern_type: CONF.AVOID.BELONG
+          observations:
+            - *mei-clear
+            - *jo-clear
+            - quote: >-
+                I said the timeline looked okay in the meeting. It doesn't,
+                and I've been stewing since
+              sign: I2
+              direction: for
+              context: >-
+                Wen proposed a timeline they thought was too tight; they
+                agreed in the meeting.
+              about: Wen, a teammate
+              days_ago: 3
+              setting: work
+              relationship: colleague
+    messages:
+      - text: long week but a decent one. got a free evening for once
+        expect:
+          struggling: false
+          agenda_shown: true
+          aimed_raised: true
+          aimed_need: counter_test
+          aimed_way: story_follow_up
+          rules:
+            - asks_for_a_different_time
+            - never_names_a_pattern
+            - no_quote_back
+
+  # A Thought Experiment for a look-alike pair. Asking about someone else
+  # came back vague five days ago, so the Agenda moves on to the next way.
+  # The story about Jo is newer than that try, so the last Conversation
+  # wasn't the one that tried.
+  - id: agenda-thought-experiment-asked
+    memory:
+      portrait: *dana-portrait
+      patterns:
+        - pattern_type: CONF.AVOID.BELONG
+          observations:
+            - <<: *mei-unclear
+              days_ago: 9
+            - <<: *jo-clear
+              days_ago: 2
+          tries:
+            - need: unclear
+              way: other_person
+              outcome: vague
+              days_ago: 5
+      thought_experiments:
+        - wording: >-
+            A friend asks you for a lift to the airport at 5am. Say you knew
+            they'd be completely fine if you said no, no hard feelings at
+            all. Do you still say yes? What's going through your mind as you
+            decide?
+          pattern_type: CONF.AVOID.BELONG
+          other_pattern_type: APPR.GIVE.NEEDED
+          sensitivity: low
+    messages:
+      - text: bored on the train home. entertain me
+        expect:
+          struggling: false
+          agenda_shown: true
+          aimed_raised: true
+          aimed_need: unclear
+          aimed_way: thought_experiment
+          rules:
+            - puts_the_airport_what_if
+            - never_names_a_pattern
+
+  # Two Explorations at once. Softening disagreement scores higher, so it
+  # is first on the Agenda and the one reply may ask only about it.
+  - id: agenda-two-explorations-top-one-asked
+    memory:
+      portrait: *dana-portrait
+      patterns:
+        - pattern_type: CONF.AVOID.BELONG
+          observations:
+            - *mei-clear
+            - *jo-clear
+        - pattern_type: ACH.WORTH.PERF
+          observations:
+            - quote: I botched one slide and I've been calling myself useless all day
+              sign: I1
+              direction: for
+              context: One slide in a client pitch had a wrong number on it.
+              about: a client pitch
+              days_ago: 4
+              setting: work
+            - quote: >-
+                Everyone said the redesign was great but honestly it was the
+                bare minimum
+              sign: I2
+              direction: for
+              context: The team praised a redesign they had led.
+              about: the team's praise for their redesign
+              days_ago: 7
+              setting: work
+    messages:
+      - text: home now. kind of a nothing day, which is nice
+        expect:
+          struggling: false
+          agenda_shown: true
+          aimed_raised: true
+          aimed_pattern_type: CONF.AVOID.BELONG
+          rules:
+            - one_question_at_most
+            - never_names_a_pattern
+
+  # Must not ask: they are struggling. Code hides the Agenda and every
+  # Curiosity then, and the reply must stay with them.
+  - id: agenda-not-asked-while-struggling
+    memory: *dana-unclear-mei
+    messages:
+      - text: >-
+          I just got off the phone with mum. dad's in hospital, they think
+          it's his heart. I can't stop shaking
+        expect:
+          struggling: true
+          agenda_shown: false
+          aimed_raised: false
+          curiosity_raised: false
+          rules: [stays_with_dad_news]
+
+  # Must not ask: they brushed the last try off two days ago, so the next
+  # one waits. The Agenda is still shown, with that try on it.
+  - id: agenda-not-asked-after-brush-off
+    memory:
+      portrait: *dana-portrait
+      patterns:
+        - pattern_type: CONF.AVOID.BELONG
+          observations:
+            - *mei-unclear
+            - <<: *jo-clear
+              days_ago: 1
+          tries:
+            - need: unclear
+              way: story_follow_up
+              outcome: brushed_off
+              days_ago: 2
+    messages:
+      - text: mei sent me the dumbest meme this morning, made my day
+        expect:
+          struggling: false
+          agenda_shown: true
+          aimed_raised: false
+          rules: [leaves_mei_move_alone, never_names_a_pattern]
+
+  # Must not ask: they asked Zeph to drop it, so the real Agenda code rests
+  # the Exploration and the Agenda is empty.
+  - id: agenda-not-asked-after-asked-to-drop
+    memory:
+      portrait: *dana-portrait
+      patterns:
+        - pattern_type: CONF.AVOID.BELONG
+          observations:
+            - *mei-unclear
+            - *jo-clear
+          tries:
+            - need: unclear
+              way: story_follow_up
+              outcome: asked_to_drop
+              days_ago: 2
+    messages:
+      - text: mei sent me the dumbest meme this morning, made my day
+        expect:
+          struggling: false
+          agenda_shown: false
+          aimed_raised: false
+          rules: [leaves_mei_move_alone, never_names_a_pattern]
+
+  # Must not ask: the last Conversation already tried (yesterday, vague), so
+  # no aimed Curiosity is written. Never two Conversations in a row.
+  - id: agenda-not-asked-two-conversations-in-a-row
+    memory:
+      portrait: *dana-portrait
+      patterns:
+        - pattern_type: CONF.AVOID.BELONG
+          observations:
+            - *mei-unclear
+            - *jo-clear
+          tries:
+            - need: unclear
+              way: story_follow_up
+              outcome: vague
+              days_ago: 1
+    messages:
+      - text: home early for once. might actually cook something
+        expect:
+          struggling: false
+          agenda_shown: true
+          aimed_raised: false
+          rules: [leaves_mei_move_alone, never_names_a_pattern]

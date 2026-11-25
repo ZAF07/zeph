@@ -26,6 +26,18 @@
 #                                      the Observation's tags fit one of its
 #                                      Pattern Type's `anyone_would_when`, for
 #                                      or against
+#
+# unclear: unclear Observations the made-up User already has, from earlier
+# Conversations (issue 25). One with `asked` on was asked about in this
+# Conversation by an aimed Curiosity, so the real tagging step is shown it
+# and may settle it. Each must end as the case says.
+#   - pattern_type: <Pattern Type ID>  the first of its two
+#     second_pattern_type: <ID>        the look-alike
+#     quote, sign, direction, context, about, days_ago, thread, setting,
+#     relationship                     as in understanding.yaml's patterns
+#     asked: true                      default true
+#     ends_clear_for: <ID>             one of its two; leave out when it must
+#                                      stay unclear
 
 now: 2026-11-24T10:00:00
 
@@ -1095,3 +1107,87 @@ cases:
     observations:
       - pattern_type: REL.MOOD.FIX
         direction: against
+
+  # Unclear stories an aimed Curiosity asked about (issue 25). Drafted by
+  # Claude to start; the owner corrects them.
+
+  # The answer settles it: it was about Mei going cold, not about being
+  # needed. The story not asked about is never shown, so it stays unclear.
+  - id: unclear-story-settled-by-the-answer
+    threads: &mei-move-thread
+      - title: Helping Mei move
+        story: Their sister Mei keeps asking for help moving flats.
+        people: [Mei]
+    unclear:
+      - &mei-unclear-story
+        pattern_type: CONF.AVOID.BELONG
+        second_pattern_type: APPR.GIVE.NEEDED
+        quote: Mei asked me to help her move again and I said yes straight away
+        sign: I2
+        direction: for
+        context: >-
+          Mei asked for help moving flat on their one free day; they said yes
+          at once.
+        about: Mei, their sister
+        days_ago: 6
+        thread: Helping Mei move
+        setting: home
+        relationship: family
+        ends_clear_for: CONF.AVOID.BELONG
+      - pattern_type: ACH.WORTH.PERF
+        second_pattern_type: CONF.AVOID.BELONG
+        quote: I rewrote the whole deck after Priya said one chart was unclear
+        sign: I3
+        direction: for
+        context: A team lead said one chart in their deck was unclear.
+        about: Priya, their team lead
+        days_ago: 10
+        setting: work
+        relationship: colleague
+        asked: false
+    messages:
+      - who: person
+        text: Quiet morning. Just having coffee before work.
+      - who: zeph
+        text: >-
+          Nice. I was thinking about when Mei asked you to help her move.
+          What were you most hoping would or wouldn't happen when you said
+          yes?
+      - who: person
+        text: >-
+          Honestly I just didn't want her to go cold on me. If I'd said no
+          she'd have been off with me for weeks, and I couldn't face that. I
+          didn't even want to help, I was dreading the whole day.
+    observations:
+      - pattern_type: CONF.AVOID.BELONG
+        direction: for
+
+  # The answer says nothing either way, so the story stays unclear.
+  - id: unclear-story-answer-tells-nothing
+    threads: *mei-move-thread
+    unclear:
+      - <<: *mei-unclear-story
+        ends_clear_for:
+    messages:
+      - who: zeph
+        text: >-
+          I was thinking about when Mei asked you to help her move. What
+          happened after you said yes?
+      - who: person
+        text: >-
+          Not much to tell. We got it done by three and had noodles after.
+          Her new place is nice, lots of light.
+
+  # They brush the question off, so the story stays unclear.
+  - id: unclear-story-question-brushed-off
+    threads: *mei-move-thread
+    unclear:
+      - <<: *mei-unclear-story
+        ends_clear_for:
+    messages:
+      - who: zeph
+        text: >-
+          I was thinking about when Mei asked you to help her move. What
+          were you hoping for when you said yes?
+      - who: person
+        text: ugh can we not do the Mei thing right now. Did you see the match last night?

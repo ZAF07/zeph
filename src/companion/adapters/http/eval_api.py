@@ -221,13 +221,31 @@ class ExpectedObservationResponse(BaseModel):
     matched: bool
 
 
+class UnclearStoryResponse(BaseModel):
+    """An unclear story a Tagging case's User already had, and how it ended."""
+
+    quote: str
+    pattern_types: list[str]
+    direction: str
+    asked: bool
+    ended_clear_for: str | None
+    sign: str | None
+    expected_clear_for: str | None
+    matched: bool
+
+
 class TaggingResultResponse(BaseModel):
-    """What a Tagging case's tagging step kept and dropped, and what it expected."""
+    """What a Tagging case's tagging step kept and dropped, and what it expected.
+
+    `unclear` is empty for a result stored before cases could have unclear
+    stories.
+    """
 
     answered: bool
     kept: list[KeptObservationResponse]
     dropped: list[DroppedObservationResponse]
     expected: list[ExpectedObservationResponse]
+    unclear: list[UnclearStoryResponse] = []
 
 
 class ReadyPatternResponse(BaseModel):

@@ -3,8 +3,10 @@ import { TaggingResultRow } from "@/components/TaggingResultRow";
 import type { TaggingResult } from "@/lib/api-client";
 import {
   describeDropped,
+  describeEnding,
   describeExpected,
   describeKept,
+  describeUnclearNow,
 } from "@/lib/tagging-results";
 
 const matchPill = "bg-cream text-ink";
@@ -15,10 +17,12 @@ const droppedPill = "border border-line-strong text-soft";
  * What a Tagging case's tagging step did: each Observation expected and
  * whether one like it was kept, each one code kept with its quote, Pattern
  * Type and sign, who it is about, its Life Thread and context line, and
- * each one code dropped with why.
+ * each one code dropped with why. When the made-up User already had
+ * unclear stories, a part after Expected shows how each one ended.
  *
- * @param props - `result` is what the case kept, dropped and expected.
- * @returns The three parts, or a note when the answer couldn't be read.
+ * @param props - `result` is what the case kept, dropped and expected, and
+ *   how its unclear stories ended.
+ * @returns The parts, or a note when the answer couldn't be read.
  */
 export function TaggingObservations({ result }: { result: TaggingResult }) {
   return (
@@ -45,6 +49,33 @@ export function TaggingObservations({ result }: { result: TaggingResult }) {
           />
         ))}
       </TaggingResultPart>
+      {result.unclear.length > 0 ? (
+        <TaggingResultPart label="Unclear stories" empty="">
+          {result.unclear.map((story, index) => (
+            <TaggingResultRow
+              key={index}
+              first={index === 0}
+              title={`“${story.quote}”`}
+              pill={{
+                label: story.ended_clear_for ? "Ended clear" : "Stayed unclear",
+                pill: story.matched ? matchPill : missPill,
+              }}
+              facts={[
+                { label: "Was", value: story.pattern_types.join(" or ") },
+                {
+                  label: "Asked about in this Conversation",
+                  value: story.asked ? "Yes" : "No",
+                },
+                { label: "Now", value: describeUnclearNow(story) },
+                {
+                  label: "Expected",
+                  value: describeEnding(story.expected_clear_for),
+                },
+              ]}
+            />
+          ))}
+        </TaggingResultPart>
+      ) : null}
       <TaggingResultPart label="Kept by code" empty="Nothing was kept.">
         {result.kept.map((kept, index) => (
           <TaggingResultRow

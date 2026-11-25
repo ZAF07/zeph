@@ -15,6 +15,7 @@ from companion.core.evals.made_up_memory import (
     give_made_up_memory,
     open_conversation_with,
 )
+from companion.core.evals.made_up_patterns import MadeUpAgenda, give_made_up_patterns
 from companion.core.evals.models import (
     CaseCheckResult,
     CaseOutcome,
@@ -134,6 +135,7 @@ def describe_what_was_done(
     reply_plan: ReplyPlan,
     reply_plan_input: str,
     calls: Sequence[ModelCall],
+    agenda: MadeUpAgenda,
 ) -> ObservedUnderstanding:
     """Describe what a saved Understanding, Reply Plan and the reply did.
 
@@ -142,6 +144,7 @@ def describe_what_was_done(
         reply_plan: The Message's saved Reply Plan.
         reply_plan_input: What the Reply Plan model was given.
         calls: The Message's model calls.
+        agenda: The Agenda the case started with.
 
     Returns:
         What they did.
@@ -172,6 +175,12 @@ def describe_what_was_done(
         wants_said=bool(understanding_form.wants.said.strip()),
         read_formed=read_formed,
         read_said=read_formed and form.say_read,
+        agenda_shown=any(need in reply_plan_input for need in agenda.open_needs),
+        aimed_raised=[
+            agenda.aimed[chosen.curiosity_id]
+            for chosen in form.curiosities
+            if chosen.curiosity_id in agenda.aimed
+        ],
     )
 
 
@@ -286,6 +295,7 @@ def check_message(
     transcript: str,
     judge_chat_model: ChatModel,
     judge: JudgeSettings,
+    agenda: MadeUpAgenda,
 ) -> CheckedMessage:
     """Check one Message's Understanding, Recall and Reply Plan, and judge the reply.
 
@@ -300,6 +310,7 @@ def check_message(
         transcript: The Conversation so far, for the Judge.
         judge_chat_model: The model that judges.
         judge: The Judge's model, thinking and prompts.
+        agenda: The Agenda the case started with.
 
     Returns:
         Its checks; a Message with no logged Understanding call fails.
@@ -315,7 +326,9 @@ def check_message(
     reply_plan_input = history_text(reply_plan_call)
     results = check_steps(
         message.expect,
-        describe_what_was_done(understanding, reply_plan, reply_plan_input, calls),
+        describe_what_was_done(
+            understanding, reply_plan, reply_plan_input, calls, agenda
+        ),
     )
     results.append(full_content_check(calls))
     rules = {rule: case.rules[rule] for rule in message.expect.rules}
@@ -464,6 +477,7 @@ def check_understanding_case(
         companion.now(),
         open_conversation_id,
     )
+    agenda = give_made_up_patterns(companion, user_id, case.memory, companion.now())
     seen_trace_ids: set[UUID] = set()
     calls_in_new_traces(repositories, user_id, seen_trace_ids)
     transcript_lines = [
@@ -489,6 +503,7 @@ def check_understanding_case(
                 "\n".join(transcript_lines),
                 companion.judge_chat_model,
                 judge,
+                agenda,
             )
         )
 
