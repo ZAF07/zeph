@@ -17,4 +17,5 @@ A migration now removes a stored prompt only where it still equals the seed text
 - Where an Admin edited a prompt, the new seed text does not load. The step may then read or write something its prompt doesn't cover, until the owner merges the new text by hand. The warning is the only sign, printed once on the deploy that runs the migration.
 - A stored prompt that differs from the previous seed for any other reason (an older seed never reloaded) is also kept.
 - The seven older migrations stay as they are; they have already run on production.
+- The same rule holds for a seed Eval Case that changes (25 Nov 2026): a migration reloads the stored case only where no Admin edited or archived it, told by the case's own edited and archived marks, not a hash.
 - How to write such a migration is in `src/companion/adapters/postgres/migrations/README.md`.

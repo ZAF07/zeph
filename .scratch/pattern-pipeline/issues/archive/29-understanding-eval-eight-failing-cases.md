@@ -1,6 +1,6 @@
 # 29 — Find out why 8 Understanding Eval cases fail
 
-Status: ready-for-agent
+Status: completed
 Track: shared
 Blocked by: none
 
@@ -37,11 +37,11 @@ Use a worktree for the old commit; don't switch branches in the main folder.
 
 ## Acceptance criteria
 
-- [ ] Each of the 8 cases was run twice before issue 01 and twice on main now, with the Eval Run IDs and costs in Comments
-- [ ] Each case is listed as got worse, always failed or flaky, with the reason
-- [ ] `guess-checked-gently` has an expectation it can meet and passed a run
-- [ ] Every real regression is fixed here or has its own issue
-- [ ] The owner was shown the estimate before each run
+- [x] Each of the 8 cases was run twice before issue 01 and twice on main now, with the Eval Run IDs and costs in Comments
+- [x] Each case is listed as got worse, always failed or flaky, with the reason
+- [x] `guess-checked-gently` has an expectation it can meet and passed a run
+- [x] Every real regression is fixed here or has its own issue
+- [x] The owner was shown the estimate before each run
 
 ## Comments
 
@@ -132,3 +132,8 @@ A seed case loads only where its key isn't stored, so editing the seed file alon
 - A reloaded case moves to the end of the Understanding list on the Dashboard.
 - Prod is at migration 0078, so 0102 runs there on the next deploy along with the rest.
 - `20-findings-for-the-owner.md` was not edited (other agents are working in it); its two findings for this issue are now answered here.
+
+## Completion
+
+- Completed: 2026-11-25
+- Commit: <filled in after the merge>
