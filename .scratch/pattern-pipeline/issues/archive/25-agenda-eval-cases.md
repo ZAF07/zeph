@@ -166,4 +166,11 @@ Run `1641c640`, 12 cases once: 9 passed, 3 failed. 108,180 tokens in, 22,240 out
 ## Completion
 
 - Completed: 2026-11-25
-- Commit: <filled in after the merge>
+- Commit: `12e442f1`, the merge of `pattern-25-agenda-eval-cases` into main: "Merge pattern-25-agenda-eval-cases: Eval cases for the Agenda (…)". The branch's commits:
+  - `d307ecc9` Pattern pipeline 25: Agenda Eval cases (made-up suspected Patterns whose Agenda and aimed Curiosity the real code writes; …)
+  - `19239747` Pattern pipeline 25: the seed setup test no longer depends on the order two aimed Curiosities are offered in
+  - `5313a2e7` Pattern pipeline 25: the struggling case no longer reads as a crisis to the Safeguard
+  - `920c7766` Pattern pipeline 25: findings from the first real run of the Agenda cases, in issue 20, issue 26 and the guide
+  - `85321868` Pattern pipeline 25: review fixes (an aim check fails when another aimed Curiosity is brought up too; made-up replies once per Conversation; old Tagging notes unchanged)
+  - `72469237` Issue 25 done: the Agenda Eval cases archived with evidence
+  - `78fe4eb0` Issue 25: the findings are kept in the archived issue; the findings file is left as main has it
