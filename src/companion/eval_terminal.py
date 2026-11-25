@@ -17,7 +17,12 @@ from companion.adapters.postgres.eval_repositories import (
 from companion.adapters.postgres.repositories import build_postgres_repositories
 from companion.config import load_settings
 from companion.core.errors import InvalidError
-from companion.core.evals.models import EvalName, EvalRunState, StartedFrom
+from companion.core.evals.models import (
+    EvalName,
+    EvalRunState,
+    StartedFrom,
+    evals_run_by_default,
+)
 from companion.core.evals.runs import EvalRunService
 from companion.core.evals.setting_overrides import SettingOverrideService
 from companion.core.moves import MoveService
@@ -34,7 +39,8 @@ def read_evals(names: str) -> list[EvalName]:
     """Read the Evals asked for on the command line.
 
     Args:
-        names: Comma-separated Eval names; "" for all nine.
+        names: Comma-separated Eval names; "" for every Eval that runs
+            without being named.
 
     Returns:
         The Evals.
@@ -43,7 +49,7 @@ def read_evals(names: str) -> list[EvalName]:
         argparse.ArgumentTypeError: If a name isn't an Eval.
     """
     if not names.strip():
-        return list(EvalName)
+        return evals_run_by_default()
     try:
         return [EvalName(name.strip()) for name in names.split(",") if name.strip()]
     except ValueError as error:
@@ -134,7 +140,9 @@ def build_eval_run_service(engine: Engine, clock: Clock) -> EvalRunService:
 def main() -> None:
     """Run `make eval`: queue a terminal run on this stack and watch it.
 
-    Runs every Eval unless `--evals` or `--cases` picks some.
+    Runs every Eval unless `--evals` or `--cases` picks some. The
+    Whole-pipeline Eval costs far more than the others, so it runs only when
+    named.
 
     Exits 0 when every case passed, 1 on any Fail or Error or when the run
     didn't finish, and 2 when the run can't be started.
@@ -153,7 +161,7 @@ def main() -> None:
         help="comma-separated case keys, e.g. reminded-of-sister",
     )
     arguments = parser.parse_args()
-    evals = arguments.evals or ([] if arguments.cases else list(EvalName))
+    evals = arguments.evals or ([] if arguments.cases else evals_run_by_default())
     settings = load_settings()
     engine = build_database_engine(settings)
     service = build_eval_run_service(engine, build_clock(settings))

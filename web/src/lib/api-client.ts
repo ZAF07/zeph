@@ -1039,7 +1039,7 @@ export type Sticker = {
   added_at: string;
 };
 
-/** One of the nine Evals. */
+/** One of the ten Evals. */
 export type EvalName =
   | "safeguard"
   | "persona"
@@ -1049,7 +1049,8 @@ export type EvalName =
   | "understanding"
   | "move_outcome"
   | "day_summary"
-  | "tagging";
+  | "tagging"
+  | "whole_pipeline";
 
 /** An Eval and the cases a new run of it would run. */
 export type EvalSummary = { eval: EvalName; case_keys: string[] };
@@ -1250,6 +1251,7 @@ export type CaseResult = {
   finished_at: string;
   day_summary?: DaySummaryResult | null;
   tagging?: TaggingResult | null;
+  whole_pipeline?: WholePipelineResult | null;
 };
 
 /** One question of a Day Summary case, answered from the Summary and marked. */
@@ -1305,6 +1307,31 @@ export type TaggingResult = {
   kept: KeptObservation[];
   dropped: DroppedObservation[];
   expected: ExpectedObservation[];
+};
+
+/** A Pattern that became ready or was shared in a Whole-pipeline case. */
+export type ReadyPattern = {
+  pattern_type: string;
+  name: string;
+  is_true: boolean;
+  shared: boolean;
+  state: string | null;
+};
+
+/** A true Pattern a Whole-pipeline case never made ready, and where it stopped. */
+export type MissedPattern = {
+  pattern_type: string;
+  name: string;
+  state: string | null;
+  blocked_by: string | null;
+};
+
+/** Which Patterns a Whole-pipeline case made ready, against the true ones. */
+export type WholePipelineResult = {
+  patterns: ReadyPattern[];
+  missed: MissedPattern[];
+  true_count: number;
+  conversations: number;
 };
 
 /** How one Variant's finished cases went, added up. */

@@ -7,6 +7,7 @@ from typing import Any
 
 from companion.core.evals.cases import EvalWebResult
 from companion.core.evals.models import ModelTokens
+from companion.core.evals.ports import EvalSetupError
 from companion.core.incoming_messages import MESSAGE_WAIT_PREFIX
 from companion.core.models import (
     AccountIdentity,
@@ -258,18 +259,37 @@ class InlineUserWorkQueue:
         del self._waiting[key]
 
 
-class IdleScheduler:
-    """Scheduler for Evals: never ticks, so no Check-in runs on the Eval database."""
+class ManualScheduler:
+    """Scheduler for Evals: never ticks on its own, so no Check-in runs unasked.
+
+    An Eval that needs the scheduled work, e.g. to end a quiet Conversation,
+    runs one tick by hand.
+    """
+
+    def __init__(self) -> None:
+        """Start with no tick to run."""
+        self._tick: Callable[[], None] | None = None
 
     def start(self, tick: Callable[[], None]) -> None:
-        """Ignore the scheduled work.
+        """Keep the scheduled work, without running it.
 
         Args:
             tick: The work a real scheduler would run.
         """
+        self._tick = tick
 
     def stop(self) -> None:
         """Do nothing."""
+
+    def run_tick(self) -> None:
+        """Run the scheduled work once, as the real scheduler does every so often.
+
+        Raises:
+            EvalSetupError: If the app hasn't started the scheduler.
+        """
+        if self._tick is None:
+            raise EvalSetupError("The app has not started the scheduler")
+        self._tick()
 
 
 class RunningClock:

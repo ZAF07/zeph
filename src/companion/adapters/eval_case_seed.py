@@ -18,6 +18,7 @@ CASE_FILES = {
     EvalName.MOVE_OUTCOME: "move_outcome.yaml",
     EvalName.DAY_SUMMARY: "day_summary.yaml",
     EvalName.TAGGING: "tagging.yaml",
+    EvalName.WHOLE_PIPELINE: "whole_pipeline.yaml",
 }
 
 
@@ -202,10 +203,11 @@ def move_outcome_cases(content: dict[str, Any]) -> list[EvalCase]:
     return cases
 
 
-def tagging_cases(content: dict[str, Any]) -> list[EvalCase]:
-    """Read the Tagging file into cases, each with its time.
+def timed_cases(name: EvalName, content: dict[str, Any]) -> list[EvalCase]:
+    """Read a Tagging or Whole-pipeline file into cases, each with its time.
 
     Args:
+        name: The Eval.
         content: `now` and `cases`.
 
     Returns:
@@ -218,7 +220,7 @@ def tagging_cases(content: dict[str, Any]) -> list[EvalCase]:
         cases.append(
             EvalCase(
                 key=entry["id"],
-                eval=EvalName.TAGGING,
+                eval=name,
                 content={
                     **without_id(entry),
                     "now": now.isoformat() if isinstance(now, datetime) else now,
@@ -252,8 +254,8 @@ def read_eval_case_file(
         cases = understanding_cases(content)
     elif name == EvalName.MOVE_OUTCOME:
         cases = move_outcome_cases(content)
-    elif name == EvalName.TAGGING:
-        cases = tagging_cases(content)
+    elif name in (EvalName.TAGGING, EvalName.WHOLE_PIPELINE):
+        cases = timed_cases(name, content)
     elif name == EvalName.SETTINGS:
         cases = [
             EvalCase(

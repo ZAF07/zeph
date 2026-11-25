@@ -131,6 +131,14 @@ VALID_CONTENT: dict[EvalName, dict[str, Any]] = {
             }
         ],
     },
+    EvalName.WHOLE_PIPELINE: {
+        "now": "2026-11-02T19:30:00",
+        "true_pattern_types": ["CONF.AVOID.BELONG"],
+        "conversations": [
+            {"days_later": 0, "messages": ["I said yes to Mei again, it's fine."]},
+            {"days_later": 2, "messages": ["With Sam I say what I think."]},
+        ],
+    },
 }
 
 
@@ -143,6 +151,7 @@ EDITS: dict[EvalName, dict[str, Any]] = {
     EvalName.UNDERSTANDING: {"now": "2026-11-14T09:00:00"},
     EvalName.MOVE_OUTCOME: {"now": "2026-11-15T09:00:00"},
     EvalName.TAGGING: {"observations": []},
+    EvalName.WHOLE_PIPELINE: {"true_pattern_types": []},
     EvalName.DAY_SUMMARY: {
         "questions": [
             {

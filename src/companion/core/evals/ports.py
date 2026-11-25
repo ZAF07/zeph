@@ -272,6 +272,31 @@ class EvalCompanion(Protocol):
         """
         ...
 
+    def turn_pattern_sharing_on(self) -> None:
+        """Turn Pattern noticing, exploring and sharing on for the made-up User.
+
+        An Admin switches each on for them, and they press "Got it" on the
+        Pattern noticing notice, so the whole Pattern pipeline runs for them.
+
+        Raises:
+            EvalSetupError: If no User is connected.
+        """
+        ...
+
+    def end_conversation(self) -> None:
+        """Let the made-up User's Conversation go quiet and run the scheduled work.
+
+        The clock moves on by the Conversation quiet gap, then the work the
+        scheduler runs on every tick runs once, as in the live app: the
+        Conversation ends and every Conversation-end step runs on it, with
+        the Eval database's Platform Settings.
+
+        Raises:
+            EvalSetupError: If no User is connected, they have no
+                Conversation, or it wasn't ended and processed.
+        """
+        ...
+
     def tag_observations(
         self, conversation_id: UUID, touched: Sequence[LifeThread]
     ) -> PlannedObservations | None:

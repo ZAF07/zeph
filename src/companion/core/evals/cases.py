@@ -1450,3 +1450,66 @@ def read_tagging_case(key: str, content: dict[str, Any]) -> TaggingCase:
             {"messages": "Add at least one message from the User."},
         )
     return case
+
+
+@dataclass(frozen=True)
+class PipelineConversation:
+    """One scripted Conversation of a Whole-pipeline case.
+
+    Attributes:
+        days_later: How many days after the Conversation before it starts;
+            for the first one, after the case's start.
+        messages: What the made-up User sends, in order. Zeph's replies are
+            the real ones.
+    """
+
+    days_later: int
+    messages: list[str]
+
+
+@dataclass(frozen=True)
+class WholePipelineCase:
+    """A made-up User with hidden true Patterns and their scripted Conversations.
+
+    Attributes:
+        id: The case's key.
+        now: When the made-up User's story starts, in UTC.
+        true_pattern_types: The IDs of the Pattern Types that are true of
+            them; none means no Pattern may become ready.
+        conversations: Their Conversations, in order.
+    """
+
+    id: str
+    now: datetime
+    true_pattern_types: list[str]
+    conversations: list[PipelineConversation]
+
+
+def read_whole_pipeline_case(key: str, content: dict[str, Any]) -> WholePipelineCase:
+    """Read a Whole-pipeline case.
+
+    Args:
+        key: The case's key.
+        content: `now`, `true_pattern_types` (Pattern Type IDs) and
+            `conversations` (each `{days_later, messages}`, `messages` being
+            the User's texts).
+
+    Returns:
+        The case, each true Pattern Type once.
+    """
+    return WholePipelineCase(
+        id=key,
+        now=to_utc(content["now"]),
+        true_pattern_types=list(
+            dict.fromkeys(
+                name.strip() for name in content.get("true_pattern_types") or []
+            )
+        ),
+        conversations=[
+            PipelineConversation(
+                days_later=entry.get("days_later") or 0,
+                messages=list(entry["messages"]),
+            )
+            for entry in content["conversations"]
+        ],
+    )
